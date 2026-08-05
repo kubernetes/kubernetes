@@ -21,7 +21,6 @@ import (
 
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 
-	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -36,14 +35,14 @@ import (
 
 // podGroupStrategy implements behavior for PodGroup objects.
 type podGroupStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // NewStrategy is the default logic that applies when creating and updating PodGroup objects.
 func NewStrategy() *podGroupStrategy {
 	return &podGroupStrategy{
-		legacyscheme.Scheme,
+		rest.DeclarativeValidation{Scheme: legacyscheme.Scheme},
 		names.SimpleNameGenerator,
 	}
 }
@@ -56,7 +55,10 @@ func (*podGroupStrategy) NamespaceScoped() bool {
 // should not be modified by the user. For a new PodGroup that is the status.
 func (*podGroupStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
-		"scheduling.k8s.io/v1alpha2": fieldpath.NewSet(
+		"scheduling.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+		"scheduling.k8s.io/v1alpha3": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
 	}
@@ -73,12 +75,18 @@ func (*podGroupStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 
 func (*podGroupStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	podGroup := obj.(*scheduling.PodGroup)
-	allErrs := validation.ValidatePodGroup(podGroup)
-	opts := []string{}
-	if schedulingConstraintsInUse(nil) {
-		opts = append(opts, string(features.TopologyAwareWorkloadScheduling))
-	}
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, nil, allErrs, operation.Create, rest.WithDeclarativeEnforcement(), rest.WithOptions(opts))
+	return validation.ValidatePodGroup(podGroup)
+}
+
+// DeclarativeValidationConfig declares the options referenced by this type's tags,
+// mapped to whether each is enabled.
+func (*podGroupStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	return rest.DeclarativeValidationConfig{Options: map[string]bool{
+		string(features.TopologyAwareWorkloadScheduling): utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling),
+		string(features.DRAWorkloadResourceClaims):       utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
+		string(features.PodGroupPreemptionPolicy):        utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy),
+		string(features.CompositePodGroup):               utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup),
+	}}
 }
 
 func (*podGroupStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
@@ -87,7 +95,7 @@ func (*podGroupStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Objec
 
 func (*podGroupStrategy) Canonicalize(obj runtime.Object) {}
 
-func (*podGroupStrategy) AllowCreateOnUpdate() bool {
+func (*podGroupStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -101,20 +109,15 @@ func (*podGroupStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 func (*podGroupStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newPodGroup := obj.(*scheduling.PodGroup)
 	oldPodGroup := old.(*scheduling.PodGroup)
-	allErrs := validation.ValidatePodGroupUpdate(newPodGroup, oldPodGroup)
-	opts := []string{}
-	if schedulingConstraintsInUse(oldPodGroup) {
-		opts = append(opts, string(features.TopologyAwareWorkloadScheduling))
-	}
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newPodGroup, oldPodGroup, allErrs, operation.Update, rest.WithDeclarativeEnforcement(), rest.WithOptions(opts))
+	return validation.ValidatePodGroupUpdate(newPodGroup, oldPodGroup)
 }
 
 func (*podGroupStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
 }
 
-func (*podGroupStrategy) AllowUnconditionalUpdate() bool {
-	return true
+func (*podGroupStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+	return false
 }
 
 type podGroupStatusStrategy struct {
@@ -130,7 +133,11 @@ func NewStatusStrategy(podGroupStrategy *podGroupStrategy) *podGroupStatusStrate
 // should not be modified by the user. For a status update that is the spec.
 func (*podGroupStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
-		"scheduling.k8s.io/v1alpha2": fieldpath.NewSet(
+		"scheduling.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("metadata"),
+			fieldpath.MakePathOrDie("spec"),
+		),
+		"scheduling.k8s.io/v1alpha3": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("metadata"),
 			fieldpath.MakePathOrDie("spec"),
 		),
@@ -144,13 +151,13 @@ func (*podGroupStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old ru
 	oldPodGroup := old.(*scheduling.PodGroup)
 	newPodGroup.Spec = oldPodGroup.Spec
 	metav1.ResetObjectMetaForStatus(&newPodGroup.ObjectMeta, &oldPodGroup.ObjectMeta)
+	dropDisabledPodGroupStatusFields(newPodGroup, oldPodGroup)
 }
 
 func (r *podGroupStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newPodGroup := obj.(*scheduling.PodGroup)
 	oldPodGroup := old.(*scheduling.PodGroup)
-	errs := validation.ValidatePodGroupStatusUpdate(newPodGroup, oldPodGroup)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newPodGroup, oldPodGroup, errs, operation.Update, rest.WithDeclarativeEnforcement())
+	return validation.ValidatePodGroupStatusUpdate(newPodGroup, oldPodGroup)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -159,21 +166,89 @@ func (*podGroupStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old ru
 }
 
 // dropDisabledPodGroupFields removes fields which are covered by a feature gate.
-func dropDisabledPodGroupFields(newPodGroup, oldPodGroup *scheduling.PodGroup) {
-	dropDisabledSchedulingConstraintsFields(newPodGroup, oldPodGroup)
+func dropDisabledPodGroupFields(podGroup, oldPodGroup *scheduling.PodGroup) {
+	var podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec
+	if podGroup != nil {
+		podGroupSpec = &podGroup.Spec
+	}
+	if oldPodGroup != nil {
+		oldPodGroupSpec = &oldPodGroup.Spec
+	}
+	dropDisabledPodGroupSpecFields(podGroupSpec, oldPodGroupSpec)
+}
+
+func dropDisabledPodGroupSpecFields(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
+	dropDisabledSchedulingConstraintsFields(podGroupSpec, oldPodGroupSpec)
+	dropDisabledDRAWorkloadResourceClaimsFields(podGroupSpec, oldPodGroupSpec)
+	dropDisabledPreemptionPolicyField(podGroupSpec, oldPodGroupSpec)
+	dropDisabledParentCompositePodGroupNameField(podGroupSpec, oldPodGroupSpec)
+}
+
+func dropDisabledPodGroupStatusFields(newPodGroup, oldPodGroup *scheduling.PodGroup) {
+	var oldPodGroupSpec *scheduling.PodGroupSpec
+	if oldPodGroup != nil {
+		oldPodGroupSpec = &oldPodGroup.Spec
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) || draWorkloadResourceClaimsInUse(oldPodGroupSpec) {
+		// No need to drop anything.
+		return
+	}
+	newPodGroup.Status.ResourceClaimStatuses = nil
 }
 
 // dropDisabledSchedulingConstraintsFields drops the SchedulingConstraints field
 // from the new PodGroup if the TopologyAwareWorkloadScheduling feature gate is disabled
 // and it was not used in the old PodGroup.
-func dropDisabledSchedulingConstraintsFields(newPodGroup, oldPodGroup *scheduling.PodGroup) {
-	if schedulingConstraintsInUse(oldPodGroup) {
+func dropDisabledSchedulingConstraintsFields(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) || schedulingConstraintsInUse(oldPodGroupSpec) {
 		// No need to drop anything.
 		return
 	}
-	newPodGroup.Spec.SchedulingConstraints = nil
+	podGroupSpec.SchedulingConstraints = nil
 }
 
-func schedulingConstraintsInUse(pg *scheduling.PodGroup) bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) || (pg != nil && pg.Spec.SchedulingConstraints != nil)
+// dropDisabledDRAWorkloadResourceClaimsFields removes resource claim references
+// unless they are already used by the old PodGroup spec.
+func dropDisabledDRAWorkloadResourceClaimsFields(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) || draWorkloadResourceClaimsInUse(oldPodGroupSpec) {
+		// No need to drop anything.
+		return
+	}
+	podGroupSpec.ResourceClaims = nil
+}
+
+// dropDisabledPreemptionPolicyField removes the PreemptionPolicy field unless it is
+// already used in the old PodGroup spec.
+func dropDisabledPreemptionPolicyField(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) || preemptionPolicyInUse(oldPodGroupSpec) {
+		// No need to drop anything.
+		return
+	}
+	podGroupSpec.PreemptionPolicy = nil
+}
+
+func schedulingConstraintsInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
+	return podGroupSpec != nil && podGroupSpec.SchedulingConstraints != nil
+}
+
+func draWorkloadResourceClaimsInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
+	return podGroupSpec != nil && len(podGroupSpec.ResourceClaims) > 0
+}
+
+func preemptionPolicyInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
+	return podGroupSpec != nil && podGroupSpec.PreemptionPolicy != nil
+}
+
+func parentCompositePodGroupNameInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
+	return podGroupSpec != nil && podGroupSpec.ParentCompositePodGroupName != nil
+}
+
+// dropDisabledParentCompositePodGroupNameField removes the ParentCompositePodGroupName field
+// unless it is already used in the old PodGroup spec.
+func dropDisabledParentCompositePodGroupNameField(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) || parentCompositePodGroupNameInUse(oldPodGroupSpec) {
+		// No need to drop anything.
+		return
+	}
+	podGroupSpec.ParentCompositePodGroupName = nil
 }

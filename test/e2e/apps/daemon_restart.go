@@ -39,7 +39,6 @@ import (
 	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -209,7 +208,7 @@ func getContainerRestarts(ctx context.Context, c clientset.Interface, ns string,
 	return failedContainers, containerRestartNodes.List()
 }
 
-var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), func() {
+var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), framework.WithProvider(framework.ProvidersWithSSH...) /* These tests require SSH */, func() {
 
 	f := framework.NewDefaultFramework("daemonrestart")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
@@ -223,8 +222,6 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), func() {
 	var tracker *podTracker
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
-		// These tests require SSH
-		e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 		ns = f.Namespace.Name
 
 		// All the restart tests need an rc and a watch on pods of the rc.
@@ -274,10 +271,8 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), func() {
 		go controller.Run(backgroundCtx.Done())
 	})
 
-	ginkgo.It("Controller Manager should not create/delete replicas across restart", func(ctx context.Context) {
+	f.It("Controller Manager should not create/delete replicas across restart", f.WithProvider("gce", "aws") /* Requires master ssh access. */, func(ctx context.Context) {
 
-		// Requires master ssh access.
-		e2eskipper.SkipUnlessProviderIs("gce", "aws")
 		nodes := framework.GetControlPlaneNodes(ctx, f.ClientSet)
 
 		// checks if there is at least one control-plane node
@@ -316,9 +311,7 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), func() {
 		}
 	})
 
-	ginkgo.It("Scheduler should continue assigning pods to nodes across restart", func(ctx context.Context) {
-		// Requires master ssh access.
-		e2eskipper.SkipUnlessProviderIs("gce", "aws")
+	f.It("Scheduler should continue assigning pods to nodes across restart", f.WithProvider("gce", "aws") /* Requires master ssh access. */, func(ctx context.Context) {
 		nodes := framework.GetControlPlaneNodes(ctx, f.ClientSet)
 
 		// checks if there is at least one control-plane node

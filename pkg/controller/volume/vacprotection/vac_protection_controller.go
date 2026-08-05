@@ -113,16 +113,19 @@ func NewVACProtectionController(logger klog.Logger,
 		),
 	}
 
-	_, _ = vacInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := vacInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			c.vacAddedUpdated(logger, obj)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			c.vacAddedUpdated(logger, new)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	if err != nil {
+		return nil, fmt.Errorf("failed to add event handler to VAC informer: %w", err)
+	}
 
-	err := pvInformer.Informer().AddIndexers(cache.Indexers{vacNameKeyIndex: func(obj interface{}) ([]string, error) {
+	err = pvInformer.Informer().AddIndexers(cache.Indexers{vacNameKeyIndex: func(obj interface{}) ([]string, error) {
 		pv, ok := obj.(*v1.PersistentVolume)
 		if !ok {
 			return []string{}, nil
@@ -178,23 +181,29 @@ func NewVACProtectionController(logger klog.Logger,
 		return pvcs, nil
 	}
 
-	_, _ = pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = pvcInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(old, new interface{}) {
 			c.pvcUpdated(logger, old, new)
 		},
 		DeleteFunc: func(obj interface{}) {
 			c.pvcDeleted(logger, obj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	if err != nil {
+		return nil, fmt.Errorf("failed to add event handler to PVC informer: %w", err)
+	}
 
-	_, _ = pvInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = pvInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(old, new interface{}) {
 			c.pvUpdated(logger, old, new)
 		},
 		DeleteFunc: func(obj interface{}) {
 			c.pvDeleted(logger, obj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	if err != nil {
+		return nil, fmt.Errorf("failed to add event handler to PV informer: %w", err)
+	}
 	return c, nil
 }
 

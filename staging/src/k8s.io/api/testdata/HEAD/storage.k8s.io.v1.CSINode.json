@@ -56,5 +56,22 @@
         }
       }
     ]
+  },
+  "status": {
+    "storageHealth": [
+      {
+        "name": "nameValue",
+        "healthConditions": [
+          {
+            "status": "statusValue",
+            "reason": "reasonValue",
+            "message": "messageValue",
+            "accessMode": "accessModeValue",
+            "volumeMode": "volumeModeValue",
+            "lastTransitionTime": "2006-01-01T01:01:01Z"
+          }
+        ]
+      }
+    ]
   }
 }

@@ -30,6 +30,7 @@ import (
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -1177,7 +1178,7 @@ func AddObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj in
 				}
 				fallthrough
 			default:
-				jsonTag := sf.Tag.Get("json")
+				jsonTag, _ := sf.Tag.Lookup("json")
 				if len(jsonTag) == 0 {
 					continue
 				}

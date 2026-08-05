@@ -40,8 +40,6 @@ type DeviceClassSpecApplyConfiguration struct {
 	// is picked to satisfy a pod's extended resource requests.
 	// If two classes are created at the same time, then the name of the class
 	// lexicographically sorted first is picked.
-	//
-	// This is a beta field.
 	ExtendedResourceName *string `json:"extendedResourceName,omitempty"`
 }
 

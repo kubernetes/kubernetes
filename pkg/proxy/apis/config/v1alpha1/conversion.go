@@ -21,11 +21,11 @@ import (
 
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/kube-proxy/config/v1alpha1"
-	"k8s.io/kubernetes/pkg/proxy/apis/config"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 )
 
 // Convert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration is defined here, because public conversion is not auto-generated due to existing warnings.
-func Convert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in *config.KubeProxyConfiguration, out *v1alpha1.KubeProxyConfiguration, scope conversion.Scope) error {
+func Convert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in *kubeproxyconfig.KubeProxyConfiguration, out *v1alpha1.KubeProxyConfiguration, scope conversion.Scope) error {
 	if err := autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in, out, scope); err != nil {
 		return err
 	}
@@ -33,17 +33,17 @@ func Convert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in
 	out.Conntrack = v1alpha1.KubeProxyConntrackConfiguration(in.Linux.Conntrack)
 	out.OOMScoreAdj = in.Linux.OOMScoreAdj
 	switch in.Mode {
-	case config.ProxyModeNFTables:
+	case kubeproxyconfig.ProxyModeNFTables:
 		out.NFTables.MasqueradeAll = in.Linux.MasqueradeAll
 	default:
 		out.IPTables.MasqueradeAll = in.Linux.MasqueradeAll
 	}
 
 	switch in.Mode {
-	case config.ProxyModeIPVS:
+	case kubeproxyconfig.ProxyModeIPVS:
 		out.IPVS.SyncPeriod = in.SyncPeriod
 		out.IPVS.MinSyncPeriod = in.MinSyncPeriod
-	case config.ProxyModeNFTables:
+	case kubeproxyconfig.ProxyModeNFTables:
 		out.NFTables.SyncPeriod = in.SyncPeriod
 		out.NFTables.MinSyncPeriod = in.MinSyncPeriod
 	default:
@@ -58,25 +58,25 @@ func Convert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in
 }
 
 // Convert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguration is defined here, because public conversion is not auto-generated due to existing warnings.
-func Convert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguration(in *v1alpha1.KubeProxyConfiguration, out *config.KubeProxyConfiguration, scope conversion.Scope) error {
+func Convert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguration(in *v1alpha1.KubeProxyConfiguration, out *kubeproxyconfig.KubeProxyConfiguration, scope conversion.Scope) error {
 	if err := autoConvert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguration(in, out, scope); err != nil {
 		return err
 	}
 	out.Windows.RunAsService = in.WindowsRunAsService
-	out.Linux.Conntrack = config.KubeProxyConntrackConfiguration(in.Conntrack)
+	out.Linux.Conntrack = kubeproxyconfig.KubeProxyConntrackConfiguration(in.Conntrack)
 	out.Linux.OOMScoreAdj = in.OOMScoreAdj
-	switch config.ProxyMode(in.Mode) {
-	case config.ProxyModeNFTables:
+	switch kubeproxyconfig.ProxyMode(in.Mode) {
+	case kubeproxyconfig.ProxyModeNFTables:
 		out.Linux.MasqueradeAll = in.NFTables.MasqueradeAll
 	default:
 		out.Linux.MasqueradeAll = in.IPTables.MasqueradeAll
 	}
 
-	switch config.ProxyMode(in.Mode) {
-	case config.ProxyModeIPVS:
+	switch kubeproxyconfig.ProxyMode(in.Mode) {
+	case kubeproxyconfig.ProxyModeIPVS:
 		out.SyncPeriod = in.IPVS.SyncPeriod
 		out.MinSyncPeriod = in.IPVS.MinSyncPeriod
-	case config.ProxyModeNFTables:
+	case kubeproxyconfig.ProxyModeNFTables:
 		out.SyncPeriod = in.NFTables.SyncPeriod
 		out.MinSyncPeriod = in.NFTables.MinSyncPeriod
 	default:
@@ -91,21 +91,21 @@ func Convert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguration(in
 }
 
 // Convert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration is defined here, because public conversion is not auto-generated due to existing warnings.
-func Convert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration(in *v1alpha1.KubeProxyIPTablesConfiguration, out *config.KubeProxyIPTablesConfiguration, scope conversion.Scope) error {
+func Convert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration(in *v1alpha1.KubeProxyIPTablesConfiguration, out *kubeproxyconfig.KubeProxyIPTablesConfiguration, scope conversion.Scope) error {
 	return autoConvert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration(in, out, scope)
 }
 
 // Convert_v1alpha1_KubeProxyIPVSConfiguration_To_config_KubeProxyIPVSConfiguration is defined here, because public conversion is not auto-generated due to existing warnings.
-func Convert_v1alpha1_KubeProxyIPVSConfiguration_To_config_KubeProxyIPVSConfiguration(in *v1alpha1.KubeProxyIPVSConfiguration, out *config.KubeProxyIPVSConfiguration, scope conversion.Scope) error {
+func Convert_v1alpha1_KubeProxyIPVSConfiguration_To_config_KubeProxyIPVSConfiguration(in *v1alpha1.KubeProxyIPVSConfiguration, out *kubeproxyconfig.KubeProxyIPVSConfiguration, scope conversion.Scope) error {
 	return autoConvert_v1alpha1_KubeProxyIPVSConfiguration_To_config_KubeProxyIPVSConfiguration(in, out, scope)
 }
 
 // Convert_v1alpha1_KubeProxyNFTablesConfiguration_To_config_KubeProxyNFTablesConfiguration is defined here, because public conversion is not auto-generated due to existing warnings.
-func Convert_v1alpha1_KubeProxyNFTablesConfiguration_To_config_KubeProxyNFTablesConfiguration(in *v1alpha1.KubeProxyNFTablesConfiguration, out *config.KubeProxyNFTablesConfiguration, scope conversion.Scope) error {
+func Convert_v1alpha1_KubeProxyNFTablesConfiguration_To_config_KubeProxyNFTablesConfiguration(in *v1alpha1.KubeProxyNFTablesConfiguration, out *kubeproxyconfig.KubeProxyNFTablesConfiguration, scope conversion.Scope) error {
 	return autoConvert_v1alpha1_KubeProxyNFTablesConfiguration_To_config_KubeProxyNFTablesConfiguration(in, out, scope)
 }
 
 // Convert_config_DetectLocalConfiguration_To_v1alpha1_DetectLocalConfiguration is defined here, because public conversion is not auto-generated due to existing warnings.
-func Convert_config_DetectLocalConfiguration_To_v1alpha1_DetectLocalConfiguration(in *config.DetectLocalConfiguration, out *v1alpha1.DetectLocalConfiguration, s conversion.Scope) error {
+func Convert_config_DetectLocalConfiguration_To_v1alpha1_DetectLocalConfiguration(in *kubeproxyconfig.DetectLocalConfiguration, out *v1alpha1.DetectLocalConfiguration, s conversion.Scope) error {
 	return autoConvert_config_DetectLocalConfiguration_To_v1alpha1_DetectLocalConfiguration(in, out, s)
 }

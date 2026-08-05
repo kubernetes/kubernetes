@@ -35,8 +35,8 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config/testing"
 	cryptoutil "k8s.io/kubernetes/cmd/kubeadm/app/util/crypto"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 func TestGetDataFromInitConfig(t *testing.T) {
@@ -165,7 +165,7 @@ func TestUploadCerts(t *testing.T) {
 		t.Fatalf("could not create certificate key: %v", err)
 	}
 
-	initConfiguration := testutil.GetDefaultInternalConfig(t)
+	initConfiguration := configutil.GetDefaultInternalConfig(t)
 	initConfiguration.ClusterConfiguration.CertificatesDir = tmpdir
 
 	if err := certs.CreatePKIAssets(initConfiguration); err != nil {
@@ -209,12 +209,12 @@ func TestDownloadCerts(t *testing.T) {
 
 	// Temporary directory where certificates will be generated
 	tmpdir := t.TempDir()
-	initConfiguration := testutil.GetDefaultInternalConfig(t)
+	initConfiguration := configutil.GetDefaultInternalConfig(t)
 	initConfiguration.ClusterConfiguration.CertificatesDir = tmpdir
 
 	// Temporary directory where certificates will be downloaded to
 	targetTmpdir := t.TempDir()
-	initForDownloadConfiguration := testutil.GetDefaultInternalConfig(t)
+	initForDownloadConfiguration := configutil.GetDefaultInternalConfig(t)
 	initForDownloadConfiguration.ClusterConfiguration.CertificatesDir = targetTmpdir
 
 	if err := certs.CreatePKIAssets(initConfiguration); err != nil {

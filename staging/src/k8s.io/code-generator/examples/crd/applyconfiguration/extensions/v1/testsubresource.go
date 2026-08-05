@@ -25,7 +25,7 @@ import (
 // TestSubresourceApplyConfiguration represents a declarative configuration of the TestSubresource type for use
 // with apply.
 type TestSubresourceApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:""`
 	Name                              *string `json:"name,omitempty"`
 }
 

@@ -33,11 +33,12 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	"github.com/emicklei/go-restful/v3"
-	cadvisormetrics "github.com/google/cadvisor/container"
-	cadvisorapi "github.com/google/cadvisor/info/v1"
-	cadvisorv2 "github.com/google/cadvisor/info/v2"
-	"github.com/google/cadvisor/metrics"
+	cadvisormetrics "github.com/google/cadvisor/lib/container"
+	"github.com/google/cadvisor/lib/metrics"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
@@ -49,7 +50,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
 	"k8s.io/apimachinery/pkg/util/proxy"
@@ -96,9 +96,11 @@ import (
 	kubeletcadvisor "k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
+	oomwatcher "k8s.io/kubernetes/pkg/kubelet/oom"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	servermetrics "k8s.io/kubernetes/pkg/kubelet/server/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
 func init() {
@@ -115,6 +117,7 @@ const (
 	checkpointPath      = "/checkpoint/"
 	pprofBasePath       = "/debug/pprof/"
 	debugFlagPath       = "/debug/flags/v"
+	allocatedPodsPath   = "/allocatedPods"
 	podsPath            = "/pods"
 	runningPodsPath     = "/runningpods/"
 )
@@ -271,7 +274,13 @@ func ListenAndServePodResources(ctx context.Context, endpoint string, providers 
 // ListenAndServePodsServer initializes an HTTP server to serve the Pod API.
 func ListenAndServePodsServer(ctx context.Context, endpoint string, srv podsv1alpha1.PodsServer) {
 	logger := klog.FromContext(ctx)
-	server := grpc.NewServer(apisgrpc.WithRateLimiter(ctx, "pods", pods.DefaultQPS, pods.DefaultBurstTokens))
+	server := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			apisgrpc.LimiterUnaryServerInterceptor(rate.NewLimiter(rate.Limit(pods.DefaultQPS), int(pods.DefaultBurstTokens))),
+			pods.MetricsUnaryServerInterceptor,
+		),
+		grpc.StreamInterceptor(pods.MetricsStreamServerInterceptor),
+	)
 
 	podsv1alpha1.RegisterPodsServer(server, srv)
 
@@ -302,7 +311,7 @@ type NodeRequestAttributesGetter interface {
 type AuthInterface interface {
 	authenticator.Request
 	NodeRequestAttributesGetter
-	authorizer.Authorizer
+	authorizer.UnconditionalAuthorizer
 	dynamiccertificates.CAContentProvider
 }
 
@@ -323,6 +332,8 @@ type HostInterface interface {
 	GetPortForward(ctx context.Context, podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error)
 	ListMetricDescriptors(ctx context.Context) ([]*runtimeapi.MetricDescriptor, error)
 	ListPodSandboxMetrics(ctx context.Context) ([]*runtimeapi.PodSandboxMetrics, error)
+	GetAllocatedPods() ([]*v1.Pod, error)
+	GetAllocatedPodByName(namespace, name string) (*v1.Pod, error)
 }
 
 // NewServer initializes and configures a kubelet.Server object to handle HTTP requests.
@@ -482,6 +493,7 @@ func (s *Server) InstallAuthNotRequiredHandlers(ctx context.Context) {
 
 	s.addMetricsBucketMatcher("pods")
 	ws := new(restful.WebService)
+	ws.Filter(GETOnlyRestfulFilter())
 	ws.
 		Path(podsPath).
 		Produces(restful.MIME_JSON)
@@ -504,7 +516,6 @@ func (s *Server) InstallAuthNotRequiredHandlers(ctx context.Context) {
 	includedMetrics := cadvisormetrics.MetricSet{
 		cadvisormetrics.CpuUsageMetrics:     struct{}{},
 		cadvisormetrics.MemoryUsageMetrics:  struct{}{},
-		cadvisormetrics.CpuLoadMetrics:      struct{}{},
 		cadvisormetrics.DiskIOMetrics:       struct{}{},
 		cadvisormetrics.DiskUsageMetrics:    struct{}{},
 		cadvisormetrics.NetworkUsageMetrics: struct{}{},
@@ -526,12 +537,12 @@ func (s *Server) InstallAuthNotRequiredHandlers(ctx context.Context) {
 		r.CustomRegister(collectors.NewCRIMetricsCollector(context.TODO(), s.host.ListPodSandboxMetrics, s.host.ListMetricDescriptors))
 		servermetrics.SetMetricsProvider(servermetrics.CRIMetricsProvider)
 	} else {
-		cadvisorOpts := cadvisorv2.RequestOptions{
-			IdType:    cadvisorv2.TypeName,
+		cadvisorOpts := cadvisorapi.RequestOptions{
+			IdType:    cadvisorapi.TypeName,
 			Count:     1,
 			Recursive: true,
 		}
-		r.RawMustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics, clock.RealClock{}, cadvisorOpts))
+		r.RawMustRegister(metrics.NewPrometheusCollector(oomEventsHostAdapter{prometheusHostAdapter{s.host}}, containerPrometheusLabelsFunc(s.host), includedMetrics, clock.RealClock{}, cadvisorOpts))
 		servermetrics.SetMetricsProvider(servermetrics.CAdvisorMetricsProvider)
 	}
 	s.restfulCont.Handle(cadvisorMetricsPath,
@@ -636,6 +647,7 @@ func (s *Server) InstallAuthRequiredHandlers(ctx context.Context) {
 
 	s.addMetricsBucketMatcher("containerLogs")
 	ws = new(restful.WebService)
+	ws.Filter(GETOnlyRestfulFilter())
 	ws.
 		Path("/containerLogs")
 	ws.Route(ws.GET("/{podNamespace}/{podID}/{containerName}").
@@ -646,9 +658,29 @@ func (s *Server) InstallAuthRequiredHandlers(ctx context.Context) {
 	s.addMetricsBucketMatcher("configz")
 	configz.InstallHandler(s.restfulCont)
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletAllocatedPodsEndpoint) {
+		s.addMetricsBucketMatcher("allocatedPods")
+		ws = new(restful.WebService)
+		ws.Filter(GETOnlyRestfulFilter())
+		ws.
+			Path(allocatedPodsPath).
+			Produces(restful.MIME_JSON)
+		ws.Route(ws.GET("").
+			To(s.getAllocatedPods).
+			Operation("getAllocatedPods"))
+		ws.Route(ws.GET("/{podNamespace}/{podID}").
+			To(s.getAllocatedPod).
+			Operation("getAllocatedPod"))
+		ws.Route(ws.GET("/{podNamespace}/{podID}/{podUID}").
+			To(s.getAllocatedPod).
+			Operation("getAllocatedPod"))
+		s.restfulCont.Add(ws)
+	}
+
 	// The /runningpods endpoint is used for testing only.
 	s.addMetricsBucketMatcher("runningpods")
 	ws = new(restful.WebService)
+	ws.Filter(GETOnlyRestfulFilter())
 	ws.
 		Path(runningPodsPath).
 		Produces(restful.MIME_JSON)
@@ -699,6 +731,7 @@ func (s *Server) InstallSystemLogHandler(enableSystemLogHandler bool, enableSyst
 	s.addMetricsBucketMatcher("logs")
 	if enableSystemLogHandler {
 		ws := new(restful.WebService)
+		ws.Filter(GETOnlyRestfulFilter())
 		ws.Path(logsPath)
 		ws.Route(ws.GET("").
 			To(s.getLogs).
@@ -770,6 +803,7 @@ func (s *Server) InstallProfilingHandler(enableProfilingLogHandler bool, enableC
 
 	// Setup pprof handlers.
 	ws := new(restful.WebService).Path(pprofBasePath)
+	ws.Filter(GETOnlyRestfulFilter())
 	ws.Route(ws.GET("/{subpath:*}").To(handlePprofEndpoint)).Doc("pprof endpoint")
 	s.restfulCont.Add(ws)
 
@@ -894,8 +928,13 @@ func encodePods(pods []*v1.Pod) (data []byte, err error) {
 	// TODO: this needs to be parameterized to the kubelet, not hardcoded. Depends on Kubelet
 	//   as API server refactor.
 	// TODO: Locked to v1, needs to be made generic
-	codec := legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Group: v1.GroupName, Version: "v1"})
+	codec := legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)
 	return runtime.Encode(codec, podList)
+}
+
+func encodePod(pod *v1.Pod) (data []byte, err error) {
+	codec := legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)
+	return runtime.Encode(codec, pod)
 }
 
 // getPods returns a list of pods bound to the Kubelet and their spec.
@@ -928,9 +967,118 @@ func (s *Server) getRunningPods(request *restful.Request, response *restful.Resp
 	writeJSONResponse(logger, response, data)
 }
 
+func (s *Server) getAllocatedPods(request *restful.Request, response *restful.Response) {
+	ctx := request.Request.Context()
+	logger := klog.FromContext(ctx)
+	pods, err := s.host.GetAllocatedPods()
+	if err != nil {
+		logger.Error(err, "Failed to GetAllocatedPods")
+		if err := response.WriteError(http.StatusInternalServerError, err); err != nil {
+			logger.Error(err, "Failed to write error response")
+		}
+		return
+	}
+
+	// Filter out status from allocated pods.
+	copiedPods := make([]*v1.Pod, len(pods))
+	for i, pod := range pods {
+		copied := *pod // Shallow copy
+		copied.Status = v1.PodStatus{}
+		copiedPods[i] = &copied
+	}
+	data, err := encodePods(copiedPods)
+	if err != nil {
+		logger.Error(err, "Failed to encode allocated pods")
+		if err := response.WriteError(http.StatusInternalServerError, err); err != nil {
+			logger.Error(err, "Failed to write error response")
+		}
+		return
+	}
+	writeJSONResponse(logger, response, data)
+}
+
+func (s *Server) getAllocatedPod(request *restful.Request, response *restful.Response) {
+	ctx := request.Request.Context()
+	logger := klog.FromContext(ctx)
+	podNamespace := request.PathParameter("podNamespace")
+	podID := request.PathParameter("podID")
+	podUID := types.UID(request.PathParameter("podUID"))
+
+	if len(podNamespace) == 0 || len(podID) == 0 {
+		logger.Error(nil, "Invalid request path: missing podNamespace or podID", "path", request.Request.URL.Path)
+		if err := response.WriteErrorString(http.StatusBadRequest, "podNamespace and podID are required"); err != nil {
+			logger.Error(err, "Failed to write error response")
+		}
+		return
+	}
+
+	pod, err := s.host.GetAllocatedPodByName(podNamespace, podID)
+	if err != nil {
+		logger.Error(err, "Failed to get allocated pod", "podNamespace", podNamespace, "podName", podID)
+		if err := response.WriteError(http.StatusInternalServerError, err); err != nil {
+			logger.Error(err, "Failed to write error response")
+		}
+		return
+	}
+	if pod == nil {
+		logger.V(3).Info("Allocated pod not found", "podNamespace", podNamespace, "podName", podID)
+		if err := response.WriteErrorString(http.StatusNotFound, "pod not found"); err != nil {
+			logger.Error(err, "Failed to write error response")
+		}
+		return
+	}
+
+	if podUID != "" && pod.UID != podUID {
+		logger.V(3).Info("Allocated pod UID mismatch", "podNamespace", podNamespace, "podName", podID, "expectedUID", podUID, "actualUID", pod.UID)
+		if err := response.WriteErrorString(http.StatusNotFound, "pod not found"); err != nil {
+			logger.Error(err, "Failed to write error response")
+		}
+		return
+	}
+
+	// Filter out status from allocated pod.
+	copied := *pod // Shallow copy
+	copied.Status = v1.PodStatus{}
+	data, err := encodePod(&copied)
+	if err != nil {
+		logger.Error(err, "Failed to encode allocated pod", "pod", format.Pod(pod))
+		if err := response.WriteError(http.StatusInternalServerError, err); err != nil {
+			logger.Error(err, "Failed to write error response")
+		}
+		return
+	}
+	writeJSONResponse(logger, response, data)
+}
+
 // getLogs handles logs requests against the Kubelet.
 func (s *Server) getLogs(request *restful.Request, response *restful.Response) {
 	s.host.ServeLogs(response, request.Request)
+}
+
+// GETOnlyRestfulFilter allows only GET. Use on WebServices that register read-only
+// kubelet APIs.
+func GETOnlyRestfulFilter() restful.FilterFunction {
+	return AllowedMethodsRestfulFilter(http.MethodGet)
+}
+
+// AllowedMethodsRestfulFilter returns a restful.FilterFunction that rejects requests
+// whose HTTP method is not listed in allowed. It responds with 405 Method Not Allowed
+// and an Allow header listing the permitted methods (RFC 9110).
+func AllowedMethodsRestfulFilter(allowed ...string) restful.FilterFunction {
+	allowedSet := make(map[string]struct{}, len(allowed))
+	for _, m := range allowed {
+		allowedSet[m] = struct{}{}
+	}
+	allowHeader := strings.Join(allowed, ", ")
+
+	return func(req *restful.Request, resp *restful.Response, chain *restful.FilterChain) {
+		if _, ok := allowedSet[req.Request.Method]; ok {
+			chain.ProcessFilter(req, resp)
+			return
+		}
+		resp.Header().Set("Allow", allowHeader)
+		_ = resp.WriteErrorString(http.StatusMethodNotAllowed, "Method Not Allowed")
+	}
 }
 
 type execRequestParams struct {
@@ -968,9 +1116,7 @@ func getPortForwardRequestParams(req *restful.Request) portForwardRequestParams 
 type responder struct{}
 
 func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
-	// Use context.TODO() because we currently do not have a proper context to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
-	logger := klog.FromContext(context.TODO())
+	logger := klog.FromContext(req.Context())
 	logger.Error(err, "Error while proxying request")
 	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
@@ -1284,7 +1430,7 @@ type prometheusHostAdapter struct {
 	host HostInterface
 }
 
-func (a prometheusHostAdapter) GetRequestedContainersInfo(containerName string, options cadvisorv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
+func (a prometheusHostAdapter) GetRequestedContainersInfo(containerName string, options cadvisorapi.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
 	return a.host.GetRequestedContainersInfo(containerName, options)
 }
 func (a prometheusHostAdapter) GetVersionInfo() (*cadvisorapi.VersionInfo, error) {
@@ -1292,6 +1438,25 @@ func (a prometheusHostAdapter) GetVersionInfo() (*cadvisorapi.VersionInfo, error
 }
 func (a prometheusHostAdapter) GetMachineInfo() (*cadvisorapi.MachineInfo, error) {
 	return a.host.GetCachedMachineInfo()
+}
+
+// oomEventsHostAdapter wraps prometheusHostAdapter and replaces the per-container
+// OOM event count with the count maintained by the kubelet OOM watcher
+// (pkg/kubelet/oom), so that container_oom_events_total is generated by the
+// kubelet rather than by cadvisor.
+type oomEventsHostAdapter struct {
+	prometheusHostAdapter
+}
+
+func (a oomEventsHostAdapter) GetRequestedContainersInfo(containerName string, options cadvisorapi.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
+	infos, err := a.prometheusHostAdapter.GetRequestedContainersInfo(containerName, options)
+	for _, info := range infos {
+		count := oomwatcher.OOMEventsForContainer(info.Name)
+		for _, stats := range info.Stats {
+			stats.OOMEvents = count
+		}
+	}
+	return infos, err
 }
 
 func containerPrometheusLabelsFunc(s stats.Provider) metrics.ContainerLabelsFunc {

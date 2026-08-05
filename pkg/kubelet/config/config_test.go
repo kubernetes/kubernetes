@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -64,7 +65,8 @@ func (s sortedPods) Less(i, j int) bool {
 
 type mockPodStartupSLIObserver struct{}
 
-func (m *mockPodStartupSLIObserver) ObservedPodOnWatch(pod *v1.Pod, when time.Time) {}
+func (m *mockPodStartupSLIObserver) ObservedPodOnWatch(logger klog.Logger, pod *v1.Pod, when time.Time) {
+}
 
 func CreateValidPod(name, namespace string) *v1.Pod {
 	return &v1.Pod{
@@ -413,7 +415,7 @@ func TestPodConfigRace(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < iterations; i++ {
-			config.SeenAllSources(seenSources)
+			config.SeenAllSources(tCtx.Logger(), seenSources)
 		}
 	}()
 

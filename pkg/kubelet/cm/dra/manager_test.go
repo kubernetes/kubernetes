@@ -38,6 +38,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -52,7 +53,7 @@ import (
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/utils/ptr"
 
-	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
+	drahealthv1 "k8s.io/kubelet/pkg/apis/dra-health/v1"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
@@ -64,6 +65,7 @@ const (
 	driverClassName = "test"
 	podName         = "test-pod"
 	containerName   = "test-container"
+	podGroupName    = "test-podgroup"
 )
 
 var (
@@ -74,7 +76,7 @@ var (
 
 type fakeDRADriverGRPCServer struct {
 	drapb.UnimplementedDRAPluginServer
-	drahealthv1alpha1.UnimplementedDRAResourceHealthServer
+	drahealthv1.UnimplementedDRAResourceHealthServer
 	driverName                 string
 	timeout                    *time.Duration
 	prepareResourceCalls       atomic.Uint32
@@ -82,7 +84,7 @@ type fakeDRADriverGRPCServer struct {
 	watchResourcesCalls        atomic.Uint32
 	prepareResourcesResponse   *drapb.NodePrepareResourcesResponse
 	unprepareResourcesResponse *drapb.NodeUnprepareResourcesResponse
-	watchResourcesResponses    chan *drahealthv1alpha1.NodeWatchResourcesResponse
+	watchResourcesResponses    chan *drahealthv1.NodeWatchResourcesResponse
 	watchResourcesError        error
 }
 
@@ -149,7 +151,7 @@ func (s *fakeDRADriverGRPCServer) NodeUnprepareResources(ctx context.Context, re
 	return s.unprepareResourcesResponse, nil
 }
 
-func (s *fakeDRADriverGRPCServer) NodeWatchResources(req *drahealthv1alpha1.NodeWatchResourcesRequest, stream drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesServer) error {
+func (s *fakeDRADriverGRPCServer) NodeWatchResources(req *drahealthv1.NodeWatchResourcesRequest, stream drahealthv1.DRAResourceHealth_NodeWatchResourcesServer) error {
 	s.watchResourcesCalls.Add(1)
 	logger := klog.FromContext(stream.Context())
 	logger.V(4).Info("Fake Server: WatchResources stream started")
@@ -187,13 +189,13 @@ func (s *fakeDRADriverGRPCServer) NodeWatchResources(req *drahealthv1alpha1.Node
 type mockWatchResourcesClient struct {
 	mock.Mock
 	RecvChan chan struct {
-		Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+		Resp *drahealthv1.NodeWatchResourcesResponse
 		Err  error
 	}
 	Ctx context.Context
 }
 
-func (m *mockWatchResourcesClient) Recv() (*drahealthv1alpha1.NodeWatchResourcesResponse, error) {
+func (m *mockWatchResourcesClient) Recv() (*drahealthv1.NodeWatchResourcesResponse, error) {
 	logger := klog.FromContext(m.Ctx)
 	select {
 	case <-m.Ctx.Done():
@@ -269,7 +271,7 @@ func setupFakeDRADriverGRPCServer(ctx context.Context, shouldTimeout bool, plugi
 		driverName:                 driverName,
 		prepareResourcesResponse:   prepareResourcesResponse,
 		unprepareResourcesResponse: unprepareResourcesResponse,
-		watchResourcesResponses:    make(chan *drahealthv1alpha1.NodeWatchResourcesResponse, 10),
+		watchResourcesResponses:    make(chan *drahealthv1.NodeWatchResourcesResponse, 10),
 		watchResourcesError:        watchResourcesError,
 	}
 	if shouldTimeout {
@@ -277,7 +279,7 @@ func setupFakeDRADriverGRPCServer(ctx context.Context, shouldTimeout bool, plugi
 		fakeDRADriverGRPCServer.timeout = &timeout
 	}
 
-	drahealthv1alpha1.RegisterDRAResourceHealthServer(s, fakeDRADriverGRPCServer)
+	drahealthv1.RegisterDRAResourceHealthServer(s, fakeDRADriverGRPCServer)
 	drapb.RegisterDRAPluginServer(s, fakeDRADriverGRPCServer)
 
 	go func() {
@@ -346,6 +348,7 @@ func TestNewManagerImpl(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+			defer manager.Stop()
 			assert.NotNil(t, manager.cache)
 			assert.NotNil(t, manager.kubeClient)
 		})
@@ -383,6 +386,43 @@ func genTestPod() *v1.Pod {
 	}
 }
 
+// genTestPodWithClaimTemplateNoStatus generates a pod that references its claim
+// via a ResourceClaimTemplateName but whose Status.ResourceClaimStatuses is
+// empty. This mimics https://github.com/kubernetes/kubernetes/issues/139772, where an external component overwrote
+// the pod status and dropped the generated claim name. resourceclaim.Name API
+// returns ErrClaimNotFound for such a pod, so unprepare must rely on the claim
+// info cache.
+func genTestPodWithClaimTemplateNoStatus() *v1.Pod {
+	templateName := claimName + "-template"
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: namespace,
+			UID:       podUID,
+		},
+		Spec: v1.PodSpec{
+			ResourceClaims: []v1.PodResourceClaim{
+				{
+					Name:                      claimName,
+					ResourceClaimTemplateName: &templateName,
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Claims: []v1.ResourceClaim{
+							{
+								Name: claimName,
+							},
+						},
+					},
+				},
+			},
+		},
+		// Status.ResourceClaimStatuses intentionally left empty.
+	}
+}
+
 func genTestPodWithClaims(claimNames ...string) *v1.Pod {
 	podCounter := testPodCounter.Add(1)
 
@@ -393,13 +433,12 @@ func genTestPodWithClaims(claimNames ...string) *v1.Pod {
 	containerClaims := make([]v1.ResourceClaim, 0, len(claimNames))
 
 	for _, claimName := range claimNames {
-		cn := claimName
 		resourceClaims = append(resourceClaims, v1.PodResourceClaim{
-			Name:              cn,
-			ResourceClaimName: &cn,
+			Name:              claimName,
+			ResourceClaimName: &claimName,
 		})
 		containerClaims = append(containerClaims, v1.ResourceClaim{
-			Name: cn,
+			Name: claimName,
 		})
 	}
 
@@ -450,6 +489,38 @@ func genTestPodWithExtendedResource() *v1.Pod {
 						ContainerName: containerName,
 						ResourceName:  "example.com/gpu",
 						RequestName:   "container-0-request-0",
+					},
+				},
+			},
+		},
+	}
+}
+
+func genTestPodWithPodGroup() *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: namespace,
+			UID:       podUID,
+		},
+		Spec: v1.PodSpec{
+			SchedulingGroup: &v1.PodSchedulingGroup{
+				PodGroupName: new(podGroupName),
+			},
+			ResourceClaims: []v1.PodResourceClaim{
+				{
+					Name:              claimName,
+					ResourceClaimName: new(claimName),
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Claims: []v1.ResourceClaim{
+							{
+								Name: claimName,
+							},
+						},
 					},
 				},
 			},
@@ -532,6 +603,49 @@ func genTestClaimWithExtendedResource(name, driver, device, podUID string) *reso
 			},
 			ReservedFor: []resourceapi.ResourceClaimConsumerReference{
 				{UID: types.UID(podUID)},
+			},
+		},
+	}
+}
+
+func genTestPodGroupClaim(name, driver, device, podGroupName string) *resourceapi.ResourceClaim {
+	return &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			UID:       types.UID(fmt.Sprintf("%s-uid", name)),
+		},
+		Spec: resourceapi.ResourceClaimSpec{
+			Devices: resourceapi.DeviceClaim{
+				Requests: []resourceapi.DeviceRequest{
+					{
+						Name: requestName,
+						Exactly: &resourceapi.ExactDeviceRequest{
+							DeviceClassName: className,
+						},
+					},
+				},
+			},
+		},
+		Status: resourceapi.ResourceClaimStatus{
+			Allocation: &resourceapi.AllocationResult{
+				Devices: resourceapi.DeviceAllocationResult{
+					Results: []resourceapi.DeviceRequestAllocationResult{
+						{
+							Request: requestName,
+							Pool:    poolName,
+							Device:  device,
+							Driver:  driver,
+						},
+					},
+				},
+			},
+			ReservedFor: []resourceapi.ResourceClaimConsumerReference{
+				{
+					APIGroup: schedulingapi.GroupName,
+					Resource: "podgroups",
+					Name:     podGroupName,
+				},
 			},
 		},
 	}
@@ -734,6 +848,7 @@ func TestGetResources(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			manager, err := NewManager(tCtx.Logger(), kubeClient, t.TempDir())
 			require.NoError(t, err)
+			defer manager.Stop()
 
 			if test.claimInfo != nil {
 				manager.cache.add(test.claimInfo)
@@ -770,6 +885,8 @@ func TestPrepareResources(t *testing.T) {
 		resp                *drapb.NodePrepareResourcesResponse
 		wantTimeout         bool
 		wantResourceSkipped bool
+
+		draWorkloadResourceClaimsEnabled bool
 
 		expectedErrMsg         string
 		expectedClaimInfoState state.ClaimInfoState
@@ -854,6 +971,20 @@ dra_operations_duration_seconds_count{is_error="true",operation_name="PrepareRes
 `,
 		},
 		{
+			description:                      "pod is not allowed to use resource claim from podgroup",
+			draWorkloadResourceClaimsEnabled: true,
+			driverName:                       driverName,
+			pod:                              genTestPodWithPodGroup(),
+			claim:                            genTestPodGroupClaim(claimName, driverName, deviceName, ""),
+			expectedErrMsg:                   "is not allowed to use ResourceClaim ",
+			expectedMetric: `# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="true",operation_name="PrepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="true",operation_name="PrepareResources"} 0
+dra_operations_duration_seconds_count{is_error="true",operation_name="PrepareResources"} 1
+`,
+		},
+		{
 			description: "no container uses the claim",
 			driverName:  driverName,
 			pod: &v1.Pod{
@@ -899,6 +1030,35 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareRe
 			expectedClaimInfoState: genClaimInfoState(cdiID),
 			resp:                   genPrepareResourcesResponse(claimUID),
 			expectedMetric: `# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="false",operation_name="PrepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="false",operation_name="PrepareResources"} 0
+dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareResources"} 1
+`,
+		},
+		{
+			// Regression test: if a previous PrepareResources attempt
+			// appended devices to the cached ClaimInfo but returned before
+			// reaching setPrepared (e.g. a driver in the same batch failed),
+			// a retry must not duplicate those devices in the cache. The
+			// seeded ClaimInfo mimics that leftover state: prepared=false,
+			// DriverState already populated with the device the fake driver
+			// will return on retry. After the retry, DriverState must
+			// contain exactly one device, not two.
+			description:            "should not duplicate devices on prepare retry",
+			driverName:             driverName,
+			pod:                    genTestPod(),
+			claim:                  genTestClaim(claimName, driverName, deviceName, podUID),
+			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, false, nil),
+			resp:                   genPrepareResourcesResponse(claimUID),
+			expectedClaimInfoState: genClaimInfoState(cdiID),
+			expectedPrepareCalls:   1,
+			expectedMetric: `# HELP dra_grpc_operations_duration_seconds [ALPHA] Duration in seconds of the DRA gRPC operations
+# TYPE dra_grpc_operations_duration_seconds histogram
+dra_grpc_operations_duration_seconds_bucket{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources",le="+Inf"} 1
+dra_grpc_operations_duration_seconds_sum{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources"} 0
+dra_grpc_operations_duration_seconds_count{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources"} 1
+# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
 # TYPE dra_operations_duration_seconds histogram
 dra_operations_duration_seconds_bucket{is_error="false",operation_name="PrepareResources",le="+Inf"} 1
 dra_operations_duration_seconds_sum{is_error="false",operation_name="PrepareResources"} 0
@@ -977,6 +1137,44 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareRe
 `,
 		},
 		{
+			description:                      "should prepare resource for podgroup, claim not in cache",
+			draWorkloadResourceClaimsEnabled: true,
+			driverName:                       driverName,
+			pod:                              genTestPodWithPodGroup(),
+			claim:                            genTestPodGroupClaim(claimName, driverName, deviceName, podGroupName),
+			expectedClaimInfoState:           genClaimInfoState(cdiID),
+			resp:                             genPrepareResourcesResponse(claimUID),
+			expectedPrepareCalls:             1,
+			expectedMetric: `# HELP dra_grpc_operations_duration_seconds [ALPHA] Duration in seconds of the DRA gRPC operations
+# TYPE dra_grpc_operations_duration_seconds histogram
+dra_grpc_operations_duration_seconds_bucket{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources",le="+Inf"} 1
+dra_grpc_operations_duration_seconds_sum{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources"} 0
+dra_grpc_operations_duration_seconds_count{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources"} 1
+# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="false",operation_name="PrepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="false",operation_name="PrepareResources"} 0
+dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareResources"} 1
+`,
+		},
+		{
+			description:                      "should fail to prepare resource for podgroup when the feature is disabled",
+			draWorkloadResourceClaimsEnabled: false,
+			driverName:                       driverName,
+			pod:                              genTestPodWithPodGroup(),
+			claim:                            genTestPodGroupClaim(claimName, driverName, deviceName, podGroupName),
+			expectedClaimInfoState:           genClaimInfoState(cdiID),
+			resp:                             genPrepareResourcesResponse(claimUID),
+			expectedPrepareCalls:             0,
+			expectedErrMsg:                   "is not allowed to use ResourceClaim ",
+			expectedMetric: `# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="true",operation_name="PrepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="true",operation_name="PrepareResources"} 0
+dra_operations_duration_seconds_count{is_error="true",operation_name="PrepareResources"} 1
+`,
+		},
+		{
 			description:    "claim UIDs mismatch",
 			driverName:     driverName,
 			pod:            genTestPod(),
@@ -1049,6 +1247,7 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareRe
 
 			manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
 			require.NoError(t, err, "create DRA manager")
+			defer manager.Stop()
 			manager.initDRAPluginManager(backgroundCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
 
 			if test.claim != nil {
@@ -1072,7 +1271,7 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareRe
 			}
 			defer draServerInfo.teardownFn()
 			plg := manager.GetWatcherHandler()
-			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
+			if err := plg.RegisterPlugin(tCtx, test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}
 
@@ -1080,8 +1279,12 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareRe
 				manager.cache.add(test.claimInfo)
 			}
 
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, true)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRAExtendedResource:       true,
+				features.DRAConsumableCapacity:     true,
+				features.DRAWorkloadResourceClaims: test.draWorkloadResourceClaimsEnabled,
+				features.GenericWorkload:           test.draWorkloadResourceClaimsEnabled, // dependency of DRAWorkloadResourceClaims
+			})
 			err = manager.PrepareResources(backgroundCtx, test.pod)
 
 			assert.Equal(t, test.expectedPrepareCalls, draServerInfo.server.prepareResourceCalls.Load())
@@ -1131,6 +1334,7 @@ func TestPrepareResourcesWithPreparedAndNewClaim(t *testing.T) {
 
 	manager, err := NewManager(logger, fakeKubeClient, t.TempDir())
 	require.NoError(t, err)
+	defer manager.Stop()
 	manager.initDRAPluginManager(tCtx, getFakeNode, time.Second)
 
 	secondClaimName := fmt.Sprintf("%s-second", claimName)
@@ -1160,7 +1364,7 @@ func TestPrepareResourcesWithPreparedAndNewClaim(t *testing.T) {
 	defer draServerInfo.teardownFn()
 
 	plg := manager.GetWatcherHandler()
-	require.NoError(t, plg.RegisterPlugin(driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil))
+	require.NoError(t, plg.RegisterPlugin(tCtx, driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil))
 
 	err = manager.PrepareResources(tCtx, firstPod)
 	require.NoError(t, err)
@@ -1187,6 +1391,59 @@ func TestPrepareResourcesWithPreparedAndNewClaim(t *testing.T) {
 		require.True(t, exists, "claim %s should exist in cache", claimName)
 		assert.True(t, claimInfo.prepared, "claim %s should be marked as prepared", claimName)
 	}
+}
+
+// TestPrepareResourcesWithUnpreparingClaim is a regression test for the race
+// where reconcileLoop-initiated (or otherwise concurrent) unprepareResources
+// has committed to calling NodeUnprepareResources on a claim, released the
+// cache lock during the RPC, and prepareResources for a different pod would
+// otherwise attach itself to the still-cached-but-being-torn-down claim.
+// PrepareResources must refuse to touch a claim marked as unpreparing.
+func TestPrepareResourcesWithUnpreparingClaim(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	fakeKubeClient := fake.NewClientset()
+
+	manager, err := NewManager(logger, fakeKubeClient, t.TempDir())
+	require.NoError(t, err)
+	manager.initDRAPluginManager(tCtx, getFakeNode, time.Second)
+
+	pod := genTestPod()
+	claim := genTestClaim(claimName, driverName, deviceName, podUID)
+	_, err = fakeKubeClient.ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, false, nil, genPrepareResourcesResponse(claim.UID), nil, nil)
+	require.NoError(t, err)
+	defer draServerInfo.teardownFn()
+
+	plg := manager.GetWatcherHandler()
+	require.NoError(t, plg.RegisterPlugin(tCtx, driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil))
+
+	// Seed the cache with a claimInfo that is fully prepared for another
+	// pod and marked as unpreparing (mimicking the state after
+	// unprepareResources has committed to calling NodeUnprepareResources
+	// but before the terminal cache delete). The other pod is still
+	// referenced so we can also check its reference survives.
+	existing := genTestClaimInfo(claimUID, []string{"another-pod-uid"}, true, nil)
+	existing.setUnpreparing()
+	manager.cache.add(existing)
+
+	err = manager.PrepareResources(tCtx, pod)
+	require.Error(t, err, "PrepareResources must fail while the claim is being unprepared")
+
+	assert.Equal(t, uint32(0), draServerInfo.server.prepareResourceCalls.Load(),
+		"driver must not be called while the claim is being unprepared")
+
+	// The seeded claimInfo must be untouched: no new pod reference, still
+	// unpreparing, still prepared, other pod's reference intact.
+	cached, ok := manager.cache.get(claimName, namespace)
+	require.True(t, ok, "claim info must still be in the cache")
+	assert.False(t, cached.PodUIDs.Has(string(pod.UID)),
+		"failing PrepareResources must not have added this pod to PodUIDs")
+	assert.True(t, cached.PodUIDs.Has("another-pod-uid"),
+		"other pod's reference must survive")
+	assert.True(t, cached.isUnpreparing(),
+		"unpreparing flag must still be set")
 }
 
 func TestUnprepareResources(t *testing.T) {
@@ -1329,6 +1586,48 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="Unprepare
 `,
 		},
 		{
+			// Regression test for https://github.com/kubernetes/kubernetes/issues/139772: the pod references its
+			// claim via a template, but Status.ResourceClaimStatuses is empty
+			// (an external component overwrote the status). resourceclaim.Name
+			// returns ErrClaimNotFound, so the claim name must come from the
+			// cache instead. Previously this wedged the pod in terminating.
+			description:            "should unprepare using cache when ResourceClaimStatuses is missing",
+			driverName:             driverName,
+			pod:                    genTestPodWithClaimTemplateNoStatus(),
+			claim:                  genTestClaim(claimName, driverName, deviceName, podUID),
+			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, true, nil),
+			expectedUnprepareCalls: 1,
+			expectedMetric: `# HELP dra_grpc_operations_duration_seconds [ALPHA] Duration in seconds of the DRA gRPC operations
+# TYPE dra_grpc_operations_duration_seconds histogram
+dra_grpc_operations_duration_seconds_bucket{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources",le="+Inf"} 1
+dra_grpc_operations_duration_seconds_sum{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources"} 0
+dra_grpc_operations_duration_seconds_count{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources"} 1
+# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="false",operation_name="UnprepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="false",operation_name="UnprepareResources"} 0
+dra_operations_duration_seconds_count{is_error="false",operation_name="UnprepareResources"} 1
+`,
+		},
+		{
+			// Regression test for the pod reference guard in unprepareResources:
+			// if the claimInfo does not reference this pod, NodeUnprepareResources
+			// must not be called.
+			description:            "should skip unprepare for pod that never prepared the claim",
+			driverName:             driverName,
+			pod:                    genTestPod(), // pod UID = podUID
+			claim:                  genTestClaim(claimName, driverName, deviceName, podUID),
+			claimInfo:              genTestClaimInfo(claimUID, []string{"another-pod-uid"}, true, nil),
+			wantResourceSkipped:    true,
+			expectedUnprepareCalls: 0,
+			expectedMetric: `# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="false",operation_name="UnprepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="false",operation_name="UnprepareResources"} 0
+dra_operations_duration_seconds_count{is_error="false",operation_name="UnprepareResources"} 1
+`,
+		},
+		{
 			description:            "should unprepare resource when driver returns nil value",
 			driverName:             driverName,
 			pod:                    genTestPod(),
@@ -1378,10 +1677,11 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="Unprepare
 
 			manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
 			require.NoError(t, err, "create DRA manager")
+			defer manager.Stop()
 			manager.initDRAPluginManager(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
 
 			plg := manager.GetWatcherHandler()
-			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
+			if err := plg.RegisterPlugin(tCtx, test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}
 
@@ -1405,10 +1705,19 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="Unprepare
 			require.NoError(t, err)
 
 			if test.wantResourceSkipped {
-				if test.claimInfo != nil && len(test.claimInfo.PodUIDs) > 1 {
+				if test.claimInfo != nil && len(test.claimInfo.PodUIDs) > 0 {
 					cachedClaim, exists := manager.cache.get(test.claimInfo.ClaimName, test.claimInfo.Namespace)
 					require.True(t, exists, "ClaimInfo should still exist if skipped")
-					assert.False(t, cachedClaim.PodUIDs.Has(string(test.pod.UID)), "Pod UID should be removed from skipped claim")
+					assert.False(t, cachedClaim.PodUIDs.Has(string(test.pod.UID)), "Pod UID should not remain in skipped claim")
+					// Any pod UIDs that belonged to other pods must survive the
+					// no-op unprepare — this guards against wrongly tearing
+					// down a claim owned by another pod.
+					for uid := range test.claimInfo.PodUIDs {
+						if uid == string(test.pod.UID) {
+							continue
+						}
+						assert.True(t, cachedClaim.PodUIDs.Has(uid), "other pod UID %q must still reference the claim", uid)
+					}
 				}
 				return // resource skipped so no need to continue
 			}
@@ -1416,8 +1725,10 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="Unprepare
 			// Check cache was cleared only on successful unprepare
 			var podClaimName *string
 			if len(test.pod.Spec.ResourceClaims) > 0 {
-				podClaimName, _, err = resourceclaim.Name(test.pod, &test.pod.Spec.ResourceClaims[0])
-				require.NoError(t, err)
+				// The claim name may not be derivable from the pod (e.g. when
+				// Status.ResourceClaimStatuses is missing, as in #139772). That
+				// is fine: we fall back to the known claimName constant below.
+				podClaimName, _, _ = resourceclaim.Name(test.pod, &test.pod.Spec.ResourceClaims[0])
 			}
 			claimName := claimName
 			if podClaimName == nil {
@@ -1433,6 +1744,7 @@ func TestPodMightNeedToUnprepareResources(t *testing.T) {
 	fakeKubeClient := fake.NewSimpleClientset()
 	manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
 	require.NoError(t, err, "create DRA manager")
+	defer manager.Stop()
 
 	claimInfo := &ClaimInfo{
 		ClaimInfoState: state.ClaimInfoState{PodUIDs: sets.New(podUID), ClaimName: claimName, Namespace: namespace},
@@ -1514,6 +1826,7 @@ func TestGetContainerClaimInfos(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			manager, err := NewManager(tCtx.Logger(), nil, t.TempDir())
 			require.NoError(t, err, "create DRA manager")
+			defer manager.Stop()
 
 			if test.claimInfo != nil {
 				manager.cache.add(test.claimInfo)
@@ -1553,10 +1866,11 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 	fakeKubeClient := fake.NewSimpleClientset()
 	manager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
 	require.NoError(t, err, "create DRA manager")
+	defer manager.Stop()
 	manager.initDRAPluginManager(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
 
 	plg := manager.GetWatcherHandler()
-	if err := plg.RegisterPlugin(driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil); err != nil {
+	if err := plg.RegisterPlugin(tCtx, driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil); err != nil {
 		t.Fatalf("failed to register plugin %s, err: %v", driverName, err)
 	}
 
@@ -1648,7 +1962,7 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 	) (
 		managerInstance *Manager,
 		runTestStreamFunc func(context.Context, chan struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1.NodeWatchResourcesResponse
 			Err  error
 		}) (<-chan resourceupdates.Update, chan struct{}, chan error),
 	) {
@@ -1656,6 +1970,7 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 		// Fresh manager for each sub-test
 		manager, err := NewManager(tCtx.Logger(), nil, st.TempDir())
 		require.NoError(st, err)
+		defer manager.Stop()
 
 		for _, ci := range initialClaimInfos {
 			manager.cache.add(ci)
@@ -1666,7 +1981,7 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 		runTestStreamFunc = func(
 			streamCtx context.Context,
 			responses chan struct {
-				Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+				Resp *drahealthv1.NodeWatchResourcesResponse
 				Err  error
 			},
 		) (<-chan resourceupdates.Update, chan struct{}, chan error) {
@@ -1714,26 +2029,26 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 		t.Log("HealthChangeForAllocatedDevice: Test Case Started")
 
 		responses := make(chan struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1.NodeWatchResourcesResponse
 			Err  error
 		}, 1)
 		updateChan, done, streamErrChan := runStreamTest(stCtx, responses)
 
 		// Send the health update message
-		unhealthyDeviceMsg := &drahealthv1alpha1.DeviceHealth{
-			Device: &drahealthv1alpha1.DeviceIdentifier{
+		unhealthyDeviceMsg := &drahealthv1.DeviceHealth{
+			Device: &drahealthv1.DeviceIdentifier{
 				PoolName:   poolName,
 				DeviceName: deviceName,
 			},
-			Health:          drahealthv1alpha1.HealthStatus_UNHEALTHY,
+			Health:          drahealthv1.HealthStatus_UNHEALTHY,
 			LastUpdatedTime: time.Now().Unix(),
 		}
 		t.Logf("HealthChangeForAllocatedDevice: Sending health update: %+v", unhealthyDeviceMsg)
 		responses <- struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1.NodeWatchResourcesResponse
 			Err  error
 		}{
-			Resp: &drahealthv1alpha1.NodeWatchResourcesResponse{Devices: []*drahealthv1alpha1.DeviceHealth{unhealthyDeviceMsg}},
+			Resp: &drahealthv1.NodeWatchResourcesResponse{Devices: []*drahealthv1.DeviceHealth{unhealthyDeviceMsg}},
 		}
 
 		t.Log("HealthChangeForAllocatedDevice: Waiting for update on manager channel")
@@ -1775,24 +2090,24 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 
 		t.Log("NonAllocatedDeviceChange: Test Case Started")
 		responses := make(chan struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1.NodeWatchResourcesResponse
 			Err  error
 		}, 1)
 		updateChan, done, streamErrChan := runStreamTest(stCtx, responses)
 
-		otherDeviceMsg := &drahealthv1alpha1.DeviceHealth{
-			Device: &drahealthv1alpha1.DeviceIdentifier{
+		otherDeviceMsg := &drahealthv1.DeviceHealth{
+			Device: &drahealthv1.DeviceIdentifier{
 				PoolName:   poolName,
 				DeviceName: "other-device",
 			},
-			Health:          drahealthv1alpha1.HealthStatus_UNHEALTHY,
+			Health:          drahealthv1.HealthStatus_UNHEALTHY,
 			LastUpdatedTime: time.Now().Unix(),
 		}
 		responses <- struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1.NodeWatchResourcesResponse
 			Err  error
 		}{
-			Resp: &drahealthv1alpha1.NodeWatchResourcesResponse{Devices: []*drahealthv1alpha1.DeviceHealth{otherDeviceMsg}},
+			Resp: &drahealthv1.NodeWatchResourcesResponse{Devices: []*drahealthv1.DeviceHealth{otherDeviceMsg}},
 		}
 
 		select {
@@ -1835,25 +2150,25 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 
 		t.Log("NoActualStateChange: Test Case Started")
 		responses := make(chan struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1.NodeWatchResourcesResponse
 			Err  error
 		}, 1)
 		updateChan, done, streamErrChan := runStreamTest(stCtx, responses)
 
 		// Send the same "Unhealthy" state again
-		unhealthyDeviceMsg := &drahealthv1alpha1.DeviceHealth{
-			Device: &drahealthv1alpha1.DeviceIdentifier{
+		unhealthyDeviceMsg := &drahealthv1.DeviceHealth{
+			Device: &drahealthv1.DeviceIdentifier{
 				PoolName:   poolName,
 				DeviceName: deviceName,
 			},
-			Health:          drahealthv1alpha1.HealthStatus_UNHEALTHY,
+			Health:          drahealthv1.HealthStatus_UNHEALTHY,
 			LastUpdatedTime: time.Now().Unix(),
 		}
 		responses <- struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1.NodeWatchResourcesResponse
 			Err  error
 		}{
-			Resp: &drahealthv1alpha1.NodeWatchResourcesResponse{Devices: []*drahealthv1alpha1.DeviceHealth{unhealthyDeviceMsg}},
+			Resp: &drahealthv1.NodeWatchResourcesResponse{Devices: []*drahealthv1.DeviceHealth{unhealthyDeviceMsg}},
 		}
 
 		select {
@@ -1885,14 +2200,14 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 		t.Log("StreamError: Test Case Started")
 
 		responses := make(chan struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1.NodeWatchResourcesResponse
 			Err  error
 		}, 1)
 		_, done, streamErrChan := runStreamTest(stCtx, responses)
 
 		expectedStreamErr := errors.New("simulated mock stream error")
 		responses <- struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1.NodeWatchResourcesResponse
 			Err  error
 		}{Err: expectedStreamErr}
 
@@ -1920,7 +2235,7 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 		t.Log("ContextCanceled: Test Case Started")
 
 		responses := make(chan struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1.NodeWatchResourcesResponse
 			Err  error
 		})
 		_, done, streamErrChan := runStreamTest(stCtx, responses)
@@ -1956,26 +2271,26 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 		t.Log("HealthChangeForDeviceWithShareID: Test Case Started")
 
 		responses := make(chan struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1.NodeWatchResourcesResponse
 			Err  error
 		}, 1)
 		updateChan, done, streamErrChan := runStreamTest(stCtx, responses)
 
 		// Send health update for the device (same device that has ShareID in the claim)
-		unhealthyDeviceMsg := &drahealthv1alpha1.DeviceHealth{
-			Device: &drahealthv1alpha1.DeviceIdentifier{
+		unhealthyDeviceMsg := &drahealthv1.DeviceHealth{
+			Device: &drahealthv1.DeviceIdentifier{
 				PoolName:   poolName,
 				DeviceName: deviceName,
 			},
-			Health:          drahealthv1alpha1.HealthStatus_UNHEALTHY,
+			Health:          drahealthv1.HealthStatus_UNHEALTHY,
 			LastUpdatedTime: time.Now().Unix(),
 		}
 		t.Logf("HealthChangeForDeviceWithShareID: Sending health update: %+v", unhealthyDeviceMsg)
 		responses <- struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1.NodeWatchResourcesResponse
 			Err  error
 		}{
-			Resp: &drahealthv1alpha1.NodeWatchResourcesResponse{Devices: []*drahealthv1alpha1.DeviceHealth{unhealthyDeviceMsg}},
+			Resp: &drahealthv1.NodeWatchResourcesResponse{Devices: []*drahealthv1.DeviceHealth{unhealthyDeviceMsg}},
 		}
 
 		t.Log("HealthChangeForDeviceWithShareID: Waiting for update on manager channel")
@@ -2076,26 +2391,26 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 		t.Log("HealthChangeForMultiplePodsWithSharedDevice: Test Case Started")
 
 		responses := make(chan struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1.NodeWatchResourcesResponse
 			Err  error
 		}, 1)
 		updateChan, done, streamErrChan := runStreamTest(stCtx, responses)
 
 		// Send health update for the shared device
-		unhealthyDeviceMsg := &drahealthv1alpha1.DeviceHealth{
-			Device: &drahealthv1alpha1.DeviceIdentifier{
+		unhealthyDeviceMsg := &drahealthv1.DeviceHealth{
+			Device: &drahealthv1.DeviceIdentifier{
 				PoolName:   poolName,
 				DeviceName: deviceName,
 			},
-			Health:          drahealthv1alpha1.HealthStatus_UNHEALTHY,
+			Health:          drahealthv1.HealthStatus_UNHEALTHY,
 			LastUpdatedTime: time.Now().Unix(),
 		}
 		t.Logf("HealthChangeForMultiplePodsWithSharedDevice: Sending health update: %+v", unhealthyDeviceMsg)
 		responses <- struct {
-			Resp *drahealthv1alpha1.NodeWatchResourcesResponse
+			Resp *drahealthv1.NodeWatchResourcesResponse
 			Err  error
 		}{
-			Resp: &drahealthv1alpha1.NodeWatchResourcesResponse{Devices: []*drahealthv1alpha1.DeviceHealth{unhealthyDeviceMsg}},
+			Resp: &drahealthv1.NodeWatchResourcesResponse{Devices: []*drahealthv1.DeviceHealth{unhealthyDeviceMsg}},
 		}
 
 		t.Log("HealthChangeForMultiplePodsWithSharedDevice: Waiting for update on manager channel")
@@ -2313,6 +2628,7 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 			logger := tCtx.Logger()
 			manager, err := NewManager(logger, nil, t.TempDir())
 			require.NoError(t, err)
+			defer manager.Stop()
 
 			for _, ci := range tc.claimInfos {
 				manager.cache.add(ci)
@@ -2336,7 +2652,7 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 			}
 
 			status := tc.initialStatus.DeepCopy()
-			manager.UpdateAllocatedResourcesStatus(tc.pod, status)
+			manager.UpdateAllocatedResourcesStatus(logger, tc.pod, status)
 
 			require.Len(t, status.ContainerStatuses, 1)
 			assert.Equal(t, tc.expectedAllocatedResourcesStatus, status.ContainerStatuses[0].AllocatedResourcesStatus)
@@ -2345,6 +2661,8 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 }
 
 func TestUpdateAllocatedResourcesStatus_Subrequest(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
 	directClaimName := "test-claim"
 
 	testCases := []struct {
@@ -2393,6 +2711,7 @@ func TestUpdateAllocatedResourcesStatus_Subrequest(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			manager, err := NewManager(tCtx.Logger(), nil, t.TempDir())
 			require.NoError(t, err)
+			defer manager.Stop()
 
 			// Setup claim info with device
 			claimInfo := &ClaimInfo{
@@ -2458,7 +2777,7 @@ func TestUpdateAllocatedResourcesStatus_Subrequest(t *testing.T) {
 			}
 
 			// Call UpdateAllocatedResourcesStatus
-			manager.UpdateAllocatedResourcesStatus(pod, status)
+			manager.UpdateAllocatedResourcesStatus(logger, pod, status)
 
 			// Assert results
 			require.Len(t, status.ContainerStatuses, 1)
@@ -2681,23 +3000,23 @@ func TestToResourceHealthStatus(t *testing.T) {
 
 func TestToDeviceHealthStatus(t *testing.T) {
 	testCases := map[string]struct {
-		input    drahealthv1alpha1.HealthStatus
+		input    drahealthv1.HealthStatus
 		expected state.DeviceHealthStatus
 	}{
 		"healthy": {
-			input:    drahealthv1alpha1.HealthStatus_HEALTHY,
+			input:    drahealthv1.HealthStatus_HEALTHY,
 			expected: state.DeviceHealthStatusHealthy,
 		},
 		"unhealthy": {
-			input:    drahealthv1alpha1.HealthStatus_UNHEALTHY,
+			input:    drahealthv1.HealthStatus_UNHEALTHY,
 			expected: state.DeviceHealthStatusUnhealthy,
 		},
 		"unknown": {
-			input:    drahealthv1alpha1.HealthStatus_UNKNOWN,
+			input:    drahealthv1.HealthStatus_UNKNOWN,
 			expected: state.DeviceHealthStatusUnknown,
 		},
 		"unexpected": {
-			input:    drahealthv1alpha1.HealthStatus(99),
+			input:    drahealthv1.HealthStatus(99),
 			expected: state.DeviceHealthStatusUnknown,
 		},
 	}
@@ -2714,7 +3033,7 @@ func TestBuildDeviceHealth(t *testing.T) {
 	longMessage := strings.Repeat("a", v1.ResourceHealthMessageMaxLength+5)
 
 	testCases := map[string]struct {
-		health         drahealthv1alpha1.HealthStatus
+		health         drahealthv1.HealthStatus
 		timeoutSeconds int64
 		message        string
 		wantHealth     state.DeviceHealthStatus
@@ -2722,7 +3041,7 @@ func TestBuildDeviceHealth(t *testing.T) {
 		wantMessage    string
 	}{
 		"healthy with positive timeout": {
-			health:         drahealthv1alpha1.HealthStatus_HEALTHY,
+			health:         drahealthv1.HealthStatus_HEALTHY,
 			timeoutSeconds: 12,
 			message:        "ok",
 			wantHealth:     state.DeviceHealthStatusHealthy,
@@ -2730,7 +3049,7 @@ func TestBuildDeviceHealth(t *testing.T) {
 			wantMessage:    "ok",
 		},
 		"unhealthy with zero timeout": {
-			health:         drahealthv1alpha1.HealthStatus_UNHEALTHY,
+			health:         drahealthv1.HealthStatus_UNHEALTHY,
 			timeoutSeconds: 0,
 			message:        "fail",
 			wantHealth:     state.DeviceHealthStatusUnhealthy,
@@ -2738,7 +3057,7 @@ func TestBuildDeviceHealth(t *testing.T) {
 			wantMessage:    "fail",
 		},
 		"unknown with negative timeout": {
-			health:         drahealthv1alpha1.HealthStatus_UNKNOWN,
+			health:         drahealthv1.HealthStatus_UNKNOWN,
 			timeoutSeconds: -1,
 			message:        longMessage,
 			wantHealth:     state.DeviceHealthStatusUnknown,
@@ -2749,8 +3068,8 @@ func TestBuildDeviceHealth(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			grpcDevice := &drahealthv1alpha1.DeviceHealth{
-				Device: &drahealthv1alpha1.DeviceIdentifier{
+			grpcDevice := &drahealthv1.DeviceHealth{
+				Device: &drahealthv1.DeviceIdentifier{
 					PoolName:   "pool",
 					DeviceName: "device",
 				},
@@ -2769,4 +3088,123 @@ func TestBuildDeviceHealth(t *testing.T) {
 			assert.Equal(t, tc.wantMessage, got.Message)
 		})
 	}
+}
+
+func genTestClaimWithSkip(name, driver, device, podUID string, skip ...resourceapi.SkipNodeOperation) *resourceapi.ResourceClaim {
+	c := genTestClaim(name, driver, device, podUID)
+	c.Status.Allocation.Devices.Results[0].SkipNodeOperations = skip
+	return c
+}
+
+func TestPrepareUnprepareResourcesSkipNodeOperations(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	fakeKubeClient := fake.NewClientset()
+
+	manager, err := NewManager(logger, fakeKubeClient, t.TempDir())
+	require.NoError(t, err)
+	manager.initDRAPluginManager(tCtx, getFakeNode, time.Second)
+
+	draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, false, nil, nil, nil, nil)
+	require.NoError(t, err)
+	defer draServerInfo.teardownFn()
+
+	pluginHandler := manager.GetWatcherHandler()
+	require.NoError(t, pluginHandler.RegisterPlugin(tCtx, driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil))
+
+	t.Run("SkipNodeOperationAll", func(t *testing.T) {
+		t.Run("Prepare fails when feature gate is disabled", func(t *testing.T) {
+			const claimName = "claim-skip-all-fg-disabled"
+			pod := genTestPodWithClaims(claimName)
+			claim := genTestClaimWithSkip(claimName, driverName, deviceName, string(pod.ObjectMeta.UID), resourceapi.SkipNodeOperationAll)
+			claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourceapi.ResourceClaimConsumerReference{UID: pod.ObjectMeta.UID})
+			_, err = fakeKubeClient.ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
+			require.NoError(t, err)
+
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, false)
+			err = manager.PrepareResources(tCtx, pod)
+			require.ErrorContains(t, err, "DRAOptionalNodeOperations feature gate is disabled")
+			assert.Equal(t, uint32(0), draServerInfo.server.prepareResourceCalls.Load())
+		})
+
+		t.Run("Feature gate enabled for prepare and unprepare", func(t *testing.T) {
+			const claimName = "claim-skip-all-normal"
+			pod := genTestPodWithClaims(claimName)
+			claim := genTestClaimWithSkip(claimName, driverName, deviceName, string(pod.ObjectMeta.UID), resourceapi.SkipNodeOperationAll)
+			claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourceapi.ResourceClaimConsumerReference{UID: pod.ObjectMeta.UID})
+			_, err = fakeKubeClient.ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
+			require.NoError(t, err)
+
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, true)
+
+			err = manager.PrepareResources(tCtx, pod)
+			require.NoError(t, err)
+			assert.Equal(t, uint32(0), draServerInfo.server.prepareResourceCalls.Load(), "NodePrepareResources must be skipped for SkipNodeOperationAll")
+
+			err = manager.UnprepareResources(tCtx, pod)
+			require.NoError(t, err)
+			assert.Equal(t, uint32(0), draServerInfo.server.unprepareResourceCalls.Load(), "NodeUnprepareResources must be skipped for SkipNodeOperationAll")
+		})
+
+		t.Run("Feature gate disabled during unprepare", func(t *testing.T) {
+			const claimName = "claim-skip-all-rollback"
+			pod := genTestPodWithClaims(claimName)
+			claim := genTestClaimWithSkip(claimName, driverName, deviceName, string(pod.ObjectMeta.UID), resourceapi.SkipNodeOperationAll)
+			claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourceapi.ResourceClaimConsumerReference{UID: pod.ObjectMeta.UID})
+			_, err = fakeKubeClient.ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
+			require.NoError(t, err)
+
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, true)
+			err = manager.PrepareResources(tCtx, pod)
+			require.NoError(t, err)
+
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, false)
+			err = manager.UnprepareResources(tCtx, pod)
+			require.NoError(t, err, "UnprepareResources must succeed during rollback even if feature gate is disabled")
+			assert.Equal(t, uint32(0), draServerInfo.server.unprepareResourceCalls.Load(), "NodeUnprepareResources must be skipped for SkipNodeOperationAll")
+		})
+	})
+
+	t.Run("SkipNodeOperationNodeUnprepareResources", func(t *testing.T) {
+		t.Run("Feature gate enabled for prepare and unprepare", func(t *testing.T) {
+			const claimName = "claim-skip-unprepare-normal"
+			pod := genTestPodWithClaims(claimName)
+			claim := genTestClaimWithSkip(claimName, driverName, deviceName, string(pod.ObjectMeta.UID), resourceapi.SkipNodeOperationNodeUnprepareResources)
+			claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourceapi.ResourceClaimConsumerReference{UID: pod.ObjectMeta.UID})
+			_, err = fakeKubeClient.ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
+			require.NoError(t, err)
+
+			draServerInfo.server.prepareResourcesResponse = genPrepareResourcesResponse(claim.UID)
+
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, true)
+
+			prepareCallsBefore := draServerInfo.server.prepareResourceCalls.Load()
+			err = manager.PrepareResources(tCtx, pod)
+			require.NoError(t, err)
+			assert.Equal(t, prepareCallsBefore+1, draServerInfo.server.prepareResourceCalls.Load(), "NodePrepareResources must be called for SkipNodeOperationNodeUnprepareResources")
+
+			err = manager.UnprepareResources(tCtx, pod)
+			require.NoError(t, err)
+			assert.Equal(t, uint32(0), draServerInfo.server.unprepareResourceCalls.Load(), "NodeUnprepareResources must be skipped for SkipNodeOperationNodeUnprepareResources")
+		})
+
+		t.Run("Feature gate disabled during unprepare", func(t *testing.T) {
+			const claimName = "claim-skip-unprepare-rollback"
+			pod := genTestPodWithClaims(claimName)
+			claim := genTestClaimWithSkip(claimName, driverName, deviceName, string(pod.ObjectMeta.UID), resourceapi.SkipNodeOperationNodeUnprepareResources)
+			claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourceapi.ResourceClaimConsumerReference{UID: pod.ObjectMeta.UID})
+			_, err = fakeKubeClient.ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
+			require.NoError(t, err)
+
+			draServerInfo.server.prepareResourcesResponse = genPrepareResourcesResponse(claim.UID)
+
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, true)
+			err = manager.PrepareResources(tCtx, pod)
+			require.NoError(t, err)
+
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAOptionalNodeOperations, false)
+			err = manager.UnprepareResources(tCtx, pod)
+			require.NoError(t, err, "UnprepareResources must succeed during rollback even if feature gate is disabled")
+			assert.Equal(t, uint32(0), draServerInfo.server.unprepareResourceCalls.Load(), "NodeUnprepareResources must be skipped for SkipNodeOperationNodeUnprepareResources")
+		})
+	})
 }

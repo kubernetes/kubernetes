@@ -17,10 +17,12 @@ limitations under the License.
 package validation
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"unicode"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -266,14 +268,39 @@ func ValidateTableOptions(opts *metav1.TableOptions) field.ErrorList {
 
 const MaxSubresourceNameLength = 256
 
-func ValidateManagedFields(fieldsList []metav1.ManagedFieldsEntry, fldPath *field.Path) field.ErrorList {
+// ManagedFieldsValidationOption specifies options for validating managed fields.
+type ManagedFieldsValidationOption int
+
+const (
+	// CoveredByDeclarative indicates whether errors should be marked as covered by declarative validation.
+	CoveredByDeclarative ManagedFieldsValidationOption = iota + 1
+)
+
+// ValidateManagedFields validates a list of managed fields.
+func ValidateManagedFields(fieldsList []metav1.ManagedFieldsEntry, fldPath *field.Path, opts ...ManagedFieldsValidationOption) field.ErrorList {
+	coveredByDeclarative := false
+	for _, opt := range opts {
+		if opt == CoveredByDeclarative {
+			coveredByDeclarative = true
+		}
+	}
 	var allErrs field.ErrorList
 	for i, fields := range fieldsList {
 		fldPath := fldPath.Index(i)
 		switch fields.Operation {
+		case "":
+			err := field.Required(fldPath.Child("operation"), "must not be empty")
+			if coveredByDeclarative {
+				err = err.MarkCoveredByDeclarative()
+			}
+			allErrs = append(allErrs, err)
 		case metav1.ManagedFieldsOperationApply, metav1.ManagedFieldsOperationUpdate:
 		default:
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("operation"), fields.Operation, "must be `Apply` or `Update`"))
+			err := field.NotSupported(fldPath.Child("operation"), fields.Operation, []metav1.ManagedFieldsOperationType{metav1.ManagedFieldsOperationApply, metav1.ManagedFieldsOperationUpdate})
+			if coveredByDeclarative {
+				err = err.MarkCoveredByDeclarative()
+			}
+			allErrs = append(allErrs, err)
 		}
 		if len(fields.FieldsType) > 0 && fields.FieldsType != "FieldsV1" {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("fieldsType"), fields.FieldsType, "must be `FieldsV1`"))
@@ -293,7 +320,7 @@ func ValidateConditions(conditions []metav1.Condition, fldPath *field.Path) fiel
 	conditionTypeToFirstIndex := map[string]int{}
 	for i, condition := range conditions {
 		if _, ok := conditionTypeToFirstIndex[condition.Type]; ok {
-			allErrs = append(allErrs, field.Duplicate(fldPath.Index(i).Child("type"), condition.Type))
+			allErrs = append(allErrs, field.Duplicate(fldPath.Index(i), condition.Type).MarkCoveredByDeclarative())
 		} else {
 			conditionTypeToFirstIndex[condition.Type] = i
 		}
@@ -316,29 +343,35 @@ func ValidateCondition(condition metav1.Condition, fldPath *field.Path) field.Er
 	var allErrs field.ErrorList
 
 	// type is set and is a valid format
-	allErrs = append(allErrs, ValidateLabelName(condition.Type, fldPath.Child("type"))...)
+	if len(condition.Type) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("type"), "is required").MarkCoveredByDeclarative())
+	} else {
+		allErrs = append(allErrs, ValidateLabelName(condition.Type, fldPath.Child("type"))...)
+	}
 
 	// status is set and is an accepted value
-	if !validConditionStatuses.Has(string(condition.Status)) {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("status"), condition.Status, validConditionStatuses.List()))
+	if len(condition.Status) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("status"), "").MarkCoveredByDeclarative())
+	} else if !validConditionStatuses.Has(string(condition.Status)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("status"), condition.Status, validConditionStatuses.List()).MarkCoveredByDeclarative())
 	}
 
 	if condition.ObservedGeneration < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("observedGeneration"), condition.ObservedGeneration, "must be greater than or equal to zero"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("observedGeneration"), condition.ObservedGeneration, "must be greater than or equal to zero").WithOrigin("minimum").MarkCoveredByDeclarative())
 	}
 
 	if condition.LastTransitionTime.IsZero() {
-		allErrs = append(allErrs, field.Required(fldPath.Child("lastTransitionTime"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("lastTransitionTime"), "").MarkCoveredByDeclarative())
 	}
 
 	if len(condition.Reason) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("reason"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("reason"), "").MarkCoveredByDeclarative())
 	} else {
-		for _, currErr := range isValidConditionReason(condition.Reason) {
+		for _, currErr := range IsValidConditionReason(condition.Reason) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("reason"), condition.Reason, currErr))
 		}
 		if len(condition.Reason) > maxReasonLen {
-			allErrs = append(allErrs, field.TooLong(fldPath.Child("reason"), "" /*unused*/, maxReasonLen))
+			allErrs = append(allErrs, field.TooLong(fldPath.Child("reason"), "" /*unused*/, maxReasonLen).WithOrigin("maxBytes").MarkCoveredByDeclarative())
 		}
 	}
 
@@ -354,8 +387,9 @@ const conditionReasonErrMsg string = "a condition reason must start with alphabe
 
 var conditionReasonRegexp = regexp.MustCompile("^" + conditionReasonFmt + "$")
 
-// isValidConditionReason tests for a string that conforms to rules for condition reasons. This checks the format, but not the length.
-func isValidConditionReason(value string) []string {
+// IsValidConditionReason tests for a string that conforms to rules for condition
+// reasons. This checks the format, but not the length.
+func IsValidConditionReason(value string) []string {
 	if !conditionReasonRegexp.MatchString(value) {
 		return []string{validation.RegexError(conditionReasonErrMsg, conditionReasonFmt, "my_name", "MY_NAME", "MyName", "ReasonA,ReasonB", "ReasonA:ReasonB")}
 	}
@@ -370,9 +404,6 @@ func ValidateIgnoreStoreReadError(fldPath *field.Path, options *metav1.DeleteOpt
 		return allErrs
 	}
 
-	if len(options.DryRun) > 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, true, "cannot be set together with .dryRun"))
-	}
 	if options.PropagationPolicy != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, true, "cannot be set together with .propagationPolicy"))
 	}
@@ -388,4 +419,15 @@ func ValidateIgnoreStoreReadError(fldPath *field.Path, options *metav1.DeleteOpt
 	}
 
 	return allErrs
+}
+
+// ValidateCustom_Condition_LastTransitionTime is wired into the generated
+// declarative validation by +k8s:customValidation on Condition.LastTransitionTime.
+// It enforces that the field is set, mirroring the handwritten check in
+// ValidateCondition.
+func ValidateCustom_Condition_LastTransitionTime(ctx context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *metav1.Time) field.ErrorList {
+	if value.IsZero() {
+		return field.ErrorList{field.Required(fldPath, "")}
+	}
+	return nil
 }

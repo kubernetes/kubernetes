@@ -25,13 +25,9 @@ import (
 	unsafe "unsafe"
 
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
-	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
-	core "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func init() {
@@ -128,17 +124,7 @@ func Convert_batch_CronJob_To_v1beta1_CronJob(in *batch.CronJob, out *batchv1bet
 
 func autoConvert_v1beta1_CronJobList_To_batch_CronJobList(in *batchv1beta1.CronJobList, out *batch.CronJobList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]batch.CronJob, len(*in))
-		for i := range *in {
-			if err := Convert_v1beta1_CronJob_To_batch_CronJob(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]batch.CronJob)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -149,17 +135,7 @@ func Convert_v1beta1_CronJobList_To_batch_CronJobList(in *batchv1beta1.CronJobLi
 
 func autoConvert_batch_CronJobList_To_v1beta1_CronJobList(in *batch.CronJobList, out *batchv1beta1.CronJobList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]batchv1beta1.CronJob, len(*in))
-		for i := range *in {
-			if err := Convert_batch_CronJob_To_v1beta1_CronJob(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]batchv1beta1.CronJob)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -169,16 +145,7 @@ func Convert_batch_CronJobList_To_v1beta1_CronJobList(in *batch.CronJobList, out
 }
 
 func autoConvert_v1beta1_CronJobSpec_To_batch_CronJobSpec(in *batchv1beta1.CronJobSpec, out *batch.CronJobSpec, s conversion.Scope) error {
-	out.Schedule = in.Schedule
-	out.TimeZone = (*string)(unsafe.Pointer(in.TimeZone))
-	out.StartingDeadlineSeconds = (*int64)(unsafe.Pointer(in.StartingDeadlineSeconds))
-	out.ConcurrencyPolicy = batch.ConcurrencyPolicy(in.ConcurrencyPolicy)
-	out.Suspend = (*bool)(unsafe.Pointer(in.Suspend))
-	if err := Convert_v1beta1_JobTemplateSpec_To_batch_JobTemplateSpec(&in.JobTemplate, &out.JobTemplate, s); err != nil {
-		return err
-	}
-	out.SuccessfulJobsHistoryLimit = (*int32)(unsafe.Pointer(in.SuccessfulJobsHistoryLimit))
-	out.FailedJobsHistoryLimit = (*int32)(unsafe.Pointer(in.FailedJobsHistoryLimit))
+	*out = *(*batch.CronJobSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -188,16 +155,7 @@ func Convert_v1beta1_CronJobSpec_To_batch_CronJobSpec(in *batchv1beta1.CronJobSp
 }
 
 func autoConvert_batch_CronJobSpec_To_v1beta1_CronJobSpec(in *batch.CronJobSpec, out *batchv1beta1.CronJobSpec, s conversion.Scope) error {
-	out.Schedule = in.Schedule
-	out.TimeZone = (*string)(unsafe.Pointer(in.TimeZone))
-	out.StartingDeadlineSeconds = (*int64)(unsafe.Pointer(in.StartingDeadlineSeconds))
-	out.ConcurrencyPolicy = batchv1beta1.ConcurrencyPolicy(in.ConcurrencyPolicy)
-	out.Suspend = (*bool)(unsafe.Pointer(in.Suspend))
-	if err := Convert_batch_JobTemplateSpec_To_v1beta1_JobTemplateSpec(&in.JobTemplate, &out.JobTemplate, s); err != nil {
-		return err
-	}
-	out.SuccessfulJobsHistoryLimit = (*int32)(unsafe.Pointer(in.SuccessfulJobsHistoryLimit))
-	out.FailedJobsHistoryLimit = (*int32)(unsafe.Pointer(in.FailedJobsHistoryLimit))
+	*out = *(*batchv1beta1.CronJobSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -207,9 +165,7 @@ func Convert_batch_CronJobSpec_To_v1beta1_CronJobSpec(in *batch.CronJobSpec, out
 }
 
 func autoConvert_v1beta1_CronJobStatus_To_batch_CronJobStatus(in *batchv1beta1.CronJobStatus, out *batch.CronJobStatus, s conversion.Scope) error {
-	out.Active = *(*[]core.ObjectReference)(unsafe.Pointer(&in.Active))
-	out.LastScheduleTime = (*v1.Time)(unsafe.Pointer(in.LastScheduleTime))
-	out.LastSuccessfulTime = (*v1.Time)(unsafe.Pointer(in.LastSuccessfulTime))
+	*out = *(*batch.CronJobStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -219,9 +175,7 @@ func Convert_v1beta1_CronJobStatus_To_batch_CronJobStatus(in *batchv1beta1.CronJ
 }
 
 func autoConvert_batch_CronJobStatus_To_v1beta1_CronJobStatus(in *batch.CronJobStatus, out *batchv1beta1.CronJobStatus, s conversion.Scope) error {
-	out.Active = *(*[]corev1.ObjectReference)(unsafe.Pointer(&in.Active))
-	out.LastScheduleTime = (*v1.Time)(unsafe.Pointer(in.LastScheduleTime))
-	out.LastSuccessfulTime = (*v1.Time)(unsafe.Pointer(in.LastSuccessfulTime))
+	*out = *(*batchv1beta1.CronJobStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -231,10 +185,7 @@ func Convert_batch_CronJobStatus_To_v1beta1_CronJobStatus(in *batch.CronJobStatu
 }
 
 func autoConvert_v1beta1_JobTemplateSpec_To_batch_JobTemplateSpec(in *batchv1beta1.JobTemplateSpec, out *batch.JobTemplateSpec, s conversion.Scope) error {
-	out.ObjectMeta = in.ObjectMeta
-	if err := batchv1.Convert_v1_JobSpec_To_batch_JobSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
+	*out = *(*batch.JobTemplateSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -244,10 +195,7 @@ func Convert_v1beta1_JobTemplateSpec_To_batch_JobTemplateSpec(in *batchv1beta1.J
 }
 
 func autoConvert_batch_JobTemplateSpec_To_v1beta1_JobTemplateSpec(in *batch.JobTemplateSpec, out *batchv1beta1.JobTemplateSpec, s conversion.Scope) error {
-	out.ObjectMeta = in.ObjectMeta
-	if err := batchv1.Convert_batch_JobSpec_To_v1_JobSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
+	*out = *(*batchv1beta1.JobTemplateSpec)(unsafe.Pointer(in))
 	return nil
 }
 

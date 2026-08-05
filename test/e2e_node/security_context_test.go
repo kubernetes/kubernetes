@@ -18,10 +18,12 @@ package e2enode
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os/exec"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,6 +36,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("Security Context", func() {
@@ -143,9 +146,22 @@ var _ = SIGDescribe("Security Context", func() {
 				true,
 			))
 
-			output := e2epod.ExecShellInContainer(f, nginxPodName, nginxPodName,
-				"cat /var/run/nginx.pid")
-			nginxPid = strings.TrimSpace(output)
+			// Retry reading the nginx PID file since nginx may not have
+			// finished starting by the time the pod is marked Ready.
+			gomega.Eventually(ctx, func() error {
+				output, _, err := e2epod.ExecCommandInContainerWithFullOutput(
+					f, nginxPodName, nginxPodName,
+					"/bin/cat", "/var/run/nginx.pid")
+				if err != nil {
+					return fmt.Errorf("failed to read nginx pid: %w", err)
+				}
+				pid := strings.TrimSpace(output)
+				if pid == "" {
+					return errors.New("nginx pid file is empty")
+				}
+				nginxPid = pid
+				return nil
+			}, 30*time.Second, 1*time.Second).Should(gomega.Succeed())
 		})
 
 		f.It("should show its pid in the host PID namespace", feature.HostAccess, func(ctx context.Context) {

@@ -35,7 +35,7 @@ func worker(f *framework.Framework, pod *v1.Pod, id int, jobs <-chan int, result
 		func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
-			stdout, stderr, err := e2epod.ExecWithOptionsContext(ctx, f, e2epod.ExecOptions{
+			stdout, stderr, err := e2epod.Exec(f.TContext(ctx), e2epod.ExecOptions{
 				Command:            []string{"date"},
 				Namespace:          f.Namespace.Name,
 				PodName:            pod.Name,

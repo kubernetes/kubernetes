@@ -69,7 +69,7 @@ func (b Bool) ConvertToNative(typeDesc reflect.Type) (any, error) {
 		case boolWrapperType:
 			// Convert the bool to a wrapperspb.BoolValue.
 			return wrapperspb.Bool(bool(b)), nil
-		case jsonValueType:
+		case JSONValueType:
 			// Return the bool as a new structpb.Value.
 			return structpb.NewBoolValue(bool(b)), nil
 		default:

@@ -336,6 +336,16 @@ const (
 // podSyncStatus tracks per-pod transitions through the three phases of pod
 // worker sync (setup, terminating, terminated).
 type podSyncStatus struct {
+	// ctx is reused across normal pod syncs.
+	// A new ctx is created on the next startPodSync after explicit cancellation.
+	//
+	// TODO: remove this from the struct by having the context initialized
+	// in startPodSync, the cancelFn used by UpdatePod, and cancellation of
+	// a parent context for tearing down workers (if needed) on shutdown.
+	// Be careful not to leak contexts (see #139823).
+	// Be careful that long-lived goroutines (such as prober workers) outlive
+	// the lifetime of a single startPodSync cancellation context.
+	ctx context.Context
 	// cancelFn if set is expected to cancel the current podSyncer operation.
 	cancelFn context.CancelFunc
 
@@ -1152,7 +1162,11 @@ func (p *podWorkers) startPodSync(parentCtx context.Context, podUID types.UID) (
 	default:
 	}
 
-	ctx, status.cancelFn = context.WithCancel(parentCtx)
+	if status.ctx == nil || status.ctx.Err() != nil {
+		// create a context with parentCtx's values, and reuse it until it is canceled
+		status.ctx, status.cancelFn = context.WithCancel(context.WithoutCancel(parentCtx))
+	}
+	ctx = status.ctx
 
 	// if we are already started, make our state visible to downstream components
 	if status.IsStarted() {

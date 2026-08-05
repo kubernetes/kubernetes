@@ -219,8 +219,7 @@ func TestResizeFunctions(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		tc := test
+	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, true)
 			pvc := tc.pvc

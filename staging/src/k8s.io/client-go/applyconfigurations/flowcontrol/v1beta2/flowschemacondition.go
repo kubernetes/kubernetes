@@ -32,8 +32,7 @@ type FlowSchemaConditionApplyConfiguration struct {
 	// Required.
 	Type *flowcontrolv1beta2.FlowSchemaConditionType `json:"type,omitempty"`
 	// `status` is the status of the condition.
-	// Can be True, False, Unknown.
-	// Required.
+	// Should be specified and set to one of True, False, Unknown.
 	Status *flowcontrolv1beta2.ConditionStatus `json:"status,omitempty"`
 	// `lastTransitionTime` is the last time the condition transitioned from one status to another.
 	LastTransitionTime *v1.Time `json:"lastTransitionTime,omitempty"`

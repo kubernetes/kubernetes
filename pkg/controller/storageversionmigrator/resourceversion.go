@@ -34,13 +34,13 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 
-	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
+	svmv1 "k8s.io/api/storagemigration/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	svminformers "k8s.io/client-go/informers/storagemigration/v1beta1"
+	svminformers "k8s.io/client-go/informers/storagemigration/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	svmlisters "k8s.io/client-go/listers/storagemigration/v1beta1"
+	svmlisters "k8s.io/client-go/listers/storagemigration/v1"
 )
 
 const (
@@ -55,13 +55,16 @@ var verbsRequiredForMigration = []string{"update", "patch", "list"}
 // to the SVM status before the migration is initiated. This resource version is utilized for checking
 // freshness of GC cache before the migration is initiated.
 type ResourceVersionController struct {
-	discoveryClient discovery.DiscoveryInterface
+	discoveryClient discovery.DiscoveryInterfaceWithContext
 	metadataClient  metadata.Interface
 	svmListers      svmlisters.StorageVersionMigrationLister
 	svmSynced       cache.InformerSynced
 	queue           workqueue.TypedRateLimitingInterface[string]
 	kubeClient      clientset.Interface
-	mapper          meta.RESTMapper
+	mapper          meta.ResettableRESTMapper
+
+	lastResetLock sync.Mutex
+	lastReset     time.Time
 }
 
 func NewResourceVersionController(
@@ -70,13 +73,13 @@ func NewResourceVersionController(
 	discoveryClient discovery.DiscoveryInterface,
 	metadataClient metadata.Interface,
 	svmInformer svminformers.StorageVersionMigrationInformer,
-	mapper meta.RESTMapper,
+	mapper meta.ResettableRESTMapper,
 ) *ResourceVersionController {
 	logger := klog.FromContext(ctx)
 
 	rvController := &ResourceVersionController{
 		kubeClient:      kubeClient,
-		discoveryClient: discoveryClient,
+		discoveryClient: discovery.ToDiscoveryInterfaceWithContext(discoveryClient),
 		metadataClient:  metadataClient,
 		svmListers:      svmInformer.Lister(),
 		svmSynced:       svmInformer.Informer().HasSynced,
@@ -87,32 +90,33 @@ func NewResourceVersionController(
 		),
 	}
 
-	_, _ = svmInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := svmInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			rvController.addSVM(logger, obj)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			rvController.updateSVM(logger, oldObj, newObj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 
 	return rvController
 }
 
 func (rv *ResourceVersionController) addSVM(logger klog.Logger, obj interface{}) {
-	svm := obj.(*svmv1beta1.StorageVersionMigration)
+	svm := obj.(*svmv1.StorageVersionMigration)
 	logger.V(4).Info("Adding", "svm", klog.KObj(svm))
 	rv.enqueue(svm)
 }
 
 func (rv *ResourceVersionController) updateSVM(logger klog.Logger, oldObj, newObj interface{}) {
-	oldSVM := oldObj.(*svmv1beta1.StorageVersionMigration)
-	newSVM := newObj.(*svmv1beta1.StorageVersionMigration)
+	oldSVM := oldObj.(*svmv1.StorageVersionMigration)
+	newSVM := newObj.(*svmv1.StorageVersionMigration)
 	logger.V(4).Info("Updating", "svm", klog.KObj(oldSVM))
 	rv.enqueue(newSVM)
 }
 
-func (rv *ResourceVersionController) enqueue(svm *svmv1beta1.StorageVersionMigration) {
+func (rv *ResourceVersionController) enqueue(svm *svmv1.StorageVersionMigration) {
 	key, err := controller.KeyFunc(svm)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %w", svm, err))
@@ -190,14 +194,14 @@ func (rv *ResourceVersionController) sync(ctx context.Context, key string) error
 	// working with copy to avoid race condition between this and migration controller
 	toBeProcessedSVM := svm.DeepCopy()
 
-	if !meta.IsStatusConditionTrue(toBeProcessedSVM.Status.Conditions, string(svmv1beta1.MigrationRunning)) {
+	if !meta.IsStatusConditionTrue(toBeProcessedSVM.Status.Conditions, string(svmv1.MigrationRunning)) {
 		logger.V(4).Info("Migration is not running yet, skipping", "svm", name)
 		return nil
 	}
 	gr := toBeProcessedSVM.Spec.Resource
 
-	if meta.IsStatusConditionTrue(toBeProcessedSVM.Status.Conditions, string(svmv1beta1.MigrationSucceeded)) ||
-		meta.IsStatusConditionTrue(toBeProcessedSVM.Status.Conditions, string(svmv1beta1.MigrationFailed)) {
+	if meta.IsStatusConditionTrue(toBeProcessedSVM.Status.Conditions, string(svmv1.MigrationSucceeded)) ||
+		meta.IsStatusConditionTrue(toBeProcessedSVM.Status.Conditions, string(svmv1.MigrationFailed)) {
 		logger.V(4).Info("Migration has already succeeded or failed previously, skipping", "svm", name)
 		return nil
 	}
@@ -215,12 +219,13 @@ func (rv *ResourceVersionController) sync(ctx context.Context, key string) error
 		// our GC cache could be missing a recently created custom resource, so give it some time to catch up
 		// we resync discovery every 30 seconds so twice that should be sufficient
 		if toBeProcessedSVM.CreationTimestamp.Add(time.Minute).After(time.Now()) {
+			rv.resetMapperIfStale()
 			return fmt.Errorf("resource does not exist in our rest mapper, requeuing to attempt again")
 		}
 		return rv.failMigration(ctx, toBeProcessedSVM, "resource does not exist in discovery")
 	}
 
-	isMigratable, err := rv.isResourceMigratable(*gvr)
+	isMigratable, err := rv.isResourceMigratable(ctx, *gvr)
 	if err != nil {
 		return err
 	}
@@ -244,7 +249,7 @@ func (rv *ResourceVersionController) sync(ctx context.Context, key string) error
 	}
 	toBeProcessedSVM.Status.ResourceVersion = latestRV
 
-	_, err = rv.kubeClient.StoragemigrationV1beta1().
+	_, err = rv.kubeClient.StoragemigrationV1().
 		StorageVersionMigrations().
 		UpdateStatus(ctx, toBeProcessedSVM, metav1.UpdateOptions{})
 	if err != nil {
@@ -256,7 +261,7 @@ func (rv *ResourceVersionController) sync(ctx context.Context, key string) error
 }
 
 func (rv *ResourceVersionController) getLatestResourceVersion(gvr schema.GroupVersionResource, ctx context.Context) (string, error) {
-	isResourceNamespaceScoped, err := rv.isResourceNamespaceScoped(gvr)
+	isResourceNamespaceScoped, err := rv.isResourceNamespaceScoped(ctx, gvr)
 	if err != nil {
 		return "", err
 	}
@@ -305,8 +310,8 @@ func resourceFor(mapper meta.RESTMapper, gr metav1.GroupResource) (*schema.Group
 	return nil, false, nil
 }
 
-func (rv *ResourceVersionController) isResourceNamespaceScoped(gvr schema.GroupVersionResource) (bool, error) {
-	resourceList, err := rv.discoveryClient.ServerResourcesForGroupVersion(gvr.GroupVersion().String())
+func (rv *ResourceVersionController) isResourceNamespaceScoped(ctx context.Context, gvr schema.GroupVersionResource) (bool, error) {
+	resourceList, err := rv.discoveryClient.ServerResourcesForGroupVersionWithContext(ctx, gvr.GroupVersion().String())
 	if err != nil {
 		return false, err
 	}
@@ -324,8 +329,8 @@ func (rv *ResourceVersionController) isResourceNamespaceScoped(gvr schema.GroupV
 // migration. Returns true if all verbs are in the discovery document and false
 // otherwise. If there is an error querying the discovery client or we fail to
 // get the GVR, return an error.
-func (rv *ResourceVersionController) isResourceMigratable(gvr schema.GroupVersionResource) (bool, error) {
-	resourceList, err := rv.discoveryClient.ServerResourcesForGroupVersion(gvr.GroupVersion().String())
+func (rv *ResourceVersionController) isResourceMigratable(ctx context.Context, gvr schema.GroupVersionResource) (bool, error) {
+	resourceList, err := rv.discoveryClient.ServerResourcesForGroupVersionWithContext(ctx, gvr.GroupVersion().String())
 	if apierrors.IsNotFound(err) {
 		return false, nil
 	}
@@ -349,16 +354,25 @@ func (rv *ResourceVersionController) isResourceMigratable(gvr schema.GroupVersio
 	return false, fmt.Errorf("resource %q not found in discovery", gvr.String())
 }
 
-func (rv *ResourceVersionController) failMigration(ctx context.Context, svm *svmv1beta1.StorageVersionMigration, message string) error {
-	_, err := rv.kubeClient.StoragemigrationV1beta1().
+func (rv *ResourceVersionController) failMigration(ctx context.Context, svm *svmv1.StorageVersionMigration, message string) error {
+	_, err := rv.kubeClient.StoragemigrationV1().
 		StorageVersionMigrations().
 		UpdateStatus(
 			ctx,
-			setStatusConditions(svm, svmv1beta1.MigrationFailed, migrationFailedStatusReason, message),
+			setStatusConditions(svm, svmv1.MigrationFailed, migrationFailedStatusReason, message),
 			metav1.UpdateOptions{},
 		)
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func (rv *ResourceVersionController) resetMapperIfStale() {
+	rv.lastResetLock.Lock()
+	defer rv.lastResetLock.Unlock()
+	if time.Since(rv.lastReset) > 10*time.Second {
+		rv.mapper.Reset()
+		rv.lastReset = time.Now()
+	}
 }

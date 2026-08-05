@@ -28,6 +28,7 @@ import (
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -40,13 +41,13 @@ import (
 
 // svcStrategy implements behavior for Services
 type svcStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Services
 // objects via the REST API.
-var Strategy = svcStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = svcStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // NamespaceScoped is true for services.
 func (svcStrategy) NamespaceScoped() bool {
@@ -99,7 +100,7 @@ func (svcStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []s
 func (svcStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (svcStrategy) AllowCreateOnUpdate() bool {
+func (svcStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return true
 }
 
@@ -113,7 +114,7 @@ func (svcStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object
 	return serviceapi.GetWarningsForService(obj.(*api.Service), old.(*api.Service))
 }
 
-func (svcStrategy) AllowUnconditionalUpdate() bool {
+func (svcStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

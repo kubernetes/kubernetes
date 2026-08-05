@@ -156,7 +156,7 @@ func (h *hostExecutor) exec(ctx context.Context, cmd string, node *v1.Node) (Res
 	}
 	containerName := pod.Spec.Containers[0].Name
 	var err error
-	result.Stdout, result.Stderr, err = e2epod.ExecWithOptions(h.Framework, e2epod.ExecOptions{
+	result.Stdout, result.Stderr, err = e2epod.Exec(h.Framework.TContext(ctx), e2epod.ExecOptions{
 		Command:            args,
 		Namespace:          pod.Namespace,
 		PodName:            pod.Name,

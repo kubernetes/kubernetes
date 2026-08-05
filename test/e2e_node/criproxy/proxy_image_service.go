@@ -28,6 +28,10 @@ const (
 	PullImage   = "PullImage"
 	RemoveImage = "RemoveImage"
 	ImageFsInfo = "ImageFsInfo"
+	// Streaming APIs
+	StreamImages = "StreamImages"
+	// Per-send injection point for streaming APIs, called before each stream.Send().
+	StreamImagesSend = "StreamImagesSend"
 )
 
 // ListImages lists existing images.
@@ -101,4 +105,25 @@ func (p *RemoteRuntime) ImageFsInfo(ctx context.Context, req *kubeapi.ImageFsInf
 		return nil, err
 	}
 	return resp, nil
+}
+
+// StreamImages returns a stream of images.
+func (p *RemoteRuntime) StreamImages(req *kubeapi.StreamImagesRequest, stream kubeapi.ImageService_StreamImagesServer) error {
+	if err := p.runInjectors(StreamImages); err != nil {
+		return err
+	}
+
+	images, err := p.imageService.ListImages(stream.Context(), req.Filter)
+	if err != nil {
+		return err
+	}
+	for _, image := range images {
+		if err := p.runInjectors(StreamImagesSend); err != nil {
+			return err
+		}
+		if err := stream.Send(&kubeapi.StreamImagesResponse{Images: []*kubeapi.Image{image}}); err != nil {
+			return err
+		}
+	}
+	return nil
 }

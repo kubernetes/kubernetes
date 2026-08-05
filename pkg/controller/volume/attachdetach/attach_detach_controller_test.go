@@ -331,8 +331,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 	}
 
 	for _, pod := range pods.Items {
-		podToAdd := pod
-		podInformer.GetIndexer().Add(&podToAdd)
+		_ = podInformer.GetIndexer().Add(&pod)
 		podsNum++
 	}
 	nodes, err := fakeKubeClient.CoreV1().Nodes().List(tCtx, metav1.ListOptions{})
@@ -340,8 +339,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: %v", err)
 	}
 	for _, node := range nodes.Items {
-		nodeToAdd := node
-		nodeInformer.GetIndexer().Add(&nodeToAdd)
+		_ = nodeInformer.GetIndexer().Add(&node)
 		nodesNum++
 	}
 
@@ -350,8 +348,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: %v", err)
 	}
 	for _, csiNode := range csiNodes.Items {
-		csiNodeToAdd := csiNode
-		csiNodeInformer.GetIndexer().Add(&csiNodeToAdd)
+		_ = csiNodeInformer.GetIndexer().Add(&csiNode)
 	}
 
 	informerFactory.Start(tCtx.Done())
@@ -569,16 +566,14 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: %v", err)
 	}
 	for _, pod := range pods.Items {
-		podToAdd := pod
-		podInformer.GetIndexer().Add(&podToAdd)
+		_ = podInformer.GetIndexer().Add(&pod)
 	}
 	nodes, err := fakeKubeClient.CoreV1().Nodes().List(tCtx, metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: %v", err)
 	}
 	for _, node := range nodes.Items {
-		nodeToAdd := node
-		nodeInformer.GetIndexer().Add(&nodeToAdd)
+		_ = nodeInformer.GetIndexer().Add(&node)
 	}
 
 	if tc.csiMigration {

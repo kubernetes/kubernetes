@@ -23,7 +23,6 @@ import (
 
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
@@ -31,22 +30,24 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/job"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	batchvalidation "k8s.io/kubernetes/pkg/apis/batch/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // cronJobStrategy implements verification logic for Replication Controllers.
 type cronJobStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating CronJob objects.
-var Strategy = cronJobStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = cronJobStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // DefaultGarbageCollectionPolicy returns OrphanDependents for batch/v1beta1 for backwards compatibility,
 // and DeleteDependents for all other versions.
@@ -91,6 +92,8 @@ func (cronJobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object)
 
 	cronJob.Generation = 1
 
+	job.DropDisabledFields(&cronJob.Spec.JobTemplate.Spec, nil)
+
 	pod.DropDisabledTemplateFields(&cronJob.Spec.JobTemplate.Spec.Template, nil)
 }
 
@@ -99,6 +102,8 @@ func (cronJobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Ob
 	newCronJob := obj.(*batch.CronJob)
 	oldCronJob := old.(*batch.CronJob)
 	newCronJob.Status = oldCronJob.Status
+
+	job.DropDisabledFields(&newCronJob.Spec.JobTemplate.Spec, &oldCronJob.Spec.JobTemplate.Spec)
 
 	pod.DropDisabledTemplateFields(&newCronJob.Spec.JobTemplate.Spec.Template, &oldCronJob.Spec.JobTemplate.Spec.Template)
 
@@ -113,8 +118,15 @@ func (cronJobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Ob
 func (cronJobStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	cronJob := obj.(*batch.CronJob)
 	opts := pod.GetValidationOptionsFromPodTemplate(&cronJob.Spec.JobTemplate.Spec.Template, nil)
-	allErrs := batchvalidation.ValidateCronJobCreate(cronJob, opts)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, nil, allErrs, operation.Create)
+	return batchvalidation.ValidateCronJobCreate(cronJob, opts)
+}
+
+// DeclarativeValidationConfig declares the options referenced by this type's tags,
+// mapped to whether each is enabled.
+func (cronJobStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	return rest.DeclarativeValidationConfig{Options: map[string]bool{
+		string(features.WorkloadWithJob): utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithJob),
+	}}
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -132,12 +144,12 @@ func (cronJobStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object)
 func (cronJobStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (cronJobStrategy) AllowUnconditionalUpdate() bool {
+func (cronJobStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 
 // AllowCreateOnUpdate is false for scheduled jobs; this means a POST is needed to create one.
-func (cronJobStrategy) AllowCreateOnUpdate() bool {
+func (cronJobStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -147,8 +159,7 @@ func (cronJobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obje
 	oldCronJob := old.(*batch.CronJob)
 
 	opts := pod.GetValidationOptionsFromPodTemplate(&newCronJob.Spec.JobTemplate.Spec.Template, &oldCronJob.Spec.JobTemplate.Spec.Template)
-	allErrs := batchvalidation.ValidateCronJobUpdate(newCronJob, oldCronJob, opts)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newCronJob, oldCronJob, allErrs, operation.Update)
+	return batchvalidation.ValidateCronJobUpdate(newCronJob, oldCronJob, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

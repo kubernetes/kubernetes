@@ -342,8 +342,8 @@ func (m *Stub) PreStartContainer(ctx context.Context, r *pluginapi.PreStartConta
 
 // ListAndWatch lists devices and update that list according to the Update call
 func (m *Stub) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a logger parameter.
+	// Use klog.TODO() because this method must match the generated device
+	// plugin gRPC signature in api_grpc.pb.go, which does not accept a logger.
 	klog.TODO().Info("ListAndWatch")
 
 	s.Send(&pluginapi.ListAndWatchResponse{Devices: m.devs})

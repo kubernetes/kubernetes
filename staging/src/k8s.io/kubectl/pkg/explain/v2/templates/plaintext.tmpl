@@ -36,7 +36,7 @@
     VERSION:    {{ $gvk.version }}{{"\n" -}}
     {{- "\n" -}}
 
-    {{- with include "schema" (dict "gvk" $gvk "Document" $.Document "FieldPath" $.FieldPath "Recursive" $.Recursive) -}}
+    {{- with include "schema" (dict "gvk" $gvk "Document" $.Document "FieldPath" $.FieldPath "Recursive" $.Recursive "MaxDepth" $.MaxDepth) -}}
         {{- . -}}
     {{- else -}}
         {{- throw "error: GVK %v not found in OpenAPI schema" $gvk -}}
@@ -101,7 +101,7 @@ Takes dictionary as argument with keys:
         {{- with include "externalDocs" (dict "schema" $resolved) -}}
             {{- "\n" -}}{{- . -}}
         {{- end -}}
-        {{- with include "fieldList" (dict "schema" $resolved "level" 1 "Document" $.Document "Recursive" $.Recursive) -}}
+        {{- with include "fieldList" (dict "schema" $resolved "level" 1 "Document" $.Document "Recursive" $.Recursive "MaxDepth" $.MaxDepth) -}}
             FIELDS:{{- "\n" -}}
             {{- . -}}
         {{- end -}}
@@ -176,7 +176,7 @@ Takes dictionary as argument with keys:
         {{- $resolved := or (resolveRef $refString $.Document) $.schema -}}
         {{- range $k, $v := $resolved.properties -}}
             {{- template "fieldDetail" (dict "name" $k "schema" $resolved "short" $.Recursive "level" $.level "Document" $.Document) -}}
-            {{- if $.Recursive -}}
+            {{- if and $.Recursive (or (eq $.MaxDepth 0) (lt $.level $.MaxDepth)) -}}
                 {{- /* Check if we already know about this element */}}
                 {{- template "fieldList" (set $nextContext "schema" $v "level" (add $.level 1)) -}}
             {{- end -}}

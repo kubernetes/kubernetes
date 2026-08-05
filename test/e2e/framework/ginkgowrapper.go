@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"reflect"
@@ -254,43 +255,140 @@ func init() {
 }
 
 func transformGinkgoNodeArgs(nodeType types.NodeType, offset ginkgo.Offset, text string, args []any) (string, []any, []error) {
-	text, args = expandGinkgoArgs(offset+1, text, args)
+	text, args = expandGinkgoArgs(nodeType == types.NodeTypeIt, offset+1, text, args)
 	return text, args, nil
 }
 
+// leafNodeLabels contains labels that
+// - might get added multiple times while constructing the spec tree and
+// - only need to be shown once and
+// - is very likely not considered part of the full test name string.
+//
+// Injecting their tag multiple times directly into the text at the place which
+// triggers their addition, they get only added as label (not visible) and the
+// text then gets added at the end of the leaf node text (= ginkgo.It name)
+// based on the previously added labels.
+//
+// The initial set contains the labels defined in the E2E framework. Feature
+// gate stability texts (Alpha, Beta, etc.) and feature gate dependencies
+// get added when we encounter them
+// to avoid making assumptions about what those strings are or because
+// they simply aren't known upfront.
+var leafNodeLabels = sets.New[string](
+	"Conformance",
+	"Disruptive",
+	"Feature:OffByDefault",
+	"Flaky",
+	"NodeConformance",
+	"Serial",
+	"Slow",
+)
+
 // expandGinkgoArgs concatenates all strings and translates our custom
-// arguments into something that Ginkgo can handle.
-func expandGinkgoArgs(offset ginkgo.Offset, text string, args []any) (string, []any) {
+// arguments into something that Ginkgo can handle. It gets called
+// through ginkgo.AddTreeConstructionNodeArgsTransformer.
+func expandGinkgoArgs(leafNode bool, offset ginkgo.Offset, text string, args []any) (string, []any) {
 	var ginkgoArgs []interface{}
 	var texts []string
 
 	if text != "" {
 		texts = append(texts, text)
 	}
+	previousText := ""
 
+	// All labels for a leaf node, from parent and added in this call.
+	allLabels := sets.New[string]()
+	if leafNode {
+		// May only be called during tree construction, i.e. not for the top-level node,
+		// so we have to be a bit careful.
+		report := ginkgo.CurrentTreeConstructionNodeReport()
+		previousText = report.FullText()
+		allLabels = sets.New[string](report.Labels()...)
+	}
 	addLabel := func(label string) {
-		texts = append(texts, fmt.Sprintf("[%s]", label))
 		ginkgoArgs = append(ginkgoArgs, ginkgo.Label(label))
+		allLabels.Insert(label)
+	}
+
+	featureDependencies := utilfeature.DefaultMutableFeatureGate.Dependencies()
+
+	// addFeatureGate handles feature gates:
+	// - The [Feature:<name>] text for the directly named feature gate gets
+	//   inserted in place because the test name may depend on it.
+	// - The text for dependencies gets added at the end (additional information).
+	// - Meta data like [Beta] always gets added at the end.
+	var addFeatureGate func(name featuregate.Feature, spec featuregate.FeatureSpec, direct bool)
+	addFeatureGate = func(name featuregate.Feature, spec featuregate.FeatureSpec, direct bool) {
+		fullLabel := "FeatureGate:" + string(name)
+		addLabel(fullLabel)
+		if direct {
+			texts = append(texts, fmt.Sprintf("[%s]", fullLabel))
+		} else {
+			leafNodeLabels.Insert(fullLabel)
+		}
+
+		// We use mixed case (i.e. Beta instead of BETA). GA feature gates have no level string.
+		var level string
+		if spec.PreRelease != "" {
+			level = string(spec.PreRelease)
+			level = strings.ToUpper(level[0:1]) + strings.ToLower(level[1:])
+			addLabel(level)
+			leafNodeLabels.Insert(level)
+		}
+		if !spec.Default {
+			addLabel("Feature:OffByDefault")
+		}
+		if level == "Beta" && !spec.Default {
+			// Not embedded in text!
+			ginkgoArgs = append(ginkgoArgs, ginkgo.Label("BetaOffByDefault"))
+		}
+
+		// Also add dependencies, recursively.
+		for _, name := range featureDependencies[name] {
+			spec := utilfeature.DefaultMutableFeatureGate.GetAll()[name]
+			addFeatureGate(name, spec, false)
+		}
+	}
+
+	var providerChecks [][]string
+	skipUnlessProviderIs := func() {
+		for _, supportedProviders := range providerChecks {
+			if !ProviderIs(supportedProviders...) {
+				ginkgo.Skip(fmt.Sprintf("Only supported for providers %v (not %s)", supportedProviders, TestContext.Provider))
+			}
+		}
+	}
+	injectSkipUnlessProviderIs := func() {
+		if leafNode {
+			// Check directly inside It.
+			skipUnlessProviderIs()
+		} else {
+			// Insert BeforeEach with the same check.
+			ginkgo.BeforeEach(skipUnlessProviderIs)
+		}
 	}
 
 	haveEmptyStrings := false
 	for _, arg := range args {
 		switch arg := arg.(type) {
+		case featureGate:
+			addFeatureGate(arg.name, arg.spec, true)
 		case label:
-			fullLabel := strings.Join(arg.parts, ":")
-			addLabel(fullLabel)
-			if arg.alphaBetaLevel != "" {
-				texts = append(texts, fmt.Sprintf("[%[1]s]", arg.alphaBetaLevel))
-				ginkgoArgs = append(ginkgoArgs, ginkgo.Label(arg.alphaBetaLevel))
+			fullLabel := arg.String()
+			if arg.parts[0] == "Provider" {
+				providerChecks = append(providerChecks, strings.Split(arg.parts[1], ","))
+				// Only add text, not as label: Ginkgo labels must not contain commas.
+				// We could split up into separate labels, but then the semantic is not clear:
+				// [Provider:gce,aws] means "provider must be one of these two",
+				// but [Provider:gce] [Provider:aws] could be either that or "must be
+				// gce and aws", i.e. the test always needs to be skipped (for example,
+				// because there are different independent WithProvider calls in different places).
+				texts = append(texts, fmt.Sprintf("[%s]", fullLabel))
+				continue
 			}
-			if arg.offByDefault {
-				texts = append(texts, "[Feature:OffByDefault]")
-				ginkgoArgs = append(ginkgoArgs, ginkgo.Label("Feature:OffByDefault"))
-				// Alphas are always off by default but we may want to select
-				// betas based on defaulted-ness.
-				if arg.alphaBetaLevel == "Beta" {
-					ginkgoArgs = append(ginkgoArgs, ginkgo.Label("BetaOffByDefault"))
-				}
+			addLabel(fullLabel)
+			if !leafNodeLabels.Has(fullLabel) {
+				texts = append(texts, fmt.Sprintf("[%s]", fullLabel))
 			}
 			if arg.parts[0] == "KubeletMinVersion" {
 				ginkgoArgs = append(ginkgoArgs, ginkgo.ComponentSemVerConstraint("kubelet", ">="+arg.parts[1]))
@@ -309,6 +407,34 @@ func expandGinkgoArgs(offset ginkgo.Offset, text string, args []any) (string, []
 				haveEmptyStrings = true
 			}
 			texts = append(texts, arg)
+		case func(context.Context):
+			// Wrapping shows up in stack backtraces. Avoid it if possible.
+			if len(providerChecks) > 0 {
+				body := arg
+				arg = func(ctx context.Context) {
+					injectSkipUnlessProviderIs()
+					body(ctx)
+				}
+			}
+			ginkgoArgs = append(ginkgoArgs, arg)
+		case func(ginkgo.SpecContext):
+			if len(providerChecks) > 0 {
+				body := arg
+				arg = func(ctx ginkgo.SpecContext) {
+					injectSkipUnlessProviderIs()
+					body(ctx)
+				}
+			}
+			ginkgoArgs = append(ginkgoArgs, arg)
+		case func():
+			if len(providerChecks) > 0 {
+				body := arg
+				arg = func() {
+					injectSkipUnlessProviderIs()
+					body()
+				}
+			}
+			ginkgoArgs = append(ginkgoArgs, arg)
 		default:
 			ginkgoArgs = append(ginkgoArgs, arg)
 		}
@@ -323,6 +449,33 @@ func expandGinkgoArgs(offset ginkgo.Offset, text string, args []any) (string, []
 	for _, text := range texts {
 		if strings.HasPrefix(text, " ") || strings.HasSuffix(text, " ") {
 			RecordBug(NewBug(fmt.Sprintf("trailing or leading spaces are unnecessary and need to be removed: %q", text), int(offset)))
+		}
+	}
+
+	// Ensure that each leaf node text contains all additional labels collected so far.
+	// We get those labels from the set of labels associated with the container node(s).
+	if leafNode {
+		var delayedLabels []string
+
+		for label := range allLabels {
+			if leafNodeLabels.Has(label) {
+				delayedLabels = append(delayedLabels, label)
+			}
+		}
+
+		slices.Sort(delayedLabels)
+		for _, label := range delayedLabels {
+			text := fmt.Sprintf("[%s]", label)
+			if strings.Contains(previousText, text) ||
+				slices.Contains(texts, text) {
+				// Never repeat text at the end which was already included earlier.
+				// In practice, this can happen for a FeatureGate when it was both
+				// explicitly mentioned and a dependency.
+				continue
+			}
+			texts = append(texts, text)
+			// This keeps validateText happy.
+			ginkgoArgs = append(ginkgoArgs, ginkgo.Label(label))
 		}
 	}
 
@@ -510,23 +663,17 @@ func (f *Framework) WithFeatureGate(featureGate featuregate.Feature) interface{}
 	return withFeatureGate(featureGate)
 }
 
-func withFeatureGate(featureGate featuregate.Feature) interface{} {
-	spec, ok := utilfeature.DefaultMutableFeatureGate.GetAll()[featureGate]
+func withFeatureGate(name featuregate.Feature) interface{} {
+	spec, ok := utilfeature.DefaultMutableFeatureGate.GetAll()[name]
 	if !ok {
-		RecordBug(NewBug(fmt.Sprintf("WithFeatureGate: the feature gate %q is unknown", featureGate), 2))
+		RecordBug(NewBug(fmt.Sprintf("WithFeatureGate: the feature gate %q is unknown", name), 2))
 	}
+	return featureGate{name, spec}
+}
 
-	// We use mixed case (i.e. Beta instead of BETA). GA feature gates have no level string.
-	var level string
-	if spec.PreRelease != "" {
-		level = string(spec.PreRelease)
-		level = strings.ToUpper(level[0:1]) + strings.ToLower(level[1:])
-	}
-
-	l := newLabel("FeatureGate", string(featureGate))
-	l.offByDefault = !spec.Default
-	l.alphaBetaLevel = level
-	return l
+type featureGate struct {
+	name featuregate.Feature
+	spec featuregate.FeatureSpec
 }
 
 // WithEnvironment specifies that a certain test or group of tests only works
@@ -548,6 +695,29 @@ func withEnvironment(name Environment) interface{} {
 		RecordBug(NewBug(fmt.Sprintf("WithEnvironment: unknown environment %q", name), 2))
 	}
 	return newLabel("Environment", string(name))
+}
+
+// WithProvider specifies that a certain test or group of tests depend on
+// features that are only available with one of the listed cluster providers.
+// It inserts the [Provider: <provider1>,<provider2>, ...] tag into the test name
+// and injects a runtime skip check at the start of the function.
+//
+// Filtering by provider is a legacy mechanism with unclear semantics: which
+// provider supports which features is undefined. Prefer defining features and
+// calling WithFeature instead.
+//
+// Note that this must come before the function in the Describe/Context/It call!
+func WithProvider(providers ...string) interface{} {
+	return withProvider(providers)
+}
+
+// WithProvider is a shorthand for the corresponding package function.
+func (f *Framework) WithProvider(providers ...string) interface{} {
+	return withProvider(providers)
+}
+
+func withProvider(providers []string) interface{} {
+	return newLabel("Provider", strings.Join(providers, ","))
 }
 
 // WithConformance specifies that a certain test or group of tests must pass in
@@ -694,49 +864,27 @@ func withKubeletMinVersion(version string) interface{} {
 	return newLabel("KubeletMinVersion", version)
 }
 
+// label must be comparable, some code uses that to detect feature.Windows.
 type label struct {
 	// parts get concatenated with ":" to build the full label.
-	parts []string
-	// explanation gets set for each label to help developers
-	// who pass a label to a ginkgo function. They need to use
-	// the corresponding framework function instead.
-	explanation string
+	parts [2]string
+	len   int
+}
 
-	// TODO: the fields below are only used for FeatureGates, we may want to refactor
-
-	// alphaBetaLevel is "Alpha", "Beta" or empty for GA features
-	// It gets added as [<level>] [Feature:<level>]
-	// to the test name and as Feature:<level> to the labels.
-	alphaBetaLevel string
-	// set based on featuregate default state
-	offByDefault bool
+func (l label) String() string {
+	if l.len == 2 {
+		return l.parts[0] + ":" + l.parts[1]
+	}
+	return l.parts[0]
 }
 
 func newLabel(parts ...string) label {
-	return label{
-		parts:       parts,
-		explanation: "If you see this as part of an 'Unknown Decorator' error from Ginkgo, then you need to replace the ginkgo.It/Context/Describe call with the corresponding framework.It/Context/Describe or (if available) f.It/Context/Describe.",
+	switch len(parts) {
+	case 1:
+		return label{parts: [2]string{parts[0], ""}, len: 1}
+	case 2:
+		return label{parts: [2]string{parts[0], parts[1]}, len: 2}
+	default:
+		panic(fmt.Sprintf("invalid number of part strings: %v", parts))
 	}
-}
-
-// TagsEqual can be used to check whether two tags are the same.
-// It's safe to compare e.g. the result of WithSlow() against the result
-// of WithSerial(), the result will be false. False is also returned
-// when a parameter is some completely different value.
-func TagsEqual(a, b interface{}) bool {
-	al, ok := a.(label)
-	if !ok {
-		return false
-	}
-	bl, ok := b.(label)
-	if !ok {
-		return false
-	}
-	if al.alphaBetaLevel != bl.alphaBetaLevel {
-		return false
-	}
-	if al.offByDefault != bl.offByDefault {
-		return false
-	}
-	return slices.Equal(al.parts, bl.parts)
 }

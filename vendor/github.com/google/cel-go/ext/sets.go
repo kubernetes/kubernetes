@@ -15,8 +15,6 @@
 package ext
 
 import (
-	"math"
-
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker"
 	"github.com/google/cel-go/common/ast"
@@ -242,37 +240,15 @@ func estimateSetsCost(costFactor float64) checker.FunctionEstimator {
 		arg0Size := estimateSize(estimator, args[0])
 		arg1Size := estimateSize(estimator, args[1])
 		costEstimate := arg0Size.Multiply(arg1Size).MultiplyByCostFactor(costFactor).Add(callCostEstimate)
-		return &checker.CallEstimate{CostEstimate: costEstimate}
+		return callEstimate(costEstimate, nil)
 	}
-}
-
-func estimateSize(estimator checker.CostEstimator, node checker.AstNode) checker.SizeEstimate {
-	if l := node.ComputedSize(); l != nil {
-		return *l
-	}
-	if l := estimator.EstimateSize(node); l != nil {
-		return *l
-	}
-	return checker.SizeEstimate{Min: 0, Max: math.MaxUint64}
 }
 
 func trackSetsCost(costFactor float64) interpreter.FunctionTracker {
 	return func(args []ref.Val, _ ref.Val) *uint64 {
 		lhsSize := actualSize(args[0])
 		rhsSize := actualSize(args[1])
-		cost := callCost + uint64(float64(lhsSize*rhsSize)*costFactor)
+		cost := safeAdd(callCost, uint64(float64(lhsSize*rhsSize)*costFactor))
 		return &cost
 	}
 }
-
-func actualSize(value ref.Val) uint64 {
-	if sz, ok := value.(traits.Sizer); ok {
-		return uint64(sz.Size().(types.Int))
-	}
-	return 1
-}
-
-var (
-	callCostEstimate = checker.FixedCostEstimate(1)
-	callCost         = uint64(1)
-)

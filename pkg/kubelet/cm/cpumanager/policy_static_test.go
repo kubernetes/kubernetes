@@ -19,6 +19,7 @@ package cpumanager
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -38,8 +39,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 	"k8s.io/utils/cpuset"
 )
 
@@ -93,7 +96,7 @@ func (spt staticPolicyTest) PseudoClone() staticPolicyTest {
 
 func TestStaticPolicyName(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
-	policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 1, cpuset.New(), topologymanager.NewFakeManager(), nil)
+	policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 1, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
 	if err != nil {
 		t.Fatalf("NewStaticPolicy() failed: %v", err)
 	}
@@ -195,7 +198,7 @@ func TestStaticPolicyStart(t *testing.T) {
 		t.Run(testCase.description, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
-			p, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), testCase.options)
+			p, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(logger), testCase.options)
 			if err != nil {
 				t.Fatalf("NewStaticPolicy() failed: %v", err)
 			}
@@ -595,6 +598,42 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expCPUAlloc:     true,
 			expCSet:         cpuset.New(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
 		},
+		{
+			// The purpose of this test is to verify that SMTAlignment consider
+			// pre-allocated CPUs assigned to the container.
+			// for example, in case of kubelet restart.
+			description: "GuPodManyCores, DualSocketHT, ExpectReAllocCPUs",
+			topo:        topoDualSocketHT,
+			options: map[string]string{
+				FullPCPUsOnlyOption: "true",
+			},
+			numReservedCPUs: 4,
+			reservedCPUs:    newCPUSetPtr(0, 1, 6, 7),
+			pod:             makePod("fakePod", "fakeContainer", "6", "6"),
+			stAssignments: state.ContainerCPUAssignments{
+				"fakePod": map[string]cpuset.CPUSet{
+					"fakeContainer": cpuset.New(2, 3, 4, 8, 9, 10),
+				},
+			},
+			stDefaultCPUSet: cpuset.New(0, 1, 5, 6, 7, 11),
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         cpuset.New(2, 3, 4, 8, 9, 10),
+		},
+		{
+			description: "GuPodManyCores, DualSocketHT, NotEnoughAvailable, NoAlloc",
+			topo:        topoDualSocketHT,
+			options: map[string]string{
+				FullPCPUsOnlyOption: "true",
+			},
+			numReservedCPUs: 4,
+			reservedCPUs:    newCPUSetPtr(0, 1, 6, 7),
+			pod:             makePod("fakePod", "fakeContainer", "10", "10"),
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			expErr:          SMTAlignmentError{RequestedCPUs: 10, CpusPerCore: 2, AvailablePhysicalCPUs: 8, CausedByPhysicalCPUs: true},
+			expCPUAlloc:     false,
+		},
 	}
 	alignBySocketOptionTestCases := []staticPolicyTest{
 		{
@@ -655,15 +694,15 @@ func TestStaticPolicyAdd(t *testing.T) {
 }
 
 func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
-	tm := topologymanager.NewFakeManager()
+	logger, _ := ktesting.NewTestContext(t)
+	tm := topologymanager.NewFakeManager(logger)
 	if testCase.topologyHint != nil {
-		tm = topologymanager.NewFakeManagerWithHint(testCase.topologyHint)
+		tm = topologymanager.NewFakeManagerWithHint(logger, testCase.topologyHint)
 	}
 	cpus := cpuset.New()
 	if testCase.reservedCPUs != nil {
 		cpus = testCase.reservedCPUs.Clone()
 	}
-	logger, _ := ktesting.NewTestContext(t)
 	policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpus, tm, testCase.options)
 	if err != nil {
 		t.Fatalf("NewStaticPolicy() failed: %v", err)
@@ -672,10 +711,11 @@ func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
 	st := &mockState{
 		assignments:   testCase.stAssignments,
 		defaultCPUSet: testCase.stDefaultCPUSet,
+		baselines:     state.ContainerCPUBaselines{},
 	}
 
 	container := &testCase.pod.Spec.Containers[0]
-	err = policy.Allocate(logger, st, testCase.pod, container)
+	err = policy.Allocate(logger, st, testCase.pod, container, lifecycle.AddOperation)
 	if !reflect.DeepEqual(err, testCase.expErr) {
 		t.Errorf("StaticPolicy Allocate() error (%v). expected add error: %q but got: %q",
 			testCase.description, testCase.expErr, err)
@@ -713,6 +753,46 @@ func runStaticPolicyTestCaseWithFeatureGate(t *testing.T, testCase staticPolicyT
 	runStaticPolicyTestCase(t, testCase)
 }
 
+func TestStaticPolicyAllocateRecordsBaseline(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, true)
+
+	logger, _ := ktesting.NewTestContext(t)
+	tm := topologymanager.NewFakeManager(logger)
+	topo := topoDualSocketHT // any topology suffice, pick a simple one
+	opts := map[string]string{}
+	policy, err := NewStaticPolicy(logger, topo, 1, cpuset.New(), tm, opts)
+	if err != nil {
+		t.Fatalf("NewStaticPolicy() failed: %v", err)
+	}
+
+	st := &mockState{
+		assignments:   state.ContainerCPUAssignments{},
+		defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11), // matches the topo we use
+		baselines:     state.ContainerCPUBaselines{},
+	}
+
+	pod := makePod("testPod", "testContainer", "2000m", "2000m") // any allocation triggering exclusive CPU assignment is fine
+	container := &pod.Spec.Containers[0]                         // shortcut
+
+	if err := policy.Allocate(logger, st, pod, container, lifecycle.AddOperation); err != nil {
+		t.Fatalf("Allocate() failed: %v", err)
+	}
+
+	cset, ok := st.GetCPUSet(string(pod.UID), container.Name)
+	if !ok {
+		t.Fatal("expected container to be present in assignments")
+	}
+
+	baseline, ok := st.GetBaselineCPUSet(string(pod.UID), container.Name)
+	if !ok {
+		t.Fatal("expected container to be present in baselines")
+	}
+
+	if !baseline.Equals(cset) {
+		t.Errorf("expected baseline %s to equal allocated cpuset %s", baseline, cset)
+	}
+}
+
 func TestStaticPolicyReuseCPUs(t *testing.T) {
 	testCases := []struct {
 		staticPolicyTest
@@ -739,7 +819,7 @@ func TestStaticPolicyReuseCPUs(t *testing.T) {
 
 	for _, testCase := range testCases {
 		logger, _ := ktesting.NewTestContext(t)
-		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
+		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
 		if err != nil {
 			t.Fatalf("NewStaticPolicy() failed: %v", err)
 		}
@@ -752,7 +832,7 @@ func TestStaticPolicyReuseCPUs(t *testing.T) {
 
 		// allocate
 		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-			_ = policy.Allocate(logger, st, pod, &container)
+			_ = policy.Allocate(logger, st, pod, &container, lifecycle.AddOperation)
 		}
 		if !st.defaultCPUSet.Equals(testCase.expCSetAfterAlloc) {
 			t.Errorf("StaticPolicy Allocate() error (%v). expected default cpuset %s but got %s",
@@ -796,7 +876,7 @@ func TestStaticPolicyDoNotReuseCPUs(t *testing.T) {
 
 	for _, testCase := range testCases {
 		logger, _ := ktesting.NewTestContext(t)
-		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
+		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
 		if err != nil {
 			t.Fatalf("NewStaticPolicy() failed: %v", err)
 		}
@@ -809,7 +889,7 @@ func TestStaticPolicyDoNotReuseCPUs(t *testing.T) {
 
 		// allocate
 		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-			err := policy.Allocate(logger, st, pod, &container)
+			err := policy.Allocate(logger, st, pod, &container, lifecycle.AddOperation)
 			if err != nil {
 				t.Errorf("StaticPolicy Allocate() error (%v). expected no error but got %v",
 					testCase.description, err)
@@ -882,7 +962,7 @@ func TestStaticPolicyRemove(t *testing.T) {
 
 	for _, testCase := range testCases {
 		logger, _ := ktesting.NewTestContext(t)
-		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
+		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
 		if err != nil {
 			t.Fatalf("NewStaticPolicy() failed: %v", err)
 		}
@@ -976,7 +1056,7 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		logger, _ := ktesting.NewTestContext(t)
-		p, err := NewStaticPolicy(logger, tc.topo, 0, cpuset.New(), topologymanager.NewFakeManager(), nil)
+		p, err := NewStaticPolicy(logger, tc.topo, 0, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
 		if err != nil {
 			t.Fatalf("NewStaticPolicy() failed: %v", err)
 		}
@@ -1077,7 +1157,7 @@ func TestStaticPolicyStartWithResvList(t *testing.T) {
 		t.Run(testCase.description, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
-			p, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(), testCase.cpuPolicyOptions)
+			p, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(logger), testCase.cpuPolicyOptions)
 			if !reflect.DeepEqual(err, testCase.expNewErr) {
 				t.Errorf("StaticPolicy Start() error (%v). expected error: %v but got: %v",
 					testCase.description, testCase.expNewErr, err)
@@ -1155,7 +1235,7 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 
 	for _, testCase := range testCases {
 		logger, _ := ktesting.NewTestContext(t)
-		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(), nil)
+		policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(logger), nil)
 		if err != nil {
 			t.Fatalf("NewStaticPolicy() failed: %v", err)
 		}
@@ -1166,7 +1246,7 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 		}
 
 		container := &testCase.pod.Spec.Containers[0]
-		err = policy.Allocate(logger, st, testCase.pod, container)
+		err = policy.Allocate(logger, st, testCase.pod, container, lifecycle.AddOperation)
 		if !reflect.DeepEqual(err, testCase.expErr) {
 			t.Errorf("StaticPolicy Allocate() error (%v). expected add error: %v but got: %v",
 				testCase.description, testCase.expErr, err)
@@ -1924,7 +2004,7 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(), testCase.cpuPolicyOptions)
+			policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(logger), testCase.cpuPolicyOptions)
 			if err != nil {
 				t.Fatalf("NewStaticPolicy() failed with %v", err)
 			}
@@ -1936,7 +2016,7 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 
 			for idx := range testCase.pod.Spec.Containers {
 				container := &testCase.pod.Spec.Containers[idx]
-				err := policy.Allocate(logger, st, testCase.pod, container)
+				err := policy.Allocate(logger, st, testCase.pod, container, lifecycle.AddOperation)
 				if err != nil {
 					t.Fatalf("Allocate failed: pod=%q container=%q", testCase.pod.UID, container.Name)
 				}
@@ -2052,6 +2132,78 @@ func TestStaticPolicyOptions(t *testing.T) {
 					testCase.policyOptions, testCase.expectedValue, opts)
 			}
 		})
+	}
+}
+
+func TestPolicyWithAlignBySocketAndDistributeCPUsAcrossNUMAEnabled(t *testing.T) {
+	testCases := []staticPolicyTest{
+		{
+			description: "AlignBySocket and DistributeCPUsAcrossNUMA both enabled",
+			topo:        topoDualSocketMultiNumaPerSocketHTType2,
+			options: map[string]string{
+				AlignBySocketOption:            "true",
+				DistributeCPUsAcrossNUMAOption: "true",
+			},
+			numReservedCPUs: 0,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
+			pod:             makePod("fakePod", "fakeContainer", "6000m", "6000m"),
+			topologyHint:    &topologymanager.TopologyHint{},
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         cpuset.New(1, 3, 5, 7, 9, 11),
+		},
+		{
+			description: "AlignBySocket takes priority over DistributeCPUsAcrossNUMA",
+			topo:        topoDualSocketMultiNumaPerSocketHTType2,
+			options: map[string]string{
+				AlignBySocketOption:            "true",
+				DistributeCPUsAcrossNUMAOption: "true",
+			},
+			numReservedCPUs: 0,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 13, 16, 17),
+			pod:             makePod("fakePod", "fakeContainer", "6000m", "6000m"),
+			topologyHint:    &topologymanager.TopologyHint{},
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         cpuset.New(1, 3, 5, 7, 9, 13),
+		},
+		{
+			description: "AlignBySocket isn't enabled",
+			topo:        topoDualSocketMultiNumaPerSocketHTType2,
+			options: map[string]string{
+				AlignBySocketOption:            "false",
+				DistributeCPUsAcrossNUMAOption: "true",
+			},
+			numReservedCPUs: 0,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 13, 16, 17),
+			pod:             makePod("fakePod", "fakeContainer", "6000m", "6000m"),
+			topologyHint:    &topologymanager.TopologyHint{},
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         cpuset.New(1, 4, 5, 8, 9, 12),
+		},
+		{
+			description: "No assignment that satisfy AlignBySocket",
+			topo:        topoDualSocketMultiNumaPerSocketHTType2,
+			options: map[string]string{
+				AlignBySocketOption:            "true",
+				DistributeCPUsAcrossNUMAOption: "true",
+			},
+			numReservedCPUs: 0,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(1, 2, 3, 4, 5, 8, 9, 12, 13),
+			pod:             makePod("fakePod", "fakeContainer", "6000m", "6000m"),
+			topologyHint:    &topologymanager.TopologyHint{},
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         cpuset.New(1, 4, 5, 8, 9, 12),
+		},
+	}
+	for _, testCase := range testCases {
+		runStaticPolicyTestCaseWithFeatureGate(t, testCase)
 	}
 }
 
@@ -2421,6 +2573,60 @@ func TestStaticPolicyAllocatePod(t *testing.T) {
 				expTotalErrors: 0,
 			},
 		},
+		{
+			description: "scope: pod, should reject a pod due to SMT alignment error when FullPhysicalCPUsOnly is enabled",
+			topo:        topoDualSocketHT,
+			options: map[string]string{
+				FullPCPUsOnlyOption: "true",
+			},
+			numReservedCPUs: 2,
+			reservedCPUs:    cpuset.New(0, 1),
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			pod: makePodWithContainersAndPodLevelResources("pod-smt-error", "3", "3", []containerSpec{}, []containerSpec{
+				{name: "gu-container", request: "3", limit: "3"},
+			}),
+			topologyHint:                    topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expErr:                          SMTAlignmentError{RequestedCPUs: 3, CpusPerCore: 2},
+			expPodAssignments:               state.ContainerCPUAssignments{},
+			expDefaultCPUSet:                cpuset.New(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalErrors: 1,
+			},
+		},
+		{
+			description: "scope: pod, should successfully allocate CPUs for a pod when FullPhysicalCPUsOnly is enabled and CPU request is a multiple of SMT level",
+			topo:        topoDualSocketHT,
+			options: map[string]string{
+				FullPCPUsOnlyOption: "true",
+			},
+			numReservedCPUs: 2,
+			reservedCPUs:    cpuset.New(0, 1),
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			pod: makePodWithContainersAndPodLevelResources("pod-smt-success", "4", "4", []containerSpec{}, []containerSpec{
+				{name: "gu-container-1", request: "2", limit: "2"},
+				{name: "gu-container-2", request: "2", limit: "2"},
+			}),
+			topologyHint: topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expErr:       nil,
+			expPodAssignments: state.ContainerCPUAssignments{
+				"pod-smt-success": map[string]cpuset.CPUSet{
+					"gu-container-1": cpuset.New(2, 8),
+					"gu-container-2": cpuset.New(4, 10),
+				},
+			},
+			expDefaultCPUSet:                cpuset.New(3, 5, 6, 7, 9, 11),
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalAllocs:              2,
+				expExclusiveAssignments:     2,
+				expPodSharedPoolAssignments: 0,
+			},
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -2433,7 +2639,7 @@ func TestStaticPolicyAllocatePod(t *testing.T) {
 			metrics.ResourceManagerAllocationErrorsTotal.Reset()
 			metrics.ResourceManagerContainerAssignments.Reset()
 
-			policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reservedCPUs, topologymanager.NewFakeManager(), testCase.options)
+			policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reservedCPUs, topologymanager.NewFakeManager(logger), testCase.options)
 			if err != nil {
 				t.Fatalf("NewStaticPolicy() failed: %v", err)
 			}
@@ -2443,7 +2649,7 @@ func TestStaticPolicyAllocatePod(t *testing.T) {
 				defaultCPUSet: testCase.stDefaultCPUSet,
 			}
 
-			err = policy.AllocatePod(logger, st, testCase.pod)
+			err = policy.AllocatePod(logger, st, testCase.pod, lifecycle.AddOperation)
 			if testCase.expErr != nil {
 				require.Error(t, err)
 
@@ -2752,4 +2958,271 @@ func getPodUncoreCacheIDs(s state.Reader, topo *topology.CPUTopology, pod *v1.Po
 		}
 	}
 	return uncoreCacheIDs, nil
+}
+
+// The following lifecycle tests verify that the static CPU manager policy
+// processes or skips operations based on the given lifecycle.Operation.
+// Since Allocate* and GetTopologyHints* do not return an error when an
+// operation is unsupported (they silently return nil/empty hints to avoid
+// aborting the entire operation across all hint providers), the tests check
+// log output to confirm whether an operation was processed or skipped.
+//
+// The test values used (e.g. cpusets, pod resource requests) are arbitrary
+// but correct values that let the code run the happy path; the exact values
+// have no special meaning. These tests do not validate the correctness of
+// the allocation or hint results, only whether the operation is processed
+// or skipped for a given lifecycle operation.
+
+func TestStaticPolicyLifecycleAllocate(t *testing.T) {
+	testCases := []struct {
+		description string
+		operation   lifecycle.Operation
+		skipped     bool
+	}{
+		{
+			description: "CPUManager static policy processes AddOperation",
+			operation:   lifecycle.AddOperation,
+			skipped:     false,
+		},
+		{
+			description: "CPUManager static policy skips ResizeOperation",
+			operation:   lifecycle.ResizeOperation,
+			skipped:     true,
+		},
+		{
+			description: "CPUManager static policy skips empty operation",
+			operation:   "",
+			skipped:     true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			ktesting.SetDefaultVerbosity(2)
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
+
+			policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 0, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
+			if err != nil {
+				t.Fatalf("NewStaticPolicy() failed: %v", err)
+			}
+
+			st := &mockState{
+				assignments:   state.ContainerCPUAssignments{},
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			}
+			pod := makeMultiContainerPod(nil, []struct{ request, limit string }{{"1", "2"}})
+			container := pod.Spec.Containers[0]
+
+			err = policy.Allocate(logger, st, pod, &container, testCase.operation)
+			require.NoError(t, err)
+
+			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			if !ok {
+				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
+			}
+			logs := underlier.GetBuffer().String()
+			expectedLog := "CPU Manager container-level resource allocation skipped, operation not supported by the static CPU manager policy"
+			if testCase.skipped {
+				if !strings.Contains(logs, expectedLog) {
+					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
+				}
+			} else {
+				if strings.Contains(logs, expectedLog) {
+					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
+				}
+			}
+		})
+	}
+}
+
+func TestStaticPolicyLifecycleAllocatePod(t *testing.T) {
+	testCases := []struct {
+		description string
+		operation   lifecycle.Operation
+		skipped     bool
+	}{
+		{
+			description: "CPUManager static policy processes AddOperation",
+			operation:   lifecycle.AddOperation,
+			skipped:     false,
+		},
+		{
+			description: "CPUManager static policy skips ResizeOperation",
+			operation:   lifecycle.ResizeOperation,
+			skipped:     true,
+		},
+		{
+			description: "CPUManager static policy skips empty operation",
+			operation:   "",
+			skipped:     true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			ktesting.SetDefaultVerbosity(2)
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
+
+			policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 0, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
+			if err != nil {
+				t.Fatalf("NewStaticPolicy() failed: %v", err)
+			}
+
+			st := &mockState{
+				assignments:   state.ContainerCPUAssignments{},
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			}
+			pod := makeMultiContainerPod(nil, []struct{ request, limit string }{{"1", "2"}})
+
+			err = policy.AllocatePod(logger, st, pod, testCase.operation)
+			require.NoError(t, err)
+
+			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			if !ok {
+				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
+			}
+			logs := underlier.GetBuffer().String()
+			expectedLog := "CPU Manager pod-level resource allocation skipped, operation not supported by the static CPU manager policy"
+			if testCase.skipped {
+				if !strings.Contains(logs, expectedLog) {
+					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
+				}
+			} else {
+				if strings.Contains(logs, expectedLog) {
+					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
+				}
+			}
+		})
+	}
+}
+
+func TestStaticPolicyLifecycleGetTopologyHints(t *testing.T) {
+	testCases := []struct {
+		description string
+		operation   lifecycle.Operation
+		skipped     bool
+	}{
+		{
+			description: "CPUManager static policy processes AddOperation",
+			operation:   lifecycle.AddOperation,
+			skipped:     false,
+		},
+		{
+			description: "CPUManager static policy skips ResizeOperation",
+			operation:   lifecycle.ResizeOperation,
+			skipped:     true,
+		},
+		{
+			description: "CPUManager static policy skips empty operation",
+			operation:   "",
+			skipped:     true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			ktesting.SetDefaultVerbosity(2)
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
+
+			policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 0, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
+			if err != nil {
+				t.Fatalf("NewStaticPolicy() failed: %v", err)
+			}
+
+			st := &mockState{
+				assignments:   state.ContainerCPUAssignments{},
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			}
+			pod := makeMultiContainerPod(nil, []struct{ request, limit string }{{"1", "2"}})
+			container := pod.Spec.Containers[0]
+
+			hints := policy.GetTopologyHints(logger, st, pod, &container, testCase.operation)
+			if hints != nil {
+				t.Errorf("Unexpected hints: %v", hints)
+			}
+
+			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			if !ok {
+				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
+			}
+			logs := underlier.GetBuffer().String()
+			expectedLog := "CPU Manager container-level hint generation skipped, operation not supported by the static CPU manager policy"
+			if testCase.skipped {
+				if !strings.Contains(logs, expectedLog) {
+					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
+				}
+			} else {
+				if strings.Contains(logs, expectedLog) {
+					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
+				}
+			}
+		})
+	}
+}
+
+func TestStaticPolicyLifecycleGetPodTopologyHints(t *testing.T) {
+	testCases := []struct {
+		description string
+		operation   lifecycle.Operation
+		skipped     bool
+	}{
+		{
+			description: "CPUManager static policy processes AddOperation",
+			operation:   lifecycle.AddOperation,
+			skipped:     false,
+		},
+		{
+			description: "CPUManager static policy skips ResizeOperation",
+			operation:   lifecycle.ResizeOperation,
+			skipped:     true,
+		},
+		{
+			description: "CPUManager static policy skips empty operation",
+			operation:   "",
+			skipped:     true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			ktesting.SetDefaultVerbosity(2)
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
+
+			policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 0, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
+			if err != nil {
+				t.Fatalf("NewStaticPolicy() failed: %v", err)
+			}
+
+			st := &mockState{
+				assignments:   state.ContainerCPUAssignments{},
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			}
+			pod := makeMultiContainerPod(nil, []struct{ request, limit string }{{"1", "2"}})
+
+			hints := policy.GetPodTopologyHints(logger, st, pod, testCase.operation)
+			if hints != nil {
+				t.Errorf("Unexpected hints: %v", hints)
+			}
+
+			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			if !ok {
+				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
+			}
+			logs := underlier.GetBuffer().String()
+			expectedLog := "CPU Manager pod hint generation skipped, operation not supported by the static CPU manager policy"
+			if testCase.skipped {
+				if !strings.Contains(logs, expectedLog) {
+					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
+				}
+			} else {
+				if strings.Contains(logs, expectedLog) {
+					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
+				}
+			}
+		})
+	}
 }

@@ -36,16 +36,15 @@ type TestDriver interface {
 	// information.
 	GetDriverInfo() *DriverInfo
 
-	// SkipUnsupportedTest skips test if Testpattern is not
+	// SkipUnsupportedTest returns the reason for skipping test if Testpattern is not
 	// suitable to test with the TestDriver. It gets called after
 	// parsing parameters of the test suite and before the
-	// framework is initialized. Cheap tests that just check
-	// parameters like the cloud provider can and should be
-	// done in SkipUnsupportedTest to avoid setting up more
-	// expensive resources like framework.Framework. Tests that
+	// framework is initialized.
+	//
+	// Tests that
 	// depend on a connection to the cluster can be done in
 	// PrepareTest once the framework is ready.
-	SkipUnsupportedTest(TestPattern)
+	SkipUnsupportedTest(TestPattern) string
 
 	// PrepareTest is called at test execution time each time a new test case is about to start.
 	// It sets up all necessary resources and returns the per-test configuration.

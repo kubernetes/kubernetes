@@ -36,7 +36,7 @@ option go_package = "k8s.io/api/events/v1";
 // continued existence of events with that Reason.  Events should be
 // treated as informative, best-effort, supplemental data.
 message Event {
-  // Standard object's metadata.
+  // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
@@ -105,7 +105,7 @@ message Event {
 
 // EventList is a list of Event objects.
 message EventList {
-  // Standard list metadata.
+  // metadata is the standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;

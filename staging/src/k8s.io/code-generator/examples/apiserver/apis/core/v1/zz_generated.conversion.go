@@ -118,7 +118,7 @@ func Convert_core_TestTypeList_To_v1_TestTypeList(in *core.TestTypeList, out *Te
 }
 
 func autoConvert_v1_TestTypeStatus_To_core_TestTypeStatus(in *TestTypeStatus, out *core.TestTypeStatus, s conversion.Scope) error {
-	out.Blah = in.Blah
+	*out = *(*core.TestTypeStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -128,7 +128,7 @@ func Convert_v1_TestTypeStatus_To_core_TestTypeStatus(in *TestTypeStatus, out *c
 }
 
 func autoConvert_core_TestTypeStatus_To_v1_TestTypeStatus(in *core.TestTypeStatus, out *TestTypeStatus, s conversion.Scope) error {
-	out.Blah = in.Blah
+	*out = *(*TestTypeStatus)(unsafe.Pointer(in))
 	return nil
 }
 

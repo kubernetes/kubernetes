@@ -25,13 +25,13 @@ import (
 // Interface provides access to all the informers in this group version.
 type Interface interface {
 	// IPAddresses returns a IPAddressInformer.
-	IPAddresses() IPAddressInformer
+	IPAddresses() TypedIPAddressInformer
 	// Ingresses returns a IngressInformer.
-	Ingresses() IngressInformer
+	Ingresses() TypedIngressInformer
 	// IngressClasses returns a IngressClassInformer.
-	IngressClasses() IngressClassInformer
+	IngressClasses() TypedIngressClassInformer
 	// ServiceCIDRs returns a ServiceCIDRInformer.
-	ServiceCIDRs() ServiceCIDRInformer
+	ServiceCIDRs() TypedServiceCIDRInformer
 }
 
 type version struct {
@@ -45,22 +45,22 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// IPAddresses returns a IPAddressInformer.
-func (v *version) IPAddresses() IPAddressInformer {
+// IPAddresses returns a TypedIPAddressInformer.
+func (v *version) IPAddresses() TypedIPAddressInformer {
 	return &iPAddressInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
-// Ingresses returns a IngressInformer.
-func (v *version) Ingresses() IngressInformer {
+// Ingresses returns a TypedIngressInformer.
+func (v *version) Ingresses() TypedIngressInformer {
 	return &ingressInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// IngressClasses returns a IngressClassInformer.
-func (v *version) IngressClasses() IngressClassInformer {
+// IngressClasses returns a TypedIngressClassInformer.
+func (v *version) IngressClasses() TypedIngressClassInformer {
 	return &ingressClassInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
-// ServiceCIDRs returns a ServiceCIDRInformer.
-func (v *version) ServiceCIDRs() ServiceCIDRInformer {
+// ServiceCIDRs returns a TypedServiceCIDRInformer.
+func (v *version) ServiceCIDRs() TypedServiceCIDRInformer {
 	return &serviceCIDRInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

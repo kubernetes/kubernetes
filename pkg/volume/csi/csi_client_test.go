@@ -32,6 +32,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	api "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltesting "k8s.io/client-go/util/testing"
@@ -68,10 +69,10 @@ func newFakeCsiDriverClientWithVolumeStats(t *testing.T, volumeStatsSet bool) *f
 	}
 }
 
-func newFakeCsiDriverClientWithVolumeStatsAndCondition(t *testing.T, volumeStatsSet, volumeConditionSet, setVolumeStat, setVolumeCondition bool) *fakeCsiDriverClient {
+func newFakeCsiDriverClientWithVolumeStatsAndHealth(t *testing.T, volumeStatsSet, volumeHealth, setVolumeStat, setVolumeHealth bool) *fakeCsiDriverClient {
 	return &fakeCsiDriverClient{
 		t:          t,
-		nodeClient: fake.NewNodeClientWithVolumeStatsAndCondition(volumeStatsSet, volumeConditionSet, setVolumeStat, setVolumeCondition),
+		nodeClient: fake.NewNodeClientWithVolumeStatsAndHealth(volumeStatsSet, volumeHealth, setVolumeStat, setVolumeHealth),
 	}
 }
 
@@ -106,12 +107,7 @@ func (c *fakeCsiDriverClient) NodeGetVolumeStats(ctx context.Context, volID stri
 	if c.nodeClient.SetVolumeStats {
 		fakeResp = getRawVolumeInfo()
 	}
-	if c.nodeClient.SetVolumecondition {
-		fakeResp.VolumeCondition = &csipbv1.VolumeCondition{
-			Abnormal: true,
-			Message:  "Volume is abnormal",
-		}
-	}
+
 	c.nodeClient.SetNodeVolumeStatsResp(fakeResp)
 
 	resp, err := c.nodeClient.NodeGetVolumeStats(ctx, req)
@@ -121,18 +117,8 @@ func (c *fakeCsiDriverClient) NodeGetVolumeStats(ctx context.Context, volID stri
 
 	metrics := &volume.Metrics{}
 
-	isSupportNodeVolumeCondition, err := c.nodeSupportsVolumeCondition(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) && isSupportNodeVolumeCondition {
-		abnormal, message := resp.VolumeCondition.GetAbnormal(), resp.VolumeCondition.GetMessage()
-		metrics.Abnormal, metrics.Message = &abnormal, &message
-	}
-
 	usages := resp.GetUsage()
-	if !isSupportNodeVolumeCondition && usages == nil {
+	if usages == nil {
 		return nil, errors.New("volume usage is nil")
 	}
 	for _, usage := range usages {
@@ -347,9 +333,40 @@ func (c *fakeCsiDriverClient) NodeExpandVolume(ctx context.Context, opts csiResi
 	return *updatedQuantity, nil
 }
 
-func (c *fakeCsiDriverClient) nodeSupportsVolumeCondition(ctx context.Context) (bool, error) {
-	c.t.Log("calling fake.nodeSupportsVolumeCondition...")
-	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_VOLUME_CONDITION)
+func (c *fakeCsiDriverClient) NodeSupportsVolumeHealth(ctx context.Context) (bool, error) {
+	c.t.Log("calling fake.NodeSupportsVolumeHealth...")
+	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_GET_VOLUME_HEALTH)
+}
+
+func (c *fakeCsiDriverClient) NodeSupportsStorageHealth(ctx context.Context) (bool, error) {
+	c.t.Log("calling fake.NodeSupportsStorageHealth...")
+	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_GET_STORAGE_HEALTH)
+}
+
+func (c *fakeCsiDriverClient) NodeGetVolumeHealth(ctx context.Context, volID, stagingTargetPath, volumePublishPath string) ([]api.VolumeHealthCondition, error) {
+	c.t.Log("calling fake.NodeGetVolumeHealth...")
+	req := &csipbv1.NodeGetVolumeHealthRequest{
+		VolumeId:          volID,
+		StagingTargetPath: stagingTargetPath,
+		VolumePublishPath: volumePublishPath,
+	}
+	resp, err := c.nodeClient.NodeGetVolumeHealth(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return mapVolumeHealthConditions(resp.GetVolumeHealth()), nil
+}
+
+func (c *fakeCsiDriverClient) NodeGetStorageHealth(ctx context.Context, secrets map[string]string) ([]storagev1.StorageHealthCondition, error) {
+	c.t.Log("calling fake.NodeGetStorageHealth...")
+	req := &csipbv1.NodeGetStorageHealthRequest{
+		Secrets: secrets,
+	}
+	resp, err := c.nodeClient.NodeGetStorageHealth(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return mapStorageBackendHealth(resp.GetBackendHealth())
 }
 
 func (c *fakeCsiDriverClient) NodeSupportsSingleNodeMultiWriterAccessMode(ctx context.Context) (bool, error) {
@@ -388,8 +405,8 @@ func setupClientWithExpansion(t *testing.T, stageUnstageSet bool, expansionSet b
 	return newFakeCsiDriverClientWithExpansion(t, stageUnstageSet, expansionSet)
 }
 
-func setupClientWithVolumeStatsAndCondition(t *testing.T, volumeStatsSet, volumeConditionSet, setVolumeStat, setVolumecondition bool) csiClient {
-	return newFakeCsiDriverClientWithVolumeStatsAndCondition(t, volumeStatsSet, volumeConditionSet, setVolumeStat, setVolumecondition)
+func setupClientWithVolumeStatsAndHealth(t *testing.T, volumeStatsSet, volumeHealth, setVolumeStat, setVolumeHealth bool) csiClient {
+	return newFakeCsiDriverClientWithVolumeStatsAndHealth(t, volumeStatsSet, volumeHealth, setVolumeStat, setVolumeHealth)
 }
 
 func setupClientWithVolumeStats(t *testing.T, volumeStatsSet bool) csiClient {
@@ -869,20 +886,20 @@ func TestVolumeHealthEnable(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
 	spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "metrics", "test-vol"), false)
 	tests := []struct {
-		name               string
-		volumeStatsSet     bool
-		setVolumeStat      bool
-		setVolumecondition bool
-		volumeConditionSet bool
-		volumeData         VolumeStatsOptions
-		success            bool
+		name            string
+		volumeStatsSet  bool
+		setVolumeStat   bool
+		setVolumeHealth bool
+		volumeHealthSet bool
+		volumeData      VolumeStatsOptions
+		success         bool
 	}{
 		{
-			name:               "when nodeVolumeStats=on, volumeStatsSet=on, setVolumeStat=on, volumeCondition=on, setVolumecondition=on",
-			volumeStatsSet:     true,
-			setVolumeStat:      true,
-			setVolumecondition: true,
-			volumeConditionSet: true,
+			name:            "when nodeVolumeStats=on, volumeStatsSet=on, setVolumeStat=on, volumeHealth=on, setVolumeHealth=on",
+			volumeStatsSet:  true,
+			setVolumeStat:   true,
+			setVolumeHealth: true,
+			volumeHealthSet: true,
 			volumeData: VolumeStatsOptions{
 				VolumeSpec:      spec,
 				VolumeID:        "volume1",
@@ -891,11 +908,11 @@ func TestVolumeHealthEnable(t *testing.T) {
 			success: true,
 		},
 		{
-			name:               "when nodeVolumeStats=on, volumeStatsSet=on, setVolumeStat=on, volumeCondition=off, setVolumecondition=off",
-			volumeStatsSet:     true,
-			setVolumeStat:      true,
-			setVolumecondition: false,
-			volumeConditionSet: false,
+			name:            "when nodeVolumeStats=on, volumeStatsSet=on, setVolumeStat=on, volumeHealth=off, setVolumeHealth=off",
+			volumeStatsSet:  true,
+			setVolumeStat:   true,
+			setVolumeHealth: false,
+			volumeHealthSet: false,
 			volumeData: VolumeStatsOptions{
 				VolumeSpec:      spec,
 				VolumeID:        "volume1",
@@ -904,22 +921,22 @@ func TestVolumeHealthEnable(t *testing.T) {
 			success: true,
 		},
 		{
-			name:               "when nodeVolumeStats=on, volumeStatsSet=off, setVolumeStat=off, volumeCondition=on, setVolumecondition=on",
-			volumeStatsSet:     false,
-			setVolumeStat:      false,
-			setVolumecondition: true,
-			volumeConditionSet: true,
+			name:            "when nodeVolumeStats=on, volumeStatsSet=off, setVolumeStat=off, volumeHealth=on, setVolumeHealth=on",
+			volumeStatsSet:  false,
+			setVolumeStat:   false,
+			setVolumeHealth: true,
+			volumeHealthSet: true,
 			volumeData: VolumeStatsOptions{
 				VolumeSpec:      spec,
 				VolumeID:        "volume1",
 				DeviceMountPath: "/foo/bar",
 			},
-			success: true,
+			success: false,
 		},
 		{
-			name:               "when nodeVolumeStats=on, volumeStatsSet=off, setVolumeStat=off, volumeCondition=off, setVolumecondition=off",
-			setVolumeStat:      false,
-			volumeConditionSet: false,
+			name:            "when nodeVolumeStats=on, volumeStatsSet=off, setVolumeStat=off, volumeHealth=off, setVolumeHealth=off",
+			setVolumeStat:   false,
+			volumeHealthSet: false,
 			volumeData: VolumeStatsOptions{
 				VolumeSpec:      spec,
 				VolumeID:        "volume1",
@@ -934,23 +951,13 @@ func TestVolumeHealthEnable(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 			defer cancel()
 			csiSource, _ := getCSISourceFromSpec(tc.volumeData.VolumeSpec)
-			csClient := setupClientWithVolumeStatsAndCondition(t, tc.volumeStatsSet, tc.volumeConditionSet, tc.setVolumeStat, tc.setVolumecondition)
-			metrics, err := csClient.NodeGetVolumeStats(ctx, csiSource.VolumeHandle, tc.volumeData.DeviceMountPath)
+			csClient := setupClientWithVolumeStatsAndHealth(t, tc.volumeStatsSet, tc.volumeHealthSet, tc.setVolumeStat, tc.setVolumeHealth)
+			_, err := csClient.NodeGetVolumeStats(ctx, csiSource.VolumeHandle, tc.volumeData.DeviceMountPath)
 			if err != nil && tc.success {
 				t.Errorf("For %s : expected %v got %v", tc.name, tc.success, err)
 			}
-			if tc.success {
-				if metrics == nil {
-					t.Errorf("csi.NodeGetVolumeStats returned nil metrics for volume %s", tc.volumeData.VolumeID)
-				} else {
-					if tc.volumeConditionSet {
-						assert.NotNil(t, metrics.Abnormal)
-						assert.NotNil(t, metrics.Message)
-					} else {
-						assert.Nil(t, metrics.Abnormal)
-						assert.Nil(t, metrics.Message)
-					}
-				}
+			if err == nil && !tc.success {
+				t.Errorf("For %s : expected %v got %v", tc.name, tc.success, err)
 			}
 		})
 	}
@@ -981,17 +988,10 @@ func TestVolumeHealthDisable(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 			defer cancel()
 			csiSource, _ := getCSISourceFromSpec(tc.volumeData.VolumeSpec)
-			csClient := setupClientWithVolumeStatsAndCondition(t, tc.volumeStatsSet, false, true, false)
-			metrics, err := csClient.NodeGetVolumeStats(ctx, csiSource.VolumeHandle, tc.volumeData.DeviceMountPath)
+			csClient := setupClientWithVolumeStatsAndHealth(t, tc.volumeStatsSet, false, true, false)
+			_, err := csClient.NodeGetVolumeStats(ctx, csiSource.VolumeHandle, tc.volumeData.DeviceMountPath)
 			if tc.success {
 				assert.NoError(t, err)
-			}
-
-			if metrics == nil {
-				t.Errorf("csi.NodeGetVolumeStats returned nil metrics for volume %s", tc.volumeData.VolumeID)
-			} else {
-				assert.Nil(t, metrics.Abnormal)
-				assert.Nil(t, metrics.Message)
 			}
 		})
 	}
@@ -1001,11 +1001,10 @@ func TestVolumeStats(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
 	spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "metrics", "test-vol"), false)
 	tests := []struct {
-		name               string
-		volumeStatsSet     bool
-		volumeConditionSet bool
-		volumeData         VolumeStatsOptions
-		success            bool
+		name           string
+		volumeStatsSet bool
+		volumeData     VolumeStatsOptions
+		success        bool
 	}{
 		{
 			name:           "when nodeVolumeStats=on, VolumeID=on, DeviceMountPath=on",
@@ -1153,5 +1152,226 @@ func TestAccessModeMapping(t *testing.T) {
 				t.Errorf("expected access mode: %v; got: %v", tc.expectedMappedAccessMode, mappedAccessMode)
 			}
 		})
+	}
+}
+
+func TestNodeGetVolumeHealth(t *testing.T) {
+	tests := []struct {
+		name            string
+		volID           string
+		setVolumeHealth bool
+		volumeHealthSet bool
+		wantConditions  int
+		wantStatus      api.VolumeHealthStatusType
+		mustFail        bool
+	}{
+		{
+			name:            "healthy volume returns empty conditions",
+			volID:           "vol-healthy",
+			setVolumeHealth: false,
+			volumeHealthSet: true,
+			wantConditions:  0,
+		},
+		{
+			name:            "unhealthy volume maps degraded condition",
+			volID:           "vol-unhealthy",
+			setVolumeHealth: true,
+			volumeHealthSet: true,
+			wantConditions:  1,
+			wantStatus:      api.VolumeHealthDegraded,
+		},
+		{
+			name:     "missing volume id fails",
+			volID:    "",
+			mustFail: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeCloser := fake.NewCloser(t)
+			client := &csiDriverClient{
+				driverName: "Fake Driver Name",
+				nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
+					nodeClient := fake.NewNodeClientWithVolumeStatsAndHealth(true, tc.volumeHealthSet, true, tc.setVolumeHealth)
+					return nodeClient, fakeCloser, nil
+				},
+			}
+			conditions, err := client.NodeGetVolumeHealth(context.Background(), tc.volID, "/stage", "/publish")
+			checkErr(t, tc.mustFail, err)
+			if tc.mustFail {
+				return
+			}
+			fakeCloser.Check()
+			if len(conditions) != tc.wantConditions {
+				t.Fatalf("expected %d conditions, got %d", tc.wantConditions, len(conditions))
+			}
+			if tc.wantConditions > 0 && conditions[0].Status != tc.wantStatus {
+				t.Fatalf("expected status %q, got %q", tc.wantStatus, conditions[0].Status)
+			}
+			supported, err := client.NodeSupportsVolumeHealth(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if supported != tc.volumeHealthSet {
+				t.Fatalf("expected NodeSupportsVolumeHealth=%v, got %v", tc.volumeHealthSet, supported)
+			}
+		})
+	}
+}
+
+func TestNodeGetStorageHealth(t *testing.T) {
+	tests := []struct {
+		name             string
+		setStorageHealth bool
+		storageHealthSet bool
+		wantConditions   int
+		wantStatus       storagev1.StorageHealthStatusType
+	}{
+		{
+			name:             "healthy backend returns empty conditions",
+			setStorageHealth: false,
+			storageHealthSet: true,
+			wantConditions:   0,
+		},
+		{
+			name:             "unhealthy backend maps degraded condition",
+			setStorageHealth: true,
+			storageHealthSet: true,
+			wantConditions:   1,
+			wantStatus:       storagev1.StorageDegraded,
+		},
+		{
+			name:             "capability not advertised",
+			setStorageHealth: false,
+			storageHealthSet: false,
+			wantConditions:   0,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeCloser := fake.NewCloser(t)
+			client := &csiDriverClient{
+				driverName: "Fake Driver Name",
+				nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
+					nodeClient := fake.NewNodeClientWithStorageHealth(tc.storageHealthSet, tc.setStorageHealth)
+					return nodeClient, fakeCloser, nil
+				},
+			}
+			conditions, err := client.NodeGetStorageHealth(context.Background(), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			fakeCloser.Check()
+			if len(conditions) != tc.wantConditions {
+				t.Fatalf("expected %d conditions, got %d", tc.wantConditions, len(conditions))
+			}
+			if tc.wantConditions > 0 && conditions[0].Status != tc.wantStatus {
+				t.Fatalf("expected status %q, got %q", tc.wantStatus, conditions[0].Status)
+			}
+			supported, err := client.NodeSupportsStorageHealth(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if supported != tc.storageHealthSet {
+				t.Fatalf("expected NodeSupportsStorageHealth=%v, got %v", tc.storageHealthSet, supported)
+			}
+		})
+	}
+}
+
+func TestMapStorageHealthVolumeCapability(t *testing.T) {
+	tests := []struct {
+		name           string
+		capability     *csipbv1.VolumeCapability
+		wantAccessMode api.PersistentVolumeAccessMode
+		wantVolumeMode api.PersistentVolumeMode
+		wantError      bool
+	}{
+		{
+			name: "block single node writer",
+			capability: &csipbv1.VolumeCapability{
+				AccessType: &csipbv1.VolumeCapability_Block{Block: &csipbv1.VolumeCapability_BlockVolume{}},
+				AccessMode: &csipbv1.VolumeCapability_AccessMode{Mode: csipbv1.VolumeCapability_AccessMode_SINGLE_NODE_WRITER},
+			},
+			wantAccessMode: api.ReadWriteOnce,
+			wantVolumeMode: api.PersistentVolumeBlock,
+		},
+		{
+			name: "mount single node single writer",
+			capability: &csipbv1.VolumeCapability{
+				AccessType: &csipbv1.VolumeCapability_Mount{Mount: &csipbv1.VolumeCapability_MountVolume{}},
+				AccessMode: &csipbv1.VolumeCapability_AccessMode{Mode: csipbv1.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER},
+			},
+			wantAccessMode: api.ReadWriteOncePod,
+			wantVolumeMode: api.PersistentVolumeFilesystem,
+		},
+		{
+			name: "mount multi node reader only",
+			capability: &csipbv1.VolumeCapability{
+				AccessType: &csipbv1.VolumeCapability_Mount{Mount: &csipbv1.VolumeCapability_MountVolume{}},
+				AccessMode: &csipbv1.VolumeCapability_AccessMode{Mode: csipbv1.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY},
+			},
+			wantAccessMode: api.ReadOnlyMany,
+			wantVolumeMode: api.PersistentVolumeFilesystem,
+		},
+		{
+			name: "mount multi node writer",
+			capability: &csipbv1.VolumeCapability{
+				AccessType: &csipbv1.VolumeCapability_Mount{Mount: &csipbv1.VolumeCapability_MountVolume{}},
+				AccessMode: &csipbv1.VolumeCapability_AccessMode{Mode: csipbv1.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER},
+			},
+			wantAccessMode: api.ReadWriteMany,
+			wantVolumeMode: api.PersistentVolumeFilesystem,
+		},
+		{
+			name: "missing access type",
+			capability: &csipbv1.VolumeCapability{
+				AccessMode: &csipbv1.VolumeCapability_AccessMode{Mode: csipbv1.VolumeCapability_AccessMode_SINGLE_NODE_WRITER},
+			},
+			wantError: true,
+		},
+		{
+			name: "missing access mode",
+			capability: &csipbv1.VolumeCapability{
+				AccessType: &csipbv1.VolumeCapability_Block{Block: &csipbv1.VolumeCapability_BlockVolume{}},
+			},
+			wantError: true,
+		},
+		{
+			name: "unknown access mode",
+			capability: &csipbv1.VolumeCapability{
+				AccessType: &csipbv1.VolumeCapability_Block{Block: &csipbv1.VolumeCapability_BlockVolume{}},
+				AccessMode: &csipbv1.VolumeCapability_AccessMode{Mode: csipbv1.VolumeCapability_AccessMode_UNKNOWN},
+			},
+			wantError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gotAccessMode, gotVolumeMode, err := mapStorageHealthVolumeCapability(tc.capability)
+			if (err != nil) != tc.wantError {
+				t.Fatalf("mapStorageHealthVolumeCapability() error = %v, wantError %v", err, tc.wantError)
+			}
+			if tc.wantError {
+				return
+			}
+			if gotAccessMode != tc.wantAccessMode || gotVolumeMode != tc.wantVolumeMode {
+				t.Errorf("mapStorageHealthVolumeCapability() = (%q, %q), want (%q, %q)", gotAccessMode, gotVolumeMode, tc.wantAccessMode, tc.wantVolumeMode)
+			}
+		})
+	}
+}
+
+func TestMapStorageBackendHealthLimit(t *testing.T) {
+	entries := make([]*csipbv1.NodeGetStorageHealthResponse_StorageBackendHealth, maxStorageHealthConditions+1)
+	for i := range entries {
+		entries[i] = &csipbv1.NodeGetStorageHealthResponse_StorageBackendHealth{
+			Status: csipbv1.StorageHealthErrorType_STORAGE_DEGRADED,
+		}
+	}
+
+	if _, err := mapStorageBackendHealth(entries); err == nil {
+		t.Fatalf("mapStorageBackendHealth() expected an error for %d conditions", len(entries))
 	}
 }

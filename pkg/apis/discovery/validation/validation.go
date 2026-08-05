@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/discovery"
 	netutils "k8s.io/utils/net"
@@ -40,9 +39,9 @@ var (
 		discovery.AddressTypeFQDN,
 	)
 	supportedPortProtocols = sets.New(
-		api.ProtocolTCP,
-		api.ProtocolUDP,
-		api.ProtocolSCTP,
+		corev1.ProtocolTCP,
+		corev1.ProtocolUDP,
+		corev1.ProtocolSCTP,
 	)
 	maxTopologyLabels = 16
 	maxAddresses      = 100

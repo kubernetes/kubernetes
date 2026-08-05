@@ -28,7 +28,9 @@ import (
 
 type SchedulingV1beta1Interface interface {
 	RESTClient() rest.Interface
+	PodGroupsGetter
 	PriorityClassesGetter
+	WorkloadsGetter
 }
 
 // SchedulingV1beta1Client is used to interact with features provided by the scheduling.k8s.io group.
@@ -36,8 +38,16 @@ type SchedulingV1beta1Client struct {
 	restClient rest.Interface
 }
 
+func (c *SchedulingV1beta1Client) PodGroups(namespace string) PodGroupInterface {
+	return newPodGroups(c, namespace)
+}
+
 func (c *SchedulingV1beta1Client) PriorityClasses() PriorityClassInterface {
 	return newPriorityClasses(c)
+}
+
+func (c *SchedulingV1beta1Client) Workloads(namespace string) WorkloadInterface {
+	return newWorkloads(c, namespace)
 }
 
 // NewForConfig creates a new SchedulingV1beta1Client for the given config.

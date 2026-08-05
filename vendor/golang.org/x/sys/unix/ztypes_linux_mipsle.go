@@ -350,6 +350,14 @@ type Taskstats struct {
 	Wpcopy_delay_min          uint64
 	Irq_delay_max             uint64
 	Irq_delay_min             uint64
+	Cpu_delay_max_ts          KernelTimespec
+	Blkio_delay_max_ts        KernelTimespec
+	Swapin_delay_max_ts       KernelTimespec
+	Freepages_delay_max_ts    KernelTimespec
+	Thrashing_delay_max_ts    KernelTimespec
+	Compact_delay_max_ts      KernelTimespec
+	Wpcopy_delay_max_ts       KernelTimespec
+	Irq_delay_max_ts          KernelTimespec
 }
 
 type cpuMask uint32
@@ -702,3 +710,7 @@ type SysvShmDesc struct {
 	Ctime_high uint16
 	_          uint16
 }
+
+const (
+	GPIO_GET_CHIPINFO_IOCTL = 0x4044b401
+)

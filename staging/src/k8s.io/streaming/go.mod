@@ -8,10 +8,10 @@ godebug default=go1.26
 
 require (
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
-	github.com/moby/spdystream v0.5.0
-	golang.org/x/net v0.49.0
+	github.com/moby/spdystream v0.5.1
+	golang.org/x/net v0.57.0
 	k8s.io/klog/v2 v2.140.0
-	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
+	k8s.io/utils v0.0.0-20260626114624-be93311217bd
 )
 
 require github.com/go-logr/logr v1.4.3 // indirect

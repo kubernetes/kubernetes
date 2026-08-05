@@ -23,7 +23,10 @@ import (
 
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -146,4 +149,87 @@ func TestDRAConsumableCapacityFeatureInUse(t *testing.T) {
 			assert.Equal(t, DRAConsumableCapacityFeatureInUse(spec), tc.expect)
 		})
 	}
+}
+
+func TestDRADerivedAttributesFeatureInUse(t *testing.T) {
+	testcases := map[string]struct {
+		obj    *resource.ResourceClaim
+		expect bool
+	}{
+		"derived-attributes-empty": {
+			obj:    nil,
+			expect: false,
+		},
+		"derived-attributes-no-inuse": {
+			obj:    obj,
+			expect: false,
+		},
+		"derived-attributes-with-inuse-fields-exactly": {
+			obj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				obj.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       "sharedNumaNode",
+						Expression: `device.attributes["dra.example.com"]["numa"]`,
+					},
+				}
+				return obj
+			}(),
+			expect: true,
+		},
+		"derived-attributes-with-inuse-fields-first-available": {
+			obj: func() *resource.ResourceClaim {
+				obj := objWithPrioritizedList.DeepCopy()
+				obj.Spec.Devices.Requests[0].FirstAvailable[0].DerivedAttributes = []resource.DeviceDerivedAttribute{
+					{
+						Name:       "sharedNumaNode",
+						Expression: `device.attributes["dra.example.com"]["numa"]`,
+					},
+				}
+				return obj
+			}(),
+			expect: true,
+		},
+	}
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			var spec *resource.ResourceClaimSpec
+			if tc.obj != nil {
+				spec = &tc.obj.Spec
+			}
+			assert.Equal(t, draDerivedAttributesInUse(spec), tc.expect)
+		})
+	}
+}
+
+func TestDropDisabledDRADerivedAttributesFields(t *testing.T) {
+	claim := obj.DeepCopy()
+	claim.Spec.Devices.Requests[0].Exactly.DerivedAttributes = []resource.DeviceDerivedAttribute{
+		{
+			Name:       "sharedNumaNode",
+			Expression: `device.attributes["dra.example.com"]["numa"]`,
+		},
+	}
+
+	t.Run("drop-on-create-when-feature-gate-disabled", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADerivedAttributes, false)
+		newClaim := claim.DeepCopy()
+		DropDisabledFields(&newClaim.Spec, nil)
+		assert.Nil(t, newClaim.Spec.Devices.Requests[0].Exactly.DerivedAttributes)
+	})
+
+	t.Run("keep-on-create-when-feature-gate-enabled", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADerivedAttributes, true)
+		newClaim := claim.DeepCopy()
+		DropDisabledFields(&newClaim.Spec, nil)
+		assert.NotNil(t, newClaim.Spec.Devices.Requests[0].Exactly.DerivedAttributes)
+	})
+
+	t.Run("keep-on-update-when-feature-gate-disabled-but-in-use", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADerivedAttributes, false)
+		newClaim := claim.DeepCopy()
+		oldClaim := claim.DeepCopy()
+		DropDisabledFields(&newClaim.Spec, &oldClaim.Spec)
+		assert.NotNil(t, newClaim.Spec.Devices.Requests[0].Exactly.DerivedAttributes)
+	})
 }

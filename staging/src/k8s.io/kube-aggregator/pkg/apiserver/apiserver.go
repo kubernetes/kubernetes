@@ -26,6 +26,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
@@ -274,8 +276,13 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		return nil, fmt.Errorf("API group/version %s must be enabled", v1.SchemeGroupVersion.String())
 	}
 
+	codecs := aggregatorscheme.Codecs
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.CBORServingAndStorage) {
+		codecs = serializer.NewCodecFactory(aggregatorscheme.Scheme, serializer.WithSerializer(cbor.NewSerializerInfo))
+	}
+
 	apisHandler := &apisHandler{
-		codecs:         aggregatorscheme.Codecs,
+		codecs:         codecs,
 		lister:         s.lister,
 		discoveryGroup: discoveryGroup(enabledVersions),
 	}
@@ -582,10 +589,15 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 		return nil
 	}
 
+	codecs := aggregatorscheme.Codecs
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.CBORServingAndStorage) {
+		codecs = serializer.NewCodecFactory(aggregatorscheme.Scheme, serializer.WithSerializer(cbor.NewSerializerInfo))
+	}
+
 	// it's time to register the group aggregation endpoint
 	groupPath := "/apis/" + apiService.Spec.Group
 	groupDiscoveryHandler := &apiGroupHandler{
-		codecs:    aggregatorscheme.Codecs,
+		codecs:    codecs,
 		groupName: apiService.Spec.Group,
 		lister:    s.lister,
 		delegate:  s.delegateHandler,

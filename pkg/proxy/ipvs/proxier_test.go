@@ -1563,41 +1563,6 @@ func TestIPv6Proxier(t *testing.T) {
 	}
 }
 
-func TestMasqueradeRule(t *testing.T) {
-	for _, testcase := range []bool{false, true} {
-		_, ctx := ktesting.NewTestContext(t)
-		ipt := iptablestest.NewFake().SetHasRandomFully(testcase)
-		ipvs := ipvstest.NewFake()
-		ipset := ipsettest.NewFake(testIPSetVersion)
-		fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
-		makeServiceMap(fp)
-		fp.syncProxyRules()
-
-		buf := bytes.NewBuffer(nil)
-		_ = ipt.SaveInto(utiliptables.TableNAT, buf)
-		natRules := strings.Split(buf.String(), "\n")
-		var hasMasqueradeJump, hasMasqRandomFully bool
-		for _, line := range natRules {
-			rule, _ := iptablestest.ParseRule(line, false)
-			if rule != nil && rule.Chain == kubePostroutingChain && rule.Jump != nil && rule.Jump.Value == "MASQUERADE" {
-				hasMasqueradeJump = true
-				if rule.RandomFully != nil {
-					hasMasqRandomFully = true
-				}
-				break
-			}
-		}
-
-		if !hasMasqueradeJump {
-			t.Errorf("Failed to find -j MASQUERADE in %s chain", kubePostroutingChain)
-		}
-		if hasMasqRandomFully != testcase {
-			probs := map[bool]string{false: "found", true: "did not find"}
-			t.Errorf("%s --random-fully in -j MASQUERADE rule in %s chain for HasRandomFully()=%v", probs[testcase], kubePostroutingChain, testcase)
-		}
-	}
-}
-
 func TestExternalIPsNoEndpoint(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()

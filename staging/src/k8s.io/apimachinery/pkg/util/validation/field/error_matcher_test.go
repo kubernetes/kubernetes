@@ -335,6 +335,104 @@ func TestErrorMatcher_Matches(t *testing.T) {
 		},
 		actualErr: &Error{FromImperative: false},
 		matches:   false,
+	}, {
+		name:    "MatchShortCircuit: match",
+		matcher: ErrorMatcher{}.MatchShortCircuit(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.ShortCircuit = true
+			return e
+		},
+		actualErr: &Error{ShortCircuit: true},
+		matches:   true,
+	}, {
+		name:    "MatchShortCircuit: no match",
+		matcher: ErrorMatcher{}.MatchShortCircuit(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.ShortCircuit = true
+			return e
+		},
+		actualErr: &Error{ShortCircuit: false},
+		matches:   false,
+	}, {
+		name:    "MatchAncestorShortCircuit: child field match",
+		matcher: ErrorMatcher{}.ByType().ByField().MatchAncestorShortCircuit(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.Field = "field.child"
+			e.Type = ErrorTypeRequired // child error can be a different type
+			return e
+		},
+		actualErr: &Error{Field: "field", Type: ErrorTypeInvalid, Origin: "immutable", ShortCircuit: true}, // parent error short-circuited
+		matches:   true,
+	}, {
+		name:    "MatchAncestorShortCircuit: array child match",
+		matcher: ErrorMatcher{}.ByType().ByField().MatchAncestorShortCircuit(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.Field = "field[0]"
+			e.Type = ErrorTypeRequired
+			return e
+		},
+		actualErr: &Error{Field: "field", Type: ErrorTypeInvalid, Origin: "immutable", ShortCircuit: true},
+		matches:   true,
+	}, {
+		name:    "MatchAncestorShortCircuit: not a child",
+		matcher: ErrorMatcher{}.ByType().ByField().MatchAncestorShortCircuit(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.Field = "other.child"
+			return e
+		},
+		actualErr: &Error{Field: "field", Type: ErrorTypeInvalid, Origin: "immutable", ShortCircuit: true},
+		matches:   false,
+	}, {
+		name:    "MatchAncestorShortCircuit: substring but not child",
+		matcher: ErrorMatcher{}.ByType().ByField().MatchAncestorShortCircuit(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.Field = "field_other"
+			return e
+		},
+		actualErr: &Error{Field: "field", Type: ErrorTypeInvalid, Origin: "immutable", ShortCircuit: true},
+		matches:   false,
+	}, {
+		name:    "MatchAncestorShortCircuit: parent path is empty string",
+		matcher: ErrorMatcher{}.ByType().ByField().MatchAncestorShortCircuit(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.Field = "field.child"
+			return e
+		},
+		actualErr: &Error{Field: "", Type: ErrorTypeInvalid, Origin: "immutable", ShortCircuit: true},
+		matches:   false,
+	}, {
+		name: "MatchAncestorShortCircuit: child field match with normalized parent",
+		matcher: ErrorMatcher{}.ByType().ByFieldNormalized([]NormalizationRule{
+			{Regexp: regexp.MustCompile(`f\[(\d+)\]\.a`), Replacement: "f[$1].x.a"},
+		}).MatchAncestorShortCircuit(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.Field = "f[0].x.a.child"
+			e.Type = ErrorTypeRequired
+			return e
+		},
+		actualErr: &Error{Field: "f[0].a", Type: ErrorTypeInvalid, Origin: "immutable", ShortCircuit: true},
+		matches:   true,
+	}, {
+		name: "MatchAncestorShortCircuit: child field match with unnormalized parent",
+		matcher: ErrorMatcher{}.ByType().ByFieldNormalized([]NormalizationRule{
+			{Regexp: regexp.MustCompile(`f\[(\d+)\]\.a`), Replacement: "f[$1].x.a"},
+		}).MatchAncestorShortCircuit(),
+		wantedErr: func() *Error {
+			e := baseErr()
+			e.Field = "f[0].a.child"
+			e.Type = ErrorTypeRequired
+			return e
+		},
+		actualErr: &Error{Field: "f[0].a", Type: ErrorTypeInvalid, Origin: "immutable", ShortCircuit: true},
+		matches:   true,
 	}}
 
 	for _, tc := range testCases {
@@ -480,6 +578,17 @@ func TestErrorMatcher_Test(t *testing.T) {
 			Invalid(NewPath("f2"), "v", "d").WithOrigin("o"),
 		},
 		expectedErrors: []string{"exact duplicate error:", "exact duplicate error:"},
+	}, {
+		name:    "match short circuit: match",
+		matcher: ErrorMatcher{}.MatchShortCircuit(),
+		want:    ErrorList{{ShortCircuit: true}},
+		got:     ErrorList{{ShortCircuit: true}},
+	}, {
+		name:           "match short circuit: no match",
+		matcher:        ErrorMatcher{}.MatchShortCircuit(),
+		want:           ErrorList{{ShortCircuit: true}},
+		got:            ErrorList{{ShortCircuit: false}},
+		expectedErrors: []string{"expected an error matching:", "unmatched error:"},
 	}}
 
 	for _, tc := range testCases {
@@ -613,6 +722,67 @@ func TestErrorMatcher_Render(t *testing.T) {
 			result := tc.matcher.Render(tc.err)
 			if result != tc.expected {
 				t.Errorf("Render() = %v, want %v", result, tc.expected)
+			}
+		})
+	}
+}
+
+func TestIsChildPath(t *testing.T) {
+	testCases := []struct {
+		name     string
+		parent   string
+		child    string
+		expected bool
+	}{
+		{
+			name:     "child is a descendant array element",
+			parent:   "spec.containers",
+			child:    "spec.containers[0]",
+			expected: true,
+		},
+		{
+			name:     "child is a subfield",
+			parent:   "spec.container",
+			child:    "spec.container.name",
+			expected: true,
+		},
+		{
+			name:     "not a child, just common prefix",
+			parent:   "spec.container",
+			child:    "spec.containers",
+			expected: false,
+		},
+		{
+			name:     "parent is empty",
+			parent:   "",
+			child:    "spec.containers",
+			expected: false,
+		},
+		{
+			name:     "child is shorter than parent",
+			parent:   "spec.containers",
+			child:    "spec",
+			expected: false,
+		},
+		{
+			name:     "child is equal to parent",
+			parent:   "spec.containers",
+			child:    "spec.containers",
+			expected: false,
+		},
+		{
+			name:     "child does not match parent prefix",
+			parent:   "spec.containers",
+			child:    "status.conditions",
+			expected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := isChildPath(tc.parent, tc.child)
+			if result != tc.expected {
+				t.Errorf("isChildPath(%q, %q) = %v, want %v", tc.parent, tc.child, result, tc.expected)
 			}
 		})
 	}

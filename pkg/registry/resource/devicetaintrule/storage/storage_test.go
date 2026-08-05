@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -45,7 +44,7 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer)
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "devicetaintrules",
 	}
-	deviceTaintStorage, statusStorage, err := NewREST(restOptions)
+	deviceTaintStorage, statusStorage, err := NewRESTv1(restOptions)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
@@ -154,16 +153,20 @@ func TestUpdateStatus(t *testing.T) {
 	storage, statusStorage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	ctx := genericapirequest.NewDefaultContext()
+	ctx := genericregistrytest.NewClusterScopeContext(storage.Store)
+	statusCtx := genericregistrytest.NewClusterScopeContext(storage.Store, "status")
 
 	key, _ := storage.KeyFunc(ctx, "foo")
 	deviceTaintStart := validNewDeviceTaint("foo")
-	err := storage.Storage.Create(ctx, key, deviceTaintStart, nil, 0, false)
+	// v1 enforces ResourceVersion comparison on status update (see AllowUnconditionalUpdate),
+	// so we need the created object and its ResourceVersion.
+	var deviceTaintCreated resource.DeviceTaintRule
+	err := storage.Storage.Create(ctx, key, deviceTaintStart, &deviceTaintCreated, 0, false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	deviceTaint := deviceTaintStart.DeepCopy()
+	deviceTaint := deviceTaintCreated.DeepCopy()
 	deviceTaint.Status.Conditions = []metav1.Condition{{
 		Type:               "EvicitionInProgress",
 		Status:             metav1.ConditionTrue,
@@ -171,7 +174,7 @@ func TestUpdateStatus(t *testing.T) {
 		Message:            "100 pods left",
 		LastTransitionTime: metav1.Time{Time: time.Now().Truncate(time.Second)},
 	}}
-	_, _, err = statusStorage.Update(ctx, deviceTaint.Name, rest.DefaultUpdatedObjectInfo(deviceTaint), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	_, _, err = statusStorage.Update(statusCtx, deviceTaint.Name, rest.DefaultUpdatedObjectInfo(deviceTaint), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

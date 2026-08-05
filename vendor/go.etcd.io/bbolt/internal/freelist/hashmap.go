@@ -108,8 +108,10 @@ func (f *hashMap) Allocate(txid common.Txid, n int) common.Pgid {
 func (f *hashMap) FreeCount() int {
 	common.Verify(func() {
 		expectedFreePageCount := f.hashmapFreeCountSlow()
-		common.Assert(int(f.freePagesCount) == expectedFreePageCount,
-			"freePagesCount (%d) is out of sync with free pages map (%d)", f.freePagesCount, expectedFreePageCount)
+		if int(f.freePagesCount) != expectedFreePageCount {
+			panic(fmt.Sprintf("assertion failed: freePagesCount (%d) is out of sync with free pages map (%d)",
+				f.freePagesCount, expectedFreePageCount))
+		}
 	})
 	return int(f.freePagesCount)
 }
@@ -169,6 +171,11 @@ func (f *hashMap) delSpan(start common.Pgid, size uint64) {
 }
 
 func (f *hashMap) mergeSpans(ids common.Pgids) {
+	if len(ids) == 0 {
+		return
+	}
+	sort.Sort(ids)
+
 	common.Verify(func() {
 		ids1Freemap := f.idsFromFreemaps()
 		ids2Forward := f.idsFromForwardMap()
@@ -181,7 +188,6 @@ func (f *hashMap) mergeSpans(ids common.Pgids) {
 			panic(fmt.Sprintf("Detected mismatch, f.freemaps: %v, f.backwardMap: %v", f.freemaps, f.backwardMap))
 		}
 
-		sort.Sort(ids)
 		prev := common.Pgid(0)
 		for _, id := range ids {
 			// The ids shouldn't have duplicated free ID.
@@ -196,26 +202,36 @@ func (f *hashMap) mergeSpans(ids common.Pgids) {
 			}
 		}
 	})
-	for _, id := range ids {
-		// try to see if we can merge and update
-		f.mergeWithExistingSpan(id)
+
+	start := ids[0]
+	end := ids[0]
+	for i := 1; i < len(ids); i++ {
+		id := ids[i]
+		if id == end+1 {
+			end = id
+			continue
+		}
+
+		f.mergeWithExistingSpan(start, end)
+		start, end = id, id
 	}
+	f.mergeWithExistingSpan(start, end)
 }
 
-// mergeWithExistingSpan merges pid to the existing free spans, try to merge it backward and forward
-func (f *hashMap) mergeWithExistingSpan(pid common.Pgid) {
-	prev := pid - 1
-	next := pid + 1
+// mergeWithExistingSpan merges free span [start, end] with adjacent existing free spans (both backward and forward).
+func (f *hashMap) mergeWithExistingSpan(start, end common.Pgid) {
+	prev := start - 1
+	next := end + 1
 
 	preSize, mergeWithPrev := f.backwardMap[prev]
 	nextSize, mergeWithNext := f.forwardMap[next]
-	newStart := pid
-	newSize := uint64(1)
+	newStart := start
+	newSize := uint64(end - start + 1)
 
 	if mergeWithPrev {
-		//merge with previous span
-		start := prev + 1 - common.Pgid(preSize)
-		f.delSpan(start, preSize)
+		// merge with previous span
+		prevStart := prev + 1 - common.Pgid(preSize)
+		f.delSpan(prevStart, preSize)
 
 		newStart -= common.Pgid(preSize)
 		newSize += preSize

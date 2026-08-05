@@ -34,11 +34,39 @@ import (
 )
 
 // ServiceInformer provides access to a shared informer and lister for
-// Services.
+// Services. Prefer using the type-safe variant (see [TypedServiceInformer]).
 type ServiceInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() corev1.ServiceLister
 }
+
+// TypedServiceInformer provides access to a shared informer and lister for
+// Services, including the type-safe TypedInformer variant.
+// It is a superset of ServiceInformer.
+type TypedServiceInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() ServiceIndexInformer
+	Lister() corev1.ServiceLister
+}
+
+// ServiceIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type ServiceIndexInformer cache.TypedSharedIndexInformer[*apicorev1.Service]
+
+// ServiceHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for Service.
+type ServiceHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apicorev1.Service]
+
+// ServiceDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for Service.
+type ServiceDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apicorev1.Service]
+
+// ServiceFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for Service.
+type ServiceFilteringHandler = cache.TypedFilteringResourceEventHandler[*apicorev1.Service]
+
+// ServiceIndexers is a specialization of [cache.TypedIndexers] for Service.
+type ServiceIndexers = cache.TypedIndexers[*apicorev1.Service]
+
+// DeletedService is a specialization of [cache.DeletedObject] for Service.
+type DeletedService = cache.DeletedObject[*apicorev1.Service]
 
 type serviceInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +77,49 @@ type serviceInformer struct {
 // NewServiceInformer constructs a new informer for Service type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedServiceInformer]).
 func NewServiceInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewServiceInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedServiceInformer constructs a new informer for Service type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedServiceInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers ServiceIndexers) ServiceIndexInformer {
+	return NewTypedServiceInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredServiceInformer constructs a new informer for Service type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredServiceInformer]).
 func NewFilteredServiceInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewServiceInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedServiceInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredServiceInformer constructs a new informer for Service type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredServiceInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers ServiceIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) ServiceIndexInformer {
+	return NewTypedServiceInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewServiceInformerWithOptions constructs a new informer for Service type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedServiceInformerWithOptions]).
 func NewServiceInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedServiceInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedServiceInformerWithOptions constructs a new informer for Service type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedServiceInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) ServiceIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "services"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apicorev1.Service](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,17 +152,57 @@ func NewServiceInformerWithOptions(client kubernetes.Interface, namespace string
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *serviceInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewServiceInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedServiceInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *serviceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apicorev1.Service{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *serviceInformer) TypedInformer() ServiceIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apicorev1.Service](f.factory.InformerFor(&apicorev1.Service{}, f.defaultInformer))
 }
 
 func (f *serviceInformer) Lister() corev1.ServiceLister {
 	return corev1.NewServiceLister(f.Informer().GetIndexer())
+}
+
+// ToTypedServiceInformer converts an untyped informer into a TypedServiceInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *Service. If that is not the case, calling type-safe methods of the returned
+// TypedServiceInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedServiceInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedServiceInformer(informer ServiceInformer) TypedServiceInformer {
+	if informer, ok := informer.(TypedServiceInformer); ok {
+		return informer
+	}
+	return &serviceTypedInformerAdapter{informer}
+}
+
+type serviceTypedInformerAdapter struct {
+	ServiceInformer
+}
+
+func (a *serviceTypedInformerAdapter) TypedInformer() ServiceIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apicorev1.Service](a.Informer())
+}
+
+// ToServiceIndexInformer converts an untyped informer into a ServiceIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *Service. If that is not the case, calling type-safe methods of the returned
+// ServiceIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a ServiceIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToServiceIndexInformer(informer cache.SharedIndexInformer) ServiceIndexInformer {
+	if informer, ok := informer.(ServiceIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apicorev1.Service](informer)
 }

@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubectl/pkg/kuberc"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
-	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -228,12 +227,12 @@ func (o *SetOptions) Run() error {
 
 // loadOrCreatePreference loads existing preference or creates a new one
 func (o *SetOptions) loadOrCreatePreference() (*v1beta1.Preference, error) {
-	data, err := os.ReadFile(o.KubeRCFile)
+	pref, err := kuberc.LoadPreference(o.KubeRCFile)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, fmt.Errorf("error reading kuberc file: %w", err)
 	}
 
-	if os.IsNotExist(err) || len(data) == 0 {
+	if os.IsNotExist(err) || pref == nil {
 		return &v1beta1.Preference{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: "kubectl.config.k8s.io/v1beta1",
@@ -242,12 +241,7 @@ func (o *SetOptions) loadOrCreatePreference() (*v1beta1.Preference, error) {
 		}, nil
 	}
 
-	var pref v1beta1.Preference
-	if err := yaml.Unmarshal(data, &pref); err != nil {
-		return nil, fmt.Errorf("error parsing kuberc file: %w", err)
-	}
-
-	return &pref, nil
+	return pref, nil
 }
 
 // parseOptions parses the --option flags into CommandOptionDefault structs

@@ -23,14 +23,14 @@ import (
 
 // PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.
 type PodDisruptionBudgetSpec struct {
-	// An eviction is allowed if at least "minAvailable" pods selected by
+	// minAvailable indicates that an eviction is allowed if at least "minAvailable" pods selected by
 	// "selector" will still be available after the eviction, i.e. even in the
 	// absence of the evicted pod.  So for example you can prevent all voluntary
 	// evictions by specifying "100%".
 	// +optional
 	MinAvailable *intstr.IntOrString `json:"minAvailable,omitempty" protobuf:"bytes,1,opt,name=minAvailable"`
 
-	// Label query over pods whose evictions are managed by the disruption
+	// selector is a label query over pods whose evictions are managed by the disruption
 	// budget.
 	// A null selector selects no pods.
 	// An empty selector ({}) also selects no pods, which differs from standard behavior of selecting all pods.
@@ -38,14 +38,14 @@ type PodDisruptionBudgetSpec struct {
 	// +optional
 	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,2,opt,name=selector"`
 
-	// An eviction is allowed if at most "maxUnavailable" pods selected by
+	// maxUnavailable indicates that an eviction is allowed if at most "maxUnavailable" pods selected by
 	// "selector" are unavailable after the eviction, i.e. even in absence of
 	// the evicted pod. For example, one can prevent all voluntary evictions
 	// by specifying 0. This is a mutually exclusive setting with "minAvailable".
 	// +optional
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty" protobuf:"bytes,3,opt,name=maxUnavailable"`
 
-	// UnhealthyPodEvictionPolicy defines the criteria for when unhealthy pods
+	// unhealthyPodEvictionPolicy defines the criteria for when unhealthy pods
 	// should be considered for eviction. Current implementation considers healthy pods,
 	// as pods that have status.conditions item with type="Ready",status="True".
 	//
@@ -147,6 +147,9 @@ type PodDisruptionBudgetStatus struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=type
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:listType=map
+	// +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,7,rep,name=conditions"`
 }
 
@@ -174,18 +177,19 @@ const (
 // +k8s:prerelease-lifecycle-gen:replacement=policy,v1,PodDisruptionBudget
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
+// +k8s:supportsSubresource="/status"
 type PodDisruptionBudget struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
-	// Standard object's metadata.
+	// metadata is the standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Specification of the desired behavior of the PodDisruptionBudget.
+	// spec is the specification of the desired behavior of the PodDisruptionBudget.
 	// +optional
 	Spec PodDisruptionBudgetSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
-	// Most recently observed status of the PodDisruptionBudget.
+	// status is the most recently observed status of the PodDisruptionBudget.
 	// +optional
 	Status PodDisruptionBudgetStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
@@ -198,7 +202,7 @@ type PodDisruptionBudget struct {
 
 // PodDisruptionBudgetList is a collection of PodDisruptionBudgets.
 type PodDisruptionBudgetList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -218,13 +222,14 @@ type PodDisruptionBudgetList struct {
 // This is a subresource of Pod.  A request to cause such an eviction is
 // created by POSTing to .../pods/<pod name>/evictions.
 type Eviction struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
-	// ObjectMeta describes the pod that is being evicted.
+	// metadata describes the pod that is being evicted.
 	// +optional
+	// +k8s:opaqueType
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// DeleteOptions may be provided
+	// deleteOptions may be provided
 	// +optional
 	DeleteOptions *metav1.DeleteOptions `json:"deleteOptions,omitempty" protobuf:"bytes,2,opt,name=deleteOptions"`
 }

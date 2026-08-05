@@ -34,6 +34,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/events"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/lifecycle"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/resource"
@@ -80,12 +81,16 @@ func NewStorageFactoryConfigEffectiveVersion(effectiveVersion basecompatibility.
 		// TODO (https://github.com/kubernetes/kubernetes/issues/108451): remove the override in 1.25.
 		// apisstorage.Resource("csistoragecapacities").WithVersion("v1beta1"),
 		coordination.Resource("leasecandidates").WithVersion("v1beta1"),
-		certificates.Resource("clustertrustbundles").WithVersion("v1beta1"),
+		certificates.Resource("clustertrustbundles").WithVersion("v1beta1"), // TODO: remove in 1.38
 		certificates.Resource("podcertificaterequests").WithVersion("v1beta1"),
-		storagemigration.Resource("storagemigrations").WithVersion("v1beta1"),
-		resource.Resource("devicetaintrules").WithVersion("v1alpha3"),
-		scheduling.Resource("workloads").WithVersion("v1alpha2"),
-		scheduling.Resource("podgroups").WithVersion("v1alpha2"),
+		storagemigration.Resource("storageversionmigrations").WithVersion("v1beta1"),
+		resource.Resource("devicetaintrules").WithVersion("v1beta2"),
+		resource.Resource("resourcepoolstatusrequests").WithVersion("v1alpha3"),
+		scheduling.Resource("workloads").WithVersion("v1beta1"),
+		scheduling.Resource("podgroups").WithVersion("v1beta1"),
+		scheduling.Resource("compositepodgroups").WithVersion("v1alpha3"),
+		lifecycle.Resource("evictions").WithVersion("v1alpha1"),
+		lifecycle.Resource("evictionrequests").WithVersion("v1alpha1"),
 	}
 	return &StorageFactoryConfig{
 		Serializer:                legacyscheme.Codecs,

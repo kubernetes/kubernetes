@@ -34,11 +34,39 @@ import (
 )
 
 // EndpointsInformer provides access to a shared informer and lister for
-// Endpoints.
+// Endpoints. Prefer using the type-safe variant (see [TypedEndpointsInformer]).
 type EndpointsInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() corev1.EndpointsLister
 }
+
+// TypedEndpointsInformer provides access to a shared informer and lister for
+// Endpoints, including the type-safe TypedInformer variant.
+// It is a superset of EndpointsInformer.
+type TypedEndpointsInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() EndpointsIndexInformer
+	Lister() corev1.EndpointsLister
+}
+
+// EndpointsIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type EndpointsIndexInformer cache.TypedSharedIndexInformer[*apicorev1.Endpoints]
+
+// EndpointsHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for Endpoints.
+type EndpointsHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apicorev1.Endpoints]
+
+// EndpointsDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for Endpoints.
+type EndpointsDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apicorev1.Endpoints]
+
+// EndpointsFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for Endpoints.
+type EndpointsFilteringHandler = cache.TypedFilteringResourceEventHandler[*apicorev1.Endpoints]
+
+// EndpointsIndexers is a specialization of [cache.TypedIndexers] for Endpoints.
+type EndpointsIndexers = cache.TypedIndexers[*apicorev1.Endpoints]
+
+// DeletedEndpoints is a specialization of [cache.DeletedObject] for Endpoints.
+type DeletedEndpoints = cache.DeletedObject[*apicorev1.Endpoints]
 
 type endpointsInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +77,49 @@ type endpointsInformer struct {
 // NewEndpointsInformer constructs a new informer for Endpoints type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedEndpointsInformer]).
 func NewEndpointsInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewEndpointsInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedEndpointsInformer constructs a new informer for Endpoints type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedEndpointsInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers EndpointsIndexers) EndpointsIndexInformer {
+	return NewTypedEndpointsInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredEndpointsInformer constructs a new informer for Endpoints type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredEndpointsInformer]).
 func NewFilteredEndpointsInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewEndpointsInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedEndpointsInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredEndpointsInformer constructs a new informer for Endpoints type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredEndpointsInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers EndpointsIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) EndpointsIndexInformer {
+	return NewTypedEndpointsInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewEndpointsInformerWithOptions constructs a new informer for Endpoints type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedEndpointsInformerWithOptions]).
 func NewEndpointsInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedEndpointsInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedEndpointsInformerWithOptions constructs a new informer for Endpoints type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedEndpointsInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) EndpointsIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "endpointss"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apicorev1.Endpoints](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,17 +152,57 @@ func NewEndpointsInformerWithOptions(client kubernetes.Interface, namespace stri
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *endpointsInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewEndpointsInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedEndpointsInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *endpointsInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apicorev1.Endpoints{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *endpointsInformer) TypedInformer() EndpointsIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apicorev1.Endpoints](f.factory.InformerFor(&apicorev1.Endpoints{}, f.defaultInformer))
 }
 
 func (f *endpointsInformer) Lister() corev1.EndpointsLister {
 	return corev1.NewEndpointsLister(f.Informer().GetIndexer())
+}
+
+// ToTypedEndpointsInformer converts an untyped informer into a TypedEndpointsInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *Endpoints. If that is not the case, calling type-safe methods of the returned
+// TypedEndpointsInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedEndpointsInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedEndpointsInformer(informer EndpointsInformer) TypedEndpointsInformer {
+	if informer, ok := informer.(TypedEndpointsInformer); ok {
+		return informer
+	}
+	return &endpointsTypedInformerAdapter{informer}
+}
+
+type endpointsTypedInformerAdapter struct {
+	EndpointsInformer
+}
+
+func (a *endpointsTypedInformerAdapter) TypedInformer() EndpointsIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apicorev1.Endpoints](a.Informer())
+}
+
+// ToEndpointsIndexInformer converts an untyped informer into a EndpointsIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *Endpoints. If that is not the case, calling type-safe methods of the returned
+// EndpointsIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a EndpointsIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToEndpointsIndexInformer(informer cache.SharedIndexInformer) EndpointsIndexInformer {
+	if informer, ok := informer.(EndpointsIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apicorev1.Endpoints](informer)
 }

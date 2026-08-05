@@ -43,6 +43,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/discovery"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
+	"k8s.io/kubernetes/pkg/apis/lifecycle"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	nodeapi "k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -5929,6 +5930,140 @@ func TestPrintStorageClass(t *testing.T) {
 	}
 }
 
+func TestPrintStorageClassListEffectiveDefault(t *testing.T) {
+	now := time.Now()
+	earlier := now.Add(-1 * time.Hour)
+
+	tests := []struct {
+		name     string
+		scList   storage.StorageClassList
+		expected []metav1.TableRow
+	}{
+		{
+			name: "single default",
+			scList: storage.StorageClassList{
+				Items: []storage.StorageClass{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "standard",
+							CreationTimestamp: metav1.Time{Time: now},
+							Annotations: map[string]string{
+								"storageclass.kubernetes.io/is-default-class": "true",
+							},
+						},
+						Provisioner: "kubernetes.io/gce-pd",
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "fast",
+							CreationTimestamp: metav1.Time{Time: earlier},
+						},
+						Provisioner: "kubernetes.io/gce-pd",
+					},
+				},
+			},
+			expected: []metav1.TableRow{
+				{Cells: []interface{}{"standard (default)", "kubernetes.io/gce-pd", "Delete", "Immediate", false, "0s"}},
+				{Cells: []interface{}{"fast", "kubernetes.io/gce-pd", "Delete", "Immediate", false, "60m"}},
+			},
+		},
+		{
+			name: "multiple defaults - newest wins",
+			scList: storage.StorageClassList{
+				Items: []storage.StorageClass{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "standard",
+							CreationTimestamp: metav1.Time{Time: earlier},
+							Annotations: map[string]string{
+								"storageclass.kubernetes.io/is-default-class": "true",
+							},
+						},
+						Provisioner: "kubernetes.io/gce-pd",
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "fast",
+							CreationTimestamp: metav1.Time{Time: now},
+							Annotations: map[string]string{
+								"storageclass.kubernetes.io/is-default-class": "true",
+							},
+						},
+						Provisioner: "kubernetes.io/gce-pd",
+					},
+				},
+			},
+			expected: []metav1.TableRow{
+				{Cells: []interface{}{"standard", "kubernetes.io/gce-pd", "Delete", "Immediate", false, "60m"}},
+				{Cells: []interface{}{"fast (default)", "kubernetes.io/gce-pd", "Delete", "Immediate", false, "0s"}},
+			},
+		},
+		{
+			name: "multiple defaults same timestamp - alphabetically first wins",
+			scList: storage.StorageClassList{
+				Items: []storage.StorageClass{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "zeta",
+							CreationTimestamp: metav1.Time{Time: now},
+							Annotations: map[string]string{
+								"storageclass.kubernetes.io/is-default-class": "true",
+							},
+						},
+						Provisioner: "kubernetes.io/gce-pd",
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "alpha",
+							CreationTimestamp: metav1.Time{Time: now},
+							Annotations: map[string]string{
+								"storageclass.kubernetes.io/is-default-class": "true",
+							},
+						},
+						Provisioner: "kubernetes.io/gce-pd",
+					},
+				},
+			},
+			expected: []metav1.TableRow{
+				{Cells: []interface{}{"zeta", "kubernetes.io/gce-pd", "Delete", "Immediate", false, "0s"}},
+				{Cells: []interface{}{"alpha (default)", "kubernetes.io/gce-pd", "Delete", "Immediate", false, "0s"}},
+			},
+		},
+		{
+			name: "no defaults",
+			scList: storage.StorageClassList{
+				Items: []storage.StorageClass{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "standard",
+							CreationTimestamp: metav1.Time{Time: now},
+						},
+						Provisioner: "kubernetes.io/gce-pd",
+					},
+				},
+			},
+			expected: []metav1.TableRow{
+				{Cells: []interface{}{"standard", "kubernetes.io/gce-pd", "Delete", "Immediate", false, "0s"}},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rows, err := printStorageClassList(&test.scList, printers.GenerateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for i := range rows {
+				rows[i].Object.Object = nil
+			}
+			if !reflect.DeepEqual(test.expected, rows) {
+				t.Errorf("mismatch: %s", cmp.Diff(test.expected, rows))
+			}
+		})
+	}
+}
+
 func TestPrintVolumeAttributesClass(t *testing.T) {
 	tests := []struct {
 		vac      storage.VolumeAttributesClass
@@ -6262,7 +6397,7 @@ func TestPrintEndpoint(t *testing.T) {
 }
 
 func TestPrintEndpointSlice(t *testing.T) {
-	tcpProtocol := api.ProtocolTCP
+	tcpProtocol := apiv1.ProtocolTCP
 
 	tests := []struct {
 		endpointSlice discovery.EndpointSlice
@@ -8101,11 +8236,9 @@ func TestPrintPodGroup(t *testing.T) {
 			Namespace: "ns1",
 		},
 		Spec: scheduling.PodGroupSpec{
-			PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
-				Workload: &scheduling.WorkloadPodGroupTemplateReference{
-					WorkloadName:         "w",
-					PodGroupTemplateName: "t1",
-				},
+			WorkloadRef: &scheduling.WorkloadReference{
+				WorkloadName: "w",
+				TemplateName: "t1",
 			},
 			SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 				Gang: &scheduling.GangSchedulingPolicy{
@@ -8137,11 +8270,9 @@ func TestPrintPodGroupList(t *testing.T) {
 					Namespace: "ns1",
 				},
 				Spec: scheduling.PodGroupSpec{
-					PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
-						Workload: &scheduling.WorkloadPodGroupTemplateReference{
-							WorkloadName:         "w1",
-							PodGroupTemplateName: "t1",
-						},
+					WorkloadRef: &scheduling.WorkloadReference{
+						WorkloadName: "w1",
+						TemplateName: "t1",
 					},
 					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 						Gang: &scheduling.GangSchedulingPolicy{
@@ -8157,11 +8288,9 @@ func TestPrintPodGroupList(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
 				Spec: scheduling.PodGroupSpec{
-					PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
-						Workload: &scheduling.WorkloadPodGroupTemplateReference{
-							WorkloadName:         "w1",
-							PodGroupTemplateName: "t2",
-						},
+					WorkloadRef: &scheduling.WorkloadReference{
+						WorkloadName: "w1",
+						TemplateName: "t2",
 					},
 					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 						Gang: &scheduling.GangSchedulingPolicy{
@@ -8177,11 +8306,9 @@ func TestPrintPodGroupList(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
 				Spec: scheduling.PodGroupSpec{
-					PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
-						Workload: &scheduling.WorkloadPodGroupTemplateReference{
-							WorkloadName:         "w2",
-							PodGroupTemplateName: "t1",
-						},
+					WorkloadRef: &scheduling.WorkloadReference{
+						WorkloadName: "w2",
+						TemplateName: "t1",
 					},
 					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
 						Basic: &scheduling.BasicSchedulingPolicy{},
@@ -8214,7 +8341,7 @@ func TestPrintPodGroupList(t *testing.T) {
 				Status: scheduling.PodGroupStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   scheduling.PodGroupScheduled,
+							Type:   scheduling.PodGroupInitiallyScheduled,
 							Status: metav1.ConditionTrue,
 						},
 					},
@@ -8234,7 +8361,7 @@ func TestPrintPodGroupList(t *testing.T) {
 				Status: scheduling.PodGroupStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   scheduling.PodGroupScheduled,
+							Type:   scheduling.PodGroupInitiallyScheduled,
 							Status: metav1.ConditionFalse,
 							Reason: scheduling.PodGroupReasonUnschedulable,
 						},
@@ -8255,7 +8382,7 @@ func TestPrintPodGroupList(t *testing.T) {
 				Status: scheduling.PodGroupStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:   scheduling.PodGroupScheduled,
+							Type:   scheduling.PodGroupInitiallyScheduled,
 							Status: metav1.ConditionTrue,
 						},
 						{
@@ -8285,6 +8412,858 @@ func TestPrintPodGroupList(t *testing.T) {
 		t.Fatalf("Error generating table rows for PodGroupList: %#v", err)
 	}
 
+	for i := range rows {
+		rows[i].Object.Object = nil
+	}
+
+	if !reflect.DeepEqual(expected, rows) {
+		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
+	}
+}
+
+func TestPrintResourcePoolStatusRequest(t *testing.T) {
+	tests := []struct {
+		name     string
+		request  resourceapis.ResourcePoolStatusRequest
+		expected []metav1.TableRow
+	}{
+		{
+			name: "ResourcePoolStatusRequest with Pending status",
+			request: resourceapis.ResourcePoolStatusRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-request",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Spec: resourceapis.ResourcePoolStatusRequestSpec{
+					Driver: "driver.example.com",
+				},
+			},
+			// Columns: Name, Driver, Total, Available, Allocated, Unavailable, Errors, Pools, Status, Completed
+			expected: []metav1.TableRow{{Cells: []interface{}{"test-request", "driver.example.com", "-", "-", "-", "-", "-", int32(0), "Pending", "<none>"}}},
+		},
+		{
+			name: "ResourcePoolStatusRequest with Complete status",
+			request: resourceapis.ResourcePoolStatusRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-request",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Spec: resourceapis.ResourcePoolStatusRequestSpec{
+					Driver: "driver.example.com",
+				},
+				Status: &resourceapis.ResourcePoolStatusRequestStatus{
+					PoolCount: ptr.To[int32](3),
+					Pools: []resourceapis.PoolStatus{
+						{
+							Driver:             "driver.example.com",
+							PoolName:           "pool-1",
+							Generation:         1,
+							TotalDevices:       ptr.To[int32](10),
+							AvailableDevices:   ptr.To[int32](5),
+							AllocatedDevices:   ptr.To[int32](3),
+							UnavailableDevices: ptr.To[int32](2),
+						},
+						{
+							Driver:             "driver.example.com",
+							PoolName:           "pool-2",
+							Generation:         1,
+							TotalDevices:       ptr.To[int32](8),
+							AvailableDevices:   ptr.To[int32](4),
+							AllocatedDevices:   ptr.To[int32](2),
+							UnavailableDevices: ptr.To[int32](2),
+						},
+						{
+							Driver:             "driver.example.com",
+							PoolName:           "pool-3",
+							Generation:         1,
+							TotalDevices:       ptr.To[int32](6),
+							AvailableDevices:   ptr.To[int32](3),
+							AllocatedDevices:   ptr.To[int32](1),
+							UnavailableDevices: ptr.To[int32](2),
+						},
+					},
+					Conditions: []metav1.Condition{
+						{
+							Type:               resourceapis.ResourcePoolStatusRequestConditionComplete,
+							Status:             metav1.ConditionTrue,
+							LastTransitionTime: metav1.Time{Time: time.Now().Add(-3e11)},
+						},
+					},
+				},
+			},
+			// Columns: Name, Driver, Total, Available, Allocated, Unavailable, Errors, Pools, Status, Completed
+			expected: []metav1.TableRow{{Cells: []interface{}{"test-request", "driver.example.com", "24", "12", "6", "6", "0", int32(3), "Complete", "5m"}}},
+		},
+		{
+			name: "ResourcePoolStatusRequest with Complete status and truncated pools",
+			request: resourceapis.ResourcePoolStatusRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-request",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Spec: resourceapis.ResourcePoolStatusRequestSpec{
+					Driver: "driver.example.com",
+				},
+				Status: &resourceapis.ResourcePoolStatusRequestStatus{
+					PoolCount: ptr.To[int32](5),
+					Pools: []resourceapis.PoolStatus{
+						{
+							Driver:             "driver.example.com",
+							PoolName:           "pool-1",
+							Generation:         1,
+							TotalDevices:       ptr.To[int32](10),
+							AvailableDevices:   ptr.To[int32](5),
+							AllocatedDevices:   ptr.To[int32](3),
+							UnavailableDevices: ptr.To[int32](2),
+						},
+						{
+							Driver:             "driver.example.com",
+							PoolName:           "pool-2",
+							Generation:         1,
+							TotalDevices:       ptr.To[int32](8),
+							AvailableDevices:   ptr.To[int32](4),
+							AllocatedDevices:   ptr.To[int32](2),
+							UnavailableDevices: ptr.To[int32](2),
+						},
+					},
+					Conditions: []metav1.Condition{
+						{
+							Type:               resourceapis.ResourcePoolStatusRequestConditionComplete,
+							Status:             metav1.ConditionTrue,
+							LastTransitionTime: metav1.Time{Time: time.Now().Add(-3e11)},
+						},
+					},
+				},
+			},
+			// Columns: Name, Driver, Total, Available, Allocated, Unavailable, Errors, Pools, Status, Completed
+			// Status shows truncation: "Complete (2/5 pools)" because len(Pools)=2 < PoolCount=5
+			expected: []metav1.TableRow{{Cells: []interface{}{"test-request", "driver.example.com", "18", "9", "5", "4", "0", int32(5), "Complete (2/5 pools)", "5m"}}},
+		},
+		{
+			name: "ResourcePoolStatusRequest with Failed status",
+			request: resourceapis.ResourcePoolStatusRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-request",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Spec: resourceapis.ResourcePoolStatusRequestSpec{
+					Driver: "driver.example.com",
+				},
+				Status: &resourceapis.ResourcePoolStatusRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   resourceapis.ResourcePoolStatusRequestConditionFailed,
+							Status: metav1.ConditionTrue,
+						},
+					},
+				},
+			},
+			// Columns: Name, Driver, Total, Available, Allocated, Unavailable, Errors, Pools, Status, Completed
+			expected: []metav1.TableRow{{Cells: []interface{}{"test-request", "driver.example.com", "-", "-", "-", "-", "-", int32(0), "Failed", "<none>"}}},
+		},
+		{
+			name: "Complete with validation error pool",
+			request: resourceapis.ResourcePoolStatusRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-request",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Spec: resourceapis.ResourcePoolStatusRequestSpec{
+					Driver: "driver.example.com",
+				},
+				Status: &resourceapis.ResourcePoolStatusRequestStatus{
+					PoolCount: ptr.To[int32](2),
+					Pools: []resourceapis.PoolStatus{
+						{
+							Driver:             "driver.example.com",
+							PoolName:           "pool-healthy",
+							Generation:         1,
+							TotalDevices:       ptr.To[int32](10),
+							AvailableDevices:   ptr.To[int32](5),
+							AllocatedDevices:   ptr.To[int32](3),
+							UnavailableDevices: ptr.To[int32](2),
+						},
+						{
+							Driver:          "driver.example.com",
+							PoolName:        "pool-error",
+							Generation:      2,
+							ValidationError: ptr.To("pool data could not be validated"),
+						},
+					},
+					Conditions: []metav1.Condition{
+						{
+							Type:               resourceapis.ResourcePoolStatusRequestConditionComplete,
+							Status:             metav1.ConditionTrue,
+							LastTransitionTime: metav1.Time{Time: time.Now().Add(-3e11)},
+						},
+					},
+				},
+			},
+			// Columns: Name, Driver, Total, Available, Allocated, Unavailable, Errors, Pools, Status, Completed
+			// Only the healthy pool's device counts are summed; the error pool has nil counts.
+			expected: []metav1.TableRow{{Cells: []interface{}{"test-request", "driver.example.com", "10", "5", "3", "2", "1", int32(2), "Complete", "5m"}}},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printResourcePoolStatusRequest(&test.request, printers.GenerateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+		}
+	}
+}
+
+func TestPrintEvictionRequest(t *testing.T) {
+	now := time.Now().UTC().AddDate(0, 0, -3)
+	twoDaysAgo := now.AddDate(0, 0, -2)
+
+	eviction := lifecycle.EvictionRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "pod-1-pod1",
+			Namespace:         "ns1",
+			CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+		},
+		Spec: lifecycle.EvictionRequestSpec{
+			Target: lifecycle.EvictionRequestTarget{
+				Pod: &lifecycle.EvictionRequestPodReference{
+					Name: "pod1",
+					UID:  "3d7fdff1-3fe5-48b9-b106-1ee24b0277f6",
+				},
+			},
+			Requester: "drain.foo.com/bar",
+			Intent:    lifecycle.EvictionRequestIntentEviction,
+		},
+		Status: lifecycle.EvictionRequestStatus{
+			ObservedGeneration: new(int64(1)),
+			Conditions:         []metav1.Condition{},
+		},
+	}
+
+	tests := []struct {
+		expected []metav1.TableRow
+	}{
+		{
+			expected: []metav1.TableRow{
+				// Columns: Name, Target, Target Type, Status, Requester, Intent, Age
+				{Cells: []interface{}{"pod-1-pod1", "pod1", "Pod", "Progressing", "drain.foo.com/bar", "Eviction", "5d"}},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		rows, err := printEvictionRequest(&eviction, printers.GenerateOptions{})
+		if err != nil {
+			t.Fatalf("Error generating table rows for EvictionRequest: %#v", err)
+		}
+		rows[0].Object.Object = nil
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("mismatch: %s", cmp.Diff(test.expected, rows))
+		}
+	}
+}
+
+func TestPrintEvictionRequestList(t *testing.T) {
+	now := time.Now().UTC().AddDate(0, 0, -3)
+	dayAgo := now.AddDate(0, 0, -1)
+	twoDaysAgo := now.AddDate(0, 0, -2)
+	evictionRequestList := lifecycle.EvictionRequestList{
+		Items: []lifecycle.EvictionRequest{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pod-1-pod1",
+					Namespace:         "ns1",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: lifecycle.EvictionRequestSpec{
+					Target: lifecycle.EvictionRequestTarget{
+						Pod: &lifecycle.EvictionRequestPodReference{
+							Name: "pod1",
+							UID:  "bc134542-aa19-4361-8fe2-cf18f78848c0",
+						},
+					},
+					Requester: "drain.foo.com/bar",
+					Intent:    lifecycle.EvictionRequestIntentEviction,
+				},
+				Status: lifecycle.EvictionRequestStatus{
+					ObservedGeneration: new(int64(1)),
+					Conditions: []metav1.Condition{
+						{Type: string(lifecycle.EvictionConditionTargetEvicted), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: dayAgo}, Reason: string(lifecycle.EvictionConditionReasonPodDeleted), Message: "Pod was successfully deleted."},
+					},
+				},
+			},
+
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pod-1-pod2",
+					Namespace:         "ns2",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: lifecycle.EvictionRequestSpec{
+					Target: lifecycle.EvictionRequestTarget{
+						Pod: &lifecycle.EvictionRequestPodReference{
+							Name: "pod2",
+							UID:  "5e153f5b-e420-41b4-9040-8f3b51cf2162",
+						},
+					},
+					Requester: "drain.foo.com/bar",
+					Intent:    lifecycle.EvictionRequestIntentEviction,
+				},
+				Status: lifecycle.EvictionRequestStatus{
+					ObservedGeneration: new(int64(1)),
+					Conditions: []metav1.Condition{
+						{Type: string(lifecycle.EvictionConditionFailed), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: string(lifecycle.EvictionConditionReasonNoFurtherResponder), Message: "Canceled because there is no further responder."},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pod-1-pod3",
+					Namespace:         "ns3",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: lifecycle.EvictionRequestSpec{
+					Target: lifecycle.EvictionRequestTarget{
+						Pod: &lifecycle.EvictionRequestPodReference{
+							Name: "pod3",
+							UID:  "68018c4c-bcca-4465-964a-66d8a1626686",
+						},
+					},
+					Requester: "drain.foo.com/bar",
+					Intent:    lifecycle.EvictionRequestIntentWithdrawn,
+				},
+				Status: lifecycle.EvictionRequestStatus{
+					ObservedGeneration: new(int64(1)),
+					Conditions: []metav1.Condition{
+						{Type: string(lifecycle.EvictionConditionFailed), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: string(lifecycle.EvictionConditionReasonCanceledDueToNoRequesters), Message: "Canceled due to no requesters."},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pod-1-pod4",
+					Namespace:         "ns4",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: lifecycle.EvictionRequestSpec{
+					Target: lifecycle.EvictionRequestTarget{
+						Pod: &lifecycle.EvictionRequestPodReference{
+							Name: "pod4",
+							UID:  "3d7fdff1-3fe5-48b9-b106-1ee24b0277f6",
+						},
+					},
+					Requester: "drain.foo.com/bar",
+					Intent:    lifecycle.EvictionRequestIntentEviction,
+				},
+				Status: lifecycle.EvictionRequestStatus{
+					ObservedGeneration: new(int64(1)),
+					Conditions: []metav1.Condition{
+						{Type: string(lifecycle.EvictionConditionTargetEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "EvictionInProgress", Message: "Pod is being evicted."},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pod-1-pod5",
+					Namespace:         "ns5",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: lifecycle.EvictionRequestSpec{
+					Target: lifecycle.EvictionRequestTarget{
+						Pod: &lifecycle.EvictionRequestPodReference{
+							Name: "pod5",
+							UID:  "9f4a1620-0e97-4246-b304-5969b2104377",
+						},
+					},
+					Requester: "drain.foo.com/bar",
+					Intent:    lifecycle.EvictionRequestIntentEviction,
+				},
+				Status: lifecycle.EvictionRequestStatus{
+					ObservedGeneration: new(int64(1)),
+					Conditions: []metav1.Condition{
+						{Type: string(lifecycle.EvictionConditionTargetEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "Canceled", Message: "Eviction failed due to cancelation."},
+						{Type: string(lifecycle.EvictionConditionFailed), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: string(lifecycle.EvictionConditionReasonEvictionInvalid), Message: "Pod pod6 was not found."},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pod-1-pod6",
+					Namespace:         "ns6",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: lifecycle.EvictionRequestSpec{
+					Target: lifecycle.EvictionRequestTarget{
+						Pod: &lifecycle.EvictionRequestPodReference{
+							Name: "pod6",
+							UID:  "e968f679-523b-4e63-9417-0cd9ae13a0b2",
+						},
+					},
+					Requester: "drain.foo.com/bar",
+					Intent:    lifecycle.EvictionRequestIntentEviction,
+				},
+			},
+		},
+	}
+
+	// Columns: Name, Target, Target Type, Status, Requester, Intent, Age
+	expected := []metav1.TableRow{
+		{Cells: []interface{}{"pod-1-pod1", "pod1", "Pod", "TargetEvicted (PodDeleted)", "drain.foo.com/bar", "Eviction", "5d"}},
+		{Cells: []interface{}{"pod-1-pod2", "pod2", "Pod", "Failed (NoFurtherResponder)", "drain.foo.com/bar", "Eviction", "5d"}},
+		{Cells: []interface{}{"pod-1-pod3", "pod3", "Pod", "Failed (CanceledDueToNoRequesters)", "drain.foo.com/bar", "Withdrawn", "5d"}},
+		{Cells: []interface{}{"pod-1-pod4", "pod4", "Pod", "Progressing", "drain.foo.com/bar", "Eviction", "5d"}},
+		{Cells: []interface{}{"pod-1-pod5", "pod5", "Pod", "Failed (EvictionInvalid)", "drain.foo.com/bar", "Eviction", "5d"}},
+		{Cells: []interface{}{"pod-1-pod6", "pod6", "Pod", "Pending", "drain.foo.com/bar", "Eviction", "5d"}},
+	}
+
+	rows, err := printEvictionRequestList(&evictionRequestList, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error generating table rows for EvictionRequestList: %#v", err)
+	}
+	for i := range rows {
+		rows[i].Object.Object = nil
+	}
+
+	if !reflect.DeepEqual(expected, rows) {
+		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
+	}
+}
+
+func TestPrintEviction(t *testing.T) {
+	now := time.Now().UTC().AddDate(0, 0, -3)
+	daysLater := now.AddDate(0, 0, 5).Add(time.Minute)
+	dayAgo := now.AddDate(0, 0, -1)
+	twoDaysAgo := now.AddDate(0, 0, -2)
+
+	eviction := lifecycle.Eviction{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "pod-1-pod1",
+			Namespace:         "ns1",
+			CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+		},
+		Spec: lifecycle.EvictionSpec{
+			Target: lifecycle.EvictionTarget{
+				Pod: &lifecycle.EvictionPodReference{
+					Name: "pod1",
+					UID:  "3d7fdff1-3fe5-48b9-b106-1ee24b0277f6",
+				},
+			},
+		},
+		Status: lifecycle.EvictionStatus{
+			ObservedGeneration: new(int64(1)),
+			TargetResponders: []lifecycle.TargetResponder{
+				{Name: "responder1", State: lifecycle.ResponderStateCompleted},
+				{Name: "responder2", State: lifecycle.ResponderStateActive},
+			},
+			Responders: []lifecycle.ResponderStatus{
+				{Name: "responder1", HeartbeatTime: &metav1.Time{Time: dayAgo}, ExpectedCompletionTime: nil, StartTime: &metav1.Time{Time: twoDaysAgo}, CompletionTime: &metav1.Time{Time: dayAgo}, Message: new("completed message")},
+				{Name: "responder2", HeartbeatTime: &metav1.Time{Time: now}, ExpectedCompletionTime: &metav1.Time{Time: daysLater}, StartTime: &metav1.Time{Time: now}, CompletionTime: nil, Message: new("migrating pod1 message")},
+			},
+			Requesters: []lifecycle.Requester{
+				{
+					Name:   "drain.foo.com/bar",
+					Intent: lifecycle.RequesterIntentEviction,
+				},
+			},
+			Conditions: []metav1.Condition{},
+		},
+	}
+
+	tests := []struct {
+		options  printers.GenerateOptions
+		expected []metav1.TableRow
+	}{
+		{
+			options: printers.GenerateOptions{Wide: false},
+			expected: []metav1.TableRow{
+				// Columns: Name, Target, Target Type, Status, Active Responder, Responder Status, Responder Expected Finish, Requesters, Age
+				{Cells: []interface{}{"pod-1-pod1", "pod1", "Pod", "Progressing", "responder2 (2/2)", "Started (3d ago)", "in 2d", "drain.foo.com/bar", "5d"}},
+			},
+		},
+		{
+			options: printers.GenerateOptions{Wide: true},
+			expected: []metav1.TableRow{
+				// Columns: Name, Target, Target Type, Status, Active Responder, Responder Status, Responder Expected Finish, Requesters, Age, Responder Status Message, Responder Heartbeat
+				{Cells: []interface{}{"pod-1-pod1", "pod1", "Pod", "Progressing", "responder2 (2/2)", "Started (3d ago)", "in 2d", "drain.foo.com/bar", "5d", "3d ago", "migrating pod1 message"}},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		rows, err := printEviction(&eviction, test.options)
+		if err != nil {
+			t.Fatalf("Error generating table rows for Eviction: %#v", err)
+		}
+		rows[0].Object.Object = nil
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("mismatch: %s", cmp.Diff(test.expected, rows))
+		}
+	}
+}
+
+func TestPrintEvictionList(t *testing.T) {
+	now := time.Now().UTC().AddDate(0, 0, -3)
+	daysLater := now.AddDate(0, 0, 5).Add(time.Minute)
+	dayAgo := now.AddDate(0, 0, -1)
+	twoDaysAgo := now.AddDate(0, 0, -2)
+	evictionList := lifecycle.EvictionList{
+		Items: []lifecycle.Eviction{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pod-1-pod1",
+					Namespace:         "ns1",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: lifecycle.EvictionSpec{
+					Target: lifecycle.EvictionTarget{
+						Pod: &lifecycle.EvictionPodReference{
+							Name: "pod1",
+							UID:  "bc134542-aa19-4361-8fe2-cf18f78848c0",
+						},
+					},
+				},
+				Status: lifecycle.EvictionStatus{
+					ObservedGeneration: new(int64(1)),
+					Requesters: []lifecycle.Requester{
+						{
+							Name:   "drain.foo.com/bar",
+							Intent: lifecycle.RequesterIntentEviction,
+						},
+					},
+					TargetResponders: []lifecycle.TargetResponder{
+						{Name: "responder1", State: lifecycle.ResponderStateCompleted},
+					},
+					Responders: []lifecycle.ResponderStatus{
+						{Name: "responder1", HeartbeatTime: &metav1.Time{Time: dayAgo}, ExpectedCompletionTime: &metav1.Time{Time: dayAgo}, StartTime: &metav1.Time{Time: twoDaysAgo}, CompletionTime: &metav1.Time{Time: dayAgo}, Message: new("migrated1")},
+					},
+					Conditions: []metav1.Condition{
+						{Type: string(lifecycle.EvictionConditionTargetEvicted), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: dayAgo}, Reason: string(lifecycle.EvictionConditionReasonPodDeleted), Message: "Pod was successfully deleted."},
+					},
+				},
+			},
+
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pod-1-pod2",
+					Namespace:         "ns2",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: lifecycle.EvictionSpec{
+					Target: lifecycle.EvictionTarget{
+						Pod: &lifecycle.EvictionPodReference{
+							Name: "pod2",
+							UID:  "5e153f5b-e420-41b4-9040-8f3b51cf2162",
+						},
+					},
+				},
+				Status: lifecycle.EvictionStatus{
+					ObservedGeneration: new(int64(1)),
+					Requesters: []lifecycle.Requester{
+						{
+							Name:   "drain.foo.com/bar",
+							Intent: lifecycle.RequesterIntentEviction,
+						},
+					},
+					TargetResponders: []lifecycle.TargetResponder{
+						{Name: "responder1", State: lifecycle.ResponderStateInterrupted},
+					},
+					Responders: []lifecycle.ResponderStatus{
+						{Name: "responder1", HeartbeatTime: &metav1.Time{Time: dayAgo}, ExpectedCompletionTime: &metav1.Time{Time: dayAgo}, StartTime: &metav1.Time{Time: twoDaysAgo}, CompletionTime: nil, Message: new("running for a long time")}},
+					Conditions: []metav1.Condition{
+						{Type: string(lifecycle.EvictionConditionFailed), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: string(lifecycle.EvictionConditionReasonNoFurtherResponder), Message: "Canceled because there is no further responder."},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pod-1-pod3",
+					Namespace:         "ns3",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: lifecycle.EvictionSpec{
+					Target: lifecycle.EvictionTarget{
+						Pod: &lifecycle.EvictionPodReference{
+							Name: "pod3",
+							UID:  "a4ea9433-da6a-4bfc-9033-296488ba12be",
+						},
+					},
+				},
+				Status: lifecycle.EvictionStatus{
+					ObservedGeneration: new(int64(1)),
+					Requesters: []lifecycle.Requester{
+						{
+							Name:   "drain.foo.com/bar",
+							Intent: lifecycle.RequesterIntentEviction,
+						},
+					},
+					TargetResponders: []lifecycle.TargetResponder{
+						{Name: "responder1", State: lifecycle.ResponderStateCompleted},
+					},
+					Responders: []lifecycle.ResponderStatus{
+						{Name: "responder1", HeartbeatTime: &metav1.Time{Time: dayAgo}, ExpectedCompletionTime: nil, StartTime: &metav1.Time{Time: twoDaysAgo}, CompletionTime: &metav1.Time{Time: dayAgo}, Message: new("completed message")}},
+					Conditions: []metav1.Condition{
+						{Type: string(lifecycle.EvictionConditionFailed), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: string(lifecycle.EvictionConditionReasonNoFurtherResponder), Message: "Canceled because there is no further responder."},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pod-1-pod4",
+					Namespace:         "ns4",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: lifecycle.EvictionSpec{
+					Target: lifecycle.EvictionTarget{
+						Pod: &lifecycle.EvictionPodReference{
+							Name: "pod4",
+							UID:  "68018c4c-bcca-4465-964a-66d8a1626686",
+						},
+					},
+				},
+				Status: lifecycle.EvictionStatus{
+					ObservedGeneration: new(int64(1)),
+					Requesters: []lifecycle.Requester{
+						{
+							Name:   "drain.foo.com/bar",
+							Intent: lifecycle.RequesterIntentWithdrawn,
+						},
+					},
+					TargetResponders: []lifecycle.TargetResponder{
+						{Name: "responder3", State: lifecycle.ResponderStateCanceled},
+						{Name: "responder4", State: lifecycle.ResponderStateInactive},
+					},
+					Responders: []lifecycle.ResponderStatus{
+						{Name: "responder3", HeartbeatTime: &metav1.Time{Time: now}, ExpectedCompletionTime: nil, StartTime: &metav1.Time{Time: now}, CompletionTime: nil, Message: new("running3")},
+						{Name: "responder4", HeartbeatTime: nil, ExpectedCompletionTime: nil, StartTime: nil, CompletionTime: nil, Message: nil},
+					},
+					Conditions: []metav1.Condition{
+						{Type: string(lifecycle.EvictionConditionFailed), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: string(lifecycle.EvictionConditionReasonCanceledDueToNoRequesters), Message: "Canceled due to no requesters."},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pod-1-pod5",
+					Namespace:         "ns5",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: lifecycle.EvictionSpec{
+					Target: lifecycle.EvictionTarget{
+						Pod: &lifecycle.EvictionPodReference{
+							Name: "pod5",
+							UID:  "3d7fdff1-3fe5-48b9-b106-1ee24b0277f6",
+						},
+					},
+				},
+				Status: lifecycle.EvictionStatus{
+					ObservedGeneration: new(int64(1)),
+					Requesters: []lifecycle.Requester{
+						{
+							Name:   "drain.foo.com/bar",
+							Intent: lifecycle.RequesterIntentEviction,
+						},
+					},
+					TargetResponders: []lifecycle.TargetResponder{
+						{Name: "responder1", State: lifecycle.ResponderStateCompleted},
+						{Name: "responder2", State: lifecycle.ResponderStateActive},
+					},
+					Responders: []lifecycle.ResponderStatus{
+						{Name: "responder1", HeartbeatTime: &metav1.Time{Time: dayAgo}, ExpectedCompletionTime: nil, StartTime: &metav1.Time{Time: twoDaysAgo}, CompletionTime: &metav1.Time{Time: dayAgo}, Message: new("completed2")},
+						{Name: "responder2", HeartbeatTime: &metav1.Time{Time: now}, ExpectedCompletionTime: &metav1.Time{Time: daysLater}, StartTime: &metav1.Time{Time: now}, CompletionTime: nil, Message: new("running2")},
+					},
+					Conditions: []metav1.Condition{
+						{Type: string(lifecycle.EvictionConditionTargetEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "EvictionInProgress", Message: "Pod is being evicted."},
+					},
+				},
+			},
+
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pod-1-pod6",
+					Namespace:         "ns6",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: lifecycle.EvictionSpec{
+					Target: lifecycle.EvictionTarget{
+						Pod: &lifecycle.EvictionPodReference{
+							Name: "pod6",
+							UID:  "aac2a982-2176-4770-8c8c-bcdf51b24fde",
+						},
+					},
+				},
+				Status: lifecycle.EvictionStatus{
+					ObservedGeneration: new(int64(1)),
+					Requesters: []lifecycle.Requester{
+						{
+							Name:   "drain.foo.com/bar",
+							Intent: lifecycle.RequesterIntentEviction,
+						},
+					},
+					TargetResponders: []lifecycle.TargetResponder{
+						{Name: "responder1", State: lifecycle.ResponderStateCompleted},
+						{Name: "responder2", State: lifecycle.ResponderStateActive},
+					},
+					Responders: []lifecycle.ResponderStatus{
+						{Name: "responder1", HeartbeatTime: &metav1.Time{Time: dayAgo}, ExpectedCompletionTime: nil, StartTime: &metav1.Time{Time: twoDaysAgo}, CompletionTime: &metav1.Time{Time: dayAgo}, Message: new("completed2")},
+						{Name: "responder2", HeartbeatTime: &metav1.Time{Time: now}, ExpectedCompletionTime: &metav1.Time{Time: dayAgo}, StartTime: &metav1.Time{Time: now}, CompletionTime: nil, Message: new("running2")},
+					},
+					Conditions: []metav1.Condition{
+						{Type: string(lifecycle.EvictionConditionTargetEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "EvictionInProgress", Message: "Pod is being evicted."},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pod-1-pod7",
+					Namespace:         "ns7",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: lifecycle.EvictionSpec{
+					Target: lifecycle.EvictionTarget{
+						Pod: &lifecycle.EvictionPodReference{
+							Name: "pod7",
+							UID:  "707ba618-ffd6-4797-b503-17af1c7f4d98",
+						},
+					},
+				},
+				Status: lifecycle.EvictionStatus{
+					ObservedGeneration: new(int64(1)),
+					Requesters: []lifecycle.Requester{
+						{
+							Name:   "rescheduler.bar.com",
+							Intent: lifecycle.RequesterIntentEviction,
+						},
+						{
+							Name:   "drain.foo.com/bar",
+							Intent: lifecycle.RequesterIntentEviction,
+						},
+					},
+					TargetResponders: []lifecycle.TargetResponder{
+						{Name: "responder3", State: lifecycle.ResponderStateActive},
+						{Name: "responder4", State: lifecycle.ResponderStateInactive},
+					},
+					Responders: []lifecycle.ResponderStatus{
+						{Name: "responder3", HeartbeatTime: &metav1.Time{Time: now}, ExpectedCompletionTime: nil, StartTime: &metav1.Time{Time: now}, CompletionTime: nil, Message: new("running3")},
+						{Name: "responder4", HeartbeatTime: nil, ExpectedCompletionTime: nil, StartTime: nil, CompletionTime: nil, Message: nil},
+					},
+
+					Conditions: []metav1.Condition{
+						{Type: string(lifecycle.EvictionConditionTargetEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "EvictionInProgress", Message: "Pod is being evicted."},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pod-1-pod8",
+					Namespace:         "ns8",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: lifecycle.EvictionSpec{
+					Target: lifecycle.EvictionTarget{
+						Pod: &lifecycle.EvictionPodReference{
+							Name: "pod8",
+							UID:  "30741366-8d1f-4385-84ff-0f2e7ba0305f",
+						},
+					},
+				},
+				Status: lifecycle.EvictionStatus{
+					ObservedGeneration: new(int64(1)),
+					Requesters: []lifecycle.Requester{
+						{
+							Name:   "drain.foo.com/bar",
+							Intent: lifecycle.RequesterIntentEviction,
+						},
+					},
+					TargetResponders: []lifecycle.TargetResponder{
+						{Name: "responder3", State: lifecycle.ResponderStateInactive},
+						{Name: "responder4", State: lifecycle.ResponderStateInactive},
+					},
+					Responders: []lifecycle.ResponderStatus{
+						{Name: "responder3", HeartbeatTime: nil, ExpectedCompletionTime: nil, StartTime: nil, CompletionTime: nil, Message: nil},
+						{Name: "responder4", HeartbeatTime: nil, ExpectedCompletionTime: nil, StartTime: nil, CompletionTime: nil, Message: nil},
+					},
+					Conditions: []metav1.Condition{
+						{Type: string(lifecycle.EvictionConditionTargetEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "WaitingForResponder", Message: "Waiting for an responder."},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pod-1-pod9",
+					Namespace:         "ns9",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: lifecycle.EvictionSpec{
+					Target: lifecycle.EvictionTarget{
+						Pod: &lifecycle.EvictionPodReference{
+							Name: "pod9",
+							UID:  "9f4a1620-0e97-4246-b304-5969b2104377",
+						},
+					},
+				},
+				Status: lifecycle.EvictionStatus{
+					ObservedGeneration: new(int64(1)),
+					Requesters: []lifecycle.Requester{
+						{
+							Name:   "drain.foo.com/bar",
+							Intent: lifecycle.RequesterIntentEviction,
+						},
+					},
+					TargetResponders: []lifecycle.TargetResponder{
+						{Name: "responder3", State: lifecycle.ResponderStateInactive},
+						{Name: "responder4", State: lifecycle.ResponderStateInactive},
+					},
+					Responders: []lifecycle.ResponderStatus{
+						{Name: "responder3", HeartbeatTime: nil, ExpectedCompletionTime: nil, StartTime: nil, CompletionTime: nil, Message: nil},
+						{Name: "responder4", HeartbeatTime: nil, ExpectedCompletionTime: nil, StartTime: nil, CompletionTime: nil, Message: nil},
+					},
+					Conditions: []metav1.Condition{
+						{Type: string(lifecycle.EvictionConditionTargetEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "Canceled", Message: "Eviction failed due to cancelation."},
+						{Type: string(lifecycle.EvictionConditionFailed), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: string(lifecycle.EvictionConditionReasonEvictionInvalid), Message: "Pod pod6 was not found."},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pod-1-pod10",
+					Namespace:         "ns10",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: lifecycle.EvictionSpec{
+					Target: lifecycle.EvictionTarget{
+						Pod: &lifecycle.EvictionPodReference{
+							Name: "pod10",
+							UID:  "e968f679-523b-4e63-9417-0cd9ae13a0b2",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Columns: Name, Target, Target Type, Status, Active Responder, Responder Status, Responder Expected Finish, Requesters, Age
+	expected := []metav1.TableRow{
+		{Cells: []interface{}{"pod-1-pod1", "pod1", "Pod", "TargetEvicted (PodDeleted)", "responder1 (1/1)", "Completed (4d ago)", "-", "drain.foo.com/bar", "5d"}},
+		{Cells: []interface{}{"pod-1-pod2", "pod2", "Pod", "Failed (NoFurtherResponder)", "responder1 (1/1)", "Interrupted", "-", "drain.foo.com/bar", "5d"}},
+		{Cells: []interface{}{"pod-1-pod3", "pod3", "Pod", "Failed (NoFurtherResponder)", "responder1 (1/1)", "Completed (4d ago)", "-", "drain.foo.com/bar", "5d"}},
+		{Cells: []interface{}{"pod-1-pod4", "pod4", "Pod", "Failed (CanceledDueToNoRequesters)", "responder3 (1/2)", "Canceled", "-", "<withdrawn>", "5d"}},
+		{Cells: []interface{}{"pod-1-pod5", "pod5", "Pod", "Progressing", "responder2 (2/2)", "Started (3d ago)", "in 2d", "drain.foo.com/bar", "5d"}},
+		{Cells: []interface{}{"pod-1-pod6", "pod6", "Pod", "Progressing", "responder2 (2/2)", "Started (3d ago)", "4d ago", "drain.foo.com/bar", "5d"}},
+		{Cells: []interface{}{"pod-1-pod7", "pod7", "Pod", "Progressing", "responder3 (1/2)", "Started (3d ago)", "<unknown>", "drain.foo.com/bar + 1 more...", "5d"}},
+		{Cells: []interface{}{"pod-1-pod8", "pod8", "Pod", "Progressing", "<unset> (0/2)", "<unset>", "<unknown>", "drain.foo.com/bar", "5d"}},
+		{Cells: []interface{}{"pod-1-pod9", "pod9", "Pod", "Failed (EvictionInvalid)", "<unset> (0/2)", "<unset>", "<unknown>", "drain.foo.com/bar", "5d"}},
+		{Cells: []interface{}{"pod-1-pod10", "pod10", "Pod", "Pending", "<unset> (0/0)", "<unset>", "<unknown>", "<none>", "5d"}},
+	}
+
+	rows, err := printEvictionList(&evictionList, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error generating table rows for EvictionList: %#v", err)
+	}
 	for i := range rows {
 		rows[i].Object.Object = nil
 	}

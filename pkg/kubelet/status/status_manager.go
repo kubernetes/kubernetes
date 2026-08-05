@@ -45,6 +45,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
 	statusutil "k8s.io/kubernetes/pkg/util/pod"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // A wrapper around v1.PodStatus that includes a version to enforce that stale pod statuses are
@@ -124,16 +125,16 @@ type PodDeletionSafetyProvider interface {
 }
 
 type PodStartupLatencyStateHelper interface {
-	RecordStatusUpdated(pod *v1.Pod)
+	RecordStatusUpdated(logger klog.Logger, pod *v1.Pod)
 	DeletePodStartupState(podUID types.UID)
 }
 
 // PodUpdateNotifier is an interface for receiving pod status updates.
 type PodUpdateNotifier interface {
 	// OnPodUpdated is called when a pod's status is updated.
-	OnPodUpdated(pod *v1.Pod, status v1.PodStatus, isAdded bool)
+	OnPodUpdated(logger klog.Logger, pod *v1.Pod, status v1.PodStatus, isAdded bool)
 	// OnPodRemoved is called when a pod is terminated.
-	OnPodRemoved(pod *v1.Pod)
+	OnPodRemoved(logger klog.Logger, pod *v1.Pod)
 }
 
 type podStatusNotification struct {
@@ -160,6 +161,11 @@ type Manager interface {
 	// SetContainerReadiness updates the cached container status with the given readiness, and
 	// triggers a status update.
 	SetContainerReadiness(logger klog.Logger, podUID types.UID, containerID kubecontainer.ContainerID, ready bool)
+
+	// SetPodVolumeHealth updates the cached VolumeHealth entry for the given
+	// volume name on the pod. conditions is the full desired condition set for
+	// that volume (empty means healthy). Returns true if the cached status changed.
+	SetPodVolumeHealth(logger klog.Logger, podUID types.UID, volumeName string, conditions []v1.VolumeHealthCondition) bool
 
 	// SetContainerStartup updates the cached container status with the given startup, and
 	// triggers a status update.
@@ -188,7 +194,7 @@ type Manager interface {
 	SetPodResizeInProgressCondition(podUID types.UID, reason, message string, observedGeneration int64) (int64, bool)
 
 	// ClearPodResizePendingCondition clears the PodResizePending condition for the pod from the cache.
-	ClearPodResizePendingCondition(podUID types.UID)
+	ClearPodResizePendingCondition(podUID types.UID, resolution metrics.DeferredResizeResolution)
 
 	// ClearPodResizeInProgressCondition clears the PodResizeInProgress condition for the pod from the cache.
 	// If the condition was cleared, it returns the observedGeneration of the cleared condition and true.
@@ -224,7 +230,8 @@ func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeleti
 
 // isPodStatusByKubeletEqual returns true if the given pod statuses are equal, ignoring
 // fields not managed by the kubelet (including non-kubelet-owned pod conditions,
-// ResourceClaimStatuses, and ExtendedResourceClaimStatus). Statuses are assumed to be
+// ResourceClaimStatuses, ExtendedResourceClaimStatus, and
+// NodeAllocatableResourceClaimStatuses). Statuses are assumed to be
 // normalized before calling this function.
 func isPodStatusByKubeletEqual(oldStatus, status *v1.PodStatus) bool {
 	oldCopy := oldStatus.DeepCopy()
@@ -257,6 +264,8 @@ func isPodStatusByKubeletEqual(oldStatus, status *v1.PodStatus) bool {
 	oldCopy.ResourceClaimStatuses = status.ResourceClaimStatuses
 	// ExtendedResourceClaimStatus is not owned and not modified by kubelet.
 	oldCopy.ExtendedResourceClaimStatus = status.ExtendedResourceClaimStatus
+	// NodeAllocatableResourceClaimStatuses is not owned and not modified by kubelet.
+	oldCopy.NodeAllocatableResourceClaimStatuses = status.NodeAllocatableResourceClaimStatuses
 
 	return apiequality.Semantic.DeepEqual(oldCopy, status)
 }
@@ -323,7 +332,7 @@ func (m *manager) SetPodResizePendingCondition(podUID types.UID, reason, message
 	}
 
 	if previousCondition == nil {
-		m.recordPendingResizeCount()
+		m.observePendingResizeCount()
 		return true
 	} else {
 		return previousCondition.Reason != reason || previousCondition.ObservedGeneration != observedGeneration
@@ -366,21 +375,36 @@ func (m *manager) SetPodResizeInProgressCondition(podUID types.UID, reason, mess
 	return observedGeneration, !reflect.DeepEqual(previousCondition, m.podResizeConditions[podUID].PodResizeInProgress)
 }
 
+func (m *manager) observeDeferredResizeDuration(podUID types.UID, cond *v1.PodCondition, resolution metrics.DeferredResizeResolution) {
+	if cond == nil || cond.Reason != v1.PodReasonDeferred || cond.LastTransitionTime.IsZero() {
+		return
+	}
+	// If the pod was already removed from the pod manager (e.g. during pod deletion cleanup),
+	// GetPodByUID will return nil. GetPriorityBucketLabel(nil) will return PriorityBucketUnknown ("unknown").
+	pod, _ := m.podManager.GetPodByUID(podUID)
+	priorityBucket := metrics.GetPriorityBucketLabel(pod)
+	duration := time.Since(cond.LastTransitionTime.Time).Seconds()
+	metrics.PodDeferredResizeDurationSeconds.WithLabelValues(string(resolution), string(priorityBucket)).Observe(duration)
+}
+
 // ClearPodResizePendingCondition clears the PodResizePending condition for the pod from the cache.
-func (m *manager) ClearPodResizePendingCondition(podUID types.UID) {
+func (m *manager) ClearPodResizePendingCondition(podUID types.UID, resolution metrics.DeferredResizeResolution) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 
-	if m.podResizeConditions[podUID].PodResizePending == nil {
+	cond := m.podResizeConditions[podUID].PodResizePending
+	if cond == nil {
 		return
 	}
+
+	m.observeDeferredResizeDuration(podUID, cond, resolution)
 
 	m.podResizeConditions[podUID] = podResizeConditions{
 		PodResizeInProgress: m.podResizeConditions[podUID].PodResizeInProgress,
 		PodResizePending:    nil,
 	}
 
-	m.recordPendingResizeCount()
+	m.observePendingResizeCount()
 }
 
 // ClearPodResizeInProgressCondition clears the PodResizeInProgress condition for the pod from the cache.
@@ -431,7 +455,7 @@ func (m *manager) BackfillPodResizeConditions(pods []*v1.Pod) {
 			}
 		}
 	}
-	m.recordPendingResizeCount()
+	m.observePendingResizeCount()
 	m.recordInProgressResizeCount()
 }
 
@@ -462,7 +486,7 @@ func (m *manager) SetPodStatus(logger klog.Logger, pod *v1.Pod, status v1.PodSta
 	var notification *podStatusNotification
 	defer func() {
 		if notification != nil {
-			m.sendNotification(notification)
+			m.sendNotification(logger, notification)
 		}
 	}()
 
@@ -488,7 +512,7 @@ func (m *manager) SetContainerReadiness(logger klog.Logger, podUID types.UID, co
 	var notification *podStatusNotification
 	defer func() {
 		if notification != nil {
-			m.sendNotification(notification)
+			m.sendNotification(logger, notification)
 		}
 	}()
 
@@ -554,11 +578,74 @@ func (m *manager) SetContainerReadiness(logger klog.Logger, podUID types.UID, co
 	_, notification = m.updateStatusInternal(logger, pod, status, false, false)
 }
 
+func (m *manager) SetPodVolumeHealth(logger klog.Logger, podUID types.UID, volumeName string, conditions []v1.VolumeHealthCondition) bool {
+	var notification *podStatusNotification
+	defer func() {
+		if notification != nil {
+			m.sendNotification(logger, notification)
+		}
+	}()
+
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+
+	pod, ok := m.podManager.GetPodByUID(podUID)
+	if !ok {
+		logger.V(4).Info("Pod has been deleted, no need to update volume health", "podUID", podUID)
+		return false
+	}
+
+	oldStatus, found := m.podStatuses[pod.UID]
+	if !found {
+		logger.Info("Volume health changed before pod has synced",
+			"pod", klog.KObj(pod),
+			"volumeName", volumeName)
+		return false
+	}
+
+	entryIndex := -1
+	var existingConditions []v1.VolumeHealthCondition
+	for i := range oldStatus.status.VolumeHealth {
+		if oldStatus.status.VolumeHealth[i].Name == volumeName {
+			entryIndex = i
+			existingConditions = oldStatus.status.VolumeHealth[i].HealthConditions
+			break
+		}
+	}
+
+	// PATCH only when the (status, reason) set differs; message-only changes are suppressed.
+	if volumeutil.VolumeHealthConditionSetsEqual(existingConditions, conditions) {
+		logger.V(4).Info("Volume health unchanged",
+			"pod", klog.KObj(pod),
+			"volumeName", volumeName)
+		return false
+	}
+
+	// Make sure we're not updating the cached version.
+	status := *oldStatus.status.DeepCopy()
+	newConditions := append([]v1.VolumeHealthCondition(nil), conditions...)
+	now := metav1.Now()
+	if entryIndex >= 0 {
+		status.VolumeHealth[entryIndex].HealthConditions = newConditions
+		status.VolumeHealth[entryIndex].LastTransitionTime = now
+	} else {
+		status.VolumeHealth = append(status.VolumeHealth, v1.PodVolumeHealth{
+			Name:               volumeName,
+			HealthConditions:   newConditions,
+			LastTransitionTime: now,
+		})
+	}
+
+	changed, notif := m.updateStatusInternal(logger, pod, status, false, false)
+	notification = notif
+	return changed
+}
+
 func (m *manager) SetContainerStartup(logger klog.Logger, podUID types.UID, containerID kubecontainer.ContainerID, started bool) {
 	var notification *podStatusNotification
 	defer func() {
 		if notification != nil {
-			m.sendNotification(notification)
+			m.sendNotification(logger, notification)
 		}
 	}()
 
@@ -635,7 +722,7 @@ func (m *manager) TerminatePod(logger klog.Logger, pod *v1.Pod) {
 	var notification *podStatusNotification
 	defer func() {
 		if notification != nil {
-			m.sendNotification(notification)
+			m.sendNotification(logger, notification)
 		}
 	}()
 
@@ -897,6 +984,13 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 		status.StartTime = &now
 	}
 
+	// Preserve volume health across pod status updates. VolumeHealth is set
+	// independently by the volume health manager and is not part of the
+	// status generated from the container runtime.
+	if len(oldStatus.VolumeHealth) > 0 && len(status.VolumeHealth) == 0 {
+		status.VolumeHealth = oldStatus.VolumeHealth
+	}
+
 	// prevent sending unnecessary patches
 	if oldStatus.ObservedGeneration > status.ObservedGeneration {
 		status.ObservedGeneration = oldStatus.ObservedGeneration
@@ -1008,12 +1102,12 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 	return true, notification
 }
 
-func (m *manager) sendNotification(n *podStatusNotification) {
+func (m *manager) sendNotification(logger klog.Logger, n *podStatusNotification) {
 	for _, notifier := range m.notifiers {
 		if !n.podIsFinished {
-			notifier.OnPodUpdated(n.pod, n.status, n.isAdded)
+			notifier.OnPodUpdated(logger, n.pod, n.status, n.isAdded)
 		} else {
-			notifier.OnPodRemoved(n.pod)
+			notifier.OnPodRemoved(logger, n.pod)
 		}
 	}
 }
@@ -1040,10 +1134,11 @@ func (m *manager) deletePodStatus(uid types.UID) {
 	delete(m.podStatuses, uid)
 	m.podStartupLatencyHelper.DeletePodStartupState(uid)
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		if _, exists := m.podResizeConditions[uid]; exists {
+		if conds, exists := m.podResizeConditions[uid]; exists {
+			m.observeDeferredResizeDuration(uid, conds.PodResizePending, metrics.DeferredResizeResolutionTerminated)
 			delete(m.podResizeConditions, uid)
 			m.recordInProgressResizeCount()
-			m.recordPendingResizeCount()
+			m.observePendingResizeCount()
 		}
 	}
 }
@@ -1057,10 +1152,11 @@ func (m *manager) RemoveOrphanedStatuses(logger klog.Logger, podUIDs map[types.U
 			logger.V(5).Info("Removing pod from status map", "podUID", key)
 			delete(m.podStatuses, key)
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-				if _, exists := m.podResizeConditions[key]; exists {
+				if conds, exists := m.podResizeConditions[key]; exists {
+					m.observeDeferredResizeDuration(key, conds.PodResizePending, metrics.DeferredResizeResolutionTerminated)
 					delete(m.podResizeConditions, key)
 					m.recordInProgressResizeCount()
-					m.recordPendingResizeCount()
+					m.observePendingResizeCount()
 				}
 			}
 		}
@@ -1190,7 +1286,7 @@ func (m *manager) syncPod(ctx context.Context, uid types.UID, status versionedPo
 		logger.V(3).Info("Status for pod updated successfully", "pod", klog.KObj(pod), "statusVersion", status.version, "status", mergedStatus)
 		pod = newPod
 		// We pass a new object (result of API call which contains updated ResourceVersion)
-		m.podStartupLatencyHelper.RecordStatusUpdated(pod)
+		m.podStartupLatencyHelper.RecordStatusUpdated(logger, pod)
 	}
 
 	// measure how long the status update took to propagate from generation to update on the server
@@ -1393,6 +1489,8 @@ func mergePodStatus(pod *v1.Pod, oldPodStatus, newPodStatus v1.PodStatus, couldH
 	newPodStatus.ResourceClaimStatuses = oldPodStatus.ResourceClaimStatuses
 	// ExtendedResourceClaimStatus is not owned and not modified by kubelet.
 	newPodStatus.ExtendedResourceClaimStatus = oldPodStatus.ExtendedResourceClaimStatus
+	// NodeAllocatableResourceClaimStatuses is not owned and not modified by kubelet.
+	newPodStatus.NodeAllocatableResourceClaimStatuses = oldPodStatus.NodeAllocatableResourceClaimStatuses
 
 	// Delay transitioning a pod to a terminal status unless the pod is actually terminal.
 	// The Kubelet should never transition a pod to terminal status that could have running
@@ -1462,18 +1560,28 @@ func updatedPodResizeCondition(conditionType v1.PodConditionType, oldCondition *
 	}
 }
 
-// recordPendingResizeCount sets the pending resize metric.
-func (m *manager) recordPendingResizeCount() {
-	pendingResizeCount := make(map[string]int)
-	for _, conditions := range m.podResizeConditions {
+// observePendingResizeCount sets the pending resize metric.
+func (m *manager) observePendingResizeCount() {
+	type pendingKey struct {
+		reason         string
+		priorityBucket metrics.PriorityBucket
+	}
+	pendingResizeCount := make(map[pendingKey]int)
+	for uid, conditions := range m.podResizeConditions {
 		if conditions.PodResizePending != nil {
-			pendingResizeCount[strings.ToLower(conditions.PodResizePending.Reason)]++
+			pod, ok := m.podManager.GetPodByUID(uid)
+			if !ok {
+				continue
+			}
+			reason := strings.ToLower(conditions.PodResizePending.Reason)
+			priorityBucket := metrics.GetPriorityBucketLabel(pod)
+			pendingResizeCount[pendingKey{reason: reason, priorityBucket: priorityBucket}]++
 		}
 	}
 
 	metrics.PodPendingResizes.Reset()
-	for reason, count := range pendingResizeCount {
-		metrics.PodPendingResizes.WithLabelValues(reason).Set(float64(count))
+	for k, count := range pendingResizeCount {
+		metrics.PodPendingResizes.WithLabelValues(k.reason, string(k.priorityBucket)).Set(float64(count))
 	}
 }
 

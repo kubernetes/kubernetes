@@ -19,11 +19,9 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
 
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
@@ -93,6 +91,7 @@ type initData struct {
 	skipTokenPrint              bool
 	dryRun                      bool
 	kubeconfig                  *clientcmdapi.Config
+	kubeconfigOriginal          *clientcmdapi.Config
 	kubeconfigDir               string
 	kubeconfigPath              string
 	ignorePreflightErrors       sets.Set[string]
@@ -463,6 +462,9 @@ func (d *initData) CertificateDir() string {
 }
 
 // KubeConfig returns a kubeconfig after loading it from KubeConfigPath().
+// If the default kubeconfig path is used (admin.conf), instead of constructing
+// a kubeconfig that points to the control plane endpoint, make it point to the localAPIEndpoint.
+// This would allow 'kubeadm init' to only talk to the local kube-apiserver instance.
 func (d *initData) KubeConfig() (*clientcmdapi.Config, error) {
 	if d.kubeconfig != nil {
 		return d.kubeconfig, nil
@@ -473,8 +475,24 @@ func (d *initData) KubeConfig() (*clientcmdapi.Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	d.kubeconfigOriginal = d.kubeconfig.DeepCopy()
+
+	if d.kubeconfigPath == kubeadmconstants.GetAdminKubeConfigPath() {
+		kubeconfigutil.PointKubeConfigToLocalAPIEndpoint(d.kubeconfig, &d.Cfg().LocalAPIEndpoint)
+	}
 
 	return d.kubeconfig, nil
+}
+
+// KubeConfigOriginal returns the original kubeconfig loaded from file, without any modifications.
+func (d *initData) KubeConfigOriginal() (*clientcmdapi.Config, error) {
+	if d.kubeconfigOriginal == nil {
+		if _, err := d.KubeConfig(); err != nil {
+			return nil, err
+		}
+	}
+
+	return d.kubeconfigOriginal, nil
 }
 
 // KubeConfigDir returns the Kubernetes configuration directory or the temporary directory if DryRun is true.
@@ -521,8 +539,12 @@ func (d *initData) OutputWriter() io.Writer {
 
 // getDryRunClient creates a fake client that answers some GET calls in order to be able to do the full init flow in dry-run mode.
 func getDryRunClient(d *initData) (clientset.Interface, error) {
+	kubeconfig, err := d.KubeConfig()
+	if err != nil {
+		return nil, err
+	}
 	dryRun := apiclient.NewDryRun()
-	if err := dryRun.WithKubeConfigFile(d.KubeConfigPath()); err != nil {
+	if err := dryRun.WithKubeConfig(kubeconfig); err != nil {
 		return nil, err
 	}
 	dryRun.WithDefaultMarshalFunction().
@@ -550,7 +572,11 @@ func (d *initData) Client() (clientset.Interface, error) {
 			// and if the bootstrapping was not already done
 			if !d.adminKubeConfigBootstrapped && isDefaultKubeConfigPath {
 				// Call EnsureAdminClusterRoleBinding() to obtain a working client from admin.conf.
-				d.client, err = kubeconfigphase.EnsureAdminClusterRoleBinding(kubeadmconstants.KubernetesDir, nil)
+				d.client, err = kubeconfigphase.EnsureAdminClusterRoleBinding(
+					kubeadmconstants.KubernetesDir,
+					&d.Cfg().LocalAPIEndpoint,
+					nil,
+				)
 				if err != nil {
 					return nil, errors.Wrapf(err, "could not bootstrap the admin user in file %s", kubeadmconstants.AdminKubeConfigFileName)
 				}
@@ -569,30 +595,6 @@ func (d *initData) Client() (clientset.Interface, error) {
 		}
 	}
 	return d.client, nil
-}
-
-// WaitControlPlaneClient returns a basic client used for the purpose of waiting
-// for control plane components to report 'ok' on their respective health check endpoints.
-// It uses the admin.conf as the base, but modifies it to point at the local API server instead
-// of the control plane endpoint.
-func (d *initData) WaitControlPlaneClient() (clientset.Interface, error) {
-	config, err := clientcmd.LoadFromFile(d.KubeConfigPath())
-	if err != nil {
-		return nil, err
-	}
-	for _, v := range config.Clusters {
-		v.Server = fmt.Sprintf("https://%s",
-			net.JoinHostPort(
-				d.Cfg().LocalAPIEndpoint.AdvertiseAddress,
-				strconv.Itoa(int(d.Cfg().LocalAPIEndpoint.BindPort)),
-			),
-		)
-	}
-	client, err := kubeconfigutil.ToClientSet(config)
-	if err != nil {
-		return nil, err
-	}
-	return client, nil
 }
 
 // Tokens returns an array of token strings.

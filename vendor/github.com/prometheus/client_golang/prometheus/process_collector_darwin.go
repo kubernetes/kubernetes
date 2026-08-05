@@ -72,7 +72,13 @@ func getOpenFileCount() (float64, error) {
 }
 
 func (c *processCollector) processCollect(ch chan<- Metric) {
-	if procs, err := unix.SysctlKinfoProcSlice("kern.proc.pid", os.Getpid()); err == nil {
+	pid, err := c.pidFn()
+	if err != nil {
+		c.reportError(ch, nil, err)
+		return
+	}
+
+	if procs, err := unix.SysctlKinfoProcSlice("kern.proc.pid", pid); err == nil {
 		if len(procs) == 1 {
 			startTime := float64(procs[0].Proc.P_starttime.Nano() / 1e9)
 			ch <- MustNewConstMetric(c.startTime, GaugeValue, startTime)
@@ -82,6 +88,11 @@ func (c *processCollector) processCollect(ch chan<- Metric) {
 		}
 	} else {
 		c.reportError(ch, c.startTime, err)
+	}
+
+	if pid != os.Getpid() {
+		c.reportError(ch, nil, fmt.Errorf("collecting metrics for pid %d is not supported on darwin: process metrics collection is limited to the current process (pid %d)", pid, os.Getpid()))
+		return
 	}
 
 	// The proc structure returned by kern.proc.pid above has an Rusage member,

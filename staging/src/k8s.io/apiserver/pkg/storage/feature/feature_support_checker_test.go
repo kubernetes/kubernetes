@@ -20,10 +20,12 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"k8s.io/apiserver/pkg/storage"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 type mockEndpointVersion struct {
@@ -89,6 +91,11 @@ func TestSupports(t *testing.T) {
 			testName:       "Disabled - default",
 			featureName:    storage.RequestWatchProgress,
 			expectedResult: false,
+		},
+		{
+			testName:       "Enabled - RangeStream defaults to supported until proven otherwise",
+			featureName:    storage.RangeStream,
+			expectedResult: true,
 		},
 	}
 
@@ -266,4 +273,21 @@ func TestSupportsRequestWatchProgress(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMarkUnsupported(t *testing.T) {
+	f := newDefaultFeatureSupportChecker()
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	f.clock = fakeClock
+
+	assert.True(t, f.Supports(storage.RangeStream))
+
+	f.MarkUnsupported(storage.RangeStream)
+	assert.False(t, f.Supports(storage.RangeStream))
+
+	fakeClock.Step(rangeStreamRecheckInterval - time.Second)
+	assert.False(t, f.Supports(storage.RangeStream))
+
+	fakeClock.Step(2 * time.Second)
+	assert.True(t, f.Supports(storage.RangeStream))
 }

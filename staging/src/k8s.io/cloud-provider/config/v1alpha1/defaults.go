@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	nodeconfigv1alpha1 "k8s.io/cloud-provider/controllers/node/config/v1alpha1"
+	nodelifecycleconfigv1alpha1 "k8s.io/cloud-provider/controllers/nodelifecycle/config/v1alpha1"
 	serviceconfigv1alpha1 "k8s.io/cloud-provider/controllers/service/config/v1alpha1"
 	cmconfigv1alpha1 "k8s.io/controller-manager/config/v1alpha1"
 	"k8s.io/utils/ptr"
@@ -52,13 +53,12 @@ func SetDefaults_CloudControllerManagerConfiguration(obj *CloudControllerManager
 	serviceconfigv1alpha1.RecommendedDefaultServiceControllerConfiguration(&obj.ServiceController)
 	// Use the default RecommendedDefaultNodeControllerConfiguration options
 	nodeconfigv1alpha1.RecommendedDefaultNodeControllerConfiguration(&obj.NodeController)
+	// Use the default RecommendedDefaultNodeLifecycleControllerConfiguration options
+	nodelifecycleconfigv1alpha1.RecommendedDefaultNodeLifecycleControllerConfiguration(&obj.NodeLifecycleController)
 }
 
 func SetDefaults_KubeCloudSharedConfiguration(obj *KubeCloudSharedConfiguration) {
 	zero := metav1.Duration{}
-	if obj.NodeMonitorPeriod == zero {
-		obj.NodeMonitorPeriod = metav1.Duration{Duration: 5 * time.Second}
-	}
 	if obj.ClusterName == "" {
 		obj.ClusterName = "kubernetes"
 	}

@@ -59,6 +59,8 @@ func TestLibraryCompatibility(t *testing.T) {
 		"jsonpatch.escapeKey",
 		// Kubernetes <1.33>:
 		"semver", "isSemver", "major", "minor", "patch",
+		// Kubernetes <1.37>:
+		"includes",
 		// Kubernetes <1.??>:
 	)
 

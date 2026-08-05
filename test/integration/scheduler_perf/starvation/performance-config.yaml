@@ -1,0 +1,128 @@
+- name: StarvationIndependent
+  metricsCollectorConfig:
+    metrics:
+      scheduler_queue_incoming_pods_total:
+      - label: event
+        values: [ScheduleAttemptFailure, AssignedPodAdd, BackoffComplete, UnscheduledPodAdd, ForceActivate]
+      - label: queue
+        values: [active, backoff, unschedulable]
+      scheduler_scheduling_attempt_duration_seconds:
+      - label: result
+        values: [scheduled, unschedulable, error]
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: templates/node.yaml
+  - opcode: createNamespaces
+    prefix: starvation
+    count: 1
+  # Start churn generator to continuously generate PodAdd/PodDelete events
+  - opcode: churn
+    mode: recreate
+    number: 600
+    intervalMilliseconds: 1000
+    namespace: starvation-0
+    templatePaths:
+    - templates/churn-pod.yaml
+  # Inject massive batch of independent, high-priority, unschedulable pods
+  - opcode: createPods
+    countParam: $cloggerPods
+    podTemplatePath: templates/clogger-pod.yaml
+    namespace: starvation-0
+    skipWaitToCompletion: true
+  # Wait until all unschedulable cloggers are attempted by the scheduler
+  - opcode: barrier
+    stageRequirement: Attempted
+  # Start metrics collection specifically for the victim pods
+  - opcode: startCollectingMetrics
+    name: victim
+    namespaces: [starvation-0]
+  # Create victim pods and wait for them to schedule
+  - opcode: createPods
+    countParam: $starvationProne
+    podTemplatePath: templates/victim-pod.yaml
+    namespace: starvation-0
+  - opcode: stopCollectingMetrics
+  workloads:
+  - name: 10Nodes_100Cloggers
+    labels: [integration-test, short]
+    params:
+      initNodes: 10
+      cloggerPods: 100
+      starvationProne: 50
+  - name: 10000Nodes_10000Cloggers
+    labels: [performance]
+    params:
+      initNodes: 10000
+      cloggerPods: 10000
+      starvationProne: 500
+- name: StarvationPodGroup
+  featureGates:
+    GenericWorkload: true
+  metricsCollectorConfig:
+    metrics:
+      scheduler_queue_incoming_pods_total:
+      - label: event
+        values: [ScheduleAttemptFailure, AssignedPodAdd, BackoffComplete, UnscheduledPodAdd, ForceActivate]
+      - label: queue
+        values: [active, backoff, unschedulable]
+      scheduler_scheduling_attempt_duration_seconds:
+      - label: result
+        values: [scheduled, unschedulable, error]
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: templates/node.yaml
+  - opcode: createNamespaces
+    prefix: starvation
+    count: 1
+  # Create the single PodGroup podgroup-0 using Basic scheduling policy under the Workload API
+  # and wait for the scheduler's informer cache to reflect the newly created PodGroup object
+  - opcode: createPodGroups
+    namespace: starvation-0
+    templatePath: templates/podgroup.yaml
+    countParam: $initPodGroups
+    templateParams:
+      minCount: $cloggerPods
+  # Start churn generator to continuously generate PodAdd/PodDelete events
+  - opcode: churn
+    mode: recreate
+    number: 600
+    intervalMilliseconds: 1000
+    namespace: starvation-0
+    templatePaths:
+    - templates/churn-pod.yaml
+  # Inject massive batch of podgroup-managed, high-priority, unschedulable pods
+  - opcode: createPods
+    countParam: $cloggerPods
+    podTemplatePath: templates/clogger-podgroup-pod.yaml
+    namespace: starvation-0
+    skipWaitToCompletion: true
+  # Wait until all unschedulable cloggers are attempted by the scheduler
+  - opcode: barrier
+    stageRequirement: Attempted
+  # Start metrics collection specifically for the victim pods
+  - opcode: startCollectingMetrics
+    name: victim
+    namespaces: [starvation-0]
+  # Create victim pods and wait for them to schedule
+  - opcode: createPods
+    countParam: $starvationProne
+    podTemplatePath: templates/victim-pod.yaml
+    namespace: starvation-0
+  - opcode: stopCollectingMetrics
+  workloads:
+  - name: 10Nodes_100Cloggers_Podgroup
+    labels: [integration-test, short]
+    params:
+      initNodes: 10
+      initPodGroups: 1
+      cloggerPods: 100
+      starvationProne: 50
+  - name: 10000Nodes_10000Cloggers_Podgroup
+    labels: [performance]
+    params:
+      initNodes: 10000
+      initPodGroups: 1
+      cloggerPods: 10000
+      starvationProne: 500

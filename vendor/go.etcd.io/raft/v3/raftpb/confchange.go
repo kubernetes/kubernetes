@@ -19,14 +19,16 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gogo/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 // ConfChangeI abstracts over ConfChangeV2 and (legacy) ConfChange to allow
 // treating them in a unified manner.
 type ConfChangeI interface {
-	AsV2() ConfChangeV2
-	AsV1() (ConfChange, bool)
+	// AsV2 should always return a non-nil object
+	AsV2() *ConfChangeV2
+	// AsV1 should always return a non-nil object
+	AsV1() (*ConfChange, bool)
 }
 
 // MarshalConfChange calls Marshal on the underlying ConfChange or ConfChangeV2
@@ -43,53 +45,53 @@ func MarshalConfChange(c ConfChangeI) (EntryType, []byte, error) {
 		ccdata = nil
 	} else if ccv1, ok := c.AsV1(); ok {
 		typ = EntryConfChange
-		ccdata, err = ccv1.Marshal()
+		ccdata, err = proto.Marshal(ccv1)
 	} else {
 		ccv2 := c.AsV2()
 		typ = EntryConfChangeV2
-		ccdata, err = ccv2.Marshal()
+		ccdata, err = proto.Marshal(ccv2)
 	}
 	return typ, ccdata, err
 }
 
 // AsV2 returns a V2 configuration change carrying out the same operation.
-func (c ConfChange) AsV2() ConfChangeV2 {
-	return ConfChangeV2{
-		Changes: []ConfChangeSingle{{
-			Type:   c.Type,
-			NodeID: c.NodeID,
+func (c *ConfChange) AsV2() *ConfChangeV2 {
+	return &ConfChangeV2{
+		Changes: []*ConfChangeSingle{{
+			Type:   c.GetType().Enum(),
+			NodeId: new(c.GetNodeId()),
 		}},
 		Context: c.Context,
 	}
 }
 
 // AsV1 returns the ConfChange and true.
-func (c ConfChange) AsV1() (ConfChange, bool) {
+func (c *ConfChange) AsV1() (*ConfChange, bool) {
 	return c, true
 }
 
 // AsV2 is the identity.
-func (c ConfChangeV2) AsV2() ConfChangeV2 { return c }
+func (c *ConfChangeV2) AsV2() *ConfChangeV2 { return c }
 
-// AsV1 returns ConfChange{} and false.
-func (c ConfChangeV2) AsV1() (ConfChange, bool) { return ConfChange{}, false }
+// AsV1 returns nil and false.
+func (c *ConfChangeV2) AsV1() (*ConfChange, bool) { return nil, false }
 
 // EnterJoint returns two bools. The second bool is true if and only if this
 // config change will use Joint Consensus, which is the case if it contains more
 // than one change or if the use of Joint Consensus was requested explicitly.
 // The first bool can only be true if second one is, and indicates whether the
 // Joint State will be left automatically.
-func (c ConfChangeV2) EnterJoint() (autoLeave bool, ok bool) {
+func (c *ConfChangeV2) EnterJoint() (autoLeave bool, ok bool) {
 	// NB: in theory, more config changes could qualify for the "simple"
 	// protocol but it depends on the config on top of which the changes apply.
 	// For example, adding two learners is not OK if both nodes are part of the
 	// base config (i.e. two voters are turned into learners in the process of
 	// applying the conf change). In practice, these distinctions should not
 	// matter, so we keep it simple and use Joint Consensus liberally.
-	if c.Transition != ConfChangeTransitionAuto || len(c.Changes) > 1 {
+	if c.GetTransition() != ConfChangeTransitionAuto || len(c.Changes) > 1 {
 		// Use Joint Consensus.
 		var autoLeave bool
-		switch c.Transition {
+		switch c.GetTransition() {
 		case ConfChangeTransitionAuto:
 			autoLeave = true
 		case ConfChangeTransitionJointImplicit:
@@ -106,10 +108,9 @@ func (c ConfChangeV2) EnterJoint() (autoLeave bool, ok bool) {
 // LeaveJoint is true if the configuration change leaves a joint configuration.
 // This is the case if the ConfChangeV2 is zero, with the possible exception of
 // the Context field.
-func (c ConfChangeV2) LeaveJoint() bool {
-	// NB: c is already a copy.
-	c.Context = nil
-	return proto.Equal(&c, &ConfChangeV2{})
+func (c *ConfChangeV2) LeaveJoint() bool {
+	return c.GetTransition() == ConfChangeTransition_ConfChangeTransitionAuto &&
+		len(c.GetChanges()) == 0
 }
 
 // ConfChangesFromString parses a Space-delimited sequence of operations into a
@@ -118,8 +119,8 @@ func (c ConfChangeV2) LeaveJoint() bool {
 // - ln: make n a learner,
 // - rn: remove n, and
 // - un: update n.
-func ConfChangesFromString(s string) ([]ConfChangeSingle, error) {
-	var ccs []ConfChangeSingle
+func ConfChangesFromString(s string) ([]*ConfChangeSingle, error) {
+	var ccs []*ConfChangeSingle
 	toks := strings.Split(strings.TrimSpace(s), " ")
 	if toks[0] == "" {
 		toks = nil
@@ -128,16 +129,16 @@ func ConfChangesFromString(s string) ([]ConfChangeSingle, error) {
 		if len(tok) < 2 {
 			return nil, fmt.Errorf("unknown token %s", tok)
 		}
-		var cc ConfChangeSingle
+		cc := &ConfChangeSingle{}
 		switch tok[0] {
 		case 'v':
-			cc.Type = ConfChangeAddNode
+			cc.Type = ConfChangeAddNode.Enum()
 		case 'l':
-			cc.Type = ConfChangeAddLearnerNode
+			cc.Type = ConfChangeAddLearnerNode.Enum()
 		case 'r':
-			cc.Type = ConfChangeRemoveNode
+			cc.Type = ConfChangeRemoveNode.Enum()
 		case 'u':
-			cc.Type = ConfChangeUpdateNode
+			cc.Type = ConfChangeUpdateNode.Enum()
 		default:
 			return nil, fmt.Errorf("unknown input: %s", tok)
 		}
@@ -145,20 +146,20 @@ func ConfChangesFromString(s string) ([]ConfChangeSingle, error) {
 		if err != nil {
 			return nil, err
 		}
-		cc.NodeID = id
+		cc.NodeId = new(id)
 		ccs = append(ccs, cc)
 	}
 	return ccs, nil
 }
 
 // ConfChangesToString is the inverse to ConfChangesFromString.
-func ConfChangesToString(ccs []ConfChangeSingle) string {
+func ConfChangesToString(ccs []*ConfChangeSingle) string {
 	var buf strings.Builder
 	for i, cc := range ccs {
 		if i > 0 {
 			buf.WriteByte(' ')
 		}
-		switch cc.Type {
+		switch cc.GetType() {
 		case ConfChangeAddNode:
 			buf.WriteByte('v')
 		case ConfChangeAddLearnerNode:
@@ -170,7 +171,7 @@ func ConfChangesToString(ccs []ConfChangeSingle) string {
 		default:
 			buf.WriteString("unknown")
 		}
-		fmt.Fprintf(&buf, "%d", cc.NodeID)
+		fmt.Fprintf(&buf, "%d", cc.GetNodeId())
 	}
 	return buf.String()
 }

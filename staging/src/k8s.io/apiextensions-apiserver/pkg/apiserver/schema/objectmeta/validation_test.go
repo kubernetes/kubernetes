@@ -82,7 +82,7 @@ func TestValidateEmbeddedResource(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			schema := &structuralschema.Structural{Extensions: structuralschema.Extensions{XEmbeddedResource: true}}
-			errs := validateEmbeddedResource(nil, tt.object, schema)
+			errs := validateEmbeddedResource(t.Context(), nil, tt.object, schema)
 			seenErrs := make([]bool, len(errs))
 
 			for _, expectedError := range tt.errors {
@@ -185,7 +185,7 @@ func TestValidate(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			errs := Validate(nil, obj, schema, tt.includeRoot)
+			errs := Validate(t.Context(), nil, obj, schema, tt.includeRoot)
 			seenErrs := make([]bool, len(errs))
 
 			for _, expectedError := range tt.errors {

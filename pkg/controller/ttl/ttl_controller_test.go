@@ -229,6 +229,7 @@ func TestDesiredTTL(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
+		logger, _ := ktesting.NewTestContext(t)
 		ttlController := &Controller{
 			queue:             workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
 			nodeCount:         testCase.nodeCount,
@@ -236,11 +237,10 @@ func TestDesiredTTL(t *testing.T) {
 			boundaryStep:      testCase.boundaryStep,
 		}
 		if testCase.addNode {
-			logger, _ := ktesting.NewTestContext(t)
 			ttlController.addNode(logger, &v1.Node{})
 		}
 		if testCase.deleteNode {
-			ttlController.deleteNode(&v1.Node{})
+			ttlController.deleteNode(logger, &v1.Node{})
 		}
 		assert.Equal(t, testCase.expectedTTL, ttlController.getDesiredTTLSeconds(),
 			"%d: unexpected ttl: %d", i, ttlController.getDesiredTTLSeconds())

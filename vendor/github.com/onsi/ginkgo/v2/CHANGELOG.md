@@ -1,3 +1,48 @@
+## 2.32.0
+
+`-fd` generate RSpec-style documentation output.  Thank @woodie !
+--sleep-on-failure pauses a failed spec before teardown. Thanks @qinqon !
+
+## 2.31.0
+
+Add a bunch of Claude Skills via the marketplace:
+
+```
+/plugin marketplace add onsi/ginkgo
+/plugin install ginkgo@ginkgo
+```
+
+## 2.30.0
+
+### Features
+Ginkgo now allows `extentions/global.Reset` to support running multiple suites from within a single process.  This may take some massaging on your part (see [1672](https://github.com/onsi/ginkgo/issues/1672)) but can dramatically speed up codebases with O(hundreds) of test suites.
+
+Thanks @lawrencejones !
+
+### Fixes
+
+- Fix nested --github-output group for progress report nested inside timeline [4f62d7a]
+
+## 2.29.0
+
+`GinkgoHelperGo` makes it easier to write test helpers that need to run in goroutines.  Specifically, it makes managing the failure state and capturing failure panics correctly straightforward.
+
+`ginkgo outline` now includes entries defined in `DescribeTableSubtree`
+
+## 2.28.3
+
+### Maintenance
+Bump all dependencies
+
+## 2.28.2
+
+- Add ArtifactDir() to support Go 1.26 testing.TB interface [f3a36b6]
+- Implement shell completion [94151c8]
+- Add asan CLI option mirroring msan implementation [4d21dbb]
+- Bump uri from 1.0.3 to 1.0.4 in /docs (#1630) [c102161]
+- fix aspect ratio [9619647]
+- update logos [5779304]
+
 ## 2.28.1
 
 Update all dependencies.  This auto-updated the required version of Go to 1.24, consistent with the fact that Go 1.23 has been out of support for almost six months.

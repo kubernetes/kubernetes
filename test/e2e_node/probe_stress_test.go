@@ -44,6 +44,7 @@ const (
 
 var _ = SIGDescribe("Probe Stress", framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("probe-stress")
+	addAfterEachForCleaningUpPods(f)
 	// LevelPrivileged is required because the stress tests create pods with many containers
 	// that may require elevated permissions for networking and resource allocation
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged

@@ -204,38 +204,41 @@ const (
 	VolumeNFSServer
 	// VolumeISCSIServer image
 	VolumeISCSIServer
+	// SampleDevicePlugin image
+	SampleDevicePlugin
 )
 
 func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config) {
 	configs := map[ImageID]Config{}
 	configs[AgnhostPrev] = Config{list.PromoterE2eRegistry, "agnhost", "2.55"}
-	configs[Agnhost] = Config{list.PromoterE2eRegistry, "agnhost", "2.63.0"}
+	configs[Agnhost] = Config{list.PromoterE2eRegistry, "agnhost", "2.66.1"}
 	configs[AgnhostPrivate] = Config{list.PrivateRegistry, "agnhost", "2.6"}
 	configs[APIServer] = Config{list.PromoterE2eRegistry, "sample-apiserver", "1.29.2"}
 	configs[AppArmorLoader] = Config{list.PromoterE2eRegistry, "apparmor-loader", "1.4"}
-	configs[BusyBox] = Config{list.PromoterE2eRegistry, "busybox", "1.37.0-1"}
-	configs[DistrolessIptables] = Config{list.BuildImageRegistry, "distroless-iptables", "v0.9.0"}
-	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.6.8-0"}
+	configs[BusyBox] = Config{list.PromoterE2eRegistry, "busybox", "1.37.0-2"}
+	configs[DistrolessIptables] = Config{list.BuildImageRegistry, "distroless-iptables", "v0.9.6"}
+	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.7.0-0"}
 	configs[InvalidRegistryImage] = Config{list.InvalidRegistry, "alpine", "3.1"}
 	configs[IpcUtils] = Config{list.PromoterE2eRegistry, "ipc-utils", "1.4"}
-	configs[GlibcDnsTesting] = Config{list.PromoterE2eRegistry, "glibc-dns-testing", "2.0.0"}
+	configs[GlibcDnsTesting] = Config{list.PromoterE2eRegistry, "glibc-dns-testing", "2.1.1"}
 	configs[Kitten] = Config{list.PromoterE2eRegistry, "kitten", "1.8"}
 	configs[Nautilus] = Config{list.PromoterE2eRegistry, "nautilus", "1.8"}
 	configs[NFSProvisioner] = Config{list.SigStorageRegistry, "nfs-provisioner", "v4.0.8"}
-	configs[Nginx] = Config{list.PromoterE2eRegistry, "nginx", "1.15-4"}
-	configs[NginxNew] = Config{list.PromoterE2eRegistry, "nginx", "1.27-0"}
+	configs[Nginx] = Config{list.PromoterE2eRegistry, "nginx", "1.27.0-2"}
+	configs[NginxNew] = Config{list.PromoterE2eRegistry, "nginx", "1.28.0-2"}
 	configs[NodePerfNpbEp] = Config{list.PromoterE2eRegistry, "node-perf/npb-ep", "1.6.0"}
 	configs[NodePerfNpbIs] = Config{list.PromoterE2eRegistry, "node-perf/npb-is", "1.7.0"}
 	configs[NodePerfPytorchWideDeep] = Config{list.PromoterE2eRegistry, "node-perf/pytorch-wide-deep", "1.0.0"}
 	configs[Nonewprivs] = Config{list.PromoterE2eRegistry, "nonewprivs", "1.4"}
 	configs[NonRoot] = Config{list.PromoterE2eRegistry, "nonroot", "1.5"}
 	// Pause - when these values are updated, also update cmd/kubelet/app/options/container_runtime.go
-	configs[Pause] = Config{list.GcRegistry, "pause", "3.10.1"}
+	configs[Pause] = Config{list.GcRegistry, "pause", "3.10.2"}
 	configs[Perl] = Config{list.PromoterE2eRegistry, "perl", "5.26"}
-	configs[RegressionIssue74839] = Config{list.PromoterE2eRegistry, "regression-issue-74839", "1.4"}
+	configs[RegressionIssue74839] = Config{list.PromoterE2eRegistry, "regression-issue-74839", "1.5"}
 	configs[ResourceConsumer] = Config{list.PromoterE2eRegistry, "resource-consumer", "1.14"}
 	configs[VolumeNFSServer] = Config{list.PromoterE2eRegistry, "volume/nfs", "1.6.0"}
 	configs[VolumeISCSIServer] = Config{list.PromoterE2eRegistry, "volume/iscsi", "2.7"}
+	configs[SampleDevicePlugin] = Config{list.PromoterE2eRegistry, "sample-device-plugin", "1.7"}
 
 	// This adds more config entries. Those have no pre-defined ImageID number,
 	// but will be used via ReplaceRegistryInImageURL when deploying

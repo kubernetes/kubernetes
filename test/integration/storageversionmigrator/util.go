@@ -38,7 +38,7 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 
 	corev1 "k8s.io/api/core/v1"
-	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
+	svmv1 "k8s.io/api/storagemigration/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	crdintegration "k8s.io/apiextensions-apiserver/test/integration"
@@ -257,7 +257,7 @@ type svmTest struct {
 	filePathForEncryptionConfig string
 }
 
-func svmSetup(ctx context.Context, t *testing.T) *svmTest {
+func svmSetup(ctx context.Context, t *testing.T, allowedCodes ...int32) *svmTest {
 	t.Helper()
 
 	filePathForEncryptionConfig, err := createEncryptionConfig(t, resources["initialEncryptionConfig"])
@@ -275,7 +275,7 @@ func svmSetup(ctx context.Context, t *testing.T) *svmTest {
 		"--audit-log-mode", "blocking",
 		"--audit-log-path", logFile.Name(),
 		"--authorization-mode=RBAC",
-		fmt.Sprintf("--runtime-config=%s=true", svmv1beta1.SchemeGroupVersion),
+		fmt.Sprintf("--runtime-config=%s=true", svmv1.SchemeGroupVersion),
 	}
 	storageConfig := framework.SharedEtcd()
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, apiServerFlags, storageConfig)
@@ -315,18 +315,7 @@ func svmSetup(ctx context.Context, t *testing.T) *svmTest {
 	}
 
 	t.Cleanup(func() {
-		var validCodes = sets.New[int32](http.StatusOK, http.StatusConflict) // make sure SVM controller never creates
-		_ = svmTest.countMatchingAuditEvents(t, func(event utils.AuditEvent) bool {
-			if event.User != "system:serviceaccount:kube-system:storage-version-migrator-controller" {
-				return false
-			}
-			if !validCodes.Has(event.Code) {
-				t.Errorf("svm controller had invalid response code for event: %#v", event)
-				return true
-			}
-			return false
-		})
-
+		svmTest.assertNoInvalidSVMControllerResponses(t, allowedCodes...)
 		kcm.TearDownFn()
 		server.TearDownFn()
 		utiltesting.CloseAndRemove(t, svmTest.logFile)
@@ -350,6 +339,26 @@ func createKubeConfigFileForRestConfig(t *testing.T, restConfig *rest.Config) st
 		t.Fatal(err)
 	}
 	return kubeConfigFile
+}
+
+// assertNoInvalidSVMControllerResponses checks that the SVM controller only received
+// expected HTTP response codes. Pass allowedCodes to permit codes beyond OK and Conflict.
+func (svm *svmTest) assertNoInvalidSVMControllerResponses(t *testing.T, allowedCodes ...int32) {
+	t.Helper()
+	validCodes := sets.New[int32](http.StatusOK, http.StatusConflict)
+	for _, code := range allowedCodes {
+		validCodes.Insert(code)
+	}
+	_ = svm.countMatchingAuditEvents(t, func(event utils.AuditEvent) bool {
+		if event.User != "system:serviceaccount:kube-system:storage-version-migrator-controller" {
+			return false
+		}
+		if !validCodes.Has(event.Code) {
+			t.Errorf("svm controller had invalid response code for event: %#v", event)
+			return true
+		}
+		return false
+	})
 }
 
 func createEncryptionConfig(t *testing.T, encryptionConfig string) (
@@ -469,15 +478,15 @@ func (svm *svmTest) updateFile(t *testing.T, configDir, filename string, newCont
 }
 
 func (svm *svmTest) createSVMResource(ctx context.Context, t *testing.T, name string, gr metav1.GroupResource) (
-	*svmv1beta1.StorageVersionMigration,
+	*svmv1.StorageVersionMigration,
 	error,
 ) {
 	t.Helper()
-	svmResource := &svmv1beta1.StorageVersionMigration{
+	svmResource := &svmv1.StorageVersionMigration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: svmv1beta1.StorageVersionMigrationSpec{
+		Spec: svmv1.StorageVersionMigrationSpec{
 			Resource: metav1.GroupResource{
 				Group:    gr.Group,
 				Resource: gr.Resource,
@@ -485,17 +494,17 @@ func (svm *svmTest) createSVMResource(ctx context.Context, t *testing.T, name st
 		},
 	}
 
-	return svm.client.StoragemigrationV1beta1().
+	return svm.client.StoragemigrationV1().
 		StorageVersionMigrations().
 		Create(ctx, svmResource, metav1.CreateOptions{})
 }
 
 func (svm *svmTest) getSVM(ctx context.Context, t *testing.T, name string) (
-	*svmv1beta1.StorageVersionMigration,
+	*svmv1.StorageVersionMigration,
 	error,
 ) {
 	t.Helper()
-	return svm.client.StoragemigrationV1beta1().
+	return svm.client.StoragemigrationV1().
 		StorageVersionMigrations().
 		Get(ctx, name, metav1.GetOptions{})
 }
@@ -598,7 +607,7 @@ func (svm *svmTest) waitForResourceMigration(
 			}
 			svmConditions := svmResource.Status.Conditions
 
-			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1beta1.MigrationFailed)) {
+			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1.MigrationFailed)) {
 				t.Logf("%q SVM has failed migration, %#v", svmName, svmConditions)
 				return false, fmt.Errorf("SVM has failed migration")
 			}
@@ -608,12 +617,12 @@ func (svm *svmTest) waitForResourceMigration(
 				return false, nil
 			}
 
-			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1beta1.MigrationSucceeded)) {
+			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1.MigrationSucceeded)) {
 				t.Logf("%q SVM has completed migration", svmName)
 				return true, nil
 			}
 
-			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1beta1.MigrationRunning)) {
+			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1.MigrationRunning)) {
 				t.Logf("%q SVM migration is running, %#v", svmName, svmConditions)
 				return false, nil
 			}
@@ -800,9 +809,7 @@ func (svm *svmTest) waitForCRDUpdate(
 	err := wait.PollUntilContextTimeout(
 		ctx,
 		500*time.Millisecond,
-		// CRD discovery and storage-version reporting can lag well beyond 1 minute
-		// on contended CI nodes while the apiextensions controllers converge.
-		2*time.Minute,
+		time.Second*60,
 		true,
 		func(ctx context.Context) (bool, error) {
 			apiGroups, _, err := svm.discoveryClient.ServerGroupsAndResources()
@@ -1109,7 +1116,7 @@ func (svm *svmTest) isCRDMigrated(ctx context.Context, t *testing.T, crdSVMName,
 			}
 			svmConditions := svmResource.Status.Conditions
 
-			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1beta1.MigrationFailed)) {
+			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1.MigrationFailed)) {
 				t.Logf("%q SVM has failed migration, %#v", crdSVMName, svmConditions)
 				return false, fmt.Errorf("SVM has failed migration")
 			}
@@ -1119,12 +1126,12 @@ func (svm *svmTest) isCRDMigrated(ctx context.Context, t *testing.T, crdSVMName,
 				return false, nil
 			}
 
-			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1beta1.MigrationSucceeded)) && svm.crdMigrated(t, crdName) {
+			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1.MigrationSucceeded)) && svm.crdMigrated(t, crdName) {
 				t.Logf("%q SVM has completed migration for crd %s", crdSVMName, crdName)
 				return true, nil
 			}
 
-			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1beta1.MigrationRunning)) {
+			if metaconditions.IsStatusConditionTrue(svmConditions, string(svmv1.MigrationRunning)) {
 				t.Logf("%q SVM migration is running, %#v", crdSVMName, svmConditions)
 				return false, nil
 			}
@@ -1190,17 +1197,20 @@ func (svm *svmTest) createChaos(ctx context.Context, t *testing.T) {
 
 	noFailT := ignoreFailures{} // these create and delete requests are not coordinated with the rest of the test and can fail
 
-	const workers = 10
+	const workers = 5
 	wg.Add(workers)
 	for i := range workers {
 		go func() {
 			defer wg.Done()
 
+			ticker := time.NewTicker(100 * time.Millisecond) // 10 ops/sec
+			defer ticker.Stop()
+
 			for {
 				select {
 				case <-ctx.Done():
 					return
-				default:
+				case <-ticker.C:
 				}
 
 				_ = svm.createCR(ctx, noFailT, "chaos-cr-"+strconv.Itoa(i), "v1")

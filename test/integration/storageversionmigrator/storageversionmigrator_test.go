@@ -19,6 +19,7 @@ package storageversionmigrator
 import (
 	"bytes"
 	"context"
+	"net/http"
 	"strconv"
 	"sync"
 	"testing"
@@ -158,8 +159,7 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 		extensionfeatures.CRDObservedGenerationTracking:                  true,
 	})
 	// decode errors are expected when using conversation webhooks
-	etcd3watcher.TestOnlySetFatalOnDecodeError(false)
-	t.Cleanup(func() { etcd3watcher.TestOnlySetFatalOnDecodeError(true) })
+	etcd3watcher.TestOnlySetFatalOnDecodeError(t, false)
 	framework.GoleakCheck(t, // block test clean up and let any lingering watches complete before making decode errors fatal again
 		goleak.IgnoreTopFunction("k8s.io/kubernetes/vendor/gopkg.in/natefinch/lumberjack%2ev2.(*Logger).millRun"),
 		goleak.IgnoreTopFunction("gopkg.in/natefinch/lumberjack%2ev2.(*Logger).millRun"),
@@ -170,7 +170,8 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 
 	crVersions := make(map[string]versions)
 
-	svmTest := svmSetup(ctx, t)
+	// chaos goroutines delete objects mid-migration, producing expected 404s on patch
+	svmTest := svmSetup(ctx, t, http.StatusNotFound)
 	certCtx := svmTest.setupServerCert(t)
 
 	// simulate monkeys creating and deleting CRs
@@ -310,7 +311,8 @@ func TestStorageVersionMigrationDuringChaos(t *testing.T) {
 
 	ctx := ktesting.Init(t)
 
-	svmTest := svmSetup(ctx, t)
+	// chaos goroutines delete objects mid-migration, producing expected 404s on patch
+	svmTest := svmSetup(ctx, t, http.StatusNotFound)
 
 	svmTest.createChaos(ctx, t)
 

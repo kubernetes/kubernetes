@@ -100,7 +100,7 @@ func probe(ip string) {
 
 		log.Printf("tcp packet: %+v, flag: %v, data: %v, addr: %v", pkt, pkt.FlagString(), data, addr)
 
-		ipPort := fmt.Sprintf("%s:%d", addr.String(), pkt.DestPort)
+		ipPort := fmt.Sprintf("%s:%d-%s:%d", addr.String(), pkt.SrcPort, ip, pkt.DestPort)
 		if pkt.Flags&SYN != 0 {
 			pending[ipPort] = pkt.Seq + 1
 			continue

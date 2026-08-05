@@ -36,7 +36,7 @@ option go_package = "k8s.io/api/storage/v1";
 // Kubelet uses this object to determine whether pod information needs to be passed on mount.
 // CSIDriver objects are non-namespaced.
 message CSIDriver {
-  // Standard object metadata.
+  // metadata is the standard object metadata.
   // metadata.Name indicates the name of the CSI driver that this object
   // refers to; it MUST be the same name returned by the CSI GetPluginName()
   // call for that driver.
@@ -124,6 +124,8 @@ message CSIDriverSpec {
   //
   // +optional
   // +listType=set
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:immutable
   repeated string volumeLifecycleModes = 3;
 
   // storageCapacity indicates that the CSI volume driver wants pod scheduling to consider the storage
@@ -250,7 +252,7 @@ message CSIDriverSpec {
   // +optional
   optional bool serviceAccountTokenInSecrets = 10;
 
-  // PreventPodSchedulingIfMissing indicates that the CSI driver wants to prevent pod
+  // preventPodSchedulingIfMissing indicates that the CSI driver wants to prevent pod
   // scheduling if the CSI driver on the node is missing.
   //
   // Enabling this option will prevent the scheduler (or any other
@@ -265,7 +267,7 @@ message CSIDriverSpec {
   // newly created node may be rejected by the scheduler because of missing CSI driver
   // information from the node.
   //
-  // This is an alpha feature and requires the VolumeLimitScaling feature gate to be enabled.
+  // This is a beta feature and requires the VolumeLimitScaling feature gate to be enabled.
   // Default is "false".
   // +featureGate=VolumeLimitScaling
   // +optional
@@ -282,12 +284,16 @@ message CSIDriverSpec {
 // enough that it doesn't create this object.
 // CSINode has an OwnerReference that points to the corresponding node object.
 message CSINode {
-  // Standard object's metadata.
+  // metadata is the standard object metadata.
   // metadata.name must be the Kubernetes node name.
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec is the specification of CSINode
   optional CSINodeSpec spec = 2;
+
+  // status contains health and status information for the node's storage.
+  // +optional
+  optional CSINodeStatus status = 3;
 }
 
 // CSINodeDriver holds information about the specification of one CSI driver installed on a node
@@ -350,6 +356,18 @@ message CSINodeSpec {
   repeated CSINodeDriver drivers = 1;
 }
 
+// CSINodeStatus contains health and status information for storage on a node.
+message CSINodeStatus {
+  // storageHealth contains backend health reports for CSI drivers registered on the node.
+  // +optional
+  // +listType=map
+  // +listMapKey=name
+  // +patchMergeKey=name
+  // +patchStrategy=merge
+  // +featureGate=CSIVolumeHealth
+  repeated StorageHealth storageHealth = 1;
+}
+
 // CSIStorageCapacity stores the result of one CSI GetCapacity call.
 // For a given StorageClass, this describes the available capacity in a
 // particular topology segment.  This can be used when considering where to
@@ -375,7 +393,7 @@ message CSINodeSpec {
 // the scheduler assumes that capacity is insufficient and tries some other
 // node.
 message CSIStorageCapacity {
-  // Standard object's metadata.
+  // metadata is the standard object metadata.
   // The name has no particular meaning. It must be a DNS subdomain (dots allowed, 253 characters).
   // To ensure that there are no conflicts with other CSI drivers on the cluster,
   // the recommendation is to use csisc-<uuid>, a generated name, or a reverse-domain name
@@ -448,29 +466,29 @@ message CSIStorageCapacityList {
 // StorageClasses are non-namespaced; the name of the storage class
 // according to etcd is in ObjectMeta.Name.
 message StorageClass {
-  // Standard object's metadata.
+  // metadata is the standard object metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // provisioner indicates the type of the provisioner.
   // +required
-  // +k8s:alpha(since: "1.36")=+k8s:required
-  // +k8s:alpha(since: "1.36")=+k8s:immutable
+  // +k8s:beta(since: "1.37")=+k8s:required
+  // +k8s:beta(since: "1.37")=+k8s:immutable
   optional string provisioner = 2;
 
   // parameters holds the parameters for the provisioner that should
   // create volumes of this storage class.
   // +optional
-  // +k8s:alpha(since: "1.36")=+k8s:immutable
-  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:beta(since: "1.37")=+k8s:immutable
+  // +k8s:beta(since: "1.37")=+k8s:optional
   map<string, string> parameters = 3;
 
   // reclaimPolicy controls the reclaimPolicy for dynamically provisioned PersistentVolumes of this storage class.
   // Defaults to Delete.
   // +optional
-  // +k8s:alpha(since: "1.36")=+k8s:immutable
-  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:beta(since: "1.37")=+k8s:immutable
+  // +k8s:beta(since: "1.37")=+k8s:optional
   optional string reclaimPolicy = 4;
 
   // mountOptions controls the mountOptions for dynamically provisioned PersistentVolumes of this storage class.
@@ -488,8 +506,8 @@ message StorageClass {
   // provisioned and bound.  When unset, VolumeBindingImmediate is used.
   // This field is only honored by servers that enable the VolumeScheduling feature.
   // +optional
-  // +k8s:alpha(since: "1.36")=+k8s:immutable
-  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:beta(since: "1.37")=+k8s:immutable
+  // +k8s:beta(since: "1.37")=+k8s:optional
   optional string volumeBindingMode = 7;
 
   // allowedTopologies restrict the node topologies where volumes can be dynamically provisioned.
@@ -512,6 +530,50 @@ message StorageClassList {
   repeated StorageClass items = 2;
 }
 
+// StorageHealth contains storage backend health reported by a CSI driver on a node.
+message StorageHealth {
+  // name is the CSI driver name, matching CSINodeDriver.name.
+  // +required
+  optional string name = 1;
+
+  // healthConditions are the adverse storage backend conditions reported by the CSI driver.
+  // At most 16 conditions may be reported.
+  // +optional
+  // +listType=atomic
+  repeated StorageHealthCondition healthConditions = 2;
+}
+
+// StorageHealthCondition represents an adverse health condition reported
+// by a CSI driver for its storage backend on a node.
+message StorageHealthCondition {
+  // status is the health status category.
+  // One of "StorageUnreachable", "StorageDegraded".
+  // +required
+  optional string status = 1;
+
+  // reason is a brief CamelCase machine-parseable reason.
+  // Maximum permitted length of a reason is 256 characters.
+  // +required
+  optional string reason = 2;
+
+  // message is a human-readable description.
+  // +optional
+  // Maximum permitted length of a message is 1024 characters.
+  optional string message = 3;
+
+  // accessMode is the access mode affected. Nil means all access modes are affected.
+  // +optional
+  optional string accessMode = 4;
+
+  // volumeMode is the volume mode affected. Nil means both are affected.
+  // +optional
+  optional string volumeMode = 5;
+
+  // lastTransitionTime is when this condition first appeared at its current state.
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 6;
+}
+
 // TokenRequest contains parameters of a service account token.
 message TokenRequest {
   // audience is the intended audience of the token in "TokenRequestSpec".
@@ -530,14 +592,14 @@ message TokenRequest {
 //
 // VolumeAttachment objects are non-namespaced.
 message VolumeAttachment {
-  // Standard object metadata.
+  // metadata is the standard object metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec represents specification of the desired attach/detach volume behavior.
   // Populated by the Kubernetes system.
-  // +k8s:alpha(since: "1.36")=+k8s:immutable
+  // +k8s:beta(since: "1.37")=+k8s:immutable
   // +required
   optional VolumeAttachmentSpec spec = 2;
 
@@ -583,9 +645,9 @@ message VolumeAttachmentSpec {
   // attacher indicates the name of the volume driver that MUST handle this
   // request. This is the name returned by GetPluginName().
   // +required
-  // +k8s:alpha(since: "1.36")=+k8s:required
-  // +k8s:alpha(since: "1.36")=+k8s:format="k8s-long-name-caseless"
-  // +k8s:alpha(since: "1.36")=+k8s:maxLength=63
+  // +k8s:beta(since: "1.37")=+k8s:required
+  // +k8s:beta(since: "1.37")=+k8s:format="k8s-long-name-caseless"
+  // +k8s:beta(since: "1.37")=+k8s:maxLength=63
   optional string attacher = 1;
 
   // source represents the volume that should be attached.
@@ -627,12 +689,12 @@ message VolumeAttachmentStatus {
 // defined by the CSI driver. The class can be specified during dynamic provisioning
 // of PersistentVolumeClaims, and changed in the PersistentVolumeClaim spec after provisioning.
 message VolumeAttributesClass {
-  // Standard object's metadata.
+  // metadata is the standard object metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Name of the CSI driver
+  // driverName is the name of the CSI driver
   // This field is immutable.
   optional string driverName = 2;
 

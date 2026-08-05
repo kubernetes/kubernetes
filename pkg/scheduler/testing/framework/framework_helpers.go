@@ -68,6 +68,11 @@ func RegisterPostFilterPlugin(pluginName string, pluginNewFunc runtime.PluginFac
 	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "PostFilter")
 }
 
+// RegisterPodGroupPostFilterPlugin returns a function to register a PodGroupPostFilter Plugin to a given registry.
+func RegisterPodGroupPostFilterPlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
+	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "PodGroupPostFilter")
+}
+
 // RegisterReservePlugin returns a function to register a Reserve Plugin to a given registry.
 func RegisterReservePlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
 	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "Reserve")

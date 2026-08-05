@@ -1,18 +1,11 @@
 syntax = "proto3";
 package etcdserverpb;
 
-import "gogoproto/gogo.proto";
-import "etcdserver.proto";
 import "rpc.proto";
 import "etcd/api/versionpb/version.proto";
 import "etcd/api/membershippb/membership.proto";
 
 option go_package = "go.etcd.io/etcd/api/v3/etcdserverpb";
-
-option (gogoproto.marshaler_all) = true;
-option (gogoproto.sizer_all) = true;
-option (gogoproto.unmarshaler_all) = true;
-option (gogoproto.goproto_getters_all) = false;
 
 message RequestHeader {
   option (versionpb.etcd_version_msg) = "3.0";
@@ -32,7 +25,8 @@ message InternalRaftRequest {
   RequestHeader header = 100;
   uint64 ID = 1;
 
-  Request v2 = 2;
+  reserved 2;
+  reserved "v2";
 
   RangeRequest range = 3;
   PutRequest put = 4;

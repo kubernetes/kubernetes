@@ -232,3 +232,42 @@ func TestResponseWriterDecorator(t *testing.T) {
 		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
 	}
 }
+
+func TestLogContentType(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+	}{
+		{
+			name:        "JSON content type",
+			contentType: "application/json",
+		},
+		{
+			name:        "Protobuf content type",
+			contentType: "application/vnd.kubernetes.protobuf",
+		},
+		{
+			name:        "Empty content type",
+			contentType: "",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodPost, "http://example.com", nil)
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			if test.contentType != "" {
+				req.Header.Set("Content-Type", test.contentType)
+			}
+
+			w := httptest.NewRecorder()
+			logger := newLogged(req, w)
+
+			if logger.contentType != test.contentType {
+				t.Errorf("Expected contentType %v, got %v", test.contentType, logger.contentType)
+			}
+		})
+	}
+}

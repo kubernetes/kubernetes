@@ -90,7 +90,6 @@ func TestUIDTrackingExpectations(t *testing.T) {
 
 	for i, track := range tracks {
 		wg.Add(len(track.firstRound) + 1)
-		track := track
 		for _, uid := range track.firstRound {
 			go func() {
 				expectations.finalizerRemovalObserved(logger, track.job, uid)

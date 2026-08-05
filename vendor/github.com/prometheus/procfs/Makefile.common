@@ -1,4 +1,4 @@
-# Copyright 2018 The Prometheus Authors
+# Copyright The Prometheus Authors
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -55,13 +55,13 @@ ifneq ($(shell command -v gotestsum 2> /dev/null),)
 endif
 endif
 
-PROMU_VERSION ?= 0.17.0
+PROMU_VERSION ?= 0.20.0
 PROMU_URL     := https://github.com/prometheus/promu/releases/download/v$(PROMU_VERSION)/promu-$(PROMU_VERSION).$(GO_BUILD_PLATFORM).tar.gz
 
 SKIP_GOLANGCI_LINT :=
 GOLANGCI_LINT :=
 GOLANGCI_LINT_OPTS ?=
-GOLANGCI_LINT_VERSION ?= v2.1.5
+GOLANGCI_LINT_VERSION ?= v2.11.4
 GOLANGCI_FMT_OPTS ?=
 # golangci-lint only supports linux, darwin and windows platforms on i386/amd64/arm64.
 # windows isn't included here because of the path separator being different.
@@ -82,11 +82,32 @@ endif
 PREFIX                  ?= $(shell pwd)
 BIN_DIR                 ?= $(shell pwd)
 DOCKER_IMAGE_TAG        ?= $(subst /,-,$(shell git rev-parse --abbrev-ref HEAD))
-DOCKERFILE_PATH         ?= ./Dockerfile
 DOCKERBUILD_CONTEXT     ?= ./
 DOCKER_REPO             ?= prom
 
-DOCKER_ARCHS            ?= amd64
+# Check if deprecated DOCKERFILE_PATH is set
+ifdef DOCKERFILE_PATH
+$(error DOCKERFILE_PATH is deprecated. Use DOCKERFILE_VARIANTS ?= $(DOCKERFILE_PATH) in the Makefile)
+endif
+
+DOCKER_ARCHS ?= amd64 arm64 armv7 ppc64le riscv64 s390x
+DOCKERFILE_VARIANTS     ?= $(wildcard Dockerfile Dockerfile.*)
+
+# Function to extract variant from Dockerfile label.
+# Returns the variant name from io.prometheus.image.variant label, or "default" if not found.
+define dockerfile_variant
+$(strip $(or $(shell sed -n 's/.*io\.prometheus\.image\.variant="\([^"]*\)".*/\1/p' $(1)),default))
+endef
+
+# Check for duplicate variant names (including default for Dockerfiles without labels).
+DOCKERFILE_VARIANT_NAMES := $(foreach df,$(DOCKERFILE_VARIANTS),$(call dockerfile_variant,$(df)))
+DOCKERFILE_VARIANT_NAMES_SORTED := $(sort $(DOCKERFILE_VARIANT_NAMES))
+ifneq ($(words $(DOCKERFILE_VARIANT_NAMES)),$(words $(DOCKERFILE_VARIANT_NAMES_SORTED)))
+$(error Duplicate variant names found. Each Dockerfile must have a unique io.prometheus.image.variant label, and only one can be without a label (default))
+endif
+
+# Build variant:dockerfile pairs for shell iteration.
+DOCKERFILE_VARIANTS_WITH_NAMES := $(foreach df,$(DOCKERFILE_VARIANTS),$(call dockerfile_variant,$(df)):$(df))
 
 BUILD_DOCKER_ARCHS = $(addprefix common-docker-,$(DOCKER_ARCHS))
 PUBLISH_DOCKER_ARCHS = $(addprefix common-docker-publish-,$(DOCKER_ARCHS))
@@ -112,7 +133,7 @@ common-all: precheck style check_license lint yamllint unused build test
 .PHONY: common-style
 common-style:
 	@echo ">> checking code style"
-	@fmtRes=$$($(GOFMT) -d $$(find . -path ./vendor -prune -o -name '*.go' -print)); \
+	@fmtRes=$$($(GOFMT) -d $$(git ls-files '*.go' ':!:vendor/*' || find . -path ./vendor -prune -o -name '*.go' -print)); \
 	if [ -n "$${fmtRes}" ]; then \
 		echo "gofmt checking failed!"; echo "$${fmtRes}"; echo; \
 		echo "Please ensure you are using $$($(GO) version) for formatting code."; \
@@ -122,13 +143,19 @@ common-style:
 .PHONY: common-check_license
 common-check_license:
 	@echo ">> checking license header"
-	@licRes=$$(for file in $$(find . -type f -iname '*.go' ! -path './vendor/*') ; do \
+	@licRes=$$(for file in $$(git ls-files '*.go' ':!:vendor/*' || find . -path ./vendor -prune -o -type f -iname '*.go' -print) ; do \
                awk 'NR<=3' $$file | grep -Eq "(Copyright|generated|GENERATED)" || echo $$file; \
        done); \
        if [ -n "$${licRes}" ]; then \
                echo "license header checking failed:"; echo "$${licRes}"; \
                exit 1; \
        fi
+	@echo ">> checking for copyright years 2026 or later"
+	@futureYearRes=$$(git grep -E 'Copyright (202[6-9]|20[3-9][0-9])' -- '*.go' ':!:vendor/*' || true); \
+	if [ -n "$${futureYearRes}" ]; then \
+		echo "Files with copyright year 2026 or later found (should use 'Copyright The Prometheus Authors'):"; echo "$${futureYearRes}"; \
+		exit 1; \
+	fi
 
 .PHONY: common-deps
 common-deps:
@@ -220,28 +247,142 @@ common-docker-repo-name:
 .PHONY: common-docker $(BUILD_DOCKER_ARCHS)
 common-docker: $(BUILD_DOCKER_ARCHS)
 $(BUILD_DOCKER_ARCHS): common-docker-%:
-	docker build -t "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(SANITIZED_DOCKER_IMAGE_TAG)" \
-		-f $(DOCKERFILE_PATH) \
-		--build-arg ARCH="$*" \
-		--build-arg OS="linux" \
-		$(DOCKERBUILD_CONTEXT)
+	@for variant in $(DOCKERFILE_VARIANTS_WITH_NAMES); do \
+		dockerfile=$${variant#*:}; \
+		variant_name=$${variant%%:*}; \
+		distroless_arch="$*"; \
+		if [ "$*" = "armv7" ]; then \
+			distroless_arch="arm"; \
+		fi; \
+		if [ "$$dockerfile" = "Dockerfile" ]; then \
+			echo "Building default variant ($$variant_name) for linux-$* using $$dockerfile"; \
+			docker build -t "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(SANITIZED_DOCKER_IMAGE_TAG)" \
+				-f $$dockerfile \
+				--build-arg ARCH="$*" \
+				--build-arg OS="linux" \
+				--build-arg DISTROLESS_ARCH="$$distroless_arch" \
+				$(DOCKERBUILD_CONTEXT); \
+			if [ "$$variant_name" != "default" ]; then \
+				echo "Tagging default variant with $$variant_name suffix"; \
+				docker tag "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(SANITIZED_DOCKER_IMAGE_TAG)" \
+					"$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(SANITIZED_DOCKER_IMAGE_TAG)-$$variant_name"; \
+			fi; \
+		else \
+			echo "Building $$variant_name variant for linux-$* using $$dockerfile"; \
+			docker build -t "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(SANITIZED_DOCKER_IMAGE_TAG)-$$variant_name" \
+				-f $$dockerfile \
+				--build-arg ARCH="$*" \
+				--build-arg OS="linux" \
+				--build-arg DISTROLESS_ARCH="$$distroless_arch" \
+				$(DOCKERBUILD_CONTEXT); \
+		fi; \
+	done
 
 .PHONY: common-docker-publish $(PUBLISH_DOCKER_ARCHS)
 common-docker-publish: $(PUBLISH_DOCKER_ARCHS)
 $(PUBLISH_DOCKER_ARCHS): common-docker-publish-%:
-	docker push "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(SANITIZED_DOCKER_IMAGE_TAG)"
+	@for variant in $(DOCKERFILE_VARIANTS_WITH_NAMES); do \
+		dockerfile=$${variant#*:}; \
+		variant_name=$${variant%%:*}; \
+		if [ "$$dockerfile" != "Dockerfile" ] || [ "$$variant_name" != "default" ]; then \
+			echo "Pushing $$variant_name variant for linux-$*"; \
+			docker push "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(SANITIZED_DOCKER_IMAGE_TAG)-$$variant_name"; \
+		fi; \
+		if [ "$$dockerfile" = "Dockerfile" ]; then \
+			echo "Pushing default variant ($$variant_name) for linux-$*"; \
+			docker push "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(SANITIZED_DOCKER_IMAGE_TAG)"; \
+		fi; \
+		if [ "$(DOCKER_IMAGE_TAG)" = "latest" ]; then \
+			if [ "$$dockerfile" != "Dockerfile" ] || [ "$$variant_name" != "default" ]; then \
+				echo "Pushing $$variant_name variant version tags for linux-$*"; \
+				docker push "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:v$(DOCKER_MAJOR_VERSION_TAG)-$$variant_name"; \
+			fi; \
+			if [ "$$dockerfile" = "Dockerfile" ]; then \
+				echo "Pushing default variant version tag for linux-$*"; \
+				docker push "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:v$(DOCKER_MAJOR_VERSION_TAG)"; \
+			fi; \
+		fi; \
+	done
 
 DOCKER_MAJOR_VERSION_TAG = $(firstword $(subst ., ,$(shell cat VERSION)))
 .PHONY: common-docker-tag-latest $(TAG_DOCKER_ARCHS)
 common-docker-tag-latest: $(TAG_DOCKER_ARCHS)
 $(TAG_DOCKER_ARCHS): common-docker-tag-latest-%:
-	docker tag "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(SANITIZED_DOCKER_IMAGE_TAG)" "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:latest"
-	docker tag "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(SANITIZED_DOCKER_IMAGE_TAG)" "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:v$(DOCKER_MAJOR_VERSION_TAG)"
+	@for variant in $(DOCKERFILE_VARIANTS_WITH_NAMES); do \
+		dockerfile=$${variant#*:}; \
+		variant_name=$${variant%%:*}; \
+		if [ "$$dockerfile" != "Dockerfile" ] || [ "$$variant_name" != "default" ]; then \
+			echo "Tagging $$variant_name variant for linux-$* as latest"; \
+			docker tag "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(SANITIZED_DOCKER_IMAGE_TAG)-$$variant_name" "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:latest-$$variant_name"; \
+			docker tag "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(SANITIZED_DOCKER_IMAGE_TAG)-$$variant_name" "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:v$(DOCKER_MAJOR_VERSION_TAG)-$$variant_name"; \
+		fi; \
+		if [ "$$dockerfile" = "Dockerfile" ]; then \
+			echo "Tagging default variant ($$variant_name) for linux-$* as latest"; \
+			docker tag "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(SANITIZED_DOCKER_IMAGE_TAG)" "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:latest"; \
+			docker tag "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(SANITIZED_DOCKER_IMAGE_TAG)" "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:v$(DOCKER_MAJOR_VERSION_TAG)"; \
+		fi; \
+	done
 
 .PHONY: common-docker-manifest
 common-docker-manifest:
-	DOCKER_CLI_EXPERIMENTAL=enabled docker manifest create -a "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME):$(SANITIZED_DOCKER_IMAGE_TAG)" $(foreach ARCH,$(DOCKER_ARCHS),$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$(ARCH):$(SANITIZED_DOCKER_IMAGE_TAG))
-	DOCKER_CLI_EXPERIMENTAL=enabled docker manifest push "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME):$(SANITIZED_DOCKER_IMAGE_TAG)"
+	@for variant in $(DOCKERFILE_VARIANTS_WITH_NAMES); do \
+		dockerfile=$${variant#*:}; \
+		variant_name=$${variant%%:*}; \
+		if [ "$$dockerfile" != "Dockerfile" ] || [ "$$variant_name" != "default" ]; then \
+			echo "Creating manifest for $$variant_name variant"; \
+			refs=""; \
+			for arch in $(DOCKER_ARCHS); do \
+				refs="$$refs $(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$$arch:$(SANITIZED_DOCKER_IMAGE_TAG)-$$variant_name"; \
+			done; \
+			if [ -z "$$refs" ]; then \
+				echo "Skipping manifest for $$variant_name variant (no supported architectures)"; \
+				continue; \
+			fi; \
+			DOCKER_CLI_EXPERIMENTAL=enabled docker manifest create -a "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME):$(SANITIZED_DOCKER_IMAGE_TAG)-$$variant_name" $$refs; \
+			DOCKER_CLI_EXPERIMENTAL=enabled docker manifest push "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME):$(SANITIZED_DOCKER_IMAGE_TAG)-$$variant_name"; \
+		fi; \
+		if [ "$$dockerfile" = "Dockerfile" ]; then \
+			echo "Creating default variant ($$variant_name) manifest"; \
+			refs=""; \
+			for arch in $(DOCKER_ARCHS); do \
+				refs="$$refs $(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$$arch:$(SANITIZED_DOCKER_IMAGE_TAG)"; \
+			done; \
+			if [ -z "$$refs" ]; then \
+				echo "Skipping default variant manifest (no supported architectures)"; \
+				continue; \
+			fi; \
+			DOCKER_CLI_EXPERIMENTAL=enabled docker manifest create -a "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME):$(SANITIZED_DOCKER_IMAGE_TAG)" $$refs; \
+			DOCKER_CLI_EXPERIMENTAL=enabled docker manifest push "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME):$(SANITIZED_DOCKER_IMAGE_TAG)"; \
+		fi; \
+		if [ "$(DOCKER_IMAGE_TAG)" = "latest" ]; then \
+			if [ "$$dockerfile" != "Dockerfile" ] || [ "$$variant_name" != "default" ]; then \
+				echo "Creating manifest for $$variant_name variant version tag"; \
+				refs=""; \
+				for arch in $(DOCKER_ARCHS); do \
+					refs="$$refs $(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$$arch:v$(DOCKER_MAJOR_VERSION_TAG)-$$variant_name"; \
+				done; \
+				if [ -z "$$refs" ]; then \
+					echo "Skipping version-tag manifest for $$variant_name variant (no supported architectures)"; \
+					continue; \
+				fi; \
+				DOCKER_CLI_EXPERIMENTAL=enabled docker manifest create -a "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME):v$(DOCKER_MAJOR_VERSION_TAG)-$$variant_name" $$refs; \
+				DOCKER_CLI_EXPERIMENTAL=enabled docker manifest push "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME):v$(DOCKER_MAJOR_VERSION_TAG)-$$variant_name"; \
+			fi; \
+			if [ "$$dockerfile" = "Dockerfile" ]; then \
+				echo "Creating default variant version tag manifest"; \
+				refs=""; \
+				for arch in $(DOCKER_ARCHS); do \
+					refs="$$refs $(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$$arch:v$(DOCKER_MAJOR_VERSION_TAG)"; \
+				done; \
+				if [ -z "$$refs" ]; then \
+					echo "Skipping default variant version-tag manifest (no supported architectures)"; \
+					continue; \
+				fi; \
+				DOCKER_CLI_EXPERIMENTAL=enabled docker manifest create -a "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME):v$(DOCKER_MAJOR_VERSION_TAG)" $$refs; \
+				DOCKER_CLI_EXPERIMENTAL=enabled docker manifest push "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME):v$(DOCKER_MAJOR_VERSION_TAG)"; \
+			fi; \
+		fi; \
+	done
 
 .PHONY: promu
 promu: $(PROMU)
@@ -266,6 +407,10 @@ $(GOLANGCI_LINT):
 		| sh -s -- -b $(FIRST_GOPATH)/bin $(GOLANGCI_LINT_VERSION)
 endif
 
+.PHONY: common-print-golangci-lint-version
+common-print-golangci-lint-version:
+	@echo $(GOLANGCI_LINT_VERSION)
+
 .PHONY: precheck
 precheck::
 
@@ -280,9 +425,3 @@ $(1)_precheck:
 		exit 1; \
 	fi
 endef
-
-govulncheck: install-govulncheck
-	govulncheck ./...
-
-install-govulncheck:
-	command -v govulncheck > /dev/null || go install golang.org/x/vuln/cmd/govulncheck@latest

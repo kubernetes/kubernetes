@@ -18,6 +18,8 @@ package e2enode
 
 import (
 	"context"
+	"fmt"
+	"path/filepath"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -26,8 +28,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"fmt"
 
 	"github.com/onsi/ginkgo/v2"
 )
@@ -107,9 +107,7 @@ var _ = SIGDescribe("Kubelet Volume Manager", func() {
 									{
 										Name: "kubelet-pods",
 										VolumeSource: v1.VolumeSource{
-											// TODO: remove hardcoded kubelet volume directory path
-											// framework.TestContext.KubeVolumeDir is currently not populated for node e2e
-											HostPath: &v1.HostPathVolumeSource{Path: "/var/lib/kubelet/pods"},
+											HostPath: &v1.HostPathVolumeSource{Path: filepath.Join(framework.TestContext.KubeletRootDir, "pods")},
 										},
 									},
 								},

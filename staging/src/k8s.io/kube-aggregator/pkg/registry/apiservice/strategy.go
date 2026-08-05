@@ -82,7 +82,7 @@ func (apiServerStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 }
 
 func (apiServerStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
-	return validation.ValidateAPIService(obj.(*apiregistration.APIService))
+	return validation.ValidateAPIService(ctx, obj.(*apiregistration.APIService))
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -90,11 +90,11 @@ func (apiServerStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Objec
 	return nil
 }
 
-func (apiServerStrategy) AllowCreateOnUpdate() bool {
+func (apiServerStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
-func (apiServerStrategy) AllowUnconditionalUpdate() bool {
+func (apiServerStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -102,7 +102,7 @@ func (apiServerStrategy) Canonicalize(obj runtime.Object) {
 }
 
 func (apiServerStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateAPIServiceUpdate(obj.(*apiregistration.APIService), old.(*apiregistration.APIService))
+	return validation.ValidateAPIServiceUpdate(ctx, obj.(*apiregistration.APIService), old.(*apiregistration.APIService))
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -149,11 +149,11 @@ func (apiServerStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old ru
 	newAPIService.OwnerReferences = oldAPIService.OwnerReferences
 }
 
-func (apiServerStatusStrategy) AllowCreateOnUpdate() bool {
+func (apiServerStatusStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
-func (apiServerStatusStrategy) AllowUnconditionalUpdate() bool {
+func (apiServerStatusStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -163,7 +163,7 @@ func (apiServerStatusStrategy) Canonicalize(obj runtime.Object) {
 
 // ValidateUpdate validates an update of apiServerStatusStrategy.
 func (apiServerStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateAPIServiceStatusUpdate(obj.(*apiregistration.APIService), old.(*apiregistration.APIService))
+	return validation.ValidateAPIServiceStatusUpdate(ctx, obj.(*apiregistration.APIService), old.(*apiregistration.APIService))
 }
 
 // WarningsOnUpdate returns warnings for the given update.

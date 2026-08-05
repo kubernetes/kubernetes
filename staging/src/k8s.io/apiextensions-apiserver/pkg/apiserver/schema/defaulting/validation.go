@@ -87,7 +87,7 @@ func validate(ctx context.Context, pth *field.Path, s *structuralschema.Structur
 			// check ObjectMeta/TypeMeta and everything else
 			if err := schemaobjectmeta.Coerce(nil, obj, rootSchema, true, false); err != nil {
 				allErrs = append(allErrs, field.Invalid(pth.Child("default"), s.Default.Object, fmt.Sprintf("must result in valid metadata: %v", err)))
-			} else if errs := schemaobjectmeta.Validate(nil, obj, rootSchema, true); len(errs) > 0 {
+			} else if errs := schemaobjectmeta.Validate(ctx, nil, obj, rootSchema, true); len(errs) > 0 {
 				allErrs = append(allErrs, field.Invalid(pth.Child("default"), s.Default.Object, fmt.Sprintf("must result in valid metadata: %v", errs.ToAggregate())))
 			} else if errs := apiservervalidation.ValidateCustomResource(pth.Child("default"), s.Default.Object, validator); len(errs) > 0 {
 				allErrs = append(allErrs, errs...)
@@ -131,7 +131,7 @@ func validate(ctx context.Context, pth *field.Path, s *structuralschema.Structur
 			// check ObjectMeta/TypeMeta and everything else
 			if err := schemaobjectmeta.Coerce(pth.Child("default"), s.Default.Object, s, s.XEmbeddedResource, false); err != nil {
 				allErrs = append(allErrs, err)
-			} else if errs := schemaobjectmeta.Validate(pth.Child("default"), s.Default.Object, s, s.XEmbeddedResource); len(errs) > 0 {
+			} else if errs := schemaobjectmeta.Validate(ctx, pth.Child("default"), s.Default.Object, s, s.XEmbeddedResource); len(errs) > 0 {
 				allErrs = append(allErrs, errs...)
 			} else if errs := apiservervalidation.ValidateCustomResource(pth.Child("default"), s.Default.Object, validator); len(errs) > 0 {
 				allErrs = append(allErrs, errs...)

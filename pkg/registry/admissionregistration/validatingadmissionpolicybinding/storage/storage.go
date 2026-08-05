@@ -41,7 +41,7 @@ type REST struct {
 var groupResource = admissionregistration.Resource("validatingadmissionpolicybindings")
 
 // NewREST returns a RESTStorage object that will work against policyBinding.
-func NewREST(optsGetter generic.RESTOptionsGetter, authorizer authorizer.Authorizer, policyGetter PolicyGetter, resourceResolver resolver.ResourceResolver) (*REST, error) {
+func NewREST(optsGetter generic.RESTOptionsGetter, authorizer authorizer.UnconditionalAuthorizer, policyGetter PolicyGetter, resourceResolver resolver.ResourceResolver) (*REST, error) {
 	r := &REST{}
 	strategy := validatingadmissionpolicybinding.NewStrategy(authorizer, policyGetter, resourceResolver)
 	store := &genericregistry.Store{

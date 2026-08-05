@@ -181,6 +181,15 @@ func (t *ginkgoTestingTProxy) TempDir() string {
 	return tmpDir
 }
 
+func (t *ginkgoTestingTProxy) ArtifactDir() string {
+	artifactDir, err := os.MkdirTemp("", "ginkgo")
+	if err != nil {
+		t.fail(fmt.Sprintf("Failed to create artifact directory: %v", err), 1)
+		return ""
+	}
+	return artifactDir
+}
+
 // FullGinkgoTInterface
 func (t *ginkgoTestingTProxy) AddReportEntryVisibilityAlways(name string, args ...any) {
 	finalArgs := []any{internal.Offset(1), types.ReportEntryVisibilityAlways}

@@ -54,7 +54,7 @@ func CollectAndCompare(c metrics.Collector, expected io.Reader, metricNames ...s
 	if err != nil {
 		return err
 	}
-	if err := getLintError(lintProblems); err != nil {
+	if err := GetLintError(lintProblems); err != nil {
 		return err
 	}
 
@@ -70,7 +70,7 @@ func GatherAndCompare(g metrics.Gatherer, expected io.Reader, metricNames ...str
 	if err != nil {
 		return err
 	}
-	if err := getLintError(lintProblems); err != nil {
+	if err := GetLintError(lintProblems); err != nil {
 		return err
 	}
 

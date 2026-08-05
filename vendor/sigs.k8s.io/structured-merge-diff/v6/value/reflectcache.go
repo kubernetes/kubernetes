@@ -39,14 +39,28 @@ type UnstructuredConverter interface {
 	ToUnstructured() interface{}
 }
 
+// UnstructuredConverterWithError is implemented instead of UnstructuredConverter by types for which
+// some, but not all, values can be converted directly to unstructured. If a type implements both
+// UnstructuredConverter and UnstructuredConverterWithError, its UnstructuredConverterWithError
+// implementation takes precedence during conversion.
+type UnstructuredConverterWithError interface {
+	json.Marshaler // require that json.Marshaler is implemented
+
+	// ToUnstructured returns the unstructured representation, or a non-nil error if the value
+	// cannot be converted to unstructured.
+	ToUnstructuredWithError() (any, error)
+}
+
 // TypeReflectCacheEntry keeps data gathered using reflection about how a type is converted to/from unstructured.
 type TypeReflectCacheEntry struct {
-	isJsonMarshaler        bool
-	ptrIsJsonMarshaler     bool
-	isJsonUnmarshaler      bool
-	ptrIsJsonUnmarshaler   bool
-	isStringConvertable    bool
-	ptrIsStringConvertable bool
+	isJsonMarshaler                     bool
+	ptrIsJsonMarshaler                  bool
+	isJsonUnmarshaler                   bool
+	ptrIsJsonUnmarshaler                bool
+	isUnstructuredConverter             bool
+	ptrIsUnstructuredConverter          bool
+	isUnstructuredConverterWithError    bool
+	ptrIsUnstructuredConverterWithError bool
 
 	structFields        map[string]*FieldCacheEntry
 	orderedStructFields []*FieldCacheEntry
@@ -93,9 +107,10 @@ func (f *FieldCacheEntry) GetFrom(structVal reflect.Value) reflect.Value {
 	return structVal
 }
 
-var marshalerType = reflect.TypeOf(new(json.Marshaler)).Elem()
-var unmarshalerType = reflect.TypeOf(new(json.Unmarshaler)).Elem()
-var unstructuredConvertableType = reflect.TypeOf(new(UnstructuredConverter)).Elem()
+var marshalerType = reflect.TypeFor[json.Marshaler]()
+var unmarshalerType = reflect.TypeFor[json.Unmarshaler]()
+var unstructuredConverterType = reflect.TypeFor[UnstructuredConverter]()
+var unstructuredConverterWithErrorType = reflect.TypeFor[UnstructuredConverterWithError]()
 var defaultReflectCache = newReflectCache()
 
 // TypeReflectEntryOf returns the TypeReflectCacheEntry of the provided reflect.Type.
@@ -122,11 +137,13 @@ func typeReflectEntryOf(cm reflectCacheMap, t reflect.Type, updates reflectCache
 		return record
 	}
 	typeEntry := &TypeReflectCacheEntry{
-		isJsonMarshaler:        t.Implements(marshalerType),
-		ptrIsJsonMarshaler:     reflect.PtrTo(t).Implements(marshalerType),
-		isJsonUnmarshaler:      reflect.PtrTo(t).Implements(unmarshalerType),
-		isStringConvertable:    t.Implements(unstructuredConvertableType),
-		ptrIsStringConvertable: reflect.PtrTo(t).Implements(unstructuredConvertableType),
+		isJsonMarshaler:                     t.Implements(marshalerType),
+		ptrIsJsonMarshaler:                  reflect.PointerTo(t).Implements(marshalerType),
+		isJsonUnmarshaler:                   reflect.PointerTo(t).Implements(unmarshalerType),
+		isUnstructuredConverter:             t.Implements(unstructuredConverterType),
+		ptrIsUnstructuredConverter:          reflect.PointerTo(t).Implements(unstructuredConverterType),
+		isUnstructuredConverterWithError:    t.Implements(unstructuredConverterWithErrorType),
+		ptrIsUnstructuredConverterWithError: reflect.PointerTo(t).Implements(unstructuredConverterWithErrorType),
 	}
 	if t.Kind() == reflect.Struct {
 		fieldEntries := map[string]*FieldCacheEntry{}
@@ -190,7 +207,7 @@ func (e TypeReflectCacheEntry) OrderedFields() []*FieldCacheEntry {
 
 // CanConvertToUnstructured returns true if this TypeReflectCacheEntry can convert values of its type to unstructured.
 func (e TypeReflectCacheEntry) CanConvertToUnstructured() bool {
-	return e.isJsonMarshaler || e.ptrIsJsonMarshaler || e.isStringConvertable || e.ptrIsStringConvertable
+	return e.isJsonMarshaler || e.ptrIsJsonMarshaler || e.isUnstructuredConverter || e.ptrIsUnstructuredConverter || e.isUnstructuredConverterWithError || e.ptrIsUnstructuredConverterWithError
 }
 
 // ToUnstructured converts the provided value to unstructured and returns it.
@@ -206,7 +223,7 @@ func (e TypeReflectCacheEntry) ToUnstructured(sv reflect.Value) (interface{}, er
 	// Check if the object has a custom string converter and use it if available, since it is much more efficient
 	// than round tripping through json.
 	if converter, ok := e.getUnstructuredConverter(sv); ok {
-		return converter.ToUnstructured(), nil
+		return converter.ToUnstructuredWithError()
 	}
 	// Check if the object has a custom JSON marshaller/unmarshaller.
 	if marshaler, ok := e.getJsonMarshaler(sv); ok {
@@ -318,16 +335,26 @@ func (e TypeReflectCacheEntry) getJsonUnmarshaler(v reflect.Value) (json.Unmarsh
 	return v.Addr().Interface().(json.Unmarshaler), true
 }
 
-func (e TypeReflectCacheEntry) getUnstructuredConverter(v reflect.Value) (UnstructuredConverter, bool) {
-	if e.isStringConvertable {
-		return v.Interface().(UnstructuredConverter), true
-	}
-	if e.ptrIsStringConvertable {
+type unstructuredConverterWithNilError struct {
+	UnstructuredConverter
+}
+
+func (c unstructuredConverterWithNilError) ToUnstructuredWithError() (any, error) {
+	return c.UnstructuredConverter.ToUnstructured(), nil
+}
+
+func (e TypeReflectCacheEntry) getUnstructuredConverter(v reflect.Value) (UnstructuredConverterWithError, bool) {
+	switch {
+	case e.isUnstructuredConverterWithError:
+		return v.Interface().(UnstructuredConverterWithError), true
+	case e.ptrIsUnstructuredConverterWithError && v.CanAddr():
 		// Check pointer receivers if v is not a pointer
-		if v.CanAddr() {
-			v = v.Addr()
-			return v.Interface().(UnstructuredConverter), true
-		}
+		return v.Addr().Interface().(UnstructuredConverterWithError), true
+	case e.isUnstructuredConverter:
+		return unstructuredConverterWithNilError{v.Interface().(UnstructuredConverter)}, true
+	case e.ptrIsUnstructuredConverter && v.CanAddr():
+		// Check pointer receivers if v is not a pointer
+		return unstructuredConverterWithNilError{v.Addr().Interface().(UnstructuredConverter)}, true
 	}
 	return nil, false
 }

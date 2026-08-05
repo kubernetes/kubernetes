@@ -25,20 +25,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 	authorizationvalidation "k8s.io/kubernetes/pkg/apis/authorization/validation"
 	authorizationutil "k8s.io/kubernetes/pkg/registry/authorization/util"
 )
 
 type REST struct {
-	authorizer authorizer.Authorizer
+	authorizer authorizer.UnconditionalAuthorizer
+	scheme     *runtime.Scheme
 }
 
-func NewREST(authorizer authorizer.Authorizer) *REST {
-	return &REST{authorizer}
+func NewREST(authorizer authorizer.UnconditionalAuthorizer, scheme *runtime.Scheme) *REST {
+	return &REST{authorizer, scheme}
 }
 
 func (r *REST) NamespaceScoped() bool {
@@ -66,14 +65,7 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 	if !ok {
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("not a SelfSubjectAccessReview: %#v", obj))
 	}
-	// clear fields if the featuregate is disabled
-	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AuthorizeWithSelectors) {
-		if selfSAR.Spec.ResourceAttributes != nil {
-			selfSAR.Spec.ResourceAttributes.FieldSelector = nil
-			selfSAR.Spec.ResourceAttributes.LabelSelector = nil
-		}
-	}
-	if errs := authorizationvalidation.ValidateSelfSubjectAccessReview(selfSAR); len(errs) > 0 {
+	if errs := authorizationvalidation.ValidateSelfSubjectAccessReviewCreate(ctx, r.scheme, selfSAR); len(errs) > 0 {
 		return nil, apierrors.NewInvalid(authorizationapi.Kind(selfSAR.Kind), "", errs)
 	}
 	userToCheck, exists := genericapirequest.UserFrom(ctx)

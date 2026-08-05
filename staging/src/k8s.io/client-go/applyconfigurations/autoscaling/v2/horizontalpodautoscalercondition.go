@@ -42,6 +42,10 @@ type HorizontalPodAutoscalerConditionApplyConfiguration struct {
 	// message is a human-readable explanation containing details about
 	// the transition
 	Message *string `json:"message,omitempty"`
+	// observedGeneration represents the .metadata.generation that the condition was set based upon.
+	// For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+	// with respect to the current state of the instance.
+	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
 }
 
 // HorizontalPodAutoscalerConditionApplyConfiguration constructs a declarative configuration of the HorizontalPodAutoscalerCondition type for use with
@@ -87,5 +91,13 @@ func (b *HorizontalPodAutoscalerConditionApplyConfiguration) WithReason(value st
 // If called multiple times, the Message field is set to the value of the last call.
 func (b *HorizontalPodAutoscalerConditionApplyConfiguration) WithMessage(value string) *HorizontalPodAutoscalerConditionApplyConfiguration {
 	b.Message = &value
+	return b
+}
+
+// WithObservedGeneration sets the ObservedGeneration field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ObservedGeneration field is set to the value of the last call.
+func (b *HorizontalPodAutoscalerConditionApplyConfiguration) WithObservedGeneration(value int64) *HorizontalPodAutoscalerConditionApplyConfiguration {
+	b.ObservedGeneration = &value
 	return b
 }

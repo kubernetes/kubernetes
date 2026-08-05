@@ -101,10 +101,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_ServerStorageVersion_To_apiserverinternal_ServerStorageVersion(in *apiserverinternalv1alpha1.ServerStorageVersion, out *apiserverinternal.ServerStorageVersion, s conversion.Scope) error {
-	out.APIServerID = in.APIServerID
-	out.EncodingVersion = in.EncodingVersion
-	out.DecodableVersions = *(*[]string)(unsafe.Pointer(&in.DecodableVersions))
-	out.ServedVersions = *(*[]string)(unsafe.Pointer(&in.ServedVersions))
+	*out = *(*apiserverinternal.ServerStorageVersion)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -114,10 +111,7 @@ func Convert_v1alpha1_ServerStorageVersion_To_apiserverinternal_ServerStorageVer
 }
 
 func autoConvert_apiserverinternal_ServerStorageVersion_To_v1alpha1_ServerStorageVersion(in *apiserverinternal.ServerStorageVersion, out *apiserverinternalv1alpha1.ServerStorageVersion, s conversion.Scope) error {
-	out.APIServerID = in.APIServerID
-	out.EncodingVersion = in.EncodingVersion
-	out.DecodableVersions = *(*[]string)(unsafe.Pointer(&in.DecodableVersions))
-	out.ServedVersions = *(*[]string)(unsafe.Pointer(&in.ServedVersions))
+	*out = *(*apiserverinternalv1alpha1.ServerStorageVersion)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -159,12 +153,7 @@ func Convert_apiserverinternal_StorageVersion_To_v1alpha1_StorageVersion(in *api
 }
 
 func autoConvert_v1alpha1_StorageVersionCondition_To_apiserverinternal_StorageVersionCondition(in *apiserverinternalv1alpha1.StorageVersionCondition, out *apiserverinternal.StorageVersionCondition, s conversion.Scope) error {
-	out.Type = apiserverinternal.StorageVersionConditionType(in.Type)
-	out.Status = apiserverinternal.ConditionStatus(in.Status)
-	out.ObservedGeneration = in.ObservedGeneration
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*apiserverinternal.StorageVersionCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -174,12 +163,7 @@ func Convert_v1alpha1_StorageVersionCondition_To_apiserverinternal_StorageVersio
 }
 
 func autoConvert_apiserverinternal_StorageVersionCondition_To_v1alpha1_StorageVersionCondition(in *apiserverinternal.StorageVersionCondition, out *apiserverinternalv1alpha1.StorageVersionCondition, s conversion.Scope) error {
-	out.Type = apiserverinternalv1alpha1.StorageVersionConditionType(in.Type)
-	out.Status = apiserverinternalv1alpha1.ConditionStatus(in.Status)
-	out.ObservedGeneration = in.ObservedGeneration
-	out.LastTransitionTime = in.LastTransitionTime
-	out.Reason = in.Reason
-	out.Message = in.Message
+	*out = *(*apiserverinternalv1alpha1.StorageVersionCondition)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -211,6 +195,7 @@ func Convert_apiserverinternal_StorageVersionList_To_v1alpha1_StorageVersionList
 }
 
 func autoConvert_v1alpha1_StorageVersionSpec_To_apiserverinternal_StorageVersionSpec(in *apiserverinternalv1alpha1.StorageVersionSpec, out *apiserverinternal.StorageVersionSpec, s conversion.Scope) error {
+	*out = *(*apiserverinternal.StorageVersionSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -220,6 +205,7 @@ func Convert_v1alpha1_StorageVersionSpec_To_apiserverinternal_StorageVersionSpec
 }
 
 func autoConvert_apiserverinternal_StorageVersionSpec_To_v1alpha1_StorageVersionSpec(in *apiserverinternal.StorageVersionSpec, out *apiserverinternalv1alpha1.StorageVersionSpec, s conversion.Scope) error {
+	*out = *(*apiserverinternalv1alpha1.StorageVersionSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -229,9 +215,7 @@ func Convert_apiserverinternal_StorageVersionSpec_To_v1alpha1_StorageVersionSpec
 }
 
 func autoConvert_v1alpha1_StorageVersionStatus_To_apiserverinternal_StorageVersionStatus(in *apiserverinternalv1alpha1.StorageVersionStatus, out *apiserverinternal.StorageVersionStatus, s conversion.Scope) error {
-	out.StorageVersions = *(*[]apiserverinternal.ServerStorageVersion)(unsafe.Pointer(&in.StorageVersions))
-	out.CommonEncodingVersion = (*string)(unsafe.Pointer(in.CommonEncodingVersion))
-	out.Conditions = *(*[]apiserverinternal.StorageVersionCondition)(unsafe.Pointer(&in.Conditions))
+	*out = *(*apiserverinternal.StorageVersionStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -241,9 +225,7 @@ func Convert_v1alpha1_StorageVersionStatus_To_apiserverinternal_StorageVersionSt
 }
 
 func autoConvert_apiserverinternal_StorageVersionStatus_To_v1alpha1_StorageVersionStatus(in *apiserverinternal.StorageVersionStatus, out *apiserverinternalv1alpha1.StorageVersionStatus, s conversion.Scope) error {
-	out.StorageVersions = *(*[]apiserverinternalv1alpha1.ServerStorageVersion)(unsafe.Pointer(&in.StorageVersions))
-	out.CommonEncodingVersion = (*string)(unsafe.Pointer(in.CommonEncodingVersion))
-	out.Conditions = *(*[]apiserverinternalv1alpha1.StorageVersionCondition)(unsafe.Pointer(&in.Conditions))
+	*out = *(*apiserverinternalv1alpha1.StorageVersionStatus)(unsafe.Pointer(in))
 	return nil
 }
 

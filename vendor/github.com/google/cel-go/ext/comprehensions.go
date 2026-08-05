@@ -146,10 +146,10 @@ const (
 // Elements in the map may optionally be filtered according to a predicate expression, where
 // elements that satisfy the predicate are transformed.
 //
-//	<list>.transformMap(indexVar, valueVar, <transform>)
-//	<list>.transformMap(indexVar, valueVar, <filter>, <transform>)
-//	<map>.transformMap(keyVar, valueVar, <transform>)
-//	<map>.transformMap(keyVar, valueVar, <filter>, <transform>)
+//	<list>.transformMapEntry(indexVar, valueVar, <transform>)
+//	<list>.transformMapEntry(indexVar, valueVar, <filter>, <transform>)
+//	<map>.transformMapEntry(keyVar, valueVar, <transform>)
+//	<map>.transformMapEntry(keyVar, valueVar, <filter>, <transform>)
 //
 // Examples:
 //

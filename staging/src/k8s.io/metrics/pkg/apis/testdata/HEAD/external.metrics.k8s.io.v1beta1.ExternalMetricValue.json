@@ -1,0 +1,11 @@
+{
+  "kind": "ExternalMetricValue",
+  "apiVersion": "external.metrics.k8s.io/v1beta1",
+  "metricName": "metricNameValue",
+  "metricLabels": {
+    "metricLabelsKey": "metricLabelsValue"
+  },
+  "timestamp": "2003-01-01T01:01:01Z",
+  "window": 4,
+  "value": "0"
+}

@@ -23,8 +23,10 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.uber.org/zap"
+
+	"go.etcd.io/etcd/pkg/v3/traceutil"
 )
 
 const maxSamplingRatePerMillion = 1000000
@@ -80,6 +82,8 @@ func newTracingExporter(ctx context.Context, cfg *Config) (*tracingExporter, err
 			tracesdk.ParentBased(determineSampler(cfg.DistributedTracingSamplingRatePerMillion)),
 		),
 	)
+
+	traceutil.Init(traceProvider)
 
 	options := []otelgrpc.Option{
 		otelgrpc.WithPropagators(

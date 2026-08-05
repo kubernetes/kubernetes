@@ -234,7 +234,7 @@ const (
 // ClusterTrustBundle objects are considered to be readable by any authenticated
 // user in the cluster.
 //
-// It can be optionally associated with a particular assigner, in which case it
+// It can be optionally associated with a particular signer, in which case it
 // contains one valid set of trust anchors for that signer. Signers may have
 // multiple associated ClusterTrustBundles; each is an independent set of trust
 // anchors for that signer.

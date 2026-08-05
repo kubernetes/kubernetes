@@ -208,7 +208,9 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 	if len(argsIn) > 0 && argsLenAtDash != 0 {
 		p.ResourceName = argsIn[0]
 	}
-	if argsLenAtDash > -1 {
+	// we expect exactly one arg (the pod/resource name) before the dash separator.
+	// pflag guarantees `argsLenAtDash <= len(args)`.
+	if argsLenAtDash == 0 || argsLenAtDash == 1 {
 		p.Command = argsIn[argsLenAtDash:]
 	} else if len(argsIn) > 1 || (len(argsIn) > 0 && len(p.FilenameOptions.Filenames) != 0) {
 		return cmdutil.UsageErrorf(cmd, "exec [POD] [COMMAND] is not supported anymore. Use exec [POD] -- [COMMAND] instead")

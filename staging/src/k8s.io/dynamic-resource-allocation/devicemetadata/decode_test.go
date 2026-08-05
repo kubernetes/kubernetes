@@ -19,6 +19,7 @@ package devicemetadata
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,74 +30,15 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/dynamic-resource-allocation/api/metadata"
 	"k8s.io/dynamic-resource-allocation/api/metadata/v1alpha1"
+	"k8s.io/dynamic-resource-allocation/api/metadata/v1beta1"
 	"k8s.io/utils/ptr"
 )
 
-var validV1Alpha1JSON = mustMarshal(&v1alpha1.DeviceMetadata{
-	TypeMeta: metav1.TypeMeta{
-		APIVersion: v1alpha1.SchemeGroupVersion.String(),
-		Kind:       "DeviceMetadata",
-	},
-	ObjectMeta: metav1.ObjectMeta{
-		Name:       "my-claim",
-		Namespace:  "default",
-		UID:        "uid-1234",
-		Generation: 1,
-	},
-	Requests: []v1alpha1.DeviceMetadataRequest{{
-		Name: "gpu",
-		Devices: []v1alpha1.Device{{
-			Driver: "gpu.example.com",
-			Pool:   "worker-0",
-			Name:   "gpu-0",
-			Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-				"model": {StringValue: ptr.To("LATEST-GPU-MODEL")}, //nolint:modernize
-			},
-		}},
-	}},
-})
-
-func mustMarshal(obj interface{}) []byte {
-	data, err := json.Marshal(obj)
-	if err != nil {
-		panic(err)
-	}
-	return append(data, '\n')
-}
-
-func TestDecodeMetadataFromStream(t *testing.T) {
-	unknownVersionJSON := `{"apiVersion":"metadata.k8s.io/v99","kind":"DeviceMetadata","metadata":{"name":"test"}}` + "\n"
-	unknownV2JSON := `{"apiVersion":"metadata.k8s.io/v100","kind":"DeviceMetadata","metadata":{"name":"test"}}` + "\n"
-	missingKindJSON := `{"apiVersion":"metadata.resource.k8s.io/v1alpha1","metadata":{"name":"test"}}` + "\n"
-	missingApiversionJSON := `{"kind":"DeviceMetadata","metadata":{"name":"test"}}` + "\n"
-
-	expectedV1Alpha1 := &v1alpha1.DeviceMetadata{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: v1alpha1.SchemeGroupVersion.String(),
-			Kind:       "DeviceMetadata",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:       "my-claim",
-			Namespace:  "default",
-			UID:        "uid-1234",
-			Generation: 1,
-		},
-		Requests: []v1alpha1.DeviceMetadataRequest{{
-			Name: "gpu",
-			Devices: []v1alpha1.Device{{
-				Driver: "gpu.example.com",
-				Pool:   "worker-0",
-				Name:   "gpu-0",
-				Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-					"model": {StringValue: ptr.To("LATEST-GPU-MODEL")}, //nolint:modernize
-				},
-			}},
-		}},
-	}
-
-	expectedInternal := &metadata.DeviceMetadata{
+var (
+	validInternal = &metadata.DeviceMetadata{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "my-claim",
 			Namespace:  "default",
@@ -116,21 +58,162 @@ func TestDecodeMetadataFromStream(t *testing.T) {
 		}},
 	}
 
+	validV1Alpha1 = &v1alpha1.DeviceMetadata{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: v1alpha1.SchemeGroupVersion.String(),
+			Kind:       "DeviceMetadata",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "my-claim",
+			Namespace:  "default",
+			UID:        "uid-1234",
+			Generation: 1,
+		},
+		Requests: []v1alpha1.DeviceMetadataRequest{{
+			Name: "gpu",
+			Devices: []v1alpha1.Device{{
+				Driver: "gpu.example.com",
+				Pool:   "worker-0",
+				Name:   "gpu-0",
+				Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"model": {StringValue: new("LATEST-GPU-MODEL")},
+				},
+			}},
+		}},
+	}
+	validV1Alpha1JSON = mustMarshal(validV1Alpha1)
+
+	validV1Beta1 = &v1beta1.DeviceMetadata{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: v1beta1.SchemeGroupVersion.String(),
+			Kind:       "DeviceMetadata",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "my-claim",
+			Namespace:  "default",
+			UID:        "uid-1234",
+			Generation: 1,
+		},
+		Requests: []v1beta1.DeviceMetadataRequest{{
+			Name: "gpu",
+			Devices: []v1beta1.Device{{
+				Driver: "gpu.example.com",
+				Pool:   "worker-0",
+				Name:   "gpu-0",
+				Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"model": {StringValue: ptr.To("LATEST-GPU-MODEL")}, //nolint:modernize
+				},
+			}},
+		}},
+	}
+	validV1Beta1JSON = mustMarshal(validV1Beta1)
+)
+
+func mustMarshal(obj interface{}) []byte {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		panic(err)
+	}
+	return append(data, '\n')
+}
+
+func TestDecodeMetadataFromStream(t *testing.T) {
+	unknownVersionJSON := `{"apiVersion":"metadata.k8s.io/v99","kind":"DeviceMetadata","metadata":{"name":"test"}}` + "\n"
+	unknownV2JSON := `{"apiVersion":"metadata.k8s.io/v100","kind":"DeviceMetadata","metadata":{"name":"test"}}` + "\n"
+	unknownVersionMissingKindJSON := `{"apiVersion":"metadata.k8s.io/v99","metadata":{"name":"test"}}` + "\n"
+	missingKindJSON := `{"apiVersion":"metadata.resource.k8s.io/v1alpha1","metadata":{"name":"test"}}` + "\n"
+	missingApiversionJSON := `{"kind":"DeviceMetadata","metadata":{"name":"test"}}` + "\n"
+	malformedV1Alpha1JSON := `{"apiVersion":"metadata.resource.k8s.io/v1alpha1","kind":"DeviceMetadata","metadata":{"name":"test"},"requests":"this-should-be-an-array"}` + "\n"
+
+	invalidV1Alpha1JSON := `{"apiVersion":"metadata.resource.k8s.io/v1alpha1","kind":"DeviceMetadata","metadata":{"name":"test"},"podClaimName":"%!$#"}`
+	invalidV1Beta1JSON := `{"apiVersion":"metadata.resource.k8s.io/v1beta1","kind":"DeviceMetadata","metadata":{"name":"test"},"podClaimName":"%!$#"}`
+	invalidInternal := &metadata.DeviceMetadata{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test",
+		},
+		PodClaimName: new("%!$#"),
+	}
+
 	testcases := map[string]struct {
+		isInvalid   bool
 		streamInput []byte
 		dest        runtime.Object
 		expected    runtime.Object
 		expectError string
+		expectGVK   *schema.GroupVersionKind
 	}{
-		"decode-to-v1alpha1": {
+		"decode-v1alpha1-to-v1alpha1": {
 			streamInput: validV1Alpha1JSON,
 			dest:        &v1alpha1.DeviceMetadata{},
-			expected:    expectedV1Alpha1,
+			expected:    validV1Alpha1,
+			expectGVK:   new(v1alpha1.SchemeGroupVersion.WithKind("DeviceMetadata")),
 		},
-		"decode-to-internal": {
+		"decode-v1alpha1-to-v1beta1": {
+			streamInput: validV1Alpha1JSON,
+			dest:        &v1beta1.DeviceMetadata{},
+			expected:    validV1Beta1,
+		},
+		"decode-v1alpha1-to-internal": {
 			streamInput: validV1Alpha1JSON,
 			dest:        &metadata.DeviceMetadata{},
-			expected:    expectedInternal,
+			expected:    validInternal,
+			expectGVK:   new(v1alpha1.SchemeGroupVersion.WithKind("DeviceMetadata")),
+		},
+		"decode-v1beta1-to-v1alpha1": {
+			streamInput: validV1Beta1JSON,
+			dest:        &v1alpha1.DeviceMetadata{},
+			expected:    validV1Alpha1,
+		},
+		"decode-v1beta1-to-v1beta1": {
+			streamInput: validV1Beta1JSON,
+			dest:        &v1beta1.DeviceMetadata{},
+			expected:    validV1Beta1,
+			expectGVK:   new(v1beta1.SchemeGroupVersion.WithKind("DeviceMetadata")),
+		},
+		"decode-v1beta1-to-internal": {
+			streamInput: validV1Beta1JSON,
+			dest:        &metadata.DeviceMetadata{},
+			expected:    validInternal,
+			expectGVK:   new(v1beta1.SchemeGroupVersion.WithKind("DeviceMetadata")),
+		},
+		"decode-all-to-v1alpha1": {
+			streamInput: []byte(string(validV1Beta1JSON) + string(validV1Alpha1JSON)),
+			dest:        &v1alpha1.DeviceMetadata{},
+			expected:    validV1Alpha1,
+		},
+		"decode-all-to-v1beta1": {
+			streamInput: []byte(string(validV1Beta1JSON) + string(validV1Alpha1JSON)),
+			dest:        &v1beta1.DeviceMetadata{},
+			expected:    validV1Beta1,
+		},
+		"decode-all-to-internal": {
+			streamInput: []byte(string(validV1Beta1JSON) + string(validV1Alpha1JSON)),
+			dest:        &metadata.DeviceMetadata{},
+			expected:    validInternal,
+			expectGVK:   new(v1beta1.SchemeGroupVersion.WithKind("DeviceMetadata")),
+		},
+		"decode-all-reversed-to-internal": {
+			streamInput: []byte(string(validV1Alpha1JSON) + string(validV1Beta1JSON)),
+			dest:        &metadata.DeviceMetadata{},
+			expected:    validInternal,
+			expectGVK:   new(v1alpha1.SchemeGroupVersion.WithKind("DeviceMetadata")),
+		},
+		"decode-all-to-wrong-type": {
+			streamInput: []byte(string(validV1Alpha1JSON) + string(validV1Beta1JSON)),
+			dest:        &resourceapi.ResourceClaim{},
+			expectError: "determine target type",
+		},
+		"invalid-v1alpha1": {
+			isInvalid:   true,
+			streamInput: []byte(invalidV1Alpha1JSON),
+			dest:        &metadata.DeviceMetadata{},
+			expected:    invalidInternal,
+		},
+		"invalid-v1beta1": {
+			isInvalid:   true,
+			streamInput: []byte(invalidV1Beta1JSON),
+			dest:        &metadata.DeviceMetadata{},
+			expected:    invalidInternal,
 		},
 		"empty-stream": {
 			streamInput: nil,
@@ -150,77 +233,112 @@ func TestDecodeMetadataFromStream(t *testing.T) {
 		"missing-kind": {
 			streamInput: []byte(missingKindJSON),
 			dest:        &v1alpha1.DeviceMetadata{},
-			expectError: "no compatible metadata version found in stream",
+			expectError: "decode metadata.resource.k8s.io/v1alpha1",
 		},
 		"missing-apiversion": {
 			streamInput: []byte(missingApiversionJSON),
 			dest:        &v1alpha1.DeviceMetadata{},
-			expectError: "no compatible metadata version found in stream",
+			expectError: "decode metadata object",
+		},
+		"malformed-registered-version": {
+			streamInput: []byte(malformedV1Alpha1JSON),
+			dest:        &v1alpha1.DeviceMetadata{},
+			expectError: "decode metadata.resource.k8s.io/v1alpha1",
 		},
 		"only-unknown-versions": {
 			streamInput: []byte(unknownVersionJSON),
 			dest:        &v1alpha1.DeviceMetadata{},
-			expectError: "no compatible metadata version found in stream",
+			expectError: "no compatible metadata version found in stream (unknown versions: metadata.k8s.io/v99)",
+		},
+		"unknown-version-missing-kind": {
+			streamInput: []byte(unknownVersionMissingKindJSON),
+			dest:        &v1alpha1.DeviceMetadata{},
+			expectError: "decode metadata.k8s.io/v99",
 		},
 		"multiple-unknown-versions": {
 			streamInput: append([]byte(unknownVersionJSON), []byte(unknownV2JSON)...),
 			dest:        &v1alpha1.DeviceMetadata{},
-			expectError: "no compatible metadata version found in stream",
-		},
-		"unknown-version-then-broken": {
-			streamInput: append([]byte(unknownVersionJSON), []byte(missingKindJSON)...),
-			dest:        &v1alpha1.DeviceMetadata{},
-			expectError: "no compatible metadata version found in stream",
+			expectError: "no compatible metadata version found in stream (unknown versions: metadata.k8s.io/v99, metadata.k8s.io/v100)",
 		},
 		"known-version-then-broken": {
 			streamInput: append(validV1Alpha1JSON, []byte("{broken")...),
 			dest:        &v1alpha1.DeviceMetadata{},
-			expected:    expectedV1Alpha1,
+			expected:    validV1Alpha1,
 		},
-
-		// Forward compatibility: object-level errors are skipped so
-		// that an older consumer can reach a version it understands.
 		"skips-unknown-version": {
 			streamInput: append([]byte(unknownVersionJSON), validV1Alpha1JSON...),
 			dest:        &v1alpha1.DeviceMetadata{},
-			expected:    expectedV1Alpha1,
+			expected:    validV1Alpha1,
 		},
-		"skips-missing-kind": {
+		"malformed-registered-then-valid-is-fatal": {
+			streamInput: append([]byte(malformedV1Alpha1JSON), validV1Alpha1JSON...),
+			dest:        &v1alpha1.DeviceMetadata{},
+			expectError: "decode metadata.resource.k8s.io/v1alpha1",
+		},
+		"missing-kind-then-valid-is-fatal": {
 			streamInput: append([]byte(missingKindJSON), validV1Alpha1JSON...),
 			dest:        &v1alpha1.DeviceMetadata{},
-			expected:    expectedV1Alpha1,
+			expectError: "decode metadata.resource.k8s.io/v1alpha1",
 		},
-		"skips-missing-apiversion": {
+		"missing-apiversion-then-valid-is-fatal": {
 			streamInput: append([]byte(missingApiversionJSON), validV1Alpha1JSON...),
 			dest:        &v1alpha1.DeviceMetadata{},
-			expected:    expectedV1Alpha1,
+			expectError: "decode metadata object",
 		},
-		"skips-multiple-errors": {
-			streamInput: append(append([]byte(unknownVersionJSON), []byte(missingKindJSON)...), validV1Alpha1JSON...),
+		"unknown-version-then-malformed-is-fatal": {
+			streamInput: append([]byte(unknownVersionJSON), []byte(missingKindJSON)...),
 			dest:        &v1alpha1.DeviceMetadata{},
-			expected:    expectedV1Alpha1,
+			expectError: "decode metadata.resource.k8s.io/v1alpha1",
 		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			err := DecodeMetadataFromStream(json.NewDecoder(bytes.NewReader(tc.streamInput)), tc.dest)
+			for _, withValidation := range []bool{true, false} {
+				t.Run(fmt.Sprintf("with-validation-%v", withValidation), func(t *testing.T) {
+					var opts []DecodeMetadataOption
+					var validationResult error
+					if withValidation {
+						opts = append(opts, DecodeMetadataWithValidationResult(&validationResult))
+					}
+					dest := tc.dest.DeepCopyObject()
+					err := DecodeMetadataFromStream(json.NewDecoder(bytes.NewReader(tc.streamInput)), dest, opts...)
+					if tc.expectError != "" {
+						if err == nil {
+							t.Fatalf("expected error containing %q, got nil", tc.expectError)
+						}
+						if !strings.Contains(err.Error(), tc.expectError) {
+							t.Fatalf("expected error containing %q, got: %v", tc.expectError, err)
+						}
+						return
+					}
+					if err != nil {
+						t.Fatalf("DecodeMetadataFromStream: %v", err)
+					}
 
-			if tc.expectError != "" {
-				if err == nil {
-					t.Fatalf("expected error containing %q, got nil", tc.expectError)
-				}
-				if !strings.Contains(err.Error(), tc.expectError) {
-					t.Fatalf("expected error containing %q, got: %v", tc.expectError, err)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("DecodeMetadataFromStream: %v", err)
-			}
+					if diff := cmp.Diff(tc.expected, dest); diff != "" {
+						t.Errorf("metadata mismatch (-want +got):\n%s", diff)
+					}
 
-			if diff := cmp.Diff(tc.expected, tc.dest); diff != "" {
-				t.Errorf("metadata mismatch (-want +got):\n%s", diff)
+					if withValidation && tc.isInvalid && validationResult == nil {
+						t.Errorf("validation did not fail as expected")
+					}
+					if validationResult != nil && (!withValidation || !tc.isInvalid) {
+						t.Errorf("unexpected validation error: %v", validationResult)
+					}
+
+					if tc.expectGVK != nil {
+						var gvk schema.GroupVersionKind
+						dest := tc.dest.DeepCopyObject()
+						err := DecodeMetadataFromStream(json.NewDecoder(bytes.NewReader(tc.streamInput)), dest, append(opts, DecodeMetadataStoreGVKResult(&gvk))...)
+						if err != nil {
+							t.Fatalf("DecodeMetadataFromStream with GVK: %v", err)
+						}
+						if gvk != *tc.expectGVK {
+							t.Errorf("expected %s, got %s", tc.expectGVK, gvk)
+						}
+					}
+				})
 			}
 		})
 	}
@@ -321,6 +439,14 @@ func TestReadRequestDir(t *testing.T) {
 			},
 		}},
 	}
+	gpuAltInternal := metadata.DeviceMetadataRequest{
+		Name: "gpu",
+		Devices: []metadata.Device{{
+			Driver: "mlx.example.com",
+			Pool:   "worker-1",
+			Name:   "gpu-1",
+		}},
+	}
 	nicInternal := metadata.DeviceMetadataRequest{
 		Name: "nic",
 		Devices: []metadata.Device{{
@@ -353,6 +479,59 @@ func TestReadRequestDir(t *testing.T) {
 			Devices: []v1alpha1.Device{{Driver: "nic.example.com", Pool: "worker-0", Name: "nic-0"}},
 		}},
 	})
+	primaryDriverJSON := mustMarshal(&v1alpha1.DeviceMetadata{
+		TypeMeta:   metav1.TypeMeta{APIVersion: v1alpha1.SchemeGroupVersion.String(), Kind: "DeviceMetadata"},
+		ObjectMeta: metav1.ObjectMeta{Name: "my-claim", Namespace: "default", UID: "uid-1234", Generation: 1},
+		Requests: []v1alpha1.DeviceMetadataRequest{
+			{
+				Name: "gpu-0",
+				Devices: []v1alpha1.Device{{
+					Driver: "gpu.example.com",
+					Pool:   "worker-0",
+					Name:   "gpu-0",
+					Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"model": {StringValue: ptr.To("LATEST-GPU-MODEL")}, //nolint:modernize
+					},
+				}},
+			},
+			{
+				Name: "single-gpu",
+				Devices: []v1alpha1.Device{{
+					Driver: "gpu.example.com",
+					Pool:   "worker-0",
+					Name:   "gpu-0",
+					Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"model": {StringValue: ptr.To("LATEST-GPU-MODEL")}, //nolint:modernize
+					},
+				}},
+			},
+			{
+				Name: "gpu-1",
+				Devices: []v1alpha1.Device{{
+					Driver: "gpu.example.com",
+					Pool:   "worker-0",
+					Name:   "gpu-0",
+					Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"model": {StringValue: ptr.To("LATEST-GPU-MODEL")}, //nolint:modernize
+					},
+				}},
+			},
+		},
+	})
+	secondaryDriverJSON := mustMarshal(&v1alpha1.DeviceMetadata{
+		TypeMeta:   metav1.TypeMeta{APIVersion: v1alpha1.SchemeGroupVersion.String(), Kind: "DeviceMetadata"},
+		ObjectMeta: metav1.ObjectMeta{Name: "my-claim", Namespace: "default", UID: "uid-1234", Generation: 1},
+		Requests: []v1alpha1.DeviceMetadataRequest{
+			{
+				Name:    "gpu-0",
+				Devices: []v1alpha1.Device{{Driver: "mlx.example.com", Pool: "worker-1", Name: "gpu-1"}},
+			},
+			{
+				Name:    "gpu-1",
+				Devices: []v1alpha1.Device{{Driver: "mlx.example.com", Pool: "worker-1", Name: "gpu-1"}},
+			},
+		},
+	})
 	podClaimJSON := mustMarshal(&v1alpha1.DeviceMetadata{
 		TypeMeta:     metav1.TypeMeta{APIVersion: v1alpha1.SchemeGroupVersion.String(), Kind: "DeviceMetadata"},
 		ObjectMeta:   metav1.ObjectMeta{Name: "my-claim", Namespace: "default", UID: "uid-1234", Generation: 1},
@@ -377,6 +556,8 @@ func TestReadRequestDir(t *testing.T) {
 	singleDir := writeFile("single", "gpu.example.com"+metadata.MetadataFileSuffix, gpuJSON)
 	multiDir := writeFile("multi", "gpu.example.com"+metadata.MetadataFileSuffix, gpuJSON)
 	writeFile("multi", "nic.example.com"+metadata.MetadataFileSuffix, nicJSON)
+	sameRequestNameDir := writeFile("same-request-name", "gpu.example.com"+metadata.MetadataFileSuffix, primaryDriverJSON)
+	writeFile("same-request-name", "mlx.example.com"+metadata.MetadataFileSuffix, secondaryDriverJSON)
 	emptyDir := writeFile("empty", "unrelated.txt", []byte("not metadata"))
 	mixedDir := writeFile("mixed", "gpu.example.com"+metadata.MetadataFileSuffix, gpuJSON)
 	writeFile("mixed", "unrelated.json", []byte(`{"foo":"bar"}`))
@@ -397,6 +578,25 @@ func TestReadRequestDir(t *testing.T) {
 			dir: multiDir,
 			expected: &metadata.DeviceMetadata{
 				Requests: []metadata.DeviceMetadataRequest{gpuInternal, nicInternal},
+			},
+		},
+		"merge-same-request-name-across-drivers": {
+			dir: sameRequestNameDir,
+			expected: &metadata.DeviceMetadata{
+				Requests: []metadata.DeviceMetadataRequest{
+					{
+						Name:    "gpu-0",
+						Devices: append(gpuInternal.Devices, gpuAltInternal.Devices...),
+					},
+					{
+						Name:    "single-gpu",
+						Devices: gpuInternal.Devices,
+					},
+					{
+						Name:    "gpu-1",
+						Devices: append(gpuInternal.Devices, gpuAltInternal.Devices...),
+					},
+				},
 			},
 		},
 		"empty-directory": {

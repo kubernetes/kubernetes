@@ -20,9 +20,10 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
@@ -39,8 +40,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 )
 
 const (
@@ -178,9 +181,9 @@ type requiredMetrics struct {
 
 func initTests(t *testing.T, testCase *testStaticPolicy, hint *topologymanager.TopologyHint, initContainersReusableMemory reusableMemory) (Policy, state.State, error) {
 	logger, _ := ktesting.NewTestContext(t)
-	manager := topologymanager.NewFakeManager()
+	manager := topologymanager.NewFakeManager(logger)
 	if hint != nil {
-		manager = topologymanager.NewFakeManagerWithHint(hint)
+		manager = topologymanager.NewFakeManagerWithHint(logger, hint)
 	}
 
 	p, err := NewPolicyStatic(logger, testCase.machineInfo, testCase.systemReserved, manager)
@@ -1220,7 +1223,7 @@ func TestStaticPolicyStart(t *testing.T) {
 }
 
 func TestStaticPolicyAllocate(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	testCases := []testStaticPolicy{
 		{
 			description:         "should do nothing for non-guaranteed pods",
@@ -2099,17 +2102,21 @@ func TestStaticPolicyAllocate(t *testing.T) {
 					v1.ResourceMemory: 512 * mb,
 				},
 			},
-			pod:                      getPodWithPodLevelResources("pod1", podLevelRequirementsGuaranteed, "container1", requirementsGuaranteed),
-			expectedTopologyHints:    nil,
-			topologyHint:             &topologymanager.TopologyHint{},
-			expectedError:            nil,
-			podLevelResourcesEnabled: true,
+			pod:                             getPodWithPodLevelResources("pod1", podLevelRequirementsGuaranteed, "container1", requirementsGuaranteed),
+			expectedTopologyHints:           nil,
+			topologyHint:                    &topologymanager.TopologyHint{},
+			expectedError:                   nil,
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: false,
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
+			if testCase.podLevelResourcesEnabled && !testCase.podLevelResourceManagersEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, false)
+			}
 
 			t.Logf("TestStaticPolicyAllocate %s", testCase.description)
 			p, s, err := initTests(t, &testCase, testCase.topologyHint, nil)
@@ -2117,7 +2124,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			err = p.Allocate(logger, s, testCase.pod, &testCase.pod.Spec.Containers[0])
+			err = p.Allocate(ctx, s, testCase.pod, &testCase.pod.Spec.Containers[0], lifecycle.AddOperation)
 			if (err == nil) != (testCase.expectedError == nil) || (err != nil && testCase.expectedError != nil && err.Error() != testCase.expectedError.Error()) {
 				t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
 			}
@@ -2140,7 +2147,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 }
 
 func TestStaticPolicyAllocateWithInitContainers(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	testCases := []testStaticPolicy{
 		{
 			description: "should re-use init containers memory, init containers requests 1Gi and 2Gi, apps containers 3Gi and 4Gi",
@@ -2842,14 +2849,14 @@ func TestStaticPolicyAllocateWithInitContainers(t *testing.T) {
 			}
 
 			for i := range testCase.pod.Spec.InitContainers {
-				err = p.Allocate(logger, s, testCase.pod, &testCase.pod.Spec.InitContainers[i])
+				err = p.Allocate(ctx, s, testCase.pod, &testCase.pod.Spec.InitContainers[i], lifecycle.AddOperation)
 				if !reflect.DeepEqual(err, testCase.expectedError) {
 					t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
 				}
 			}
 
 			for i := range testCase.pod.Spec.Containers {
-				err = p.Allocate(logger, s, testCase.pod, &testCase.pod.Spec.Containers[i])
+				err = p.Allocate(ctx, s, testCase.pod, &testCase.pod.Spec.Containers[i], lifecycle.AddOperation)
 				if !reflect.DeepEqual(err, testCase.expectedError) {
 					t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
 				}
@@ -2869,7 +2876,7 @@ func TestStaticPolicyAllocateWithInitContainers(t *testing.T) {
 }
 
 func TestStaticPolicyAllocateWithRestartableInitContainers(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	testCases := []testStaticPolicy{
 		{
 			description: "should do nothing once containers already exist under the state file",
@@ -3176,7 +3183,7 @@ func TestStaticPolicyAllocateWithRestartableInitContainers(t *testing.T) {
 			}
 
 			for i := range testCase.pod.Spec.InitContainers {
-				err = p.Allocate(logger, s, testCase.pod, &testCase.pod.Spec.InitContainers[i])
+				err = p.Allocate(ctx, s, testCase.pod, &testCase.pod.Spec.InitContainers[i], lifecycle.AddOperation)
 				if !reflect.DeepEqual(err, testCase.expectedError) {
 					t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
 				}
@@ -3187,7 +3194,7 @@ func TestStaticPolicyAllocateWithRestartableInitContainers(t *testing.T) {
 			}
 
 			for i := range testCase.pod.Spec.Containers {
-				err = p.Allocate(logger, s, testCase.pod, &testCase.pod.Spec.Containers[i])
+				err = p.Allocate(ctx, s, testCase.pod, &testCase.pod.Spec.Containers[i], lifecycle.AddOperation)
 				if err != nil {
 					t.Fatalf("Unexpected error: %v", err)
 				}
@@ -3967,19 +3974,15 @@ func TestStaticPolicyGetTopologyHints(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			if testCase.podLevelResourcesEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
-			}
-			if testCase.podLevelResourceManagersEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, testCase.podLevelResourceManagersEnabled)
-			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, testCase.podLevelResourceManagersEnabled)
 
 			p, s, err := initTests(t, &testCase, nil, nil)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			topologyHints := p.GetTopologyHints(logger, s, testCase.pod, &testCase.pod.Spec.Containers[0])
+			topologyHints := p.GetTopologyHints(logger, s, testCase.pod, &testCase.pod.Spec.Containers[0], lifecycle.AddOperation)
 			if !reflect.DeepEqual(topologyHints, testCase.expectedTopologyHints) {
 				t.Fatalf("The actual topology hints: '%+v' are different from the expected one: '%+v'", topologyHints, testCase.expectedTopologyHints)
 			}
@@ -4286,19 +4289,15 @@ func TestStaticPolicyGetPodTopologyHints(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			if testCase.podLevelResourcesEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
-			}
-			if testCase.podLevelResourceManagersEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, testCase.podLevelResourceManagersEnabled)
-			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, testCase.podLevelResourceManagersEnabled)
 
 			p, s, err := initTests(t, &testCase, nil, nil)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			topologyHints := p.GetPodTopologyHints(logger, s, testCase.pod)
+			topologyHints := p.GetPodTopologyHints(logger, s, testCase.pod, lifecycle.AddOperation)
 			if !reflect.DeepEqual(topologyHints, testCase.expectedTopologyHints) {
 				t.Fatalf("The actual topology hints: '%+v' are different from the expected one: '%+v'", topologyHints, testCase.expectedTopologyHints)
 			}
@@ -5669,7 +5668,7 @@ func TestStaticPolicyAllocatePod(t *testing.T) {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			err = p.AllocatePod(logger, s, testCase.pod)
+			err = p.AllocatePod(logger, s, testCase.pod, lifecycle.AddOperation)
 			if testCase.expectedError != nil {
 				require.Error(t, err)
 				require.Equal(t, testCase.expectedError.Error(), err.Error())
@@ -5703,6 +5702,341 @@ func TestStaticPolicyAllocatePod(t *testing.T) {
 			podSharedPoolAssignments, err := testutil.GetCounterMetricValue(metrics.ResourceManagerContainerAssignments.WithLabelValues(metrics.ResourceManagerMemory, metrics.ResourceManagerSharedPod))
 			require.NoError(t, err)
 			require.InDelta(t, float64(testCase.requiredMetrics.expPodSharedPoolAssignments), podSharedPoolAssignments, 0.001, "unexpected number of assignments")
+		})
+	}
+}
+
+// The following lifecycle tests verify that the static memory manager policy
+// processes or skips operations based on the given lifecycle.Operation.
+// Since Allocate* and GetTopologyHints* do not return an error when an
+// operation is unsupported (they silently return nil/empty hints to avoid
+// aborting the entire operation across all hint providers), the tests check
+// log output to confirm whether an operation was processed or skipped.
+//
+// The test values used (e.g. memory sizes, cpusets, pod resource requests)
+// are arbitrary but correct values that let the code run the happy path; the
+// exact values have no special meaning. These tests do not validate the
+// correctness of the allocation or hint results, only whether the operation
+// is processed or skipped for a given lifecycle operation.
+
+func TestStaticPolicyLifecycleAllocate(t *testing.T) {
+	testCases := []struct {
+		description string
+		operation   lifecycle.Operation
+		skipped     bool
+	}{
+		{
+			description: "MemoryManager static policy processes AddOperation",
+			operation:   lifecycle.AddOperation,
+			skipped:     false,
+		},
+		{
+			description: "MemoryManager static policy skips ResizeOperation",
+			operation:   lifecycle.ResizeOperation,
+			skipped:     true,
+		},
+		{
+			description: "MemoryManager static policy skips empty operation",
+			operation:   "",
+			skipped:     true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			ktesting.SetDefaultVerbosity(2)
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
+
+			systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
+			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger))
+			require.NoError(t, err)
+
+			st := state.NewMemoryState(logger)
+			st.SetMachineState(state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           1536 * mb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells: []int{},
+				},
+			})
+
+			pod := getPod("pod1", "container1", requirementsBurstable)
+			err = policy.Allocate(tCtx, st, pod, &pod.Spec.Containers[0], testCase.operation)
+			require.NoError(t, err)
+
+			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			if !ok {
+				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
+			}
+			logs := underlier.GetBuffer().String()
+			expectedLog := "Container-level memory allocation skipped, Memory manager with static policy supports only add operation"
+			if testCase.skipped {
+				if !strings.Contains(logs, expectedLog) {
+					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
+				}
+			} else {
+				if strings.Contains(logs, expectedLog) {
+					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
+				}
+			}
+		})
+	}
+}
+
+func TestStaticPolicyLifecycleAllocatePod(t *testing.T) {
+	testCases := []struct {
+		description string
+		operation   lifecycle.Operation
+		skipped     bool
+	}{
+		{
+			description: "MemoryManager static policy processes AddOperation",
+			operation:   lifecycle.AddOperation,
+			skipped:     false,
+		},
+		{
+			description: "MemoryManager static policy skips ResizeOperation",
+			operation:   lifecycle.ResizeOperation,
+			skipped:     true,
+		},
+		{
+			description: "MemoryManager static policy skips empty operation",
+			operation:   "",
+			skipped:     true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			ktesting.SetDefaultVerbosity(2)
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
+
+			systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
+			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger))
+			require.NoError(t, err)
+
+			st := state.NewMemoryState(logger)
+			st.SetMachineState(state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           1536 * mb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells: []int{},
+				},
+			})
+
+			pod := getPod("pod1", "container1", requirementsBurstable)
+			err = policy.AllocatePod(logger, st, pod, testCase.operation)
+			require.NoError(t, err)
+
+			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			if !ok {
+				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
+			}
+			logs := underlier.GetBuffer().String()
+			expectedLog := "Pod-level memory allocation skipped, memory manager with static policy supports only add operation"
+			if testCase.skipped {
+				if !strings.Contains(logs, expectedLog) {
+					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
+				}
+			} else {
+				if strings.Contains(logs, expectedLog) {
+					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
+				}
+			}
+		})
+	}
+}
+
+func TestStaticPolicyLifecycleGetTopologyHints(t *testing.T) {
+	testCases := []struct {
+		description string
+		operation   lifecycle.Operation
+		skipped     bool
+	}{
+		{
+			description: "MemoryManager static policy processes AddOperation",
+			operation:   lifecycle.AddOperation,
+			skipped:     false,
+		},
+		{
+			description: "MemoryManager static policy skips ResizeOperation",
+			operation:   lifecycle.ResizeOperation,
+			skipped:     true,
+		},
+		{
+			description: "MemoryManager static policy skips empty operation",
+			operation:   "",
+			skipped:     true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			ktesting.SetDefaultVerbosity(2)
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
+
+			systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
+			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger))
+			require.NoError(t, err)
+
+			st := state.NewMemoryState(logger)
+			st.SetMachineState(state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           1536 * mb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells: []int{},
+				},
+			})
+
+			pod := getPod("pod1", "container1", requirementsBurstable)
+			hints := policy.GetTopologyHints(logger, st, pod, &pod.Spec.Containers[0], testCase.operation)
+			if hints != nil {
+				t.Errorf("Unexpected hints: %v", hints)
+			}
+			require.NoError(t, err)
+
+			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			if !ok {
+				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
+			}
+			logs := underlier.GetBuffer().String()
+			expectedLog := "GetTopologyHints skipped, memory manager with static policy supports only add operation"
+			if testCase.skipped {
+				if !strings.Contains(logs, expectedLog) {
+					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
+				}
+			} else {
+				if strings.Contains(logs, expectedLog) {
+					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
+				}
+			}
+		})
+	}
+}
+
+func TestStaticPolicyLifecycleGetPodTopologyHints(t *testing.T) {
+	testCases := []struct {
+		description string
+		operation   lifecycle.Operation
+		skipped     bool
+	}{
+		{
+			description: "MemoryManager static policy processes AddOperation",
+			operation:   lifecycle.AddOperation,
+			skipped:     false,
+		},
+		{
+			description: "MemoryManager static policy skips ResizeOperation",
+			operation:   lifecycle.ResizeOperation,
+			skipped:     true,
+		},
+		{
+			description: "MemoryManager static policy skips empty operation",
+			operation:   "",
+			skipped:     true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			ktesting.SetDefaultVerbosity(2)
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
+
+			systemReserved := systemReservedMemory{0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb}}
+			policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManager(logger))
+			require.NoError(t, err)
+
+			st := state.NewMemoryState(logger)
+			st.SetMachineState(state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           1536 * mb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells: []int{},
+				},
+			})
+
+			pod := getPod("pod1", "container1", requirementsBurstable)
+			hints := policy.GetPodTopologyHints(logger, st, pod, testCase.operation)
+			if hints != nil {
+				t.Errorf("Unexpected hints: %v", hints)
+			}
+			require.NoError(t, err)
+
+			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			if !ok {
+				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
+			}
+			logs := underlier.GetBuffer().String()
+			expectedLog := "GetPodTopologyHints skipped, memory manager with static policy supports only add operation"
+			if testCase.skipped {
+				if !strings.Contains(logs, expectedLog) {
+					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
+				}
+			} else {
+				if strings.Contains(logs, expectedLog) {
+					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
+				}
+			}
 		})
 	}
 }

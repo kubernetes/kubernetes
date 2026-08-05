@@ -486,7 +486,7 @@ func TestCachingAuthorizer(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var misses int
-			frontend := NewCachingAuthorizer(func() authorizer.Authorizer {
+			frontend := NewCachingAuthorizer(func() authorizer.UnconditionalAuthorizer {
 				return authorizer.AuthorizerFunc(func(_ context.Context, attributes authorizer.Attributes) (authorizer.Decision, string, error) {
 					if misses >= len(tc.backend) {
 						t.Fatalf("got more than expected %d backend invocations", len(tc.backend))

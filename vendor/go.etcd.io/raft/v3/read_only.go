@@ -14,7 +14,12 @@
 
 package raft
 
-import pb "go.etcd.io/raft/v3/raftpb"
+import (
+	"encoding/binary"
+
+	"go.etcd.io/raft/v3/quorum"
+	pb "go.etcd.io/raft/v3/raftpb"
+)
 
 // ReadState provides state for read only query.
 // It's caller's responsibility to call ReadIndex first before getting
@@ -26,96 +31,71 @@ type ReadState struct {
 	RequestCtx []byte
 }
 
-type readIndexStatus struct {
-	req   pb.Message
+type readIndexRequest struct {
+	req   *pb.Message
 	index uint64
-	// NB: this never records 'false', but it's more convenient to use this
-	// instead of a map[uint64]struct{} due to the API of quorum.VoteResult. If
-	// this becomes performance sensitive enough (doubtful), quorum.VoteResult
-	// can change to an API that is closer to that of CommittedIndex.
-	acks map[uint64]bool
 }
 
 type readOnly struct {
-	option           ReadOnlyOption
-	pendingReadIndex map[string]*readIndexStatus
-	readIndexQueue   []string
+	option ReadOnlyOption
+	acks   map[uint64]uint64
+
+	unconfirmedReads []*readIndexRequest
+	// Number of readIndexRequests that were confirmed in the past by this
+	// readOnly, which were removed from the beginning of `unconfirmedReads`.
+	confirmedReads uint64
 }
 
 func newReadOnly(option ReadOnlyOption) *readOnly {
 	return &readOnly{
-		option:           option,
-		pendingReadIndex: make(map[string]*readIndexStatus),
+		option: option,
+		acks:   make(map[uint64]uint64),
 	}
 }
 
-// addRequest adds a read only request into readonly struct.
-// `index` is the commit index of the raft state machine when it received
+// addRequest adds a read only request into the `readOnly`.
+// `commitIndex` is the commit index of the raft state machine when it received
 // the read only request.
-// `m` is the original read only request message from the local or remote node.
-func (ro *readOnly) addRequest(index uint64, m pb.Message) {
-	s := string(m.Entries[0].Data)
-	if _, ok := ro.pendingReadIndex[s]; ok {
-		return
-	}
-	ro.pendingReadIndex[s] = &readIndexStatus{index: index, req: m, acks: make(map[uint64]bool)}
-	ro.readIndexQueue = append(ro.readIndexQueue, s)
+// `req` is the original read only request message from the local or remote node.
+func (ro *readOnly) addRequest(commitIndex uint64, req *pb.Message) {
+	ro.unconfirmedReads = append(ro.unconfirmedReads, &readIndexRequest{req: req, index: commitIndex})
 }
 
-// recvAck notifies the readonly struct that the raft state machine received
-// an acknowledgment of the heartbeat that attached with the read only request
-// context.
-func (ro *readOnly) recvAck(id uint64, context []byte) map[uint64]bool {
-	rs, ok := ro.pendingReadIndex[string(context)]
-	if !ok {
+// recvAck notifies the `readOnly` of an acknowledgment of a heartbeat response.
+func (ro *readOnly) recvAck(from uint64, ctx []byte) {
+	if len(ctx) != 0 {
+		ro.acks[from] = max(ro.acks[from], binary.LittleEndian.Uint64(ctx))
+	}
+}
+
+// AckedIndex allows for using `CommittedIndex` in `maybeAdvance`.
+func (ro *readOnly) AckedIndex(voterID uint64) (quorum.Index, bool) {
+	idx, found := ro.acks[voterID]
+	return quorum.Index(idx), found
+}
+
+// maybeAdvance uses the existing acknowledgements and current raft
+// configuration to confirm and return as many unconfirmed reads as possible.
+func (ro *readOnly) maybeAdvance(c quorum.JointConfig) []*readIndexRequest {
+	// Use `CommittedIndex` to figure out how many reads are now confirmed.
+	newConfirmedReads := uint64(c.CommittedIndex(ro))
+	if newConfirmedReads <= ro.confirmedReads {
 		return nil
 	}
-
-	rs.acks[id] = true
-	return rs.acks
+	readStates := ro.unconfirmedReads[:newConfirmedReads-ro.confirmedReads]
+	ro.unconfirmedReads = ro.unconfirmedReads[newConfirmedReads-ro.confirmedReads:]
+	ro.confirmedReads = newConfirmedReads
+	return readStates
 }
 
-// advance advances the read only request queue kept by the readonly struct.
-// It dequeues the requests until it finds the read only request that has
-// the same context as the given `m`.
-func (ro *readOnly) advance(m pb.Message) []*readIndexStatus {
-	var (
-		i     int
-		found bool
-	)
-
-	ctx := string(m.Context)
-	var rss []*readIndexStatus
-
-	for _, okctx := range ro.readIndexQueue {
-		i++
-		rs, ok := ro.pendingReadIndex[okctx]
-		if !ok {
-			panic("cannot find corresponding read state from pending map")
-		}
-		rss = append(rss, rs)
-		if okctx == ctx {
-			found = true
-			break
-		}
+// heartbeatCtx returns the `Context` that should be sent in order to confirm
+// all currently unconfirmed reads.
+func (ro *readOnly) heartbeatCtx() []byte {
+	if len(ro.unconfirmedReads) == 0 {
+		return nil
 	}
-
-	if found {
-		ro.readIndexQueue = ro.readIndexQueue[i:]
-		for _, rs := range rss {
-			delete(ro.pendingReadIndex, string(rs.req.Entries[0].Data))
-		}
-		return rss
-	}
-
-	return nil
-}
-
-// lastPendingRequestCtx returns the context of the last pending read only
-// request in readonly struct.
-func (ro *readOnly) lastPendingRequestCtx() string {
-	if len(ro.readIndexQueue) == 0 {
-		return ""
-	}
-	return ro.readIndexQueue[len(ro.readIndexQueue)-1]
+	unconfirmedReadPosition := ro.confirmedReads + uint64(len(ro.unconfirmedReads))
+	encLastIndex := make([]byte, 8)
+	binary.LittleEndian.PutUint64(encLastIndex, unconfirmedReadPosition)
+	return encLastIndex
 }

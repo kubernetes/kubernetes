@@ -35,7 +35,7 @@ import (
 //
 // Kubelets use this API to implement podCertificate projected volumes
 type PodCertificateRequestApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:""`
 	// metadata contains the object metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// spec contains the details about the certificate being requested.

@@ -97,6 +97,14 @@ func DeserializePathElement(s string) (PathElement, error) {
 		if err != nil {
 			return PathElement{}, err
 		}
+		// Lookahead validates that there is no unexpected trailing data.
+		// io.EOF is a successful termination indicator; all other errors or trailing data fail.
+		if iter.WhatIsNext(); iter.Error != io.EOF {
+			if iter.Error == nil {
+				iter.ReportError("managedFields parsing", "unexpected trailing data after JSON object")
+			}
+			return PathElement{}, iter.Error
+		}
 		return PathElement{Value: &v}, nil
 	case peKeySepBytes[0]:
 		iter := readPool.BorrowIterator(b)
@@ -112,8 +120,16 @@ func DeserializePathElement(s string) (PathElement, error) {
 			fields = append(fields, value.Field{Name: key, Value: v})
 			return true
 		})
+		// Lookahead validates that there is no unexpected trailing data.
+		// io.EOF is a successful termination indicator; all other errors or trailing data fail.
+		if iter.WhatIsNext(); iter.Error != io.EOF {
+			if iter.Error == nil {
+				iter.ReportError("managedFields parsing", "unexpected trailing data after JSON object")
+			}
+			return PathElement{}, iter.Error
+		}
 		fields.Sort()
-		return PathElement{Key: &fields}, iter.Error
+		return PathElement{Key: &fields}, nil
 	case peIndexSepBytes[0]:
 		i, err := strconv.Atoi(s[2:])
 		if err != nil {

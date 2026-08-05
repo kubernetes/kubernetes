@@ -25,9 +25,11 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
@@ -729,7 +731,7 @@ func TestMemoryPressure(t *testing.T) {
 	// try to admit our pods (they should succeed)
 	expected := []bool{true, true}
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -822,7 +824,7 @@ func TestMemoryPressure(t *testing.T) {
 	// the best-effort pod should not admit, burstable should
 	expected = []bool{false, true}
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -850,7 +852,7 @@ func TestMemoryPressure(t *testing.T) {
 	// the best-effort pod should not admit, burstable should
 	expected = []bool{false, true}
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -878,7 +880,7 @@ func TestMemoryPressure(t *testing.T) {
 	// all pods should admit now
 	expected = []bool{true, true}
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -998,7 +1000,7 @@ func TestPIDPressure(t *testing.T) {
 			}
 
 			// try to admit our pod (should succeed)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
+			if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
 			}
 
@@ -1092,7 +1094,7 @@ func TestPIDPressure(t *testing.T) {
 			}
 
 			// try to admit our pod (should fail)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
+			if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, false, result.Admit)
 			}
 
@@ -1117,7 +1119,7 @@ func TestPIDPressure(t *testing.T) {
 			}
 
 			// try to admit our pod (should fail)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
+			if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, false, result.Admit)
 			}
 
@@ -1141,7 +1143,7 @@ func TestPIDPressure(t *testing.T) {
 			}
 
 			// try to admit our pod (should succeed)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
+			if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
 			}
 		})
@@ -1149,6 +1151,7 @@ func TestPIDPressure(t *testing.T) {
 }
 
 func TestAdmitUnderNodeConditions(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	manager := &managerImpl{}
 	pods := []*v1.Pod{
 		newPod("guaranteed-pod", scheduling.DefaultPriorityWhenNoDefaultClassExists, makeContainersByQOS(v1.PodQOSGuaranteed), nil),
@@ -1158,7 +1161,7 @@ func TestAdmitUnderNodeConditions(t *testing.T) {
 
 	expected := []bool{true, true, true}
 	for i, pod := range pods {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -1166,7 +1169,7 @@ func TestAdmitUnderNodeConditions(t *testing.T) {
 	manager.nodeConditions = []v1.NodeConditionType{v1.NodeMemoryPressure}
 	expected = []bool{true, true, false}
 	for i, pod := range pods {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -1174,7 +1177,7 @@ func TestAdmitUnderNodeConditions(t *testing.T) {
 	manager.nodeConditions = []v1.NodeConditionType{v1.NodeMemoryPressure, v1.NodeDiskPressure}
 	expected = []bool{false, false, false}
 	for i, pod := range pods {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -1376,7 +1379,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			}
 
 			// try to admit our pod (should succeed)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
+			if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
 			}
 
@@ -1481,7 +1484,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			}
 
 			// try to admit our pod (should fail)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
+			if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, false, result.Admit)
 			}
 
@@ -1506,7 +1509,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			}
 
 			// try to admit our pod (should fail)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
+			if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, false, result.Admit)
 			}
 
@@ -1531,7 +1534,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			}
 
 			// try to admit our pod (should succeed)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
+			if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
 			}
 		})
@@ -2358,7 +2361,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			}
 
 			// try to admit our pod (should succeed)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
+			if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
 			}
 
@@ -2448,7 +2451,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			}
 
 			// try to admit our pod (should fail)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
+			if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, false, result.Admit)
 			}
 
@@ -2473,7 +2476,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			}
 
 			// try to admit our pod (should fail)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
+			if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, false, result.Admit)
 			}
 
@@ -2498,7 +2501,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			}
 
 			// try to admit our pod (should succeed)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
+			if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
 			}
 		})
@@ -2758,6 +2761,128 @@ func TestStorageLimitEvictions(t *testing.T) {
 	}
 }
 
+func TestEmptyDirLimitEviction(t *testing.T) {
+	specLimit := resource.MustParse("1Gi") // 1Gi set as the 'desired' sizeLimit in the podspec.
+
+	tests := []struct {
+		testName            string
+		medium              v1.StorageMedium
+		enableGate          bool
+		actualCapacityBytes *uint64
+		usedBytes           uint64
+		expectEviction      bool
+	}{
+		{
+			testName:            "Memory medium, gate disabled: falls back to spec limit, used (2Gi) > spec (1Gi) -> evict",
+			medium:              v1.StorageMediumMemory,
+			enableGate:          false,
+			actualCapacityBytes: new(uint64(3 * 1024 * 1024 * 1024)), // 3Gi stat capacity (ignored)
+			usedBytes:           2 * 1024 * 1024 * 1024,              // 2Gi used (exceeds 'desired', but within 'allocated')
+			expectEviction:      true,
+		},
+		{
+			testName:            "Memory medium, gate disabled: within spec limit, used (500Mi) < spec (1Gi) -> NO evict",
+			medium:              v1.StorageMediumMemory,
+			enableGate:          false,
+			actualCapacityBytes: new(uint64(500 * 1024 * 1024)),
+			usedBytes:           500 * 1024 * 1024,
+			expectEviction:      false,
+		},
+		{
+			testName:            "Memory medium, gate enabled: uses stat capacity, identical usage (2Gi) < stat capacity (3Gi) -> NO evict",
+			medium:              v1.StorageMediumMemory,
+			enableGate:          true,
+			actualCapacityBytes: new(uint64(3 * 1024 * 1024 * 1024)), // 3Gi stat capacity (respected)
+			usedBytes:           2 * 1024 * 1024 * 1024,              // 2Gi used (identical to case 1, except the FG is enabled)
+			expectEviction:      false,
+		},
+		{
+			testName:            "Memory medium, gate enabled: missing stat capacity skips evaluation -> NO evict",
+			medium:              v1.StorageMediumMemory,
+			enableGate:          true,
+			actualCapacityBytes: nil, // transiently missing stat
+			usedBytes:           2 * 1024 * 1024 * 1024,
+			expectEviction:      false,
+		},
+
+		{
+			testName:            "Default medium: ignores stat capacity entirely, used (2Gi) > spec (1Gi) -> evict",
+			medium:              v1.StorageMediumDefault,
+			enableGate:          true,                                // Gate status is irrelevant for default volumes
+			actualCapacityBytes: new(uint64(3 * 1024 * 1024 * 1024)), // 3Gi stat capacity (ignored)
+			usedBytes:           2 * 1024 * 1024 * 1024,              // 2Gi used (exceeds 'desired', but within 'allocated')
+			expectEviction:      true,
+		},
+		{
+			testName:            "Default medium: within spec limit, used (500Mi) < spec (1Gi) -> NO evict",
+			medium:              v1.StorageMediumDefault,
+			enableGate:          true,
+			actualCapacityBytes: new(uint64(500 * 1024 * 1024)),
+			usedBytes:           500 * 1024 * 1024,
+			expectEviction:      false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.testName, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, tc.enableGate)
+
+			logger, _ := ktesting.NewTestContext(t)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+					UID:  types.UID("test-uid"),
+				},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "test-volume",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    tc.medium,
+									SizeLimit: &specLimit,
+								},
+							},
+						},
+					},
+				},
+			}
+
+			podStats := statsapi.PodStats{
+				PodRef: statsapi.PodReference{
+					Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID),
+				},
+				VolumeStats: []statsapi.VolumeStats{
+					{
+						Name: "test-volume",
+						FsStats: statsapi.FsStats{
+							UsedBytes:     &tc.usedBytes,
+							CapacityBytes: tc.actualCapacityBytes,
+						},
+					},
+				},
+			}
+
+			podKiller := &mockPodKiller{}
+			m := &managerImpl{
+				killPodFunc: podKiller.killPodNow,
+				recorder:    &record.FakeRecorder{},
+			}
+
+			evicted := m.emptyDirLimitEviction(logger, podStats, pod)
+
+			assert.Equal(t, tc.expectEviction, evicted, "Eviction decision boundary failed")
+
+			if tc.expectEviction {
+				assert.NotNil(t, podKiller.pod, "Expected pod to be killed")
+			} else {
+				assert.Nil(t, podKiller.pod, "Expected pod killer to remain inactive")
+			}
+		})
+	}
+}
+
 // TestAllocatableMemoryPressure
 func TestAllocatableMemoryPressure(t *testing.T) {
 	tCtx := ktesting.Init(t)
@@ -2834,7 +2959,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	// try to admit our pods (they should succeed)
 	expected := []bool{true, true}
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -2870,7 +2995,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	// the best-effort pod should not admit, burstable should
 	expected = []bool{false, true}
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -2903,7 +3028,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	// the best-effort pod should not admit, burstable should
 	expected = []bool{false, true}
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -2931,7 +3056,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	// all pods should admit now
 	expected = []bool{true, true}
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -3093,5 +3218,81 @@ func TestManagerWithLocalStorageCapacityIsolationOpen(t *testing.T) {
 
 	if diff := cmp.Diff(pods, evictedPods); diff != "" {
 		t.Fatalf("Unexpected evicted pod (-want,+got):\n%s", diff)
+	}
+}
+
+func TestContainerEphemeralStorageLimitEvictionForRestartableInitContainers(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	initContainer := newRestartableInitContainer("sidecar", newResourceList("", "", ""), newResourceList("", "", "10Mi"))
+	mainContainer := newContainer("main", newResourceList("", "", ""), newResourceList("", "", ""))
+
+	pod := newPod("sidecar-ephemeral-repro", 0, []v1.Container{mainContainer}, nil)
+	pod.Spec.InitContainers = []v1.Container{initContainer}
+
+	sidecarQuantity := resource.MustParse("50Mi")
+	sidecarUsed := uint64(sidecarQuantity.Value())
+	mainUsed := uint64(0)
+	podStats := statsapi.PodStats{
+		PodRef: statsapi.PodReference{
+			Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID),
+		},
+		Containers: []statsapi.ContainerStats{
+			{
+				Name:   "sidecar",
+				Logs:   &statsapi.FsStats{UsedBytes: &sidecarUsed},
+				Rootfs: &statsapi.FsStats{UsedBytes: &sidecarUsed},
+			},
+			{
+				Name:   "main",
+				Logs:   &statsapi.FsStats{UsedBytes: &mainUsed},
+				Rootfs: &statsapi.FsStats{UsedBytes: &mainUsed},
+			},
+		},
+	}
+
+	diskStat := diskStats{
+		rootFsAvailableBytes:  "1Gi",
+		imageFsAvailableBytes: "200Mi",
+		podStats:              map[*v1.Pod]statsapi.PodStats{pod: podStats},
+	}
+	summaryProvider := &fakeSummaryProvider{result: makeDiskStats(diskStat)}
+
+	config := Config{
+		MaxPodGracePeriodSeconds: 5,
+		PressureTransitionPeriod: time.Minute * 5,
+		Thresholds:               []evictionapi.Threshold{},
+	}
+
+	podKiller := &mockPodKiller{}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	fakeClock := testingclock.NewFakeClock(time.Now())
+
+	mgr := &managerImpl{
+		clock:                         fakeClock,
+		killPodFunc:                   podKiller.killPodNow,
+		imageGC:                       &mockDiskGC{err: nil},
+		containerGC:                   &mockDiskGC{err: nil},
+		config:                        config,
+		recorder:                      &record.FakeRecorder{},
+		summaryProvider:               summaryProvider,
+		nodeRef:                       nodeRef,
+		localStorageCapacityIsolation: true,
+		dedicatedImageFs:              ptr.To(false),
+	}
+
+	activePodsFunc := func() []*v1.Pod {
+		return []*v1.Pod{pod}
+	}
+
+	evictedPods, err := mgr.synchronize(tCtx, &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false)}, activePodsFunc)
+	if err != nil {
+		t.Fatalf("Manager should not have error but got %v", err)
+	}
+	if podKiller.pod == nil {
+		t.Fatalf("Manager should have evicted the pod for restartable init container exceeding ephemeral-storage limit")
+	}
+	if len(evictedPods) != 1 || evictedPods[0].Name != pod.Name {
+		t.Fatalf("Expected evicted pod %q, got %v", pod.Name, evictedPods)
 	}
 }

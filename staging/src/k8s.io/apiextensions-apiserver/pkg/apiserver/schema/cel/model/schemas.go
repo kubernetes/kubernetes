@@ -17,6 +17,7 @@ limitations under the License.
 package model
 
 import (
+	apimachineryvalidation "k8s.io/apimachinery/pkg/util/validation"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/common"
 
@@ -62,14 +63,32 @@ func WithTypeAndObjectMeta(s *schema.Structural) *schema.Structural {
 	stringType := schema.Structural{Generic: schema.Generic{Type: "string"}}
 	props["kind"] = stringType
 	props["apiVersion"] = stringType
+	metadataProps := s.Properties["metadata"].Properties
 	props["metadata"] = schema.Structural{
 		Generic: schema.Generic{Type: "object"},
 		Properties: map[string]schema.Structural{
-			"name":         stringType,
-			"generateName": stringType,
+			"name":         cappedLengthStringType(metadataProps["name"], nameMaxLength),
+			"generateName": cappedLengthStringType(metadataProps["generateName"], nameMaxLength-1), // The generated suffix is at least 1 byte
 		},
 	}
 	result.Properties = props
 
 	return result
+}
+
+// nameMaxLength is the default maxLength applied to metadata.name.
+const nameMaxLength = int64(apimachineryvalidation.DNS1123SubdomainMaxLength)
+
+// cappedLengthStringType returns a string type whose max length is capped at maxLength,
+// using the existing schema's maxLength instead when it is shorter.
+func cappedLengthStringType(existing schema.Structural, maxLength int64) schema.Structural {
+	if existing.ValueValidation != nil && existing.ValueValidation.MaxLength != nil {
+		if *existing.ValueValidation.MaxLength < maxLength {
+			maxLength = *existing.ValueValidation.MaxLength
+		}
+	}
+	return schema.Structural{
+		Generic:         schema.Generic{Type: "string"},
+		ValueValidation: &schema.ValueValidation{MaxLength: &maxLength},
+	}
 }

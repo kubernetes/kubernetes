@@ -17,6 +17,7 @@ limitations under the License.
 package replicaset
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -45,7 +46,7 @@ func TestReplicaSetStrategy(t *testing.T) {
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("ReplicaSet must be namespace scoped")
 	}
-	if Strategy.AllowCreateOnUpdate() {
+	if Strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("ReplicaSet should not allow create on update")
 	}
 
@@ -100,7 +101,7 @@ func TestReplicaSetStatusStrategy(t *testing.T) {
 	if !StatusStrategy.NamespaceScoped() {
 		t.Errorf("ReplicaSet must be namespace scoped")
 	}
-	if StatusStrategy.AllowCreateOnUpdate() {
+	if StatusStrategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("ReplicaSet should not allow create on update")
 	}
 	validSelector := map[string]string{"a": "b"}

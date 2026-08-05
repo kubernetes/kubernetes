@@ -32,7 +32,7 @@ import (
 //
 // ReplicaSet ensures that a specified number of pod replicas are running at any given time.
 type ReplicaSetApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:""`
 	// If the Labels of a ReplicaSet are empty, they are defaulted to
 	// be the same as the Pod(s) that the ReplicaSet manages.
 	// Standard object's metadata.

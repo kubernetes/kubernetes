@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/slice"
 	vol "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
 	"k8s.io/klog/v2"
 )
@@ -104,23 +105,32 @@ func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolu
 		return nil, fmt.Errorf("could not initialize volume plugins for PersistentVolume Controller: %w", err)
 	}
 
-	p.VolumeInformer.Informer().AddEventHandler(
+	logger := klog.FromContext(ctx)
+	_, err := p.VolumeInformer.Informer().AddEventHandlerWithOptions(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    func(obj interface{}) { controller.enqueueWork(ctx, controller.volumeQueue, obj) },
 			UpdateFunc: func(oldObj, newObj interface{}) { controller.enqueueWork(ctx, controller.volumeQueue, newObj) },
 			DeleteFunc: func(obj interface{}) { controller.enqueueWork(ctx, controller.volumeQueue, obj) },
 		},
+		cache.HandlerOptions{Logger: &logger},
 	)
+	if err != nil {
+		return nil, fmt.Errorf("could not add volume event handler: %w", err)
+	}
 	controller.volumeLister = p.VolumeInformer.Lister()
 	controller.volumeListerSynced = p.VolumeInformer.Informer().HasSynced
 
-	p.ClaimInformer.Informer().AddEventHandler(
+	_, err = p.ClaimInformer.Informer().AddEventHandlerWithOptions(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    func(obj interface{}) { controller.enqueueWork(ctx, controller.claimQueue, obj) },
 			UpdateFunc: func(oldObj, newObj interface{}) { controller.enqueueWork(ctx, controller.claimQueue, newObj) },
 			DeleteFunc: func(obj interface{}) { controller.enqueueWork(ctx, controller.claimQueue, obj) },
 		},
+		cache.HandlerOptions{Logger: &logger},
 	)
+	if err != nil {
+		return nil, fmt.Errorf("could not add claim event handler: %w", err)
+	}
 	controller.claimLister = p.ClaimInformer.Lister()
 	controller.claimListerSynced = p.ClaimInformer.Informer().HasSynced
 
@@ -331,6 +341,7 @@ func (ctrl *PersistentVolumeController) Run(ctx context.Context) {
 
 	ctrl.initializeCaches(logger, ctrl.volumeLister, ctrl.claimLister)
 	metrics.Register(ctrl.volumes.store, ctrl.claims, &ctrl.volumePluginMgr)
+	volumeutil.RegisterMetrics()
 
 	wg.Go(func() {
 		wait.Until(func() { ctrl.resync(ctx) }, ctrl.resyncPeriod, ctx.Done())

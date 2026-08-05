@@ -17,6 +17,7 @@ limitations under the License.
 package namespace
 
 import (
+	"context"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -34,7 +35,7 @@ func TestNamespaceStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("Namespaces should not be namespace scoped")
 	}
-	if Strategy.AllowCreateOnUpdate() {
+	if Strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("Namespaces should not allow create on update")
 	}
 	namespace := &api.Namespace{
@@ -85,7 +86,7 @@ func TestNamespaceStatusStrategy(t *testing.T) {
 	if StatusStrategy.NamespaceScoped() {
 		t.Errorf("Namespaces should not be namespace scoped")
 	}
-	if StatusStrategy.AllowCreateOnUpdate() {
+	if StatusStrategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("Namespaces should not allow create on update")
 	}
 	now := metav1.Now()
@@ -121,7 +122,7 @@ func TestNamespaceFinalizeStrategy(t *testing.T) {
 	if FinalizeStrategy.NamespaceScoped() {
 		t.Errorf("Namespaces should not be namespace scoped")
 	}
-	if FinalizeStrategy.AllowCreateOnUpdate() {
+	if FinalizeStrategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("Namespaces should not allow create on update")
 	}
 	oldNamespace := &api.Namespace{

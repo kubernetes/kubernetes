@@ -30,7 +30,7 @@ import (
 func main() {
 	err := output()
 	if err != nil {
-		os.Stderr.WriteString(fmt.Sprintf("Failed: %v", err)) // nolint:errcheck
+		fmt.Fprintf(os.Stderr, "Failed: %v", err) // nolint:errcheck
 		os.Exit(1)
 	}
 }

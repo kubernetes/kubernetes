@@ -197,11 +197,17 @@ func (sm ServicePortMap) Update(sct *ServiceChangeTracker) UpdateServiceMapResul
 // In other words, if some elements in current collisions with other, update the current by other.
 func (sm *ServicePortMap) merge(other ServicePortMap) {
 	for svcPortName, info := range other {
-		_, exists := (*sm)[svcPortName]
+		existingInfo, exists := (*sm)[svcPortName]
 		if !exists {
 			klog.V(4).InfoS("Adding new service port", "portName", svcPortName, "servicePort", info)
 		} else {
 			klog.V(4).InfoS("Updating existing service port", "portName", svcPortName, "servicePort", info)
+			if existingInfo.NodePort() != 0 && info.NodePort() == 0 {
+				klog.V(4).InfoS("Clearing nodePort for service port name", "portName", svcPortName, "nodePort", existingInfo.NodePort())
+			}
+		}
+		if info.NodePort() != 0 {
+			klog.V(4).InfoS("Setting nodePort for service port name", "portName", svcPortName, "nodePort", info.NodePort())
 		}
 		(*sm)[svcPortName] = info
 	}
@@ -219,10 +225,13 @@ func (sm *ServicePortMap) filter(other ServicePortMap) {
 
 // unmerge deletes all other ServicePortMap's elements from current ServicePortMap.
 func (sm *ServicePortMap) unmerge(other ServicePortMap) {
-	for svcPortName := range other {
+	for svcPortName, info := range other {
 		_, exists := (*sm)[svcPortName]
 		if exists {
 			klog.V(4).InfoS("Removing service port", "portName", svcPortName)
+			if info.NodePort() != 0 {
+				klog.V(4).InfoS("Clearing nodePort for service port name", "portName", svcPortName, "nodePort", info.NodePort())
+			}
 			delete(*sm, svcPortName)
 		} else {
 			klog.ErrorS(nil, "Service port does not exists", "portName", svcPortName)

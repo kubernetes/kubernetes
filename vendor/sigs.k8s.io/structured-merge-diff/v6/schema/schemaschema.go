@@ -69,6 +69,9 @@ var SchemaSchemaYAML = `types:
     - name: elementRelationship
       type:
         scalar: string
+    - name: nullable
+      type:
+        scalar: boolean
 - name: scalar
   scalar: string
 - name: map

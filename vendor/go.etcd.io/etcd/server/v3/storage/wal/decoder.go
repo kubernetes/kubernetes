@@ -22,6 +22,8 @@ import (
 	"io"
 	"sync"
 
+	"google.golang.org/protobuf/proto"
+
 	"go.etcd.io/etcd/client/pkg/v3/fileutil"
 	"go.etcd.io/etcd/pkg/v3/crc"
 	"go.etcd.io/etcd/pkg/v3/pbutil"
@@ -120,7 +122,7 @@ func (d *decoder) decodeRecord(rec *walpb.Record) error {
 		}
 		return err
 	}
-	if err := rec.Unmarshal(data[:recBytes]); err != nil {
+	if err := proto.Unmarshal(data[:recBytes], rec); err != nil {
 		if d.isTornEntry(data) {
 			return io.ErrUnexpectedEOF
 		}
@@ -128,7 +130,7 @@ func (d *decoder) decodeRecord(rec *walpb.Record) error {
 	}
 
 	// skip crc checking if the record type is CrcType
-	if rec.Type != CrcType {
+	if rec.GetType() != CrcType {
 		_, err := d.crc.Write(rec.Data)
 		if err != nil {
 			return err
@@ -210,16 +212,16 @@ func (d *decoder) LastCRC() uint32 {
 
 func (d *decoder) LastOffset() int64 { return d.lastValidOff }
 
-func MustUnmarshalEntry(d []byte) raftpb.Entry {
+func MustUnmarshalEntry(d []byte) *raftpb.Entry {
 	var e raftpb.Entry
-	pbutil.MustUnmarshal(&e, d)
-	return e
+	pbutil.MustUnmarshalMessage(&e, d)
+	return &e
 }
 
-func MustUnmarshalState(d []byte) raftpb.HardState {
+func MustUnmarshalState(d []byte) *raftpb.HardState {
 	var s raftpb.HardState
-	pbutil.MustUnmarshal(&s, d)
-	return s
+	pbutil.MustUnmarshalMessage(&s, d)
+	return &s
 }
 
 func readInt64(r io.Reader) (int64, error) {

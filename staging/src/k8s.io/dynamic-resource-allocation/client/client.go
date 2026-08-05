@@ -80,6 +80,16 @@ func (c *Client) DeviceClasses() cgoresource.DeviceClassInterface {
 	)
 }
 
+func (c *Client) DeviceTaintRules() cgoresource.DeviceTaintRuleInterface {
+	return newConvertingClient(c,
+		c.clientSet.ResourceV1().DeviceTaintRules(),
+		// DeviceTaintRules isn't in v1beta1 but newConvertingClient expects this.
+		// We can simply treat it like v1beta2.
+		c.clientSet.ResourceV1beta2().DeviceTaintRules(),
+		c.clientSet.ResourceV1beta2().DeviceTaintRules(),
+	)
+}
+
 func (c *Client) ResourceClaims(namespace string) cgoresource.ResourceClaimInterface {
 	return newConvertingClient(c,
 		c.clientSet.ResourceV1().ResourceClaims(namespace),

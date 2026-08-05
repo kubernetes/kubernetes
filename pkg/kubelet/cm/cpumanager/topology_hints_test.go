@@ -21,7 +21,7 @@ import (
 	"sort"
 	"testing"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/cpuset"
 )
@@ -215,12 +216,9 @@ func TestPodGuaranteedCPUs(t *testing.T) {
 	}
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.podLevelResourcesEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
-			}
-			if tc.podLevelResourceManagersEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
-			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
+
 			requestedCPU := p.podGuaranteedCPUs(logger, tc.pod)
 
 			if requestedCPU != tc.expectedCPU {
@@ -235,12 +233,8 @@ func TestGetTopologyHints(t *testing.T) {
 	machineInfo := returnMachineInfo()
 
 	for _, tc := range returnTestCases() {
-		if tc.podLevelResourcesEnabled {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
-		}
-		if tc.podLevelResourceManagersEnabled {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
-		}
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
 
 		topology, _ := topology.Discover(logger, &machineInfo)
 
@@ -270,7 +264,7 @@ func TestGetTopologyHints(t *testing.T) {
 			sourcesReady:      &sourcesReadyStub{},
 		}
 
-		hints := m.GetTopologyHints(&tc.pod, &tc.container)[string(v1.ResourceCPU)]
+		hints := m.GetTopologyHints(logger, &tc.pod, &tc.container, lifecycle.AddOperation)[string(v1.ResourceCPU)]
 		if len(tc.expectedHints) == 0 && len(hints) == 0 {
 			continue
 		}
@@ -291,12 +285,8 @@ func TestGetPodTopologyHints(t *testing.T) {
 	machineInfo := returnMachineInfo()
 
 	for _, tc := range returnTestCases() {
-		if tc.podLevelResourcesEnabled {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
-		}
-		if tc.podLevelResourceManagersEnabled {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
-		}
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
 
 		topology, _ := topology.Discover(logger, &machineInfo)
 
@@ -326,7 +316,7 @@ func TestGetPodTopologyHints(t *testing.T) {
 			sourcesReady:      &sourcesReadyStub{},
 		}
 
-		podHints := m.GetPodTopologyHints(&tc.pod)[string(v1.ResourceCPU)]
+		podHints := m.GetPodTopologyHints(logger, &tc.pod, lifecycle.AddOperation)[string(v1.ResourceCPU)]
 		if len(tc.expectedHints) == 0 && len(podHints) == 0 {
 			continue
 		}
@@ -480,6 +470,7 @@ func TestGetPodTopologyHintsWithPolicyOptions(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUManagerPolicyAlphaOptions, true)
+			tCtx := ktesting.Init(t)
 
 			var activePods []*v1.Pod
 			for p := range testCase.assignments {
@@ -508,7 +499,7 @@ func TestGetPodTopologyHintsWithPolicyOptions(t *testing.T) {
 				sourcesReady:      &sourcesReadyStub{},
 			}
 
-			podHints := m.GetPodTopologyHints(&testCase.pod)[string(v1.ResourceCPU)]
+			podHints := m.GetPodTopologyHints(tCtx.Logger(), &testCase.pod, lifecycle.AddOperation)[string(v1.ResourceCPU)]
 			sort.SliceStable(podHints, func(i, j int) bool {
 				return podHints[i].LessThan(podHints[j])
 			})
@@ -633,7 +624,7 @@ func TestTopologyHintsPodLevelResources(t *testing.T) {
 			}
 
 			// Test GetPodTopologyHints
-			podHints := m.GetPodTopologyHints(&tc.pod)[string(v1.ResourceCPU)]
+			podHints := m.GetPodTopologyHints(logger, &tc.pod, lifecycle.AddOperation)[string(v1.ResourceCPU)]
 			sort.SliceStable(podHints, func(i, j int) bool {
 				return podHints[i].LessThan(podHints[j])
 			})
@@ -645,7 +636,7 @@ func TestTopologyHintsPodLevelResources(t *testing.T) {
 			}
 
 			// Test GetTopologyHints
-			containerHints := m.GetTopologyHints(&tc.pod, &tc.container)[string(v1.ResourceCPU)]
+			containerHints := m.GetTopologyHints(logger, &tc.pod, &tc.container, lifecycle.AddOperation)[string(v1.ResourceCPU)]
 			sort.SliceStable(containerHints, func(i, j int) bool {
 				return containerHints[i].LessThan(containerHints[j])
 			})

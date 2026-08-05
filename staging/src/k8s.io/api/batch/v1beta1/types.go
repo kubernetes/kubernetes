@@ -27,6 +27,7 @@ type JobTemplateSpec struct {
 	// Standard object's metadata of the jobs created from this template.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
+	// +k8s:opaqueType
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Specification of the desired behavior of the job.
@@ -43,8 +44,9 @@ type JobTemplateSpec struct {
 // +k8s:prerelease-lifecycle-gen:replacement=batch,v1,CronJob
 
 // CronJob represents the configuration of a single cron job.
+// +k8s:supportsSubresource="/status"
 type CronJob struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -69,7 +71,7 @@ type CronJob struct {
 
 // CronJobList is a collection of cron jobs.
 type CronJobList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -85,7 +87,7 @@ type CronJobSpec struct {
 
 	// The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
 	// +required
-	// +k8s:alpha(since: "1.36")=+k8s:required
+	// +k8s:beta(since: "1.37")=+k8s:required
 	Schedule string `json:"schedule" protobuf:"bytes,1,opt,name=schedule"`
 
 	// The time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones.

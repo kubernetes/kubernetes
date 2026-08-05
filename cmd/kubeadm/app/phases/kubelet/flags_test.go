@@ -43,10 +43,8 @@ func TestBuildKubeletArgs(t *testing.T) {
 						{Name: "hostname-override", Value: "override-name"},
 					},
 				},
-				criSocket: "unix:///var/run/containerd/containerd.sock",
 			},
 			expected: []kubeadmapi.Arg{
-				{Name: "container-runtime-endpoint", Value: "unix:///var/run/containerd/containerd.sock"},
 				{Name: "hostname-override", Value: "override-name"},
 			},
 		},
@@ -67,11 +65,9 @@ func TestBuildKubeletArgs(t *testing.T) {
 						},
 					},
 				},
-				criSocket:                "unix:///var/run/containerd/containerd.sock",
 				registerTaintsUsingFlags: true,
 			},
 			expected: []kubeadmapi.Arg{
-				{Name: "container-runtime-endpoint", Value: "unix:///var/run/containerd/containerd.sock"},
 				{Name: "register-with-taints", Value: "foo=bar:baz,key=val:eff"},
 			},
 		},

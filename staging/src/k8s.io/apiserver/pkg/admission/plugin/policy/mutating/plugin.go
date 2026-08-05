@@ -74,7 +74,7 @@ type MutationEvaluationFunc func(
 	namespace *corev1.Namespace,
 	typeConverter managedfields.TypeConverter,
 	runtimeCELCostBudget int64,
-	authorizer authorizer.Authorizer,
+	authorizer authorizer.UnconditionalAuthorizer,
 ) (runtime.Object, error)
 
 type PolicyEvaluator struct {
@@ -147,7 +147,7 @@ func NewPlugin(configFile io.Reader) (*Plugin, error) {
 				restMapper,
 			)
 		},
-		func(a authorizer.Authorizer, m *matching.Matcher, client kubernetes.Interface) generic.Dispatcher[PolicyHook] {
+		func(a authorizer.UnconditionalAuthorizer, m *matching.Matcher, client kubernetes.Interface) generic.Dispatcher[PolicyHook] {
 			return NewDispatcher(a, m, patch.NewTypeConverterManager(nil, client.Discovery().OpenAPIV3()))
 		},
 	)

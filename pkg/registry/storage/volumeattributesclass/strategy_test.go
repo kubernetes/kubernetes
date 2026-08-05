@@ -17,6 +17,7 @@ limitations under the License.
 package volumeattributesclass
 
 import (
+	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +30,7 @@ func TestVolumeAttributesClassStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("VolumeAttributesClassStrategy must not be namespace scoped")
 	}
-	if Strategy.AllowCreateOnUpdate() {
+	if Strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("VolumeAttributesClassStrategy should not allow create on update")
 	}
 

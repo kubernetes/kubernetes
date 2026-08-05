@@ -335,6 +335,26 @@ func (f *RemoteRuntime) CheckpointContainer(ctx context.Context, req *kubeapi.Ch
 	return &kubeapi.CheckpointContainerResponse{}, nil
 }
 
+// CheckpointPod checkpoints the given pod sandbox.
+func (f *RemoteRuntime) CheckpointPod(ctx context.Context, req *kubeapi.CheckpointPodRequest) (*kubeapi.CheckpointPodResponse, error) {
+	err := f.RuntimeService.CheckpointPod(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return &kubeapi.CheckpointPodResponse{}, nil
+}
+
+// RestorePod restores a pod sandbox from a checkpoint.
+func (f *RemoteRuntime) RestorePod(ctx context.Context, req *kubeapi.RestorePodRequest) (*kubeapi.RestorePodResponse, error) {
+	response, err := f.RuntimeService.RestorePod(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
 func (f *RemoteRuntime) GetContainerEvents(req *kubeapi.GetEventsRequest, ces kubeapi.RuntimeService_GetContainerEventsServer) error {
 	return nil
 }
@@ -372,6 +392,60 @@ func (f *RemoteRuntime) RuntimeConfig(ctx context.Context, req *kubeapi.RuntimeC
 // UpdatePodSandboxResources synchronously updates the PodSandboxConfig.
 func (f *RemoteRuntime) UpdatePodSandboxResources(ctx context.Context, req *kubeapi.UpdatePodSandboxResourcesRequest) (*kubeapi.UpdatePodSandboxResourcesResponse, error) {
 	return f.RuntimeService.UpdatePodSandboxResources(ctx, req)
+}
+
+// StreamPodSandboxes returns a stream of PodSandboxes.
+func (f *RemoteRuntime) StreamPodSandboxes(req *kubeapi.StreamPodSandboxesRequest, stream kubeapi.RuntimeService_StreamPodSandboxesServer) error {
+	items, err := f.RuntimeService.ListPodSandbox(stream.Context(), req.Filter)
+	if err != nil {
+		return err
+	}
+	return stream.Send(&kubeapi.StreamPodSandboxesResponse{PodSandboxes: items})
+}
+
+// StreamContainers returns a stream of containers.
+func (f *RemoteRuntime) StreamContainers(req *kubeapi.StreamContainersRequest, stream kubeapi.RuntimeService_StreamContainersServer) error {
+	items, err := f.RuntimeService.ListContainers(stream.Context(), req.Filter)
+	if err != nil {
+		return err
+	}
+	return stream.Send(&kubeapi.StreamContainersResponse{Containers: items})
+}
+
+// StreamContainerStats returns a stream of container stats.
+func (f *RemoteRuntime) StreamContainerStats(req *kubeapi.StreamContainerStatsRequest, stream kubeapi.RuntimeService_StreamContainerStatsServer) error {
+	stats, err := f.RuntimeService.ListContainerStats(stream.Context(), req.Filter)
+	if err != nil {
+		return err
+	}
+	return stream.Send(&kubeapi.StreamContainerStatsResponse{ContainerStats: stats})
+}
+
+// StreamPodSandboxStats returns a stream of pod sandbox stats.
+func (f *RemoteRuntime) StreamPodSandboxStats(req *kubeapi.StreamPodSandboxStatsRequest, stream kubeapi.RuntimeService_StreamPodSandboxStatsServer) error {
+	stats, err := f.RuntimeService.ListPodSandboxStats(stream.Context(), req.Filter)
+	if err != nil {
+		return err
+	}
+	return stream.Send(&kubeapi.StreamPodSandboxStatsResponse{PodSandboxStats: stats})
+}
+
+// StreamPodSandboxMetrics returns a stream of pod sandbox metrics.
+func (f *RemoteRuntime) StreamPodSandboxMetrics(req *kubeapi.StreamPodSandboxMetricsRequest, stream kubeapi.RuntimeService_StreamPodSandboxMetricsServer) error {
+	podMetrics, err := f.RuntimeService.ListPodSandboxMetrics(stream.Context())
+	if err != nil {
+		return err
+	}
+	return stream.Send(&kubeapi.StreamPodSandboxMetricsResponse{PodSandboxMetrics: podMetrics})
+}
+
+// StreamImages returns a stream of images.
+func (f *RemoteRuntime) StreamImages(req *kubeapi.StreamImagesRequest, stream kubeapi.ImageService_StreamImagesServer) error {
+	images, err := f.ImageService.ListImages(stream.Context(), req.Filter)
+	if err != nil {
+		return err
+	}
+	return stream.Send(&kubeapi.StreamImagesResponse{Images: images})
 }
 
 // Close will shutdown the internal gRPC client connection.

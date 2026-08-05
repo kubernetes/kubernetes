@@ -25,7 +25,7 @@ import (
 // Interface provides access to all the informers in this group version.
 type Interface interface {
 	// Events returns a EventInformer.
-	Events() EventInformer
+	Events() TypedEventInformer
 }
 
 type version struct {
@@ -39,7 +39,7 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// Events returns a EventInformer.
-func (v *version) Events() EventInformer {
+// Events returns a TypedEventInformer.
+func (v *version) Events() TypedEventInformer {
 	return &eventInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

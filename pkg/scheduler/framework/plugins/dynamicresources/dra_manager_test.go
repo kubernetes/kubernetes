@@ -17,12 +17,15 @@ limitations under the License.
 package dynamicresources
 
 import (
-	"sync"
+	"maps"
 	"testing"
 
 	"github.com/onsi/gomega"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/cache"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -31,33 +34,84 @@ const (
 	otherClaimUID = types.UID("claim-uid-2")
 )
 
-func TestAddSharedClaimPendingAllocation(t *testing.T) {
-	testAddSharedClaimPendingAllocation(ktesting.Init(t))
+// testInformer implements [assumecache.Informer] and can be used to feed changes into an assume
+// cache during unit testing. Only a single event handler is supported, which is
+// sufficient for one assume cache.
+type testInformer struct {
+	handler cache.ResourceEventHandler
 }
-func testAddSharedClaimPendingAllocation(tCtx ktesting.TContext) {
+
+func (i *testInformer) AddEventHandler(handler cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error) {
+	i.handler = handler
+	return nil, nil
+}
+
+func (i *testInformer) add(obj any) {
+	if i.handler == nil {
+		return
+	}
+	i.handler.OnAdd(obj, false)
+}
+
+func TestSignalClaimPendingAllocation(t *testing.T) {
+	testSignalClaimPendingAllocation(ktesting.Init(t))
+}
+func testSignalClaimPendingAllocation(tCtx ktesting.TContext) {
+	specialAllocatedClaim := allocatedClaim.DeepCopy()
+	specialAllocatedClaim.Name = specialClaimInMemName
+
 	tests := map[string]struct {
-		inFlightAllocationSharers         map[types.UID]int
-		claimUID                          types.UID
-		allocatedClaim                    *resourceapi.ResourceClaim
-		expectedInFlightAllocationSharers map[types.UID]int
+		inFlightAllocations         map[types.UID]inFlightAllocation
+		cachedClaims                []*resourceapi.ResourceClaim
+		claimUID                    types.UID
+		allocatedClaim              *resourceapi.ResourceClaim
+		expectedInFlightAllocations map[types.UID]inFlightAllocation
 	}{
 		"empty": {
+			cachedClaims: []*resourceapi.ResourceClaim{
+				st.FromResourceClaim(pendingClaim).UID(string(claimUID)).Obj(),
+			},
 			claimUID:       claimUID,
 			allocatedClaim: allocatedClaim,
-			expectedInFlightAllocationSharers: map[types.UID]int{
-				claimUID: 1,
+			expectedInFlightAllocations: map[types.UID]inFlightAllocation{
+				claimUID: {claim: allocatedClaim, sharers: 1},
 			},
 		},
-		"increment": {
-			inFlightAllocationSharers: map[types.UID]int{
-				claimUID:      1,
-				otherClaimUID: 10,
+		"claim-already-allocated": {
+			claimUID: claimUID,
+			cachedClaims: []*resourceapi.ResourceClaim{
+				st.FromResourceClaim(allocatedClaim).UID(string(claimUID)).Obj(),
+			},
+			allocatedClaim:              allocatedClaim,
+			expectedInFlightAllocations: map[types.UID]inFlightAllocation{},
+		},
+		"extended-resource-claim-not-in-cache": {
+			claimUID:       claimUID,
+			allocatedClaim: specialAllocatedClaim,
+			expectedInFlightAllocations: map[types.UID]inFlightAllocation{
+				claimUID: {claim: specialAllocatedClaim, sharers: 1},
+			},
+		},
+		"already-exists": {
+			inFlightAllocations: map[types.UID]inFlightAllocation{
+				claimUID:      {claim: allocatedClaim, sharers: 1},
+				otherClaimUID: {claim: allocatedClaim2, sharers: 10},
 			},
 			claimUID:       claimUID,
 			allocatedClaim: allocatedClaim,
-			expectedInFlightAllocationSharers: map[types.UID]int{
-				claimUID:      2,
-				otherClaimUID: 10,
+			expectedInFlightAllocations: map[types.UID]inFlightAllocation{
+				claimUID:      {claim: allocatedClaim, sharers: 2},
+				otherClaimUID: {claim: allocatedClaim2, sharers: 10},
+			},
+		},
+		"already-exists-ignores-different-claim-argument": {
+			inFlightAllocations: map[types.UID]inFlightAllocation{
+				claimUID: {claim: allocatedClaim, sharers: 1},
+			},
+			claimUID:       claimUID,
+			allocatedClaim: allocatedClaim2,
+			expectedInFlightAllocations: map[types.UID]inFlightAllocation{
+				claimUID: {claim: allocatedClaim, sharers: 2},
 			},
 		},
 	}
@@ -65,79 +119,67 @@ func testAddSharedClaimPendingAllocation(tCtx ktesting.TContext) {
 	for name, test := range tests {
 		tCtx.Run(name, func(tCtx ktesting.TContext) {
 			c := &claimTracker{
-				logger:                    tCtx.Logger(),
-				inFlightAllocationSharers: &sync.Map{},
+				logger:              tCtx.Logger(),
+				inFlightAllocations: make(map[types.UID]inFlightAllocation),
+			}
+			maps.Copy(c.inFlightAllocations, test.inFlightAllocations)
+
+			informer := &testInformer{}
+			c.cache = assumecache.NewAssumeCache(tCtx.Logger(), informer, "", "", nil)
+			for _, cached := range test.cachedClaims {
+				informer.add(cached)
 			}
 
-			for key, value := range test.inFlightAllocationSharers {
-				c.inFlightAllocationSharers.Store(key, value)
-			}
-			err := c.AddSharedClaimPendingAllocation(test.claimUID, test.allocatedClaim)
+			err := c.SignalClaimPendingAllocation(test.claimUID, test.allocatedClaim)
 			tCtx.ExpectNoError(err)
-			actual := map[types.UID]int{}
-			c.inFlightAllocationSharers.Range(func(key, value any) bool {
-				actual[key.(types.UID)] = value.(int)
-				return true
-			})
-			tCtx.Expect(actual).To(gomega.Equal(test.expectedInFlightAllocationSharers))
+			tCtx.Expect(c.inFlightAllocations).To(gomega.Equal(test.expectedInFlightAllocations))
 		})
 	}
 }
 
-func TestRemoveSharedClaimPendingAllocation(t *testing.T) {
-	testRemoveSharedClaimPendingAllocation(ktesting.Init(t))
+func TestGetPendingAllocation(t *testing.T) {
+	testGetPendingAllocation(ktesting.Init(t))
 }
-func testRemoveSharedClaimPendingAllocation(tCtx ktesting.TContext) {
+func testGetPendingAllocation(tCtx ktesting.TContext) {
 	tests := map[string]struct {
-		inFlightAllocationSharers         map[types.UID]int
-		claimUID                          types.UID
-		allocatedClaim                    *resourceapi.ResourceClaim
-		expectedInFlightAllocationSharers map[types.UID]int
-		expectedErr                       string
+		inFlightAllocations map[types.UID]inFlightAllocation
+		claimUID            types.UID
+		expected            *resourceapi.AllocationResult
 	}{
 		"empty": {
-			inFlightAllocationSharers: map[types.UID]int{
-				claimUID:      1,
-				otherClaimUID: 10,
-			},
-			claimUID:       claimUID,
-			allocatedClaim: allocatedClaim,
-			expectedInFlightAllocationSharers: map[types.UID]int{
-				otherClaimUID: 10,
-			},
+			claimUID: claimUID,
+			expected: nil,
 		},
-		"decrement": {
-			inFlightAllocationSharers: map[types.UID]int{
-				claimUID:      2,
-				otherClaimUID: 10,
+		"nil-claim": {
+			inFlightAllocations: map[types.UID]inFlightAllocation{
+				claimUID: {claim: nil},
 			},
-			claimUID:       claimUID,
-			allocatedClaim: allocatedClaim,
-			expectedInFlightAllocationSharers: map[types.UID]int{
-				claimUID:      1,
-				otherClaimUID: 10,
+			claimUID: claimUID,
+			expected: nil,
+		},
+		"claim": {
+			inFlightAllocations: map[types.UID]inFlightAllocation{
+				claimUID:      {claim: allocatedClaim, sharers: 1},
+				otherClaimUID: {claim: allocatedClaim2, sharers: 10},
 			},
+			claimUID: claimUID,
+			expected: allocationResult,
 		},
 	}
 
 	for name, test := range tests {
 		tCtx.Run(name, func(tCtx ktesting.TContext) {
 			c := &claimTracker{
-				logger:                    tCtx.Logger(),
-				inFlightAllocationSharers: &sync.Map{},
+				logger:              tCtx.Logger(),
+				inFlightAllocations: make(map[types.UID]inFlightAllocation),
 			}
+			maps.Copy(c.inFlightAllocations, test.inFlightAllocations)
+			beforeInFlight := maps.Clone(c.inFlightAllocations)
 
-			for key, value := range test.inFlightAllocationSharers {
-				c.inFlightAllocationSharers.Store(key, value)
-			}
-			err := c.RemoveSharedClaimPendingAllocation(test.claimUID, test.allocatedClaim)
-			tCtx.ExpectNoError(err)
-			actual := map[types.UID]int{}
-			c.inFlightAllocationSharers.Range(func(key, value any) bool {
-				actual[key.(types.UID)] = value.(int)
-				return true
-			})
-			tCtx.Expect(actual).To(gomega.Equal(test.expectedInFlightAllocationSharers))
+			actual := c.GetPendingAllocation(test.claimUID)
+			tCtx.Expect(actual).To(gomega.Equal(test.expected))
+			// Get is strictly read-only
+			tCtx.Expect(c.inFlightAllocations).To(gomega.Equal(beforeInFlight))
 		})
 	}
 }
@@ -147,62 +189,63 @@ func TestMaybeRemoveClaimPendingAllocation(t *testing.T) {
 }
 func testMaybeRemoveClaimPendingAllocation(tCtx ktesting.TContext) {
 	tests := map[string]struct {
-		inFlightAllocations               map[types.UID]*resourceapi.ResourceClaim
-		inFlightAllocationSharers         map[types.UID]int
-		claimUID                          types.UID
-		shareable                         bool
-		expected                          bool
-		expectedInFlightAllocationSharers map[types.UID]int
-		expectedInFlightAllocations       map[types.UID]*resourceapi.ResourceClaim
+		inFlightAllocations         map[types.UID]inFlightAllocation
+		claimUID                    types.UID
+		forceRemove                 bool
+		expected                    bool
+		expectedInFlightAllocations map[types.UID]inFlightAllocation
 	}{
 		"empty": {
-			claimUID:                          claimUID,
-			shareable:                         true,
-			expected:                          false,
-			expectedInFlightAllocations:       map[types.UID]*resourceapi.ResourceClaim{},
-			expectedInFlightAllocationSharers: map[types.UID]int{},
-		},
-		"delete-existing-not-shareable": {
-			inFlightAllocations: map[types.UID]*resourceapi.ResourceClaim{
-				claimUID: allocatedClaim,
-			},
-			claimUID:                          claimUID,
-			expected:                          true,
-			expectedInFlightAllocations:       map[types.UID]*resourceapi.ResourceClaim{},
-			expectedInFlightAllocationSharers: map[types.UID]int{},
-		},
-		"delete-existing-shareable-unshared": {
-			inFlightAllocations: map[types.UID]*resourceapi.ResourceClaim{
-				claimUID: allocatedClaim,
-			},
-			inFlightAllocationSharers: map[types.UID]int{
-				otherClaimUID: 10,
-			},
 			claimUID:                    claimUID,
-			shareable:                   true,
-			expected:                    true,
-			expectedInFlightAllocations: map[types.UID]*resourceapi.ResourceClaim{},
-			expectedInFlightAllocationSharers: map[types.UID]int{
-				otherClaimUID: 10,
+			forceRemove:                 true,
+			expected:                    false,
+			expectedInFlightAllocations: map[types.UID]inFlightAllocation{},
+		},
+		"delete-last-sharer": {
+			inFlightAllocations: map[types.UID]inFlightAllocation{
+				claimUID:      {claim: allocatedClaim, sharers: 1},
+				otherClaimUID: {claim: allocatedClaim2, sharers: 10},
+			},
+			claimUID: claimUID,
+			expected: true,
+			expectedInFlightAllocations: map[types.UID]inFlightAllocation{
+				otherClaimUID: {claim: allocatedClaim2, sharers: 10},
 			},
 		},
-		"keep-existing-shareable-shared": {
-			inFlightAllocations: map[types.UID]*resourceapi.ResourceClaim{
-				claimUID: allocatedClaim,
+		"force-delete-last-sharer": {
+			inFlightAllocations: map[types.UID]inFlightAllocation{
+				claimUID:      {claim: allocatedClaim, sharers: 1},
+				otherClaimUID: {claim: allocatedClaim2, sharers: 10},
 			},
-			inFlightAllocationSharers: map[types.UID]int{
-				claimUID:      1,
-				otherClaimUID: 0,
+			claimUID:    claimUID,
+			forceRemove: true,
+			expected:    true,
+			expectedInFlightAllocations: map[types.UID]inFlightAllocation{
+				otherClaimUID: {claim: allocatedClaim2, sharers: 10},
 			},
-			claimUID:  claimUID,
-			shareable: true,
-			expected:  false,
-			expectedInFlightAllocations: map[types.UID]*resourceapi.ResourceClaim{
-				claimUID: allocatedClaim,
+		},
+		"decrement-remaining-sharers": {
+			inFlightAllocations: map[types.UID]inFlightAllocation{
+				claimUID:      {claim: allocatedClaim, sharers: 2},
+				otherClaimUID: {claim: allocatedClaim2, sharers: 10},
 			},
-			expectedInFlightAllocationSharers: map[types.UID]int{
-				claimUID:      1,
-				otherClaimUID: 0,
+			claimUID: claimUID,
+			expected: false,
+			expectedInFlightAllocations: map[types.UID]inFlightAllocation{
+				claimUID:      {claim: allocatedClaim, sharers: 1},
+				otherClaimUID: {claim: allocatedClaim2, sharers: 10},
+			},
+		},
+		"force-delete-remaining-sharers": {
+			inFlightAllocations: map[types.UID]inFlightAllocation{
+				claimUID:      {claim: allocatedClaim, sharers: 2},
+				otherClaimUID: {claim: allocatedClaim2, sharers: 10},
+			},
+			claimUID:    claimUID,
+			forceRemove: true,
+			expected:    true,
+			expectedInFlightAllocations: map[types.UID]inFlightAllocation{
+				otherClaimUID: {claim: allocatedClaim2, sharers: 10},
 			},
 		},
 	}
@@ -210,31 +253,14 @@ func testMaybeRemoveClaimPendingAllocation(tCtx ktesting.TContext) {
 	for name, test := range tests {
 		tCtx.Run(name, func(tCtx ktesting.TContext) {
 			c := &claimTracker{
-				logger:                    tCtx.Logger(),
-				inFlightAllocations:       &sync.Map{},
-				inFlightAllocationSharers: &sync.Map{},
+				logger:              tCtx.Logger(),
+				inFlightAllocations: make(map[types.UID]inFlightAllocation),
 			}
+			maps.Copy(c.inFlightAllocations, test.inFlightAllocations)
 
-			for key, value := range test.inFlightAllocations {
-				c.inFlightAllocations.Store(key, value)
-			}
-			for key, value := range test.inFlightAllocationSharers {
-				c.inFlightAllocationSharers.Store(key, value)
-			}
-			actual := c.MaybeRemoveClaimPendingAllocation(test.claimUID, test.shareable)
+			actual := c.MaybeRemoveClaimPendingAllocation(test.claimUID, test.forceRemove)
 			tCtx.Expect(actual).To(gomega.Equal(test.expected), "wrong value for deletion indicator")
-			actualInFlight := map[types.UID]*resourceapi.ResourceClaim{}
-			c.inFlightAllocations.Range(func(key, value any) bool {
-				actualInFlight[key.(types.UID)] = value.(*resourceapi.ResourceClaim)
-				return true
-			})
-			tCtx.Expect(actualInFlight).To(gomega.Equal(test.expectedInFlightAllocations))
-			actualSharers := map[types.UID]int{}
-			c.inFlightAllocationSharers.Range(func(key, value any) bool {
-				actualSharers[key.(types.UID)] = value.(int)
-				return true
-			})
-			tCtx.Expect(actualSharers).To(gomega.Equal(test.expectedInFlightAllocationSharers))
+			tCtx.Expect(c.inFlightAllocations).To(gomega.Equal(test.expectedInFlightAllocations))
 		})
 	}
 }

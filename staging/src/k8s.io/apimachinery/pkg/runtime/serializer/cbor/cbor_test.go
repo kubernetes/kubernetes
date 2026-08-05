@@ -138,7 +138,7 @@ func (structWithRawFields) DeepCopyObject() runtime.Object {
 }
 
 type structWithEmbeddedMetas struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta   `json:""`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 }
 
@@ -779,7 +779,7 @@ func (mf stubMetaFactory) Interpret([]byte) (*schema.GroupVersionKind, error) {
 }
 
 type oneMapField struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	Map             map[string]interface{} `json:"map"`
 }
 
@@ -792,7 +792,7 @@ func (o oneMapField) GetObjectKind() schema.ObjectKind {
 }
 
 type eightStringFields struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	A               string `json:"1"`
 	B               string `json:"2"`
 	C               string `json:"3"`

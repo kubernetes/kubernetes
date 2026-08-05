@@ -25,9 +25,11 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
@@ -372,10 +374,10 @@ func TestUpdateAnnotations(t *testing.T) {
 	}
 	for _, test := range tests {
 		options := &AnnotateOptions{
-			overwrite:         test.overwrite,
-			newAnnotations:    test.annotations,
-			removeAnnotations: test.remove,
-			resourceVersion:   test.version,
+			Overwrite:         test.overwrite,
+			NewAnnotations:    test.annotations,
+			RemoveAnnotations: test.remove,
+			ResourceVersion:   test.version,
 		}
 		err := options.updateAnnotations(test.obj)
 		if test.expectedErr != "" {
@@ -435,6 +437,8 @@ func TestAnnotateErrors(t *testing.T) {
 
 	for k, testCase := range testCases {
 		t.Run(k, func(t *testing.T) {
+			// tf satisfies cmdutil.Factory, which embeds genericclioptions.RESTClientGetter, so the
+			// same value serves both tab-completion (via ValidArgsFunction) and resource building.
 			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
@@ -445,8 +449,8 @@ func TestAnnotateErrors(t *testing.T) {
 			cmd.SetOut(bufOut)
 			cmd.SetErr(bufOut)
 
-			flags := NewAnnotateFlags(iostreams)
-			_, err := flags.ToOptions(tf, cmd, testCase.args)
+			flags := NewAnnotateFlags(tf, iostreams)
+			_, err := flags.ToOptions(cmd, testCase.args)
 			if !testCase.errFn(err) {
 				t.Errorf("%s: unexpected error: %v", k, err)
 				return
@@ -461,58 +465,130 @@ func TestAnnotateErrors(t *testing.T) {
 	}
 }
 
-func TestAnnotateObject(t *testing.T) {
+func TestRunAnnotate(t *testing.T) {
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	pods, _, _ := cmdtesting.TestData()
 
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
+	podMapping := &meta.RESTMapping{
+		Resource:         schema.GroupVersionResource{Version: "v1", Resource: "pods"},
+		GroupVersionKind: schema.GroupVersionKind{Version: "v1", Kind: "Pod"},
+		Scope:            meta.RESTScopeNamespace,
+	}
 
-	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+	tests := []struct {
+		name           string
+		infos          []*resource.Info
+		newAnnotations map[string]string
+		removeAnns     []string
+		overwrite      bool
+		local          bool
+		list           bool
+		resourceVer    string
+		verifyPatch    func(*testing.T, []byte)
+		expectErr      string
+	}{
+		{
+			name: "annotate single pod",
+			infos: []*resource.Info{
+				{
+					Mapping:   podMapping,
+					Name:      "foo",
+					Namespace: "test",
+					Object:    &pods.Items[0],
+				},
+			},
+			newAnnotations: map[string]string{"a": "b"},
+		},
+		{
+			name: "annotate local mode",
+			infos: []*resource.Info{
+				{
+					Mapping:   podMapping,
+					Name:      "foo",
+					Namespace: "test",
+					Object:    &pods.Items[0],
+				},
+			},
+			newAnnotations: map[string]string{"a": "b"},
+			local:          true,
+		},
+		{
+			name: "annotate multiple pods",
+			infos: []*resource.Info{
+				{
+					Mapping:   podMapping,
+					Name:      "foo",
+					Namespace: "test",
+					Object:    &pods.Items[0],
+				},
+				{
+					Mapping:   podMapping,
+					Name:      "bar",
+					Namespace: "test",
+					Object:    &pods.Items[1],
+				},
+			},
+			newAnnotations: map[string]string{"a": "b"},
+		},
+	}
 
-	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
-		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch req.Method {
-			case "GET":
-				switch req.URL.Path {
-				case "/namespaces/test/pods/foo":
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
-				}
-			case "PATCH":
-				switch req.URL.Path {
-				case "/namespaces/test/pods/foo":
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
-				}
-			default:
-				t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
-				return nil, nil
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			iostreams, _, _, _ := genericiooptions.NewTestIOStreams()
+			fakeClient := &fake.RESTClient{
+				GroupVersion:         schema.GroupVersion{Version: "v1"},
+				NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					if req.Method == http.MethodPatch && test.verifyPatch != nil {
+						body, err := io.ReadAll(req.Body)
+						if err != nil {
+							t.Fatal(err)
+						}
+						test.verifyPatch(t, body)
+					}
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Header:     cmdtesting.DefaultHeader(),
+						Body:       cmdtesting.ObjBody(codec, &pods.Items[0]),
+					}, nil
+				}),
 			}
-		}),
-	}
-	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-
-	iostreams, _, bufOut, _ := genericiooptions.NewTestIOStreams()
-	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
-	cmd.SetOut(bufOut)
-	cmd.SetErr(bufOut)
-	flags := NewAnnotateFlags(iostreams)
-	args := []string{"pods/foo", "a=b", "c-"}
-
-	options, err := flags.ToOptions(tf, cmd, args)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if err := options.RunAnnotate(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+			for _, info := range test.infos {
+				info.Client = fakeClient
+			}
+			o := &AnnotateOptions{
+				ResourceBuilder:   genericclioptions.NewSimpleFakeResourceFinder(test.infos...),
+				NewAnnotations:    test.newAnnotations,
+				RemoveAnnotations: test.removeAnns,
+				Overwrite:         test.overwrite,
+				Local:             test.local,
+				List:              test.list,
+				ResourceVersion:   test.resourceVer,
+				Recorder:          genericclioptions.NoopRecorder{},
+				IOStreams:         iostreams,
+				PrintObj: func(obj runtime.Object, out io.Writer) error {
+					return nil
+				},
+			}
+			err := o.RunAnnotate()
+			switch {
+			case err == nil && test.expectErr != "":
+				t.Fatalf("expected error %q, got nil", test.expectErr)
+			case err != nil && test.expectErr == "":
+				t.Fatalf("unexpected error: %v", err)
+			case err != nil && test.expectErr != "" && !strings.Contains(err.Error(), test.expectErr):
+				t.Fatalf("expected error %q, got %v", test.expectErr, err)
+			}
+		})
 	}
 }
+
+// resourceFinderFunc adapts a resource.Result into a ResourceFinder so tests
+// can inject a real *resource.Result (which supports IntoSingleItemImplied)
+// while AnnotateOptions.ResourceBuilder uses the narrower ResourceFinder interface.
+type resourceFinderFunc func() resource.Visitor
+
+func (f resourceFinderFunc) Do() resource.Visitor { return f() }
 
 func TestAnnotateResourceVersion(t *testing.T) {
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -524,181 +600,26 @@ func TestAnnotateResourceVersion(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
 			case "GET":
-				switch req.URL.Path {
-				case "/namespaces/test/pods/foo":
-					return &http.Response{
-						StatusCode: http.StatusOK,
-						Header:     cmdtesting.DefaultHeader(),
-						Body: io.NopCloser(bytes.NewBufferString(
-							`{"kind":"Pod","apiVersion":"v1","metadata":{"name":"foo","namespace":"test","resourceVersion":"10"}}`,
-						))}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
-				}
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     cmdtesting.DefaultHeader(),
+					Body: io.NopCloser(bytes.NewBufferString(
+						`{"kind":"Pod","apiVersion":"v1","metadata":{"name":"foo","namespace":"test","resourceVersion":"10"}}`,
+					))}, nil
 			case "PATCH":
-				switch req.URL.Path {
-				case "/namespaces/test/pods/foo":
-					body, err := io.ReadAll(req.Body)
-					if err != nil {
-						t.Fatal(err)
-					}
-					if !bytes.Equal(body, []byte(`{"metadata":{"annotations":{"a":"b"},"resourceVersion":"10"}}`)) {
-						t.Fatalf("expected patch with resourceVersion set, got %s", string(body))
-					}
-					return &http.Response{
-						StatusCode: http.StatusOK,
-						Header:     cmdtesting.DefaultHeader(),
-						Body: io.NopCloser(bytes.NewBufferString(
-							`{"kind":"Pod","apiVersion":"v1","metadata":{"name":"foo","namespace":"test","resourceVersion":"11"}}`,
-						))}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
+				body, err := io.ReadAll(req.Body)
+				if err != nil {
+					t.Fatal(err)
 				}
-			default:
-				t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
-				return nil, nil
-			}
-		}),
-	}
-	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-
-	iostreams, _, bufOut, _ := genericiooptions.NewTestIOStreams()
-	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
-	cmd.SetOut(bufOut)
-	cmd.SetErr(bufOut)
-	//options := NewAnnotateOptions(iostreams)
-	flags := NewAnnotateFlags(iostreams)
-	flags.resourceVersion = "10"
-	args := []string{"pods/foo", "a=b"}
-
-	options, err := flags.ToOptions(tf, cmd, args)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if err := options.RunAnnotate(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestAnnotateObjectFromFile(t *testing.T) {
-	pods, _, _ := cmdtesting.TestData()
-
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
-
-	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-
-	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
-		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch req.Method {
-			case "GET":
-				switch req.URL.Path {
-				case "/namespaces/test/replicationcontrollers/cassandra":
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
+				if !bytes.Equal(body, []byte(`{"metadata":{"annotations":{"a":"b"},"resourceVersion":"10"}}`)) {
+					t.Fatalf("expected patch with resourceVersion set, got %s", string(body))
 				}
-			case "PATCH":
-				switch req.URL.Path {
-				case "/namespaces/test/replicationcontrollers/cassandra":
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
-				}
-			default:
-				t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
-				return nil, nil
-			}
-		}),
-	}
-	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-
-	iostreams, _, bufOut, _ := genericiooptions.NewTestIOStreams()
-	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
-	cmd.SetOut(bufOut)
-	cmd.SetErr(bufOut)
-	flags := NewAnnotateFlags(iostreams)
-	flags.Filenames = []string{"../../../testdata/controller.yaml"}
-	args := []string{"a=b", "c-"}
-
-	options, err := flags.ToOptions(tf, cmd, args)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if err := options.RunAnnotate(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestAnnotateLocal(t *testing.T) {
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
-
-	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
-		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
-			return nil, nil
-		}),
-	}
-	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-
-	iostreams, _, _, _ := genericiooptions.NewTestIOStreams()
-	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
-	flags := NewAnnotateFlags(iostreams)
-	flags.Local = true
-	flags.Filenames = []string{"../../../testdata/controller.yaml"}
-	args := []string{"a=b"}
-
-	options, err := flags.ToOptions(tf, cmd, args)
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if err := options.RunAnnotate(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestAnnotateMultipleObjects(t *testing.T) {
-	pods, _, _ := cmdtesting.TestData()
-
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
-
-	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
-		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch req.Method {
-			case "GET":
-				switch req.URL.Path {
-				case "/namespaces/test/pods":
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
-				}
-			case "PATCH":
-				switch req.URL.Path {
-				case "/namespaces/test/pods/foo":
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
-				case "/namespaces/test/pods/bar":
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[1])}, nil
-				default:
-					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-					return nil, nil
-				}
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     cmdtesting.DefaultHeader(),
+					Body: io.NopCloser(bytes.NewBufferString(
+						`{"kind":"Pod","apiVersion":"v1","metadata":{"name":"foo","namespace":"test","resourceVersion":"11"}}`,
+					))}, nil
 			default:
 				t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
 				return nil, nil
@@ -708,18 +629,28 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 	iostreams, _, _, _ := genericiooptions.NewTestIOStreams()
-	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
-	cmd.SetOut(iostreams.Out)
-	cmd.SetErr(iostreams.Out)
-	flags := NewAnnotateFlags(iostreams)
-	flags.All = true
-	args := []string{"pods", "a=b", "c-"}
 
-	options, err := flags.ToOptions(tf, cmd, args)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	// Use tf.NewBuilder() (FakeBuilder) which routes through tf.UnstructuredClient
+	// and returns a real *resource.Result supporting IntoSingleItemImplied.
+	result := tf.NewBuilder().
+		Unstructured().
+		NamespaceParam("test").DefaultNamespace().
+		ResourceTypeOrNameArgs(false, "pods/foo").
+		Latest().
+		Flatten().
+		Do()
+
+	o := &AnnotateOptions{
+		ResourceBuilder: resourceFinderFunc(func() resource.Visitor { return result }),
+		NewAnnotations:  map[string]string{"a": "b"},
+		ResourceVersion: "10",
+		Recorder:        genericclioptions.NoopRecorder{},
+		IOStreams:       iostreams,
+		PrintObj: func(obj runtime.Object, out io.Writer) error {
+			return nil
+		},
 	}
-	if err := options.RunAnnotate(); err != nil {
+	if err := o.RunAnnotate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

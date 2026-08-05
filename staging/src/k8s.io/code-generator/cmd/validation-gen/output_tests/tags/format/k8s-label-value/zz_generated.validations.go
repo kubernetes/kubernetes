@@ -38,64 +38,113 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	// type Struct
-	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_Struct(ctx, op, nil /* fldPath */, obj.(*Struct), safe.Cast[*Struct](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*Struct)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_Struct(
+					ctx, op, nil, /* fldPath */
+					obj.(*Struct),
+					safe.Cast[*Struct](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
 // Validate_LabelValueStringType validates an instance of LabelValueStringType according
 // to declarative validation rules in the API schema.
-func Validate_LabelValueStringType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *LabelValueStringType) (errs field.ErrorList) {
-	errs = append(errs, validate.LabelValue(ctx, op, fldPath, obj, oldObj)...)
+func Validate_LabelValueStringType(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *LabelValueStringType) (errs field.ErrorList) {
+
+	if e := validate.LabelValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+		errs = append(errs, e...)
+	}
 
 	return errs
 }
 
 // Validate_Struct validates an instance of Struct according
 // to declarative validation rules in the API schema.
-func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
+func Validate_Struct(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *Struct) (errs field.ErrorList) {
+
 	// field Struct.TypeMeta has no validation
 
-	// field Struct.LabelValueField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.LabelValueField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
-			errs = append(errs, validate.LabelValue(ctx, op, fldPath, obj, oldObj)...)
+			if e := validate.LabelValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("labelValueField"), &obj.LabelValueField, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.LabelValueField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *string {
+				return &oldObj.LabelValueField
+			})
+		errs = append(errs, fn(fldPath.Child("labelValueField"), &obj.LabelValueField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.LabelValuePtrField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.LabelValuePtrField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
-			errs = append(errs, validate.LabelValue(ctx, op, fldPath, obj, oldObj)...)
+			if e := validate.LabelValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("labelValuePtrField"), obj.LabelValuePtrField, safe.Field(oldObj, func(oldObj *Struct) *string { return oldObj.LabelValuePtrField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *string {
+				return oldObj.LabelValuePtrField
+			})
+		errs = append(errs, fn(fldPath.Child("labelValuePtrField"), obj.LabelValuePtrField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.LabelValueTypedefField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *LabelValueStringType, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.LabelValueTypedefField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *LabelValueStringType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_LabelValueStringType(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("labelValueTypedefField"), &obj.LabelValueTypedefField, safe.Field(oldObj, func(oldObj *Struct) *LabelValueStringType { return &oldObj.LabelValueTypedefField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *LabelValueStringType {
+				return &oldObj.LabelValueTypedefField
+			})
+		errs = append(errs, fn(fldPath.Child("labelValueTypedefField"), &obj.LabelValueTypedefField, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }

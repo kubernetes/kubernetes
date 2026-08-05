@@ -36,6 +36,8 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts" // nolint:depguard // this package provides test utilities
 
 	"k8s.io/apimachinery/pkg/api/operation"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/test/coverage"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/randfill"
@@ -62,7 +64,7 @@ func (s *Scheme) AddValidationFunc(srcType any, fn func(ctx context.Context, op 
 }
 
 // Validate validates an object using the registered validation function.
-func (s *Scheme) Validate(ctx context.Context, options []string, object any, subresources ...string) field.ErrorList {
+func (s *Scheme) Validate(ctx context.Context, options map[string]bool, object any, subresources ...string) field.ErrorList {
 	if len(s.registrationErrors) > 0 {
 		return s.registrationErrors // short circuit with registration errors if any are present
 	}
@@ -73,7 +75,7 @@ func (s *Scheme) Validate(ctx context.Context, options []string, object any, sub
 }
 
 // ValidateUpdate validates an update to an object using the registered validation function.
-func (s *Scheme) ValidateUpdate(ctx context.Context, options []string, object, oldObject any, subresources ...string) field.ErrorList {
+func (s *Scheme) ValidateUpdate(ctx context.Context, options map[string]bool, object, oldObject any, subresources ...string) field.ErrorList {
 	if len(s.registrationErrors) > 0 {
 		return s.registrationErrors // short circuit with registration errors if any are present
 	}
@@ -246,7 +248,7 @@ type ValidationTester struct {
 	value        any
 	oldValue     any
 	isUpdate     bool
-	options      []string
+	options      map[string]bool
 	subresources []string
 }
 
@@ -270,7 +272,7 @@ func (v *ValidationTester) OldValueFuzzed(oldValue any) *ValidationTester {
 }
 
 // Opts sets the ValidationOpts to use.
-func (v *ValidationTester) Opts(options []string) *ValidationTester {
+func (v *ValidationTester) Opts(options map[string]bool) *ValidationTester {
 	v.options = options
 	return v
 }
@@ -373,8 +375,20 @@ func (v *ValidationTester) ExpectMatches(matcher field.ErrorMatcher, expected fi
 }
 
 func (v *ValidationTester) validate() field.ErrorList {
+	var errs field.ErrorList
 	if v.isUpdate {
-		return v.s.ValidateUpdate(context.Background(), v.options, v.value, v.oldValue, v.subresources...)
+		errs = v.s.ValidateUpdate(context.Background(), v.options, v.value, v.oldValue, v.subresources...)
+	} else {
+		errs = v.s.Validate(context.Background(), v.options, v.value, v.subresources...)
 	}
-	return v.s.Validate(context.Background(), v.options, v.value, v.subresources...)
+
+	rt := reflect.TypeOf(v.value)
+	for rt.Kind() == reflect.Ptr {
+		rt = rt.Elem()
+	}
+	pkgName := strings.Split(rt.String(), ".")[0]
+	gvk := schema.GroupVersionKind{Group: rt.PkgPath(), Version: pkgName, Kind: rt.Name()}
+	coverage.RecordObservedRules(gvk, errs)
+
+	return errs
 }

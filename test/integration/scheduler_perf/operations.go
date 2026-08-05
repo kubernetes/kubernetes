@@ -21,26 +21,33 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"html/template"
+	"maps"
 	"os"
 	"strconv"
+	"strings"
+	"text/template"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/klog/v2"
-	testutils "k8s.io/kubernetes/test/utils"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 )
 
 // createAny defines an op where some object gets created from a YAML file.
-// The nameset can be specified.
+// The namespace can be specified.
+// Go templating is supported with some additional methods (see getTemplateFuncs)
+// and parameters:
+// .Index: start index for counting
+// .Count: number of items to create
+// .<template param>: a member of the operation's templateParams
 type createAny struct {
 	// Must match createAnyOpcode.
 	Opcode operationCode
@@ -54,6 +61,9 @@ type createAny struct {
 	// Count determines how many objects get created. Defaults to 1 if unset.
 	Count      *int
 	CountParam string
+	// Params to be passed to the template.
+	// Values with `$` prefix will be resolved to the workload parameters.
+	TemplateParams map[string]any
 }
 
 var _ runnableOp = &createAny{}
@@ -79,6 +89,13 @@ func (c createAny) patchParams(w *Workload) (realOp, error) {
 		}
 		c.Count = ptr.To(count)
 	}
+	if len(c.TemplateParams) > 0 {
+		var err error
+		c.TemplateParams, err = resolveTemplateParams(c.TemplateParams, w)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return &c, c.isValid(false)
 }
 
@@ -94,15 +111,43 @@ func (c *createAny) run(tCtx ktesting.TContext) {
 	if c.Count != nil {
 		count = *c.Count
 	}
+	var items []string
 	for index := 0; index < count; index++ {
-		c.create(tCtx, map[string]any{"Index": index, "Count": count})
+		env := make(map[string]any)
+		maps.Copy(env, c.TemplateParams)
+		env["Index"] = index
+		env["Count"] = count
+		item := c.create(tCtx, env)
+		// Keep first and last item for reporting.
+		if index == 0 {
+			items = []string{strings.TrimSpace(item)}
+			continue
+		}
+		if index == count-1 {
+			if index > 1 {
+				// We skipped some intermediate item(s).
+				items = append(items, "\n\n...\n\n")
+			}
+			items = append(items, strings.TrimSpace(item))
+		}
 	}
+
+	params := ""
+	if len(c.TemplateParams) > 0 {
+		params = fmt.Sprintf(" with params %v", c.TemplateParams)
+	}
+	namespace := " in cluster scope"
+	if c.Namespace != "" {
+		namespace = fmt.Sprintf(" in namespace %q", c.Namespace)
+	}
+	tCtx.Logf("Created %d item(s) from %s%s%s:\n%s", count, c.TemplatePath, params, namespace, strings.Join(items, ""))
 }
 
-func (c *createAny) create(tCtx ktesting.TContext, env map[string]any) {
+func (c *createAny) create(tCtx ktesting.TContext, env map[string]any) string {
 	var obj *unstructured.Unstructured
-	if err := getSpecFromTextTemplateFile(c.TemplatePath, env, &obj); err != nil {
-		tCtx.Fatalf("%s: parsing failed: %v", c.TemplatePath, err)
+	objData, err := getSpecFromTextTemplateFile(c.TemplatePath, env, &obj)
+	if err != nil {
+		tCtx.Fatalf("%s: parsing failed: %v\n%s", c.TemplatePath, err, objData)
 	}
 
 	// Not caching the discovery result isn't very efficient, but good enough when
@@ -140,31 +185,31 @@ func (c *createAny) create(tCtx ktesting.TContext, env map[string]any) {
 	for {
 		err := create()
 		if err == nil {
-			return
+			return objData
 		}
 		select {
 		case <-ctx.Done():
-			tCtx.Fatalf("%s: timed out (%q) while creating %q, last error was: %v", c.TemplatePath, context.Cause(ctx), klog.KObj(obj), err)
+			tCtx.Fatalf("%s: timed out (%q) while creating %q, last error was: %v\n\n%s", c.TemplatePath, context.Cause(ctx), klog.KObj(obj), err, objData)
 		case <-time.After(time.Second):
 		}
 	}
 }
 
-func getSpecFromTextTemplateFile(path string, env map[string]any, spec interface{}) error {
+func getSpecFromTextTemplateFile(path string, env map[string]any, spec interface{}) (string, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
-		return err
+		return "", err
 	}
 	tmpl, err := template.New("object").Funcs(getTemplateFuncs()).Parse(string(content))
 	if err != nil {
-		return err
+		return "", err
 	}
 	var buffer bytes.Buffer
 	if err := tmpl.Execute(&buffer, env); err != nil {
-		return err
+		return "", err
 	}
 
-	return yaml.UnmarshalStrict(buffer.Bytes(), spec)
+	return buffer.String(), yaml.UnmarshalStrict(buffer.Bytes(), spec)
 }
 
 func restMappingFromUnstructuredObj(tCtx ktesting.TContext, obj *unstructured.Unstructured) (*meta.RESTMapping, error) {
@@ -199,9 +244,12 @@ type createNodesOp struct {
 	// At most one of the following strategies can be defined. Defaults
 	// to TrivialNodePrepareStrategy if unspecified.
 	// Optional
-	NodeAllocatableStrategy  *testutils.NodeAllocatableStrategy
-	LabelNodePrepareStrategy *testutils.LabelNodePrepareStrategy
-	UniqueNodeLabelStrategy  *testutils.UniqueNodeLabelStrategy
+	NodeAllocatableStrategy  *NodeAllocatableStrategy
+	LabelNodePrepareStrategy *LabelNodePrepareStrategy
+	UniqueNodeLabelStrategy  *UniqueNodeLabelStrategy
+	// Params to be passed to the template.
+	// Values with `$` prefix will be resolved to the workload parameters.
+	TemplateParams map[string]any
 }
 
 func (cno *createNodesOp) isValid(allowParameterization bool) error {
@@ -216,9 +264,15 @@ func (*createNodesOp) collectsMetrics() bool {
 }
 
 func (cno createNodesOp) patchParams(w *Workload) (realOp, error) {
+	var err error
 	if cno.CountParam != "" {
-		var err error
 		cno.Count, err = w.Params.get(cno.CountParam[1:])
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(cno.TemplateParams) > 0 {
+		cno.TemplateParams, err = resolveTemplateParams(cno.TemplateParams, w)
 		if err != nil {
 			return nil, err
 		}
@@ -274,6 +328,10 @@ type createPodsOp struct {
 	Count int
 	// Template parameter for Count.
 	CountParam string
+	// Template parameter for multiplying CountParam. It is used when total number of pods
+	// is defined by number of pods per podgroup for multiple podgroups.
+	// Optional.
+	CountMultiplierParam string
 	// If false, Count pods get created rapidly. This can be used to
 	// measure how quickly the scheduler can fill up a cluster.
 	//
@@ -317,11 +375,27 @@ type createPodsOp struct {
 	// Optional
 	PersistentVolumeTemplatePath      *string
 	PersistentVolumeClaimTemplatePath *string
+	// Params to be passed to the template.
+	// Values with `$` prefix will be resolved to the workload parameters.
+	TemplateParams map[string]any
+	// SignatureBatchSize defines how many subsequent pods have the same "signature" label.
+	// If positive, every SignatureBatchSize pods will have a "signature" label with value "signature-label-<index/batchSize>".
+	// If not specified, it defaults to 1 (each pod has a unique signature).
+	// Optional
+	SignatureBatchSize int
+	// Template parameter for SignatureBatchSize.
+	SignatureBatchSizeParam string
 }
 
 func (cpo *createPodsOp) isValid(allowParameterization bool) error {
+	if !isValidCount(allowParameterization, cpo.SignatureBatchSize, cpo.SignatureBatchSizeParam) {
+		return fmt.Errorf("invalid SignatureBatchSize=%d / SignatureBatchSizeParam=%q", cpo.SignatureBatchSize, cpo.SignatureBatchSizeParam)
+	}
 	if !isValidCount(allowParameterization, cpo.Count, cpo.CountParam) {
 		return fmt.Errorf("invalid Count=%d / CountParam=%q", cpo.Count, cpo.CountParam)
+	}
+	if cpo.CountMultiplierParam != "" && !isValidParameterizable(cpo.CountMultiplierParam) {
+		return fmt.Errorf("invalid CountMultiplierParam=%q", cpo.CountMultiplierParam)
 	}
 	if cpo.CollectMetrics && cpo.SkipWaitToCompletion {
 		// While it's technically possible to achieve this, the additional
@@ -343,12 +417,30 @@ func (cpo *createPodsOp) collectsMetrics() bool {
 }
 
 func (cpo createPodsOp) patchParams(w *Workload) (realOp, error) {
+	var err error
 	if cpo.CountParam != "" {
-		var err error
 		cpo.Count, err = w.Params.get(cpo.CountParam[1:])
 		if err != nil {
 			return nil, err
 		}
+	}
+	if cpo.CountMultiplierParam != "" {
+		multiplier, err := w.Params.get(cpo.CountMultiplierParam[1:])
+		if err != nil {
+			return nil, err
+		}
+		cpo.Count *= multiplier
+	}
+	if cpo.SignatureBatchSizeParam != "" {
+		paramKey := cpo.SignatureBatchSizeParam[1:]
+		signatureBatchSize, err := w.Params.get(paramKey)
+		if err != nil {
+			return nil, err
+		}
+		cpo.SignatureBatchSize = signatureBatchSize
+	}
+	if cpo.SignatureBatchSize == 0 {
+		cpo.SignatureBatchSize = 1
 	}
 	if cpo.DurationParam != "" {
 		durationStr, err := getParam[string](w.Params, cpo.DurationParam[1:])
@@ -360,8 +452,13 @@ func (cpo createPodsOp) patchParams(w *Workload) (realOp, error) {
 		}
 	}
 	if cpo.SteadyStateParam != "" {
-		var err error
 		cpo.SteadyState, err = getParam[bool](w.Params, cpo.SteadyStateParam[1:])
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(cpo.TemplateParams) > 0 {
+		cpo.TemplateParams, err = resolveTemplateParams(cpo.TemplateParams, w)
 		if err != nil {
 			return nil, err
 		}
@@ -569,6 +666,61 @@ func (so sleepOp) patchParams(w *Workload) (realOp, error) {
 	return &so, nil
 }
 
+// createPodGroups defines an op where PodGroups get created from a YAML template
+// then waits for them to be visible in the scheduler's informer cache.
+type createPodGroups struct {
+	// Must match createPodGroupsOpcode.
+	Opcode operationCode
+	// Namespace the objects should be created in.
+	Namespace string
+	// Path to spec file describing the PodGroup to create.
+	TemplatePath string
+	// Params to be passed to the template.
+	TemplateParams map[string]any
+	// Count determines how many PodGroups get created.
+	Count int
+	// CountParam is the name of the parameter that determines the count.
+	CountParam string
+}
+
+func (cpg *createPodGroups) isValid(allowParameterization bool) error {
+	if cpg.TemplatePath == "" {
+		return fmt.Errorf("templatePath must be set")
+	}
+	if cpg.Namespace == "" {
+		return fmt.Errorf("namespace must be set")
+	}
+	if !isValidCount(allowParameterization, cpg.Count, cpg.CountParam) {
+		return fmt.Errorf("invalid Count=%d / CountParam=%q", cpg.Count, cpg.CountParam)
+	}
+	if !allowParameterization && cpg.Count < 1 {
+		return fmt.Errorf("count must be greater than 0, got %d", cpg.Count)
+	}
+	return nil
+}
+
+func (cpg *createPodGroups) collectsMetrics() bool {
+	return false
+}
+
+func (cpg createPodGroups) patchParams(w *Workload) (realOp, error) {
+	if cpg.CountParam != "" {
+		count, err := w.Params.get(cpg.CountParam[1:])
+		if err != nil {
+			return nil, err
+		}
+		cpg.Count = count
+	}
+	if len(cpg.TemplateParams) > 0 {
+		var err error
+		cpg.TemplateParams, err = resolveTemplateParams(cpg.TemplateParams, w)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &cpg, cpg.isValid(false)
+}
+
 // startCollectingMetricsOp defines an op that starts metrics collectors.
 // stopCollectingMetricsOp has to be used after this op to finish collecting.
 type startCollectingMetricsOp struct {
@@ -619,12 +771,106 @@ func (scm stopCollectingMetricsOp) patchParams(_ *Workload) (realOp, error) {
 	return &scm, nil
 }
 
+// startCollectingProfileOp defines an op that starts profile collection.
+// stopCollectingProfileOp has to be used after this op to finish collecting.
+type startCollectingProfileOp struct {
+	// Must be "startCollectingProfile".
+	Opcode operationCode
+	// Type is the profile type to collect (currently only "CPU" is supported).
+	Type string
+	// FilePath is the path to the output profile file. If dataItemsDir is set,
+	// the file will be created relative to dataItemsDir.
+	FilePath string
+}
+
+func (scp *startCollectingProfileOp) isValid(_ bool) error {
+	if scp.FilePath == "" {
+		return fmt.Errorf("filePath cannot be empty")
+	}
+	if strings.ToUpper(scp.Type) != "CPU" {
+		return fmt.Errorf("only CPU profile type is supported, got %q", scp.Type)
+	}
+	return nil
+}
+
+func (*startCollectingProfileOp) collectsMetrics() bool {
+	return false
+}
+
+func (scp startCollectingProfileOp) patchParams(_ *Workload) (realOp, error) {
+	return &scp, nil
+}
+
+// stopCollectingProfileOp defines an op that stops profile collection.
+type stopCollectingProfileOp struct {
+	// Must be "stopCollectingProfile".
+	Opcode operationCode
+	// Type is the profile type to stop (currently only "CPU" is supported).
+	Type string
+}
+
+func (scp *stopCollectingProfileOp) isValid(_ bool) error {
+	if strings.ToUpper(scp.Type) != "CPU" {
+		return fmt.Errorf("only CPU profile type is supported, got %q", scp.Type)
+	}
+	return nil
+}
+
+func (*stopCollectingProfileOp) collectsMetrics() bool {
+	return false
+}
+
+func (scp stopCollectingProfileOp) patchParams(_ *Workload) (realOp, error) {
+	return &scp, nil
+}
+
+// resolveTemplateParams resolves the template parameters using the workload parameters.
+// Values starting with $ are references to workload parameters.
+// The string after an optional | is the default value, using YAML encoding
+// (in particular, a plain string without quotation marks is valid).
+func resolveTemplateParams(templateParams map[string]any, w *Workload) (map[string]any, error) {
+	if len(templateParams) == 0 {
+		return templateParams, nil
+	}
+	resolved := maps.Clone(templateParams)
+	for k, v := range resolved {
+		if s, ok := v.(string); ok && strings.HasPrefix(s, "$") {
+			paramKey := s[1:]
+			var def *string
+			sep := strings.Index(paramKey, "|")
+			if sep > 0 {
+				def = new(paramKey[sep+1:])
+				paramKey = paramKey[:sep]
+			}
+			if val, found := w.Params.params[paramKey]; found {
+				w.Params.isUsed[paramKey] = true
+				resolved[k] = val
+				continue
+			}
+			if def != nil {
+				// Must convert string into actual value first,
+				// otherwise only string values could have defaults.
+				var val any
+				if err := yaml.Unmarshal([]byte(*def), &val); err != nil {
+					return nil, fmt.Errorf("decoding parameter %q default %q as YAML: %w", paramKey, *def, err)
+				}
+				resolved[k] = val
+				continue
+			}
+			return nil, fmt.Errorf("parameter %q not found", paramKey)
+		}
+	}
+	return resolved, nil
+}
+
 func getTemplateFuncs() template.FuncMap {
 	return template.FuncMap{
 		"AddFloat":      addFloat,
 		"AddInt":        addInt,
 		"DivideFloat":   divideFloat,
 		"DivideInt":     divideInt,
+		"Int":           toInt,
+		"JSON":          toJSON,
 		"Mod":           mod,
 		"MultiplyFloat": multiplyFloat,
 		"MultiplyInt":   multiplyInt,
@@ -658,6 +904,43 @@ func toFloat64(val any) float64 {
 		}
 	}
 	panic(fmt.Sprintf("cannot cast %v to float64", val))
+}
+
+func toInt(val any) int {
+	switch i := val.(type) {
+	case float64:
+		return int(i)
+	case float32:
+		return int(i)
+	case int64:
+		return int(i)
+	case int32:
+		return int(i)
+	case int:
+		return i
+	case uint64:
+		return int(i)
+	case uint32:
+		return int(i)
+	case uint:
+		return int(i)
+	case string:
+		v, err := strconv.Atoi(i)
+		if err == nil {
+			return v
+		}
+	}
+	panic(fmt.Sprintf("cannot cast %v to int", val))
+}
+
+func toJSON(val any) string {
+	var buffer strings.Builder
+	encoder := json.NewEncoder(&buffer)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(val); err != nil {
+		panic(fmt.Sprintf("cannot JSON-encode %v: %v", val, err))
+	}
+	return strings.TrimSpace(buffer.String())
 }
 
 func addInt(numbers ...any) int {

@@ -87,7 +87,7 @@ func (m *FakePodContainerManager) ReduceCPULimits(_ klog.Logger, _ CgroupName) e
 	return nil
 }
 
-func (m *FakePodContainerManager) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
+func (m *FakePodContainerManager) GetAllPodsFromCgroups(_ klog.Logger) (map[types.UID]CgroupName, error) {
 	m.Lock()
 	defer m.Unlock()
 	m.CalledFunctions = append(m.CalledFunctions, "GetAllPodsFromCgroups")

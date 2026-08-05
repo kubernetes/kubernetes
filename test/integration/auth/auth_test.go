@@ -814,6 +814,16 @@ func (impersonateAuthorizer) Authorize(ctx context.Context, a authorizer.Attribu
 	return authorizer.DecisionNoOpinion, "I can't allow that.  Go ask alice.", nil
 }
 
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (i impersonateAuthorizer) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(i.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (impersonateAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+}
+
 func TestImpersonateIsForbidden(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
@@ -824,7 +834,14 @@ func TestImpersonateIsForbidden(t *testing.T) {
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// Prepend an impersonation authorizer with specific opinions about alice and bob
-			config.ControlPlane.Generic.Authorization.Authorizer = unionauthz.New(impersonateAuthorizer{}, config.ControlPlane.Generic.Authorization.Authorizer)
+			authz, err := unionauthz.New(
+				unionauthz.NamedAuthorizer{AuthorizerName: "impersonate", Authorizer: impersonateAuthorizer{}},
+				unionauthz.NamedAuthorizer{AuthorizerName: "default", Authorizer: config.ControlPlane.Generic.Authorization.Authorizer},
+			)
+			if err != nil {
+				t.Fatalf("unionauthz.New: %v", err)
+			}
+			config.ControlPlane.Generic.Authorization.Authorizer = authz
 		},
 	})
 	defer tearDownFn()
@@ -1452,7 +1469,7 @@ func assertImpersonationMetrics(t *testing.T, ctx context.Context, client client
 	}
 
 	var gotMetricStrings []string
-	trimFP := regexp.MustCompile(`(.*)(} \d+\.\d+.*)`)
+	trimFP := regexp.MustCompile(`(} )[\de.+-]+(.*)`)
 	for line := range strings.SplitSeq(string(body), "\n") {
 		if !strings.HasPrefix(line, "apiserver_impersonation_") {
 			continue
@@ -1462,7 +1479,7 @@ func assertImpersonationMetrics(t *testing.T, ctx context.Context, client client
 			continue
 		}
 		if strings.Contains(line, "_seconds_sum") {
-			line = trimFP.ReplaceAllString(line, `$1`) + "} FP"
+			line = trimFP.ReplaceAllString(line, "${1}FP")
 		}
 		gotMetricStrings = append(gotMetricStrings, line)
 	}
@@ -1832,6 +1849,16 @@ func (a *trackingAuthorizer) Authorize(ctx context.Context, attributes authorize
 	return authorizer.DecisionAllow, "", nil
 }
 
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (a *trackingAuthorizer) ConditionsAwareAuthorize(ctx context.Context, attributes authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(a.Authorize(ctx, attributes))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (a *trackingAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+}
+
 // TestAuthorizationAttributeDetermination tests that authorization attributes are built correctly
 func TestAuthorizationAttributeDetermination(t *testing.T) {
 	tCtx := ktesting.Init(t)
@@ -1845,7 +1872,14 @@ func TestAuthorizationAttributeDetermination(t *testing.T) {
 			opts.Authentication.TokenFile.TokenFile = "testdata/tokens.csv"
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
-			config.ControlPlane.Generic.Authorization.Authorizer = unionauthz.New(config.ControlPlane.Generic.Authorization.Authorizer, trackingAuthorizer)
+			authz, err := unionauthz.New(
+				unionauthz.NamedAuthorizer{AuthorizerName: "default", Authorizer: config.ControlPlane.Generic.Authorization.Authorizer},
+				unionauthz.NamedAuthorizer{AuthorizerName: "tracking", Authorizer: trackingAuthorizer},
+			)
+			if err != nil {
+				t.Fatalf("unionauthz.New: %v", err)
+			}
+			config.ControlPlane.Generic.Authorization.Authorizer = authz
 		},
 	})
 	defer tearDownFn()

@@ -4275,3 +4275,16 @@ func TestRequestWarningHandler(t *testing.T) {
 		assert.Nil(t, request.warningHandler)
 	})
 }
+
+func TestTryThrottleWithInfoContextDeadline(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	r := &Request{
+		rateLimiter: flowcontrol.NewTokenBucketRateLimiter(1, 1),
+		c:           &RESTClient{base: &url.URL{Path: "/"}},
+	}
+	err := r.tryThrottleWithInfo(ctx, "")
+	require.ErrorIs(t, err, context.Canceled)
+	assert.NotContains(t, err.Error(), "client rate limiter")
+}

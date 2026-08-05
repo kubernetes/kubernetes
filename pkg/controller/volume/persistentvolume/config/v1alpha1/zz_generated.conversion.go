@@ -22,6 +22,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	unsafe "unsafe"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -80,8 +82,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_GroupResource_To_v1_GroupResource(in *configv1alpha1.GroupResource, out *v1.GroupResource, s conversion.Scope) error {
-	out.Group = in.Group
-	out.Resource = in.Resource
+	*out = *(*v1.GroupResource)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -91,8 +92,7 @@ func Convert_v1alpha1_GroupResource_To_v1_GroupResource(in *configv1alpha1.Group
 }
 
 func autoConvert_v1_GroupResource_To_v1alpha1_GroupResource(in *v1.GroupResource, out *configv1alpha1.GroupResource, s conversion.Scope) error {
-	out.Group = in.Group
-	out.Resource = in.Resource
+	*out = *(*configv1alpha1.GroupResource)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -118,13 +118,7 @@ func autoConvert_config_PersistentVolumeBinderControllerConfiguration_To_v1alpha
 }
 
 func autoConvert_v1alpha1_PersistentVolumeRecyclerConfiguration_To_config_PersistentVolumeRecyclerConfiguration(in *configv1alpha1.PersistentVolumeRecyclerConfiguration, out *config.PersistentVolumeRecyclerConfiguration, s conversion.Scope) error {
-	out.MaximumRetry = in.MaximumRetry
-	out.MinimumTimeoutNFS = in.MinimumTimeoutNFS
-	out.PodTemplateFilePathNFS = in.PodTemplateFilePathNFS
-	out.IncrementTimeoutNFS = in.IncrementTimeoutNFS
-	out.PodTemplateFilePathHostPath = in.PodTemplateFilePathHostPath
-	out.MinimumTimeoutHostPath = in.MinimumTimeoutHostPath
-	out.IncrementTimeoutHostPath = in.IncrementTimeoutHostPath
+	*out = *(*config.PersistentVolumeRecyclerConfiguration)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -134,13 +128,7 @@ func Convert_v1alpha1_PersistentVolumeRecyclerConfiguration_To_config_Persistent
 }
 
 func autoConvert_config_PersistentVolumeRecyclerConfiguration_To_v1alpha1_PersistentVolumeRecyclerConfiguration(in *config.PersistentVolumeRecyclerConfiguration, out *configv1alpha1.PersistentVolumeRecyclerConfiguration, s conversion.Scope) error {
-	out.MaximumRetry = in.MaximumRetry
-	out.MinimumTimeoutNFS = in.MinimumTimeoutNFS
-	out.PodTemplateFilePathNFS = in.PodTemplateFilePathNFS
-	out.IncrementTimeoutNFS = in.IncrementTimeoutNFS
-	out.PodTemplateFilePathHostPath = in.PodTemplateFilePathHostPath
-	out.MinimumTimeoutHostPath = in.MinimumTimeoutHostPath
-	out.IncrementTimeoutHostPath = in.IncrementTimeoutHostPath
+	*out = *(*configv1alpha1.PersistentVolumeRecyclerConfiguration)(unsafe.Pointer(in))
 	return nil
 }
 

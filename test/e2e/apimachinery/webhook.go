@@ -393,6 +393,77 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	})
 
 	/*
+		Release: v1.31
+		Testname: Admission webhook, connection pool isolation on pod restart
+		Description: Verify that the admission webhook connection pool is isolated by resolved IP address.
+		When the backend pod behind the service is recreated and its IP address changes, subsequent admission
+		requests must successfully route to the new pod IP address without hitting the old connection pool.
+	*/
+	ginkgo.It("should isolate connection pool by resolved backend IP address on pod restart", func(ctx context.Context) {
+		client := f.ClientSet
+
+		ginkgo.By("Registering a validating webhook")
+		registerWebhook(ctx, f, markersNamespaceName, f.UniqueName, certCtx, servicePort)
+
+		// Get the active webhook pod details
+		ginkgo.By("Getting the current webhook pod details")
+		pods, err := client.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: "app=sample-webhook"})
+		framework.ExpectNoError(err)
+		gomega.Expect(pods.Items).To(gomega.HaveLen(1))
+		oldPod := pods.Items[0]
+		oldIP := oldPod.Status.PodIP
+		framework.Logf("Webhook currently running on pod %s with IP %s", oldPod.Name, oldIP)
+
+		// Recreate/restart the webhook pod by rolling out a change to the deployment
+		ginkgo.By("Triggering a rolling update of the webhook deployment")
+		deployment, err := client.AppsV1().Deployments(f.Namespace.Name).Get(ctx, deploymentName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+
+		// Update the deployment template labels or env to trigger a rolling update
+		if deployment.Spec.Template.Annotations == nil {
+			deployment.Spec.Template.Annotations = make(map[string]string)
+		}
+		deployment.Spec.Template.Annotations["restartedAt"] = time.Now().Format(time.RFC3339)
+
+		deployment, err = client.AppsV1().Deployments(f.Namespace.Name).Update(ctx, deployment, metav1.UpdateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Wait for the deployment rolling update to complete")
+		err = e2edeployment.WaitForDeploymentComplete(client, deployment)
+		framework.ExpectNoError(err)
+
+		// Get the new webhook pod details
+		ginkgo.By("Getting the new webhook pod details")
+		newPods, err := client.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: "app=sample-webhook"})
+		framework.ExpectNoError(err)
+		gomega.Expect(newPods.Items).To(gomega.HaveLen(1))
+		newPod := newPods.Items[0]
+		newIP := newPod.Status.PodIP
+		framework.Logf("Webhook now running on pod %s with IP %s", newPod.Name, newIP)
+
+		// Make sure the IP actually changed (or at least the pod was recreated)
+		gomega.Expect(newPod.Name).ToNot(gomega.Equal(oldPod.Name), "expected webhook pod to be recreated")
+
+		// Execute new admission request and verify it succeeds
+		ginkgo.By("Sending a new admission request to verify the webhook connection pool successfully routes to the new pod IP")
+		err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+			cm := &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: string(uuid.NewUUID()),
+				},
+			}
+			_, err = client.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, cm, metav1.CreateOptions{})
+			if err == nil {
+				_ = client.CoreV1().ConfigMaps(f.Namespace.Name).Delete(ctx, cm.Name, metav1.DeleteOptions{})
+				return true, nil
+			}
+			framework.Logf("Retrying admission request, last error: %v", err)
+			return false, nil
+		})
+		framework.ExpectNoError(err, "admission request failed after webhook pod restart")
+	})
+
+	/*
 		Release: v1.16
 		Testname: Admission webhook, update validating webhook
 		Description: Register a validating admission webhook configuration. Update the webhook to not apply to the create

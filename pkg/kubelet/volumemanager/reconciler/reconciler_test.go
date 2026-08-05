@@ -48,6 +48,7 @@ import (
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
+	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -2017,10 +2018,14 @@ func waitForUnmount(
 	err := retryWithExponentialBackOff(
 		testOperationBackOffDuration,
 		func() (bool, error) {
-			if asw.PodHasMountedVolumes(podName) {
-				return false, nil
+			// GetAllMountedVolumes includes both VolumeMounted and VolumeMountUncertain
+			// states, so this correctly detects unmount for reconstructed (uncertain)
+			// volumes as well as normally mounted volumes.
+			for _, v := range asw.GetAllMountedVolumes() {
+				if v.PodName == podName {
+					return false, nil
+				}
 			}
-
 			return true, nil
 		},
 	)
@@ -2586,6 +2591,24 @@ func TestReconstructedVolumeShouldUnmountSucceedAfterSetupFailed(t *testing.T) {
 
 	// Act first reconcile to trigger mount reconstructed volume
 	reconciler.reconcile(ctx)
+
+	// Wait for the operation executor to finish processing the mount failure.
+	// SetUp returning is not sufficient because the executor clears the pending
+	// operation after the generated operation handles the error.
+	err = retryWithExponentialBackOff(
+		testOperationBackOffDuration,
+		func() (bool, error) {
+			return !oex.IsOperationPending(
+				generatedVolumeName,
+				nestedpendingoperations.EmptyUniquePodName,
+				nestedpendingoperations.EmptyNodeName,
+			), nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("Timed out waiting for failed mount operation to stop being pending")
+	}
+
 	waitForUncertainPodMount(t, generatedVolumeName, podName, asw)
 
 	// mock remove pod

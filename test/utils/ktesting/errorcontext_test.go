@@ -20,19 +20,20 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/onsi/gomega"
 )
 
 func TestWithError(t *testing.T) {
 	t.Run("panic", func(t *testing.T) {
-		assert.Panics(t, func() {
+		tCtx := Init(t)
+		tCtx.Expect(func() {
 			tCtx := Init(t)
 			var err error
 			_, finalize := tCtx.WithError(&err)
 			defer finalize()
 
 			panic("pass me through")
-		})
+		}).To(gomega.Panic())
 	})
 
 	normalErr := errors.New("normal error")
@@ -105,11 +106,15 @@ second error`,
 				tc.cb(tCtx)
 			}()
 
-			assert.Equal(t, !tc.expectNoFail, tCtx.Failed(), "Failed()")
+			if tc.expectNoFail {
+				tCtx.Assert(tCtx.Failed()).To(gomega.BeFalseBecause("should have failed"))
+			} else {
+				tCtx.Assert(tCtx.Failed()).To(gomega.BeTrueBecause("should not have failed"))
+			}
 			if tc.expectError == "" {
-				assert.NoError(t, err)
-			} else if assert.Error(t, err) {
-				assert.Equal(t, tc.expectError, err.Error())
+				tCtx.Assert(err).To(gomega.Succeed())
+			} else {
+				tCtx.Assert(err).To(gomega.MatchError(gomega.Equal(tc.expectError)))
 			}
 		})
 	}

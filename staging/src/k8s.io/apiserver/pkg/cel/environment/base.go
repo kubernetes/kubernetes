@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
-	"sync/atomic"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker"
@@ -31,9 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/cel/library"
-	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/util/compatibility"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	basecompatibility "k8s.io/component-base/compatibility"
 )
 
@@ -72,7 +69,6 @@ var baseOpts = []VersionedOptions{
 
 			UnversionedLib(library.URLs),
 			UnversionedLib(library.Regex),
-			UnversionedLib(library.Lists),
 
 			// cel-go v0.17.7 change the cost of has() from 0 to 1, but also provided the CostEstimatorOptions option to preserve the old behavior, so we enabled it at the same time we bumped our cel version to v0.17.7.
 			// Since it is a regression fix, we apply it uniformly to all code use v0.17.7.
@@ -85,6 +81,13 @@ var baseOpts = []VersionedOptions{
 			// cel-go v0.17.7 change the cost of has() from 0 to 1, but also provided the CostEstimatorOptions option to preserve the old behavior, so we enabled it at the same time we bumped our cel version to v0.17.7.
 			// Since it is a regression fix, we apply it uniformly to all code use v0.17.7.
 			cel.CostTrackerOptions(interpreter.PresenceTestHasCost(false)),
+		},
+	},
+	{
+		IntroducedVersion: version.MajorMinor(1, 0),
+		RemovedVersion:    version.MajorMinor(1, 37),
+		EnvOptions: []cel.EnvOption{
+			library.Lists(library.ListsVersion(0)),
 		},
 	},
 	{
@@ -151,18 +154,6 @@ var baseOpts = []VersionedOptions{
 	// Authz selectors
 	{
 		IntroducedVersion: version.MajorMinor(1, 31),
-		FeatureEnabled: func() bool {
-			enabled := utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AuthorizeWithSelectors)
-			authzSelectorsLibraryInit.Do(func() {
-				// Record the first time feature enablement was checked for this library.
-				// This is checked from integration tests to ensure no cached cel envs
-				// are constructed before feature enablement is effectively set.
-				authzSelectorsLibraryEnabled.Store(enabled)
-				// Uncomment to debug where the first initialization is coming from if needed.
-				// debug.PrintStack()
-			})
-			return enabled
-		},
 		EnvOptions: []cel.EnvOption{
 			UnversionedLib(library.AuthzSelectors),
 		},
@@ -188,20 +179,13 @@ var baseOpts = []VersionedOptions{
 			ext.Lists(ext.ListsVersion(3)),
 		},
 	},
+	{
+		IntroducedVersion: version.MajorMinor(1, 37),
+		EnvOptions: []cel.EnvOption{
+			library.Lists(library.ListsVersion(1)),
+		},
+	},
 	StrictCostOpt,
-}
-
-var (
-	authzSelectorsLibraryInit    sync.Once
-	authzSelectorsLibraryEnabled atomic.Value
-)
-
-// AuthzSelectorsLibraryEnabled returns whether the AuthzSelectors library was enabled when it was constructed.
-// If it has not been contructed yet, this returns `false, false`.
-// This is solely for the benefit of the integration tests making sure feature gates get correctly parsed before AuthzSelector ever has to check for enablement.
-func AuthzSelectorsLibraryEnabled() (enabled, constructed bool) {
-	enabled, constructed = authzSelectorsLibraryEnabled.Load().(bool)
-	return
 }
 
 var StrictCostOpt = VersionedOptions{

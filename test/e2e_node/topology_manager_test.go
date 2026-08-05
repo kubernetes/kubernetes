@@ -92,6 +92,16 @@ func detectCoresPerSocket() int {
 	return coreCount
 }
 
+func detectSockets() int {
+	outData, err := exec.Command("/bin/sh", "-c", "lscpu | grep \"Socket(s):\" | cut -d \":\" -f 2").Output()
+	framework.ExpectNoError(err)
+
+	socketCount, err := strconv.Atoi(strings.TrimSpace(string(outData)))
+	framework.ExpectNoError(err)
+
+	return socketCount
+}
+
 func detectThreadPerCore() int {
 	outData, err := exec.Command("/bin/sh", "-c", "lscpu | grep \"Thread(s) per core:\" | cut -d \":\" -f 2").Output()
 	framework.ExpectNoError(err)
@@ -661,6 +671,7 @@ func teardownSRIOVConfigOrFail(ctx context.Context, f *framework.Framework, sd *
 func runTMScopeResourceAlignmentTestSuite(ctx context.Context, f *framework.Framework, configMap *v1.ConfigMap, reservedSystemCPUs, policy string, numaNodes, coreCount int) {
 	smtLevel := smtLevelFromSysFS()
 	sd := setupSRIOVConfigOrFail(ctx, f, configMap)
+	ginkgo.DeferCleanup(teardownSRIOVConfigOrFail, f, sd)
 	var ctnAttrs, initCtnAttrs []tmCtnAttribute
 
 	waitForSRIOVResources(ctx, f, sd)
@@ -842,8 +853,6 @@ func runTMScopeResourceAlignmentTestSuite(ctx context.Context, f *framework.Fram
 		},
 	}
 	runTopologyManagerNegativeTest(ctx, f, ctnAttrs, initCtnAttrs, envInfo)
-
-	teardownSRIOVConfigOrFail(ctx, f, sd)
 }
 
 func runTopologyManagerNodeAlignmentSuiteTests(ctx context.Context, f *framework.Framework, sd *sriovData, reservedSystemCPUs, policy string, numaNodes, coreCount int) {
@@ -1486,9 +1495,10 @@ func runNonGuPodTest(ctx context.Context, f *framework.Framework, cpuCap int64, 
 	framework.ExpectNoError(err)
 	expAllowedCPUs = expAllowedCPUs.Difference(strictReservedCPUs)
 	expAllowedCPUsListRegex = fmt.Sprintf("^%s\n$", expAllowedCPUs.String())
-	err = e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
-	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
-		pod.Spec.Containers[0].Name, pod.Name)
+	gomega.Eventually(ctx, func() error {
+		return e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+	}).WithTimeout(30*time.Second).WithPolling(2*time.Second).Should(gomega.Succeed(),
+		"expected log not found in container [%s] of pod [%s]", pod.Spec.Containers[0].Name, pod.Name)
 
 	ginkgo.By("by deleting the pods and waiting for container removal")
 	deletePods(ctx, f, []string{pod.Name})

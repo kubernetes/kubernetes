@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -33,6 +33,8 @@ import (
 // - A pod which gets scheduled on the previous release because of a toleration is kept running after an upgrade.
 // - A DeviceTaintRule created to evict the pod before a downgrade prevents pod scheduling after a downgrade.
 func deviceTaints(tCtx ktesting.TContext, b *drautils.Builder) upgradedTestFunc {
+	tCtx.Skip("v1.36.1 artifacts have a bug that prevent this from passing: https://github.com/kubernetes/kubernetes/pull/139651")
+
 	namespace := tCtx.Namespace()
 	taintKey := "devicetaints"
 	taintValueFromSlice := "from-slice"

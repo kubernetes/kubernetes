@@ -94,7 +94,7 @@ var upgradeableMethods = []string{"GET", "POST"}
 type AttachREST struct {
 	Store       pod.ResourceGetter
 	KubeletConn client.ConnectionInfoGetter
-	Authorizer  authorizer.Authorizer
+	Authorizer  authorizer.UnconditionalAuthorizer
 }
 
 // Implement Connecter
@@ -169,7 +169,7 @@ func (r *AttachREST) ConnectMethods() []string {
 type ExecREST struct {
 	Store       pod.ResourceGetter
 	KubeletConn client.ConnectionInfoGetter
-	Authorizer  authorizer.Authorizer
+	Authorizer  authorizer.UnconditionalAuthorizer
 }
 
 // Implement Connecter
@@ -244,7 +244,7 @@ func (r *ExecREST) ConnectMethods() []string {
 type PortForwardREST struct {
 	Store       pod.ResourceGetter
 	KubeletConn client.ConnectionInfoGetter
-	Authorizer  authorizer.Authorizer
+	Authorizer  authorizer.UnconditionalAuthorizer
 }
 
 // Implement Connecter

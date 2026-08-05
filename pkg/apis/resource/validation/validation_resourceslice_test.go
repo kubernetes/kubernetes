@@ -18,6 +18,8 @@ package validation
 
 import (
 	"fmt"
+	"math"
+	"slices"
 	"strings"
 	"testing"
 
@@ -137,19 +139,72 @@ func testResourceSliceWithNodeAllocatableResources(name, nodeName, driverName st
 			Name:       fmt.Sprintf("device-%d", d),
 			Attributes: testAttributes(),
 			Capacity:   testNodeAllocatableResourceCapacity(),
-			NodeAllocatableResourceMappings: map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
 				v1.ResourceCPU: {
-					AllocationMultiplier: ptr.To(resource.MustParse("1")),
-					CapacityKey:          ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
+					Mapping: &resourceapi.NodeAllocatableMapping{
+						CapacityMultiplier: new(resource.MustParse("1")),
+						CapacityKey:        new[resourceapi.QualifiedName]("dra.example.com/cpu"),
+					},
 				},
 				"memory": {
-					CapacityKey: ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
+					Mapping: &resourceapi.NodeAllocatableMapping{
+						CapacityKey:        new[resourceapi.QualifiedName]("dra.example.com/cpu"),
+						CapacityMultiplier: new(resource.MustParse("1")),
+					},
 				},
 			},
 		}
 		slice.Spec.Devices = append(slice.Spec.Devices, device)
 	}
 	return slice
+}
+
+func testResourceSliceWithConsumableCapacity(name, nodeName, driverName string, numDevices int) *resourceapi.ResourceSlice {
+	slice := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: resourceapi.ResourceSliceSpec{
+			NodeName: &nodeName,
+			Driver:   driverName,
+			Pool: resourceapi.ResourcePool{
+				Name:               nodeName,
+				ResourceSliceCount: 1,
+			},
+		},
+	}
+	for d := range numDevices {
+		device := resourceapi.Device{
+			Name:                     fmt.Sprintf("device-%d", d),
+			AllowMultipleAllocations: new(true),
+			Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+				"a": {
+					Value: resource.MustParse("100"),
+					RequestPolicy: &resourceapi.CapacityRequestPolicy{
+						Default: new(resource.MustParse("10")),
+						ValidValues: []resource.Quantity{
+							resource.MustParse("5"),
+							resource.MustParse("10"),
+							resource.MustParse("100"),
+						},
+					},
+				},
+			},
+		}
+		slice.Spec.Devices = append(slice.Spec.Devices, device)
+	}
+	return slice
+}
+
+func updateConsumableCapacity(slice *resourceapi.ResourceSlice, deviceNum int, update func(cap *resourceapi.DeviceCapacity)) {
+	cap := slice.Spec.Devices[deviceNum].Capacity["a"]
+	cap = *cap.DeepCopy()
+	update(&cap)
+	slice.Spec.Devices[deviceNum].Capacity["a"] = cap
+}
+
+func consumeableCapacityPath(deviceNum int) *field.Path {
+	return field.NewPath("spec", "devices").Index(deviceNum).Child("capacity").Key("a")
 }
 
 func TestValidateResourceSlice(t *testing.T) {
@@ -159,10 +214,33 @@ func TestValidateResourceSlice(t *testing.T) {
 	now := metav1.Now()
 	badValue := "spaces not allowed"
 
+	badMultipleListValue := resourceapi.DeviceAttribute{
+		IntValues: []int64{1}, BoolValues: []bool{true},
+	}
+	badMultipleListValueWithEmptyList := resourceapi.DeviceAttribute{
+		IntValues: []int64{1}, BoolValues: []bool{true}, StringValues: []string{},
+	}
+	badListStringValueTooLong := resourceapi.DeviceAttribute{
+		StringValues: []string{strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1)},
+	}
+	badListVersionValueTooLong := resourceapi.DeviceAttribute{
+		VersionValues: []string{strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1)},
+	}
+	badListAttributeTooManyValueWithMixedTypes := resourceapi.DeviceAttribute{
+		// (ResourceSliceMaxAttributeValuesPerDevice+1) values in single attribute key with multiple types.
+		// note: this causes "exactly one value must be specified" error
+		//       in addition to "the total number of attribute values must not exceed" error.
+		StringValues:  slices.Repeat([]string{"x"}, resourceapi.ResourceSliceMaxAttributeValuesPerDevice-2),
+		IntValues:     []int64{int64(1)},
+		BoolValues:    []bool{true},
+		VersionValues: []string{"1.0.0"},
+	}
+
 	scenarios := map[string]struct {
 		slice                                        *resourceapi.ResourceSlice
 		wantFailures                                 field.ErrorList
 		consumableCapacityFeatureGate                bool
+		fractionalCapacityRangeFeatureGate           bool
 		enableDRANodeAllocatableResourcesFeatureGate bool
 	}{
 		"good": {
@@ -174,7 +252,7 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"good-taints": {
 			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevicesWithTaintsOrConsumesCounters)
+				slice := testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures)
 				for i := range slice.Spec.Devices {
 					slice.Spec.Devices[i].Taints = []resourceapi.DeviceTaint{{Key: "example.com/taint", Effect: resourceapi.DeviceTaintEffectNoExecute}}
 				}
@@ -182,12 +260,80 @@ func TestValidateResourceSlice(t *testing.T) {
 			}(),
 		},
 		"too-large-taints": {
-			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "devices"), resourceapi.ResourceSliceMaxDevicesWithTaintsOrConsumesCounters+1, resourceapi.ResourceSliceMaxDevicesWithTaintsOrConsumesCounters)},
+			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "devices"), resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures+1, resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures)},
 			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevicesWithTaintsOrConsumesCounters+1)
+				slice := testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures+1)
 				for i := range slice.Spec.Devices {
 					slice.Spec.Devices[i].Taints = []resourceapi.DeviceTaint{{Key: "example.com/taint", Effect: resourceapi.DeviceTaintEffectNoExecute}}
 				}
+				return slice
+			}(),
+		},
+		// "string" is a bare key, so it qualifies with the driver's own domain.
+		"good-partition-type-attribute": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].ConsumesCounters = createConsumesCounters(1)
+				slice.Spec.PartitionTypeAttribute = ptr.To(resourceapi.FullyQualifiedName(driverName + "/string"))
+				return slice
+			}(),
+		},
+		// Devices which consume no counters need not carry the attribute.
+		"good-partition-type-attribute-with-exempt-device": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 2)
+				slice.Spec.Devices[0].ConsumesCounters = createConsumesCounters(1)
+				slice.Spec.Devices[1].Attributes = nil
+				slice.Spec.PartitionTypeAttribute = ptr.To(resourceapi.FullyQualifiedName(driverName + "/string"))
+				return slice
+			}(),
+		},
+		// The name format is validated declaratively; see the declarative
+		// validation tests for that coverage.
+		"partition-type-attribute-without-partitionable-devices": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "partitionTypeAttribute"), driverName+"/string", "may only be set on a slice which declares devices that consume counters")},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.PartitionTypeAttribute = ptr.To(resourceapi.FullyQualifiedName(driverName + "/string"))
+				return slice
+			}(),
+		},
+		"partition-type-attribute-on-shared-counters-slice": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "partitionTypeAttribute"), driverName+"/string", "may only be set on a slice which declares devices that consume counters")},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithSharedCounters(goodName, goodName, driverName, 1)
+				slice.Spec.PartitionTypeAttribute = ptr.To(resourceapi.FullyQualifiedName(driverName + "/string"))
+				return slice
+			}(),
+		},
+		"partition-type-attribute-missing-on-partitionable-device": {
+			wantFailures: field.ErrorList{field.Required(field.NewPath("spec", "devices").Index(0).Child("attributes").Key("gpu.example.com/profile"), "device consumes counters and `partitionTypeAttribute` names this attribute, so it must be set")},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].ConsumesCounters = createConsumesCounters(1)
+				slice.Spec.PartitionTypeAttribute = ptr.To(resourceapi.FullyQualifiedName("gpu.example.com/profile"))
+				return slice
+			}(),
+		},
+		"partition-type-attribute-not-a-string": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices").Index(0).Child("attributes").Key(driverName+"/int"), resourceapi.DeviceAttribute{IntValue: ptr.To(int64(42))}, "must be a string value because `partitionTypeAttribute` names this attribute")},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].ConsumesCounters = createConsumesCounters(1)
+				slice.Spec.PartitionTypeAttribute = ptr.To(resourceapi.FullyQualifiedName(driverName + "/int"))
+				return slice
+			}(),
+		},
+		// The device declares the attribute both bare (a valid string) and
+		// explicitly (a non-string). The explicit form is authoritative, so the
+		// result is deterministic rather than dependent on map iteration order.
+		"partition-type-attribute-explicit-form-wins": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices").Index(0).Child("attributes").Key(driverName+"/string"), resourceapi.DeviceAttribute{IntValue: ptr.To(int64(1))}, "must be a string value because `partitionTypeAttribute` names this attribute")},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].ConsumesCounters = createConsumesCounters(1)
+				slice.Spec.Devices[0].Attributes[resourceapi.QualifiedName(driverName+"/string")] = resourceapi.DeviceAttribute{IntValue: ptr.To(int64(1))}
+				slice.Spec.PartitionTypeAttribute = ptr.To(resourceapi.FullyQualifiedName(driverName + "/string"))
 				return slice
 			}(),
 		},
@@ -457,6 +603,138 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 		},
+		"good-list-attribute": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, 4)
+				slice.Spec.Devices[0].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName(goodName): {BoolValues: []bool{true}},
+				}
+				slice.Spec.Devices[1].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName(goodName): {IntValues: []int64{1}},
+				}
+				slice.Spec.Devices[2].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName(goodName): {StringValues: []string{"x"}},
+				}
+				slice.Spec.Devices[3].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName(goodName): {VersionValues: []string{"1.2.3"}},
+				}
+				return slice
+			}(),
+		},
+		"bad-list-attribute": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("attributes").Key(goodName), badMultipleListValue, "exactly one value must be specified").WithOrigin("union").MarkCoveredByDeclarative(),
+				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(goodName).Child("strings"), []string{}, "must not be empty if specified"),
+				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(goodName), badMultipleListValueWithEmptyList, "exactly one value must be specified").WithOrigin("union").MarkCoveredByDeclarative(),
+				field.TooLongMaxLength(field.NewPath("spec", "devices").Index(2).Child("attributes").Key(goodName).Child("strings").Index(0), badListStringValueTooLong.StringValues[0], resourceapi.DeviceAttributeMaxValueLength).WithOrigin("maxBytes").MarkCoveredByDeclarative(),
+				field.Invalid(field.NewPath("spec", "devices").Index(3).Child("attributes").Key(goodName).Child("versions").Index(0), badListVersionValueTooLong.VersionValues[0], "must be a string compatible with semver.org spec 2.0.0"),
+				field.TooLongMaxLength(field.NewPath("spec", "devices").Index(3).Child("attributes").Key(goodName).Child("versions").Index(0), badListVersionValueTooLong.VersionValues[0], resourceapi.DeviceAttributeMaxValueLength),
+				field.Invalid(field.NewPath("spec", "devices").Index(4).Child("attributes").Key(goodName).Child("bools"), []bool{}, "must not be empty if specified"),
+				field.Invalid(field.NewPath("spec", "devices").Index(5).Child("attributes").Key(goodName).Child("ints"), []int64{}, "must not be empty if specified"),
+				field.Invalid(field.NewPath("spec", "devices").Index(6).Child("attributes").Key(goodName).Child("strings"), []string{}, "must not be empty if specified"),
+				field.Invalid(field.NewPath("spec", "devices").Index(7).Child("attributes").Key(goodName).Child("versions"), []string{}, "must not be empty if specified"),
+			},
+
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, 8)
+				// multiple list values specified for single attribute key
+				slice.Spec.Devices[0].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName(goodName): badMultipleListValue,
+				}
+				slice.Spec.Devices[1].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName(goodName): badMultipleListValueWithEmptyList,
+				}
+				// max length violations for list values(string and version)
+				slice.Spec.Devices[2].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName(goodName): badListStringValueTooLong,
+				}
+				slice.Spec.Devices[3].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName(goodName): badListVersionValueTooLong,
+				}
+				// non-nil & empty list values
+				slice.Spec.Devices[4].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName(goodName): {BoolValues: []bool{}},
+				}
+				slice.Spec.Devices[5].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName(goodName): {IntValues: []int64{}},
+				}
+				slice.Spec.Devices[6].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName(goodName): {StringValues: []string{}},
+				}
+				slice.Spec.Devices[7].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName(goodName): {VersionValues: []string{}},
+				}
+				return slice
+			}(),
+		},
+		"max-devices-with-list-of-int-attributes": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures)
+				for i := range slice.Spec.Devices {
+					slice.Spec.Devices[i].Attributes["ints"] = resourceapi.DeviceAttribute{IntValues: []int64{1, 2, 3}}
+				}
+				return slice
+			}(),
+		},
+		"too-many-devices-with-list-of-int-attributes": {
+			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "devices"), resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures+1, resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures)},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures+1)
+				slice.Spec.Devices[0].Attributes["ints"] = resourceapi.DeviceAttribute{IntValues: []int64{1, 2, 3}}
+				return slice
+			}(),
+		},
+		"max-devices-with-list-of-bool-attributes": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures)
+				for i := range slice.Spec.Devices {
+					slice.Spec.Devices[i].Attributes["bools"] = resourceapi.DeviceAttribute{BoolValues: []bool{true, false, true}}
+				}
+				return slice
+			}(),
+		},
+		"too-many-devices-with-list-of-bool-attributes": {
+			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "devices"), resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures+1, resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures)},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures+1)
+				slice.Spec.Devices[0].Attributes["bools"] = resourceapi.DeviceAttribute{BoolValues: []bool{true, false, true}}
+				return slice
+			}(),
+		},
+		"max-devices-with-list-of-string-attributes": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures)
+				for i := range slice.Spec.Devices {
+					slice.Spec.Devices[i].Attributes["strings"] = resourceapi.DeviceAttribute{StringValues: []string{"a", "b", "c"}}
+				}
+				return slice
+			}(),
+		},
+		"too-many-devices-with-list-of-string-attributes": {
+			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "devices"), resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures+1, resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures)},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures+1)
+				slice.Spec.Devices[0].Attributes["strings"] = resourceapi.DeviceAttribute{StringValues: []string{"a", "b", "c"}}
+				return slice
+			}(),
+		},
+		"max-devices-with-list-of-version-attributes": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures)
+				for i := range slice.Spec.Devices {
+					slice.Spec.Devices[i].Attributes["versions"] = resourceapi.DeviceAttribute{VersionValues: []string{"1.0.0", "2.0.0", "3.0.0"}}
+				}
+				return slice
+			}(),
+		},
+		"too-many-devices-with-list-of-version-attributes": {
+			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "devices"), resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures+1, resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures)},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures+1)
+				slice.Spec.Devices[0].Attributes["versions"] = resourceapi.DeviceAttribute{VersionValues: []string{"1.0.0", "2.0.0", "3.0.0"}}
+				return slice
+			}(),
+		},
 		"good-attribute-names": {
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, goodName, 2)
@@ -526,7 +804,7 @@ func TestValidateResourceSlice(t *testing.T) {
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, goodName, 5)
 				slice.Spec.Devices[0].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{}
-				slice.Spec.Devices[0].Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{}
+				slice.Spec.Devices[0].Capacity = nil
 				for i := 0; i < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice; i++ {
 					slice.Spec.Devices[0].Attributes[resourceapi.QualifiedName(fmt.Sprintf("attr_%d", i))] = resourceapi.DeviceAttribute{StringValue: ptr.To("x")}
 				}
@@ -543,6 +821,117 @@ func TestValidateResourceSlice(t *testing.T) {
 				slice.Spec.Devices[3].Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
 					"cap": capacity,
 				}
+				return slice
+			}(),
+		},
+		"max-attribute-values-with-list": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(1), resourceapi.ResourceSliceMaxAttributeValuesPerDevice+1, fmt.Sprintf("the total number of attribute values must not exceed %d", resourceapi.ResourceSliceMaxAttributeValuesPerDevice)),
+				field.Invalid(field.NewPath("spec", "devices").Index(2), resourceapi.ResourceSliceMaxAttributeValuesPerDevice+1, fmt.Sprintf("the total number of attribute values must not exceed %d", resourceapi.ResourceSliceMaxAttributeValuesPerDevice)),
+				field.Invalid(field.NewPath("spec", "devices").Index(3), resourceapi.ResourceSliceMaxAttributeValuesPerDevice+1, fmt.Sprintf("the total number of attribute values must not exceed %d", resourceapi.ResourceSliceMaxAttributeValuesPerDevice)),
+				field.Invalid(field.NewPath("spec", "devices").Index(4), resourceapi.ResourceSliceMaxAttributeValuesPerDevice+1, fmt.Sprintf("the total number of attribute values must not exceed %d", resourceapi.ResourceSliceMaxAttributeValuesPerDevice)),
+				field.Invalid(field.NewPath("spec", "devices").Index(5), resourceapi.ResourceSliceMaxAttributeValuesPerDevice+1, fmt.Sprintf("the total number of attribute values must not exceed %d", resourceapi.ResourceSliceMaxAttributeValuesPerDevice)),
+				field.Invalid(field.NewPath("spec", "devices").Index(6), resourceapi.ResourceSliceMaxAttributeValuesPerDevice+1, fmt.Sprintf("the total number of attribute values must not exceed %d", resourceapi.ResourceSliceMaxAttributeValuesPerDevice)),
+				field.Invalid(field.NewPath("spec", "devices").Index(7), resourceapi.ResourceSliceMaxAttributeValuesPerDevice+1, fmt.Sprintf("the total number of attribute values must not exceed %d", resourceapi.ResourceSliceMaxAttributeValuesPerDevice)),
+				field.Invalid(field.NewPath("spec", "devices").Index(8), resourceapi.ResourceSliceMaxAttributeValuesPerDevice+1, fmt.Sprintf("the total number of attribute values must not exceed %d", resourceapi.ResourceSliceMaxAttributeValuesPerDevice)),
+				field.Invalid(field.NewPath("spec", "devices").Index(9), resourceapi.ResourceSliceMaxAttributeValuesPerDevice+1, fmt.Sprintf("the total number of attribute values must not exceed %d", resourceapi.ResourceSliceMaxAttributeValuesPerDevice)),
+				field.Invalid(field.NewPath("spec", "devices").Index(9).Child("attributes").Key("mixed_list_attrs"), badListAttributeTooManyValueWithMixedTypes, "exactly one value must be specified").MarkCoveredByDeclarative(),
+				field.Invalid(field.NewPath("spec", "devices").Index(10), resourceapi.ResourceSliceMaxAttributeValuesPerDevice+1, fmt.Sprintf("the total number of attribute values must not exceed %d", resourceapi.ResourceSliceMaxAttributeValuesPerDevice)),
+				field.Invalid(field.NewPath("spec", "devices").Index(11), resourceapi.ResourceSliceMaxAttributeValuesPerDevice+1, fmt.Sprintf("the total number of attribute values must not exceed %d", resourceapi.ResourceSliceMaxAttributeValuesPerDevice)),
+				field.Invalid(field.NewPath("spec", "devices").Index(12), resourceapi.ResourceSliceMaxAttributeValuesPerDevice+1, fmt.Sprintf("the total number of attribute values must not exceed %d", resourceapi.ResourceSliceMaxAttributeValuesPerDevice)),
+				field.Invalid(field.NewPath("spec", "devices").Index(13), resourceapi.ResourceSliceMaxAttributeValuesPerDevice+1, fmt.Sprintf("the total number of attribute values must not exceed %d", resourceapi.ResourceSliceMaxAttributeValuesPerDevice)),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				maxStringAttributeValuesInList := func(maxAttributeValues int) map[resourceapi.QualifiedName]resourceapi.DeviceAttribute {
+					attributes := map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{}
+					// (ResourceSliceMaxAttributesAndCapacitiesPerDevice - 1) attribute keys with (ResourceSliceMaxAttributeValuesPerDevice) values
+					// to make room for one additional attribute key with one value so that not hitting the ResourceSliceMaxAttributesAndCapacitiesPerDevice limit,
+					// while hitting the ResourceSliceMaxAttributeValuesPerDevice limit.
+					for i := range resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice - 1 {
+						stringList := []string{"x"}
+						if i == 0 {
+							// The first list gets as many additional strings as allowed by the overall value limit.
+							stringList = slices.Repeat(stringList, maxAttributeValues-(resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice-2))
+						}
+						attributes[resourceapi.QualifiedName(fmt.Sprintf("list_attr_%d", i))] = resourceapi.DeviceAttribute{
+							StringValues: stringList,
+						}
+					}
+					return attributes
+				}
+
+				slice := testResourceSlice(goodName, goodName, goodName, 14)
+
+				// success: ResourceSliceMaxAttributeValues attributes with string list values
+				slice.Spec.Devices[0].Attributes = maxStringAttributeValuesInList(resourceapi.ResourceSliceMaxAttributeValuesPerDevice)
+				slice.Spec.Devices[0].Capacity = nil
+
+				// error: extra int(scalar) attribute beyond ResourceSliceMaxAttributeValues
+				slice.Spec.Devices[1].Attributes = maxStringAttributeValuesInList(resourceapi.ResourceSliceMaxAttributeValuesPerDevice)
+				slice.Spec.Devices[1].Attributes[resourceapi.QualifiedName("extra_attr")] = resourceapi.DeviceAttribute{IntValue: new(int64(1))}
+				slice.Spec.Devices[1].Capacity = nil
+
+				// error: extra bool(scalar) attribute beyond ResourceSliceMaxAttributeValues
+				slice.Spec.Devices[2].Attributes = maxStringAttributeValuesInList(resourceapi.ResourceSliceMaxAttributeValuesPerDevice)
+				slice.Spec.Devices[2].Attributes[resourceapi.QualifiedName("extra_attr")] = resourceapi.DeviceAttribute{BoolValue: new(true)}
+				slice.Spec.Devices[2].Capacity = nil
+
+				// error: extra string(scalar) attribute beyond ResourceSliceMaxAttributeValues
+				slice.Spec.Devices[3].Attributes = maxStringAttributeValuesInList(resourceapi.ResourceSliceMaxAttributeValuesPerDevice)
+				slice.Spec.Devices[3].Attributes[resourceapi.QualifiedName("extra_attr")] = resourceapi.DeviceAttribute{StringValue: ptr.To("x")}
+				slice.Spec.Devices[3].Capacity = nil
+
+				// error: extra version(scalar) attribute beyond ResourceSliceMaxAttributeValues
+				slice.Spec.Devices[4].Attributes = maxStringAttributeValuesInList(resourceapi.ResourceSliceMaxAttributeValuesPerDevice)
+				slice.Spec.Devices[4].Attributes[resourceapi.QualifiedName("extra_attr")] = resourceapi.DeviceAttribute{VersionValue: ptr.To("1.0.0")}
+				slice.Spec.Devices[4].Capacity = nil
+
+				// error: extra int attribute(list) beyond ResourceSliceMaxAttributeValues
+				slice.Spec.Devices[5].Attributes = maxStringAttributeValuesInList(resourceapi.ResourceSliceMaxAttributeValuesPerDevice)
+				slice.Spec.Devices[5].Attributes[resourceapi.QualifiedName("extra_attr")] = resourceapi.DeviceAttribute{IntValues: []int64{int64(1)}}
+				slice.Spec.Devices[5].Capacity = nil
+
+				// error: extra bool attribute(list) beyond ResourceSliceMaxAttributeValues
+				slice.Spec.Devices[6].Attributes = maxStringAttributeValuesInList(resourceapi.ResourceSliceMaxAttributeValuesPerDevice)
+				slice.Spec.Devices[6].Attributes[resourceapi.QualifiedName("extra_attr")] = resourceapi.DeviceAttribute{BoolValues: []bool{true}}
+				slice.Spec.Devices[6].Capacity = nil
+
+				// error: extra string attribute(list) beyond ResourceSliceMaxAttributeValues
+				slice.Spec.Devices[7].Attributes = maxStringAttributeValuesInList(resourceapi.ResourceSliceMaxAttributeValuesPerDevice)
+				slice.Spec.Devices[7].Attributes[resourceapi.QualifiedName("extra_attr")] = resourceapi.DeviceAttribute{StringValues: []string{"extra"}}
+				slice.Spec.Devices[7].Capacity = nil
+
+				// error: extra version attribute(list) beyond ResourceSliceMaxAttributeValues
+				slice.Spec.Devices[8].Attributes = maxStringAttributeValuesInList(resourceapi.ResourceSliceMaxAttributeValuesPerDevice)
+				slice.Spec.Devices[8].Attributes[resourceapi.QualifiedName("extra_attr")] = resourceapi.DeviceAttribute{VersionValues: []string{"1.0.0"}}
+				slice.Spec.Devices[8].Capacity = nil
+
+				// error: multiple types of list in single attribute beyond ResourceSliceMaxAttributeValues
+				slice.Spec.Devices[9].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName("mixed_list_attrs"): badListAttributeTooManyValueWithMixedTypes,
+				}
+				slice.Spec.Devices[9].Capacity = nil
+
+				// error: extra bool values (list length 2) beyond ResourceSliceMaxAttributeValues.
+				// This verifies that BoolValues are counted by list length, not as a scalar fallback.
+				slice.Spec.Devices[10].Attributes = maxStringAttributeValuesInList(resourceapi.ResourceSliceMaxAttributeValuesPerDevice - 1)
+				slice.Spec.Devices[10].Attributes[resourceapi.QualifiedName("extra_attr")] = resourceapi.DeviceAttribute{BoolValues: []bool{true, false}}
+				slice.Spec.Devices[10].Capacity = nil
+
+				// error: extra int values (list length 2) beyond ResourceSliceMaxAttributeValues.
+				slice.Spec.Devices[11].Attributes = maxStringAttributeValuesInList(resourceapi.ResourceSliceMaxAttributeValuesPerDevice - 1)
+				slice.Spec.Devices[11].Attributes[resourceapi.QualifiedName("extra_attr")] = resourceapi.DeviceAttribute{IntValues: []int64{1, 2}}
+				slice.Spec.Devices[11].Capacity = nil
+
+				// error: extra string values (list length 2) beyond ResourceSliceMaxAttributeValues.
+				slice.Spec.Devices[12].Attributes = maxStringAttributeValuesInList(resourceapi.ResourceSliceMaxAttributeValuesPerDevice - 1)
+				slice.Spec.Devices[12].Attributes[resourceapi.QualifiedName("extra_attr")] = resourceapi.DeviceAttribute{StringValues: []string{"a", "b"}}
+				slice.Spec.Devices[12].Capacity = nil
+
+				// error: extra version values (list length 2) beyond ResourceSliceMaxAttributeValues.
+				slice.Spec.Devices[13].Attributes = maxStringAttributeValuesInList(resourceapi.ResourceSliceMaxAttributeValuesPerDevice - 1)
+				slice.Spec.Devices[13].Attributes[resourceapi.QualifiedName("extra_attr")] = resourceapi.DeviceAttribute{VersionValues: []string{"1.0.0", "1.0.1"}}
+				slice.Spec.Devices[13].Capacity = nil
 				return slice
 			}(),
 		},
@@ -567,6 +956,225 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 			consumableCapacityFeatureGate: true,
+		},
+		"invalid-request-policy-zero-step": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("capacity").Key("cap").Child("requestPolicy").Child("validRange", "step"), "0", "must be greater than zero"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, 2)
+				slice.Spec.Devices[1].AllowMultipleAllocations = ptr.To(true)
+				capacity := resourceapi.DeviceCapacity{
+					Value: resource.MustParse("1Gi"),
+					RequestPolicy: &resourceapi.CapacityRequestPolicy{
+						Default: ptr.To(resource.MustParse("10Mi")),
+						ValidRange: &resourceapi.CapacityRequestPolicyRange{
+							Min:  ptr.To(resource.MustParse("1Mi")),
+							Max:  ptr.To(resource.MustParse("100Mi")),
+							Step: ptr.To(resource.MustParse("0")),
+						},
+					},
+				}
+				slice.Spec.Devices[1].Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+					"cap": capacity,
+				}
+				return slice
+			}(),
+			consumableCapacityFeatureGate: true,
+		},
+		"invalid-request-policy-negative-step": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("capacity").Key("cap").Child("requestPolicy").Child("validRange", "step"), "-1Mi", "must be greater than zero"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, 2)
+				slice.Spec.Devices[1].AllowMultipleAllocations = ptr.To(true)
+				capacity := resourceapi.DeviceCapacity{
+					Value: resource.MustParse("1Gi"),
+					RequestPolicy: &resourceapi.CapacityRequestPolicy{
+						Default: ptr.To(resource.MustParse("10Mi")),
+						ValidRange: &resourceapi.CapacityRequestPolicyRange{
+							Min:  ptr.To(resource.MustParse("1Mi")),
+							Max:  ptr.To(resource.MustParse("100Mi")),
+							Step: ptr.To(resource.MustParse("-1Mi")),
+						},
+					},
+				}
+				slice.Spec.Devices[1].Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+					"cap": capacity,
+				}
+				return slice
+			}(),
+			consumableCapacityFeatureGate: true,
+		},
+		"consumable-capacity-integer": {
+			consumableCapacityFeatureGate:      true,
+			fractionalCapacityRangeFeatureGate: false,
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithConsumableCapacity(goodName, goodName, driverName, 12)
+				updateConsumableCapacity(slice, 1, func(cap *resourceapi.DeviceCapacity) { cap.Value = resource.MustParse("-1") })
+				updateConsumableCapacity(slice, 2, func(cap *resourceapi.DeviceCapacity) { cap.RequestPolicy.Default = new(resource.MustParse("-1")) })
+				updateConsumableCapacity(slice, 3, func(cap *resourceapi.DeviceCapacity) { cap.RequestPolicy.ValidValues = nil }) // Valid (no constraints on consumption).
+				updateConsumableCapacity(slice, 4, func(cap *resourceapi.DeviceCapacity) {
+					// Invalid, ValidValues also set.
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{Min: new(resource.MustParse("10"))}
+				})
+				updateConsumableCapacity(slice, 5, func(cap *resourceapi.DeviceCapacity) {
+					// Valid, only ValidRange.
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{Min: new(resource.MustParse("1"))}
+					cap.RequestPolicy.ValidValues = nil
+				})
+				updateConsumableCapacity(slice, 6, func(cap *resourceapi.DeviceCapacity) {
+					// Rounds down in integer mode, still valid.
+					fraction := resource.MustParse("0.1")
+					cap.RequestPolicy.Default.Add(fraction)
+					cap.RequestPolicy.ValidValues[0].Add(fraction)
+					cap.RequestPolicy.ValidValues[1].Add(fraction)
+				})
+				updateConsumableCapacity(slice, 7, func(cap *resourceapi.DeviceCapacity) {
+					// Invalid, default too small.
+					cap.RequestPolicy.Default = new(resource.MustParse("1.05"))
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{Min: new(resource.MustParse("1.1"))}
+					cap.RequestPolicy.ValidValues = nil
+				})
+				updateConsumableCapacity(slice, 8, func(cap *resourceapi.DeviceCapacity) {
+					fraction := resource.MustParse("0.1")
+					min := cap.RequestPolicy.ValidValues[1]
+					minFrac := min.DeepCopy()
+					minFrac.Sub(fraction)
+					cap.RequestPolicy.ValidValues[0] = minFrac // Smaller, but gets rounded up to min == Value[1] -> invalid duplicate.
+
+				})
+				updateConsumableCapacity(slice, 9, func(cap *resourceapi.DeviceCapacity) {
+					// Valid big integers.
+					cap.Value.Set(math.MaxInt64)
+					cap.RequestPolicy.Default.Set(math.MaxInt64)
+					cap.RequestPolicy.ValidValues = nil
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{
+						Min:  resource.NewQuantity(0, resource.DecimalSI),
+						Step: resource.NewQuantity(1, resource.DecimalSI),
+						Max:  &cap.Value,
+					}
+				})
+				updateConsumableCapacity(slice, 10, func(cap *resourceapi.DeviceCapacity) {
+					// Valid fractions.
+					maxMilli := *resource.NewMilliQuantity(math.MaxInt64, resource.DecimalSI)
+					cap.Value = maxMilli
+					cap.RequestPolicy.Default = &maxMilli
+					cap.RequestPolicy.ValidValues = nil
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{
+						Min:  resource.NewMilliQuantity(0, resource.DecimalSI),
+						Step: resource.NewMilliQuantity(1, resource.DecimalSI),
+						Max:  &cap.Value,
+					}
+				})
+				updateConsumableCapacity(slice, 11, func(cap *resourceapi.DeviceCapacity) {
+					// Invalid fractions, range too large - okay when rounding to integer.
+					cap.Value.Set(math.MaxInt64)
+					cap.RequestPolicy.Default.Set(math.MaxInt64)
+					cap.RequestPolicy.ValidValues = nil
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{
+						Min:  resource.NewMilliQuantity(0, resource.DecimalSI),
+						Step: resource.NewMilliQuantity(1, resource.DecimalSI),
+						Max:  &cap.Value,
+					}
+				})
+				return slice
+			}(),
+			wantFailures: field.ErrorList{
+				field.Invalid(consumeableCapacityPath(1).Child("requestPolicy", "validValues").Index(0), "5", "option is larger than capacity value: -1"),
+				field.Invalid(consumeableCapacityPath(1).Child("requestPolicy", "validValues").Index(1), "10", "option is larger than capacity value: -1"),
+				field.Invalid(consumeableCapacityPath(1).Child("requestPolicy", "validValues").Index(2), "100", "option is larger than capacity value: -1"),
+				field.Invalid(consumeableCapacityPath(2).Child("requestPolicy", "validValues"), "-1", "default value is not valid according to the requestPolicy"),
+				field.Forbidden(consumeableCapacityPath(4).Child("requestPolicy"), `exactly one policy can be specified, cannot specify "validValues" and "validRange" at the same time`),
+				field.Invalid(consumeableCapacityPath(7).Child("requestPolicy", "validRange", "default"), "1050m", "default is less than min: 1100m"),
+				field.Duplicate(consumeableCapacityPath(8).Child("requestPolicy", "validValues").Index(1), "10"),
+			},
+		},
+		"consumable-capacity-fractional": {
+			consumableCapacityFeatureGate:      true,
+			fractionalCapacityRangeFeatureGate: true,
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithConsumableCapacity(goodName, goodName, driverName, 12)
+				updateConsumableCapacity(slice, 1, func(cap *resourceapi.DeviceCapacity) { cap.Value = resource.MustParse("-1") })
+				updateConsumableCapacity(slice, 2, func(cap *resourceapi.DeviceCapacity) { cap.RequestPolicy.Default = new(resource.MustParse("-1")) })
+				updateConsumableCapacity(slice, 3, func(cap *resourceapi.DeviceCapacity) { cap.RequestPolicy.ValidValues = nil }) // Valid (no constraints on consumption).
+				updateConsumableCapacity(slice, 4, func(cap *resourceapi.DeviceCapacity) {
+					// Invalid, ValidValues also set.
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{Min: new(resource.MustParse("10"))}
+				})
+				updateConsumableCapacity(slice, 5, func(cap *resourceapi.DeviceCapacity) {
+					// Valid, only ValidRange.
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{Min: new(resource.MustParse("1"))}
+					cap.RequestPolicy.ValidValues = nil
+				})
+				updateConsumableCapacity(slice, 6, func(cap *resourceapi.DeviceCapacity) {
+					// Rounds down in integer mode, still valid.
+					fraction := resource.MustParse("0.1")
+					cap.RequestPolicy.Default.Add(fraction)
+					cap.RequestPolicy.ValidValues[0].Add(fraction)
+					cap.RequestPolicy.ValidValues[1].Add(fraction)
+				})
+				updateConsumableCapacity(slice, 7, func(cap *resourceapi.DeviceCapacity) {
+					// Invalid, default too small.
+					cap.RequestPolicy.Default = new(resource.MustParse("1.05"))
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{Min: new(resource.MustParse("1.1"))}
+					cap.RequestPolicy.ValidValues = nil
+				})
+				updateConsumableCapacity(slice, 8, func(cap *resourceapi.DeviceCapacity) {
+					fraction := resource.MustParse("0.1")
+					min := cap.RequestPolicy.ValidValues[1]
+					minFrac := min.DeepCopy()
+					minFrac.Sub(fraction)
+					cap.RequestPolicy.ValidValues[0] = minFrac // Not a duplicate when using milli-values.
+
+				})
+				updateConsumableCapacity(slice, 9, func(cap *resourceapi.DeviceCapacity) {
+					// Valid big integers.
+					cap.Value.Set(math.MaxInt64)
+					cap.RequestPolicy.Default.Set(math.MaxInt64)
+					cap.RequestPolicy.ValidValues = nil
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{
+						Min:  resource.NewQuantity(0, resource.DecimalSI),
+						Step: resource.NewQuantity(1, resource.DecimalSI),
+						Max:  resource.NewQuantity(math.MaxInt, resource.DecimalSI),
+					}
+				})
+				updateConsumableCapacity(slice, 10, func(cap *resourceapi.DeviceCapacity) {
+					// Valid fractions.
+					maxMilli := *resource.NewMilliQuantity(math.MaxInt64, resource.DecimalSI)
+					cap.Value = maxMilli
+					cap.RequestPolicy.Default = &maxMilli
+					cap.RequestPolicy.ValidValues = nil
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{
+						Min:  resource.NewMilliQuantity(0, resource.DecimalSI),
+						Step: resource.NewMilliQuantity(1, resource.DecimalSI),
+						Max:  &maxMilli,
+					}
+				})
+				updateConsumableCapacity(slice, 11, func(cap *resourceapi.DeviceCapacity) {
+					// Invalid fractions, range too large.
+					cap.Value.Set(math.MaxInt64)
+					cap.RequestPolicy.Default.Set(math.MaxInt64)
+					cap.RequestPolicy.ValidValues = nil
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{
+						Min:  resource.NewMilliQuantity(0, resource.DecimalSI),
+						Step: resource.NewMilliQuantity(1, resource.DecimalSI),
+						Max:  &cap.Value,
+					}
+				})
+				return slice
+			}(),
+			wantFailures: field.ErrorList{
+				field.Invalid(consumeableCapacityPath(1).Child("requestPolicy", "validValues").Index(0), "5", "option is larger than capacity value: -1"),
+				field.Invalid(consumeableCapacityPath(1).Child("requestPolicy", "validValues").Index(1), "10", "option is larger than capacity value: -1"),
+				field.Invalid(consumeableCapacityPath(1).Child("requestPolicy", "validValues").Index(2), "100", "option is larger than capacity value: -1"),
+				field.Invalid(consumeableCapacityPath(2).Child("requestPolicy", "validValues"), "-1", "default value is not valid according to the requestPolicy"),
+				field.Forbidden(consumeableCapacityPath(4).Child("requestPolicy"), `exactly one policy can be specified, cannot specify "validValues" and "validRange" at the same time`),
+				field.Invalid(consumeableCapacityPath(7).Child("requestPolicy", "validRange", "default"), "1050m", "default is less than min: 1100m"),
+				field.Invalid(consumeableCapacityPath(11).Child("requestPolicy", "validRange", "default"), fmt.Sprintf("%d", math.MaxInt), "value cannot be represented as a milli value"),
+				field.Invalid(consumeableCapacityPath(11).Child("requestPolicy", "validRange", "max"), fmt.Sprintf("%d", math.MaxInt), "value cannot be represented as a milli value"),
+			},
 		},
 		"invalid-node-selecor-label-value": {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "nodeSelector", "nodeSelectorTerms").Index(0).Child("matchExpressions").Index(0).Child("values").Index(0), "-1", "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')")},
@@ -775,7 +1383,7 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"missing-counter-shared-counters": {
 			wantFailures: field.ErrorList{
-				field.Required(field.NewPath("spec", "sharedCounters").Index(0).Child("counters"), ""),
+				field.Required(field.NewPath("spec", "sharedCounters").Index(0).Child("counters"), "").MarkCoveredByDeclarative(),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSliceWithSharedCounters(goodName, goodName, driverName, 0)
@@ -906,7 +1514,7 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"missing-counter-consumes-counter": {
 			wantFailures: field.ErrorList{
-				field.Required(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters"), ""),
+				field.Required(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters"), "").MarkCoveredByDeclarative(),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
@@ -972,7 +1580,7 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"max-number-of-devices-with-consumes-counters": {
 			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevicesWithTaintsOrConsumesCounters)
+				slice := testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures)
 				for i := range slice.Spec.Devices {
 					slice.Spec.Devices[i].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
 						{
@@ -985,9 +1593,9 @@ func TestValidateResourceSlice(t *testing.T) {
 			}(),
 		},
 		"too-many-devices-with-consumes-counters": {
-			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "devices"), resourceapi.ResourceSliceMaxDevicesWithTaintsOrConsumesCounters+1, resourceapi.ResourceSliceMaxDevicesWithTaintsOrConsumesCounters)},
+			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "devices"), resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures+1, resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures)},
 			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevicesWithTaintsOrConsumesCounters+1)
+				slice := testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures+1)
 				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
 					{
 						CounterSet: "counterset-0",
@@ -1043,83 +1651,123 @@ func TestValidateResourceSlice(t *testing.T) {
 			}(),
 			enableDRANodeAllocatableResourcesFeatureGate: true,
 		},
-		"node-allocatable-resource-mappings-both-quantityfrom": {
+		"node-allocatable-resources-both-quantityfrom": {
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
-				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
 					v1.ResourceCPU: {
-						CapacityKey:          ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
-						AllocationMultiplier: ptr.To(resource.MustParse("1")),
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							CapacityKey:        ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
+							CapacityMultiplier: ptr.To(resource.MustParse("1")),
+						},
 					},
 				}
 				return slice
 			}(),
 			enableDRANodeAllocatableResourcesFeatureGate: true,
 		},
-		"bad-node-allocatable-resource-mappings-no-quantityfrom": {
+
+		"bad-node-allocatable-resources-capacityKey-empty": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key(string(v1.ResourceCPU)), "", "at least one of allocationMultiplier or capacityKey must be set"),
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)).Child("mapping").Child("capacityKey"), "", "capacityKey must not be an empty string"),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
-				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
-					v1.ResourceCPU: {},
-				}
-				return slice
-			}(),
-			enableDRANodeAllocatableResourcesFeatureGate: true,
-		},
-		"bad-node-allocatable-resource-mappings-capacityKey-empty": {
-			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key(string(v1.ResourceCPU)).Child("capacityKey"), "", "capacityKey must not be an empty string"),
-			},
-			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
-				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
 					v1.ResourceCPU: {
-						CapacityKey: ptr.To[resourceapi.QualifiedName](""),
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							CapacityKey:        ptr.To[resourceapi.QualifiedName](""),
+							CapacityMultiplier: ptr.To(resource.MustParse("1")),
+						},
 					},
 				}
 				return slice
 			}(),
 			enableDRANodeAllocatableResourcesFeatureGate: true,
 		},
-		"bad-node-allocatable-resource-mappings-capacity-key-not-found": {
+		"bad-node-allocatable-resources-capacity-key-not-found": {
 			wantFailures: field.ErrorList{
-				field.NotFound(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key(string(v1.ResourceCPU)).Child("capacityKey"), resourceapi.QualifiedName("nonexistent")),
+				field.NotFound(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)).Child("mapping").Child("capacityKey"), resourceapi.QualifiedName("nonexistent")),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
-				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
 					v1.ResourceCPU: {
-						CapacityKey: ptr.To[resourceapi.QualifiedName]("nonexistent"),
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							CapacityKey:        ptr.To[resourceapi.QualifiedName]("nonexistent"),
+							CapacityMultiplier: ptr.To(resource.MustParse("1")),
+						},
 					},
 				}
 				return slice
 			}(),
 			enableDRANodeAllocatableResourcesFeatureGate: true,
 		},
-		"bad-node-allocatable-resource-mappings-invalid-allocation-multiplier-negative": {
+		"bad-node-allocatable-resources-invalid-device-multiplier-negative": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key(string(v1.ResourceCPU)).Child("allocationMultiplier"), "-1", "must be positive"),
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)).Child("mapping").Child("deviceMultiplier"), "-1", "must be positive"),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
-				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
-					v1.ResourceCPU: {AllocationMultiplier: ptr.To(resource.MustParse("-1"))},
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							DeviceMultiplier: ptr.To(resource.MustParse("-1")),
+						},
+					},
 				}
 				return slice
 			}(),
 			enableDRANodeAllocatableResourcesFeatureGate: true,
 		},
-		"bad-node-allocatable-resource-mappings-invalid-allocation-multiplier-zero": {
+		"bad-node-allocatable-resources-invalid-capacity-multiplier-negative": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key(string(v1.ResourceCPU)).Child("allocationMultiplier"), "0", "must be positive"),
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)).Child("mapping").Child("capacityMultiplier"), "-1", "must be positive"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							CapacityKey:        ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
+							CapacityMultiplier: ptr.To(resource.MustParse("-1")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resources-invalid-device-multiplier-zero": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)).Child("mapping").Child("deviceMultiplier"), "0", "must be positive"),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
-				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
-					v1.ResourceCPU: {AllocationMultiplier: ptr.To(resource.MustParse("0"))},
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							DeviceMultiplier: ptr.To(resource.MustParse("0")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resources-invalid-capacity-multiplier-zero": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)).Child("mapping").Child("capacityMultiplier"), "0", "must be positive"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							CapacityKey:        ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
+							CapacityMultiplier: ptr.To(resource.MustParse("0")),
+						},
+					},
 				}
 				return slice
 			}(),
@@ -1128,43 +1776,266 @@ func TestValidateResourceSlice(t *testing.T) {
 		"capacity key not in spec.devices[].capacity": {
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
-				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
 					v1.ResourceMemory: {
-						CapacityKey:          ptr.To[resourceapi.QualifiedName]("dra.example.com/hugepages"),
-						AllocationMultiplier: ptr.To(resource.MustParse("1")),
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							CapacityKey:        ptr.To[resourceapi.QualifiedName]("dra.example.com/hugepages"),
+							CapacityMultiplier: ptr.To(resource.MustParse("1")),
+						},
 					},
 				}
 				return slice
 			}(),
 			enableDRANodeAllocatableResourcesFeatureGate: true,
 			wantFailures: field.ErrorList{
-				field.NotFound(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key(string(v1.ResourceMemory)).Child("capacityKey"), resourceapi.QualifiedName("dra.example.com/hugepages")),
+				field.NotFound(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceMemory)).Child("mapping").Child("capacityKey"), resourceapi.QualifiedName("dra.example.com/hugepages")),
 			},
 		},
 		"mapped resource is not a node allocatable resource": {
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
-				slice.Spec.Devices[0].NodeAllocatableResourceMappings = map[v1.ResourceName]resourceapi.NodeAllocatableResourceMapping{
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
 					v1.ResourceName("dra.example.com/gpu"): {
-						CapacityKey:          ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
-						AllocationMultiplier: ptr.To(resource.MustParse("1")),
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							CapacityKey:        ptr.To[resourceapi.QualifiedName]("dra.example.com/cpu"),
+							CapacityMultiplier: ptr.To(resource.MustParse("1")),
+						},
 					},
 				}
 				return slice
 			}(),
 			enableDRANodeAllocatableResourcesFeatureGate: true,
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResourceMappings").Key("dra.example.com/gpu"), v1.ResourceName("dra.example.com/gpu"), "must be a node allocatable resource name"),
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("dra.example.com/gpu"), v1.ResourceName("dra.example.com/gpu"), "must be a node allocatable resource name"),
+			},
+		},
+		"non standard resource name": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceName("abc"): {
+						Overhead: &resourceapi.NodeAllocatableOverhead{
+							PerPod: ptr.To(resource.MustParse("1")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("abc"), v1.ResourceName("abc"), "must be a node allocatable resource name"),
+			},
+		},
+		"kubernetes.io namespace is rejected": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceName("kubernetes.io/foo"): {
+						Overhead: &resourceapi.NodeAllocatableOverhead{
+							PerPod: ptr.To(resource.MustParse("1")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("kubernetes.io/foo"), v1.ResourceName("kubernetes.io/foo"), "must be a node allocatable resource name"),
+			},
+		},
+		"ephemeral-storage is rejected": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceName("ephemeral-storage"): {
+						Overhead: &resourceapi.NodeAllocatableOverhead{
+							PerPod: ptr.To(resource.MustParse("2Gi")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("ephemeral-storage"), v1.ResourceName("ephemeral-storage"), "must be a node allocatable resource name"),
+			},
+		},
+		"valid hugepages resource": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceName("hugepages-2Mi"): {
+						Overhead: &resourceapi.NodeAllocatableOverhead{
+							PerPod: ptr.To(resource.MustParse("2Mi")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+
+		"bad-node-allocatable-resources-overhead-neither-perpod-nor-percontainer-set": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceMemory)).Child("overhead"), "", "at least one of perPod or perContainer must be set"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceMemory: {
+						Overhead: &resourceapi.NodeAllocatableOverhead{},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resources-overhead-negative-perpod": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceMemory)).Child("overhead").Child("perPod"), "-1Gi", "must be non-negative"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceMemory: {
+						Overhead: &resourceapi.NodeAllocatableOverhead{
+							PerPod: ptr.To(resource.MustParse("-1Gi")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resources-overhead-negative-percontainer": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceMemory)).Child("overhead").Child("perContainer"), "-500Mi", "must be non-negative"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceMemory: {
+						Overhead: &resourceapi.NodeAllocatableOverhead{
+							PerContainer: ptr.To(resource.MustParse("-500Mi")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"good-node-allocatable-resources-overhead": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceMemory: {
+						Overhead: &resourceapi.NodeAllocatableOverhead{
+							PerPod:       ptr.To(resource.MustParse("1Gi")),
+							PerContainer: ptr.To(resource.MustParse("500Mi")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"good-node-allocatable-resources-both-mapping-and-overhead-set": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							CapacityKey:        new[resourceapi.QualifiedName]("dra.example.com/cpu"),
+							CapacityMultiplier: new(resource.MustParse("1")),
+						},
+						Overhead: &resourceapi.NodeAllocatableOverhead{
+							PerPod: new(resource.MustParse("1Gi")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resources-neither-mapping-nor-overhead-set": {
+			wantFailures: field.ErrorList{
+				field.Required(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)), "at least one of mapping or overhead must be set"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resources-capacity-key-set-without-multiplier": {
+			wantFailures: field.ErrorList{
+				field.Required(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)).Child("mapping").Child("capacityMultiplier"), "capacityMultiplier is required when capacityKey is set").MarkCoveredByDeclarative(),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							CapacityKey: new[resourceapi.QualifiedName]("dra.example.com/cpu"),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"bad-node-allocatable-resources-multiplier-set-without-capacity-key": {
+			wantFailures: field.ErrorList{
+				field.Required(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key(string(v1.ResourceCPU)).Child("mapping").Child("capacityKey"), "capacityKey is required when capacityMultiplier is set").MarkCoveredByDeclarative(),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithNodeAllocatableResources(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {
+						Mapping: &resourceapi.NodeAllocatableMapping{
+							CapacityMultiplier: new(resource.MustParse("1")),
+						},
+					},
+				}
+				return slice
+			}(),
+			enableDRANodeAllocatableResourcesFeatureGate: true,
+		},
+		"valid: skipNodeOperations All and Prepare": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SkipNodeOperations = []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationAll, resourceapi.SkipNodeOperationNodePrepareResources}
+				return slice
+			}(),
+		},
+		"valid: skipNodeOperations Prepare and Unprepare": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SkipNodeOperations = []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationNodePrepareResources, resourceapi.SkipNodeOperationNodeUnprepareResources}
+				return slice
+			}(),
+		},
+		"invalid: skipNodeOperations Prepare only": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SkipNodeOperations = []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationNodePrepareResources}
+				return slice
+			}(),
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "skipNodeOperations"), []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationNodePrepareResources}, "NodePrepareResources cannot be skipped unless NodeUnprepareResources is also skipped"),
 			},
 		},
 	}
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, scenario.consumableCapacityFeatureGate)
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.DRANodeAllocatableResources: scenario.enableDRANodeAllocatableResourcesFeatureGate,
 				features.DRAConsumableCapacity:       scenario.consumableCapacityFeatureGate,
+				features.DRAFractionalCapacityRange:  scenario.fractionalCapacityRangeFeatureGate,
 			})
 			errs := ValidateResourceSlice(scenario.slice)
 			assertFailures(t, scenario.wantFailures, errs)
@@ -1188,9 +2059,11 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 	}
 
 	scenarios := map[string]struct {
-		oldResourceSlice *resourceapi.ResourceSlice
-		update           func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice
-		wantFailures     field.ErrorList
+		consumableCapacityFeatureGate      bool
+		fractionalCapacityRangeFeatureGate bool
+		oldResourceSlice                   *resourceapi.ResourceSlice
+		update                             func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice
+		wantFailures                       field.ErrorList
 	}{
 		"valid-no-op-update": {
 			oldResourceSlice: validResourceSlice,
@@ -1282,10 +2155,158 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 				return slice
 			},
 		},
+		"consumable-capacity-valid-values-integer": {
+			consumableCapacityFeatureGate:      true,
+			fractionalCapacityRangeFeatureGate: false,
+			wantFailures:                       field.ErrorList{field.Duplicate(consumeableCapacityPath(0).Child("requestPolicy", "validValues").Index(1), "10")},
+			oldResourceSlice:                   testResourceSliceWithConsumableCapacity(name, name, name, 1),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				updateConsumableCapacity(slice, 0, func(cap *resourceapi.DeviceCapacity) {
+					fraction := resource.MustParse("0.1")
+					min := cap.RequestPolicy.ValidValues[1]
+					minFrac := min.DeepCopy()
+					minFrac.Sub(fraction)
+					cap.RequestPolicy.ValidValues[0] = minFrac // A duplicate when using integers.
+
+				})
+				return slice
+			},
+		},
+		"consumable-capacity-valid-values-integer-okay-if-stored": {
+			consumableCapacityFeatureGate:      true,
+			fractionalCapacityRangeFeatureGate: false,
+			wantFailures:                       nil,
+			oldResourceSlice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithConsumableCapacity(name, name, name, 1)
+				updateConsumableCapacity(slice, 0, func(cap *resourceapi.DeviceCapacity) {
+					fraction := resource.MustParse("0.1")
+					min := cap.RequestPolicy.ValidValues[1]
+					minFrac := min.DeepCopy()
+					minFrac.Sub(fraction)
+					cap.RequestPolicy.ValidValues[0] = minFrac // A duplicate when using integers.
+				})
+				return slice
+			}(),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice { return slice },
+		},
+		"consumable-capacity-valid-range-out-of-int64-bound": {
+			consumableCapacityFeatureGate: true,
+			wantFailures:                  field.ErrorList{field.Invalid(consumeableCapacityPath(0).Child("requestPolicy", "validRange", "min"), "-1", "must be greater than or equal to 0")},
+			oldResourceSlice:              testResourceSliceWithConsumableCapacity(name, name, name, 1),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				updateConsumableCapacity(slice, 0, func(cap *resourceapi.DeviceCapacity) {
+					cap.RequestPolicy = &resourceapi.CapacityRequestPolicy{
+						Default:    new(resource.MustParse("0")),
+						ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: new(resource.MustParse("-1")), Step: new(resource.MustParse("1"))},
+					}
+				})
+				return slice
+			},
+		},
+		"consumable-capacity-valid-range-out-of-int64-bound-okay-if-stored": {
+			consumableCapacityFeatureGate: true,
+			wantFailures:                  nil,
+			oldResourceSlice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithConsumableCapacity(name, name, name, 1)
+				updateConsumableCapacity(slice, 0, func(cap *resourceapi.DeviceCapacity) {
+					cap.RequestPolicy = &resourceapi.CapacityRequestPolicy{
+						Default:    new(resource.MustParse("0")),
+						ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: new(resource.MustParse("-1")), Step: new(resource.MustParse("1"))},
+					}
+				})
+				return slice
+			}(),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice { return slice },
+		},
+		"consumable-capacity-valid-values-milli-values": {
+			consumableCapacityFeatureGate:      true,
+			fractionalCapacityRangeFeatureGate: true,
+			wantFailures:                       nil,
+			oldResourceSlice:                   testResourceSliceWithConsumableCapacity(name, name, name, 1),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				updateConsumableCapacity(slice, 0, func(cap *resourceapi.DeviceCapacity) {
+					fraction := resource.MustParse("0.1")
+					min := cap.RequestPolicy.ValidValues[1]
+					minFrac := min.DeepCopy()
+					minFrac.Sub(fraction)
+					cap.RequestPolicy.ValidValues[0] = minFrac // Okay when using milli-values.
+
+				})
+				return slice
+			},
+		},
+		"consumable-capacity-valid-range-integer": {
+			consumableCapacityFeatureGate:      true,
+			fractionalCapacityRangeFeatureGate: false,
+			wantFailures:                       nil,
+			oldResourceSlice:                   testResourceSliceWithConsumableCapacity(name, name, name, 1),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				updateConsumableCapacity(slice, 0, func(cap *resourceapi.DeviceCapacity) {
+					// Invalid fractions, range too large - okay when rounding to integer.
+					cap.Value.Set(math.MaxInt64)
+					cap.RequestPolicy.Default.Set(math.MaxInt64)
+					cap.RequestPolicy.ValidValues = nil
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{
+						Min:  resource.NewMilliQuantity(0, resource.DecimalSI),
+						Step: resource.NewMilliQuantity(1, resource.DecimalSI),
+						Max:  &cap.Value,
+					}
+				})
+				return slice
+			},
+		},
+		"consumable-capacity-valid-range-integer-okay-if-stored": {
+			consumableCapacityFeatureGate:      true,
+			fractionalCapacityRangeFeatureGate: true,
+			wantFailures:                       nil,
+			oldResourceSlice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSliceWithConsumableCapacity(name, name, name, 1)
+				updateConsumableCapacity(slice, 0, func(cap *resourceapi.DeviceCapacity) {
+					// Invalid fractions, range too large.
+					cap.Value.Set(math.MaxInt64)
+					cap.RequestPolicy.Default.Set(math.MaxInt64)
+					cap.RequestPolicy.ValidValues = nil
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{
+						Min:  resource.NewMilliQuantity(0, resource.DecimalSI),
+						Step: resource.NewMilliQuantity(1, resource.DecimalSI),
+						Max:  &cap.Value,
+					}
+				})
+				return slice
+			}(),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice { return slice },
+		},
+		"consumable-capacity-valid-range-milli-values": {
+			consumableCapacityFeatureGate:      true,
+			fractionalCapacityRangeFeatureGate: true,
+			wantFailures: field.ErrorList{
+				field.Invalid(consumeableCapacityPath(0).Child("requestPolicy", "validRange", "default"), fmt.Sprintf("%d", math.MaxInt), "value cannot be represented as a milli value"),
+				field.Invalid(consumeableCapacityPath(0).Child("requestPolicy", "validRange", "max"), fmt.Sprintf("%d", math.MaxInt), "value cannot be represented as a milli value"),
+			},
+			oldResourceSlice: testResourceSliceWithConsumableCapacity(name, name, name, 1),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				updateConsumableCapacity(slice, 0, func(cap *resourceapi.DeviceCapacity) {
+					// Invalid fractions, range too large.
+					cap.Value.Set(math.MaxInt64)
+					cap.RequestPolicy.Default.Set(math.MaxInt64)
+					cap.RequestPolicy.ValidValues = nil
+					cap.RequestPolicy.ValidRange = &resourceapi.CapacityRequestPolicyRange{
+						Min:  resource.NewMilliQuantity(0, resource.DecimalSI),
+						Step: resource.NewMilliQuantity(1, resource.DecimalSI),
+						Max:  &cap.Value,
+					}
+				})
+				return slice
+			},
+		},
 	}
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRAConsumableCapacity:      scenario.consumableCapacityFeatureGate,
+				features.DRAFractionalCapacityRange: scenario.fractionalCapacityRangeFeatureGate,
+			})
 			scenario.oldResourceSlice.ResourceVersion = "1"
 			errs := ValidateResourceSliceUpdate(scenario.update(scenario.oldResourceSlice.DeepCopy()), scenario.oldResourceSlice)
 			assertFailures(t, scenario.wantFailures, errs)

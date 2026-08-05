@@ -23,7 +23,7 @@ package v1alpha1
 //
 // ImageReviewContainerSpec is a description of a container within the pod creation request.
 type ImageReviewContainerSpecApplyConfiguration struct {
-	// This can be in the form image:tag or image@SHA:012345679abcdef.
+	// image can be in the form image:tag or image@SHA:012345679abcdef.
 	Image *string `json:"image,omitempty"`
 }
 

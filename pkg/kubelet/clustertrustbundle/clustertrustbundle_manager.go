@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-logr/logr"
+	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	lrucache "k8s.io/apimachinery/pkg/util/cache"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -47,7 +48,7 @@ const (
 
 // clusterTrustBundle is a type constraint for version-independent ClusterTrustBundle API
 type clusterTrustBundle interface {
-	certificatesv1alpha1.ClusterTrustBundle | certificatesv1beta1.ClusterTrustBundle
+	certificatesv1alpha1.ClusterTrustBundle | certificatesv1beta1.ClusterTrustBundle | certificatesv1.ClusterTrustBundle
 }
 
 // clusterTrustBundlesLister is an API-verion independent ClusterTrustBundles lister
@@ -63,8 +64,8 @@ type clusterTrustBundleHandlers[T clusterTrustBundle] interface {
 }
 
 type alphaClusterTrustBundleHandlers struct{}
-
 type betaClusterTrustBundleHandlers struct{}
+type gaClusterTrustBundleHandlers struct{}
 
 func (b *alphaClusterTrustBundleHandlers) GetName(ctb *certificatesv1alpha1.ClusterTrustBundle) string {
 	return ctb.Name
@@ -78,7 +79,7 @@ func (b *alphaClusterTrustBundleHandlers) GetTrustBundle(ctb *certificatesv1alph
 	return ctb.Spec.TrustBundle
 }
 
-func (b betaClusterTrustBundleHandlers) GetName(ctb *certificatesv1beta1.ClusterTrustBundle) string {
+func (b *betaClusterTrustBundleHandlers) GetName(ctb *certificatesv1beta1.ClusterTrustBundle) string {
 	return ctb.Name
 }
 
@@ -90,10 +91,22 @@ func (b *betaClusterTrustBundleHandlers) GetTrustBundle(ctb *certificatesv1beta1
 	return ctb.Spec.TrustBundle
 }
 
+func (b *gaClusterTrustBundleHandlers) GetName(ctb *certificatesv1.ClusterTrustBundle) string {
+	return ctb.Name
+}
+
+func (b *gaClusterTrustBundleHandlers) GetSignerName(ctb *certificatesv1.ClusterTrustBundle) string {
+	return ctb.Spec.SignerName
+}
+
+func (b *gaClusterTrustBundleHandlers) GetTrustBundle(ctb *certificatesv1.ClusterTrustBundle) string {
+	return ctb.Spec.TrustBundle
+}
+
 // Manager abstracts over the ability to get trust anchors.
 type Manager interface {
-	GetTrustAnchorsByName(name string, allowMissing bool) ([]byte, error)
-	GetTrustAnchorsBySigner(signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error)
+	GetTrustAnchorsByName(ctx context.Context, name string, allowMissing bool) ([]byte, error)
+	GetTrustAnchorsBySigner(ctx context.Context, signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error)
 }
 
 // InformerManager is the "real" manager.  It uses informers to track
@@ -108,7 +121,7 @@ type InformerManager[T clusterTrustBundle] struct {
 	cacheTTL           time.Duration
 }
 
-var _ Manager = (*InformerManager[certificatesv1beta1.ClusterTrustBundle])(nil)
+var _ Manager = (*InformerManager[certificatesv1.ClusterTrustBundle])(nil)
 
 func NewAlphaInformerManager(
 	ctx context.Context, informerFactory informers.SharedInformerFactory, cacheSize int, cacheTTL time.Duration,
@@ -125,6 +138,15 @@ func NewBetaInformerManager(
 	bundlesInformer := informerFactory.Certificates().V1beta1().ClusterTrustBundles()
 	return newInformerManager(
 		ctx, &betaClusterTrustBundleHandlers{}, bundlesInformer.Informer(), bundlesInformer.Lister(), cacheSize, cacheTTL,
+	)
+}
+
+func NewGAInformerManager(
+	ctx context.Context, informerFactory informers.SharedInformerFactory, cacheSize int, cacheTTL time.Duration,
+) (Manager, error) {
+	bundlesInformer := informerFactory.Certificates().V1().ClusterTrustBundles()
+	return newInformerManager(
+		ctx, &gaClusterTrustBundleHandlers{}, bundlesInformer.Informer(), bundlesInformer.Lister(), cacheSize, cacheTTL,
 	)
 }
 
@@ -197,7 +219,7 @@ func (m *InformerManager[T]) dropCacheFor(ctb *T) {
 
 // GetTrustAnchorsByName returns normalized and deduplicated trust anchors from
 // a single named ClusterTrustBundle.
-func (m *InformerManager[T]) GetTrustAnchorsByName(name string, allowMissing bool) ([]byte, error) {
+func (m *InformerManager[T]) GetTrustAnchorsByName(ctx context.Context, name string, allowMissing bool) ([]byte, error) {
 	if !m.ctbInformer.HasSynced() {
 		return nil, fmt.Errorf("ClusterTrustBundle informer has not yet synced")
 	}
@@ -228,7 +250,7 @@ func (m *InformerManager[T]) GetTrustAnchorsByName(name string, allowMissing boo
 
 // GetTrustAnchorsBySigner returns normalized and deduplicated trust anchors
 // from a set of selected ClusterTrustBundles.
-func (m *InformerManager[T]) GetTrustAnchorsBySigner(signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error) {
+func (m *InformerManager[T]) GetTrustAnchorsBySigner(ctx context.Context, signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error) {
 	if !m.ctbInformer.HasSynced() {
 		return nil, fmt.Errorf("ClusterTrustBundle informer has not yet synced")
 	}
@@ -324,12 +346,12 @@ type NoopManager struct{}
 var _ Manager = (*NoopManager)(nil)
 
 // GetTrustAnchorsByName implements Manager.
-func (m *NoopManager) GetTrustAnchorsByName(name string, allowMissing bool) ([]byte, error) {
+func (m *NoopManager) GetTrustAnchorsByName(ctx context.Context, name string, allowMissing bool) ([]byte, error) {
 	return nil, fmt.Errorf("ClusterTrustBundle projection is not supported in static kubelet mode")
 }
 
 // GetTrustAnchorsBySigner implements Manager.
-func (m *NoopManager) GetTrustAnchorsBySigner(signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error) {
+func (m *NoopManager) GetTrustAnchorsBySigner(ctx context.Context, signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error) {
 	return nil, fmt.Errorf("ClusterTrustBundle projection is not supported in static kubelet mode")
 }
 
@@ -343,7 +365,7 @@ type LazyInformerManager struct {
 	client            clientset.Interface
 	cacheSize         int
 	contextWithLogger context.Context
-	logger            logr.Logger
+	logger            klog.Logger
 }
 
 func NewLazyInformerManager(ctx context.Context, kubeClient clientset.Interface, cacheSize int) Manager {
@@ -356,18 +378,18 @@ func NewLazyInformerManager(ctx context.Context, kubeClient clientset.Interface,
 	}
 }
 
-func (m *LazyInformerManager) GetTrustAnchorsByName(name string, allowMissing bool) ([]byte, error) {
-	if err := m.ensureManagerSet(); err != nil {
+func (m *LazyInformerManager) GetTrustAnchorsByName(ctx context.Context, name string, allowMissing bool) ([]byte, error) {
+	if err := m.ensureManagerSet(ctx); err != nil {
 		return nil, fmt.Errorf("failed to ensure informer manager for ClusterTrustBundles: %w", err)
 	}
-	return m.manager.GetTrustAnchorsByName(name, allowMissing)
+	return m.manager.GetTrustAnchorsByName(ctx, name, allowMissing)
 }
 
-func (m *LazyInformerManager) GetTrustAnchorsBySigner(signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error) {
-	if err := m.ensureManagerSet(); err != nil {
+func (m *LazyInformerManager) GetTrustAnchorsBySigner(ctx context.Context, signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error) {
+	if err := m.ensureManagerSet(ctx); err != nil {
 		return nil, fmt.Errorf("failed to ensure informer manager for ClusterTrustBundles: %w", err)
 	}
-	return m.manager.GetTrustAnchorsBySigner(signerName, labelSelector, allowMissing)
+	return m.manager.GetTrustAnchorsBySigner(ctx, signerName, labelSelector, allowMissing)
 }
 
 func (m *LazyInformerManager) isManagerSet() bool {
@@ -378,7 +400,7 @@ func (m *LazyInformerManager) isManagerSet() bool {
 
 type managerConstructor func(ctx context.Context, informerFactory informers.SharedInformerFactory, cacheSize int, cacheTTL time.Duration) (Manager, error)
 
-func (m *LazyInformerManager) ensureManagerSet() error {
+func (m *LazyInformerManager) ensureManagerSet(ctx context.Context) error {
 	if m.isManagerSet() {
 		return nil
 	}
@@ -393,14 +415,20 @@ func (m *LazyInformerManager) ensureManagerSet() error {
 	managerSchema := map[schema.GroupVersion]managerConstructor{
 		certificatesv1alpha1.SchemeGroupVersion: NewAlphaInformerManager,
 		certificatesv1beta1.SchemeGroupVersion:  NewBetaInformerManager,
+		certificatesv1.SchemeGroupVersion:       NewGAInformerManager,
 	}
 
 	kubeInformers := informers.NewSharedInformerFactoryWithOptions(m.client, 0)
 
 	var clusterTrustBundleManager Manager
 	var foundGV string
-	for _, gv := range []schema.GroupVersion{certificatesv1beta1.SchemeGroupVersion, certificatesv1alpha1.SchemeGroupVersion} {
-		ctbAPIAvailable, err := clusterTrustBundlesAvailable(m.client, gv)
+	discoveryClient := discovery.ToDiscoveryInterfaceWithContext(m.client.Discovery())
+	for _, gv := range []schema.GroupVersion{
+		certificatesv1.SchemeGroupVersion,
+		certificatesv1beta1.SchemeGroupVersion,
+		certificatesv1alpha1.SchemeGroupVersion,
+	} {
+		ctbAPIAvailable, err := clusterTrustBundlesAvailable(ctx, discoveryClient, gv)
 		if err != nil {
 			return fmt.Errorf("failed to determine which informer manager to choose: %w", err)
 		}
@@ -445,8 +473,8 @@ func (m *LazyInformerManager) ensureManagerSet() error {
 	return nil
 }
 
-func clusterTrustBundlesAvailable(client clientset.Interface, gv schema.GroupVersion) (bool, error) {
-	resList, err := client.Discovery().ServerResourcesForGroupVersion(gv.String())
+func clusterTrustBundlesAvailable(ctx context.Context, discoveryClient discovery.DiscoveryInterfaceWithContext, gv schema.GroupVersion) (bool, error) {
+	resList, err := discoveryClient.ServerResourcesForGroupVersionWithContext(ctx, gv.String())
 	if k8serrors.IsNotFound(err) {
 		return false, nil
 	}

@@ -134,7 +134,7 @@ func (c *crdRegistrationController) Run(workers int, stopCh <-chan struct{}) {
 	close(c.syncedInitialSet)
 
 	// start up your worker threads based on workers.  Some controllers have multiple kinds of workers
-	for i := 0; i < workers; i++ {
+	for range workers {
 		// runWorker will loop until "something bad" happens.  The .Until will then rekick the worker
 		// after one second
 		go wait.Until(c.runWorker, time.Second, stopCh)

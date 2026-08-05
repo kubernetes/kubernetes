@@ -18,6 +18,7 @@ import (
 	"sync"
 
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 
 	"go.etcd.io/etcd/server/v3/etcdserver/cindex"
 	"go.etcd.io/etcd/server/v3/storage/backend"
@@ -30,7 +31,7 @@ type BackendHooks struct {
 	lg      *zap.Logger
 
 	// confState to Be written in the next submitted Backend transaction (if dirty)
-	confState raftpb.ConfState
+	confState *raftpb.ConfState
 	// first write changes it to 'dirty'. false by default, so
 	// not initialized `confState` is meaningless.
 	confStateDirty bool
@@ -46,7 +47,7 @@ func (bh *BackendHooks) OnPreCommitUnsafe(tx backend.UnsafeReadWriter) {
 	bh.confStateLock.Lock()
 	defer bh.confStateLock.Unlock()
 	if bh.confStateDirty {
-		schema.MustUnsafeSaveConfStateToBackend(bh.lg, tx, &bh.confState)
+		schema.MustUnsafeSaveConfStateToBackend(bh.lg, tx, bh.confState)
 		// save bh.confState
 		bh.confStateDirty = false
 	}
@@ -55,6 +56,6 @@ func (bh *BackendHooks) OnPreCommitUnsafe(tx backend.UnsafeReadWriter) {
 func (bh *BackendHooks) SetConfState(confState *raftpb.ConfState) {
 	bh.confStateLock.Lock()
 	defer bh.confStateLock.Unlock()
-	bh.confState = *confState
+	bh.confState = proto.Clone(confState).(*raftpb.ConfState)
 	bh.confStateDirty = true
 }

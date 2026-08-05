@@ -53,6 +53,11 @@
       "apiVersion": "apiVersionValue",
       "name": "nameValue",
       "uid": "uidValue"
+    },
+    "attestations": {
+      "attestationsKey": [
+        "attestationsValue"
+      ]
     }
   },
   "status": {

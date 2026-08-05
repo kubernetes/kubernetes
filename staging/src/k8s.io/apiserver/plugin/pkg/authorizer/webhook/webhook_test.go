@@ -26,11 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 func mustLabelRequirement(selector string) labels.Requirements {
@@ -47,33 +43,10 @@ func Test_resourceAttributesFrom(t *testing.T) {
 		attr authorizer.Attributes
 	}
 	tests := []struct {
-		name                        string
-		args                        args
-		want                        *authorizationv1.ResourceAttributes
-		enableAuthorizationSelector bool
+		name string
+		args args
+		want *authorizationv1.ResourceAttributes
 	}{
-		{
-			name: "field selector: don't parse when disabled",
-			args: args{
-				attr: authorizer.AttributesRecord{
-					FieldSelectorRequirements: fields.Requirements{
-						fields.OneTermEqualSelector("foo", "bar").Requirements()[0],
-					},
-					FieldSelectorParsingErr: nil,
-				},
-			},
-			want: &authorizationv1.ResourceAttributes{},
-		},
-		{
-			name: "label selector: don't parse when disabled",
-			args: args{
-				attr: authorizer.AttributesRecord{
-					LabelSelectorRequirements: mustLabelRequirement("foo in (bar,baz)"),
-					LabelSelectorParsingErr:   nil,
-				},
-			},
-			want: &authorizationv1.ResourceAttributes{},
-		},
 		{
 			name: "field selector: ignore error",
 			args: args{
@@ -89,7 +62,6 @@ func Test_resourceAttributesFrom(t *testing.T) {
 					Requirements: []metav1.FieldSelectorRequirement{{Key: "foo", Operator: "In", Values: []string{"bar"}}},
 				},
 			},
-			enableAuthorizationSelector: true,
 		},
 		{
 			name: "label selector: ignore error",
@@ -104,7 +76,6 @@ func Test_resourceAttributesFrom(t *testing.T) {
 					Requirements: []metav1.LabelSelectorRequirement{{Key: "foo", Operator: "In", Values: []string{"bar", "baz"}}},
 				},
 			},
-			enableAuthorizationSelector: true,
 		},
 		{
 			name: "field selector: equals, double equals, in",
@@ -139,7 +110,6 @@ func Test_resourceAttributesFrom(t *testing.T) {
 					},
 				},
 			},
-			enableAuthorizationSelector: true,
 		},
 		{
 			name: "field selector: not equals, not in",
@@ -168,7 +138,6 @@ func Test_resourceAttributesFrom(t *testing.T) {
 					},
 				},
 			},
-			enableAuthorizationSelector: true,
 		},
 		{
 			name: "field selector: unknown operator skipped",
@@ -192,7 +161,6 @@ func Test_resourceAttributesFrom(t *testing.T) {
 					},
 				},
 			},
-			enableAuthorizationSelector: true,
 		},
 		{
 			name: "field selector: no requirements has no fieldselector",
@@ -204,8 +172,7 @@ func Test_resourceAttributesFrom(t *testing.T) {
 					FieldSelectorParsingErr: nil,
 				},
 			},
-			want:                        &authorizationv1.ResourceAttributes{},
-			enableAuthorizationSelector: true,
+			want: &authorizationv1.ResourceAttributes{},
 		},
 		{
 			name: "label selector: in, equals, double equals",
@@ -236,7 +203,6 @@ func Test_resourceAttributesFrom(t *testing.T) {
 					},
 				},
 			},
-			enableAuthorizationSelector: true,
 		},
 		{
 			name: "label selector: not in, not equals",
@@ -262,7 +228,6 @@ func Test_resourceAttributesFrom(t *testing.T) {
 					},
 				},
 			},
-			enableAuthorizationSelector: true,
 		},
 		{
 			name: "label selector: exists, not exists",
@@ -286,7 +251,6 @@ func Test_resourceAttributesFrom(t *testing.T) {
 					},
 				},
 			},
-			enableAuthorizationSelector: true,
 		},
 		{
 			name: "label selector: unknown operator skipped",
@@ -307,7 +271,6 @@ func Test_resourceAttributesFrom(t *testing.T) {
 					},
 				},
 			},
-			enableAuthorizationSelector: true,
 		},
 		{
 			name: "label selector: no requirements has no labelselector",
@@ -317,17 +280,11 @@ func Test_resourceAttributesFrom(t *testing.T) {
 					LabelSelectorParsingErr:   nil,
 				},
 			},
-			want:                        &authorizationv1.ResourceAttributes{},
-			enableAuthorizationSelector: true,
+			want: &authorizationv1.ResourceAttributes{},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if !tt.enableAuthorizationSelector {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AuthorizeWithSelectors, false)
-			}
-
 			if got := resourceAttributesFrom(tt.args.attr); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("resourceAttributesFrom() = %v, want %v", got, tt.want)
 			}

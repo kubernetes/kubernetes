@@ -40,5 +40,12 @@ function git_find() {
         ':(glob)**/*.go' \
         "$@"
 }
+# GOTOOLCHAIN has no effect on the version of gofmt.
+# We need to find right gofmt, otherwise the one in PATH will be used.
+gofmt="$(go env GOROOT)/bin/gofmt"
+if [[ ! -x "${gofmt}" ]]; then
+  echo "Failed to find $gofmt" >&2
+  exit 1
+fi
 
-git_find -z | xargs -0 gofmt -s -w
+git_find -z | xargs -0 "${gofmt}" -s -w

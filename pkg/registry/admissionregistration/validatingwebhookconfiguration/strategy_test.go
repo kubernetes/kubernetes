@@ -17,6 +17,7 @@ limitations under the License.
 package validatingwebhookconfiguration
 
 import (
+	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +33,7 @@ func TestValidatingWebhookConfigurationStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Error("ValidatingWebhookConfiguration strategy must be cluster scoped")
 	}
-	if Strategy.AllowCreateOnUpdate() {
+	if Strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("ValidatingWebhookConfiguration should not allow create on update")
 	}
 

@@ -17,6 +17,7 @@ limitations under the License.
 package csidriver
 
 import (
+	"context"
 	"slices"
 	"testing"
 
@@ -58,7 +59,7 @@ func TestCSIDriverStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("CSIDriver must not be namespace scoped")
 	}
-	if Strategy.AllowCreateOnUpdate() {
+	if Strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("CSIDriver should not allow create on update")
 	}
 

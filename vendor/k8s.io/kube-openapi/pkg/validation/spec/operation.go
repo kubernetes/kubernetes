@@ -20,6 +20,7 @@ import (
 	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
 	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
+	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/jsontext"
 )
 
 // OperationProps describes an operation
@@ -104,13 +105,13 @@ func (o *Operation) UnmarshalJSON(data []byte) error {
 	return json.Unmarshal(data, &o.VendorExtensible)
 }
 
-func (o *Operation) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+func (o *Operation) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	type OperationPropsNoMethods OperationProps // strip MarshalJSON method
 	var x struct {
-		Extensions
+		Extensions Extensions `json:",inline"`
 		OperationPropsNoMethods
 	}
-	if err := opts.UnmarshalNext(dec, &x); err != nil {
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
 		return err
 	}
 	o.Extensions = internal.SanitizeExtensions(x.Extensions)
@@ -135,12 +136,12 @@ func (o Operation) MarshalJSON() ([]byte, error) {
 	return concated, nil
 }
 
-func (o Operation) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+func (o Operation) MarshalJSONTo(enc *jsontext.Encoder) error {
 	var x struct {
-		Extensions
+		Extensions     Extensions             `json:",inline"`
 		OperationProps operationPropsOmitZero `json:",inline"`
 	}
 	x.Extensions = internal.SanitizeExtensions(o.Extensions)
 	x.OperationProps = operationPropsOmitZero(o.OperationProps)
-	return opts.MarshalNext(enc, x)
+	return jsonv2.MarshalEncode(enc, x)
 }

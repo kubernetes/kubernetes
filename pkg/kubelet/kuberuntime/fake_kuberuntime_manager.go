@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"time"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"go.opentelemetry.io/otel/trace"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/component-base/logs/logreduction"
 	internalapi "k8s.io/cri-api/pkg/apis"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -95,31 +96,26 @@ func (f *fakePodPullingTimeRecorder) RecordImageStartedPulling(podUID types.UID)
 
 func (f *fakePodPullingTimeRecorder) RecordImageFinishedPulling(podUID types.UID) {}
 
-func newFakeKubeRuntimeManager(ctx context.Context, runtimeService internalapi.RuntimeService, imageService internalapi.ImageManagerService, machineInfo *cadvisorapi.MachineInfo, osInterface kubecontainer.OSInterface, runtimeHelper kubecontainer.RuntimeHelper, tracer trace.Tracer) (*kubeGenericRuntimeManager, error) {
-	recorder := &record.FakeRecorder{}
-	logManager, err := logs.NewContainerLogManager(runtimeService, osInterface, "1", 2, 10, metav1.Duration{Duration: 10 * time.Second})
-	if err != nil {
-		return nil, err
-	}
+func newFakeKubeRuntimeManager(ctx context.Context, runtimeService internalapi.RuntimeService, imageService internalapi.ImageManagerService, machineInfo *cadvisorapi.MachineInfo, osInterface kubecontainer.OSInterface, runtimeHelper kubecontainer.RuntimeHelper, tracer trace.Tracer, recorder *record.FakeRecorder) (*kubeGenericRuntimeManager, error) {
+	logger := klog.FromContext(ctx)
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
-		recorder:               recorder,
-		cpuCFSQuota:            false,
-		cpuCFSQuotaPeriod:      metav1.Duration{Duration: time.Millisecond * 100},
-		livenessManager:        proberesults.NewManager(),
-		startupManager:         proberesults.NewManager(),
-		machineInfo:            machineInfo,
-		osInterface:            osInterface,
-		containerManager:       cm.NewFakeContainerManager(),
-		runtimeHelper:          runtimeHelper,
-		runtimeService:         runtimeService,
-		imageService:           imageService,
-		seccompProfileRoot:     fakeSeccompProfileRoot,
-		internalLifecycle:      cm.NewFakeInternalContainerLifecycle(),
-		logReduction:           logreduction.NewLogReduction(identicalErrorDelay),
-		logManager:             logManager,
-		memoryThrottlingFactor: 0.9,
-		podLogsDirectory:       fakePodLogsDirectory,
-		actuatedState:          state.NewStateMemory(nil),
+		recorder:           recorder,
+		cpuCFSQuota:        false,
+		cpuCFSQuotaPeriod:  metav1.Duration{Duration: time.Millisecond * 100},
+		livenessManager:    proberesults.NewManager(),
+		startupManager:     proberesults.NewManager(),
+		machineInfo:        machineInfo,
+		osInterface:        osInterface,
+		containerManager:   cm.NewFakeContainerManager(logger),
+		runtimeHelper:      runtimeHelper,
+		runtimeService:     runtimeService,
+		imageService:       imageService,
+		seccompProfileRoot: fakeSeccompProfileRoot,
+		internalLifecycle:  cm.NewFakeInternalContainerLifecycle(),
+		logReduction:       logreduction.NewLogReduction(identicalErrorDelay),
+		logManager:         logs.NewStubContainerLogManager(),
+		podLogsDirectory:   fakePodLogsDirectory,
+		actuatedState:      state.NewStateMemory(logger, nil),
 	}
 
 	// Initialize swap controller availability check (always false for tests)

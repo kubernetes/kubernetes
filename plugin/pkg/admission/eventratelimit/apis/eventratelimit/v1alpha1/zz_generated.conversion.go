@@ -80,10 +80,7 @@ func Convert_eventratelimit_Configuration_To_v1alpha1_Configuration(in *eventrat
 }
 
 func autoConvert_v1alpha1_Limit_To_eventratelimit_Limit(in *Limit, out *eventratelimit.Limit, s conversion.Scope) error {
-	out.Type = eventratelimit.LimitType(in.Type)
-	out.QPS = in.QPS
-	out.Burst = in.Burst
-	out.CacheSize = in.CacheSize
+	*out = *(*eventratelimit.Limit)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -93,10 +90,7 @@ func Convert_v1alpha1_Limit_To_eventratelimit_Limit(in *Limit, out *eventratelim
 }
 
 func autoConvert_eventratelimit_Limit_To_v1alpha1_Limit(in *eventratelimit.Limit, out *Limit, s conversion.Scope) error {
-	out.Type = LimitType(in.Type)
-	out.QPS = in.QPS
-	out.Burst = in.Burst
-	out.CacheSize = in.CacheSize
+	*out = *(*Limit)(unsafe.Pointer(in))
 	return nil
 }
 

@@ -42,6 +42,9 @@ type HTTPGetActionApplyConfiguration struct {
 	Scheme *corev1.URIScheme `json:"scheme,omitempty"`
 	// Custom headers to set in the request. HTTP allows repeated headers.
 	HTTPHeaders []HTTPHeaderApplyConfiguration `json:"httpHeaders,omitempty"`
+	// Protocol selects the wire protocol for the probe connection.
+	// Nil defaults to HTTP/1.1.
+	Protocol *corev1.HTTPProtocol `json:"protocol,omitempty"`
 }
 
 // HTTPGetActionApplyConfiguration constructs a declarative configuration of the HTTPGetAction type for use with
@@ -92,5 +95,13 @@ func (b *HTTPGetActionApplyConfiguration) WithHTTPHeaders(values ...*HTTPHeaderA
 		}
 		b.HTTPHeaders = append(b.HTTPHeaders, *values[i])
 	}
+	return b
+}
+
+// WithProtocol sets the Protocol field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Protocol field is set to the value of the last call.
+func (b *HTTPGetActionApplyConfiguration) WithProtocol(value corev1.HTTPProtocol) *HTTPGetActionApplyConfiguration {
+	b.Protocol = &value
 	return b
 }

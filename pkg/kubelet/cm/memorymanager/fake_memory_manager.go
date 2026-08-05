@@ -24,8 +24,10 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
+	cmqos "k8s.io/kubernetes/pkg/kubelet/cm/qos"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 )
 
@@ -44,9 +46,9 @@ func (m *fakeManager) Policy(logger klog.Logger) Policy {
 	return NewPolicyNone(logger)
 }
 
-func (m *fakeManager) Allocate(pod *v1.Pod, container *v1.Container) error {
-	logger := klog.TODO()
-	logger.Info("Allocate", "pod", klog.KObj(pod), "containerName", container.Name)
+func (m *fakeManager) Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) error {
+	logger := klog.LoggerWithValues(klog.FromContext(ctx), "pod", klog.KObj(pod), "containerName", container.Name, "operation", operation)
+	logger.Info("Allocate")
 	return nil
 }
 
@@ -64,21 +66,18 @@ func (m *fakeManager) RemoveContainer(logger klog.Logger, containerID string) er
 	return nil
 }
 
-func (m *fakeManager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
-	logger := klog.TODO()
-	logger.Info("Get Topology Hints", "pod", klog.KObj(pod), "containerName", container.Name)
+func (m *fakeManager) GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
+	logger.Info("GetTopologyHints", "pod", klog.KObj(pod), "containerName", container.Name, "operation", operation)
 	return map[string][]topologymanager.TopologyHint{}
 }
 
-func (m *fakeManager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
-	logger := klog.TODO()
-	logger.Info("Get Pod Topology Hints", "pod", klog.KObj(pod))
+func (m *fakeManager) GetPodTopologyHints(logger klog.Logger, pod *v1.Pod, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
+	logger.Info("GetPodTopologyHints", "pod", klog.KObj(pod), "operation", operation)
 	return map[string][]topologymanager.TopologyHint{}
 }
 
-func (m *fakeManager) AllocatePod(pod *v1.Pod) error {
-	logger := klog.TODO()
-	logger.Info("AllocatePod", "pod", klog.KObj(pod))
+func (m *fakeManager) AllocatePod(logger klog.Logger, pod *v1.Pod, operation lifecycle.Operation) error {
+	logger.Info("AllocatePod", "pod", klog.KObj(pod), "operation", operation)
 	return nil
 }
 
@@ -87,17 +86,27 @@ func (m *fakeManager) State() state.Reader {
 }
 
 // GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
-func (m *fakeManager) GetAllocatableMemory() []state.Block {
-	logger := klog.TODO()
+func (m *fakeManager) GetAllocatableMemory(logger klog.Logger) []state.Block {
 	logger.Info("Get Allocatable Memory")
 	return []state.Block{}
 }
 
 // GetMemory returns the memory allocated by a container from NUMA nodes
-func (m *fakeManager) GetMemory(podUID, containerName string) []state.Block {
-	logger := klog.LoggerWithValues(klog.TODO(), "podUID", podUID, "containerName", containerName)
+func (m *fakeManager) GetMemory(logger klog.Logger, podUID, containerName string) []state.Block {
+	logger = klog.LoggerWithValues(logger, "podUID", podUID, "containerName", containerName)
 	logger.Info("Get Memory")
 	return []state.Block{}
+}
+
+// GetPodMemory returns the memory allocated by a pod from NUMA nodes
+func (m *fakeManager) GetPodMemory(podUID string) []state.Block {
+	logger := klog.LoggerWithValues(klog.TODO(), "podUID", podUID)
+	logger.Info("Get Pod Memory")
+	return []state.Block{}
+}
+
+func (m *fakeManager) GetResourceIsolationLevel(pod *v1.Pod, container *v1.Container) cmqos.ResourceIsolationLevel {
+	return cmqos.ResourceIsolationContainer
 }
 
 // NewFakeManager creates empty/fake memory manager

@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 
@@ -33,7 +33,7 @@ func Test_hostStatsProvider_getPodEtcHostsStats(t *testing.T) {
 		name                string
 		podEtcHostsPathFunc PodEtcHostsPathFunc
 		podUID              types.UID
-		rootFsInfo          *cadvisorapiv2.FsInfo
+		rootFsInfo          *cadvisorapi.FsInfo
 		want                *statsapi.FsStats
 		wantErr             bool
 	}{

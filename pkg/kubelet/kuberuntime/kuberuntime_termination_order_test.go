@@ -19,6 +19,7 @@ package kuberuntime
 import (
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -26,6 +27,9 @@ import (
 )
 
 func TestTerminationOrderingSidecarStopAfterMain(t *testing.T) {
+	synctest.Test(t, testTerminationOrderingSidecarStopAfterMain)
+}
+func testTerminationOrderingSidecarStopAfterMain(t *testing.T) {
 	restartPolicy := v1.ContainerRestartPolicyAlways
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -83,6 +87,9 @@ func TestTerminationOrderingSidecarStopAfterMain(t *testing.T) {
 }
 
 func TestTerminationOrderingSidecarsInReverseOrder(t *testing.T) {
+	synctest.Test(t, testTerminationOrderingSidecarsInReverseOrder)
+}
+func testTerminationOrderingSidecarsInReverseOrder(t *testing.T) {
 	restartPolicy := v1.ContainerRestartPolicyAlways
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -185,6 +192,9 @@ func TestTerminationOrderingSidecarsInReverseOrder(t *testing.T) {
 }
 
 func TestTerminationOrderingObeysGrace(t *testing.T) {
+	synctest.Test(t, testTerminationOrderingObeysGrace)
+}
+func testTerminationOrderingObeysGrace(t *testing.T) {
 	restartPolicy := v1.ContainerRestartPolicyAlways
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

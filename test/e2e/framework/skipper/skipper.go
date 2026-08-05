@@ -108,20 +108,6 @@ func SkipUnlessNodeCountIsAtMost(maxNodeCount int) {
 	}
 }
 
-// SkipIfProviderIs skips if the provider is included in the unsupportedProviders.
-func SkipIfProviderIs(unsupportedProviders ...string) {
-	if framework.ProviderIs(unsupportedProviders...) {
-		skipInternalf(1, "Not supported for providers %v (found %s)", unsupportedProviders, framework.TestContext.Provider)
-	}
-}
-
-// SkipUnlessProviderIs skips if the provider is not included in the supportedProviders.
-func SkipUnlessProviderIs(supportedProviders ...string) {
-	if !framework.ProviderIs(supportedProviders...) {
-		skipInternalf(1, "Only supported for providers %v (not %s)", supportedProviders, framework.TestContext.Provider)
-	}
-}
-
 // SkipUnlessMultizone skips if the cluster does not have multizone.
 func SkipUnlessMultizone(ctx context.Context, c clientset.Interface) {
 	zones, err := e2enode.GetClusterZones(ctx, c)

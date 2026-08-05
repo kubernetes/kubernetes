@@ -282,7 +282,7 @@ func (p *fakePlugin) Name() string {
 	return p.name
 }
 
-func (p *fakePlugin) Less(fwk.QueuedPodInfo, fwk.QueuedPodInfo) bool {
+func (p *fakePlugin) Less(fwk.QueuedEntityInfo, fwk.QueuedEntityInfo) bool {
 	return false
 }
 
@@ -296,7 +296,7 @@ func newFakePlugin(name string) func(ctx context.Context, object runtime.Object,
 	}
 }
 
-func nilRecorderFactory(_ string) events.EventRecorder {
+func nilRecorderFactory(_ string) events.EventRecorderLogger {
 	return nil
 }
 

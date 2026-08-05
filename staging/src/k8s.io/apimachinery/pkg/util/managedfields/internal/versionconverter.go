@@ -63,23 +63,22 @@ func newCRDVersionConverter(t TypeConverter, o runtime.ObjectConvertor, h schema
 
 // Convert implements sigs.k8s.io/structured-merge-diff/merge.Converter
 func (v *versionConverter) Convert(object *typed.TypedValue, version fieldpath.APIVersion) (*typed.TypedValue, error) {
-	// Convert the smd typed value to a kubernetes object.
-	objectToConvert, err := v.typeConverter.TypedToObject(object)
-	if err != nil {
-		return object, err
-	}
-
-	// Parse the target groupVersion.
 	groupVersion, err := schema.ParseGroupVersion(string(version))
 	if err != nil {
 		return object, err
 	}
 
 	// If attempting to convert to the same version as we already have, just return it.
-	fromVersion := objectToConvert.GetObjectKind().GroupVersionKind().GroupVersion()
-	if fromVersion == groupVersion {
+	if typedVersion, ok := GroupVersionOfTypedValue(object); ok && typedVersion == groupVersion {
 		return object, nil
 	}
+
+	// Convert the smd typed value to a kubernetes object.
+	objectToConvert, err := v.typeConverter.TypedToObject(object)
+	if err != nil {
+		return object, err
+	}
+	fromVersion := objectToConvert.GetObjectKind().GroupVersionKind().GroupVersion()
 
 	// Convert to internal
 	internalObject, err := v.objectConvertor.ConvertToVersion(objectToConvert, v.hubGetter(fromVersion))

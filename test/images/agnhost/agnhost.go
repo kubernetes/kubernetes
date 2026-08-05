@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/test/images/agnhost/fakeregistryserver"
 	grpchealthchecking "k8s.io/kubernetes/test/images/agnhost/grpc-health-checking"
 	"k8s.io/kubernetes/test/images/agnhost/guestbook"
+	h2cserver "k8s.io/kubernetes/test/images/agnhost/h2c-server"
 	"k8s.io/kubernetes/test/images/agnhost/inclusterclient"
 	"k8s.io/kubernetes/test/images/agnhost/liveness"
 	logsgen "k8s.io/kubernetes/test/images/agnhost/logs-generator"
@@ -94,6 +95,7 @@ func main() {
 	rootCmd.AddCommand(webhook.CmdWebhook)
 	rootCmd.AddCommand(openidmetadata.CmdTestServiceAccountIssuerDiscovery)
 	rootCmd.AddCommand(grpchealthchecking.CmdGrpcHealthChecking)
+	rootCmd.AddCommand(h2cserver.CmdH2CServer)
 	rootCmd.AddCommand(vishhstress.CmdStress)
 	rootCmd.AddCommand(podcertificatesigner.CmdPodCertificateSigner)
 	rootCmd.AddCommand(mtlsclient.CmdMtlsClient)

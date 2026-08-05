@@ -220,6 +220,7 @@ func (c *streamingConnectionAdapter) RemoveStreams(streams ...streamhttp.Stream)
 			compatStreams = append(compatStreams, s)
 			continue
 		}
+		//nolint:logcheck // Extending the httpstream.Connection API is not worth it for contextual, structured logging of this.
 		klog.V(5).Infof("dropping unadaptable streaming stream %T in RemoveStreams", stream)
 	}
 	c.delegate.RemoveStreams(compatStreams...)
@@ -301,6 +302,7 @@ func (c *compatConnectionAdapter) RemoveStreams(streams ...httpstream.Stream) {
 			streamingStreams = append(streamingStreams, s)
 			continue
 		}
+		//nolint:logcheck // Extending the API is not worth it for contextual, structured logging of this.
 		klog.V(5).Infof("dropping unadaptable compat stream %T in RemoveStreams", stream)
 	}
 	c.delegate.RemoveStreams(streamingStreams...)

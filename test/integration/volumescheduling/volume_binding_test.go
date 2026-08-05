@@ -50,6 +50,7 @@ type testConfig struct {
 	ns       string
 	stop     <-chan struct{}
 	teardown func()
+	testCtx  *testutil.TestContext
 }
 
 var (
@@ -1089,20 +1090,29 @@ func initPVController(t *testing.T, testCtx *testutil.TestContext, provisionDela
 
 	// Start PV controller for volume binding.
 	host := volumetest.NewFakeVolumeHost(t, "/tmp/fake", nil, nil)
-	plugin := &volumetest.FakeVolumePlugin{
-		PluginName:             provisionerPluginName,
-		Host:                   host,
-		Config:                 volume.VolumeConfig{},
-		LastProvisionerOptions: volume.VolumeOptions{},
-		ProvisionDelaySeconds:  provisionDelaySeconds,
-		NewAttacherCallCount:   0,
-		NewDetacherCallCount:   0,
-		Mounters:               nil,
-		Unmounters:             nil,
-		Attachers:              nil,
-		Detachers:              nil,
+	provisionerNames := sets.New(
+		provisionerPluginName,
+		multiDriverAProvisionerName,
+		multiDriverBProvisionerName,
+		mixedEnabledProvisionerName,
+		mixedDisabledProvisionerName,
+	)
+	plugins := make([]volume.VolumePlugin, 0, provisionerNames.Len())
+	for provisionerName := range provisionerNames {
+		plugins = append(plugins, &volumetest.FakeVolumePlugin{
+			PluginName:             provisionerName,
+			Host:                   host,
+			Config:                 volume.VolumeConfig{},
+			LastProvisionerOptions: volume.VolumeOptions{},
+			ProvisionDelaySeconds:  provisionDelaySeconds,
+			NewAttacherCallCount:   0,
+			NewDetacherCallCount:   0,
+			Mounters:               nil,
+			Unmounters:             nil,
+			Attachers:              nil,
+			Detachers:              nil,
+		})
 	}
-	plugins := []volume.VolumePlugin{plugin}
 
 	params := persistentvolume.ControllerParameters{
 		KubeClient: clientset,

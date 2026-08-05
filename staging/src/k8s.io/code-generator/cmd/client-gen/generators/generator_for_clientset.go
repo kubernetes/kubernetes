@@ -78,7 +78,7 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 		"DefaultKubernetesUserAgent":           c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "DefaultKubernetesUserAgent"}),
 		"RESTClientInterface":                  c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
 		"RESTHTTPClientFor":                    c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "HTTPClientFor"}),
-		"DiscoveryInterface":                   c.Universe.Type(types.Name{Package: "k8s.io/client-go/discovery", Name: "DiscoveryInterface"}),
+		"DiscoveryInterfaces":                  c.Universe.Type(types.Name{Package: "k8s.io/client-go/discovery", Name: "DiscoveryInterfaces"}),
 		"DiscoveryClient":                      c.Universe.Type(types.Name{Package: "k8s.io/client-go/discovery", Name: "DiscoveryClient"}),
 		"httpClient":                           c.Universe.Type(types.Name{Package: "net/http", Name: "Client"}),
 		"NewDiscoveryClientForConfigAndClient": c.Universe.Function(types.Name{Package: "k8s.io/client-go/discovery", Name: "NewDiscoveryClientForConfigAndClient"}),
@@ -102,7 +102,7 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 
 var clientsetInterface = `
 type Interface interface {
-	Discovery() $.DiscoveryInterface|raw$
+	Discovery() $.DiscoveryInterfaces|raw$
     $range .allGroups$$.GroupGoName$$.Version$() $.PackageAlias$.$.GroupGoName$$.Version$Interface
 	$end$
 }
@@ -126,7 +126,7 @@ func (c *Clientset) $.GroupGoName$$.Version$() $.PackageAlias$.$.GroupGoName$$.V
 
 var getDiscoveryTemplate = `
 // Discovery retrieves the DiscoveryClient
-func (c *Clientset) Discovery() $.DiscoveryInterface|raw$ {
+func (c *Clientset) Discovery() $.DiscoveryInterfaces|raw$ {
 	if c == nil {
 		return nil
 	}

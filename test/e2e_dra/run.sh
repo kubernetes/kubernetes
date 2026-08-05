@@ -16,16 +16,16 @@
 
 set -ex
 
-killall etcd || true
-sudo rm -rf /tmp/ginkgo* /tmp/*.log /var/run/kubernetes /var/run/cdi /var/lib/kubelet/plugins_registry /var/lib/kubelet/plugins /var/lib/kubelet/*_state /var/lib/kubelet/checkpoints /tmp/artifacts
-sudo mkdir /var/lib/kubelet/plugins_registry
-sudo mkdir /var/lib/kubelet/plugins
-sudo mkdir /var/run/cdi
-sudo chown "$(id -u)" /var/lib/kubelet/plugins_registry /var/lib/kubelet/plugins /var/run/cdi
+sudo rm -rf /var/run/kubernetes /var/run/cdi /var/lib/kubelet/plugins_registry /var/lib/kubelet/plugins /var/lib/kubelet/*_state /var/lib/kubelet/checkpoints /tmp/artifacts
+sudo mkdir /var/run/kubernetes /var/lib/kubelet/plugins_registry /var/lib/kubelet/plugins /var/run/cdi
+sudo chown "$(id -u)" /var/run/kubernetes /var/lib/kubelet/plugins_registry /var/lib/kubelet/plugins /var/run/cdi
 ARTIFACTS=/tmp/artifacts
+TMP_DIR=${ARTIFACTS}/tmp
+LOG_DIR=${ARTIFACTS}/logs
+TMPDIR=${TMP_DIR}
 KUBERNETES_SERVER_BIN_DIR="$(pwd)/_output/local/bin/$(go env GOOS)/$(go env GOARCH)"
 KUBERNETES_SERVER_CACHE_DIR="${KUBERNETES_SERVER_BIN_DIR}/cache-dir"
-
-export ARTIFACTS KUBERNETES_SERVER_BIN_DIR KUBERNETES_SERVER_CACHE_DIR
+mkdir -p "${TMP_DIR}" "${LOG_DIR}"
+export ARTIFACTS TMP_DIR LOG_DIR TMPDIR KUBERNETES_SERVER_BIN_DIR KUBERNETES_SERVER_CACHE_DIR
 
 exec "$@"

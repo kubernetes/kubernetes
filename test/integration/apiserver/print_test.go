@@ -61,7 +61,6 @@ var kindAllowList = sets.NewString(
 	"PodPortForwardOptions",
 	"PodLogOptions",
 	"PodProxyOptions",
-	"PodStatusResult",
 	"RangeAllocation",
 	"ServiceProxyOptions",
 	"SerializedReference",

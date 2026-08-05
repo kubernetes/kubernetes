@@ -25,37 +25,37 @@ import (
 // Interface provides access to all the informers in this group version.
 type Interface interface {
 	// ComponentStatuses returns a ComponentStatusInformer.
-	ComponentStatuses() ComponentStatusInformer
+	ComponentStatuses() TypedComponentStatusInformer
 	// ConfigMaps returns a ConfigMapInformer.
-	ConfigMaps() ConfigMapInformer
+	ConfigMaps() TypedConfigMapInformer
 	// Endpoints returns a EndpointsInformer.
-	Endpoints() EndpointsInformer
+	Endpoints() TypedEndpointsInformer
 	// Events returns a EventInformer.
-	Events() EventInformer
+	Events() TypedEventInformer
 	// LimitRanges returns a LimitRangeInformer.
-	LimitRanges() LimitRangeInformer
+	LimitRanges() TypedLimitRangeInformer
 	// Namespaces returns a NamespaceInformer.
-	Namespaces() NamespaceInformer
+	Namespaces() TypedNamespaceInformer
 	// Nodes returns a NodeInformer.
-	Nodes() NodeInformer
+	Nodes() TypedNodeInformer
 	// PersistentVolumes returns a PersistentVolumeInformer.
-	PersistentVolumes() PersistentVolumeInformer
+	PersistentVolumes() TypedPersistentVolumeInformer
 	// PersistentVolumeClaims returns a PersistentVolumeClaimInformer.
-	PersistentVolumeClaims() PersistentVolumeClaimInformer
+	PersistentVolumeClaims() TypedPersistentVolumeClaimInformer
 	// Pods returns a PodInformer.
-	Pods() PodInformer
+	Pods() TypedPodInformer
 	// PodTemplates returns a PodTemplateInformer.
-	PodTemplates() PodTemplateInformer
+	PodTemplates() TypedPodTemplateInformer
 	// ReplicationControllers returns a ReplicationControllerInformer.
-	ReplicationControllers() ReplicationControllerInformer
+	ReplicationControllers() TypedReplicationControllerInformer
 	// ResourceQuotas returns a ResourceQuotaInformer.
-	ResourceQuotas() ResourceQuotaInformer
+	ResourceQuotas() TypedResourceQuotaInformer
 	// Secrets returns a SecretInformer.
-	Secrets() SecretInformer
+	Secrets() TypedSecretInformer
 	// Services returns a ServiceInformer.
-	Services() ServiceInformer
+	Services() TypedServiceInformer
 	// ServiceAccounts returns a ServiceAccountInformer.
-	ServiceAccounts() ServiceAccountInformer
+	ServiceAccounts() TypedServiceAccountInformer
 }
 
 type version struct {
@@ -69,82 +69,82 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// ComponentStatuses returns a ComponentStatusInformer.
-func (v *version) ComponentStatuses() ComponentStatusInformer {
+// ComponentStatuses returns a TypedComponentStatusInformer.
+func (v *version) ComponentStatuses() TypedComponentStatusInformer {
 	return &componentStatusInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
-// ConfigMaps returns a ConfigMapInformer.
-func (v *version) ConfigMaps() ConfigMapInformer {
+// ConfigMaps returns a TypedConfigMapInformer.
+func (v *version) ConfigMaps() TypedConfigMapInformer {
 	return &configMapInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// Endpoints returns a EndpointsInformer.
-func (v *version) Endpoints() EndpointsInformer {
+// Endpoints returns a TypedEndpointsInformer.
+func (v *version) Endpoints() TypedEndpointsInformer {
 	return &endpointsInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// Events returns a EventInformer.
-func (v *version) Events() EventInformer {
+// Events returns a TypedEventInformer.
+func (v *version) Events() TypedEventInformer {
 	return &eventInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// LimitRanges returns a LimitRangeInformer.
-func (v *version) LimitRanges() LimitRangeInformer {
+// LimitRanges returns a TypedLimitRangeInformer.
+func (v *version) LimitRanges() TypedLimitRangeInformer {
 	return &limitRangeInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// Namespaces returns a NamespaceInformer.
-func (v *version) Namespaces() NamespaceInformer {
+// Namespaces returns a TypedNamespaceInformer.
+func (v *version) Namespaces() TypedNamespaceInformer {
 	return &namespaceInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
-// Nodes returns a NodeInformer.
-func (v *version) Nodes() NodeInformer {
+// Nodes returns a TypedNodeInformer.
+func (v *version) Nodes() TypedNodeInformer {
 	return &nodeInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
-// PersistentVolumes returns a PersistentVolumeInformer.
-func (v *version) PersistentVolumes() PersistentVolumeInformer {
+// PersistentVolumes returns a TypedPersistentVolumeInformer.
+func (v *version) PersistentVolumes() TypedPersistentVolumeInformer {
 	return &persistentVolumeInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
-// PersistentVolumeClaims returns a PersistentVolumeClaimInformer.
-func (v *version) PersistentVolumeClaims() PersistentVolumeClaimInformer {
+// PersistentVolumeClaims returns a TypedPersistentVolumeClaimInformer.
+func (v *version) PersistentVolumeClaims() TypedPersistentVolumeClaimInformer {
 	return &persistentVolumeClaimInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// Pods returns a PodInformer.
-func (v *version) Pods() PodInformer {
+// Pods returns a TypedPodInformer.
+func (v *version) Pods() TypedPodInformer {
 	return &podInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// PodTemplates returns a PodTemplateInformer.
-func (v *version) PodTemplates() PodTemplateInformer {
+// PodTemplates returns a TypedPodTemplateInformer.
+func (v *version) PodTemplates() TypedPodTemplateInformer {
 	return &podTemplateInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// ReplicationControllers returns a ReplicationControllerInformer.
-func (v *version) ReplicationControllers() ReplicationControllerInformer {
+// ReplicationControllers returns a TypedReplicationControllerInformer.
+func (v *version) ReplicationControllers() TypedReplicationControllerInformer {
 	return &replicationControllerInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// ResourceQuotas returns a ResourceQuotaInformer.
-func (v *version) ResourceQuotas() ResourceQuotaInformer {
+// ResourceQuotas returns a TypedResourceQuotaInformer.
+func (v *version) ResourceQuotas() TypedResourceQuotaInformer {
 	return &resourceQuotaInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// Secrets returns a SecretInformer.
-func (v *version) Secrets() SecretInformer {
+// Secrets returns a TypedSecretInformer.
+func (v *version) Secrets() TypedSecretInformer {
 	return &secretInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// Services returns a ServiceInformer.
-func (v *version) Services() ServiceInformer {
+// Services returns a TypedServiceInformer.
+func (v *version) Services() TypedServiceInformer {
 	return &serviceInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// ServiceAccounts returns a ServiceAccountInformer.
-func (v *version) ServiceAccounts() ServiceAccountInformer {
+// ServiceAccounts returns a TypedServiceAccountInformer.
+func (v *version) ServiceAccounts() TypedServiceAccountInformer {
 	return &serviceAccountInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

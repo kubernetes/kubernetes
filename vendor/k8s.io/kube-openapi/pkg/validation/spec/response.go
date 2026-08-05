@@ -20,6 +20,7 @@ import (
 	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
 	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
+	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/jsontext"
 )
 
 // ResponseProps properties specific to a response
@@ -67,13 +68,13 @@ func (r *Response) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (r *Response) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+func (r *Response) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	var x struct {
 		ResponseProps
-		Extensions
+		Extensions Extensions `json:",inline"`
 	}
 
-	if err := opts.UnmarshalNext(dec, &x); err != nil {
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
 		return err
 	}
 
@@ -106,16 +107,16 @@ func (r Response) MarshalJSON() ([]byte, error) {
 	return swag.ConcatJSON(b1, b2, b3), nil
 }
 
-func (r Response) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+func (r Response) MarshalJSONTo(enc *jsontext.Encoder) error {
 	var x struct {
-		Ref string `json:"$ref,omitempty"`
-		Extensions
+		Ref           string                `json:"$ref,omitempty"`
+		Extensions    Extensions            `json:",inline"`
 		ResponseProps responsePropsOmitZero `json:",inline"`
 	}
 	x.Ref = r.Refable.Ref.String()
 	x.Extensions = internal.SanitizeExtensions(r.Extensions)
 	x.ResponseProps = responsePropsOmitZero(r.ResponseProps)
-	return opts.MarshalNext(enc, x)
+	return jsonv2.MarshalEncode(enc, x)
 }
 
 // NewResponse creates a new response instance

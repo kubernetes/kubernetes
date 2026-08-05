@@ -31,12 +31,12 @@ type multiKeyItem struct {
 	V  int    `json:"v"`
 }
 
-func TestSliceItem(t *testing.T) {
+func TestValSliceItem(t *testing.T) {
 	testCases := []struct {
 		name      string
 		new       []multiKeyItem
 		old       []multiKeyItem
-		match     MatchItemFn[multiKeyItem]
+		match     MatchItemFunc[*multiKeyItem]
 		validator func(context.Context, operation.Operation, *field.Path, *multiKeyItem, *multiKeyItem) field.ErrorList
 		expected  field.ErrorList
 	}{
@@ -157,7 +157,77 @@ func TestSliceItem(t *testing.T) {
 			op := operation.Operation{Type: operation.Update}
 			fp := field.NewPath("")
 
-			got := SliceItem(ctx, op, fp, tc.new, tc.old, tc.match, SemanticDeepEqual, tc.validator)
+			got := ValSliceItem(ctx, op, fp, tc.new, tc.old, tc.match, SemanticDeepEqual, tc.validator)
+
+			if !reflect.DeepEqual(got, tc.expected) {
+				t.Errorf("got %v want %v", got, tc.expected)
+			}
+		})
+	}
+}
+
+func TestPtrSliceItem(t *testing.T) {
+	testCases := []struct {
+		name      string
+		new       []*multiKeyItem
+		old       []*multiKeyItem
+		match     MatchItemFunc[*multiKeyItem]
+		validator func(context.Context, operation.Operation, *field.Path, *multiKeyItem, *multiKeyItem) field.ErrorList
+		expected  field.ErrorList
+	}{
+		{
+			name: "no match",
+			new: []*multiKeyItem{
+				{K1: "a", K2: "1", V: 1},
+			},
+			match: func(i *multiKeyItem) bool {
+				return i.K1 == "target"
+			},
+			validator: func(_ context.Context, _ operation.Operation, fp *field.Path, _, _ *multiKeyItem) field.ErrorList {
+				return field.ErrorList{field.Invalid(fp, nil, "err")}
+			},
+			expected: nil,
+		},
+		{
+			name: "new item with matching keys",
+			new: []*multiKeyItem{
+				{K1: "a", K2: "1", V: 1},
+				{K1: "target", K2: "target2", V: 2},
+			},
+			match: func(i *multiKeyItem) bool {
+				return i.K1 == "target" && i.K2 == "target2"
+			},
+			validator: func(_ context.Context, _ operation.Operation, fp *field.Path, n, o *multiKeyItem) field.ErrorList {
+				if n != nil && o == nil {
+					return field.ErrorList{field.Invalid(fp, n.K1, "added")}
+				}
+				return nil
+			},
+			expected: field.ErrorList{field.Invalid(field.NewPath("").Index(1), "target", "added")},
+		},
+		{
+			name: "nil element in new list (ignored)",
+			new: []*multiKeyItem{
+				nil,
+				{K1: "target", V: 1},
+			},
+			match: func(i *multiKeyItem) bool {
+				return i.K1 == "target"
+			},
+			validator: func(_ context.Context, _ operation.Operation, fp *field.Path, n, _ *multiKeyItem) field.ErrorList {
+				return field.ErrorList{field.Invalid(fp, n.K1, "matched")}
+			},
+			expected: field.ErrorList{field.Invalid(field.NewPath("").Index(1), "target", "matched")},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			op := operation.Operation{Type: operation.Update}
+			fp := field.NewPath("")
+
+			got := PtrSliceItem(ctx, op, fp, tc.new, tc.old, tc.match, SemanticDeepEqual, tc.validator)
 
 			if !reflect.DeepEqual(got, tc.expected) {
 				t.Errorf("got %v want %v", got, tc.expected)

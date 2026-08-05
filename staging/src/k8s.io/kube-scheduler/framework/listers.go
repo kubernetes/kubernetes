@@ -19,20 +19,27 @@ package framework
 import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/dynamic-resource-allocation/structured"
+	"k8s.io/klog/v2"
 )
 
 // NodeInfoLister interface represents anything that can list/get NodeInfo objects from node name.
 type NodeInfoLister interface {
 	// List returns the list of NodeInfos.
 	List() ([]NodeInfo, error)
-	// HavePodsWithAffinityList returns the list of NodeInfos of nodes with pods with affinity terms.
+	// HavePodsWithAffinityList returns the list of NodeInfos of nodes with pods with inter-pod (anti-)affinity terms.
 	HavePodsWithAffinityList() ([]NodeInfo, error)
-	// HavePodsWithRequiredAntiAffinityList returns the list of NodeInfos of nodes with pods with required anti-affinity terms.
+	// HavePodsWithRequiredAntiAffinityList returns the list of NodeInfos of nodes with pods with required inter-pod anti-affinity terms.
 	HavePodsWithRequiredAntiAffinityList() ([]NodeInfo, error)
+	// HavePodsWithRequiredNonHostScopedAntiAffinityList returns nodes containing pods that require a wider topology scan (topologyKey other than hostname).
+	// PreFilter uses this to identify existing pods whose non-hostname scoped anti-affinity rules might conflict with the incoming pod, allowing it to skip scanning nodes that cannot possibly conflict.
+	// It returns an empty list and no error if the InterPodAffinityHostnameFastPath feature gate is disabled.
+	HavePodsWithRequiredNonHostScopedAntiAffinityList() ([]NodeInfo, error)
 	// Get returns the NodeInfo of the given node name.
 	Get(nodeName string) (NodeInfo, error)
 }
@@ -48,13 +55,60 @@ type StorageInfoLister interface {
 type SharedLister interface {
 	NodeInfos() NodeInfoLister
 	StorageInfos() StorageInfoLister
+	// PodGroupStates provides access to dynamic state information for pod groups.
 	PodGroupStates() PodGroupStateLister
+	// PodGroups provides access to cached pod group objects.
+	PodGroups() PodGroupLister
+	// CompositePodGroupStates provides access to dynamic state information for composite pod groups.
+	CompositePodGroupStates() CompositePodGroupStateLister
+	// CompositePodGroups provides access to cached composite pod group objects.
+	CompositePodGroups() CompositePodGroupLister
+}
+
+// PodGroupLister provides read access to cached pod group objects.
+type PodGroupLister interface {
+	// Get returns the PodGroup with the given namespace and name.
+	Get(namespace, name string) (*schedulingapi.PodGroup, error)
+}
+
+// MutableSnapshotSharedLister interface represents a lister that allows mutating snapshot and restoring it afterwards.
+// It extends SharedLister interface.
+// Only PodGroupPostFilter extension point can use this.
+type MutableSnapshotSharedLister interface {
+	SharedLister
+	// StartMutations starts a mutation session.
+	// It is used for operations requiring modifying snapshot state for checking multiple scenarios.
+	// There can be only one mutation session at the moment.
+	// If StartMutations() is called, EndMutations() must be called in the same scheduling cycle.
+	StartMutations() error
+	// EndMutations ends the mutation session and restores the snapshot state to the one before StartMutations.
+	EndMutations() error
+	// AddPod adds a given pod to the snapshot.
+	// AddPod should be called only if the mutation was started via StartMutations.
+	// This function is not thread safe, so it should be executed when no other routines can write/read from the snapshot.
+	AddPod(podInfo PodInfo, nodeName string) error
+	// RemovePod removes a given pod from the snapshot.
+	// RemovePod should be called only if the mutation was started via StartMutations.
+	// The state will be reverted when EndMutations is called.
+	RemovePod(logger klog.Logger, pod *v1.Pod, nodeName string) error
 }
 
 // PodGroupStateLister provides read access to pod group states.
 type PodGroupStateLister interface {
 	// Get returns the PodGroupState of the given pod group.
 	Get(namespace string, podGroupName string) (PodGroupState, error)
+}
+
+// CompositePodGroupLister provides read access to cached composite pod group objects.
+type CompositePodGroupLister interface {
+	// Get returns the CompositePodGroup with the given namespace and name.
+	Get(namespace, name string) (*schedulingv1alpha3.CompositePodGroup, error)
+}
+
+// CompositePodGroupStateLister provides read access to composite pod group states.
+type CompositePodGroupStateLister interface {
+	// Get returns the CompositePodGroupState of the given composite pod group.
+	Get(namespace string, compositePodGroupName string) (CompositePodGroupState, error)
 }
 
 type CSINodeLister interface {
@@ -104,25 +158,20 @@ type ResourceClaimTracker interface {
 	GatherAllocatedState() (*structured.AllocatedState, error)
 
 	// SignalClaimPendingAllocation signals to the tracker that the given ResourceClaim will be allocated via an API call in the
-	// binding phase. This change is immediately reflected in the result of List() and the other accessors.
+	// binding phase, therefore the given ResourceClaim must be non-nil and have a non-nil Status.Allocation.
+	// If the claim already has a pending allocation, then the allocation becomes shared. The same number of SignalClaimPendingAllocation() callers
+	// for a given claimUID is expected to eventually call MaybeRemoveClaimPendingAllocation() for that claimUID.
+	// This change is immediately reflected in the result of List() and the other accessors.
 	SignalClaimPendingAllocation(claimUID types.UID, allocatedClaim *resourceapi.ResourceClaim) error
-	// GetPendingAllocation answers whether a given claim has a pending allocation during the binding phase. It can be used to avoid
+	// ClaimHasPendingAllocation answers whether a given claim has a pending allocation during the binding phase. It can be used to avoid
 	// race conditions in subsequent scheduling phases.
-	GetPendingAllocation(claimUID types.UID) (*resourceapi.AllocationResult, bool)
+	GetPendingAllocation(claimUID types.UID) *resourceapi.AllocationResult
 	// MaybeRemoveClaimPendingAllocation might remove the pending allocation for the given ResourceClaim from the tracker if any was signaled via
-	// SignalClaimPendingAllocation(). When a pending allocation is `shareable`, it removes the pending allocation only when
-	// no other pods are still using that pending allocation (per AddSharedClaimPendingAllocation and
-	// RemoveSharedClaimPendingAllocation). When a pending allocation is not shareable, it always removes the pending
-	// allocation as long as one exists. Returns whether there was a pending allocation and it was removed.
-	// List() and the other accessors immediately stop reflecting the pending allocation in the results.
-	MaybeRemoveClaimPendingAllocation(claimUID types.UID, shareable bool) (deleted bool)
-
-	// AddSharedClaimPendingAllocation increments the number of active sharers
-	// of the given ResourceClaim.
-	AddSharedClaimPendingAllocation(claimUID types.UID, allocatedClaim *resourceapi.ResourceClaim) error
-	// RemoveSharedClaimPendingAllocation decrements the number of active sharers
-	// of the given ResourceClaim.
-	RemoveSharedClaimPendingAllocation(claimUID types.UID, allocatedClaim *resourceapi.ResourceClaim) error
+	// SignalClaimPendingAllocation(). When `forceRemove` is true, it always removes the pending allocation. Otherwise, it removes the pending
+	// allocation only when no other pods are still using that pending allocation (from SignalClaimPendingAllocation and AcquirePendingAllocation).
+	// Returns whether there was a pending allocation and it was removed.
+	// List() and the other accessors immediately stop reflecting the pending allocation in the results when the pending allocation is removed.
+	MaybeRemoveClaimPendingAllocation(claimUID types.UID, forceRemove bool) (deleted bool)
 
 	// AssumeClaimAfterAPICall signals to the tracker that an API call modifying the given ResourceClaim was made in the binding phase, and the
 	// changes should be reflected in informers very soon. This change is immediately reflected in the result of List() and the other accessors.
@@ -165,6 +214,16 @@ type CSIManager interface {
 type PodGroupManager interface {
 	// PodGroupStates returns the PodGroupStateLister.
 	PodGroupStates() PodGroupStateLister
+	// PodGroups returns the PodGroupLister.
+	PodGroups() PodGroupLister
+	// CompositePodGroupStates returns the CompositePodGroupStateLister.
+	CompositePodGroupStates() CompositePodGroupStateLister
+	// CompositePodGroups returns the CompositePodGroupLister.
+	CompositePodGroups() CompositePodGroupLister
+	// BuildHierarchySnapshotFromPod builds a hierarchy snapshot from the given pod.
+	BuildHierarchySnapshotFromPod(pod *v1.Pod) (PodGroupManager, error)
+	// GetRootKeyForGroup returns the root key of the given EntityKey.
+	GetRootKeyForGroup(key EntityKey) (EntityKey, bool, error)
 }
 
 // PodGroupState provides an interface to view the state of a single pod group.
@@ -186,4 +245,10 @@ type PodGroupState interface {
 	ScheduledPods() []*v1.Pod
 	// ScheduledPodsCount returns the number of pods for this group that are either assumed or assigned.
 	ScheduledPodsCount() int
+}
+
+// CompositePodGroupState provides an interface to view the state of a single composite pod group.
+type CompositePodGroupState interface {
+	// GetChildren returns the keys of child groups.
+	GetChildren() []EntityKey
 }

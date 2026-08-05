@@ -41,6 +41,15 @@ type EmptyDirVolumeSourceApplyConfiguration struct {
 	// The default is nil which means that the limit is undefined.
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir
 	SizeLimit *resource.Quantity `json:"sizeLimit,omitempty"`
+	// mode specifies the permission bits for the emptyDir directory, in numeric
+	// notation (e.g., 0755, 01777). Must be a value between 0000 and 01777.
+	// If not specified, defaults to 0777.
+	// This might be in conflict with other options that affect the file
+	// mode, like fsGroup. If fsGroup is specified, the fsGroup permissions
+	// will override the mode specified here.
+	// This field has no effect on Windows.
+	// This field is alpha and requires EmptyDirVolumeMode featuregate to be enabled.
+	Mode *int32 `json:"mode,omitempty"`
 }
 
 // EmptyDirVolumeSourceApplyConfiguration constructs a declarative configuration of the EmptyDirVolumeSource type for use with
@@ -62,5 +71,13 @@ func (b *EmptyDirVolumeSourceApplyConfiguration) WithMedium(value corev1.Storage
 // If called multiple times, the SizeLimit field is set to the value of the last call.
 func (b *EmptyDirVolumeSourceApplyConfiguration) WithSizeLimit(value resource.Quantity) *EmptyDirVolumeSourceApplyConfiguration {
 	b.SizeLimit = &value
+	return b
+}
+
+// WithMode sets the Mode field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Mode field is set to the value of the last call.
+func (b *EmptyDirVolumeSourceApplyConfiguration) WithMode(value int32) *EmptyDirVolumeSourceApplyConfiguration {
+	b.Mode = &value
 	return b
 }

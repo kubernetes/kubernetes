@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -36,9 +37,9 @@ import (
 
 // VolumeRestrictions is a plugin that checks volume restrictions.
 type VolumeRestrictions struct {
-	pvcLister                 corelisters.PersistentVolumeClaimLister
-	sharedLister              fwk.SharedLister
-	enableSchedulingQueueHint bool
+	pvcLister                                          corelisters.PersistentVolumeClaimLister
+	sharedLister                                       fwk.SharedLister
+	enableInPlacePodVerticalScalingSchedulerPreemption bool
 }
 
 var _ fwk.PreFilterPlugin = &VolumeRestrictions{}
@@ -172,6 +173,9 @@ func needsRestrictionsCheck(v v1.Volume) bool {
 
 // PreFilter computes and stores cycleState containing details for enforcing ReadWriteOncePod.
 func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		return nil, fwk.NewStatus(fwk.Skip)
+	}
 	needsCheck := false
 	for i := range pod.Spec.Volumes {
 		if needsRestrictionsCheck(pod.Spec.Volumes[i]) {
@@ -316,6 +320,9 @@ func (pl *VolumeRestrictions) PreFilterExtensions() fwk.PreFilterExtensions {
 // If the pod uses PVCs with the ReadWriteOncePod access mode, it evaluates if
 // these PVCs are already in-use and if preemption will help.
 func (pl *VolumeRestrictions) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		return nil
+	}
 	if !satisfyVolumeConflicts(pod, nodeInfo) {
 		return fwk.NewStatus(fwk.Unschedulable, ErrReasonDiskConflict)
 	}
@@ -329,24 +336,14 @@ func (pl *VolumeRestrictions) Filter(ctx context.Context, cycleState fwk.CycleSt
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *VolumeRestrictions) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
-	// A note about UpdateNodeTaint/UpdateNodeLabel event:
-	// Ideally, it's supposed to register only Add because any Node update event will never change the result from this plugin.
-	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
-	// See: https://github.com/kubernetes/kubernetes/issues/109437
-	nodeActionType := fwk.Add | fwk.UpdateNodeTaint | fwk.UpdateNodeLabel
-	if pl.enableSchedulingQueueHint {
-		// preCheck is not used when QHint is enabled, and hence Update event isn't necessary.
-		nodeActionType = fwk.Add
-	}
-
 	return []fwk.ClusterEventWithHint{
 		// Pods may fail to schedule because of volumes conflicting with other pods on same node.
 		// Once running pods are deleted and volumes have been released, the unschedulable pod will be schedulable.
 		// Due to immutable fields `spec.volumes`, pod update events are ignored.
-		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
+		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterAssignedPodDeleted},
 		// A new Node may make a pod schedulable.
 		// We intentionally don't set QueueingHint since all Node/Add events could make Pods schedulable.
-		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}},
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add}},
 		// Pods may fail to schedule because the PVC it uses has not yet been created.
 		// This PVC is required to exist to check its access modes.
 		{Event: fwk.ClusterEvent{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.Add},
@@ -380,12 +377,12 @@ func (pl *VolumeRestrictions) isSchedulableAfterPersistentVolumeClaimAdded(logge
 	return fwk.QueueSkip, nil
 }
 
-// isSchedulableAfterPodDeleted is invoked whenever a pod deleted,
+// isSchedulableAfterAssignedPodDeleted is invoked whenever an assigned pod is deleted,
 // It checks whether the deleted pod will conflict with volumes of other pods on the same node
-func (pl *VolumeRestrictions) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+func (pl *VolumeRestrictions) isSchedulableAfterAssignedPodDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	deletedPod, _, err := util.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
-		return fwk.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPodDeleted: %w", err)
+		return fwk.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterAssignedPodDeleted: %w", err)
 	}
 
 	if deletedPod.Namespace != pod.Namespace {
@@ -428,8 +425,8 @@ func New(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.Fea
 	sharedLister := handle.SnapshotSharedLister()
 
 	return &VolumeRestrictions{
-		pvcLister:                 pvcLister,
-		sharedLister:              sharedLister,
-		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,
+		pvcLister:    pvcLister,
+		sharedLister: sharedLister,
+		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
 	}, nil
 }

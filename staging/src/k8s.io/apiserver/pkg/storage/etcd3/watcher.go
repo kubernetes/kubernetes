@@ -32,6 +32,8 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -39,10 +41,12 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
+	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
 	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 const (
@@ -50,6 +54,9 @@ const (
 	incomingBufSize         = 100
 	outgoingBufSize         = 100
 	processEventConcurrency = 10
+
+	watchChanLogWarningInterval  = 5 * time.Second
+	watchChanLogWarningThreshold = 100 * time.Millisecond
 )
 
 // defaultWatcherMaxLimit is used to facilitate construction tests
@@ -61,12 +68,23 @@ var fatalOnDecodeError atomic.Bool
 func init() {
 	// check to see if we are running in a test environment
 	b, _ := strconv.ParseBool(os.Getenv("KUBE_PANIC_WATCH_DECODE_ERROR"))
-	TestOnlySetFatalOnDecodeError(b)
+	fatalOnDecodeError.Store(b)
+}
+
+// TestingTB is the subset of testing.TB required by TestOnlySetFatalOnDecodeError. Avoids importing
+// the testing package.
+type TestingTB interface {
+	Helper()
+	Cleanup(func())
 }
 
 // TestOnlySetFatalOnDecodeError should only be used for cases where decode errors are expected and need to be tested. e.g. conversion webhooks.
-func TestOnlySetFatalOnDecodeError(b bool) {
-	fatalOnDecodeError.Store(b)
+func TestOnlySetFatalOnDecodeError(tb TestingTB, b bool) {
+	tb.Helper()
+	old := fatalOnDecodeError.Swap(b)
+	tb.Cleanup(func() {
+		fatalOnDecodeError.Store(old)
+	})
 }
 
 type watcher struct {
@@ -88,12 +106,16 @@ type watchChan struct {
 	initialRev               int64
 	recursive                bool
 	progressNotify           bool
+	recordTimestamps         bool
 	internalPred             storage.SelectionPredicate
 	ctx                      context.Context
 	cancel                   context.CancelFunc
 	incomingEventChan        chan *event
 	resultChan               chan watch.Event
 	getResourceSizeEstimator func() *resourceSizeEstimator
+
+	incomingEventLogger *blockLogger
+	resultLogger        *blockLogger
 }
 
 // Watch watches on a key and returns a watch.Interface that transfers relevant notifications.
@@ -114,7 +136,7 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage
 	if err != nil {
 		return nil, err
 	}
-	wc := w.createWatchChan(ctx, key, startWatchRV, opts.Recursive, opts.ProgressNotify, opts.Predicate)
+	wc := w.createWatchChan(ctx, key, startWatchRV, opts.Recursive, opts.ProgressNotify, opts.RecordTimestamps, opts.Predicate)
 	go wc.run(isInitialEventsEndBookmarkRequired(opts), areInitialEventsRequired(rev, opts))
 
 	// For etcd watch we don't have an easy way to answer whether the watch
@@ -127,13 +149,14 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage
 	return wc, nil
 }
 
-func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive, progressNotify bool, pred storage.SelectionPredicate) *watchChan {
+func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive, progressNotify, recordTimestamps bool, pred storage.SelectionPredicate) *watchChan {
 	wc := &watchChan{
 		watcher:                  w,
 		key:                      key,
 		initialRev:               rev,
 		recursive:                recursive,
 		progressNotify:           progressNotify,
+		recordTimestamps:         recordTimestamps,
 		internalPred:             pred,
 		incomingEventChan:        make(chan *event, incomingBufSize),
 		resultChan:               make(chan watch.Event, outgoingBufSize),
@@ -144,6 +167,10 @@ func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, re
 		wc.internalPred = storage.Everything
 	}
 	wc.ctx, wc.cancel = context.WithCancel(ctx)
+
+	wc.incomingEventLogger = newBlockLogger(watchChanLogWarningInterval, watchChanLogWarningThreshold, "Fast watcher, slow processing. Probably caused by slow decoding, user not receiving fast, or other processing logic", wc.watcher.objectType, wc.watcher.groupResource, clock.RealClock{})
+	wc.resultLogger = newBlockLogger(watchChanLogWarningInterval, watchChanLogWarningThreshold, "Fast watcher, slow processing. Probably caused by slow dispatching events to watchers", wc.watcher.objectType, wc.watcher.groupResource, clock.RealClock{})
+
 	return wc
 }
 
@@ -269,6 +296,22 @@ func (wc *watchChan) RequestWatchProgress() error {
 // The revision to watch will be set to the revision in response.
 // All events sent will have isCreated=true
 func (wc *watchChan) sync() error {
+	if wc.recursive && utilfeature.DefaultFeatureGate.Enabled(features.EtcdRangeStream) &&
+		etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RangeStream) {
+		err := wc.syncStreamRecursive()
+		if err == nil {
+			return nil
+		}
+		if grpcstatus.Code(err) != grpccodes.Unimplemented {
+			return err
+		}
+		etcdfeature.DefaultFeatureSupportChecker.MarkUnsupported(storage.RangeStream)
+		klog.V(4).Infof("etcd server does not support RangeStream for %v; falling back to paginated list", wc.watcher.groupResource)
+	}
+	return wc.syncPaginated()
+}
+
+func (wc *watchChan) syncPaginated() error {
 	opts := []clientv3.OpOption{}
 	if wc.recursive {
 		opts = append(opts, clientv3.WithLimit(defaultWatcherMaxLimit))
@@ -323,6 +366,52 @@ func (wc *watchChan) sync() error {
 			opts = append(opts, clientv3.WithRev(withRev))
 		}
 	}
+}
+
+func (wc *watchChan) syncStreamRecursive() error {
+	if !wc.recursive {
+		return fmt.Errorf("syncStreamRecursive called on a non-recursive watch")
+	}
+	opts := []clientv3.OpOption{
+		clientv3.WithRange(clientv3.GetPrefixRangeEnd(wc.key)),
+	}
+
+	startTime := time.Now()
+	streamResp, err := wc.watcher.client.KV.GetStream(wc.ctx, wc.key, opts...)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		// Only record the listStream metric if streaming was actually exercised.
+		if grpcstatus.Code(err) == grpccodes.Unimplemented {
+			return
+		}
+		metrics.RecordEtcdRequest("listStream", wc.watcher.groupResource, err, startTime)
+	}()
+
+	var initialRev int64
+	for r := range streamResp {
+		if err = r.Err(); err != nil {
+			// paging=false: a compaction mid-stream can't be resumed with a
+			// continue token, so surface it as ResourceExpired for a relist.
+			return interpretListError(err, false, wc.key, wc.key)
+		}
+		rangeResp := r.RangeResponse
+		for i, kv := range rangeResp.Kvs {
+			wc.queueEvent(parseKV(kv))
+			// free kv early. Long lists can take O(seconds) to decode.
+			rangeResp.Kvs[i] = nil
+		}
+		if initialRev == 0 && rangeResp.Header != nil {
+			initialRev = rangeResp.Header.Revision
+		}
+	}
+	if initialRev == 0 {
+		return fmt.Errorf("rangeStream for %q completed without a revision", wc.key)
+	}
+
+	wc.initialRev = initialRev
+	return nil
 }
 
 func logWatchChannelErr(err error) {
@@ -614,7 +703,7 @@ func (wc *watchChan) transform(e *event) (res *watch.Event, err error) {
 				Type:   watch.Modified,
 				Object: curObj,
 			}
-			return res, nil
+			break
 		}
 		curObjPasses := wc.filter(curObj)
 		oldObjPasses := wc.filter(oldObj)
@@ -636,7 +725,39 @@ func (wc *watchChan) transform(e *event) (res *watch.Event, err error) {
 			}
 		}
 	}
+	if res != nil && wc.recordTimestamps && !e.isInitialEvent {
+		res.Object = &timedWatchEvent{Object: res.Object, recordTime: e.recordTime}
+	}
 	return res, nil
+}
+
+// timedWatchEvent wraps a decoded watch object with the timestamp at which the
+// storage layer decoded it, so the watch cache can measure end-to-end dispatch
+// latency. It exists only on the watch cache's ingest path (opened with
+// ListOptions.RecordTimestamps) and MUST be unwrapped by the watch cache before
+// the object is stored or serialized.
+type timedWatchEvent struct {
+	runtime.Object
+	recordTime time.Time
+}
+
+var _ storage.WatchEventWithRecordTime = &timedWatchEvent{}
+
+func (t *timedWatchEvent) GetObjectMeta() metav1.Object {
+	m, _ := meta.Accessor(t.Object)
+	return m
+}
+
+func (t *timedWatchEvent) DeepCopyObject() runtime.Object {
+	return &timedWatchEvent{Object: t.Object.DeepCopyObject(), recordTime: t.recordTime}
+}
+
+func (t *timedWatchEvent) RecordTime() time.Time {
+	return t.recordTime
+}
+
+func (t *timedWatchEvent) Unwrap() runtime.Object {
+	return t.Object
 }
 
 func transformErrorToEvent(err error) *watch.Event {
@@ -674,9 +795,8 @@ func (wc *watchChan) sendError(err error) {
 // sendEvent synchronously puts an event into resultChan.
 // Returns true if it was successful.
 func (wc *watchChan) sendEvent(event *watch.Event) bool {
-	if len(wc.resultChan) == cap(wc.resultChan) {
-		klog.V(3).InfoS("Fast watcher, slow processing. Probably caused by slow dispatching events to watchers", "outgoingEvents", outgoingBufSize, "objectType", wc.watcher.objectType, "groupResource", wc.watcher.groupResource)
-	}
+	defer func(start time.Time) { wc.resultLogger.recordWait(time.Since(start)) }(time.Now())
+
 	// If user couldn't receive results fast enough, we also block incoming events from watcher.
 	// Because storing events in local will cause more memory usage.
 	// The worst case would be closing the fast watcher.
@@ -689,9 +809,8 @@ func (wc *watchChan) sendEvent(event *watch.Event) bool {
 }
 
 func (wc *watchChan) queueEvent(e *event) {
-	if len(wc.incomingEventChan) == incomingBufSize {
-		klog.V(3).InfoS("Fast watcher, slow processing. Probably caused by slow decoding, user not receiving fast, or other processing logic", "incomingEvents", incomingBufSize, "objectType", wc.watcher.objectType, "groupResource", wc.watcher.groupResource)
-	}
+	defer func(start time.Time) { wc.incomingEventLogger.recordWait(time.Since(start)) }(time.Now())
+
 	select {
 	case wc.incomingEventChan <- e:
 	case <-wc.ctx.Done():

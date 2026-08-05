@@ -40,6 +40,8 @@ type CSINodesGetter interface {
 type CSINodeInterface interface {
 	Create(ctx context.Context, cSINode *storagev1.CSINode, opts metav1.CreateOptions) (*storagev1.CSINode, error)
 	Update(ctx context.Context, cSINode *storagev1.CSINode, opts metav1.UpdateOptions) (*storagev1.CSINode, error)
+	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+	UpdateStatus(ctx context.Context, cSINode *storagev1.CSINode, opts metav1.UpdateOptions) (*storagev1.CSINode, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*storagev1.CSINode, error)
@@ -47,6 +49,8 @@ type CSINodeInterface interface {
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *storagev1.CSINode, err error)
 	Apply(ctx context.Context, cSINode *applyconfigurationsstoragev1.CSINodeApplyConfiguration, opts metav1.ApplyOptions) (result *storagev1.CSINode, err error)
+	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+	ApplyStatus(ctx context.Context, cSINode *applyconfigurationsstoragev1.CSINodeApplyConfiguration, opts metav1.ApplyOptions) (result *storagev1.CSINode, err error)
 	CSINodeExpansion
 }
 

@@ -12,25 +12,8 @@ bazel_dep(
     repo_name = "bazel_gazelle",
 )
 bazel_dep(
-    name = "googleapis",
-    version = "0.0.0-20241220-5e258e33.bcr.1",
-    repo_name = "com_google_googleapis",
-)
-bazel_dep(
-    name = "googleapis-cc",
-    version = "1.0.0",
-)
-bazel_dep(
-    name = "googleapis-java",
-    version = "1.0.0",
-)
-bazel_dep(
-    name = "googleapis-go",
-    version = "1.0.0",
-)
-bazel_dep(
     name = "protobuf",
-    version = "27.0",
+    version = "27.1",
     repo_name = "com_google_protobuf",
 )
 bazel_dep(
@@ -63,12 +46,11 @@ python.toolchain(
 )
 
 go_sdk = use_extension("@io_bazel_rules_go//go:extensions.bzl", "go_sdk")
-go_sdk.download(version = "1.22.0")
+go_sdk.download(version = "1.23.0")
 
 go_deps = use_extension("@bazel_gazelle//:extensions.bzl", "go_deps")
 go_deps.from_file(go_mod = "//:go.mod")
 use_repo(
     go_deps,
-    "org_golang_google_genproto_googleapis_rpc",
     "org_golang_google_protobuf",
 )

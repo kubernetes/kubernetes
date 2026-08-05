@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/server/egressselector"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 func kubeletTestCertHelper(valid bool) KubeletTLSConfig {
@@ -460,7 +461,7 @@ func TestGetConnectionInfo(t *testing.T) {
 				t.Fatalf("failed to create NodeConnectionInfoGetter: %v", err)
 			}
 
-			tCtx := context.Background()
+			tCtx := ktesting.Init(t)
 			connInfo, err := getter.GetConnectionInfo(tCtx, tt.nodeName)
 
 			if tt.expectError {

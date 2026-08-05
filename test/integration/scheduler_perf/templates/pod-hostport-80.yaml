@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: pod-hostport-80-
+spec:
+  containers:
+  - image: registry.k8s.io/pause:3.10.1
+    name: pause
+    ports:
+    - containerPort: 80
+      hostPort: 80
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi

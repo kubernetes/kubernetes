@@ -550,14 +550,17 @@ var _ = SIGDescribe(feature.HPA, framework.WithSlow(), framework.WithFeatureGate
 			ginkgo.It("should scale up but should not scale down", func(ctx context.Context) {
 				ginkgo.By("setting up resource consumer and HPA")
 				initPods := 10
-				podCPURequest := 500
+				podCPURequest := 200
 				targetCPUUtilizationPercent := 60
+				// Compute initial load for 10 pods.
 				initCPUUsageTotal := usageForReplicasWithRequest(initPods, podCPURequest, targetCPUUtilizationPercent)
 				waitDeadline := maxHPAReactionTime + maxResourceConsumerDelay + waitBuffer
 
+				// Pass 0 as initCPUTotal so the regular ConsumeCPU goroutine stays idle.
+				// We drive load exclusively via ConsumeCPUPerPod to guarantee even distribution.
 				rc := e2eautoscaling.NewDynamicResourceConsumer(ctx,
 					hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
-					initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
+					0, 0, 0, int64(podCPURequest), 200,
 					f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
 					nil)
 				ginkgo.DeferCleanup(rc.CleanUp)
@@ -573,8 +576,14 @@ var _ = SIGDescribe(feature.HPA, framework.WithSlow(), framework.WithFeatureGate
 				ginkgo.By("waiting for deployment to start initial pods")
 				rc.WaitForReplicas(ctx, initPods, waitDeadline)
 
+				// Set initial stable load using even per-pod distribution and wait for
+				// HPA to observe it before triggering scale-up. This ensures HPA has a
+				// baseline measurement before we push load above the scale-up tolerance.
+				rc.ConsumeCPUPerPod(initCPUUsageTotal)
+				rc.EnsureDesiredReplicasInRange(ctx, initPods, initPods, maxHPAReactionTime+maxResourceConsumerDelay, hpa.Name)
+
 				ginkgo.By("trying to trigger scale up to 11 replicas")
-				rc.ConsumeCPU(usageForReplicasWithRequest(11, podCPURequest, targetCPUUtilizationPercent))
+				rc.ConsumeCPUPerPod(usageForReplicasWithRequest(11, podCPURequest, targetCPUUtilizationPercent))
 
 				ginkgo.By("waiting for replicas to scale up")
 				waitStart := time.Now()
@@ -583,12 +592,10 @@ var _ = SIGDescribe(feature.HPA, framework.WithSlow(), framework.WithFeatureGate
 				framework.Logf("time waited for scale up: %s", timeWaited)
 				gomega.Expect(timeWaited).To(gomega.BeNumerically("<", waitDeadline), "waited %s, wanted less than %s", timeWaited, waitDeadline)
 
-				// Increase resource usage to match 12 replicas. The difference is less
-				// than 10% (the default tolerance), but it should scale up anyway thanks
-				// to the small scale-up custom tolerance.
-
+				// Increase to 12 replicas. Difference is less than 10% default tolerance
+				// but should still scale up due to the small (2%) custom scale-up tolerance.
 				ginkgo.By("trying to trigger scale up to 12 replicas")
-				rc.ConsumeCPU(usageForReplicasWithRequest(12, podCPURequest, targetCPUUtilizationPercent))
+				rc.ConsumeCPUPerPod(usageForReplicasWithRequest(12, podCPURequest, targetCPUUtilizationPercent))
 
 				ginkgo.By("waiting for replicas to scale up")
 				waitStart = time.Now()
@@ -597,12 +604,11 @@ var _ = SIGDescribe(feature.HPA, framework.WithSlow(), framework.WithFeatureGate
 				framework.Logf("time waited for scale up: %s", timeWaited)
 				gomega.Expect(timeWaited).To(gomega.BeNumerically("<", waitDeadline), "waited %s, wanted less than %s", timeWaited, waitDeadline)
 
-				// Decrease resource usage to match 10 replicas. Should not scale down
-				// because of the large scale-down custom tolerance.
-
+				// Drop load to 10-replica level. Should NOT scale down because the
+				// difference is within the large (30%) custom scale-down tolerance.
 				ginkgo.By("triggering scale down by lowering consumption")
 				waitStart = time.Now()
-				rc.ConsumeCPU(usageForReplicasWithRequest(10, podCPURequest, targetCPUUtilizationPercent))
+				rc.ConsumeCPUPerPod(usageForReplicasWithRequest(10, podCPURequest, targetCPUUtilizationPercent))
 
 				rc.EnsureDesiredReplicasInRange(ctx, 12, 12, waitDeadline, hpa.Name)
 				timeWaited = time.Since(waitStart)
@@ -610,6 +616,7 @@ var _ = SIGDescribe(feature.HPA, framework.WithSlow(), framework.WithFeatureGate
 				ginkgo.By("verifying time waited for a scale down")
 				framework.Logf("time waited for scale down: %s", timeWaited)
 				gomega.Expect(timeWaited).To(gomega.BeNumerically(">", waitDeadline), "waited %s, wanted to wait more than %s", timeWaited, waitDeadline)
+
 			})
 		})
 	})

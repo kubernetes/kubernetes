@@ -26,15 +26,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/cadvisor/machine"
-	"github.com/google/cadvisor/utils/sysfs"
-
 	"k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
-	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
+	"k8s.io/utils/cpuset"
 )
 
-func SetSysctls(ctx context.Context, config *proxyconfigapi.KubeProxyConntrackConfiguration) error {
+func SetSysctls(ctx context.Context, config *kubeproxyconfig.KubeProxyConntrackConfiguration) error {
 	return setSysctls(ctx, realConntrackConfigurer{}, config)
 }
 
@@ -57,7 +55,7 @@ type conntrackConfigurer interface {
 	SetUDPStreamTimeout(ctx context.Context, seconds int) error
 }
 
-func setSysctls(ctx context.Context, ct conntrackConfigurer, config *proxyconfigapi.KubeProxyConntrackConfiguration) error {
+func setSysctls(ctx context.Context, ct conntrackConfigurer, config *kubeproxyconfig.KubeProxyConntrackConfiguration) error {
 	max, err := getConntrackMax(ctx, config, detectNumCPU())
 	if err != nil {
 		return err
@@ -106,7 +104,7 @@ func setSysctls(ctx context.Context, ct conntrackConfigurer, config *proxyconfig
 	return nil
 }
 
-func getConntrackMax(ctx context.Context, config *proxyconfigapi.KubeProxyConntrackConfiguration, numCPU int) (int, error) {
+func getConntrackMax(ctx context.Context, config *kubeproxyconfig.KubeProxyConntrackConfiguration, numCPU int) (int, error) {
 	logger := klog.FromContext(ctx)
 	if config.MaxPerCore != nil && *config.MaxPerCore > 0 {
 		floor := 0
@@ -130,13 +128,16 @@ func getConntrackMax(ctx context.Context, config *proxyconfigapi.KubeProxyConntr
 	return 0, nil
 }
 
+// detectNumCPU returns the CPU count used to size nf_conntrack_max. That limit
+// is host-wide, so it must be based on the node's CPU count, not runtime.NumCPU():
+// runtime.NumCPU() honors the process cpuset and undercounts when kube-proxy
+// runs under a static CPU policy. cpuset.NumCPU() reads the node's online CPU
+// count from sysfs instead, falling back to runtime.NumCPU() if it can't.
 func detectNumCPU() int {
-	// try get numCPU from /sys firstly due to a known issue (https://github.com/kubernetes/kubernetes/issues/99225)
-	_, numCPU, err := machine.GetTopology(sysfs.NewRealSysFs())
-	if err != nil || numCPU < 1 {
-		return runtime.NumCPU()
+	if n, err := cpuset.NumCPU(); err == nil && n > 0 {
+		return n
 	}
-	return numCPU
+	return runtime.NumCPU()
 }
 
 type realConntrackConfigurer struct {

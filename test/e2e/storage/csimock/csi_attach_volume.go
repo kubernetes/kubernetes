@@ -70,9 +70,8 @@ var _ = utils.SIGDescribe("CSI Mock volume attach", func() {
 				deployClusterRegistrar: false,
 			},
 		}
-		for _, t := range tests {
-			test := t
-			ginkgo.It(t.name, func(ctx context.Context) {
+		for _, test := range tests {
+			ginkgo.It(test.name, func(ctx context.Context) {
 				var err error
 				m.init(ctx, testParameters{registerDriver: test.deployClusterRegistrar, disableAttach: test.disableAttach})
 				ginkgo.DeferCleanup(m.cleanup)

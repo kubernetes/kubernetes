@@ -54,6 +54,7 @@ func FromASTFile(fset *token.FileSet, src *ast.File) (*outline, error) {
 			// Node is not a Ginkgo spec or container, so it was not pushed onto the stack, continue
 			return true
 		}
+		expandSubtree(lastVisitedGinkgoNode)
 		stack = stack[0 : len(stack)-1]
 		return true
 	})
@@ -127,4 +128,30 @@ func (o *outline) StringIndent(width int) string {
 	}
 
 	return b.String()
+}
+
+// expandSubtree restructures a DescribeTableSubtree node so that each Entry
+// child gets a copy of the subtree's spec nodes as its children. This mirrors
+// the runtime behavior where each Entry generates a container with the specs
+// defined in the DescribeTableSubtree body.
+func expandSubtree(gn *ginkgoNode) {
+	if !strings.Contains(gn.Name, "DescribeTableSubtree") {
+		return
+	}
+	subNodes, entries := splitSubtreeSubnodes(gn.Nodes)
+	gn.Nodes = entries
+	for _, entry := range entries {
+		entry.Nodes = subNodes
+	}
+}
+
+// splitSubtreeSubnodes splits the child nodes of a DescribeTableSubtree into
+// spec/container nodes (defined in the body) and Entry nodes.
+func splitSubtreeSubnodes(nodes []*ginkgoNode) ([]*ginkgoNode, []*ginkgoNode) {
+	for i, node := range nodes {
+		if strings.Contains(node.Name, "Entry") {
+			return nodes[:i], nodes[i:]
+		}
+	}
+	return nodes, nil
 }

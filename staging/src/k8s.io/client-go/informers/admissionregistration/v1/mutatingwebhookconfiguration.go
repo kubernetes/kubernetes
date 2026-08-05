@@ -34,11 +34,39 @@ import (
 )
 
 // MutatingWebhookConfigurationInformer provides access to a shared informer and lister for
-// MutatingWebhookConfigurations.
+// MutatingWebhookConfigurations. Prefer using the type-safe variant (see [TypedMutatingWebhookConfigurationInformer]).
 type MutatingWebhookConfigurationInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() admissionregistrationv1.MutatingWebhookConfigurationLister
 }
+
+// TypedMutatingWebhookConfigurationInformer provides access to a shared informer and lister for
+// MutatingWebhookConfigurations, including the type-safe TypedInformer variant.
+// It is a superset of MutatingWebhookConfigurationInformer.
+type TypedMutatingWebhookConfigurationInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() MutatingWebhookConfigurationIndexInformer
+	Lister() admissionregistrationv1.MutatingWebhookConfigurationLister
+}
+
+// MutatingWebhookConfigurationIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type MutatingWebhookConfigurationIndexInformer cache.TypedSharedIndexInformer[*apiadmissionregistrationv1.MutatingWebhookConfiguration]
+
+// MutatingWebhookConfigurationHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for MutatingWebhookConfiguration.
+type MutatingWebhookConfigurationHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apiadmissionregistrationv1.MutatingWebhookConfiguration]
+
+// MutatingWebhookConfigurationDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for MutatingWebhookConfiguration.
+type MutatingWebhookConfigurationDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apiadmissionregistrationv1.MutatingWebhookConfiguration]
+
+// MutatingWebhookConfigurationFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for MutatingWebhookConfiguration.
+type MutatingWebhookConfigurationFilteringHandler = cache.TypedFilteringResourceEventHandler[*apiadmissionregistrationv1.MutatingWebhookConfiguration]
+
+// MutatingWebhookConfigurationIndexers is a specialization of [cache.TypedIndexers] for MutatingWebhookConfiguration.
+type MutatingWebhookConfigurationIndexers = cache.TypedIndexers[*apiadmissionregistrationv1.MutatingWebhookConfiguration]
+
+// DeletedMutatingWebhookConfiguration is a specialization of [cache.DeletedObject] for MutatingWebhookConfiguration.
+type DeletedMutatingWebhookConfiguration = cache.DeletedObject[*apiadmissionregistrationv1.MutatingWebhookConfiguration]
 
 type mutatingWebhookConfigurationInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -48,25 +76,49 @@ type mutatingWebhookConfigurationInformer struct {
 // NewMutatingWebhookConfigurationInformer constructs a new informer for MutatingWebhookConfiguration type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedMutatingWebhookConfigurationInformer]).
 func NewMutatingWebhookConfigurationInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewMutatingWebhookConfigurationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedMutatingWebhookConfigurationInformer constructs a new informer for MutatingWebhookConfiguration type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedMutatingWebhookConfigurationInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers MutatingWebhookConfigurationIndexers) MutatingWebhookConfigurationIndexInformer {
+	return NewTypedMutatingWebhookConfigurationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredMutatingWebhookConfigurationInformer constructs a new informer for MutatingWebhookConfiguration type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredMutatingWebhookConfigurationInformer]).
 func NewFilteredMutatingWebhookConfigurationInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewMutatingWebhookConfigurationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedMutatingWebhookConfigurationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredMutatingWebhookConfigurationInformer constructs a new informer for MutatingWebhookConfiguration type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredMutatingWebhookConfigurationInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers MutatingWebhookConfigurationIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) MutatingWebhookConfigurationIndexInformer {
+	return NewTypedMutatingWebhookConfigurationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewMutatingWebhookConfigurationInformerWithOptions constructs a new informer for MutatingWebhookConfiguration type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedMutatingWebhookConfigurationInformerWithOptions]).
 func NewMutatingWebhookConfigurationInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedMutatingWebhookConfigurationInformerWithOptions(client, options)
+}
+
+// NewTypedMutatingWebhookConfigurationInformerWithOptions constructs a new informer for MutatingWebhookConfiguration type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedMutatingWebhookConfigurationInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) MutatingWebhookConfigurationIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "admissionregistration.k8s.io", Version: "v1", Resource: "mutatingwebhookconfigurations"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apiadmissionregistrationv1.MutatingWebhookConfiguration](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -99,17 +151,57 @@ func NewMutatingWebhookConfigurationInformerWithOptions(client kubernetes.Interf
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *mutatingWebhookConfigurationInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewMutatingWebhookConfigurationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedMutatingWebhookConfigurationInformerWithOptions(client, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *mutatingWebhookConfigurationInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiadmissionregistrationv1.MutatingWebhookConfiguration{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *mutatingWebhookConfigurationInformer) TypedInformer() MutatingWebhookConfigurationIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiadmissionregistrationv1.MutatingWebhookConfiguration](f.factory.InformerFor(&apiadmissionregistrationv1.MutatingWebhookConfiguration{}, f.defaultInformer))
 }
 
 func (f *mutatingWebhookConfigurationInformer) Lister() admissionregistrationv1.MutatingWebhookConfigurationLister {
 	return admissionregistrationv1.NewMutatingWebhookConfigurationLister(f.Informer().GetIndexer())
+}
+
+// ToTypedMutatingWebhookConfigurationInformer converts an untyped informer into a TypedMutatingWebhookConfigurationInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *MutatingWebhookConfiguration. If that is not the case, calling type-safe methods of the returned
+// TypedMutatingWebhookConfigurationInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedMutatingWebhookConfigurationInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedMutatingWebhookConfigurationInformer(informer MutatingWebhookConfigurationInformer) TypedMutatingWebhookConfigurationInformer {
+	if informer, ok := informer.(TypedMutatingWebhookConfigurationInformer); ok {
+		return informer
+	}
+	return &mutatingWebhookConfigurationTypedInformerAdapter{informer}
+}
+
+type mutatingWebhookConfigurationTypedInformerAdapter struct {
+	MutatingWebhookConfigurationInformer
+}
+
+func (a *mutatingWebhookConfigurationTypedInformerAdapter) TypedInformer() MutatingWebhookConfigurationIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiadmissionregistrationv1.MutatingWebhookConfiguration](a.Informer())
+}
+
+// ToMutatingWebhookConfigurationIndexInformer converts an untyped informer into a MutatingWebhookConfigurationIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *MutatingWebhookConfiguration. If that is not the case, calling type-safe methods of the returned
+// MutatingWebhookConfigurationIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a MutatingWebhookConfigurationIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToMutatingWebhookConfigurationIndexInformer(informer cache.SharedIndexInformer) MutatingWebhookConfigurationIndexInformer {
+	if informer, ok := informer.(MutatingWebhookConfigurationIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apiadmissionregistrationv1.MutatingWebhookConfiguration](informer)
 }

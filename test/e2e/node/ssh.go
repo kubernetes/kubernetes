@@ -31,15 +31,12 @@ import (
 
 const maxNodes = 100
 
-var _ = SIGDescribe("SSH", func() {
+var _ = SIGDescribe("SSH", framework.WithProvider(framework.ProvidersWithSSH...) /* When adding more providers here, also implement their functionality in e2essh.GetSigner(...). */, func() {
 
 	f := framework.NewDefaultFramework("ssh")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
-		// When adding more providers here, also implement their functionality in e2essh.GetSigner(...).
-		e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
-
 		// This test SSH's into the node for which it needs the $HOME/.ssh/id_rsa key to be present. So
 		// we should skip if the environment does not have the key (not all CI systems support this use case)
 		e2eskipper.SkipUnlessSSHKeyPresent()

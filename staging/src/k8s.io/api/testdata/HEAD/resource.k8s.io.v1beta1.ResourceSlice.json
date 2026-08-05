@@ -85,7 +85,19 @@
               "int": 2,
               "bool": true,
               "string": "stringValue",
-              "version": "versionValue"
+              "version": "versionValue",
+              "ints": [
+                6
+              ],
+              "bools": [
+                true
+              ],
+              "strings": [
+                "stringsValue"
+              ],
+              "versions": [
+                "versionsValue"
+              ]
             }
           },
           "capacity": {
@@ -111,7 +123,10 @@
                 "countersKey": {
                   "value": "0"
                 }
-              }
+              },
+              "compatibilityGroups": [
+                "compatibilityGroupsValue"
+              ]
             }
           ],
           "nodeName": "nodeNameValue",
@@ -156,10 +171,17 @@
             "bindingFailureConditionsValue"
           ],
           "allowMultipleAllocations": true,
-          "nodeAllocatableResourceMappings": {
-            "nodeAllocatableResourceMappingsKey": {
-              "capacityKey": "capacityKeyValue",
-              "allocationMultiplier": "0"
+          "nodeAllocatableResources": {
+            "nodeAllocatableResourcesKey": {
+              "mapping": {
+                "capacityKey": "capacityKeyValue",
+                "capacityMultiplier": "0",
+                "deviceMultiplier": "0"
+              },
+              "overhead": {
+                "perPod": "0",
+                "perContainer": "0"
+              }
             }
           }
         }
@@ -175,6 +197,10 @@
           }
         }
       }
+    ],
+    "partitionTypeAttribute": "partitionTypeAttributeValue",
+    "skipNodeOperations": [
+      "skipNodeOperationsValue"
     ]
   }
 }

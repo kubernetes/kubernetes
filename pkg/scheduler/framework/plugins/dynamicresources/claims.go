@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"iter"
 
+	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -32,6 +33,10 @@ import (
 type claimStore struct {
 	// claims contains all user-owned claims, optionally followed by the special ResourceClaim for extended resources.
 	claims []*resourceapi.ResourceClaim
+	// bindTo lists the objects to which each of the claims should be bound:
+	// either a Pod or its PodGroup. It is always empty when PodGroup claims are
+	// disabled.
+	bindTo []resourceapi.ResourceClaimConsumerReference
 	// numUserOwned is the number of claims without the special ResourceClaim.
 	numUserOwned int
 	// initialExtendedResourceClaimUID is the initial extended resource claim UID from PreFilter phase.
@@ -40,9 +45,10 @@ type claimStore struct {
 }
 
 // newClaimStore stores the list of user-owned claims and the optional claim owned by the scheduler.
-func newClaimStore(claims []*resourceapi.ResourceClaim, extendedResourceClaim *resourceapi.ResourceClaim) claimStore {
+func newClaimStore(claims []*resourceapi.ResourceClaim, extendedResourceClaim *resourceapi.ResourceClaim, claimBindings []resourceapi.ResourceClaimConsumerReference) claimStore {
 	cs := claimStore{
 		claims:                          claims,
+		bindTo:                          claimBindings,
 		numUserOwned:                    len(claims),
 		initialExtendedResourceClaimUID: "",
 	}
@@ -125,6 +131,21 @@ func (cs claimStore) get(i int) *resourceapi.ResourceClaim {
 // set sets the input claim at the input index for the internal claims slice.
 func (cs claimStore) set(i int, c *resourceapi.ResourceClaim) {
 	cs.claims[i] = c
+}
+
+// getBinding returns a reference to the object to which the ResourceClaim at
+// the given index should be bound: either a Pod or its PodGroup. For extended
+// resource claims, it always returns a reference to the Pod.
+func (cs claimStore) getBinding(i int, pod *v1.Pod) resourceapi.ResourceClaimConsumerReference {
+	if i >= len(cs.bindTo) {
+		return resourceapi.ResourceClaimConsumerReference{
+			APIGroup: v1.GroupName,
+			Resource: "pods",
+			Name:     pod.Name,
+			UID:      pod.UID,
+		}
+	}
+	return cs.bindTo[i]
 }
 
 // updateExtendedResourceClaim updates the input claim as extended resource

@@ -34,7 +34,9 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/client-go/kubernetes"
+	admissionregistrationv1client "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
 	networkingv1client "k8s.io/client-go/kubernetes/typed/networking/v1"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	"k8s.io/klog/v2"
@@ -72,6 +74,9 @@ type Config struct {
 
 	Proxy    ProxyConfig
 	Services ServicesConfig
+
+	EndpointSliceGetter proxy.EndpointSliceGetter
+	Authorizer          authorizer.Authorizer
 }
 
 type ProxyConfig struct {
@@ -100,12 +105,12 @@ type legacyProvider struct {
 	primaryServiceClusterIPAllocator ipallocator.Interface
 	serviceClusterIPAllocators       map[api.IPFamily]ipallocator.Interface
 	serviceNodePortAllocator         *portallocator.PortAllocator
-	authorizer                       authorizer.Authorizer
+	authorizer                       authorizer.UnconditionalAuthorizer
 
 	startServiceNodePortsRepair, startServiceClusterIPRepair func(onFirstSuccess func(), stopCh chan struct{})
 }
 
-func New(c Config, authorizer authorizer.Authorizer) (*legacyProvider, error) {
+func New(c Config, authorizer authorizer.UnconditionalAuthorizer) (*legacyProvider, error) {
 	rangeRegistries, serviceClusterIPAllocator, serviceIPAllocators, serviceNodePortAllocator, err := c.newServiceIPAllocators()
 	if err != nil {
 		return nil, err
@@ -207,7 +212,7 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		p.primaryServiceClusterIPAllocator.IPFamily(),
 		p.serviceClusterIPAllocators,
 		p.serviceNodePortAllocator,
-		endpointsStorage,
+		p.EndpointSliceGetter,
 		podStorage.Pod,
 		p.Proxy.Transport)
 	if err != nil {
@@ -219,6 +224,12 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		storage = map[string]rest.Storage{}
 	}
 
+	// client for getting service account token bound objects
+	whClient, err := admissionregistrationv1client.NewForConfig(p.LoopbackClientConfig)
+	if err != nil {
+		return genericapiserver.APIGroupInfo{}, err
+	}
+
 	// potentially override the generic serviceaccount storage with one that supports pods
 	var serviceAccountStorage *serviceaccountstore.REST
 	if p.ServiceAccountIssuer != nil {
@@ -227,7 +238,8 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 			utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenPodNodeInfo) {
 			nodeGetter = nodeStorage.Node.Store
 		}
-		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, p.ServiceAccountIssuer, p.APIAudiences, p.ServiceAccountMaxExpiration, podStorage.Pod.Store, storage["secrets"].(rest.Getter), nodeGetter, p.ExtendExpiration, p.MaxExtendedExpiration)
+		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, p.ServiceAccountIssuer, p.APIAudiences, p.Authorizer, p.ServiceAccountMaxExpiration, podStorage.Pod.Store, storage["secrets"].(rest.Getter), nodeGetter,
+			whClient.ValidatingWebhookConfigurations(), whClient.MutatingWebhookConfigurations(), p.ExtendExpiration, p.MaxExtendedExpiration)
 		if err != nil {
 			return genericapiserver.APIGroupInfo{}, err
 		}
@@ -534,8 +546,12 @@ func (p *legacyProvider) PostStartHook() (string, genericapiserver.PostStartHook
 		}()
 		select {
 		case <-done:
+
+		case <-context.Done():
+			return goerrors.New("unable to perform initial IP and Port allocation check (context cancelled)")
+
 		case <-time.After(time.Minute):
-			return goerrors.New("unable to perform initial IP and Port allocation check")
+			return goerrors.New("unable to perform initial IP and Port allocation check (timeout)")
 		}
 
 		return nil

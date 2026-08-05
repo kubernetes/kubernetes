@@ -35,6 +35,7 @@ func DropDisabledFields(new, old *resource.ResourceClaimSpec) {
 	dropDisabledDRADeviceTaintsFields(new, old) // Intentionally after dropDisabledDRAPrioritizedListFields to avoid iterating over FirstAvailable slice which needs to be dropped.
 	dropDisabledDRAAdminAccessFields(new, old)
 	dropDisabledDRAResourceClaimConsumableCapacityFields(new, old)
+	dropDisabledDRADerivedAttributesFields(new, old)
 }
 
 func dropDisabledDRADeviceTaintsFields(new, old *resource.ResourceClaimSpec) {
@@ -168,6 +169,41 @@ func DRAConsumableCapacityFeatureInUse(spec *resource.ResourceClaimSpec) bool {
 		}
 		for _, subRequest := range request.FirstAvailable {
 			if subRequest.Capacity != nil {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func dropDisabledDRADerivedAttributesFields(new, old *resource.ResourceClaimSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADerivedAttributes) ||
+		draDerivedAttributesInUse(old) {
+		return
+	}
+
+	for i, req := range new.Devices.Requests {
+		if exactly := req.Exactly; exactly != nil {
+			exactly.DerivedAttributes = nil
+		}
+		for e := range req.FirstAvailable {
+			new.Devices.Requests[i].FirstAvailable[e].DerivedAttributes = nil
+		}
+	}
+}
+
+func draDerivedAttributesInUse(spec *resource.ResourceClaimSpec) bool {
+	if spec == nil {
+		return false
+	}
+
+	for _, req := range spec.Devices.Requests {
+		if exactly := req.Exactly; exactly != nil && len(exactly.DerivedAttributes) > 0 {
+			return true
+		}
+		for _, sub := range req.FirstAvailable {
+			if len(sub.DerivedAttributes) > 0 {
 				return true
 			}
 		}

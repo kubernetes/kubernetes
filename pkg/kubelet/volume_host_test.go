@@ -23,6 +23,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/podcertificate"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type recordingPodCertificateManager struct {
@@ -55,13 +56,14 @@ func (f *recordingPodCertificateManager) MetricReport() *podcertificate.MetricRe
 // correct order.  Seems excessive, but we got here because I put the arguments
 // in the wrong order...
 func TestGetPodCertificateCredentialBundle(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	recorder := &recordingPodCertificateManager{}
 
 	kvh := &kubeletVolumeHost{
 		podCertificateManager: recorder,
 	}
 
-	_, _, err := kvh.GetPodCertificateCredentialBundle(context.Background(), "namespace", "pod-name", "pod-uid", "volume-name", 10)
+	_, _, err := kvh.GetPodCertificateCredentialBundle(tCtx, "namespace", "pod-name", "pod-uid", "volume-name", 10)
 	if err != nil {
 		t.Fatalf("Unexpected error calling GetPodCertificateCredentialBundle: %v", err)
 	}

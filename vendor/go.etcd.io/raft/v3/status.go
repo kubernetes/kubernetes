@@ -33,7 +33,7 @@ type Status struct {
 type BasicStatus struct {
 	ID uint64
 
-	pb.HardState
+	*pb.HardState
 	SoftState
 
 	Applied uint64
@@ -79,7 +79,7 @@ func getStatus(r *raft) Status {
 // TODO: try to simplify this by introducing ID type into raft
 func (s Status) MarshalJSON() ([]byte, error) {
 	j := fmt.Sprintf(`{"id":"%x","term":%d,"vote":"%x","commit":%d,"lead":"%x","raftState":%q,"applied":%d,"progress":{`,
-		s.ID, s.Term, s.Vote, s.Commit, s.Lead, s.RaftState, s.Applied)
+		s.ID, s.GetTerm(), s.GetVote(), s.GetCommit(), s.Lead, s.RaftState, s.Applied)
 
 	if len(s.Progress) == 0 {
 		j += "},"

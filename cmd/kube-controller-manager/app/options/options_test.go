@@ -57,6 +57,7 @@ import (
 	daemonconfig "k8s.io/kubernetes/pkg/controller/daemon/config"
 	deploymentconfig "k8s.io/kubernetes/pkg/controller/deployment/config"
 	devicetaintevictionconfig "k8s.io/kubernetes/pkg/controller/devicetainteviction/config"
+	disruptionconfig "k8s.io/kubernetes/pkg/controller/disruption/config"
 	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
 	endpointsliceconfig "k8s.io/kubernetes/pkg/controller/endpointslice/config"
 	endpointslicemirroringconfig "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config"
@@ -100,6 +101,7 @@ var args = []string{
 	"--cluster-signing-legacy-unknown-cert-file=/cluster-signing-legacy-unknown/cert-file",
 	"--cluster-signing-legacy-unknown-key-file=/cluster-signing-legacy-unknown/key-file",
 	"--concurrent-deployment-syncs=10",
+	"--concurrent-disruption-syncs=10",
 	"--concurrent-device-taint-eviction-syncs=10",
 	"--concurrent-resourceclaim-syncs=10",
 	"--concurrent-daemonset-syncs=10",
@@ -114,7 +116,6 @@ var args = []string{
 	"--concurrent-cron-job-syncs=10",
 	"--concurrent-replicaset-syncs=10",
 	"--concurrent-resource-quota-syncs=10",
-	"--concurrent-service-syncs=2",
 	"--concurrent-serviceaccount-token-syncs=10",
 	"--concurrent_rc_syncs=10",
 	"--concurrent-validating-admission-policy-status-syncs=9",
@@ -219,7 +220,6 @@ func TestAddFlags(t *testing.T) {
 			KubeCloudSharedConfiguration: &cpconfig.KubeCloudSharedConfiguration{
 				UseServiceAccountCredentials: true,
 				RouteReconciliationPeriod:    metav1.Duration{Duration: 30 * time.Second},
-				NodeMonitorPeriod:            metav1.Duration{Duration: 10 * time.Second},
 				ClusterName:                  "k8s",
 				ClusterCIDR:                  "1.2.3.4/24",
 				AllocateNodeCIDRs:            true,
@@ -231,11 +231,6 @@ func TestAddFlags(t *testing.T) {
 					Name:            "gce",
 					CloudConfigFile: "/cloud-config",
 				},
-			},
-		},
-		ServiceController: &cpoptions.ServiceControllerOptions{
-			ServiceControllerConfiguration: &serviceconfig.ServiceControllerConfiguration{
-				ConcurrentServiceSyncs: 2,
 			},
 		},
 		AttachDetachController: &AttachDetachControllerOptions{
@@ -275,6 +270,11 @@ func TestAddFlags(t *testing.T) {
 		DeploymentController: &DeploymentControllerOptions{
 			&deploymentconfig.DeploymentControllerConfiguration{
 				ConcurrentDeploymentSyncs: 10,
+			},
+		},
+		DisruptionController: &DisruptionControllerOptions{
+			&disruptionconfig.DisruptionControllerConfiguration{
+				ConcurrentDisruptionSyncs: 10,
 			},
 		},
 		DeviceTaintEvictionController: &DeviceTaintEvictionControllerOptions{
@@ -368,6 +368,7 @@ func TestAddFlags(t *testing.T) {
 				NodeStartupGracePeriod:    metav1.Duration{Duration: 30 * time.Second},
 				LargeClusterSizeThreshold: 100,
 				UnhealthyZoneThreshold:    0.6,
+				NodeMonitorPeriod:         metav1.Duration{Duration: 10 * time.Second},
 			},
 		},
 		PersistentVolumeBinderController: &PersistentVolumeBinderControllerOptions{
@@ -593,7 +594,6 @@ func TestApplyTo(t *testing.T) {
 			KubeCloudShared: cpconfig.KubeCloudSharedConfiguration{
 				UseServiceAccountCredentials: true,
 				RouteReconciliationPeriod:    metav1.Duration{Duration: 30 * time.Second},
-				NodeMonitorPeriod:            metav1.Duration{Duration: 10 * time.Second},
 				ClusterName:                  "k8s",
 				ClusterCIDR:                  "1.2.3.4/24",
 				AllocateNodeCIDRs:            true,
@@ -604,9 +604,7 @@ func TestApplyTo(t *testing.T) {
 					CloudConfigFile: "/cloud-config",
 				},
 			},
-			ServiceController: serviceconfig.ServiceControllerConfiguration{
-				ConcurrentServiceSyncs: 2,
-			},
+			ServiceController: serviceconfig.ServiceControllerConfiguration{},
 			AttachDetachController: attachdetachconfig.AttachDetachControllerConfiguration{
 				ReconcilerSyncLoopPeriod:          metav1.Duration{Duration: 30 * time.Second},
 				DisableAttachDetachReconcilerSync: true,
@@ -637,6 +635,9 @@ func TestApplyTo(t *testing.T) {
 			},
 			DeploymentController: deploymentconfig.DeploymentControllerConfiguration{
 				ConcurrentDeploymentSyncs: 10,
+			},
+			DisruptionController: disruptionconfig.DisruptionControllerConfiguration{
+				ConcurrentDisruptionSyncs: 10,
 			},
 			DeviceTaintEvictionController: devicetaintevictionconfig.DeviceTaintEvictionControllerConfiguration{
 				ConcurrentSyncs: 10,
@@ -700,6 +701,7 @@ func TestApplyTo(t *testing.T) {
 				NodeStartupGracePeriod:    metav1.Duration{Duration: 30 * time.Second},
 				LargeClusterSizeThreshold: 100,
 				UnhealthyZoneThreshold:    0.6,
+				NodeMonitorPeriod:         metav1.Duration{Duration: 10 * time.Second},
 			},
 			PersistentVolumeBinderController: persistentvolumeconfig.PersistentVolumeBinderControllerConfiguration{
 				PVClaimBinderSyncPeriod: metav1.Duration{Duration: 30 * time.Second},
@@ -1279,6 +1281,15 @@ func TestValidateControllersOptions(t *testing.T) {
 			options: &DeploymentControllerOptions{
 				&deploymentconfig.DeploymentControllerConfiguration{
 					ConcurrentDeploymentSyncs: 10,
+				},
+			},
+		},
+		{
+			name:         "DisruptionControllerOptions",
+			expectErrors: false,
+			options: &DisruptionControllerOptions{
+				&disruptionconfig.DisruptionControllerConfiguration{
+					ConcurrentDisruptionSyncs: 10,
 				},
 			},
 		},

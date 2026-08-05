@@ -677,3 +677,27 @@ func GetReliableMountRefs(mounter mount.Interface, mountPath string) ([]string, 
 	}
 	return paths, err
 }
+
+func VolumeHealthConditionSetsEqual(a, b []v1.VolumeHealthCondition) bool {
+	type key struct {
+		status v1.VolumeHealthStatusType
+		reason string
+	}
+	toSet := func(conds []v1.VolumeHealthCondition) map[key]struct{} {
+		s := make(map[key]struct{}, len(conds))
+		for _, c := range conds {
+			s[key{c.Status, c.Reason}] = struct{}{}
+		}
+		return s
+	}
+	sa, sb := toSet(a), toSet(b)
+	if len(sa) != len(sb) {
+		return false
+	}
+	for k := range sa {
+		if _, ok := sb[k]; !ok {
+			return false
+		}
+	}
+	return true
+}

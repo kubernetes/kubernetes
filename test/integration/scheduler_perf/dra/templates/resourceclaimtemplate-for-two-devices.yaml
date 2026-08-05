@@ -10,7 +10,3 @@ spec:
         exactly:
           deviceClassName: test-class
           count: 2
-      constraints:
-      - requests:
-        - req-0
-        matchAttribute: dra.example.com/slice

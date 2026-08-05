@@ -29,7 +29,7 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 func testPrioritizedList(tCtx ktesting.TContext, enabled bool) {
@@ -49,6 +49,7 @@ func testPrioritizedList(tCtx ktesting.TContext, enabled bool) {
 		return
 	}
 
+	require.NoError(tCtx, err, "create ResourceClaim")
 	require.NotEmpty(tCtx, claim.Spec.Devices.Requests[0].FirstAvailable, "should store FirstAvailable")
 	startScheduler(tCtx)
 
@@ -61,7 +62,7 @@ func testPrioritizedList(tCtx ktesting.TContext, enabled bool) {
 			"Type":    gomega.Equal(v1.PodScheduled),
 			"Status":  gomega.Equal(v1.ConditionFalse),
 			"Reason":  gomega.Equal("Unschedulable"),
-			"Message": gomega.Equal("0/8 nodes are available: 8 cannot allocate all claims. still not schedulable, preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling."),
+			"Message": gomega.Equal("0/8 nodes are available: 8 cannot allocate all claims. preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling."),
 		}),
 	))
 	tCtx.Eventually(func(tCtx ktesting.TContext) (*v1.Pod, error) {

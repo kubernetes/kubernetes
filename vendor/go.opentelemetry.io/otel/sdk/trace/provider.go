@@ -5,6 +5,7 @@ package trace // import "go.opentelemetry.io/otel/sdk/trace"
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -81,6 +82,10 @@ type TracerProvider struct {
 
 var _ trace.TracerProvider = &TracerProvider{}
 
+type experimentalOption interface {
+	Experimental()
+}
+
 // NewTracerProvider returns a new and configured TracerProvider.
 //
 // By default the returned TracerProvider is configured with:
@@ -98,6 +103,9 @@ func NewTracerProvider(opts ...TracerProviderOption) *TracerProvider {
 	o = applyTracerProviderEnvConfigs(o)
 
 	for _, opt := range opts {
+		if _, ok := opt.(experimentalOption); ok {
+			continue
+		}
 		o = opt.apply(o)
 	}
 
@@ -262,6 +270,7 @@ func (p *TracerProvider) ForceFlush(ctx context.Context) error {
 		return nil
 	}
 
+	var err error
 	for _, sps := range spss {
 		select {
 		case <-ctx.Done():
@@ -269,11 +278,9 @@ func (p *TracerProvider) ForceFlush(ctx context.Context) error {
 		default:
 		}
 
-		if err := sps.sp.ForceFlush(ctx); err != nil {
-			return err
-		}
+		err = errors.Join(err, sps.sp.ForceFlush(ctx))
 	}
-	return nil
+	return err
 }
 
 // Shutdown shuts down TracerProvider. All registered span processors are shut down
@@ -303,21 +310,14 @@ func (p *TracerProvider) Shutdown(ctx context.Context) error {
 		sps.state.Do(func() {
 			err = sps.sp.Shutdown(ctx)
 		})
-		if err != nil {
-			if retErr == nil {
-				retErr = err
-			} else {
-				// Poor man's list of errors
-				retErr = fmt.Errorf("%w; %w", retErr, err)
-			}
-		}
+		retErr = errors.Join(retErr, err)
 	}
 	p.spanProcessors.Store(&spanProcessorStates{})
 	return retErr
 }
 
 func (p *TracerProvider) getSpanProcessors() spanProcessorStates {
-	return *(p.spanProcessors.Load())
+	return *p.spanProcessors.Load()
 }
 
 // TracerProviderOption configures a TracerProvider.

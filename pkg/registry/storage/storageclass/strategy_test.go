@@ -17,6 +17,7 @@ limitations under the License.
 package storageclass
 
 import (
+	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +31,7 @@ func TestStorageClassStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("StorageClass must not be namespace scoped")
 	}
-	if Strategy.AllowCreateOnUpdate() {
+	if Strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("StorageClass should not allow create on update")
 	}
 

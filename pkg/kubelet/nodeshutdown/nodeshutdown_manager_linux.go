@@ -54,6 +54,7 @@ type dbusInhibiter interface {
 	ReloadLogindConf() error
 	MonitorShutdown(klog.Logger) (<-chan bool, error)
 	OverrideInhibitDelay(inhibitDelayMax time.Duration) error
+	Close() error
 }
 
 // managerImpl has functions that can be used to interact with the Node Shutdown Manager.
@@ -65,6 +66,7 @@ type managerImpl struct {
 	getPods        eviction.ActivePodsFunc
 	syncNodeStatus func(context.Context)
 
+	newDBusConn func() (dbusInhibiter, error)
 	dbusCon     dbusInhibiter
 	inhibitLock systemd.InhibitLock
 
@@ -97,6 +99,7 @@ func NewManager(conf *Config) Manager {
 		nodeRef:        conf.NodeRef,
 		getPods:        conf.GetPodsFunc,
 		syncNodeStatus: conf.SyncNodeStatusFunc,
+		newDBusConn:    systemDbus,
 		podManager:     podManager,
 		enableMetrics:  utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdownBasedOnPodPriority),
 		storage: localStorage{
@@ -112,7 +115,7 @@ func NewManager(conf *Config) Manager {
 }
 
 // Admit rejects all pods if node is shutting
-func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (m *managerImpl) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	nodeShuttingDown := m.ShutdownStatus() != nil
 
 	if nodeShuttingDown {
@@ -152,10 +155,20 @@ func (m *managerImpl) Start(ctx context.Context) error {
 	go func() {
 		for {
 			if stop != nil {
-				<-stop
+				select {
+				case <-stop:
+				case <-ctx.Done():
+					return
+				}
 			}
 
-			time.Sleep(dbusReconnectPeriod)
+			t := time.NewTimer(dbusReconnectPeriod)
+			select {
+			case <-t.C:
+			case <-ctx.Done():
+				t.Stop()
+				return
+			}
 			m.logger.V(1).Info("Restarting watch for node shutdown events")
 			stop, err = m.start(ctx)
 			if err != nil {
@@ -169,11 +182,31 @@ func (m *managerImpl) Start(ctx context.Context) error {
 }
 
 func (m *managerImpl) start(ctx context.Context) (chan struct{}, error) {
-	systemBus, err := systemDbus()
+	systemBus, err := m.newDBusConn()
 	if err != nil {
 		return nil, err
 	}
+
+	// Close any previous dbus connection before replacing it to avoid
+	// leaking goroutines and file descriptors. See #120613.
+	if m.dbusCon != nil {
+		if err := m.dbusCon.Close(); err != nil {
+			m.logger.Error(err, "Failed to close previous dbus connection, ignoring and starting a new one anyway")
+		}
+	}
 	m.dbusCon = systemBus
+
+	// If we fail after this point, close the new connection so we don't
+	// leak dbus goroutines on every retry.
+	startSucceeded := false
+	defer func() {
+		if !startSucceeded {
+			if err := m.dbusCon.Close(); err != nil {
+				m.logger.Error(err, "Failed to close dbus connection after start failure")
+			}
+			m.dbusCon = nil
+		}
+	}()
 
 	currentInhibitDelay, err := m.dbusCon.CurrentInhibitDelay()
 	if err != nil {
@@ -240,6 +273,7 @@ func (m *managerImpl) start(ctx context.Context) (chan struct{}, error) {
 		return nil, fmt.Errorf("failed to monitor shutdown: %v", err)
 	}
 
+	startSucceeded = true
 	stop := make(chan struct{})
 	go func() {
 		// Monitor for shutdown events. This follows the logind Inhibit Delay pattern described on https://www.freedesktop.org/wiki/Software/systemd/inhibit/
@@ -248,9 +282,12 @@ func (m *managerImpl) start(ctx context.Context) (chan struct{}, error) {
 		// 3. When shutdown(false) event is received, this indicates a previous shutdown was cancelled. In this case, acquire the inhibit lock again.
 		for {
 			select {
+			case <-ctx.Done():
+				close(stop)
+				return
 			case isShuttingDown, ok := <-events:
 				if !ok {
-					m.logger.Error(err, "Ended to watching the node for shutdown events")
+					m.logger.Error(nil, "Ended to watching the node for shutdown events")
 					close(stop)
 					return
 				}
@@ -275,9 +312,12 @@ func (m *managerImpl) start(ctx context.Context) (chan struct{}, error) {
 
 				if isShuttingDown {
 					// Update node status and ready condition
-					go m.syncNodeStatus(ctx)
+					nodeStatusCtx := klog.NewContext(ctx, m.logger)
+					go m.syncNodeStatus(nodeStatusCtx)
 
-					m.processShutdownEvent()
+					if err := m.processShutdownEvent(ctx); err != nil {
+						m.logger.Error(err, "Shutdown manager failed to process shutdown event")
+					}
 				} else {
 					_ = m.acquireInhibitLock()
 				}
@@ -310,7 +350,7 @@ func (m *managerImpl) ShutdownStatus() error {
 	return nil
 }
 
-func (m *managerImpl) processShutdownEvent() error {
+func (m *managerImpl) processShutdownEvent(ctx context.Context) error {
 	m.logger.V(1).Info("Shutdown manager processing shutdown event")
 	activePods := m.getPods()
 
@@ -343,5 +383,5 @@ func (m *managerImpl) processShutdownEvent() error {
 		}()
 	}
 
-	return m.podManager.killPods(activePods)
+	return m.podManager.killPods(ctx, activePods)
 }

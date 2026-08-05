@@ -84,7 +84,7 @@ type DisruptionController struct {
 	mapper     apimeta.RESTMapper
 
 	scaleNamespacer scaleclient.ScalesGetter
-	discoveryClient discovery.DiscoveryInterface
+	discoveryClient discovery.DiscoveryInterfaceWithContext
 
 	pdbLister       policylisters.PodDisruptionBudgetLister
 	pdbListerSynced cache.InformerSynced
@@ -254,7 +254,7 @@ func NewDisruptionControllerInternal(ctx context.Context,
 
 	dc.mapper = restMapper
 	dc.scaleNamespacer = scaleNamespacer
-	dc.discoveryClient = discoveryClient
+	dc.discoveryClient = discovery.ToDiscoveryInterfaceWithContext(discoveryClient)
 
 	dc.clock = clock
 
@@ -391,7 +391,7 @@ func (dc *DisruptionController) getScaleController(ctx context.Context, controll
 			// The IsNotFound error can mean either that the resource does not exist,
 			// or it exist but doesn't implement the scale subresource. We check which
 			// situation we are facing so we can give an appropriate error message.
-			isScale, err := dc.implementsScale(mapping.Resource)
+			isScale, err := dc.implementsScale(ctx, mapping.Resource)
 			if err != nil {
 				return nil, err
 			}
@@ -408,8 +408,8 @@ func (dc *DisruptionController) getScaleController(ctx context.Context, controll
 	return &controllerAndScale{scale.UID, scale.Spec.Replicas}, nil
 }
 
-func (dc *DisruptionController) implementsScale(gvr schema.GroupVersionResource) (bool, error) {
-	resourceList, err := dc.discoveryClient.ServerResourcesForGroupVersion(gvr.GroupVersion().String())
+func (dc *DisruptionController) implementsScale(ctx context.Context, gvr schema.GroupVersionResource) (bool, error) {
+	resourceList, err := dc.discoveryClient.ServerResourcesForGroupVersionWithContext(ctx, gvr.GroupVersion().String())
 	if err != nil {
 		return false, err
 	}
@@ -444,7 +444,7 @@ func verifyGroupKind(controllerRef *metav1.OwnerReference, expectedKind string, 
 	return slices.Contains(expectedGroups, gv.Group), nil
 }
 
-func (dc *DisruptionController) Run(ctx context.Context) {
+func (dc *DisruptionController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 
 	logger := klog.FromContext(ctx)
@@ -472,9 +472,11 @@ func (dc *DisruptionController) Run(ctx context.Context) {
 		return
 	}
 
-	wg.Go(func() {
-		wait.UntilWithContext(ctx, dc.worker, time.Second)
-	})
+	for range workers {
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, dc.worker, time.Second)
+		})
+	}
 	wg.Go(func() {
 		wait.Until(dc.recheckWorker, time.Second, ctx.Done())
 	})

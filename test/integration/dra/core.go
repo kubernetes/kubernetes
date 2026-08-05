@@ -33,23 +33,26 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	resourcev1beta1 "k8s.io/api/resource/v1beta1"
+	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/metrics/testutil"
 	draclient "k8s.io/dynamic-resource-allocation/client"
+	resourceclaimmetrics "k8s.io/dynamic-resource-allocation/resourceclaim/metrics"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
-	resourceclaimmetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
 	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/integration/util"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -90,6 +93,124 @@ func testConvert(tCtx ktesting.TContext) {
 	tCtx.ExpectNoError(err, "get claim")
 	// We could check more fields, but there are unit tests which cover this better.
 	assert.Equal(tCtx, claim.Name, claimBeta2.Name, "claim name")
+}
+
+// testResourceSliceFieldSelectors verifies that all supported ResourceSlice
+// field selectors return the same objects through all served API versions.
+func testResourceSliceFieldSelectors(tCtx ktesting.TContext) {
+	tCtx.Parallel()
+
+	type resourceSliceTestCase struct {
+		driverField   string
+		nodeNameField string
+		poolNameField string
+		list          func(ktesting.TContext, metav1.ListOptions) (runtime.Object, error)
+	}
+	testCases := map[string]resourceSliceTestCase{
+		"v1": {
+			driverField:   resourceapi.ResourceSliceSelectorDriver,
+			nodeNameField: resourceapi.ResourceSliceSelectorNodeName,
+			poolNameField: resourceapi.ResourceSliceSelectorPoolName,
+			list: func(tCtx ktesting.TContext, options metav1.ListOptions) (runtime.Object, error) {
+				return tCtx.Client().ResourceV1().ResourceSlices().List(tCtx, options)
+			},
+		},
+		"v1beta1": {
+			driverField:   resourcev1beta1.ResourceSliceSelectorDriver,
+			nodeNameField: resourcev1beta1.ResourceSliceSelectorNodeName,
+			poolNameField: resourcev1beta1.ResourceSliceSelectorPoolName,
+			list: func(tCtx ktesting.TContext, options metav1.ListOptions) (runtime.Object, error) {
+				return tCtx.Client().ResourceV1beta1().ResourceSlices().List(tCtx, options)
+			},
+		},
+		"v1beta2": {
+			driverField:   resourcev1beta2.ResourceSliceSelectorDriver,
+			nodeNameField: resourcev1beta2.ResourceSliceSelectorNodeName,
+			poolNameField: resourcev1beta2.ResourceSliceSelectorPoolName,
+			list: func(tCtx ktesting.TContext, options metav1.ListOptions) (runtime.Object, error) {
+				return tCtx.Client().ResourceV1beta2().ResourceSlices().List(tCtx, options)
+			},
+		},
+	}
+
+	for testName, testCase := range testCases {
+		tCtx.Run(testName, func(tCtx ktesting.TContext) {
+			namespace := createTestNamespace(tCtx, nil)
+			driverName := namespace + ".example.com"
+			nodeName := namespace + "-node"
+			poolName := namespace + "-pool"
+			metadataSliceName := namespace + "-metadata"
+			driverSliceName := namespace + "-driver"
+			otherDriverName := namespace + "-other.example.com"
+			otherNodeName := namespace + "-other-node"
+			otherPoolName := namespace + "-other-pool"
+
+			selectorTestCases := []struct {
+				name          string
+				driver        string
+				nodeName      string
+				poolName      string
+				fieldSelector string
+				value         string
+			}{
+				{
+					name:          metadataSliceName,
+					driver:        otherDriverName,
+					nodeName:      otherNodeName,
+					poolName:      otherPoolName,
+					fieldSelector: "metadata.name",
+					value:         metadataSliceName,
+				},
+				{
+					name:          driverSliceName,
+					driver:        driverName,
+					nodeName:      otherNodeName,
+					poolName:      otherPoolName,
+					fieldSelector: testCase.driverField,
+					value:         driverName,
+				},
+				{
+					name:          nodeName,
+					driver:        otherDriverName,
+					nodeName:      nodeName,
+					poolName:      otherPoolName,
+					fieldSelector: testCase.nodeNameField,
+					value:         nodeName,
+				},
+				{
+					name:          poolName,
+					driver:        otherDriverName,
+					nodeName:      otherNodeName,
+					poolName:      poolName,
+					fieldSelector: testCase.poolNameField,
+					value:         poolName,
+				},
+			}
+			for _, selectorTestCase := range selectorTestCases {
+				createSlice(tCtx, &resourceapi.ResourceSlice{
+					ObjectMeta: metav1.ObjectMeta{Name: selectorTestCase.name},
+					Spec: resourceapi.ResourceSliceSpec{
+						Driver:   selectorTestCase.driver,
+						NodeName: new(selectorTestCase.nodeName),
+						Pool: resourceapi.ResourcePool{
+							Name:               selectorTestCase.poolName,
+							ResourceSliceCount: 1,
+						},
+					},
+				})
+			}
+
+			for _, selectorTestCase := range selectorTestCases {
+				selector := selectorTestCase.fieldSelector + "=" + selectorTestCase.value
+				list, err := testCase.list(tCtx, metav1.ListOptions{FieldSelector: selector})
+				tCtx.ExpectNoError(err, "list ResourceSlices with field selector %q", selector)
+				names, err := listObjectNames(list)
+				tCtx.ExpectNoError(err, "extract ResourceSlices from list with field selector %q", selector)
+				require.Len(tCtx, names, 1, "field selector %q", selector)
+				assert.Equal(tCtx, selectorTestCase.name, names[0], "field selector %q", selector)
+			}
+		})
+	}
 }
 
 // testFilterTimeout covers the scheduler plugin's filter timeout configuration and behavior.
@@ -176,6 +297,7 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 								Name: "device-simple",
 							},
 						},
+						SkipNodeOperations: []resourceapi.SkipNodeOperation{resourceapi.SkipNodeOperationAll},
 					},
 					{
 						SharedCounters: []resourceapi.CounterSet{
@@ -214,6 +336,7 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 									Counters: map[string]resourceapi.Counter{
 										"mem": {Value: resource.MustParse("1")},
 									},
+									CompatibilityGroups: []string{"compat-group-1", "compat-group-2"},
 								}},
 							},
 							{
@@ -246,9 +369,10 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 				Name:               poolName,
 				ResourceSliceCount: int64(len(expectedResources.Pools[poolName].Slices)),
 			},
-			AllNodes:       ptr.To(true),
-			SharedCounters: sl.SharedCounters,
-			Devices:        sl.Devices,
+			AllNodes:           new(true),
+			SharedCounters:     sl.SharedCounters,
+			Devices:            sl.Devices,
+			SkipNodeOperations: sl.SkipNodeOperations,
 		})
 	}
 
@@ -286,70 +410,89 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 						disabledFeaturesForSlice.Insert(disabled)
 					}
 				}
+			case features.DRAOptionalNodeOperations:
+				if expectedSliceSpecs[i].SkipNodeOperations != nil {
+					expectedSliceSpecs[i].SkipNodeOperations = nil
+					disabledFeaturesForSlice.Insert(disabled)
+				}
+			case features.DRADeviceCompatibilityGroups:
+				for e := range expectedSliceSpecs[i].Devices {
+					for c := range expectedSliceSpecs[i].Devices[e].ConsumesCounters {
+						if expectedSliceSpecs[i].Devices[e].ConsumesCounters[c].CompatibilityGroups != nil {
+							expectedSliceSpecs[i].Devices[e].ConsumesCounters[c].CompatibilityGroups = nil
+							disabledFeaturesForSlice.Insert(disabled)
+						}
+					}
+				}
 			default:
 				tCtx.Fatalf("faulty test, case for %s missing", disabled)
 			}
 		}
 		disabledFeaturesBySlice[i] = disabledFeaturesForSlice
 	}
-	var expectedSlices []any
-	for _, spec := range expectedSliceSpecs {
-		// The matcher is precise and matches all fields, except for those few which are known to
-		// be not exactly as sent by the client. New fields have to be added when extending the API.
-		expectedSlices = append(expectedSlices, gomega.HaveField("Spec", gstruct.MatchAllFields(gstruct.Fields{
-			"Driver": gomega.Equal(driverName),
-			"Pool": gstruct.MatchAllFields(gstruct.Fields{
-				"Name":               gomega.Equal(poolName),
-				"Generation":         gomega.BeNumerically(">=", int64(1)),
-				"ResourceSliceCount": gomega.Equal(int64(len(expectedResources.Pools[poolName].Slices))),
-			}),
-			"NodeName":     matchPointer(spec.NodeName),
-			"NodeSelector": matchPointer(spec.NodeSelector),
-			"AllNodes":     gstruct.PointTo(gomega.BeTrue()),
-			"Devices": gomega.HaveExactElements(func() []any {
-				var expected []any
-				for _, device := range spec.Devices {
-					expected = append(expected, gstruct.MatchAllFields(gstruct.Fields{
-						"Name":                     gomega.Equal(device.Name),
-						"AllowMultipleAllocations": gomega.Equal(device.AllowMultipleAllocations),
-						"Attributes":               gomega.Equal(device.Attributes),
-						"Capacity":                 gomega.Equal(device.Capacity),
-						"ConsumesCounters":         gomega.Equal(device.ConsumesCounters),
-						"NodeName":                 matchPointer(device.NodeName),
-						"NodeSelector":             matchPointer(device.NodeSelector),
-						"AllNodes":                 matchPointer(device.AllNodes),
-						"Taints": gomega.HaveExactElements(func() []any {
-							var expected []any
-							for _, taint := range device.Taints {
-								if taint.TimeAdded != nil {
-									// Can do exact match.
-									expected = append(expected, gomega.Equal(taint))
-								} else {
-									// Ignore TimeAdded value.
-									expected = append(expected, gstruct.MatchAllFields(gstruct.Fields{
-										"Key":       gomega.Equal(taint.Key),
-										"Value":     gomega.Equal(taint.Value),
-										"Effect":    gomega.Equal(taint.Effect),
-										"TimeAdded": gomega.Not(gomega.BeNil()),
-									}))
+	expectedSlices := func(expectedSliceSpecs []resourceapi.ResourceSliceSpec) []any {
+		var expectedSlices []any
+		for _, spec := range expectedSliceSpecs {
+			// The matcher is precise and matches all fields, except for those few which are known to
+			// be not exactly as sent by the client. New fields have to be added when extending the API.
+			expectedSlices = append(expectedSlices, gomega.HaveField("Spec", gstruct.MatchAllFields(gstruct.Fields{
+				"Driver": gomega.Equal(driverName),
+				"Pool": gstruct.MatchAllFields(gstruct.Fields{
+					"Name":               gomega.Equal(poolName),
+					"Generation":         gomega.BeNumerically(">=", int64(1)),
+					"ResourceSliceCount": gomega.Equal(int64(len(expectedSliceSpecs))),
+				}),
+				"NodeName":     matchPointer(spec.NodeName),
+				"NodeSelector": matchPointer(spec.NodeSelector),
+				"AllNodes":     gstruct.PointTo(gomega.BeTrue()), //nolint:forbidigo // Here BeTrue is okay.
+				"Devices": gomega.HaveExactElements(func() []any {
+					var expected []any
+					for _, device := range spec.Devices {
+						expected = append(expected, gstruct.MatchAllFields(gstruct.Fields{
+							"Name":                     gomega.Equal(device.Name),
+							"AllowMultipleAllocations": gomega.Equal(device.AllowMultipleAllocations),
+							"Attributes":               gomega.Equal(device.Attributes),
+							"Capacity":                 gomega.Equal(device.Capacity),
+							"ConsumesCounters":         gomega.Equal(device.ConsumesCounters),
+							"NodeName":                 matchPointer(device.NodeName),
+							"NodeSelector":             matchPointer(device.NodeSelector),
+							"AllNodes":                 matchPointer(device.AllNodes),
+							"Taints": gomega.HaveExactElements(func() []any {
+								var expected []any
+								for _, taint := range device.Taints {
+									if taint.TimeAdded != nil {
+										// Can do exact match.
+										expected = append(expected, gomega.Equal(taint))
+									} else {
+										// Ignore TimeAdded value.
+										expected = append(expected, gstruct.MatchAllFields(gstruct.Fields{
+											"Key":       gomega.Equal(taint.Key),
+											"Value":     gomega.Equal(taint.Value),
+											"Effect":    gomega.Equal(taint.Effect),
+											"TimeAdded": gomega.Not(gomega.BeNil()),
+										}))
+									}
 								}
-							}
-							return expected
-						}()...),
-						"BindingConditions":               gomega.Equal(device.BindingConditions),
-						"BindingFailureConditions":        gomega.Equal(device.BindingFailureConditions),
-						"BindsToNode":                     gomega.Equal(device.BindsToNode),
-						"NodeAllocatableResourceMappings": gomega.Equal(device.NodeAllocatableResourceMappings),
-					}))
-				}
-				return expected
-			}()...),
-			"PerDeviceNodeSelection": matchPointer(spec.PerDeviceNodeSelection),
-			"SharedCounters":         gomega.Equal(spec.SharedCounters),
-		})))
+								return expected
+							}()...),
+							"BindingConditions":        gomega.Equal(device.BindingConditions),
+							"BindingFailureConditions": gomega.Equal(device.BindingFailureConditions),
+							"BindsToNode":              gomega.Equal(device.BindsToNode),
+							"NodeAllocatableResources": gomega.Equal(device.NodeAllocatableResources),
+						}))
+					}
+					return expected
+				}()...),
+				"PerDeviceNodeSelection": matchPointer(spec.PerDeviceNodeSelection),
+				"SharedCounters":         gomega.Equal(spec.SharedCounters),
+				"PartitionTypeAttribute": matchPointer(spec.PartitionTypeAttribute),
+				"SkipNodeOperations":     gomega.Equal(spec.SkipNodeOperations),
+			})))
+		}
+		return expectedSlices
 	}
 
-	expectSlices := func(tCtx ktesting.TContext) {
+	expectSlices := func(tCtx ktesting.TContext, expectedSliceSpecs []resourceapi.ResourceSliceSpec) {
 		tCtx.Helper()
 
 		if !haveLatestAPI {
@@ -357,7 +500,7 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 		}
 		slices, err := tCtx.Client().ResourceV1().ResourceSlices().List(tCtx, listDriverSlices)
 		tCtx.ExpectNoError(err, "list slices")
-		gomega.NewGomegaWithT(tCtx).Expect(slices.Items).Should(gomega.ConsistOf(expectedSlices...))
+		gomega.NewGomegaWithT(tCtx).Expect(slices.Items).Should(gomega.ConsistOf(expectedSlices(expectedSliceSpecs)...))
 	}
 
 	deleteSlices := func(tCtx ktesting.TContext) {
@@ -378,7 +521,7 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 	var gotValidationError atomic.Bool
 	var validationErrorsOkay atomic.Bool
 
-	setup := func(tCtx ktesting.TContext) (*resourceslice.Controller, func(tCtx ktesting.TContext) resourceslice.Stats, resourceslice.Stats) {
+	setup := func(tCtx ktesting.TContext, resources *resourceslice.DriverResources) (*resourceslice.Controller, func(tCtx ktesting.TContext) resourceslice.Stats, resourceslice.Stats) {
 		tCtx.Helper()
 
 		tCtx.CleanupCtx(deleteSlices)
@@ -423,22 +566,26 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 		tCtx.ExpectNoError(err, "start controller")
 		tCtx.Cleanup(controller.Stop)
 
+		numSlices := 0
+		for _, pool := range resources.Pools {
+			numSlices += len(pool.Slices)
+		}
 		expectedStats := resourceslice.Stats{
-			NumCreates: int64(len(expectedSlices)),
+			NumCreates: int64(numSlices),
 		}
 		getStats := func(tCtx ktesting.TContext) resourceslice.Stats {
 			return controller.GetStats()
 		}
-		tCtx.Eventually(getStats).WithTimeout(syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
-		expectSlices(tCtx)
-
 		return controller, getStats, expectedStats
 	}
 
 	// Each sub-test starts with no slices and must clean up after itself.
 
 	runSubTest(tCtx, "create", func(tCtx ktesting.TContext) {
-		controller, getStats, expectedStats := setup(tCtx)
+		controller, getStats, expectedStats := setup(tCtx, resources)
+		tCtx.Eventually(getStats).WithTimeout(syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
+		expectSlices(tCtx, expectedSliceSpecs)
+		tCtx.Consistently(getStats).WithTimeout(quiesencePeriod).Should(gomega.Equal(expectedStats))
 
 		// No further changes necessary.
 		tCtx.Consistently(getStats).WithTimeout(quiesencePeriod).Should(gomega.Equal(expectedStats))
@@ -466,7 +613,9 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 	}
 
 	runSubTest(tCtx, "recreate-after-delete", func(tCtx ktesting.TContext) {
-		_, getStats, expectedStats := setup(tCtx)
+		_, getStats, expectedStats := setup(tCtx, resources)
+		tCtx.Eventually(getStats).WithTimeout(syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
+		expectSlices(tCtx, expectedSliceSpecs)
 		tCtx.Consistently(getStats).WithTimeout(quiesencePeriod).Should(gomega.Equal(expectedStats))
 
 		// Stress the controller by repeatedly deleting the slices.
@@ -475,16 +624,19 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 		for range 2 {
 			tCtx.Log("deleting ResourceSlices")
 			tCtx.ExpectNoError(tCtx.Client().ResourceV1().ResourceSlices().DeleteCollection(tCtx, metav1.DeleteOptions{}, listDriverSlices), "delete driver slices")
-			expectedStats.NumCreates += int64(len(expectedSlices))
+			expectedStats.NumCreates += int64(len(expectedSliceSpecs))
 			tCtx.Eventually(getStats).WithTimeout(syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
-			expectSlices(tCtx)
+			expectSlices(tCtx, expectedSliceSpecs)
 		}
 	})
 
 	runSubTest(tCtx, "fix-after-update", func(tCtx ktesting.TContext) {
-		_, getStats, expectedStats := setup(tCtx)
+		_, getStats, expectedStats := setup(tCtx, resources)
+		tCtx.Eventually(getStats).WithTimeout(syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
+		expectSlices(tCtx, expectedSliceSpecs)
+		tCtx.Consistently(getStats).WithTimeout(quiesencePeriod).Should(gomega.Equal(expectedStats))
 
-		// Stress the controller by repeatedly updatings the slices.
+		// Stress the controller by repeatedly updating the slices.
 		for range 2 {
 			slices, err := tCtx.Client().ResourceV1().ResourceSlices().List(tCtx, listDriverSlices)
 			tCtx.ExpectNoError(err, "list slices")
@@ -499,10 +651,63 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 				_, err := tCtx.Client().ResourceV1().ResourceSlices().Update(tCtx, &slice, metav1.UpdateOptions{})
 				tCtx.ExpectNoError(err, "update slice")
 			}
-			expectedStats.NumUpdates += int64(len(expectedSlices))
+			expectedStats.NumUpdates += int64(len(expectedSliceSpecs))
 			tCtx.Eventually(getStats).WithTimeout(syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
-			expectSlices(tCtx)
+			expectSlices(tCtx, expectedSliceSpecs)
 		}
+	})
+
+	runSubTest(tCtx, "recreate-after-update-delete", func(tCtx ktesting.TContext) {
+		// Simplify the test data: just one slice with a basic device.
+		resources := resources.DeepCopy()
+		pool := resources.Pools[poolName]
+		pool.Slices = pool.Slices[:1]
+		resources.Pools[poolName] = pool
+		expectedSliceSpecs := expectedSliceSpecs[:1]
+
+		// Create an incomplete ResourceSlice that the controller needs to update once it starts.
+		// This attribute is obsolete and needs to be removed.
+		device := expectedSliceSpecs[0].Devices[0].DeepCopy()
+		device.Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+			"foo": {
+				StringValue: new("bar"),
+			},
+		}
+		slice := &resourceapi.ResourceSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "00000-" + namespace + "-slice",
+			},
+			Spec: resourceapi.ResourceSliceSpec{
+				Driver: driverName,
+				Pool: resourceapi.ResourcePool{
+					Name:               poolName,
+					Generation:         1,
+					ResourceSliceCount: 1,
+				},
+				AllNodes: new(true),
+				Devices:  []resourceapi.Device{*device},
+			},
+		}
+		slice, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
+		tCtx.ExpectNoError(err, "create slice")
+		_, getStats, expectedStats := setup(tCtx, resources)
+		expectedStats.NumCreates = 0
+		expectedStats.NumUpdates = 1
+		tCtx.Eventually(getStats).WithTimeout(syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
+		expectSlices(tCtx, expectedSliceSpecs)
+		tCtx.Consistently(getStats).WithTimeout(quiesencePeriod).Should(gomega.Equal(expectedStats))
+
+		// Verify that the existing slice got updated, then delete it.
+		slice, err = tCtx.Client().ResourceV1().ResourceSlices().Get(tCtx, slice.Name, metav1.GetOptions{})
+		tCtx.ExpectNoError(err, "get slice")
+		tCtx.Log("Deleting slice...")
+		err = tCtx.Client().ResourceV1().ResourceSlices().Delete(tCtx, slice.Name, metav1.DeleteOptions{})
+		tCtx.ExpectNoError(err, "delete slice")
+
+		// The controller must react to the deletion and recreate it.
+		expectedStats.NumCreates = 1
+		tCtx.Eventually(getStats).WithTimeout(syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
+		expectSlices(tCtx, expectedSliceSpecs)
 	})
 }
 
@@ -518,7 +723,8 @@ func testMaxResourceSlice(tCtx ktesting.TContext) {
 				managedFieldsSize += f.Size()
 			}
 			specSize := createdSlice.Spec.Size()
-			tCtx.Logf("\n\nTotal size: %s\nManagedFields size: %s (%.0f%%)\nSpec size: %s (%.0f)%%\n\nManagedFields:\n%s",
+			tCtx.Logf("\n\nDevices: %d\nTotal size: %s\nManagedFields size: %s (%.0f%%)\nSpec size: %s (%.0f)%%\n\nManagedFields:\n%s",
+				len(createdSlice.Spec.Devices),
 				resource.NewQuantity(int64(totalSize), resource.BinarySI),
 				resource.NewQuantity(int64(managedFieldsSize), resource.BinarySI), float64(managedFieldsSize)*100/float64(totalSize),
 				resource.NewQuantity(int64(specSize), resource.BinarySI), float64(specSize)*100/float64(totalSize),
@@ -559,7 +765,7 @@ func testControllerManagerMetrics(tCtx ktesting.TContext) {
 
 	// Helper function to get metrics from the metric counter directly
 	getMetricValue := func(status, adminAccess string) float64 {
-		value, err := testutil.GetCounterMetricValue(resourceclaimmetrics.ResourceClaimCreate.WithLabelValues(status, adminAccess))
+		value, err := testutil.GetCounterMetricValue(resourceclaimmetrics.ResourceClaimCreate.WithLabelValues(status, adminAccess, "", "Pod"))
 		if err != nil {
 			// If the metric doesn't exist yet, default to 0
 			return 0
@@ -818,7 +1024,7 @@ func testInvalidResourceSlices(tCtx ktesting.TContext) {
 			expectedPodScheduledCondition: gstruct.Fields{
 				"Type":    gomega.Equal(v1.PodScheduled),
 				"Status":  gomega.Equal(v1.ConditionFalse),
-				"Message": gomega.Equal("0/8 nodes are available: 1 invalid resource pools were encountered, 7 cannot allocate all claims. still not schedulable, preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling."),
+				"Message": gomega.Equal("0/8 nodes are available: 1 invalid resource pools were encountered, 7 cannot allocate all claims. preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling."),
 			},
 		},
 		"invalid-for-all-nodes": {
@@ -841,7 +1047,7 @@ func testInvalidResourceSlices(tCtx ktesting.TContext) {
 			expectedPodScheduledCondition: gstruct.Fields{
 				"Type":    gomega.Equal(v1.PodScheduled),
 				"Status":  gomega.Equal(v1.ConditionFalse),
-				"Message": gomega.Equal("0/8 nodes are available: 8 invalid resource pools were encountered. still not schedulable, preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling."),
+				"Message": gomega.Equal("0/8 nodes are available: 8 invalid resource pools were encountered. preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling."),
 			},
 		},
 	}

@@ -83,6 +83,25 @@ func TestIsStandardContainerResource(t *testing.T) {
 	}
 }
 
+func TestIsNodeAllocatableResource(t *testing.T) {
+	testCases := []struct {
+		input  string
+		output bool
+	}{
+		{"cpu", true},
+		{"memory", true},
+		{"ephemeral-storage", false},
+		{"hugepages-2Mi", true},
+		{"disk", false},
+		{"blah", false},
+	}
+	for i, tc := range testCases {
+		if IsNodeAllocatableResourceName(core.ResourceName(tc.input)) != tc.output {
+			t.Errorf("case[%d], input: %s, expected: %t, got: %t", i, tc.input, tc.output, !tc.output)
+		}
+	}
+}
+
 func TestGetAccessModesFromString(t *testing.T) {
 	modes := GetAccessModesFromString("ROX")
 	if !ContainsAccessMode(modes, core.ReadOnlyMany) {

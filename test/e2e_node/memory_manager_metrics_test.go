@@ -20,6 +20,7 @@ package e2enode
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -31,7 +32,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
@@ -79,8 +82,21 @@ var _ = SIGDescribe("Memory Manager Metrics", framework.WithSerial(), feature.Me
 				updateKubeletConfig(ctx, f, oldCfg, true)
 			})
 
-			count := printAllPodsOnNode(ctx, f.ClientSet, framework.TestContext.NodeName)
-			gomega.Expect(count).To(gomega.BeZero(), "unexpected pods on %q, please check output above", framework.TestContext.NodeName)
+			// Wait for pods from previous serial tests to finish terminating.
+			// Framework namespace deletion is async, and the kubelet restart
+			// above can delay in-flight pod cleanup. Poll instead of asserting
+			// immediately so we don't flake on test ordering.
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				count, err := printAllPodsOnNode(ctx, f.ClientSet, framework.TestContext.NodeName)
+				if err != nil {
+					return err
+				}
+				if count != 0 {
+					return fmt.Errorf("unexpected pods on %q: %d still present", framework.TestContext.NodeName, count)
+				}
+				return nil
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(
+				gomega.Succeed(), "unexpected pods on %q, please check output above", framework.TestContext.NodeName)
 		})
 
 		ginkgo.It("should report zero pinning counters after a fresh restart", func(ctx context.Context) {
@@ -160,7 +176,8 @@ var _ = SIGDescribe("Memory Manager Metrics", framework.WithSerial(), feature.Me
 				}),
 			)
 
-			printAllPodsOnNode(ctx, f.ClientSet, framework.TestContext.NodeName)
+			_, err := printAllPodsOnNode(ctx, f.ClientSet, framework.TestContext.NodeName)
+			framework.ExpectNoError(err)
 
 			// we updated the kubelet config in BeforeEach, so we can assume we start fresh.
 			// being [Serial], we can also assume noone else but us is running pods.
@@ -213,7 +230,7 @@ func validateMetrics(values e2emetrics.KubeletMetrics, totalKey, errorKey string
 
 // printAllPodsOnNode outputs status of all kubelet pods into log.
 // Note considering the e2e_node environment we will always have exactly 1 node, but still.
-func printAllPodsOnNode(ctx context.Context, c clientset.Interface, nodeName string) int {
+func printAllPodsOnNode(ctx context.Context, c clientset.Interface, nodeName string) (int, error) {
 	nodeSelector := fields.Set{
 		"spec.nodeName": nodeName,
 	}.AsSelector().String()
@@ -223,7 +240,7 @@ func printAllPodsOnNode(ctx context.Context, c clientset.Interface, nodeName str
 	})
 	if err != nil {
 		framework.Logf("Unable to retrieve pods for node %v: %v", nodeName, err)
-		return 0
+		return 0, err
 	}
 	count := 0
 	framework.Logf("begin listing pods: %d found", len(podList.Items))
@@ -237,5 +254,266 @@ func printAllPodsOnNode(ctx context.Context, c clientset.Interface, nodeName str
 		count++
 	}
 	framework.Logf("end listing pods: %d found", len(podList.Items))
-	return count
+	return count, nil
 }
+
+var _ = SIGDescribe("Memory Manager Metrics Pod Level Resources", ginkgo.Ordered, ginkgo.ContinueOnFailure, framework.WithSerial(), feature.MemoryManager, feature.PodLevelResources, feature.PodLevelResourceManagers, framework.WithFeatureGate(features.PodLevelResources), framework.WithFeatureGate(features.PodLevelResourceManagers), func() {
+	f := framework.NewDefaultFramework("memory-manager-metrics-pod-level-resources")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	var (
+		oldCfg  *kubeletconfig.KubeletConfiguration
+		testPod *v1.Pod
+	)
+
+	memoryQuantity := resource.MustParse("1100Mi")
+	defaultKubeParams := &memoryManagerKubeletParams{
+		systemReservedMemory: []kubeletconfig.MemoryReservation{
+			{
+				NumaNode: 0,
+				Limits: v1.ResourceList{
+					resourceMemory: memoryQuantity,
+				},
+			},
+		},
+		systemReserved: map[string]string{resourceMemory: "500Mi"},
+		kubeReserved:   map[string]string{resourceMemory: "500Mi"},
+		evictionHard:   map[string]string{evictionHardMemory: "100Mi"},
+	}
+
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		var err error
+		if oldCfg == nil {
+			oldCfg, err = getCurrentKubeletConfig(ctx)
+			framework.ExpectNoError(err)
+		}
+	})
+
+	ginkgo.AfterEach(func(ctx context.Context) {
+		if testPod != nil {
+			deletePodSyncByName(ctx, f, testPod.Name)
+			waitForContainerRemoval(ctx, testPod.Spec.Containers[0].Name, testPod.Name, testPod.Namespace)
+		}
+		updateKubeletConfig(ctx, f, oldCfg, true)
+	})
+
+	ginkgo.It("should increment allocation and container assignment metrics in pod scope", func(ctx context.Context) {
+		newCfg := oldCfg.DeepCopy()
+		kubeParams := *defaultKubeParams
+		kubeParams.policy = staticPolicy
+		updateKubeletConfigWithMemoryManagerParams(newCfg, &kubeParams)
+
+		newCfg = configureMemoryManagerInKubelet(newCfg, &memoryManagerKubeletArguments{
+			policyName:                     string(staticPolicy),
+			topologyManagerPolicy:          topologymanager.PolicyRestricted,
+			topologyManagerScope:           topologymanager.PodTopologyScope,
+			enablePodLevelResources:        true,
+			enablePodLevelResourceManagers: true,
+		})
+		updateKubeletConfig(ctx, f, newCfg, true)
+
+		ginkgo.By("Getting baseline metrics")
+		baselineMetrics, err := getKubeletMetrics(ctx)
+		framework.ExpectNoError(err)
+
+		baseAllocations, err := getCounterMetricValue(baselineMetrics, "kubelet_resource_manager_allocations_total", map[string]string{"resource_name": "memory", "source": "pod"})
+		if !errors.Is(err, ErrMetricNotFound) {
+			framework.ExpectNoError(err)
+		}
+
+		baseExclusiveAssignments, err := getCounterMetricValue(baselineMetrics, "kubelet_resource_manager_container_assignments_total", map[string]string{"resource_name": "memory", "assignment_type": "pod_exclusive"})
+		if !errors.Is(err, ErrMetricNotFound) {
+			framework.ExpectNoError(err)
+		}
+
+		baseSharedAssignments, err := getCounterMetricValue(baselineMetrics, "kubelet_resource_manager_container_assignments_total", map[string]string{"resource_name": "memory", "assignment_type": "pod_shared"})
+		if !errors.Is(err, ErrMetricNotFound) {
+			framework.ExpectNoError(err)
+		}
+
+		ginkgo.By("Creating a Guaranteed pod with pod-level resources and a mix of guaranteed and non-guaranteed containers")
+		testPod = &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "plrm-memory-metrics-pod",
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyNever,
+				Containers: []v1.Container{
+					{
+						Name:  "exclusive-container",
+						Image: busyboxImage,
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("100m"),
+								v1.ResourceMemory: resource.MustParse("64Mi"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("100m"),
+								v1.ResourceMemory: resource.MustParse("64Mi"),
+							},
+						},
+						Command: []string{"sh", "-c", "sleep 1d"},
+					},
+					{
+						Name:    "shared-container",
+						Image:   busyboxImage,
+						Command: []string{"sh", "-c", "sleep 1d"},
+					},
+				},
+			},
+		}
+		testPod.Spec.Resources = &v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("200m"),
+				v1.ResourceMemory: resource.MustParse("128Mi"),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("200m"),
+				v1.ResourceMemory: resource.MustParse("128Mi"),
+			},
+		}
+
+		testPod = e2epod.NewPodClient(f).CreateSync(ctx, testPod)
+
+		ginkgo.By("Verifying metrics show correct updates")
+		gomega.Eventually(ctx, func(ctx context.Context) error {
+			currentMetrics, err := getKubeletMetrics(ctx)
+			if err != nil {
+				return err
+			}
+
+			allocations, err := getCounterMetricValue(currentMetrics, "kubelet_resource_manager_allocations_total", map[string]string{"resource_name": "memory", "source": "pod"})
+			if err != nil {
+				return err
+			}
+
+			exclusiveAssignments, err := getCounterMetricValue(currentMetrics, "kubelet_resource_manager_container_assignments_total", map[string]string{"resource_name": "memory", "assignment_type": "pod_exclusive"})
+			if err != nil {
+				return err
+			}
+
+			sharedAssignments, err := getCounterMetricValue(currentMetrics, "kubelet_resource_manager_container_assignments_total", map[string]string{"resource_name": "memory", "assignment_type": "pod_shared"})
+			if err != nil {
+				return err
+			}
+
+			// Expected metric deltas for pod scope with 2 containers (1 exclusive, 1 shared):
+			// - 2 allocations: processed for each container during pod-level resource manager allocation.
+			// - 1 pod_exclusive assignment: assigned to the container requesting exclusive memory.
+			// - 1 pod_shared assignment: assigned to the container using the shared pod pool.
+			if allocations-baseAllocations != 2 {
+				return fmt.Errorf("expected 2 new allocations, got %v", allocations-baseAllocations)
+			}
+			if exclusiveAssignments-baseExclusiveAssignments != 1 {
+				return fmt.Errorf("expected 1 new exclusive assignment, got %v", exclusiveAssignments-baseExclusiveAssignments)
+			}
+			if sharedAssignments-baseSharedAssignments != 1 {
+				return fmt.Errorf("expected 1 new shared assignment, got %v", sharedAssignments-baseSharedAssignments)
+			}
+			return nil
+		}).WithTimeout(2 * time.Minute).WithPolling(10 * time.Second).Should(gomega.Succeed())
+	})
+
+	ginkgo.It("should increment allocation and container assignment metrics in container scope", func(ctx context.Context) {
+		newCfg := oldCfg.DeepCopy()
+		kubeParams := *defaultKubeParams
+		kubeParams.policy = staticPolicy
+		updateKubeletConfigWithMemoryManagerParams(newCfg, &kubeParams)
+
+		newCfg = configureMemoryManagerInKubelet(newCfg, &memoryManagerKubeletArguments{
+			policyName:                     string(staticPolicy),
+			topologyManagerPolicy:          topologymanager.PolicyRestricted,
+			topologyManagerScope:           topologymanager.ContainerTopologyScope,
+			enablePodLevelResources:        true,
+			enablePodLevelResourceManagers: true,
+		})
+		updateKubeletConfig(ctx, f, newCfg, true)
+
+		ginkgo.By("Getting baseline metrics")
+		baselineMetrics, err := getKubeletMetrics(ctx)
+		framework.ExpectNoError(err)
+
+		baseAllocations, err := getCounterMetricValue(baselineMetrics, "kubelet_resource_manager_allocations_total", map[string]string{"resource_name": "memory", "source": "node"})
+		if !errors.Is(err, ErrMetricNotFound) {
+			framework.ExpectNoError(err)
+		}
+
+		baseExclusiveAssignments, err := getCounterMetricValue(baselineMetrics, "kubelet_resource_manager_container_assignments_total", map[string]string{"resource_name": "memory", "assignment_type": "node_exclusive"})
+		if !errors.Is(err, ErrMetricNotFound) {
+			framework.ExpectNoError(err)
+		}
+
+		ginkgo.By("Creating a Guaranteed pod with pod-level resources and a mix of guaranteed and non-guaranteed containers")
+		testPod = &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "plrm-memory-metrics-pod-container-scope",
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyNever,
+				Containers: []v1.Container{
+					{
+						Name:  "exclusive-container",
+						Image: busyboxImage,
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("100m"),
+								v1.ResourceMemory: resource.MustParse("64Mi"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("100m"),
+								v1.ResourceMemory: resource.MustParse("64Mi"),
+							},
+						},
+						Command: []string{"sh", "-c", "sleep 1d"},
+					},
+					{
+						Name:    "shared-container",
+						Image:   busyboxImage,
+						Command: []string{"sh", "-c", "sleep 1d"},
+					},
+				},
+			},
+		}
+		testPod.Spec.Resources = &v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("200m"),
+				v1.ResourceMemory: resource.MustParse("128Mi"),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("200m"),
+				v1.ResourceMemory: resource.MustParse("128Mi"),
+			},
+		}
+
+		testPod = e2epod.NewPodClient(f).CreateSync(ctx, testPod)
+
+		ginkgo.By("Verifying metrics show correct updates in container scope")
+		gomega.Eventually(ctx, func(ctx context.Context) error {
+			currentMetrics, err := getKubeletMetrics(ctx)
+			if err != nil {
+				return err
+			}
+
+			allocations, err := getCounterMetricValue(currentMetrics, "kubelet_resource_manager_allocations_total", map[string]string{"resource_name": "memory", "source": "node"})
+			if err != nil {
+				return err
+			}
+
+			exclusiveAssignments, err := getCounterMetricValue(currentMetrics, "kubelet_resource_manager_container_assignments_total", map[string]string{"resource_name": "memory", "assignment_type": "node_exclusive"})
+			if err != nil {
+				return err
+			}
+
+			// Expected metric deltas for container scope with 2 containers (1 exclusive, 1 without requests):
+			// - 1 allocation: containers requesting no resources skip allocation in container scope.
+			// - 1 node_exclusive assignment: assigned to the container requesting exclusive memory.
+			if allocations-baseAllocations != 1 {
+				return fmt.Errorf("expected 1 new allocation, got %v", allocations-baseAllocations)
+			}
+			if exclusiveAssignments-baseExclusiveAssignments != 1 {
+				return fmt.Errorf("expected 1 new node_exclusive assignment, got %v", exclusiveAssignments-baseExclusiveAssignments)
+			}
+			return nil
+		}).WithTimeout(2 * time.Minute).WithPolling(10 * time.Second).Should(gomega.Succeed())
+	})
+})

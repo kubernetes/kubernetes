@@ -45,24 +45,24 @@ type ws2wcClientStream struct{ chanClientStream }
 type ws2wcServerStream struct{ chanServerStream }
 
 func (s *ws2wcClientStream) Send(wr *pb.WatchRequest) error {
-	return s.SendMsg(wr)
+	return s.SendMsg(wr) //nolint:staticcheck // TODO: remove for a supported version
 }
 
 func (s *ws2wcClientStream) Recv() (*pb.WatchResponse, error) {
 	var v any
-	if err := s.RecvMsg(&v); err != nil {
+	if err := s.RecvMsg(&v); err != nil { //nolint:staticcheck // TODO: remove for a supported version
 		return nil, err
 	}
 	return v.(*pb.WatchResponse), nil
 }
 
 func (s *ws2wcServerStream) Send(wr *pb.WatchResponse) error {
-	return s.SendMsg(wr)
+	return s.SendMsg(wr) //nolint:staticcheck // TODO: remove for a supported version
 }
 
 func (s *ws2wcServerStream) Recv() (*pb.WatchRequest, error) {
 	var v any
-	if err := s.RecvMsg(&v); err != nil {
+	if err := s.RecvMsg(&v); err != nil { //nolint:staticcheck // TODO: remove for a supported version
 		return nil, err
 	}
 	return v.(*pb.WatchRequest), nil

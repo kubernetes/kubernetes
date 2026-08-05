@@ -21,12 +21,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
+	"gopkg.in/inf.v0"
 
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -46,6 +48,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	dracel "k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured"
+	core "k8s.io/kubernetes/pkg/apis/core"
+	corehelper "k8s.io/kubernetes/pkg/apis/core/helper"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/resource"
@@ -56,12 +60,18 @@ import (
 // (flattened fields) and v1/v1beta2 (fields under 'exactly') for validation error paths.
 var ResourceNormalizationRules = []field.NormalizationRule{
 	{
-		Regexp:      regexp.MustCompile(`spec.devices\.requests\[(\d+)\]\.(deviceClassName|selectors|allocationMode|count|adminAccess|tolerations)`),
+		// ResourceClaim
+		Regexp:      regexp.MustCompile(`spec\.devices\.requests\[(\d+)\]\.(deviceClassName|selectors|allocationMode|count|adminAccess|tolerations|derivedAttributes)`),
 		Replacement: "spec.devices.requests[$1].exactly.$2",
 	},
 	{
+		// ResourceClaimTemplate (RCT.Spec.Spec adds an extra "spec." prefix)
+		Regexp:      regexp.MustCompile(`spec\.spec\.devices\.requests\[(\d+)\]\.(deviceClassName|selectors|allocationMode|count|adminAccess|tolerations|derivedAttributes)`),
+		Replacement: "spec.spec.devices.requests[$1].exactly.$2",
+	},
+	{
 		// This v1beta1 'basic' to flattened rule is to support ResourceSlice
-		Regexp:      regexp.MustCompile(`spec.devices\[(\d+)\]\.basic\.`),
+		Regexp:      regexp.MustCompile(`spec\.devices\[(\d+)\]\.basic\.`),
 		Replacement: "spec.devices[$1].",
 	},
 }
@@ -137,12 +147,76 @@ func validateResourceClaimSpec(spec *resource.ResourceClaimSpec, fldPath *field.
 	return allErrs
 }
 
+// deviceValidationOptions holds validation options and shared state (like accumulators)
+// that are used during the validation of a DeviceClaim.
+type deviceValidationOptions struct {
+	// stored indicates whether the object being validated is already stored
+	// in the API server. If true, certain previously valid fields (like CEL expressions) are
+	// considered valid without re-evaluation, allowing for relaxed validation on updates.
+	stored bool
+
+	// totalDerivedAttrCost tracks the cumulative compilation cost of all derived
+	// attribute CEL expressions across the entire DeviceClaim. This ensures their
+	// combined cost does not exceed the allowed budget.
+	totalDerivedAttrCost *uint64
+
+	// constraintAttributes maps a request/subrequest reference ("req" or
+	// "req/subreq") to the set of attribute names referenced by constraints
+	// targeting it:
+	// - If an attribute name is in the "" key, it applies to all requests.
+	// - If an attribute name is in the "req" key, it applies to all subrequests
+	//   of "req".
+	// - If an attribute name is in the "req/subreq" key, it applies to that
+	//   specific subrequest.
+	constraintAttributes map[string]sets.Set[string]
+}
+
+func gatherConstraintAttributes(constraints []resource.DeviceConstraint) map[string]sets.Set[string] {
+	attrs := make(map[string]sets.Set[string])
+	for _, constraint := range constraints {
+		var attrName string
+		if constraint.MatchAttribute != nil {
+			attrName = string(*constraint.MatchAttribute)
+		} else if constraint.DistinctAttribute != nil {
+			attrName = string(*constraint.DistinctAttribute)
+		} else {
+			continue
+		}
+
+		if len(constraint.Requests) == 0 {
+			// A constraint with an empty requests list applies globally, so we
+			// use the empty string key to represent all requests.
+			if attrs[""] == nil {
+				attrs[""] = sets.New[string]()
+			}
+			attrs[""].Insert(attrName)
+		} else {
+			// A constraint might target multiple explicit requests or subrequests,
+			// so we track the attribute usage for each individual target.
+			for _, req := range constraint.Requests {
+				if attrs[req] == nil {
+					attrs[req] = sets.New[string]()
+				}
+				attrs[req].Insert(attrName)
+			}
+		}
+	}
+	return attrs
+}
+
 func validateDeviceClaim(deviceClaim *resource.DeviceClaim, fldPath *field.Path, stored bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 	requestNames := gatherRequestNames(deviceClaim)
+
+	var totalDerivedAttrCost uint64
+	opts := deviceValidationOptions{
+		stored:               stored,
+		totalDerivedAttrCost: &totalDerivedAttrCost,
+		constraintAttributes: gatherConstraintAttributes(deviceClaim.Constraints),
+	}
 	allErrs = append(allErrs, validateSet(deviceClaim.Requests, resource.DeviceRequestsMaxSize,
 		func(request resource.DeviceRequest, fldPath *field.Path) field.ErrorList {
-			return validateDeviceRequest(request, fldPath, stored)
+			return validateDeviceRequest(request, fldPath, opts)
 		},
 		func(request resource.DeviceRequest) string {
 			return request.Name
@@ -156,6 +230,10 @@ func validateDeviceClaim(deviceClaim *resource.DeviceClaim, fldPath *field.Path,
 		func(config resource.DeviceClaimConfiguration, fldPath *field.Path) field.ErrorList {
 			return validateDeviceClaimConfiguration(config, fldPath, requestNames, stored)
 		}, fldPath.Child("config"), sizeCovered)...)
+	if totalDerivedAttrCost > resource.DeviceClaimDerivedAttributeCELMaxCost {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "too complex, total cost of derived attribute CEL expressions in the claim exceeds cost limit"))
+	}
+
 	return allErrs
 }
 
@@ -209,7 +287,7 @@ func gatherAllocatedDevices(allocationResult *resource.DeviceAllocationResult) s
 	return allocatedDevices
 }
 
-func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, stored bool) field.ErrorList {
+func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, opts deviceValidationOptions) field.ErrorList {
 	allErrs := validateRequestName(request.Name, fldPath.Child("name"))
 	numDeviceRequestType := 0
 
@@ -231,22 +309,23 @@ func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, 
 	case hasFirstAvailable:
 		allErrs = append(allErrs, validateSet(request.FirstAvailable, resource.FirstAvailableDeviceRequestMaxSize,
 			func(subRequest resource.DeviceSubRequest, fldPath *field.Path) field.ErrorList {
-				return validateDeviceSubRequest(subRequest, fldPath, stored)
+				return validateDeviceSubRequest(subRequest, fldPath, opts, request.Name)
 			},
 			func(subRequest resource.DeviceSubRequest) string {
 				return subRequest.Name
 			},
 			fldPath.Child("firstAvailable"), sizeCovered, uniquenessCovered)...)
 	case hasExactly:
-		allErrs = append(allErrs, validateExactDeviceRequest(*request.Exactly, fldPath.Child("exactly"), stored)...)
+		allErrs = append(allErrs, validateExactDeviceRequest(*request.Exactly, fldPath.Child("exactly"), opts, request.Name)...)
 	}
 	return allErrs
 }
 
-func validateDeviceSubRequest(subRequest resource.DeviceSubRequest, fldPath *field.Path, stored bool) field.ErrorList {
+func validateDeviceSubRequest(subRequest resource.DeviceSubRequest, fldPath *field.Path, opts deviceValidationOptions, parentRequestName string) field.ErrorList {
 	allErrs := validateRequestName(subRequest.Name, fldPath.Child("name"))
 	allErrs = append(allErrs, validateDeviceClass(subRequest.DeviceClassName, fldPath.Child("deviceClassName")).MarkCoveredByDeclarative()...)
-	allErrs = append(allErrs, validateSelectorSlice(subRequest.Selectors, fldPath.Child("selectors"), stored)...)
+	allErrs = append(allErrs, validateSelectorSlice(subRequest.Selectors, fldPath.Child("selectors"), opts)...)
+	allErrs = append(allErrs, validateDeviceDerivedAttributes(subRequest.DerivedAttributes, fldPath.Child("derivedAttributes"), opts, parentRequestName+"/"+subRequest.Name)...)
 	allErrs = append(allErrs, validateDeviceAllocationMode(subRequest.AllocationMode, subRequest.Count, fldPath.Child("allocationMode"), fldPath.Child("count"))...)
 	for i, toleration := range subRequest.Tolerations {
 		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
@@ -254,10 +333,11 @@ func validateDeviceSubRequest(subRequest resource.DeviceSubRequest, fldPath *fie
 	return allErrs
 }
 
-func validateExactDeviceRequest(request resource.ExactDeviceRequest, fldPath *field.Path, stored bool) field.ErrorList {
+func validateExactDeviceRequest(request resource.ExactDeviceRequest, fldPath *field.Path, opts deviceValidationOptions, requestName string) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDeviceClass(request.DeviceClassName, fldPath.Child("deviceClassName"))...)
-	allErrs = append(allErrs, validateSelectorSlice(request.Selectors, fldPath.Child("selectors"), stored)...)
+	allErrs = append(allErrs, validateSelectorSlice(request.Selectors, fldPath.Child("selectors"), opts)...)
+	allErrs = append(allErrs, validateDeviceDerivedAttributes(request.DerivedAttributes, fldPath.Child("derivedAttributes"), opts, requestName)...)
 	allErrs = append(allErrs, validateDeviceAllocationMode(request.AllocationMode, request.Count, fldPath.Child("allocationMode"), fldPath.Child("count"))...)
 	for i, toleration := range request.Tolerations {
 		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
@@ -295,41 +375,61 @@ func validateDeviceClass(deviceClass string, fldPath *field.Path) field.ErrorLis
 	return allErrs
 }
 
-func validateSelectorSlice(selectors []resource.DeviceSelector, fldPath *field.Path, stored bool) field.ErrorList {
+func validateSelectorSlice(selectors []resource.DeviceSelector, fldPath *field.Path, opts deviceValidationOptions) field.ErrorList {
 	return validateSlice(selectors, resource.DeviceSelectorsMaxSize,
 		func(selector resource.DeviceSelector, fldPath *field.Path) field.ErrorList {
-			return validateSelector(selector, fldPath, stored)
+			return validateSelector(selector, fldPath, opts)
 		},
 		fldPath, sizeCovered)
 }
 
-func validateSelector(selector resource.DeviceSelector, fldPath *field.Path, stored bool) field.ErrorList {
+func validateSelector(selector resource.DeviceSelector, fldPath *field.Path, opts deviceValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
 	if selector.CEL == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("cel"), ""))
 	} else {
-		allErrs = append(allErrs, validateCELSelector(*selector.CEL, fldPath.Child("cel"), stored)...)
+		allErrs = append(allErrs, validateCELExpression(selector.CEL.Expression, fldPath.Child("cel", "expression"), opts, false)...)
 	}
 	return allErrs
 }
 
-func validateCELSelector(celSelector resource.CELDeviceSelector, fldPath *field.Path, stored bool) field.ErrorList {
-	var allErrs field.ErrorList
-	envType := environment.NewExpressions
-	if stored {
-		envType = environment.StoredExpressions
+func validateCELExpression(expression string, fldPath *field.Path, opts deviceValidationOptions, derivedAttribute bool) field.ErrorList {
+	if opts.stored {
+		// If a CEL expression is stored, it must have been valid at the
+		// time it was stored and thus must also be valid now. Returning
+		// early here allows relaxing validation more quickly without
+		// ratcheting and is cheaper.
+		return nil
 	}
-	if len(celSelector.Expression) > resource.CELSelectorExpressionMaxLength {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("expression"), "" /*unused*/, resource.CELSelectorExpressionMaxLength))
+	envType := environment.NewExpressions
+
+	var allErrs field.ErrorList
+	if len(expression) > resource.CELSelectorExpressionMaxLength {
+		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, resource.CELSelectorExpressionMaxLength))
 		// Don't bother compiling too long expressions.
 		return allErrs
 	}
 
-	result := dracel.GetCompiler(dracel.Features{EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity)}).CompileCELExpression(celSelector.Expression, dracel.Options{EnvType: &envType})
+	result := dracel.GetCompiler(dracel.Features{
+		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		EnableListTypeAttributes: utilfeature.DefaultFeatureGate.Enabled(features.DRAListTypeAttributes),
+	}).CompileCELExpression(expression, dracel.Options{
+		EnvType:          &envType,
+		DerivedAttribute: derivedAttribute,
+	})
 	if result.Error != nil {
-		allErrs = append(allErrs, convertCELErrorToValidationError(fldPath.Child("expression"), celSelector.Expression, result.Error))
-	} else if result.MaxCost > resource.CELSelectorExpressionMaxCost {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("expression"), "too complex, exceeds cost limit"))
+		allErrs = append(allErrs, convertCELErrorToValidationError(fldPath, expression, result.Error))
+	} else {
+		if derivedAttribute {
+			if result.MaxCost > min(resource.CELSelectorExpressionMaxCost, resource.DeviceClaimDerivedAttributeCELMaxCost) {
+				allErrs = append(allErrs, field.Forbidden(fldPath, "too complex, exceeds cost limit"))
+			}
+			if opts.totalDerivedAttrCost != nil {
+				*opts.totalDerivedAttrCost += result.MaxCost
+			}
+		} else if result.MaxCost > resource.CELSelectorExpressionMaxCost {
+			allErrs = append(allErrs, field.Forbidden(fldPath, "too complex, exceeds cost limit"))
+		}
 	}
 
 	return allErrs
@@ -350,6 +450,56 @@ func convertCELErrorToValidationError(fldPath *field.Path, expression string, er
 	return field.InternalError(fldPath, fmt.Errorf("unsupported error type: %w", err))
 }
 
+func isAttributeUsedByConstraint(attrName, reqName string, constraintAttributes map[string]sets.Set[string]) bool {
+	// Check if the attribute is used by a globally applied constraint.
+	if globalAttrs, ok := constraintAttributes[""]; ok && globalAttrs.Has(attrName) {
+		return true
+	}
+	// Check if the attribute is used by a constraint explicitly targeting this
+	// request or subrequest.
+	if reqAttrs, ok := constraintAttributes[reqName]; ok && reqAttrs.Has(attrName) {
+		return true
+	}
+	// If this is a subrequest (e.g. "req/subreq"), check if the attribute is
+	// used by a constraint targeting the parent request ("req"), as that
+	// applies to all of its subrequests.
+	if parentReqName, _, found := strings.Cut(reqName, "/"); found {
+		if parentAttrs, ok := constraintAttributes[parentReqName]; ok && parentAttrs.Has(attrName) {
+			return true
+		}
+	}
+	return false
+}
+
+func validateDeviceDerivedAttributes(attrs []resource.DeviceDerivedAttribute, fldPath *field.Path, opts deviceValidationOptions, requestName string) field.ErrorList {
+	return validateSet(attrs, -1,
+		func(attr resource.DeviceDerivedAttribute, fldPath *field.Path) field.ErrorList {
+			return validateDeviceDerivedAttribute(attr, fldPath, opts, requestName)
+		},
+		func(attr resource.DeviceDerivedAttribute) string {
+			return string(attr.Name)
+		},
+		fldPath)
+}
+
+func validateDeviceDerivedAttribute(attr resource.DeviceDerivedAttribute, fldPath *field.Path, opts deviceValidationOptions, requestName string) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// Declarative validation checks for non-empty value,
+	// no need to check that here.
+	if attr.Name != "" {
+		if !isAttributeUsedByConstraint(string(attr.Name), requestName, opts.constraintAttributes) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), attr.Name, "must be referenced by at least one matchAttribute or distinctAttribute constraint targeting this request"))
+		}
+	}
+	// Declarative validation checks for non-empty value,
+	// no need to check that here.
+	if attr.Expression != "" {
+		allErrs = append(allErrs, validateCELExpression(attr.Expression, fldPath.Child("expression"), opts, true)...)
+	}
+	return allErrs
+}
+
 func validateDeviceConstraint(constraint resource.DeviceConstraint, fldPath *field.Path, requestNames requestNames) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateSet(constraint.Requests, resource.DeviceRequestsMaxSize,
@@ -360,7 +510,7 @@ func validateDeviceConstraint(constraint resource.DeviceConstraint, fldPath *fie
 	if constraint.MatchAttribute != nil {
 		allErrs = append(allErrs, validateFullyQualifiedName(*constraint.MatchAttribute, fldPath.Child("matchAttribute")).MarkCoveredByDeclarative()...)
 	} else if constraint.DistinctAttribute != nil {
-		allErrs = append(allErrs, validateFullyQualifiedName(*constraint.DistinctAttribute, fldPath.Child("distinctAttribute"))...)
+		allErrs = append(allErrs, validateFullyQualifiedName(*constraint.DistinctAttribute, fldPath.Child("distinctAttribute")).MarkCoveredByDeclarative()...)
 	} else if utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity) {
 		allErrs = append(allErrs, field.Required(fldPath, `exactly one of "matchAttribute" or "distinctAttribute" is required, but multiple fields are set`))
 	} else {
@@ -513,9 +663,13 @@ func validateDeviceRequestAllocationResult(result resource.DeviceRequestAllocati
 	allErrs = append(allErrs, validatePoolName(result.Pool, fldPath.Child("pool")).MarkCoveredByDeclarative()...)
 	allErrs = append(allErrs, validateDeviceName(result.Device, fldPath.Child("device"))...)
 	allErrs = append(allErrs, validateDeviceBindingParameters(result.BindingConditions, result.BindingFailureConditions, fldPath)...)
+	for i, toleration := range result.Tolerations {
+		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
+	}
 	if result.ShareID != nil {
 		allErrs = append(allErrs, validateUID(string(*result.ShareID), fldPath.Child("shareID")).MarkCoveredByDeclarative()...)
 	}
+	allErrs = append(allErrs, validateSkipNodeOperations(result.SkipNodeOperations, fldPath.Child("skipNodeOperations"))...)
 	return allErrs
 }
 
@@ -577,7 +731,7 @@ func validateDeviceClassSpec(spec, oldSpec *resource.DeviceClassSpec, fldPath *f
 	}
 	allErrs = append(allErrs, validateSlice(spec.Selectors, resource.DeviceSelectorsMaxSize,
 		func(selector resource.DeviceSelector, fldPath *field.Path) field.ErrorList {
-			return validateSelector(selector, fldPath, stored)
+			return validateSelector(selector, fldPath, deviceValidationOptions{stored: stored})
 		},
 		fldPath.Child("selectors"), sizeCovered)...)
 	// Same logic as above for configs.
@@ -708,8 +862,8 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 	}
 
 	maxDevices := resource.ResourceSliceMaxDevices
-	if haveDeviceTaints(spec) || haveConsumesCounters(spec) {
-		maxDevices = resource.ResourceSliceMaxDevicesWithTaintsOrConsumesCounters
+	if haveDeviceTaints(spec) || haveConsumesCounters(spec) || haveListAttributes(spec) {
+		maxDevices = resource.ResourceSliceMaxDevicesWithAdvancedFeatures
 	}
 	allErrs = append(allErrs, validateSet(spec.Devices, maxDevices,
 		func(device resource.Device, fldPath *field.Path) field.ErrorList {
@@ -726,7 +880,111 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 			return counterSet.Name
 		}, fldPath.Child("sharedCounters"), sizeCovered, uniquenessCovered)...)
 
+	// The name format is validated declaratively; see the field's tags.
+	if spec.PartitionTypeAttribute != nil {
+		allErrs = append(allErrs, validatePartitionTypeAttribute(spec, fldPath)...)
+	}
+
+	allErrs = append(allErrs, validateSkipNodeOperations(spec.SkipNodeOperations, fldPath.Child("skipNodeOperations"))...)
+
 	return allErrs
+}
+
+// validatePartitionTypeAttribute checks that a slice naming a partition type
+// attribute declares devices which consume counters, and that each of those
+// devices carries the attribute as a string. Devices which consume no counters
+// are exempt and may appear alongside them.
+func validatePartitionTypeAttribute(spec *resource.ResourceSliceSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	name := string(*spec.PartitionTypeAttribute)
+
+	if !haveConsumesCounters(spec) {
+		return append(allErrs, field.Invalid(fldPath.Child("partitionTypeAttribute"), name,
+			"may only be set on a slice which declares devices that consume counters"))
+	}
+
+	// A malformed name is reported declaratively; no device can carry it, so
+	// checking each of them would only bury that one error.
+	if len(validateFullyQualifiedName(*spec.PartitionTypeAttribute, nil)) > 0 {
+		return allErrs
+	}
+
+	// A name in the driver's own domain may also be declared bare. Strip the
+	// prefix once here rather than allocating driver+"/" per device below.
+	bareName, _ := strings.CutPrefix(name, spec.Driver+"/")
+
+	for i, device := range spec.Devices {
+		if len(device.ConsumesCounters) == 0 {
+			continue
+		}
+		attrPath := fldPath.Child("devices").Index(i).Child("attributes").Key(name)
+		attribute, ok := lookupQualifiedAttribute(device.Attributes, name, bareName)
+		if !ok {
+			allErrs = append(allErrs, field.Required(attrPath,
+				"device consumes counters and `partitionTypeAttribute` names this attribute, so it must be set"))
+			continue
+		}
+		if attribute.StringValue == nil {
+			allErrs = append(allErrs, field.Invalid(attrPath, attribute,
+				"must be a string value because `partitionTypeAttribute` names this attribute"))
+		}
+	}
+
+	return allErrs
+}
+
+// validateSkipNodeOperations checks business logic constraints on SkipNodeOperations:
+// NodePrepareResources cannot be skipped unless NodeUnprepareResources is also skipped
+// (or "*" is specified). Other checks (e.g. valid enum values, set uniqueness) are handled
+// by declarative validation.
+func validateSkipNodeOperations(skipOps []resource.SkipNodeOperation, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	skipSet := sets.New(skipOps...)
+
+	if skipSet.Has(resource.SkipNodeOperationNodePrepareResources) &&
+		!skipSet.Has(resource.SkipNodeOperationNodeUnprepareResources) &&
+		!skipSet.Has(resource.SkipNodeOperationAll) {
+		allErrs = append(allErrs, field.Invalid(fldPath, skipOps,
+			"NodePrepareResources cannot be skipped unless NodeUnprepareResources is also skipped"))
+	}
+
+	return allErrs
+}
+
+// lookupQualifiedAttribute finds a device attribute by its fully qualified
+// name. A key that carries no domain defaults to the driver's own domain, so an
+// attribute in the driver's domain may be declared either explicitly or bare.
+// The explicit form wins, keeping the result deterministic when a device
+// declares both; bareName (the name with the driver's domain stripped, empty
+// when the name is in another domain) is consulted only when non-empty.
+func lookupQualifiedAttribute(attributes map[resource.QualifiedName]resource.DeviceAttribute, name, bareName string) (resource.DeviceAttribute, bool) {
+	if attribute, ok := attributes[resource.QualifiedName(name)]; ok {
+		return attribute, true
+	}
+	if bareName != "" {
+		if attribute, ok := attributes[resource.QualifiedName(bareName)]; ok {
+			return attribute, true
+		}
+	}
+	return resource.DeviceAttribute{}, false
+}
+
+func haveListAttributes(spec *resource.ResourceSliceSpec) bool {
+	if spec == nil {
+		return false
+	}
+
+	for _, device := range spec.Devices {
+		for _, attribute := range device.Attributes {
+			if attribute.BoolValues != nil ||
+				attribute.IntValues != nil ||
+				attribute.StringValues != nil ||
+				attribute.VersionValues != nil {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func haveDeviceTaints(spec *resource.ResourceSliceSpec) bool {
@@ -773,10 +1031,10 @@ func validateCounterSet(counterSet resource.CounterSet, fldPath *field.Path) fie
 	if counterSet.Name == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
 	} else {
-		allErrs = append(allErrs, validateCounterName(counterSet.Name, fldPath.Child("name"))...).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, validateCounterName(counterSet.Name, fldPath.Child("name")).MarkCoveredByDeclarative()...)
 	}
 	if len(counterSet.Counters) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("counters"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("counters"), "").MarkCoveredByDeclarative())
 	} else {
 		// The size limit is enforced for across all sets by the caller.
 		allErrs = append(allErrs, validateMap(counterSet.Counters, resource.ResourceSliceMaxCountersPerCounterSet, validation.DNS1123LabelMaxLength,
@@ -802,18 +1060,28 @@ func validateDevice(device resource.Device, oldDevice *resource.Device, fldPath 
 	var allErrs field.ErrorList
 	allowMultipleAllocations := device.AllowMultipleAllocations != nil && *device.AllowMultipleAllocations
 	allErrs = append(allErrs, validateDeviceName(device.Name, fldPath.Child("name"))...)
+
 	// Warn about exceeding the maximum length only once. If any individual
 	// field is too large, then so is the combination.
+	// we count the total number of attribute entries (scalars and list items)
 	attributeAndCapacityLength := len(device.Attributes) + len(device.Capacity)
 	if attributeAndCapacityLength > resource.ResourceSliceMaxAttributesAndCapacitiesPerDevice {
 		allErrs = append(allErrs, field.Invalid(fldPath, attributeAndCapacityLength, fmt.Sprintf("the total number of attributes and capacities must not exceed %d", resource.ResourceSliceMaxAttributesAndCapacitiesPerDevice)))
 	}
+	numAttributeValues := numEntriesDeviceAttribute(device)
+	if numAttributeValues > resource.ResourceSliceMaxAttributeValuesPerDevice {
+		allErrs = append(allErrs, field.Invalid(fldPath, numAttributeValues, fmt.Sprintf("the total number of attribute values must not exceed %d", resource.ResourceSliceMaxAttributeValuesPerDevice)))
+	}
 
 	allErrs = append(allErrs, validateMap(device.Attributes, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateDeviceAttribute, fldPath.Child("attributes"))...)
-	if allowMultipleAllocations {
-		allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateMultiAllocatableDeviceCapacity, fldPath.Child("capacity"))...)
-	} else {
-		allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateSingleAllocatableDeviceCapacity, fldPath.Child("capacity"))...)
+	// If the entire capacity is the same as before then validation can be skipped.
+	// We could also do the DeepEqual on the entire spec, but here it is a bit cheaper.
+	if oldDevice == nil || !apiequality.Semantic.DeepEqual(oldDevice.Capacity, device.Capacity) {
+		if allowMultipleAllocations {
+			allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateMultiAllocatableDeviceCapacity, fldPath.Child("capacity"))...)
+		} else {
+			allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateSingleAllocatableDeviceCapacity, fldPath.Child("capacity"))...)
+		}
 	}
 	// If the entire set is the same as before then validation can be skipped.
 	// We could also do the DeepEqual on the entire spec, but here it is a bit cheaper.
@@ -865,39 +1133,101 @@ func validateDevice(device resource.Device, oldDevice *resource.Device, fldPath 
 	}
 
 	allErrs = append(allErrs, validateDeviceBindingParameters(device.BindingConditions, device.BindingFailureConditions, fldPath)...)
-	allErrs = append(allErrs, validateNodeAllocatableResourceMappings(device.NodeAllocatableResourceMappings, device.Capacity, fldPath.Child("nodeAllocatableResourceMappings"))...)
+	allErrs = append(allErrs, validateNodeAllocatableResources(device.NodeAllocatableResources, device.Capacity, fldPath.Child("nodeAllocatableResources"))...)
 
 	return allErrs
 }
 
-func validateNodeAllocatableResourceMappings(mappings map[corev1.ResourceName]resource.NodeAllocatableResourceMapping, capacities map[resource.QualifiedName]resource.DeviceCapacity, fldPath *field.Path) field.ErrorList {
+func validateNodeAllocatableResources(mappings map[corev1.ResourceName]resource.NodeAllocatableResource, capacities map[resource.QualifiedName]resource.DeviceCapacity, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	for resourceName, mapping := range mappings {
 		keyPath := fldPath.Key(string(resourceName))
-		if !v1helper.IsNativeResource(resourceName) {
+		if !corehelper.IsNodeAllocatableResourceName(core.ResourceName(resourceName)) {
 			allErrs = append(allErrs, field.Invalid(keyPath, resourceName, "must be a node allocatable resource name"))
 		}
 
-		if mapping.AllocationMultiplier == nil && mapping.CapacityKey == nil {
-			allErrs = append(allErrs, field.Invalid(keyPath, "", "at least one of allocationMultiplier or capacityKey must be set"))
-		} else {
-			if mapping.AllocationMultiplier != nil {
-				if mapping.AllocationMultiplier.Sign() <= 0 {
-					allErrs = append(allErrs, field.Invalid(keyPath.Child("allocationMultiplier"), mapping.AllocationMultiplier.String(), "must be positive"))
-				}
-			}
-			if mapping.CapacityKey != nil {
-				if *mapping.CapacityKey == "" {
-					allErrs = append(allErrs, field.Invalid(keyPath.Child("capacityKey"), "", "capacityKey must not be an empty string"))
-				} else if capacities == nil {
-					allErrs = append(allErrs, field.NotFound(keyPath.Child("capacityKey"), *mapping.CapacityKey))
-				} else if _, exists := capacities[*mapping.CapacityKey]; !exists {
-					allErrs = append(allErrs, field.NotFound(keyPath.Child("capacityKey"), *mapping.CapacityKey))
-				}
-			}
+		if mapping.Mapping == nil && mapping.Overhead == nil {
+			allErrs = append(allErrs, field.Required(keyPath, "at least one of mapping or overhead must be set"))
+		}
+		if mapping.Mapping != nil {
+			allErrs = append(allErrs, validateNodeAllocatableMapping(mapping.Mapping, capacities, keyPath.Child("mapping"))...)
+		}
+		if mapping.Overhead != nil {
+			allErrs = append(allErrs, validateNodeAllocatableOverheadMapping(mapping.Overhead, keyPath.Child("overhead"))...)
 		}
 	}
 	return allErrs
+}
+
+// validateNodeAllocatableMapping validates a mapped node allocatable resource configuration
+func validateNodeAllocatableMapping(mapping *resource.NodeAllocatableMapping, capacities map[resource.QualifiedName]resource.DeviceCapacity, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if mapping.CapacityKey != nil {
+		if *mapping.CapacityKey == "" {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("capacityKey"), "", "capacityKey must not be an empty string"))
+		} else {
+			var exists bool
+			if capacities != nil {
+				_, exists = capacities[*mapping.CapacityKey]
+			}
+			if !exists {
+				allErrs = append(allErrs, field.NotFound(fldPath.Child("capacityKey"), *mapping.CapacityKey))
+			}
+		}
+		if mapping.CapacityMultiplier == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("capacityMultiplier"), "capacityMultiplier is required when capacityKey is set").WithOrigin("dependentRequired").MarkCoveredByDeclarative())
+		} else if mapping.CapacityMultiplier.Sign() <= 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("capacityMultiplier"), mapping.CapacityMultiplier.String(), "must be positive"))
+		}
+	}
+
+	if mapping.DeviceMultiplier != nil {
+		if mapping.DeviceMultiplier.Sign() <= 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("deviceMultiplier"), mapping.DeviceMultiplier.String(), "must be positive"))
+		}
+	}
+
+	if mapping.CapacityMultiplier != nil && mapping.CapacityKey == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("capacityKey"), "capacityKey is required when capacityMultiplier is set").WithOrigin("dependentRequired").MarkCoveredByDeclarative())
+	}
+
+	return allErrs
+}
+
+// validateNodeAllocatableOverheadMapping validates an overhead node allocatable resource configuration
+func validateNodeAllocatableOverheadMapping(overhead *resource.NodeAllocatableOverhead, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if overhead.PerPod == nil && overhead.PerContainer == nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, "", "at least one of perPod or perContainer must be set"))
+		return allErrs
+	}
+
+	if overhead.PerPod != nil && overhead.PerPod.Sign() < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("perPod"), overhead.PerPod.String(), "must be non-negative"))
+	}
+
+	if overhead.PerContainer != nil && overhead.PerContainer.Sign() < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("perContainer"), overhead.PerContainer.String(), "must be non-negative"))
+	}
+	return allErrs
+}
+
+// numEntriesDeviceAttribute counts the total number of entries in the device's attributes,
+// counting each item in list values separately.
+// This is used to enforce the maximum number of attributes and capacities
+// per device when the DRAListTypeAttributes feature gate is enabled.
+func numEntriesDeviceAttribute(device resource.Device) int {
+	numEntries := 0
+	for _, attr := range device.Attributes {
+		if len(attr.BoolValues) == 0 && len(attr.IntValues) == 0 && len(attr.StringValues) == 0 && len(attr.VersionValues) == 0 {
+			numEntries++
+			continue
+		}
+		// These fields are actually mutually exclusive, but we count the total number of entries across all of them.
+		// If setting multiple fields in the list value, the validation will fail later and report that exactly one value must be specified.
+		numEntries += len(attr.BoolValues) + len(attr.IntValues) + len(attr.StringValues) + len(attr.VersionValues)
+	}
+	return numEntries
 }
 
 func validateDeviceCounterConsumption(deviceCounterConsumption resource.DeviceCounterConsumption, fldPath *field.Path) field.ErrorList {
@@ -906,10 +1236,10 @@ func validateDeviceCounterConsumption(deviceCounterConsumption resource.DeviceCo
 	if len(deviceCounterConsumption.CounterSet) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("counterSet"), "").MarkCoveredByDeclarative())
 	} else {
-		allErrs = append(allErrs, validateCounterName(deviceCounterConsumption.CounterSet, fldPath.Child("counterSet"))...).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, validateCounterName(deviceCounterConsumption.CounterSet, fldPath.Child("counterSet")).MarkCoveredByDeclarative()...)
 	}
 	if len(deviceCounterConsumption.Counters) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("counters"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("counters"), "").MarkCoveredByDeclarative())
 	} else {
 		allErrs = append(allErrs, validateMap(deviceCounterConsumption.Counters, resource.ResourceSliceMaxCountersPerDeviceCounterConsumption,
 			validation.DNS1123LabelMaxLength, validateCounterName, validateDeviceCounter, fldPath.Child("counters"), keysCovered)...)
@@ -954,6 +1284,36 @@ func validateDeviceAttribute(attribute resource.DeviceAttribute, fldPath *field.
 		numFields++
 		allErrs = append(allErrs, validateDeviceAttributeVersionValue(attribute.VersionValue, fldPath.Child("version"))...)
 	}
+	if attribute.BoolValues != nil {
+		numFields++
+		if len(attribute.BoolValues) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("bools"), attribute.BoolValues, "must not be empty if specified"))
+		}
+	}
+	if attribute.IntValues != nil {
+		numFields++
+		if len(attribute.IntValues) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("ints"), attribute.IntValues, "must not be empty if specified"))
+		}
+	}
+	if attribute.StringValues != nil {
+		numFields++
+		if len(attribute.StringValues) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("strings"), attribute.StringValues, "must not be empty if specified"))
+		}
+		for i, item := range attribute.StringValues {
+			allErrs = append(allErrs, validateDeviceAttributeStringValue(&item, fldPath.Child("strings").Index(i)).WithOrigin("maxBytes").MarkCoveredByDeclarative()...)
+		}
+	}
+	if attribute.VersionValues != nil {
+		numFields++
+		if len(attribute.VersionValues) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("versions"), attribute.VersionValues, "must not be empty if specified"))
+		}
+		for i, item := range attribute.VersionValues {
+			allErrs = append(allErrs, validateDeviceAttributeVersionValue(&item, fldPath.Child("versions").Index(i))...)
+		}
+	}
 
 	switch numFields {
 	case 0:
@@ -986,6 +1346,7 @@ func validateDeviceAttributeVersionValue(value *string, fldPath *field.Path) fie
 }
 
 // validateMultiAllocatableDeviceCapacity must check requestPolicy in consumable capacity.
+// It only gets called for new or modified capacity.
 func validateMultiAllocatableDeviceCapacity(capacity resource.DeviceCapacity, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if capacity.RequestPolicy != nil {
@@ -1007,6 +1368,7 @@ func validateSingleAllocatableDeviceCapacity(capacity resource.DeviceCapacity, f
 
 // validateRequestPolicy validates at most one of ValidRequestValues can be defined.
 // If any ValidRequestValues are defined, Default must also be defined and valid.
+// Only gets called for new or modified policy.
 func validateRequestPolicy(maxCapacity apiresource.Quantity, policy *resource.CapacityRequestPolicy, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(policy.ValidValues) > 0 && policy.ValidRange != nil {
@@ -1050,6 +1412,14 @@ func validateRequestPolicyValidValues(defaultValue apiresource.Quantity, maxCapa
 		}
 	}
 
+	// Choose the key function based on whether fractional capacity values are
+	// supported. When DRAFractionalCapacityRange is enabled, use decimal precision;
+	// otherwise, use integer-based keys.
+	quantityKeyFunc := quantityKeyInt
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAFractionalCapacityRange) {
+		quantityKeyFunc = quantityKeyAsDec
+	}
+
 	allErrs = append(allErrs, validateSet(validValues, resource.CapacityRequestPolicyDiscreteMaxOptions,
 		func(option apiresource.Quantity, fldPath *field.Path) field.ErrorList {
 			var allErrs field.ErrorList
@@ -1060,13 +1430,15 @@ func validateRequestPolicyValidValues(defaultValue apiresource.Quantity, maxCapa
 				foundDefault = true
 			}
 			return allErrs
-		}, quantityKey, fldPath)...)
+		}, quantityKeyFunc, fldPath)...)
 	if !foundDefault {
 		allErrs = append(allErrs, field.Invalid(fldPath, defaultValue.String(), "default value is not valid according to the requestPolicy"))
 	}
 	return allErrs
 }
 
+// validateRequestPolicyRange validates a CapacityRequestPolicyRange.
+// Only gets called for a new or modified range.
 func validateRequestPolicyRange(defaultValue apiresource.Quantity, maxCapacity apiresource.Quantity, valueRange resource.CapacityRequestPolicyRange, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if valueRange.Min == nil {
@@ -1077,7 +1449,7 @@ func validateRequestPolicyRange(defaultValue apiresource.Quantity, maxCapacity a
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("min"), valueRange.Min.String(), fmt.Sprintf("min is larger than capacity value: %s", maxCapacity.String())))
 	}
 	if defaultValue.Cmp(*valueRange.Min) < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("min"), defaultValue.String(), fmt.Sprintf("default is less than min: %s", valueRange.Min.String())))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("default"), defaultValue.String(), fmt.Sprintf("default is less than min: %s", valueRange.Min.String())))
 	}
 	if valueRange.Max != nil {
 		if valueRange.Min.Cmp(*valueRange.Max) > 0 {
@@ -1087,33 +1459,149 @@ func validateRequestPolicyRange(defaultValue apiresource.Quantity, maxCapacity a
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("max"), valueRange.Max.String(), fmt.Sprintf("max is larger than capacity value: %s", maxCapacity.String())))
 		}
 		if defaultValue.Cmp(*valueRange.Max) > 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("max"), defaultValue.String(), fmt.Sprintf("default is more than max: %s", valueRange.Max.String())))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("default"), defaultValue.String(), fmt.Sprintf("default is more than max: %s", valueRange.Max.String())))
+		}
+	}
+	useMilli := false
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAFractionalCapacityRange) {
+		// The default is not part of the range, so rangeHasFractional does not see it.
+		// A fractional default with an integer range must still use the milli path, or the
+		// integer path reads default.Value() (which rounds) and accepts a non-multiple.
+		useMilli = rangeHasFractional(valueRange) || isFractionalQuantity(defaultValue)
+		// Overflow guards apply when DRAFractionalCapacityRange is enabled and the incoming
+		// range has fractional values.
+		if useMilli {
+			hasUnsafeValue := false
+			for _, pair := range []struct {
+				q    *apiresource.Quantity
+				name string
+			}{
+				{&defaultValue, "default"},
+				{valueRange.Min, "min"},
+				{valueRange.Max, "max"},
+				{valueRange.Step, "step"},
+			} {
+				if pair.q != nil {
+					milliQuantity := apiresource.NewMilliQuantity(pair.q.MilliValue(), pair.q.Format)
+					if pair.q.Cmp(*milliQuantity) != 0 {
+						allErrs = append(allErrs, field.Invalid(fldPath.Child(pair.name), pair.q.String(),
+							"value cannot be represented as a milli value"))
+						hasUnsafeValue = true
+					}
+				}
+			}
+			if hasUnsafeValue {
+				// fast return to avoid unsafe calculation
+				return allErrs
+			}
 		}
 	}
 	if valueRange.Step != nil {
-		added := valueRange.Min.DeepCopy()
-		added.Add(*valueRange.Step)
-		if added.Cmp(maxCapacity) > 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("step"), valueRange.Step.String(), fmt.Sprintf("one step %s is larger than capacity value: %s", added.String(), maxCapacity.String())))
-		}
-		allErrs = append(allErrs, validateRequestPolicyRangeStep(defaultValue, *valueRange.Min, *valueRange.Step, fldPath.Child("step"))...)
-		if valueRange.Max != nil {
-			allErrs = append(allErrs, validateRequestPolicyRangeStep(*valueRange.Max, *valueRange.Min, *valueRange.Step, fldPath.Child("step"))...)
+		if valueRange.Step.Sign() <= 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("step"), valueRange.Step.String(), "must be greater than zero"))
+		} else {
+			added := valueRange.Min.DeepCopy()
+			added.Add(*valueRange.Step)
+			if added.Cmp(maxCapacity) > 0 {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("step"), valueRange.Step.String(), fmt.Sprintf("one step %s is larger than capacity value: %s", added.String(), maxCapacity.String())))
+			}
+			// The integer path of validateRequestPolicyRangeStep below reads step,
+			// min, max and the default value with Quantity.Value(), which only holds
+			// in [0, MaxInt64]: above it a positive multiple of 2^64 reads as 0 and the
+			// step check divides by zero, and a negative decimal-backed bound can read
+			// back positive. Reject those before the arithmetic. The milli path is
+			// bounded by the hasUnsafeValue check above instead.
+			hasUnsafeValue := false
+			if !useMilli {
+				for _, pair := range []struct {
+					q    *apiresource.Quantity
+					name string
+				}{
+					{&defaultValue, "default"},
+					{valueRange.Min, "min"},
+					{valueRange.Max, "max"},
+					{valueRange.Step, "step"},
+				} {
+					if pair.q != nil {
+						if errs := validateInt64Range(*pair.q, fldPath.Child(pair.name)); len(errs) > 0 {
+							allErrs = append(allErrs, errs...)
+							hasUnsafeValue = true
+						}
+					}
+				}
+			}
+			if !hasUnsafeValue {
+				// Use milli-value arithmetic whenever any field is fractional.
+				// useMilli is set only when the DRAFractionalCapacityRange gate is on.
+				allErrs = append(allErrs, validateRequestPolicyRangeStep(defaultValue, *valueRange.Min, *valueRange.Step, useMilli, fldPath.Child("step"))...)
+				if valueRange.Max != nil {
+					allErrs = append(allErrs, validateRequestPolicyRangeStep(*valueRange.Max, *valueRange.Min, *valueRange.Step, useMilli, fldPath.Child("step"))...)
+				}
+			}
 		}
 	}
 	return allErrs
 }
 
-func validateRequestPolicyRangeStep(value, min, step apiresource.Quantity, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	stepVal := step.Value()
-	minVal := min.Value()
-	val := value.Value()
-	added := (val - minVal)
-	if added%stepVal != 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, value.String(), fmt.Sprintf("value is not a multiple of a given step (%s) from (%s)", step.String(), min.String())))
+// validateRequestPolicyRangeStep checks if the value is a valid step increment
+// starting from the minimum value (i.e., value - min is a multiple of step).
+//
+// Pre-requisite: value, min, and step must be pre-validated to ensure they
+// don't underflow or overflow the supported value range (int64 or milli-value)
+// and that step is not zero.
+func validateRequestPolicyRangeStep(value, min, step apiresource.Quantity, useMilli bool, fldPath *field.Path) field.ErrorList {
+	var stepVal, minVal, val int64
+	if useMilli {
+		stepVal = step.MilliValue()
+		minVal = min.MilliValue()
+		val = value.MilliValue()
+	} else {
+		stepVal = step.Value()
+		minVal = min.Value()
+		val = value.Value()
 	}
-	return allErrs
+	if (val-minVal)%stepVal != 0 {
+		return field.ErrorList{field.Invalid(fldPath, value.String(), fmt.Sprintf("value is not a multiple of a given step (%s) from (%s)", step.String(), min.String()))}
+	}
+	return nil
+}
+
+// boundOverInt64Message is the field error for a consumable-capacity validRange
+// bound above the range where Quantity.Value() is usable.
+const boundOverInt64Message = "must not be larger than 9223372036854775807"
+
+// validateInt64Range reports whether q is in [0, MaxInt64], the range where
+// Quantity.Value() returns a number the bound can be reasoned about with. Above
+// MaxInt64 it overflows, so a positive multiple of 2^64 reads back as 0; below
+// zero it does not round as documented once the quantity is decimal-backed and
+// can read back with the wrong sign (#110653). Sign() alone misses the first
+// case and CmpInt64 alone misses the second, so the check needs both.
+func validateInt64Range(q apiresource.Quantity, fldPath *field.Path) field.ErrorList {
+	if q.Sign() < 0 {
+		return field.ErrorList{field.Invalid(fldPath, q.String(), apimachineryvalidation.IsNegativeErrorMsg)}
+	}
+	if q.CmpInt64(math.MaxInt64) > 0 {
+		return field.ErrorList{field.Invalid(fldPath, q.String(), boundOverInt64Message)}
+	}
+	return nil
+}
+
+// rangeHasFractional reports whether any non-nil field of r has sub-integer precision.
+func rangeHasFractional(r resource.CapacityRequestPolicyRange) bool {
+	for _, q := range []*apiresource.Quantity{r.Min, r.Max, r.Step} {
+		if q != nil && isFractionalQuantity(*q) {
+			return true
+		}
+	}
+	return false
+}
+
+// isFractionalQuantity reports whether q has sub-integer precision.
+func isFractionalQuantity(q apiresource.Quantity) bool {
+	dec := q.AsDec()
+	infDec := inf.Dec{}
+	rounded := infDec.Round(dec, 0, inf.RoundDown)
+	return dec.Cmp(rounded) != 0
 }
 
 func validateDeviceCounter(counter resource.Counter, fldPath *field.Path) field.ErrorList {
@@ -1262,8 +1750,15 @@ func stringKey(item string) string {
 	return item
 }
 
-// quantityKey uses the item itself as a key for validateSet.
-func quantityKey(item apiresource.Quantity) string {
+// quantityKeyAsDec uses a scaled inf.Dec of the item as itself
+// as a key for validateSet.
+func quantityKeyAsDec(item apiresource.Quantity) string {
+	return item.AsDec().String()
+}
+
+// quantityKeyInt uses base-10 integer of the item itself
+// as a key for validateSet.
+func quantityKeyInt(item apiresource.Quantity) string {
 	return strconv.FormatInt(item.Value(), 10)
 }
 

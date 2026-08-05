@@ -24,7 +24,6 @@ package v1alpha1
 import (
 	unsafe "unsafe"
 
-	v1 "k8s.io/api/resource/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	metadata "k8s.io/dynamic-resource-allocation/api/metadata"
@@ -71,11 +70,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_Device_To_metadata_Device(in *Device, out *metadata.Device, s conversion.Scope) error {
-	out.Driver = in.Driver
-	out.Pool = in.Pool
-	out.Name = in.Name
-	out.Attributes = *(*map[v1.QualifiedName]v1.DeviceAttribute)(unsafe.Pointer(&in.Attributes))
-	out.NetworkData = (*v1.NetworkDeviceData)(unsafe.Pointer(in.NetworkData))
+	*out = *(*metadata.Device)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -85,11 +80,7 @@ func Convert_v1alpha1_Device_To_metadata_Device(in *Device, out *metadata.Device
 }
 
 func autoConvert_metadata_Device_To_v1alpha1_Device(in *metadata.Device, out *Device, s conversion.Scope) error {
-	out.Driver = in.Driver
-	out.Pool = in.Pool
-	out.Name = in.Name
-	out.Attributes = *(*map[v1.QualifiedName]v1.DeviceAttribute)(unsafe.Pointer(&in.Attributes))
-	out.NetworkData = (*v1.NetworkDeviceData)(unsafe.Pointer(in.NetworkData))
+	*out = *(*Device)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -123,8 +114,7 @@ func Convert_metadata_DeviceMetadata_To_v1alpha1_DeviceMetadata(in *metadata.Dev
 }
 
 func autoConvert_v1alpha1_DeviceMetadataRequest_To_metadata_DeviceMetadataRequest(in *DeviceMetadataRequest, out *metadata.DeviceMetadataRequest, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Devices = *(*[]metadata.Device)(unsafe.Pointer(&in.Devices))
+	*out = *(*metadata.DeviceMetadataRequest)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -134,8 +124,7 @@ func Convert_v1alpha1_DeviceMetadataRequest_To_metadata_DeviceMetadataRequest(in
 }
 
 func autoConvert_metadata_DeviceMetadataRequest_To_v1alpha1_DeviceMetadataRequest(in *metadata.DeviceMetadataRequest, out *DeviceMetadataRequest, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Devices = *(*[]Device)(unsafe.Pointer(&in.Devices))
+	*out = *(*DeviceMetadataRequest)(unsafe.Pointer(in))
 	return nil
 }
 

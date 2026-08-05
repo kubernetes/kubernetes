@@ -1938,3 +1938,49 @@ func fakeFunction(arg1 ref.Val) ref.Val {
 
 	return types.String(strings.ToUpper(arg))
 }
+
+// TestMetadataNameCostIsBounded verifies that CEL rules referencing
+// self.metadata.name are cost-estimated using the bounded object-name length
+// rather than the full request size.
+func TestMetadataNameCostIsBounded(t *testing.T) {
+	const boundedCeiling = 10000
+	cases := []struct {
+		name string
+		rule apiextensions.ValidationRule
+	}{
+		{name: "name rule", rule: apiextensions.ValidationRule{Rule: "self.metadata.name.contains('x')"}},
+		{name: "generateName rule", rule: apiextensions.ValidationRule{Rule: "self.metadata.generateName.contains('x')"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := &schema.Structural{
+				Generic: schema.Generic{Type: "object"},
+				ValidationExtensions: schema.ValidationExtensions{
+					XValidations: apiextensions.ValidationRules{tc.rule},
+				},
+			}
+			results, err := Compile(
+				s,
+				model.SchemaDeclType(s, true),
+				celconfig.PerCallLimit,
+				environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()),
+				StoredExpressionsEnvLoader(),
+			)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(results) != 1 {
+				t.Fatalf("expected 1 compilation result, got %d", len(results))
+			}
+			if results[0].Error != nil {
+				t.Fatalf("unexpected compile error: %v", results[0].Error)
+			}
+			if results[0].MaxCost == 0 {
+				t.Errorf("%s: expected a non-zero cost", tc.name)
+			}
+			if results[0].MaxCost > boundedCeiling {
+				t.Errorf("%s MaxCost = %d, expected it bounded (<= %d); an unbounded name would cost far more", tc.name, results[0].MaxCost, boundedCeiling)
+			}
+		})
+	}
+}

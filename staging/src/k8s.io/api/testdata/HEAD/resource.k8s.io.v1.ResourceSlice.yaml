@@ -40,9 +40,17 @@ spec:
     attributes:
       attributesKey:
         bool: true
+        bools:
+        - true
         int: 2
+        ints:
+        - 6
         string: stringValue
+        strings:
+        - stringsValue
         version: versionValue
+        versions:
+        - versionsValue
     bindingConditions:
     - bindingConditionsValue
     bindingFailureConditions:
@@ -60,15 +68,22 @@ spec:
           - "0"
         value: "0"
     consumesCounters:
-    - counterSet: counterSetValue
+    - compatibilityGroups:
+      - compatibilityGroupsValue
+      counterSet: counterSetValue
       counters:
         countersKey:
           value: "0"
     name: nameValue
-    nodeAllocatableResourceMappings:
-      nodeAllocatableResourceMappingsKey:
-        allocationMultiplier: "0"
-        capacityKey: capacityKeyValue
+    nodeAllocatableResources:
+      nodeAllocatableResourcesKey:
+        mapping:
+          capacityKey: capacityKeyValue
+          capacityMultiplier: "0"
+          deviceMultiplier: "0"
+        overhead:
+          perContainer: "0"
+          perPod: "0"
     nodeName: nodeNameValue
     nodeSelector:
       nodeSelectorTerms:
@@ -101,6 +116,7 @@ spec:
         operator: operatorValue
         values:
         - valuesValue
+  partitionTypeAttribute: partitionTypeAttributeValue
   perDeviceNodeSelection: true
   pool:
     generation: 2
@@ -111,3 +127,5 @@ spec:
       countersKey:
         value: "0"
     name: nameValue
+  skipNodeOperations:
+  - skipNodeOperationsValue

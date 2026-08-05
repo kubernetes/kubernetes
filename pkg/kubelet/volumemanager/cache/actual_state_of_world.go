@@ -227,6 +227,7 @@ func NewActualStateOfWorld(
 		nodeName:                        nodeName,
 		attachedVolumes:                 make(map[v1.UniqueVolumeName]attachedVolume),
 		foundDuringReconstruction:       make(map[v1.UniqueVolumeName]map[volumetypes.UniquePodName]types.UID),
+		attemptedMounts:                 make(map[volumetypes.UniquePodName]sets.Set[v1.UniqueVolumeName]),
 		volumePluginMgr:                 volumePluginMgr,
 		volumesWithFinalExpansionErrors: sets.New[v1.UniqueVolumeName](),
 	}
@@ -260,6 +261,11 @@ type actualStateOfWorld struct {
 	// foundDuringReconstruction is a map of volumes which were discovered
 	// from kubelet root directory when kubelet was restarted.
 	foundDuringReconstruction map[v1.UniqueVolumeName]map[volumetypes.UniquePodName]types.UID
+
+	// attemptedMounts tracks pod/volume pairs for which kubelet attempted to
+	// stage/publish, even if the mount never reached mounted/uncertain ASW state.
+	// Keyed by pod name to a set of volume names.
+	attemptedMounts map[volumetypes.UniquePodName]sets.Set[v1.UniqueVolumeName]
 
 	volumesWithFinalExpansionErrors sets.Set[v1.UniqueVolumeName]
 
@@ -506,6 +512,9 @@ func (asw *actualStateOfWorld) CheckAndMarkVolumeAsUncertainViaReconstruction(op
 	}
 	podMap[opts.PodName] = opts.PodUID
 	asw.foundDuringReconstruction[opts.VolumeName] = podMap
+	// Reconstructed volumes were previously staged/published; mark as attempted
+	// so they remain eligible for volume health probing.
+	asw.markVolumeAsAttemptedLocked(opts.PodName, opts.VolumeName)
 	return true, nil
 }
 
@@ -644,6 +653,59 @@ func (asw *actualStateOfWorld) GetVolumeMountState(volumeName v1.UniqueVolumeNam
 		return operationexecutor.VolumeNotMounted
 	}
 	return podObj.volumeMountStateForPod
+}
+
+// MarkVolumeAsMountAttempted records that kubelet attempted to stage/publish this
+// volume for the pod.
+func (asw *actualStateOfWorld) MarkVolumeAsMountAttempted(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) {
+	asw.Lock()
+	defer asw.Unlock()
+	asw.markVolumeAsAttemptedLocked(podName, volumeName)
+}
+
+// IsVolumeMountAttempted returns true if MarkVolumeAsMountAttempted was called for this pair.
+func (asw *actualStateOfWorld) IsVolumeMountAttempted(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) bool {
+	asw.RLock()
+	defer asw.RUnlock()
+	volumes, ok := asw.attemptedMounts[podName]
+	if !ok {
+		return false
+	}
+	return volumes.Has(volumeName)
+}
+
+// markVolumeAsAttemptedLocked records an attempted mount. Caller must hold asw.Lock.
+func (asw *actualStateOfWorld) markVolumeAsAttemptedLocked(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) {
+	volumes, ok := asw.attemptedMounts[podName]
+	if !ok {
+		volumes = sets.New[v1.UniqueVolumeName]()
+		asw.attemptedMounts[podName] = volumes
+	}
+	volumes.Insert(volumeName)
+}
+
+// clearVolumeMountAttemptedLocked clears the attempted marker for a pod/volume pair.
+// Caller must hold asw.Lock.
+func (asw *actualStateOfWorld) clearVolumeMountAttemptedLocked(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) {
+	volumes, ok := asw.attemptedMounts[podName]
+	if !ok {
+		return
+	}
+	volumes.Delete(volumeName)
+	if volumes.Len() == 0 {
+		delete(asw.attemptedMounts, podName)
+	}
+}
+
+// clearVolumeMountAttemptedForVolumeLocked clears attempted markers for a volume across all pods.
+// Caller must hold asw.Lock.
+func (asw *actualStateOfWorld) clearVolumeMountAttemptedForVolumeLocked(volumeName v1.UniqueVolumeName) {
+	for podName, volumes := range asw.attemptedMounts {
+		volumes.Delete(volumeName)
+		if volumes.Len() == 0 {
+			delete(asw.attemptedMounts, podName)
+		}
+	}
 }
 
 func (asw *actualStateOfWorld) IsVolumeMountedElsewhere(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool {
@@ -894,6 +956,8 @@ func (asw *actualStateOfWorld) DeletePodFromVolume(
 		delete(asw.foundDuringReconstruction[volumeName], podName)
 	}
 
+	asw.clearVolumeMountAttemptedLocked(podName, volumeName)
+
 	return nil
 }
 
@@ -915,6 +979,7 @@ func (asw *actualStateOfWorld) DeleteVolume(volumeName v1.UniqueVolumeName) erro
 
 	delete(asw.attachedVolumes, volumeName)
 	delete(asw.foundDuringReconstruction, volumeName)
+	asw.clearVolumeMountAttemptedForVolumeLocked(volumeName)
 	return nil
 }
 

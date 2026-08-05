@@ -47,11 +47,11 @@ func (i *internalContainerLifecycleImpl) PreStartContainer(logger klog.Logger, p
 		i.memoryManager.AddContainer(logger, pod, container, containerID)
 	}
 
-	i.topologyManager.AddContainer(pod, container, containerID)
+	i.topologyManager.AddContainer(logger, pod, container, containerID)
 
 	return nil
 }
 
 func (i *internalContainerLifecycleImpl) PostStopContainer(logger klog.Logger, containerID string) error {
-	return i.topologyManager.RemoveContainer(containerID)
+	return i.topologyManager.RemoveContainer(logger, containerID)
 }

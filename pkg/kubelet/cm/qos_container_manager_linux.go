@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	units "github.com/docker/go-units"
-	"github.com/go-logr/logr"
 	libcontainercgroups "github.com/opencontainers/cgroups"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
@@ -110,6 +109,20 @@ func (m *qosContainerManagerImpl) Start(ctx context.Context, getNodeAllocatable 
 			resourceParameters.CPUShares = &minShares
 		}
 
+		// Reset stale memory protection on startup when MemoryQoS is off or
+		// policy is None. The periodic loop only runs for TieredReservation
+		// (where values change with pod churn); all other transitions are
+		// config changes that require a kubelet restart, so startup is
+		// sufficient.
+		if libcontainercgroups.IsCgroup2UnifiedMode() {
+			if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) ||
+				m.memoryReservationPolicy != kubeletconfig.TieredReservationMemoryReservationPolicy {
+				if qosClass == v1.PodQOSBurstable {
+					resourceParameters.Unified = map[string]string{Cgroup2MemoryLow: "0"}
+				}
+			}
+		}
+
 		// containerConfig object stores the cgroup specifications
 		containerConfig := &CgroupConfig{
 			Name:               containerName,
@@ -131,6 +144,27 @@ func (m *qosContainerManagerImpl) Start(ctx context.Context, getNodeAllocatable 
 			}
 		}
 	}
+	// Reset stale memory protection on the root cgroup (kubepods.slice) at
+	// startup, which the loop above
+	// does not cover.
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
+		if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) ||
+			m.memoryReservationPolicy != kubeletconfig.TieredReservationMemoryReservationPolicy {
+			rootConfig := &CgroupConfig{
+				Name: rootContainer,
+				ResourceParameters: &ResourceConfig{
+					Unified: map[string]string{
+						Cgroup2MemoryMin: "0",
+						Cgroup2MemoryLow: "0",
+					},
+				},
+			}
+			if err := cm.Update(logger, rootConfig); err != nil {
+				logger.Error(err, "Failed to reset memory protection on root cgroup")
+			}
+		}
+	}
+
 	// Store the top level qos container names
 	m.qosContainersInfo = QOSContainersInfo{
 		Guaranteed: rootContainer,
@@ -186,10 +220,12 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 			// we only care about the burstable qos tier
 			continue
 		}
+		draNodeAllocatableEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources)
 		req := resource.PodRequests(pod, resource.PodResourcesOptions{
 			Reuse: reuseReqs,
 			// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-			SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources),
+			SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources),
+			UseDRANodeAllocatableResourceClaimStatus: draNodeAllocatableEnabled,
 		})
 		if request, found := req[v1.ResourceCPU]; found {
 			burstablePodCPURequest += request.MilliValue()
@@ -224,7 +260,11 @@ func (m *qosContainerManagerImpl) getQoSMemoryRequests() map[v1.PodQOSClass]int6
 			// limits are not set for Best Effort pods
 			continue
 		}
-		req := resource.PodRequests(pod, resource.PodResourcesOptions{Reuse: reuseReqs})
+		draNodeAllocatableEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources)
+		req := resource.PodRequests(pod, resource.PodResourcesOptions{
+			Reuse:                                    reuseReqs,
+			UseDRANodeAllocatableResourceClaimStatus: draNodeAllocatableEnabled,
+		})
 		if request, found := req[v1.ResourceMemory]; found {
 			podMemoryRequest += request.Value()
 		}
@@ -300,17 +340,15 @@ func (m *qosContainerManagerImpl) setMemoryQoS(logger klog.Logger, configs map[v
 		logger.V(4).Info("MemoryQoS config for qos", "qos", qos, "key", key, "value", value)
 	}
 
+	// In production the only caller already gates on
+	// memoryReservationPolicy == TieredReservation, so this branch is
+	// unreachable. Keep this for unit-test coverage.
 	if m.memoryReservationPolicy != kubeletconfig.TieredReservationMemoryReservationPolicy {
 		setUnified(v1.PodQOSGuaranteed, Cgroup2MemoryMin, 0)
+		setUnified(v1.PodQOSGuaranteed, Cgroup2MemoryLow, 0)
 		setUnified(v1.PodQOSBurstable, Cgroup2MemoryLow, 0)
 		kubeletmetrics.MemoryQoSNodeMemoryMinBytes.Set(0)
 		kubeletmetrics.MemoryQoSNodeMemoryLowBytes.Set(0)
-		// Clear per-pod memory protection only when MemoryQoS feature gate is
-		// enabled but policy is None (rollback scenario). When the gate is off,
-		// pods never had protection set, so there's nothing to reconcile.
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) {
-			m.reconcilePodMemoryProtection(logger)
-		}
 		return
 	}
 
@@ -322,46 +360,15 @@ func (m *qosContainerManagerImpl) setMemoryQoS(logger klog.Logger, configs map[v
 	kubeletmetrics.MemoryQoSNodeMemoryMinBytes.Set(float64(guaranteedRequests))
 	kubeletmetrics.MemoryQoSNodeMemoryLowBytes.Set(float64(burstableRequests))
 
-	// Guaranteed QoS class: memory.min = sum of guaranteed + burstable requests
-	// (parent must cover children's protection for it to be effective)
+	// Root (kubepods.slice): ancestor coverage for both protection chains.
+	// v1.PodQOSGuaranteed is the map key for the root cgroup, not per-pod config.
 	setUnified(v1.PodQOSGuaranteed, Cgroup2MemoryMin, guaranteedRequests+burstableRequests)
+	setUnified(v1.PodQOSGuaranteed, Cgroup2MemoryLow, burstableRequests)
 
-	// Burstable QoS class: memory.low = sum of burstable pod requests
 	setUnified(v1.PodQOSBurstable, Cgroup2MemoryLow, burstableRequests)
 }
 
-// reconcilePodMemoryProtection clears stale memory.min and memory.low on pod-level cgroups
-// when MemoryQoS is disabled or memoryReservationPolicy is not TieredReservation.
-func (m *qosContainerManagerImpl) reconcilePodMemoryProtection(logger klog.Logger) {
-	pods := m.activePods()
-	for _, pod := range pods {
-		podQOS := v1qos.GetPodQOS(pod)
-		var parentContainer CgroupName
-		switch podQOS {
-		case v1.PodQOSGuaranteed:
-			parentContainer = m.qosContainersInfo.Guaranteed
-		case v1.PodQOSBurstable:
-			parentContainer = m.qosContainersInfo.Burstable
-		case v1.PodQOSBestEffort:
-			parentContainer = m.qosContainersInfo.BestEffort
-		}
-		podCgroupName := NewCgroupName(parentContainer, GetPodCgroupNameSuffix(pod.UID))
-		podConfig := &CgroupConfig{
-			Name: podCgroupName,
-			ResourceParameters: &ResourceConfig{
-				Unified: map[string]string{
-					Cgroup2MemoryMin: "0",
-					Cgroup2MemoryLow: "0",
-				},
-			},
-		}
-		if err := m.cgroupManager.Update(logger, podConfig); err != nil {
-			logger.V(4).Info("Failed to reconcile pod memory protection", "pod", klog.KObj(pod), "err", err)
-		}
-	}
-}
-
-func (m *qosContainerManagerImpl) UpdateCgroups(logger logr.Logger) error {
+func (m *qosContainerManagerImpl) UpdateCgroups(logger klog.Logger) error {
 	m.Lock()
 	defer m.Unlock()
 
@@ -390,9 +397,13 @@ func (m *qosContainerManagerImpl) UpdateCgroups(logger logr.Logger) error {
 		return err
 	}
 
-	// Update cgroup v2 memory.min settings. Called regardless of the MemoryQoS
-	// feature gate to clear stale values when the feature is disabled.
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	// Update cgroup v2 memory.min/memory.low periodically only when
+	// TieredReservation policy is active, since the values change as pods
+	// come and go. The None policy and feature-gate-disabled rollback cases
+	// are handled at startup to avoid unnecessary systemd SetUnitProperties
+	// calls that reset unrelated cgroup properties as a side effect.
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) && libcontainercgroups.IsCgroup2UnifiedMode() &&
+		m.memoryReservationPolicy == kubeletconfig.TieredReservationMemoryReservationPolicy {
 		m.setMemoryQoS(logger, qosConfigs)
 	}
 

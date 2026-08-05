@@ -100,12 +100,7 @@ func Convert_api_PodSecurityConfiguration_To_v1beta1_PodSecurityConfiguration(in
 }
 
 func autoConvert_v1beta1_PodSecurityDefaults_To_api_PodSecurityDefaults(in *PodSecurityDefaults, out *api.PodSecurityDefaults, s conversion.Scope) error {
-	out.Enforce = in.Enforce
-	out.EnforceVersion = in.EnforceVersion
-	out.Audit = in.Audit
-	out.AuditVersion = in.AuditVersion
-	out.Warn = in.Warn
-	out.WarnVersion = in.WarnVersion
+	*out = *(*api.PodSecurityDefaults)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -115,12 +110,7 @@ func Convert_v1beta1_PodSecurityDefaults_To_api_PodSecurityDefaults(in *PodSecur
 }
 
 func autoConvert_api_PodSecurityDefaults_To_v1beta1_PodSecurityDefaults(in *api.PodSecurityDefaults, out *PodSecurityDefaults, s conversion.Scope) error {
-	out.Enforce = in.Enforce
-	out.EnforceVersion = in.EnforceVersion
-	out.Audit = in.Audit
-	out.AuditVersion = in.AuditVersion
-	out.Warn = in.Warn
-	out.WarnVersion = in.WarnVersion
+	*out = *(*PodSecurityDefaults)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -130,9 +120,7 @@ func Convert_api_PodSecurityDefaults_To_v1beta1_PodSecurityDefaults(in *api.PodS
 }
 
 func autoConvert_v1beta1_PodSecurityExemptions_To_api_PodSecurityExemptions(in *PodSecurityExemptions, out *api.PodSecurityExemptions, s conversion.Scope) error {
-	out.Usernames = *(*[]string)(unsafe.Pointer(&in.Usernames))
-	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
-	out.RuntimeClasses = *(*[]string)(unsafe.Pointer(&in.RuntimeClasses))
+	*out = *(*api.PodSecurityExemptions)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -142,9 +130,7 @@ func Convert_v1beta1_PodSecurityExemptions_To_api_PodSecurityExemptions(in *PodS
 }
 
 func autoConvert_api_PodSecurityExemptions_To_v1beta1_PodSecurityExemptions(in *api.PodSecurityExemptions, out *PodSecurityExemptions, s conversion.Scope) error {
-	out.Usernames = *(*[]string)(unsafe.Pointer(&in.Usernames))
-	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
-	out.RuntimeClasses = *(*[]string)(unsafe.Pointer(&in.RuntimeClasses))
+	*out = *(*PodSecurityExemptions)(unsafe.Pointer(in))
 	return nil
 }
 

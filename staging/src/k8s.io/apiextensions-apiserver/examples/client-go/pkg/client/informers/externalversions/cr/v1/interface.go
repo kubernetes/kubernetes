@@ -25,7 +25,7 @@ import (
 // Interface provides access to all the informers in this group version.
 type Interface interface {
 	// Examples returns a ExampleInformer.
-	Examples() ExampleInformer
+	Examples() TypedExampleInformer
 }
 
 type version struct {
@@ -39,7 +39,7 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// Examples returns a ExampleInformer.
-func (v *version) Examples() ExampleInformer {
+// Examples returns a TypedExampleInformer.
+func (v *version) Examples() TypedExampleInformer {
 	return &exampleInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

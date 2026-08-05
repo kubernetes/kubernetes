@@ -22,8 +22,9 @@ import (
 
 // JSON type constants representing the reflected types of protobuf JSON values.
 var (
-	jsonValueType     = reflect.TypeOf(&structpb.Value{})
-	jsonListValueType = reflect.TypeOf(&structpb.ListValue{})
-	jsonStructType    = reflect.TypeOf(&structpb.Struct{})
-	jsonNullType      = reflect.TypeOf(structpb.NullValue_NULL_VALUE)
+	// JSONValueType describes the protobuf native type for a JSON value.
+	JSONValueType  = reflect.TypeFor[*structpb.Value]()
+	JSONListType   = reflect.TypeFor[*structpb.ListValue]()
+	JSONStructType = reflect.TypeFor[*structpb.Struct]()
+	JSONNullType   = reflect.TypeFor[structpb.NullValue]()
 )

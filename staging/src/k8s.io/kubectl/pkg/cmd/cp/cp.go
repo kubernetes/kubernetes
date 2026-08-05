@@ -76,6 +76,7 @@ type CopyOptions struct {
 	ClientConfig      *restclient.Config
 	Clientset         kubernetes.Interface
 	ExecParentCmdName string
+	Executor          exec.RemoteExecutor
 
 	args []string
 
@@ -204,6 +205,7 @@ func (o *CopyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 	if cmd.Parent() != nil {
 		o.ExecParentCmdName = cmd.Parent().CommandPath()
 	}
+	o.Executor = &exec.DefaultRemoteExecutor{}
 
 	var err error
 	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
@@ -277,7 +279,7 @@ func (o *CopyOptions) checkDestinationIsDir(dest fileSpec) error {
 		},
 
 		Command:  []string{"test", "-d", dest.File.String()},
-		Executor: &exec.DefaultRemoteExecutor{},
+		Executor: o.Executor,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -345,7 +347,7 @@ func (o *CopyOptions) copyToPod(src, dest fileSpec, options *exec.ExecOptions) e
 	}
 
 	options.Command = cmdArr
-	options.Executor = &exec.DefaultRemoteExecutor{}
+	options.Executor = o.Executor
 	return o.execute(options)
 }
 
@@ -391,10 +393,11 @@ func (t *TarPipe) initReadFrom(n uint64) {
 		},
 
 		Command:  []string{"tar", "cf", "-", t.src.File.String()},
-		Executor: &exec.DefaultRemoteExecutor{},
+		Executor: t.o.Executor,
 	}
 	if t.o.MaxTries != 0 {
-		options.Command = []string{"sh", "-c", fmt.Sprintf("tar cf - %s | tail -c+%d", t.src.File, n)}
+		escapedPath := strings.ReplaceAll(t.src.File.String(), "'", `'\''`)
+		options.Command = []string{"sh", "-c", fmt.Sprintf("tar cf - '%s' | tail -c+%d", escapedPath, n)}
 	}
 
 	go func() {

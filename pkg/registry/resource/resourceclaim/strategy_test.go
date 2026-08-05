@@ -17,6 +17,7 @@ limitations under the License.
 package resourceclaim
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -26,12 +27,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
@@ -331,6 +334,41 @@ var objWithDeviceBindingConditions = &resource.ResourceClaim{
 	},
 }
 
+var objWithSkipNodeOperationsStatus = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
+		Namespace: "kube-system",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name: "req-0",
+					Exactly: &resource.ExactDeviceRequest{
+						DeviceClassName: "class",
+						AllocationMode:  resource.DeviceAllocationModeAll,
+					},
+				},
+			},
+		},
+	},
+	Status: resource.ResourceClaimStatus{
+		Allocation: &resource.AllocationResult{
+			Devices: resource.DeviceAllocationResult{
+				Results: []resource.DeviceRequestAllocationResult{
+					{
+						Request:            "req-0",
+						Driver:             "dra.example.com",
+						Pool:               "pool-0",
+						Device:             "device-0",
+						SkipNodeOperations: []resource.SkipNodeOperation{resource.SkipNodeOperationAll},
+					},
+				},
+			},
+		},
+	},
+}
+
 var objWithCapacityRequests = &resource.ResourceClaim{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "valid-claim",
@@ -356,6 +394,74 @@ var objWithCapacityRequests = &resource.ResourceClaim{
 	},
 }
 
+var objWithDerivedAttributes = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
+		Namespace: "kube-system",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name: "req-0",
+					Exactly: &resource.ExactDeviceRequest{
+						DeviceClassName: "class",
+						AllocationMode:  resource.DeviceAllocationModeAll,
+						DerivedAttributes: []resource.DeviceDerivedAttribute{
+							{
+								Name:       "derived/sharedNumaNode",
+								Expression: `device.attributes["dra.example.com"]["numa"]`,
+							},
+						},
+					},
+				},
+			},
+			Constraints: []resource.DeviceConstraint{
+				{
+					Requests:       []string{"req-0"},
+					MatchAttribute: ptr.To(resource.FullyQualifiedName("derived/sharedNumaNode")),
+				},
+			},
+		},
+	},
+}
+
+var objWithDerivedAttributesInPrioritizedList = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
+		Namespace: "kube-system",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name: "req-0",
+					FirstAvailable: []resource.DeviceSubRequest{
+						{
+							Name:            "subreq-0",
+							DeviceClassName: "class",
+							AllocationMode:  resource.DeviceAllocationModeExactCount,
+							Count:           1,
+							DerivedAttributes: []resource.DeviceDerivedAttribute{
+								{
+									Name:       "derived/sharedNumaNode",
+									Expression: `device.attributes["dra.example.com"]["numa"]`,
+								},
+							},
+						},
+					},
+				},
+			},
+			Constraints: []resource.DeviceConstraint{
+				{
+					Requests:       []string{"req-0"},
+					MatchAttribute: ptr.To(resource.FullyQualifiedName("derived/sharedNumaNode")),
+				},
+			},
+		},
+	},
+}
+
 var ns1 = &corev1.Namespace{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:   "default",
@@ -374,6 +480,9 @@ var fieldImmutableError = "field is immutable"
 var metadataError = "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
 var deviceRequestError = "exactly one of `exactly` or `firstAvailable` is required"
 var constraintError = "matchAttribute: Required value"
+var bindingUpdateError = `User "test-user" cannot update resource "resourceclaims/binding" in API group "resource.k8s.io" at the cluster scope: denied`
+var deviceAssociatedNodeUpdateError = `User "system:serviceaccount:kube-system:dra-driver" cannot associated-node:update resource "resourceclaims/driver" in API group "resource.k8s.io" in the namespace "default": denied`
+var deviceArbitraryNodeUpdateError = `User "test-user" cannot arbitrary-node:update resource "resourceclaims/driver" in API group "resource.k8s.io" in the namespace "default": denied`
 
 const (
 	req0        = "req-0"
@@ -384,6 +493,7 @@ const (
 	testDriver  = "test-driver"
 	testPool    = "test-pool"
 	testDevice  = "test-device"
+	testUser    = "test-user"
 )
 
 var (
@@ -397,11 +507,11 @@ var testCapacity = map[resource.QualifiedName]apiresource.Quantity{
 func TestStrategy(t *testing.T) {
 	fakeClient := fake.NewSimpleClientset()
 	mockNSClient := fakeClient.CoreV1().Namespaces()
-	strategy := NewStrategy(mockNSClient)
+	strategy := NewStrategy(mockNSClient, nil)
 	if !strategy.NamespaceScoped() {
 		t.Errorf("ResourceClaim must be namespace scoped")
 	}
-	if strategy.AllowCreateOnUpdate() {
+	if strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("ResourceClaim should not allow create on update")
 	}
 }
@@ -410,12 +520,8 @@ func TestStrategyCreate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	testcases := map[string]struct {
 		obj                   *resource.ResourceClaim
-		adminAccess           bool
-		deviceTaints          bool
-		prioritizedList       bool
-		bindingConditions     bool
-		deviceStatus          bool
-		consumableCapacity    bool
+		featureOverrides      featuregatetesting.FeatureOverrides
+		emulatedVersion       string
 		expectValidationError string
 		expectObj             *resource.ResourceClaim
 		verify                func(*testing.T, []testclient.Action)
@@ -443,9 +549,10 @@ func TestStrategyCreate(t *testing.T) {
 			},
 		},
 		"drop-fields-admin-access": {
-			obj:         objWithAdminAccess,
-			adminAccess: false,
-			expectObj:   obj,
+			obj:              objWithAdminAccess,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAAdminAccess: false},
+			emulatedVersion:  "1.35",
+			expectObj:        obj,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -453,9 +560,9 @@ func TestStrategyCreate(t *testing.T) {
 			},
 		},
 		"keep-fields-admin-access": {
-			obj:         objWithAdminAccess,
-			adminAccess: true,
-			expectObj:   objWithAdminAccess,
+			obj:              objWithAdminAccess,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAAdminAccess: true},
+			expectObj:        objWithAdminAccess,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 1 {
 					t.Errorf("expected one action but got %d", len(as))
@@ -468,9 +575,10 @@ func TestStrategyCreate(t *testing.T) {
 			},
 		},
 		"drop-fields-device-taints": {
-			obj:          objWithDeviceTaints,
-			deviceTaints: false,
-			expectObj:    obj,
+			obj:              objWithDeviceTaints,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceTaints: false},
+			emulatedVersion:  "1.35",
+			expectObj:        obj,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -478,9 +586,9 @@ func TestStrategyCreate(t *testing.T) {
 			},
 		},
 		"keep-fields-device-taints": {
-			obj:          objWithDeviceTaints,
-			deviceTaints: true,
-			expectObj:    objWithDeviceTaints,
+			obj:              objWithDeviceTaints,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceTaints: true},
+			expectObj:        objWithDeviceTaints,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -488,10 +596,10 @@ func TestStrategyCreate(t *testing.T) {
 			},
 		},
 		"drop-fields-device-taints-in-prioritized-list": {
-			obj:             objWithDeviceTaintsInPrioritizedList,
-			deviceTaints:    false,
-			prioritizedList: true,
-			expectObj:       objWithPrioritizedList,
+			obj:              objWithDeviceTaintsInPrioritizedList,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceTaints: false, features.DRAPrioritizedList: true},
+			emulatedVersion:  "1.35",
+			expectObj:        objWithPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -499,10 +607,9 @@ func TestStrategyCreate(t *testing.T) {
 			},
 		},
 		"keep-fields-device-taints-in-prioritized-list": {
-			obj:             objWithDeviceTaintsInPrioritizedList,
-			deviceTaints:    true,
-			prioritizedList: true,
-			expectObj:       objWithDeviceTaintsInPrioritizedList,
+			obj:              objWithDeviceTaintsInPrioritizedList,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceTaints: true, features.DRAPrioritizedList: true},
+			expectObj:        objWithDeviceTaintsInPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -511,7 +618,8 @@ func TestStrategyCreate(t *testing.T) {
 		},
 		"drop-fields-prioritized-list": {
 			obj:                   objWithPrioritizedList,
-			prioritizedList:       false,
+			featureOverrides:      featuregatetesting.FeatureOverrides{features.DRAPrioritizedList: false},
+			emulatedVersion:       "1.36",
 			expectValidationError: deviceRequestError,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -520,9 +628,9 @@ func TestStrategyCreate(t *testing.T) {
 			},
 		},
 		"keep-fields-prioritized-list": {
-			obj:             objWithPrioritizedList,
-			prioritizedList: true,
-			expectObj:       objWithPrioritizedList,
+			obj:              objWithPrioritizedList,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPrioritizedList: true},
+			expectObj:        objWithPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -530,9 +638,9 @@ func TestStrategyCreate(t *testing.T) {
 			},
 		},
 		"admin-access-admin-namespace": {
-			obj:         objWithAdminAccess,
-			adminAccess: true,
-			expectObj:   objWithAdminAccess,
+			obj:              objWithAdminAccess,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAAdminAccess: true},
+			expectObj:        objWithAdminAccess,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 1 {
 					t.Errorf("expected one action but got %d", len(as))
@@ -546,7 +654,7 @@ func TestStrategyCreate(t *testing.T) {
 		},
 		"admin-access-non-admin-namespace": {
 			obj:                   objWithAdminAccessInNonAdminNamespace,
-			adminAccess:           true,
+			featureOverrides:      featuregatetesting.FeatureOverrides{features.DRAAdminAccess: true},
 			expectObj:             objWithAdminAccessInNonAdminNamespace,
 			expectValidationError: adminAccessError,
 			verify: func(t *testing.T, as []testclient.Action) {
@@ -561,9 +669,9 @@ func TestStrategyCreate(t *testing.T) {
 			},
 		},
 		"keep-fields-consumable-capacity": {
-			obj:                objWithCapacityRequests,
-			consumableCapacity: true,
-			expectObj:          objWithCapacityRequests,
+			obj:              objWithCapacityRequests,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAConsumableCapacity: true},
+			expectObj:        objWithCapacityRequests,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -571,9 +679,9 @@ func TestStrategyCreate(t *testing.T) {
 			},
 		},
 		"drop-fields-consumable-capacity-disabled-feature": {
-			obj:                objWithCapacityRequests,
-			consumableCapacity: false,
-			expectObj:          obj,
+			obj:              objWithCapacityRequests,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAConsumableCapacity: false},
+			expectObj:        obj,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -587,7 +695,7 @@ func TestStrategyCreate(t *testing.T) {
 				addDistinctAttribute(obj)
 				return obj
 			}(),
-			consumableCapacity:    false,
+			featureOverrides:      featuregatetesting.FeatureOverrides{features.DRAConsumableCapacity: false},
 			expectValidationError: constraintError,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -601,8 +709,7 @@ func TestStrategyCreate(t *testing.T) {
 				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, true)
 				return obj
 			}(),
-			consumableCapacity: false,
-			prioritizedList:    true,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAConsumableCapacity: false, features.DRAPrioritizedList: true},
 			expectObj: func() *resource.ResourceClaim {
 				obj := objWithPrioritizedList.DeepCopy()
 				modifySpecDeviceRequestWithCapacityRequests(obj, nil, true)
@@ -620,16 +727,13 @@ func TestStrategyCreate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(ns1, ns2)
 			mockNSClient := fakeClient.CoreV1().Namespaces()
-			if !tc.adminAccess {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+
+			if tc.emulatedVersion != "" {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse(tc.emulatedVersion))
 			}
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.DRAAdminAccess:        tc.adminAccess,
-				features.DRADeviceTaints:       tc.deviceTaints,
-				features.DRAPrioritizedList:    tc.prioritizedList,
-				features.DRAConsumableCapacity: tc.consumableCapacity,
-			})
-			strategy := NewStrategy(mockNSClient)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, tc.featureOverrides)
+
+			strategy := NewStrategy(mockNSClient, nil)
 
 			obj := tc.obj.DeepCopy()
 			strategy.PrepareForCreate(ctx, obj)
@@ -659,10 +763,8 @@ func TestStrategyUpdate(t *testing.T) {
 	testcases := map[string]struct {
 		oldObj                *resource.ResourceClaim
 		newObj                *resource.ResourceClaim
-		adminAccess           bool
-		deviceTaints          bool
-		prioritizedList       bool
-		consumableCapacity    bool
+		featureOverrides      featuregatetesting.FeatureOverrides
+		emulatedVersion       string
 		expectValidationError string
 		expectObj             *resource.ResourceClaim
 		verify                func(*testing.T, []testclient.Action)
@@ -692,10 +794,11 @@ func TestStrategyUpdate(t *testing.T) {
 			},
 		},
 		"drop-fields-admin-access": {
-			oldObj:      obj,
-			newObj:      objWithAdminAccess,
-			adminAccess: false,
-			expectObj:   obj,
+			oldObj:           obj,
+			newObj:           objWithAdminAccess,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAAdminAccess: false},
+			emulatedVersion:  "1.35",
+			expectObj:        obj,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -705,7 +808,7 @@ func TestStrategyUpdate(t *testing.T) {
 		"keep-fields-admin-access": {
 			oldObj:                obj,
 			newObj:                objWithAdminAccess,
-			adminAccess:           true,
+			featureOverrides:      featuregatetesting.FeatureOverrides{features.DRAAdminAccess: true},
 			expectValidationError: fieldImmutableError, // Spec is immutable.
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -714,10 +817,10 @@ func TestStrategyUpdate(t *testing.T) {
 			},
 		},
 		"keep-existing-fields-admin-access": {
-			oldObj:      objWithAdminAccess,
-			newObj:      objWithAdminAccess,
-			adminAccess: true,
-			expectObj:   objWithAdminAccess,
+			oldObj:           objWithAdminAccess,
+			newObj:           objWithAdminAccess,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAAdminAccess: true},
+			expectObj:        objWithAdminAccess,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -725,10 +828,10 @@ func TestStrategyUpdate(t *testing.T) {
 			},
 		},
 		"admin-access-admin-namespace": {
-			oldObj:      objWithAdminAccess,
-			newObj:      objWithAdminAccess,
-			adminAccess: true,
-			expectObj:   objWithAdminAccess,
+			oldObj:           objWithAdminAccess,
+			newObj:           objWithAdminAccess,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAAdminAccess: true},
+			expectObj:        objWithAdminAccess,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -738,7 +841,7 @@ func TestStrategyUpdate(t *testing.T) {
 		"admin-access-non-admin-namespace": {
 			oldObj:                objInNonAdminNamespace,
 			newObj:                objWithAdminAccessInNonAdminNamespace,
-			adminAccess:           true,
+			featureOverrides:      featuregatetesting.FeatureOverrides{features.DRAAdminAccess: true},
 			expectValidationError: fieldImmutableError,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -749,7 +852,8 @@ func TestStrategyUpdate(t *testing.T) {
 		"drop-fields-prioritized-list": {
 			oldObj:                obj,
 			newObj:                objWithPrioritizedList,
-			prioritizedList:       false,
+			featureOverrides:      featuregatetesting.FeatureOverrides{features.DRAPrioritizedList: false},
+			emulatedVersion:       "1.36",
 			expectValidationError: fieldImmutableError,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -760,7 +864,7 @@ func TestStrategyUpdate(t *testing.T) {
 		"keep-fields-prioritized-list": {
 			oldObj:                obj,
 			newObj:                objWithPrioritizedList,
-			prioritizedList:       true,
+			featureOverrides:      featuregatetesting.FeatureOverrides{features.DRAPrioritizedList: true},
 			expectValidationError: fieldImmutableError, // Spec is immutable.
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -769,10 +873,10 @@ func TestStrategyUpdate(t *testing.T) {
 			},
 		},
 		"keep-existing-fields-prioritized-list": {
-			oldObj:          objWithPrioritizedList,
-			newObj:          objWithPrioritizedList,
-			prioritizedList: true,
-			expectObj:       objWithPrioritizedList,
+			oldObj:           objWithPrioritizedList,
+			newObj:           objWithPrioritizedList,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPrioritizedList: true},
+			expectObj:        objWithPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -780,10 +884,11 @@ func TestStrategyUpdate(t *testing.T) {
 			},
 		},
 		"keep-existing-fields-prioritized-list-disabled-feature": {
-			oldObj:          objWithPrioritizedList,
-			newObj:          objWithPrioritizedList,
-			prioritizedList: false,
-			expectObj:       objWithPrioritizedList,
+			oldObj:           objWithPrioritizedList,
+			newObj:           objWithPrioritizedList,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPrioritizedList: false},
+			emulatedVersion:  "1.36",
+			expectObj:        objWithPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -791,10 +896,10 @@ func TestStrategyUpdate(t *testing.T) {
 			},
 		},
 		"keep-existing-fields-consumable-capacity": {
-			oldObj:             objWithCapacityRequests,
-			newObj:             objWithCapacityRequests,
-			consumableCapacity: true,
-			expectObj:          objWithCapacityRequests,
+			oldObj:           objWithCapacityRequests,
+			newObj:           objWithCapacityRequests,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAConsumableCapacity: true},
+			expectObj:        objWithCapacityRequests,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -802,10 +907,10 @@ func TestStrategyUpdate(t *testing.T) {
 			},
 		},
 		"keep-existing-fields-consumable-capacity-disabled-feature": {
-			oldObj:             objWithCapacityRequests,
-			newObj:             objWithCapacityRequests,
-			consumableCapacity: false,
-			expectObj:          objWithCapacityRequests,
+			oldObj:           objWithCapacityRequests,
+			newObj:           objWithCapacityRequests,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAConsumableCapacity: false},
+			expectObj:        objWithCapacityRequests,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -813,9 +918,9 @@ func TestStrategyUpdate(t *testing.T) {
 			},
 		},
 		"drop-fields-consumable-capacity-disabled-feature": {
-			oldObj:             obj,
-			newObj:             objWithCapacityRequests,
-			consumableCapacity: false,
+			oldObj:           obj,
+			newObj:           objWithCapacityRequests,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAConsumableCapacity: false},
 			expectObj: func() *resource.ResourceClaim {
 				obj := obj.DeepCopy()
 				modifySpecDeviceRequestWithCapacityRequests(obj, nil, false)
@@ -838,8 +943,7 @@ func TestStrategyUpdate(t *testing.T) {
 				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, true)
 				return obj
 			}(),
-			consumableCapacity: false,
-			prioritizedList:    true,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAConsumableCapacity: false, features.DRAPrioritizedList: true},
 			expectObj: func() *resource.ResourceClaim {
 				obj := objWithPrioritizedList.DeepCopy()
 				modifySpecDeviceRequestWithCapacityRequests(obj, nil, true)
@@ -852,11 +956,11 @@ func TestStrategyUpdate(t *testing.T) {
 			},
 		},
 		"drop-fields-device-taints": {
-			oldObj:          obj,
-			newObj:          objWithDeviceTaints,
-			deviceTaints:    false,
-			prioritizedList: true,
-			expectObj:       obj,
+			oldObj:           obj,
+			newObj:           objWithDeviceTaints,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceTaints: false, features.DRAPrioritizedList: true},
+			emulatedVersion:  "1.35",
+			expectObj:        obj,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -866,8 +970,7 @@ func TestStrategyUpdate(t *testing.T) {
 		"keep-fields-device-taints": {
 			oldObj:                obj,
 			newObj:                objWithDeviceTaints,
-			deviceTaints:          true,
-			prioritizedList:       true,
+			featureOverrides:      featuregatetesting.FeatureOverrides{features.DRADeviceTaints: true, features.DRAPrioritizedList: true},
 			expectValidationError: fieldImmutableError, // Spec is immutable, cannot add tolerations.
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -876,11 +979,10 @@ func TestStrategyUpdate(t *testing.T) {
 			},
 		},
 		"keep-existing-fields-device-taints": {
-			oldObj:          objWithDeviceTaints,
-			newObj:          objWithDeviceTaints,
-			deviceTaints:    true,
-			prioritizedList: true,
-			expectObj:       objWithDeviceTaints,
+			oldObj:           objWithDeviceTaints,
+			newObj:           objWithDeviceTaints,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceTaints: true, features.DRAPrioritizedList: true},
+			expectObj:        objWithDeviceTaints,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -888,11 +990,11 @@ func TestStrategyUpdate(t *testing.T) {
 			},
 		},
 		"keep-existing-fields-device-taints-disabled-feature": {
-			oldObj:          objWithDeviceTaints,
-			newObj:          objWithDeviceTaints,
-			deviceTaints:    false,
-			prioritizedList: true,
-			expectObj:       objWithDeviceTaints,
+			oldObj:           objWithDeviceTaints,
+			newObj:           objWithDeviceTaints,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceTaints: false, features.DRAPrioritizedList: true},
+			emulatedVersion:  "1.35",
+			expectObj:        objWithDeviceTaints,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -900,11 +1002,11 @@ func TestStrategyUpdate(t *testing.T) {
 			},
 		},
 		"drop-fields-device-taints-in-prioritized-list": {
-			oldObj:          objWithPrioritizedList,
-			newObj:          objWithDeviceTaintsInPrioritizedList,
-			deviceTaints:    false,
-			prioritizedList: true,
-			expectObj:       objWithPrioritizedList,
+			oldObj:           objWithPrioritizedList,
+			newObj:           objWithDeviceTaintsInPrioritizedList,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceTaints: false, features.DRAPrioritizedList: true},
+			emulatedVersion:  "1.35",
+			expectObj:        objWithPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -914,8 +1016,7 @@ func TestStrategyUpdate(t *testing.T) {
 		"keep-fields-device-taints-in-prioritized-list": {
 			oldObj:                objWithPrioritizedList,
 			newObj:                objWithDeviceTaintsInPrioritizedList,
-			deviceTaints:          true,
-			prioritizedList:       true,
+			featureOverrides:      featuregatetesting.FeatureOverrides{features.DRADeviceTaints: true, features.DRAPrioritizedList: true},
 			expectValidationError: fieldImmutableError, // Spec is immutable, cannot add tolerations.
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -924,11 +1025,10 @@ func TestStrategyUpdate(t *testing.T) {
 			},
 		},
 		"keep-existing-fields-device-taints-in-prioritized-list": {
-			oldObj:          objWithDeviceTaintsInPrioritizedList,
-			newObj:          objWithDeviceTaintsInPrioritizedList,
-			deviceTaints:    true,
-			prioritizedList: true,
-			expectObj:       objWithDeviceTaintsInPrioritizedList,
+			oldObj:           objWithDeviceTaintsInPrioritizedList,
+			newObj:           objWithDeviceTaintsInPrioritizedList,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceTaints: true, features.DRAPrioritizedList: true},
+			expectObj:        objWithDeviceTaintsInPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -936,11 +1036,11 @@ func TestStrategyUpdate(t *testing.T) {
 			},
 		},
 		"keep-existing-fields-device-taints-in-prioritized-list-disabled-feature": {
-			oldObj:          objWithDeviceTaintsInPrioritizedList,
-			newObj:          objWithDeviceTaintsInPrioritizedList,
-			deviceTaints:    false,
-			prioritizedList: true,
-			expectObj:       objWithDeviceTaintsInPrioritizedList,
+			oldObj:           objWithDeviceTaintsInPrioritizedList,
+			newObj:           objWithDeviceTaintsInPrioritizedList,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceTaints: false, features.DRAPrioritizedList: true},
+			emulatedVersion:  "1.35",
+			expectObj:        objWithDeviceTaintsInPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -954,17 +1054,12 @@ func TestStrategyUpdate(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(ns1, ns2)
 			mockNSClient := fakeClient.CoreV1().Namespaces()
 
-			if !tc.adminAccess {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			if tc.emulatedVersion != "" {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse(tc.emulatedVersion))
 			}
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.DRAAdminAccess:        tc.adminAccess,
-				features.DRADeviceTaints:       tc.deviceTaints,
-				features.DRAPrioritizedList:    tc.prioritizedList,
-				features.DRAConsumableCapacity: tc.consumableCapacity,
-			})
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, tc.featureOverrides)
 
-			strategy := NewStrategy(mockNSClient)
+			strategy := NewStrategy(mockNSClient, nil)
 
 			oldObj := tc.oldObj.DeepCopy()
 			newObj := tc.newObj.DeepCopy()
@@ -994,19 +1089,167 @@ func TestStrategyUpdate(t *testing.T) {
 	}
 }
 
+func stripDerivedAttributes(obj *resource.ResourceClaim) *resource.ResourceClaim {
+	res := obj.DeepCopy()
+	for i := range res.Spec.Devices.Requests {
+		if res.Spec.Devices.Requests[i].Exactly != nil {
+			res.Spec.Devices.Requests[i].Exactly.DerivedAttributes = nil
+		}
+		for j := range res.Spec.Devices.Requests[i].FirstAvailable {
+			res.Spec.Devices.Requests[i].FirstAvailable[j].DerivedAttributes = nil
+		}
+	}
+	return res
+}
+
+func TestStrategyCreateWithDerivedAttributes(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	testcases := []struct {
+		name              string
+		obj               *resource.ResourceClaim
+		derivedAttributes bool // DRADerivedAttributes feature gate
+		expectObj         *resource.ResourceClaim
+	}{
+		{
+			name:              "should drop derivedAttributes during creation when the feature gate is disabled",
+			obj:               objWithDerivedAttributes,
+			derivedAttributes: false,
+			expectObj:         stripDerivedAttributes(objWithDerivedAttributes),
+		},
+		{
+			name:              "should preserve derivedAttributes during creation when the feature gate is enabled",
+			obj:               objWithDerivedAttributes,
+			derivedAttributes: true,
+			expectObj:         objWithDerivedAttributes,
+		},
+		{
+			name:              "should drop derivedAttributes in prioritized list during creation when the feature gate is disabled",
+			obj:               objWithDerivedAttributesInPrioritizedList,
+			derivedAttributes: false,
+			expectObj:         stripDerivedAttributes(objWithDerivedAttributesInPrioritizedList),
+		},
+		{
+			name:              "should preserve derivedAttributes in prioritized list during creation when the feature gate is enabled",
+			obj:               objWithDerivedAttributesInPrioritizedList,
+			derivedAttributes: true,
+			expectObj:         objWithDerivedAttributesInPrioritizedList,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeClient := fake.NewSimpleClientset(ns1, ns2)
+			mockNSClient := fakeClient.CoreV1().Namespaces()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADerivedAttributes, tc.derivedAttributes)
+			strategy := NewStrategy(mockNSClient, nil)
+
+			obj := tc.obj.DeepCopy()
+			strategy.PrepareForCreate(ctx, obj)
+			if errs := strategy.Validate(ctx, obj); len(errs) != 0 {
+				t.Fatalf("unexpected error(s): %v", errs)
+			}
+			strategy.Canonicalize(obj)
+			assert.Equal(t, tc.expectObj, obj)
+		})
+	}
+}
+
+func TestStrategyUpdateWithDerivedAttributes(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	testcases := []struct {
+		name                  string
+		oldObj                *resource.ResourceClaim
+		newObj                *resource.ResourceClaim
+		derivedAttributes     bool // DRADerivedAttributes feature gate
+		expectValidationError string
+		expectObj             *resource.ResourceClaim
+	}{
+		{
+			name:              "should drop derivedAttributes during update when the feature gate is disabled and they were not previously in use",
+			oldObj:            stripDerivedAttributes(objWithDerivedAttributes),
+			newObj:            objWithDerivedAttributes,
+			derivedAttributes: false,
+			expectObj:         stripDerivedAttributes(objWithDerivedAttributes),
+		},
+		{
+			name:                  "should fail validation on update when the feature gate is enabled because spec is immutable",
+			oldObj:                stripDerivedAttributes(objWithDerivedAttributes),
+			newObj:                objWithDerivedAttributes,
+			derivedAttributes:     true,
+			expectValidationError: fieldImmutableError, // Spec is immutable, cannot add derived attributes.
+		},
+		{
+			name:              "should preserve derivedAttributes during update when the feature gate is enabled and they were already in use",
+			oldObj:            objWithDerivedAttributes,
+			newObj:            objWithDerivedAttributes,
+			derivedAttributes: true,
+			expectObj:         objWithDerivedAttributes,
+		},
+		{
+			name:              "should preserve derivedAttributes during update even if the feature gate is disabled because they were already in use",
+			oldObj:            objWithDerivedAttributes,
+			newObj:            objWithDerivedAttributes,
+			derivedAttributes: false,
+			expectObj:         objWithDerivedAttributes,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeClient := fake.NewSimpleClientset(ns1, ns2)
+			mockNSClient := fakeClient.CoreV1().Namespaces()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADerivedAttributes, tc.derivedAttributes)
+			strategy := NewStrategy(mockNSClient, nil)
+
+			oldObj := tc.oldObj.DeepCopy()
+			newObj := tc.newObj.DeepCopy()
+			newObj.ResourceVersion = "4"
+
+			strategy.PrepareForUpdate(ctx, newObj, oldObj)
+			if errs := strategy.ValidateUpdate(ctx, newObj, oldObj); len(errs) != 0 {
+				if tc.expectValidationError == "" {
+					t.Fatalf("unexpected error(s): %v", errs)
+				}
+				assert.Len(t, errs, 1, "exactly one error expected")
+				assert.ErrorContains(t, errs[0], tc.expectValidationError, "the error message should have contained the expected error message")
+				return
+			}
+			if tc.expectValidationError != "" {
+				t.Fatal("expected validation error(s), got none")
+			}
+			strategy.Canonicalize(newObj)
+			expectObj := tc.expectObj.DeepCopy()
+			expectObj.ResourceVersion = "4"
+			assert.Equal(t, expectObj, newObj)
+		})
+	}
+}
+
 func TestStatusStrategyUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
+	ctx = genericapirequest.WithUser(ctx, &user.DefaultInfo{
+		Name:   testUser,
+		Groups: []string{"system:authenticated"},
+	})
+	ctx = genericapirequest.WithRequestInfo(ctx, &genericapirequest.RequestInfo{
+		IsResourceRequest: true,
+		Verb:              "update",
+		APIGroup:          "resource.k8s.io",
+		APIVersion:        "v1",
+		Resource:          "resourceclaims",
+		Subresource:       "status",
+		Namespace:         metav1.NamespaceDefault,
+	})
 	testcases := map[string]struct {
-		oldObj                        *resource.ResourceClaim
-		newObj                        *resource.ResourceClaim
-		adminAccess                   bool
-		deviceStatusFeatureGate       bool
-		consumableCapacityFeatureGate bool
-		prioritizedListFeatureGate    bool
-		bindingConditions             bool
-		expectValidationError         string
-		expectObj                     *resource.ResourceClaim
-		verify                        func(*testing.T, []testclient.Action)
+		oldObj                 *resource.ResourceClaim
+		newObj                 *resource.ResourceClaim
+		authz                  authorizer.UnconditionalAuthorizer
+		ctxOverride            func(context.Context) context.Context // if set, transforms the default ctx
+		featureOverrides       featuregatetesting.FeatureOverrides
+		emulatedVersion        string
+		expectValidationErrors []string
+		expectObj              *resource.ResourceClaim
+		verify                 func(*testing.T, []testclient.Action)
 	}{
 		"no-changes-okay": {
 			oldObj:    obj,
@@ -1025,7 +1268,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				obj.Name += "-2"
 				return obj
 			}(),
-			expectValidationError: fieldImmutableError,
+			expectValidationErrors: []string{fieldImmutableError},
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -1050,10 +1293,11 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			},
 		},
 		"drop-fields-admin-access": {
-			oldObj:      obj,
-			newObj:      objWithAdminAccessStatus,
-			adminAccess: false,
-			expectObj:   objWithStatus,
+			oldObj:           obj,
+			newObj:           objWithAdminAccessStatus,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAAdminAccess: false},
+			emulatedVersion:  "1.35",
+			expectObj:        objWithStatus,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -1061,9 +1305,9 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			},
 		},
 		"keep-fields-admin-access": {
-			oldObj:      obj,
-			newObj:      objWithAdminAccessStatus,
-			adminAccess: true,
+			oldObj:           obj,
+			newObj:           objWithAdminAccessStatus,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAAdminAccess: true},
 			expectObj: func() *resource.ResourceClaim {
 				expectObj := objWithAdminAccessStatus.DeepCopy()
 				// Spec remains unchanged.
@@ -1082,10 +1326,10 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			},
 		},
 		"keep-fields-admin-access-NonAdminNamespace": {
-			oldObj:                objInNonAdminNamespace,
-			newObj:                objWithAdminAccessStatusInNonAdminNamespace,
-			adminAccess:           true,
-			expectValidationError: adminAccessError,
+			oldObj:                 objInNonAdminNamespace,
+			newObj:                 objWithAdminAccessStatusInNonAdminNamespace,
+			featureOverrides:       featuregatetesting.FeatureOverrides{features.DRAAdminAccess: true},
+			expectValidationErrors: []string{adminAccessError},
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 1 {
 					t.Errorf("expected one action but got %d", len(as))
@@ -1098,10 +1342,11 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			},
 		},
 		"keep-fields-admin-access-because-of-spec": {
-			oldObj:      objWithAdminAccess,
-			newObj:      objWithAdminAccessStatus,
-			adminAccess: false,
-			expectObj:   objWithAdminAccessStatus,
+			oldObj:           objWithAdminAccess,
+			newObj:           objWithAdminAccessStatus,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAAdminAccess: false},
+			emulatedVersion:  "1.35",
+			expectObj:        objWithAdminAccessStatus,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 1 {
 					t.Errorf("expected one action but got %d", len(as))
@@ -1122,8 +1367,9 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				oldObj.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(false)
 				return oldObj
 			}(),
-			newObj:      objWithAdminAccessStatus,
-			adminAccess: false,
+			newObj:           objWithAdminAccessStatus,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAAdminAccess: false},
+			emulatedVersion:  "1.35",
 			expectObj: func() *resource.ResourceClaim {
 				oldObj := objWithAdminAccessStatus.DeepCopy()
 				oldObj.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(false)
@@ -1149,7 +1395,8 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
 				return obj
 			}(),
-			deviceStatusFeatureGate: false,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: false},
+			emulatedVersion:  "1.36",
 			expectObj: func() *resource.ResourceClaim { // Status is no longer there
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, testRequest)
@@ -1177,7 +1424,8 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
 				return obj
 			}(),
-			deviceStatusFeatureGate: false,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: false},
+			emulatedVersion:  "1.36",
 			expectObj: func() *resource.ResourceClaim { // Status is still there (as the status was set in the old object)
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, testRequest)
@@ -1205,7 +1453,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
 				return obj
 			}(),
-			deviceStatusFeatureGate: true,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true},
 			expectObj: func() *resource.ResourceClaim { // Status is still there
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, testRequest)
@@ -1233,7 +1481,121 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
 				return obj
 			}(),
-			deviceStatusFeatureGate: true,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true},
+			expectObj: func() *resource.ResourceClaim { // Status is no longer there
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				return obj
+			}(),
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"fail-update-fields-devices-status-without-permissions": {
+			oldObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest, nil, nil)
+				return obj
+			}(),
+			newObj: func() *resource.ResourceClaim { // Status is added
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest, nil, nil)
+				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
+				return obj
+			}(),
+			featureOverrides:       featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAAdminAccess: true},
+			expectValidationErrors: []string{deviceArbitraryNodeUpdateError},
+			expectObj: func() *resource.ResourceClaim { // Status is not updated
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest, nil, nil)
+				return obj
+			}(),
+			authz: &fakeAuthorizer{false},
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"fail-update-fields-devices-status-associated-node-without-permissions": {
+			oldObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest, nil, nil)
+				obj.Status.Allocation.NodeSelector = &core.NodeSelector{
+					NodeSelectorTerms: []core.NodeSelectorTerm{{
+						MatchFields: []core.NodeSelectorRequirement{{
+							Key: "metadata.name", Operator: core.NodeSelectorOpIn, Values: []string{"test-node"},
+						}},
+					}},
+				}
+				return obj
+			}(),
+			newObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest, nil, nil)
+				obj.Status.Allocation.NodeSelector = &core.NodeSelector{
+					NodeSelectorTerms: []core.NodeSelectorTerm{{
+						MatchFields: []core.NodeSelectorRequirement{{
+							Key: "metadata.name", Operator: core.NodeSelectorOpIn, Values: []string{"test-node"},
+						}},
+					}},
+				}
+				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
+				return obj
+			}(),
+			ctxOverride: func(ctx context.Context) context.Context {
+				return genericapirequest.WithUser(ctx, &user.DefaultInfo{
+					Name:   "system:serviceaccount:kube-system:dra-driver",
+					Groups: []string{"system:authenticated"},
+					Extra:  map[string][]string{"authentication.kubernetes.io/node-name": {"test-node"}},
+				})
+			},
+			featureOverrides:       featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAAdminAccess: true},
+			authz:                  &fakeAuthorizer{false},
+			expectValidationErrors: []string{deviceAssociatedNodeUpdateError},
+			expectObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest, nil, nil)
+				obj.Status.Allocation.NodeSelector = &core.NodeSelector{
+					NodeSelectorTerms: []core.NodeSelectorTerm{{
+						MatchFields: []core.NodeSelectorRequirement{{
+							Key: "metadata.name", Operator: core.NodeSelectorOpIn, Values: []string{"test-node"},
+						}},
+					}},
+				}
+				return obj
+			}(),
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"fail-drop-status-deallocated-device-without-permissions": {
+			oldObj: func() *resource.ResourceClaim {
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusAllocationDevicesResults(obj, testDriver, testPool, testDevice, testRequest, nil, nil)
+				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
+				return obj
+			}(),
+			newObj: func() *resource.ResourceClaim { // device is deallocated
+				obj := obj.DeepCopy()
+				addSpecDevicesRequest(obj, testRequest)
+				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
+				return obj
+			}(),
+			authz:                  &fakeAuthorizer{false},
+			featureOverrides:       featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAAdminAccess: true},
+			expectValidationErrors: []string{bindingUpdateError},
 			expectObj: func() *resource.ResourceClaim { // Status is no longer there
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, testRequest)
@@ -1259,7 +1621,8 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
 				return obj
 			}(),
-			deviceStatusFeatureGate: false,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: false},
+			emulatedVersion:  "1.36",
 			expectObj: func() *resource.ResourceClaim { // Status is no longer there
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, testRequest)
@@ -1280,8 +1643,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 					t.Errorf("expected no action to be taken")
 				}
 			},
-			bindingConditions:       true,
-			deviceStatusFeatureGate: true,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: true},
 		},
 		"keep-exist-fields-disable-bindingconditions-feature-gate": {
 			oldObj:    objWithDeviceBindingConditions,
@@ -1292,8 +1654,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 					t.Errorf("expected no action to be taken")
 				}
 			},
-			bindingConditions:       false,
-			deviceStatusFeatureGate: true,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: false},
 		},
 		"drop-fields-binding-conditions": {
 			oldObj:    obj,
@@ -1304,8 +1665,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 					t.Errorf("expected no action to be taken")
 				}
 			},
-			bindingConditions:       false,
-			deviceStatusFeatureGate: true,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: false},
 		},
 		"drop-fields-binding-conditions-disable-feature-gate": {
 			oldObj:    obj,
@@ -1316,8 +1676,8 @@ func TestStatusStrategyUpdate(t *testing.T) {
 					t.Errorf("expected no action to be taken")
 				}
 			},
-			bindingConditions:       false,
-			deviceStatusFeatureGate: false,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: false, features.DRADeviceBindingConditions: false},
+			emulatedVersion:  "1.36",
 		},
 		"drop-fields-binding-conditions-disable-binding-conditions-feature-gate": {
 			oldObj:    obj,
@@ -1328,8 +1688,40 @@ func TestStatusStrategyUpdate(t *testing.T) {
 					t.Errorf("expected no action to be taken")
 				}
 			},
-			bindingConditions:       false,
-			deviceStatusFeatureGate: true,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: false},
+		},
+		"keep-fields-optional-node-operations": {
+			oldObj:    obj,
+			newObj:    objWithSkipNodeOperationsStatus,
+			expectObj: objWithSkipNodeOperationsStatus,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAOptionalNodeOperations: true},
+		},
+		"keep-existing-fields-disable-optional-node-operations-feature-gate": {
+			oldObj:    objWithSkipNodeOperationsStatus,
+			newObj:    objWithSkipNodeOperationsStatus,
+			expectObj: objWithSkipNodeOperationsStatus,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAOptionalNodeOperations: false},
+		},
+		"drop-fields-optional-node-operations": {
+			oldObj:    obj,
+			newObj:    objWithSkipNodeOperationsStatus,
+			expectObj: objWithStatus,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAOptionalNodeOperations: false},
 		},
 		"keep-fields-consumable-capacity-with-device-status": {
 			oldObj: func() *resource.ResourceClaim {
@@ -1347,9 +1739,8 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addStatusDevices(obj, testDriver, testPool, testDevice, testShareID)
 				return obj
 			}(),
-			deviceStatusFeatureGate:       true,
-			consumableCapacityFeatureGate: true,
-			prioritizedListFeatureGate:    false,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAConsumableCapacity: true, features.DRAPrioritizedList: false},
+			emulatedVersion:  "1.36",
 			expectObj: func() *resource.ResourceClaim {
 				obj := obj.DeepCopy()
 				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, false)
@@ -1380,8 +1771,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addStatusDevices(obj, testDriver, testPool, testDevice, testShareID)
 				return obj
 			}(),
-			deviceStatusFeatureGate:       true,
-			consumableCapacityFeatureGate: false,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAConsumableCapacity: false},
 			expectObj: func() *resource.ResourceClaim {
 				obj := obj.DeepCopy()
 				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, false)
@@ -1412,8 +1802,8 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addStatusDevices(obj, testDriver, testPool, testDevice, testShareID)
 				return obj
 			}(),
-			deviceStatusFeatureGate:       false,
-			consumableCapacityFeatureGate: true,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: false, features.DRAConsumableCapacity: true},
+			emulatedVersion:  "1.36",
 			expectObj: func() *resource.ResourceClaim {
 				obj := obj.DeepCopy()
 				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, false)
@@ -1442,9 +1832,8 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addStatusDevices(obj, testDriver, testPool, testDevice, testShareID)
 				return obj
 			}(),
-			deviceStatusFeatureGate:       true,
-			consumableCapacityFeatureGate: true,
-			prioritizedListFeatureGate:    false,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAConsumableCapacity: true, features.DRAPrioritizedList: false},
+			emulatedVersion:  "1.36",
 			expectObj: func() *resource.ResourceClaim {
 				obj := objWithPrioritizedList.DeepCopy()
 				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, true)
@@ -1470,7 +1859,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				modifySpecDeviceRequestWithCapacityRequests(obj, testCapacity, false)
 				return obj
 			}(),
-			consumableCapacityFeatureGate: false,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAConsumableCapacity: false},
 			expectObj: func() *resource.ResourceClaim {
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, req0)
@@ -1490,9 +1879,8 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addDistinctAttribute(obj)
 				return obj
 			}(),
-			prioritizedListFeatureGate:    true,
-			consumableCapacityFeatureGate: false,
-			expectObj:                     objWithPrioritizedList,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAPrioritizedList: true, features.DRAConsumableCapacity: false},
+			expectObj:        objWithPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -1513,8 +1901,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addStatusDevices(obj, testDriver, testPool, testDevice, testShareID)
 				return obj
 			}(),
-			deviceStatusFeatureGate:       true,
-			consumableCapacityFeatureGate: false,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAConsumableCapacity: false},
 			expectObj: func() *resource.ResourceClaim {
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, req0)
@@ -1541,8 +1928,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				addStatusDevices(obj, testDriver, testPool, testDevice, nil)
 				return obj
 			}(),
-			deviceStatusFeatureGate:       true,
-			consumableCapacityFeatureGate: false,
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRAConsumableCapacity: false},
 			expectObj: func() *resource.ResourceClaim {
 				obj := obj.DeepCopy()
 				addSpecDevicesRequest(obj, req0)
@@ -1562,23 +1948,23 @@ func TestStatusStrategyUpdate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(ns1, ns2)
 			mockNSClient := fakeClient.CoreV1().Namespaces()
-			strategy := NewStrategy(mockNSClient)
-
-			if !tc.adminAccess {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			authz := tc.authz
+			if tc.authz == nil {
+				authz = &fakeAuthorizer{true}
 			}
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.DRAAdminAccess:               tc.adminAccess,
-				features.DRAResourceClaimDeviceStatus: tc.deviceStatusFeatureGate,
-				features.DRADeviceBindingConditions:   tc.bindingConditions,
-			})
-			klog.InfoS("Testing strategy", "adminAccess", tc.adminAccess, "bindingConditions", tc.bindingConditions, "deviceStatus", tc.deviceStatusFeatureGate)
+			strategy := NewStrategy(mockNSClient, authz)
 
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.DRAConsumableCapacity: tc.consumableCapacityFeatureGate,
-				features.DRAPrioritizedList:    tc.prioritizedListFeatureGate,
-			})
+			if tc.emulatedVersion != "" {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse(tc.emulatedVersion))
+			}
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, tc.featureOverrides)
+
 			statusStrategy := NewStatusStrategy(strategy)
+
+			ctx := ctx
+			if tc.ctxOverride != nil {
+				ctx = tc.ctxOverride(ctx)
+			}
 
 			oldObj := tc.oldObj.DeepCopy()
 			newObj := tc.newObj.DeepCopy()
@@ -1586,14 +1972,16 @@ func TestStatusStrategyUpdate(t *testing.T) {
 
 			statusStrategy.PrepareForUpdate(ctx, newObj, oldObj)
 			if errs := statusStrategy.ValidateUpdate(ctx, newObj, oldObj); len(errs) != 0 {
-				if tc.expectValidationError == "" {
+				if len(tc.expectValidationErrors) == 0 {
 					t.Fatalf("unexpected error(s): %v", errs)
 				}
-				assert.Len(t, errs, 1, "exactly one error expected")
-				assert.ErrorContains(t, errs[0], tc.expectValidationError, "the error message should have contained the expected error message")
+				assert.Len(t, errs, len(tc.expectValidationErrors), "wrong number of validation errors")
+				for i, expectValidationError := range tc.expectValidationErrors {
+					assert.ErrorContains(t, errs[i], expectValidationError, "the error message should have contained the expected error message")
+				}
 				return
 			}
-			if tc.expectValidationError != "" {
+			if len(tc.expectValidationErrors) != 0 {
 				t.Fatal("expected validation error(s), got none")
 			}
 			if warnings := statusStrategy.WarningsOnUpdate(ctx, newObj, oldObj); len(warnings) != 0 {
@@ -1660,4 +2048,15 @@ func addStatusDevices(resourceClaim *resource.ResourceClaim, driver string, pool
 		Device:  device,
 		ShareID: (*string)(shareID),
 	})
+}
+
+type fakeAuthorizer struct {
+	verdict bool
+}
+
+func (f *fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+	if !f.verdict {
+		return authorizer.DecisionDeny, "denied", nil
+	}
+	return authorizer.DecisionAllow, "default accept", nil
 }

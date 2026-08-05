@@ -69,6 +69,14 @@ var safeSysctls = []sysctl{
 		name:   "net.ipv4.tcp_wmem",
 		kernel: utilkernel.TCPTransmitMemoryNamespacedKernelVersion,
 	},
+	{
+		name:   "net.ipv4.tcp_slow_start_after_idle",
+		kernel: utilkernel.TCPSlowStartAfterIdleNamespacedKernelVersion,
+	},
+	{
+		name:   "net.ipv4.tcp_notsent_lowat",
+		kernel: utilkernel.TCPNotSentLowatNamespacedKernelVersion,
+	},
 }
 
 // SafeSysctlAllowlist returns the allowlist of safe sysctls and safe sysctl patterns (ending in *).

@@ -27,7 +27,6 @@ package gzip
 
 import (
 	"compress/gzip"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"sync"
@@ -82,6 +81,8 @@ func (z *writer) Close() error {
 	return z.Writer.Close()
 }
 
+var _ io.Closer = &reader{}
+
 type reader struct {
 	*gzip.Reader
 	pool *sync.Pool
@@ -103,23 +104,14 @@ func (c *compressor) Decompress(r io.Reader) (io.Reader, error) {
 	return z, nil
 }
 
-func (z *reader) Read(p []byte) (n int, err error) {
-	n, err = z.Reader.Read(p)
-	if err == io.EOF {
-		z.pool.Put(z)
-	}
+func (r *reader) Read(p []byte) (n int, err error) {
+	n, err = r.Reader.Read(p)
 	return n, err
 }
 
-// RFC1952 specifies that the last four bytes "contains the size of
-// the original (uncompressed) input data modulo 2^32."
-// gRPC has a max message size of 2GB so we don't need to worry about wraparound.
-func (c *compressor) DecompressedSize(buf []byte) int {
-	last := len(buf)
-	if last < 4 {
-		return -1
-	}
-	return int(binary.LittleEndian.Uint32(buf[last-4 : last]))
+func (r *reader) Close() error {
+	defer r.pool.Put(r)
+	return r.Reader.Close()
 }
 
 func (c *compressor) Name() string {

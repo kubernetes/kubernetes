@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
@@ -37,13 +38,13 @@ import (
 
 // persistentvolumeclaimStrategy implements behavior for PersistentVolumeClaim objects
 type persistentvolumeclaimStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating PersistentVolumeClaim
 // objects via the REST API.
-var Strategy = persistentvolumeclaimStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = persistentvolumeclaimStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 func (persistentvolumeclaimStrategy) NamespaceScoped() bool {
 	return true
@@ -93,7 +94,7 @@ func (persistentvolumeclaimStrategy) WarningsOnCreate(ctx context.Context, obj r
 func (persistentvolumeclaimStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (persistentvolumeclaimStrategy) AllowCreateOnUpdate() bool {
+func (persistentvolumeclaimStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -130,7 +131,7 @@ func (persistentvolumeclaimStrategy) WarningsOnUpdate(ctx context.Context, obj, 
 	return pvcutil.GetWarningsForPersistentVolumeClaim(obj.(*api.PersistentVolumeClaim))
 }
 
-func (persistentvolumeclaimStrategy) AllowUnconditionalUpdate() bool {
+func (persistentvolumeclaimStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

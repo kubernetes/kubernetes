@@ -24,10 +24,12 @@ import (
 
 	"golang.org/x/sys/unix"
 	"unsafe"
+
+	"k8s.io/klog/v2"
 )
 
 // GetBootTime returns the time at which the machine was started, truncated to the nearest second
-func GetBootTime() (time.Time, error) {
+func GetBootTime(klog.Logger) (time.Time, error) {
 	currentTime := time.Now()
 	ts := &unix.Timeval{}
 	_, _, e1 := unix.Syscall(uintptr(unix.SYS_CLOCK_GETTIME), uintptr(unix.CLOCK_UPTIME), uintptr(unsafe.Pointer(ts)), 0)

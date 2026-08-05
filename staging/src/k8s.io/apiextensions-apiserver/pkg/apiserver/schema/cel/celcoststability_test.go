@@ -98,8 +98,8 @@ func TestCelCostStability(t *testing.T) {
 			schema: schemas(stringType, stringType),
 			expectCost: map[string]int64{
 				ValsEqualThemselvesAndDataLiteral("self.val1", "self.val2", "'Rook takes 👑'"): 14,
-				"self.val1.startsWith('Rook')":    4,
-				"!self.val1.startsWith('knight')": 5,
+				"self.val1.startsWith('Rook')":    3,
+				"!self.val1.startsWith('knight')": 4,
 				"self.val1.matches('^[^0-9]*$')":  8,
 				"!self.val1.matches('^[0-9]*$')":  7,
 				"type(self.val1) == string":       4,

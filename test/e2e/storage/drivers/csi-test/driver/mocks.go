@@ -258,6 +258,39 @@ func (_c *MockIdentityServer_Probe_Call) RunAndReturn(run func(context1 context.
 	return _c
 }
 
+// mustEmbedUnimplementedIdentityServer provides a mock function for the type MockIdentityServer
+func (_mock *MockIdentityServer) mustEmbedUnimplementedIdentityServer() {
+	_mock.Called()
+	return
+}
+
+// MockIdentityServer_mustEmbedUnimplementedIdentityServer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'mustEmbedUnimplementedIdentityServer'
+type MockIdentityServer_mustEmbedUnimplementedIdentityServer_Call struct {
+	*mock.Call
+}
+
+// mustEmbedUnimplementedIdentityServer is a helper method to define mock.On call
+func (_e *MockIdentityServer_Expecter) mustEmbedUnimplementedIdentityServer() *MockIdentityServer_mustEmbedUnimplementedIdentityServer_Call {
+	return &MockIdentityServer_mustEmbedUnimplementedIdentityServer_Call{Call: _e.mock.On("mustEmbedUnimplementedIdentityServer")}
+}
+
+func (_c *MockIdentityServer_mustEmbedUnimplementedIdentityServer_Call) Run(run func()) *MockIdentityServer_mustEmbedUnimplementedIdentityServer_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockIdentityServer_mustEmbedUnimplementedIdentityServer_Call) Return() *MockIdentityServer_mustEmbedUnimplementedIdentityServer_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockIdentityServer_mustEmbedUnimplementedIdentityServer_Call) RunAndReturn(run func()) *MockIdentityServer_mustEmbedUnimplementedIdentityServer_Call {
+	_c.Run(run)
+	return _c
+}
+
 // NewMockControllerServer creates a new instance of MockControllerServer. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockControllerServer(t interface {
@@ -485,6 +518,142 @@ func (_c *MockControllerServer_ControllerGetVolume_Call) Return(controllerGetVol
 }
 
 func (_c *MockControllerServer_ControllerGetVolume_Call) RunAndReturn(run func(context1 context.Context, controllerGetVolumeRequest *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error)) *MockControllerServer_ControllerGetVolume_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ControllerGetVolumeHealth provides a mock function for the type MockControllerServer
+func (_mock *MockControllerServer) ControllerGetVolumeHealth(context1 context.Context, controllerGetVolumeHealthRequest *csi.ControllerGetVolumeHealthRequest) (*csi.ControllerGetVolumeHealthResponse, error) {
+	ret := _mock.Called(context1, controllerGetVolumeHealthRequest)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ControllerGetVolumeHealth")
+	}
+
+	var r0 *csi.ControllerGetVolumeHealthResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *csi.ControllerGetVolumeHealthRequest) (*csi.ControllerGetVolumeHealthResponse, error)); ok {
+		return returnFunc(context1, controllerGetVolumeHealthRequest)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *csi.ControllerGetVolumeHealthRequest) *csi.ControllerGetVolumeHealthResponse); ok {
+		r0 = returnFunc(context1, controllerGetVolumeHealthRequest)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*csi.ControllerGetVolumeHealthResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *csi.ControllerGetVolumeHealthRequest) error); ok {
+		r1 = returnFunc(context1, controllerGetVolumeHealthRequest)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockControllerServer_ControllerGetVolumeHealth_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ControllerGetVolumeHealth'
+type MockControllerServer_ControllerGetVolumeHealth_Call struct {
+	*mock.Call
+}
+
+// ControllerGetVolumeHealth is a helper method to define mock.On call
+//   - context1 context.Context
+//   - controllerGetVolumeHealthRequest *csi.ControllerGetVolumeHealthRequest
+func (_e *MockControllerServer_Expecter) ControllerGetVolumeHealth(context1 interface{}, controllerGetVolumeHealthRequest interface{}) *MockControllerServer_ControllerGetVolumeHealth_Call {
+	return &MockControllerServer_ControllerGetVolumeHealth_Call{Call: _e.mock.On("ControllerGetVolumeHealth", context1, controllerGetVolumeHealthRequest)}
+}
+
+func (_c *MockControllerServer_ControllerGetVolumeHealth_Call) Run(run func(context1 context.Context, controllerGetVolumeHealthRequest *csi.ControllerGetVolumeHealthRequest)) *MockControllerServer_ControllerGetVolumeHealth_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *csi.ControllerGetVolumeHealthRequest
+		if args[1] != nil {
+			arg1 = args[1].(*csi.ControllerGetVolumeHealthRequest)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockControllerServer_ControllerGetVolumeHealth_Call) Return(controllerGetVolumeHealthResponse *csi.ControllerGetVolumeHealthResponse, err error) *MockControllerServer_ControllerGetVolumeHealth_Call {
+	_c.Call.Return(controllerGetVolumeHealthResponse, err)
+	return _c
+}
+
+func (_c *MockControllerServer_ControllerGetVolumeHealth_Call) RunAndReturn(run func(context1 context.Context, controllerGetVolumeHealthRequest *csi.ControllerGetVolumeHealthRequest) (*csi.ControllerGetVolumeHealthResponse, error)) *MockControllerServer_ControllerGetVolumeHealth_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ControllerListVolumeHealth provides a mock function for the type MockControllerServer
+func (_mock *MockControllerServer) ControllerListVolumeHealth(context1 context.Context, controllerListVolumeHealthRequest *csi.ControllerListVolumeHealthRequest) (*csi.ControllerListVolumeHealthResponse, error) {
+	ret := _mock.Called(context1, controllerListVolumeHealthRequest)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ControllerListVolumeHealth")
+	}
+
+	var r0 *csi.ControllerListVolumeHealthResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *csi.ControllerListVolumeHealthRequest) (*csi.ControllerListVolumeHealthResponse, error)); ok {
+		return returnFunc(context1, controllerListVolumeHealthRequest)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *csi.ControllerListVolumeHealthRequest) *csi.ControllerListVolumeHealthResponse); ok {
+		r0 = returnFunc(context1, controllerListVolumeHealthRequest)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*csi.ControllerListVolumeHealthResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *csi.ControllerListVolumeHealthRequest) error); ok {
+		r1 = returnFunc(context1, controllerListVolumeHealthRequest)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockControllerServer_ControllerListVolumeHealth_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ControllerListVolumeHealth'
+type MockControllerServer_ControllerListVolumeHealth_Call struct {
+	*mock.Call
+}
+
+// ControllerListVolumeHealth is a helper method to define mock.On call
+//   - context1 context.Context
+//   - controllerListVolumeHealthRequest *csi.ControllerListVolumeHealthRequest
+func (_e *MockControllerServer_Expecter) ControllerListVolumeHealth(context1 interface{}, controllerListVolumeHealthRequest interface{}) *MockControllerServer_ControllerListVolumeHealth_Call {
+	return &MockControllerServer_ControllerListVolumeHealth_Call{Call: _e.mock.On("ControllerListVolumeHealth", context1, controllerListVolumeHealthRequest)}
+}
+
+func (_c *MockControllerServer_ControllerListVolumeHealth_Call) Run(run func(context1 context.Context, controllerListVolumeHealthRequest *csi.ControllerListVolumeHealthRequest)) *MockControllerServer_ControllerListVolumeHealth_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *csi.ControllerListVolumeHealthRequest
+		if args[1] != nil {
+			arg1 = args[1].(*csi.ControllerListVolumeHealthRequest)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockControllerServer_ControllerListVolumeHealth_Call) Return(controllerListVolumeHealthResponse *csi.ControllerListVolumeHealthResponse, err error) *MockControllerServer_ControllerListVolumeHealth_Call {
+	_c.Call.Return(controllerListVolumeHealthResponse, err)
+	return _c
+}
+
+func (_c *MockControllerServer_ControllerListVolumeHealth_Call) RunAndReturn(run func(context1 context.Context, controllerListVolumeHealthRequest *csi.ControllerListVolumeHealthRequest) (*csi.ControllerListVolumeHealthResponse, error)) *MockControllerServer_ControllerListVolumeHealth_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1033,6 +1202,74 @@ func (_c *MockControllerServer_GetCapacity_Call) RunAndReturn(run func(context1 
 	return _c
 }
 
+// GetSnapshot provides a mock function for the type MockControllerServer
+func (_mock *MockControllerServer) GetSnapshot(context1 context.Context, getSnapshotRequest *csi.GetSnapshotRequest) (*csi.GetSnapshotResponse, error) {
+	ret := _mock.Called(context1, getSnapshotRequest)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetSnapshot")
+	}
+
+	var r0 *csi.GetSnapshotResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *csi.GetSnapshotRequest) (*csi.GetSnapshotResponse, error)); ok {
+		return returnFunc(context1, getSnapshotRequest)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *csi.GetSnapshotRequest) *csi.GetSnapshotResponse); ok {
+		r0 = returnFunc(context1, getSnapshotRequest)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*csi.GetSnapshotResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *csi.GetSnapshotRequest) error); ok {
+		r1 = returnFunc(context1, getSnapshotRequest)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockControllerServer_GetSnapshot_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSnapshot'
+type MockControllerServer_GetSnapshot_Call struct {
+	*mock.Call
+}
+
+// GetSnapshot is a helper method to define mock.On call
+//   - context1 context.Context
+//   - getSnapshotRequest *csi.GetSnapshotRequest
+func (_e *MockControllerServer_Expecter) GetSnapshot(context1 interface{}, getSnapshotRequest interface{}) *MockControllerServer_GetSnapshot_Call {
+	return &MockControllerServer_GetSnapshot_Call{Call: _e.mock.On("GetSnapshot", context1, getSnapshotRequest)}
+}
+
+func (_c *MockControllerServer_GetSnapshot_Call) Run(run func(context1 context.Context, getSnapshotRequest *csi.GetSnapshotRequest)) *MockControllerServer_GetSnapshot_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *csi.GetSnapshotRequest
+		if args[1] != nil {
+			arg1 = args[1].(*csi.GetSnapshotRequest)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockControllerServer_GetSnapshot_Call) Return(getSnapshotResponse *csi.GetSnapshotResponse, err error) *MockControllerServer_GetSnapshot_Call {
+	_c.Call.Return(getSnapshotResponse, err)
+	return _c
+}
+
+func (_c *MockControllerServer_GetSnapshot_Call) RunAndReturn(run func(context1 context.Context, getSnapshotRequest *csi.GetSnapshotRequest) (*csi.GetSnapshotResponse, error)) *MockControllerServer_GetSnapshot_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListSnapshots provides a mock function for the type MockControllerServer
 func (_mock *MockControllerServer) ListSnapshots(context1 context.Context, listSnapshotsRequest *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
 	ret := _mock.Called(context1, listSnapshotsRequest)
@@ -1234,6 +1471,39 @@ func (_c *MockControllerServer_ValidateVolumeCapabilities_Call) Return(validateV
 
 func (_c *MockControllerServer_ValidateVolumeCapabilities_Call) RunAndReturn(run func(context1 context.Context, validateVolumeCapabilitiesRequest *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error)) *MockControllerServer_ValidateVolumeCapabilities_Call {
 	_c.Call.Return(run)
+	return _c
+}
+
+// mustEmbedUnimplementedControllerServer provides a mock function for the type MockControllerServer
+func (_mock *MockControllerServer) mustEmbedUnimplementedControllerServer() {
+	_mock.Called()
+	return
+}
+
+// MockControllerServer_mustEmbedUnimplementedControllerServer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'mustEmbedUnimplementedControllerServer'
+type MockControllerServer_mustEmbedUnimplementedControllerServer_Call struct {
+	*mock.Call
+}
+
+// mustEmbedUnimplementedControllerServer is a helper method to define mock.On call
+func (_e *MockControllerServer_Expecter) mustEmbedUnimplementedControllerServer() *MockControllerServer_mustEmbedUnimplementedControllerServer_Call {
+	return &MockControllerServer_mustEmbedUnimplementedControllerServer_Call{Call: _e.mock.On("mustEmbedUnimplementedControllerServer")}
+}
+
+func (_c *MockControllerServer_mustEmbedUnimplementedControllerServer_Call) Run(run func()) *MockControllerServer_mustEmbedUnimplementedControllerServer_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockControllerServer_mustEmbedUnimplementedControllerServer_Call) Return() *MockControllerServer_mustEmbedUnimplementedControllerServer_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockControllerServer_mustEmbedUnimplementedControllerServer_Call) RunAndReturn(run func()) *MockControllerServer_mustEmbedUnimplementedControllerServer_Call {
+	_c.Run(run)
 	return _c
 }
 
@@ -1464,6 +1734,142 @@ func (_c *MockNodeServer_NodeGetInfo_Call) Return(nodeGetInfoResponse *csi.NodeG
 }
 
 func (_c *MockNodeServer_NodeGetInfo_Call) RunAndReturn(run func(context1 context.Context, nodeGetInfoRequest *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error)) *MockNodeServer_NodeGetInfo_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// NodeGetStorageHealth provides a mock function for the type MockNodeServer
+func (_mock *MockNodeServer) NodeGetStorageHealth(context1 context.Context, nodeGetStorageHealthRequest *csi.NodeGetStorageHealthRequest) (*csi.NodeGetStorageHealthResponse, error) {
+	ret := _mock.Called(context1, nodeGetStorageHealthRequest)
+
+	if len(ret) == 0 {
+		panic("no return value specified for NodeGetStorageHealth")
+	}
+
+	var r0 *csi.NodeGetStorageHealthResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *csi.NodeGetStorageHealthRequest) (*csi.NodeGetStorageHealthResponse, error)); ok {
+		return returnFunc(context1, nodeGetStorageHealthRequest)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *csi.NodeGetStorageHealthRequest) *csi.NodeGetStorageHealthResponse); ok {
+		r0 = returnFunc(context1, nodeGetStorageHealthRequest)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*csi.NodeGetStorageHealthResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *csi.NodeGetStorageHealthRequest) error); ok {
+		r1 = returnFunc(context1, nodeGetStorageHealthRequest)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockNodeServer_NodeGetStorageHealth_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'NodeGetStorageHealth'
+type MockNodeServer_NodeGetStorageHealth_Call struct {
+	*mock.Call
+}
+
+// NodeGetStorageHealth is a helper method to define mock.On call
+//   - context1 context.Context
+//   - nodeGetStorageHealthRequest *csi.NodeGetStorageHealthRequest
+func (_e *MockNodeServer_Expecter) NodeGetStorageHealth(context1 interface{}, nodeGetStorageHealthRequest interface{}) *MockNodeServer_NodeGetStorageHealth_Call {
+	return &MockNodeServer_NodeGetStorageHealth_Call{Call: _e.mock.On("NodeGetStorageHealth", context1, nodeGetStorageHealthRequest)}
+}
+
+func (_c *MockNodeServer_NodeGetStorageHealth_Call) Run(run func(context1 context.Context, nodeGetStorageHealthRequest *csi.NodeGetStorageHealthRequest)) *MockNodeServer_NodeGetStorageHealth_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *csi.NodeGetStorageHealthRequest
+		if args[1] != nil {
+			arg1 = args[1].(*csi.NodeGetStorageHealthRequest)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockNodeServer_NodeGetStorageHealth_Call) Return(nodeGetStorageHealthResponse *csi.NodeGetStorageHealthResponse, err error) *MockNodeServer_NodeGetStorageHealth_Call {
+	_c.Call.Return(nodeGetStorageHealthResponse, err)
+	return _c
+}
+
+func (_c *MockNodeServer_NodeGetStorageHealth_Call) RunAndReturn(run func(context1 context.Context, nodeGetStorageHealthRequest *csi.NodeGetStorageHealthRequest) (*csi.NodeGetStorageHealthResponse, error)) *MockNodeServer_NodeGetStorageHealth_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// NodeGetVolumeHealth provides a mock function for the type MockNodeServer
+func (_mock *MockNodeServer) NodeGetVolumeHealth(context1 context.Context, nodeGetVolumeHealthRequest *csi.NodeGetVolumeHealthRequest) (*csi.NodeGetVolumeHealthResponse, error) {
+	ret := _mock.Called(context1, nodeGetVolumeHealthRequest)
+
+	if len(ret) == 0 {
+		panic("no return value specified for NodeGetVolumeHealth")
+	}
+
+	var r0 *csi.NodeGetVolumeHealthResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *csi.NodeGetVolumeHealthRequest) (*csi.NodeGetVolumeHealthResponse, error)); ok {
+		return returnFunc(context1, nodeGetVolumeHealthRequest)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *csi.NodeGetVolumeHealthRequest) *csi.NodeGetVolumeHealthResponse); ok {
+		r0 = returnFunc(context1, nodeGetVolumeHealthRequest)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*csi.NodeGetVolumeHealthResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *csi.NodeGetVolumeHealthRequest) error); ok {
+		r1 = returnFunc(context1, nodeGetVolumeHealthRequest)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockNodeServer_NodeGetVolumeHealth_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'NodeGetVolumeHealth'
+type MockNodeServer_NodeGetVolumeHealth_Call struct {
+	*mock.Call
+}
+
+// NodeGetVolumeHealth is a helper method to define mock.On call
+//   - context1 context.Context
+//   - nodeGetVolumeHealthRequest *csi.NodeGetVolumeHealthRequest
+func (_e *MockNodeServer_Expecter) NodeGetVolumeHealth(context1 interface{}, nodeGetVolumeHealthRequest interface{}) *MockNodeServer_NodeGetVolumeHealth_Call {
+	return &MockNodeServer_NodeGetVolumeHealth_Call{Call: _e.mock.On("NodeGetVolumeHealth", context1, nodeGetVolumeHealthRequest)}
+}
+
+func (_c *MockNodeServer_NodeGetVolumeHealth_Call) Run(run func(context1 context.Context, nodeGetVolumeHealthRequest *csi.NodeGetVolumeHealthRequest)) *MockNodeServer_NodeGetVolumeHealth_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *csi.NodeGetVolumeHealthRequest
+		if args[1] != nil {
+			arg1 = args[1].(*csi.NodeGetVolumeHealthRequest)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockNodeServer_NodeGetVolumeHealth_Call) Return(nodeGetVolumeHealthResponse *csi.NodeGetVolumeHealthResponse, err error) *MockNodeServer_NodeGetVolumeHealth_Call {
+	_c.Call.Return(nodeGetVolumeHealthResponse, err)
+	return _c
+}
+
+func (_c *MockNodeServer_NodeGetVolumeHealth_Call) RunAndReturn(run func(context1 context.Context, nodeGetVolumeHealthRequest *csi.NodeGetVolumeHealthRequest) (*csi.NodeGetVolumeHealthResponse, error)) *MockNodeServer_NodeGetVolumeHealth_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1805,5 +2211,38 @@ func (_c *MockNodeServer_NodeUnstageVolume_Call) Return(nodeUnstageVolumeRespons
 
 func (_c *MockNodeServer_NodeUnstageVolume_Call) RunAndReturn(run func(context1 context.Context, nodeUnstageVolumeRequest *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error)) *MockNodeServer_NodeUnstageVolume_Call {
 	_c.Call.Return(run)
+	return _c
+}
+
+// mustEmbedUnimplementedNodeServer provides a mock function for the type MockNodeServer
+func (_mock *MockNodeServer) mustEmbedUnimplementedNodeServer() {
+	_mock.Called()
+	return
+}
+
+// MockNodeServer_mustEmbedUnimplementedNodeServer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'mustEmbedUnimplementedNodeServer'
+type MockNodeServer_mustEmbedUnimplementedNodeServer_Call struct {
+	*mock.Call
+}
+
+// mustEmbedUnimplementedNodeServer is a helper method to define mock.On call
+func (_e *MockNodeServer_Expecter) mustEmbedUnimplementedNodeServer() *MockNodeServer_mustEmbedUnimplementedNodeServer_Call {
+	return &MockNodeServer_mustEmbedUnimplementedNodeServer_Call{Call: _e.mock.On("mustEmbedUnimplementedNodeServer")}
+}
+
+func (_c *MockNodeServer_mustEmbedUnimplementedNodeServer_Call) Run(run func()) *MockNodeServer_mustEmbedUnimplementedNodeServer_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockNodeServer_mustEmbedUnimplementedNodeServer_Call) Return() *MockNodeServer_mustEmbedUnimplementedNodeServer_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockNodeServer_mustEmbedUnimplementedNodeServer_Call) RunAndReturn(run func()) *MockNodeServer_mustEmbedUnimplementedNodeServer_Call {
+	_c.Run(run)
 	return _c
 }

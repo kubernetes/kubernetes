@@ -18,11 +18,7 @@ package v1
 
 import (
 	"fmt"
-
-	v1 "k8s.io/api/batch/v1"
-	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/apis/batch"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
@@ -35,15 +31,4 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				return "", "", fmt.Errorf("field label %q not supported for Job", label)
 			}
 		})
-}
-
-// The following functions don't do anything special, but they need to be added
-// here due to the dependency of v1beta1 on v1.
-
-func Convert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *v1.JobSpec, s conversion.Scope) error {
-	return autoConvert_batch_JobSpec_To_v1_JobSpec(in, out, s)
-}
-
-func Convert_v1_JobSpec_To_batch_JobSpec(in *v1.JobSpec, out *batch.JobSpec, s conversion.Scope) error {
-	return autoConvert_v1_JobSpec_To_batch_JobSpec(in, out, s)
 }

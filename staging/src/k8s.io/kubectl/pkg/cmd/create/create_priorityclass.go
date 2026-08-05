@@ -152,7 +152,7 @@ func (o *PriorityClassOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	return nil
 }
 
-// Run calls the CreateSubcommandOptions.Run in the PriorityClassOptions instance
+// Run performs the execution of the 'create priorityclass' sub command
 func (o *PriorityClassOptions) Run() error {
 	priorityClass, err := o.createPriorityClass()
 	if err != nil {

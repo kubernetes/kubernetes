@@ -35,7 +35,7 @@ import (
 // the device requests of a claim to apply these presets.
 // Cluster scoped.
 type DeviceClassApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:""`
 	// Standard object metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// Spec defines what can be allocated and how to configure it.

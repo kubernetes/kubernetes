@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC
+// Copyright 2026 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -66,9 +66,13 @@ const (
 //	  app_profile_id: profiles/prof_qux
 //	}
 //
-// The routing header consists of one or multiple key-value pairs. Every key
-// and value must be percent-encoded, and joined together in the format of
-// `key1=value1&key2=value2`.
+// The routing header consists of one or multiple key-value pairs. The order of
+// the key-value pairs is undefined, the order of the `routing_parameters` in
+// the `RoutingRule` only matters for the evaluation order of the path
+// templates when `field` is the same. See the examples below for more details.
+//
+// Every key and value in the routing header must be percent-encoded,
+// and joined together in the following format: `key1=value1&key2=value2`.
 // The examples below skip the percent-encoding for readability.
 //
 // # Example 1

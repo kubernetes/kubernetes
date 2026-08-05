@@ -233,6 +233,14 @@ func (sctx *serveCtx) serve(
 			return tlsErr
 		}
 
+		// In gRPC-only mode the gRPC stack owns the TLS handshake (via grpc.Creds).
+		// Wrapping sctx.l with a second TLS listener would cause a double-TLS failure,
+		// so inject CRL checking into the TLS config before the gRPC server is created
+		// (gRPC clones the config at creation time).
+		if onlyGRPC {
+			tlsinfo.ConfigureCRLVerification(tlscfg)
+		}
+
 		if grpcEnabled {
 			gs = v3rpc.Server(s, tlscfg, nil, gopts...)
 			v3electionpb.RegisterElectionServer(gs, servElection)

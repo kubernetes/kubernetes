@@ -18,9 +18,12 @@ package framework
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -54,6 +57,8 @@ const (
 	UpdateNodeAnnotation
 	// UpdateNodeDeclaredFeature is an update for node's declared features.
 	UpdateNodeDeclaredFeature
+	// UpdateNodePreemptionPolicy is an update for node's preemption policy.
+	UpdateNodePreemptionPolicy
 
 	// UpdatePodXYZ is only applicable for Pod events.
 	// If you use UpdatePodXYZ,
@@ -63,6 +68,8 @@ const (
 	UpdatePodLabel
 	// UpdatePodScaleDown is an update for pod's scale down (i.e., any resource request is reduced).
 	UpdatePodScaleDown
+	// UpdatePodScaleUp is an update for pod's scale up (i.e., any resource request is increased).
+	UpdatePodScaleUp
 	// UpdatePodToleration is an addition for pod's tolerations.
 	// (Due to API validation, we can add, but cannot modify or remove tolerations.)
 	UpdatePodToleration
@@ -75,7 +82,7 @@ const (
 	All ActionType = 1<<iota - 1
 
 	// Use the general Update type if you don't either know or care the specific sub-Update type to use.
-	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdateNodeDeclaredFeature | UpdatePodLabel | UpdatePodScaleDown | UpdatePodToleration | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim
+	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdateNodeDeclaredFeature | UpdateNodePreemptionPolicy | UpdatePodLabel | UpdatePodScaleDown | UpdatePodScaleUp | UpdatePodToleration | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim
 
 	// None is a special ActionType that is only used internally.
 	None ActionType = 0
@@ -99,10 +106,14 @@ func (a ActionType) String() string {
 		return "UpdateNodeAnnotation"
 	case UpdateNodeDeclaredFeature:
 		return "UpdateNodeDeclaredFeature"
+	case UpdateNodePreemptionPolicy:
+		return "UpdateNodePreemptionPolicy"
 	case UpdatePodLabel:
 		return "UpdatePodLabel"
 	case UpdatePodScaleDown:
 		return "UpdatePodScaleDown"
+	case UpdatePodScaleUp:
+		return "UpdatePodScaleUp"
 	case UpdatePodToleration:
 		return "UpdatePodToleration"
 	case UpdatePodSchedulingGatesEliminated:
@@ -148,18 +159,17 @@ const (
 	// the previous rejection from noderesources plugin can be resolved.
 	// this plugin would implement QueueingHint for Pod/Update event
 	// that returns Queue when such label changes are made in unscheduled Pods.
+	//
+	// There is one general pod resource: Pod, that contains three specific pod resources: AssignedPod, UnscheduledPod, and TargetPod.
+	// Plugins can and are expected to register to specific pod events for better performance.
 	Pod EventResource = "Pod"
+	// AssignedPod resource is associated with the cluster event that gets triggered when a scheduled pod is updated.
+	AssignedPod EventResource = "AssignedPod"
+	// UnscheduledPod resource is associated with the cluster event that gets triggered when an unscheduled pod is updated, other than the target pod.
+	UnscheduledPod EventResource = "UnscheduledPod"
+	// TargetPod resource is associated with the cluster event that gets triggered when an unscheduled pod itself is updated.
+	TargetPod EventResource = "TargetPod"
 
-	// A note about NodeAdd event and UpdateNodeTaint event:
-	// When QHint is disabled, NodeAdd often isn't worked expectedly because of the internal feature called preCheck.
-	// It's definitely not something expected for plugin developers,
-	// and registering UpdateNodeTaint event is the only mitigation for now.
-	// So, kube-scheduler registers UpdateNodeTaint event for plugins that has NodeAdded event, but don't have UpdateNodeTaint event.
-	// It has a bad impact for the requeuing efficiency though, a lot better than some Pods being stuck in the
-	// unschedulable pod pool.
-	// This problematic preCheck feature is disabled when QHint is enabled,
-	// and eventually will be removed along with QHint graduation.
-	// See: https://github.com/kubernetes/kubernetes/issues/110175
 	Node                  EventResource = "Node"
 	PersistentVolume      EventResource = "PersistentVolume"
 	PersistentVolumeClaim EventResource = "PersistentVolumeClaim"
@@ -172,6 +182,7 @@ const (
 	ResourceSlice         EventResource = "resource.k8s.io/ResourceSlice"
 	DeviceClass           EventResource = "resource.k8s.io/DeviceClass"
 	PodGroup              EventResource = "scheduling.k8s.io/PodGroup"
+	CompositePodGroup     EventResource = "scheduling.k8s.io/CompositePodGroup"
 
 	// WildCard is a special EventResource to match all resources.
 	// e.g., If you register `{Resource: "*", ActionType: All}` in EventsToRegister,
@@ -191,6 +202,9 @@ type ClusterEventWithHint struct {
 	// the scheduling of Pods will be always retried with backoff when this Event happens.
 	// (the same as Queue)
 	QueueingHintFn QueueingHintFn
+	// PreQueueingHintFn is called once per event to narrow the set of pods to evaluate with QueueingHint.
+	// If set, only pods identified in the returned PreQueueingHintResult are checked.
+	PreQueueingHintFn PreQueueingHintFn
 }
 
 // QueueingHintFn returns a hint that signals whether the event can make a Pod,
@@ -205,6 +219,24 @@ type ClusterEventWithHint struct {
 //   - `oldObj` is nil if the event is add event.
 //   - `newObj` is nil if the event is delete event.
 type QueueingHintFn func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (QueueingHint, error)
+
+// PreQueueingHintResult is the return value of PreQueueingHintFn.
+// When AllPods is true, all unschedulable pods are evaluated (existing behavior).
+// When AllPods is false, only pods listed in Pods are evaluated.
+type PreQueueingHintResult struct {
+	AllPods bool
+	Pods    []types.NamespacedName
+}
+
+// PreQueueingHintFn is called once per event before iterating unschedulable pods.
+// PreQueueingHintFn will not be called when the deleted object is unknown (both oldObj and newObj are nil).
+// It returns a PreQueueingHintResult indicating which pods should be evaluated
+// by QueueingHintFn for this event. If it returns an error, the error is logged
+// and the result is treated as AllPods (all unschedulable pods are evaluated).
+//
+// - oldObj is the old object in update events, or the deleted object in delete events.
+// - newObj is the new/added object. It is nil for delete events.
+type PreQueueingHintFn func(logger klog.Logger, oldObj, newObj interface{}) (PreQueueingHintResult, error)
 
 type QueueingHint int
 
@@ -255,10 +287,13 @@ type NodeInfo interface {
 	Node() *v1.Node
 	// GetPods returns Pods running on the node.
 	GetPods() []PodInfo
-	// GetPodsWithAffinity returns the subset of pods with affinity.
+	// GetPodsWithAffinity returns the subset of pods with inter-pod (anti-)affinity.
 	GetPodsWithAffinity() []PodInfo
-	// GetPodsWithRequiredAntiAffinity returns the subset of pods with required anti-affinity.
+	// GetPodsWithRequiredAntiAffinity returns the subset of pods with required inter-pod anti-affinity.
 	GetPodsWithRequiredAntiAffinity() []PodInfo
+	// GetPodsWithRequiredNonHostScopedAntiAffinity returns the subset of pods with required inter-pod anti-affinity that is non-hostname scoped.
+	// This must be empty when the InterPodAffinityHostnameFastPath feature gate is disabled.
+	GetPodsWithRequiredNonHostScopedAntiAffinity() []PodInfo
 	// GetUsedPorts returns the ports allocated on the node.
 	GetUsedPorts() HostPortInfo
 	// GetRequested returns total requested resources of all pods on this node. This includes assumed
@@ -288,8 +323,6 @@ type NodeInfo interface {
 	Snapshot() NodeInfo
 	// String returns representation of human readable format of this NodeInfo.
 	String() string
-	// GetNodeAllocatableDRAClaimState returns the node allocatable DRA claim allocation states on this node.
-	GetNodeAllocatableDRAClaimState() map[types.NamespacedName]*NodeAllocatableDRAClaimState
 
 	// AddPodInfo adds pod information to this NodeInfo.
 	// Consider using this instead of AddPod if a PodInfo is already computed.
@@ -300,31 +333,33 @@ type NodeInfo interface {
 	SetNode(node *v1.Node)
 }
 
-// QueuedPodInfo is a Pod wrapper with additional information related to
-// the pod's status in the scheduling queue, such as the timestamp when
-// it's added to the queue.
-type QueuedPodInfo interface {
-	// GetPodInfo returns the PodInfo object wrapped by this QueuedPodInfo instance.
-	GetPodInfo() PodInfo
-	// GetTimestamp returns the time pod added to the scheduling queue.
+// QueuedEntityInfo is an interface that represents a schedulable entity in the scheduling queue.
+// It can be a single Pod (QueuedPodInfo) or a group of Pods (QueuedPodGroupInfo).
+type QueuedEntityInfo interface {
+	// Type returns the type of the entity.
+	Type() EntityKeyType
+	// GetPriority returns the priority of the entity.
+	GetPriority() int32
+	// GetTimestamp returns the time entity added to the scheduling queue.
 	GetTimestamp() time.Time
 	// GetAttempts returns the number of all schedule attempts before successfully scheduled.
 	// It's used to record the # attempts metric.
 	GetAttempts() int
-	// GetBackoffExpiration returns the time when the Pod will complete its backoff.
+	// GetBackoffExpiration returns the time when the entity will complete its backoff.
+	// It's empty for Pods that belong to a pod group. QueuedPodGroupInfo's BackoffExpiration is used instead.
 	// If the SchedulerPopFromBackoffQ feature is enabled, the value is aligned to the backoff ordering window.
-	// Then, two Pods with the same BackoffExpiration (time bucket) are ordered by priority and eventually the timestamp,
-	// to make sure popping from the backoffQ considers priority of pods that are close to the expiration time.
+	// Then, two entities with the same BackoffExpiration (time bucket) are ordered by priority and eventually the timestamp,
+	// to make sure popping from the backoffQ considers priority of entities that are close to the expiration time.
 	GetBackoffExpiration() time.Time
-	// GetUnschedulableCount returns the total number of the scheduling attempts that this Pod gets unschedulable.
-	// Basically it equals Attempts, but when the Pod fails with the Error status (e.g., the network error),
+	// GetUnschedulableCount returns the total number of the scheduling attempts that this entity gets unschedulable.
+	// Basically it equals Attempts, but when the entity fails with the Error status (e.g., the network error),
 	// this count won't be incremented.
-	// It's used to calculate the backoff time this Pod is obliged to get before retrying.
+	// It's used to calculate the backoff time this entity is obliged to get before retrying.
 	GetUnschedulableCount() int
-	// GetConsecutiveErrorsCount returns the number of the error status that this Pod gets sequentially.
-	// This count is reset when the Pod gets another status than Error.
+	// GetConsecutiveErrorsCount returns the number of the error status that this entity gets sequentially.
+	// This count is reset when the entity gets another status than Error.
 	//
-	// If the error status is returned (e.g., kube-apiserver is unstable), we don't want to immediately retry the Pod and hence need a backoff retry mechanism
+	// If the error status is returned (e.g., kube-apiserver is unstable), we don't want to immediately retry the entity and hence need a backoff retry mechanism
 	// because that might push more burden to the kube-apiserver.
 	// But, we don't want to calculate the backoff time in the same way as the normal unschedulable reason
 	// since the purpose is different; the backoff for a unschedulable status etc is for the punishment of wasting the scheduling cycles,
@@ -332,24 +367,24 @@ type QueuedPodInfo interface {
 	// That's why we need to distinguish ConsecutiveErrorsCount for the error status and UnschedulableCount for the unschedulable status.
 	// See https://github.com/kubernetes/kubernetes/issues/128744 for the discussion.
 	GetConsecutiveErrorsCount() int
-	// GetInitialAttemptTimestamp returns the time when the pod is added to the queue for the first time. The pod may be added
+	// GetInitialAttemptTimestamp returns the time when the entity is added to the queue for the first time. The entity may be added
 	// back to the queue multiple times before it's successfully scheduled.
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
-	// latency for a pod.
+	// latency for an entity.
 	GetInitialAttemptTimestamp() *time.Time
-	// GetUnschedulablePlugins records the plugin names that the Pod failed with Unschedulable or UnschedulableAndUnresolvable status
+	// GetUnschedulablePlugins records the plugin names that the entity failed with Unschedulable or UnschedulableAndUnresolvable status
 	// at specific extension points: PreFilter, Filter, Reserve, or Permit (WaitOnPermit).
-	// If Pods are rejected at other extension points,
+	// If entities are rejected at other extension points,
 	// they're assumed to be unexpected errors (e.g., temporal network issue, plugin implementation issue, etc)
 	// and retried soon after a backoff period.
 	// That is because such failures could be solved regardless of incoming cluster events (registered in EventsToRegister).
 	GetUnschedulablePlugins() sets.Set[string]
-	// GetPendingPlugins records the plugin names that the Pod failed with Pending status.
+	// GetPendingPlugins records the plugin names that the entity failed with Pending status.
 	GetPendingPlugins() sets.Set[string]
-	// GetGatingPlugin records the plugin name that gated the Pod at PreEnqueue.
+	// GetGatingPlugin records the plugin name that gated the entity at PreEnqueue.
 	GetGatingPlugin() string
-	// GetGatingPluginEvents records the events registered by the plugin that gated the Pod at PreEnqueue.
-	// We have it as a cache purpose to avoid re-computing which event(s) might ungate the Pod.
+	// GetGatingPluginEvents records the events registered by the plugin that gated the entity at PreEnqueue.
+	// We have it as a cache purpose to avoid re-computing which event(s) might ungate the entity.
 	GetGatingPluginEvents() []ClusterEvent
 }
 
@@ -640,6 +675,15 @@ func (h HostPortInfo) sanitize(ip, protocol *string) {
 	}
 }
 
+// EntityKeyType is the type of an entity.
+type EntityKeyType string
+
+const (
+	PodKeyType               EntityKeyType = "pod"
+	PodGroupKeyType          EntityKeyType = "podgroup"
+	CompositePodGroupKeyType EntityKeyType = "compositepodgroup"
+)
+
 // PodGroupInfo is a wrapper around the PodGroup API object together with a list of unscheduled pods that belong to the pod group.
 // Typically used as an input to pod group scheduling cycle plugins.
 type PodGroupInfo interface {
@@ -652,6 +696,18 @@ type PodGroupInfo interface {
 	GetName() string
 	// GetNamespace returns the namespace the pod group belongs to.
 	GetNamespace() string
+	// GetType returns the type of the pod group.
+	GetType() EntityKeyType
+	// GetKey returns the key uniquely identifying the pod group.
+	GetKey() string
+	// GetPodGroup returns the PodGroup API object or nil if the group is a composite pod group.
+	GetPodGroup() *schedulingv1beta1.PodGroup
+	// GetCompositePodGroup returns the associated composite pod group or nil if the group is not a composite pod group.
+	// It should only be used when the CompositePodGroup feature gate is enabled.
+	GetCompositePodGroup() *schedulingv1alpha3.CompositePodGroup
+	// GetChildren returns the child pod groups of this pod group.
+	// Only composite pod groups have children.
+	GetChildren() []PodGroupInfo
 }
 
 // Placement determines the resources to be considered when scheduling a pod group.
@@ -671,8 +727,13 @@ type Placement struct {
 type ProposedAssignment interface {
 	// GetPod returns the pod that has the proposed node assignment.
 	GetPod() *v1.Pod
+	// GetPodInfo returns the PodInfo for the pod that has the proposed node assignment.
+	// It should be treated as immutable, read only data.
+	GetPodInfo() PodInfo
 	// GetNodeName returns the name of the proposed node for the pod.
 	GetNodeName() string
+	// GetCycleState returns the CycleState computed for this pod during pod group scheduling cycle.
+	GetCycleState() CycleState
 }
 
 // PodGroupAssignments holds the temporary assignments of pods in a pod group to nodes for a placement.
@@ -685,18 +746,50 @@ type PodGroupAssignments struct {
 	ProposedAssignments []ProposedAssignment
 }
 
-// NodeAllocatableDRAClaimState holds information about a node allocatable resource DRA claim's allocation on a node.
-type NodeAllocatableDRAClaimState struct {
-	// ConsumerPods is a set of UIDs of pods that are consuming the DRA claim on this node.
-	ConsumerPods sets.Set[types.UID]
+// EntityKey uniquely identifies a specific instance of an entity (like PodGroup or CompositePodGroup).
+type EntityKey struct {
+	Type      EntityKeyType
+	Name      string
+	Namespace string
 }
 
-// Snapshot returns a copy of NodeAllocatableDRAClaimAllocationState with ConsumerPods cloned.
-func (s *NodeAllocatableDRAClaimState) Snapshot() *NodeAllocatableDRAClaimState {
-	if s == nil {
-		return nil
+func (ek EntityKey) GetName() string {
+	return ek.Name
+}
+
+func (ek EntityKey) GetNamespace() string {
+	return ek.Namespace
+}
+
+func (ek EntityKey) GetType() EntityKeyType {
+	return ek.Type
+}
+
+func (ek EntityKey) String() string {
+	return fmt.Sprintf("%s/%s/%s", ek.Type, ek.Namespace, ek.Name)
+}
+
+// MustParseEntityKey returns the entity key for a given key.
+// It should be only used in tests.
+func MustParseEntityKey(key string) EntityKey {
+	parts := strings.Split(key, "/")
+	if len(parts) != 3 {
+		return EntityKey{}
 	}
-	return &NodeAllocatableDRAClaimState{
-		ConsumerPods: s.ConsumerPods.Clone(),
-	}
+	return EntityKey{Type: EntityKeyType(parts[0]), Namespace: parts[1], Name: parts[2]}
+}
+
+// PodKey returns the key for a pod.
+func PodKey(namespace, name string) EntityKey {
+	return EntityKey{Type: PodKeyType, Namespace: namespace, Name: name}
+}
+
+// PodGroupKey returns the key for a pod group.
+func PodGroupKey(namespace, name string) EntityKey {
+	return EntityKey{Type: PodGroupKeyType, Namespace: namespace, Name: name}
+}
+
+// CompositePodGroupKey returns the key for a composite pod group.
+func CompositePodGroupKey(namespace, name string) EntityKey {
+	return EntityKey{Type: CompositePodGroupKeyType, Namespace: namespace, Name: name}
 }

@@ -679,8 +679,8 @@ func TestDispatcher(t *testing.T) {
 			vAttrs := &admission.VersionedAttributes{
 				Attributes:         attrs,
 				VersionedKind:      tc.gvk,
-				VersionedObject:    tc.object,
-				VersionedOldObject: tc.oldObject,
+				VersionedObject:    admission.NewLazyObject(tc.object),
+				VersionedOldObject: admission.NewLazyObject(tc.oldObject),
 			}
 
 			err = dispatcher.Dispatch(ctx, vAttrs, objectInterfaces, tc.policyHooks)
@@ -688,7 +688,7 @@ func TestDispatcher(t *testing.T) {
 				t.Fatalf("error dispatching policy hooks: %v", err)
 			}
 
-			obj := vAttrs.VersionedObject
+			obj := vAttrs.VersionedObject.Object()
 			if !equality.Semantic.DeepEqual(obj, tc.expect) {
 				t.Errorf("unexpected result, got diff:\n%s\n", cmp.Diff(tc.expect, obj))
 			}

@@ -32,17 +32,15 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = utils.SIGDescribe("CSI Mock when kubelet restart", framework.WithSerial(), framework.WithDisruptive(), func() {
+// These tests requires SSH to nodes, so the provider check should be identical to there
+// (the limiting factor is the implementation of util.go's e2essh.GetSigner(...)).
+// Cluster must support node reboot.
+var _ = utils.SIGDescribe("CSI Mock when kubelet restart", framework.WithSerial(), framework.WithDisruptive(), framework.WithProvider(framework.ProvidersWithSSH...), func() {
 	f := framework.NewDefaultFramework("csi-mock-when-kubelet-restart")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
 
 	ginkgo.BeforeEach(func() {
-		// These tests requires SSH to nodes, so the provider check should be identical to there
-		// (the limiting factor is the implementation of util.go's e2essh.GetSigner(...)).
-
-		// Cluster must support node reboot
-		e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 		e2eskipper.SkipUnlessSSHKeyPresent()
 	})
 

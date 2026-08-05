@@ -58,10 +58,6 @@ func init() {
 
 // Compressor is used for compressing and decompressing when sending or
 // receiving messages.
-//
-// If a Compressor implements `DecompressedSize(compressedBytes []byte) int`,
-// gRPC will invoke it to determine the size of the buffer allocated for the
-// result of decompression.  A return value of -1 indicates unknown size.
 type Compressor interface {
 	// Compress writes the data written to wc to w after compressing it.  If an
 	// error occurs while initializing the compressor, that error is returned
@@ -70,6 +66,9 @@ type Compressor interface {
 	// Decompress reads data from r, decompresses it, and provides the
 	// uncompressed data via the returned io.Reader.  If an error occurs while
 	// initializing the decompressor, that error is returned instead.
+	//
+	// The returned io.Reader may optionally implement io.ReadCloser, and if it
+	// does, gRPC will call Close() exactly once.
 	Decompress(r io.Reader) (io.Reader, error)
 	// Name is the name of the compression codec and is used to set the content
 	// coding header.  The result must be static; the result cannot change

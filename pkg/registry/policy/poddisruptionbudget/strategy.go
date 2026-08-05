@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -34,12 +35,12 @@ import (
 
 // podDisruptionBudgetStrategy implements verification logic for PodDisruptionBudgets.
 type podDisruptionBudgetStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating PodDisruptionBudget objects.
-var Strategy = podDisruptionBudgetStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = podDisruptionBudgetStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // NamespaceScoped returns true because all PodDisruptionBudget' need to be within a namespace.
 func (podDisruptionBudgetStrategy) NamespaceScoped() bool {
@@ -68,6 +69,8 @@ func (podDisruptionBudgetStrategy) PrepareForCreate(ctx context.Context, obj run
 	podDisruptionBudget.Status = policy.PodDisruptionBudgetStatus{}
 
 	podDisruptionBudget.Generation = 1
+
+	dropDisabledFields(podDisruptionBudget, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -82,6 +85,24 @@ func (podDisruptionBudgetStrategy) PrepareForUpdate(ctx context.Context, obj, ol
 	// See metav1.ObjectMeta description for more information on Generation.
 	if !apiequality.Semantic.DeepEqual(oldPodDisruptionBudget.Spec, newPodDisruptionBudget.Spec) {
 		newPodDisruptionBudget.Generation = oldPodDisruptionBudget.Generation + 1
+	}
+
+	dropDisabledFields(newPodDisruptionBudget, oldPodDisruptionBudget)
+}
+
+func dropDisabledFields(pdb, oldPDB *policy.PodDisruptionBudget) {
+	if oldPDB != nil && apiequality.Semantic.DeepEqual(oldPDB.Spec.Selector, pdb.Spec.Selector) {
+		return
+	}
+	switch {
+	case apiequality.Semantic.DeepEqual(pdb.Spec.Selector, policy.NonV1beta1MatchNoneSelector):
+		// no-op, preserve
+	case apiequality.Semantic.DeepEqual(pdb.Spec.Selector, policy.NonV1beta1MatchAllSelector):
+		// no-op, preserve
+	default:
+		// otherwise, make sure the label intended to be used in a match-all or match-none selector
+		// never gets combined with user-specified fields
+		policy.StripPDBV1beta1Label(pdb.Spec.Selector)
 	}
 }
 
@@ -104,7 +125,7 @@ func (podDisruptionBudgetStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is true for PodDisruptionBudget; this means you may create one with a PUT request.
-func (podDisruptionBudgetStrategy) AllowCreateOnUpdate() bool {
+func (podDisruptionBudgetStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -123,7 +144,7 @@ func (podDisruptionBudgetStrategy) WarningsOnUpdate(ctx context.Context, obj, ol
 
 // AllowUnconditionalUpdate is the default update policy for PodDisruptionBudget objects. Status update should
 // only be allowed if version match.
-func (podDisruptionBudgetStrategy) AllowUnconditionalUpdate() bool {
+func (podDisruptionBudgetStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 

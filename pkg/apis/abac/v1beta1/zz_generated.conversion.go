@@ -22,6 +22,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	unsafe "unsafe"
+
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	abac "k8s.io/kubernetes/pkg/apis/abac"
@@ -77,13 +79,7 @@ func Convert_abac_Policy_To_v1beta1_Policy(in *abac.Policy, out *Policy, s conve
 }
 
 func autoConvert_v1beta1_PolicySpec_To_abac_PolicySpec(in *PolicySpec, out *abac.PolicySpec, s conversion.Scope) error {
-	out.User = in.User
-	out.Group = in.Group
-	out.Readonly = in.Readonly
-	out.APIGroup = in.APIGroup
-	out.Resource = in.Resource
-	out.Namespace = in.Namespace
-	out.NonResourcePath = in.NonResourcePath
+	*out = *(*abac.PolicySpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -93,13 +89,7 @@ func Convert_v1beta1_PolicySpec_To_abac_PolicySpec(in *PolicySpec, out *abac.Pol
 }
 
 func autoConvert_abac_PolicySpec_To_v1beta1_PolicySpec(in *abac.PolicySpec, out *PolicySpec, s conversion.Scope) error {
-	out.User = in.User
-	out.Group = in.Group
-	out.Readonly = in.Readonly
-	out.APIGroup = in.APIGroup
-	out.Resource = in.Resource
-	out.Namespace = in.Namespace
-	out.NonResourcePath = in.NonResourcePath
+	*out = *(*PolicySpec)(unsafe.Pointer(in))
 	return nil
 }
 

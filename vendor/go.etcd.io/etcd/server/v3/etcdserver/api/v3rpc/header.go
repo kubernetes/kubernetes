@@ -38,13 +38,20 @@ func newHeader(s *etcdserver.EtcdServer) header {
 
 // fill populates pb.ResponseHeader using etcdserver information
 func (h *header) fill(rh *pb.ResponseHeader) {
+	h.fillWithoutRevision(rh)
+	if rh.Revision == 0 {
+		rh.Revision = h.rev()
+	}
+}
+
+// fillWithoutRevision populates pb.ResponseHeader except for Revision.
+// Streaming handlers use this because the pinned read revision must be set
+// by the handler rather than silently replaced with the live store revision.
+func (h *header) fillWithoutRevision(rh *pb.ResponseHeader) {
 	if rh == nil {
 		panic("unexpected nil resp.Header")
 	}
 	rh.ClusterId = uint64(h.clusterID)
 	rh.MemberId = uint64(h.memberID)
 	rh.RaftTerm = h.sg.Term()
-	if rh.Revision == 0 {
-		rh.Revision = h.rev()
-	}
 }

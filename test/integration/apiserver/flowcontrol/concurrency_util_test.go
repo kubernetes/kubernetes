@@ -122,7 +122,7 @@ func intervalMetricAvg(snapshot0, snapshot1 metricSnapshot, plLabel string) plMe
 }
 
 type noxuDelayingAuthorizer struct {
-	Authorizer authorizer.Authorizer
+	Authorizer authorizer.UnconditionalAuthorizer
 }
 
 func (d *noxuDelayingAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
@@ -130,6 +130,16 @@ func (d *noxuDelayingAuthorizer) Authorize(ctx context.Context, a authorizer.Att
 		time.Sleep(fakeworkDuration) // simulate fake work with sleep
 	}
 	return d.Authorizer.Authorize(ctx, a)
+}
+
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (d *noxuDelayingAuthorizer) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(d.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (*noxuDelayingAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 }
 
 // TestConcurrencyIsolation tests the concurrency isolation between priority levels.

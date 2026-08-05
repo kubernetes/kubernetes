@@ -35,8 +35,8 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
+	filesutil "k8s.io/kubernetes/cmd/kubeadm/app/util/files/testing"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 func TestGetEtcdPodSpec(t *testing.T) {
@@ -212,8 +212,8 @@ status: {}
 				t.Errorf("CreateLocalEtcdStaticPodManifestFile failed when not expected: %v", err)
 			}
 			// Assert expected files are there
-			testutil.AssertFilesCount(t, manifestPath, 1)
-			testutil.AssertFileExists(t, manifestPath, kubeadmconstants.Etcd+".yaml")
+			filesutil.AssertFilesCount(t, manifestPath, 1)
+			filesutil.AssertFileExists(t, manifestPath, kubeadmconstants.Etcd+".yaml")
 			manifestBytes, err := os.ReadFile(path.Join(manifestPath, kubeadmconstants.Etcd+".yaml"))
 			if err != nil {
 				t.Errorf("failed to load generated manifest file: %v", err)
@@ -225,7 +225,7 @@ status: {}
 				)
 			}
 		} else {
-			testutil.AssertError(t, err, "etcd static pod manifest cannot be generated for cluster using external etcd")
+			assertError(t, err, "etcd static pod manifest cannot be generated for cluster using external etcd")
 		}
 	}
 }
@@ -440,5 +440,15 @@ func TestGetEtcdCommand(t *testing.T) {
 				t.Errorf("failed getEtcdCommand:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
 			}
 		})
+	}
+}
+
+func assertError(t *testing.T, err error, expected string) {
+	if err == nil {
+		t.Errorf("no error was found, but '%s' was expected", expected)
+		return
+	}
+	if err.Error() != expected {
+		t.Errorf("error '%s' does not match expected error: '%s'", err.Error(), expected)
 	}
 }

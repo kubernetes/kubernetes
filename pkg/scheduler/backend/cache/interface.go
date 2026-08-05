@@ -18,6 +18,8 @@ package cache
 
 import (
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -69,8 +71,13 @@ type Cache interface {
 	// AssumePod assumes a pod scheduled and aggregates the pod's information into its node.
 	AssumePod(logger klog.Logger, pod *v1.Pod) error
 
-	// ForgetPod removes an assumed pod from cache.
+	// ForgetPod forgets an assumed pod from the cache. It should be called when the pod
+	// still exists, as an undo operation for AssumePod.
 	ForgetPod(logger klog.Logger, pod *v1.Pod) error
+
+	// RemoveAssumedPod removes an assumed pod from the cache. It should be called when the assumed
+	// pod was removed from the cluster to correctly clean up internal state.
+	RemoveAssumedPod(logger klog.Logger, pod *v1.Pod) error
 
 	// AddPod confirms an assumed pod, or adds a newly assigned pod to the cache.
 	AddPod(logger klog.Logger, pod *v1.Pod) error
@@ -89,12 +96,10 @@ type Cache interface {
 	IsAssumedPod(pod *v1.Pod) (bool, error)
 
 	// AddNode adds overall information about node.
-	// It returns a clone of added NodeInfo object.
-	AddNode(logger klog.Logger, node *v1.Node) *framework.NodeInfo
+	AddNode(logger klog.Logger, node *v1.Node)
 
 	// UpdateNode updates overall information about node.
-	// It returns a clone of updated NodeInfo object.
-	UpdateNode(logger klog.Logger, oldNode, newNode *v1.Node) *framework.NodeInfo
+	UpdateNode(logger klog.Logger, oldNode, newNode *v1.Node)
 
 	// RemoveNode removes overall information about node.
 	RemoveNode(logger klog.Logger, node *v1.Node) error
@@ -116,6 +121,15 @@ type Cache interface {
 	// PodGroupStates returns a PodGroupStateLister.
 	PodGroupStates() fwk.PodGroupStateLister
 
+	// PodGroups returns a PodGroupLister used to access the cached PodGroup objects.
+	PodGroups() fwk.PodGroupLister
+
+	// CompositePodGroupStates returns a CompositePodGroupStateLister.
+	CompositePodGroupStates() fwk.CompositePodGroupStateLister
+
+	// CompositePodGroups returns a CompositePodGroupLister used to access the cached CompositePodGroup objects.
+	CompositePodGroups() fwk.CompositePodGroupLister
+
 	// AddPodGroupMember adds not assigned and not assumed pod to its pod group state.
 	AddPodGroupMember(pod *v1.Pod)
 
@@ -124,6 +138,30 @@ type Cache interface {
 
 	// RemovePodGroupMember removes a pod from its pod group state.
 	RemovePodGroupMember(pod *v1.Pod)
+
+	// AddPodGroup adds a pod group object to the cache.
+	AddPodGroup(podGroup *schedulingv1beta1.PodGroup)
+
+	// UpdatePodGroup updates a pod group object in the cache.
+	UpdatePodGroup(logger klog.Logger, oldPodGroup, newPodGroup *schedulingv1beta1.PodGroup)
+
+	// RemovePodGroup removes a pod group object from the cache.
+	RemovePodGroup(logger klog.Logger, podGroup *schedulingv1beta1.PodGroup)
+
+	// AddCompositePodGroup adds a composite pod group to the cache.
+	AddCompositePodGroup(logger klog.Logger, cpg *schedulingv1alpha3.CompositePodGroup)
+
+	// UpdateCompositePodGroup updates a composite pod group object in the cache.
+	UpdateCompositePodGroup(logger klog.Logger, oldPodGroup, newPodGroup *schedulingv1alpha3.CompositePodGroup)
+
+	// RemoveCompositePodGroup removes a composite pod group from the cache.
+	RemoveCompositePodGroup(logger klog.Logger, cpg *schedulingv1alpha3.CompositePodGroup)
+
+	// BuildHierarchySnapshotFromPod returns a snapshot of the pod group hierarchy for the given pod.
+	BuildHierarchySnapshotFromPod(pod *v1.Pod) (fwk.PodGroupManager, error)
+
+	// GetRootKeyForGroup returns the root key of the given EntityKey.
+	GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bool, error)
 }
 
 // Dump is a dump of the cache state.

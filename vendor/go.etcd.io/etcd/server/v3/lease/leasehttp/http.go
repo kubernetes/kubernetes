@@ -23,6 +23,8 @@ import (
 	"net/http"
 	"time"
 
+	"google.golang.org/protobuf/proto"
+
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/pkg/v3/httputil"
 	"go.etcd.io/etcd/server/v3/lease"
@@ -63,7 +65,7 @@ func (h *leaseHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case LeasePrefix:
 		lreq := pb.LeaseKeepAliveRequest{}
-		if uerr := lreq.Unmarshal(b); uerr != nil {
+		if uerr := proto.Unmarshal(b, &lreq); uerr != nil {
 			http.Error(w, "error unmarshalling request", http.StatusBadRequest)
 			return
 		}
@@ -73,6 +75,7 @@ func (h *leaseHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, ErrLeaseHTTPTimeout.Error(), http.StatusRequestTimeout)
 			return
 		}
+		// gofail: var beforeServeHTTPLeaseRenew struct{}
 		ttl, rerr := h.l.Renew(lease.LeaseID(lreq.ID))
 		if rerr != nil {
 			if errors.Is(rerr, lease.ErrLeaseNotFound) {
@@ -85,7 +88,7 @@ func (h *leaseHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		// TODO: fill out ResponseHeader
 		resp := &pb.LeaseKeepAliveResponse{ID: lreq.ID, TTL: ttl}
-		v, err = resp.Marshal()
+		v, err = proto.Marshal(resp)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -93,7 +96,7 @@ func (h *leaseHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	case LeaseInternalPrefix:
 		lreq := leasepb.LeaseInternalRequest{}
-		if lerr := lreq.Unmarshal(b); lerr != nil {
+		if lerr := proto.Unmarshal(b, &lreq); lerr != nil {
 			http.Error(w, "error unmarshalling request", http.StatusBadRequest)
 			return
 		}
@@ -137,7 +140,7 @@ func (h *leaseHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		v, err = resp.Marshal()
+		v, err = proto.Marshal(resp)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -156,7 +159,7 @@ func (h *leaseHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // TODO: Batch request in future?
 func RenewHTTP(ctx context.Context, id lease.LeaseID, url string, rt http.RoundTripper) (int64, error) {
 	// will post lreq protobuf to leader
-	lreq, err := (&pb.LeaseKeepAliveRequest{ID: int64(id)}).Marshal()
+	lreq, err := proto.Marshal(&pb.LeaseKeepAliveRequest{ID: int64(id)})
 	if err != nil {
 		return -1, err
 	}
@@ -171,8 +174,8 @@ func RenewHTTP(ctx context.Context, id lease.LeaseID, url string, rt http.RoundT
 	if err != nil {
 		return -1, err
 	}
+	req = req.WithContext(ctx)
 	req.Header.Set("Content-Type", "application/protobuf")
-	req.Cancel = ctx.Done()
 
 	resp, err := cc.Do(req)
 	if err != nil {
@@ -196,7 +199,7 @@ func RenewHTTP(ctx context.Context, id lease.LeaseID, url string, rt http.RoundT
 	}
 
 	lresp := &pb.LeaseKeepAliveResponse{}
-	if err := lresp.Unmarshal(b); err != nil {
+	if err := proto.Unmarshal(b, lresp); err != nil {
 		return -1, fmt.Errorf(`lease: %w. data = "%s"`, err, b)
 	}
 	if lresp.ID != int64(id) {
@@ -208,12 +211,12 @@ func RenewHTTP(ctx context.Context, id lease.LeaseID, url string, rt http.RoundT
 // TimeToLiveHTTP retrieves lease information of the given lease ID.
 func TimeToLiveHTTP(ctx context.Context, id lease.LeaseID, keys bool, url string, rt http.RoundTripper) (*leasepb.LeaseInternalResponse, error) {
 	// will post lreq protobuf to leader
-	lreq, err := (&leasepb.LeaseInternalRequest{
+	lreq, err := proto.Marshal(&leasepb.LeaseInternalRequest{
 		LeaseTimeToLiveRequest: &pb.LeaseTimeToLiveRequest{
 			ID:   int64(id),
 			Keys: keys,
 		},
-	}).Marshal()
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +256,7 @@ func TimeToLiveHTTP(ctx context.Context, id lease.LeaseID, keys bool, url string
 	}
 
 	lresp := &leasepb.LeaseInternalResponse{}
-	if err := lresp.Unmarshal(b); err != nil {
+	if err := proto.Unmarshal(b, lresp); err != nil {
 		return nil, fmt.Errorf(`lease: %w. data = "%s"`, err, string(b))
 	}
 	if lresp.LeaseTimeToLiveResponse.ID != int64(id) {

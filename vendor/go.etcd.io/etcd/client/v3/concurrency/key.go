@@ -30,7 +30,7 @@ func waitDelete(ctx context.Context, client *v3.Client, key string, rev int64) e
 	wch := client.Watch(cctx, key, v3.WithRev(rev))
 	for wr = range wch {
 		for _, ev := range wr.Events {
-			if ev.Type == mvccpb.DELETE {
+			if ev.Type == mvccpb.Event_DELETE {
 				return nil
 			}
 		}

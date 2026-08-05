@@ -35,7 +35,7 @@ import (
 // +k8s:supportsSubresource="/status"
 // +k8s:supportsSubresource="/approval"
 type CertificateSigningRequest struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -177,12 +177,12 @@ type CertificateSigningRequestStatus struct {
 	// +listType=map
 	// +listMapKey=type
 	// +optional
-	// +k8s:alpha(since: "1.36")=+k8s:listType=map
-	// +k8s:alpha(since: "1.36")=+k8s:listMapKey=type
-	// +k8s:alpha(since: "1.36")=+k8s:customUnique
-	// +k8s:alpha(since: "1.36")=+k8s:optional
-	// +k8s:alpha(since: "1.36")=+k8s:item(type: "Approved")=+k8s:zeroOrOneOfMember
-	// +k8s:alpha(since: "1.36")=+k8s:item(type: "Denied")=+k8s:zeroOrOneOfMember
+	// +k8s:beta(since: "1.37")=+k8s:listType=map
+	// +k8s:beta(since: "1.37")=+k8s:listMapKey=type
+	// +k8s:beta(since: "1.37")=+k8s:customUnique
+	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:beta(since: "1.37")=+k8s:item(type: "Approved")=+k8s:zeroOrOneOfMember
+	// +k8s:beta(since: "1.37")=+k8s:item(type: "Denied")=+k8s:zeroOrOneOfMember
 	Conditions []CertificateSigningRequestCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`
 
 	// If request was approved, the controller will place the issued certificate here.
@@ -230,7 +230,7 @@ type CertificateSigningRequestCondition struct {
 // +k8s:prerelease-lifecycle-gen:replacement=certificates.k8s.io,v1,CertificateSigningRequestList
 
 type CertificateSigningRequestList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -274,6 +274,7 @@ const (
 // +genclient:nonNamespaced
 // +k8s:prerelease-lifecycle-gen:introduced=1.33
 // +k8s:prerelease-lifecycle-gen:deprecated=1.37
+// +k8s:prerelease-lifecycle-gen:replacement=certificates.k8s.io,v1,ClusterTrustBundle
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClusterTrustBundle is a cluster-scoped container for X.509 trust anchors
@@ -286,13 +287,13 @@ const (
 // to a cluster can read ClusterTrustBundles by impersonating a serviceaccount
 // that they have access to.
 //
-// It can be optionally associated with a particular assigner, in which case it
+// It can be optionally associated with a particular signer, in which case it
 // contains one valid set of trust anchors for that signer. Signers may have
 // multiple associated ClusterTrustBundles; each is an independent set of trust
 // anchors for that signer. Admission control is used to enforce that only users
 // with permissions on the signer can create or modify the corresponding bundle.
 type ClusterTrustBundle struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// metadata contains the object metadata.
 	// +optional
@@ -324,6 +325,8 @@ type ClusterTrustBundleSpec struct {
 	// using a `spec.signerName=NAME` field selector.
 	//
 	// +optional
+	// +k8s:alpha(since:"1.37")=+k8s:optional
+	// +k8s:alpha(since:"1.37")=+k8s:immutable
 	SignerName string `json:"signerName,omitempty" protobuf:"bytes,1,opt,name=signerName"`
 
 	// trustBundle contains the individual X.509 trust anchors for this
@@ -342,11 +345,12 @@ type ClusterTrustBundleSpec struct {
 
 // +k8s:prerelease-lifecycle-gen:introduced=1.33
 // +k8s:prerelease-lifecycle-gen:deprecated=1.37
+// +k8s:prerelease-lifecycle-gen:replacement=certificates.k8s.io,v1,ClusterTrustBundleList
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClusterTrustBundleList is a collection of ClusterTrustBundle objects
 type ClusterTrustBundleList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// metadata contains the list metadata.
 	//
@@ -359,14 +363,17 @@ type ClusterTrustBundleList struct {
 
 // +genclient
 // +k8s:prerelease-lifecycle-gen:introduced=1.35
+// +k8s:prerelease-lifecycle-gen:deprecated=1.37
+// +k8s:prerelease-lifecycle-gen:replacement=certificates.k8s.io,v1,PodCertificateRequest
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodCertificateRequest encodes a pod requesting a certificate from a given
 // signer.
 //
 // Kubelets use this API to implement podCertificate projected volumes
+// +k8s:supportsSubresource="/status"
 type PodCertificateRequest struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// metadata contains the object metadata.
 	//
@@ -538,6 +545,9 @@ type PodCertificateRequestStatus struct {
 	// +listType=map
 	// +listMapKey=type
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:listType=map
+	// +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 
 	// certificateChain is populated with an issued certificate by the signer.
@@ -618,10 +628,12 @@ const (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.35
+// +k8s:prerelease-lifecycle-gen:deprecated=1.37
+// +k8s:prerelease-lifecycle-gen:replacement=certificates.k8s.io,v1,PodCertificateRequestList
 
 // PodCertificateRequestList is a collection of PodCertificateRequest objects
 type PodCertificateRequestList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// metadata contains the list metadata.
 	//

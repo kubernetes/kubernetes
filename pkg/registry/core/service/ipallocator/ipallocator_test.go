@@ -128,7 +128,7 @@ func TestAllocateIPAllocator(t *testing.T) {
 			if f := r.Used(); f != 0 {
 				t.Errorf("[%s]: wrong used: expected %d, got %d", tc.name, 0, f)
 			}
-			found := sets.NewString()
+			found := sets.New[string]()
 			count := 0
 			for r.Free() > 0 {
 				ip, err := r.AllocateNext()
@@ -337,7 +337,7 @@ func TestAllocateSmallIPAllocator(t *testing.T) {
 	if f := r.Free(); f != 2 {
 		t.Errorf("expected free equal to 2 got: %d", f)
 	}
-	found := sets.NewString()
+	found := sets.New[string]()
 	for i := 0; i < 2; i++ {
 		ip, err := r.AllocateNext()
 		if err != nil {
@@ -373,11 +373,11 @@ func TestForEachIPAllocator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	testCases := []sets.String{
-		sets.NewString(),
-		sets.NewString("192.168.1.1"),
-		sets.NewString("192.168.1.1", "192.168.1.254"),
-		sets.NewString("192.168.1.1", "192.168.1.128", "192.168.1.254"),
+	testCases := []sets.Set[string]{
+		sets.New[string](),
+		sets.New[string]("192.168.1.1"),
+		sets.New[string]("192.168.1.1", "192.168.1.254"),
+		sets.New[string]("192.168.1.1", "192.168.1.128", "192.168.1.254"),
 	}
 
 	for i, tc := range testCases {
@@ -396,7 +396,7 @@ func TestForEachIPAllocator(t *testing.T) {
 				t.Errorf("[%d] expected IP %v allocated", i, ip)
 			}
 		}
-		calls := sets.NewString()
+		calls := sets.New[string]()
 		r.ForEach(func(ip net.IP) {
 			calls.Insert(ip.String())
 		})
@@ -404,7 +404,7 @@ func TestForEachIPAllocator(t *testing.T) {
 			t.Errorf("[%d] expected %d calls, got %d", i, len(tc), len(calls))
 		}
 		if !calls.Equal(tc) {
-			t.Errorf("[%d] expected calls to equal testcase: %v vs %v", i, calls.List(), tc.List())
+			t.Errorf("[%d] expected calls to equal testcase: %v vs %v", i, sets.List(calls), sets.List(tc))
 		}
 	}
 }
@@ -445,7 +445,7 @@ func TestIPAllocatorClusterIPMetrics(t *testing.T) {
 	expectMetrics(t, cidrIPv6, em)
 
 	// allocate 2 IPv4 addresses
-	found := sets.NewString()
+	found := sets.New[string]()
 	for i := 0; i < 2; i++ {
 		ip, err := a.AllocateNext()
 		if err != nil {
@@ -541,7 +541,7 @@ func TestIPAllocatorClusterIPAllocatedMetrics(t *testing.T) {
 	expectMetrics(t, cidrIPv4, em)
 
 	// allocate 2 dynamic IPv4 addresses
-	found := sets.NewString()
+	found := sets.New[string]()
 	for i := 0; i < 2; i++ {
 		ip, err := a.AllocateNext()
 		if err != nil {

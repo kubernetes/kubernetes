@@ -24,7 +24,7 @@ WHALE = "🇩"
 ONI = "👹"
 
 # Project binaries.
-COMMANDS=protoc-gen-go-ttrpc protoc-gen-gogottrpc
+COMMANDS=protoc-gen-go-ttrpc
 
 ifdef BUILDTAGS
     GO_BUILDTAGS = ${BUILDTAGS}
@@ -57,7 +57,7 @@ TESTFLAGS_PARALLEL ?= 8
 # Use this to replace `go test` with, for instance, `gotestsum`
 GOTEST ?= $(GO) test
 
-.PHONY: clean all AUTHORS build binaries test integration generate protos check-protos coverage ci check help install vendor install-protobuf install-protobuild
+.PHONY: clean all AUTHORS build binaries test integration generate protos check-protos coverage ci check help install vendor maintainer-clean
 .DEFAULT: default
 
 # Forcibly set the default goal to all, in case an include above brought in a rule definition.
@@ -65,7 +65,7 @@ GOTEST ?= $(GO) test
 
 all: binaries
 
-check: proto-fmt ## run all linters
+check: ## run all linters
 	@echo "$(WHALE) $@"
 	GOGC=75 golangci-lint run
 
@@ -78,28 +78,16 @@ generate: protos
 	@echo "$(WHALE) $@"
 	@PATH="${ROOTDIR}/bin:${PATH}" $(GO) generate -x ${PACKAGES}
 
-protos: bin/protoc-gen-gogottrpc bin/protoc-gen-go-ttrpc ## generate protobuf
+protos: bin/protoc-gen-go-ttrpc ## generate protobuf
 	@echo "$(WHALE) $@"
-	@(PATH="${ROOTDIR}/bin:${PATH}" protobuild --quiet ${PACKAGES})
+	(cd example && buf generate)
+	buf generate
 
 check-protos: protos ## check if protobufs needs to be generated again
 	@echo "$(WHALE) $@"
 	@test -z "$$(git status --short | grep ".pb.go" | tee /dev/stderr)" || \
 		((git diff | cat) && \
 		(echo "$(ONI) please run 'make protos' when making changes to proto files" && false))
-
-check-api-descriptors: protos ## check that protobuf changes aren't present.
-	@echo "$(WHALE) $@"
-	@test -z "$$(git status --short | grep ".pb.txt" | tee /dev/stderr)" || \
-		((git diff $$(find . -name '*.pb.txt') | cat) && \
-		(echo "$(ONI) please run 'make protos' when making changes to proto files and check-in the generated descriptor file changes" && false))
-
-proto-fmt: ## check format of proto files
-	@echo "$(WHALE) $@"
-	@test -z "$$(find . -name '*.proto' -type f -exec grep -Hn -e "^ " {} \; | tee /dev/stderr)" || \
-		(echo "$(ONI) please indent proto files with tabs only" && false)
-	@test -z "$$(find . -name '*.proto' -type f -exec grep -Hn "Meta meta = " {} \; | grep -v '(gogoproto.nullable) = false' | tee /dev/stderr)" || \
-		(echo "$(ONI) meta fields in proto files must have option (gogoproto.nullable) = false" && false)
 
 build: ## build the go packages
 	@echo "$(WHALE) $@"
@@ -116,6 +104,10 @@ integration: ## run integration tests
 benchmark: ## run benchmarks tests
 	@echo "$(WHALE) $@"
 	@$(GO) test ${TESTFLAGS} -bench . -run Benchmark
+
+maintainer-clean:
+	@echo "$(WHALE) $@"
+	@find . -name '*.pb.go' -delete
 
 FORCE:
 
@@ -138,15 +130,6 @@ clean: ## clean up binaries
 install: ## install binaries
 	@echo "$(WHALE) $@ $(BINPACKAGES)"
 	@$(GO) install $(BINPACKAGES)
-
-install-protobuf:
-	@echo "$(WHALE) $@"
-	@script/install-protobuf
-
-install-protobuild:
-	@echo "$(WHALE) $@"
-	@$(GO) install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.1
-	@$(GO) install github.com/containerd/protobuild@14832ccc41429f5c4f81028e5af08aa233a219cf
 
 coverage: ## generate coverprofiles from the unit tests, except tests that require root
 	@echo "$(WHALE) $@"

@@ -16,7 +16,6 @@ package schema
 
 import (
 	"encoding/binary"
-	"fmt"
 
 	"go.etcd.io/etcd/client/pkg/v3/verify"
 	"go.etcd.io/etcd/server/v3/storage/backend"
@@ -76,10 +75,11 @@ func unsafeUpdateConsistentIndex(tx backend.UnsafeReadWriter, index uint64, term
 	binary.BigEndian.PutUint64(bs1, index)
 
 	if !allowDecreasing {
-		verify.Verify(func() {
+		verify.Verify("update of consistent index not advancing", func() (bool, map[string]any) {
 			previousIndex, _ := UnsafeReadConsistentIndex(tx)
-			if index < previousIndex {
-				panic(fmt.Errorf("update of consistent index not advancing: previous: %v new: %v", previousIndex, index))
+			return index >= previousIndex, map[string]any{
+				"previousIndex": previousIndex,
+				"currentIndex":  index,
 			}
 		})
 	}

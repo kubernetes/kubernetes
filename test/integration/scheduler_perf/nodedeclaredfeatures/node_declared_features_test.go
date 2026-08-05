@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	perf "k8s.io/kubernetes/test/integration/scheduler_perf"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 // This test benchmarks the NodeDeclaredFeatures features performance impact.

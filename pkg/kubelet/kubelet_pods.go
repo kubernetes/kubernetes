@@ -30,6 +30,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -38,6 +39,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -279,7 +281,15 @@ func makeMounts(logger klog.Logger, pod *v1.Pod, podDir string, container *v1.Co
 	mountEtcHostsFile := shouldMountHostsFile(pod, podIPs)
 	logger.V(3).Info("Creating hosts mount for container", "pod", klog.KObj(pod), "containerName", container.Name, "podIPs", podIPs, "path", mountEtcHostsFile)
 	mounts := []kubecontainer.Mount{}
-	var cleanupAction func()
+	var cleanupActions []func()
+	cleanupAction := func() {
+		// We reverse the order to do the cleanup in the opposite order the mounts were done in - in case there are dependencies
+		// between the cleanup actions. Note that there is no hierarchy or any other order here in the first place,
+		// it is just clean up actions are performed in opposite order.
+		for _, fn := range slices.Backward(cleanupActions) {
+			fn()
+		}
+	}
 	for i, mount := range container.VolumeMounts {
 		// do not mount /etc/hosts if container is already mounting on the path
 		mountEtcHostsFile = mountEtcHostsFile && (mount.MountPath != etcHostsPath)
@@ -352,13 +362,14 @@ func makeMounts(logger klog.Logger, pod *v1.Pod, podDir string, container *v1.Co
 					if err != nil {
 						return nil, cleanupAction, err
 					}
-					if err := subpather.SafeMakeDir(subPath, volumePath, perm); err != nil {
+					if err := subpather.SafeMakeDir(subPath, volumePath, perm); err != nil && !goerrors.Is(err, os.ErrExist) {
 						// Don't pass detailed error back to the user because it could give information about host filesystem
 						logger.Error(nil, "Failed to create subPath directory for volumeMount of the container", "containerName", container.Name, "volumeMountName", mount.Name)
 						return nil, cleanupAction, fmt.Errorf("failed to create subPath directory for volumeMount %q of container %q", mount.Name, container.Name)
 					}
 				}
-				hostPath, cleanupAction, err = subpather.PrepareSafeSubpath(subpath.Subpath{
+				var subpathCleanup func()
+				hostPath, subpathCleanup, err = subpather.PrepareSafeSubpath(subpath.Subpath{
 					VolumeMountIndex: i,
 					Path:             hostPath,
 					VolumeName:       vol.InnerVolumeSpecName,
@@ -366,6 +377,11 @@ func makeMounts(logger klog.Logger, pod *v1.Pod, podDir string, container *v1.Co
 					PodDir:           podDir,
 					ContainerName:    container.Name,
 				})
+				if subpathCleanup != nil {
+					// Append to the cleanup slice so all subpath cleanup actions are
+					// invoked when the composite cleanupAction is called.
+					cleanupActions = append(cleanupActions, subpathCleanup)
+				}
 				if err != nil {
 					// Don't pass detailed error back to the user because it could give information about host filesystem
 					logger.Error(nil, "Failed to prepare subPath for volumeMount of the container", "containerName", container.Name, "volumeMountName", mount.Name)
@@ -410,6 +426,7 @@ func makeMounts(logger klog.Logger, pod *v1.Pod, podDir string, container *v1.Co
 			RecursiveReadOnly: rro,
 			SELinuxRelabel:    relabelVolume,
 			Propagation:       propagation,
+			BindMountOptions:  mount.BindMountOptions,
 		})
 	}
 	if mountEtcHostsFile {
@@ -580,7 +597,7 @@ func (kl *Kubelet) GetOrCreateUserNamespaceMappings(logger klog.Logger, pod *v1.
 func (kl *Kubelet) GeneratePodHostNameAndDomain(logger klog.Logger, pod *v1.Pod) (string, string, error) {
 	clusterDomain := kl.dnsConfigurer.ClusterDomain
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.HostnameOverride) && pod.Spec.HostnameOverride != nil {
+	if pod.Spec.HostnameOverride != nil {
 		hostname := *pod.Spec.HostnameOverride
 		if msgs := utilvalidation.IsDNS1123Subdomain(hostname); len(msgs) != 0 {
 			return "", "", fmt.Errorf("pod HostnameOverride %q is not a valid DNS subdomain: %s", hostname, strings.Join(msgs, ";"))
@@ -621,6 +638,11 @@ func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) string {
 	pcm := kl.containerManager.NewPodContainerManager()
 	_, cgroupParent := pcm.GetPodContainerName(pod)
 	return cgroupParent
+}
+
+// ResizeEphemeralVolume directly triggers a resize of the specified volume.
+func (kl *Kubelet) ResizeEphemeralVolume(pod *v1.Pod, volumeName string, newSize *apiresource.Quantity) error {
+	return kl.volumeManager.ResizeEphemeralVolume(pod, volumeName, newSize)
 }
 
 // GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
@@ -767,7 +789,7 @@ func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, co
 	var (
 		configMaps = make(map[string]*v1.ConfigMap)
 		secrets    = make(map[string]*v1.Secret)
-		tmpEnv     = make(map[string]string)
+		tmpEnv     = make(map[string]string) // TODO: switch to map[string][]byte
 	)
 
 	// Env will override EnvFrom variables.
@@ -799,6 +821,7 @@ func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, co
 					k = envFrom.Prefix + k
 				}
 
+				// TODO: validate no NUL bytes
 				tmpEnv[k] = v
 			}
 		case envFrom.SecretRef != nil:
@@ -826,6 +849,7 @@ func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, co
 					k = envFrom.Prefix + k
 				}
 
+				// TODO: validate no NUL bytes
 				tmpEnv[k] = string(v)
 			}
 		}
@@ -919,6 +943,7 @@ func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, co
 					}
 					return result, fmt.Errorf("couldn't find key %v in Secret %v/%v", key, pod.Namespace, name)
 				}
+				// TODO: validate no NUL bytes
 				runtimeVal = string(runtimeValBytes)
 			case utilfeature.DefaultFeatureGate.Enabled(features.EnvFiles) && envVar.ValueFrom.FileKeyRef != nil:
 				f := envVar.ValueFrom.FileKeyRef
@@ -1064,10 +1089,11 @@ func (kl *Kubelet) makePodDataDirs(pod *v1.Pod) error {
 }
 
 // getPullSecretsForPod inspects the Pod and retrieves the referenced pull
-// secrets.
-func (kl *Kubelet) getPullSecretsForPod(logger klog.Logger, pod *v1.Pod) []v1.Secret {
+// secrets. The names of secrets that cannot be found are returned so we can
+// emit an event later if the image pull fails too.
+func (kl *Kubelet) getPullSecretsForPod(logger klog.Logger, pod *v1.Pod) ([]v1.Secret, []string) {
 	pullSecrets := []v1.Secret{}
-	failedPullSecrets := []string{}
+	missingPullSecretNames := []string{}
 
 	for _, secretRef := range pod.Spec.ImagePullSecrets {
 		if len(secretRef.Name) == 0 {
@@ -1077,19 +1103,15 @@ func (kl *Kubelet) getPullSecretsForPod(logger klog.Logger, pod *v1.Pod) []v1.Se
 		}
 		secret, err := kl.secretManager.GetSecret(pod.Namespace, secretRef.Name)
 		if err != nil {
-			logger.Info("Unable to retrieve pull secret, the image pull may not succeed.", "pod", klog.KObj(pod), "secret", klog.KObj(secret), "err", err)
-			failedPullSecrets = append(failedPullSecrets, secretRef.Name)
+			logger.Info("Unable to retrieve pull secret, the image pull may not succeed.", "pod", klog.KObj(pod), "secret", klog.KRef(pod.Namespace, secretRef.Name), "err", err)
+			missingPullSecretNames = append(missingPullSecretNames, secretRef.Name)
 			continue
 		}
 
 		pullSecrets = append(pullSecrets, *secret)
 	}
 
-	if len(failedPullSecrets) > 0 {
-		kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, "FailedToRetrieveImagePullSecret", "Unable to retrieve some image pull secrets (%s); attempting to pull the image may not succeed.", strings.Join(failedPullSecrets, ", "))
-	}
-
-	return pullSecrets
+	return pullSecrets, missingPullSecretNames
 }
 
 // PodCouldHaveRunningContainers returns true if the pod with the given UID could still have running
@@ -1211,7 +1233,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	)
 	if kl.cgroupsPerQOS {
 		pcm := kl.containerManager.NewPodContainerManager()
-		cgroupPods, err = pcm.GetAllPodsFromCgroups()
+		cgroupPods, err = pcm.GetAllPodsFromCgroups(logger)
 		if err != nil {
 			return fmt.Errorf("failed to get list of pods that still exist on cgroup mounts: %v", err)
 		}
@@ -1522,7 +1544,7 @@ func splitPodsByStatic(pods []*v1.Pod) (regular, static []*v1.Pod) {
 // of the container. The previous flag will only return the logs for the last terminated container, otherwise, the current
 // running container is preferred over a previous termination. If info about the container is not available then a specific
 // error is returned to the end user.
-func (kl *Kubelet) validateContainerLogStatus(podName string, podStatus *v1.PodStatus, containerName string, previous bool) (containerID kubecontainer.ContainerID, err error) {
+func (kl *Kubelet) validateContainerLogStatus(logger klog.Logger, podName string, podStatus *v1.PodStatus, containerName string, previous bool) (containerID kubecontainer.ContainerID, err error) {
 	var cID string
 
 	cStatus, found := podutil.GetContainerStatus(podStatus.ContainerStatuses, containerName)
@@ -1581,7 +1603,7 @@ func (kl *Kubelet) validateContainerLogStatus(podName string, podStatus *v1.PodS
 		return kubecontainer.ContainerID{}, fmt.Errorf("container %q in pod %q is waiting to start - no logs yet", containerName, podName)
 	}
 
-	return kubecontainer.ParseContainerID(cID), nil
+	return kubecontainer.ParseContainerID(logger, cID), nil
 }
 
 // GetKubeletContainerLogs returns logs from the container
@@ -1628,7 +1650,7 @@ func (kl *Kubelet) GetKubeletContainerLogs(ctx context.Context, podFullName, con
 	// but inside kuberuntime we convert container id back to container name and restart count.
 	// TODO: After separate container log lifecycle management, we should get log based on the existing log files
 	// instead of container status.
-	containerID, err := kl.validateContainerLogStatus(pod.Name, &podStatus, containerName, logOptions.Previous)
+	containerID, err := kl.validateContainerLogStatus(klog.FromContext(ctx), pod.Name, &podStatus, containerName, logOptions.Previous)
 	if err != nil {
 		return err
 	}
@@ -1875,7 +1897,7 @@ func (kl *Kubelet) determinePodResizeStatus(allocatedPod *v1.Pod, podIsTerminal 
 	// If pod is terminal, clear the resize status.
 	if podIsTerminal {
 		kl.statusManager.ClearPodResizeInProgressCondition(allocatedPod.UID)
-		kl.statusManager.ClearPodResizePendingCondition(allocatedPod.UID)
+		kl.statusManager.ClearPodResizePendingCondition(allocatedPod.UID, metrics.DeferredResizeResolutionTerminated)
 		return nil
 	}
 
@@ -1948,7 +1970,7 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 
 	// update the allocated resources status
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {
-		kl.containerManager.UpdateAllocatedResourcesStatus(pod, s)
+		kl.containerManager.UpdateAllocatedResourcesStatus(logger, pod, s)
 	}
 
 	// preserve all conditions not owned by the kubelet
@@ -2154,7 +2176,8 @@ func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, po
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
 		apiPodStatus.Resources = kl.convertToAPIPodLevelResourcesStatus(logger, pod, oldPodStatus)
 		opts := resourcehelper.PodResourcesOptions{
-			SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+			SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+			UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
 		}
 		apiPodStatus.AllocatedResources = resourcehelper.PodRequests(pod, opts)
 	}
@@ -2168,7 +2191,8 @@ func getEffectiveAllocatedResources(allocatedPod *v1.Pod) *v1.ResourceRequiremen
 		allocatedResources = &v1.ResourceRequirements{}
 	}
 	opts := resourcehelper.PodResourcesOptions{
-		SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
 	}
 	allocatedResources.Requests = resourcehelper.PodRequests(allocatedPod, opts)
 	allocatedResources.Limits = resourcehelper.PodLimits(allocatedPod, opts)
@@ -2226,11 +2250,25 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 	}
 
 	if cpuRequest != nil {
-		// If both the allocated & actual resources are at
-		// or below MinShares, preserve the allocated value in the API to avoid
-		// confusion and simplify comparisons.
+		// If both the allocated and actual values are at or below MinShares,
+		// preserve the allocated value in the API to avoid confusion and simplify
+		// comparisons at the cgroup minimum floor.
 		if cpuRequest.MilliValue() > cm.MinShares || resources.Requests.Cpu().MilliValue() > cm.MinShares {
-			resources.Requests[v1.ResourceCPU] = cpuRequest.DeepCopy()
+			allocatedMilliCPU := resources.Requests.Cpu().MilliValue()
+			allocatedShares := cm.MilliCPUToShares(allocatedMilliCPU)
+			// On cgroup v2, cpu.weight has coarse granularity and converting
+			// shares -> weight -> shares can be lossy. If the cgroup readback
+			// matches the round-tripped allocated shares, preserve the allocated
+			// milliCPU in the API. Otherwise treat it as a real change and use
+			// the actuated value.
+			if cpuConfig != nil && cpuConfig.CPUShares != nil &&
+				cm.CPUSharesEqualAfterV2RoundTrip(allocatedShares, *cpuConfig.CPUShares) {
+				logger.V(4).Info("Preserving allocated CPU request due to cgroup v2 round-trip",
+					"allocated", allocatedMilliCPU, "actuated", cpuRequest.MilliValue(),
+					"allocatedShares", allocatedShares, "readbackShares", *cpuConfig.CPUShares)
+			} else {
+				resources.Requests[v1.ResourceCPU] = cpuRequest.DeepCopy()
+			}
 		}
 	} else {
 		preserveOldResourcesValue(v1.ResourceCPU, oldPodStatus.Resources.Requests, resources.Requests)
@@ -2238,17 +2276,14 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 
 	if _, found := resources.Requests[v1.ResourceMemory]; !found {
 		opts := resourcehelper.PodResourcesOptions{
-			SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+			SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+			UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
 		}
 		aggregatedResources := resourcehelper.PodRequests(allocatedPod, opts)
 		if val, ok := aggregatedResources[v1.ResourceMemory]; ok {
 			resources.Requests[v1.ResourceMemory] = val
 		}
 	}
-
-	// TODO: Once we begin persisting memory Request from the PodSpec to cgroups,
-	// the code needs to persist that value if it is non-nil.
-	preserveOldResourcesValue(v1.ResourceMemory, oldPodStatus.Resources.Requests, resources.Requests)
 
 	if cpuLimit != nil {
 		// If both the allocated & actual resources are at
@@ -2665,7 +2700,14 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 			allocatedContainer := kubecontainer.GetContainerSpec(pod, cName)
 			if allocatedContainer != nil {
+				// status.Resources reflects cgroup-actuated resources. If the container is running,
+				// it is populated from CRI status.
 				status.Resources = convertContainerStatusResources(allocatedContainer, status, cStatus, oldStatuses)
+				// status.AllocatedResources represents the desired cgroup resource state for resize,
+				// and is strictly based on the uninflated standard cgroup resources requested in the spec.
+				// DRA based allocations are not included in AllocatedResources at the container level.
+				// This is because the claims can be shared across containers in the pod and can be
+				// shared unevenly (enforced by the DRA driver).
 				status.AllocatedResources = allocatedContainer.Resources.Requests
 			}
 		}
@@ -2938,4 +2980,31 @@ func resolveRecursiveReadOnly(m v1.VolumeMount, runtimeSupportsRRO bool) (bool, 
 	default:
 		return false, fmt.Errorf("unknown recursive read-only mode %q", rroMode)
 	}
+}
+
+func recordPodLevelResourcesAdmission(pod *v1.Pod) {
+	hasResources := func(containers []v1.Container) bool {
+		for _, c := range containers {
+			if len(c.Resources.Requests) > 0 || len(c.Resources.Limits) > 0 {
+				return true
+			}
+		}
+		return false
+	}
+
+	hasPodLevel := resourcehelper.IsPodLevelResourcesSet(pod)
+	hasContainerLevel := hasResources(pod.Spec.Containers) || hasResources(pod.Spec.InitContainers)
+
+	var configMode string
+	switch {
+	case hasPodLevel && hasContainerLevel:
+		configMode = "pod_and_container_level"
+	case hasPodLevel:
+		configMode = "pod_level"
+	case hasContainerLevel:
+		configMode = "container_level"
+	}
+
+	qosLabel := strings.ToLower(string(v1qos.GetPodQOS(pod)))
+	metrics.PodLevelResourcesAdmissionTotal.WithLabelValues(configMode, qosLabel).Inc()
 }

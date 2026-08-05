@@ -31,6 +31,7 @@ import (
 	"testing"
 	"time"
 
+	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/api/admission/v1beta1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -42,6 +43,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -358,4 +360,228 @@ func (c *connectionTrackingListener) Close() error {
 }
 func (c *connectionTrackingListener) Addr() net.Addr {
 	return c.delegate.Addr()
+}
+
+// TestWebhookLoadBalanceAcrossEndpoints ensures that the webhook client distributes sequential requests
+// across different endpoint IPs behind a service when using a ServiceReference.
+// Prior to the host-rewrite pool isolation fix, all sequential requests would reuse the first established
+// TCP connection from the single shared pool, completely starving other endpoints.
+func TestWebhookLoadBalanceAcrossEndpoints(t *testing.T) {
+	roots := x509.NewCertPool()
+	if !roots.AppendCertsFromPEM(localhostCert) {
+		t.Fatal("Failed to append Cert from PEM")
+	}
+	cert, err := tls.X509KeyPair(localhostCert, localhostKey)
+	if err != nil {
+		t.Fatalf("Failed to build cert with error: %+v", err)
+	}
+
+	// 1. Start Server A
+	var serverACalls int64
+	serverAListener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	serverA := &http.Server{
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			atomic.AddInt64(&serverACalls, 1)
+			defer func() { _ = r.Body.Close() }()
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			var review struct {
+				Request struct {
+					UID string `json:"uid"`
+				} `json:"request"`
+			}
+			if err := json.Unmarshal(body, &review); err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(&admissionv1.AdmissionReview{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "admission.k8s.io/v1",
+					Kind:       "AdmissionReview",
+				},
+				Response: &admissionv1.AdmissionResponse{
+					UID:     types.UID(review.Request.UID),
+					Allowed: true,
+				},
+			})
+		}),
+		TLSConfig: &tls.Config{
+			Certificates: []tls.Certificate{cert},
+		},
+	}
+	go func() {
+		_ = serverA.ServeTLS(serverAListener, "", "")
+	}()
+	defer func() { _ = serverA.Close() }()
+
+	// 2. Start Server B
+	var serverBCalls int64
+	serverBListener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	serverB := &http.Server{
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			atomic.AddInt64(&serverBCalls, 1)
+			defer func() { _ = r.Body.Close() }()
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			var review struct {
+				Request struct {
+					UID string `json:"uid"`
+				} `json:"request"`
+			}
+			if err := json.Unmarshal(body, &review); err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(&admissionv1.AdmissionReview{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "admission.k8s.io/v1",
+					Kind:       "AdmissionReview",
+				},
+				Response: &admissionv1.AdmissionResponse{
+					UID:     types.UID(review.Request.UID),
+					Allowed: true,
+				},
+			})
+		}),
+		TLSConfig: &tls.Config{
+			Certificates: []tls.Certificate{cert},
+		},
+	}
+	go func() {
+		_ = serverB.ServeTLS(serverBListener, "", "")
+	}()
+	defer func() { _ = serverB.Close() }()
+
+	// Parse URLs to extract target hosts (IP:Port)
+	urlA, _ := url.Parse("https://" + serverAListener.Addr().String())
+	urlB, _ := url.Parse("https://" + serverBListener.Addr().String())
+
+	// Set up a round-robin service resolver that returns alternate endpoints for each resolve call
+	var resolveIndex int64
+	resolver := funcServiceResolver(func(namespace, name string, port int32) (*url.URL, error) {
+		idx := atomic.AddInt64(&resolveIndex, 1)
+		if idx%2 == 0 {
+			return urlA, nil
+		}
+		return urlB, nil
+	})
+
+	t.Cleanup(app.SetServiceResolverForTests(resolver))
+
+	// 3. Start Test API Server
+	s := kubeapiservertesting.StartTestServerOrDie(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{
+		"--disable-admission-plugins=ServiceAccount",
+	}, framework.SharedEtcd())
+	defer s.TearDownFn()
+
+	clientConfig := rest.CopyConfig(s.ClientConfig)
+	client, err := clientset.NewForConfig(clientConfig)
+	if err != nil {
+		t.Fatalf("Unexpected error creating client: %v", err)
+	}
+
+	// 4. Register a Validating Webhook with ServiceReference
+	fail := admissionregistrationv1.Fail
+	sideEffectsNone := admissionregistrationv1.SideEffectClassNone
+	webhookConfig, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(context.TODO(), &admissionregistrationv1.ValidatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{Name: "load-balance-endpoints.integration.test"},
+		Webhooks: []admissionregistrationv1.ValidatingWebhook{{
+			Name: "load-balance-endpoints.integration.test",
+			ClientConfig: admissionregistrationv1.WebhookClientConfig{
+				CABundle: localhostCert,
+				Service: &admissionregistrationv1.ServiceReference{
+					Namespace: "test",
+					Name:      "webhook",
+					Port:      ptr.To[int32](443),
+				},
+			},
+			Rules: []admissionregistrationv1.RuleWithOperations{{
+				Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create},
+				Rule: admissionregistrationv1.Rule{
+					APIGroups:   []string{""},
+					APIVersions: []string{"v1"},
+					Resources:   []string{"pods"},
+				},
+			}},
+			FailurePolicy:           &fail,
+			SideEffects:             &sideEffectsNone,
+			AdmissionReviewVersions: []string{"v1"},
+		}},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create validating webhook config: %v", err)
+	}
+	defer func() {
+		_ = client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(context.TODO(), webhookConfig.Name, metav1.DeleteOptions{})
+	}()
+
+	// 5. Warm up the webhook until it is ready/active
+	podFixture := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "warmup-pod", Namespace: "default"},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{{Name: "test", Image: "nginx"}},
+		},
+	}
+	err = wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+		_, err = client.CoreV1().Pods("default").Create(ctx, podFixture, metav1.CreateOptions{})
+		if err == nil {
+			_ = client.CoreV1().Pods("default").Delete(ctx, podFixture.Name, metav1.DeleteOptions{})
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Fatalf("Webhook failed to become active: %v", err)
+	}
+
+	// Reset counts
+	atomic.StoreInt64(&serverACalls, 0)
+	atomic.StoreInt64(&serverBCalls, 0)
+
+	// 6. Send 100 sequential requests to trigger validating webhook
+	for i := range 100 {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("test-pod-%d", i), Namespace: "default"},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "test", Image: "nginx"}},
+			},
+		}
+		_, err = client.CoreV1().Pods("default").Create(context.TODO(), pod, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Request %d failed: %v", i, err)
+		}
+		_ = client.CoreV1().Pods("default").Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
+	}
+
+	// 7. Assertions
+	callsA := atomic.LoadInt64(&serverACalls)
+	callsB := atomic.LoadInt64(&serverBCalls)
+
+	t.Logf("Sequential requests distribution: ServerA = %d calls, ServerB = %d calls", callsA, callsB)
+
+	// Both servers MUST receive a balanced portion of calls under the pool isolation fix.
+	// We assert a minimum 70-30 distribution split to verify dynamic load-balancing.
+	if callsA < 30 || callsB < 30 {
+		t.Errorf("Expected balanced load-balancing across both servers (minimum 70-30 split), but got ServerA = %d calls, ServerB = %d calls. Stale connection pool reuse or starvation detected!", callsA, callsB)
+	}
+}
+
+type funcServiceResolver func(namespace, name string, port int32) (*url.URL, error)
+
+func (f funcServiceResolver) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
+	return f(namespace, name, port)
 }

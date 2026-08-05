@@ -410,6 +410,21 @@ items:
     - create
     - patch
     - update
+  - apiGroups:
+    - resource.k8s.io
+    resources:
+    - devicetaintrules/status
+    verbs:
+    - patch
+    - update
+  - apiGroups:
+    - resource.k8s.io
+    resources:
+    - devicetaintrules
+    verbs:
+    - get
+    - list
+    - watch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -867,6 +882,42 @@ items:
       rbac.authorization.kubernetes.io/autoupdate: "true"
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
+    name: system:controller:kube-apiserver-serving-clustertrustbundle-publisher
+  rules:
+  - apiGroups:
+    - certificates.k8s.io
+    resourceNames:
+    - kubernetes.io/kube-apiserver-serving
+    resources:
+    - signers
+    verbs:
+    - attest
+  - apiGroups:
+    - certificates.k8s.io
+    resources:
+    - clustertrustbundles
+    verbs:
+    - create
+    - delete
+    - list
+    - update
+    - watch
+  - apiGroups:
+    - ""
+    - events.k8s.io
+    resources:
+    - events
+    verbs:
+    - create
+    - patch
+    - update
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: "true"
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:legacy-service-account-token-cleaner
   rules:
   - apiGroups:
@@ -959,6 +1010,14 @@ items:
     - pods
     verbs:
     - delete
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - coordination.k8s.io
+    resources:
+    - leases
+    verbs:
     - get
     - list
     - watch
@@ -1083,6 +1142,24 @@ items:
     - pods/status
     verbs:
     - patch
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: "true"
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
+    name: system:controller:podcertificaterequestcleaner
+  rules:
+  - apiGroups:
+    - certificates.k8s.io
+    resources:
+    - podcertificaterequests
+    verbs:
+    - delete
+    - get
+    - list
+    - watch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -1307,6 +1384,13 @@ items:
     - events
     verbs:
     - create
+    - patch
+    - update
+  - apiGroups:
+    - resource.k8s.io
+    resources:
+    - resourceclaims/binding
+    verbs:
     - patch
     - update
 - apiVersion: rbac.authorization.k8s.io/v1
@@ -1648,6 +1732,40 @@ items:
     verbs:
     - create
     - patch
+    - update
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: "true"
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
+    name: system:controller:storage-version-migrator-controller
+  rules:
+  - apiGroups:
+    - '*'
+    resources:
+    - '*'
+    verbs:
+    - list
+    - patch
+  - apiGroups:
+    - apiextensions.k8s.io
+    resources:
+    - customresourcedefinitions
+    verbs:
+    - get
+  - apiGroups:
+    - apiextensions.k8s.io
+    resources:
+    - customresourcedefinitions/status
+    verbs:
+    - patch
+  - apiGroups:
+    - storagemigration.k8s.io
+    resources:
+    - storageversionmigrations/status
+    verbs:
     - update
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole

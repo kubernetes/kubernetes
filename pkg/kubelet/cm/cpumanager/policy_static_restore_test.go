@@ -17,12 +17,11 @@ limitations under the License.
 package cpumanager
 
 import (
-	"context"
 	"runtime"
 	"testing"
 	"time"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
@@ -32,6 +31,7 @@ import (
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/cpuset"
 )
@@ -101,7 +101,7 @@ func TestCPUManagerRestoreState(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
 
 			sDir := t.TempDir()
-			logger, _ := ktesting.NewTestContext(t)
+			logger, tCtx := ktesting.NewTestContext(t)
 			mgr, err := NewManager(
 				logger,
 				"static",
@@ -123,7 +123,7 @@ func TestCPUManagerRestoreState(t *testing.T) {
 				cpuset.New(),
 				v1.ResourceList{v1.ResourceCPU: *resource.NewQuantity(1, resource.DecimalSI)},
 				sDir,
-				topologymanager.NewFakeManager(),
+				topologymanager.NewFakeManager(logger),
 			)
 			if err != nil {
 				t.Fatalf("could not create manager: %v", err)
@@ -140,14 +140,14 @@ func TestCPUManagerRestoreState(t *testing.T) {
 			pod.UID = types.UID("pod1")
 
 			// Start manager to initialize state and activePods
-			err = mgr.Start(context.Background(), func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
+			err = mgr.Start(tCtx, func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
 			if err != nil {
 				t.Fatalf("could not start manager: %v", err)
 			}
 
 			// Allocate resources (Pod Scope)
 			if tc.podLevelResourceManagersEnabled && resourcehelper.IsPodLevelResourcesSet(pod) {
-				err = mgr.AllocatePod(pod)
+				err = mgr.AllocatePod(logger, pod, lifecycle.AddOperation)
 				if err != nil {
 					t.Fatalf("could not allocate pod: %v", err)
 				}
@@ -155,7 +155,7 @@ func TestCPUManagerRestoreState(t *testing.T) {
 				// Allocate resources (Container Scope / Legacy)
 				for i := range pod.Spec.Containers {
 					container := &pod.Spec.Containers[i]
-					err = mgr.Allocate(pod, container)
+					err = mgr.Allocate(tCtx, pod, container, lifecycle.AddOperation)
 					if err != nil {
 						t.Fatalf("could not allocate container %s: %v", container.Name, err)
 					}
@@ -198,13 +198,13 @@ func TestCPUManagerRestoreState(t *testing.T) {
 				cpuset.New(),
 				v1.ResourceList{v1.ResourceCPU: *resource.NewQuantity(1, resource.DecimalSI)},
 				sDir,
-				topologymanager.NewFakeManager(),
+				topologymanager.NewFakeManager(logger),
 			)
 			if err != nil {
 				t.Fatalf("could not create manager 2: %v", err)
 			}
 
-			err = mgr2.Start(context.Background(), func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
+			err = mgr2.Start(tCtx, func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
 			if err != nil {
 				t.Fatalf("could not start manager 2: %v", err)
 			}

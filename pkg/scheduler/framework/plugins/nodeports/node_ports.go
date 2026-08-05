@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -31,7 +32,7 @@ import (
 
 // NodePorts is a plugin that checks if a node has free ports for the requested pod ports.
 type NodePorts struct {
-	enableSchedulingQueueHint bool
+	enableInPlacePodVerticalScalingSchedulerPreemption bool
 }
 
 var _ fwk.PreFilterPlugin = &NodePorts{}
@@ -73,6 +74,9 @@ func (pl *NodePorts) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragme
 
 // PreFilter invoked at the prefilter extension point.
 func (pl *NodePorts) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		return nil, fwk.NewStatus(fwk.Skip)
+	}
 	s := util.GetHostPorts(pod)
 	// Skip if a pod has no ports.
 	if len(s) == 0 {
@@ -104,28 +108,18 @@ func getPreFilterState(cycleState fwk.CycleState) (preFilterState, error) {
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *NodePorts) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
-	// A note about UpdateNodeTaint/UpdateNodeLabel event:
-	// Ideally, it's supposed to register only Add because NodeUpdated event never means to have any free ports for the Pod.
-	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
-	// See: https://github.com/kubernetes/kubernetes/issues/109437
-	nodeActionType := fwk.Add | fwk.UpdateNodeTaint | fwk.UpdateNodeLabel
-	if pl.enableSchedulingQueueHint {
-		// preCheck is not used when QHint is enabled, and hence Update event isn't necessary.
-		nodeActionType = fwk.Add
-	}
-
 	return []fwk.ClusterEventWithHint{
 		// Due to immutable fields `spec.containers[*].ports`, pod update events are ignored.
-		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
+		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterAssignedPodDeleted},
 		// We don't need the QueueingHintFn here because the scheduling of Pods will be always retried with backoff when this Event happens.
 		// (the same as Queue)
-		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}},
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add}},
 	}, nil
 }
 
-// isSchedulableAfterPodDeleted is invoked whenever a pod deleted. It checks whether
+// isSchedulableAfterAssignedPodDeleted is invoked whenever an assigned pod is deleted. It checks whether
 // that change made a previously unschedulable pod schedulable.
-func (pl *NodePorts) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+func (pl *NodePorts) isSchedulableAfterAssignedPodDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	deletedPod, _, err := util.As[*v1.Pod](oldObj, nil)
 	if err != nil {
 		return fwk.Queue, err
@@ -160,6 +154,9 @@ func (pl *NodePorts) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 
 // Filter invoked at the filter extension point.
 func (pl *NodePorts) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+		return nil
+	}
 	wantPorts, err := getPreFilterState(cycleState)
 	if err != nil {
 		return fwk.AsStatus(err)
@@ -191,7 +188,5 @@ func fitsPorts(wantPorts []v1.ContainerPort, portsInUse fwk.HostPortInfo) bool {
 
 // New initializes a new plugin and returns it.
 func New(_ context.Context, _ runtime.Object, _ fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
-	return &NodePorts{
-		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,
-	}, nil
+	return &NodePorts{enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption}, nil
 }

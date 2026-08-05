@@ -29,7 +29,7 @@ import (
 )
 
 func TestListPodResourcesV1alpha1(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	podName := "pod-name"
 	podNamespace := "pod-namespace"
 	podUID := types.UID("pod-uid")
@@ -129,7 +129,7 @@ func TestListPodResourcesV1alpha1(t *testing.T) {
 
 			mockPodsProvider.EXPECT().GetPods().Return(tc.pods).Maybe()
 			mockDevicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(tc.devices).Maybe()
-			mockDevicesProvider.EXPECT().UpdateAllocatedDevices().Return().Maybe()
+			mockDevicesProvider.EXPECT().UpdateAllocatedDevices(logger).Return().Maybe()
 
 			providers := PodResourcesProviders{
 				Pods:    mockPodsProvider,

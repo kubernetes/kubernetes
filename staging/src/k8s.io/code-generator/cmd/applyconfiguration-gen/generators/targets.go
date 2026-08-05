@@ -32,6 +32,7 @@ import (
 	"k8s.io/code-generator/cmd/applyconfiguration-gen/args"
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
+	"k8s.io/code-generator/pkg/apidefinitions"
 	genutil "k8s.io/code-generator/pkg/util"
 )
 
@@ -62,7 +63,12 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	pkgTypes := packageTypesForInputs(context, args.OutputPkg)
+	var idOpts []apidefinitions.Option
+	if len(args.LintRules) > 0 {
+		idOpts = append(idOpts, apidefinitions.WithLintRules(args.LintRules...))
+	}
+
+	pkgTypes := packageTypesForInputs(context, args.OutputPkg, idOpts)
 	initialTypes := args.ExternalApplyConfigurations
 	refs := refGraphForReachableTypes(context.Universe, pkgTypes, initialTypes)
 	typeModels, err := newTypeModels(args.OpenAPISchemaFilePath, pkgTypes)
@@ -252,10 +258,17 @@ func goName(gv clientgentypes.GroupVersion, p *types.Package) (string, error) {
 	return goName, nil
 }
 
-func packageTypesForInputs(context *generator.Context, outPkgBase string) map[string]*types.Package {
+func packageTypesForInputs(context *generator.Context, outPkgBase string, idOpts []apidefinitions.Option) map[string]*types.Package {
 	pkgTypes := map[string]*types.Package{}
 	for _, inputDir := range context.Inputs {
 		p := context.Universe.Package(inputDir)
+		info, err := apidefinitions.Identify(p, apidefinitions.ApplyConfiguration, idOpts...)
+		if err != nil {
+			klog.Fatal(err)
+		}
+		if !info.ShouldGenerate() {
+			continue
+		}
 		internal := isInternalPackage(p)
 		if internal {
 			klog.Warningf("Skipping internal package: %s", p.Path)
@@ -280,13 +293,12 @@ func groupVersion(p *types.Package) (gv clientgentypes.GroupVersion, err error) 
 	// If there's a comment of the form "// +groupName=somegroup" or
 	// "// +groupName=somegroup.foo.bar.io", use the first field (somegroup) as the name of the
 	// group when generating.
-	override, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{"groupName"}, p.Comments)
-
+	override, ok, err := apidefinitions.GroupNameForPackage(p.Comments)
 	if err != nil {
 		return gv, err
 	}
-	if values, ok := override["groupName"]; ok {
-		gv.Group = clientgentypes.Group(values[0])
+	if ok {
+		gv.Group = clientgentypes.Group(override)
 	}
 
 	return gv, nil

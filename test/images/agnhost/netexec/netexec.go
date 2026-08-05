@@ -100,6 +100,9 @@ var CmdNetexec = &cobra.Command{
   server is healthy (don't kill it), but the it should not be sent traffic (remove from endpoints).
 - "/hostname": Returns the server's hostname.
 - "/hostName": Returns the server's hostname.
+- "/envvar": Returns the value of the environment variable named by the "var" query
+  parameter ("/envvar?var=NODE_NAME"). Returns 400 if the parameter is missing or empty,
+  500 if the variable is not set. For UDP/SCTP, send "envvar <VAR_NAME>" as the command.
 - "/redirect": Returns a redirect response to the given "location", with the optional status "code"
   ("/redirect?location=/echo%3Fmsg=foobar&code=307").
 - "/shell": Executes the given "shellCommand" or "cmd" ("/shell?cmd=some-command") and
@@ -121,6 +124,7 @@ It will also start a UDP server on the indicated UDP port and addresses that res
 
 - "hostname": Returns the server's hostname
 - "echo <msg>": Returns the given <msg>
+- "envvar <VAR_NAME>": Returns the value of the named environment variable (empty string if not set)
 - "clientip": Returns the request's IP address
 - "serverport": Returns the server port
 
@@ -219,6 +223,7 @@ func addRoutes(mux *http.ServeMux, sigTermReceived chan struct{}, exitCh chan sh
 	mux.HandleFunc("/healthz", healthzHandler)
 	mux.HandleFunc("/readyz", readyzHandler(sigTermReceived))
 	mux.HandleFunc("/hostname", hostnameHandler)
+	mux.HandleFunc("/envvar", envvarHandler)
 	mux.HandleFunc("/redirect", redirectHandler)
 	mux.HandleFunc("/shell", shellHandler)
 	mux.HandleFunc("/upload", uploadHandler)
@@ -329,6 +334,21 @@ func exitHandler(w http.ResponseWriter, r *http.Request, exitCh chan<- shutdownR
 func hostnameHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GET /hostname")
 	fmt.Fprint(w, getHostName())
+}
+
+func envvarHandler(w http.ResponseWriter, r *http.Request) {
+	varName := r.FormValue("var")
+	if varName == "" {
+		http.Error(w, "'var' query parameter is required", http.StatusBadRequest)
+		return
+	}
+	log.Printf("GET /envvar?var=%s", varName)
+	val, ok := os.LookupEnv(varName)
+	if !ok {
+		http.Error(w, fmt.Sprintf("env var %q is not set", varName), http.StatusInternalServerError)
+		return
+	}
+	_, _ = fmt.Fprint(w, val)
 }
 
 // healthHandler response with a 200 if the UDP server is ready. It also serves
@@ -640,11 +660,23 @@ func startUDPServer(address string, udpPort int) {
 	for {
 		n, clientAddress, err := serverConn.ReadFromUDP(buf)
 		assertNoError(err, "failed accepting UDP connections")
-		receivedText := strings.ToLower(strings.TrimSpace(string(buf[0:n])))
+		rawText := strings.TrimSpace(string(buf[0:n]))
+		receivedText := strings.ToLower(rawText)
 		if receivedText == "hostname" {
 			log.Println("Sending udp hostName response")
 			_, err = serverConn.WriteToUDP([]byte(getHostName()), clientAddress)
 			assertNoError(err, fmt.Sprintf("failed to write hostname to UDP client %s", clientAddress))
+		} else if strings.HasPrefix(receivedText, "envvar ") {
+			parts := strings.SplitN(rawText, " ", 2)
+			if len(parts) != 2 {
+				log.Printf("Unknown UDP command received from %s: %v\n", clientAddress, receivedText)
+				continue
+			}
+			varName := strings.TrimSpace(parts[1])
+			val, _ := os.LookupEnv(varName)
+			log.Printf("Sending UDP envvar response for %s", varName)
+			_, err = serverConn.WriteToUDP([]byte(val), clientAddress)
+			assertNoError(err, fmt.Sprintf("failed to write envvar to UDP client %s", clientAddress))
 		} else if strings.HasPrefix(receivedText, "echo ") {
 			parts := strings.SplitN(receivedText, " ", 2)
 			resp := ""
@@ -694,7 +726,8 @@ func startSCTPServer(sctpPort int) {
 		clientAddress := remoteAddr.String()
 		n, err := conn.Read(buf)
 		assertNoError(err, fmt.Sprintf("failed to read from SCTP client %s", clientAddress))
-		receivedText := strings.ToLower(strings.TrimSpace(string(buf[0:n])))
+		rawText := strings.TrimSpace(string(buf[0:n]))
+		receivedText := strings.ToLower(rawText)
 		if receivedText == "hostname" {
 			log.Println("Sending SCTP hostName response")
 			_, err = conn.Write([]byte(getHostName()))
@@ -716,6 +749,17 @@ func startSCTPServer(sctpPort int) {
 			log.Printf("Sending server port to SCTP client %s\n", strconv.Itoa(sctpPort))
 			_, err = conn.Write([]byte(strconv.Itoa(sctpPort)))
 			assertNoError(err, fmt.Sprintf("failed to write server port to SCTP client %s", clientAddress))
+		} else if strings.HasPrefix(receivedText, "envvar ") {
+			parts := strings.SplitN(rawText, " ", 2)
+			if len(parts) != 2 {
+				log.Printf("Unknown SCTP command received from %s: %v\n", clientAddress, receivedText)
+				continue
+			}
+			varName := strings.TrimSpace(parts[1])
+			val, _ := os.LookupEnv(varName)
+			log.Printf("Sending SCTP envvar response for %s", varName)
+			_, err = conn.Write([]byte(val))
+			assertNoError(err, fmt.Sprintf("failed to write envvar to SCTP client %s", clientAddress))
 		} else if len(receivedText) > 0 {
 			log.Printf("Unknown SCTP command received from %s: %v\n", clientAddress, receivedText)
 		}

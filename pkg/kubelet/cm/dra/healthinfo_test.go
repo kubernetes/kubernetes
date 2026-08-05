@@ -18,6 +18,7 @@ package dra
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path"
 	"testing"
@@ -441,8 +442,91 @@ func TestUpdateHealthInfo(t *testing.T) {
 	assertDeviceHealthElementsMatchIgnoreTime(t, expectedChanged6, changedDevices)
 
 	driverState := (*cache.HealthInfo)[testDriver]
-	device := driverState.Devices[testPool+"/timeoutDevice"]
-	assert.Equal(t, state.DeviceHealthStatusUnknown, device.Health, "Health status should be Unknown after timeout in updateHealthInfo")
+	_, exists := driverState.Devices[testPool+"/timeoutDevice"]
+	assert.False(t, exists, "stale device entry should be removed from the cache after the Unknown notification; a missing entry reads as Unknown")
+	assert.Equal(t, state.DeviceHealthStatusUnknown, cache.getHealthInfo(testDriver, testPool, "timeoutDevice").Health, "removed device should still read as Unknown")
+}
+
+// TestUpdateHealthInfoStaleEntryRemoval verifies that entries which the driver
+// stopped reporting are removed from the cache once stale, so that the cache
+// stays bounded by what the driver keeps vouching for.
+func TestUpdateHealthInfoStaleEntryRemoval(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	cache, err := newHealthInfoCache(logger, "")
+	require.NoError(t, err)
+
+	healthyDevice := state.DeviceHealth{PoolName: testPool, DeviceName: "healthy-stale", Health: state.DeviceHealthStatusHealthy, HealthCheckTimeout: DefaultHealthTimeout}
+	unknownDevice := state.DeviceHealth{PoolName: testPool, DeviceName: "unknown-stale", Health: state.DeviceHealthStatusUnknown, HealthCheckTimeout: DefaultHealthTimeout}
+	freshDevice := state.DeviceHealth{PoolName: testPool, DeviceName: "fresh", Health: state.DeviceHealthStatusHealthy, HealthCheckTimeout: DefaultHealthTimeout}
+	_, err = cache.updateHealthInfo(logger, testDriver, []state.DeviceHealth{healthyDevice, unknownDevice, freshDevice})
+	require.NoError(t, err)
+
+	// Make two of the devices stale.
+	err = cache.withLock(func() error {
+		for _, deviceName := range []string{"healthy-stale", "unknown-stale"} {
+			key := testPool + "/" + deviceName
+			device := (*cache.HealthInfo)[testDriver].Devices[key]
+			device.LastUpdated = time.Now().Add(-2 * DefaultHealthTimeout)
+			(*cache.HealthInfo)[testDriver].Devices[key] = device
+		}
+		return nil
+	})
+	require.NoError(t, err)
+
+	// A report which only covers the fresh device removes the stale ones.
+	changedDevices, err := cache.updateHealthInfo(logger, testDriver, []state.DeviceHealth{freshDevice})
+	require.NoError(t, err)
+
+	// Only the previously healthy device produces an Unknown transition;
+	// removing an entry which already was Unknown changes nothing for readers.
+	require.Len(t, changedDevices, 1)
+	assert.Equal(t, "healthy-stale", changedDevices[0].DeviceName)
+	assert.Equal(t, state.DeviceHealthStatusUnknown, changedDevices[0].Health)
+
+	devices := (*cache.HealthInfo)[testDriver].Devices
+	assert.NotContains(t, devices, testPool+"/healthy-stale")
+	assert.NotContains(t, devices, testPool+"/unknown-stale")
+	assert.Contains(t, devices, testPool+"/fresh")
+}
+
+// TestUpdateHealthInfoDeviceCap verifies that the cache does not grow beyond
+// maxDevicesPerDriver entries per driver even when a plugin keeps reporting
+// new device names, while updates for known devices are still accepted.
+func TestUpdateHealthInfoDeviceCap(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	cache, err := newHealthInfoCache(logger, "")
+	require.NoError(t, err)
+
+	// Fill the cache up to the cap, plus one device which must be ignored.
+	report := make([]state.DeviceHealth, 0, maxDevicesPerDriver+1)
+	for i := range maxDevicesPerDriver + 1 {
+		report = append(report, state.DeviceHealth{
+			PoolName:           testPool,
+			DeviceName:         fmt.Sprintf("device-%d", i),
+			Health:             state.DeviceHealthStatusHealthy,
+			HealthCheckTimeout: DefaultHealthTimeout,
+		})
+	}
+	changedDevices, err := cache.updateHealthInfo(logger, testDriver, report)
+	require.NoError(t, err)
+	assert.Len(t, changedDevices, maxDevicesPerDriver)
+	assert.Len(t, (*cache.HealthInfo)[testDriver].Devices, maxDevicesPerDriver)
+
+	// New device names are ignored while the cache is full.
+	newDevice := state.DeviceHealth{PoolName: testPool, DeviceName: "one-too-many", Health: state.DeviceHealthStatusHealthy, HealthCheckTimeout: DefaultHealthTimeout}
+	changedDevices, err = cache.updateHealthInfo(logger, testDriver, []state.DeviceHealth{newDevice})
+	require.NoError(t, err)
+	assert.Empty(t, changedDevices)
+	assert.NotContains(t, (*cache.HealthInfo)[testDriver].Devices, testPool+"/one-too-many")
+
+	// Updates for known devices are still accepted while the cache is full.
+	updatedDevice := state.DeviceHealth{PoolName: testPool, DeviceName: "device-0", Health: state.DeviceHealthStatusUnhealthy, HealthCheckTimeout: DefaultHealthTimeout}
+	changedDevices, err = cache.updateHealthInfo(logger, testDriver, []state.DeviceHealth{updatedDevice})
+	require.NoError(t, err)
+	require.Len(t, changedDevices, 1)
+	assert.Equal(t, state.DeviceHealthStatusUnhealthy, changedDevices[0].Health)
+	assert.Equal(t, state.DeviceHealthStatusUnhealthy, cache.getHealthInfo(testDriver, testPool, "device-0").Health)
+	assert.Len(t, (*cache.HealthInfo)[testDriver].Devices, maxDevicesPerDriver)
 }
 
 // TestClearDriver tests clearing a driver’s health data.

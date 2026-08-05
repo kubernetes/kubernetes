@@ -22,6 +22,7 @@ import (
 	"k8s.io/apiserver/pkg/server/mux"
 	cachermetrics "k8s.io/apiserver/pkg/storage/cacher/metrics"
 	etcd3metrics "k8s.io/apiserver/pkg/storage/etcd3/metrics"
+	storagemetrics "k8s.io/apiserver/pkg/storage/metrics"
 	flowcontrolmetrics "k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	peerproxymetrics "k8s.io/apiserver/pkg/util/peerproxy/metrics"
 	proxymetrics "k8s.io/apiserver/pkg/util/proxy/metrics"
@@ -50,6 +51,7 @@ func (m MetricsWithReset) Install(c *mux.PathRecorderMux) {
 // register apiserver and etcd metrics
 func register() {
 	apimetrics.Register()
+	storagemetrics.Register()
 	cachermetrics.Register()
 	etcd3metrics.Register()
 	flowcontrolmetrics.Register()

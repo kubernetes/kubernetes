@@ -33,7 +33,7 @@ func TestDaemonSetLister(t *testing.T) {
 	testCases := []struct {
 		inDSs             []*extensions.DaemonSet
 		list              func() ([]*extensions.DaemonSet, error)
-		outDaemonSetNames sets.String
+		outDaemonSetNames sets.Set[string]
 		expectErr         bool
 	}{
 		// Basic listing
@@ -44,7 +44,7 @@ func TestDaemonSetLister(t *testing.T) {
 			list: func() ([]*extensions.DaemonSet, error) {
 				return lister.List(labels.Everything())
 			},
-			outDaemonSetNames: sets.NewString("basic"),
+			outDaemonSetNames: sets.New[string]("basic"),
 		},
 		// Listing multiple daemon sets
 		{
@@ -56,7 +56,7 @@ func TestDaemonSetLister(t *testing.T) {
 			list: func() ([]*extensions.DaemonSet, error) {
 				return lister.List(labels.Everything())
 			},
-			outDaemonSetNames: sets.NewString("basic", "complex", "complex2"),
+			outDaemonSetNames: sets.New[string]("basic", "complex", "complex2"),
 		},
 		// No pod labels
 		{
@@ -74,7 +74,7 @@ func TestDaemonSetLister(t *testing.T) {
 				}
 				return lister.GetPodDaemonSets(pod)
 			},
-			outDaemonSetNames: sets.NewString(),
+			outDaemonSetNames: sets.New[string](),
 			expectErr:         true,
 		},
 		// No DS selectors
@@ -94,7 +94,7 @@ func TestDaemonSetLister(t *testing.T) {
 				}
 				return lister.GetPodDaemonSets(pod)
 			},
-			outDaemonSetNames: sets.NewString(),
+			outDaemonSetNames: sets.New[string](),
 			expectErr:         true,
 		},
 		// Matching labels to selectors and namespace
@@ -123,7 +123,7 @@ func TestDaemonSetLister(t *testing.T) {
 				}
 				return lister.GetPodDaemonSets(pod)
 			},
-			outDaemonSetNames: sets.NewString("bar"),
+			outDaemonSetNames: sets.New[string]("bar"),
 		},
 	}
 	for _, c := range testCases {

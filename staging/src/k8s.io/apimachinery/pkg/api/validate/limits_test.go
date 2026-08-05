@@ -163,6 +163,77 @@ func TestMinItems(t *testing.T) {
 	}
 }
 
+func TestMinProperties(t *testing.T) {
+	cases := []struct {
+		name       string
+		properties int
+		min        int
+		wantErrs   field.ErrorList
+	}{{
+		name:       "0 properties, min 0",
+		properties: 0,
+		min:        0,
+	}, {
+		name:       "1 property, min 0",
+		properties: 1,
+		min:        0,
+	}, {
+		name:       "1 property, min 1",
+		properties: 1,
+		min:        1,
+	}, {
+		name:       "0 properties, min 1",
+		properties: 0,
+		min:        1,
+		wantErrs: field.ErrorList{
+			field.TooFew(field.NewPath("fldpath"), 0, 1).WithOrigin("minProperties"),
+		},
+	}, {
+		name:       "1 property, min 2",
+		properties: 1,
+		min:        2,
+		wantErrs: field.ErrorList{
+			field.TooFew(field.NewPath("fldpath"), 1, 2).WithOrigin("minProperties"),
+		},
+	}, {
+		name:       "0 properties, min 100000",
+		properties: 0,
+		min:        100000,
+		wantErrs: field.ErrorList{
+			field.TooFew(field.NewPath("fldpath"), 0, 100000).WithOrigin("minProperties"),
+		},
+	}, {
+		name:       "99999 properties, min 100000",
+		properties: 99999,
+		min:        100000,
+		wantErrs: field.ErrorList{
+			field.TooFew(field.NewPath("fldpath"), 99999, 100000).WithOrigin("minProperties"),
+		},
+	}, {
+		name:       "100000 properties, min 100000",
+		properties: 100000,
+		min:        100000,
+	}, {
+		// Note: While JSON Schema does not allow negative values for minProperties,
+		// we test that the validator handles it safely if it ever occurs at runtime.
+		name:       "0 properties, min -1",
+		properties: 0,
+		min:        -1,
+	}}
+
+	matcher := field.ErrorMatcher{}.ByOrigin().ByDetailSubstring().ByField().ByType()
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			value := make(map[string]bool, tc.properties)
+			for i := 0; i < tc.properties; i++ {
+				value[fmt.Sprintf("k%d", i)] = true
+			}
+			gotErrs := MinProperties(context.Background(), operation.Operation{}, field.NewPath("fldpath"), value, nil, tc.min)
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}
+
 func TestMaxItems(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -205,6 +276,70 @@ func TestMaxItems(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			value := make([]bool, tc.items)
 			gotErrs := MaxItems(context.Background(), operation.Operation{}, field.NewPath("fldpath"), value, nil, tc.max)
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}
+
+func TestMaxProperties(t *testing.T) {
+	cases := []struct {
+		name       string
+		properties int
+		max        int
+		wantErrs   field.ErrorList
+	}{{
+		name:       "0 properties, max 0",
+		properties: 0,
+		max:        0,
+	}, {
+		name:       "1 property, max 0",
+		properties: 1,
+		max:        0,
+		wantErrs: field.ErrorList{
+			field.TooMany(field.NewPath("fldpath"), 1, 0).WithOrigin("maxProperties"),
+		},
+	}, {
+		name:       "1 property, max 1",
+		properties: 1,
+		max:        1,
+	}, {
+		name:       "2 properties, max 1",
+		properties: 2,
+		max:        1,
+		wantErrs: field.ErrorList{
+			field.TooMany(field.NewPath("fldpath"), 2, 1).WithOrigin("maxProperties"),
+		},
+	}, {
+		name:       "100000 properties, max 100000",
+		properties: 100000,
+		max:        100000,
+	}, {
+		name:       "100001 properties, max 100000",
+		properties: 100001,
+		max:        100000,
+		wantErrs: field.ErrorList{
+			field.TooMany(field.NewPath("fldpath"), 100001, 100000).WithOrigin("maxProperties"),
+		},
+	}, {
+		// Note: While JSON Schema does not allow negative values for maxProperties,
+		// we test that the validator handles it safely if it ever occurs at runtime.
+		name:       "0 properties, max -1",
+		properties: 0,
+		max:        -1,
+		wantErrs: field.ErrorList{
+			field.TooMany(field.NewPath("fldpath"), 0, -1).WithOrigin("maxProperties"),
+		},
+	}}
+
+	matcher := field.ErrorMatcher{}.ByOrigin().ByDetailSubstring().ByField().ByType()
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			value := make(map[string]string, tc.properties)
+			for i := 0; i < tc.properties; i++ {
+				value[fmt.Sprintf("%d", i)] = "value"
+			}
+
+			gotErrs := MaxProperties(context.Background(), operation.Operation{}, field.NewPath("fldpath"), value, nil, tc.max)
 			matcher.Test(t, tc.wantErrs, gotErrs)
 		})
 	}

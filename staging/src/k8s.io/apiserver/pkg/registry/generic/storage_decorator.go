@@ -25,11 +25,12 @@ import (
 )
 
 // StorageDecorator is a function signature for producing a storage.Interface
-// and an associated DestroyFunc from given parameters.
+// and an associated DestroyFunc from given parameters. cacheKeyFunc is used by
+// cache layers to compute resource keys from objects.
 type StorageDecorator func(
 	config *storagebackend.ConfigForResource,
 	resourcePrefix string,
-	keyFunc func(obj runtime.Object) (string, error),
+	cacheKeyFunc func(obj runtime.Object) (string, error),
 	newFunc func() runtime.Object,
 	newListFunc func() runtime.Object,
 	getAttrsFunc storage.AttrFunc,
@@ -41,7 +42,7 @@ type StorageDecorator func(
 func UndecoratedStorage(
 	config *storagebackend.ConfigForResource,
 	resourcePrefix string,
-	keyFunc func(obj runtime.Object) (string, error),
+	cacheKeyFunc func(obj runtime.Object) (string, error),
 	newFunc func() runtime.Object,
 	newListFunc func() runtime.Object,
 	getAttrsFunc storage.AttrFunc,

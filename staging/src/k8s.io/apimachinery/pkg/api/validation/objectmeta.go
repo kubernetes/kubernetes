@@ -17,11 +17,14 @@ limitations under the License.
 package validation
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/operation"
+	"k8s.io/apimachinery/pkg/api/validate"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -46,7 +49,7 @@ func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) fie
 	for k := range annotations {
 		// The rule is QualifiedName except that case doesn't matter, so convert to lowercase before checking.
 		for _, msg := range validation.IsQualifiedName(strings.ToLower(k)) {
-			allErrs = append(allErrs, field.Invalid(fldPath, k, msg)).WithOrigin("format=k8s-label-key")
+			allErrs = append(allErrs, field.Invalid(fldPath, k, msg).WithOrigin("format=k8s-label-key"))
 		}
 	}
 	if err := ValidateAnnotationsSize(annotations); err != nil {
@@ -68,20 +71,23 @@ func ValidateAnnotationsSize(annotations map[string]string) error {
 
 func validateOwnerReference(ownerReference metav1.OwnerReference, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	gvk := schema.FromAPIVersionAndKind(ownerReference.APIVersion, ownerReference.Kind)
+	gv, err := schema.ParseGroupVersion(ownerReference.APIVersion)
 	// gvk.Group is empty for the legacy group.
-	if len(gvk.Version) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("apiVersion"), ownerReference.APIVersion, "version must not be empty"))
+	if len(ownerReference.APIVersion) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("apiVersion"), "must not be empty").MarkCoveredByDeclarative())
+	} else if err != nil || len(gv.Version) == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("apiVersion"), ownerReference.APIVersion, "must be <group>/<version> or <version>"))
 	}
-	if len(gvk.Kind) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), ownerReference.Kind, "must not be empty"))
+	if len(ownerReference.Kind) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), "must not be empty").MarkCoveredByDeclarative())
 	}
 	if len(ownerReference.Name) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ownerReference.Name, "must not be empty"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "must not be empty").MarkCoveredByDeclarative())
 	}
 	if len(ownerReference.UID) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("uid"), ownerReference.UID, "must not be empty"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("uid"), "must not be empty").MarkCoveredByDeclarative())
 	}
+	gvk := gv.WithKind(ownerReference.Kind)
 	if _, ok := BannedOwners[gvk]; ok {
 		allErrs = append(allErrs, field.Invalid(fldPath, ownerReference, fmt.Sprintf("%s is disallowed from being an owner", gvk)))
 	}
@@ -92,8 +98,8 @@ func validateOwnerReference(ownerReference metav1.OwnerReference, fldPath *field
 func ValidateOwnerReferences(ownerReferences []metav1.OwnerReference, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	firstControllerName := ""
-	for _, ref := range ownerReferences {
-		allErrs = append(allErrs, validateOwnerReference(ref, fldPath)...)
+	for idx, ref := range ownerReferences {
+		allErrs = append(allErrs, validateOwnerReference(ref, fldPath.Index(idx))...)
 		if ref.Controller != nil && *ref.Controller {
 			curControllerName := ref.Kind + "/" + ref.Name
 			if firstControllerName != "" {
@@ -134,6 +140,25 @@ func ValidateImmutableField(newVal, oldVal interface{}, fldPath *field.Path) fie
 		allErrs = append(allErrs, field.Invalid(fldPath, newVal, FieldImmutableErrorMsg))
 	}
 	return allErrs
+}
+
+// ValidateObjectMetaDeclaratively validates an ObjectMeta instance declaratively and deduplicates handwritten errors.
+// betaEnabled controls whether declarative validation rules at the Beta stability level are enforced.
+// NOTE: This method should be used in the types for which declarative validation is not enabled yet or cannot be enabled. The types
+// for which declarative validation is enabled and valdiation code is generated must use ValidateObjectMeta and ValidateObjectMetaUpdate.
+func ValidateObjectMetaDeclaratively(ctx context.Context, op operation.Type, obj, oldObj *metav1.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path, betaEnabled bool) field.ErrorList {
+	var errs field.ErrorList
+	switch op {
+	case operation.Create:
+		errs = ValidateObjectMeta(obj, requiresNamespace, nameFn, fldPath)
+	case operation.Update:
+		errs = ValidateObjectMetaUpdate(obj, oldObj, fldPath)
+	}
+	dvErrs := v1validation.Validate_ObjectMeta(ctx, operation.Operation{Type: op}, fldPath, obj, oldObj)
+	enforcedDVErrs := validate.FilterEnforcedDeclarativeErrors(ctx, dvErrs, betaEnabled)
+	errs = errs.MarkFromImperative()
+	errs = validate.FilterCoveredHandwrittenErrors(ctx, errs, enforcedDVErrs, betaEnabled)
+	return append(errs, enforcedDVErrs...)
 }
 
 // ValidateObjectMeta validates an object's metadata on creation. It expects that name generation has already
@@ -262,12 +287,12 @@ func validateObjectMetaAccessorWithOptsCommon(meta metav1.Object, isNamespaced b
 		}
 	}
 
-	allErrs = append(allErrs, ValidateNonnegativeField(meta.GetGeneration(), fldPath.Child("generation"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(meta.GetGeneration(), fldPath.Child("generation")).MarkCoveredByDeclarative()...)
 	allErrs = append(allErrs, v1validation.ValidateLabels(meta.GetLabels(), fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(meta.GetAnnotations(), fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidateOwnerReferences(meta.GetOwnerReferences(), fldPath.Child("ownerReferences"))...)
 	allErrs = append(allErrs, ValidateFinalizers(meta.GetFinalizers(), fldPath.Child("finalizers"))...)
-	allErrs = append(allErrs, v1validation.ValidateManagedFields(meta.GetManagedFields(), fldPath.Child("managedFields"))...)
+	allErrs = append(allErrs, v1validation.ValidateManagedFields(meta.GetManagedFields(), fldPath.Child("managedFields"), v1validation.CoveredByDeclarative)...)
 	return allErrs
 }
 
@@ -323,21 +348,22 @@ func ValidateObjectMetaAccessorUpdate(newMeta, oldMeta metav1.Object, fldPath *f
 	}
 
 	// Generation shouldn't be decremented
+	allErrs = append(allErrs, ValidateNonnegativeField(newMeta.GetGeneration(), fldPath.Child("generation")).MarkCoveredByDeclarative()...)
 	if newMeta.GetGeneration() < oldMeta.GetGeneration() {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("generation"), newMeta.GetGeneration(), "must not be decremented"))
 	}
 
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetName(), oldMeta.GetName(), fldPath.Child("name"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetNamespace(), oldMeta.GetNamespace(), fldPath.Child("namespace"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetUID(), oldMeta.GetUID(), fldPath.Child("uid"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetCreationTimestamp(), oldMeta.GetCreationTimestamp(), fldPath.Child("creationTimestamp"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetDeletionTimestamp(), oldMeta.GetDeletionTimestamp(), fldPath.Child("deletionTimestamp"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetDeletionGracePeriodSeconds(), oldMeta.GetDeletionGracePeriodSeconds(), fldPath.Child("deletionGracePeriodSeconds"))...)
+	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetUID(), oldMeta.GetUID(), fldPath.Child("uid")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
+	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetCreationTimestamp(), oldMeta.GetCreationTimestamp(), fldPath.Child("creationTimestamp")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
+	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetDeletionTimestamp(), oldMeta.GetDeletionTimestamp(), fldPath.Child("deletionTimestamp")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
+	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetDeletionGracePeriodSeconds(), oldMeta.GetDeletionGracePeriodSeconds(), fldPath.Child("deletionGracePeriodSeconds")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 
 	allErrs = append(allErrs, v1validation.ValidateLabels(newMeta.GetLabels(), fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(newMeta.GetAnnotations(), fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidateOwnerReferences(newMeta.GetOwnerReferences(), fldPath.Child("ownerReferences"))...)
-	allErrs = append(allErrs, v1validation.ValidateManagedFields(newMeta.GetManagedFields(), fldPath.Child("managedFields"))...)
+	allErrs = append(allErrs, v1validation.ValidateManagedFields(newMeta.GetManagedFields(), fldPath.Child("managedFields"), v1validation.CoveredByDeclarative)...)
 
 	return allErrs
 }

@@ -22,6 +22,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	unsafe "unsafe"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -70,8 +72,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_CSRSigningConfiguration_To_config_CSRSigningConfiguration(in *configv1alpha1.CSRSigningConfiguration, out *config.CSRSigningConfiguration, s conversion.Scope) error {
-	out.CertFile = in.CertFile
-	out.KeyFile = in.KeyFile
+	*out = *(*config.CSRSigningConfiguration)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -81,8 +82,7 @@ func Convert_v1alpha1_CSRSigningConfiguration_To_config_CSRSigningConfiguration(
 }
 
 func autoConvert_config_CSRSigningConfiguration_To_v1alpha1_CSRSigningConfiguration(in *config.CSRSigningConfiguration, out *configv1alpha1.CSRSigningConfiguration, s conversion.Scope) error {
-	out.CertFile = in.CertFile
-	out.KeyFile = in.KeyFile
+	*out = *(*configv1alpha1.CSRSigningConfiguration)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -130,8 +130,7 @@ func autoConvert_config_CSRSigningControllerConfiguration_To_v1alpha1_CSRSigning
 }
 
 func autoConvert_v1alpha1_GroupResource_To_v1_GroupResource(in *configv1alpha1.GroupResource, out *v1.GroupResource, s conversion.Scope) error {
-	out.Group = in.Group
-	out.Resource = in.Resource
+	*out = *(*v1.GroupResource)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -141,8 +140,7 @@ func Convert_v1alpha1_GroupResource_To_v1_GroupResource(in *configv1alpha1.Group
 }
 
 func autoConvert_v1_GroupResource_To_v1alpha1_GroupResource(in *v1.GroupResource, out *configv1alpha1.GroupResource, s conversion.Scope) error {
-	out.Group = in.Group
-	out.Resource = in.Resource
+	*out = *(*configv1alpha1.GroupResource)(unsafe.Pointer(in))
 	return nil
 }
 

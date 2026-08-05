@@ -17,10 +17,12 @@ limitations under the License.
 package cache
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -240,5 +242,31 @@ func TestPodGroupState_ScheduledPods(t *testing.T) {
 
 	if diff := cmp.Diff(expectedScheduledPods, snapshotScheduledPods); diff != "" {
 		t.Errorf("unexpected snapshot ScheduledPods result (-want,+got):\n%s", diff)
+	}
+}
+
+func TestCompositePodGroupState_Children(t *testing.T) {
+	cpgs := newCompositePodGroupState()
+
+	// 1. Initial state (children should be empty)
+	if children := cpgs.GetChildren(); len(children) != 0 {
+		t.Errorf("Expected no children initially, got %v", children)
+	}
+
+	// 2. Set children and test GetChildren
+	childKey1 := fwk.PodGroupKey("ns1", "child1")
+	childKey2 := fwk.CompositePodGroupKey("ns1", "child2")
+	cpgs.addChild(childKey1)
+	cpgs.addChild(childKey2)
+
+	children := cpgs.GetChildren()
+	var childrenStrs []string
+	for _, child := range children {
+		childrenStrs = append(childrenStrs, child.String())
+	}
+	sort.Strings(childrenStrs)
+	expectedChildren := []string{"compositepodgroup/ns1/child2", "podgroup/ns1/child1"}
+	if diff := cmp.Diff(expectedChildren, childrenStrs); diff != "" {
+		t.Errorf("Unexpected children result (-want,+got):\n%s", diff)
 	}
 }

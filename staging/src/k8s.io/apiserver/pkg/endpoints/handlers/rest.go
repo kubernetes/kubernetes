@@ -83,7 +83,7 @@ type RequestScope struct {
 	Defaulter       runtime.ObjectDefaulter
 	Typer           runtime.ObjectTyper
 	UnsafeConvertor runtime.ObjectConvertor
-	Authorizer      authorizer.Authorizer
+	Authorizer      authorizer.UnconditionalAuthorizer
 
 	EquivalentResourceMapper runtime.EquivalentResourceMapper
 

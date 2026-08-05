@@ -19,8 +19,8 @@ package topology
 import (
 	"fmt"
 
-	"github.com/go-logr/logr"
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/cpuset"
 )
 
@@ -327,6 +327,18 @@ func (d CPUDetails) CPUsInCores(ids ...int) cpuset.CPUSet {
 	return cpuset.New(cpuIDs...)
 }
 
+// AreNUMANodesInSameSocket returns true for all NUMANodes in the same socket
+func (d CPUDetails) AreNUMANodesInSameSocket(numaNodes []int) bool {
+	allNUMAs := d.NUMANodes()
+	for _, id := range numaNodes {
+		if !allNUMAs.Contains(id) {
+			// return false if any NUMANode is out of range
+			return false
+		}
+	}
+	return d.SocketsInNUMANodes(numaNodes...).Size() <= 1
+}
+
 func getUncoreCacheID(core cadvisorapi.Core) int {
 	if len(core.UncoreCaches) < 1 {
 		// In case cAdvisor is nil, failback to socket alignment since uncorecache is not shared
@@ -338,7 +350,7 @@ func getUncoreCacheID(core cadvisorapi.Core) int {
 }
 
 // Discover returns CPUTopology based on cadvisor node info
-func Discover(logger logr.Logger, machineInfo *cadvisorapi.MachineInfo) (*CPUTopology, error) {
+func Discover(logger klog.Logger, machineInfo *cadvisorapi.MachineInfo) (*CPUTopology, error) {
 	if machineInfo.NumCores == 0 {
 		return nil, fmt.Errorf("could not detect number of cpus")
 	}

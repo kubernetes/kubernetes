@@ -28,12 +28,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
-
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
@@ -419,7 +419,10 @@ func TestDropNodeDeclaredFeaturesFieldDuringCreate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tc.featureGateEnabled)
+			if !tc.featureGateEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.36"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, false)
+			}
 
 			nodeCreate := tc.initialNode.DeepCopy()
 			Strategy.PrepareForCreate(context.TODO(), nodeCreate)
@@ -518,12 +521,109 @@ func TestDropNodeDeclaredFeaturesFieldDuringUpdate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, tc.featureGateEnabled)
+			if !tc.featureGateEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.36"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, false)
+			}
 
 			newNode := tc.newNode.DeepCopy()
 			Strategy.PrepareForUpdate(context.TODO(), newNode, tc.oldNode)
 			if !slices.Equal(tc.expectedNode.Status.DeclaredFeatures, newNode.Status.DeclaredFeatures) {
 				t.Fatalf("PrepareForUpdate: expected %v, got %v", tc.expectedNode.Status.DeclaredFeatures, newNode.Status.DeclaredFeatures)
+			}
+		})
+	}
+}
+
+func TestDropPodPreemptionPolicy(t *testing.T) {
+	nodeWithPolicy := func() *api.Node {
+		return &api.Node{
+			Spec: api.NodeSpec{
+				PodPreemptionPolicy: &api.NodePodPreemptionPolicy{
+					DisableResizePreemption: []string{"o1"},
+				},
+			},
+		}
+	}
+	nodeWithoutPolicy := func() *api.Node {
+		return &api.Node{
+			Spec: api.NodeSpec{},
+		}
+	}
+	nodeWithEmptyPolicy := func() *api.Node {
+		return &api.Node{
+			Spec: api.NodeSpec{
+				PodPreemptionPolicy: &api.NodePodPreemptionPolicy{
+					DisableResizePreemption: []string{},
+				},
+			},
+		}
+	}
+
+	testCases := []struct {
+		name               string
+		featureGateEnabled bool
+		newNode            *api.Node
+		oldNode            *api.Node
+		expectedNode       *api.Node
+	}{
+		{
+			name:               "feature gate disabled, create node with policy -> drop policy",
+			featureGateEnabled: false,
+			newNode:            nodeWithPolicy(),
+			oldNode:            nil,
+			expectedNode:       nodeWithoutPolicy(),
+		},
+		{
+			name:               "feature gate disabled, update node with policy (old had no policy) -> drop policy",
+			featureGateEnabled: false,
+			newNode:            nodeWithPolicy(),
+			oldNode:            nodeWithoutPolicy(),
+			expectedNode:       nodeWithoutPolicy(),
+		},
+		{
+			name:               "feature gate disabled, update node with policy (old had policy) -> keep policy",
+			featureGateEnabled: false,
+			newNode:            nodeWithPolicy(),
+			oldNode:            nodeWithPolicy(),
+			expectedNode:       nodeWithPolicy(),
+		},
+		{
+			name:               "feature gate disabled, update node with empty policy (old had empty policy) -> keep policy",
+			featureGateEnabled: false,
+			newNode:            nodeWithEmptyPolicy(),
+			oldNode:            nodeWithEmptyPolicy(),
+			expectedNode:       nodeWithEmptyPolicy(),
+		},
+		{
+			name:               "feature gate enabled, create node with policy -> keep policy",
+			featureGateEnabled: true,
+			newNode:            nodeWithPolicy(),
+			oldNode:            nil,
+			expectedNode:       nodeWithPolicy(),
+		},
+		{
+			name:               "feature gate enabled, update node with policy (old had no policy) -> keep policy",
+			featureGateEnabled: true,
+			newNode:            nodeWithPolicy(),
+			oldNode:            nodeWithoutPolicy(),
+			expectedNode:       nodeWithPolicy(),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, tc.featureGateEnabled)
+
+			newNode := tc.newNode.DeepCopy()
+			if tc.oldNode == nil {
+				Strategy.PrepareForCreate(context.TODO(), newNode)
+			} else {
+				Strategy.PrepareForUpdate(context.TODO(), newNode, tc.oldNode)
+			}
+
+			if diff := cmp.Diff(tc.expectedNode.Spec.PodPreemptionPolicy, newNode.Spec.PodPreemptionPolicy); diff != "" {
+				t.Fatalf("unexpected podPreemptionPolicy (-want, +got):\n%s", diff)
 			}
 		})
 	}

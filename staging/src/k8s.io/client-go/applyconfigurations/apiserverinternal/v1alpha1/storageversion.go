@@ -32,7 +32,7 @@ import (
 //
 // Storage version of a specific resource.
 type StorageVersionApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:""`
 	// metadata is the standard object metadata.
 	// The name is <group>.<resource>.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`

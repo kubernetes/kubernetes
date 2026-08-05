@@ -31,6 +31,9 @@ const (
 	// DefaultTracesPath is a default URL path for endpoint that
 	// receives spans.
 	DefaultTracesPath string = "/v1/traces"
+	// DefaultMaxRequestSize is the default maximum size of a serialized export
+	// request, before compression.
+	DefaultMaxRequestSize int = 64 * 1024 * 1024
 	// DefaultTimeout is a default max waiting time for the backend to process
 	// each span batch.
 	DefaultTimeout time.Duration = 10 * time.Second
@@ -42,13 +45,14 @@ type (
 	HTTPTransportProxyFunc func(*http.Request) (*url.URL, error)
 
 	SignalConfig struct {
-		Endpoint    string
-		Insecure    bool
-		TLSCfg      *tls.Config
-		Headers     map[string]string
-		Compression Compression
-		Timeout     time.Duration
-		URLPath     string
+		Endpoint       string
+		Insecure       bool
+		TLSCfg         *tls.Config
+		Headers        map[string]string
+		Compression    Compression
+		MaxRequestSize int
+		Timeout        time.Duration
+		URLPath        string
 
 		// gRPC configurations
 		GRPCCredentials credentials.TransportCredentials
@@ -77,10 +81,11 @@ type (
 func NewHTTPConfig(opts ...HTTPOption) Config {
 	cfg := Config{
 		Traces: SignalConfig{
-			Endpoint:    fmt.Sprintf("%s:%d", DefaultCollectorHost, DefaultCollectorHTTPPort),
-			URLPath:     DefaultTracesPath,
-			Compression: NoCompression,
-			Timeout:     DefaultTimeout,
+			Endpoint:       fmt.Sprintf("%s:%d", DefaultCollectorHost, DefaultCollectorHTTPPort),
+			URLPath:        DefaultTracesPath,
+			Compression:    NoCompression,
+			MaxRequestSize: DefaultMaxRequestSize,
+			Timeout:        DefaultTimeout,
 		},
 		RetryConfig: retry.DefaultConfig,
 	}
@@ -111,10 +116,11 @@ func NewGRPCConfig(opts ...GRPCOption) Config {
 	userAgent := "OTel OTLP Exporter Go/" + otlptrace.Version()
 	cfg := Config{
 		Traces: SignalConfig{
-			Endpoint:    fmt.Sprintf("%s:%d", DefaultCollectorHost, DefaultCollectorGRPCPort),
-			URLPath:     DefaultTracesPath,
-			Compression: NoCompression,
-			Timeout:     DefaultTimeout,
+			Endpoint:       fmt.Sprintf("%s:%d", DefaultCollectorHost, DefaultCollectorGRPCPort),
+			URLPath:        DefaultTracesPath,
+			Compression:    NoCompression,
+			MaxRequestSize: DefaultMaxRequestSize,
+			Timeout:        DefaultTimeout,
 		},
 		RetryConfig: retry.DefaultConfig,
 		DialOptions: []grpc.DialOption{grpc.WithUserAgent(userAgent)},
@@ -341,6 +347,13 @@ func WithHeaders(headers map[string]string) GenericOption {
 func WithTimeout(duration time.Duration) GenericOption {
 	return newGenericOption(func(cfg Config) Config {
 		cfg.Traces.Timeout = duration
+		return cfg
+	})
+}
+
+func WithMaxRequestSize(size int) GenericOption {
+	return newGenericOption(func(cfg Config) Config {
+		cfg.Traces.MaxRequestSize = size
 		return cfg
 	})
 }

@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -73,15 +74,12 @@ func (c *GenericConfig) NewRESTStorage(apiResourceConfigSource serverstorage.API
 		ParameterCodec:               legacyscheme.ParameterCodec,
 		NegotiatedSerializer:         legacyscheme.Codecs,
 	}
-	opts := []serializer.CodecFactoryOptionsMutator{}
+	opts := []serializer.CodecFactoryOptionsMutator{
+		serializer.WithStreamingCollectionEncodingToJSON(),
+		serializer.WithStreamingCollectionEncodingToProtobuf(),
+	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
 		opts = append(opts, serializer.WithSerializer(cbor.NewSerializerInfo))
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.StreamingCollectionEncodingToJSON) {
-		opts = append(opts, serializer.WithStreamingCollectionEncodingToJSON())
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.StreamingCollectionEncodingToProtobuf) {
-		opts = append(opts, serializer.WithStreamingCollectionEncodingToProtobuf())
 	}
 	if len(opts) != 0 {
 		apiGroupInfo.NegotiatedSerializer = serializer.NewCodecFactory(legacyscheme.Scheme, opts...)
@@ -113,9 +111,11 @@ func (c *GenericConfig) NewRESTStorage(apiResourceConfigSource serverstorage.API
 
 	var serviceAccountStorage *serviceaccountstore.REST
 	if c.ServiceAccountIssuer != nil {
-		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.APIAudiences, c.ServiceAccountMaxExpiration, newNotFoundGetter(schema.GroupResource{Resource: "pods"}), secretStorage.Store, newNotFoundGetter(schema.GroupResource{Resource: "nodes"}), c.ExtendExpiration, c.MaxExtendedExpiration)
+		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.APIAudiences, authorizerfactory.NewAlwaysDenyAuthorizer(), c.ServiceAccountMaxExpiration, newNotFoundGetter(schema.GroupResource{Resource: "pods"}), secretStorage.Store, newNotFoundGetter(schema.GroupResource{Resource: "nodes"}),
+			notFoundValidatingWebhookConfigurations{}, notFoundMutatingWebhookConfigurations{}, c.ExtendExpiration, c.MaxExtendedExpiration)
 	} else {
-		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, nil, nil, 0, newNotFoundGetter(schema.GroupResource{Resource: "pods"}), newNotFoundGetter(schema.GroupResource{Resource: "secrets"}), newNotFoundGetter(schema.GroupResource{Resource: "nodes"}), false, c.MaxExtendedExpiration)
+		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, nil, nil, authorizerfactory.NewAlwaysDenyAuthorizer(), 0, newNotFoundGetter(schema.GroupResource{Resource: "pods"}), newNotFoundGetter(schema.GroupResource{Resource: "secrets"}), newNotFoundGetter(schema.GroupResource{Resource: "nodes"}),
+			notFoundValidatingWebhookConfigurations{}, notFoundMutatingWebhookConfigurations{}, false, c.MaxExtendedExpiration)
 	}
 	if err != nil {
 		return genericapiserver.APIGroupInfo{}, err

@@ -49,6 +49,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
+	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
@@ -77,6 +78,7 @@ import (
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 	discoveryrest "k8s.io/kubernetes/pkg/registry/discovery/rest"
+	lifecyclerest "k8s.io/kubernetes/pkg/registry/lifecycle/rest"
 	networkingrest "k8s.io/kubernetes/pkg/registry/networking/rest"
 	noderest "k8s.io/kubernetes/pkg/registry/node/rest"
 	policyrest "k8s.io/kubernetes/pkg/registry/policy/rest"
@@ -559,7 +561,8 @@ func TestGenericStorageProviders(t *testing.T) {
 			schedulingrest.RESTStorageProvider,
 			storagerest.RESTStorageProvider,
 			appsrest.StorageProvider,
-			resourcerest.RESTStorageProvider:
+			resourcerest.RESTStorageProvider,
+			lifecyclerest.RESTStorageProvider:
 			// all these are non-generic, but kube specific
 			continue
 		default:
@@ -651,6 +654,59 @@ func TestGetResetFieldsHasAllVersions(t *testing.T) {
 	}
 }
 
+// TestDeclarativeValidationEnablementInStrategies verifies that every CreateStrategy and
+// UpdateStrategy installed supports declarative validation.
+func TestDeclarativeValidationEnablementInStrategies(t *testing.T) {
+	_, config, _ := setUp(t)
+
+	client, err := kubernetes.NewForConfig(config.ControlPlane.Generic.LoopbackClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	providers, err := config.Complete().StorageProviders(client)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Enable all versions (including alpha and beta) so the check covers
+	// every resource that kube-apiserver can serve.
+	allVersionsConfig := DefaultAPIResourceConfigSource()
+	allVersionsConfig.EnableVersions(betaAPIGroupVersionsDisabledByDefault...)
+	allVersionsConfig.EnableVersions(alphaAPIGroupVersionsDisabledByDefault...)
+
+	for _, provider := range providers {
+		groupName := provider.GroupName()
+		apiGroupInfo, err := provider.NewRESTStorage(allVersionsConfig, config.ControlPlane.Generic.RESTOptionsGetter)
+		if err != nil {
+			t.Errorf("error creating REST storage for %s: %v", groupName, err)
+			continue
+		}
+
+		for v, resourcesInVersion := range apiGroupInfo.VersionedResourcesStorageMap {
+			for resource, storage := range resourcesInVersion {
+				gs, ok := storage.(registry.GenericStore)
+				if !ok {
+					// Non-generic storage (e.g. proxy/exec subresources)
+					// has no strategy to check.
+					continue
+				}
+				name := gvr(groupName, v, resource)
+				if cs := gs.GetCreateStrategy(); cs != nil {
+					if _, ok := cs.(rest.DeclarativeValidationStrategy); !ok {
+						t.Errorf("%s: CreateStrategy %T does not implement rest.DeclarativeValidationStrategy; embed rest.DeclarativeValidation to enable automatic declarative validation", name, cs)
+					}
+				}
+				if us := gs.GetUpdateStrategy(); us != nil {
+					if _, ok := us.(rest.DeclarativeValidationStrategy); !ok {
+						t.Errorf("%s: UpdateStrategy %T does not implement rest.DeclarativeValidationStrategy; embed rest.DeclarativeValidation to enable automatic declarative validation", name, us)
+					}
+				}
+			}
+		}
+	}
+}
+
 func gvr(g string, v string, r string) string {
 	var gvr string
 	if len(g) == 0 {
@@ -697,6 +753,8 @@ var gvrToStorageVersionHash = map[string]string{
 	"batch/v1/jobs":     "mudhfqk/qZY=",
 	"batch/v1/cronjobs": "sd5LIXh4Fjs=",
 	"certificates.k8s.io/v1/certificatesigningrequests":                 "95fRKMXA+00=",
+	"certificates.k8s.io/v1/clustertrustbundles":                        "v5yhuVertL4=",
+	"certificates.k8s.io/v1/podcertificaterequests":                     "wYA9yXQH8fg=",
 	"coordination.k8s.io/v1/leases":                                     "gqkMMb/YqFM=",
 	"discovery.k8s.io/v1/endpointslices":                                "qgS0xkrxYAI=",
 	"networking.k8s.io/v1/networkpolicies":                              "YpfwF18m1G8=",
@@ -711,6 +769,7 @@ var gvrToStorageVersionHash = map[string]string{
 	"rbac.authorization.k8s.io/v1/rolebindings":                         "eGsCzGH6b1g=",
 	"rbac.authorization.k8s.io/v1/roles":                                "7FuwZcIIItM=",
 	"resource.k8s.io/v1/deviceclasses":                                  "Yk2PTc1Ybxk=",
+	"resource.k8s.io/v1/devicetaintrules":                               "i+85+TcIKpA=",
 	"resource.k8s.io/v1/resourceclaims":                                 "wgAZaHcZxUg=",
 	"resource.k8s.io/v1/resourceclaimtemplates":                         "TuzjC49aUfM=",
 	"resource.k8s.io/v1/resourceslices":                                 "KsC072WgaEY=",
@@ -721,6 +780,7 @@ var gvrToStorageVersionHash = map[string]string{
 	"storage.k8s.io/v1/csistoragecapacities":                            "xeVl+2Ly1kE=",
 	"storage.k8s.io/v1/volumeattachments":                               "tJx/ezt6UDU=",
 	"storage.k8s.io/v1/volumeattributesclasses":                         "tIjydgKBC5w=",
+	"storagemigration.k8s.io/v1/storageversionmigrations":               "pCjmmKOkLy4=",
 	"apps/v1/controllerrevisions":                                       "85nkx63pcBU=",
 	"apps/v1/daemonsets":                                                "dd7pWHUlMKQ=",
 	"apps/v1/deployments":                                               "8aSe+NMegvE=",
@@ -728,8 +788,8 @@ var gvrToStorageVersionHash = map[string]string{
 	"apps/v1/statefulsets":                                              "H+vl74LkKdo=",
 	"admissionregistration.k8s.io/v1/mutatingwebhookconfigurations":     "Sqi0GUgDaX0=",
 	"admissionregistration.k8s.io/v1/validatingwebhookconfigurations":   "B0wHjQmsGNk=",
-	"admissionregistration.k8s.io/v1/mutatingadmissionpolicies":         "LYmCf+UMVdg=",
-	"admissionregistration.k8s.io/v1/mutatingadmissionpolicybindings":   "90V5FRZZ3Zg=",
+	"admissionregistration.k8s.io/v1/mutatingadmissionpolicies":         "mHCkTKpUTrE=",
+	"admissionregistration.k8s.io/v1/mutatingadmissionpolicybindings":   "ZKgZT1uTmZ0=",
 	"admissionregistration.k8s.io/v1/validatingadmissionpolicies":       "6OxvlMmQ6is=",
 	"admissionregistration.k8s.io/v1/validatingadmissionpolicybindings": "v9715VZqakg=",
 	"events.k8s.io/v1/events":                                           "r2yiGXH7wu8=",

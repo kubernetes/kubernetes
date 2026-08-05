@@ -34,6 +34,6 @@ func NewAdmissionFailureHandlerStub() *AdmissionFailureHandlerStub {
 }
 
 // HandleAdmissionFailure simply passes admission rejection on, with no special handling.
-func (n *AdmissionFailureHandlerStub) HandleAdmissionFailure(ctx context.Context, admitPod *v1.Pod, failureReasons []PredicateFailureReason) ([]PredicateFailureReason, error) {
+func (n *AdmissionFailureHandlerStub) HandleAdmissionFailure(ctx context.Context, admitPod *v1.Pod, failureReasons []PredicateFailureReason, operation Operation) ([]PredicateFailureReason, error) {
 	return failureReasons, nil
 }

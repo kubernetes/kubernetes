@@ -38,7 +38,7 @@ func (a *applierV3Corrupt) DeleteRange(_ *pb.DeleteRangeRequest) (*pb.DeleteRang
 	return nil, nil, errors.ErrCorrupt
 }
 
-func (a *applierV3Corrupt) Txn(_ *pb.TxnRequest) (*pb.TxnResponse, *traceutil.Trace, error) {
+func (a *applierV3Corrupt) Txn(_ *pb.TxnRequest, _ bool) (*pb.TxnResponse, *traceutil.Trace, error) {
 	return nil, nil, errors.ErrCorrupt
 }
 

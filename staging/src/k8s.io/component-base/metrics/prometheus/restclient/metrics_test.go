@@ -26,6 +26,17 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 )
 
+// TestMain ensures the deferred restclient registration callback (installed
+// via RegisterOpts.RegisterFn in this package's init()) fires before any test
+// exercises the adapter paths. In production this is triggered by
+// rest.RESTClientForConfigAndClient calling metrics.EnsureRegistered, but
+// these tests bypass rest client construction and write to adapters
+// directly.
+func TestMain(m *testing.M) {
+	metrics.EnsureRegistered()
+	m.Run()
+}
+
 func TestClientGOMetrics(t *testing.T) {
 	tests := []struct {
 		description string

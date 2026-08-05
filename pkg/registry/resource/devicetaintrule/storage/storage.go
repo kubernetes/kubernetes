@@ -37,8 +37,19 @@ type REST struct {
 	*genericregistry.Store
 }
 
-// NewREST returns a RESTStorage object that will work against DeviceTaintRule.
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
+// NewRESTv1 returns a RESTStorage object that will work against DeviceTaintRule
+// for the v1 API version.
+func NewRESTv1(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
+	return newREST(optsGetter, false /* returnDeletedObject */)
+}
+
+// NewRESTLegacy returns a RESTStorage object that will work against DeviceTaintRule
+// for the API versions < v1.
+func NewRESTLegacy(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
+	return newREST(optsGetter, true /* returnDeletedObject */)
+}
+
+func newREST(optsGetter generic.RESTOptionsGetter, returnDeletedObject bool) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &resource.DeviceTaintRule{} },
 		NewListFunc:               func() runtime.Object { return &resource.DeviceTaintRuleList{} },
@@ -48,7 +59,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 		CreateStrategy:      devicetaintrule.Strategy,
 		UpdateStrategy:      devicetaintrule.Strategy,
 		DeleteStrategy:      devicetaintrule.Strategy,
-		ReturnDeletedObject: true,
+		ReturnDeletedObject: returnDeletedObject,
 		ResetFieldsStrategy: devicetaintrule.Strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},

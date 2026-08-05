@@ -38,12 +38,12 @@ var groupResource = rbac.Resource("clusterrolebindings")
 type Storage struct {
 	rest.StandardStorage
 
-	authorizer authorizer.Authorizer
+	authorizer authorizer.UnconditionalAuthorizer
 
 	ruleResolver rbacregistryvalidation.AuthorizationRuleResolver
 }
 
-func NewStorage(s rest.StandardStorage, authorizer authorizer.Authorizer, ruleResolver rbacregistryvalidation.AuthorizationRuleResolver) *Storage {
+func NewStorage(s rest.StandardStorage, authorizer authorizer.UnconditionalAuthorizer, ruleResolver rbacregistryvalidation.AuthorizationRuleResolver) *Storage {
 	return &Storage{s, authorizer, ruleResolver}
 }
 

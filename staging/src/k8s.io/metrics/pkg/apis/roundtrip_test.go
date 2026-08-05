@@ -20,21 +20,22 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
+	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
+	genericfuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	custommetrics "k8s.io/metrics/pkg/apis/custom_metrics"
 	custommetricsv1beta1 "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1"
 	custommetricsv1beta2 "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	externalmetrics "k8s.io/metrics/pkg/apis/external_metrics"
 	externalmetricsv1beta1 "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
 	metrics "k8s.io/metrics/pkg/apis/metrics"
+	metricsv1 "k8s.io/metrics/pkg/apis/metrics/v1"
 	metricsv1alpha1 "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 	metricsv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
-
-	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
-	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
-	genericfuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 )
 
 var groups = []runtime.SchemeBuilder{
@@ -44,6 +45,7 @@ var groups = []runtime.SchemeBuilder{
 	externalmetrics.SchemeBuilder,
 	externalmetricsv1beta1.SchemeBuilder,
 	metrics.SchemeBuilder,
+	metricsv1.SchemeBuilder,
 	metricsv1alpha1.SchemeBuilder,
 	metricsv1beta1.SchemeBuilder,
 }
@@ -61,4 +63,14 @@ func TestRoundTripTypes(t *testing.T) {
 
 	roundtrip.RoundTripExternalTypes(t, scheme, codecs, fuzzer, nil)
 	roundtrip.RoundTripTypes(t, scheme, codecs, fuzzer, nil)
+}
+
+func TestCompatibility(t *testing.T) {
+	scheme := runtime.NewScheme()
+	for _, builder := range groups {
+		if err := builder.AddToScheme(scheme); err != nil {
+			t.Fatalf("unexpected error adding to scheme: %v", err)
+		}
+	}
+	roundtrip.NewCompatibilityTestOptions(scheme).Complete(t).Run(t)
 }

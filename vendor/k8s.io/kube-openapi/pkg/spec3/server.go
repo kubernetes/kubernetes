@@ -22,6 +22,7 @@ import (
 	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
 	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
+	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/jsontext"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -55,14 +56,14 @@ func (s *Server) MarshalJSON() ([]byte, error) {
 	return swag.ConcatJSON(b1, b2), nil
 }
 
-func (s *Server) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+func (s *Server) MarshalJSONTo(enc *jsontext.Encoder) error {
 	var x struct {
 		ServerProps `json:",inline"`
-		spec.Extensions
+		Extensions  spec.Extensions `json:",inline"`
 	}
 	x.Extensions = internal.SanitizeExtensions(s.Extensions)
 	x.ServerProps = s.ServerProps
-	return opts.MarshalNext(enc, x)
+	return jsonv2.MarshalEncode(enc, x)
 }
 
 func (s *Server) UnmarshalJSON(data []byte) error {
@@ -79,12 +80,12 @@ func (s *Server) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (s *Server) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+func (s *Server) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	var x struct {
-		spec.Extensions
+		Extensions spec.Extensions `json:",inline"`
 		ServerProps
 	}
-	if err := opts.UnmarshalNext(dec, &x); err != nil {
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
 		return err
 	}
 	s.Extensions = internal.SanitizeExtensions(x.Extensions)
@@ -123,14 +124,14 @@ func (s *ServerVariable) MarshalJSON() ([]byte, error) {
 	return swag.ConcatJSON(b1, b2), nil
 }
 
-func (s *ServerVariable) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+func (s *ServerVariable) MarshalJSONTo(enc *jsontext.Encoder) error {
 	var x struct {
 		ServerVariableProps `json:",inline"`
-		spec.Extensions
+		Extensions          spec.Extensions `json:",inline"`
 	}
 	x.Extensions = internal.SanitizeExtensions(s.Extensions)
 	x.ServerVariableProps = s.ServerVariableProps
-	return opts.MarshalNext(enc, x)
+	return jsonv2.MarshalEncode(enc, x)
 }
 
 func (s *ServerVariable) UnmarshalJSON(data []byte) error {
@@ -146,12 +147,12 @@ func (s *ServerVariable) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (s *ServerVariable) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+func (s *ServerVariable) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	var x struct {
-		spec.Extensions
+		Extensions spec.Extensions `json:",inline"`
 		ServerVariableProps
 	}
-	if err := opts.UnmarshalNext(dec, &x); err != nil {
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
 		return err
 	}
 	s.Extensions = internal.SanitizeExtensions(x.Extensions)

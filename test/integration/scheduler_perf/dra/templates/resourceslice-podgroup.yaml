@@ -1,0 +1,19 @@
+kind: ResourceSlice
+apiVersion: resource.k8s.io/v1
+metadata:
+  name: resourceslice-podgroup-{{.Index}}
+spec:
+  pool:
+    name: resourceslice-{{.Index}}
+    generation: 1
+    resourceSliceCount: 1
+  driver: test-driver.cdi.k8s.io
+  nodeSelector:
+    nodeSelectorTerms:
+    - matchExpressions:
+      - key: node-with-dra
+        operator: In
+        values:
+        - "true"
+  devices:
+  - name: device

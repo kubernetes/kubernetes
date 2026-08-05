@@ -24,7 +24,6 @@ import (
 	"time"
 
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
-	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	apidiscoveryv2conversion "k8s.io/apiserver/pkg/apis/apidiscovery/v2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,12 +58,6 @@ var APIRegistrationGroupPriority int = 20001
 const discoveryRefreshInterval = 1 * time.Minute
 
 // Aggregated discovery content-type GVK.
-var v2Beta1GVK = schema.GroupVersionKind{
-	Group:   "apidiscovery.k8s.io",
-	Version: "v2beta1",
-	Kind:    "APIGroupDiscoveryList",
-}
-
 var v2GVK = schema.GroupVersionKind{
 	Group:   "apidiscovery.k8s.io",
 	Version: "v2",
@@ -194,7 +187,6 @@ func NewDiscoveryManager(
 ) DiscoveryAggregationController {
 	discoveryScheme := runtime.NewScheme()
 	utilruntime.Must(apidiscoveryv2.AddToScheme(discoveryScheme))
-	utilruntime.Must(apidiscoveryv2beta1.AddToScheme(discoveryScheme))
 	// Register conversion for apidiscovery
 	utilruntime.Must(apidiscoveryv2conversion.RegisterConversions(discoveryScheme))
 	codecs := serializer.NewCodecFactory(discoveryScheme)
@@ -245,7 +237,7 @@ func (dm *discoveryManager) fetchFreshDiscoveryForService(gv metav1.GroupVersion
 		Path:              req.URL.Path,
 		IsResourceRequest: false,
 	}))
-	req.Header.Add("Accept", discovery.AcceptV2+","+discovery.AcceptV2Beta1)
+	req.Header.Add("Accept", discovery.AcceptV2)
 
 	if exists && len(cached.etag) > 0 {
 		req.Header.Add("If-None-Match", cached.etag)
@@ -258,7 +250,6 @@ func (dm *discoveryManager) fetchFreshDiscoveryForService(gv metav1.GroupVersion
 	writer := responsewriter.NewInMemoryResponseWriter()
 	handler.ServeHTTP(writer, req)
 
-	isV2Beta1GVK, _ := discovery.ContentTypeIsGVK(writer.Header().Get("Content-Type"), v2Beta1GVK)
 	isV2GVK, _ := discovery.ContentTypeIsGVK(writer.Header().Get("Content-Type"), v2GVK)
 
 	switch {
@@ -275,7 +266,7 @@ func (dm *discoveryManager) fetchFreshDiscoveryForService(gv metav1.GroupVersion
 	case writer.RespCode() == http.StatusServiceUnavailable:
 		return nil, fmt.Errorf("service %s returned non-success response code: %v",
 			info.service.String(), writer.RespCode())
-	case writer.RespCode() == http.StatusOK && (isV2GVK || isV2Beta1GVK):
+	case writer.RespCode() == http.StatusOK && isV2GVK:
 		parsed := &apidiscoveryv2.APIGroupDiscoveryList{}
 		if err := runtime.DecodeInto(dm.codecs.UniversalDecoder(), writer.Data(), parsed); err != nil {
 			return nil, err

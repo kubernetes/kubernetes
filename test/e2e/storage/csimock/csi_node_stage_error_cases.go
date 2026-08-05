@@ -131,8 +131,7 @@ var _ = utils.SIGDescribe("CSI Mock volume node stage", func() {
 				},
 			},
 		}
-		for _, t := range tests {
-			test := t
+		for _, test := range tests {
 			ginkgo.It(test.name, func(ctx context.Context) {
 				var hooks *drivers.Hooks
 				if test.nodeStageHook != nil {
@@ -264,8 +263,7 @@ var _ = utils.SIGDescribe("CSI Mock volume node stage", func() {
 				},
 			},
 		}
-		for _, t := range tests {
-			test := t
+		for _, test := range tests {
 			ginkgo.It(test.name, func(ctx context.Context) {
 				// Index of the last deleted pod. NodeUnstage calls are then related to this pod.
 				var deletedPodNumber atomic.Int64

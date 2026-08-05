@@ -454,11 +454,11 @@ func TestListWithTypedFixtures(t *testing.T) {
 
 type (
 	mockResource struct {
-		metav1.TypeMeta   `json:",inline"`
+		metav1.TypeMeta   `json:""`
 		metav1.ObjectMeta `json:"metadata"`
 	}
 	mockResourceList struct {
-		metav1.TypeMeta `json:",inline"`
+		metav1.TypeMeta `json:""`
 		metav1.ListMeta `json:"metadata"`
 
 		Items []mockResource

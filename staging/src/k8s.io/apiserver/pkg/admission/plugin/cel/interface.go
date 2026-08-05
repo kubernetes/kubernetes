@@ -80,7 +80,7 @@ type OptionalVariableBindings struct {
 	// Authorizer provides the authorizer used for the "authorizer" and
 	// "authorizer.requestResource" variable bindings. If the expression was compiled with
 	// OptionalVariableDeclarations.HasAuthorizer set to true this must be non-nil.
-	Authorizer authorizer.Authorizer
+	Authorizer authorizer.UnconditionalAuthorizer
 }
 
 // ConditionEvaluator contains the result of compiling a CEL expression

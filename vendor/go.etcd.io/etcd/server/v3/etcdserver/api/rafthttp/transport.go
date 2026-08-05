@@ -23,6 +23,7 @@ import (
 	"github.com/xiang90/probing"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
+	"google.golang.org/protobuf/proto"
 
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 	"go.etcd.io/etcd/client/pkg/v3/types"
@@ -33,7 +34,7 @@ import (
 )
 
 type Raft interface {
-	Process(ctx context.Context, m raftpb.Message) error
+	Process(ctx context.Context, m *raftpb.Message) error
 	IsIDRemoved(id uint64) bool
 	ReportUnreachable(id uint64)
 	ReportSnapshot(id uint64, status raft.SnapshotStatus)
@@ -54,10 +55,10 @@ type Transporter interface {
 	// to an existing peer in the transport.
 	// If the id cannot be found in the transport, the message
 	// will be ignored.
-	Send(m []raftpb.Message)
+	Send(m []*raftpb.Message)
 	// SendSnapshot sends out the given snapshot message to a remote peer.
 	// The behavior of SendSnapshot is similar to Send.
-	SendSnapshot(m snap.Message)
+	SendSnapshot(m *snap.Message)
 	// AddRemote adds a remote with given peer urls into the transport.
 	// A remote helps newly joined member to catch up the progress of cluster,
 	// and will not be used after that.
@@ -172,13 +173,13 @@ func (t *Transport) Get(id types.ID) Peer {
 	return t.peers[id]
 }
 
-func (t *Transport) Send(msgs []raftpb.Message) {
+func (t *Transport) Send(msgs []*raftpb.Message) {
 	for _, m := range msgs {
-		if m.To == 0 {
+		if m.GetTo() == 0 {
 			// ignore intentionally dropped message
 			continue
 		}
-		to := types.ID(m.To)
+		to := types.ID(m.GetTo())
 
 		t.mu.RLock()
 		p, pok := t.peers[to]
@@ -187,7 +188,7 @@ func (t *Transport) Send(msgs []raftpb.Message) {
 
 		if pok {
 			if isMsgApp(m) {
-				t.ServerStats.SendAppendReq(m.Size())
+				t.ServerStats.SendAppendReq(proto.Size(m))
 			}
 			p.send(m)
 			continue
@@ -201,7 +202,7 @@ func (t *Transport) Send(msgs []raftpb.Message) {
 		if t.Logger != nil {
 			t.Logger.Debug(
 				"ignored message send request; unknown remote peer target",
-				zap.String("type", m.Type.String()),
+				zap.String("type", m.GetType().String()),
 				zap.String("unknown-target-peer-id", to.String()),
 			)
 		}
@@ -405,10 +406,10 @@ func (t *Transport) ActiveSince(id types.ID) time.Time {
 	return time.Time{}
 }
 
-func (t *Transport) SendSnapshot(m snap.Message) {
+func (t *Transport) SendSnapshot(m *snap.Message) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	p := t.peers[types.ID(m.To)]
+	p := t.peers[types.ID(m.GetTo())]
 	if p == nil {
 		m.CloseWithError(errMemberNotFound)
 		return

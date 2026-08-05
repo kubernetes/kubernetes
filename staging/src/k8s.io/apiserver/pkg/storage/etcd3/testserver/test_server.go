@@ -31,7 +31,6 @@ import (
 	"go.etcd.io/etcd/server/v3/embed"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest"
-	"google.golang.org/grpc"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 )
 
@@ -124,13 +123,13 @@ func RunEtcd(t testing.TB, cfg *embed.Config) *kubernetes.Client {
 		TLS:         tlsConfig,
 		Endpoints:   e.Server.Cluster().ClientURLs(),
 		DialTimeout: 10 * time.Second,
-		DialOptions: []grpc.DialOption{grpc.WithBlock()},
 		Logger:      zaptest.NewLogger(t, zaptest.Level(zapcore.ErrorLevel)).Named("etcd-client"),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.KV = storagetesting.NewKVRecorder(client.KV)
-	client.Kubernetes = storagetesting.NewKubernetesRecorder(client.Kubernetes)
+	kubernetesRecorder := storagetesting.NewKubernetesRecorder(client.Kubernetes)
+	client.KV = storagetesting.NewKVRecorder(client.KV, kubernetesRecorder)
+	client.Kubernetes = kubernetesRecorder
 	return client
 }

@@ -143,6 +143,10 @@ profiles:
 							Name: "VolumeBinding",
 							Args: &config.VolumeBindingArgs{
 								BindTimeoutSeconds: 300,
+								Shape: []config.UtilizationShapePoint{
+									{Utilization: 0, Score: 10},
+									{Utilization: 100, Score: 0},
+								},
 							},
 						},
 						{
@@ -282,6 +286,10 @@ profiles:
 							Name: "VolumeBinding",
 							Args: &config.VolumeBindingArgs{
 								BindTimeoutSeconds: 600,
+								Shape: []config.UtilizationShapePoint{
+									{Utilization: 0, Score: 10},
+									{Utilization: 100, Score: 0},
+								},
 							},
 						},
 					},
@@ -423,6 +431,10 @@ profiles:
 							Name: "VolumeBinding",
 							Args: &config.VolumeBindingArgs{
 								BindTimeoutSeconds: 600,
+								Shape: []config.UtilizationShapePoint{
+									{Utilization: 0, Score: 10},
+									{Utilization: 100, Score: 0},
+								},
 							},
 						},
 						{
@@ -511,6 +523,10 @@ profiles:
 							Name: "VolumeBinding",
 							Args: &config.VolumeBindingArgs{
 								BindTimeoutSeconds: 600,
+								Shape: []config.UtilizationShapePoint{
+									{Utilization: 0, Score: 10},
+									{Utilization: 100, Score: 0},
+								},
 							},
 						},
 					},

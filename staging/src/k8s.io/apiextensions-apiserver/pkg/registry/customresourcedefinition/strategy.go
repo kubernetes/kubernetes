@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/cel/environment"
@@ -138,17 +139,19 @@ func (strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []stri
 		warnings = append(warnings, fmt.Sprintf("unrecognized format %q", format))
 	}
 
+	warnings = append(warnings, getNonScalarListTypeSetWarnings(&newCRD.Spec)...)
+
 	return warnings
 }
 
 // AllowCreateOnUpdate is false for CustomResourceDefinition; this means a POST is
 // needed to create one.
-func (strategy) AllowCreateOnUpdate() bool {
+func (strategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
 // AllowUnconditionalUpdate is the default update policy for CustomResourceDefinition objects.
-func (strategy) AllowUnconditionalUpdate() bool {
+func (strategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -193,6 +196,14 @@ func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) [
 		warnings = append(warnings, fmt.Sprintf("unrecognized format %q", format))
 	}
 
+	seen := sets.New[string]()
+	seen.Insert(getNonScalarListTypeSetWarnings(&oldCRD.Spec)...)
+	for _, w := range getNonScalarListTypeSetWarnings(&newCRD.Spec) {
+		if !seen.Has(w) {
+			warnings = append(warnings, w)
+		}
+	}
+
 	return warnings
 }
 
@@ -213,6 +224,31 @@ func getUnrecognizedFormatsInCRD(spec *apiextensions.CustomResourceDefinitionSpe
 	}
 
 	return unrecognizedFormats
+}
+
+// getNonScalarListTypeSetWarnings returns warning messages for schema fields
+// declaring x-kubernetes-list-type: set with non-scalar items anywhere in the
+// CRD's schemas. The output is sorted to ensure warnings are displayed in a stable order.
+func getNonScalarListTypeSetWarnings(spec *apiextensions.CustomResourceDefinitionSpec) []string {
+	seen := sets.New[string]()
+	check := func(s *apiextensions.JSONSchemaProps) bool {
+		if s.XListType != nil && *s.XListType == "set" && s.Items != nil && s.Items.Schema != nil {
+			switch s.Items.Schema.Type {
+			case "object", "array":
+				seen.Insert(fmt.Sprintf("x-kubernetes-list-type: set for items of type %q is not supported by server-side apply or CEL validation rules", s.Items.Schema.Type))
+			}
+		}
+		return false // continue traversing
+	}
+	if spec.Validation != nil && spec.Validation.OpenAPIV3Schema != nil {
+		validation.SchemaHas(spec.Validation.OpenAPIV3Schema, check)
+	}
+	for _, v := range spec.Versions {
+		if v.Schema != nil && v.Schema.OpenAPIV3Schema != nil {
+			validation.SchemaHas(v.Schema.OpenAPIV3Schema, check)
+		}
+	}
+	return sets.List(seen)
 }
 
 // getUnrecognizedFormatsInSchema recursively traverses the schema and collects unrecognized formats.
@@ -279,11 +315,11 @@ func (statusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Obj
 	metav1.ResetObjectMetaForStatus(&newObj.ObjectMeta, &newObj.ObjectMeta)
 }
 
-func (statusStrategy) AllowCreateOnUpdate() bool {
+func (statusStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
-func (statusStrategy) AllowUnconditionalUpdate() bool {
+func (statusStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -291,7 +327,7 @@ func (statusStrategy) Canonicalize(obj runtime.Object) {
 }
 
 func (statusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateUpdateCustomResourceDefinitionStatus(obj.(*apiextensions.CustomResourceDefinition), old.(*apiextensions.CustomResourceDefinition))
+	return validation.ValidateUpdateCustomResourceDefinitionStatus(ctx, obj.(*apiextensions.CustomResourceDefinition), old.(*apiextensions.CustomResourceDefinition))
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -326,7 +362,7 @@ func CustomResourceDefinitionToSelectableFields(obj *apiextensions.CustomResourc
 // dropDisabledFields drops disabled fields that are not used if their associated feature gates
 // are not enabled.
 func dropDisabledFields(newCRD *apiextensions.CustomResourceDefinition, oldCRD *apiextensions.CustomResourceDefinition) {
-	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) && (oldCRD == nil || (oldCRD != nil && !specHasOptionalOldSelf(&oldCRD.Spec))) {
+	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) && (oldCRD == nil || !specHasOptionalOldSelf(&oldCRD.Spec)) {
 		if newCRD.Spec.Validation != nil {
 			dropOptionalOldSelfField(newCRD.Spec.Validation.OpenAPIV3Schema)
 		}
@@ -337,7 +373,7 @@ func dropDisabledFields(newCRD *apiextensions.CustomResourceDefinition, oldCRD *
 			}
 		}
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceFieldSelectors) && (oldCRD == nil || (oldCRD != nil && !specHasSelectableFields(&oldCRD.Spec))) {
+	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceFieldSelectors) && (oldCRD == nil || !specHasSelectableFields(&oldCRD.Spec)) {
 		dropSelectableFields(&newCRD.Spec)
 	}
 	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDObservedGenerationTracking) && (oldCRD == nil || !observedGenerationTrackingInUse(&oldCRD.Status)) {

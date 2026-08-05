@@ -110,24 +110,24 @@ func MustVerifyIfEnabled(cfg Config) {
 
 func validateConsistentIndex(cfg Config, hardstate *raftpb.HardState, snapshot *walpb.Snapshot, be backend.Backend) error {
 	index, term := schema.ReadConsistentIndex(be.ReadTx())
-	if cfg.ExactIndex && index != hardstate.Commit {
-		return fmt.Errorf("backend.ConsistentIndex (%v) expected == WAL.HardState.commit (%v)", index, hardstate.Commit)
+	if cfg.ExactIndex && index != hardstate.GetCommit() {
+		return fmt.Errorf("backend.ConsistentIndex (%v) expected == WAL.HardState.commit (%v)", index, hardstate.GetCommit())
 	}
-	if cfg.ExactIndex && term != hardstate.Term {
-		return fmt.Errorf("backend.Term (%v) expected == WAL.HardState.term, (%v)", term, hardstate.Term)
+	if cfg.ExactIndex && term != hardstate.GetTerm() {
+		return fmt.Errorf("backend.Term (%v) expected == WAL.HardState.term, (%v)", term, hardstate.GetTerm())
 	}
-	if index > hardstate.Commit {
-		return fmt.Errorf("backend.ConsistentIndex (%v) must be <= WAL.HardState.commit (%v)", index, hardstate.Commit)
+	if index > hardstate.GetCommit() {
+		return fmt.Errorf("backend.ConsistentIndex (%v) must be <= WAL.HardState.commit (%v)", index, hardstate.GetCommit())
 	}
-	if term > hardstate.Term {
-		return fmt.Errorf("backend.Term (%v) must be <= WAL.HardState.term, (%v)", term, hardstate.Term)
-	}
-
-	if index < snapshot.Index {
-		return fmt.Errorf("backend.ConsistentIndex (%v) must be >= last snapshot index (%v)", index, snapshot.Index)
+	if term > hardstate.GetTerm() {
+		return fmt.Errorf("backend.Term (%v) must be <= WAL.HardState.term, (%v)", term, hardstate.GetTerm())
 	}
 
-	cfg.Logger.Info("verification: consistentIndex OK", zap.Uint64("backend-consistent-index", index), zap.Uint64("hardstate-commit", hardstate.Commit))
+	if index < snapshot.GetIndex() {
+		return fmt.Errorf("backend.ConsistentIndex (%v) must be >= last snapshot index (%v)", index, snapshot.GetIndex())
+	}
+
+	cfg.Logger.Info("verification: consistentIndex OK", zap.Uint64("backend-consistent-index", index), zap.Uint64("hardstate-commit", hardstate.GetCommit()))
 	return nil
 }
 
@@ -144,5 +144,5 @@ func validateWAL(cfg Config) (*walpb.Snapshot, *raftpb.HardState, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	return &snapshot, hardstate, nil
+	return snapshot, hardstate, nil
 }

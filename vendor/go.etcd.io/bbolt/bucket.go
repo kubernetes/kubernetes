@@ -661,16 +661,20 @@ func (b *Bucket) Stats() BucketStats {
 			}
 		} else if p.IsBranchPage() {
 			s.BranchPageN++
-			lastElement := p.BranchPageElement(p.Count() - 1)
 
-			// used totals the used bytes for the page
-			// Add header and all element headers.
-			used := common.PageHeaderSize + (common.BranchPageElementSize * uintptr(p.Count()-1))
+			used := common.PageHeaderSize
+			if p.Count() != 0 {
+				lastElement := p.BranchPageElement(p.Count() - 1)
 
-			// Add size of all keys and values.
-			// Again, use the fact that last element's position equals to
-			// the total of key, value sizes of all previous elements.
-			used += uintptr(lastElement.Pos() + lastElement.Ksize())
+				// Add all element headers.
+				used += common.BranchPageElementSize * uintptr(p.Count()-1)
+
+				// Add size of all keys and values.
+				// Again, use the fact that last element's position equals to
+				// the total of key, value sizes of all previous elements.
+				used += uintptr(lastElement.Pos() + lastElement.Ksize())
+			}
+
 			s.BranchInuse += int(used)
 			s.BranchOverflowN += int(p.Overflow())
 		}
@@ -880,7 +884,9 @@ func (b *Bucket) node(pgId common.Pgid, parent *node) *node {
 		// if p isn't nil, then it's an inline bucket.
 		// The pgId must be 0 in this case.
 		common.Verify(func() {
-			common.Assert(pgId == 0, "The page ID (%d) isn't 0 for an inline bucket", pgId)
+			if pgId != 0 {
+				panic(fmt.Sprintf("assertion failed: The page ID (%d) isn't 0 for an inline bucket", pgId))
+			}
 		})
 	}
 

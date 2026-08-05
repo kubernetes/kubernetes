@@ -53,7 +53,7 @@ func (lo *ListenerOptions) IsSocketOpts() bool {
 	return lo.socketOpts.ReusePort || lo.socketOpts.ReuseAddress
 }
 
-// IsTLS returns true if listner options includes TLSInfo.
+// IsTLS returns true if listener options includes TLSInfo.
 func (lo *ListenerOptions) IsTLS() bool {
 	if lo.tlsInfo == nil {
 		return false

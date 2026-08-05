@@ -26,6 +26,7 @@ import (
 	daemonconfig "k8s.io/kubernetes/pkg/controller/daemon/config"
 	deploymentconfig "k8s.io/kubernetes/pkg/controller/deployment/config"
 	devicetaintevictionconfig "k8s.io/kubernetes/pkg/controller/devicetainteviction/config"
+	disruptionconfig "k8s.io/kubernetes/pkg/controller/disruption/config"
 	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
 	endpointsliceconfig "k8s.io/kubernetes/pkg/controller/endpointslice/config"
 	endpointslicemirroringconfig "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config"
@@ -76,6 +77,9 @@ type KubeControllerManagerConfiguration struct {
 	// DeploymentControllerConfiguration holds configuration for
 	// DeploymentController related features.
 	DeploymentController deploymentconfig.DeploymentControllerConfiguration
+	// DisruptionControllerConfiguration holds configuration for
+	// DisruptionController related features.
+	DisruptionController disruptionconfig.DisruptionControllerConfiguration
 	// DeviceTaintEvictionControllerConfiguration contains elements configuring the device taint eviction controller.
 	DeviceTaintEvictionController devicetaintevictionconfig.DeviceTaintEvictionControllerConfiguration
 	// DeprecatedControllerConfiguration holds configuration for some deprecated

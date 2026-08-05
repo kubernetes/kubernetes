@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package
-// +groupName=example2.k8s.io
+// +groupName=example2.apiserver.k8s.io
 //
 // package example2 contains an example API whose internal version is defined in
 // another group ("example"). This happens if a type is moved to a different

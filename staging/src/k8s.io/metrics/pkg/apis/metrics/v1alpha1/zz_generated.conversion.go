@@ -91,8 +91,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_ContainerMetrics_To_metrics_ContainerMetrics(in *ContainerMetrics, out *metrics.ContainerMetrics, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Usage = *(*v1.ResourceList)(unsafe.Pointer(&in.Usage))
+	*out = *(*metrics.ContainerMetrics)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -102,8 +101,7 @@ func Convert_v1alpha1_ContainerMetrics_To_metrics_ContainerMetrics(in *Container
 }
 
 func autoConvert_metrics_ContainerMetrics_To_v1alpha1_ContainerMetrics(in *metrics.ContainerMetrics, out *ContainerMetrics, s conversion.Scope) error {
-	out.Name = in.Name
-	out.Usage = *(*v1.ResourceList)(unsafe.Pointer(&in.Usage))
+	*out = *(*ContainerMetrics)(unsafe.Pointer(in))
 	return nil
 }
 

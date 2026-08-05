@@ -153,17 +153,17 @@ func (tc *Controller) enqueue(logger klog.Logger, job *batch.Job) {
 	logger.V(4).Info("Add job to cleanup", "job", klog.KObj(job))
 	key, err := controller.KeyFunc(job)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", job, err))
+		utilruntime.HandleErrorWithLogger(logger, err, "Failed to get key for job", "job", klog.KObj(job))
 		return
 	}
 
 	tc.queue.Add(key)
 }
 
-func (tc *Controller) enqueueAfter(job *batch.Job, after time.Duration) {
+func (tc *Controller) enqueueAfter(logger klog.Logger, job *batch.Job, after time.Duration) {
 	key, err := controller.KeyFunc(job)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", job, err))
+		utilruntime.HandleErrorWithLogger(logger, err, "Failed to get key for job", "job", klog.KObj(job))
 		return
 	}
 
@@ -183,18 +183,18 @@ func (tc *Controller) processNextWorkItem(ctx context.Context) bool {
 	defer tc.queue.Done(key)
 
 	err := tc.processJob(ctx, key)
-	tc.handleErr(err, key)
+	tc.handleErr(ctx, err, key)
 
 	return true
 }
 
-func (tc *Controller) handleErr(err error, key string) {
+func (tc *Controller) handleErr(ctx context.Context, err error, key string) {
 	if err == nil {
 		tc.queue.Forget(key)
 		return
 	}
 
-	utilruntime.HandleError(fmt.Errorf("error cleaning up Job %v, will retry: %v", key, err))
+	utilruntime.HandleErrorWithContext(ctx, err, "Failed to clean up job, will retry", "key", key)
 	tc.queue.AddRateLimited(key)
 }
 
@@ -280,7 +280,7 @@ func (tc *Controller) processTTL(logger klog.Logger, job *batch.Job) (expiredAt 
 		return e, nil
 	}
 
-	tc.enqueueAfter(job, *t)
+	tc.enqueueAfter(logger, job, *t)
 	return nil, nil
 }
 

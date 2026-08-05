@@ -34,6 +34,7 @@ import (
 	"time"
 
 	codes "google.golang.org/grpc/codes"
+
 	crierror "k8s.io/cri-api/pkg/errors"
 
 	"github.com/opencontainers/selinux/go-selinux"
@@ -261,7 +262,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 	}
 
 	// When creating a container, mark the resources as actuated.
-	if err := m.setActuatedContainerResources(pod, container); err != nil {
+	if err := m.setActuatedContainerResources(logger, pod, container); err != nil {
 		m.recordContainerEvent(ctx, pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", err)
 		return err.Error(), ErrCreateContainerConfig
 	}
@@ -398,7 +399,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context,
 		e := opts.Envs[idx]
 		envs[idx] = &runtimeapi.KeyValue{
 			Key:   e.Name,
-			Value: e.Value,
+			Value: []byte(e.Value),
 		}
 	}
 	config.Envs = envs
@@ -407,23 +408,25 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context,
 }
 
 func (m *kubeGenericRuntimeManager) updateContainerResources(ctx context.Context, pod *v1.Pod, container *v1.Container, containerID kubecontainer.ContainerID) error {
+	logger := klog.FromContext(ctx)
 	containerResources := m.generateContainerResources(ctx, pod, container)
 	if containerResources == nil {
 		return fmt.Errorf("container %q updateContainerResources failed: cannot generate resources config", containerID.String())
 	}
 	err := m.runtimeService.UpdateContainerResources(ctx, containerID.ID, containerResources)
 	if err == nil {
-		err = m.setActuatedContainerResources(pod, container)
+		err = m.setActuatedContainerResources(logger, pod, container)
 	}
 	return err
 }
 
-func (m *kubeGenericRuntimeManager) setActuatedContainerResources(pod *v1.Pod, container *v1.Container) error {
+func (m *kubeGenericRuntimeManager) setActuatedContainerResources(logger klog.Logger, pod *v1.Pod, container *v1.Container) error {
 	containerResources := container.Resources
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+		containerResources = *containerResources.DeepCopy()
 		containerResources.Limits = kubeutil.GetLimits(&kubeutil.ResourceOpts{PodResources: pod.Spec.Resources, ContainerResources: &container.Resources})
 	}
-	return m.actuatedState.SetContainerResources(pod.UID, container.Name, containerResources)
+	return m.actuatedState.SetContainerResources(logger, pod.UID, container.Name, containerResources)
 }
 
 func (m *kubeGenericRuntimeManager) updatePodSandboxResources(ctx context.Context, sandboxID string, pod *v1.Pod, podResources *cm.ResourceConfig) error {
@@ -495,6 +498,7 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 			RecursiveReadOnly: v.RecursiveReadOnly,
 			Image:             v.Image,
 			ImageSubPath:      v.ImageSubPath,
+			MountOptions:      v.BindMountOptions,
 		}
 
 		volumeMounts = append(volumeMounts, mount)
@@ -723,9 +727,9 @@ func (m *kubeGenericRuntimeManager) toKubeContainerStatus(ctx context.Context, p
 	var cStatusStopSignal *v1.Signal
 	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerStopSignals) {
 		signal := status.GetStopSignal().String()
-		// Here Signal_RUNTIME_DEFAULT means that the runtime is not returning any StopSignal
+		// Here Signal_SIGNAL_RUNTIME_DEFAULT means that the runtime is not returning any StopSignal
 		// This happens only when the container runtime version doesn't support StopSignal yet
-		if signal != "" && signal != "RUNTIME_DEFAULT" {
+		if signal != "" && signal != runtimeapi.Signal_SIGNAL_RUNTIME_DEFAULT.String() {
 			cStatusStopSignal = runtimeSignalToString(status.GetStopSignal())
 		}
 	}
@@ -1062,35 +1066,16 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 		return true
 	}
 
-	// If any of the main containers have status and are Running, then all init containers must
-	// have been executed at some point in the past.  However, they could have been removed
-	// from the container runtime now, and if we proceed, it would appear as if they
-	// never ran and will re-execute improperly except for the restartable init containers.
-	podHasInitialized := false
-	for _, container := range pod.Spec.Containers {
-		status := podStatus.FindContainerStatusByName(container.Name)
-		if status == nil {
-			continue
-		}
-		switch status.State {
-		case kubecontainer.ContainerStateCreated,
-			kubecontainer.ContainerStateRunning:
-			podHasInitialized = true
-		case kubecontainer.ContainerStateExited:
-			// This is a workaround for the issue that the kubelet cannot
-			// differentiate the container statuses of the previous podSandbox
-			// from the current one.
-			// If the node is rebooted, all containers will be in the exited
-			// state and the kubelet will try to recreate a new podSandbox.
-			// In this case, the kubelet should not mistakenly think that
-			// the newly created podSandbox has been initialized.
-		default:
-			// Ignore other states
-		}
-		if podHasInitialized {
-			break
-		}
-	}
+	// If ActiveContainerStatuses contains any main container (i.e. from pod.Spec.Containers),
+	// a main container has started on the current sandbox, which implies all init containers
+	// have already completed. Treating the pod as initialized here prevents non-restartable
+	// init containers — which the runtime may have already garbage-collected — from being
+	// improperly re-executed.
+	//
+	// Using ActiveContainerStatuses scopes the check to the current sandbox, so a stale main
+	// container left over from a previous sandbox (e.g. after a node reboot) cannot falsely
+	// mark the pod as initialized.
+	podHasInitialized := kubecontainer.HasAnyActiveRegularContainerStarted(&pod.Spec, podStatus)
 
 	// isPreviouslyInitialized indicates if the current init container is
 	// previously initialized.
@@ -1110,7 +1095,7 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 	// find the restartable init containers to restart.
 	for i := len(pod.Spec.InitContainers) - 1; i >= 0; i-- {
 		container := &pod.Spec.InitContainers[i]
-		status := podStatus.FindContainerStatusByName(container.Name)
+		status := podStatus.FindActiveContainerStatusByName(container.Name)
 		logger.V(4).Info("Computing init container action", "pod", klog.KObj(pod), "container", container.Name, "status", status)
 		if status == nil {
 			// If the container is previously initialized but its status is not
@@ -1307,6 +1292,11 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 	for i := 0; i < l/2; i++ {
 		changes.InitContainersToStart[i], changes.InitContainersToStart[l-1-i] =
 			changes.InitContainersToStart[l-1-i], changes.InitContainersToStart[i]
+	}
+
+	if !changes.UpdatePodLevelResources && !changes.UpdatePodResources {
+		// If any starting containers have resized, we need to resize the pod resources.
+		changes.UpdatePodResources = m.startingResizedContainer(logger, pod, pod.Spec.InitContainers, changes.InitContainersToStart)
 	}
 
 	return podHasInitialized

@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -235,7 +234,7 @@ func TestResourceLocation(t *testing.T) {
 			defer server.Terminate(t)
 			defer storage.Store.DestroyFunc()
 
-			ctx := genericapirequest.WithNamespace(genericapirequest.NewDefaultContext(), fmt.Sprintf("namespace-%s", testCase.name))
+			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, fmt.Sprintf("namespace-%s", testCase.name))
 			key, _ := storage.KeyFunc(ctx, testCase.node.Name)
 			if err := storage.Storage.Create(ctx, key, testCase.node, nil, 0, false); err != nil {
 				t.Fatalf("unexpected error: %v", err)

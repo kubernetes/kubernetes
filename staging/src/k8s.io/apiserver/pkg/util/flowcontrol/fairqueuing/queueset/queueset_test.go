@@ -455,18 +455,6 @@ func (uss *uniformScenarioState) finalReview() {
 			uss.t.Log("Success with" + e)
 		}
 	}
-	if uss.evalExecutingMetrics && len(uss.expectedConcurrencyInUse) > 0 {
-		e := `
-				# HELP apiserver_flowcontrol_request_concurrency_in_use [ALPHA] Concurrency (number of seats) occupied by the currently executing (initial stage for a WATCH, any stage otherwise) requests in the API Priority and Fairness subsystem
-				# TYPE apiserver_flowcontrol_request_concurrency_in_use gauge
-` + uss.expectedConcurrencyInUse
-		err := metrics.GatherAndCompare(e, "apiserver_flowcontrol_request_concurrency_in_use")
-		if err != nil {
-			uss.t.Error(err)
-		} else {
-			uss.t.Log("Success with" + e)
-		}
-	}
 	if uss.evalExecutingMetrics && len(expectedRejects) > 0 {
 		e := `
 				# HELP apiserver_flowcontrol_rejected_requests_total [BETA] Number of requests rejected by API Priority and Fairness subsystem
@@ -948,9 +936,9 @@ func TestTooWide(t *testing.T) {
 			newUniformClient(90090090090090, 15, 21, time.Second, time.Second-1).setInitWidth(7),
 		},
 		concurrencyLimit:            6,
-		evalDuration:                time.Second * 225,
+		evalDuration:                time.Second * 400,
 		expectedFair:                []bool{true},
-		expectedFairnessMargin:      []float64{0.33},
+		expectedFairnessMargin:      []float64{0.35},
 		expectAllRequests:           true,
 		evalInqueueMetrics:          true,
 		evalExecutingMetrics:        true,

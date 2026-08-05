@@ -62,6 +62,10 @@ type TypeRef struct {
 	// If this field is nil, then it has no effect.
 	// See `Map` and `List` for more information about `ElementRelationship`
 	ElementRelationship *ElementRelationship `yaml:"elementRelationship,omitempty"`
+
+	// Nullable indicates that an explicit null is a valid value,
+	// corresponding to OpenAPI's `nullable: true`.
+	Nullable bool `yaml:"nullable,omitempty"`
 }
 
 // Atom represents the smallest possible pieces of the type system.

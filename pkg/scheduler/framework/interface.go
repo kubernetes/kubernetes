@@ -131,7 +131,7 @@ func (m *NodeToStatus) NodesForStatusCode(nodeLister fwk.NodeInfoLister, code fw
 }
 
 // PodsToActivateKey is a reserved state key for stashing pods.
-// If the stashed pods are present in unschedulablePods or backoffQ，they will be
+// If the stashed pods are present in unschedulableEntities or backoffQ，they will be
 // activated (i.e., moved to activeQ) in two phases:
 // - end of a scheduling cycle if it succeeds (will be cleared from `PodsToActivate` if activated)
 // - end of a binding cycle if it succeeds
@@ -156,8 +156,36 @@ func NewPodsToActivate() *PodsToActivate {
 
 // SortedScoredNodes is a list of scored nodes, returned from scheduling.
 type SortedScoredNodes interface {
-	Pop() string
+	Pop() fwk.NodePluginScores
 	Len() int
+	// UnorderedList returns all nodes in heap-internal order (not sorted by score).
+	UnorderedList() []fwk.NodePluginScores
+}
+
+// PlacementFeasiblePlugin is an interface for plugins that are called after each pod in a pod group is evaluated.
+// It is used to determine if a pod group is schedulable, may become schedulable or will not become schedulable regardless of the scheduling result of the remaining pods in the pod group.
+type PlacementFeasiblePlugin interface {
+	fwk.Plugin
+
+	// PlacementFeasible is called after each pod in a pod group is evaluated.
+	// placementProgress contains information that plugins might additionally need when determining whether pod group scheduling placement is feasible.
+	// Return Wait status if the pod group cannot be scheduled in the current partially evaluated placement, but may become schedulable once more pods are evaluated.
+	// Return Unschedulable status if the pod group cannot be scheduled in the current placement.
+	// The scheduler will give up this placement and won't even evaluate remaining pods. The placement will remain eligible for preemption.
+	// Return Success status if the pod group can be scheduled in the current partially evaluated placement.
+	// After returning Success, the plugin should keep returning Success for the remaining pods.
+	PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo, placementProgress PlacementProgress) *fwk.Status
+}
+
+// PlacementProgress contains information that plugins implementing the PlacementFeasiblePlugin
+// interface might additionally need when determining whether pod group scheduling placement is feasible.
+type PlacementProgress struct {
+	// Remaining is the number of children that have not been evaluated yet in the current scheduling cycle. For pod groups, this is the number of unscheduled pods.
+	Remaining int
+	// Scheduled is the number of children scheduled so far in the current pod group scheduling cycle
+	// for a particular (composite) pod group and placement. For a pod group the field includes the pods that are assigned
+	// or assumed in the current PodGroup scheduling cycle.
+	Scheduled int
 }
 
 // Framework manages the set of plugins in use by the scheduling framework.
@@ -207,6 +235,14 @@ type Framework interface {
 	// StoreScheduleResults stores the results after we have sorted and filtered nodes.
 	StoreScheduleResults(ctx context.Context, signature fwk.PodSignature, hintedNode, chosenNode string, otherNodes SortedScoredNodes, cycleCount int64)
 
+	// RunRawScorePlugins runs only the Score() phase of each active scoring plugin for a single node,
+	// without NormalizeScore or weighting and returns pre-NormalizeScore values.
+	RunRawScorePlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) ([]fwk.PluginScore, *fwk.Status)
+
+	// NormalizeScores runs NormalizeScore() and applies weights for the given nodes, using
+	// their RawScores as input. It updates Scores and TotalScore in-place on each NodePluginScores.
+	NormalizeScores(ctx context.Context, state fwk.CycleState, pod *v1.Pod, scores []fwk.NodePluginScores) *fwk.Status
+
 	// RunPlacementGeneratePlugins runs the set of configured PlacementGenerate plugins.
 	// It returns the combined list of generated Placements.
 	RunPlacementGeneratePlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, nodes []fwk.NodeInfo) ([]*fwk.Placement, *fwk.Status)
@@ -225,22 +261,20 @@ type Framework interface {
 	// RunPostBindPlugins runs the set of configured PostBind plugins.
 	RunPostBindPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string)
 
-	// RunReservePluginsReserve runs the Reserve method of the set of
-	// configured Reserve plugins. If any of these calls returns an error, it
-	// does not continue running the remaining ones and returns the error. In
-	// such case, pod will not be scheduled.
-	RunReservePluginsReserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status
-
-	// RunReservePluginsUnreserve runs the Unreserve method of the set of
-	// configured Reserve plugins.
-	RunReservePluginsUnreserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string)
-
 	// RunPermitPlugins runs the set of configured Permit plugins. If any of these
 	// plugins returns a status other than "Success" or "Wait", it does not continue
 	// running the remaining plugins and returns an error. Otherwise, if any of the
 	// plugins returns "Wait", then this function will construct the pluginsWaitTime and return status with "Wait" code.
 	// This function itself will NOT create a waiting pod object and the caller should call AddWaitingPod method to do this.
 	RunPermitPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (pluginsWaitTime map[string]time.Duration, status *fwk.Status)
+
+	// RunPlacementFeasiblePlugins runs the set of configured Permit plugins that implement PlacementFeasible interface.
+	// The result will be Success if all plugins return Success.
+	// The only other valid statuses are Wait and Unschedulable.
+	// If any plugin returns invalid status, the result will be Error and the remaining plugins won't be invoked.
+	// Otherwise, if at least 1 plugin returns Unschedulable, the remaining plugins won't be invoked and the result will be Unschedulable. The placement will remain eligible for preemption.
+	// Otherwise, if at least 1 plugin returns Wait, the remaining plugins will be invoked and the result will be Wait.
+	RunPlacementFeasiblePlugins(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo, placementProgress PlacementProgress) *fwk.Status
 
 	// AddWaitingPod creates a waiting pod instance and adds it to the framework.
 	// It takes the pluginsWaitTime map returned by the RunPermitPlugins.
@@ -265,7 +299,11 @@ type Framework interface {
 	// It returns a list that stores scores from each plugin and total score for each Placement.
 	// It also returns *Status, which is set to non-success if any of the plugins returns
 	// a non-success status.
-	RunPlacementScorePlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo, placements []*fwk.PodGroupAssignments) (ns []fwk.PlacementPluginScores, status *fwk.Status)
+	// Each PlacementCycleState is passed to ScorePlacement for the PodGroupAssignments at the same index.
+	RunPlacementScorePlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo, placements []*fwk.PodGroupAssignments, placementStates []fwk.PlacementCycleState) (ns []fwk.PlacementPluginScores, status *fwk.Status)
+
+	// RunPodGroupPostFilterPlugins runs the set of configured PodGroupPostFilter plugins.
+	RunPodGroupPostFilterPlugins(ctx context.Context, state *CycleState, podGroupInfo fwk.PodGroupInfo, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status)
 
 	// HasFilterPlugins returns true if at least one Filter plugin is defined.
 	HasFilterPlugins() bool
@@ -275,6 +313,9 @@ type Framework interface {
 
 	// HasScorePlugins returns true if at least one Score plugin is defined.
 	HasScorePlugins() bool
+
+	// PodGroupPostFilterPlugins returns registered PodGroupPostFilter plugins.
+	PodGroupPostFilterPlugins() []fwk.PodGroupPostFilterPlugin
 
 	// ListPlugins returns a map of extension point name to list of configured Plugins.
 	ListPlugins() *config.Plugins

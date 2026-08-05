@@ -34,11 +34,39 @@ import (
 )
 
 // FlunderInformer provides access to a shared informer and lister for
-// Flunders.
+// Flunders. Prefer using the type-safe variant (see [TypedFlunderInformer]).
 type FlunderInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() wardlev1alpha1.FlunderLister
 }
+
+// TypedFlunderInformer provides access to a shared informer and lister for
+// Flunders, including the type-safe TypedInformer variant.
+// It is a superset of FlunderInformer.
+type TypedFlunderInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() FlunderIndexInformer
+	Lister() wardlev1alpha1.FlunderLister
+}
+
+// FlunderIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type FlunderIndexInformer cache.TypedSharedIndexInformer[*apiswardlev1alpha1.Flunder]
+
+// FlunderHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for Flunder.
+type FlunderHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apiswardlev1alpha1.Flunder]
+
+// FlunderDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for Flunder.
+type FlunderDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apiswardlev1alpha1.Flunder]
+
+// FlunderFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for Flunder.
+type FlunderFilteringHandler = cache.TypedFilteringResourceEventHandler[*apiswardlev1alpha1.Flunder]
+
+// FlunderIndexers is a specialization of [cache.TypedIndexers] for Flunder.
+type FlunderIndexers = cache.TypedIndexers[*apiswardlev1alpha1.Flunder]
+
+// DeletedFlunder is a specialization of [cache.DeletedObject] for Flunder.
+type DeletedFlunder = cache.DeletedObject[*apiswardlev1alpha1.Flunder]
 
 type flunderInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +77,49 @@ type flunderInformer struct {
 // NewFlunderInformer constructs a new informer for Flunder type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFlunderInformer]).
 func NewFlunderInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewFlunderInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedFlunderInformer constructs a new informer for Flunder type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFlunderInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers FlunderIndexers) FlunderIndexInformer {
+	return NewTypedFlunderInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredFlunderInformer constructs a new informer for Flunder type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredFlunderInformer]).
 func NewFilteredFlunderInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewFlunderInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedFlunderInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredFlunderInformer constructs a new informer for Flunder type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredFlunderInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers FlunderIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) FlunderIndexInformer {
+	return NewTypedFlunderInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewFlunderInformerWithOptions constructs a new informer for Flunder type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFlunderInformerWithOptions]).
 func NewFlunderInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedFlunderInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedFlunderInformerWithOptions constructs a new informer for Flunder type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFlunderInformerWithOptions(client versioned.Interface, namespace string, options internalinterfaces.InformerOptions) FlunderIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "wardle.example.com", Version: "v1alpha1", Resource: "flunders"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apiswardlev1alpha1.Flunder](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,17 +152,57 @@ func NewFlunderInformerWithOptions(client versioned.Interface, namespace string,
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *flunderInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFlunderInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedFlunderInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *flunderInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiswardlev1alpha1.Flunder{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *flunderInformer) TypedInformer() FlunderIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiswardlev1alpha1.Flunder](f.factory.InformerFor(&apiswardlev1alpha1.Flunder{}, f.defaultInformer))
 }
 
 func (f *flunderInformer) Lister() wardlev1alpha1.FlunderLister {
 	return wardlev1alpha1.NewFlunderLister(f.Informer().GetIndexer())
+}
+
+// ToTypedFlunderInformer converts an untyped informer into a TypedFlunderInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *Flunder. If that is not the case, calling type-safe methods of the returned
+// TypedFlunderInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedFlunderInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedFlunderInformer(informer FlunderInformer) TypedFlunderInformer {
+	if informer, ok := informer.(TypedFlunderInformer); ok {
+		return informer
+	}
+	return &flunderTypedInformerAdapter{informer}
+}
+
+type flunderTypedInformerAdapter struct {
+	FlunderInformer
+}
+
+func (a *flunderTypedInformerAdapter) TypedInformer() FlunderIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apiswardlev1alpha1.Flunder](a.Informer())
+}
+
+// ToFlunderIndexInformer converts an untyped informer into a FlunderIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *Flunder. If that is not the case, calling type-safe methods of the returned
+// FlunderIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a FlunderIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToFlunderIndexInformer(informer cache.SharedIndexInformer) FlunderIndexInformer {
+	if informer, ok := informer.(FlunderIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apiswardlev1alpha1.Flunder](informer)
 }

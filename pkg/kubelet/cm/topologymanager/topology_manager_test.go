@@ -17,15 +17,21 @@ limitations under the License.
 package topologymanager
 
 import (
+	"context"
 	"fmt"
+	"runtime"
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -37,6 +43,12 @@ func NewTestBitMask(sockets ...int) bitmask.BitMask {
 }
 
 func TestNewManager(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	numaDistanceErr := "error getting NUMA distances from cadvisor"
+	if runtime.GOOS == "windows" {
+		numaDistanceErr = fmt.Sprintf("the %q policy option is not supported on Windows because NUMA node distances are not available", PreferClosestNUMANodes)
+	}
+
 	tcases := []struct {
 		description    string
 		policyName     string
@@ -96,7 +108,7 @@ func TestNewManager(t *testing.T) {
 			policyOptions: map[string]string{
 				PreferClosestNUMANodes: "true",
 			},
-			expectedError: fmt.Errorf("error getting NUMA distances from cadvisor"),
+			expectedError: fmt.Errorf("%s", numaDistanceErr),
 			topology: []cadvisorapi.Node{
 				{
 					Id: 0,
@@ -143,7 +155,7 @@ func TestNewManager(t *testing.T) {
 	for _, tc := range tcases {
 		topology := tc.topology
 
-		mngr, err := NewManager(topology, tc.policyName, "container", tc.policyOptions)
+		mngr, err := NewManager(logger, topology, tc.policyName, "container", tc.policyOptions)
 		if tc.expectedError != nil {
 			if !strings.Contains(err.Error(), tc.expectedError.Error()) {
 				t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), tc.expectedError.Error())
@@ -164,6 +176,7 @@ func TestNewManager(t *testing.T) {
 }
 
 func TestManagerScope(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	tcases := []struct {
 		description   string
 		scopeName     string
@@ -188,7 +201,7 @@ func TestManagerScope(t *testing.T) {
 	}
 
 	for _, tc := range tcases {
-		mngr, err := NewManager(nil, "best-effort", tc.scopeName, nil)
+		mngr, err := NewManager(logger, nil, "best-effort", tc.scopeName, nil)
 
 		if tc.expectedError != nil {
 			if !strings.Contains(err.Error(), tc.expectedError.Error()) {
@@ -210,19 +223,19 @@ type mockHintProvider struct {
 	//allocateError error
 }
 
-func (m *mockHintProvider) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]TopologyHint {
+func (m *mockHintProvider) GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container, _ lifecycle.Operation) map[string][]TopologyHint {
 	return m.th
 }
 
-func (m *mockHintProvider) GetPodTopologyHints(pod *v1.Pod) map[string][]TopologyHint {
+func (m *mockHintProvider) GetPodTopologyHints(logger klog.Logger, pod *v1.Pod, _ lifecycle.Operation) map[string][]TopologyHint {
 	return m.th
 }
 
-func (m *mockHintProvider) AllocatePod(pod *v1.Pod) error {
+func (m *mockHintProvider) AllocatePod(logger klog.Logger, pod *v1.Pod, _ lifecycle.Operation) error {
 	return nil
 }
 
-func (m *mockHintProvider) Allocate(pod *v1.Pod, container *v1.Container) error {
+func (m *mockHintProvider) Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container, _ lifecycle.Operation) error {
 	//return allocateError
 	return nil
 }
@@ -265,6 +278,7 @@ func TestAddHintProvider(t *testing.T) {
 }
 
 func TestAdmit(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	numaInfo := &NUMAInfo{
 		Nodes: []int{0, 1},
 		NUMADistances: NUMADistances{
@@ -570,7 +584,7 @@ func TestAdmit(t *testing.T) {
 		}
 
 		// Container scope Admit
-		ctnActual := ctnScopeManager.Admit(&podAttr)
+		ctnActual := ctnScopeManager.Admit(tCtx, &podAttr)
 		if ctnActual.Admit != tc.expected {
 			t.Errorf("Error occurred, expected Admit in result to be %v got %v", tc.expected, ctnActual.Admit)
 		}
@@ -579,12 +593,176 @@ func TestAdmit(t *testing.T) {
 		}
 
 		// Pod scope Admit
-		podActual := podScopeManager.Admit(&podAttr)
+		podActual := podScopeManager.Admit(tCtx, &podAttr)
 		if podActual.Admit != tc.expected {
 			t.Errorf("Error occurred, expected Admit in result to be %v got %v", tc.expected, podActual.Admit)
 		}
 		if !ctnActual.Admit && ctnActual.Reason != ErrorTopologyAffinity {
 			t.Errorf("Error occurred, expected Reason in result to be %v got %v", ErrorTopologyAffinity, ctnActual.Reason)
 		}
+	}
+}
+
+type trackingHintProvider struct {
+	podHintsCalled          bool
+	containerHintsCalled    bool
+	allocatePodCalled       bool
+	allocateContainerCalled bool
+	hints                   map[string][]TopologyHint
+}
+
+func (m *trackingHintProvider) GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) map[string][]TopologyHint {
+	m.containerHintsCalled = true
+	return m.hints
+}
+
+func (m *trackingHintProvider) GetPodTopologyHints(logger klog.Logger, pod *v1.Pod, operation lifecycle.Operation) map[string][]TopologyHint {
+	m.podHintsCalled = true
+	return m.hints
+}
+
+func (m *trackingHintProvider) AllocatePod(logger klog.Logger, pod *v1.Pod, operation lifecycle.Operation) error {
+	m.allocatePodCalled = true
+	return nil
+}
+
+func (m *trackingHintProvider) Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) error {
+	m.allocateContainerCalled = true
+	return nil
+}
+
+func TestAdmitWithPodLevelResources(t *testing.T) {
+	numaInfo := &NUMAInfo{
+		Nodes: []int{0, 1},
+		NUMADistances: NUMADistances{
+			0: {10, 11},
+			1: {11, 10},
+		},
+	}
+	opts := PolicyOptions{}
+	restrictedPolicy := NewRestrictedPolicy(numaInfo, opts)
+
+	tcases := []struct {
+		name                            string
+		podLevelResourcesEnabled        bool
+		podLevelResourceManagersEnabled bool
+		pod                             *v1.Pod
+		expectedAdmit                   bool
+		expectedPodHintsCalled          bool
+		expectedContainerHintsCalled    bool
+		expectedAllocatePodCalled       bool
+		expectedAllocateContainerCalled bool
+		scope                           Scope
+	}{
+		{
+			name:                            "pod scope, feature disabled, falls back to container level flow",
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: false,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources:  &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}},
+					Containers: []v1.Container{{Name: "c1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}}}},
+				},
+				Status: v1.PodStatus{QOSClass: v1.PodQOSGuaranteed},
+			},
+			expectedAdmit:                   true,
+			expectedPodHintsCalled:          true,
+			expectedContainerHintsCalled:    false,
+			expectedAllocatePodCalled:       false,
+			expectedAllocateContainerCalled: true,
+			scope:                           NewPodScope(restrictedPolicy),
+		},
+		{
+			name:                            "pod scope, feature enabled, uses pod-level flow",
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources:  &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}},
+					Containers: []v1.Container{{Name: "c1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}}}},
+				},
+				Status: v1.PodStatus{QOSClass: v1.PodQOSGuaranteed},
+			},
+			expectedAdmit:                   true,
+			expectedPodHintsCalled:          true,
+			expectedContainerHintsCalled:    false,
+			expectedAllocatePodCalled:       true,
+			expectedAllocateContainerCalled: false,
+			scope:                           NewPodScope(restrictedPolicy),
+		},
+		{
+			name:                            "container scope, feature enabled, uses container-level flow",
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources:  &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}},
+					Containers: []v1.Container{{Name: "c1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}}}},
+				},
+				Status: v1.PodStatus{QOSClass: v1.PodQOSGuaranteed},
+			},
+			expectedAdmit:                   true,
+			expectedPodHintsCalled:          false,
+			expectedContainerHintsCalled:    true,
+			expectedAllocatePodCalled:       false,
+			expectedAllocateContainerCalled: true,
+			scope:                           NewContainerScope(restrictedPolicy),
+		},
+		{
+			name:                            "container scope, feature disabled, uses container-level flow",
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: false,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources:  &v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}},
+					Containers: []v1.Container{{Name: "c1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}}}},
+				},
+				Status: v1.PodStatus{QOSClass: v1.PodQOSGuaranteed},
+			},
+			expectedAdmit:                   true,
+			expectedPodHintsCalled:          false,
+			expectedContainerHintsCalled:    true,
+			expectedAllocatePodCalled:       false,
+			expectedAllocateContainerCalled: true,
+			scope:                           NewContainerScope(restrictedPolicy),
+		},
+	}
+
+	for _, tc := range tcases {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
+
+			tracker := &trackingHintProvider{
+				hints: map[string][]TopologyHint{
+					"resource": {
+						{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+					},
+				},
+			}
+
+			m := manager{scope: tc.scope}
+			tc.scope.AddHintProvider(tCtx.Logger(), tracker)
+
+			podAttr := lifecycle.PodAdmitAttributes{Pod: tc.pod}
+			actual := m.Admit(tCtx, &podAttr)
+
+			if actual.Admit != tc.expectedAdmit {
+				t.Errorf("Expected Admit to be %v got %v", tc.expectedAdmit, actual.Admit)
+			}
+			if tracker.podHintsCalled != tc.expectedPodHintsCalled {
+				t.Errorf("Expected podHintsCalled to be %v got %v", tc.expectedPodHintsCalled, tracker.podHintsCalled)
+			}
+			if tracker.containerHintsCalled != tc.expectedContainerHintsCalled {
+				t.Errorf("Expected containerHintsCalled to be %v got %v", tc.expectedContainerHintsCalled, tracker.containerHintsCalled)
+			}
+			if tracker.allocatePodCalled != tc.expectedAllocatePodCalled {
+				t.Errorf("Expected allocatePodCalled to be %v got %v", tc.expectedAllocatePodCalled, tracker.allocatePodCalled)
+			}
+			if tracker.allocateContainerCalled != tc.expectedAllocateContainerCalled {
+				t.Errorf("Expected allocateContainerCalled to be %v got %v", tc.expectedAllocateContainerCalled, tracker.allocateContainerCalled)
+			}
+		})
 	}
 }

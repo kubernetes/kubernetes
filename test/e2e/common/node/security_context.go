@@ -28,7 +28,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/feature"
@@ -125,81 +124,6 @@ var _ = SIGDescribe("Security Context", func() {
 				framework.Failf("two different pods are running with the same user namespace configuration")
 			}
 		})
-
-		f.It("must create a user namespace and use host network when hostUsers is false and hostNetwork is true [LinuxOnly]", feature.UserNamespacesHostNetworkSupport, framework.WithFeatureGate(features.UserNamespacesHostNetworkSupport),
-			feature.UserNamespacesSupport, func(ctx context.Context) {
-				// with hostUsers=false the pod must use a new user namespace.
-				// with hostNetwork=true the pod must use the host network namespace.
-				podClient := e2epod.PodClientNS(f, f.Namespace.Name)
-
-				// Schedule pods on the same node to ensure they share the same host network namespace.
-				targetNode, err := findLinuxNode(ctx, f)
-				framework.ExpectNoError(err, "Error finding Linux node")
-
-				makePodForHostNetTest := func(nodeName string) *v1.Pod {
-					return &v1.Pod{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "userns-hostnet-" + string(uuid.NewUUID()),
-						},
-						Spec: v1.PodSpec{
-							NodeName: nodeName,
-							Containers: []v1.Container{
-								{
-									Name:    containerName,
-									Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-									Command: []string{"sh", "-c", "cat /proc/self/uid_map && readlink /proc/self/ns/net"},
-								},
-							},
-							RestartPolicy: v1.RestartPolicyNever,
-							HostUsers:     ptr.To(false),
-							HostNetwork:   true,
-						},
-					}
-				}
-
-				createdPod1 := podClient.Create(ctx, makePodForHostNetTest(targetNode.Name))
-				createdPod2 := podClient.Create(ctx, makePodForHostNetTest(targetNode.Name))
-				ginkgo.DeferCleanup(func(ctx context.Context) {
-					ginkgo.By("delete the pods")
-					podClient.DeleteSync(ctx, createdPod1.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
-					podClient.DeleteSync(ctx, createdPod2.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
-				})
-				getLogs := func(pod *v1.Pod) (string, string, error) {
-					err := e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, pod.Name, f.Namespace.Name, f.Timeouts.PodStart)
-					if err != nil {
-						return "", "", err
-					}
-					podStatus, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-					if err != nil {
-						return "", "", err
-					}
-					logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, podStatus.Name, containerName)
-					if err != nil {
-						return "", "", err
-					}
-					parts := strings.Split(strings.TrimSpace(logs), "\n")
-					if len(parts) != 2 {
-						return "", "", fmt.Errorf("expected 2 lines of logs, got %d: %q", len(parts), logs)
-					}
-					return parts[0], parts[1], nil
-				}
-
-				uidMap1, netNs1, err := getLogs(createdPod1)
-				framework.ExpectNoError(err)
-				uidMap2, netNs2, err := getLogs(createdPod2)
-				framework.ExpectNoError(err)
-
-				// 65536 is the size used for a user namespace.  Verify that the value is present
-				// in the /proc/self/uid_map file.
-				gomega.Expect(uidMap1).To(gomega.ContainSubstring("65536"), "user namespace not created for pod1")
-				gomega.Expect(uidMap2).To(gomega.ContainSubstring("65536"), "user namespace not created for pod2")
-
-				// Check they are in different user namespaces.
-				gomega.Expect(uidMap1).NotTo(gomega.Equal(uidMap2), "two different pods are running with the same user namespace configuration")
-
-				// Check they are in the same network namespace (the host's one).
-				gomega.Expect(netNs1).To(gomega.Equal(netNs2), "two different pods with hostNetwork=true should be in the same network namespace, but they are not. NetNS1: %s, NetNS2: %s", netNs1, netNs2)
-			})
 
 		f.It("must create the user namespace in the configured hostUID/hostGID range [LinuxOnly]", feature.UserNamespacesSupport, func(ctx context.Context) {
 			// We need to check with the binary "getsubuids" the mappings for the kubelet.
@@ -864,6 +788,18 @@ var _ = SIGDescribe("Security Context", func() {
 				},
 			}
 		}
+		nodeSupportsSupplementalGroupsPolicy := func(ctx context.Context, f *framework.Framework, nodeName string) bool {
+			node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(node).NotTo(gomega.BeNil())
+			if node.Status.Features != nil {
+				supportsSupplementalGroupsPolicy := node.Status.Features.SupplementalGroupsPolicy
+				if supportsSupplementalGroupsPolicy != nil && *supportsSupplementalGroupsPolicy {
+					return true
+				}
+			}
+			return false
+		}
 		waitForContainerUser := func(ctx context.Context, f *framework.Framework, podName string, containerName string, expectedContainerUser *v1.ContainerUser) error {
 			return framework.Gomega().Eventually(ctx,
 				framework.RetryNotFound(framework.GetObject(f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get, podName, metav1.GetOptions{}))).
@@ -933,6 +869,9 @@ var _ = SIGDescribe("Security Context", func() {
 					ginkgo.By("creating a pod", func() {
 						pod = e2epod.NewPodClient(f).CreateSync(ctx, mkPod(ptr.To(v1.SupplementalGroupsPolicyMerge)))
 					})
+					if !nodeSupportsSupplementalGroupsPolicy(ctx, f, pod.Spec.NodeName) {
+						e2eskipper.Skipf("scheduled node does not support SupplementalGroupsPolicy")
+					}
 				})
 				ginkgo.It("it should add SupplementalGroups to them [LinuxOnly]", func(ctx context.Context) {
 					expectMergePolicyInEffect(ctx, f, pod.Name, pod.Spec.Containers[0].Name, true)
@@ -946,6 +885,9 @@ var _ = SIGDescribe("Security Context", func() {
 					ginkgo.By("creating a pod", func() {
 						pod = e2epod.NewPodClient(f).CreateSync(ctx, mkPod(nil))
 					})
+					if !nodeSupportsSupplementalGroupsPolicy(ctx, f, pod.Spec.NodeName) {
+						e2eskipper.Skipf("scheduled node does not support SupplementalGroupsPolicy")
+					}
 				})
 				ginkgo.It("it should add SupplementalGroups to them [LinuxOnly]", func(ctx context.Context) {
 					expectMergePolicyInEffect(ctx, f, pod.Name, pod.Spec.Containers[0].Name, true)
@@ -957,8 +899,15 @@ var _ = SIGDescribe("Security Context", func() {
 				var pod *v1.Pod
 				ginkgo.BeforeEach(func(ctx context.Context) {
 					ginkgo.By("creating a pod", func() {
-						pod = e2epod.NewPodClient(f).CreateSync(ctx, mkPod(ptr.To(v1.SupplementalGroupsPolicyStrict)))
+						pod = e2epod.NewPodClient(f).Create(ctx, mkPod(ptr.To(v1.SupplementalGroupsPolicyStrict)))
+						framework.ExpectNoError(e2epod.WaitForPodScheduled(ctx, f.ClientSet, pod.Namespace, pod.Name))
+						var err error
+						pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
+						framework.ExpectNoError(err)
 					})
+					if !nodeSupportsSupplementalGroupsPolicy(ctx, f, pod.Spec.NodeName) {
+						e2eskipper.Skipf("scheduled node does not support SupplementalGroupsPolicy")
+					}
 				})
 				ginkgo.It("it should NOT add SupplementalGroups to them [LinuxOnly]", func(ctx context.Context) {
 					expectStrictPolicyInEffect(ctx, f, pod.Name, pod.Spec.Containers[0].Name, true)

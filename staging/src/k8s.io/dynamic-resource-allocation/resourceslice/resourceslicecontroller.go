@@ -126,6 +126,11 @@ type Controller struct {
 
 	// Optional pool name to reconcile.
 	reconcilePoolWithName string
+
+	// usePoolNameFieldSelector is disabled when the API server rejects the
+	// spec.pool.name field selector. Access must be atomic because List and Watch
+	// can run concurrently.
+	usePoolNameFieldSelector atomic.Bool
 }
 
 // +k8s:deepcopy-gen=true
@@ -199,6 +204,11 @@ type Slice struct {
 	Devices                []resourceapi.Device
 	SharedCounters         []resourceapi.CounterSet
 	PerDeviceNodeSelection *bool
+	// PartitionTypeAttribute names the device attribute whose value labels each
+	// device's partition type. Only effective when the DRAPartitionableDevicesType
+	// feature is enabled; dropped by the apiserver otherwise.
+	PartitionTypeAttribute *resourceapi.FullyQualifiedName
+	SkipNodeOperations     []resourceapi.SkipNodeOperation
 }
 
 // +k8s:deepcopy-gen=true
@@ -367,6 +377,30 @@ func (err *DroppedFieldsError) DisabledFeatures() []string {
 		}
 	}
 
+	// PartitionTypeAttribute is dropped when DRAPartitionableDevicesType is disabled.
+	if err.DesiredSlice.Spec.PartitionTypeAttribute != nil && err.ActualSlice.Spec.PartitionTypeAttribute == nil {
+		disabled = append(disabled, "DRAPartitionableDevicesType")
+	}
+
+	if len(err.DesiredSlice.Spec.SkipNodeOperations) > 0 && len(err.ActualSlice.Spec.SkipNodeOperations) == 0 {
+		disabled = append(disabled, "DRAOptionalNodeOperations")
+	}
+
+	// Compatibility groups are dropped from within a device counter consumption,
+	// so a shorter list there (while the consumption itself is preserved)
+	// indicates that the DRADeviceCompatibilityGroups feature is disabled.
+compatibilityGroups:
+	for i := 0; i < len(err.DesiredSlice.Spec.Devices) && i < len(err.ActualSlice.Spec.Devices); i++ {
+		desired := err.DesiredSlice.Spec.Devices[i].ConsumesCounters
+		actual := err.ActualSlice.Spec.Devices[i].ConsumesCounters
+		for j := 0; j < len(desired) && j < len(actual); j++ {
+			if len(desired[j].CompatibilityGroups) > len(actual[j].CompatibilityGroups) {
+				disabled = append(disabled, "DRADeviceCompatibilityGroups")
+				break compatibilityGroups
+			}
+		}
+	}
+
 	return disabled
 }
 
@@ -495,6 +529,7 @@ func newController(ctx context.Context, options Options) (*Controller, error) {
 			utilruntime.HandleErrorWithContext(ctx, err, msg)
 		}
 	}
+	c.usePoolNameFieldSelector.Store(c.reconcilePoolWithName != "")
 	if err := c.initInformer(ctx); err != nil {
 		return nil, err
 	}
@@ -508,19 +543,23 @@ func newController(ctx context.Context, options Options) (*Controller, error) {
 func (c *Controller) initInformer(ctx context.Context) error {
 	logger := klog.FromContext(ctx)
 
-	// We always filter by driver name, by node name only for node-local resources.
-	selector := fields.Set{
-		resourceapi.ResourceSliceSelectorDriver:   c.driverName,
-		resourceapi.ResourceSliceSelectorNodeName: "",
+	fieldSelector := func(includePoolName bool) string {
+		// We always filter by driver name, by node name only for node-local resources.
+		selector := fields.Set{
+			resourceapi.ResourceSliceSelectorDriver:   c.driverName,
+			resourceapi.ResourceSliceSelectorNodeName: "",
+		}
+		if c.owner != nil && c.owner.APIVersion == "v1" && c.owner.Kind == "Node" && c.reconcilePoolWithName == "" {
+			selector[resourceapi.ResourceSliceSelectorNodeName] = c.owner.Name
+		}
+		if includePoolName {
+			selector[resourceapi.ResourceSliceSelectorPoolName] = c.reconcilePoolWithName
+		}
+
+		return selector.String()
 	}
-	// TODO: We can list/watch ResourceSlices with field selectors for NodeName or Driver.
-	// There is no field selector for PoolName, so we apply additional client-side filtering in list/watch. Issue for adding a PoolName field selector:                                                     │
-	// https://github.com/kubernetes/kubernetes/issues/137413
-	if c.owner != nil && c.owner.APIVersion == "v1" && c.owner.Kind == "Node" && c.reconcilePoolWithName == "" {
-		selector[resourceapi.ResourceSliceSelectorNodeName] = c.owner.Name
-	}
-	tweakListOptions := func(options *metav1.ListOptions) {
-		options.FieldSelector = selector.String()
+	tweakListOptions := func(options *metav1.ListOptions, includePoolName bool) {
+		options.FieldSelector = fieldSelector(includePoolName)
 	}
 	indexers := cache.Indexers{
 		poolNameIndex: func(obj interface{}) ([]string, error) {
@@ -534,25 +573,39 @@ func (c *Controller) initInformer(ctx context.Context) error {
 	informer := cache.NewSharedIndexInformer(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
-				tweakListOptions(&options)
+				usePoolNameFieldSelector := c.usePoolNameFieldSelector.Load()
+				tweakListOptions(&options, usePoolNameFieldSelector)
 				slices, err := c.resourceClient.ResourceSlices().List(ctx, options)
+				if err != nil && usePoolNameFieldSelector && isUnsupportedPoolNameFieldSelector(err) {
+					c.usePoolNameFieldSelector.Store(false)
+					usePoolNameFieldSelector = false
+					tweakListOptions(&options, usePoolNameFieldSelector)
+					slices, err = c.resourceClient.ResourceSlices().List(ctx, options)
+				}
 				if err == nil {
 					logger.V(5).Info("Listed ResourceSlices", "resourceAPI", c.resourceClient.CurrentAPI(), "numSlices", len(slices.Items), "listMeta", slices.ListMeta)
 				} else {
 					logger.V(5).Info("Listed ResourceSlices", "resourceAPI", c.resourceClient.CurrentAPI(), "err", err)
 				}
 
-				if c.reconcilePoolWithName != "" {
+				if err == nil && c.reconcilePoolWithName != "" && !usePoolNameFieldSelector {
 					retainSlicesByPoolName(slices, c.reconcilePoolWithName)
 				}
 				return slices, err
 			},
 			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
-				tweakListOptions(&options)
+				usePoolNameFieldSelector := c.usePoolNameFieldSelector.Load()
+				tweakListOptions(&options, usePoolNameFieldSelector)
 				w, err := c.resourceClient.ResourceSlices().Watch(ctx, options)
+				if err != nil && usePoolNameFieldSelector && isUnsupportedPoolNameFieldSelector(err) {
+					c.usePoolNameFieldSelector.Store(false)
+					usePoolNameFieldSelector = false
+					tweakListOptions(&options, usePoolNameFieldSelector)
+					w, err = c.resourceClient.ResourceSlices().Watch(ctx, options)
+				}
 				logger.V(5).Info("Started watching ResourceSlices", "resourceAPI", c.resourceClient.CurrentAPI(), "err", err)
 
-				if c.reconcilePoolWithName != "" {
+				if err == nil && c.reconcilePoolWithName != "" && !usePoolNameFieldSelector {
 					return filterSliceWatchByPoolName(ctx, w, c.reconcilePoolWithName), nil
 				}
 
@@ -575,6 +628,7 @@ func (c *Controller) initInformer(ctx context.Context) error {
 				return
 			}
 			logger.V(5).Info("ResourceSlice add", "slice", klog.KObj(slice))
+			c.sliceStore.OnAddOrUpdate(slice)
 			c.queue.AddAfter(slice.Spec.Pool.Name, c.syncDelay)
 			logger.V(5).Info("Scheduled sync", "poolName", slice.Spec.Pool.Name, "at", time.Now().Add(c.syncDelay))
 		},
@@ -592,6 +646,7 @@ func (c *Controller) initInformer(ctx context.Context) error {
 			} else {
 				logger.V(5).Info("ResourceSlice update", "slice", klog.KObj(newSlice))
 			}
+			c.sliceStore.OnAddOrUpdate(newSlice)
 			c.queue.AddAfter(oldSlice.Spec.Pool.Name, c.syncDelay)
 			logger.V(5).Info("Scheduled sync", "pool", oldSlice.Spec.Pool.Name, "at", time.Now().Add(c.syncDelay))
 			if oldSlice.Spec.Pool.Name != newSlice.Spec.Pool.Name {
@@ -608,6 +663,7 @@ func (c *Controller) initInformer(ctx context.Context) error {
 				return
 			}
 			logger.V(5).Info("ResourceSlice delete", "slice", klog.KObj(slice))
+			c.sliceStore.OnDelete(slice)
 			c.queue.AddAfter(slice.Spec.Pool.Name, c.syncDelay)
 			logger.V(5).Info("Scheduled sync", "poolName", slice.Spec.Pool.Name, "at", time.Now().Add(c.syncDelay))
 		},
@@ -780,7 +836,9 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 			ptr.Deref(currentSlice.Spec.AllNodes, false) != pool.AllNodes ||
 			!DevicesDeepEqual(currentSlice.Spec.Devices, pool.Slices[i].Devices) ||
 			!apiequality.Semantic.DeepEqual(currentSlice.Spec.SharedCounters, pool.Slices[i].SharedCounters) ||
-			!apiequality.Semantic.DeepEqual(currentSlice.Spec.PerDeviceNodeSelection, pool.Slices[i].PerDeviceNodeSelection) {
+			!apiequality.Semantic.DeepEqual(currentSlice.Spec.PerDeviceNodeSelection, pool.Slices[i].PerDeviceNodeSelection) ||
+			!apiequality.Semantic.DeepEqual(currentSlice.Spec.PartitionTypeAttribute, pool.Slices[i].PartitionTypeAttribute) ||
+			!apiequality.Semantic.DeepEqual(currentSlice.Spec.SkipNodeOperations, pool.Slices[i].SkipNodeOperations) {
 			changedDesiredSlices.Insert(i)
 			logger.V(5).Info("Need to update slice", "slice", klog.KObj(currentSlice), "matchIndex", i)
 		}
@@ -830,6 +888,8 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		slice.Spec.AllNodes = refIfNotZero(pool.AllNodes)
 		slice.Spec.SharedCounters = pool.Slices[i].SharedCounters
 		slice.Spec.PerDeviceNodeSelection = pool.Slices[i].PerDeviceNodeSelection
+		slice.Spec.PartitionTypeAttribute = pool.Slices[i].PartitionTypeAttribute
+		slice.Spec.SkipNodeOperations = pool.Slices[i].SkipNodeOperations
 		// Preserve TimeAdded from existing device, if there is a matching device and taint.
 		slice.Spec.Devices = copyTaintTimeAdded(slice.Spec.Devices, pool.Slices[i].Devices)
 
@@ -883,6 +943,8 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 				Devices:                pool.Slices[i].Devices,
 				SharedCounters:         pool.Slices[i].SharedCounters,
 				PerDeviceNodeSelection: pool.Slices[i].PerDeviceNodeSelection,
+				PartitionTypeAttribute: pool.Slices[i].PartitionTypeAttribute,
+				SkipNodeOperations:     pool.Slices[i].SkipNodeOperations,
 			},
 		}
 
@@ -986,9 +1048,13 @@ func (c *Controller) sliceStored(ctx context.Context, msg string, poolName strin
 	// we can store.
 	if !apiequality.Semantic.DeepEqual(desiredSlice.Spec.PerDeviceNodeSelection, actualSlice.Spec.PerDeviceNodeSelection) ||
 		!apiequality.Semantic.DeepEqual(desiredSlice.Spec.SharedCounters, actualSlice.Spec.SharedCounters) ||
+		!apiequality.Semantic.DeepEqual(desiredSlice.Spec.PartitionTypeAttribute, actualSlice.Spec.PartitionTypeAttribute) ||
+		!apiequality.Semantic.DeepEqual(desiredSlice.Spec.SkipNodeOperations, actualSlice.Spec.SkipNodeOperations) ||
 		!apiequality.Semantic.DeepEqual(desiredSlice.Spec.Devices, actualSlice.Spec.Devices) {
 		pool.Slices[sliceIndex].PerDeviceNodeSelection = actualSlice.Spec.PerDeviceNodeSelection
 		pool.Slices[sliceIndex].SharedCounters = actualSlice.Spec.SharedCounters
+		pool.Slices[sliceIndex].PartitionTypeAttribute = actualSlice.Spec.PartitionTypeAttribute
+		pool.Slices[sliceIndex].SkipNodeOperations = actualSlice.Spec.SkipNodeOperations
 		pool.Slices[sliceIndex].Devices = actualSlice.Spec.Devices
 
 		err := &DroppedFieldsError{
@@ -1137,9 +1203,23 @@ func retainSlicesByPoolName(sliceList *resourceapi.ResourceSliceList, poolName s
 	})
 }
 
+// isUnsupportedPoolNameFieldSelector is needed for backwards compatibility.
+// The client-side list and watch filtering fallback can be removed in the future.
+func isUnsupportedPoolNameFieldSelector(err error) bool {
+	return apierrors.IsBadRequest(err)
+}
+
 func filterSliceWatchByPoolName(ctx context.Context, w watch.Interface, poolName string) watch.Interface {
 	return newWrapWatcher(ctx, w, func(event watch.Event) bool {
 		resourceSlice, ok := event.Object.(*resourceapi.ResourceSlice)
-		return ok && resourceSlice.Spec.Pool.Name == poolName
+		if !ok {
+			// things like error events
+			return true
+		}
+		if resourceSlice == nil || (resourceSlice.Name == "" && resourceSlice.Spec.Pool.Name == "") {
+			// things like bookmark events
+			return true
+		}
+		return resourceSlice.Spec.Pool.Name == poolName
 	})
 }

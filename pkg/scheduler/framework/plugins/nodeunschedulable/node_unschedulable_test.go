@@ -17,6 +17,7 @@ limitations under the License.
 package nodeunschedulable
 
 import (
+	"context"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -235,13 +236,6 @@ func TestIsSchedulableAfterPodTolerationChange(t *testing.T) {
 			expectedErr:  true,
 		},
 		{
-			name:         "skip-different-pod-update",
-			pod:          st.MakePod().UID("uid").Obj(),
-			newObj:       st.MakePod().UID("different-uid").Toleration(v1.TaintNodeUnschedulable).Obj(),
-			oldObj:       st.MakePod().UID("different-uid").Obj(),
-			expectedHint: fwk.QueueSkip,
-		},
-		{
 			name:         "queue-when-the-unsched-pod-gets-toleration",
 			pod:          st.MakePod().UID("uid").Obj(),
 			newObj:       st.MakePod().UID("uid").Toleration(v1.TaintNodeUnschedulable).Obj(),
@@ -261,7 +255,7 @@ func TestIsSchedulableAfterPodTolerationChange(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			pl := &NodeUnschedulable{}
-			got, err := pl.isSchedulableAfterPodTolerationChange(logger, testCase.pod, testCase.oldObj, testCase.newObj)
+			got, err := pl.isSchedulableAfterTargetPodTolerationChange(logger, testCase.pod, testCase.oldObj, testCase.newObj)
 			if err != nil && !testCase.expectedErr {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -269,5 +263,22 @@ func TestIsSchedulableAfterPodTolerationChange(t *testing.T) {
 				t.Errorf("isSchedulableAfterNodeChange() = %v, want %v", got, testCase.expectedHint)
 			}
 		})
+	}
+}
+
+func TestNodeUnschedulable_DeferredResizeSkipped(t *testing.T) {
+	ctx := context.Background()
+	pod := st.MakePod().Name("p").UID("p").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+	nodeInfo := framework.NewNodeInfo()
+	nodeInfo.SetNode(st.MakeNode().Name("node1").Obj())
+
+	pl := &NodeUnschedulable{enableInPlacePodVerticalScalingSchedulerPreemption: true}
+
+	if preRes, preStatus := pl.PreFilter(ctx, nil, pod, nil); preStatus.Code() != fwk.Skip || preRes != nil {
+		t.Errorf("PreFilter: got (res: %v, status: %v), want (nil, Skip)", preRes, preStatus.Code())
+	}
+
+	if filterStatus := pl.Filter(ctx, nil, pod, nodeInfo); filterStatus.Code() != fwk.Success {
+		t.Errorf("Filter: got status %v, want Success (nil)", filterStatus.Code())
 	}
 }

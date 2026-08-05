@@ -603,14 +603,18 @@ func TestStartupProbeFailureThreshold(t *testing.T) {
 }
 
 func TestCleanUp(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
+	ktesting.Init(t).SyncTest("", testCleanUp)
+}
+
+func testCleanUp(tCtx ktesting.TContext) {
+	t := tCtx.TB()
 	m := newTestManager()
 
 	for _, probeType := range [...]probeType{liveness, readiness, startup} {
 		key := probeKey{testPodUID, testContainerName, probeType}
 		w := newTestWorker(m, probeType, v1.Probe{})
-		m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatusWithStarted(probeType != startup))
-		go w.run(ctx)
+		m.statusManager.SetPodStatus(tCtx.Logger(), w.pod, getTestRunningStatusWithStarted(probeType != startup))
+		go w.run(tCtx)
 		m.workers[key] = w
 
 		// Wait for worker to run.
@@ -1080,7 +1084,7 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 					podStatus.InitContainerStatuses[0].State.Running.StartedAt = metav1.Time{Time: m.start.Add(5 * time.Minute)}
 				}
 				m.statusManager.SetPodStatus(logger, w.pod, podStatus)
-				containerID = kubecontainer.ParseContainerID(podStatus.InitContainerStatuses[0].ContainerID)
+				containerID = kubecontainer.ParseContainerID(logger, podStatus.InitContainerStatuses[0].ContainerID)
 			} else {
 				podStatus := getTestRunningStatus()
 				podStatus.ContainerStatuses[0].ContainerID = "test://container-id"
@@ -1091,7 +1095,7 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 				}
 				w = newTestWorker(m, tc.probeType, v1.Probe{InitialDelaySeconds: 1000})
 				m.statusManager.SetPodStatus(logger, w.pod, podStatus)
-				containerID = kubecontainer.ParseContainerID(podStatus.ContainerStatuses[0].ContainerID)
+				containerID = kubecontainer.ParseContainerID(logger, podStatus.ContainerStatuses[0].ContainerID)
 			}
 
 			w.doProbe(ctx)

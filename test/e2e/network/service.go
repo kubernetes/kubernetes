@@ -2481,7 +2481,8 @@ var _ = common.SIGDescribe("Services", func() {
 		// Create a pod in one node to get evicted
 		ginkgo.By("creating a client pod that is going to be evicted for the service " + serviceName)
 		evictedPod := e2epod.NewAgnhostPod(namespace, "evicted-pod", nil, nil, nil)
-		evictedPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "sleep 10; dd if=/dev/zero of=file bs=1M count=10; sleep 10000"}
+		// Use /dev/urandom rather than /dev/zero so the write isn't collapsed by filesystems with inline compression.
+		evictedPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "sleep 10; dd if=/dev/urandom of=file bs=1M count=10; sleep 10000"}
 		evictedPod.Spec.Containers[0].Name = "evicted-pod"
 		evictedPod.Spec.Containers[0].Resources = v1.ResourceRequirements{
 			Limits: v1.ResourceList{"ephemeral-storage": resource.MustParse("5Mi")},
@@ -2701,6 +2702,12 @@ var _ = common.SIGDescribe("Services", func() {
 		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(endpointPort), "--udp-port", strconv.Itoa(endpointPort))
 		webserverPod0.Labels = jig.Labels
 		webserverPod0.Spec.HostNetwork = true
+		webserverPod0.Spec.Containers[0].Env = append(webserverPod0.Spec.Containers[0].Env, v1.EnvVar{
+			Name: "NODE_NAME",
+			ValueFrom: &v1.EnvVarSource{
+				FieldRef: &v1.ObjectFieldSelector{FieldPath: "spec.nodeName"},
+			},
+		})
 		e2epod.SetNodeSelection(&webserverPod0.Spec, e2epod.NodeSelection{Name: node0.Name})
 
 		_, err = cs.CoreV1().Pods(ns).Create(ctx, webserverPod0, metav1.CreateOptions{})
@@ -2729,8 +2736,8 @@ var _ = common.SIGDescribe("Services", func() {
 		serviceAddress := net.JoinHostPort(svc.Spec.ClusterIP, strconv.Itoa(servicePort))
 		for range 5 {
 			// the first pause pod should be on the same node as the webserver, so it can connect to the local pod using clusterIP
-			// note that the expected hostname is the node name because the backend pod is on host network
-			execHostnameTest(*pausePod0, serviceAddress, node0.Name)
+			// note that the expected value is the node name because the backend pod is on host network
+			execNodenameTest(*pausePod0, serviceAddress, node0.Name)
 
 			// the second pause pod is on a different node, so it should see a connection error every time
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
@@ -2758,8 +2765,8 @@ var _ = common.SIGDescribe("Services", func() {
 		// assert 5 times that the first pause pod can connect to the Service locally and the second one errors with a timeout
 		for range 5 {
 			// the first pause pod should be on the same node as the webserver, so it can connect to the local pod using clusterIP
-			// note that the expected hostname is the node name because the backend pod is on host network
-			execHostnameTest(*pausePod2, serviceAddress, node0.Name)
+			// note that the expected value is the node name because the backend pod is on host network
+			execNodenameTest(*pausePod2, serviceAddress, node0.Name)
 
 			// the second pause pod is on a different node, so it should see a connection error every time
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)

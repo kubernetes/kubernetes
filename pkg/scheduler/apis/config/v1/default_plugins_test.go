@@ -47,8 +47,8 @@ func TestApplyFeatureGates(t *testing.T) {
 					Enabled: []v1.Plugin{
 						{Name: names.SchedulingGates},
 						{Name: names.PrioritySort},
-						{Name: names.NodeUnschedulable},
 						{Name: names.NodeName},
+						{Name: names.NodeUnschedulable},
 						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
 						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.NodePorts},
@@ -78,8 +78,8 @@ func TestApplyFeatureGates(t *testing.T) {
 					Enabled: []v1.Plugin{
 						{Name: names.SchedulingGates},
 						{Name: names.PrioritySort},
-						{Name: names.NodeUnschedulable},
 						{Name: names.NodeName},
+						{Name: names.NodeUnschedulable},
 						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
 						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.NodePorts},
@@ -110,8 +110,8 @@ func TestApplyFeatureGates(t *testing.T) {
 					Enabled: []v1.Plugin{
 						{Name: names.SchedulingGates},
 						{Name: names.PrioritySort},
-						{Name: names.NodeUnschedulable},
 						{Name: names.NodeName},
+						{Name: names.NodeUnschedulable},
 						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
 						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.NodePorts},
@@ -142,8 +142,8 @@ func TestApplyFeatureGates(t *testing.T) {
 					Enabled: []v1.Plugin{
 						{Name: names.SchedulingGates},
 						{Name: names.PrioritySort},
-						{Name: names.NodeUnschedulable},
 						{Name: names.NodeName},
+						{Name: names.NodeUnschedulable},
 						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
 						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.NodePorts},
@@ -164,9 +164,8 @@ func TestApplyFeatureGates(t *testing.T) {
 			},
 		},
 		{
-			name: "Feature gate GangScheduling enabled",
+			name: "Feature gate GenericWorkload enabled",
 			features: map[featuregate.Feature]bool{
-				features.GangScheduling:  true,
 				features.GenericWorkload: true,
 			},
 			wantConfig: &v1.Plugins{
@@ -174,8 +173,8 @@ func TestApplyFeatureGates(t *testing.T) {
 					Enabled: []v1.Plugin{
 						{Name: names.SchedulingGates},
 						{Name: names.PrioritySort},
-						{Name: names.NodeUnschedulable},
 						{Name: names.NodeName},
+						{Name: names.NodeUnschedulable},
 						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
 						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.NodePorts},
@@ -208,8 +207,8 @@ func TestApplyFeatureGates(t *testing.T) {
 					Enabled: []v1.Plugin{
 						{Name: names.SchedulingGates},
 						{Name: names.PrioritySort},
-						{Name: names.NodeUnschedulable},
 						{Name: names.NodeName},
+						{Name: names.NodeUnschedulable},
 						{Name: names.TaintToleration, Weight: ptr.To[int32](3)},
 						{Name: names.NodeAffinity, Weight: ptr.To[int32](2)},
 						{Name: names.NodePorts},
@@ -226,6 +225,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
 						{Name: names.DefaultBinder},
 						{Name: names.NodeDeclaredFeatures},
+						{Name: names.GangScheduling},
 						{Name: names.TopologyPlacementGenerator},
 						{Name: names.PodGroupPodsCount, Weight: ptr.To[int32](1)},
 					},
@@ -238,6 +238,8 @@ func TestApplyFeatureGates(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			if draEnabled, draExists := test.features[features.DynamicResourceAllocation]; draExists && !draEnabled {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.34"))
+			} else if ndfEnabled, ndfExists := test.features[features.NodeDeclaredFeatures]; ndfExists && !ndfEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.36"))
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, test.features)
 

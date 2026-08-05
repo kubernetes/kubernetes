@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured/internal"
 	"k8s.io/klog/v2/ktesting"
@@ -109,6 +110,12 @@ var (
 	two   = *resource.NewQuantity(2, resource.BinarySI)
 	three = *resource.NewQuantity(3, resource.BinarySI)
 	four  = *resource.NewQuantity(4, resource.BinarySI)
+
+	pointOne     = resource.MustParse("100m")
+	pointTwo     = resource.MustParse("200m")
+	pointTwoFive = resource.MustParse("250m")
+	// pointThree uses NewMilliQuantity so its s field matches allocator output (s:"").
+	pointThree = *resource.NewMilliQuantity(300, resource.DecimalSI)
 )
 
 func init() {
@@ -139,6 +146,14 @@ func node(name, region string) *v1.Node {
 			},
 		},
 	}
+}
+
+// nodeWithDRAOptionalNodeOperations returns a node declaring DRAOptionalNodeOperations feature support
+// required by devices that define SkipNodeOperations.
+func nodeWithDRAOptionalNodeOperations(name, region string) *v1.Node {
+	n := node(name, region)
+	n.Status.DeclaredFeatures = append(n.Status.DeclaredFeatures, draoptionalnodeoperations.DRAOptionalNodeOperationsFeatureGate)
+	return n
 }
 
 // generate a DeviceClass object with the given name and a driver CEL selector.
@@ -264,6 +279,8 @@ func subRequest(name, class string, count int64, fields ...any) wrapDeviceSubReq
 			subRequest.Selectors = append(subRequest.Selectors, typedField)
 		case resourceapi.DeviceToleration:
 			subRequest.Tolerations = append(subRequest.Tolerations, typedField)
+		case []resourceapi.DeviceDerivedAttribute:
+			subRequest.DerivedAttributes = append(subRequest.DerivedAttributes, typedField...)
 		default:
 			panic(fmt.Sprintf("unsupported field for DeviceSubRequest: %T", field))
 		}
@@ -404,6 +421,8 @@ func device(name string, capacity any, attributes map[resourceapi.QualifiedName]
 	switch capacity := capacity.(type) {
 	case map[resourceapi.QualifiedName]resource.Quantity:
 		device.Capacity = toDeviceCapacity(capacity)
+	case map[resourceapi.QualifiedName]resourceapi.DeviceCapacity:
+		device.Capacity = capacity
 	case string:
 		if capacity == fromCounters {
 			capacityFromCounters = true
@@ -522,6 +541,30 @@ func (in wrapDevice) withCapacityRequestPolicyRange(capacity map[resourceapi.Qua
 	return wrapDevice{Device: *device}
 }
 
+// withFractionalCapacityRequestPolicyRange adds capacity with a fractional requestPolicy
+// (min=200m, step=100m, max=1, default=200m).
+func (in wrapDevice) withFractionalCapacityRequestPolicyRange(capacity map[resourceapi.QualifiedName]resource.Quantity) wrapDevice {
+	inDevice := in.Device
+	device := inDevice.DeepCopy()
+	if device.Capacity == nil {
+		device.Capacity = make(map[resourceapi.QualifiedName]resourceapi.DeviceCapacity, len(capacity))
+	}
+	for name, quantity := range capacity {
+		device.Capacity[name] = resourceapi.DeviceCapacity{
+			Value: quantity,
+			RequestPolicy: &resourceapi.CapacityRequestPolicy{
+				Default: &pointTwo,
+				ValidRange: &resourceapi.CapacityRequestPolicyRange{
+					Min:  &pointTwo,
+					Step: &pointOne,
+					Max:  &one,
+				},
+			},
+		}
+	}
+	return wrapDevice{Device: *device}
+}
+
 // withCapacityRequestPolicyValidValues adds capacity with default valid values (1)
 func (in wrapDevice) withCapacityRequestPolicyValidValues(defaultValue resource.Quantity, capacity map[resourceapi.QualifiedName]resource.Quantity, additionalValidValues []resource.Quantity) wrapDevice {
 	inDevice := in.Device
@@ -547,6 +590,14 @@ func deviceCounterConsumption(counterSet string, counters map[string]resource.Qu
 	return resourceapi.DeviceCounterConsumption{
 		CounterSet: counterSet,
 		Counters:   toCounters(counters),
+	}
+}
+
+func deviceCounterConsumptionWithGroups(counterSet string, counters map[string]resource.Quantity, compatibilityGroups ...string) resourceapi.DeviceCounterConsumption {
+	return resourceapi.DeviceCounterConsumption{
+		CounterSet:          counterSet,
+		Counters:            toCounters(counters),
+		CompatibilityGroups: compatibilityGroups,
 	}
 }
 
@@ -622,6 +673,12 @@ func (in wrapResourceSliceWithDevices) obj() *resourceapi.ResourceSlice {
 	return in.ResourceSlice
 }
 
+func (in wrapResourceSliceWithDevices) withSkipNodeOperations(skip ...resourceapi.SkipNodeOperation) wrapResourceSliceWithDevices {
+	out := in.DeepCopy()
+	out.Spec.SkipNodeOperations = skip
+	return wrapResourceSliceWithDevices{ResourceSlice: out}
+}
+
 func sliceWithCounterSets(name string, nodeSelection, pool any, driver string, counterSets ...resourceapi.CounterSet) wrapResourceSliceWithCounterSets {
 	slice := slice(name, nodeSelection, pool, driver)
 	slice.Spec.SharedCounters = counterSets
@@ -655,6 +712,12 @@ func deviceAllocationResult(request, driver, pool, device string, adminAccess bo
 	if adminAccess {
 		r.AdminAccess = &adminAccess
 	}
+	return r
+}
+
+func deviceAllocationResultWithSkipNodeOperations(request, driver, pool, device string, skip ...resourceapi.SkipNodeOperation) resourceapi.DeviceRequestAllocationResult {
+	r := deviceAllocationResult(request, driver, pool, device, false)
+	r.SkipNodeOperations = skip
 	return r
 }
 
@@ -922,6 +985,12 @@ type AllocatorTestCase struct {
 	expectNumAllocateOneInvocationsByChannel map[internal.AllocatorChannel]int64
 }
 
+func requestWithDerivedAttributes(name, class string, count int64, derivedAttrs []resourceapi.DeviceDerivedAttribute, selectors ...resourceapi.DeviceSelector) resourceapi.DeviceRequest {
+	req := request(name, class, count, selectors...)
+	req.Exactly.DerivedAttributes = derivedAttrs
+	return req
+}
+
 // TestAllocator runs as many of the shared tests against a specific allocator implementation as possible.
 // Test cases which depend on features that are not supported by the implementation are silently skipped.
 func TestAllocator(t *testing.T,
@@ -939,6 +1008,7 @@ func TestAllocator(t *testing.T,
 	stringAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "stringAttribute")
 	versionAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "driverVersion")
 	intAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "numa")
+	numaNodeAttribute := resourceapi.FullyQualifiedName("resource.kubernetes.io/numaNode")
 	taintKey := "taint-key"
 	taintValue := "taint-value"
 	taintValue2 := "taint-value-2"
@@ -976,6 +1046,400 @@ func TestAllocator(t *testing.T,
 
 	testcases := map[string]AllocatorTestCase{
 		"empty": {},
+		// Two requests in one claim, both landing on the same counter set with the
+		// same compatibility group: they can be co-allocated.
+		"compatibility-groups-compatible": {
+			features: Features{PartitionableDevices: true, CompatibilityGroups: true},
+			claimsToAllocate: objects(claim(claim0).withRequests(
+				deviceRequest(req0, classA, 1),
+				deviceRequest(req1, classA, 1),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: two}, "mig"),
+					),
+					device(device2, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: two}, "mig"),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{capacity0: four}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req1, driverA, pool1, device2, false),
+			)},
+		},
+		// Two requests in one claim, the only candidates are an incompatible pair on
+		// the same counter set (mig vs vgpu): no combination satisfies the claim.
+		"compatibility-groups-incompatible": {
+			features: Features{PartitionableDevices: true, CompatibilityGroups: true},
+			claimsToAllocate: objects(claim(claim0).withRequests(
+				deviceRequest(req0, classA, 1),
+				deviceRequest(req1, classA, 1),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: two}, "mig"),
+					),
+					device(device2, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: two}, "vgpu"),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{capacity0: four}),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
+		// A single-device claim whose first candidate (device1) declares group "mig"
+		// and carries a NoSchedule taint, while the second (device2) declares the
+		// disjoint group "vgpu". device1 is rejected by its taint; the compatibility
+		// narrowing it consumed on counterSet1 must be rolled back so device2, which
+		// shares no group with it, can still be allocated.
+		"compatibility-groups-taint-rollback": {
+			features: Features{PartitionableDevices: true, CompatibilityGroups: true, DeviceTaints: true},
+			claimsToAllocate: objects(claim(claim0).withRequests(
+				deviceRequest(req0, classA, 1),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withTaints(taintNoSchedule).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: two}, "mig"),
+					),
+					device(device2, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: two}, "vgpu"),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{capacity0: four}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
+		// An incompatible device is already allocated on the counter set; its groups
+		// are read live from the slice. The only remaining candidate shares no
+		// group, so the claim is unschedulable.
+		"compatibility-groups-incompatible-with-allocated-peer": {
+			features:         Features{PartitionableDevices: true, CompatibilityGroups: true},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1))),
+			allocatedDevices: []DeviceID{MakeDeviceID(driverA, pool1, device1)},
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: one}, "mig"),
+					),
+					device(device2, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: one}, "vgpu"),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{capacity0: four}),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
+		// A compatible device is already allocated on the counter set; the candidate
+		// shares the group the peer declares in the slice and is admitted.
+		"compatibility-groups-compatible-with-allocated-peer": {
+			features:         Features{PartitionableDevices: true, CompatibilityGroups: true},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1))),
+			allocatedDevices: []DeviceID{MakeDeviceID(driverA, pool1, device1)},
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: one}, "mig"),
+					),
+					device(device2, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: one}, "mig"),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{capacity0: four}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
+		// With the feature disabled, a slice with a device declaring
+		// compatibility groups is ignored during pool gathering (the scheduler
+		// cannot validate it), which leaves its pool incomplete and blocks the
+		// pool as a whole. A separate pool without groups is still allocatable.
+		// This is the feature-off safety behavior and is verified across all
+		// allocator variants.
+		"compatibility-groups-disabled-skips-grouped-pool": {
+			// CompatibilityGroups is set explicitly to false so this case keeps
+			// exercising the feature-disabled path unchanged after the feature
+			// graduates to on-by-default. The scope is the pool: device1's pool1
+			// is off-limits, but device2 in the group-free pool2 is still
+			// allocated.
+			features: Features{PartitionableDevices: true, CompatibilityGroups: false},
+			claimsToAllocate: objects(claim(claim0).withRequests(
+				deviceRequest(req0, classA, 1),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: two}, "mig"),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{capacity0: four}),
+				),
+				sliceWithDevices(slice3, node1, resourcePool(pool2, 2), driverA,
+					device(device2, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet2, map[string]resource.Quantity{capacity0: two}),
+					),
+				),
+				sliceWithCounterSets(slice4, node1, resourcePool(pool2, 2), driverA,
+					counterSet(counterSet2, map[string]resource.Quantity{capacity0: four}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool2, device2, false),
+			)},
+		},
+		// With the feature disabled, a candidate that declares no groups is not
+		// allocatable either when another device of the same pool declares them:
+		// only the slice with the grouped device1 gets ignored during pool
+		// gathering, but that leaves the pool incomplete, which also blocks
+		// device2 in the remaining device slice - whether or not device1 is
+		// allocated, so that the outcome does not depend on allocation order.
+		// Verified across all allocator variants, including stable.
+		"compatibility-groups-disabled-skips-ungrouped-device-in-grouped-pool": {
+			features:         Features{PartitionableDevices: true, CompatibilityGroups: false},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1))),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 3), driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: one}, "mig"),
+					),
+				),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA,
+					device(device2, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{capacity0: one}),
+					),
+				),
+				sliceWithCounterSets(slice3, node1, resourcePool(pool1, 3), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{capacity0: four}),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
+		// Groups are tracked per counter set: two devices whose groups are
+		// disjoint can still be co-allocated when they draw from different
+		// counter sets of the same pool.
+		"compatibility-groups-multiple-counter-sets": {
+			features: Features{PartitionableDevices: true, CompatibilityGroups: true},
+			claimsToAllocate: objects(claim(claim0).withRequests(
+				deviceRequest(req0, classA, 1),
+				deviceRequest(req1, classA, 1),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: two}, "mig"),
+					),
+					device(device2, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet2, map[string]resource.Quantity{capacity0: two}, "vgpu"),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{capacity0: four}),
+					counterSet(counterSet2, map[string]resource.Quantity{capacity0: four}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req1, driverA, pool1, device2, false),
+			)},
+		},
+		// A device drawing from several counter sets must be admitted by every
+		// one of them. device2 is unopposed on counterSet2 (nothing else draws
+		// from that set) but shares no group with device1 on counterSet1, so
+		// no combination satisfies the claim - including the backtracked order
+		// where device2 goes first and its narrowing of both counter sets has
+		// to be rolled back.
+		"compatibility-groups-multiple-counter-sets-spanning-device": {
+			features: Features{PartitionableDevices: true, CompatibilityGroups: true},
+			claimsToAllocate: objects(claim(claim0).withRequests(
+				deviceRequest(req0, classA, 1),
+				deviceRequest(req1, classA, 1),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: one}, "mig"),
+					),
+					device(device2, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: one}, "vgpu"),
+						deviceCounterConsumptionWithGroups(counterSet2, map[string]resource.Quantity{capacity0: one}, "vgpu"),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{capacity0: four}),
+					counterSet(counterSet2, map[string]resource.Quantity{capacity0: four}),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
+		// The first subrequest asks for two devices, but only one candidate is
+		// compatible with the "mig" device taken by req0 (device3 declares the
+		// disjoint "vgpu"), so it fails and its tentative narrowing is rolled
+		// back before the allocator falls back to the second subrequest.
+		"compatibility-groups-with-prioritized-list": {
+			features: Features{PartitionableDevices: true, CompatibilityGroups: true, PrioritizedList: true},
+			claimsToAllocate: objects(claim(claim0).withRequests(
+				deviceRequest(req0, classA, 1),
+				requestWithPrioritizedList(req1,
+					subRequest(subReq0, classA, 2),
+					subRequest(subReq1, classA, 1),
+				),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: one}, "mig"),
+					),
+					device(device2, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: one}, "mig"),
+					),
+					device(device3, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: one}, "vgpu"),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{capacity0: four}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req1SubReq1, driverA, pool1, device2, false),
+			)},
+		},
+		// Compatibility groups steer allocation among shareable devices: req1
+		// does not fit on device1 (req0's share exhausted its capacity) and is
+		// rejected on device2, which declares the disjoint "vgpu" group on the
+		// same counter set, before landing on device3.
+		"compatibility-groups-with-consumable-capacity": {
+			features: Features{PartitionableDevices: true, CompatibilityGroups: true, ConsumableCapacity: true},
+			claimsToAllocate: objects(claim(claim0).withRequests(
+				deviceRequest(req0, classA, 1).withCapacityRequest(new(one)),
+				deviceRequest(req1, classA, 1).withCapacityRequest(new(one)),
+			)),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: one}, "mig"),
+					).withAllowMultipleAllocations(),
+					device(device2, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: one}, "vgpu"),
+					).withAllowMultipleAllocations(),
+					device(device3, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: one}, "mig"),
+					).withAllowMultipleAllocations(),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{capacity0: four}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
+				deviceRequestAllocationResult(req1, driverA, pool1, device3).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
+			)},
+		},
+		// Two claims allocated in a single call must satisfy the constraint
+		// jointly: the second claim's device is checked against the rolling
+		// intersection left by the first claim's device.
+		"compatibility-groups-multiple-claims": {
+			features: Features{PartitionableDevices: true, CompatibilityGroups: true},
+			claimsToAllocate: objects(
+				claimWithRequest(claim0, req0, classA),
+				claimWithRequest(claim1, req0, classA),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: one}, "mig"),
+					),
+					device(device2, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: one}, "mig"),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{capacity0: four}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				allocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, false)),
+				allocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device2, false)),
+			},
+		},
+		// Each claim could be satisfied on its own, but not both in one call:
+		// whichever device goes to the first claim, the other claim's only
+		// remaining candidate declares a disjoint group on the same counter
+		// set. The rolling intersection spans claims, so the joint allocation
+		// is correctly refused.
+		"compatibility-groups-multiple-claims-incompatible": {
+			features: Features{PartitionableDevices: true, CompatibilityGroups: true},
+			claimsToAllocate: objects(
+				claimWithRequest(claim0, req0, classA),
+				claimWithRequest(claim1, req0, classA),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: one}, "mig"),
+					),
+					device(device2, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{capacity0: one}, "vgpu"),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{capacity0: four}),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
 		"simple": {
 			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
 			classes:          objects(class(classA, driverA)),
@@ -986,6 +1450,27 @@ func TestAllocator(t *testing.T,
 				localNodeSelector(node1),
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 			)},
+		},
+		"optional-node-operations": {
+			features:         Features{OptionalNodeOperations: true},
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			slices:           unwrapResourceSlices(sliceWithOneDevice(slice1, node1, pool1, driverA).withSkipNodeOperations(resourceapi.SkipNodeOperationAll)),
+			node:             nodeWithDRAOptionalNodeOperations(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResultWithSkipNodeOperations(req0, driverA, pool1, device1, resourceapi.SkipNodeOperationAll),
+			)},
+		},
+		"optional-node-operations-missing-feature": {
+			features:         Features{OptionalNodeOperations: true},
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			slices:           unwrapResourceSlices(sliceWithOneDevice(slice1, node1, pool1, driverA).withSkipNodeOperations(resourceapi.SkipNodeOperationAll)),
+			node:             node(node1, region1),
+
+			expectResults: []any{},
 		},
 		"other-node": {
 			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
@@ -1227,6 +1712,43 @@ func TestAllocator(t *testing.T,
 			classes: objects(class(classA, driverA)),
 			slices:  unwrapResourceSlices(sliceWithOneDevice(slice1, node1, pool1, driverA)),
 			node:    node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
+		"all-devices-with-consumed-counters": {
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
+				Name: req0,
+				Exactly: &resourceapi.ExactDeviceRequest{
+					AllocationMode:  resourceapi.DeviceAllocationModeAll,
+					DeviceClassName: classA,
+				},
+			})),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("4Gi"),
+							},
+						),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("8Gi"),
+						},
+					),
+				),
+			),
+			node: node(node1, region1),
 
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
@@ -1969,6 +2491,51 @@ func TestAllocator(t *testing.T,
 
 			expectError: gomega.MatchError(gomega.ContainSubstring("claim claim-0, request req-0: cannot add device driver-a/pool-1/device-2 because a claim constraint would not be satisfied")),
 		},
+		"partitionable-all-mode-constraint-must-error-with-reserved-counter": {
+			// Covers allocateDevice's must=true error path when the rejected device
+			// has already reserved a shared counter. An all-mode request over two
+			// devices with mismatched constraint attributes fails on the second
+			// device, which consumes the counter, so rollbackDevice runs with a
+			// reserved counter before the must-error is returned. The error aborts the
+			// whole allocation, so this asserts the error contract and exercises the
+			// counter-release branch; the released counter is not separately
+			// observable through the allocation result.
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(
+				func() wrapResourceClaim {
+					claim := claimWithRequests(
+						claim0,
+						[]resourceapi.DeviceConstraint{{MatchAttribute: &intAttribute}},
+						request(req0, classA, 0),
+					)
+					claim.Spec.Devices.Requests[0].Exactly.AllocationMode = resourceapi.DeviceAllocationModeAll
+					return claim
+				}(),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"numa": {IntValue: new(int64(1))},
+					}),
+					// device2 mismatches the constraint and consumes the single
+					// counter, so it reserves the counter first and then fails the
+					// constraint, reaching the must-error path with state to undo.
+					device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"numa": {IntValue: new(int64(2))},
+					}).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+				),
+			),
+			node:        node(node1, region1),
+			expectError: gomega.MatchError(gomega.ContainSubstring("claim claim-0, request req-0: cannot add device driver-a/pool-1/device-2 because a claim constraint would not be satisfied")),
+		},
 		"with-constraint-not-matching-string-attribute": {
 			claimsToAllocate: objects(claimWithRequests(
 				claim0,
@@ -2109,7 +2676,7 @@ func TestAllocator(t *testing.T,
 					[]resourceapi.DeviceAllocationConfiguration{
 						{
 							Source:              resourceapi.AllocationConfigSourceClass,
-							Requests:            []string{req0},
+							Requests:            nil,
 							DeviceConfiguration: deviceConfiguration(driverA, "classAttribute"),
 						},
 					},
@@ -2146,6 +2713,43 @@ func TestAllocator(t *testing.T,
 							Source:              resourceapi.AllocationConfigSourceClass,
 							Requests:            []string{req2},
 							DeviceConfiguration: deviceConfiguration(driverB, "classAttribute-B"),
+						},
+					},
+				),
+			},
+		},
+		"with-claim-config-for-two-requests": {
+			claimsToAllocate: func() []wrapResourceClaim {
+				c := claimWithRequests(claim0, nil, request(req0, classA, 1), request(req1, classA, 1), request(req2, classA, 1))
+				c.Spec.Devices.Config = []resourceapi.DeviceClaimConfiguration{
+					{
+						Requests:            []string{req0, req1},
+						DeviceConfiguration: deviceConfiguration(driverA, "deviceAttribute"),
+					},
+				}
+				return []wrapResourceClaim{c}
+			}(),
+			classes: objects(
+				class(classA, driverA),
+			),
+			slices: unwrap(
+				sliceWithMultipleDevices(slice1, node1, pool1, driverA, 3),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{
+				allocationResultWithConfigs(
+					localNodeSelector(node1),
+					objects(
+						deviceAllocationResult(req0, driverA, pool1, device0, false),
+						deviceAllocationResult(req1, driverA, pool1, device1, false),
+						deviceAllocationResult(req2, driverA, pool1, device2, false),
+					),
+					[]resourceapi.DeviceAllocationConfiguration{
+						{
+							Source:              resourceapi.AllocationConfigSourceClaim,
+							Requests:            []string{req0, req1},
+							DeviceConfiguration: deviceConfiguration(driverA, "deviceAttribute"),
 						},
 					},
 				),
@@ -2359,10 +2963,8 @@ func TestAllocator(t *testing.T,
 				),
 				[]resourceapi.DeviceAllocationConfiguration{
 					{
-						Source: resourceapi.AllocationConfigSourceClaim,
-						Requests: []string{
-							req0SubReq1,
-						},
+						Source:              resourceapi.AllocationConfigSourceClaim,
+						Requests:            nil,
 						DeviceConfiguration: deviceConfiguration(driverB, "bar"),
 					},
 				},
@@ -2402,8 +3004,86 @@ func TestAllocator(t *testing.T,
 				[]resourceapi.DeviceAllocationConfiguration{
 					{
 						Source:              resourceapi.AllocationConfigSourceClass,
-						Requests:            []string{req0SubReq1},
+						Requests:            nil,
 						DeviceConfiguration: deviceConfiguration(driverB, "bar"),
+					},
+				},
+			)},
+		},
+		"claim-config-scoped-to-subrequests-of-one-request": {
+			features: Features{
+				PrioritizedList: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(
+					requestWithPrioritizedList(req0,
+						subRequest(subReq0, classA, 1),
+						subRequest(subReq1, classB, 1),
+					),
+					deviceRequest(req1, classA, 1),
+				).withConfigs(
+					objects(
+						deviceClaimConfig([]string{req0SubReq0, req0SubReq1}, deviceConfiguration(driverA, "scoped")),
+					),
+				),
+			),
+			classes: objects(class(classA, driverA), class(classB, driverB)),
+			slices: unwrap(
+				sliceWithMultipleDevices(slice1, node1, pool1, driverA, 2),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResultWithConfigs(
+				localNodeSelector(node1),
+				objects(
+					deviceAllocationResult(req0SubReq0, driverA, pool1, device0, false),
+					deviceAllocationResult(req1, driverA, pool1, device1, false),
+				),
+				[]resourceapi.DeviceAllocationConfiguration{
+					{
+						Source:              resourceapi.AllocationConfigSourceClaim,
+						Requests:            []string{req0SubReq0, req0SubReq1},
+						DeviceConfiguration: deviceConfiguration(driverA, "scoped"),
+					},
+				},
+			)},
+		},
+		"claim-config-covering-all-requests-is-cleared": {
+			features: Features{
+				PrioritizedList: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(
+					requestWithPrioritizedList(req0,
+						subRequest(subReq0, classA, 1),
+						subRequest(subReq1, classB, 1),
+					),
+					deviceRequest(req1, classA, 1),
+				).withConfigs(
+					objects(
+						// Covers req0 (via its selected subrequest) and req1 (by name),
+						// i.e. every top-level request, so Requests must collapse to nil.
+						deviceClaimConfig([]string{req0SubReq0, req1}, deviceConfiguration(driverA, "all")),
+					),
+				),
+			),
+			classes: objects(class(classA, driverA), class(classB, driverB)),
+			slices: unwrap(
+				sliceWithMultipleDevices(slice1, node1, pool1, driverA, 2),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResultWithConfigs(
+				localNodeSelector(node1),
+				objects(
+					deviceAllocationResult(req0SubReq0, driverA, pool1, device0, false),
+					deviceAllocationResult(req1, driverA, pool1, device1, false),
+				),
+				[]resourceapi.DeviceAllocationConfiguration{
+					{
+						Source:              resourceapi.AllocationConfigSourceClaim,
+						Requests:            nil,
+						DeviceConfiguration: deviceConfiguration(driverA, "all"),
 					},
 				},
 			)},
@@ -2820,6 +3500,384 @@ func TestAllocator(t *testing.T,
 				localNodeSelector(node1),
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 			)},
+		},
+		"partitionable-devices-counter-quantities-are-not-modified": {
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, request(req0, classA, 1)),
+			),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+			},
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("9000000000000000000")}),
+					),
+					device(device2, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("10000000000000000000")}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
+		"partitionable-devices-counter-cache-scoped-by-pool-ID": {
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, request(req0, classA, 1)),
+				claimWithRequests(claim1, nil, request(req1, classB, 1)),
+			),
+			classes: objects(class(classA, driverA), class(classB, driverB)),
+			slices: unwrapResourceSlices(
+				// driverA / pool "pool-1": counterSet1 c:1, device1 consumes c:1.
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+				),
+				// driverB / pool "pool-1": same pool name, different driver. Its capacity and
+				// consumption differ (c:2) on purpose, so that leaving *either* cache keyed by
+				// pool name alone fails this case: device2 would be checked against driverA's
+				// cached c:1 and wrongly rejected.
+				sliceWithDevices(slice3, node1, resourcePool(pool1, 2), driverB,
+					device(device2, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("2")}),
+					),
+				),
+				sliceWithCounterSets(slice4, node1, resourcePool(pool1, 2), driverB,
+					counterSet(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("2")}),
+				),
+			),
+			node: node(node1, region1),
+			// driver-a/pool-1 and driver-b/pool-1 are distinct pools with independent counter
+			// sets, so both devices allocate. The differing capacities make this guard both
+			// caches: keying availableCounters or consumedCounters by pool name alone lets
+			// driver A's cache leak into driver B's pool and fails the case.
+			expectResults: []any{
+				allocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, false)),
+				allocationResult(localNodeSelector(node1), deviceAllocationResult(req1, driverB, pool1, device2, false)),
+			},
+		},
+		"partitionable-devices-counter-cache-not-crossed-between-driver-schemas": {
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, request(req0, classA, 1)),
+				claimWithRequests(claim1, nil, request(req1, classB, 1)),
+			),
+			classes: objects(class(classA, driverA), class(classB, driverB)),
+			slices: unwrapResourceSlices(
+				// driverA / pool "pool-1": counterSet1 with c:1, device1 consumes c:1 (valid).
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+				),
+				// driverB / pool "pool-1": same pool name but a different counter set
+				// (counterSet2 with d:1). device2 over-consumes it (d:2) and must be rejected.
+				sliceWithDevices(slice3, node1, resourcePool(pool1, 2), driverB,
+					device(device2, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet2, map[string]resource.Quantity{"d": resource.MustParse("2")}),
+					),
+				),
+				sliceWithCounterSets(slice4, node1, resourcePool(pool1, 2), driverB,
+					counterSet(counterSet2, map[string]resource.Quantity{"d": resource.MustParse("1")}),
+				),
+			),
+			node: node(node1, region1),
+			// device2 over-consumes its own counter (d:2 > d:1), so it must be rejected and
+			// the allocation cannot be satisfied. If the caches are keyed by pool name,
+			// device2 reuses driver A's cached counterSet1 and its own counterSet2 is never
+			// compared, so it is wrongly accepted (over-allocation).
+			expectResults: []any{},
+		},
+		"partitionable-devices-taint-releases-counter": {
+			features: Features{
+				PartitionableDevices: true,
+				DeviceTaints:         true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, request(req0, classA, 1)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).withTaints(taintNoSchedule).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+					),
+					device(device2, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+				),
+			),
+			node: node(node1, region1),
+			// device1 is rejected by its NoSchedule taint after its counter is
+			// reserved. Releasing that reservation lets the clean device2 allocate.
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
+		"partitionable-devices-constraint-releases-counter": {
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0,
+					[]resourceapi.DeviceConstraint{{MatchAttribute: &stringAttribute}},
+					request(req0, classA, 2),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"stringAttribute": {StringValue: new("red")},
+					}).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+					),
+					device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"stringAttribute": {StringValue: new("blue")},
+					}).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+					),
+					device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"stringAttribute": {StringValue: new("blue")},
+					}).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("2")}),
+				),
+			),
+			node: node(node1, region1),
+			// device1 (red) is accepted first; the blue candidates are rejected by
+			// the match-attribute constraint after their counters are reserved.
+			// Releasing those reservations lets the two blue devices allocate.
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+				deviceAllocationResult(req0, driverA, pool1, device3, false),
+			)},
+		},
+		"partitionable-consumable-capacity-backtrack-releases-counter": {
+			features: Features{
+				PartitionableDevices: true,
+				ConsumableCapacity:   true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 1, resourceapi.DeviceSelector{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.attributes["%s"].kind == "shared"`, driverA),
+						}}),
+					request(req1, classA, 1, resourceapi.DeviceSelector{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.attributes["%s"].kind == "counteronly"`, driverA),
+						}}),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					// device1 allows multiple allocations and consumes the single
+					// shared counter. It is listed first, so req0 reserves its counter
+					// on the first try.
+					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"kind": {StringValue: new("shared")},
+					}).withAllowMultipleAllocations().withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+					),
+					// device2 consumes no counter and is the correct choice for req0
+					// once device1 has been backtracked.
+					device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"kind": {StringValue: new("shared")},
+					}),
+					// device3 is the only device that satisfies req1 and needs the same
+					// counter device1 reserved.
+					device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"kind": {StringValue: new("counteronly")},
+					}).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+				),
+			),
+			node: node(node1, region1),
+			// device1 allows multiple allocations and reserves the single shared
+			// counter when req0 tries it first. req1 can only use device3, which needs
+			// that same counter, so the search must backtrack device1. The backtracking
+			// undo has to release device1's counter reservation; otherwise req0 cannot
+			// fall back to device2 and req1 cannot take device3.
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+				deviceAllocationResult(req1, driverA, pool1, device3, false),
+			)},
+		},
+		"consumable-capacity-rejection-rolls-back-constraints": {
+			features: Features{
+				ConsumableCapacity: true,
+				PrioritizedList:    true,
+			},
+			claimsToAllocate: objects(
+				// claim0 consumes all of device1's capacity first. Its request is not
+				// subject to claim1's constraint, so it does not set the reference value.
+				claim(claim0).withRequests(
+					deviceRequest(req0, classA, 1).
+						withCapacityRequest(new(two)).
+						withSelectors(resourceapi.DeviceSelector{
+							CEL: &resourceapi.CELDeviceSelector{
+								Expression: fmt.Sprintf(`device.attributes["%s"].stringAttribute == "cap"`, driverA),
+							}}),
+				),
+				// claim1 has a match-attribute constraint. Its first (all-mode)
+				// subrequest includes device1, which was capacity-sufficient when the
+				// candidate list was built but is now full, so it is rejected on the
+				// in-function capacity check after being added to the constraint. The
+				// fallback subrequest then needs device2, whose attribute differs.
+				claim(claim1).
+					withConstraints(resourceapi.DeviceConstraint{MatchAttribute: &stringAttribute}).
+					withRequests(requestWithPrioritizedList(req0,
+						subRequest(subReq0, classA, 1, resourceapi.DeviceSelector{
+							CEL: &resourceapi.CELDeviceSelector{
+								Expression: fmt.Sprintf(`device.attributes["%s"].stringAttribute == "cap"`, driverA),
+							}}).
+							withAllocationMode(resourceapi.DeviceAllocationModeAll).
+							withCapacityRequest(new(two)),
+						subRequest(subReq1, classA, 1, resourceapi.DeviceSelector{
+							CEL: &resourceapi.CELDeviceSelector{
+								Expression: fmt.Sprintf(`device.attributes["%s"].stringAttribute == "fb"`, driverA),
+							}}),
+					)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two},
+						map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+							"stringAttribute": {StringValue: new("cap")},
+						}).withAllowMultipleAllocations(),
+					device(device2, nil,
+						map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+							"stringAttribute": {StringValue: new("fb")},
+						}),
+				),
+			),
+			node: node(node1, region1),
+			// claim1's all-mode subReq0 adds device1 to the match constraint and is then
+			// rejected because claim0 already consumed device1's capacity. Rolling back
+			// that rejected candidate's constraint entry is what lets the fallback
+			// subReq1 take device2; otherwise device1's leaked attribute value blocks it.
+			expectResults: []any{
+				allocationResult(localNodeSelector(node1),
+					deviceRequestAllocationResult(req0, driverA, pool1, device1).
+						withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two})),
+				allocationResult(localNodeSelector(node1),
+					deviceAllocationResult(req0SubReq1, driverA, pool1, device2, false)),
+			},
+		},
+		"partitionable-empty-capacity-multiple-share-backtrack-keeps-counter-ownership": {
+			features: Features{
+				PartitionableDevices: true,
+				ConsumableCapacity:   true,
+			},
+			claimsToAllocate: objects(
+				// claim0 pins device1 as the first share and reserves its single
+				// shared counter.
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 1, resourceapi.DeviceSelector{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.attributes["%s"].kind == "shared"`, driverA),
+						}}),
+				),
+				// claim1's req1 first tries device1 as a second share (skipping the
+				// counter, since claim0 already reserved it), but the match-attribute
+				// constraint with req2 forces it to backtrack onto device2. req3 then
+				// shares device1 again, after req1 has already left it.
+				claimWithRequests(claim1,
+					[]resourceapi.DeviceConstraint{
+						{MatchAttribute: &stringAttribute, Requests: []string{req1, req2}},
+					},
+					request(req1, classA, 1, resourceapi.DeviceSelector{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.attributes["%s"].kind == "shared" || device.attributes["%s"].kind == "fallback"`, driverA, driverA),
+						}}),
+					request(req2, classA, 1, resourceapi.DeviceSelector{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.attributes["%s"].kind == "gate"`, driverA),
+						}}),
+					request(req3, classA, 1, resourceapi.DeviceSelector{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.attributes["%s"].kind == "shared"`, driverA),
+						}}),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					// device1: allow-multiple, no capacity, consumes the single counter.
+					// kind steers the selectors; stringAttribute steers the constraint.
+					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"kind":            {StringValue: new("shared")},
+						"stringAttribute": {StringValue: new("red")},
+					}).withAllowMultipleAllocations().withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+					),
+					// device2: the fallback for req1, matching req2's stringAttribute.
+					device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"kind":            {StringValue: new("fallback")},
+						"stringAttribute": {StringValue: new("blue")},
+					}),
+					// device3: the only device req2 can take.
+					device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"kind":            {StringValue: new("gate")},
+						"stringAttribute": {StringValue: new("blue")},
+					}),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{"c": resource.MustParse("1")}),
+				),
+			),
+			node: node(node1, region1),
+			// claim0 reserves device1's counter as the first share. claim1's req1 tries
+			// device1 as a second share, skips the counter, then backtracks onto device2
+			// because of the constraint with req2. Rolling back that empty-capacity share
+			// must not drop device1's shared marker, because claim0's share still holds
+			// the counter. req3 then shares device1 again without recharging the counter.
+			expectResults: []any{
+				allocationResult(localNodeSelector(node1),
+					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, nil)),
+				allocationResult(localNodeSelector(node1),
+					deviceAllocationResult(req1, driverA, pool1, device2, false),
+					deviceAllocationResult(req2, driverA, pool1, device3, false),
+					deviceRequestAllocationResult(req3, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, nil)),
+			},
 		},
 		"partitionable-devices-prioritized-list": {
 			features: Features{
@@ -4859,6 +5917,107 @@ func TestAllocator(t *testing.T,
 				),
 			},
 		},
+		"consumable-capacity-range-policy-request-above-int64-rejected": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			// A capacity request above MaxInt64 cannot be rounded on the integer Step path
+			// without reading it through Quantity.Value(), which wraps. The request is not
+			// representable, so allocation aborts with a specific error instead of skipping.
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(new(resource.MustParse("18446744073709551616")))),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withAllowMultipleAllocations().withCapacityRequestPolicyRange(map[resourceapi.QualifiedName]resource.Quantity{capacity0: four}),
+				),
+			),
+			node:        node(node1, region1),
+			expectError: gomega.MatchError(gomega.ContainSubstring("cannot be represented")),
+		},
+		"consumable-capacity-range-policy-rounded-value-overflow-rejected": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			// Rounding a MaxInt64 request up to the next Step multiple passes MaxInt64 and
+			// would wrap to a negative value. The rounded value is not representable, so
+			// allocation aborts with a specific error instead of acting on the wrapped read.
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(new(resource.MustParse("9223372036854775807")))),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withAllowMultipleAllocations().withCapacityRequestPolicyRange(map[resourceapi.QualifiedName]resource.Quantity{capacity0: four}),
+				),
+			),
+			node:        node(node1, region1),
+			expectError: gomega.MatchError(gomega.ContainSubstring("cannot be represented")),
+		},
+		"consumable-capacity-range-policy-overflow-aborts-not-skip": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			// device-1 has a Step range, so a request above MaxInt64 overflows its integer
+			// rounding. device-2 has no Step and could satisfy the same request by exact
+			// comparison, but a not-representable request is fail-closed: allocation aborts
+			// rather than skipping device-1 to allocate device-2. Aborting on the first
+			// overflowing device is what stops the backtracking a user-controlled
+			// out-of-range request would otherwise force.
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(new(resource.MustParse("18446744073709551616")))),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withAllowMultipleAllocations().withCapacityRequestPolicyRange(map[resourceapi.QualifiedName]resource.Quantity{capacity0: four}),
+					device(device2, map[resourceapi.QualifiedName]resource.Quantity{capacity0: resource.MustParse("36893488147419103232")}, nil).withAllowMultipleAllocations(),
+				),
+			),
+			node:        node(node1, region1),
+			expectError: gomega.MatchError(gomega.ContainSubstring("cannot be represented")),
+		},
+		"consumable-capacity-range-policy-allocation-mode-all-overflow-aborts": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			// The all-devices pre-scan in validateDeviceRequest validates capacity too. An
+			// out-of-range request must abort there, not silently drop the overflowing
+			// device from the set and allocate whatever remains. The count-mode cases above
+			// exercise allocateOne; this one exercises the AllocationModeAll pre-scan.
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(allDeviceRequest(req0, classA).withCapacityRequest(new(resource.MustParse("18446744073709551616")))),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withAllowMultipleAllocations().withCapacityRequestPolicyRange(map[resourceapi.QualifiedName]resource.Quantity{capacity0: four}),
+				),
+			),
+			node:        node(node1, region1),
+			expectError: gomega.MatchError(gomega.ContainSubstring("cannot be represented")),
+		},
+		"consumable-capacity-negative-request-aborts": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			// A stored request or slice from before stricter validation could carry a
+			// negative capacity, which admission does not re-check on existing objects. A
+			// negative value must abort rather than record negative consumed capacity and
+			// over-allocate the device.
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(new(resource.MustParse("-5")))),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, map[resourceapi.QualifiedName]resource.Quantity{capacity0: resource.MustParse("10")}, nil).withAllowMultipleAllocations(),
+				),
+			),
+			node:        node(node1, region1),
+			expectError: gomega.MatchError(gomega.ContainSubstring("negative")),
+		},
 		"consumable-capacity-multi-allocatable-device-with-valid-values-policy": {
 			features: Features{
 				ConsumableCapacity: true,
@@ -5219,13 +6378,8 @@ func TestAllocator(t *testing.T,
 					device(device2, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}, nil).withAllowMultipleAllocations(),
 				),
 			),
-			node: node(node1, region1),
-			expectResults: []any{
-				allocationResult(
-					localNodeSelector(node1),
-					deviceRequestAllocationResult(req0, driverA, pool1, device2).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
-				),
-			},
+			node:          node(node1, region1),
+			expectResults: []any{}, // device-1 capacity-exhausted but still matches; All fails, not device-2 only
 		},
 		"consumable-capacity-dedicated-device-with-consumable-capacity-request": {
 			features: Features{
@@ -5265,6 +6419,39 @@ func TestAllocator(t *testing.T,
 			),
 			node:          node(node1, region1),
 			expectResults: []any{},
+		},
+		"consumable-capacity-requests-are-not-modified": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(
+					deviceRequest(req0, classA, 1).withCapacityRequest(ptr.To(two)),
+					deviceRequest(req1, classA, 1).withCapacityRequest(ptr.To(resource.MustParse("1000000000000000000000"))),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+						capacity0: {
+							Value: resource.MustParse("1000000000000000000002"),
+							RequestPolicy: &resourceapi.CapacityRequestPolicy{
+								Default: ptr.To(resource.MustParse("1000000000000000000000")),
+								ValidRange: &resourceapi.CapacityRequestPolicyRange{
+									Min: &two,
+								},
+							},
+						},
+					}, nil).withAllowMultipleAllocations(),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
+				deviceRequestAllocationResult(req1, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: resource.MustParse("1000000000000000000000")}),
+			)},
 		},
 		"allow-multiple-allocations-exclude-multi-allocatable-device-by-class-selector": {
 			features: Features{
@@ -5386,6 +6573,93 @@ func TestAllocator(t *testing.T,
 				localNodeSelector(node1),
 				deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{"memory": resource.MustParse("4Gi")}),
 				deviceRequestAllocationResult(req1SubReq1, driverA, pool1, device3).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{"memory": resource.MustParse("4Gi")}),
+			)},
+		},
+		"allow-multiple-allocations-with-shared-device-counter-cross-cycle": {
+			features: Features{
+				PartitionableDevices: true,
+				ConsumableCapacity:   true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(
+					deviceRequest(req0, classA, 1).
+						withCapacityRequest(ptr.To(one)).
+						withSelectors(resourceapi.DeviceSelector{
+							CEL: &resourceapi.CELDeviceSelector{
+								Expression: fmt.Sprintf(`device.attributes["%s"].mode == "b"`, driverA),
+							},
+						}),
+				),
+			),
+			allocatedSharedDeviceIDs: sets.New(
+				internal.MakeSharedDeviceID(MakeDeviceID(driverA, pool1, device1), &fixedShareID),
+			),
+			allocatedCapacityDevices: ConsumedCapacityCollection{
+				MakeDeviceID(driverA, pool1, device1): ConsumedCapacity{
+					capacity0: ptr.To(one),
+				},
+			},
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, fromCounters, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"mode": {StringValue: ptr.To("a")},
+					}).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+							capacity0: one,
+						}),
+					).withAllowMultipleAllocations(),
+					device(device2, fromCounters, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"mode": {StringValue: ptr.To("b")},
+					}).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+							capacity0: one,
+						}),
+					).withAllowMultipleAllocations(),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						capacity0: one,
+					}),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{},
+		},
+		"partitionable-consumable-capacity-shared-device-counter-not-recharged": {
+			features: Features{
+				PartitionableDevices: true,
+				ConsumableCapacity:   true,
+			},
+			// device1 already has a persisted shared allocation. It is represented
+			// only by a share ID, with no AggregatedCapacity entry.
+			allocatedSharedDeviceIDs: sets.New(
+				internal.MakeSharedDeviceID(MakeDeviceID(driverA, pool1, device1), &fixedShareID),
+			),
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, request(req0, classA, 1)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, nil, nil).
+						withAllowMultipleAllocations().
+						withDeviceCounterConsumption(
+							deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+								"c": resource.MustParse("1"),
+							}),
+						),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						"c": resource.MustParse("1"),
+					}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, nil),
 			)},
 		},
 		"consumable-capacity-with-partitionable-device-multiple-capacity-pools": {
@@ -5541,6 +6815,109 @@ func TestAllocator(t *testing.T,
 				deviceRequestAllocationResult(req3, driverA, pool1, device4).withConsumedCapacity(&fixedShareID, nil),
 			)},
 		},
+		"distinct-constraint-single-request-count-3-not-distinct": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{DistinctAttribute: &stringAttribute}},
+				request(req0, classA, 3)),
+			),
+			classes: objects(class(classA, driverA)),
+			// req0 asks for 3 devices under a DistinctAttribute(stringAttribute)
+			// constraint. Three devices exist with stringAttribute values
+			// value1, value2, value1 -- only two distinct values.
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value1")},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value2")},
+				}),
+				device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value1")},
+				}),
+			)),
+			node: node(node1, region1),
+			// Expected results:
+			//   - [req0] No allocation. Satisfying req0 requires 3 devices with
+			//     distinct stringAttribute values, but device1 and device3 both
+			//     have "value1", so no set of 3 distinct-valued devices exists.
+			expectResults: nil,
+		},
+		"distinct-constraint-single-request-count-3-all-distinct": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{DistinctAttribute: &stringAttribute}},
+				request(req0, classA, 3)),
+			),
+			classes: objects(class(classA, driverA)),
+			// req0 asks for 3 devices under a DistinctAttribute(stringAttribute)
+			// constraint. Three devices exist with distinct values
+			// value1, value2, value3.
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value1")},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value2")},
+				}),
+				device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value3")},
+				}),
+			)),
+			node: node(node1, region1),
+			// Expected results:
+			//   - [req0] All three devices are allocated: their stringAttribute
+			//     values (value1, value2, value3) are pairwise distinct, so the
+			//     constraint holds.
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+				deviceAllocationResult(req0, driverA, pool1, device3, false),
+			)},
+		},
+		"distinct-constraint-two-requests-with-count-not-distinct": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withConstraints(
+					resourceapi.DeviceConstraint{DistinctAttribute: &stringAttribute, Requests: []string{req0, req1}},
+				).withRequests(
+					deviceRequest(req0, classA, 2),
+					deviceRequest(req1, classA, 1),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			// req0 asks for 2 devices and req1 for 1 device; a single
+			// DistinctAttribute(stringAttribute) constraint covers both requests,
+			// so all 3 allocated devices must be distinct. Three devices exist
+			// with values value1, value2, value1 -- only two distinct values.
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value1")},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value2")},
+				}),
+				device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value1")},
+				}),
+			)),
+			node: node(node1, region1),
+			// Expected results:
+			//   - No allocation. The constraint spans req0 and req1, so the 3
+			//     devices across both requests must be pairwise distinct. Because
+			//     device1 and device3 share "value1", 3 distinct-valued devices
+			//     cannot be chosen.
+			expectResults: nil,
+		},
 		"with-distinct-constraints-attribute-not-set": {
 			features: Features{
 				ConsumableCapacity: true,
@@ -5639,6 +7016,92 @@ func TestAllocator(t *testing.T,
 				deviceRequestAllocationResult(req2SubReq0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, nil),
 			)},
 		},
+		"distinct-constraint-single-request-multiple-devices-attribute-not-set": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0,
+					[]resourceapi.DeviceConstraint{{DistinctAttribute: &intAttribute}},
+					request(req0, classA, 3),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, nil, nil),
+					device(device2, nil, nil),
+					device(device3, nil, nil),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{},
+		},
+		"distinct-constraint-single-request-not-enough-distinct-values": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0,
+					[]resourceapi.DeviceConstraint{{DistinctAttribute: &intAttribute}},
+					request(req0, classA, 3),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"numa": {IntValue: new(int64(1))},
+					}),
+					device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"numa": {IntValue: new(int64(2))},
+					}),
+					device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"numa": {IntValue: new(int64(2))},
+					}),
+					device(device4, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"numa": {IntValue: new(int64(2))},
+					}),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{},
+		},
+		"distinct-constraint-single-request-multiple-devices-attribute-set": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0,
+					[]resourceapi.DeviceConstraint{{DistinctAttribute: &intAttribute}},
+					request(req0, classA, 3),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"numa": {IntValue: new(int64(1))},
+					}),
+					device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"numa": {IntValue: new(int64(2))},
+					}),
+					device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"numa": {IntValue: new(int64(1))},
+					}),
+					device(device4, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"numa": {IntValue: new(int64(3))},
+					}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+				deviceAllocationResult(req0, driverA, pool1, device4, false),
+			)},
+		},
 		"distinct-constraint-one-multi-allocatable-device-with-distinct-constraint": {
 			features: Features{
 				ConsumableCapacity: true,
@@ -5691,6 +7154,857 @@ func TestAllocator(t *testing.T,
 					deviceRequestAllocationResult(req1, driverA, pool1, device2).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
 				),
 			},
+		},
+
+		// Test cases for DRAFractionalCapacityRange feature
+		"consumable-capacity-fractional-range-gate-disabled": {
+			// FractionalCapacityRange is off: step arithmetic uses Value(), which rounds
+			// sub-integer quantities up to 1.  With min=1, step=1, request=1:
+			// added=0, n=0 → consumed = min + step*0 = 1 (DecimalSI, from step's format).
+			features: Features{
+				ConsumableCapacity: true,
+				// FractionalCapacityRange intentionally not set
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(&pointTwo)),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withAllowMultipleAllocations().withFractionalCapacityRequestPolicyRange(
+						map[resourceapi.QualifiedName]resource.Quantity{capacity0: one},
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				allocationResult(
+					localNodeSelector(node1),
+					// Integer path: Value() of 200m and 100m both round up to 1,
+					// so min=1, step=1, added=0 → result = NewQuantity(1, DecimalSI).
+					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{
+						capacity0: *resource.NewQuantity(1, resource.DecimalSI),
+					}),
+				),
+			},
+		},
+		"consumable-capacity-fractional-range-gate-enabled-round-up": {
+			// FractionalCapacityRange on: 250m is between min=200m and next step=300m,
+			// so it is rounded up to 300m (milli-arithmetic: (250-200)/100 rounds up to 1 step).
+			features: Features{
+				ConsumableCapacity:      true,
+				FractionalCapacityRange: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(&pointTwoFive)),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withAllowMultipleAllocations().withFractionalCapacityRequestPolicyRange(
+						map[resourceapi.QualifiedName]resource.Quantity{capacity0: one},
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				allocationResult(
+					localNodeSelector(node1),
+					// Milli path: (250m - 200m) / 100m = 0.5 → ceil → 1 step → 200m + 100m = 300m.
+					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{
+						capacity0: pointThree,
+					}),
+				),
+			},
+		},
+
+		// Test cases for DRAListTypeAttributes features (matchAttributes/distinctAttributes)
+		"list-attributes-match-constaint-scalar-string-values": {
+			features: Features{
+				ListTypeAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{MatchAttribute: &stringAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value1")},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value1")},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
+		"list-attributes-match-constaint-list-of-string-values-with-common-elements": {
+			features: Features{
+				ListTypeAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{MatchAttribute: &stringAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value1", "value2", "value3"}},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value2", "value3", "value4"}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
+		"list-attributes-match-constaint-list-of-string-values-with-partially-common-elements": {
+			features: Features{
+				ListTypeAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{MatchAttribute: &stringAttribute}},
+				request(req0, classA, 3)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value1", "value2"}},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value2", "value3"}},
+				}),
+				device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value3", "value1"}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: nil,
+		},
+		"list-attributes-match-constraint-backtrack-needs-intersection-restore": {
+			features: Features{
+				ListTypeAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{MatchAttribute: &stringAttribute}},
+				request(req0, classA, 3),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value1", "value2"}},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value1"}},
+				}),
+				device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value2"}},
+				}),
+				device(device4, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value2"}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device3, false),
+				deviceAllocationResult(req0, driverA, pool1, device4, false),
+			)},
+		},
+		"list-attributes-match-constaint-list-of-string-values-without-common-elements": {
+			features: Features{
+				ListTypeAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{MatchAttribute: &stringAttribute}},
+				request(req0, classA, 1),
+				request(req0, classA, 1),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value1", "value2"}},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value3", "value4"}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: nil,
+		},
+		"list-attributes-match-constaint-mixed-scalar-and-list-of-string-values-with-common-elements": {
+			features: Features{
+				ListTypeAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{MatchAttribute: &stringAttribute}},
+				request(req0, classA, 2),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value1")},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value1", "value2"}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
+		"list-attributes-match-constaint-mixed-scalar-and-list-of-string-values-with-partially-common-elements": {
+			features: Features{
+				ListTypeAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{MatchAttribute: &stringAttribute}},
+				request(req0, classA, 3)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value1")},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value1", "value2"}},
+				}),
+				device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value2", "value3"}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: nil,
+		},
+		"list-attributes-match-constaint-mixed-scalar-and-list-of-string-values-without-common-elements": {
+			features: Features{
+				ListTypeAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{MatchAttribute: &stringAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value1")},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value2", "value3"}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: nil,
+		},
+		"list-attributes-match-constaint-list-of-int-values-with-common-elements": {
+			features: Features{
+				ListTypeAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{MatchAttribute: &intAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"numa": {IntValues: []int64{0, 1, 2}},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"numa": {IntValues: []int64{1, 2, 3}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
+		// KEP-6072: standardized numaNode attribute, list form. Two devices whose
+		// numaNode lists share an element (physical node + same-socket equidistant
+		// nodes) are co-placed by matchAttribute set intersection.
+		"numanode-matchattribute-overlapping-lists-are-co-placed": {
+			features: Features{
+				ListTypeAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{MatchAttribute: &numaNodeAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"resource.kubernetes.io/numaNode": {IntValues: []int64{4}},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"resource.kubernetes.io/numaNode": {IntValues: []int64{4, 5, 6, 7}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
+		// KEP-6072: numaNode lists with no common element (different NUMA domains)
+		// cannot satisfy matchAttribute, so no allocation is made.
+		"numanode-matchattribute-disjoint-lists-are-not-allocated": {
+			features: Features{
+				ListTypeAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{MatchAttribute: &numaNodeAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"resource.kubernetes.io/numaNode": {IntValues: []int64{0}},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"resource.kubernetes.io/numaNode": {IntValues: []int64{4, 5, 6, 7}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: nil,
+		},
+		"list-attributes-match-constaint-list-of-bool-values-with-common-elements": {
+			features: Features{
+				ListTypeAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{MatchAttribute: &boolAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"boolAttribute": {BoolValues: []bool{true, false}},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"boolAttribute": {BoolValues: []bool{true}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
+		"list-attributes-match-constaint-list-of-version-values-with-common-elements": {
+			features: Features{
+				ListTypeAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{MatchAttribute: &versionAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"driverVersion": {VersionValues: []string{"1.0.0", "1.1.0", "2.0.0"}},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"driverVersion": {VersionValues: []string{"1.1.0", "2.0.0", "2.1.0"}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
+		"list-attributes-match-constaint-with-empty-or-unknown-type": {
+			features: Features{
+				ListTypeAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{MatchAttribute: &stringAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{}},
+				}),
+			)),
+			node:          node(node1, region1),
+			expectResults: nil,
+			expectError:   gomega.MatchError(gomega.ContainSubstring("unsupported attribute value")),
+		},
+		"list-attributes-disabled-match-constraint-with-lists": {
+			features: Features{
+				ListTypeAttributes: false,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{MatchAttribute: &stringAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value1", "value2", "value3"}},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value2", "value3", "value4"}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: nil,
+		},
+		"list-attributes-distinct-constraint-scalar-string-values-all-distinct": {
+			features: Features{
+				ListTypeAttributes: true,
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{DistinctAttribute: &stringAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value1")},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value2")},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
+		"list-attributes-distinct-constraint-scalar-string-values-not-distinct": {
+			features: Features{
+				ListTypeAttributes: true,
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{DistinctAttribute: &stringAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value1")},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value1")},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: nil,
+		},
+		"list-attributes-distinct-constraint-single-request-count-3-not-distinct": {
+			features: Features{
+				ListTypeAttributes: true,
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{DistinctAttribute: &stringAttribute}},
+				request(req0, classA, 3)),
+			),
+			classes: objects(class(classA, driverA)),
+			// Same scenario as distinct-constraint-single-request-count-3-not-distinct
+			// but with the ListTypeAttributes feature enabled: req0 asks for 3
+			// devices under a DistinctAttribute constraint, and the 3 devices carry
+			// values value1, value2, value1 -- only two distinct values.
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value1")},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value2")},
+				}),
+				device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value1")},
+				}),
+			)),
+			node: node(node1, region1),
+			// Expected results:
+			//   - [req0] No allocation. device1 and device3 both have "value1",
+			//     so 3 devices with distinct stringAttribute values cannot be found.
+			expectResults: nil,
+		},
+		"list-attributes-distinct-constraint-single-request-count-3-all-distinct": {
+			features: Features{
+				ListTypeAttributes: true,
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{DistinctAttribute: &stringAttribute}},
+				request(req0, classA, 3)),
+			),
+			classes: objects(class(classA, driverA)),
+			// Same scenario as distinct-constraint-single-request-count-3-all-distinct
+			// but with the ListTypeAttributes feature enabled: req0 asks for 3
+			// devices under a DistinctAttribute constraint, and the 3 devices carry
+			// distinct values value1, value2, value3.
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value1")},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value2")},
+				}),
+				device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value3")},
+				}),
+			)),
+			node: node(node1, region1),
+			// Expected results:
+			//   - [req0] All three devices are allocated: their stringAttribute
+			//     values (value1, value2, value3) are pairwise distinct.
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+				deviceAllocationResult(req0, driverA, pool1, device3, false),
+			)},
+		},
+		"list-attributes-distinct-constraint-list-of-string-values-all-distinct": {
+			features: Features{
+				ListTypeAttributes: true,
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{DistinctAttribute: &stringAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value1", "value2"}},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value2", "value3"}},
+				}),
+				device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value3", "value4"}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device3, false),
+			)},
+		},
+		"list-attributes-distinct-constraint-list-of-string-values-with-common-elements": {
+			features: Features{
+				ListTypeAttributes: true,
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{DistinctAttribute: &stringAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value1", "value2", "value3"}},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value2", "value4", "value5"}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: nil,
+		},
+		"list-attributes-distinct-constraint-mixed-scalar-and-list-all-distinct": {
+			features: Features{
+				ListTypeAttributes: true,
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{DistinctAttribute: &stringAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value1")},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value1", "value2"}},
+				}),
+				device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value2", "value3"}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device3, false),
+			)},
+		},
+		"list-attributes-distinct-constraint-mixed-scalar-and-list-with-common-elements": {
+			features: Features{
+				ListTypeAttributes: true,
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{DistinctAttribute: &stringAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValue: new("value1")},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value1", "value2"}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: nil,
+		},
+		"list-attributes-distinct-constraint-list-of-int-values-all-distinct": {
+			features: Features{
+				ListTypeAttributes: true,
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{DistinctAttribute: &intAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"numa": {IntValues: []int64{0, 1}},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"numa": {IntValues: []int64{1, 2}},
+				}),
+				device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"numa": {IntValues: []int64{2, 3}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device3, false),
+			)},
+		},
+		"list-attributes-distinct-constraint-list-of-bool-values-all-distinct": {
+			features: Features{
+				ListTypeAttributes: true,
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{DistinctAttribute: &boolAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"boolAttribute": {BoolValues: []bool{true}},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"boolAttribute": {BoolValues: []bool{true, false}},
+				}),
+				device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"boolAttribute": {BoolValues: []bool{false}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device3, false),
+			)},
+		},
+		"list-attributes-distinct-constraint-list-of-version-values-all-distinct": {
+			features: Features{
+				ListTypeAttributes: true,
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{DistinctAttribute: &versionAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"driverVersion": {VersionValues: []string{"1.0.0", "1.1.0"}},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"driverVersion": {VersionValues: []string{"1.1.0", "2.0.0"}},
+				}),
+				device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"driverVersion": {VersionValues: []string{"2.0.0", "2.1.0"}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device3, false),
+			)},
+		},
+		"list-attributes-distinct-constaint-with-empty-or-unknown-type": {
+			features: Features{
+				ListTypeAttributes: true,
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{DistinctAttribute: &versionAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"driverVersion": {VersionValues: []string{}},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"driverVersion": {VersionValues: nil},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: nil,
+			expectError:   gomega.MatchError(gomega.ContainSubstring("unsupported attribute value")),
+		},
+		"list-attributes-disabled-distinct-constraint-with-lists": {
+			features: Features{
+				ListTypeAttributes: false,
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{{DistinctAttribute: &stringAttribute}},
+				request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value1", "value2", "value3"}},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value2", "value3", "value4"}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: nil,
+		},
+		"list-attributes-distinct-constraint-backtrack-needs-remove": {
+			features: Features{
+				ListTypeAttributes: true,
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withConstraints(
+					resourceapi.DeviceConstraint{
+						Requests:          []string{req0, req1, req2},
+						DistinctAttribute: &stringAttribute,
+					},
+				).withRequests(
+					deviceRequest(req0, classA, 1),
+					deviceRequest(req1, classA, 1),
+					deviceRequest(req2, classA, 1),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value1", "value2", "value3"}},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value3", "value4", "value5"}},
+				}),
+				device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value1", "value2"}},
+				}),
+				device(device4, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value3", "value4"}},
+				}),
+				device(device0, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"stringAttribute": {StringValues: []string{"value5", "value6"}},
+				}),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device3, false),
+				deviceAllocationResult(req1, driverA, pool1, device4, false),
+				deviceAllocationResult(req2, driverA, pool1, device0, false),
+			)},
 		},
 
 		"allocation-mode-all-with-multi-host-resource-pool": {
@@ -6099,6 +8413,49 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0SubReq1, driverA, pool1, device2, false),
 			)},
 		},
+		"partitionable-devices-devices-consume-counter-set-in-different-nodes": {
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, request(req0, classA, 1)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice1, node1, resourcePool(pool1, 3), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						"memory": resource.MustParse("8Gi"),
+					}),
+				),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA,
+					device(device1, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+							"memory": resource.MustParse("6Gi"),
+						}),
+					),
+				),
+				sliceWithDevices(slice3, node2, resourcePool(pool1, 3), driverA,
+					device(device2, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+							"memory": resource.MustParse("6Gi"),
+						}),
+					),
+					device(device3, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+							"memory": resource.MustParse("2Gi"),
+						}),
+					),
+				),
+			),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+			},
+			node: node(node2, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node2),
+				deviceAllocationResult(req0, driverA, pool1, device3, false),
+			)},
+		},
 		"partitionable-devices-validation-error-on-non-targeting-slice": {
 			features: Features{
 				PartitionableDevices: true,
@@ -6462,6 +8819,282 @@ func TestAllocator(t *testing.T,
 				internal.Stable: 32,
 			},
 		},
+
+		// "derived-attributes" is the primary test case. It mirrors the
+		// cross-request hardware alignment example from the KEP.
+		// It defines two requests and synthesizes a virtual grouping
+		// key ("sharedNumaNode") across their differing
+		// attribute names. The allocator must backtrack past the
+		// incompatible first device to successfully co-allocate.
+		"derived-attributes": {
+			features: Features{
+				DerivedAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{
+					{
+						Requests:       []string{req0, req1},
+						MatchAttribute: ptr.To(resourceapi.FullyQualifiedName("derived/sharedNumaNode")),
+					},
+				},
+				requestWithDerivedAttributes(
+					req0,
+					classA,
+					1,
+					[]resourceapi.DeviceDerivedAttribute{
+						{
+							Name:       "derived/sharedNumaNode",
+							Expression: fmt.Sprintf(`device.attributes["%s"]["numa"]`, driverA),
+						},
+					},
+				),
+				requestWithDerivedAttributes(
+					req1,
+					classB,
+					1,
+					[]resourceapi.DeviceDerivedAttribute{
+						{
+							Name:       "derived/sharedNumaNode",
+							Expression: fmt.Sprintf(`device.attributes["%s"]["numaNode"]`, driverB),
+						},
+					},
+				),
+			)),
+			classes: objects(
+				class(classA, driverA),
+				class(classB, driverB),
+			),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"numa": {StringValue: new("numa-0")},
+					}),
+					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"numa": {StringValue: new("numa-1")},
+					}),
+				),
+				sliceWithDevices(slice2, node1, pool2, driverB,
+					device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"numaNode": {StringValue: new("numa-1")},
+					}),
+					device(device4, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"numaNode": {StringValue: new("numa-2")},
+					}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req1, driverB, pool2, device3, false),
+			)},
+		},
+		// "derived-attributes-with-prioritized-list" verifies that
+		// the allocator correctly evaluates derived attributes that are
+		// defined differently across alternatives in a prioritized list.
+		// It expects the allocator to skip the first alternative (because its
+		// derived attribute violates the cross-request match constraint)
+		// and successfully allocate using the second alternative which
+		// correctly satisfies the constraint with the other request.
+		"derived-attributes-with-prioritized-list": {
+			features: Features{
+				DerivedAttributes: true,
+				PrioritizedList:   true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{
+					{
+						Requests:       []string{req0, req1},
+						MatchAttribute: ptr.To(resourceapi.FullyQualifiedName("derived/match")),
+					},
+				},
+				requestWithPrioritizedList(req0,
+					// First alternative pulls physical attribute "foo" ("A").
+					// This won't match req1 which pulls "baz" ("B").
+					subRequest(subReq0, classA, 1, []resourceapi.DeviceDerivedAttribute{
+						{
+							Name:       resourceapi.FullyQualifiedName("derived/match"),
+							Expression: fmt.Sprintf(`device.attributes["%s"]["foo"]`, driverA),
+						},
+					}),
+					// Second alternative pulls physical attribute "bar" ("B").
+					// This matches req1.
+					subRequest(subReq1, classA, 1, []resourceapi.DeviceDerivedAttribute{
+						{
+							Name:       resourceapi.FullyQualifiedName("derived/match"),
+							Expression: fmt.Sprintf(`device.attributes["%s"]["bar"]`, driverA),
+						},
+					}),
+				).obj(),
+				requestWithDerivedAttributes(
+					req1,
+					classB, // Notice req1 uses classB (driverB)
+					1,
+					[]resourceapi.DeviceDerivedAttribute{
+						{
+							Name:       resourceapi.FullyQualifiedName("derived/match"),
+							Expression: fmt.Sprintf(`device.attributes["%s"]["baz"]`, driverB),
+						},
+					},
+				),
+			)),
+			classes: objects(
+				class(classA, driverA),
+				class(classB, driverB),
+			),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"foo": {StringValue: new("A")},
+						"bar": {StringValue: new("B")},
+					}),
+				),
+				sliceWithDevices(slice2, node1, pool2, driverB,
+					device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"baz": {StringValue: new("B")},
+					}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0SubReq1, driverA, pool1, device1, false),
+				deviceAllocationResult(req1, driverB, pool2, device2, false),
+			)},
+		},
+		// "derived-attributes-override" verifies that derived
+		// attributes shadow/override physical attributes of the same
+		// name. It also proves that this shadowing is strictly
+		// request-scoped and does not leak or affect other requests
+		// (which continue to fall back to physical attributes).
+		"derived-attributes-override": {
+			features: Features{
+				DerivedAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{
+					{
+						// Require match on "myAttr".
+						Requests:       []string{req0, req1},
+						MatchAttribute: ptr.To(resourceapi.FullyQualifiedName("dra.example.com/myAttr")),
+					},
+				},
+				requestWithDerivedAttributes(
+					req0,
+					classA,
+					1,
+					[]resourceapi.DeviceDerivedAttribute{
+						{
+							// Overrides physical attribute to "value-2".
+							Name:       resourceapi.FullyQualifiedName("dra.example.com/myAttr"),
+							Expression: `"value-2"`,
+						},
+					},
+				),
+				// Falls back to physical attribute.
+				request(req1, classA, 1),
+			)),
+			classes: objects(class(classA, "dra.example.com")),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, "dra.example.com",
+				// Mismatched physical attributes.
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"myAttr": {StringValue: new("value-1")},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"myAttr": {StringValue: new("value-2")},
+				}),
+			)),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				// req0 overridden to "value-2" -> device1. req1 uses physical "value-2" -> device2.
+				deviceAllocationResult(req0, "dra.example.com", pool1, device1, false),
+				deviceAllocationResult(req1, "dra.example.com", pool1, device2, false),
+			)},
+		},
+		// "derived-attributes-cel-missing-attribute" verifies that
+		// CEL runtime evaluation errors (such as looking up a key
+		// that isn't defined on a candidate device) are caught
+		// immediately. The allocator aborts allocation and
+		// propagates the explicit CEL error, preventing silent
+		// topology matching failures.
+		"derived-attributes-cel-missing-attribute": {
+			features: Features{
+				DerivedAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{
+					{
+						Requests:       []string{req0},
+						MatchAttribute: ptr.To(resourceapi.FullyQualifiedName("derived/missing")),
+					},
+				},
+				requestWithDerivedAttributes(
+					req0,
+					classA,
+					1,
+					[]resourceapi.DeviceDerivedAttribute{
+						{
+							Name:       resourceapi.FullyQualifiedName("derived/missing"),
+							Expression: fmt.Sprintf(`device.attributes["%s"]["missingAttr"]`, driverA),
+						},
+					},
+				),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"existingAttr": {StringValue: new("yes")},
+				}),
+			)),
+			node:        node(node1, region1),
+			expectError: gomega.MatchError(gomega.ContainSubstring("no such key: missingAttr")),
+		},
+		// "derived-attributes-type-mismatch" verifies that when CEL
+		// dynamically evaluates to different value types for the same
+		// attribute across candidate devices (e.g., string vs int),
+		// the MatchAttribute constraint safely rejects the mismatch
+		// rather than panicking or throwing an unhandled error.
+		"derived-attributes-type-mismatch": {
+			features: Features{
+				DerivedAttributes: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				[]resourceapi.DeviceConstraint{
+					{
+						Requests:       []string{req0},
+						MatchAttribute: ptr.To(resourceapi.FullyQualifiedName("derived/myAttr")),
+					},
+				},
+				requestWithDerivedAttributes(
+					req0,
+					classA,
+					2,
+					[]resourceapi.DeviceDerivedAttribute{
+						{
+							Name:       resourceapi.FullyQualifiedName("derived/myAttr"),
+							Expression: fmt.Sprintf(`device.attributes["%s"]["static"]`, driverA),
+						},
+					},
+				),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"static": {StringValue: new("value")},
+				}),
+				device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					"static": {IntValue: new(int64(1))},
+				}),
+			)),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
 	}
 
 	RunTestAllocator(t, supportedFeatures, newAllocator, testcases)
@@ -6560,13 +9193,22 @@ func RunTestAllocator(t *testing.T,
 			claimsToAllocate := slices.Clone(tc.claimsToAllocate)
 			allocatedDevices := slices.Clone(tc.allocatedDevices)
 			allocatedShare := tc.allocatedCapacityDevices.Clone()
-			slices := slices.Clone(tc.slices)
+			var slices []*resourceapi.ResourceSlice
+			if tc.slices != nil {
+				slices = make([]*resourceapi.ResourceSlice, len(tc.slices))
+				for i, slice := range tc.slices {
+					slices[i] = slice.DeepCopy()
+				}
+			}
 			allocatedState := AllocatedState{
 				AllocatedDevices:         sets.New(allocatedDevices...),
 				AllocatedSharedDeviceIDs: tc.allocatedSharedDeviceIDs,
 				AggregatedCapacity:       allocatedShare,
 			}
-			allocator, err := newAllocator(ctx, tc.features, allocatedState, classLister, slices, cel.NewCache(1, cel.Features{EnableConsumableCapacity: tc.features.ConsumableCapacity}))
+			allocator, err := newAllocator(ctx, tc.features, allocatedState, classLister, slices, cel.NewCache(1, cel.Features{
+				EnableConsumableCapacity: tc.features.ConsumableCapacity,
+				EnableListTypeAttributes: tc.features.ListTypeAttributes,
+			}))
 			g.Expect(err).ToNot(gomega.HaveOccurred())
 
 			if _, ok := allocator.(internal.AllocatorExtended); tc.expectNumAllocateOneInvocations > 0 && !ok {
@@ -6597,7 +9239,7 @@ func RunTestAllocator(t *testing.T,
 			// Objects that the allocator had access to should not have been modified.
 			g.Expect(claimsToAllocate).To(gomega.HaveExactElements(tc.claimsToAllocate))
 			g.Expect(allocatedDevices).To(gomega.HaveExactElements(tc.allocatedDevices))
-			g.Expect(slices).To(gomega.ConsistOf(tc.slices))
+			g.Expect(slices).To(gomega.Equal(tc.slices))
 			g.Expect(classLister.objs).To(gomega.ConsistOf(tc.classes))
 
 			if expectNumAllocateOneInvocations := tc.expectNumAllocateOneInvocations; expectNumAllocateOneInvocations > 0 {

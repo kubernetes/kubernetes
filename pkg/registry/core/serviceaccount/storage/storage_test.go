@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -56,7 +55,7 @@ func newTokenStorage(t *testing.T, issuer token.TokenGenerator, auds authenticat
 		ResourcePrefix:          "serviceaccounts",
 	}
 	// set issuer, podStore and secretStore to allow the token endpoint to be initialised
-	rest, err := NewREST(restOptions, issuer, auds, 0, podStorage, secretStorage, nodeStorage, false, time.Hour*9999)
+	rest, err := NewREST(restOptions, issuer, auds, nil, 0, podStorage, secretStorage, nodeStorage, nil, nil, false, time.Hour*9999)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
@@ -120,11 +119,8 @@ func TestCreate_Token_SetsCredentialIDAuditAnnotation(t *testing.T) {
 	// Enable JTI feature
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenJTI, true)
 
-	ctx := context.Background()
-	// Create a test service account
 	serviceAccount := validNewServiceAccount("foo")
-	// add the namespace to the context as it is required
-	ctx = request.WithNamespace(ctx, serviceAccount.Namespace)
+	ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, serviceAccount.Namespace)
 	_, err := storage.Store.Create(ctx, serviceAccount, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed creating test service account: %v", err)

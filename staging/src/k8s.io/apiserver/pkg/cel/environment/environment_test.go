@@ -52,6 +52,19 @@ func TestBaseEnvironment(t *testing.T) {
 			},
 		})
 
+	// Gated functions like 'includes' become available at 1.37. When the default compatibility version rolls over to 1.37 or later, 'includes' will be valid. We dynamically select valid/invalid expressions depending on the current DefaultCompatibilityVersion to prevent test failures during Kubernetes version bump.
+	var defaultCompatibilityInvalid []string
+	var defaultCompatibilityValid []string
+	if DefaultCompatibilityVersion().AtLeast(version.MajorMinor(1, 37)) {
+		defaultCompatibilityValid = []string{
+			"[1, 2].includes(2) == true",
+		}
+	} else {
+		defaultCompatibilityInvalid = []string{
+			"[1, 2].includes(2)",
+		}
+	}
+
 	cases := []struct {
 		name                    string
 		typeVersionCombinations []envTypeAndVersion
@@ -294,6 +307,42 @@ func TestBaseEnvironment(t *testing.T) {
 						cel.Variable("gadget", cel.ObjectType("Gadget")),
 					},
 				},
+			},
+		},
+		{
+			name: "includes function version gating (default compatibility version)",
+			typeVersionCombinations: []envTypeAndVersion{
+				{version: DefaultCompatibilityVersion(), envType: NewExpressions},
+			},
+			invalidExpressions: defaultCompatibilityInvalid,
+			validExpressions:   defaultCompatibilityValid,
+		},
+		{
+			name: "includes function version gating (emulated version 1.36)",
+			typeVersionCombinations: []envTypeAndVersion{
+				{version: version.MajorMinor(1, 36), envType: NewExpressions},
+			},
+			invalidExpressions: []string{
+				"[1, 2].includes(2)",
+			},
+		},
+		{
+			name: "includes function available (emulated version 1.37)",
+			typeVersionCombinations: []envTypeAndVersion{
+				{version: version.MajorMinor(1, 37), envType: NewExpressions},
+			},
+			validExpressions: []string{
+				"[1, 2].includes(2) == true",
+			},
+		},
+		{
+			name: "includes function available (stored expressions for default/1.36)",
+			typeVersionCombinations: []envTypeAndVersion{
+				{version: DefaultCompatibilityVersion(), envType: StoredExpressions},
+				{version: version.MajorMinor(1, 36), envType: StoredExpressions},
+			},
+			validExpressions: []string{
+				"[1, 2].includes(2) == true",
 			},
 		},
 	}

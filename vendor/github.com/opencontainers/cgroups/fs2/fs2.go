@@ -105,50 +105,85 @@ func (m *Manager) GetAllPids() ([]int, error) {
 }
 
 func (m *Manager) GetStats() (*cgroups.Stats, error) {
-	var errs []error
+	return m.Stats(nil)
+}
 
+// Stats returns cgroup statistics for the specified controllers.
+func (m *Manager) Stats(opts *cgroups.StatsOptions) (*cgroups.Stats, error) {
+	// Default: query all controllers
+	controllers := cgroups.AllControllers
+	if opts != nil && opts.Controllers != 0 {
+		controllers = opts.Controllers
+	}
+
+	var errs []error
+	var err error
 	st := cgroups.NewStats()
 
 	// pids (since kernel 4.5)
-	if err := statPids(m.dirPath, st); err != nil {
-		errs = append(errs, err)
+	if controllers&cgroups.Pids != 0 {
+		if err = statPids(m.dirPath, st); err != nil {
+			errs = append(errs, err)
+		}
 	}
+
 	// memory (since kernel 4.5)
-	if err := statMemory(m.dirPath, st); err != nil && !os.IsNotExist(err) {
-		errs = append(errs, err)
+	if controllers&cgroups.Memory != 0 {
+		if err = statMemory(m.dirPath, st); err != nil && !os.IsNotExist(err) {
+			errs = append(errs, err)
+		}
+
+		if st.MemoryStats.PSI, err = statPSI(m.dirPath, "memory.pressure"); err != nil {
+			errs = append(errs, err)
+		}
 	}
+
 	// io (since kernel 4.5)
-	if err := statIo(m.dirPath, st); err != nil && !os.IsNotExist(err) {
-		errs = append(errs, err)
+	if controllers&cgroups.IO != 0 {
+		if err = statIo(m.dirPath, st); err != nil && !os.IsNotExist(err) {
+			errs = append(errs, err)
+		}
+
+		if st.BlkioStats.PSI, err = statPSI(m.dirPath, "io.pressure"); err != nil {
+			errs = append(errs, err)
+		}
 	}
+
 	// cpu (since kernel 4.15)
 	// Note cpu.stat is available even if the controller is not enabled.
-	if err := statCpu(m.dirPath, st); err != nil && !os.IsNotExist(err) {
-		errs = append(errs, err)
+	if controllers&cgroups.CPU != 0 {
+		if err = statCpu(m.dirPath, st); err != nil && !os.IsNotExist(err) {
+			errs = append(errs, err)
+		}
+
+		// PSI (since kernel 4.20)
+		if st.CpuStats.PSI, err = statPSI(m.dirPath, "cpu.pressure"); err != nil {
+			errs = append(errs, err)
+		}
+
 	}
-	// PSI (since kernel 4.20).
-	var err error
-	if st.CpuStats.PSI, err = statPSI(m.dirPath, "cpu.pressure"); err != nil {
-		errs = append(errs, err)
-	}
-	if st.MemoryStats.PSI, err = statPSI(m.dirPath, "memory.pressure"); err != nil {
-		errs = append(errs, err)
-	}
-	if st.BlkioStats.PSI, err = statPSI(m.dirPath, "io.pressure"); err != nil {
-		errs = append(errs, err)
-	}
+
 	// hugetlb (since kernel 5.6)
-	if err := statHugeTlb(m.dirPath, st); err != nil && !os.IsNotExist(err) {
-		errs = append(errs, err)
+	if controllers&cgroups.HugeTLB != 0 {
+		if err := statHugeTlb(m.dirPath, st); err != nil && !os.IsNotExist(err) {
+			errs = append(errs, err)
+		}
 	}
+
 	// rdma (since kernel 4.11)
-	if err := fscommon.RdmaGetStats(m.dirPath, st); err != nil && !os.IsNotExist(err) {
-		errs = append(errs, err)
+	if controllers&cgroups.RDMA != 0 {
+		if err := fscommon.RdmaGetStats(m.dirPath, st); err != nil && !os.IsNotExist(err) {
+			errs = append(errs, err)
+		}
 	}
+
 	// misc (since kernel 5.13)
-	if err := statMisc(m.dirPath, st); err != nil && !os.IsNotExist(err) {
-		errs = append(errs, err)
+	if controllers&cgroups.Misc != 0 {
+		if err := statMisc(m.dirPath, st); err != nil && !os.IsNotExist(err) {
+			errs = append(errs, err)
+		}
 	}
+
 	if len(errs) > 0 && !m.config.Rootless {
 		return st, fmt.Errorf("error while statting cgroup v2: %+v", errs)
 	}

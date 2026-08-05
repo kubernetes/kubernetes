@@ -165,7 +165,7 @@ func (r *Reader) Close() error {
 }
 
 func (r *Reader) freeFirstBufferIfEmpty() bool {
-	if len(r.data) == 0 || r.bufferIdx != len(r.data[0].ReadOnlyData()) {
+	if len(r.data) == 0 || r.bufferIdx != r.data[0].Len() {
 		return false
 	}
 

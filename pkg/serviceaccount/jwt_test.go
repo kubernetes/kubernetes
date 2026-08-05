@@ -33,6 +33,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	typedv1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	admissionregistrationv1listers "k8s.io/client-go/listers/admissionregistration/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/keyutil"
@@ -379,6 +380,12 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			})),
 			v1listers.NewNodeLister(newIndexer(func(_, name string) (interface{}, error) {
 				return tc.Client.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
+			})),
+			admissionregistrationv1listers.NewValidatingWebhookConfigurationLister(newIndexer(func(_, name string) (interface{}, error) {
+				return tc.Client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(context.TODO(), name, metav1.GetOptions{})
+			})),
+			admissionregistrationv1listers.NewMutatingWebhookConfigurationLister(newIndexer(func(_, name string) (interface{}, error) {
+				return tc.Client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(context.TODO(), name, metav1.GetOptions{})
 			})),
 		)
 		var secretsWriter typedv1core.SecretsGetter

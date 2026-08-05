@@ -114,7 +114,7 @@ type DeviceApplyConfiguration struct {
 	// If AllowMultipleAllocations is set to true, the device can be allocated more than once,
 	// and all of its capacity is consumable, regardless of whether the requestPolicy is defined or not.
 	AllowMultipleAllocations *bool `json:"allowMultipleAllocations,omitempty"`
-	// NodeAllocatableResourceMappings defines the mapping of node resources
+	// NodeAllocatableResources defines the mapping of node resources
 	// that are managed by the DRA driver exposing this device. This includes resources currently
 	// reported in v1.Node `status.allocatable` that are not extended resources
 	// (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources).
@@ -125,7 +125,7 @@ type DeviceApplyConfiguration struct {
 	// dependencies of an accelerator device.
 	// The keys of this map are the node-allocatable resource names (e.g., "cpu", "memory").
 	// Extended resource names are not permitted as keys.
-	NodeAllocatableResourceMappings map[apicorev1.ResourceName]NodeAllocatableResourceMappingApplyConfiguration `json:"nodeAllocatableResourceMappings,omitempty"`
+	NodeAllocatableResources map[apicorev1.ResourceName]NodeAllocatableResourceApplyConfiguration `json:"nodeAllocatableResources,omitempty"`
 }
 
 // DeviceApplyConfiguration constructs a declarative configuration of the Device type for use with
@@ -256,16 +256,16 @@ func (b *DeviceApplyConfiguration) WithAllowMultipleAllocations(value bool) *Dev
 	return b
 }
 
-// WithNodeAllocatableResourceMappings puts the entries into the NodeAllocatableResourceMappings field in the declarative configuration
+// WithNodeAllocatableResources puts the entries into the NodeAllocatableResources field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, the entries provided by each call will be put on the NodeAllocatableResourceMappings field,
-// overwriting an existing map entries in NodeAllocatableResourceMappings field with the same key.
-func (b *DeviceApplyConfiguration) WithNodeAllocatableResourceMappings(entries map[apicorev1.ResourceName]NodeAllocatableResourceMappingApplyConfiguration) *DeviceApplyConfiguration {
-	if b.NodeAllocatableResourceMappings == nil && len(entries) > 0 {
-		b.NodeAllocatableResourceMappings = make(map[apicorev1.ResourceName]NodeAllocatableResourceMappingApplyConfiguration, len(entries))
+// If called multiple times, the entries provided by each call will be put on the NodeAllocatableResources field,
+// overwriting an existing map entries in NodeAllocatableResources field with the same key.
+func (b *DeviceApplyConfiguration) WithNodeAllocatableResources(entries map[apicorev1.ResourceName]NodeAllocatableResourceApplyConfiguration) *DeviceApplyConfiguration {
+	if b.NodeAllocatableResources == nil && len(entries) > 0 {
+		b.NodeAllocatableResources = make(map[apicorev1.ResourceName]NodeAllocatableResourceApplyConfiguration, len(entries))
 	}
 	for k, v := range entries {
-		b.NodeAllocatableResourceMappings[k] = v
+		b.NodeAllocatableResources[k] = v
 	}
 	return b
 }

@@ -84,7 +84,7 @@ type GroupResource struct {
 
 // KubeControllerManagerConfiguration contains elements describing kube-controller manager.
 type KubeControllerManagerConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Generic holds configuration for a generic controller-manager
 	Generic cmconfigv1alpha1.GenericControllerManagerConfiguration
@@ -104,6 +104,9 @@ type KubeControllerManagerConfiguration struct {
 	// DeploymentControllerConfiguration holds configuration for
 	// DeploymentController related features.
 	DeploymentController DeploymentControllerConfiguration
+	// DisruptionControllerConfiguration holds configuration for
+	// DisruptionController related features.
+	DisruptionController DisruptionControllerConfiguration
 	// StatefulSetControllerConfiguration holds configuration for
 	// StatefulSetController related features.
 	StatefulSetController StatefulSetControllerConfiguration
@@ -236,6 +239,14 @@ type DeploymentControllerConfiguration struct {
 	// allowed to sync concurrently. Larger number = more responsive deployments,
 	// but more CPU (and network) load.
 	ConcurrentDeploymentSyncs int32
+}
+
+// DisruptionControllerConfiguration contains elements describing DisruptionController.
+type DisruptionControllerConfiguration struct {
+	// concurrentDisruptionSyncs is the number of PodDisruptionBudget objects that
+	// are allowed to sync concurrently. Larger number = more responsive PDB
+	// updates, but more CPU (and network) load.
+	ConcurrentDisruptionSyncs int32
 }
 
 // StatefulSetControllerConfiguration contains elements describing StatefulSetController.
@@ -417,6 +428,8 @@ type NodeLifecycleControllerConfiguration struct {
 	// Zone is treated as unhealthy in nodeEvictionRate and secondaryNodeEvictionRate when at least
 	// unhealthyZoneThreshold (no less than 3) of Nodes in the zone are NotReady
 	UnhealthyZoneThreshold float32
+	// NodeMonitorPeriod is the period for syncing NodeStatus in NodeLifecycleController.
+	NodeMonitorPeriod metav1.Duration
 }
 
 // PersistentVolumeBinderControllerConfiguration contains elements describing

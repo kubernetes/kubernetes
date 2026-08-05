@@ -45,7 +45,7 @@ var _ = sigDescribe(feature.Windows, "Kubelet-Stats", framework.WithSerial(), sk
 
 	ginkgo.Describe("Kubelet stats collection for Windows nodes", func() {
 
-		ginkgo.Context("when running 10 pods", func() {
+		ginkgo.Context("when running up to 10 pods", func() {
 			// 10 seconds is the default scrape timeout for metrics-server and kube-prometheus
 			ginkgo.It("should return within 10 seconds", func(ctx context.Context) {
 
@@ -54,14 +54,45 @@ var _ = sigDescribe(feature.Windows, "Kubelet-Stats", framework.WithSerial(), sk
 				framework.ExpectNoError(err, "Error finding Windows node")
 				framework.Logf("Using node: %v", targetNode.Name)
 
-				ginkgo.By("Scheduling 10 pods")
+				// Adjust pod count for any per-pod overhead the cluster's admission chain
+				// injects (Pod Overhead, KEP-688); a no-op when overhead is 0.
+				const baselineNumPods = 10
+				const minNumPods = 3
+				numPods := baselineNumPods
+				overhead, err := detectPodOverheadMemory(ctx, f.ClientSet, f.Namespace.Name)
+				framework.ExpectNoError(err, "detecting pod overhead memory")
+				if overhead > 0 {
+					// Use admission accounting (allocatable - sum of admitted requests incl. overhead),
+					// not /stats/summary's Memory.AvailableBytes: the latter is a working-set view
+					// and can disagree with admission when a prior [Serial] test still has Terminating pods.
+					allocatable := targetNode.Status.Allocatable.Memory().Value()
+					waitForNodeMemoryToSettle(ctx, f.ClientSet, targetNode.Name, overhead+windowsTestMemorySafetyBuffer)
+					existing := sumExistingPodMemoryReservation(ctx, f.ClientSet, targetNode.Name)
+					maxPods := (allocatable - existing - windowsTestMemorySafetyBuffer) / overhead
+					if maxPods < int64(numPods) {
+						numPods = int(maxPods)
+					}
+					// Fail when the node lacks the capacity to schedule the minimum
+					// required pod count. This indicates a misconfigured test cluster
+					// (allocatable too small, existing reservation unexpectedly large,
+					// or pod overhead higher than the cluster was sized for); surface
+					// it loudly rather than silently skipping the test.
+					if numPods < minNumPods {
+						framework.Failf("Node %s has insufficient memory capacity to schedule %d pods: allocatable=%d, existing-reservation=%d, per-pod-overhead=%d, safety-buffer=%d, max-pods=%d. Right-size the test cluster, lower per-pod overhead, or reduce existing reservation.",
+							targetNode.Name, minNumPods, allocatable, existing, overhead, windowsTestMemorySafetyBuffer, maxPods)
+					}
+					framework.Logf("Adjusted pod count to %d (baseline=%d, overhead=%d bytes, allocatable=%d bytes, existing-reservation=%d bytes, safety-buffer=%d bytes)",
+						numPods, baselineNumPods, overhead, allocatable, existing, windowsTestMemorySafetyBuffer)
+				}
+
+				ginkgo.By(fmt.Sprintf("Scheduling %d pods", numPods))
 				powershellImage := imageutils.GetConfig(imageutils.BusyBox)
-				pods := newKubeletStatsTestPods(10, powershellImage, targetNode.Name)
+				pods := newKubeletStatsTestPods(numPods, powershellImage, targetNode.Name)
 				e2epod.NewPodClient(f).CreateBatch(ctx, pods)
 
-				ginkgo.By("Waiting up to 3 minutes for pods to be running")
+				ginkgo.By(fmt.Sprintf("Waiting up to 3 minutes for %d pods to be running", numPods))
 				timeout := 3 * time.Minute
-				err = e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 10, timeout)
+				err = e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, numPods, timeout)
 				framework.ExpectNoError(err)
 
 				ginkgo.By("Getting kubelet stats 5 times and checking average duration")
@@ -100,7 +131,7 @@ var _ = sigDescribe(feature.Windows, "Kubelet-Stats", framework.WithSerial(), sk
 							}
 						}
 					}
-					gomega.Expect(statsChecked).To(gomega.Equal(10), "Should find stats for 10 pods in kubelet stats")
+					gomega.Expect(statsChecked).To(gomega.Equal(numPods), fmt.Sprintf("Should find stats for %d pods in kubelet stats", numPods))
 
 					time.Sleep(5 * time.Second)
 				}
@@ -145,6 +176,24 @@ var _ = sigDescribe(feature.Windows, "Kubelet-Stats", skipUnlessWindows(func() {
 				targetNode, err := findWindowsNode(ctx, f)
 				framework.ExpectNoError(err, "Error finding Windows node")
 				framework.Logf("Using node: %v", targetNode.Name)
+
+				// Fail if the node lacks capacity for the required pod count once overhead
+				// is accounted for. A misconfigured test cluster should be surfaced loudly
+				// rather than silently skipped. No-op when the cluster injects no overhead.
+				const numPods = 3
+				overhead, err := detectPodOverheadMemory(ctx, f.ClientSet, f.Namespace.Name)
+				framework.ExpectNoError(err, "detecting pod overhead memory")
+				if overhead > 0 {
+					allocatable := targetNode.Status.Allocatable.Memory().Value()
+					needed := int64(numPods)*overhead + windowsTestMemorySafetyBuffer
+					waitForNodeMemoryToSettle(ctx, f.ClientSet, targetNode.Name, needed)
+					existing := sumExistingPodMemoryReservation(ctx, f.ClientSet, targetNode.Name)
+					free := allocatable - existing - windowsTestMemorySafetyBuffer
+					if free < int64(numPods)*overhead {
+						framework.Failf("Node %s has insufficient memory capacity to schedule %d pods: allocatable=%d, existing-reservation=%d, per-pod-overhead=%d, safety-buffer=%d, free=%d (need %d). Right-size the test cluster, lower per-pod overhead, or reduce existing reservation.",
+							targetNode.Name, numPods, allocatable, existing, overhead, windowsTestMemorySafetyBuffer, free, int64(numPods)*overhead)
+					}
+				}
 
 				ginkgo.By("Scheduling 3 pods")
 				powershellImage := imageutils.GetConfig(imageutils.BusyBox)

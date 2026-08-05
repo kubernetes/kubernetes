@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-gang-{{.Index}}
+spec:
+  priority: {{if .priority}}{{AddInt 0 .priority}}{{else}}8888888{{end}}
+  schedulingGroup:
+    podGroupName: gang-{{DivideInt .Index .podsPerGroup}}
+  terminationGracePeriodSeconds: 0
+  containers:
+  - image: registry.k8s.io/pause:3.10.1
+    name: pause
+    {{if .hostPortBase}}
+    ports:
+    - containerPort: 80
+      # hostPort guarantees that all pods from the same PodGroup have the exact same host port.
+      # Since two pods cannot share the same host port on a single node, this forces them to land on different nodes.
+      hostPort: {{AddInt .hostPortBase (DivideInt .Index .podsPerGroup)}}
+    {{end}}
+    resources:
+      limits:
+        cpu: {{.cpuRequest}}
+        memory: 100Mi
+      requests:
+        cpu: {{.cpuRequest}}
+        memory: 100Mi

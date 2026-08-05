@@ -40,10 +40,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletdevicepluginv1beta1 "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	apisgrpc "k8s.io/kubernetes/pkg/kubelet/apis/grpc"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	testutils "k8s.io/kubernetes/test/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -1103,6 +1106,7 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 // Serial because the test updates kubelet configuration.
 var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodResourcesAPI, func() {
 	f := framework.NewDefaultFramework("podresources-test")
+	addBeforeEachForCleaningUpPods(f)
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var reservedSystemCPUs cpuset.CPUSet
@@ -1153,7 +1157,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 					endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 					framework.ExpectNoError(err, "LocalEndpoint() failed err: %v", err)
 
-					cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+					cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 					framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
 					defer framework.ExpectNoError(conn.Close())
 
@@ -1182,9 +1186,11 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 				framework.ExpectNoError(err, "LocalEndpoint() failed err: %v", err)
 
-				cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+				cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 				framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
-				defer conn.Close()
+				defer func() {
+					framework.ExpectNoError(conn.Close())
+				}()
 
 				waitForSRIOVResources(ctx, f, sd)
 
@@ -1289,7 +1295,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 					endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 					framework.ExpectNoError(err, "LocalEndpoint() failed err: %v", err)
 
-					cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+					cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 					framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
 					defer func() {
 						framework.ExpectNoError(conn.Close())
@@ -1309,7 +1315,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 					endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 					framework.ExpectNoError(err, "LocalEndpoint() failed err: %v", err)
 
-					cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+					cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 					framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
 					defer func() {
 						framework.ExpectNoError(conn.Close())
@@ -1324,12 +1330,17 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 
 		ginkgo.Context("with CPU manager None policy", func() {
 			ginkgo.It("should return the expected responses", func(ctx context.Context) {
+
+				waitForPodResourcesV1Serving(ctx)
+
 				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 				framework.ExpectNoError(err, "LocalEndpoint() failed err: %v", err)
 
-				cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+				cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 				framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
-				defer conn.Close()
+				defer func() {
+					framework.ExpectNoError(conn.Close())
+				}()
 
 				// intentionally passing empty cpuset instead of onlineCPUs because with none policy
 				// we should get no allocatable cpus - no exclusively allocatable CPUs, depends on policy static
@@ -1355,7 +1366,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 			deletePodsAsync(ctx, f, podMap)
 		})
 
-		ginkgo.JustBeforeEach(func(ctx context.Context) {
+		ginkgo.BeforeEach(func(ctx context.Context) {
 			// this is a very rough check. We just want to rule out system that does NOT have enough resources
 			_, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f)
 			if cpuAlloc < minCoreCount {
@@ -1487,7 +1498,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 				framework.ExpectNoError(err)
 
 				var cli kubeletpodresourcesv1.PodResourcesListerClient
-				cli, podresConn, err = podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+				cli, podresConn, err = podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 				framework.ExpectNoError(err)
 
 				gomega.Consistently(func(ctx context.Context) error {
@@ -1580,7 +1591,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 				framework.ExpectNoError(err)
 
 				var cli kubeletpodresourcesv1.PodResourcesListerClient
-				cli, podresConn, err = podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+				cli, podresConn, err = podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 				framework.ExpectNoError(err)
 
 				gomega.Consistently(func(ctx context.Context) error {
@@ -1621,7 +1632,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 				framework.ExpectNoError(err)
 
 				var cli kubeletpodresourcesv1.PodResourcesListerClient
-				cli, podresConn, err = podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+				cli, podresConn, err = podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 				framework.ExpectNoError(err)
 
 				gomega.Eventually(func(ctx context.Context) error {
@@ -1754,7 +1765,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 				framework.ExpectNoError(err)
 
 				var cli kubeletpodresourcesv1.PodResourcesListerClient
-				cli, podresConn, err = podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+				cli, podresConn, err = podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 				framework.ExpectNoError(err)
 
 				gomega.Consistently(func(ctx context.Context) error {
@@ -1828,7 +1839,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 				framework.ExpectNoError(err)
 
 				var cli kubeletpodresourcesv1.PodResourcesListerClient
-				cli, podresConn, err = podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+				cli, podresConn, err = podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 				framework.ExpectNoError(err)
 
 				gomega.Consistently(func(ctx context.Context) error {
@@ -1874,7 +1885,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 				framework.ExpectNoError(err)
 
 				var cli kubeletpodresourcesv1.PodResourcesListerClient
-				cli, podresConn, err = podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+				cli, podresConn, err = podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 				framework.ExpectNoError(err)
 
 				// After all pods terminate, PodResources should eventually stop reporting them.
@@ -1943,9 +1954,11 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 					endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 					framework.ExpectNoError(err, "LocalEndpoint() failed err: %v", err)
 
-					cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+					cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 					framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
-					defer conn.Close()
+					defer func() {
+						framework.ExpectNoError(conn.Close())
+					}()
 
 					ginkgo.By("checking List and resources topology unaware resource should be without topology")
 
@@ -1993,9 +2006,11 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 			framework.ExpectNoError(err, "LocalEndpoint() failed err %v", err)
 
-			cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+			cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 			framework.ExpectNoError(err, "GetV1Client() failed err %v", err)
-			defer conn.Close()
+			defer func() {
+				framework.ExpectNoError(conn.Close())
+			}()
 
 			_, err = cli.List(ctx, &kubeletpodresourcesv1.ListPodResourcesRequest{})
 			framework.ExpectNoError(err, "List() failed err %v", err)
@@ -2058,9 +2073,11 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 			framework.ExpectNoError(err, "LocalEndpoint() failed err %v", err)
 
 			ginkgo.By("Connecting to the kubelet endpoint")
-			cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+			cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 			framework.ExpectNoError(err, "GetV1Client() failed err %v", err)
-			defer conn.Close()
+			defer func() {
+				framework.ExpectNoError(conn.Close())
+			}()
 
 			tries := podresources.DefaultQPS * 2 // This should also be greater than DefaultBurstTokens
 			errs := []error{}
@@ -2118,7 +2135,7 @@ func getOnlineCPUs() (cpuset.CPUSet, error) {
 func setupSampleDevicePluginOrFail(ctx context.Context, f *framework.Framework) *v1.Pod {
 	e2enode.WaitForNodeToBeReady(ctx, f.ClientSet, framework.TestContext.NodeName, 5*time.Minute)
 
-	dp := getSampleDevicePluginPod(kubeletdevicepluginv1beta1.DevicePluginPath)
+	dp := getSampleDevicePluginPod(kubeletdevicepluginv1beta1.DevicePluginPath, "dp")
 	dp.Spec.NodeName = framework.TestContext.NodeName
 
 	ginkgo.By("Create the sample device plugin pod")
@@ -2186,6 +2203,20 @@ func getPodResourcesFromList(ctx context.Context, cli kubeletpodresourcesv1.PodR
 	return nil, fmt.Errorf("pod %s/%s not found in List() response", podNamespace, podName)
 }
 
+func sanitizeMemory(mem []*kubeletpodresourcesv1.ContainerMemory) {
+	// We sort memory blocks to ensure deterministic ordering of memory types
+	// (since they can be returned in non-deterministic orders from map traversals)
+	// and clear Topology info because NUMA node layouts are hardware-dependent and
+	// not part of the API List vs Get consistency checks.
+	//nolint:modernize // keep sort.Slice for compatibility with supported Go versions
+	sort.Slice(mem, func(i, j int) bool {
+		return mem[i].GetMemoryType() < mem[j].GetMemoryType()
+	})
+	for _, m := range mem {
+		m.Topology = nil
+	}
+}
+
 func preparePodResourcesListVsGet(pr *kubeletpodresourcesv1.PodResources) *kubeletpodresourcesv1.PodResources {
 	if pr == nil {
 		return nil
@@ -2198,6 +2229,14 @@ func preparePodResourcesListVsGet(pr *kubeletpodresourcesv1.PodResources) *kubel
 	sort.Slice(out.Containers, func(i, j int) bool {
 		return out.Containers[i].GetName() < out.Containers[j].GetName()
 	})
+
+	// sort pod-level CPU IDs.
+	//nolint:modernize // keep sort.Slice for compatibility with supported Go versions
+	sort.Slice(out.CpuIds, func(i, j int) bool {
+		return out.CpuIds[i] < out.CpuIds[j]
+	})
+
+	sanitizeMemory(out.Memory)
 
 	for _, c := range out.Containers {
 		// sort CPU IDs.
@@ -2218,8 +2257,7 @@ func preparePodResourcesListVsGet(pr *kubeletpodresourcesv1.PodResources) *kubel
 			d.Topology = nil
 		}
 
-		// also ignore memory and DRA checks for a lightweight comparison.
-		c.Memory = nil
+		sanitizeMemory(c.Memory)
 		c.DynamicResources = nil
 	}
 
@@ -2289,7 +2327,7 @@ func withPodResourcesV1Client(
 		return err
 	}
 
-	cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+	cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 	if err != nil {
 		return err
 	}
@@ -2318,3 +2356,262 @@ func waitForPodResourcesV1Serving(ctx context.Context) {
 		"PodResources endpoint did not become ready (last err: %v)", lastErr,
 	)
 }
+
+func makeMixPodWithPodLevelResources(podName, podCPURequest, containerCPURequest, memRequest string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "exclusive-container",
+					Image: busyboxImage,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse(containerCPURequest),
+							v1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse(containerCPURequest),
+							v1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+					},
+					Command: []string{"sh", "-c", "sleep 1d"},
+				},
+				{
+					Name:  "shared-container",
+					Image: busyboxImage,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+					},
+					Command: []string{"sh", "-c", "sleep 1d"},
+				},
+			},
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse(podCPURequest),
+					v1.ResourceMemory: resource.MustParse(memRequest),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse(podCPURequest),
+					v1.ResourceMemory: resource.MustParse(memRequest),
+				},
+			},
+		},
+	}
+}
+
+func configureStaticResourceManagers(initialConfig *kubeletconfig.KubeletConfiguration, reservedCPUs string) {
+	initialConfig.CPUManagerPolicy = string(cpumanager.PolicyStatic)
+	initialConfig.CPUManagerReconcilePeriod = metav1.Duration{Duration: 1 * time.Second}
+	initialConfig.ReservedSystemCPUs = reservedCPUs
+
+	initialConfig.MemoryManagerPolicy = string(memorymanager.PolicyTypeStatic)
+	initialConfig.ReservedMemory = []kubeletconfig.MemoryReservation{
+		{
+			NumaNode: 0,
+			Limits: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("1100Mi"),
+			},
+		},
+	}
+	if initialConfig.SystemReserved == nil {
+		initialConfig.SystemReserved = map[string]string{}
+	}
+	initialConfig.SystemReserved[string(v1.ResourceMemory)] = "500Mi"
+	if initialConfig.KubeReserved == nil {
+		initialConfig.KubeReserved = map[string]string{}
+	}
+	initialConfig.KubeReserved[string(v1.ResourceMemory)] = "500Mi"
+	if initialConfig.EvictionHard == nil {
+		initialConfig.EvictionHard = map[string]string{}
+	}
+	initialConfig.EvictionHard["memory.available"] = "100Mi"
+	if initialConfig.FeatureGates == nil {
+		initialConfig.FeatureGates = make(map[string]bool)
+	}
+	initialConfig.FeatureGates[string(features.PodLevelResources)] = true
+	initialConfig.FeatureGates[string(features.PodLevelResourceManagers)] = true
+}
+
+var _ = SIGDescribe("Pod Resources API Pod Level Resources", framework.WithSerial(), feature.PodResourcesAPI, feature.PodLevelResources, feature.PodLevelResourceManagers, framework.WithFeatureGate(features.PodLevelResources), framework.WithFeatureGate(features.PodLevelResourceManagers), func() {
+	f := framework.NewDefaultFramework("podresources-pod-level-resources-test")
+	addBeforeEachForCleaningUpPods(f)
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	var reservedSystemCPUs cpuset.CPUSet
+
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		reservedSystemCPUs = cpuset.New(1)
+		// Ensure system has enough CPUs (at least 2 cores)
+		_, cpuAlloc, _ := getLocalNodeCPUDetails(ctx, f)
+		if cpuAlloc < 2 {
+			e2eskipper.Skipf("Skipping tests since the CPU allocatable < 2 cores")
+		}
+	})
+
+	ginkgo.Context("with CPU manager Static policy", func() {
+		ginkgo.Context("when the topology manager scope is 'pod'", func() {
+			tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+				configureStaticResourceManagers(initialConfig, reservedSystemCPUs.String())
+				initialConfig.TopologyManagerPolicy = string(topologymanager.PolicyRestricted)
+				initialConfig.TopologyManagerScope = string(topologymanager.PodTopologyScope)
+			})
+
+			ginkgo.It("should return pod-level CPU and Memory, container-level CPU and Memory, and empty container-level CPU and Memory for shared container in a guaranteed pod", func(ctx context.Context) {
+				waitForPodResourcesV1Serving(ctx)
+
+				// Create a pod with pod-level resources requesting 2 exclusive CPUs and 200Mi memory,
+				// containing an exclusive container requesting 1 CPU and 100Mi memory and a shared
+				// container requesting 100Mi memory
+				pod := makeMixPodWithPodLevelResources("pod-scope-pod", "2", "1", "200Mi")
+
+				ginkgo.By("creating the test pod")
+				pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+				defer e2epod.NewPodClient(f).DeleteSync(ctx, pod.Name, metav1.DeleteOptions{}, 2*time.Minute)
+
+				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+				framework.ExpectNoError(err)
+				cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+				framework.ExpectNoError(err)
+				defer func() { framework.ExpectNoError(conn.Close()) }()
+
+				// Fetch and match
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					resp, err := cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{
+						PodName:      pod.Name,
+						PodNamespace: pod.Namespace,
+					})
+					if err != nil {
+						return err
+					}
+
+					podRes := resp.GetPodResources()
+					if len(podRes.GetCpuIds()) != 2 {
+						return fmt.Errorf("expected 2 pod-level CPUs, got %v", podRes.GetCpuIds())
+					}
+					if len(podRes.GetMemory()) != 1 {
+						return fmt.Errorf("expected 1 pod-level memory block, got %v", podRes.GetMemory())
+					}
+					if podRes.GetMemory()[0].GetSize() != 200*1024*1024 {
+						return fmt.Errorf("expected 200Mi pod-level memory block size, got %d", podRes.GetMemory()[0].GetSize())
+					}
+
+					var foundExclusive, foundShared bool
+					for _, cRes := range podRes.GetContainers() {
+						if cRes.GetName() == "exclusive-container" {
+							foundExclusive = true
+							if len(cRes.GetCpuIds()) != 1 {
+								return fmt.Errorf("expected 1 container-level CPU for exclusive-container, got %v", cRes.GetCpuIds())
+							}
+							if len(cRes.GetMemory()) != 1 {
+								return fmt.Errorf("expected 1 container-level memory block for exclusive-container, got %v", cRes.GetMemory())
+							}
+							if cRes.GetMemory()[0].GetSize() != 100*1024*1024 {
+								return fmt.Errorf("expected 100Mi container-level memory block size for exclusive-container, got %d", cRes.GetMemory()[0].GetSize())
+							}
+						}
+						if cRes.GetName() == "shared-container" {
+							foundShared = true
+							if len(cRes.GetCpuIds()) > 0 {
+								return fmt.Errorf("expected empty container-level CPUs for shared-container, got %v", cRes.GetCpuIds())
+							}
+							if len(cRes.GetMemory()) > 0 {
+								return fmt.Errorf("expected empty container-level memory for shared-container, got %v", cRes.GetMemory())
+							}
+						}
+					}
+					if !foundExclusive || !foundShared {
+						return fmt.Errorf("exclusive-container or shared-container resources not found")
+					}
+					return nil
+				}).WithTimeout(1 * time.Minute).WithPolling(5 * time.Second).Should(gomega.Succeed())
+
+				expectListAndGetConsistent(ctx, cli, pod.Name, pod.Namespace)
+			})
+		})
+
+		ginkgo.Context("when the topology manager scope is 'container'", func() {
+			tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+				configureStaticResourceManagers(initialConfig, reservedSystemCPUs.String())
+				initialConfig.TopologyManagerPolicy = string(topologymanager.PolicyRestricted)
+				initialConfig.TopologyManagerScope = string(topologymanager.ContainerTopologyScope)
+			})
+
+			ginkgo.It("should return empty pod-level CPU and Memory, container-level CPU and Memory, and empty container-level CPU and Memory for shared container in a guaranteed pod", func(ctx context.Context) {
+				waitForPodResourcesV1Serving(ctx)
+
+				// Create a pod with pod-level resources requesting 2 exclusive CPUs and 200Mi memory,
+				// containing an exclusive container requesting 1 CPU and 100Mi memory and a shared
+				// container requesting 100Mi memory
+				pod := makeMixPodWithPodLevelResources("container-scope-pod", "2", "1", "200Mi")
+
+				ginkgo.By("creating the test pod")
+				pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+				defer e2epod.NewPodClient(f).DeleteSync(ctx, pod.Name, metav1.DeleteOptions{}, 2*time.Minute)
+
+				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+				framework.ExpectNoError(err)
+				cli, conn, err := podresources.GetV1Client(ctx, endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+				framework.ExpectNoError(err)
+				defer func() { framework.ExpectNoError(conn.Close()) }()
+
+				// Fetch and match
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					resp, err := cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{
+						PodName:      pod.Name,
+						PodNamespace: pod.Namespace,
+					})
+					if err != nil {
+						return err
+					}
+
+					podRes := resp.GetPodResources()
+					if len(podRes.GetCpuIds()) > 0 {
+						return fmt.Errorf("expected empty pod-level CPU, got %v", podRes.GetCpuIds())
+					}
+					if len(podRes.GetMemory()) > 0 {
+						return fmt.Errorf("expected empty pod-level memory, got %v", podRes.GetMemory())
+					}
+
+					var foundExclusive, foundShared bool
+					for _, cRes := range podRes.GetContainers() {
+						if cRes.GetName() == "exclusive-container" {
+							foundExclusive = true
+							if len(cRes.GetCpuIds()) != 1 {
+								return fmt.Errorf("expected 1 container-level CPU for exclusive-container, got %v", cRes.GetCpuIds())
+							}
+							if len(cRes.GetMemory()) != 1 {
+								return fmt.Errorf("expected 1 container-level memory block for exclusive-container, got %v", cRes.GetMemory())
+							}
+							if cRes.GetMemory()[0].GetSize() != 100*1024*1024 {
+								return fmt.Errorf("expected 100Mi container-level memory block size for exclusive-container, got %d", cRes.GetMemory()[0].GetSize())
+							}
+						}
+						if cRes.GetName() == "shared-container" {
+							foundShared = true
+							if len(cRes.GetCpuIds()) > 0 {
+								return fmt.Errorf("expected empty container-level CPUs for shared-container, got %v", cRes.GetCpuIds())
+							}
+							if len(cRes.GetMemory()) > 0 {
+								return fmt.Errorf("expected empty container-level memory for shared-container, got %v", cRes.GetMemory())
+							}
+						}
+					}
+					if !foundExclusive || !foundShared {
+						return fmt.Errorf("exclusive-container or shared-container resources not found")
+					}
+					return nil
+				}).WithTimeout(1 * time.Minute).WithPolling(5 * time.Second).Should(gomega.Succeed())
+
+				expectListAndGetConsistent(ctx, cli, pod.Name, pod.Namespace)
+			})
+		})
+	})
+})

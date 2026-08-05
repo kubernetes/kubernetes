@@ -39,6 +39,13 @@ var rolesWithAllowStar = sets.NewString(
 	saRolePrefix+"horizontal-pod-autoscaler",
 	saRolePrefix+"clusterrole-aggregation-controller",
 	saRolePrefix+"disruption-controller",
+	saRolePrefix+"storage-version-migrator-controller",
+)
+
+// rolesWithAllowListWithoutWatch are the controller roles which are allowed to contain a
+// List verb without a Watch verb. If you're adding to this list tag sig-auth
+var rolesWithAllowListWithoutWatch = sets.NewString(
+	saRolePrefix + "storage-version-migrator-controller",
 )
 
 // TestNoStarsForControllers confirms that no controller role has star verbs, groups,
@@ -176,9 +183,57 @@ func TestControllerRoleVerbsConsistency(t *testing.T) {
 	for _, role := range roles {
 		for _, rule := range role.Rules {
 			verbs := rule.Verbs
-			if slices.Contains(verbs, "list") && !slices.Contains(verbs, "watch") {
+			if slices.Contains(verbs, "list") && !slices.Contains(verbs, "watch") && !rolesWithAllowListWithoutWatch.Has(role.Name) {
 				t.Errorf("The ClusterRole %s has Verb `List` but does not have Verb `Watch`.", role.Name)
 			}
 		}
 	}
+}
+
+func TestJobControllerSchedulingRules(t *testing.T) {
+	cases := []struct {
+		name                string
+		workloadWithJob     bool
+		wantSchedulingRules bool
+	}{
+		{
+			name:                "feature gate disabled",
+			workloadWithJob:     false,
+			wantSchedulingRules: false,
+		},
+		{
+			name:                "feature gate enabled",
+			workloadWithJob:     true,
+			wantSchedulingRules: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload: tc.workloadWithJob,
+				features.WorkloadWithJob: tc.workloadWithJob,
+			})
+			got := hasSchedulingRules(ControllerRoles())
+			if got != tc.wantSchedulingRules {
+				t.Errorf("hasSchedulingRules() = %v, want %v", got, tc.wantSchedulingRules)
+			}
+		})
+	}
+}
+
+func hasSchedulingRules(roles []rbacv1.ClusterRole) bool {
+	for _, role := range roles {
+		if role.Name != saRolePrefix+"job-controller" {
+			continue
+		}
+		for _, rule := range role.Rules {
+			if slices.Contains(rule.APIGroups, "scheduling.k8s.io") &&
+				slices.Contains(rule.Resources, "workloads") &&
+				slices.Contains(rule.Resources, "podgroups") {
+				return true
+			}
+		}
+	}
+	return false
 }

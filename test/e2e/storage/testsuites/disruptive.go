@@ -18,6 +18,7 @@ package testsuites
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
@@ -27,7 +28,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -43,7 +43,7 @@ func InitCustomDisruptiveTestSuite(patterns []storageframework.TestPattern) stor
 	return &disruptiveTestSuite{
 		tsInfo: storageframework.TestSuiteInfo{
 			Name:         "disruptive",
-			TestTags:     []interface{}{framework.WithDisruptive(), framework.WithLabel("LinuxOnly")},
+			TestTags:     []interface{}{framework.WithDisruptive(), framework.WithLabel("LinuxOnly"), framework.WithProvider(framework.ProvidersWithSSH...)},
 			TestPatterns: patterns,
 		},
 	}
@@ -67,12 +67,14 @@ func (s *disruptiveTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo 
 	return s.tsInfo
 }
 
-func (s *disruptiveTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
-	skipVolTypePatterns(pattern, driver, storageframework.NewVolTypeMap(storageframework.PreprovisionedPV))
-	if pattern.VolMode == v1.PersistentVolumeBlock && !driver.GetDriverInfo().Capabilities[storageframework.CapBlock] {
-		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", driver.GetDriverInfo().Name, pattern.VolMode)
+func (s *disruptiveTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) string {
+	if reason := checkVolTypePatterns(pattern, driver, storageframework.NewVolTypeMap(storageframework.PreprovisionedPV)); reason != "" {
+		return reason
 	}
-	e2eskipper.SkipUnlessSSHKeyPresent()
+	if pattern.VolMode == v1.PersistentVolumeBlock && !driver.GetDriverInfo().Capabilities[storageframework.CapBlock] {
+		return fmt.Sprintf("Driver %s doesn't support %v", driver.GetDriverInfo().Name, pattern.VolMode)
+	}
+	return ""
 }
 
 func (s *disruptiveTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {

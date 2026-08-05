@@ -38,18 +38,17 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 
-	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
+	svmv1 "k8s.io/api/storagemigration/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	svminformers "k8s.io/client-go/informers/storagemigration/v1beta1"
-	svmlisters "k8s.io/client-go/listers/storagemigration/v1beta1"
+	svminformers "k8s.io/client-go/informers/storagemigration/v1"
+	svmlisters "k8s.io/client-go/listers/storagemigration/v1"
 )
 
 const (
 	workers                      = 5
 	migrationSuccessStatusReason = "StorageVersionMigrationSucceeded"
-	migrationRunningStatusReason = "StorageVersionMigrationInProgress"
 	migrationFailedStatusReason  = "StorageVersionMigrationFailed"
 )
 
@@ -96,14 +95,15 @@ func NewSVMController(
 		rateLimiter: rateLimiter,
 	}
 
-	_, _ = svmInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := svmInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			svmController.addSVM(logger, obj)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			svmController.updateSVM(logger, oldObj, newObj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 
 	return svmController
 }
@@ -113,19 +113,19 @@ func (svmc *SVMController) Name() string {
 }
 
 func (svmc *SVMController) addSVM(logger klog.Logger, obj interface{}) {
-	svm := obj.(*svmv1beta1.StorageVersionMigration)
+	svm := obj.(*svmv1.StorageVersionMigration)
 	logger.V(4).Info("Adding", "svm", klog.KObj(svm))
 	svmc.enqueue(svm)
 }
 
 func (svmc *SVMController) updateSVM(logger klog.Logger, oldObj, newObj interface{}) {
-	oldSVM := oldObj.(*svmv1beta1.StorageVersionMigration)
-	newSVM := newObj.(*svmv1beta1.StorageVersionMigration)
+	oldSVM := oldObj.(*svmv1.StorageVersionMigration)
+	newSVM := newObj.(*svmv1.StorageVersionMigration)
 	logger.V(4).Info("Updating", "svm", klog.KObj(oldSVM))
 	svmc.enqueue(newSVM)
 }
 
-func (svmc *SVMController) enqueue(svm *svmv1beta1.StorageVersionMigration) {
+func (svmc *SVMController) enqueue(svm *svmv1.StorageVersionMigration) {
 	key, err := controller.KeyFunc(svm)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %w", svm, err))
@@ -209,8 +209,8 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 	// working with a copy to avoid race condition between this and resource version controller
 	toBeProcessedSVM := svm.DeepCopy()
 
-	if meta.IsStatusConditionTrue(toBeProcessedSVM.Status.Conditions, string(svmv1beta1.MigrationSucceeded)) ||
-		meta.IsStatusConditionTrue(toBeProcessedSVM.Status.Conditions, string(svmv1beta1.MigrationFailed)) {
+	if meta.IsStatusConditionTrue(toBeProcessedSVM.Status.Conditions, string(svmv1.MigrationSucceeded)) ||
+		meta.IsStatusConditionTrue(toBeProcessedSVM.Status.Conditions, string(svmv1.MigrationFailed)) {
 		logger.V(4).Info("Migration has already succeeded or failed previously, skipping", "svm", name)
 		return nil
 	}
@@ -224,7 +224,7 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		return err
 	}
 	if !exists {
-		logger.V(4).Info("resource does not exist in our rest mapper", "gvr", gvr.String())
+		logger.V(4).Info("resource does not exist in our rest mapper", "resource", toBeProcessedSVM.Spec.Resource.String())
 		if toBeProcessedSVM.CreationTimestamp.Add(time.Minute).After(time.Now()) {
 			return fmt.Errorf("resource does not exist in rest mapper, requeuing to attempt again: %w", err)
 		}
@@ -270,28 +270,23 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		return nil
 	}
 
-	_, err = svmc.kubeClient.StoragemigrationV1beta1().
-		StorageVersionMigrations().
-		UpdateStatus(
-			ctx,
-			setStatusConditions(toBeProcessedSVM, svmv1beta1.MigrationSucceeded, migrationSuccessStatusReason, ""),
-			metav1.UpdateOptions{},
-		)
-	if err != nil {
-		return err
-	}
-
 	logger.V(4).Info("Finished syncing svm resource", "key", key, "gr", toBeProcessedSVM.Spec.Resource.String(), "elapsed", time.Since(startTime))
 	return nil
 }
 
-func (svmc *SVMController) runMigration(ctx context.Context, gvr schema.GroupVersionResource, resourceMonitor *garbagecollector.Monitor, toBeProcessedSVM *svmv1beta1.StorageVersionMigration, listResourceVersion string) (err error, failed bool) {
+func (svmc *SVMController) runMigration(ctx context.Context, gvr schema.GroupVersionResource, resourceMonitor *garbagecollector.Monitor, toBeProcessedSVM *svmv1.StorageVersionMigration, listResourceVersion string) (err error, failed bool) {
 	gvk, err := svmc.restMapper.KindFor(gvr)
 	if err != nil {
 		return svmc.failMigration(ctx, toBeProcessedSVM, err), true
 	}
 	logger := klog.FromContext(ctx)
-	for _, obj := range resourceMonitor.Store.List() {
+
+	allObjects := resourceMonitor.Store.List()
+	totalObjects := len(allObjects)
+
+	// Filter out objects that resource versions are greater than the list resource version.
+	var candidateObjects []metav1.Object
+	for _, obj := range allObjects {
 		accessor, err := meta.Accessor(obj)
 		if err != nil {
 			return svmc.failMigration(ctx, toBeProcessedSVM, err), true
@@ -305,56 +300,111 @@ func (svmc *SVMController) runMigration(ctx context.Context, gvr schema.GroupVer
 			logger.V(6).Info("Resource ignored due to resource version being greater than the SVM checkpoint", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "accessorRV", accessor.GetResourceVersion(), "listResourceVersion", listResourceVersion)
 			continue
 		}
+		candidateObjects = append(candidateObjects, accessor)
+	}
 
+	candidatesToPatch := len(candidateObjects)
+
+	for _, accessor := range candidateObjects {
 		typeMeta := typeMetaUIDRV{}
 		typeMeta.APIVersion, typeMeta.Kind = gvk.ToAPIVersionAndKind()
-		// set UID so that when a resource gets deleted, we get an "uid mismatch"
-		// conflict error instead of trying to create it.
-		typeMeta.UID = accessor.GetUID()
-		// set RV so that when a resources gets updated or deleted+recreated, we get an "object has been modified"
-		// conflict error.  we do not actually need to do anything special for the updated case because if RV
-		// was not set, it would just result in no-op request.  but for the deleted+recreated case, if RV is
-		// not set but UID is set, we would get an immutable field validation error.  hence we must set both.
 		typeMeta.ResourceVersion = accessor.GetResourceVersion()
 		data, err := json.Marshal(typeMeta)
 		if err != nil {
-			return svmc.failMigration(ctx, toBeProcessedSVM, err), true
+			return svmc.failMigrationWithObjectsMigrated(ctx, toBeProcessedSVM, err, candidatesToPatch, totalObjects), true
 		}
 
 		_, errPatch := svmc.dynamicClient.Resource(gvr).
 			Namespace(accessor.GetNamespace()).
 			Patch(ctx,
 				accessor.GetName(),
-				types.ApplyPatchType,
+				types.MergePatchType,
 				data,
 				metav1.PatchOptions{
 					FieldManager: svmc.controllerName,
 				},
 			)
 
-		// in case of conflict, we can stop processing migration for that resource because it has either been
+		// in case of conflict or not found error, we can stop processing migration for that resource because it has either been
 		// - updated, meaning that migration has already been performed
 		// - deleted, meaning that migration is not needed
 		// - deleted and recreated, meaning that migration has already been performed
-		if apierrors.IsConflict(errPatch) {
+		if apierrors.IsConflict(errPatch) || apierrors.IsNotFound(errPatch) {
 			logger.V(6).Info("Resource ignored due to conflict", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "err", errPatch)
+			candidatesToPatch--
 			continue
 		}
 
 		// in case of retriable errors like server throttling, we can return an error since that will cause the migration to be reattempted.
 		if isRetriableError(errPatch) {
 			logger.V(6).Info("Resource patch failed due to an error that can be retried", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "err", errPatch)
+			_ = svmc.updateRunningCondition(ctx, toBeProcessedSVM, candidatesToPatch, totalObjects, errPatch)
 			return errPatch, false
 		}
 
 		if errPatch != nil {
 			logger.Error(errPatch, "Failed to migrate the resource", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "reason", apierrors.ReasonForError(errPatch))
-			errStatus := svmc.failMigration(ctx, toBeProcessedSVM, errPatch)
+			errStatus := svmc.failMigrationWithObjectsMigrated(ctx, toBeProcessedSVM, errPatch, candidatesToPatch, totalObjects)
 			return errStatus, true
 		}
+
+		candidatesToPatch--
 		logger.V(4).Info("Successfully migrated the resource", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String())
 	}
+
+	updatedRunningCondition := meta.SetStatusCondition(&toBeProcessedSVM.Status.Conditions, metav1.Condition{
+		Type:               string(svmv1.MigrationRunning),
+		Status:             metav1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
+		Reason:             migrationRunningReason,
+		Message:            migrationRunningMessage(&candidatesToPatch, &totalObjects, nil),
+	})
+
+	updatedSucceededCondition := meta.SetStatusCondition(&toBeProcessedSVM.Status.Conditions, metav1.Condition{
+		Type:               string(svmv1.MigrationSucceeded),
+		Status:             metav1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
+		Reason:             migrationSuccessStatusReason,
+		Message:            "Migration completed",
+	})
+
+	if updatedRunningCondition || updatedSucceededCondition {
+		_, err = svmc.kubeClient.StoragemigrationV1().
+			StorageVersionMigrations().
+			UpdateStatus(
+				ctx,
+				toBeProcessedSVM,
+				metav1.UpdateOptions{},
+			)
+		if err != nil {
+			return err, false
+		}
+	}
+
 	return nil, false
+}
+
+func (svmc *SVMController) updateRunningCondition(ctx context.Context, svm *svmv1.StorageVersionMigration, candidatesToPatch, totalObjects int, err error) error {
+	cond := &metav1.Condition{
+		Type:               string(svmv1.MigrationRunning),
+		Status:             metav1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
+		Reason:             migrationRunningReason,
+		Message:            migrationRunningMessage(&candidatesToPatch, &totalObjects, err),
+	}
+
+	if !meta.SetStatusCondition(&svm.Status.Conditions, *cond) {
+		return nil
+	}
+
+	_, updateErr := svmc.kubeClient.StoragemigrationV1().
+		StorageVersionMigrations().
+		UpdateStatus(
+			ctx,
+			svm,
+			metav1.UpdateOptions{},
+		)
+	return updateErr
 }
 
 func isRetriableError(k8sError error) bool {
@@ -368,25 +418,68 @@ func isRetriableError(k8sError error) bool {
 		apierrors.IsTimeout(k8sError)
 }
 
-func (svmc *SVMController) failMigration(ctx context.Context, toBeProcessedSVM *svmv1beta1.StorageVersionMigration, err error) error {
+func (svmc *SVMController) failMigration(ctx context.Context, toBeProcessedSVM *svmv1.StorageVersionMigration, err error) error {
 	errMsg := fmt.Sprintf("migration encountered unhandled error: %s", err)
 
-	_, errStatus := svmc.kubeClient.StoragemigrationV1beta1().
+	cond := &metav1.Condition{
+		Type:               string(svmv1.MigrationFailed),
+		Status:             metav1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
+		Reason:             migrationFailedStatusReason,
+		Message:            errMsg,
+	}
+	if !meta.SetStatusCondition(&toBeProcessedSVM.Status.Conditions, *cond) {
+		return nil
+	}
+
+	_, errStatus := svmc.kubeClient.StoragemigrationV1().
 		StorageVersionMigrations().
 		UpdateStatus(
 			ctx,
-			setStatusConditions(toBeProcessedSVM, svmv1beta1.MigrationFailed, migrationFailedStatusReason, errMsg),
+			toBeProcessedSVM,
+			metav1.UpdateOptions{},
+		)
+	return errStatus
+}
+
+func (svmc *SVMController) failMigrationWithObjectsMigrated(ctx context.Context, toBeProcessedSVM *svmv1.StorageVersionMigration, err error, candidatesToPatch, totalObjects int) error {
+	errMsg := fmt.Sprintf("%d/%d not yet migrated. migration encountered unhandled error: %s", candidatesToPatch, totalObjects, err)
+
+	updatedRunningCondition := meta.SetStatusCondition(&toBeProcessedSVM.Status.Conditions, metav1.Condition{
+		Type:               string(svmv1.MigrationRunning),
+		Status:             metav1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
+		Reason:             migrationRunningReason,
+		Message:            migrationRunningMessage(&candidatesToPatch, &totalObjects, nil),
+	})
+
+	failedCond := meta.SetStatusCondition(&toBeProcessedSVM.Status.Conditions, metav1.Condition{
+		Type:               string(svmv1.MigrationFailed),
+		Status:             metav1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
+		Reason:             migrationFailedStatusReason,
+		Message:            errMsg,
+	})
+
+	if !updatedRunningCondition && !failedCond {
+		return nil
+	}
+
+	_, errStatus := svmc.kubeClient.StoragemigrationV1().
+		StorageVersionMigrations().
+		UpdateStatus(
+			ctx,
+			toBeProcessedSVM,
 			metav1.UpdateOptions{},
 		)
 	return errStatus
 }
 
 type typeMetaUIDRV struct {
-	metav1.TypeMeta    `json:",inline"`
-	objectMetaUIDandRV `json:"metadata,omitempty"`
+	metav1.TypeMeta `json:""`
+	objectRV        `json:"metadata,omitempty"`
 }
 
-type objectMetaUIDandRV struct {
-	UID             types.UID `json:"uid,omitempty"`
-	ResourceVersion string    `json:"resourceVersion,omitempty"`
+type objectRV struct {
+	ResourceVersion string `json:"resourceVersion,omitempty"`
 }

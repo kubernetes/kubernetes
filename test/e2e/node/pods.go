@@ -629,8 +629,7 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 			})
 
 			expectedPodConditions := []v1.PodConditionType{
-				// add back once PodReadyToStartContainers feature GAs
-				// v1.PodReadyToStartContainers
+				v1.PodReadyToStartContainers,
 				v1.PodInitialized,
 				v1.PodReady,
 				v1.ContainersReady,
@@ -1015,6 +1014,11 @@ func (v *podStartVerifier) Verify(event watch.Event) error {
 		switch {
 		case t.ExitCode == 1:
 			// expected
+		case t.ExitCode == 2 && t.Reason == "Error" && t.Message == "":
+			// Some runtimes occasionally surface exit code 2 if stopped before execve makes
+			// it to launching /bin/false in fast-delete scenarios. The test only cares
+			// that the container failed.
+			framework.Logf("pod %s on node %s failed with the symptoms of https://github.com/kubernetes/kubernetes/issues/135713", pod.Name, pod.Spec.NodeName)
 		case t.ExitCode == 137 && (t.Reason == "ContainerStatusUnknown" || t.Reason == "Error"):
 			// expected, pod was force-killed after grace period
 		case t.ExitCode == 128 && (t.Reason == "StartError" || t.Reason == "ContainerCannotRun") && reBug88766.MatchString(t.Message):

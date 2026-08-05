@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen=TypesWithField=TypeMeta
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 
 // This is a test package.
@@ -51,4 +51,20 @@ type Struct struct {
 	// +k8s:optional
 	// +default=true
 	BoolPtrField *bool `json:"boolPtrField"`
+
+	// +k8s:optional
+	// +default={"name": "x"}
+	StructPtrField *Submarker `json:"structPtrField"`
+
+	// +k8s:optional
+	// +default=["foo"]
+	SliceField []string `json:"sliceField"`
+
+	// +k8s:optional
+	// +default={"k": "v"}
+	MapField map[string]string `json:"mapField"`
+}
+
+type Submarker struct {
+	Name string `json:"name"`
 }

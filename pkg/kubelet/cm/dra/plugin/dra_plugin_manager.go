@@ -25,8 +25,10 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	grpcstats "google.golang.org/grpc/stats"
+	"google.golang.org/grpc/status"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
@@ -321,17 +323,22 @@ func (pm *DRAPluginManager) get(driverName string) *DRAPlugin {
 // name>" format (e.g. "v1beta1.DRAPlugin"). This allows kubelet to determine
 // in advance which version to use resp. which optional services the plugin
 // supports.
-func (pm *DRAPluginManager) RegisterPlugin(driverName string, endpoint string, supportedServices []string, pluginClientTimeout *time.Duration) error {
+func (pm *DRAPluginManager) RegisterPlugin(_ context.Context, driverName string, endpoint string, supportedServices []string, pluginClientTimeout *time.Duration) error {
 	chosenService, err := pm.validateSupportedServices(driverName, supportedServices)
 	if err != nil {
 		return fmt.Errorf("invalid supported gRPC versions of DRA driver plugin %s at endpoint %s: %w", driverName, endpoint, err)
 	}
 
+	// The DRAResourceHealth service is optional. Pick the most recent version
+	// that both the plugin and the kubelet support, or "" if the plugin does
+	// not advertise it.
+	chosenHealthService := pickHealthService(supportedServices)
+
 	timeout := ptr.Deref(pluginClientTimeout, defaultClientCallTimeout)
 
 	// Storing endpoint of newly registered DRA DRAPlugin into the map, where the DRA driver name will be the key
 	// under which the manager will be able to get a plugin when it needs to call it.
-	if err := pm.add(driverName, endpoint, chosenService, timeout); err != nil {
+	if err := pm.add(driverName, endpoint, chosenService, chosenHealthService, timeout); err != nil {
 		// No wrapping, the error already contains details.
 		return err
 	}
@@ -339,16 +346,29 @@ func (pm *DRAPluginManager) RegisterPlugin(driverName string, endpoint string, s
 	return nil
 }
 
-func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenService string, clientCallTimeout time.Duration) error {
+// pickHealthService returns the most recent DRAResourceHealth gRPC service that
+// is supported by both the plugin and the kubelet, or "" if the plugin does not
+// advertise the optional health service.
+func pickHealthService(supportedServices []string) string {
+	for _, service := range healthServicesSupportedByKubelet {
+		if slices.Contains(supportedServices, service) {
+			return service
+		}
+	}
+	return ""
+}
+
+func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenService string, chosenHealthService string, clientCallTimeout time.Duration) error {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
 
 	p := &DRAPlugin{
-		driverName:        driverName,
-		endpoint:          endpoint,
-		chosenService:     chosenService,
-		clientCallTimeout: clientCallTimeout,
-		backgroundCtx:     pm.backgroundCtx,
+		driverName:          driverName,
+		endpoint:            endpoint,
+		chosenService:       chosenService,
+		chosenHealthService: chosenHealthService,
+		clientCallTimeout:   clientCallTimeout,
+		backgroundCtx:       pm.backgroundCtx,
 	}
 	if pm.store == nil {
 		pm.store = make(map[string][]*monitoredPlugin)
@@ -384,7 +404,7 @@ func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenServic
 	}
 	p.conn = conn
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) && pm.streamHandler != nil {
+	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) && pm.streamHandler != nil && p.chosenHealthService != "" {
 		pm.wg.Add(1)
 		go func() {
 			defer pm.wg.Done()
@@ -403,7 +423,13 @@ func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenServic
 
 				err = pm.streamHandler.HandleWatchResourcesStream(ctx, stream, driverName)
 				logger.V(2).Info("WatchResources health stream has ended", "error", err)
-
+				if status.Code(err) == codes.Unimplemented {
+					// The driver advertises the health service but does not
+					// support health reporting. Stop watching instead of
+					// retrying; a driver which gains support re-registers.
+					logger.V(2).Info("Driver does not support WatchResources health stream, stopping")
+					streamCancel()
+				}
 			}, 5*time.Second)
 		}()
 	}
@@ -425,7 +451,7 @@ func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenServic
 // The plugin manager calls it after it has detected that
 // the plugin removed its registration socket,
 // signaling that it is no longer available.
-func (pm *DRAPluginManager) DeRegisterPlugin(driverName, endpoint string) {
+func (pm *DRAPluginManager) DeRegisterPlugin(_ context.Context, driverName, endpoint string) {
 	// remove could be removed (no pun intended) but is kept for the sake of symmetry.
 	pm.remove(driverName, endpoint)
 }
@@ -526,7 +552,7 @@ func (pm *DRAPluginManager) usable(driverName string) bool {
 //
 // The plugin manager calls it upon detection of a new registration socket
 // opened by DRA plugin.
-func (pm *DRAPluginManager) ValidatePlugin(driverName string, endpoint string, supportedServices []string) error {
+func (pm *DRAPluginManager) ValidatePlugin(_ context.Context, driverName string, endpoint string, supportedServices []string) error {
 	_, err := pm.validateSupportedServices(driverName, supportedServices)
 	if err != nil {
 		return fmt.Errorf("invalid supported gRPC versions of DRA driver plugin %s at endpoint %s: %w", driverName, endpoint, err)

@@ -152,8 +152,7 @@ func Convert_core_EventList_To_v1beta1_EventList(in *core.EventList, out *events
 }
 
 func autoConvert_v1beta1_EventSeries_To_core_EventSeries(in *eventsv1beta1.EventSeries, out *core.EventSeries, s conversion.Scope) error {
-	out.Count = in.Count
-	out.LastObservedTime = in.LastObservedTime
+	*out = *(*core.EventSeries)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -163,8 +162,7 @@ func Convert_v1beta1_EventSeries_To_core_EventSeries(in *eventsv1beta1.EventSeri
 }
 
 func autoConvert_core_EventSeries_To_v1beta1_EventSeries(in *core.EventSeries, out *eventsv1beta1.EventSeries, s conversion.Scope) error {
-	out.Count = in.Count
-	out.LastObservedTime = in.LastObservedTime
+	*out = *(*eventsv1beta1.EventSeries)(unsafe.Pointer(in))
 	return nil
 }
 

@@ -18,110 +18,119 @@ package v1
 
 import (
 	"reflect"
-	"strings"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"k8s.io/api/policy/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
+	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	internalfuzzer "k8s.io/kubernetes/pkg/apis/policy/fuzzer"
+	"math/rand"
 )
 
-func TestConversion(t *testing.T) {
-	testcases := []struct {
-		Name      string
-		In        runtime.Object
-		Out       runtime.Object
-		ExpectOut runtime.Object
-		ExpectErr string
-	}{
-		{
-			Name: "v1 to internal with match none selector",
-			In: &v1.PodDisruptionBudget{
-				Spec: v1.PodDisruptionBudgetSpec{
-					Selector: &metav1.LabelSelector{
-						MatchExpressions: []metav1.LabelSelectorRequirement{
-							{
-								Key:      "pdb.kubernetes.io/deprecated-v1beta1-empty-selector-match",
-								Operator: metav1.LabelSelectorOpExists,
-							},
-						},
-					},
-				},
-			},
-			Out: &policy.PodDisruptionBudget{},
-			ExpectOut: &policy.PodDisruptionBudget{
-				Spec: policy.PodDisruptionBudgetSpec{
-					Selector: &metav1.LabelSelector{
-						MatchExpressions: []metav1.LabelSelectorRequirement{
-							{
-								Key:      "pdb.kubernetes.io/deprecated-v1beta1-empty-selector-match",
-								Operator: metav1.LabelSelectorOpExists,
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			Name:      "v1 to internal with nil selector",
-			In:        &v1.PodDisruptionBudget{},
-			Out:       &policy.PodDisruptionBudget{},
-			ExpectOut: &policy.PodDisruptionBudget{},
-		},
-		{
-			Name: "v1 to internal with match all selector",
-			In: &v1.PodDisruptionBudget{
-				Spec: v1.PodDisruptionBudgetSpec{
-					Selector: &metav1.LabelSelector{
-						MatchExpressions: []metav1.LabelSelectorRequirement{
-							{
-								Key:      "pdb.kubernetes.io/deprecated-v1beta1-empty-selector-match",
-								Operator: metav1.LabelSelectorOpDoesNotExist,
-							},
-						},
-					},
-				},
-			},
-			Out: &policy.PodDisruptionBudget{},
-			ExpectOut: &policy.PodDisruptionBudget{
-				Spec: policy.PodDisruptionBudgetSpec{
-					Selector: &metav1.LabelSelector{
-						MatchExpressions: []metav1.LabelSelectorRequirement{},
-					},
-				},
-			},
-		},
-	}
+func TestEvictionMemoryIdenticalConversion(t *testing.T) {
 
 	scheme := runtime.NewScheme()
 	if err := policy.AddToScheme(scheme); err != nil {
 		t.Fatal(err)
 	}
-
 	if err := AddToScheme(scheme); err != nil {
 		t.Fatal(err)
 	}
+	codecs := serializer.NewCodecFactory(scheme)
+	f := fuzzer.FuzzerFor(fuzzer.MergeFuzzerFuncs(metafuzzer.Funcs, internalfuzzer.Funcs), rand.NewSource(1), codecs).NilChance(0).NumElements(1, 1)
+	t.Run("v1 to internal", func(t *testing.T) {
+		in := &v1.Eviction{}
+		f.Fill(in)
+		out := &policy.Eviction{}
+		if err := scheme.Convert(in, out, nil); err != nil {
+			t.Fatalf("conversion failed: %v", err)
+		}
+		assertMemoryIdentical(t, "Eviction", reflect.ValueOf(in).Elem(), reflect.ValueOf(out).Elem())
+	})
+	t.Run("internal to v1", func(t *testing.T) {
+		in := &policy.Eviction{}
+		f.Fill(in)
+		out := &v1.Eviction{}
+		if err := scheme.Convert(in, out, nil); err != nil {
+			t.Fatalf("conversion failed: %v", err)
+		}
+		assertMemoryIdentical(t, "Eviction", reflect.ValueOf(in).Elem(), reflect.ValueOf(out).Elem())
+	})
+}
 
-	for _, tc := range testcases {
-		t.Run(tc.Name, func(t *testing.T) {
-			err := scheme.Convert(tc.In, tc.Out, nil)
-			if err != nil {
-				if len(tc.ExpectErr) == 0 {
-					t.Fatalf("unexpected error %v", err)
-				}
-				if !strings.Contains(err.Error(), tc.ExpectErr) {
-					t.Fatalf("expected error %s, got %v", tc.ExpectErr, err)
-				}
-				return
+func TestPodDisruptionBudgetMemoryIdenticalConversion(t *testing.T) {
+
+	scheme := runtime.NewScheme()
+	if err := policy.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	codecs := serializer.NewCodecFactory(scheme)
+	f := fuzzer.FuzzerFor(fuzzer.MergeFuzzerFuncs(metafuzzer.Funcs, internalfuzzer.Funcs), rand.NewSource(1), codecs).NilChance(0).NumElements(1, 1)
+	t.Run("v1 to internal", func(t *testing.T) {
+		in := &v1.PodDisruptionBudget{}
+		f.Fill(in)
+		out := &policy.PodDisruptionBudget{}
+		if err := scheme.Convert(in, out, nil); err != nil {
+			t.Fatalf("conversion failed: %v", err)
+		}
+		assertMemoryIdentical(t, "PodDisruptionBudget", reflect.ValueOf(in).Elem(), reflect.ValueOf(out).Elem())
+	})
+	t.Run("internal to v1", func(t *testing.T) {
+		in := &policy.PodDisruptionBudget{}
+		f.Fill(in)
+		out := &v1.PodDisruptionBudget{}
+		if err := scheme.Convert(in, out, nil); err != nil {
+			t.Fatalf("conversion failed: %v", err)
+		}
+		assertMemoryIdentical(t, "PodDisruptionBudget", reflect.ValueOf(in).Elem(), reflect.ValueOf(out).Elem())
+	})
+}
+
+func assertMemoryIdentical(t *testing.T, path string, a, b reflect.Value) {
+	t.Helper()
+	if a.Kind() != b.Kind() {
+		t.Errorf("%s: unexpected kind mismatch: %s, %s", path, a.Kind(), b.Kind())
+		return
+	}
+	switch a.Kind() {
+	case reflect.Struct: // allow for copied structs since conversion copies status/spec today
+		if a.Type().Size() != b.Type().Size() {
+			t.Errorf("%s: unexpected struct size mismatch: %d, %d", path, a.Type().Size(), b.Type().Size())
+			return
+		}
+		if a.NumField() != b.NumField() {
+			t.Errorf("%s: unexpected field count mismatch: %d, %d", path, a.NumField(), b.NumField())
+			return
+		}
+		for i := 0; i < a.NumField(); i++ {
+			aTypeField := a.Type().Field(i)
+			bTypeField := b.Type().Field(i)
+			if aTypeField.Name != bTypeField.Name {
+				t.Errorf("%s: unexpected field name mismatch: %s, %s", path, aTypeField.Name, bTypeField.Name)
 			}
-			if len(tc.ExpectErr) > 0 {
-				t.Fatalf("expected error %s, got none", tc.ExpectErr)
+			if aTypeField.Offset != bTypeField.Offset {
+				t.Errorf("%s.%s: unexpected field offset mismatch: %d, %d", path, aTypeField.Name, aTypeField.Offset, bTypeField.Offset)
 			}
-			if !reflect.DeepEqual(tc.Out, tc.ExpectOut) {
-				t.Fatalf("unexpected result:\n %s", cmp.Diff(tc.ExpectOut, tc.Out))
-			}
-		})
+			assertMemoryIdentical(t, path+"."+aTypeField.Name, a.Field(i), b.Field(i))
+		}
+	case reflect.Pointer, reflect.Map, reflect.Slice:
+		if a.IsNil() != b.IsNil() {
+			t.Errorf("%s: nilable pointer mismatch: %v, %v", path, !a.IsNil(), !b.IsNil())
+			return
+		}
+		if !a.IsNil() && a.UnsafePointer() != b.UnsafePointer() {
+			t.Errorf("%s: nilable type was unexpectedly copied", path)
+		}
+	case reflect.Bool, reflect.Int, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64, reflect.String:
+		// Assume scalars are copied by value
+	default:
+		t.Errorf("%s: unexpected kind: %v", path, a.Kind())
 	}
 }

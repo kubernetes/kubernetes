@@ -56,8 +56,8 @@ import (
 // the scheduler assumes that capacity is insufficient and tries some other
 // node.
 type CSIStorageCapacityApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration `json:",inline"`
-	// Standard object's metadata.
+	metav1.TypeMetaApplyConfiguration `json:""`
+	// metadata is the standard object metadata.
 	// The name has no particular meaning. It must be a DNS subdomain (dots allowed, 253 characters).
 	// To ensure that there are no conflicts with other CSI drivers on the cluster,
 	// the recommendation is to use csisc-<uuid>, a generated name, or a reverse-domain name

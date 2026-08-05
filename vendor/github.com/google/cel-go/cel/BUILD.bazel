@@ -10,6 +10,7 @@ go_library(
         "cel.go",
         "decls.go",
         "env.go",
+        "fieldpaths.go",
         "folding.go",
         "inlining.go",
         "io.go",
@@ -21,7 +22,7 @@ go_library(
         "prompt.go",
         "validator.go",
     ],
-    embedsrcs = ["//cel/templates"],
+    embedsrcs = ["templates/authoring.tmpl"],
     importpath = "github.com/google/cel-go/cel",
     visibility = ["//visibility:public"],
     deps = [
@@ -43,6 +44,7 @@ go_library(
         "//interpreter:go_default_library",
         "//parser:go_default_library",
         "@dev_cel_expr//:expr",
+        "@dev_cel_expr//conformance/proto3:go_default_library",
         "@org_golang_google_genproto_googleapis_api//expr/v1alpha1:go_default_library",
         "@org_golang_google_protobuf//proto:go_default_library",
         "@org_golang_google_protobuf//reflect/protodesc:go_default_library",
@@ -63,6 +65,7 @@ go_test(
         "cel_test.go",
         "decls_test.go",
         "env_test.go",
+        "fieldpaths_test.go",
         "folding_test.go",
         "inlining_test.go",
         "io_test.go",
@@ -78,6 +81,7 @@ go_test(
     ],
     embedsrcs = [
         "//cel/testdata:prompts",
+        "//cel/testdata:test_fds_with_source_info",
     ],
     deps = [
         "//common/operators:go_default_library",
@@ -89,10 +93,16 @@ go_test(
         "//test:go_default_library",
         "//test/proto2pb:go_default_library",
         "//test/proto3pb:go_default_library",
+        "@com_github_google_go_cmp//cmp:go_default_library",
         "@org_golang_google_genproto_googleapis_api//expr/v1alpha1:go_default_library",
         "@org_golang_google_protobuf//encoding/prototext:go_default_library",
         "@org_golang_google_protobuf//proto:go_default_library",
         "@org_golang_google_protobuf//types/known/structpb:go_default_library",
         "@org_golang_google_protobuf//types/known/wrapperspb:go_default_library",
     ],
+)
+
+exports_files(
+    ["templates/authoring.tmpl"],
+    visibility = ["//visibility:public"],
 )

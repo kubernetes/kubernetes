@@ -24,13 +24,13 @@ import (
 type readView struct{ kv KV }
 
 func (rv *readView) FirstRev() int64 {
-	tr := rv.kv.Read(ConcurrentReadTxMode, traceutil.TODO())
+	tr := rv.kv.Read(SharedBufReadTxMode, traceutil.TODO())
 	defer tr.End()
 	return tr.FirstRev()
 }
 
 func (rv *readView) Rev() int64 {
-	tr := rv.kv.Read(ConcurrentReadTxMode, traceutil.TODO())
+	tr := rv.kv.Read(SharedBufReadTxMode, traceutil.TODO())
 	defer tr.End()
 	return tr.Rev()
 }

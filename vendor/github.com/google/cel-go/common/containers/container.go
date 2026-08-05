@@ -227,7 +227,7 @@ func Abbrevs(qualifiedNames ...string) ContainerOption {
 			}
 			alias := qn[ind+1:]
 			var err error
-			c, err = aliasAs("abbreviation", qn, alias)(c)
+			c, err = aliasAs("abbreviation", qn, alias, true)(c)
 			if err != nil {
 				return nil, err
 			}
@@ -236,31 +236,32 @@ func Abbrevs(qualifiedNames ...string) ContainerOption {
 	}
 }
 
-// Alias associates a fully-qualified name with a user-defined alias.
+// Alias associates a name with a user-defined alias.
 //
 // In general, Abbrevs is preferred to Alias since the names generated from the Abbrevs option
 // are more easily traced back to source code. The Alias option is useful for propagating alias
 // configuration from one Container instance to another, and may also be useful for remapping
 // poorly chosen protobuf message / package names.
-//
-// Note: all of the rules that apply to Abbrevs also apply to Alias.
 func Alias(qualifiedName, alias string) ContainerOption {
-	return aliasAs("alias", qualifiedName, alias)
+	return aliasAs("alias", qualifiedName, alias, false)
 }
 
-func aliasAs(kind, qualifiedName, alias string) ContainerOption {
+func aliasAs(kind, qualifiedName, alias string, requireQualified bool) ContainerOption {
 	return func(c *Container) (*Container, error) {
 		if len(alias) == 0 || strings.Contains(alias, ".") {
 			return nil, fmt.Errorf(
 				"%s must be non-empty and simple (not qualified): %s=%s", kind, kind, alias)
 		}
 
+		if len(qualifiedName) == 0 {
+			return nil, fmt.Errorf("%s must refer to a valid name: %s", kind, qualifiedName)
+		}
 		if qualifiedName[0:1] == "." {
 			return nil, fmt.Errorf("qualified name must not begin with a leading '.': %s",
 				qualifiedName)
 		}
 		ind := strings.LastIndex(qualifiedName, ".")
-		if ind <= 0 || ind == len(qualifiedName)-1 {
+		if ind == len(qualifiedName)-1 || (requireQualified && ind <= 0) {
 			return nil, fmt.Errorf("%s must refer to a valid qualified name: %s",
 				kind, qualifiedName)
 		}

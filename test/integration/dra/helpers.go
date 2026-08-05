@@ -30,10 +30,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -50,6 +52,22 @@ func must[R, P, O any](tCtx ktesting.TContext, call func(context.Context, P, O) 
 	r, err := call(tCtx, p, o)
 	tCtx.ExpectNoError(err)
 	return r
+}
+
+func listObjectNames(list runtime.Object) ([]string, error) {
+	items, err := meta.ExtractList(list)
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(items))
+	for _, item := range items {
+		object, err := meta.Accessor(item)
+		if err != nil {
+			return nil, err
+		}
+		names = append(names, object.GetName())
+	}
+	return names, nil
 }
 
 // createTestNamespace creates a namespace with a name that is derived from the
@@ -238,7 +256,10 @@ func deleteAndWait[T any](tCtx ktesting.TContext, del func(context.Context, stri
 		options.GracePeriodSeconds = ptr.To(int64(0))
 	}
 
-	tCtx.ExpectNoError(del(tCtx, name, options), fmt.Sprintf("delete %T %s", t, name))
+	err := del(tCtx, name, options)
+	if !apierrors.IsNotFound(err) {
+		tCtx.ExpectNoError(err, fmt.Sprintf("delete %T %s", t, name))
+	}
 	waitForNotFound(tCtx, get, name)
 }
 

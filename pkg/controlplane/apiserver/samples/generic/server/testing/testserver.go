@@ -28,7 +28,6 @@ import (
 	"github.com/spf13/pflag"
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"google.golang.org/grpc"
 	"k8s.io/kubernetes/pkg/controlplane/apiserver/samples/generic/server"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -268,10 +267,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	etcdConfig := clientv3.Config{
 		Endpoints:   storageConfig.Transport.ServerList,
 		DialTimeout: 20 * time.Second,
-		DialOptions: []grpc.DialOption{
-			grpc.WithBlock(), // block until the underlying connection is up
-		},
-		TLS: tlsConfig,
+		TLS:         tlsConfig,
 	}
 	etcdClient, err := clientv3.New(etcdConfig)
 	if err != nil {

@@ -11089,6 +11089,22 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			},
 		},
 		{
+			// Validate that metadata.name and metadata.generateName are estimated against the cost limit of a 253 length string.
+			// This will fail with a cost limit exceeded error if either length is incorrectly assumed to be unbounded.
+			name: "x-kubernetes-validations rule referencing metadata.name and generateName is within estimated cost limit",
+			opts: validationOptions{requireStructuralSchema: true},
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					XValidations: apiextensions.ValidationRules{
+						{
+							Rule: "self.metadata.name.contains(self.metadata.name) && self.metadata.generateName.contains(self.metadata.generateName)",
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "x-kubernetes-validations rule invalidated by messageExpression exceeding per-CRD estimated cost limit",
 			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{

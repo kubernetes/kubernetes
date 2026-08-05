@@ -55,7 +55,7 @@ import (
 // This is an alpha type and requires enabling the DynamicResourceAllocation
 // feature gate.
 type ResourceSliceApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:""`
 	// Standard object metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// Contains the information published by the driver.

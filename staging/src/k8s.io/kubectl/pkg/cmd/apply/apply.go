@@ -184,7 +184,7 @@ var ApplySetToolVersion = version.Get().GitVersion
 func NewApplyFlags(streams genericiooptions.IOStreams) *ApplyFlags {
 	return &ApplyFlags{
 		RecordFlags: genericclioptions.NewRecordFlags(),
-		DeleteFlags: cmddelete.NewDeleteFlags("The files that contain the configurations to apply."),
+		DeleteFlags: cmddelete.NewDeleteFlags("The files, directories or URLs that contain the configurations to apply."),
 		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 
 		Overwrite:    true,

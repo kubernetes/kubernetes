@@ -38,10 +38,14 @@ CROSSLINK = $(TOOLS)/crosslink
 $(TOOLS)/crosslink: PACKAGE=go.opentelemetry.io/build-tools/crosslink
 
 SEMCONVKIT = $(TOOLS)/semconvkit
+SEMCONVKIT_FILES := $(sort $(shell find $(TOOLS_MOD_DIR)/semconvkit -type f))
 $(TOOLS)/semconvkit: PACKAGE=go.opentelemetry.io/otel/$(TOOLS_MOD_DIR)/semconvkit
+$(TOOLS)/semconvkit: $(SEMCONVKIT_FILES)
 
 VERIFYREADMES = $(TOOLS)/verifyreadmes
+VERIFYREADMES_FILES := $(sort $(shell find $(TOOLS_MOD_DIR)/verifyreadmes -type f))
 $(TOOLS)/verifyreadmes: PACKAGE=go.opentelemetry.io/otel/$(TOOLS_MOD_DIR)/verifyreadmes
+$(TOOLS)/verifyreadmes: $(VERIFYREADMES_FILES)
 
 GOLANGCI_LINT = $(TOOLS)/golangci-lint
 $(TOOLS)/golangci-lint: PACKAGE=github.com/golangci/golangci-lint/v2/cmd/golangci-lint
@@ -185,11 +189,18 @@ test-coverage: $(GOCOVMERGE)
 .PHONY: benchmark
 benchmark: $(OTEL_GO_MOD_DIRS:%=benchmark/%)
 benchmark/%:
-	@echo "$(GO) test -run=xxxxxMatchNothingxxxxx -bench=. $*..." \
-		&& cd $* \
-		&& $(GO) list ./... \
-		| grep -v third_party \
-		| xargs $(GO) test -run=xxxxxMatchNothingxxxxx -bench=.
+	cd $* && $(GO) test -run='^$$' -bench=. $(ARGS) ./...
+
+# sdk/metric is split into two shards to work around CodSpeed limitations.
+# See https://github.com/CodSpeedHQ/codspeed-go/issues/56
+BENCHMARK_SHARDS := $(filter-out ./sdk/metric,$(OTEL_GO_MOD_DIRS)) ./sdk/metric/root ./sdk/metric/internal
+benchmark/./sdk/metric/root:
+	cd ./sdk/metric && $(GO) test -run='^$$' -bench=. $(ARGS) . ./exemplar/...
+benchmark/./sdk/metric/internal:
+	cd ./sdk/metric && $(GO) test -run='^$$' -bench=. $(ARGS) ./internal/...
+
+print-sharded-benchmarks:
+	@echo $(BENCHMARK_SHARDS) | jq -cR 'split(" ")'
 
 .PHONY: golangci-lint golangci-lint-fix
 golangci-lint-fix: ARGS=--fix
@@ -215,7 +226,7 @@ go-mod-tidy/%: crosslink
 		&& $(GO) mod tidy -compat=1.21
 
 .PHONY: lint
-lint: misspell go-mod-tidy golangci-lint govulncheck
+lint: misspell go-mod-tidy golangci-lint
 
 .PHONY: vanity-import-check
 vanity-import-check: $(PORTO)

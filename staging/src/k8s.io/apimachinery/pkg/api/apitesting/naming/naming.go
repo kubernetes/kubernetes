@@ -88,9 +88,9 @@ func ensureNoTags(gvk schema.GroupVersionKind, tp reflect.Type, parents []reflec
 			if f.PkgPath != "" {
 				continue // Ignore unexported fields
 			}
-			jsonTag := f.Tag.Get("json")
+			_, jsonTagExists := f.Tag.Lookup("json")
 			protoTag := f.Tag.Get("protobuf")
-			if len(jsonTag) > 0 || len(protoTag) > 0 {
+			if jsonTagExists || len(protoTag) > 0 {
 				errs = append(errs, fmt.Errorf("internal types should not have json or protobuf tags. %#v has tag on field %v: %v.\n%s", gvk, f.Name, f.Tag, fmtParentString(parents)))
 			}
 
@@ -126,9 +126,13 @@ func ensureTags(gvk schema.GroupVersionKind, tp reflect.Type, parents []reflect.
 	case reflect.Struct:
 		for i := 0; i < tp.NumField(); i++ {
 			f := tp.Field(i)
-			jsonTag := f.Tag.Get("json")
+			jsonTag, jsonTagExists := f.Tag.Lookup("json")
 			if len(jsonTag) == 0 {
-				errs = append(errs, fmt.Errorf("external types should have json tags. %#v tags on field %v are: %s.\n%s", gvk, f.Name, f.Tag, fmtParentString(parents)))
+				if f.Anonymous && jsonTagExists {
+					// allow json:"" on embedded fields
+				} else {
+					errs = append(errs, fmt.Errorf("external types should have json tags. %#v tags on field %v are: %s.\n%s", gvk, f.Name, f.Tag, fmtParentString(parents)))
+				}
 			}
 
 			jsonTagName := strings.Split(jsonTag, ",")[0]

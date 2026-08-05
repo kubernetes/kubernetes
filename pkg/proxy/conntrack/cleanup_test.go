@@ -458,6 +458,7 @@ func TestServiceWithoutEndpoints(t *testing.T) {
 				{
 					Name:     "test-udp",
 					Port:     testServicePort,
+					NodePort: testServiceNodePort,
 					Protocol: v1.ProtocolUDP,
 				},
 			},
@@ -508,10 +509,38 @@ func TestServiceWithoutEndpoints(t *testing.T) {
 	_ = endpointsMap.Update(ect)
 
 	flows := []*netlink.ConntrackFlow{}
-	// 1 valid entry
-	flows = append(flows, generateConntrackEntry(testExternalIP, testServicePort, testServingEndpointIP, testEndpointPort, unix.IPPROTO_UDP))
-	// 1 stale entry
-	flows = append(flows, generateConntrackEntry(testExternalIP, testServicePort, testDeletedEndpointIP, testEndpointPort, unix.IPPROTO_UDP))
+	var entriesAfterCleanup []*netlink.ConntrackFlow
+
+	// All UDP entries directed to the frontends of a service without serving
+	// endpoints are stale and must be cleared, regardless of which (deleted)
+	// endpoint they are DNATed to: established flows bypass the REJECT rule
+	// installed for services with no endpoints and would otherwise keep
+	// blackholing traffic to the deleted endpoint IP indefinitely.
+	for _, origDest := range []string{testClusterIP, testLoadBalancerIP, testExternalIP} {
+		for _, dnatDest := range []string{testServingEndpointIP, testDeletedEndpointIP} {
+			flows = append(flows, generateConntrackEntry(origDest, testServicePort, dnatDest, testEndpointPort, unix.IPPROTO_UDP))
+		}
+	}
+
+	// UDP entries not directed to a service frontend are not owned by
+	// kube-proxy and must be preserved.
+	entry := generateConntrackEntry(testExternalIP, testNonServicePort, testDeletedEndpointIP, testEndpointPort, unix.IPPROTO_UDP)
+	flows = append(flows, entry)
+	entriesAfterCleanup = append(entriesAfterCleanup, entry)
+
+	// non-UDP entries must be preserved.
+	entry = generateConntrackEntry(testExternalIP, testServicePort, testDeletedEndpointIP, testEndpointPort, unix.IPPROTO_TCP)
+	flows = append(flows, entry)
+	entriesAfterCleanup = append(entriesAfterCleanup, entry)
+
+	// *:NodePort entries are matched on the destination port only, which with an
+	// empty endpoints set would also remove flows not owned by kube-proxy, so
+	// NodePort cleanup is skipped for services without serving endpoints and
+	// these entries must be preserved.
+	entry = generateConntrackEntry("", testServiceNodePort, testDeletedEndpointIP, testEndpointPort, unix.IPPROTO_UDP)
+	flows = append(flows, entry)
+	entriesAfterCleanup = append(entriesAfterCleanup, entry)
+
 	ct := newConntracker(
 		&fakeHandler{
 			entries: flows,
@@ -520,7 +549,19 @@ func TestServiceWithoutEndpoints(t *testing.T) {
 
 	CleanStaleEntries(ct, testIPFamily, svcPortMap, endpointsMap)
 	actualEntries, _ := ct.ListEntries(ipFamilyMap[testIPFamily])
-	if len(actualEntries) != 2 {
-		t.Errorf("unexpected number of entries, got %d expected %d", len(actualEntries), 2)
+
+	require.Len(t, actualEntries, len(entriesAfterCleanup))
+
+	// sort the actual flows before comparison
+	sort.Slice(actualEntries, func(i, j int) bool {
+		return actualEntries[i].String() < actualEntries[j].String()
+	})
+	// sort the expected flows before comparison
+	sort.Slice(entriesAfterCleanup, func(i, j int) bool {
+		return entriesAfterCleanup[i].String() < entriesAfterCleanup[j].String()
+	})
+
+	if diff := cmp.Diff(entriesAfterCleanup, actualEntries); len(diff) > 0 {
+		t.Errorf("unexpected entries after cleanup: %s", diff)
 	}
 }

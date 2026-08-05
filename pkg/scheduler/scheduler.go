@@ -30,8 +30,9 @@ import (
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	"k8s.io/client-go/informers/internalinterfaces"
 	clientset "k8s.io/client-go/kubernetes"
-	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha2"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha3"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
@@ -72,11 +73,11 @@ type Scheduler struct {
 
 	Extenders []fwk.Extender
 
-	// NextPod should be a function that blocks until the next pod
+	// NextEntity should be a function that blocks until the next entity (pod or pod group)
 	// is available. We don't use a channel for this, because scheduling
 	// a pod may take some amount of time and we don't want pods to get
 	// stale while they sit in a channel.
-	NextPod func(logger klog.Logger) (*framework.QueuedPodInfo, error)
+	NextEntity func(logger klog.Logger) (framework.QueuedEntityInfo, error)
 
 	// FailureHandler is called upon a scheduling failure.
 	FailureHandler FailureHandlerFn
@@ -103,6 +104,8 @@ type Scheduler struct {
 
 	client clientset.Interface
 
+	compositePodGroupLister schedulinglisters.CompositePodGroupLister
+
 	nodeInfoSnapshot *internalcache.Snapshot
 
 	percentageOfNodesToScore int32
@@ -114,13 +117,12 @@ type Scheduler struct {
 	// panic.
 	logger klog.Logger
 
-	podGroupLister schedulinglisters.PodGroupLister
-
 	// registeredHandlers contains the registrations of all handlers. It's used to check if all handlers have finished syncing before the scheduling cycles start.
 	registeredHandlers []cache.ResourceEventHandlerRegistration
 
-	nominatedNodeNameForExpectationEnabled bool
-	genericWorkloadEnabled                 bool
+	nominatedNodeNameForExpectationEnabled              bool
+	genericWorkloadEnabled                              bool
+	inPlacePodVerticalScalingSchedulerPreemptionEnabled bool
 }
 
 func (sched *Scheduler) applyDefaultHandlers() {
@@ -144,6 +146,7 @@ type schedulerOptions struct {
 	frameworkCapturer          FrameworkCapturer
 	parallelism                int32
 	applyDefaultProfile        bool
+	nodeInfoSnapshot           *internalcache.Snapshot
 }
 
 // Option configures a Scheduler
@@ -258,6 +261,13 @@ func WithBuildFrameworkCapturer(fc FrameworkCapturer) Option {
 	}
 }
 
+// WithNodeInfoSnapshot sets the nodeInfoSnapshot for Scheduler.
+func WithNodeInfoSnapshot(snapshot *internalcache.Snapshot) Option {
+	return func(o *schedulerOptions) {
+		o.nodeInfoSnapshot = snapshot
+	}
+}
+
 var defaultSchedulerOptions = schedulerOptions{
 	clock:                             clock.RealClock{},
 	percentageOfNodesToScore:          schedulerapi.DefaultPercentageOfNodesToScore,
@@ -312,12 +322,11 @@ func New(ctx context.Context,
 
 	podLister := informerFactory.Core().V1().Pods().Lister()
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
-	var podGroupLister schedulinglisters.PodGroupLister
-	if feature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-		podGroupLister = informerFactory.Scheduling().V1alpha2().PodGroups().Lister()
-	}
 
-	snapshot := internalcache.NewEmptySnapshot()
+	snapshot := options.nodeInfoSnapshot
+	if snapshot == nil {
+		snapshot = internalcache.NewEmptySnapshot()
+	}
 	metricsRecorder := metrics.NewMetricsAsyncRecorder(1000, time.Second, stopEverything)
 	// waitingPods holds all the pods that are in the scheduler and waiting in the permit stage
 	waitingPods := frameworkruntime.NewWaitingPodsMap()
@@ -340,8 +349,7 @@ func New(ctx context.Context,
 		// If device taint rules are disabled, the additional informers are not needed and
 		// the tracker turns into a simple wrapper around the slice informer.
 		if resourceSliceTrackerOpts.EnableDeviceTaintRules {
-			resourceSliceTrackerOpts.TaintInformer = informerFactory.Resource().V1beta2().DeviceTaintRules()
-			resourceSliceTrackerOpts.ClassInformer = informerFactory.Resource().V1().DeviceClasses()
+			resourceSliceTrackerOpts.TaintInformer = informerFactory.Resource().V1().DeviceTaintRules()
 		}
 		resourceSliceTracker, err = resourceslicetracker.StartTracker(ctx, resourceSliceTrackerOpts)
 		if err != nil {
@@ -356,7 +364,7 @@ func New(ctx context.Context,
 		apiDispatcher = apidispatcher.New(client, int(options.parallelism), apicalls.Relevances)
 	}
 
-	schedulerCache := internalcache.New(ctx, apiDispatcher, feature.DefaultFeatureGate.Enabled(features.GenericWorkload))
+	schedulerCache := internalcache.New(ctx, apiDispatcher, feature.DefaultFeatureGate.Enabled(features.GenericWorkload), feature.DefaultFeatureGate.Enabled(features.CompositePodGroup))
 
 	profiles, err := profile.NewMap(ctx, options.profiles, registry, recorderFactory,
 		frameworkruntime.WithComponentConfigVersion(options.componentConfigVersion),
@@ -365,6 +373,7 @@ func New(ctx context.Context,
 		frameworkruntime.WithInformerFactory(informerFactory),
 		frameworkruntime.WithSharedDRAManager(draManager),
 		frameworkruntime.WithSnapshotSharedLister(snapshot),
+		frameworkruntime.WithMutableSnapshotLister(snapshot),
 		frameworkruntime.WithCaptureProfile(frameworkruntime.CaptureProfile(options.frameworkCapturer)),
 		frameworkruntime.WithParallelism(int(options.parallelism)),
 		frameworkruntime.WithExtenders(extenders),
@@ -440,6 +449,11 @@ func New(ctx context.Context,
 	debugger := cachedebugger.New(nodeLister, podLister, schedulerCache, podQueue)
 	debugger.ListenForSignal(ctx)
 
+	var compositePodGroupLister schedulinglisters.CompositePodGroupLister
+	if feature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+		compositePodGroupLister = informerFactory.Scheduling().V1alpha3().CompositePodGroups().Lister()
+	}
+
 	sched := &Scheduler{
 		Cache:                                  schedulerCache,
 		client:                                 client,
@@ -451,11 +465,12 @@ func New(ctx context.Context,
 		Profiles:                               profiles,
 		logger:                                 logger,
 		APIDispatcher:                          apiDispatcher,
+		compositePodGroupLister:                compositePodGroupLister,
 		nominatedNodeNameForExpectationEnabled: feature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation),
-		podGroupLister:                         podGroupLister,
 		genericWorkloadEnabled:                 feature.DefaultFeatureGate.Enabled(features.GenericWorkload),
+		inPlacePodVerticalScalingSchedulerPreemptionEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption),
 	}
-	sched.NextPod = podQueue.Pop
+	sched.NextEntity = podQueue.Pop
 	sched.applyDefaultHandlers()
 
 	if err = addAllEventHandlers(sched, informerFactory, dynInformerFactory, resourceClaimCache, resourceSliceTracker, draManager, unionedGVKs(queueingHintsPerProfile)); err != nil {
@@ -492,46 +507,25 @@ func buildQueueingHintMap(ctx context.Context, es []fwk.EnqueueExtensions) (inte
 		// cannot be moved by any regular cluster event.
 		// So, we can just ignore such EventsToRegister here.
 
-		registerNodeAdded := false
-		registerNodeTaintUpdated := false
 		for _, event := range events {
 			fn := event.QueueingHintFn
-			if fn == nil || !feature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
+			if fn == nil {
 				fn = defaultQueueingHintFn
 			}
 
-			if event.Event.Resource == fwk.Node {
-				if event.Event.ActionType&fwk.Add != 0 {
-					registerNodeAdded = true
-				}
-				if event.Event.ActionType&fwk.UpdateNodeTaint != 0 {
-					registerNodeTaintUpdated = true
-				}
+			queueingHintFn := &internalqueue.QueueingHintFunction{
+				PluginName:        e.Name(),
+				QueueingHintFn:    fn,
+				PreQueueingHintFn: event.PreQueueingHintFn,
 			}
 
-			queueingHintMap[event.Event] = append(queueingHintMap[event.Event], &internalqueue.QueueingHintFunction{
-				PluginName:     e.Name(),
-				QueueingHintFn: fn,
-			})
-		}
-		if registerNodeAdded && !registerNodeTaintUpdated {
-			// Temporally fix for the issue https://github.com/kubernetes/kubernetes/issues/109437
-			// NodeAdded QueueingHint isn't always called because of preCheck.
-			// It's definitely not something expected for plugin developers,
-			// and registering UpdateNodeTaint event is the only mitigation for now.
-			//
-			// So, here registers UpdateNodeTaint event for plugins that has NodeAdded event, but don't have UpdateNodeTaint event.
-			// It has a bad impact for the requeuing efficiency though, a lot better than some Pods being stuch in the
-			// unschedulable pod pool.
-			// This behavior will be removed when we remove the preCheck feature.
-			// See: https://github.com/kubernetes/kubernetes/issues/110175
-			queueingHintMap[fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.UpdateNodeTaint}] =
-				append(queueingHintMap[fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.UpdateNodeTaint}],
-					&internalqueue.QueueingHintFunction{
-						PluginName:     e.Name(),
-						QueueingHintFn: defaultQueueingHintFn,
-					},
-				)
+			if event.Event.Resource == fwk.Pod {
+				for _, podEvent := range framework.UnrollPodEvent(event.Event) {
+					queueingHintMap[podEvent] = append(queueingHintMap[podEvent], queueingHintFn)
+				}
+			} else {
+				queueingHintMap[event.Event] = append(queueingHintMap[event.Event], queueingHintFn)
+			}
 		}
 	}
 	if returnErr != nil {
@@ -572,9 +566,11 @@ func (sched *Scheduler) Run(ctx context.Context) {
 
 // NewInformerFactory creates a SharedInformerFactory and initializes a scheduler specific
 // in-place podInformer.
-func NewInformerFactory(cs clientset.Interface, resyncPeriod time.Duration) informers.SharedInformerFactory {
-	informerFactory := informers.NewSharedInformerFactory(cs, resyncPeriod)
-	informerFactory.InformerFor(&v1.Pod{}, newPodInformer)
+func NewInformerFactory(cs clientset.Interface, resyncPeriod time.Duration, informerName *cache.InformerName) informers.SharedInformerFactory {
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(cs, resyncPeriod, informers.WithInformerName(informerName))
+	informerFactory.InformerFor(&v1.Pod{}, func(cs clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+		return newPodInformer(cs, resyncPeriod, informerName)
+	})
 	return informerFactory
 }
 
@@ -654,12 +650,17 @@ func unionedGVKs(queueingHintsPerProfile internalqueue.QueueingHintMapPerProfile
 
 // newPodInformer creates a shared index informer that returns only non-terminal pods.
 // The PodInformer allows indexers to be added, but note that only non-conflict indexers are allowed.
-func newPodInformer(cs clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+func newPodInformer(cs clientset.Interface, resyncPeriod time.Duration, informerName *cache.InformerName) cache.SharedIndexInformer {
 	selector := fmt.Sprintf("status.phase!=%v,status.phase!=%v", v1.PodSucceeded, v1.PodFailed)
 	tweakListOptions := func(options *metav1.ListOptions) {
 		options.FieldSelector = selector
 	}
-	informer := coreinformers.NewFilteredPodInformer(cs, metav1.NamespaceAll, resyncPeriod, cache.Indexers{}, tweakListOptions)
+	informer := coreinformers.NewPodInformerWithOptions(cs, metav1.NamespaceAll, internalinterfaces.InformerOptions{
+		ResyncPeriod:     resyncPeriod,
+		Indexers:         cache.Indexers{},
+		TweakListOptions: tweakListOptions,
+		InformerName:     informerName,
+	})
 
 	// Dropping `.metadata.managedFields` to improve memory usage.
 	// The Extract workflow (i.e. `ExtractPod`) should be unused.

@@ -17,6 +17,8 @@ limitations under the License.
 package retry
 
 import (
+	"context"
+	stderrors "errors"
 	"fmt"
 	"testing"
 
@@ -67,5 +69,14 @@ func TestRetryOnConflict(t *testing.T) {
 	})
 	if err != nil || i != 2 {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestRetryOnConflictPreservesContextErrorWithoutLastError(t *testing.T) {
+	err := RetryOnConflict(DefaultBackoff, func() error {
+		return context.Canceled
+	})
+	if !stderrors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got %v", err)
 	}
 }

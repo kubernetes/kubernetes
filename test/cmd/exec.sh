@@ -67,7 +67,27 @@ __EOF__
   output_message=$(! kubectl exec test-pod -c nonexistent -- date 2>&1)
   kube::test::if_has_string "${output_message}" 'container nonexistent is not valid for pod test-pod out of: kubernetes-pause'
 
+  kubectl create -f - << __EOF__
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-test
+spec:
+  containers:
+  - name: container-a
+    image: registry.k8s.io/pause:3.10.1
+  - name: container-b
+    image: registry.k8s.io/pause:3.10.1
+__EOF__
+
+  ### Test execute with pod and container before dash separator
+  output_message=$(! kubectl exec -it pod-test -c container-a -- echo "test" 2>&1)
+  kube::test::if_has_not_string "${output_message}" 'exec \[POD\] \[COMMAND\] is not supported anymore'
+  kube::test::if_has_not_string "${output_message}" 'container container-a is not valid for pod pod-test'
+  kube::test::if_has_not_string "${output_message}" 'pods "pod-test" not found'
+
   # Clean up
+  kubectl delete pods pod-test
   kubectl delete pods test-pod
 
   set +o nounset

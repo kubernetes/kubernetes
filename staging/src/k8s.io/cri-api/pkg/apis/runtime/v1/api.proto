@@ -48,6 +48,19 @@ service RuntimeService {
     rpc PodSandboxStatus(PodSandboxStatusRequest) returns (PodSandboxStatusResponse) {}
     // ListPodSandbox returns a list of PodSandboxes.
     rpc ListPodSandbox(ListPodSandboxRequest) returns (ListPodSandboxResponse) {}
+    // StreamPodSandboxes returns a stream of PodSandboxes.
+    // This is an alternative to ListPodSandbox that streams results in lists
+    // of at least one item, avoiding the gRPC message size limit for nodes with
+    // many pods. The number of items per list may vary depending on the
+    // container runtime. Each item must appear in exactly one response and must
+    // not be duplicated across responses in the same stream. The server must
+    // close the stream with EOF after all items have been sent. The kubelet
+    // collects all items from the stream and processes them all at once after
+    // the stream completes. The kubelet enforces a timeout on the entire stream
+    // and will discard partial results if the stream is not completed in time.
+    // Feature gate: CRIListStreaming
+    // See https://kep.k8s.io/5825 for more details.
+    rpc StreamPodSandboxes(StreamPodSandboxesRequest) returns (stream StreamPodSandboxesResponse) {}
 
     // CreateContainer creates a new container in specified PodSandbox
     rpc CreateContainer(CreateContainerRequest) returns (CreateContainerResponse) {}
@@ -66,6 +79,19 @@ service RuntimeService {
     rpc RemoveContainer(RemoveContainerRequest) returns (RemoveContainerResponse) {}
     // ListContainers lists all containers by filters.
     rpc ListContainers(ListContainersRequest) returns (ListContainersResponse) {}
+    // StreamContainers returns a stream of containers.
+    // This is an alternative to ListContainers that streams results in lists
+    // of at least one item, avoiding the gRPC message size limit for nodes with
+    // many containers. The number of items per list may vary depending on the
+    // container runtime. Each item must appear in exactly one response and must
+    // not be duplicated across responses in the same stream. The server must
+    // close the stream with EOF after all items have been sent. The kubelet
+    // collects all items from the stream and processes them all at once after
+    // the stream completes. The kubelet enforces a timeout on the entire stream
+    // and will discard partial results if the stream is not completed in time.
+    // Feature gate: CRIListStreaming
+    // See https://kep.k8s.io/5825 for more details.
+    rpc StreamContainers(StreamContainersRequest) returns (stream StreamContainersResponse) {}
     // ContainerStatus returns status of the container. If the container is not
     // present, returns an error.
     rpc ContainerStatus(ContainerStatusRequest) returns (ContainerStatusResponse) {}
@@ -93,12 +119,40 @@ service RuntimeService {
     rpc ContainerStats(ContainerStatsRequest) returns (ContainerStatsResponse) {}
     // ListContainerStats returns stats of all running containers.
     rpc ListContainerStats(ListContainerStatsRequest) returns (ListContainerStatsResponse) {}
+    // StreamContainerStats returns a stream of container stats.
+    // This is an alternative to ListContainerStats that streams results in
+    // lists of at least one item, avoiding the gRPC message size limit for
+    // nodes with many containers. The number of items per list may vary
+    // depending on the container runtime. Each item must appear in exactly one
+    // response and must not be duplicated across responses in the same stream.
+    // The server must close the stream with EOF after all items have been sent.
+    // The kubelet collects all items from the stream and processes them all at
+    // once after the stream completes. The kubelet enforces a timeout on the
+    // entire stream and will discard partial results if the stream is not
+    // completed in time.
+    // Feature gate: CRIListStreaming
+    // See https://kep.k8s.io/5825 for more details.
+    rpc StreamContainerStats(StreamContainerStatsRequest) returns (stream StreamContainerStatsResponse) {}
 
     // PodSandboxStats returns stats of the pod sandbox. If the pod sandbox does not
     // exist, the call returns an error.
     rpc PodSandboxStats(PodSandboxStatsRequest) returns (PodSandboxStatsResponse) {}
     // ListPodSandboxStats returns stats of the pod sandboxes matching a filter.
     rpc ListPodSandboxStats(ListPodSandboxStatsRequest) returns (ListPodSandboxStatsResponse) {}
+    // StreamPodSandboxStats returns a stream of pod sandbox stats.
+    // This is an alternative to ListPodSandboxStats that streams results in
+    // lists of at least one item, avoiding the gRPC message size limit for
+    // nodes with many pods. The number of items per list may vary depending on
+    // the container runtime. Each item must appear in exactly one response and
+    // must not be duplicated across responses in the same stream. The server
+    // must close the stream with EOF after all items have been sent. The
+    // kubelet collects all items from the stream and processes them all at once
+    // after the stream completes. The kubelet enforces a timeout on the entire
+    // stream and will discard partial results if the stream is not completed
+    // in time.
+    // Feature gate: CRIListStreaming
+    // See https://kep.k8s.io/5825 for more details.
+    rpc StreamPodSandboxStats(StreamPodSandboxStatsRequest) returns (stream StreamPodSandboxStatsResponse) {}
 
     // UpdateRuntimeConfig updates the runtime configuration based on the given request.
     rpc UpdateRuntimeConfig(UpdateRuntimeConfigRequest) returns (UpdateRuntimeConfigResponse) {}
@@ -108,6 +162,25 @@ service RuntimeService {
 
     // CheckpointContainer checkpoints a container
     rpc CheckpointContainer(CheckpointContainerRequest) returns (CheckpointContainerResponse) {}
+
+    // CheckpointPod creates a Pod-level checkpoint. The caller must set a
+    // deadline on the call. If the pod sandbox does not exist, the deadline is
+    // exceeded, or the checkpoint operation fails, the call returns an error.
+    // The pod sandbox and containers must be running when the call starts. The
+    // runtime must pause every selected container before capturing any of
+    // them, keep all selected containers paused until every selected
+    // container has been captured, and resume all of them before returning on
+    // success, error, or deadline expiry. This produces one consistent
+    // pod-wide cut while ensuring the runtime never returns a frozen pod.
+    rpc CheckpointPod(CheckpointPodRequest) returns (CheckpointPodResponse) {}
+
+    // RestorePod prepares a pod sandbox and containers from a checkpoint. The
+    // caller must set a deadline on the call. On success, every returned
+    // container must be in the CREATED state and must not have executed the
+    // restored process; the caller invokes its pre-start hooks and then calls
+    // StartContainer for each returned ID. On error, the runtime must remove
+    // any sandbox and containers created by the call before returning.
+    rpc RestorePod(RestorePodRequest) returns (RestorePodResponse) {}
 
     // GetContainerEvents gets container events from the CRI runtime
     rpc GetContainerEvents(GetEventsRequest) returns (stream ContainerEventResponse) {}
@@ -121,6 +194,20 @@ service RuntimeService {
 
     // ListPodSandboxMetrics gets pod sandbox metrics from CRI Runtime
     rpc ListPodSandboxMetrics(ListPodSandboxMetricsRequest) returns (ListPodSandboxMetricsResponse) {}
+    // StreamPodSandboxMetrics returns a stream of pod sandbox metrics.
+    // This is an alternative to ListPodSandboxMetrics that streams results in
+    // lists of at least one item, avoiding the gRPC message size limit for
+    // nodes with many pods. The number of items per list may vary depending on
+    // the container runtime. Each item must appear in exactly one response and
+    // must not be duplicated across responses in the same stream. The server
+    // must close the stream with EOF after all items have been sent. The
+    // kubelet collects all items from the stream and processes them all at once
+    // after the stream completes. The kubelet enforces a timeout on the entire
+    // stream and will discard partial results if the stream is not completed
+    // in time.
+    // Feature gate: CRIListStreaming
+    // See https://kep.k8s.io/5825 for more details.
+    rpc StreamPodSandboxMetrics(StreamPodSandboxMetricsRequest) returns (stream StreamPodSandboxMetricsResponse) {}
 
     // RuntimeConfig returns configuration information of the runtime.
     // A couple of notes:
@@ -143,6 +230,19 @@ service RuntimeService {
 service ImageService {
     // ListImages lists existing images.
     rpc ListImages(ListImagesRequest) returns (ListImagesResponse) {}
+    // StreamImages returns a stream of images.
+    // This is an alternative to ListImages that streams results in lists of at
+    // least one item, avoiding the gRPC message size limit for nodes with many
+    // images. The number of items per list may vary depending on the container
+    // runtime. Each item must appear in exactly one response and must not be
+    // duplicated across responses in the same stream. The server must close the
+    // stream with EOF after all items have been sent. The kubelet collects all
+    // items from the stream and processes them all at once after the stream
+    // completes. The kubelet enforces a timeout on the entire stream and will
+    // discard partial results if the stream is not completed in time.
+    // Feature gate: CRIListStreaming
+    // See https://kep.k8s.io/5825 for more details.
+    rpc StreamImages(StreamImagesRequest) returns (stream StreamImagesResponse) {}
     // ImageStatus returns the status of the image. If the image is not
     // present, returns a response with ImageStatusResponse.Image set to
     // nil.
@@ -275,6 +375,10 @@ message Mount {
     // return an error.
     // Introduced in the Image Volume Source KEP beta graduation: https://kep.k8s.io/4639
     string image_sub_path = 10;
+    // mount_options specifies additional bind mount options (e.g., noexec,
+    // nodev, nosuid) that the runtime must apply when mounting this volume
+    // into the container. These are passed as OCI mount options.
+    repeated string mount_options = 11;
 }
 
 // IDMapping describes host to container ID mappings for a pod sandbox.
@@ -678,6 +782,16 @@ message ListPodSandboxResponse {
     repeated PodSandbox items = 1;
 }
 
+message StreamPodSandboxesRequest {
+    // Filter for the list request.
+    PodSandboxFilter filter = 1;
+}
+
+message StreamPodSandboxesResponse {
+    // List of PodSandboxes.
+    repeated PodSandbox pod_sandboxes = 1;
+}
+
 message PodSandboxStatsRequest {
     // ID of the pod sandbox for which to retrieve stats.
     string pod_sandbox_id = 1;
@@ -706,6 +820,16 @@ message ListPodSandboxStatsRequest {
 message ListPodSandboxStatsResponse {
     // Stats of the pod sandbox.
     repeated PodSandboxStats stats = 1;
+}
+
+message StreamPodSandboxStatsRequest {
+    // Filter for the list request.
+    PodSandboxStatsFilter filter = 1;
+}
+
+message StreamPodSandboxStatsResponse {
+    // List of pod sandbox stats.
+    repeated PodSandboxStats pod_sandbox_stats = 1;
 }
 
 // PodSandboxAttributes provides basic information of the pod sandbox.
@@ -850,7 +974,7 @@ message ImageSpec {
 
 message KeyValue {
     string key = 1;
-    string value = 2;
+    bytes value = 2;
 }
 
 // LinuxContainerResources specifies Linux specific configuration for
@@ -1195,72 +1319,72 @@ message ContainerConfig {
 }
 
 enum Signal {
-    RUNTIME_DEFAULT   = 0;
-    SIGABRT           = 1;
-    SIGALRM           = 2;
-    SIGBUS            = 3;
-    SIGCHLD           = 4;
-    SIGCLD            = 5;
-    SIGCONT           = 6;
-    SIGFPE            = 7;
-    SIGHUP            = 8;
-    SIGILL            = 9;
-    SIGINT            = 10;
-    SIGIO             = 11;
-    SIGIOT            = 12;
-    SIGKILL           = 13;
-    SIGPIPE           = 14;
-    SIGPOLL           = 15;
-    SIGPROF           = 16;
-    SIGPWR            = 17;
-    SIGQUIT           = 18;
-    SIGSEGV           = 19;
-    SIGSTKFLT         = 20;
-    SIGSTOP           = 21;
-    SIGSYS            = 22;
-    SIGTERM           = 23;
-    SIGTRAP           = 24;
-    SIGTSTP           = 25;
-    SIGTTIN           = 26;
-    SIGTTOU           = 27;
-    SIGURG            = 28;
-    SIGUSR1           = 29;
-    SIGUSR2           = 30;
-    SIGVTALRM         = 31;
-    SIGWINCH          = 32;
-    SIGXCPU           = 33;
-    SIGXFSZ           = 34;
-    SIGRTMIN          = 35;
-    SIGRTMINPLUS1     = 36;
-    SIGRTMINPLUS2     = 37;
-    SIGRTMINPLUS3     = 38;
-    SIGRTMINPLUS4     = 39;
-    SIGRTMINPLUS5     = 40;
-    SIGRTMINPLUS6     = 41;
-    SIGRTMINPLUS7     = 42;
-    SIGRTMINPLUS8     = 43;
-    SIGRTMINPLUS9     = 44;
-    SIGRTMINPLUS10    = 45;
-    SIGRTMINPLUS11    = 46;
-    SIGRTMINPLUS12    = 47;
-    SIGRTMINPLUS13    = 48;
-    SIGRTMINPLUS14    = 49;
-    SIGRTMINPLUS15    = 50;
-    SIGRTMAXMINUS14   = 51;
-    SIGRTMAXMINUS13   = 52;
-    SIGRTMAXMINUS12   = 53;
-    SIGRTMAXMINUS11   = 54;
-    SIGRTMAXMINUS10   = 55;
-    SIGRTMAXMINUS9    = 56;
-    SIGRTMAXMINUS8    = 57;
-    SIGRTMAXMINUS7    = 58;
-    SIGRTMAXMINUS6    = 59;
-    SIGRTMAXMINUS5    = 60;
-    SIGRTMAXMINUS4    = 61;
-    SIGRTMAXMINUS3    = 62;
-    SIGRTMAXMINUS2    = 63;
-    SIGRTMAXMINUS1    = 64;
-    SIGRTMAX          = 65;
+    SIGNAL_RUNTIME_DEFAULT   = 0;
+    SIGNAL_SIGABRT           = 1;
+    SIGNAL_SIGALRM           = 2;
+    SIGNAL_SIGBUS            = 3;
+    SIGNAL_SIGCHLD           = 4;
+    SIGNAL_SIGCLD            = 5;
+    SIGNAL_SIGCONT           = 6;
+    SIGNAL_SIGFPE            = 7;
+    SIGNAL_SIGHUP            = 8;
+    SIGNAL_SIGILL            = 9;
+    SIGNAL_SIGINT            = 10;
+    SIGNAL_SIGIO             = 11;
+    SIGNAL_SIGIOT            = 12;
+    SIGNAL_SIGKILL           = 13;
+    SIGNAL_SIGPIPE           = 14;
+    SIGNAL_SIGPOLL           = 15;
+    SIGNAL_SIGPROF           = 16;
+    SIGNAL_SIGPWR            = 17;
+    SIGNAL_SIGQUIT           = 18;
+    SIGNAL_SIGSEGV           = 19;
+    SIGNAL_SIGSTKFLT         = 20;
+    SIGNAL_SIGSTOP           = 21;
+    SIGNAL_SIGSYS            = 22;
+    SIGNAL_SIGTERM           = 23;
+    SIGNAL_SIGTRAP           = 24;
+    SIGNAL_SIGTSTP           = 25;
+    SIGNAL_SIGTTIN           = 26;
+    SIGNAL_SIGTTOU           = 27;
+    SIGNAL_SIGURG            = 28;
+    SIGNAL_SIGUSR1           = 29;
+    SIGNAL_SIGUSR2           = 30;
+    SIGNAL_SIGVTALRM         = 31;
+    SIGNAL_SIGWINCH          = 32;
+    SIGNAL_SIGXCPU           = 33;
+    SIGNAL_SIGXFSZ           = 34;
+    SIGNAL_SIGRTMIN          = 35;
+    SIGNAL_SIGRTMINPLUS1     = 36;
+    SIGNAL_SIGRTMINPLUS2     = 37;
+    SIGNAL_SIGRTMINPLUS3     = 38;
+    SIGNAL_SIGRTMINPLUS4     = 39;
+    SIGNAL_SIGRTMINPLUS5     = 40;
+    SIGNAL_SIGRTMINPLUS6     = 41;
+    SIGNAL_SIGRTMINPLUS7     = 42;
+    SIGNAL_SIGRTMINPLUS8     = 43;
+    SIGNAL_SIGRTMINPLUS9     = 44;
+    SIGNAL_SIGRTMINPLUS10    = 45;
+    SIGNAL_SIGRTMINPLUS11    = 46;
+    SIGNAL_SIGRTMINPLUS12    = 47;
+    SIGNAL_SIGRTMINPLUS13    = 48;
+    SIGNAL_SIGRTMINPLUS14    = 49;
+    SIGNAL_SIGRTMINPLUS15    = 50;
+    SIGNAL_SIGRTMAXMINUS14   = 51;
+    SIGNAL_SIGRTMAXMINUS13   = 52;
+    SIGNAL_SIGRTMAXMINUS12   = 53;
+    SIGNAL_SIGRTMAXMINUS11   = 54;
+    SIGNAL_SIGRTMAXMINUS10   = 55;
+    SIGNAL_SIGRTMAXMINUS9    = 56;
+    SIGNAL_SIGRTMAXMINUS8    = 57;
+    SIGNAL_SIGRTMAXMINUS7    = 58;
+    SIGNAL_SIGRTMAXMINUS6    = 59;
+    SIGNAL_SIGRTMAXMINUS5    = 60;
+    SIGNAL_SIGRTMAXMINUS4    = 61;
+    SIGNAL_SIGRTMAXMINUS3    = 62;
+    SIGNAL_SIGRTMAXMINUS2    = 63;
+    SIGNAL_SIGRTMAXMINUS1    = 64;
+    SIGNAL_SIGRTMAX          = 65;
 }
 
 message CreateContainerRequest {
@@ -1370,6 +1494,16 @@ message Container {
 }
 
 message ListContainersResponse {
+    // List of containers.
+    repeated Container containers = 1;
+}
+
+message StreamContainersRequest {
+    // Filter for the list request.
+    ContainerFilter filter = 1;
+}
+
+message StreamContainersResponse {
     // List of containers.
     repeated Container containers = 1;
 }
@@ -1610,6 +1744,16 @@ message ListImagesResponse {
     repeated Image images = 1;
 }
 
+message StreamImagesRequest {
+    // Filter to list images.
+    ImageFilter filter = 1;
+}
+
+message StreamImagesResponse {
+    // List of images.
+    repeated Image images = 1;
+}
+
 message ImageStatusRequest {
     // Spec of the image.
     ImageSpec image = 1;
@@ -1751,6 +1895,12 @@ message RuntimeHandler {
 message RuntimeFeatures {
     // supplemental_groups_policy is set to true if the runtime supports SupplementalGroupsPolicy and ContainerUser.
     bool supplemental_groups_policy = 1;
+    // user_namespaces_host_network is set to true if the runtime supports containers using both
+    // host network and user namespace simultaneously.
+    bool user_namespaces_host_network = 2;
+    // mount_options is set to true if the runtime supports additional bind
+    // mount options (noexec, nodev, nosuid) on container mounts.
+    bool mount_options = 3;
 }
 
 message StatusResponse {
@@ -1851,6 +2001,16 @@ message ContainerStatsFilter {
 message ListContainerStatsResponse {
     // Stats of the container.
     repeated ContainerStats stats = 1;
+}
+
+message StreamContainerStatsRequest {
+    // Filter for the list request.
+    ContainerStatsFilter filter = 1;
+}
+
+message StreamContainerStatsResponse {
+    // List of container stats.
+    repeated ContainerStats container_stats = 1;
 }
 
 // ContainerAttributes provides basic information of the container.
@@ -2012,6 +2172,96 @@ message CheckpointContainerRequest {
 
 message CheckpointContainerResponse {}
 
+message CheckpointPodRequest {
+    // ID of the pod sandbox to be checkpointed.
+    string pod_sandbox_id = 1;
+    // Absolute path to an existing, empty directory where the runtime must
+    // write the checkpoint. The caller owns the directory, makes it writable by
+    // the runtime, and should restrict access to the caller and runtime. The
+    // runtime must not remove the directory. A Pod checkpoint is a collection
+    // of runtime-defined files; their layout and format are opaque to the
+    // caller. The runtime must not write outside this directory and must remove
+    // partial artifacts before returning an error.
+    string output_path = 2;
+    // IDs of the containers to include in the checkpoint. The list must be
+    // non-empty, must not contain duplicates, and must contain exactly the
+    // running containers selected by the caller. Every container must belong to
+    // `pod_sandbox_id` and be running; otherwise the runtime must fail the
+    // request without producing a checkpoint.
+    repeated string container_ids = 3;
+    // Optional opaque runtime-specific checkpoint options supplied by the CRI
+    // caller. Keys are interpreted in the scope of the pod sandbox's runtime
+    // handler. Kubernetes does not expose these options in its alpha API and
+    // kubelet sends an empty map. Direct CRI callers may set keys documented by
+    // the selected runtime. The runtime must reject unsupported or invalid keys
+    // and values rather than silently ignore them. Options must not contain
+    // secrets.
+    map<string, string> options = 4;
+}
+
+// Empty: the checkpoint is written under the request's `output_path` directory,
+// which the caller provided and already knows, so there is no separate location
+// or object name to return.
+message CheckpointPodResponse {}
+
+message RestorePodRequest {
+    // Absolute path to the directory containing the checkpoint data to restore.
+    // The runtime must not modify the checkpoint data. The data format and
+    // layout are runtime-defined.
+    string checkpoint_path = 1;
+    // Pod sandbox configuration supplied by the kubelet, with node-local restore-time
+    // updates (new Pod UID, cgroup parent path, log directory). Pod-spec equality between
+    // the live Pod and status.checkpointedPodTemplate of the referenced PodCheckpoint is
+    // enforced at API-server admission (and re-checked by the kubelet before this call);
+    // arbitrary user overrides are not permitted.
+    PodSandboxConfig config = 2;
+    // Runtime handler to use for restoring the pod sandbox and its containers.
+    // The handler selects the configured runtime implementation that interprets
+    // the runtime-specific checkpoint data. The selected handler must be
+    // compatible with the checkpoint; the runtime must reject a checkpoint it
+    // cannot restore. An empty value selects the default handler, as for
+    // RunPodSandboxRequest. The runtime must reject an unknown non-empty handler.
+    string runtime_handler = 3;
+    // Optional opaque runtime-specific restore options supplied by the CRI
+    // caller. Keys are interpreted in the scope of `runtime_handler`.
+    // Kubernetes does not expose these options in its alpha API and kubelet
+    // sends an empty map. Direct CRI callers may set keys documented by the
+    // selected runtime. The runtime must reject unsupported or invalid keys and
+    // values rather than silently ignore them. Options must not contain secrets.
+    map<string, string> options = 4;
+    // Complete restore-time configurations for all containers represented by
+    // the checkpoint. The list must be non-empty. Every entry must have a
+    // non-empty, unique metadata name, and those names must be the exact set of
+    // container names in the checkpoint. The runtime must match containers by
+    // metadata name. The checkpoint is authoritative for filesystem and
+    // process state. Image, command, args, working directory, environment, and
+    // process credentials describe the expected checkpointed process; they
+    // must not start or mutate it, and any mismatch the runtime can validate
+    // must fail the restore. The runtime applies restore-time settings outside
+    // checkpoint-owned process state, including labels, annotations, mounts,
+    // devices, Linux resources, logging, and security constraints, and must
+    // fail settings incompatible with the checkpoint.
+    repeated ContainerConfig container_configs = 5;
+}
+
+message RestoredContainer {
+    // Name from the restored container's ContainerMetadata. This identifies
+    // which requested container configuration produced the runtime ID.
+    string name = 1;
+    // Non-empty runtime ID of the restored container.
+    string container_id = 2;
+}
+
+message RestorePodResponse {
+    // Non-empty ID of the restored pod sandbox.
+    string pod_sandbox_id = 1;
+    // Restored containers in CREATED state, without having executed the
+    // restored process (see RestorePod). This must contain exactly one entry
+    // for every request.container_configs entry. Names and container IDs
+    // must each be non-empty and unique.
+    repeated RestoredContainer restored_containers = 2;
+}
+
 message GetEventsRequest {}
 
 message ContainerEventResponse {
@@ -2067,6 +2317,13 @@ message ListPodSandboxMetricsRequest {}
 
 message ListPodSandboxMetricsResponse {
     repeated PodSandboxMetrics pod_metrics = 1;
+}
+
+message StreamPodSandboxMetricsRequest {}
+
+message StreamPodSandboxMetricsResponse {
+    // List of pod sandbox metrics.
+    repeated PodSandboxMetrics pod_sandbox_metrics = 1;
 }
 
 message PodSandboxMetrics {

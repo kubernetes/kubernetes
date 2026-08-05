@@ -73,20 +73,22 @@ func NewStorageVersionGC(ctx context.Context, clientset kubernetes.Interface, le
 		),
 	}
 	logger := klog.FromContext(ctx)
-	leaseInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := leaseInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: func(obj interface{}) {
 			c.onDeleteLease(logger, obj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 	// use the default resync period from the informer
-	storageVersionInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = storageVersionInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			c.onAddStorageVersion(logger, obj)
 		},
 		UpdateFunc: func(old, newObj interface{}) {
 			c.onUpdateStorageVersion(logger, old, newObj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 
 	return c
 }

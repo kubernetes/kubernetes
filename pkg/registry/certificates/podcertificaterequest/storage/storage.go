@@ -47,7 +47,7 @@ var _ rest.TableConvertor = &REST{}
 var _ genericregistry.GenericStore = &REST{}
 
 // NewREST returns a RESTStorage object for PodCertificateRequest objects.
-func NewREST(optsGetter generic.RESTOptionsGetter, authorizer authorizer.Authorizer, clock clock.PassiveClock) (*REST, *StatusREST, error) {
+func NewREST(optsGetter generic.RESTOptionsGetter, authorizer authorizer.UnconditionalAuthorizer, clock clock.PassiveClock) (*REST, *StatusREST, error) {
 	strategy := podcertificaterequest.NewStrategy()
 
 	store := &genericregistry.Store{
@@ -56,9 +56,10 @@ func NewREST(optsGetter generic.RESTOptionsGetter, authorizer authorizer.Authori
 		DefaultQualifiedResource:  api.Resource("podcertificaterequests"),
 		SingularQualifiedResource: api.Resource("podcertificaterequest"),
 
-		CreateStrategy: strategy,
-		UpdateStrategy: strategy,
-		DeleteStrategy: strategy,
+		CreateStrategy:      strategy,
+		UpdateStrategy:      strategy,
+		DeleteStrategy:      strategy,
+		ResetFieldsStrategy: strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}

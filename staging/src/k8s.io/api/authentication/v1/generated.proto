@@ -28,9 +28,19 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "k8s.io/api/authentication/v1";
 
+// AttestationValue masks the value so protobuf can generate
+// +protobuf.nullable=true
+// +protobuf.options.(gogoproto.goproto_stringer)=false
+message AttestationValue {
+  // items, if empty, will result in an empty slice
+
+  repeated string items = 1;
+}
+
 // BoundObjectReference is a reference to an object that a token is bound to.
 message BoundObjectReference {
-  // kind of the referent. Valid kinds are 'Pod' and 'Secret'.
+  // kind of the referent. Valid kinds are 'Pod', 'Secret', 'Node',
+  // 'ValidatingWebhookConfiguration', and 'MutatingWebhookConfiguration'.
   // +optional
   optional string kind = 1;
 
@@ -59,10 +69,12 @@ message ExtraValue {
 // SelfSubjectReview contains the user information that the kube-apiserver has about the user making this request.
 // When using impersonation, users will receive the user info of the user being impersonated.  If impersonation or
 // request header authentication is used, any extra keys will have their case ignored and returned as lowercase.
+// +k8s:supportsSubresource="/status"
 message SelfSubjectReview {
   // metadata is standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
+  // +k8s:opaqueType
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // status is filled in by the server with the user attributes.
@@ -82,6 +94,7 @@ message TokenRequest {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
+  // +k8s:opaqueType
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec holds information about the request being evaluated
@@ -118,6 +131,14 @@ message TokenRequestSpec {
   // small if you want prompt revocation.
   // +optional
   optional BoundObjectReference boundObjectRef = 3;
+
+  // attestations is a map of well-known keys to string-slice values.
+  // The values for each key have a specific semantic meaning, which is
+  // documented on the key definition. Requesters of tokens may ask
+  // the Kubernetes API Server to attest to certain claims. The API Server
+  // may perform authorization checks depending on the key of this map.
+  // +optional
+  map<string, AttestationValue> attestations = 5;
 }
 
 // TokenRequestStatus is the result of a token request.
@@ -134,10 +155,12 @@ message TokenRequestStatus {
 // TokenReview attempts to authenticate a token to a known user.
 // Note: TokenReview requests may be cached by the webhook token authenticator
 // plugin in the kube-apiserver.
+// +k8s:supportsSubresource="/status"
 message TokenReview {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
+  // +k8s:opaqueType
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec holds information about the request being evaluated

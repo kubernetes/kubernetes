@@ -43,7 +43,6 @@ import (
 	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -74,9 +73,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		TestReplicationControllerServeImageOrFail(ctx, f, "basic", imageutils.GetE2EImage(imageutils.Agnhost))
 	})
 
-	ginkgo.It("should serve a basic image on each replica with a private image", func(ctx context.Context) {
-		// requires private images
-		e2eskipper.SkipUnlessProviderIs("gce")
+	f.It("should serve a basic image on each replica with a private image", f.WithProvider("gce") /* requires private images */, func(ctx context.Context) {
 		privateimage := imageutils.GetConfig(imageutils.AgnhostPrivate)
 		TestReplicationControllerServeImageOrFail(ctx, f, "private", privateimage.GetE2EImage())
 	})

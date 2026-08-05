@@ -17,13 +17,16 @@ limitations under the License.
 package memorymanager
 
 import (
-	"github.com/go-logr/logr"
-	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"context"
+
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 
 	v1 "k8s.io/api/core/v1"
 
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
 // On Windows we want to use the same logic as the StaticPolicy to compute the memory topology hints
@@ -36,11 +39,16 @@ const policyTypeBestEffort policyType = "BestEffort"
 // bestEffortPolicy is implementation of the policy interface for the BestEffort policy
 type bestEffortPolicy struct {
 	static *staticPolicy
+	// affinity is the same Store used by the static policy, but typed as an
+	// AuthoritativeStore so the policy can ask whether a container's hint is
+	// authoritative (Windows: the container follows the CPU manager's NUMA
+	// decision) and therefore must not be extended to additional NUMA nodes.
+	affinity topologymanager.AuthoritativeStore
 }
 
 var _ Policy = &bestEffortPolicy{}
 
-func NewPolicyBestEffort(logger logr.Logger, machineInfo *cadvisorapi.MachineInfo, reserved systemReservedMemory, affinity topologymanager.Store) (Policy, error) {
+func NewPolicyBestEffort(logger klog.Logger, machineInfo *cadvisorapi.MachineInfo, reserved systemReservedMemory, affinity topologymanager.AuthoritativeStore) (Policy, error) {
 	p, err := NewPolicyStatic(logger, machineInfo, reserved, affinity)
 
 	if err != nil {
@@ -48,7 +56,8 @@ func NewPolicyBestEffort(logger logr.Logger, machineInfo *cadvisorapi.MachineInf
 	}
 
 	return &bestEffortPolicy{
-		static: p.(*staticPolicy),
+		static:   p.(*staticPolicy),
+		affinity: affinity,
 	}, nil
 }
 
@@ -56,32 +65,38 @@ func (p *bestEffortPolicy) Name() string {
 	return string(policyTypeBestEffort)
 }
 
-func (p *bestEffortPolicy) Start(logger logr.Logger, s state.State) error {
+func (p *bestEffortPolicy) Start(logger klog.Logger, s state.State) error {
 	return p.static.Start(logger, s)
 }
 
-func (p *bestEffortPolicy) Allocate(logger logr.Logger, s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
-	return p.static.Allocate(logger, s, pod, container)
+func (p *bestEffortPolicy) Allocate(ctx context.Context, s state.State, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) (rerr error) {
+	// On Windows the container follows the CPU manager's NUMA decision when its
+	// affinity hint is authoritative (it owns exclusive CPUs). In that case the
+	// static policy must not extend the hint to additional NUMA nodes (memory
+	// placement follows CPU affinity), so signal that through skipExtend before
+	// delegating. Otherwise the static policy extends the hint as usual.
+	p.static.skipExtend = p.affinity.IsHintAuthoritative(string(pod.UID), container.Name)
+	return p.static.Allocate(ctx, s, pod, container, operation)
 }
 
-func (p *bestEffortPolicy) RemoveContainer(logger logr.Logger, s state.State, podUID string, containerName string) {
+func (p *bestEffortPolicy) RemoveContainer(logger klog.Logger, s state.State, podUID string, containerName string) {
 	p.static.RemoveContainer(logger, s, podUID, containerName)
 }
 
-func (p *bestEffortPolicy) GetPodTopologyHints(logger logr.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (p *bestEffortPolicy) GetPodTopologyHints(_ klog.Logger, s state.State, pod *v1.Pod, _ lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	// Pod-level resources are not supported on Windows.
 	return nil
 }
 
-func (p *bestEffortPolicy) GetTopologyHints(logger logr.Logger, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
-	return p.static.GetTopologyHints(logger, s, pod, container)
+func (p *bestEffortPolicy) GetTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
+	return p.static.GetTopologyHints(logger, s, pod, container, operation)
 }
 
 func (p *bestEffortPolicy) GetAllocatableMemory(s state.State) []state.Block {
 	return p.static.GetAllocatableMemory(s)
 }
 
-func (p *bestEffortPolicy) AllocatePod(logger logr.Logger, s state.State, pod *v1.Pod) error {
+func (p *bestEffortPolicy) AllocatePod(_ klog.Logger, s state.State, pod *v1.Pod, _ lifecycle.Operation) error {
 	// Pod-level resources are not supported on Windows.
 	return nil
 }

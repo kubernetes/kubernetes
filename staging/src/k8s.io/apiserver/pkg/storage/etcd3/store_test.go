@@ -19,11 +19,13 @@ package etcd3
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -47,11 +49,16 @@ import (
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
+	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
+	storagemetrics "k8s.io/apiserver/pkg/storage/metrics"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
@@ -160,6 +167,72 @@ func TestDeleteWithConflict(t *testing.T) {
 	storagetesting.RunTestDeleteWithConflict(ctx, t, store)
 }
 
+type testTransformer struct {
+	value.Transformer
+	fail atomic.Bool
+}
+
+func (tt *testTransformer) setFailing(c bool) {
+	tt.fail.Store(c)
+}
+
+func (tt *testTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) (out []byte, stale bool, err error) {
+	if tt.fail.Load() {
+		return nil, false, errors.New("synthetic error")
+	}
+	return tt.Transformer.TransformFromStorage(ctx, data, dataCtx)
+}
+
+type testCodec struct {
+	runtime.Codec
+	fail atomic.Bool
+}
+
+func (tc *testCodec) setFailing(c bool) {
+	tc.fail.Store(c)
+}
+
+func (tc *testCodec) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
+	if tc.fail.Load() {
+		return nil, nil, errors.New("synthetic error")
+	}
+	return tc.Codec.Decode(data, defaults, into)
+}
+
+func TestDeleteWithConflictAndMissingExpectedTransformOrDecodeError(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
+
+	codec := &testCodec{Codec: apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)}
+	ctx, s, _ := testSetup(t, withCodec(codec))
+
+	storagetesting.RunTestDeleteWithConflictAndMissingExpectedTransformOrDecodeError(ctx, t, s, codec.setFailing)
+}
+
+func TestDeleteWithConflictAndExpectedTransformError(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
+
+	transformer := &testTransformer{Transformer: newTestTransformer()}
+	ctx, s, _ := testSetup(t, withTransformer(transformer))
+
+	storagetesting.RunTestDeleteExpectedTransformOrDecodeError(ctx, t, s, transformer.setFailing)
+}
+
+func TestDeleteWithConflictAndExpectedDecodeError(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
+
+	codec := &testCodec{Codec: apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)}
+	ctx, s, _ := testSetup(t, withCodec(codec))
+
+	storagetesting.RunTestDeleteExpectedTransformOrDecodeError(ctx, t, s, codec.setFailing)
+}
+
+func TestDeleteWithSuggestionAndMissingExpectedTransformOrDecodeFailure(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
+
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestDeleteWithSuggestionAndMissingExpectedTransformOrDecodeError(ctx, t, store)
+}
+
 func TestPreconditionalDeleteWithSuggestion(t *testing.T) {
 	ctx, store, _ := testSetup(t)
 	storagetesting.RunTestPreconditionalDeleteWithSuggestion(ctx, t, store)
@@ -190,6 +263,21 @@ func TestKeySchema(t *testing.T) {
 	storagetesting.RunTestKeySchema(ctx, t, store)
 }
 
+func TestGetListWithErrorAggregation(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
+	ctx, s, _ := testSetup(t)
+	store := NewStoreWithUnsafeCorruptObjectDeletion(s, s.groupResource)
+	corruptErr := &corruptObjectError{err: fmt.Errorf("bits flipped"), errType: untransformable}
+	storagetesting.RunTestGetListWithErrorAggregation(ctx, t, &storeWithTransformerOverride{Interface: store, store: s}, corruptErr)
+}
+
+func TestGetListWithoutErrorAggregation(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, false)
+	ctx, s, _ := testSetup(t)
+	corruptErr := &corruptObjectError{err: fmt.Errorf("bits flipped"), errType: untransformable}
+	storagetesting.RunTestGetListWithoutErrorAggregation(ctx, t, &storeWithTransformerOverride{Interface: s, store: s}, corruptErr)
+}
+
 type storeWithPrefixTransformer struct {
 	*store
 }
@@ -205,25 +293,20 @@ func (s *storeWithPrefixTransformer) UpdatePrefixTransformer(modifier storagetes
 	}
 }
 
-type corruptedTransformer struct {
-	value.Transformer
+type storeWithTransformerOverride struct {
+	storage.Interface
+	// we need the original *store instance to mutate the transformer
+	store *store
 }
 
-func (f *corruptedTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) (out []byte, stale bool, err error) {
-	return nil, true, &corruptObjectError{err: fmt.Errorf("bits flipped"), errType: untransformable}
-}
-
-type storeWithCorruptedTransformer struct {
-	*store
-}
-
-func (s *storeWithCorruptedTransformer) CorruptTransformer() func() {
-	ct := &corruptedTransformer{Transformer: s.transformer}
-	s.transformer = ct
-	s.watcher.transformer = ct
+func (s *storeWithTransformerOverride) UpdateTransformer(modifier storagetesting.TransformerModifier) func() {
+	orig := s.store.transformer
+	next := modifier(orig)
+	s.store.transformer = next
+	s.store.watcher.transformer = next
 	return func() {
-		s.transformer = ct.Transformer
-		s.watcher.transformer = ct.Transformer
+		s.store.transformer = orig
+		s.store.watcher.transformer = orig
 	}
 }
 
@@ -258,13 +341,196 @@ func TestTransformationFailure(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
+	for _, rangeStream := range []bool{false, true} {
+		t.Run(fmt.Sprintf("rangeStream=%v", rangeStream), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EtcdRangeStream, rangeStream)
+			resetFeatureSupportCheckerDuringTest(t)
+			ctx, store, client := testSetup(t)
+			kvRecorder := client.KV.(*storagetesting.KVRecorder)
+			storagetesting.RunTestList(ctx, t, store, compactStorage(store, client.Client), false, client.Kubernetes.(*storagetesting.KubernetesRecorder))
+			streamReads := kvRecorder.GetStreamReadsAndReset()
+			if rangeStream && streamReads == 0 {
+				t.Error("expected lists to be served by RangeStream")
+			}
+			if !rangeStream && streamReads > 0 {
+				t.Errorf("expected no RangeStream requests with the feature disabled, got %d", streamReads)
+			}
+		})
+	}
+}
+
+// TestGetListStreamFallsBackToPaginated verifies that a GetList against a server without
+// RangeStream support marks the feature unsupported and serves from the paginated path.
+func TestGetListStreamFallsBackToPaginated(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EtcdRangeStream, true)
+	resetFeatureSupportCheckerDuringTest(t)
+
+	ctx, store, _ := testSetup(t)
+	initList, err := initStoreData(ctx, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kvWrapper := newEtcdClientKVWrapper(store.client.KV)
+	kvWrapper.streamKV = unimplementedRangeStreamKV()
+	store.client.KV = kvWrapper
+
+	metrics.Register()
+	legacyregistry.Reset()
+	t.Cleanup(legacyregistry.Reset)
+
+	out := &example.PodList{}
+	if err := store.GetList(ctx, "/pods/", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, out); err != nil {
+		t.Fatalf("GetList failed: %v", err)
+	}
+
+	if kvWrapper.getStreamCallCounter != 1 {
+		t.Errorf("expected GetStream to be called once, got %d", kvWrapper.getStreamCallCounter)
+	}
+	// The Unimplemented probe is not recorded, only the unary request serving the list.
+	expected := `# HELP etcd_requests_total [ALPHA] Etcd request counts for each operation and object type.
+# TYPE etcd_requests_total counter
+etcd_requests_total{group="",operation="list",resource="pods"} 1
+`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "etcd_requests_total", "etcd_request_errors_total"); err != nil {
+		t.Error(err)
+	}
+	if kvWrapper.getCallCounter == 0 {
+		t.Error("expected the paginated Get path to serve the list after fallback")
+	}
+	if etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RangeStream) {
+		t.Error("expected RangeStream to be marked unsupported after the Unimplemented fallback")
+	}
+	if len(out.Items) != len(initList) {
+		t.Errorf("returned %d items, want %d", len(out.Items), len(initList))
+	}
+
+	// The feature is marked unsupported, so subsequent lists must not retry the stream.
+	if err := store.GetList(ctx, "/pods/", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, &example.PodList{}); err != nil {
+		t.Fatalf("GetList failed: %v", err)
+	}
+	if kvWrapper.getStreamCallCounter != 1 {
+		t.Errorf("expected no further GetStream calls after fallback, got %d", kvWrapper.getStreamCallCounter)
+	}
+}
+
+// TestGetListStreamMultiChunk verifies the streamed request shapes on lists spanning
+// multiple RangeStream chunks (the etcd server chunks streams at 10 keys).
+func TestGetListStreamMultiChunk(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EtcdRangeStream, true)
+	resetFeatureSupportCheckerDuringTest(t)
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestList(ctx, t, store, compactStorage(store, client.Client), false, client.Kubernetes.(*storagetesting.KubernetesRecorder))
+	kvRecorder := client.KV.(*storagetesting.KVRecorder)
+
+	const podCount = 25
+	for i := range podCount {
+		pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: fmt.Sprintf("pod-%02d", i)}}
+		if err := store.Create(ctx, fmt.Sprintf("/pods/ns/pod-%02d", i), pod, &example.Pod{}, 0); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	streamedList := func(t *testing.T, rv string, rvMatch metav1.ResourceVersionMatch) *example.PodList {
+		t.Helper()
+		out := &example.PodList{}
+		opts := storage.ListOptions{ResourceVersion: rv, ResourceVersionMatch: rvMatch, Predicate: storage.Everything, Recursive: true}
+		if err := store.GetList(ctx, "/pods/", opts, out); err != nil {
+			t.Fatalf("GetList failed: %v", err)
+		}
+		if streams := kvRecorder.GetStreamReadsAndReset(); streams == 0 {
+			t.Error("expected the list to be served by RangeStream")
+		}
+		if out.Continue != "" || out.RemainingItemCount != nil {
+			t.Errorf("streamed list must not paginate, got continue %q, remainingItemCount %v", out.Continue, out.RemainingItemCount)
+		}
+		return out
+	}
+
+	snapshot := streamedList(t, "", "")
+	if len(snapshot.Items) != podCount {
+		t.Errorf("consistent list returned %d items, want %d", len(snapshot.Items), podCount)
+	}
+
+	extraPod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod-extra"}}
+	if err := store.Create(ctx, "/pods/ns/pod-extra", extraPod, &example.Pod{}, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	// A pinned stream returns the snapshot at the exact revision, not later writes.
+	exact := streamedList(t, snapshot.ResourceVersion, metav1.ResourceVersionMatchExact)
+	if len(exact.Items) != podCount {
+		t.Errorf("exact list returned %d items, want %d", len(exact.Items), podCount)
+	}
+	if exact.ResourceVersion != snapshot.ResourceVersion {
+		t.Errorf("exact list returned resourceVersion %s, want %s", exact.ResourceVersion, snapshot.ResourceVersion)
+	}
+
+	// An unpinned stream at a minimum revision serves the latest data.
+	notOlder := streamedList(t, snapshot.ResourceVersion, "")
+	if len(notOlder.Items) != podCount+1 {
+		t.Errorf("notOlderThan list returned %d items, want %d", len(notOlder.Items), podCount+1)
+	}
+}
+
+func TestListMetrics(t *testing.T) {
+	for _, rangeStream := range []bool{false, true} {
+		t.Run(fmt.Sprintf("rangeStream=%v", rangeStream), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EtcdRangeStream, rangeStream)
+			resetFeatureSupportCheckerDuringTest(t)
+			testListMetrics(t)
+		})
+	}
+}
+
+func testListMetrics(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+
+	storagemetrics.Register()
+	legacyregistry.Reset()
+	t.Cleanup(legacyregistry.Reset)
+
+	pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "ns"}}
+	if err := store.Create(ctx, computePodKey(pod), pod, &example.Pod{}, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	result := &example.PodList{}
+	if err := store.GetList(ctx, "/pods/ns", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, result); err != nil {
+		t.Fatal(err)
+	}
+
+	expected := `# HELP apiserver_storage_list_evaluated_objects_total [ALPHA] Number of objects tested in the course of serving a LIST request from storage
+# TYPE apiserver_storage_list_evaluated_objects_total counter
+apiserver_storage_list_evaluated_objects_total{group="",resource="pods",storage="etcd"} 1
+# HELP apiserver_storage_list_fetched_objects_total [ALPHA] Number of objects read from storage in the course of serving a LIST request
+# TYPE apiserver_storage_list_fetched_objects_total counter
+apiserver_storage_list_fetched_objects_total{group="",index="",resource="pods",storage="etcd"} 1
+# HELP apiserver_storage_list_returned_objects_total [ALPHA] Number of objects returned for a LIST request from storage
+# TYPE apiserver_storage_list_returned_objects_total counter
+apiserver_storage_list_returned_objects_total{group="",resource="pods",storage="etcd"} 1
+# HELP apiserver_storage_list_total [ALPHA] Number of LIST requests served from storage
+# TYPE apiserver_storage_list_total counter
+apiserver_storage_list_total{group="",index="",resource="pods",storage="etcd"} 1
+`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected),
+		"apiserver_storage_list_total",
+		"apiserver_storage_list_fetched_objects_total",
+		"apiserver_storage_list_evaluated_objects_total",
+		"apiserver_storage_list_returned_objects_total",
+	); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestConsistentList(t *testing.T) {
-	ctx, store, client := testSetup(t)
-	storagetesting.RunTestConsistentList(ctx, t, store, increaseRVFunc(client.Client), false, true, false)
+	for _, rangeStream := range []bool{false, true} {
+		t.Run(fmt.Sprintf("rangeStream=%v", rangeStream), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EtcdRangeStream, rangeStream)
+			resetFeatureSupportCheckerDuringTest(t)
+			ctx, store, client := testSetup(t)
+			storagetesting.RunTestConsistentList(ctx, t, store, increaseRVFunc(client.Client), false, true, false)
+		})
+	}
 }
 
 func TestCompactRevision(t *testing.T) {
@@ -298,7 +564,7 @@ func checkStorageCallsInvariants(transformer *storagetesting.PrefixTransformer, 
 				estimatedGetCalls++
 			}
 		}
-		if reads := recorder.GetReadsAndReset(); reads != estimatedGetCalls {
+		if reads := recorder.GetReadsAndReset() + recorder.GetStreamReadsAndReset(); reads != estimatedGetCalls {
 			t.Fatalf("unexpected reads: %d, want: %d", reads, estimatedGetCalls)
 		}
 	}
@@ -612,6 +878,18 @@ func withLeaseConfig(leaseConfig LeaseManagerConfig) setupOption {
 	}
 }
 
+func withTransformer(transformer value.Transformer) setupOption {
+	return func(options *setupOptions) {
+		options.transformer = transformer
+	}
+}
+
+func withCodec(codec runtime.Codec) setupOption {
+	return func(options *setupOptions) {
+		options.codec = codec
+	}
+}
+
 func withDefaults(options *setupOptions) {
 	options.client = func(t testing.TB) *kubernetes.Client {
 		return testserver.RunEtcd(t, nil)
@@ -901,16 +1179,27 @@ func BenchmarkStore_GetList(b *testing.B) {
 	}
 }
 
-func BenchmarkStoreListCreate(b *testing.B) {
+func BenchmarkStoreWriteThroughput(b *testing.B) {
 	klog.SetLogger(logr.Discard())
-	b.Run("RV=NotOlderThan", func(b *testing.B) {
-		ctx, store, _ := testSetup(b)
-		storagetesting.RunBenchmarkStoreListCreate(ctx, b, store, metav1.ResourceVersionMatchNotOlderThan)
-	})
-	b.Run("RV=ExactMatch", func(b *testing.B) {
-		ctx, store, _ := testSetup(b)
-		storagetesting.RunBenchmarkStoreListCreate(ctx, b, store, metav1.ResourceVersionMatchExact)
-	})
+	dimensions := []struct {
+		namespaceCount       int
+		podPerNamespaceCount int
+		nodeCount            int
+	}{
+		{
+			namespaceCount:       50,
+			podPerNamespaceCount: 3_000,
+			nodeCount:            5_000,
+		},
+	}
+	for _, dims := range dimensions {
+		b.Run(fmt.Sprintf("Namespaces=%d/Pods=%d/Nodes=%d", dims.namespaceCount, dims.namespaceCount*dims.podPerNamespaceCount, dims.nodeCount), func(b *testing.B) {
+			ctx, store, _ := testSetup(b)
+			data := storagetesting.PrepareBenchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
+			b.ResetTimer()
+			storagetesting.RunBenchmarkWriteThroughput(ctx, b, store, data, false, nil)
+		})
+	}
 }
 
 func BenchmarkStoreList(b *testing.B) {
@@ -941,15 +1230,9 @@ func BenchmarkStoreList(b *testing.B) {
 		for _, sizeBasedEnabled := range []bool{true, false} {
 			featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.SizeBasedListCostEstimate, sizeBasedEnabled)
 			b.Run(fmt.Sprintf("SizeBasedListCostEstimate=%v/Namespaces=%d/Pods=%d/Nodes=%d", sizeBasedEnabled, dims.namespaceCount, dims.namespaceCount*dims.podPerNamespaceCount, dims.nodeCount), func(b *testing.B) {
-				data := storagetesting.PrepareBenchchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
+				data := storagetesting.PrepareBenchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
 				ctx, store, _ := testSetup(b)
-				var out example.Pod
-				for _, pod := range data.Pods {
-					err := store.Create(ctx, computePodKey(pod), pod, &out, 0)
-					if err != nil {
-						b.Fatal(err)
-					}
-				}
+				require.NoError(b, storagetesting.PrecreateBenchmarkPods(ctx, store, data))
 				storagetesting.RunBenchmarkStoreList(ctx, b, store, data, false)
 			})
 		}
@@ -1008,15 +1291,9 @@ func TestGetCurrentResourceVersion(t *testing.T) {
 
 func BenchmarkStoreStats(b *testing.B) {
 	klog.SetLogger(logr.Discard())
-	data := storagetesting.PrepareBenchchmarkData(50, 3_000, 5_000)
+	data := storagetesting.PrepareBenchmarkData(50, 3_000, 5_000)
 	ctx, store, _ := testSetup(b)
-	var out example.Pod
-	for _, pod := range data.Pods {
-		err := store.Create(ctx, computePodKey(pod), pod, &out, 0)
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
+	require.NoError(b, storagetesting.PrecreateBenchmarkPods(ctx, store, data))
 	storagetesting.RunBenchmarkStoreStats(ctx, b, store)
 }
 
@@ -1025,15 +1302,9 @@ func BenchmarkStatsCacheCleanKeys(b *testing.B) {
 	klog.SetLogger(logr.Discard())
 	namespaceCount := 50
 	podPerNamespaceCount := 3_000
-	data := storagetesting.PrepareBenchchmarkData(namespaceCount, podPerNamespaceCount, 5_000)
+	data := storagetesting.PrepareBenchmarkData(namespaceCount, podPerNamespaceCount, 5_000)
 	ctx, store, _ := testSetup(b)
-	var out example.Pod
-	for _, pod := range data.Pods {
-		err := store.Create(ctx, computePodKey(pod), pod, &out, 0)
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
+	require.NoError(b, storagetesting.PrecreateBenchmarkPods(ctx, store, data))
 	// List to fetch object sizes for statsCache.
 	listOut := &example.PodList{}
 	err := store.GetList(ctx, "/pods/", storage.ListOptions{Recursive: true, Predicate: storage.Everything}, listOut)

@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -47,8 +48,10 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -834,8 +837,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			ginkgo.By("checking if the expected cpuset was assigned")
 
@@ -863,8 +865,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			ginkgo.By("checking if the expected cpuset was assigned")
 
@@ -895,8 +896,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the guaranteed test pod")
-			podGu = e2epod.NewPodClient(f).CreateSync(ctx, podGu)
-			podMap[string(podGu.UID)] = podGu
+			podGu = createPodSync(ctx, podGu)
 
 			podBu := makeCPUManagerPod("non-gu-pod", []ctnAttribute{
 				{
@@ -906,8 +906,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the burstable test pod")
-			podBu = e2epod.NewPodClient(f).CreateSync(ctx, podBu)
-			podMap[string(podBu.UID)] = podBu
+			podBu = createPodSync(ctx, podBu)
 
 			ginkgo.By("checking if the expected cpuset was assigned")
 
@@ -998,8 +997,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			ginkgo.By("validating each container in the testing pod")
 			for _, cnt := range pod.Spec.Containers {
@@ -1008,6 +1006,65 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				gomega.Expect(pod).To(HaveContainerCPUsAlignedTo(cnt.Name, smtLevel))
 				gomega.Expect(pod).To(HaveContainerCPUsThreadSiblings(cnt.Name))
 			}
+		})
+
+		ginkgo.It("should count for pre-allocated CPUs after kubelet restart", func(ctx context.Context) {
+			// This test verifies that pods with pre-allocated CPUs (from the checkpoint file)
+			// are not rejected after kubelet restart when SMT alignment is enabled.
+			// Regression test for the fix where the container presence check was moved
+			// before the SMT alignment check.
+
+			// The key is to request enough CPUs so that if pre-allocated CPUs are not
+			// counted, the SMT alignment check would fail due to insufficient available
+			// physical CPUs.
+
+			// Calculate the maximum SMT-aligned CPUs we can request
+			// We need to request most of the allocatable CPUs to trigger the bug
+			nodeCPUDetails := cpuDetailsFromNode(getLocalNode(ctx, f))
+			allocatableCPUs := int(nodeCPUDetails.Allocatable) - reservedCPUs.Size()
+
+			// Round down to the nearest multiple of smtLevel for SMT alignment
+			cpuCount := (allocatableCPUs / smtLevel) * smtLevel
+
+			// We need at least 2*smtLevel CPUs to make this test meaningful
+			// (one set for the pod, leaving less than smtLevel available which would fail the check)
+			if cpuCount < 2*smtLevel {
+				e2eskipper.Skipf("Not enough allocatable CPUs for this test: need at least %d, have %d", 2*smtLevel, allocatableCPUs)
+			}
+
+			ginkgo.By(fmt.Sprintf("creating the testing pod cpuRequest=%d (allocatable=%d, reserved=%d)", cpuCount, allocatableCPUs, reservedCPUs.Size()))
+			pod := makeCPUManagerPod("gu-pod", []ctnAttribute{
+				{
+					ctnName:    "gu-container",
+					cpuRequest: fmt.Sprintf("%d", cpuCount),
+					cpuLimit:   fmt.Sprintf("%d", cpuCount),
+				},
+			})
+			ginkgo.By("creating the test pod")
+			pod = createPodSync(ctx, pod)
+
+			ginkgo.By("verifying the pod is running with allocated CPUs")
+			cpusBeforeRestart, err := getContainerAllowedCPUs(pod, "gu-container", false)
+			framework.ExpectNoError(err, "cannot get CPUs for container gu-container before restart")
+			framework.Logf("CPUs before kubelet restart: %s (count=%d)", cpusBeforeRestart.String(), cpusBeforeRestart.Size())
+			gomega.Expect(cpusBeforeRestart.Size()).To(gomega.Equal(cpuCount))
+
+			ginkgo.By("restarting the kubelet")
+			restartKubelet := mustStopKubelet(ctx, f)
+			restartKubelet(ctx)
+
+			ginkgo.By("ensuring kubelet is healthy after restart")
+			gomega.Eventually(ctx, func() bool {
+				return e2enode.HealthCheck(kubeletHealthCheckURL)
+			}).WithTimeout(f.Timeouts.PodStart).WithPolling(f.Timeouts.Poll).Should(gomega.BeTrueBecause("kubelet should be healthy after restart"))
+
+			ginkgo.By("verifying pod is still running after kubelet restart")
+			pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "failed to get pod after kubelet restart")
+			gomega.Expect(pod).To(BeAPodInPhase(v1.PodRunning), "pod should still be running after kubelet restart")
+
+			ginkgo.By("verifying container still has the same CPUs after restart")
+			gomega.Expect(pod).To(HaveContainerCPUsEqualTo("gu-container", cpusBeforeRestart))
 		})
 	})
 
@@ -1053,8 +1110,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 					},
 				})
 				ginkgo.By("creating the test pod")
-				pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-				podMap[string(pod.UID)] = pod
+				pod = createPodSync(ctx, pod)
 
 				ginkgo.By("validating each container in the testing pod")
 				for _, cnt := range pod.Spec.Containers {
@@ -1076,8 +1132,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 					},
 				})
 				ginkgo.By("creating the test pod")
-				pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-				podMap[string(pod.UID)] = pod
+				pod = createPodSync(ctx, pod)
 
 				ginkgo.By("validating each container in the testing pod")
 				for _, cnt := range pod.Spec.Containers {
@@ -1127,8 +1182,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			ginkgo.By("checking if the expected cpuset was assigned")
 
@@ -1229,8 +1283,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 					},
 				})
 				ginkgo.By("creating the testing pod")
-				pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-				podMap[string(pod.UID)] = pod
+				pod = createPodSync(ctx, pod)
 
 				usableCPUs := onlineCPUs.Difference(reservedCPUs)
 
@@ -1280,8 +1333,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				}
 				pod := makeCPUManagerPod("test-pod-uncore-cache-alignment-disabled", ctnAttrs)
 				ginkgo.By("creating the test pod")
-				pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-				podMap[string(pod.UID)] = pod
+				pod = createPodSync(ctx, pod)
 
 				ginkgo.By("validating each container in the testing pod")
 				for _, cnt := range pod.Spec.Containers {
@@ -1324,8 +1376,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 					}
 					pod := makeCPUManagerPod("test-pod-align-cpus-by-uncore-cache", ctnAttrs)
 					ginkgo.By("creating the test pod")
-					pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-					podMap[string(pod.UID)] = pod
+					pod = createPodSync(ctx, pod)
 
 					// 'prefer-align-cpus-by-uncore-cache' policy options will attempt at best-effort to allocate cpus
 					// so that distribution across uncore caches is minimized. Since the test container is requesting a full
@@ -1358,8 +1409,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 					}
 					pod := makeCPUManagerPod("test-pod-align-cpus-by-uncore-cache", ctnAttrs)
 					ginkgo.By("creating the test pod")
-					pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-					podMap[string(pod.UID)] = pod
+					pod = createPodSync(ctx, pod)
 
 					ginkgo.By("validating each container in the testing pod")
 					for _, cnt := range pod.Spec.Containers {
@@ -1414,8 +1464,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 					}
 					pod := makeCPUManagerPod("test-pod-align-cpus-by-uncore-cache", ctnAttrs)
 					ginkgo.By("creating the test pod")
-					pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-					podMap[string(pod.UID)] = pod
+					pod = createPodSync(ctx, pod)
 
 					// 'prefer-align-cpus-by-uncore-cache' policy options will attempt at best-effort to allocate cpus
 					// so that distribution across uncore caches is minimized. Since the test container is requesting a full
@@ -1448,8 +1497,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 					}
 					pod := makeCPUManagerPod("test-pod-align-cpus-by-uncore-cache", ctnAttrs)
 					ginkgo.By("creating the test pod")
-					pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-					podMap[string(pod.UID)] = pod
+					pod = createPodSync(ctx, pod)
 
 					ginkgo.By("validating each container in the testing pod")
 					for _, cnt := range pod.Spec.Containers {
@@ -1495,8 +1543,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				}
 				pod := makeCPUManagerPod("test-pod-distribute-cpus-across-numa-disabled", ctnAttrs)
 				ginkgo.By("creating the test pod")
-				pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-				podMap[string(pod.UID)] = pod
+				pod = createPodSync(ctx, pod)
 
 				ginkgo.By("validating each container in the testing pod")
 				for _, cnt := range pod.Spec.Containers {
@@ -1548,8 +1595,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				}
 				pod := makeCPUManagerPod("test-pod-distribute-cpus-across-numa", ctnAttrs)
 				ginkgo.By("creating the test pod")
-				pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-				podMap[string(pod.UID)] = pod
+				pod = createPodSync(ctx, pod)
 
 				for _, cnt := range pod.Spec.Containers {
 					ginkgo.By(fmt.Sprintf("validating the container %s on pod %s", cnt.Name, pod.Name))
@@ -1567,6 +1613,130 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				}
 			})
 		})
+
+		ginkgo.Context("align-by-socket and distribute-cpus-across-numa policy options", ginkgo.Label("align-by-socket", "distribute-cpus-across-numa"), func() {
+			ginkgo.BeforeEach(func(ctx context.Context) {
+				reservedCPUs = cpuset.New(0)
+			})
+
+			ginkgo.It("should assign CPUs within a single socket when align-by-socket is enabled", func(ctx context.Context) {
+				_, _, numaPerSocket, cpusNumPerNUMA := hostCheckForSocketPolicyOptions()
+
+				// Request more CPUs than a single NUMA node provides, but fewer than a full socket,
+				// so allocation must span multiple NUMA nodes on the same socket.
+				cpuReq := cpusNumPerNUMA + 1
+				cpusPerSocket := cpusNumPerNUMA * numaPerSocket
+				if cpuReq >= cpusPerSocket {
+					e2eskipper.Skipf("cannot construct align-by-socket test: need %d < %d CPUs per socket", cpuReq, cpusPerSocket)
+				}
+				skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuReq)
+
+				updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+					policyName:              string(cpumanager.PolicyStatic),
+					reservedSystemCPUs:      reservedCPUs,
+					enableCPUManagerOptions: true,
+					options: map[string]string{
+						cpumanager.AlignBySocketOption:            "true",
+						cpumanager.DistributeCPUsAcrossNUMAOption: "false",
+					},
+				}))
+
+				pod := makeCPUManagerPod("test-pod-align-by-socket", []ctnAttribute{
+					{
+						ctnName:    "test-gu-container-align-by-socket",
+						cpuRequest: fmt.Sprintf("%d", cpuReq),
+						cpuLimit:   fmt.Sprintf("%d", cpuReq),
+					},
+				})
+				ginkgo.By("creating the test pod")
+				pod = createPodSync(ctx, pod)
+
+				ginkgo.By("validating the container is allocated within a single socket")
+				cpus, err := getContainerAllowedCPUs(pod, "test-gu-container-align-by-socket", false)
+				framework.ExpectNoError(err)
+				gomega.Expect(cpus.Size()).To(gomega.Equal(cpuReq))
+				gomega.Expect(cpus).To(BeAllocatedToSingleSocket())
+			})
+
+			ginkgo.It("should assign CPUs distributed across NUMA when distribute-cpus-across-numa is enabled", func(ctx context.Context) {
+				if smtLevel < minSMTLevel {
+					e2eskipper.Skipf("Skipping CPU Manager %q tests since SMT disabled", cpumanager.FullPCPUsOnlyOption)
+				}
+
+				numaNodeNum, _, _, cpusNumPerNUMA := hostCheck()
+				cpuReq := (cpusNumPerNUMA - smtLevel) * numaNodeNum
+				skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuReq)
+
+				updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+					policyName:              string(cpumanager.PolicyStatic),
+					reservedSystemCPUs:      reservedCPUs,
+					enableCPUManagerOptions: true,
+					options: map[string]string{
+						cpumanager.FullPCPUsOnlyOption:            "true",
+						cpumanager.AlignBySocketOption:            "false",
+						cpumanager.DistributeCPUsAcrossNUMAOption: "true",
+					},
+				}))
+
+				pod := makeCPUManagerPod("test-pod-distribute-cpus-across-numa-only", []ctnAttribute{
+					{
+						ctnName:    "test-gu-container-distribute-cpus-across-numa-only",
+						cpuRequest: fmt.Sprintf("%d", cpuReq),
+						cpuLimit:   fmt.Sprintf("%d", cpuReq),
+					},
+				})
+				ginkgo.By("creating the test pod")
+				pod = createPodSync(ctx, pod)
+
+				ginkgo.By("validating CPUs are evenly distributed across NUMA nodes")
+				cpus, err := getContainerAllowedCPUs(pod, "test-gu-container-distribute-cpus-across-numa-only", false)
+				framework.ExpectNoError(err)
+				gomega.Expect(pod).To(HaveContainerCPUsAlignedTo("test-gu-container-distribute-cpus-across-numa-only", smtLevel))
+				gomega.Expect(pod).To(HaveContainerCPUsThreadSiblings("test-gu-container-distribute-cpus-across-numa-only"))
+
+				expectedSpread := cpus.Size() / numaNodeNum
+				gomega.Expect(cpus).To(BeDistributedCPUs(expectedSpread))
+			})
+
+			ginkgo.It("should distribute CPUs across NUMA within a single socket when both policy options are enabled", func(ctx context.Context) {
+				if smtLevel < minSMTLevel {
+					e2eskipper.Skipf("Skipping CPU Manager %q tests since SMT disabled", cpumanager.FullPCPUsOnlyOption)
+				}
+
+				_, _, numaPerSocket, cpusNumPerNUMA := hostCheckForSocketPolicyOptions()
+				cpuReq := (cpusNumPerNUMA - smtLevel) * numaPerSocket
+				skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuReq)
+
+				updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+					policyName:              string(cpumanager.PolicyStatic),
+					reservedSystemCPUs:      reservedCPUs,
+					enableCPUManagerOptions: true,
+					options: map[string]string{
+						cpumanager.FullPCPUsOnlyOption:            "true",
+						cpumanager.AlignBySocketOption:            "true",
+						cpumanager.DistributeCPUsAcrossNUMAOption: "true",
+					},
+				}))
+
+				pod := makeCPUManagerPod("test-pod-align-by-socket-distribute-across-numa", []ctnAttribute{
+					{
+						ctnName:    "test-gu-container-align-by-socket-distribute-across-numa",
+						cpuRequest: fmt.Sprintf("%d", cpuReq),
+						cpuLimit:   fmt.Sprintf("%d", cpuReq),
+					},
+				})
+				ginkgo.By("creating the test pod")
+				pod = createPodSync(ctx, pod)
+
+				ginkgo.By("validating CPUs are socket-aligned and evenly distributed across NUMA nodes on that socket")
+				cpus, err := getContainerAllowedCPUs(pod, "test-gu-container-align-by-socket-distribute-across-numa", false)
+				framework.ExpectNoError(err)
+				gomega.Expect(pod).To(HaveContainerCPUsAlignedTo("test-gu-container-align-by-socket-distribute-across-numa", smtLevel))
+				gomega.Expect(pod).To(HaveContainerCPUsThreadSiblings("test-gu-container-align-by-socket-distribute-across-numa"))
+				gomega.Expect(cpus).To(BeAllocatedToSingleSocket())
+				gomega.Expect(cpus).To(BeEvenlyDistributedAcrossActiveNUMANodes())
+			})
+		})
 	})
 
 	ginkgo.When("checking the CFS quota management", ginkgo.Label("cfs-quota"), func() {
@@ -1576,9 +1746,8 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			//          this means on more-than-2-way SMT systems this test will prove nothing
 			reservedCPUs = cpuset.New(0)
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:                       string(cpumanager.PolicyStatic),
-				reservedSystemCPUs:               reservedCPUs,
-				disableCPUQuotaWithExclusiveCPUs: true,
+				policyName:         string(cpumanager.PolicyStatic),
+				reservedSystemCPUs: reservedCPUs,
 			}))
 		})
 
@@ -1591,8 +1760,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			gomega.Expect(pod).To(HaveSandboxQuota("max"))
 			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "max"))
@@ -1611,8 +1779,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			gomega.Expect(pod).To(HaveSandboxQuota("max"))
 			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "max"))
@@ -1631,8 +1798,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			gomega.Expect(pod).To(HaveSandboxQuota("max"))
 			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "max"))
@@ -1655,8 +1821,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			gomega.Expect(pod).To(HaveSandboxQuota("50000"))
 			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "50000"))
@@ -1674,8 +1839,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			gomega.Expect(pod).To(HaveSandboxQuota("50000"))
 			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "50000"))
@@ -1698,8 +1862,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			gomega.Expect(pod).To(HaveSandboxQuota("170000"))
 			gomega.Expect(pod).To(HaveContainerQuota("gu-container-non-int-values-1", "50000"))
@@ -1723,118 +1886,11 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			gomega.Expect(pod).To(HaveSandboxQuota("max"))
 			gomega.Expect(pod).To(HaveContainerQuota("gu-container-non-int-values", "50000"))
 			gomega.Expect(pod).To(HaveContainerQuota("gu-container-int-values", "max"))
-		})
-	})
-
-	ginkgo.When("checking the CFS quota management can be disabled", ginkgo.Label("cfs-quota"), func() {
-		// NOTE: these tests check only cases on which the quota is set to "max", so we intentionally
-		// don't duplicate the all the tests
-
-		ginkgo.BeforeEach(func(ctx context.Context) {
-			requireCGroupV2()
-			// WARNING: this assumes 2-way SMT systems - we don't know how to access other SMT levels.
-			//          this means on more-than-2-way SMT systems this test will prove nothing
-			reservedCPUs = cpuset.New(0)
-			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:                       string(cpumanager.PolicyStatic),
-				reservedSystemCPUs:               reservedCPUs,
-				disableCPUQuotaWithExclusiveCPUs: false,
-			}))
-		})
-
-		ginkgo.It("should enforce for a guaranteed pod with exclusive CPUs assigned", func(ctx context.Context) {
-			cpuCount := 1
-			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
-
-			ctnName := "gu-container-cfsquota-disabled"
-			pod := makeCPUManagerPod("gu-pod-cfsquota-off", []ctnAttribute{
-				{
-					ctnName:    ctnName,
-					cpuRequest: "1",
-					cpuLimit:   "1",
-				},
-			})
-			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
-
-			gomega.Expect(pod).To(HaveSandboxQuota("100000"))
-			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "100000"))
-		})
-
-		ginkgo.It("should enforce for a guaranteed pod with multiple exclusive CPUs assigned", func(ctx context.Context) {
-			cpuCount := 4
-			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
-
-			ctnName := "gu-container-cfsquota-disabled"
-			pod := makeCPUManagerPod("gu-pod-cfsquota-off", []ctnAttribute{
-				{
-					ctnName:    ctnName,
-					cpuRequest: "3",
-					cpuLimit:   "3",
-				},
-			})
-			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
-
-			gomega.Expect(pod).To(HaveSandboxQuota("300000"))
-			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "300000"))
-
-			gomega.Expect(pod).To(HaveContainerCPUsCount(ctnName, 3))
-			gomega.Expect(pod).To(HaveContainerCPUsASubsetOf(ctnName, onlineCPUs))
-			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith(ctnName, reservedCPUs))
-		})
-
-		ginkgo.It("should enforce for guaranteed pod not requiring exclusive CPUs", func(ctx context.Context) {
-			cpuCount := 1 // overshoot, minimum request is 1
-			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
-
-			ctnName := "gu-container-cfsquota-enabled"
-			pod := makeCPUManagerPod("gu-pod-cfs-quota-on", []ctnAttribute{
-				{
-					ctnName:    ctnName,
-					cpuRequest: "500m",
-					cpuLimit:   "500m",
-				},
-			})
-			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
-
-			gomega.Expect(pod).To(HaveSandboxQuota("50000"))
-			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "50000"))
-		})
-
-		ginkgo.It("should enforce with multiple containers regardless if they require exclusive CPUs or not", func(ctx context.Context) {
-			cpuCount := 2
-			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
-
-			pod := makeCPUManagerPod("gu-pod-multicontainer-mixed", []ctnAttribute{
-				{
-					ctnName:    "gu-container-non-int-values",
-					cpuRequest: "500m",
-					cpuLimit:   "500m",
-				},
-				{
-					ctnName:    "gu-container-int-values",
-					cpuRequest: "1",
-					cpuLimit:   "1",
-				},
-			})
-			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
-
-			gomega.Expect(pod).To(HaveSandboxQuota("150000"))
-			gomega.Expect(pod).To(HaveContainerQuota("gu-container-non-int-values", "50000"))
-			gomega.Expect(pod).To(HaveContainerQuota("gu-container-int-values", "100000"))
 		})
 	})
 
@@ -1874,8 +1930,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			gomega.Expect(pod).To(HaveSandboxQuotaWithPeriod("25000", testCFSPeriod))
 			gomega.Expect(pod).To(HaveContainerQuotaWithPeriod(ctnName, "25000", testCFSPeriod))
@@ -1893,8 +1948,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 				},
 			})
 			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			gomega.Expect(pod).To(HaveSandboxQuotaWithPeriod("25000", testCFSPeriod))
 			gomega.Expect(pod).To(HaveContainerQuotaWithPeriod(ctnName, "25000", testCFSPeriod))
@@ -1933,8 +1987,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			}
 			pod := makeCPUManagerInitContainersPod("gu-pod", ctrAttrs)
 			ginkgo.By("running a Gu pod with a regular init container and a restartable init container")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
+			pod = createPodSync(ctx, pod)
 
 			// when we get there the real initcontainer terminated, so we can only check its logs
 			ginkgo.By("checking if the expected cpuset was assigned")
@@ -1955,6 +2008,146 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			gomega.Expect(pod).To(HaveContainerCPUsASubsetOf(appContainerName, onlineCPUs))
 			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith(appContainerName, reservedCPUs))
 			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith(appContainerName, nonReusableCPUs))
+		})
+	})
+
+	f.Context("WhenRestartAllContainers", f.WithFeatureGate(features.ContainerRestartRules), f.WithFeatureGate(features.RestartAllContainersOnContainerExits), func() {
+		var (
+			containerRestartPolicyNever = v1.ContainerRestartPolicyNever
+		)
+		restartAllContainersRules := []v1.ContainerRestartRule{
+			{
+				Action: v1.ContainerRestartRuleActionRestartAllContainers,
+				ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+					Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+					Values:   []int32{42},
+				},
+			},
+		}
+
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			reservedCPUs = cpuset.New(0)
+		})
+
+		ginkgo.It("should preserve CPU affinity after restarting all containers", func(ctx context.Context) {
+			cpuCount := 4 // total
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				policyName:         string(cpumanager.PolicyStatic),
+				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
+			}))
+
+			podName := "restart-all-preserve-affinity-" + string(uuid.NewUUID())
+			// We use a Guaranteed pod to ensure managers (like CPU Manager) are engaged.
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Name:  "affinity-checker",
+							Image: imageutils.GetE2EImage(imageutils.BusyBox),
+							// Script logic:
+							// 1. Check if "affinity.txt" exists in shared volume.
+							// 2. If not: verify isolation, record current affinity, and exit 42 to trigger RestartAll.
+							// 3. If yes: compare current affinity with "affinity.txt". If match, sleep forever (success).
+							Command: []string{"/bin/sh", "-c", `
+								AFFINITY_FILE="/mnt/affinity.txt"
+								CURRENT_AFFINITY=$(grep Cpus_allowed_list /proc/self/status | cut -f2)
+								if [ ! -f $AFFINITY_FILE ]; then
+									echo "First run. Recording affinity: $CURRENT_AFFINITY"
+									if echo "$CURRENT_AFFINITY" | grep -E [,-]; then
+										echo "ERROR: CPU Manager did not assign an exclusive CPU. Affinity list: $CURRENT_AFFINITY"
+										exit 1
+									fi
+									echo "$CURRENT_AFFINITY" > $AFFINITY_FILE
+									exit 42
+								else
+									OLD_AFFINITY=$(cat $AFFINITY_FILE)
+									echo "Restarted. Old: $OLD_AFFINITY, New: $CURRENT_AFFINITY"
+									if [ "$OLD_AFFINITY" != "$CURRENT_AFFINITY" ]; then
+										echo "ERROR: Affinity not preserved!"
+										exit 1
+									fi
+									echo "Affinity preserved. Success."
+									sleep 10000
+								fi
+							`},
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("1"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("1"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+							},
+							RestartPolicy:      &containerRestartPolicyNever,
+							RestartPolicyRules: restartAllContainersRules,
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      "workdir",
+									MountPath: "/mnt",
+								},
+							},
+						},
+						{
+							Name:    "regular",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"/bin/sh", "-c", "sleep 10000"},
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("1"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("1"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "workdir",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+				},
+			}
+			createPodSync(ctx, pod)
+
+			// All containers should be restarted once
+			ginkgo.By("Waiting for all containers to restart")
+			err := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "all containers restarted", 3*time.Minute, func(pod *v1.Pod) (bool, error) {
+				restartedCount := 0
+				containers := []string{"affinity-checker", "regular"}
+				for _, cName := range containers {
+					restarted := false
+					for _, status := range pod.Status.ContainerStatuses {
+						if status.Name == cName && status.RestartCount > 0 {
+							restarted = true
+						}
+					}
+					if restarted {
+						restartedCount++
+					} else {
+						framework.Logf("container %s did not restart", cName)
+					}
+				}
+				framework.Logf("%d out of %d containers restarted", restartedCount, len(containers))
+				return restartedCount == len(containers), nil
+			})
+			framework.ExpectNoError(err, "failed to see all containers restart")
+
+			// Wait for the container to be running which indicates that CPU assignment is kept
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "affinity-checker", 3*time.Minute))
+			framework.ExpectNoError(e2epod.WaitForContainerRunning(ctx, f.ClientSet, f.Namespace.Name, podName, "regular", 3*time.Minute))
 		})
 	})
 })
@@ -2675,13 +2868,12 @@ var _ = SIGDescribe("CPU Manager Pod Level Resources", ginkgo.Ordered, ginkgo.Co
 
 		ginkgo.It("should not maintain CPU quota for a pod with pod-level resources and guaranteed containers in Pod scope, PodLevelResourceManagers enabled", ginkgo.Label("pod-scope"), func(ctx context.Context) {
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:                       string(cpumanager.PolicyStatic),
-				reservedSystemCPUs:               cpuset.CPUSet{},
-				topologyManagerPolicy:            topologymanager.PolicyRestricted,
-				topologyManagerScope:             topologymanager.PodTopologyScope,
-				enablePodLevelResources:          true,
-				enablePodLevelResourceManagers:   true,
-				disableCPUQuotaWithExclusiveCPUs: true,
+				policyName:                     string(cpumanager.PolicyStatic),
+				reservedSystemCPUs:             cpuset.CPUSet{},
+				topologyManagerPolicy:          topologymanager.PolicyRestricted,
+				topologyManagerScope:           topologymanager.PodTopologyScope,
+				enablePodLevelResources:        true,
+				enablePodLevelResourceManagers: true,
 			}))
 
 			pod := makeCPUManagerPod("gu-pod-level-resources-quota", []ctnAttribute{
@@ -2711,13 +2903,12 @@ var _ = SIGDescribe("CPU Manager Pod Level Resources", ginkgo.Ordered, ginkgo.Co
 
 		ginkgo.It("should maintain CPU quota for a pod with pod-level resources and non-guaranteed containers in Pod scope, PodLevelResourceManagers enabled", ginkgo.Label("pod-scope"), func(ctx context.Context) {
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:                       string(cpumanager.PolicyStatic),
-				reservedSystemCPUs:               cpuset.CPUSet{},
-				topologyManagerPolicy:            topologymanager.PolicyRestricted,
-				topologyManagerScope:             topologymanager.PodTopologyScope,
-				enablePodLevelResources:          true,
-				enablePodLevelResourceManagers:   true,
-				disableCPUQuotaWithExclusiveCPUs: true,
+				policyName:                     string(cpumanager.PolicyStatic),
+				reservedSystemCPUs:             cpuset.CPUSet{},
+				topologyManagerPolicy:          topologymanager.PolicyRestricted,
+				topologyManagerScope:           topologymanager.PodTopologyScope,
+				enablePodLevelResources:        true,
+				enablePodLevelResourceManagers: true,
 			}))
 
 			pod := makeCPUManagerPod("gu-pod-level-resources-quota", []ctnAttribute{
@@ -3061,13 +3252,12 @@ var _ = SIGDescribe("CPU Manager Pod Level Resources", ginkgo.Ordered, ginkgo.Co
 
 		ginkgo.It("should not maintain CPU quota for a pod with pod-level resources and guaranteed containers in Container scope, PodLevelResourceManagers enabled", ginkgo.Label("container-scope"), func(ctx context.Context) {
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:                       string(cpumanager.PolicyStatic),
-				reservedSystemCPUs:               cpuset.CPUSet{},
-				topologyManagerPolicy:            topologymanager.PolicyRestricted,
-				topologyManagerScope:             topologymanager.ContainerTopologyScope,
-				enablePodLevelResources:          true,
-				enablePodLevelResourceManagers:   true,
-				disableCPUQuotaWithExclusiveCPUs: true,
+				policyName:                     string(cpumanager.PolicyStatic),
+				reservedSystemCPUs:             cpuset.CPUSet{},
+				topologyManagerPolicy:          topologymanager.PolicyRestricted,
+				topologyManagerScope:           topologymanager.ContainerTopologyScope,
+				enablePodLevelResources:        true,
+				enablePodLevelResourceManagers: true,
 			}))
 
 			pod := makeCPUManagerPod("gu-pod-level-resources-quota", []ctnAttribute{
@@ -3097,13 +3287,12 @@ var _ = SIGDescribe("CPU Manager Pod Level Resources", ginkgo.Ordered, ginkgo.Co
 
 		ginkgo.It("should maintain CPU quota for a pod with pod-level resources and non-guaranteed containers in Container scope, PodLevelResourceManagers enabled", ginkgo.Label("container-scope"), func(ctx context.Context) {
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:                       string(cpumanager.PolicyStatic),
-				reservedSystemCPUs:               cpuset.CPUSet{},
-				topologyManagerPolicy:            topologymanager.PolicyRestricted,
-				topologyManagerScope:             topologymanager.ContainerTopologyScope,
-				enablePodLevelResources:          true,
-				enablePodLevelResourceManagers:   true,
-				disableCPUQuotaWithExclusiveCPUs: true,
+				policyName:                     string(cpumanager.PolicyStatic),
+				reservedSystemCPUs:             cpuset.CPUSet{},
+				topologyManagerPolicy:          topologymanager.PolicyRestricted,
+				topologyManagerScope:           topologymanager.ContainerTopologyScope,
+				enablePodLevelResources:        true,
+				enablePodLevelResourceManagers: true,
 			}))
 
 			pod := makeCPUManagerPod("gu-pod-level-resources-quota", []ctnAttribute{
@@ -3534,8 +3723,11 @@ func BePackedCPUs() types.GomegaMatcher {
 // Custom matcher for checking distributed CPUs.
 func BeDistributedCPUs(expectedSpread int) types.GomegaMatcher {
 	return gcustom.MakeMatcher(func(allocatedCPUs cpuset.CPUSet) (bool, error) {
-		distribution := computeNUMADistribution(allocatedCPUs)
-		for _, count := range distribution {
+		counts, err := numaAllocationCounts(allocatedCPUs, false)
+		if err != nil {
+			return false, err
+		}
+		for _, count := range counts {
 			if count != expectedSpread {
 				return false, nil
 			}
@@ -3546,6 +3738,77 @@ func BeDistributedCPUs(expectedSpread int) types.GomegaMatcher {
 
 // Other helpers
 
+func numaAllocationCounts(allocatedCPUs cpuset.CPUSet, activeOnly bool) ([]int, error) {
+	distribution := computeNUMADistribution(allocatedCPUs)
+	counts := make([]int, 0, len(distribution))
+	for _, count := range distribution {
+		if activeOnly && count == 0 {
+			continue
+		}
+		counts = append(counts, count)
+	}
+	if len(counts) == 0 {
+		return nil, fmt.Errorf("no CPUs allocated on any NUMA node")
+	}
+	return counts, nil
+}
+
+func hostCheckForSocketPolicyOptions() (numaNodes, sockets, numaPerSocket, cpusNumPerNUMA int) {
+	numaNodes, _, _, cpusNumPerNUMA = hostCheck()
+	sockets = detectSockets()
+	if sockets < 2 {
+		e2eskipper.Skipf("align-by-socket policy option tests require a multi-socket system")
+	}
+	// Assumes a clean socket to NUMA node hierarchy (multiple NUMA nodes per socket, not the reverse).
+	// Skip when that does not hold, e.g. a single NUMA node spanning multiple sockets.
+	numaPerSocket = numaNodes / sockets
+	if numaPerSocket < 2 {
+		e2eskipper.Skipf("align-by-socket policy option tests require at least 2 NUMA nodes per socket")
+	}
+	return numaNodes, sockets, numaPerSocket, cpusNumPerNUMA
+}
+
+func BeAllocatedToSingleSocket() types.GomegaMatcher {
+	return gcustom.MakeMatcher(func(allocatedCPUs cpuset.CPUSet) (bool, error) {
+		if allocatedCPUs.IsEmpty() {
+			return false, fmt.Errorf("empty cpuset")
+		}
+		socketIDs := sets.New[int]()
+		for _, cpu := range allocatedCPUs.UnsortedList() {
+			socketID, err := getCPUSocketID(cpu)
+			if err != nil {
+				return false, err
+			}
+			socketIDs.Insert(socketID)
+		}
+		if socketIDs.Len() != 1 {
+			return false, fmt.Errorf("CPUs span %d sockets (%v), expected 1", socketIDs.Len(), socketIDs.UnsortedList())
+		}
+		return true, nil
+	}).WithMessage("expected CPUs to be allocated within a single socket")
+}
+
+func BeEvenlyDistributedAcrossActiveNUMANodes() types.GomegaMatcher {
+	return gcustom.MakeMatcher(func(allocatedCPUs cpuset.CPUSet) (bool, error) {
+		counts, err := numaAllocationCounts(allocatedCPUs, true)
+		if err != nil {
+			return false, err
+		}
+		if !allCountsEqual(counts) {
+			return false, fmt.Errorf("uneven NUMA distribution across active nodes: %v", counts)
+		}
+		return true, nil
+	}).WithMessage("expected CPUs to be evenly distributed across NUMA nodes with non-zero allocation")
+}
+func allCountsEqual(counts []int) bool {
+	expected := counts[0]
+	for _, count := range counts[1:] {
+		if count != expected {
+			return false
+		}
+	}
+	return true
+}
 func getContainerAllowedCPUsFromLogs(podName, cntName, logs string) cpuset.CPUSet {
 	framework.Logf("got pod logs: <%v>", logs)
 	cpus, err := cpuset.Parse(strings.TrimSpace(logs))
@@ -4011,16 +4274,15 @@ func makeCPUManagerInitContainersPod(podName string, ctnAttributes []ctnAttribut
 }
 
 type cpuManagerKubeletArguments struct {
-	policyName                       string
-	topologyManagerPolicy            string
-	topologyManagerScope             string
-	enableCPUManagerOptions          bool
-	disableCPUQuotaWithExclusiveCPUs bool
-	enablePodLevelResources          bool
-	customCPUCFSQuotaPeriod          time.Duration
-	enablePodLevelResourceManagers   bool
-	reservedSystemCPUs               cpuset.CPUSet
-	options                          map[string]string
+	policyName                     string
+	topologyManagerPolicy          string
+	topologyManagerScope           string
+	enableCPUManagerOptions        bool
+	enablePodLevelResources        bool
+	customCPUCFSQuotaPeriod        time.Duration
+	enablePodLevelResourceManagers bool
+	reservedSystemCPUs             cpuset.CPUSet
+	options                        map[string]string
 }
 
 func configureCPUManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, kubeletArguments *cpuManagerKubeletArguments) *kubeletconfig.KubeletConfiguration {
@@ -4031,8 +4293,13 @@ func configureCPUManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, ku
 
 	newCfg.FeatureGates["CPUManagerPolicyBetaOptions"] = kubeletArguments.enableCPUManagerOptions
 	newCfg.FeatureGates["CPUManagerPolicyAlphaOptions"] = kubeletArguments.enableCPUManagerOptions
-	newCfg.FeatureGates["DisableCPUQuotaWithExclusiveCPUs"] = kubeletArguments.disableCPUQuotaWithExclusiveCPUs
 	newCfg.FeatureGates["PodLevelResources"] = kubeletArguments.enablePodLevelResources
+	// InPlacePodLevelResourcesVerticalScaling, PodLevelResourcesFixDefaulting and PodLevelResourcesFixKubeletQOSClass are only supported when PodLevelResources is enabled
+	if !kubeletArguments.enablePodLevelResources {
+		newCfg.FeatureGates["InPlacePodLevelResourcesVerticalScaling"] = kubeletArguments.enablePodLevelResources
+		newCfg.FeatureGates["PodLevelResourcesFixDefaulting"] = kubeletArguments.enablePodLevelResources
+		newCfg.FeatureGates["PodLevelResourcesFixKubeletQOSClass"] = kubeletArguments.enablePodLevelResources
+	}
 	newCfg.FeatureGates["PodLevelResourceManagers"] = kubeletArguments.enablePodLevelResourceManagers
 
 	if kubeletArguments.customCPUCFSQuotaPeriod != 0 {

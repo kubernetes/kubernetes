@@ -24,7 +24,6 @@ package v1beta1
 import (
 	unsafe "unsafe"
 
-	v1 "k8s.io/api/core/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	resourcequota "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota"
@@ -81,10 +80,7 @@ func Convert_resourcequota_Configuration_To_v1beta1_Configuration(in *resourcequ
 }
 
 func autoConvert_v1beta1_LimitedResource_To_resourcequota_LimitedResource(in *LimitedResource, out *resourcequota.LimitedResource, s conversion.Scope) error {
-	out.APIGroup = in.APIGroup
-	out.Resource = in.Resource
-	out.MatchContains = *(*[]string)(unsafe.Pointer(&in.MatchContains))
-	out.MatchScopes = *(*[]v1.ScopedResourceSelectorRequirement)(unsafe.Pointer(&in.MatchScopes))
+	*out = *(*resourcequota.LimitedResource)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -94,10 +90,7 @@ func Convert_v1beta1_LimitedResource_To_resourcequota_LimitedResource(in *Limite
 }
 
 func autoConvert_resourcequota_LimitedResource_To_v1beta1_LimitedResource(in *resourcequota.LimitedResource, out *LimitedResource, s conversion.Scope) error {
-	out.APIGroup = in.APIGroup
-	out.Resource = in.Resource
-	out.MatchContains = *(*[]string)(unsafe.Pointer(&in.MatchContains))
-	out.MatchScopes = *(*[]v1.ScopedResourceSelectorRequirement)(unsafe.Pointer(&in.MatchScopes))
+	*out = *(*LimitedResource)(unsafe.Pointer(in))
 	return nil
 }
 

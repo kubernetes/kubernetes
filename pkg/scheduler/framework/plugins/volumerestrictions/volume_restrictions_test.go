@@ -486,7 +486,7 @@ func TestAccessModeConflicts(t *testing.T) {
 	}
 }
 
-func Test_isSchedulableAfterPodDeleted(t *testing.T) {
+func Test_isSchedulableAfterAssignedPodDeleted(t *testing.T) {
 	GCEDiskVolState := v1.Volume{
 		VolumeSource: v1.VolumeSource{
 			GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
@@ -672,7 +672,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			defer cancel()
 			p := newPluginWithListers(ctx, t, tc.existingPods, nil, []*v1.PersistentVolumeClaim{tc.existingPVC})
 
-			actualHint, err := p.(*VolumeRestrictions).isSchedulableAfterPodDeleted(logger, tc.pod, tc.oldObj, nil)
+			actualHint, err := p.(*VolumeRestrictions).isSchedulableAfterAssignedPodDeleted(logger, tc.pod, tc.oldObj, nil)
 			if tc.expectedErr {
 				if err == nil {
 					t.Error("Expect error, but got nil")
@@ -800,4 +800,21 @@ func newPluginWithListers(ctx context.Context, t *testing.T, pods []*v1.Pod, nod
 	}
 
 	return plugintesting.SetupPluginWithInformers(ctx, t, pluginFactory, &config.InterPodAffinityArgs{}, snapshot, objects)
+}
+
+func TestVolumeRestrictions_DeferredResizeSkipped(t *testing.T) {
+	ctx := context.Background()
+	pod := st.MakePod().Name("p").UID("p").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+	nodeInfo := framework.NewNodeInfo()
+	nodeInfo.SetNode(st.MakeNode().Name("node1").Obj())
+
+	pl := &VolumeRestrictions{enableInPlacePodVerticalScalingSchedulerPreemption: true}
+
+	if preRes, preStatus := pl.PreFilter(ctx, nil, pod, nil); preStatus.Code() != fwk.Skip || preRes != nil {
+		t.Errorf("PreFilter: got (res: %v, status: %v), want (nil, Skip)", preRes, preStatus.Code())
+	}
+
+	if filterStatus := pl.Filter(ctx, nil, pod, nodeInfo); filterStatus.Code() != fwk.Success {
+		t.Errorf("Filter: got status %v, want Success (nil)", filterStatus.Code())
+	}
 }

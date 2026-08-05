@@ -21,16 +21,16 @@ package e2enode
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"sort"
 	"strings"
 	"sync"
 	"text/tabwriter"
 	"time"
 
-	cadvisorclient "github.com/google/cadvisor/client/v2"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/opencontainers/cgroups"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,7 +43,6 @@ import (
 	"k8s.io/kubernetes/test/e2e_node/perftype"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -62,13 +61,51 @@ var (
 // ResourceCollector is a collector object which collects
 // resource usage periodically from Cadvisor.
 type ResourceCollector struct {
-	client  *cadvisorclient.Client
-	request *cadvisorapiv2.RequestOptions
-
 	pollingInterval time.Duration
 	buffers         map[string][]*e2ekubelet.ContainerResourceUsage
 	lock            sync.RWMutex
 	stopCh          chan struct{}
+}
+
+// cadvisorContainerInfo / cadvisorContainerStats are the minimal subset of the
+// standalone cAdvisor pod's v2 /api/v2.1/stats response that this collector
+// reads. Decoding into these local types keeps test/e2e_node free of both the
+// cAdvisor Go client and its v2 API types -- it talks to the pod over HTTP+JSON.
+type cadvisorContainerInfo struct {
+	Stats []*cadvisorContainerStats `json:"stats"`
+}
+
+type cadvisorContainerStats struct {
+	Timestamp time.Time `json:"timestamp"`
+	CPU       struct {
+		Usage struct {
+			Total uint64 `json:"total"`
+		} `json:"usage"`
+	} `json:"cpu"`
+	Memory struct {
+		Usage      uint64 `json:"usage"`
+		WorkingSet uint64 `json:"working_set"`
+		RSS        uint64 `json:"rss"`
+	} `json:"memory"`
+}
+
+// cadvisorStats fetches the latest stats sample for a container from the
+// standalone cAdvisor pod's v2 REST API (replacing the cAdvisor v2 Go client).
+func cadvisorStats(name string) (map[string]*cadvisorContainerInfo, error) {
+	u := fmt.Sprintf("http://localhost:%d/api/v2.1/stats%s?count=1&type=name&recursive=false", cadvisorPort, name)
+	resp, err := http.Get(u)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("cadvisor stats for %q: HTTP %d", name, resp.StatusCode)
+	}
+	out := map[string]*cadvisorContainerInfo{}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // NewResourceCollector creates a resource collector object which collects
@@ -96,21 +133,20 @@ func (r *ResourceCollector) Start() {
 		framework.Failf("Failed to get runtime container name in test-e2e-node resource collector.")
 	}
 
-	wait.Poll(1*time.Second, 1*time.Minute, func() (bool, error) {
-		var err error
-		r.client, err = cadvisorclient.NewClient(fmt.Sprintf("http://localhost:%d/", cadvisorPort))
-		if err == nil {
-			return true, nil
+	// Wait for the standalone cAdvisor pod's v2 REST API to be reachable.
+	err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 1*time.Minute, false, func(context.Context) (bool, error) {
+		resp, err := http.Get(fmt.Sprintf("http://localhost:%d/api/v2.1/machine", cadvisorPort))
+		if err != nil {
+			return false, nil
 		}
-		return false, err
+		_ = resp.Body.Close()
+		return resp.StatusCode == http.StatusOK, nil
 	})
+	framework.ExpectNoError(err, "cadvisor not ready")
 
-	gomega.Expect(r.client).NotTo(gomega.BeNil(), "cadvisor client not ready")
-
-	r.request = &cadvisorapiv2.RequestOptions{IdType: "name", Count: 1, Recursive: false}
 	r.stopCh = make(chan struct{})
 
-	oldStatsMap := make(map[string]*cadvisorapiv2.ContainerStats)
+	oldStatsMap := make(map[string]*cadvisorContainerStats)
 	go wait.Until(func() { r.collectStats(oldStatsMap) }, r.pollingInterval, r.stopCh)
 }
 
@@ -148,15 +184,15 @@ func (r *ResourceCollector) LogLatest() {
 }
 
 // collectStats collects resource usage from Cadvisor.
-func (r *ResourceCollector) collectStats(oldStatsMap map[string]*cadvisorapiv2.ContainerStats) {
+func (r *ResourceCollector) collectStats(oldStatsMap map[string]*cadvisorContainerStats) {
 	for _, name := range systemContainers {
-		ret, err := r.client.Stats(name, r.request)
+		ret, err := cadvisorStats(name)
 		if err != nil {
 			framework.Logf("Error getting container stats, err: %v", err)
 			return
 		}
 		cStats, ok := ret[name]
-		if !ok {
+		if !ok || len(cStats.Stats) == 0 {
 			framework.Logf("Missing info/stats for container %q", name)
 			return
 		}
@@ -171,11 +207,11 @@ func (r *ResourceCollector) collectStats(oldStatsMap map[string]*cadvisorapiv2.C
 }
 
 // computeContainerResourceUsage computes resource usage based on new data sample.
-func computeContainerResourceUsage(name string, oldStats, newStats *cadvisorapiv2.ContainerStats) *e2ekubelet.ContainerResourceUsage {
+func computeContainerResourceUsage(name string, oldStats, newStats *cadvisorContainerStats) *e2ekubelet.ContainerResourceUsage {
 	return &e2ekubelet.ContainerResourceUsage{
 		Name:                    name,
 		Timestamp:               newStats.Timestamp,
-		CPUUsageInCores:         float64(newStats.Cpu.Usage.Total-oldStats.Cpu.Usage.Total) / float64(newStats.Timestamp.Sub(oldStats.Timestamp).Nanoseconds()),
+		CPUUsageInCores:         float64(newStats.CPU.Usage.Total-oldStats.CPU.Usage.Total) / float64(newStats.Timestamp.Sub(oldStats.Timestamp).Nanoseconds()),
 		MemoryUsageInBytes:      newStats.Memory.Usage,
 		MemoryWorkingSetInBytes: newStats.Memory.WorkingSet,
 		MemoryRSSInBytes:        newStats.Memory.RSS,

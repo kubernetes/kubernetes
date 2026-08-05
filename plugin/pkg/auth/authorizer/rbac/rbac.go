@@ -47,6 +47,9 @@ type RequestToRuleMapper interface {
 	VisitRulesFor(ctx context.Context, user user.Info, namespace string, visitor func(source fmt.Stringer, rule *rbacv1.PolicyRule, err error) bool)
 }
 
+var _ = authorizer.Authorizer(&RBACAuthorizer{})
+var _ = authorizer.RuleResolver(&RBACAuthorizer{})
+
 type RBACAuthorizer struct {
 	authorizationRuleResolver RequestToRuleMapper
 }
@@ -124,6 +127,16 @@ func (r *RBACAuthorizer) Authorize(ctx context.Context, requestAttributes author
 		reason = fmt.Sprintf("RBAC: %v", utilerrors.NewAggregate(ruleCheckingVisitor.errors))
 	}
 	return authorizer.DecisionNoOpinion, reason, nil
+}
+
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (r *RBACAuthorizer) ConditionsAwareAuthorize(ctx context.Context, requestAttributes authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(r.Authorize(ctx, requestAttributes))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (*RBACAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
 }
 
 func (r *RBACAuthorizer) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {

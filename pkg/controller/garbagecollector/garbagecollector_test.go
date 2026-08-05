@@ -77,6 +77,7 @@ type testRESTMapper struct {
 }
 
 func (m *testRESTMapper) Reset() {
+	//nolint:logcheck // Context-awareness not important for existing tests.
 	meta.MaybeResetRESTMapper(m.RESTMapper)
 }
 
@@ -922,14 +923,14 @@ func TestGetDeletableResources(t *testing.T) {
 		},
 	}
 
-	logger, _ := ktesting.NewTestContext(t)
+	_, ctx := ktesting.NewTestContext(t)
 	for name, test := range tests {
 		t.Logf("testing %q", name)
 		client := &fakeServerResources{
 			PreferredResources: test.serverResources,
 			Error:              test.err,
 		}
-		actual, actualErr := GetDeletableResources(logger, client)
+		actual, actualErr := GetDeletableResources(ctx, discovery.ToServerResourcesInterfaceWithContext(client))
 		if !reflect.DeepEqual(test.deletableResources, actual) {
 			t.Errorf("expected resources:\n%v\ngot:\n%v", test.deletableResources, actual)
 		}

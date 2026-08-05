@@ -55,6 +55,9 @@ func (a *TypeRef) Equals(b *TypeRef) bool {
 	if a.ElementRelationship != b.ElementRelationship {
 		return false
 	}
+	if a.Nullable != b.Nullable {
+		return false
+	}
 	return a.Inlined.Equals(&b.Inlined)
 }
 

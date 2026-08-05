@@ -22,6 +22,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
@@ -31,12 +32,12 @@ import (
 
 // flowSchemaStrategy implements verification logic for FlowSchema.
 type flowSchemaStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating flow schema objects.
-var Strategy = flowSchemaStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = flowSchemaStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // NamespaceScoped returns false because all PriorityClasses are global.
 func (flowSchemaStrategy) NamespaceScoped() bool {
@@ -97,12 +98,12 @@ func (flowSchemaStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Obje
 func (flowSchemaStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (flowSchemaStrategy) AllowUnconditionalUpdate() bool {
+func (flowSchemaStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 
 // AllowCreateOnUpdate is false for flow-schemas; this means a POST is needed to create one.
-func (flowSchemaStrategy) AllowCreateOnUpdate() bool {
+func (flowSchemaStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 

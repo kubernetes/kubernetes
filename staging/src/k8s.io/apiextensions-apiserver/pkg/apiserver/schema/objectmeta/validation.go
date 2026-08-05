@@ -17,19 +17,23 @@ limitations under the License.
 package objectmeta
 
 import (
+	"context"
 	"strings"
 
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/validate/content"
 	metavalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 // Validate validates embedded ObjectMeta and TypeMeta.
 // It also validate those at the root if isResourceRoot is true.
-func Validate(pth *field.Path, obj interface{}, s *structuralschema.Structural, isResourceRoot bool) field.ErrorList {
+func Validate(ctx context.Context, pth *field.Path, obj interface{}, s *structuralschema.Structural, isResourceRoot bool) field.ErrorList {
 	if isResourceRoot {
 		if s == nil {
 			s = &structuralschema.Structural{}
@@ -40,10 +44,10 @@ func Validate(pth *field.Path, obj interface{}, s *structuralschema.Structural, 
 			s = &clone
 		}
 	}
-	return validate(pth, obj, s)
+	return validate(ctx, pth, obj, s)
 }
 
-func validate(pth *field.Path, x interface{}, s *structuralschema.Structural) field.ErrorList {
+func validate(ctx context.Context, pth *field.Path, x interface{}, s *structuralschema.Structural) field.ErrorList {
 	if s == nil {
 		return nil
 	}
@@ -53,20 +57,20 @@ func validate(pth *field.Path, x interface{}, s *structuralschema.Structural) fi
 	switch x := x.(type) {
 	case map[string]interface{}:
 		if s.XEmbeddedResource {
-			allErrs = append(allErrs, validateEmbeddedResource(pth, x, s)...)
+			allErrs = append(allErrs, validateEmbeddedResource(ctx, pth, x, s)...)
 		}
 
 		for k, v := range x {
 			prop, ok := s.Properties[k]
 			if ok {
-				allErrs = append(allErrs, validate(pth.Child(k), v, &prop)...)
+				allErrs = append(allErrs, validate(ctx, pth.Child(k), v, &prop)...)
 			} else if s.AdditionalProperties != nil {
-				allErrs = append(allErrs, validate(pth.Key(k), v, s.AdditionalProperties.Structural)...)
+				allErrs = append(allErrs, validate(ctx, pth.Key(k), v, s.AdditionalProperties.Structural)...)
 			}
 		}
 	case []interface{}:
 		for i, v := range x {
-			allErrs = append(allErrs, validate(pth.Index(i), v, s.Items)...)
+			allErrs = append(allErrs, validate(ctx, pth.Index(i), v, s.Items)...)
 		}
 	default:
 		// scalars, do nothing
@@ -82,7 +86,7 @@ func validatePathSegment(name string, prefix bool) []string {
 	return content.IsPathSegmentName(name)
 }
 
-func validateEmbeddedResource(pth *field.Path, x map[string]interface{}, s *structuralschema.Structural) field.ErrorList {
+func validateEmbeddedResource(ctx context.Context, pth *field.Path, x map[string]interface{}, s *structuralschema.Structural) field.ErrorList {
 	var allErrs field.ErrorList
 
 	// require apiVersion and kind, but not metadata
@@ -119,7 +123,7 @@ func validateEmbeddedResource(pth *field.Path, x map[string]interface{}, s *stru
 				if len(meta.Name) == 0 {
 					meta.Name = "fakename" // we have to set something to avoid an error
 				}
-				allErrs = append(allErrs, metavalidation.ValidateObjectMeta(meta, len(meta.Namespace) > 0, validatePathSegment, pth.Child("metadata"))...)
+				allErrs = append(allErrs, metavalidation.ValidateObjectMetaDeclaratively(ctx, operation.Create, meta, nil, len(meta.Namespace) > 0, validatePathSegment, pth.Child("metadata"), utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationBeta))...)
 			}
 		}
 	}

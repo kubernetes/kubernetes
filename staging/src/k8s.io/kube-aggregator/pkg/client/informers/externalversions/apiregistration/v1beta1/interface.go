@@ -25,7 +25,7 @@ import (
 // Interface provides access to all the informers in this group version.
 type Interface interface {
 	// APIServices returns a APIServiceInformer.
-	APIServices() APIServiceInformer
+	APIServices() TypedAPIServiceInformer
 }
 
 type version struct {
@@ -39,7 +39,7 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// APIServices returns a APIServiceInformer.
-func (v *version) APIServices() APIServiceInformer {
+// APIServices returns a TypedAPIServiceInformer.
+func (v *version) APIServices() TypedAPIServiceInformer {
 	return &aPIServiceInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

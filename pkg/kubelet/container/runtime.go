@@ -150,7 +150,10 @@ type Runtime interface {
 	// (allocated resources != actuated resources).
 	IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *PodStatus) bool
 	// UpdateActuatedPodLevelResources updates pod-level resources in actuatedState
-	UpdateActuatedPodLevelResources(actuatedPod *v1.Pod) error
+	UpdateActuatedPodLevelResources(logger klog.Logger, actuatedPod *v1.Pod) error
+	// InitializeActuatedPod initializes actuated container resources and emptyDir volume size limits for the given pod,
+	// if they are not already set.
+	InitializeActuatedPod(logger klog.Logger, allocatedPod *v1.Pod)
 }
 
 var (
@@ -221,6 +224,8 @@ type Pod struct {
 	// Sandboxes are sorted by creation time, newest -> oldest.
 	// TODO: use the runtimeApi.PodSandbox type directly.
 	Sandboxes []*Container
+	// Timestamp is the time that this Pod object was read from the runtime.
+	Timestamp time.Time
 }
 
 // PodPair contains both runtime#Pod and api#Pod
@@ -247,12 +252,9 @@ func BuildContainerID(typ, ID string) ContainerID {
 }
 
 // ParseContainerID is a convenience method for creating a ContainerID from an ID string.
-func ParseContainerID(containerID string) ContainerID {
+func ParseContainerID(logger klog.Logger, containerID string) ContainerID {
 	var id ContainerID
 	if err := id.ParseString(containerID); err != nil {
-		// Use klog.TODO() because we currently do not have a proper logger to pass in.
-		// This should be replaced with an appropriate logger when refactoring this function to accept a logger parameter.
-		logger := klog.TODO()
 		logger.Error(err, "Parsing containerID failed")
 	}
 	return id
@@ -446,6 +448,17 @@ func (podStatus *PodStatus) FindContainerStatusByName(containerName string) *Sta
 	return nil
 }
 
+// FindActiveContainerStatusByName returns active container status in the pod status with the given name.
+// When there are multiple containers' statuses with the same name, the first match will be returned.
+func (podStatus *PodStatus) FindActiveContainerStatusByName(containerName string) *Status {
+	for _, containerStatus := range podStatus.ActiveContainerStatuses {
+		if containerStatus.Name == containerName {
+			return containerStatus
+		}
+	}
+	return nil
+}
+
 // GetRunningContainerStatuses returns container status of all the running containers in a pod
 func (podStatus *PodStatus) GetRunningContainerStatuses() []*Status {
 	runningContainerStatuses := []*Status{}
@@ -476,7 +489,7 @@ type Image struct {
 // EnvVar represents the environment variable.
 type EnvVar struct {
 	Name  string
-	Value string
+	Value string // TODO: switch to []byte
 }
 
 // Annotation represents an annotation.
@@ -509,6 +522,9 @@ type Mount struct {
 	// ImageSubPath is set if an image volume sub path should get mounted. This
 	// field is only required if the above Image is set.
 	ImageSubPath string
+	// BindMountOptions are additional bind mount options (noexec, nodev, nosuid)
+	// to apply when mounting this volume into the container.
+	BindMountOptions []string
 }
 
 // ImageVolumes is a map of image specs by volume name.
@@ -666,7 +682,9 @@ func (c *RuntimeCondition) String() string {
 
 // RuntimeFeatures contains the set of features implemented by the runtime
 type RuntimeFeatures struct {
-	SupplementalGroupsPolicy bool
+	SupplementalGroupsPolicy  bool
+	UserNamespacesHostNetwork bool
+	MountOptions              bool
 }
 
 // String formats the runtime condition into a human readable string.
@@ -674,7 +692,7 @@ func (f *RuntimeFeatures) String() string {
 	if f == nil {
 		return "nil"
 	}
-	return fmt.Sprintf("SupplementalGroupsPolicy: %v", f.SupplementalGroupsPolicy)
+	return fmt.Sprintf("SupplementalGroupsPolicy: %v UserNamespacesHostNetwork: %v MountOptions: %v", f.SupplementalGroupsPolicy, f.UserNamespacesHostNetwork, f.MountOptions)
 }
 
 // Pods represents the list of pods

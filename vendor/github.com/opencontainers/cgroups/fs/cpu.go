@@ -18,6 +18,11 @@ func (s *CpuGroup) Name() string {
 	return "cpu"
 }
 
+// ID returns the controller ID for CPU subsystem.
+func (s *CpuGroup) ID() cgroups.Controller {
+	return cgroups.CPU
+}
+
 func (s *CpuGroup) Apply(path string, r *cgroups.Resources, pid int) error {
 	if err := os.MkdirAll(path, 0o755); err != nil {
 		return err

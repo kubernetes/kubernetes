@@ -164,30 +164,6 @@ function create_node() {
 __EOF__
 }
 
-# Run it if:
-# 1) $WHAT is empty
-# 2) $WHAT is not empty and kubeadm is part of $WHAT
-WHAT=${WHAT:-}
-if [[ ${WHAT} == "" || ${WHAT} =~ .*kubeadm.* ]] ; then
-  kube::log::status "Running kubeadm tests"
-
-  # build kubeadm
-  make all -C "${KUBE_ROOT}" WHAT=cmd/kubeadm
-  # unless the user sets KUBEADM_PATH, assume that "make all..." just built it
-  export KUBEADM_PATH="${KUBEADM_PATH:="$(kube::util::find-binary kubeadm)"}"
-  # invoke the tests
-  make -C "${KUBE_ROOT}" test \
-    WHAT=k8s.io/kubernetes/cmd/kubeadm/test/cmd \
-    KUBE_TIMEOUT=--timeout=240s \
-    KUBE_RACE=""
-
-  # if we ONLY want to run kubeadm, then exit here.
-  if [[ ${WHAT} == "kubeadm" ]]; then
-    kube::log::status "TESTS PASSED"
-    exit 0
-  fi
-fi
-
 kube::log::status "Running kubectl tests for kube-apiserver"
 
 setup

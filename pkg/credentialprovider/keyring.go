@@ -128,25 +128,24 @@ type AuthConfig struct {
 // Add inserts the docker config `cfg` into the basic docker keyring. It attaches
 // the `src` information that describes where the docker config `cfg` comes from.
 // `src` is nil if the docker config is globally available on the node.
-func (dk *BasicDockerKeyring) Add(src *CredentialSource, cfg DockerConfig) {
+func (dk *BasicDockerKeyring) Add(src *CredentialSource, cfgs DockerConfig) {
 	if dk.index == nil {
 		dk.index = make([]string, 0)
 		dk.creds = make(map[string][]TrackedAuthConfig)
 	}
-	for loc, ident := range cfg {
+	for repository, dockerAuthCfg := range cfgs {
 		creds := AuthConfig{
-			Username: ident.Username,
-			Password: ident.Password,
-			Email:    ident.Email,
+			Username: dockerAuthCfg.Username,
+			Password: dockerAuthCfg.Password,
+			Email:    dockerAuthCfg.Email,
 		}
 
-		value := loc
-		if !strings.HasPrefix(value, "https://") && !strings.HasPrefix(value, "http://") {
-			value = "https://" + value
+		if !strings.HasPrefix(repository, "https://") && !strings.HasPrefix(repository, "http://") {
+			repository = "https://" + repository
 		}
-		parsed, err := url.Parse(value)
+		parsed, err := url.Parse(repository)
 		if err != nil {
-			klog.Errorf("Entry %q in dockercfg invalid (%v), ignoring", loc, err)
+			klog.Errorf("Entry %q in dockercfg invalid (%v), ignoring", repository, err)
 			continue
 		}
 

@@ -19,6 +19,7 @@ package queueing
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -304,7 +305,6 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	defer testutils.CleanupTest(t, testCtx)
 
 	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
-	logger := klog.FromContext(ctx)
 	// Create one Node.
 	node := st.MakeNode().Name("fake-node").Obj()
 	if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
@@ -327,7 +327,8 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	}
 
 	// Pop fake-pod out. It should be unschedulable.
-	podInfo := testutils.NextPodOrDie(t, testCtx)
+	entity := testutils.NextEntityOrDie(t, testCtx)
+	podInfo := entity.(*framework.QueuedPodInfo)
 	schedFramework, ok := testCtx.Scheduler.Profiles[podInfo.Pod.Spec.SchedulerName]
 	if !ok {
 		t.Fatalf("Cannot find the profile for Pod %v", podInfo.Pod.Name)
@@ -340,12 +341,8 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	}
 	testCtx.Scheduler.FailureHandler(ctx, schedFramework, podInfo, fwk.NewStatus(fwk.Unschedulable).WithError(fitError), nil, time.Now())
 
-	// Scheduling cycle is incremented from 0 to 1 after NextPod() is called, so
-	// pass a number larger than 1 to move Pod to unschedulablePods.
-	testCtx.Scheduler.SchedulingQueue.AddUnschedulableIfNotPresent(logger, podInfo, 10)
-
 	// Trigger a Custom Resource event.
-	// We expect this event to trigger moving the test Pod from unschedulablePods to activeQ.
+	// We expect this event to trigger moving the test Pod from unschedulableEntities to activeQ.
 	crdGVR := schema.GroupVersionResource{Group: fooCRD.Spec.Group, Version: fooCRD.Spec.Versions[0].Name, Resource: "foos"}
 	crClient := dynamicClient.Resource(crdGVR).Namespace(ns)
 	if _, err := crClient.Create(ctx, &unstructured.Unstructured{
@@ -359,9 +356,9 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	}
 
 	// Now we should be able to pop the Pod from activeQ again.
-	podInfo = testutils.NextPodOrDie(t, testCtx)
-	if podInfo.Attempts != 2 {
-		t.Errorf("Expected the Pod to be attempted 2 times, but got %v", podInfo.Attempts)
+	entity = testutils.NextEntityOrDie(t, testCtx)
+	if attempts := entity.GetAttempts(); attempts != 2 {
+		t.Errorf("Expected the Pod to be attempted 2 times, but got %v", attempts)
 	}
 }
 
@@ -618,5 +615,15 @@ func TestPopFromBackoffQWhenActiveQEmpty(t *testing.T) {
 	err = wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, ns, pod.Name))
 	if err != nil {
 		t.Fatalf("Expected pod to be scheduled: %v", err)
+	}
+}
+
+// TestCoreResourceEnqueue verify Pods failed by in-tree default plugins can be
+// moved properly upon their registered events.
+func TestCoreResourceEnqueue(t *testing.T) {
+	for _, tt := range CoreResourceEnqueueTestCases {
+		t.Run(strings.Join(append(tt.EnablePlugins, tt.Name), "/"), func(t *testing.T) {
+			RunTestCoreResourceEnqueue(t, tt)
+		})
 	}
 }

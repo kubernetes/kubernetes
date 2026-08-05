@@ -25,13 +25,13 @@ import (
 // Interface provides access to all the informers in this group version.
 type Interface interface {
 	// ClusterRoles returns a ClusterRoleInformer.
-	ClusterRoles() ClusterRoleInformer
+	ClusterRoles() TypedClusterRoleInformer
 	// ClusterRoleBindings returns a ClusterRoleBindingInformer.
-	ClusterRoleBindings() ClusterRoleBindingInformer
+	ClusterRoleBindings() TypedClusterRoleBindingInformer
 	// Roles returns a RoleInformer.
-	Roles() RoleInformer
+	Roles() TypedRoleInformer
 	// RoleBindings returns a RoleBindingInformer.
-	RoleBindings() RoleBindingInformer
+	RoleBindings() TypedRoleBindingInformer
 }
 
 type version struct {
@@ -45,22 +45,22 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// ClusterRoles returns a ClusterRoleInformer.
-func (v *version) ClusterRoles() ClusterRoleInformer {
+// ClusterRoles returns a TypedClusterRoleInformer.
+func (v *version) ClusterRoles() TypedClusterRoleInformer {
 	return &clusterRoleInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
-// ClusterRoleBindings returns a ClusterRoleBindingInformer.
-func (v *version) ClusterRoleBindings() ClusterRoleBindingInformer {
+// ClusterRoleBindings returns a TypedClusterRoleBindingInformer.
+func (v *version) ClusterRoleBindings() TypedClusterRoleBindingInformer {
 	return &clusterRoleBindingInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
-// Roles returns a RoleInformer.
-func (v *version) Roles() RoleInformer {
+// Roles returns a TypedRoleInformer.
+func (v *version) Roles() TypedRoleInformer {
 	return &roleInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// RoleBindings returns a RoleBindingInformer.
-func (v *version) RoleBindings() RoleBindingInformer {
+// RoleBindings returns a TypedRoleBindingInformer.
+func (v *version) RoleBindings() TypedRoleBindingInformer {
 	return &roleBindingInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

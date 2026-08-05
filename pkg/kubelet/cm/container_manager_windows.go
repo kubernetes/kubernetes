@@ -119,10 +119,11 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 
 // NewContainerManager creates windows container manager.
 func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder, kubeClient clientset.Interface) (ContainerManager, error) {
+	logger := klog.FromContext(ctx)
 	// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
 	// machine info is computed and cached once as part of cAdvisor object creation.
 	// But `RootFsInfo` and `ImagesFsInfo` are not available at this moment so they will be called later during manager starts
-	machineInfo, err := cadvisorInterface.MachineInfo()
+	machineInfo, err := cadvisorInterface.MachineInfo(logger)
 	if err != nil {
 		return nil, err
 	}
@@ -134,15 +135,15 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 		cadvisorInterface: cadvisorInterface,
 	}
 
-	logger := klog.FromContext(ctx)
-
-	cm.topologyManager = topologymanager.NewFakeManager()
+	cm.topologyManager = topologymanager.NewFakeManager(logger)
 	cm.cpuManager = cpumanager.NewFakeManager(logger)
 	cm.memoryManager = memorymanager.NewFakeManager(logger)
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
 		logger.Info("Creating topology manager")
-		cm.topologyManager, err = topologymanager.NewManager(machineInfo.Topology,
+		cm.topologyManager, err = topologymanager.NewManager(
+			logger,
+			machineInfo.Topology,
 			nodeConfig.TopologyManagerPolicy,
 			nodeConfig.TopologyManagerScope,
 			nodeConfig.TopologyManagerPolicyOptions)
@@ -170,6 +171,15 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 		cm.topologyManager.AddHintProvider(logger, cm.cpuManager)
 
 		logger.Info("Creating memory manager")
+		// On Windows memory affinity is best-effort and there is no cpuset.mems
+		// equivalent to pin memory to a NUMA node directly. We choose to have
+		// memory placement follow the CPU manager's NUMA decision as a best-effort
+		// design. Wrap the topology manager store so the memory manager's
+		// GetAffinity returns the NUMA nodes of the container's exclusive CPUs.
+		// This relies on the CPU manager already being registered as a hint
+		// provider above, so its Allocate runs first and its CPUs are committed by
+		// the time the memory manager reads the affinity.
+		memoryAffinity := newCPUFollowingStore(cm.topologyManager, cm.cpuManager, machineInfo)
 		cm.memoryManager, err = memorymanager.NewManager(
 			logger,
 			nodeConfig.MemoryManagerPolicy,
@@ -177,7 +187,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 			cm.GetNodeAllocatableReservation(),
 			nodeConfig.MemoryManagerReservedMemory,
 			nodeConfig.KubeletRootDir,
-			cm.topologyManager,
+			memoryAffinity,
 		)
 		if err != nil {
 			logger.Error(err, "Failed to initialize memory manager")
@@ -187,7 +197,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 	}
 
 	logger.Info("Creating device plugin manager")
-	cm.deviceManager, err = devicemanager.NewManagerImpl(nil, cm.topologyManager)
+	cm.deviceManager, err = devicemanager.NewManagerImpl(logger, nil, cm.topologyManager)
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +253,7 @@ func (cm *containerManagerImpl) GetNodeAllocatableReservation() v1.ResourceList 
 	return result
 }
 
-func (cm *containerManagerImpl) GetCapacity(localStorageCapacityIsolation bool) v1.ResourceList {
+func (cm *containerManagerImpl) GetCapacity(_ klog.Logger, localStorageCapacityIsolation bool) v1.ResourceList {
 	return cm.capacity
 }
 
@@ -256,8 +266,8 @@ func (cm *containerManagerImpl) GetHealthCheckers() []healthz.HealthChecker {
 	return []healthz.HealthChecker{cm.deviceManager.GetHealthChecker()}
 }
 
-func (cm *containerManagerImpl) GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string) {
-	return cm.deviceManager.GetCapacity()
+func (cm *containerManagerImpl) GetDevicePluginResourceCapacity(logger klog.Logger) (v1.ResourceList, v1.ResourceList, []string) {
+	return cm.deviceManager.GetCapacity(logger)
 }
 
 func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
@@ -281,10 +291,10 @@ func (cm *containerManagerImpl) GetResources(ctx context.Context, pod *v1.Pod, c
 	return opts, nil
 }
 
-func (cm *containerManagerImpl) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStatus) {
+func (cm *containerManagerImpl) UpdateAllocatedResourcesStatus(logger klog.Logger, pod *v1.Pod, status *v1.PodStatus) {
 	// For now we only support Device Plugin
 
-	cm.deviceManager.UpdateAllocatedResourcesStatus(pod, status)
+	cm.deviceManager.UpdateAllocatedResourcesStatus(logger, pod, status)
 
 	// TODO(SergeyKanzhelev, https://kep.k8s.io/4680): add support for DRA resources when DRA supports Windows
 }
@@ -298,7 +308,7 @@ func (cm *containerManagerImpl) UpdatePluginResources(node *schedulerframework.N
 	return cm.deviceManager.UpdatePluginResources(node, attrs)
 }
 
-func (cm *containerManagerImpl) InternalContainerLifecycle() InternalContainerLifecycle {
+func (cm *containerManagerImpl) InternalContainerLifecycle(_ klog.Logger) InternalContainerLifecycle {
 	return &internalContainerLifecycleImpl{cm.cpuManager, cm.memoryManager, cm.topologyManager}
 }
 
@@ -310,7 +320,7 @@ func (cm *containerManagerImpl) GetDevices(podUID, containerName string) []*podr
 	return containerDevicesFromResourceDeviceInstances(cm.deviceManager.GetDevices(podUID, containerName))
 }
 
-func (cm *containerManagerImpl) GetAllocatableDevices() []*podresourcesapi.ContainerDevices {
+func (cm *containerManagerImpl) GetAllocatableDevices(_ klog.Logger) []*podresourcesapi.ContainerDevices {
 	return nil
 }
 
@@ -318,21 +328,25 @@ func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 	return cm.deviceManager.ShouldResetExtendedResourceCapacity()
 }
 
-func (cm *containerManagerImpl) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {
+func (cm *containerManagerImpl) GetAllocateResourcesPodAdmitHandler(_ klog.Logger) lifecycle.PodAdmitHandler {
 	return cm.topologyManager
 }
 
-func (cm *containerManagerImpl) UpdateAllocatedDevices() {
+func (cm *containerManagerImpl) UpdateAllocatedDevices(_ klog.Logger) {
 	return
 }
 
-func (cm *containerManagerImpl) GetCPUs(podUID, containerName string) []int64 {
+func (cm *containerManagerImpl) GetCPUs(pod *v1.Pod, container *v1.Container) []int64 {
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
 		if cm.cpuManager != nil {
-			return int64Slice(cm.cpuManager.GetExclusiveCPUs(podUID, containerName).UnsortedList())
+			return int64Slice(cm.cpuManager.GetExclusiveCPUs(string(pod.UID), container.Name).UnsortedList())
 		}
 		return []int64{}
 	}
+	return nil
+}
+
+func (cm *containerManagerImpl) GetPodCPUs(podUID string) []int64 {
 	return nil
 }
 
@@ -346,11 +360,15 @@ func (cm *containerManagerImpl) GetAllocatableCPUs() []int64 {
 	return nil
 }
 
-func (cm *containerManagerImpl) GetMemory(_, _ string) []*podresourcesapi.ContainerMemory {
+func (cm *containerManagerImpl) GetMemory(_ klog.Logger, pod *v1.Pod, container *v1.Container) []*podresourcesapi.ContainerMemory {
 	return nil
 }
 
-func (cm *containerManagerImpl) GetAllocatableMemory() []*podresourcesapi.ContainerMemory {
+func (cm *containerManagerImpl) GetPodMemory(_ klog.Logger, _ string) []*podresourcesapi.ContainerMemory {
+	return nil
+}
+
+func (cm *containerManagerImpl) GetAllocatableMemory(_ klog.Logger) []*podresourcesapi.ContainerMemory {
 	return nil
 }
 
@@ -358,7 +376,7 @@ func (cm *containerManagerImpl) GetNodeAllocatableAbsolute() v1.ResourceList {
 	return nil
 }
 
-func (cm *containerManagerImpl) GetDynamicResources(pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource {
+func (cm *containerManagerImpl) GetDynamicResources(logger klog.Logger, pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource {
 	return nil
 }
 
@@ -374,16 +392,10 @@ func (cm *containerManagerImpl) PodMightNeedToUnprepareResources(UID types.UID) 
 	return false
 }
 
-func (cm *containerManagerImpl) PodHasExclusiveCPUs(pod *v1.Pod) bool {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func (cm *containerManagerImpl) PodHasExclusiveCPUs(logger klog.Logger, pod *v1.Pod) bool {
 	return podHasExclusiveCPUs(logger, cm.cpuManager, pod)
 }
 
-func (cm *containerManagerImpl) ContainerHasExclusiveCPUs(pod *v1.Pod, container *v1.Container) bool {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func (cm *containerManagerImpl) ContainerHasExclusiveCPUs(logger klog.Logger, pod *v1.Pod, container *v1.Container) bool {
 	return containerHasExclusiveCPUs(logger, cm.cpuManager, pod, container)
 }

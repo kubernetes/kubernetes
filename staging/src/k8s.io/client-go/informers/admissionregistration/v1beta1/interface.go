@@ -25,17 +25,17 @@ import (
 // Interface provides access to all the informers in this group version.
 type Interface interface {
 	// MutatingAdmissionPolicies returns a MutatingAdmissionPolicyInformer.
-	MutatingAdmissionPolicies() MutatingAdmissionPolicyInformer
+	MutatingAdmissionPolicies() TypedMutatingAdmissionPolicyInformer
 	// MutatingAdmissionPolicyBindings returns a MutatingAdmissionPolicyBindingInformer.
-	MutatingAdmissionPolicyBindings() MutatingAdmissionPolicyBindingInformer
+	MutatingAdmissionPolicyBindings() TypedMutatingAdmissionPolicyBindingInformer
 	// MutatingWebhookConfigurations returns a MutatingWebhookConfigurationInformer.
-	MutatingWebhookConfigurations() MutatingWebhookConfigurationInformer
+	MutatingWebhookConfigurations() TypedMutatingWebhookConfigurationInformer
 	// ValidatingAdmissionPolicies returns a ValidatingAdmissionPolicyInformer.
-	ValidatingAdmissionPolicies() ValidatingAdmissionPolicyInformer
+	ValidatingAdmissionPolicies() TypedValidatingAdmissionPolicyInformer
 	// ValidatingAdmissionPolicyBindings returns a ValidatingAdmissionPolicyBindingInformer.
-	ValidatingAdmissionPolicyBindings() ValidatingAdmissionPolicyBindingInformer
+	ValidatingAdmissionPolicyBindings() TypedValidatingAdmissionPolicyBindingInformer
 	// ValidatingWebhookConfigurations returns a ValidatingWebhookConfigurationInformer.
-	ValidatingWebhookConfigurations() ValidatingWebhookConfigurationInformer
+	ValidatingWebhookConfigurations() TypedValidatingWebhookConfigurationInformer
 }
 
 type version struct {
@@ -49,32 +49,32 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// MutatingAdmissionPolicies returns a MutatingAdmissionPolicyInformer.
-func (v *version) MutatingAdmissionPolicies() MutatingAdmissionPolicyInformer {
+// MutatingAdmissionPolicies returns a TypedMutatingAdmissionPolicyInformer.
+func (v *version) MutatingAdmissionPolicies() TypedMutatingAdmissionPolicyInformer {
 	return &mutatingAdmissionPolicyInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
-// MutatingAdmissionPolicyBindings returns a MutatingAdmissionPolicyBindingInformer.
-func (v *version) MutatingAdmissionPolicyBindings() MutatingAdmissionPolicyBindingInformer {
+// MutatingAdmissionPolicyBindings returns a TypedMutatingAdmissionPolicyBindingInformer.
+func (v *version) MutatingAdmissionPolicyBindings() TypedMutatingAdmissionPolicyBindingInformer {
 	return &mutatingAdmissionPolicyBindingInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
-// MutatingWebhookConfigurations returns a MutatingWebhookConfigurationInformer.
-func (v *version) MutatingWebhookConfigurations() MutatingWebhookConfigurationInformer {
+// MutatingWebhookConfigurations returns a TypedMutatingWebhookConfigurationInformer.
+func (v *version) MutatingWebhookConfigurations() TypedMutatingWebhookConfigurationInformer {
 	return &mutatingWebhookConfigurationInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
-// ValidatingAdmissionPolicies returns a ValidatingAdmissionPolicyInformer.
-func (v *version) ValidatingAdmissionPolicies() ValidatingAdmissionPolicyInformer {
+// ValidatingAdmissionPolicies returns a TypedValidatingAdmissionPolicyInformer.
+func (v *version) ValidatingAdmissionPolicies() TypedValidatingAdmissionPolicyInformer {
 	return &validatingAdmissionPolicyInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
-// ValidatingAdmissionPolicyBindings returns a ValidatingAdmissionPolicyBindingInformer.
-func (v *version) ValidatingAdmissionPolicyBindings() ValidatingAdmissionPolicyBindingInformer {
+// ValidatingAdmissionPolicyBindings returns a TypedValidatingAdmissionPolicyBindingInformer.
+func (v *version) ValidatingAdmissionPolicyBindings() TypedValidatingAdmissionPolicyBindingInformer {
 	return &validatingAdmissionPolicyBindingInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
-// ValidatingWebhookConfigurations returns a ValidatingWebhookConfigurationInformer.
-func (v *version) ValidatingWebhookConfigurations() ValidatingWebhookConfigurationInformer {
+// ValidatingWebhookConfigurations returns a TypedValidatingWebhookConfigurationInformer.
+func (v *version) ValidatingWebhookConfigurations() TypedValidatingWebhookConfigurationInformer {
 	return &validatingWebhookConfigurationInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

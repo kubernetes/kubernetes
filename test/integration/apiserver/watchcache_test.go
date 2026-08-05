@@ -38,7 +38,7 @@ import (
 // setup create kube-apiserver backed up by two separate etcds,
 // with one of them containing events and the other all other objects.
 func multiEtcdSetup(ctx context.Context, t *testing.T) (clientset.Interface, framework.TearDownFunc) {
-	etcdArgs := []string{"--experimental-watch-progress-notify-interval", "1s"}
+	etcdArgs := []string{"--watch-progress-notify-interval", "1s"}
 	etcd0URL, stopEtcd0, err := framework.RunCustomEtcd(klog.FromContext(ctx).WithName("etcd0"), "etcd_watchcache0", etcdArgs)
 	if err != nil {
 		t.Fatalf("Couldn't start etcd: %v", err)
@@ -180,9 +180,8 @@ func BenchmarkListFromWatchCache(b *testing.B) {
 	wg := sync.WaitGroup{}
 
 	errCh := make(chan error, namespaces)
-	for i := range namespaces {
+	for index := range namespaces {
 		wg.Add(1)
-		index := i
 		go func() {
 			defer wg.Done()
 

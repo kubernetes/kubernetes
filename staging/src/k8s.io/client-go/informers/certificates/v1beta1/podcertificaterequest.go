@@ -34,11 +34,39 @@ import (
 )
 
 // PodCertificateRequestInformer provides access to a shared informer and lister for
-// PodCertificateRequests.
+// PodCertificateRequests. Prefer using the type-safe variant (see [TypedPodCertificateRequestInformer]).
 type PodCertificateRequestInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() certificatesv1beta1.PodCertificateRequestLister
 }
+
+// TypedPodCertificateRequestInformer provides access to a shared informer and lister for
+// PodCertificateRequests, including the type-safe TypedInformer variant.
+// It is a superset of PodCertificateRequestInformer.
+type TypedPodCertificateRequestInformer interface {
+	Informer() cache.SharedIndexInformer
+	TypedInformer() PodCertificateRequestIndexInformer
+	Lister() certificatesv1beta1.PodCertificateRequestLister
+}
+
+// PodCertificateRequestIndexInformer is a wrapper around the underlying [cache.SharedIndexInformer]
+// with type-safe variants of several methods.
+type PodCertificateRequestIndexInformer cache.TypedSharedIndexInformer[*apicertificatesv1beta1.PodCertificateRequest]
+
+// PodCertificateRequestHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerFuncs] for PodCertificateRequest.
+type PodCertificateRequestHandlerFuncs = cache.TypedResourceEventHandlerFuncs[*apicertificatesv1beta1.PodCertificateRequest]
+
+// PodCertificateRequestDetailedHandlerFuncs is a specialization of [cache.TypedResourceEventHandlerDetailedFuncs] for PodCertificateRequest.
+type PodCertificateRequestDetailedHandlerFuncs = cache.TypedResourceEventHandlerDetailedFuncs[*apicertificatesv1beta1.PodCertificateRequest]
+
+// PodCertificateRequestFilteringHandler is a specialization of [cache.TypedFilteringResourceEventHandler] for PodCertificateRequest.
+type PodCertificateRequestFilteringHandler = cache.TypedFilteringResourceEventHandler[*apicertificatesv1beta1.PodCertificateRequest]
+
+// PodCertificateRequestIndexers is a specialization of [cache.TypedIndexers] for PodCertificateRequest.
+type PodCertificateRequestIndexers = cache.TypedIndexers[*apicertificatesv1beta1.PodCertificateRequest]
+
+// DeletedPodCertificateRequest is a specialization of [cache.DeletedObject] for PodCertificateRequest.
+type DeletedPodCertificateRequest = cache.DeletedObject[*apicertificatesv1beta1.PodCertificateRequest]
 
 type podCertificateRequestInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
@@ -49,25 +77,49 @@ type podCertificateRequestInformer struct {
 // NewPodCertificateRequestInformer constructs a new informer for PodCertificateRequest type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedPodCertificateRequestInformer]).
 func NewPodCertificateRequestInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
 	return NewPodCertificateRequestInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers})
+}
+
+// NewTypedPodCertificateRequestInformer constructs a new informer for PodCertificateRequest type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedPodCertificateRequestInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers PodCertificateRequestIndexers) PodCertificateRequestIndexInformer {
+	return NewTypedPodCertificateRequestInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers)})
 }
 
 // NewFilteredPodCertificateRequestInformer constructs a new informer for PodCertificateRequest type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedFilteredPodCertificateRequestInformer]).
 func NewFilteredPodCertificateRequestInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewPodCertificateRequestInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+	return NewTypedPodCertificateRequestInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: indexers, TweakListOptions: tweakListOptions})
+}
+
+// NewTypedFilteredPodCertificateRequestInformer constructs a new informer for PodCertificateRequest type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedFilteredPodCertificateRequestInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers PodCertificateRequestIndexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) PodCertificateRequestIndexInformer {
+	return NewTypedPodCertificateRequestInformerWithOptions(client, namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.TypedIndexersToIndexers(indexers), TweakListOptions: tweakListOptions})
 }
 
 // NewPodCertificateRequestInformerWithOptions constructs a new informer for PodCertificateRequest type with additional options.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
+// If you really need an independent one, prefer using the type-safe variant (see [NewTypedPodCertificateRequestInformerWithOptions]).
 func NewPodCertificateRequestInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) cache.SharedIndexInformer {
+	return NewTypedPodCertificateRequestInformerWithOptions(client, namespace, options)
+}
+
+// NewTypedPodCertificateRequestInformerWithOptions constructs a new informer for PodCertificateRequest type with additional options.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewTypedPodCertificateRequestInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) PodCertificateRequestIndexInformer {
 	gvr := schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "podcertificaterequests"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewTypedSharedIndexInformer[*apicertificatesv1beta1.PodCertificateRequest](cache.NewSharedIndexInformerWithOptions(
 		cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 			ListFunc: func(opts v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -100,17 +152,57 @@ func NewPodCertificateRequestInformerWithOptions(client kubernetes.Interface, na
 			Indexers:     options.Indexers,
 			Identifier:   identifier,
 		},
-	)
+	))
 }
 
 func (f *podCertificateRequestInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewPodCertificateRequestInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
+	return NewTypedPodCertificateRequestInformerWithOptions(client, f.namespace, internalinterfaces.InformerOptions{ResyncPeriod: resyncPeriod, Indexers: cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, InformerName: f.factory.InformerName(), TweakListOptions: f.tweakListOptions})
 }
 
 func (f *podCertificateRequestInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apicertificatesv1beta1.PodCertificateRequest{}, f.defaultInformer)
+	return f.TypedInformer()
+}
+
+func (f *podCertificateRequestInformer) TypedInformer() PodCertificateRequestIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apicertificatesv1beta1.PodCertificateRequest](f.factory.InformerFor(&apicertificatesv1beta1.PodCertificateRequest{}, f.defaultInformer))
 }
 
 func (f *podCertificateRequestInformer) Lister() certificatesv1beta1.PodCertificateRequestLister {
 	return certificatesv1beta1.NewPodCertificateRequestLister(f.Informer().GetIndexer())
+}
+
+// ToTypedPodCertificateRequestInformer converts an untyped informer into a TypedPodCertificateRequestInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *PodCertificateRequest. If that is not the case, calling type-safe methods of the returned
+// TypedPodCertificateRequestInformer leads to runtime panics. A safer alternative is to pass
+// around a TypedPodCertificateRequestInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToTypedPodCertificateRequestInformer(informer PodCertificateRequestInformer) TypedPodCertificateRequestInformer {
+	if informer, ok := informer.(TypedPodCertificateRequestInformer); ok {
+		return informer
+	}
+	return &podCertificateRequestTypedInformerAdapter{informer}
+}
+
+type podCertificateRequestTypedInformerAdapter struct {
+	PodCertificateRequestInformer
+}
+
+func (a *podCertificateRequestTypedInformerAdapter) TypedInformer() PodCertificateRequestIndexInformer {
+	return cache.NewTypedSharedIndexInformer[*apicertificatesv1beta1.PodCertificateRequest](a.Informer())
+}
+
+// ToPodCertificateRequestIndexInformer converts an untyped informer into a PodCertificateRequestIndexInformer.
+//
+// WARNING: this conversion is only safe if the informer handles objects of type
+// *PodCertificateRequest. If that is not the case, calling type-safe methods of the returned
+// PodCertificateRequestIndexInformer leads to runtime panics. A safer alternative is to pass
+// around a PodCertificateRequestIndexInformer instances that was obtained from a
+// SharedInformerFactory.
+func ToPodCertificateRequestIndexInformer(informer cache.SharedIndexInformer) PodCertificateRequestIndexInformer {
+	if informer, ok := informer.(PodCertificateRequestIndexInformer); ok {
+		return informer
+	}
+	return cache.NewTypedSharedIndexInformer[*apicertificatesv1beta1.PodCertificateRequest](informer)
 }

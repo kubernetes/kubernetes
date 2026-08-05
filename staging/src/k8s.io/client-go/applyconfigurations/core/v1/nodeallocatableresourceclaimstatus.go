@@ -18,11 +18,6 @@ limitations under the License.
 
 package v1
 
-import (
-	corev1 "k8s.io/api/core/v1"
-	resource "k8s.io/apimachinery/pkg/api/resource"
-)
-
 // NodeAllocatableResourceClaimStatusApplyConfiguration represents a declarative configuration of the NodeAllocatableResourceClaimStatus type for use
 // with apply.
 //
@@ -32,8 +27,12 @@ type NodeAllocatableResourceClaimStatusApplyConfiguration struct {
 	ResourceClaimName *string `json:"resourceClaimName,omitempty"`
 	// Containers lists the names of all containers in this pod that reference the claim.
 	Containers []string `json:"containers,omitempty"`
-	// Resources is a map of the node-allocatable resource name to the aggregate quantity allocated to the claim.
-	Resources map[corev1.ResourceName]resource.Quantity `json:"resources,omitempty"`
+	// Mapping contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].mapping` field.
+	// This is used by kubelet for pod level and container-level cgroup enforcement.
+	Mapping []NodeAllocatableMappedResourcesApplyConfiguration `json:"mapping,omitempty"`
+	// Overhead contains allocations through devices mapped in the device spec's `nodeAllocatableResources[...].overhead` field.
+	// This is used by kubelet for pod level and container-level cgroup enforcement.
+	Overhead []NodeAllocatableOverheadResourcesApplyConfiguration `json:"overhead,omitempty"`
 }
 
 // NodeAllocatableResourceClaimStatusApplyConfiguration constructs a declarative configuration of the NodeAllocatableResourceClaimStatus type for use with
@@ -60,16 +59,28 @@ func (b *NodeAllocatableResourceClaimStatusApplyConfiguration) WithContainers(va
 	return b
 }
 
-// WithResources puts the entries into the Resources field in the declarative configuration
+// WithMapping adds the given value to the Mapping field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, the entries provided by each call will be put on the Resources field,
-// overwriting an existing map entries in Resources field with the same key.
-func (b *NodeAllocatableResourceClaimStatusApplyConfiguration) WithResources(entries map[corev1.ResourceName]resource.Quantity) *NodeAllocatableResourceClaimStatusApplyConfiguration {
-	if b.Resources == nil && len(entries) > 0 {
-		b.Resources = make(map[corev1.ResourceName]resource.Quantity, len(entries))
+// If called multiple times, values provided by each call will be appended to the Mapping field.
+func (b *NodeAllocatableResourceClaimStatusApplyConfiguration) WithMapping(values ...*NodeAllocatableMappedResourcesApplyConfiguration) *NodeAllocatableResourceClaimStatusApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithMapping")
+		}
+		b.Mapping = append(b.Mapping, *values[i])
 	}
-	for k, v := range entries {
-		b.Resources[k] = v
+	return b
+}
+
+// WithOverhead adds the given value to the Overhead field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Overhead field.
+func (b *NodeAllocatableResourceClaimStatusApplyConfiguration) WithOverhead(values ...*NodeAllocatableOverheadResourcesApplyConfiguration) *NodeAllocatableResourceClaimStatusApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithOverhead")
+		}
+		b.Overhead = append(b.Overhead, *values[i])
 	}
 	return b
 }

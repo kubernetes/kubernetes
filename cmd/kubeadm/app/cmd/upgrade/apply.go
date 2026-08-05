@@ -106,7 +106,7 @@ func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 			if err := applyRunner.Run(args); err != nil {
 				return err
 			}
-			if flags.dryRun {
+			if applyData.DryRun() {
 				fmt.Println("[upgrade/successful] Finished dryrunning successfully!")
 				return nil
 			}
@@ -241,7 +241,7 @@ func newApplyData(cmd *cobra.Command, args []string, applyFlags *applyFlags) (*a
 	getNodeRegistration := true
 	isControlPlaneNode := true
 	getComponentConfigs := true
-	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, nil, "upgrade", getNodeRegistration, isControlPlaneNode, getComponentConfigs)
+	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, nil, "upgrade", getNodeRegistration, isControlPlaneNode, getComponentConfigs, false)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			_, _ = printer.Printf("[upgrade] In order to upgrade, a ConfigMap called %q in the %q namespace must exist.\n", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)

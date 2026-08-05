@@ -24,7 +24,7 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // FlunderList is a list of Flunder objects.
 type FlunderList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	Items []Flunder `json:"items" protobuf:"bytes,2,rep,name=items"`
@@ -53,7 +53,7 @@ type FlunderStatus struct {
 // +k8s:prerelease-lifecycle-gen:removed=1.10
 
 type Flunder struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta   `json:""`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	Spec   FlunderSpec   `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
@@ -67,7 +67,7 @@ type Flunder struct {
 // +k8s:prerelease-lifecycle-gen:removed=1.10
 
 type Fischer struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta   `json:""`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// DisallowedFlunders holds a list of Flunder.Names that are disallowed.
@@ -82,7 +82,7 @@ type Fischer struct {
 
 // FischerList is a list of Fischer objects.
 type FischerList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	Items []Fischer `json:"items" protobuf:"bytes,2,rep,name=items"`

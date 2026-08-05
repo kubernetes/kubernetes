@@ -105,21 +105,6 @@ var (
 		},
 		[]string{"verb", "dry_run", "group", "version", "resource", "subresource", "scope", "component"},
 	)
-	requestSloLatencies = compbasemetrics.NewHistogramVec(
-		&compbasemetrics.HistogramOpts{
-			Subsystem: APIServerComponent,
-			Name:      "request_slo_duration_seconds",
-			Help:      "Response latency distribution (not counting webhook duration and priority & fairness queue wait times) in seconds for each verb, group, version, resource, subresource, scope and component.",
-			// This metric is supplementary to the requestLatencies metric.
-			// It measures request duration excluding webhooks as they are mostly
-			// dependant on user configuration.
-			Buckets: []float64{0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3,
-				4, 5, 6, 8, 10, 15, 20, 30, 45, 60},
-			StabilityLevel:    compbasemetrics.ALPHA,
-			DeprecatedVersion: "1.27.0",
-		},
-		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
-	)
 	requestSliLatencies = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Subsystem: APIServerComponent,
@@ -172,7 +157,7 @@ var (
 			Subsystem:      APIServerComponent,
 			Name:           "watch_events_total",
 			Help:           "Number of events sent in watch clients",
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"group", "version", "resource"},
 	)
@@ -182,7 +167,7 @@ var (
 			Name:           "watch_events_sizes",
 			Help:           "Watch event size distribution in bytes",
 			Buckets:        compbasemetrics.ExponentialBuckets(1024, 2.0, 8), // 1K, 2K, 4K, 8K, ..., 128K.
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"group", "version", "resource"},
 	)
@@ -285,10 +270,14 @@ var (
 
 	watchListLatencies = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
-			Subsystem:      APIServerComponent,
-			Name:           "watch_list_duration_seconds",
-			Help:           "Response latency distribution in seconds for watch list requests broken by group, version, resource and scope.",
-			Buckets:        []float64{0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 2, 4, 6, 8, 10, 15, 20, 30, 45, 60},
+			Subsystem: APIServerComponent,
+			Name:      "watch_list_duration_seconds",
+			Help:      "Response latency distribution in seconds for watch list requests broken by group, version, resource and scope.",
+			// This metric is used for verifying api call latencies SLO,
+			// as well as tracking regressions in this aspects.
+			// Thus we customize buckets significantly, to empower both usecases.
+			Buckets: []float64{0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3,
+				4, 5, 6, 8, 10, 15, 20, 30, 45, 60, 90, 120, 180, 300},
 			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"group", "version", "resource", "scope"},
@@ -299,7 +288,6 @@ var (
 		requestCounter,
 		longRunningRequestsGauge,
 		requestLatencies,
-		requestSloLatencies,
 		requestSliLatencies,
 		fieldValidationRequestLatencies,
 		responseSizes,
@@ -610,7 +598,6 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 
 	if wd, ok := request.LatencyTrackersFrom(req.Context()); ok && dryRun == "" {
 		sliLatency := elapsedSeconds - (wd.MutatingWebhookTracker.GetLatency() + wd.ValidatingWebhookTracker.GetLatency() + wd.APFQueueWaitTracker.GetLatency()).Seconds()
-		requestSloLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(sliLatency)
 		requestSliLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(sliLatency)
 	}
 	// We are only interested in response sizes of read requests.

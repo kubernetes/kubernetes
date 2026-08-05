@@ -29,7 +29,7 @@ func init() {
 	// We override grpc logger only when the environment variable is set
 	// in order to not interfere by default with user's code or other libraries.
 	if os.Getenv("ETCD_CLIENT_DEBUG") != "" {
-		lg, err := logutil.CreateDefaultZapLogger(etcdClientDebugLevel())
+		lg, err := logutil.CreateDefaultZapLogger(ClientLogLevel())
 		if err != nil {
 			panic(err)
 		}
@@ -45,8 +45,8 @@ func SetLogger(l grpclog.LoggerV2) {
 	grpclog.SetLoggerV2(l)
 }
 
-// etcdClientDebugLevel translates ETCD_CLIENT_DEBUG into zap log level.
-func etcdClientDebugLevel() zapcore.Level {
+// ClientLogLevel translates ETCD_CLIENT_DEBUG into zap log level.
+func ClientLogLevel() zapcore.Level {
 	envLevel := os.Getenv("ETCD_CLIENT_DEBUG")
 	if envLevel == "" || envLevel == "true" {
 		return zapcore.InfoLevel

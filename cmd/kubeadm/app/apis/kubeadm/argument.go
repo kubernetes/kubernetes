@@ -61,3 +61,16 @@ func SetArgValues(args []Arg, name, value string, nArgs int) []Arg {
 	args = append(args, Arg{Name: name, Value: value})
 	return args
 }
+
+// MergeArgWithBase takes a base and an argument and merges them based
+// on the argument's MergeMethod. No merge method means replace.
+func MergeArgWithBase(base string, arg Arg) string {
+	switch arg.MergeMethod {
+	case ArgMergeMethodAppend:
+		return base + arg.Value
+	case ArgMergeMethodPrepend:
+		return arg.Value + base
+	default:
+		return arg.Value
+	}
+}

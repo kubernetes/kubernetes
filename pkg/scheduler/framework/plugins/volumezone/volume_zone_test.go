@@ -270,10 +270,9 @@ func TestSingleZone(t *testing.T) {
 			node := &framework.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
-				pvLister:                  pvLister,
-				pvcLister:                 pvcLister,
-				scLister:                  nil,
-				enableSchedulingQueueHint: false,
+				pvLister:  pvLister,
+				pvcLister: pvcLister,
+				scLister:  nil,
 			}
 			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod, nil)
 			if diff := cmp.Diff(preFilterStatus, test.wantPreFilterStatus); diff != "" {
@@ -403,10 +402,9 @@ func TestMultiZone(t *testing.T) {
 			node := &framework.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
-				pvLister:                  pvLister,
-				pvcLister:                 pvcLister,
-				scLister:                  nil,
-				enableSchedulingQueueHint: false,
+				pvLister:  pvLister,
+				pvcLister: pvcLister,
+				scLister:  nil,
 			}
 			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod, nil)
 			if diff := cmp.Diff(preFilterStatus, test.wantPreFilterStatus); diff != "" {
@@ -529,10 +527,9 @@ func TestWithBinding(t *testing.T) {
 			node := &framework.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
-				pvLister:                  pvLister,
-				pvcLister:                 pvcLister,
-				scLister:                  scLister,
-				enableSchedulingQueueHint: false,
+				pvLister:  pvLister,
+				pvcLister: pvcLister,
+				scLister:  scLister,
 			}
 			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod, nil)
 			if diff := cmp.Diff(preFilterStatus, test.wantPreFilterStatus); diff != "" {
@@ -888,4 +885,21 @@ func makeNodesWithTopologyZone(num int) []*v1.Node {
 		}
 	}
 	return nodeList
+}
+
+func TestVolumeZone_DeferredResizeSkipped(t *testing.T) {
+	ctx := context.Background()
+	pod := st.MakePod().Name("p").UID("p").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj()
+	nodeInfo := framework.NewNodeInfo()
+	nodeInfo.SetNode(st.MakeNode().Name("node1").Obj())
+
+	pl := &VolumeZone{enableInPlacePodVerticalScalingSchedulerPreemption: true}
+
+	if preRes, preStatus := pl.PreFilter(ctx, nil, pod, nil); preStatus.Code() != fwk.Skip || preRes != nil {
+		t.Errorf("PreFilter: got (res: %v, status: %v), want (nil, Skip)", preRes, preStatus.Code())
+	}
+
+	if filterStatus := pl.Filter(ctx, nil, pod, nodeInfo); filterStatus.Code() != fwk.Success {
+		t.Errorf("Filter: got status %v, want Success (nil)", filterStatus.Code())
+	}
 }

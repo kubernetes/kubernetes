@@ -48,4 +48,7 @@ func RecommendedDefaultNodeLifecycleControllerConfiguration(obj *kubectrlmgrconf
 	if obj.NodeStartupGracePeriod == zero {
 		obj.NodeStartupGracePeriod = metav1.Duration{Duration: 60 * time.Second}
 	}
+	if obj.NodeMonitorPeriod == zero {
+		obj.NodeMonitorPeriod = metav1.Duration{Duration: 5 * time.Second}
+	}
 }

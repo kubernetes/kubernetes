@@ -208,7 +208,7 @@ func (a customResourceStrategy) Validate(ctx context.Context, obj runtime.Object
 	errs = append(errs, a.validator.Validate(ctx, u, a.scale)...)
 
 	// validate embedded resources
-	errs = append(errs, schemaobjectmeta.Validate(nil, u.Object, a.structuralSchema, false)...)
+	errs = append(errs, schemaobjectmeta.Validate(ctx, nil, u.Object, a.structuralSchema, false)...)
 
 	// validate x-kubernetes-list-type "map" and "set" invariant
 	errs = append(errs, structurallisttype.ValidateListSetsAndMaps(nil, a.structuralSchema, u.Object)...)
@@ -261,12 +261,12 @@ func (customResourceStrategy) Canonicalize(obj runtime.Object) {
 
 // AllowCreateOnUpdate is false for CustomResources; this means a POST is
 // needed to create one.
-func (customResourceStrategy) AllowCreateOnUpdate() bool {
+func (customResourceStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
 // AllowUnconditionalUpdate is the default update policy for CustomResource objects.
-func (customResourceStrategy) AllowUnconditionalUpdate() bool {
+func (customResourceStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -294,7 +294,7 @@ func (a customResourceStrategy) ValidateUpdate(ctx context.Context, obj, old run
 	errs = append(errs, a.validator.ValidateUpdate(ctx, uNew, uOld, a.scale, options...)...)
 
 	// Checks the embedded objects. We don't make a difference between update and create for those.
-	errs = append(errs, schemaobjectmeta.Validate(nil, uNew.Object, a.structuralSchema, false)...)
+	errs = append(errs, schemaobjectmeta.Validate(ctx, nil, uNew.Object, a.structuralSchema, false)...)
 
 	// ratcheting validation of x-kubernetes-list-type value map and set
 	if oldErrs := structurallisttype.ValidateListSetsAndMaps(nil, a.structuralSchema, uOld.Object); len(oldErrs) == 0 {

@@ -90,25 +90,26 @@ func (s *snapshottableTestSuite) GetTestSuiteInfo() storageframework.TestSuiteIn
 	return s.tsInfo
 }
 
-func (s *snapshottableTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+func (s *snapshottableTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) string {
 	// Check preconditions.
 	dInfo := driver.GetDriverInfo()
 	ok := false
 	_, ok = driver.(storageframework.SnapshottableTestDriver)
 	if !dInfo.Capabilities[storageframework.CapSnapshotDataSource] || !ok {
-		e2eskipper.Skipf("Driver %q does not support snapshots - skipping", dInfo.Name)
+		return fmt.Sprintf("Driver %q does not support snapshots", dInfo.Name)
 	}
 	_, ok = driver.(storageframework.DynamicPVTestDriver)
 	if !ok {
-		e2eskipper.Skipf("Driver %q does not support dynamic provisioning - skipping", driver.GetDriverInfo().Name)
+		return fmt.Sprintf("Driver %q does not support dynamic provisioning", driver.GetDriverInfo().Name)
 	}
+	return ""
 }
 
 func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewDefaultFramework("snapshotting")
+	f := framework.NewFrameworkWithCustomTimeouts("snapshotting", storageframework.GetDriverTimeouts(driver))
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Describe("volume snapshot controller", func() {

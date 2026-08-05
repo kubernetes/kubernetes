@@ -85,7 +85,7 @@ func (e *jsonPatcher) Patch(ctx context.Context, r Request, runtimeCELCostBudget
 	}
 	o := r.ObjectInterfaces
 	jsonSerializer := json.NewSerializerWithOptions(json.DefaultMetaFactory, o.GetObjectCreater(), o.GetObjectTyper(), json.SerializerOptions{Pretty: false, Strict: true})
-	objJS, err := runtime.Encode(jsonSerializer, r.VersionedAttributes.VersionedObject)
+	objJS, err := runtime.Encode(jsonSerializer, r.VersionedAttributes.VersionedObject.Object())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create JSON patch: %w", err)
 	}
@@ -93,13 +93,13 @@ func (e *jsonPatcher) Patch(ctx context.Context, r Request, runtimeCELCostBudget
 	if err != nil {
 		if errors.Is(err, jsonpatch.ErrTestFailed) {
 			// If a json patch fails a test operation, the patch must not be applied
-			return r.VersionedAttributes.VersionedObject, nil
+			return r.VersionedAttributes.VersionedObject.Object(), nil
 		}
 		return nil, fmt.Errorf("JSON Patch: %w", err)
 	}
 
 	var newVersionedObject runtime.Object
-	if _, ok := r.VersionedAttributes.VersionedObject.(*unstructured.Unstructured); ok {
+	if _, ok := r.VersionedAttributes.VersionedObject.Object().(*unstructured.Unstructured); ok {
 		newVersionedObject = &unstructured.Unstructured{}
 	} else {
 		newVersionedObject, err = o.GetObjectCreater().New(r.VersionedAttributes.VersionedKind)

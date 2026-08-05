@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/typed"
 )
 
 var testTypeConverter = func() TypeConverter {
@@ -78,6 +79,50 @@ func TestVersionConverter(t *testing.T) {
 	if !reflect.DeepEqual(expected, actual) {
 		t.Fatalf("expected to get %v but got %v", expected, actual)
 	}
+}
+
+func TestVersionConverterSameVersion(t *testing.T) {
+	tc := &countingTypeConverter{TypeConverter: testTypeConverter}
+	oc := &countingObjectConvertor{ObjectConvertor: fakeObjectConvertorForTestSchema{}}
+	vc := newVersionConverter(tc, oc, schema.GroupVersion{Group: "apps", Version: runtime.APIVersionInternal})
+
+	input, err := testTypeConverter.ObjectToTyped(objForGroupVersion("apps/v1beta1"))
+	if err != nil {
+		t.Fatalf("error converting input object to a typed value: %v", err)
+	}
+	output, err := vc.Convert(input, fieldpath.APIVersion("apps/v1beta1"))
+	if err != nil {
+		t.Fatalf("expected err to be nil but got %v", err)
+	}
+	if output != input {
+		t.Errorf("expected same-version conversion to return the input unchanged")
+	}
+	if tc.typedToObjectCalls != 0 {
+		t.Errorf("expected no TypedToObject calls for same-version conversion, got %d", tc.typedToObjectCalls)
+	}
+	if oc.convertToVersionCalls != 0 {
+		t.Errorf("expected no ConvertToVersion calls for same-version conversion, got %d", oc.convertToVersionCalls)
+	}
+}
+
+type countingTypeConverter struct {
+	TypeConverter
+	typedToObjectCalls int
+}
+
+func (c *countingTypeConverter) TypedToObject(value *typed.TypedValue) (runtime.Object, error) {
+	c.typedToObjectCalls++
+	return c.TypeConverter.TypedToObject(value)
+}
+
+type countingObjectConvertor struct {
+	runtime.ObjectConvertor
+	convertToVersionCalls int
+}
+
+func (c *countingObjectConvertor) ConvertToVersion(in runtime.Object, gv runtime.GroupVersioner) (runtime.Object, error) {
+	c.convertToVersionCalls++
+	return c.ObjectConvertor.ConvertToVersion(in, gv)
 }
 
 func gvkForVersion(v string) schema.GroupVersionKind {

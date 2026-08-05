@@ -50,6 +50,9 @@ func TestFeatureRequirementsConsistency(t *testing.T) {
 				FeatureGates: mockFG,
 				Version:      version.MustParse("1.36.0"),
 			}
+			if reqs.RequiredRuntimeFeatures != nil {
+				discoverCfg.RuntimeFeatures = *reqs.RequiredRuntimeFeatures
+			}
 
 			featureEnabled := registeredFeature.Discover(discoverCfg)
 			if !featureEnabled {

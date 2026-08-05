@@ -25,7 +25,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
-	certsv1beta1 "k8s.io/api/certificates/v1beta1"
+	certsv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -960,14 +960,14 @@ func TestIndex2(t *testing.T) {
 	}
 }
 
-func pcr(namespace, name, podName, saName, nodeName string) *certsv1beta1.PodCertificateRequest {
-	pcr := &certsv1beta1.PodCertificateRequest{
+func pcr(namespace, name, podName, saName, nodeName string) *certsv1.PodCertificateRequest {
+	pcr := &certsv1.PodCertificateRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
 			UID:       types.UID(fmt.Sprintf("pcr%suid", name)),
 		},
-		Spec: certsv1beta1.PodCertificateRequestSpec{
+		Spec: certsv1.PodCertificateRequestSpec{
 			PodName:            podName,
 			ServiceAccountName: saName,
 			NodeName:           types.NodeName(nodeName),

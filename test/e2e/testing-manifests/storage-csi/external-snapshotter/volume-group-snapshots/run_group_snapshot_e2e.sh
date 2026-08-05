@@ -244,7 +244,7 @@ run_tests() {
   export KUBE_CONTAINER_RUNTIME=remote
   export KUBE_CONTAINER_RUNTIME_ENDPOINT=unix:///run/containerd/containerd.sock
   export KUBE_CONTAINER_RUNTIME_NAME=containerd
-  export SNAPSHOTTER_VERSION="${SNAPSHOTTER_VERSION:-v8.4.0}"
+  export SNAPSHOTTER_VERSION="${SNAPSHOTTER_VERSION:-v8.6.0}"
   echo "SNAPSHOTTER_VERSION is $SNAPSHOTTER_VERSION"
 
   # Enable VolumeGroupSnapshot tests in csi-driver-hostpath

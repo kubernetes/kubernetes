@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -30,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/klog/v2"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/kubernetes/test/e2e/feature"
@@ -111,30 +111,57 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), feature.DeviceMana
 				WithTimeout(time.Minute).
 				Should(gomega.BeEquivalentTo(1))
 
-			ginkgo.By("Setting up the directory and file for controlling registration")
-			triggerPathDir = filepath.Join(devicePluginDir, "sample")
-			if _, err := os.Stat(triggerPathDir); errors.Is(err, os.ErrNotExist) {
-				err := os.Mkdir(triggerPathDir, os.ModePerm)
+			// Before we run the device plugin test, we need to ensure
+			// that the cluster is in a clean state and there are no
+			// pods running on this node.
+			// This is done in a gomega.Eventually with retries since a prior test in a different test suite could've run and the deletion of it's resources may still be in progress.
+			// xref: https://issue.k8s.io/115381
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				v1PodResources, err := getV1NodeDevices(ctx)
 				if err != nil {
-					klog.Errorf("Directory creation %s failed: %v ", triggerPathDir, err)
-					panic(err)
+					return fmt.Errorf("failed to get node local podresources by accessing the (v1) podresources API endpoint: %w", err)
 				}
-				klog.InfoS("Directory created successfully")
 
-				triggerPathFile = filepath.Join(triggerPathDir, "registration")
-				if _, err := os.Stat(triggerPathFile); errors.Is(err, os.ErrNotExist) {
-					_, err = os.Create(triggerPathFile)
-					if err != nil {
-						klog.Errorf("File creation %s failed: %v ", triggerPathFile, err)
-						panic(err)
-					}
+				if len(v1PodResources.PodResources) > 0 {
+					return fmt.Errorf("expected v1 pod resources to be empty, but got non-empty resources: %+v", v1PodResources.PodResources)
 				}
+				return nil
+			}, f.Timeouts.SystemDaemonsetStartup, f.Timeouts.Poll).Should(gomega.Succeed())
+
+			ginkgo.By("Setting up the directory for controlling registration")
+			triggerPathDir = filepath.Join(devicePluginDir, "sample")
+			if _, err := os.Stat(triggerPathDir); err != nil {
+				if errors.Is(err, os.ErrNotExist) {
+					if err := os.Mkdir(triggerPathDir, os.ModePerm); err != nil {
+						framework.Fail(fmt.Sprintf("registration control directory %q creation failed: %v ", triggerPathDir, err))
+					}
+					framework.Logf("registration control directory created successfully")
+				} else {
+					framework.Fail(fmt.Sprintf("unexpected error checking %q: %v", triggerPathDir, err))
+				}
+			} else {
+				framework.Logf("registration control directory %q already present", triggerPathDir)
+			}
+
+			ginkgo.By("Setting up the file trigger for controlling registration")
+			triggerPathFile = filepath.Join(triggerPathDir, "registration")
+			if _, err := os.Stat(triggerPathFile); err != nil {
+				if errors.Is(err, os.ErrNotExist) {
+					if _, err = os.Create(triggerPathFile); err != nil {
+						framework.Fail(fmt.Sprintf("registration control file %q creation failed: %v", triggerPathFile, err))
+					}
+					framework.Logf("registration control file created successfully")
+				} else {
+					framework.Fail(fmt.Sprintf("unexpected error creating %q: %v", triggerPathFile, err))
+				}
+			} else {
+				framework.Logf("registration control file %q already present", triggerPathFile)
 			}
 
 			ginkgo.By("Scheduling a sample device plugin pod")
 			data, err := e2etestfiles.Read(e2enode.SampleDevicePluginControlRegistrationDSYAML)
 			if err != nil {
-				framework.Fail(err.Error())
+				framework.Fail(fmt.Sprintf("error reading test data %q: %v", e2enode.SampleDevicePluginControlRegistrationDSYAML, err))
 			}
 			ds := readDaemonSetV1OrDie(data)
 
@@ -146,6 +173,30 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), feature.DeviceMana
 			}
 
 			devicePluginPod = e2epod.NewPodClient(f).CreateSync(ctx, dp)
+
+			ginkgo.By("making sure all the pods are ready")
+
+			err = e2epod.WaitForPodCondition(ctx, f.ClientSet, devicePluginPod.Namespace, devicePluginPod.Name, "Ready", 120*time.Second, testutils.PodRunningReady)
+			framework.ExpectNoError(err, "pod %s/%s did not go running", devicePluginPod.Namespace, devicePluginPod.Name)
+			framework.Logf("pod %s/%s running", devicePluginPod.Namespace, devicePluginPod.Name)
+
+			ginkgo.By("Verifying the devicePluginPod handleRegistrationProcess entered twice in the loop before we delete the registration file to trigger manual registration")
+			gomega.Eventually(ctx, func() bool {
+				logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, devicePluginPod.Namespace, devicePluginPod.Name, devicePluginPod.Spec.Containers[0].Name)
+				if err != nil {
+					framework.Logf("error getting logs for pod %q: %v", devicePluginPod.Name, err)
+					return false // Returning false to continue trying
+				}
+				framework.Logf("got pod logs: %v", logs)
+				regex := regexp.MustCompile("Starting watching routine(.?)")
+				matches := regex.Find([]byte(logs))
+				if matches == nil {
+					framework.Logf("handleRegistrationProcess not started for pod %q", devicePluginPod.Name)
+					return false // Returning false to continue trying
+				}
+				framework.Logf("handleRegistrationProcess started: %s", matches)
+				return true
+			}, 60*time.Second, framework.Poll).Should(gomega.BeTrueBecause("expected watching routine"))
 
 			go func() {
 				// Since autoregistration is disabled for the device plugin (as REGISTER_CONTROL_FILE
@@ -259,11 +310,21 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), feature.DeviceMana
 		})
 
 		ginkgo.AfterEach(func(ctx context.Context) {
+
+			ginkgo.By("Get and print devicePluginPod logs")
+			// Printing the logs form the pod, help to troubleshoot cases when devicePluginPod fails to register device with manual registration
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, devicePluginPod.Namespace, devicePluginPod.Name, devicePluginPod.Spec.Containers[0].Name)
+			if err != nil {
+				framework.Logf("failed to get pod logs %v", err)
+			} else {
+				framework.Logf("logs of %s/%s/%s (error: %v): %s", devicePluginPod.Namespace, devicePluginPod.Name, devicePluginPod.Spec.Containers[0].Name, err, logs)
+			}
+
 			ginkgo.By("Deleting the device plugin pod")
 			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 
 			ginkgo.By("Deleting the directory and file setup for controlling registration")
-			err := os.RemoveAll(triggerPathDir)
+			err = os.RemoveAll(triggerPathDir)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Deleting any Pods created by the test")
@@ -283,6 +344,8 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), feature.DeviceMana
 				WithArguments(f).
 				WithTimeout(5 * time.Minute).
 				Should(BeReady())
+
+			ginkgo.By("devices now unavailable on the local node")
 		})
 
 	})

@@ -16,6 +16,8 @@ limitations under the License.
 
 package value
 
+import "reflect"
+
 // Allocator provides a value object allocation strategy.
 // Value objects can be allocated by passing an allocator to the "Using"
 // receiver functions on the value interfaces, e.g. Map.ZipUsing(allocator, ...).
@@ -24,8 +26,8 @@ package value
 type Allocator interface {
 	// Free gives the allocator back any value objects returned by the "Using"
 	// receiver functions on the value interfaces.
-	// interface{} may be any of: Value, Map, List or Range.
-	Free(interface{})
+	// any may be any of: Value, Map, List or Range.
+	Free(any)
 
 	// The unexported functions are for "Using" receiver functions of the value types
 	// to request what they need from the allocator.
@@ -74,7 +76,7 @@ func (p *heapAllocator) allocListReflectRange() *listReflectRange {
 	return &listReflectRange{vr: &valueReflect{}}
 }
 
-func (p *heapAllocator) Free(_ interface{}) {}
+func (p *heapAllocator) Free(_ any) {}
 
 // NewFreelistAllocator creates freelist based allocator.
 // This allocator provides fast allocation and freeing of short lived value objects.
@@ -89,25 +91,25 @@ func (p *heapAllocator) Free(_ interface{}) {}
 // for all temporary value access.
 func NewFreelistAllocator() Allocator {
 	return &freelistAllocator{
-		valueUnstructured: &freelist{new: func() interface{} {
+		valueUnstructured: &freelist[*valueUnstructured]{new: func() *valueUnstructured {
 			return &valueUnstructured{}
 		}},
-		listUnstructuredRange: &freelist{new: func() interface{} {
+		listUnstructuredRange: &freelist[*listUnstructuredRange]{new: func() *listUnstructuredRange {
 			return &listUnstructuredRange{vv: &valueUnstructured{}}
 		}},
-		valueReflect: &freelist{new: func() interface{} {
+		valueReflect: &freelist[*valueReflect]{new: func() *valueReflect {
 			return &valueReflect{}
 		}},
-		mapReflect: &freelist{new: func() interface{} {
+		mapReflect: &freelist[*mapReflect]{new: func() *mapReflect {
 			return &mapReflect{}
 		}},
-		structReflect: &freelist{new: func() interface{} {
+		structReflect: &freelist[*structReflect]{new: func() *structReflect {
 			return &structReflect{}
 		}},
-		listReflect: &freelist{new: func() interface{} {
+		listReflect: &freelist[*listReflect]{new: func() *listReflect {
 			return &listReflect{}
 		}},
-		listReflectRange: &freelist{new: func() interface{} {
+		listReflectRange: &freelist[*listReflectRange]{new: func() *listReflectRange {
 			return &listReflectRange{vr: &valueReflect{}}
 		}},
 	}
@@ -119,22 +121,22 @@ func NewFreelistAllocator() Allocator {
 const freelistMaxSize = 1000
 
 type freelistAllocator struct {
-	valueUnstructured     *freelist
-	listUnstructuredRange *freelist
-	valueReflect          *freelist
-	mapReflect            *freelist
-	structReflect         *freelist
-	listReflect           *freelist
-	listReflectRange      *freelist
+	valueUnstructured     *freelist[*valueUnstructured]
+	listUnstructuredRange *freelist[*listUnstructuredRange]
+	valueReflect          *freelist[*valueReflect]
+	mapReflect            *freelist[*mapReflect]
+	structReflect         *freelist[*structReflect]
+	listReflect           *freelist[*listReflect]
+	listReflectRange      *freelist[*listReflectRange]
 }
 
-type freelist struct {
-	list []interface{}
-	new  func() interface{}
+type freelist[T any] struct {
+	list []T
+	new  func() T
 }
 
-func (f *freelist) allocate() interface{} {
-	var w2 interface{}
+func (f *freelist[T]) allocate() T {
+	var w2 T
 	if n := len(f.list); n > 0 {
 		w2, f.list = f.list[n-1], f.list[:n-1]
 	} else {
@@ -143,61 +145,73 @@ func (f *freelist) allocate() interface{} {
 	return w2
 }
 
-func (f *freelist) free(v interface{}) {
+func (f *freelist[T]) free(v T) {
 	if len(f.list) < freelistMaxSize {
 		f.list = append(f.list, v)
 	}
 }
 
-func (w *freelistAllocator) Free(value interface{}) {
+func (w *freelistAllocator) Free(value any) {
 	switch v := value.(type) {
 	case *valueUnstructured:
 		v.Value = nil // don't hold references to unstructured objects
 		w.valueUnstructured.free(v)
 	case *listUnstructuredRange:
+		v.list = nil     // don't hold references to unstructured objects
 		v.vv.Value = nil // don't hold references to unstructured objects
 		w.listUnstructuredRange.free(v)
 	case *valueReflect:
-		v.ParentMapKey = nil
 		v.ParentMap = nil
+		v.ParentMapKey = nil
+		v.Value = reflect.Value{} // don't hold references to reflected objects
 		w.valueReflect.free(v)
 	case *mapReflect:
+		v.valueReflect.ParentMap = nil
+		v.valueReflect.ParentMapKey = nil
+		v.valueReflect.Value = reflect.Value{} // don't hold references to reflected objects
 		w.mapReflect.free(v)
 	case *structReflect:
+		v.valueReflect.ParentMap = nil
+		v.valueReflect.ParentMapKey = nil
+		v.valueReflect.Value = reflect.Value{} // don't hold references to reflected objects
 		w.structReflect.free(v)
 	case *listReflect:
+		v.Value = reflect.Value{} // don't hold references to reflected objects
 		w.listReflect.free(v)
 	case *listReflectRange:
-		v.vr.ParentMapKey = nil
+		v.list = reflect.Value{} // don't hold references to reflected objects
 		v.vr.ParentMap = nil
+		v.vr.ParentMapKey = nil
+		v.vr.Value = reflect.Value{} // don't hold references to reflected objects
+		v.entry = nil
 		w.listReflectRange.free(v)
 	}
 }
 
 func (w *freelistAllocator) allocValueUnstructured() *valueUnstructured {
-	return w.valueUnstructured.allocate().(*valueUnstructured)
+	return w.valueUnstructured.allocate()
 }
 
 func (w *freelistAllocator) allocListUnstructuredRange() *listUnstructuredRange {
-	return w.listUnstructuredRange.allocate().(*listUnstructuredRange)
+	return w.listUnstructuredRange.allocate()
 }
 
 func (w *freelistAllocator) allocValueReflect() *valueReflect {
-	return w.valueReflect.allocate().(*valueReflect)
+	return w.valueReflect.allocate()
 }
 
 func (w *freelistAllocator) allocStructReflect() *structReflect {
-	return w.structReflect.allocate().(*structReflect)
+	return w.structReflect.allocate()
 }
 
 func (w *freelistAllocator) allocMapReflect() *mapReflect {
-	return w.mapReflect.allocate().(*mapReflect)
+	return w.mapReflect.allocate()
 }
 
 func (w *freelistAllocator) allocListReflect() *listReflect {
-	return w.listReflect.allocate().(*listReflect)
+	return w.listReflect.allocate()
 }
 
 func (w *freelistAllocator) allocListReflectRange() *listReflectRange {
-	return w.listReflectRange.allocate().(*listReflectRange)
+	return w.listReflectRange.allocate()
 }

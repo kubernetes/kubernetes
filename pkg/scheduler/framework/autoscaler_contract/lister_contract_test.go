@@ -23,6 +23,8 @@ package contract
 import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
@@ -34,7 +36,11 @@ var _ fwk.StorageInfoLister = &storageInfoListerContract{}
 var _ fwk.SharedLister = &shareListerContract{}
 var _ fwk.ResourceSliceLister = &resourceSliceListerContract{}
 var _ fwk.PodGroupStateLister = &podGroupStateListerContract{}
+var _ fwk.PodGroupLister = &podGroupListerContract{}
 var _ fwk.PodGroupState = &podGroupStateContract{}
+var _ fwk.CompositePodGroupStateLister = &compositePodGroupStateListerContract{}
+var _ fwk.CompositePodGroupLister = &compositePodGroupListerContract{}
+var _ fwk.CompositePodGroupState = &compositePodGroupStateContract{}
 var _ fwk.DeviceClassLister = &deviceClassListerContract{}
 var _ fwk.ResourceClaimTracker = &resourceClaimTrackerContract{}
 var _ fwk.DeviceClassResolver = &deviceClassResolverContract{}
@@ -51,6 +57,10 @@ func (c *nodeInfoListerContract) HavePodsWithAffinityList() ([]fwk.NodeInfo, err
 }
 
 func (c *nodeInfoListerContract) HavePodsWithRequiredAntiAffinityList() ([]fwk.NodeInfo, error) {
+	return nil, nil
+}
+
+func (c *nodeInfoListerContract) HavePodsWithRequiredNonHostScopedAntiAffinityList() ([]fwk.NodeInfo, error) {
 	return nil, nil
 }
 
@@ -76,6 +86,24 @@ func (c *shareListerContract) StorageInfos() fwk.StorageInfoLister {
 
 func (c *shareListerContract) PodGroupStates() fwk.PodGroupStateLister {
 	return nil
+}
+
+func (c *shareListerContract) PodGroups() fwk.PodGroupLister {
+	return nil
+}
+
+func (c *shareListerContract) CompositePodGroupStates() fwk.CompositePodGroupStateLister {
+	return nil
+}
+
+func (c *shareListerContract) CompositePodGroups() fwk.CompositePodGroupLister {
+	return nil
+}
+
+type podGroupListerContract struct{}
+
+func (c *podGroupListerContract) Get(_ string, _ string) (*schedulingapi.PodGroup, error) {
+	return nil, nil
 }
 
 type podGroupStateListerContract struct{}
@@ -114,6 +142,24 @@ func (c *podGroupStateContract) ScheduledPods() []*v1.Pod {
 	return nil
 }
 
+type compositePodGroupListerContract struct{}
+
+func (c *compositePodGroupListerContract) Get(_ string, _ string) (*schedulingv1alpha3.CompositePodGroup, error) {
+	return nil, nil
+}
+
+type compositePodGroupStateListerContract struct{}
+
+func (c *compositePodGroupStateListerContract) Get(_ string, _ string) (fwk.CompositePodGroupState, error) {
+	return nil, nil
+}
+
+type compositePodGroupStateContract struct{}
+
+func (c *compositePodGroupStateContract) GetChildren() []fwk.EntityKey {
+	return nil
+}
+
 type resourceSliceListerContract struct{}
 
 func (c *resourceSliceListerContract) ListWithDeviceTaintRules() ([]*resourceapi.ResourceSlice, error) {
@@ -148,24 +194,16 @@ func (r *resourceClaimTrackerContract) GatherAllocatedState() (*schedulerapi.All
 	return nil, nil
 }
 
+func (r *resourceClaimTrackerContract) GetPendingAllocation(_ types.UID) *resourceapi.AllocationResult {
+	return nil
+}
+
 func (r *resourceClaimTrackerContract) SignalClaimPendingAllocation(_ types.UID, _ *resourceapi.ResourceClaim) error {
 	return nil
 }
 
-func (r *resourceClaimTrackerContract) GetPendingAllocation(_ types.UID) (*resourceapi.AllocationResult, bool) {
-	return nil, false
-}
-
 func (r *resourceClaimTrackerContract) MaybeRemoveClaimPendingAllocation(_ types.UID, _ bool) (deleted bool) {
 	return false
-}
-
-func (r *resourceClaimTrackerContract) AddSharedClaimPendingAllocation(claimUID types.UID, allocatedClaim *resourceapi.ResourceClaim) error {
-	return nil
-}
-
-func (r *resourceClaimTrackerContract) RemoveSharedClaimPendingAllocation(claimUID types.UID, allocatedClaim *resourceapi.ResourceClaim) error {
-	return nil
 }
 
 func (r *resourceClaimTrackerContract) AssumeClaimAfterAPICall(_ *resourceapi.ResourceClaim) error {

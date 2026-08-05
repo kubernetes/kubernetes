@@ -17,6 +17,8 @@ limitations under the License.
 package top
 
 import (
+	"slices"
+
 	"github.com/spf13/cobra"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,6 +36,7 @@ const (
 
 var (
 	supportedMetricsAPIVersions = []string{
+		"v1",
 		"v1beta1",
 	}
 	topLong = templates.LongDesc(i18n.T(`
@@ -49,6 +52,8 @@ var (
 		Vertical Pod Autoscaler (VPA). Because of this, the values may not match those
 		from standard OS tools like 'top', as the metrics are designed to provide a
 		stable signal for autoscalers rather than for pinpoint accuracy.
+        
+		FAQ for Metrics Server: https://github.com/kubernetes-sigs/metrics-server/blob/master/FAQ.md
 
 		When to use this command:
 
@@ -82,18 +87,16 @@ func NewCmdTop(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Com
 	return cmd
 }
 
-func SupportedMetricsAPIVersionAvailable(discoveredAPIGroups *metav1.APIGroupList) bool {
+func SupportedMetricsAPIVersionAvailable(discoveredAPIGroups *metav1.APIGroupList) string {
 	for _, discoveredAPIGroup := range discoveredAPIGroups.Groups {
 		if discoveredAPIGroup.Name != metricsapi.GroupName {
 			continue
 		}
 		for _, version := range discoveredAPIGroup.Versions {
-			for _, supportedVersion := range supportedMetricsAPIVersions {
-				if version.Version == supportedVersion {
-					return true
-				}
+			if slices.Contains(supportedMetricsAPIVersions, version.Version) {
+				return version.Version
 			}
 		}
 	}
-	return false
+	return ""
 }

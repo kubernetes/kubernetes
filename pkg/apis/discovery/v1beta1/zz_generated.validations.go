@@ -30,6 +30,8 @@ import (
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	sets "k8s.io/apimachinery/pkg/util/sets"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
@@ -41,13 +43,20 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
 	// type EndpointSlice
-	scheme.AddValidationFunc((*discoveryv1beta1.EndpointSlice)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_EndpointSlice(ctx, op, nil /* fldPath */, obj.(*discoveryv1beta1.EndpointSlice), safe.Cast[*discoveryv1beta1.EndpointSlice](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*discoveryv1beta1.EndpointSlice)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_EndpointSlice(
+					ctx, op, nil, /* fldPath */
+					obj.(*discoveryv1beta1.EndpointSlice),
+					safe.Cast[*discoveryv1beta1.EndpointSlice](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
@@ -55,29 +64,41 @@ var symbolsForAddressType = sets.New(discoveryv1beta1.AddressTypeFQDN, discovery
 
 // Validate_AddressType validates an instance of AddressType according
 // to declarative validation rules in the API schema.
-func Validate_AddressType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *discoveryv1beta1.AddressType) (errs field.ErrorList) {
-	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForAddressType, nil).MarkAlpha()...)
+func Validate_AddressType(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *discoveryv1beta1.AddressType) (errs field.ErrorList) {
+
+	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForAddressType, nil).MarkBeta(); len(e) != 0 {
+		errs = append(errs, e...)
+	}
 
 	return errs
 }
 
 // Validate_Endpoint validates an instance of Endpoint according
 // to declarative validation rules in the API schema.
-func Validate_Endpoint(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *discoveryv1beta1.Endpoint) (errs field.ErrorList) {
-	// field discoveryv1beta1.Endpoint.Addresses
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []string, oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_Endpoint(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *discoveryv1beta1.Endpoint) (errs field.ErrorList) {
+
+	{ // field discoveryv1beta1.Endpoint.Addresses
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 100).MarkAlpha(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 100).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -85,7 +106,13 @@ func Validate_Endpoint(ctx context.Context, op operation.Operation, fldPath *fie
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("addresses"), obj.Addresses, safe.Field(oldObj, func(oldObj *discoveryv1beta1.Endpoint) []string { return oldObj.Addresses }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *discoveryv1beta1.Endpoint) []string {
+				return oldObj.Addresses
+			})
+		errs = append(errs, fn(fldPath.Child("addresses"), obj.Addresses, oldVal, oldObj != nil)...)
+	}
 
 	// field discoveryv1beta1.Endpoint.Conditions has no validation
 	// field discoveryv1beta1.Endpoint.Hostname has no validation
@@ -98,24 +125,52 @@ func Validate_Endpoint(ctx context.Context, op operation.Operation, fldPath *fie
 
 // Validate_EndpointSlice validates an instance of EndpointSlice according
 // to declarative validation rules in the API schema.
-func Validate_EndpointSlice(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *discoveryv1beta1.EndpointSlice) (errs field.ErrorList) {
-	// field discoveryv1beta1.EndpointSlice.TypeMeta has no validation
-	// field discoveryv1beta1.EndpointSlice.ObjectMeta has no validation
+func Validate_EndpointSlice(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *discoveryv1beta1.EndpointSlice) (errs field.ErrorList) {
 
-	// field discoveryv1beta1.EndpointSlice.AddressType
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *discoveryv1beta1.AddressType, oldValueCorrelated bool) (errs field.ErrorList) {
+	// field discoveryv1beta1.EndpointSlice.TypeMeta has no validation
+
+	{ // field discoveryv1beta1.EndpointSlice.ObjectMeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.ObjectMeta,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, validation.Validate_ObjectMeta(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *discoveryv1beta1.EndpointSlice) *v1.ObjectMeta {
+				return &oldObj.ObjectMeta
+			})
+		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
+	}
+
+	{ // field discoveryv1beta1.EndpointSlice.AddressType
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *discoveryv1beta1.AddressType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -125,27 +180,45 @@ func Validate_EndpointSlice(ctx context.Context, op operation.Operation, fldPath
 			// call the type's validation function
 			errs = append(errs, Validate_AddressType(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("addressType"), &obj.AddressType, safe.Field(oldObj, func(oldObj *discoveryv1beta1.EndpointSlice) *discoveryv1beta1.AddressType { return &oldObj.AddressType }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *discoveryv1beta1.EndpointSlice) *discoveryv1beta1.AddressType {
+				return &oldObj.AddressType
+			})
+		errs = append(errs, fn(fldPath.Child("addressType"), &obj.AddressType, oldVal, oldObj != nil)...)
+	}
 
-	// field discoveryv1beta1.EndpointSlice.Endpoints
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []discoveryv1beta1.Endpoint, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field discoveryv1beta1.EndpointSlice.Endpoints
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []discoveryv1beta1.Endpoint,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Endpoint)...)
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Endpoint); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("endpoints"), obj.Endpoints, safe.Field(oldObj, func(oldObj *discoveryv1beta1.EndpointSlice) []discoveryv1beta1.Endpoint { return oldObj.Endpoints }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *discoveryv1beta1.EndpointSlice) []discoveryv1beta1.Endpoint {
+				return oldObj.Endpoints
+			})
+		errs = append(errs, fn(fldPath.Child("endpoints"), obj.Endpoints, oldVal, oldObj != nil)...)
+	}
 
 	// field discoveryv1beta1.EndpointSlice.Ports has no validation
 	return errs

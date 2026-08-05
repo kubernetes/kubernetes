@@ -68,7 +68,7 @@ type batchSpanProcessor struct {
 	o BatchSpanProcessorOptions
 
 	queue   chan ReadOnlySpan
-	dropped uint32
+	dropped atomic.Uint32
 
 	inst *observ.BSP
 
@@ -123,12 +123,10 @@ func NewBatchSpanProcessor(exporter SpanExporter, options ...BatchSpanProcessorO
 		otel.Handle(err)
 	}
 
-	bsp.stopWait.Add(1)
-	go func() {
-		defer bsp.stopWait.Done()
+	bsp.stopWait.Go(func() {
 		bsp.processQueue()
 		bsp.drainQueue()
-	}()
+	})
 
 	return bsp
 }
@@ -165,19 +163,21 @@ func (bsp *batchSpanProcessor) Shutdown(ctx context.Context) error {
 	bsp.stopOnce.Do(func() {
 		bsp.stopped.Store(true)
 		wait := make(chan struct{})
+		// exportErr is written by the goroutine before closing wait.
+		// It is only read in the <-wait case, so there is no race.
+		var exportErr error
 		go func() {
 			close(bsp.stopCh)
 			bsp.stopWait.Wait()
 			if bsp.e != nil {
-				if err := bsp.e.Shutdown(ctx); err != nil {
-					otel.Handle(err)
-				}
+				exportErr = bsp.e.Shutdown(ctx)
 			}
 			close(wait)
 		}()
-		// Wait until the wait group is done or the context is cancelled
+		// Wait until the channel is ready or the context is canceled.
 		select {
 		case <-wait:
+			err = exportErr
 		case <-ctx.Done():
 			err = ctx.Err()
 		}
@@ -295,7 +295,7 @@ func (bsp *batchSpanProcessor) exportSpans(ctx context.Context) error {
 	}
 
 	if l := len(bsp.batch); l > 0 {
-		global.Debug("exporting spans", "count", len(bsp.batch), "total_dropped", atomic.LoadUint32(&bsp.dropped))
+		global.Debug("exporting spans", "count", len(bsp.batch), "total_dropped", bsp.dropped.Load())
 		if bsp.inst != nil {
 			bsp.inst.Processed(ctx, int64(l))
 		}
@@ -423,7 +423,7 @@ func (bsp *batchSpanProcessor) enqueueDrop(ctx context.Context, sd ReadOnlySpan)
 	case bsp.queue <- sd:
 		return true
 	default:
-		atomic.AddUint32(&bsp.dropped, 1)
+		bsp.dropped.Add(1)
 		if bsp.inst != nil {
 			bsp.inst.ProcessedQueueFull(ctx, 1)
 		}

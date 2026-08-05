@@ -37,16 +37,16 @@ type VersionValidationRunner func(t *testing.T, gv string, versionValidationErro
 //	      errs = append(errs, versionValidationErrors...) // generated declarative validation
 //		  // Validate that the errors are what was expected for this test case.
 //		})
-func RunValidationForEachVersion(t *testing.T, scheme *runtime.Scheme, options []string, unversioned runtime.Object, fn VersionValidationRunner, ignoreConversionErrors bool, subresources ...string) {
+func RunValidationForEachVersion(t *testing.T, scheme *runtime.Scheme, options map[string]bool, unversioned runtime.Object, fn VersionValidationRunner, ignoreConversionErrors bool, subresources ...string) {
 	runValidation(t, scheme, options, unversioned, fn, ignoreConversionErrors, subresources...)
 }
 
 // RunUpdateValidationForEachVersion is like RunValidationForEachVersion but for update validation.
-func RunUpdateValidationForEachVersion(t *testing.T, scheme *runtime.Scheme, options []string, unversioned, unversionedOld runtime.Object, fn VersionValidationRunner, ignoreConversionErrors bool, subresources ...string) {
+func RunUpdateValidationForEachVersion(t *testing.T, scheme *runtime.Scheme, options map[string]bool, unversioned, unversionedOld runtime.Object, fn VersionValidationRunner, ignoreConversionErrors bool, subresources ...string) {
 	runUpdateValidation(t, scheme, options, unversioned, unversionedOld, fn, ignoreConversionErrors, subresources...)
 }
 
-func runValidation(t *testing.T, scheme *runtime.Scheme, options []string, unversioned runtime.Object, fn VersionValidationRunner, ignoreConversionErrors bool, subresources ...string) {
+func runValidation(t *testing.T, scheme *runtime.Scheme, options map[string]bool, unversioned runtime.Object, fn VersionValidationRunner, ignoreConversionErrors bool, subresources ...string) {
 	unversionedGVKs, _, err := scheme.ObjectKinds(unversioned)
 	if err != nil {
 		t.Fatal(err)
@@ -78,7 +78,7 @@ func runValidation(t *testing.T, scheme *runtime.Scheme, options []string, unver
 	}
 }
 
-func runUpdateValidation(t *testing.T, scheme *runtime.Scheme, options []string, unversionedNew, unversionedOld runtime.Object, fn VersionValidationRunner, ignoreConversionErrors bool, subresources ...string) {
+func runUpdateValidation(t *testing.T, scheme *runtime.Scheme, options map[string]bool, unversionedNew, unversionedOld runtime.Object, fn VersionValidationRunner, ignoreConversionErrors bool, subresources ...string) {
 	unversionedGVKs, _, err := scheme.ObjectKinds(unversionedNew)
 	if err != nil {
 		t.Fatal(err)

@@ -17,7 +17,6 @@ limitations under the License.
 package memorymanager
 
 import (
-	"context"
 	"runtime"
 	"testing"
 
@@ -30,6 +29,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -39,6 +39,8 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Memory Manager static policy is not available on Windows")
 	}
+
+	tCtx := ktesting.Init(t)
 
 	testCases := []struct {
 		description                     string
@@ -97,7 +99,7 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelResourceManagersEnabled)
 
-			logger, _ := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 			machineInfo := returnMachineInfo()
 			nodeAllocatableReservation := v1.ResourceList{
 				v1.ResourceMemory: *resource.NewQuantity(2*gb, resource.BinarySI),
@@ -116,7 +118,7 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 					},
 				},
 			}
-			affinity := topologymanager.NewFakeManager()
+			affinity := topologymanager.NewFakeManager(logger)
 
 			// Create new manager
 			sDir := t.TempDir()
@@ -129,14 +131,14 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 			pod := getPodWithContainersAndPodLevelResources("pod1", tc.podMemoryRequest, tc.podMemoryRequest, nil, tc.containers)
 
 			// Start manager to initialize state
-			err = mgr.Start(context.Background(), func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
+			err = mgr.Start(tCtx, func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
 			if err != nil {
 				t.Fatalf("could not start manager: %v", err)
 			}
 
 			// Allocate resources
 			if tc.podLevelResourceManagersEnabled && resourcehelper.IsPodLevelResourcesSet(pod) {
-				err = mgr.AllocatePod(pod)
+				err = mgr.AllocatePod(logger, pod, lifecycle.AddOperation)
 				if err != nil {
 					t.Fatalf("could not allocate pod: %v", err)
 				}
@@ -144,7 +146,7 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 				// Add containers (allocates exclusive resources from the pod pool)
 				for i := range pod.Spec.Containers {
 					container := &pod.Spec.Containers[i]
-					err = mgr.Allocate(pod, container)
+					err = mgr.Allocate(ctx, pod, container, lifecycle.AddOperation)
 					if err != nil {
 						t.Fatalf("could not allocate container %s: %v", container.Name, err)
 					}
@@ -166,7 +168,7 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 				t.Fatalf("could not create manager 2: %v", err)
 			}
 
-			err = mgr2.Start(context.Background(), func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
+			err = mgr2.Start(tCtx, func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
 			if err != nil {
 				t.Fatalf("could not start manager 2: %v", err)
 			}

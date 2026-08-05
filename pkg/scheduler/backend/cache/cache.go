@@ -24,6 +24,8 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -41,8 +43,8 @@ var (
 // New returns a Cache implementation.
 // It automatically starts a go routine that exports cache metrics.
 // "ctx" is the context that would close the background goroutine.
-func New(ctx context.Context, apiDispatcher fwk.APIDispatcher, genericWorkloadEnabled bool) Cache {
-	cache := newCache(ctx, updateMetricsPeriod, apiDispatcher, genericWorkloadEnabled)
+func New(ctx context.Context, apiDispatcher fwk.APIDispatcher, genericWorkloadEnabled, compositePodGroupEnabled bool) Cache {
+	cache := newCache(ctx, updateMetricsPeriod, apiDispatcher, genericWorkloadEnabled, compositePodGroupEnabled)
 	cache.run()
 	return cache
 }
@@ -75,32 +77,46 @@ type cacheImpl struct {
 	// A map from image name to its ImageStateSummary.
 	imageStates map[string]*fwk.ImageStateSummary
 	// podGroupStates stores the runtime state for each known pod group (only if GenericWorkload feature gate is enabled).
-	podGroupStates map[podGroupKey]*podGroupState
+	podGroupStates map[fwk.EntityKey]*podGroupState
+	// compositePodGroupStates stores the runtime state for each known composite pod group (only if CompositePodGroup feature gate is enabled).
+	compositePodGroupStates map[fwk.EntityKey]*compositePodGroupState
 	// genericWorkloadEnabled stores the GenericWorkload feature gate value.
 	genericWorkloadEnabled bool
+	// compositePodGroupEnabled stores the CompositePodGroup feature gate value.
+	compositePodGroupEnabled bool
 	// apiDispatcher is used for the methods that are expected to send API calls.
 	// It's non-nil only if the SchedulerAsyncAPICalls feature gate is enabled.
 	apiDispatcher fwk.APIDispatcher
+
+	// pvcRefCountsDelta contains the delta of changes to PVCRefCounts since the last snapshot.
+	// Keys are in the format "namespace/name". This data struct serves as an optimization for avoiding
+	// burdensome PVC ref count aggregations during scheduler cycles. PVCRefCountsDelta holds the incoming
+	// deltas from events handlers while within the scheduler cycle, we only apply and reset the delta to
+	// avoid global re-calculation.
+	pvcRefCountsDelta map[string]int
 }
 
 type podState struct {
 	pod *v1.Pod
 }
 
-func newCache(ctx context.Context, period time.Duration, apiDispatcher fwk.APIDispatcher, genericWorkloadEnabled bool) *cacheImpl {
+func newCache(ctx context.Context, period time.Duration, apiDispatcher fwk.APIDispatcher, genericWorkloadEnabled, compositePodGroupEnabled bool) *cacheImpl {
 	logger := klog.FromContext(ctx)
 	return &cacheImpl{
 		period: period,
 		stop:   ctx.Done(),
 
-		nodes:                  make(map[string]*nodeInfoListItem),
-		nodeTree:               newNodeTree(logger, nil),
-		assumedPods:            sets.New[string](),
-		podStates:              make(map[string]*podState),
-		imageStates:            make(map[string]*fwk.ImageStateSummary),
-		podGroupStates:         make(map[podGroupKey]*podGroupState),
-		genericWorkloadEnabled: genericWorkloadEnabled,
-		apiDispatcher:          apiDispatcher,
+		nodes:                    make(map[string]*nodeInfoListItem),
+		nodeTree:                 newNodeTree(logger, nil),
+		assumedPods:              sets.New[string](),
+		podStates:                make(map[string]*podState),
+		imageStates:              make(map[string]*fwk.ImageStateSummary),
+		podGroupStates:           make(map[fwk.EntityKey]*podGroupState),
+		compositePodGroupStates:  make(map[fwk.EntityKey]*compositePodGroupState),
+		genericWorkloadEnabled:   genericWorkloadEnabled,
+		compositePodGroupEnabled: compositePodGroupEnabled,
+		apiDispatcher:            apiDispatcher,
+		pvcRefCountsDelta:        make(map[string]int),
 	}
 }
 
@@ -210,13 +226,15 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 	// status from having pods with required anti-affinity to NOT having pods with required
 	// anti-affinity or the other way around.
 	updateNodesHavePodsWithRequiredAntiAffinity := false
-	// usedPVCSet must be re-created whenever the head node generation is greater than
-	// last snapshot generation.
-	updateUsedPVCSet := false
 
 	// Forget all assumed pods from a previous snapshot version.
 	// This is a safety check in case any pod wasn't forgotten in the previous scheduling cycle.
 	nodeSnapshot.forgetAllAssumedPods(logger)
+
+	// HavePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList must be re-created if a node changed its status
+	// from having pods with required anti-affinity with topologyKey other than kubernetes.io/hostname to NOT
+	// having such pods, or the other way around.
+	updateNodesHavePodsWithRequiredNonHostScopedAntiAffinity := false
 
 	// Start from the head of the NodeInfo doubly linked list and update snapshot
 	// of NodeInfos updated after the last snapshot.
@@ -242,17 +260,8 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 			if (len(existing.PodsWithRequiredAntiAffinity) > 0) != (len(clone.PodsWithRequiredAntiAffinity) > 0) {
 				updateNodesHavePodsWithRequiredAntiAffinity = true
 			}
-			if !updateUsedPVCSet {
-				if len(existing.PVCRefCounts) != len(clone.PVCRefCounts) {
-					updateUsedPVCSet = true
-				} else {
-					for pvcKey := range clone.PVCRefCounts {
-						if _, found := existing.PVCRefCounts[pvcKey]; !found {
-							updateUsedPVCSet = true
-							break
-						}
-					}
-				}
+			if (len(existing.PodsWithRequiredNonHostScopedAntiAffinity) > 0) != (len(clone.PodsWithRequiredNonHostScopedAntiAffinity) > 0) {
+				updateNodesHavePodsWithRequiredNonHostScopedAntiAffinity = true
 			}
 			// We need to preserve the original pointer of the NodeInfo struct since it
 			// is used in the NodeInfoList, which we may not update.
@@ -272,7 +281,16 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 		updateAllLists = true
 	}
 
-	if updateAllLists || updateNodesHavePodsWithAffinity || updateNodesHavePodsWithRequiredAntiAffinity || updateUsedPVCSet {
+	// Apply the deltas for PVC reference count to the snapshot.
+	// This no-op if the snapshot is built afresh i.e. updateAllLists=true
+	if !updateAllLists {
+		if err := cache.applyPVCRefCountDelta(nodeSnapshot); err != nil {
+			logger.Error(err, "rebuilding node snapshot due to unexpected error from refreshing PVC ref counts")
+			updateAllLists = true
+		}
+	}
+
+	if updateAllLists || updateNodesHavePodsWithAffinity || updateNodesHavePodsWithRequiredAntiAffinity || updateNodesHavePodsWithRequiredNonHostScopedAntiAffinity {
 		cache.updateNodeInfoSnapshotList(logger, nodeSnapshot, updateAllLists)
 	}
 
@@ -289,8 +307,14 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 		return errors.New(errMsg)
 	}
 
-	// Take a snapshot of pod group states for this scheduling cycle.
-	cache.updatePodGroupStateSnapshot(nodeSnapshot)
+	if cache.genericWorkloadEnabled {
+		// Take a snapshot of pod group states for this scheduling cycle.
+		cache.updatePodGroupStateSnapshot(nodeSnapshot)
+		if cache.compositePodGroupEnabled {
+			// Take a snapshot of composite pod group states for this scheduling cycle.
+			cache.updateCompositePodGroupStateSnapshot(nodeSnapshot)
+		}
+	}
 
 	return nil
 }
@@ -315,11 +339,32 @@ func (cache *cacheImpl) updatePodGroupStateSnapshot(snapshot *Snapshot) {
 	}
 }
 
+// updateCompositePodGroupStateSnapshot updates the composite pod group state portion of the given snapshot.
+// It assumes that the cache lock is already held.
+// It removes entries that no longer exist in the live cache
+// and clones entries whose generation has advanced since the last snapshot.
+func (cache *cacheImpl) updateCompositePodGroupStateSnapshot(snapshot *Snapshot) {
+	// Remove pod group states from snapshot that no longer exist in cache.
+	for key := range snapshot.compositePodGroupStates {
+		if _, exists := cache.compositePodGroupStates[key]; !exists {
+			delete(snapshot.compositePodGroupStates, key)
+		}
+	}
+	// Clone only pod group states that changed since the last snapshot.
+	for key, cpgState := range cache.compositePodGroupStates {
+		if existing, ok := snapshot.compositePodGroupStates[key]; ok && existing.generation == cpgState.generation {
+			continue
+		}
+		snapshot.compositePodGroupStates[key] = cpgState.snapshot()
+	}
+}
+
 func (cache *cacheImpl) updateNodeInfoSnapshotList(logger klog.Logger, snapshot *Snapshot, updateAll bool) {
 	snapshot.havePodsWithAffinityNodeInfoList = make([]fwk.NodeInfo, 0, cache.nodeTree.numNodes)
 	snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = make([]fwk.NodeInfo, 0, cache.nodeTree.numNodes)
-	snapshot.usedPVCSet = sets.New[string]()
+	snapshot.havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList = make([]fwk.NodeInfo, 0, cache.nodeTree.numNodes)
 	if updateAll {
+		snapshot.usedPVCRefCounts = make(map[string]int)
 		// Take a snapshot of the nodes order in the tree
 		snapshot.nodeInfoList = make([]fwk.NodeInfo, 0, cache.nodeTree.numNodes)
 		nodesList, err := cache.nodeTree.list()
@@ -335,13 +380,18 @@ func (cache *cacheImpl) updateNodeInfoSnapshotList(logger klog.Logger, snapshot 
 				if len(nodeInfo.PodsWithRequiredAntiAffinity) > 0 {
 					snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = append(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList, nodeInfo)
 				}
-				for key := range nodeInfo.PVCRefCounts {
-					snapshot.usedPVCSet.Insert(key)
+				if len(nodeInfo.PodsWithRequiredNonHostScopedAntiAffinity) > 0 {
+					snapshot.havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList = append(snapshot.havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList, nodeInfo)
+				}
+				for key, value := range nodeInfo.PVCRefCounts {
+					snapshot.usedPVCRefCounts[key] += value
 				}
 			} else {
 				utilruntime.HandleErrorWithLogger(logger, nil, "Node exists in nodeTree but not in NodeInfoMap, this should not happen", "node", klog.KRef("", nodeName))
 			}
 		}
+		// reset the deltas if update all
+		cache.pvcRefCountsDelta = map[string]int{}
 	} else {
 		for _, nodeInfo := range snapshot.nodeInfoList {
 			if len(nodeInfo.GetPodsWithAffinity()) > 0 {
@@ -350,8 +400,8 @@ func (cache *cacheImpl) updateNodeInfoSnapshotList(logger klog.Logger, snapshot 
 			if len(nodeInfo.GetPodsWithRequiredAntiAffinity()) > 0 {
 				snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = append(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList, nodeInfo)
 			}
-			for key := range nodeInfo.GetPVCRefCounts() {
-				snapshot.usedPVCSet.Insert(key)
+			if len(nodeInfo.GetPodsWithRequiredNonHostScopedAntiAffinity()) > 0 {
+				snapshot.havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList = append(snapshot.havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList, nodeInfo)
 			}
 		}
 	}
@@ -409,6 +459,21 @@ func (cache *cacheImpl) AssumePod(logger klog.Logger, pod *v1.Pod) error {
 	return cache.addPod(logger, pod, true)
 }
 
+// validateAssumedPod checks that the given pod is currently assumed.
+// Assumes that lock is already acquired.
+func (cache *cacheImpl) validateAssumedPod(pod *v1.Pod, key string, currState *podState) error {
+	if currState.pod.Spec.NodeName != pod.Spec.NodeName {
+		return fmt.Errorf("pod %v(%v) was assumed on %v but assigned to %v", key, klog.KObj(pod), pod.Spec.NodeName, currState.pod.Spec.NodeName)
+	}
+	if !cache.assumedPods.Has(key) {
+		return fmt.Errorf("pod %v(%v) is not assumed, so it cannot be removed or forgotten", key, klog.KObj(pod))
+	}
+	return nil
+}
+
+// ForgetPod forgets an assumed pod from the cache. It should be called when the pod
+// still exists, as an undo operation for AssumePod.
+// If the pod is a pod group member, it is moved from assumed to unscheduled pods of that pod group state in cache.
 func (cache *cacheImpl) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 	key, err := framework.GetPodKey(pod)
 	if err != nil {
@@ -423,14 +488,34 @@ func (cache *cacheImpl) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 		// Pod does not exist in the cache anymore.
 		return nil
 	}
-	if currState.pod.Spec.NodeName != pod.Spec.NodeName {
-		return fmt.Errorf("pod %v(%v) was assumed on %v but assigned to %v", key, klog.KObj(pod), pod.Spec.NodeName, currState.pod.Spec.NodeName)
+	if err := cache.validateAssumedPod(pod, key, currState); err != nil {
+		return err
 	}
-	// Only assumed pod can be forgotten.
-	if cache.assumedPods.Has(key) {
-		return cache.removePod(logger, pod, true)
+	return cache.removePod(logger, pod, true)
+}
+
+// RemoveAssumedPod removes an assumed pod from the cache. It should be called when the assumed
+// pod was removed from the cluster to correctly clean up internal state.
+// It differs from ForgetPod in how it handles pod group members, as it removes the pod from
+// the pod group state in the cache.
+func (cache *cacheImpl) RemoveAssumedPod(logger klog.Logger, pod *v1.Pod) error {
+	key, err := framework.GetPodKey(pod)
+	if err != nil {
+		return err
 	}
-	return fmt.Errorf("pod %v(%v) wasn't assumed so cannot be forgotten", key, klog.KObj(pod))
+
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	currState, ok := cache.podStates[key]
+	if !ok {
+		// Pod does not exist in the cache anymore.
+		return nil
+	}
+	if err := cache.validateAssumedPod(pod, key, currState); err != nil {
+		return err
+	}
+	return cache.removePod(logger, pod, false)
 }
 
 // Assumes that lock is already acquired.
@@ -444,6 +529,11 @@ func (cache *cacheImpl) addPod(logger klog.Logger, pod *v1.Pod, assumePod bool) 
 		n = newNodeInfoListItem(framework.NewNodeInfo())
 		cache.nodes[pod.Spec.NodeName] = n
 	}
+
+	// new_delta = old_delta + (PVCRefCounts_after − PVCRefCounts_before)
+	cache.refreshPVCRefCountsDelta(n.info, -1)
+	defer cache.refreshPVCRefCountsDelta(n.info, 1)
+
 	n.info.AddPod(pod)
 	cache.moveNodeInfoToHead(logger, pod.Spec.NodeName)
 	ps := &podState{
@@ -487,6 +577,10 @@ func (cache *cacheImpl) removePod(logger klog.Logger, pod *v1.Pod, forgetPod boo
 	if !ok {
 		utilruntime.HandleErrorWithLogger(logger, nil, "Node not found when trying to remove pod", "node", klog.KRef("", pod.Spec.NodeName), "podKey", key, "pod", klog.KObj(pod))
 	} else {
+		// new_delta = old_delta + (PVCRefCounts_after − PVCRefCounts_before)
+		cache.refreshPVCRefCountsDelta(n.info, -1)
+		defer cache.refreshPVCRefCountsDelta(n.info, 1)
+
 		if err := n.info.RemovePod(logger, pod); err != nil {
 			return err
 		}
@@ -627,7 +721,7 @@ func (cache *cacheImpl) GetPod(pod *v1.Pod) (*v1.Pod, error) {
 	return podState.pod, nil
 }
 
-func (cache *cacheImpl) AddNode(logger klog.Logger, node *v1.Node) *framework.NodeInfo {
+func (cache *cacheImpl) AddNode(logger klog.Logger, node *v1.Node) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
@@ -643,10 +737,9 @@ func (cache *cacheImpl) AddNode(logger klog.Logger, node *v1.Node) *framework.No
 	cache.nodeTree.addNode(logger, node)
 	cache.addNodeImageStates(node, n.info)
 	n.info.SetNode(node)
-	return n.info.SnapshotConcrete()
 }
 
-func (cache *cacheImpl) UpdateNode(logger klog.Logger, oldNode, newNode *v1.Node) *framework.NodeInfo {
+func (cache *cacheImpl) UpdateNode(logger klog.Logger, oldNode, newNode *v1.Node) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 	n, ok := cache.nodes[newNode.Name]
@@ -662,7 +755,6 @@ func (cache *cacheImpl) UpdateNode(logger klog.Logger, oldNode, newNode *v1.Node
 	cache.nodeTree.updateNode(logger, oldNode, newNode)
 	cache.addNodeImageStates(newNode, n.info)
 	n.info.SetNode(newNode)
-	return n.info.SnapshotConcrete()
 }
 
 // RemoveNode removes a node from the cache's tree.
@@ -679,6 +771,10 @@ func (cache *cacheImpl) RemoveNode(logger klog.Logger, node *v1.Node) error {
 	if !ok {
 		return fmt.Errorf("node %v is not found", node.Name)
 	}
+
+	// only subtract the PVCRefCount into the delta map
+	cache.refreshPVCRefCountsDelta(n.info, -1)
+
 	n.info.RemoveNode()
 	// We remove NodeInfo for this node only if there aren't any pods on this node.
 	// We can't do it unconditionally, because notifications about pods are delivered
@@ -816,7 +912,7 @@ func (cache *cacheImpl) RemovePodGroupMember(pod *v1.Pod) {
 // addPodGroupMember adds the pod to its pod group state, creating the group entry if it doesn't exist yet.
 // Assumes that the cache lock is already held.
 func (cache *cacheImpl) addPodGroupMember(pod *v1.Pod) {
-	key := newPodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
+	key := fwk.PodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
 	podGroupState, exists := cache.podGroupStates[key]
 	if !exists {
 		podGroupState = newPodGroupState()
@@ -829,11 +925,11 @@ func (cache *cacheImpl) addPodGroupMember(pod *v1.Pod) {
 // updatePodGroupMember updates the pod entry inside its pod group state.
 // Assumes that the cache lock is already held.
 func (cache *cacheImpl) updatePodGroupMember(logger klog.Logger, oldPod, newPod *v1.Pod) {
-	key := newPodGroupKey(newPod.Namespace, *newPod.Spec.SchedulingGroup.PodGroupName)
+	key := fwk.PodGroupKey(newPod.Namespace, *newPod.Spec.SchedulingGroup.PodGroupName)
 	podGroupState, exists := cache.podGroupStates[key]
 	if !exists {
 		// This should not happen: the pod group state should have been already created by a prior pod add action.
-		utilruntime.HandleErrorWithLogger(logger, nil, "Pod group state not found for update, this indicates a missed add event", "pod", klog.KObj(newPod), "podGroupKey", key)
+		utilruntime.HandleErrorWithLogger(logger, nil, "Pod group state not found for update, this indicates a missed add event", "pod", klog.KObj(newPod), "fwk.EntityKey", key)
 		return
 	}
 
@@ -843,13 +939,15 @@ func (cache *cacheImpl) updatePodGroupMember(logger klog.Logger, oldPod, newPod 
 // removePodGroupMember removes the pod from its pod group state, deleting the group entry when empty.
 // Assumes that the cache lock is already held.
 func (cache *cacheImpl) removePodGroupMember(pod *v1.Pod) {
-	key := newPodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
+	key := fwk.PodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
 	podGroupState, exists := cache.podGroupStates[key]
 	if !exists {
 		return
 	}
 	podGroupState.deletePod(pod.UID)
 	if podGroupState.empty() {
+		// podGroupState can exist without the member pods, but when the PodGroup object exists.
+		// Only when there are no member pods and the PodGroup object is removed, the podGroupState can be removed.
 		delete(cache.podGroupStates, key)
 	}
 }
@@ -857,7 +955,7 @@ func (cache *cacheImpl) removePodGroupMember(pod *v1.Pod) {
 // assumePodGroupMember marks the pod as assumed in its pod group state.
 // Assumes that the cache lock is already held.
 func (cache *cacheImpl) assumePodGroupMember(pod *v1.Pod) {
-	key := newPodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
+	key := fwk.PodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
 	podGroupState, exists := cache.podGroupStates[key]
 	if !exists {
 		podGroupState = newPodGroupState()
@@ -870,11 +968,11 @@ func (cache *cacheImpl) assumePodGroupMember(pod *v1.Pod) {
 // forgetPodGroupMember moves the pod back from assumed to unscheduled in its pod group state.
 // Assumes that the cache lock is already held.
 func (cache *cacheImpl) forgetPodGroupMember(logger klog.Logger, pod *v1.Pod) {
-	key := newPodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
+	key := fwk.PodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
 	pgs, exists := cache.podGroupStates[key]
 	if !exists {
 		// This should not happen: the pod group state should have been already created by a prior pod add or assume action.
-		utilruntime.HandleErrorWithLogger(logger, nil, "Pod group state not found for forget, this indicates a missed add or assume event", "pod", klog.KObj(pod), "podGroupKey", key)
+		utilruntime.HandleErrorWithLogger(logger, nil, "Pod group state not found for forget, this indicates a missed add or assume event", "pod", klog.KObj(pod), "fwk.EntityKey", key)
 		return
 	}
 	pgs.forgetPod(pod.UID)
@@ -882,20 +980,108 @@ func (cache *cacheImpl) forgetPodGroupMember(logger klog.Logger, pod *v1.Pod) {
 
 // PodGroupStates returns the PodGroupStateLister for this cache.
 func (cache *cacheImpl) PodGroupStates() fwk.PodGroupStateLister {
-	return cache
+	return &podGroupStateListerImpl{cache: cache}
 }
 
-// Get returns the pod group state for the given pod group.
-func (cache *cacheImpl) Get(namespace string, podGroupName string) (fwk.PodGroupState, error) {
-	cache.mu.RLock()
-	defer cache.mu.RUnlock()
+type podGroupStateListerImpl struct {
+	cache *cacheImpl
+}
 
-	key := newPodGroupKey(namespace, podGroupName)
-	podGroupState, exists := cache.podGroupStates[key]
+func (l *podGroupStateListerImpl) Get(namespace, podGroupName string) (fwk.PodGroupState, error) {
+	if !l.cache.genericWorkloadEnabled {
+		return nil, fmt.Errorf("generic workload feature gate is disabled")
+	}
+	l.cache.mu.RLock()
+	defer l.cache.mu.RUnlock()
+
+	key := fwk.PodGroupKey(namespace, podGroupName)
+	podGroupState, exists := l.cache.podGroupStates[key]
+	if !exists {
+		return nil, fmt.Errorf("pod group state not found for pod group %s/%s", namespace, podGroupName)
+	}
+	return podGroupState, nil
+}
+
+// PodGroups returns the PodGroupLister for this cache.
+func (cache *cacheImpl) PodGroups() fwk.PodGroupLister {
+	return &podGroupListerImpl{cache: cache}
+}
+
+type podGroupListerImpl struct {
+	cache *cacheImpl
+}
+
+// Get returns the cached pod group object.
+func (l *podGroupListerImpl) Get(namespace, name string) (*schedulingv1beta1.PodGroup, error) {
+	if !l.cache.genericWorkloadEnabled {
+		return nil, fmt.Errorf("generic workload feature gate is disabled")
+	}
+	l.cache.mu.RLock()
+	defer l.cache.mu.RUnlock()
+
+	key := fwk.PodGroupKey(namespace, name)
+	pgs, exists := l.cache.podGroupStates[key]
 	if !exists {
 		return nil, fmt.Errorf("pod group state not found for pod group %s", key)
 	}
-	return podGroupState, nil
+	pg := pgs.podGroup
+	if pg == nil {
+		return nil, fmt.Errorf("pod group object not found for pod group %s", key)
+	}
+	return pg, nil
+}
+
+// CompositePodGroupStates returns the CompositePodGroupStateLister for this cache.
+func (cache *cacheImpl) CompositePodGroupStates() fwk.CompositePodGroupStateLister {
+	return &compositePodGroupStateListerImpl{cache: cache}
+}
+
+type compositePodGroupStateListerImpl struct {
+	cache *cacheImpl
+}
+
+func (l *compositePodGroupStateListerImpl) Get(namespace string, podGroupName string) (fwk.CompositePodGroupState, error) {
+	if !l.cache.compositePodGroupEnabled {
+		return nil, fmt.Errorf("composite pod group feature gate is disabled")
+	}
+	l.cache.mu.RLock()
+	defer l.cache.mu.RUnlock()
+
+	key := fwk.CompositePodGroupKey(namespace, podGroupName)
+	cpgs, exists := l.cache.compositePodGroupStates[key]
+	if !exists {
+		return nil, fmt.Errorf("composite pod group state not found for composite pod group %s", key)
+	}
+	return cpgs, nil
+}
+
+// CompositePodGroups returns the CompositePodGroupLister for this cache.
+func (cache *cacheImpl) CompositePodGroups() fwk.CompositePodGroupLister {
+	return &compositePodGroupListerImpl{cache: cache}
+}
+
+type compositePodGroupListerImpl struct {
+	cache *cacheImpl
+}
+
+// Get returns the cached pod group object.
+func (l *compositePodGroupListerImpl) Get(namespace, name string) (*schedulingv1alpha3.CompositePodGroup, error) {
+	if !l.cache.compositePodGroupEnabled {
+		return nil, fmt.Errorf("composite pod group feature gate is disabled")
+	}
+	l.cache.mu.RLock()
+	defer l.cache.mu.RUnlock()
+
+	key := fwk.CompositePodGroupKey(namespace, name)
+	cpgs, exists := l.cache.compositePodGroupStates[key]
+	if !exists {
+		return nil, fmt.Errorf("composite pod group state not found for composite pod group %s", key)
+	}
+	cpg := cpgs.compositePodGroup
+	if cpg == nil {
+		return nil, fmt.Errorf("composite pod group object not found for composite pod group %s", key)
+	}
+	return cpg, nil
 }
 
 // BindPod handles the pod binding by adding a bind API call to the dispatcher.
@@ -910,4 +1096,325 @@ func (cache *cacheImpl) BindPod(binding *v1.Binding) (<-chan error, error) {
 		return onFinish, err
 	}
 	return onFinish, nil
+}
+
+// refreshPVCRefCountsDelta accumulates the given node's PVC reference counts
+// into cache.pvcRefCountsDelta, which is later applied to the snapshot during
+// UpdateSnapshot. sign should be +1 to add the node's contribution or -1 to
+// remove it.
+func (cache *cacheImpl) refreshPVCRefCountsDelta(nodeInfo *framework.NodeInfo, sign int) {
+	for key, count := range nodeInfo.PVCRefCounts {
+		cache.pvcRefCountsDelta[key] += sign * count
+	}
+}
+
+// applyPVCRefCountDelta merges cache.pvcRefCountsDelta into the snapshot's
+// PVC ref counts, removes entries that reach zero, and clears the delta.
+func (cache *cacheImpl) applyPVCRefCountDelta(snapshot *Snapshot) error {
+	for key, delta := range cache.pvcRefCountsDelta {
+		snapshot.usedPVCRefCounts[key] += delta
+		if refCount := snapshot.usedPVCRefCounts[key]; refCount <= 0 {
+			if refCount < 0 {
+				delete(snapshot.usedPVCRefCounts, key)
+				return fmt.Errorf("PVC %s had negative ref count %v", key, refCount)
+			}
+			delete(snapshot.usedPVCRefCounts, key)
+		}
+	}
+	cache.pvcRefCountsDelta = map[string]int{}
+	return nil
+}
+
+// AddPodGroup adds a pod group object to the cache.
+func (cache *cacheImpl) AddPodGroup(podGroup *schedulingv1beta1.PodGroup) {
+	if !cache.genericWorkloadEnabled {
+		return
+	}
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	key := fwk.PodGroupKey(podGroup.Namespace, podGroup.Name)
+	pgs, exists := cache.podGroupStates[key]
+	if !exists {
+		pgs = newPodGroupState()
+		cache.podGroupStates[key] = pgs
+	}
+	pgs.setPodGroup(podGroup)
+
+	if !cache.compositePodGroupEnabled || podGroup.Spec.ParentCompositePodGroupName == nil {
+		return
+	}
+
+	parentKey := fwk.CompositePodGroupKey(podGroup.Namespace, *podGroup.Spec.ParentCompositePodGroupName)
+
+	// Even if the parent composite pod group has not been observed in the cache yet, we can assume that it
+	// will be observed eventually, and we should create an entry (placeholder) representing it in the cache.
+	parent, parentExists := cache.compositePodGroupStates[parentKey]
+	if !parentExists {
+		parent = newCompositePodGroupState()
+		cache.compositePodGroupStates[parentKey] = parent
+	}
+	parent.addChild(key)
+}
+
+// UpdatePodGroup updates a pod group object in the cache.
+func (cache *cacheImpl) UpdatePodGroup(logger klog.Logger, oldPodGroup, newPodGroup *schedulingv1beta1.PodGroup) {
+	if !cache.genericWorkloadEnabled {
+		return
+	}
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	key := fwk.PodGroupKey(newPodGroup.Namespace, newPodGroup.Name)
+	pgs, exists := cache.podGroupStates[key]
+	if !exists {
+		// This should not happen: the pod group state should have been already created by a prior pod group add action.
+		utilruntime.HandleErrorWithLogger(logger, nil, "Pod group state not found for update, this indicates a missed add event", "podGroup", klog.KObj(newPodGroup))
+		return
+	}
+	pgs.setPodGroup(newPodGroup)
+}
+
+// RemovePodGroup removes a pod group object from the cache.
+func (cache *cacheImpl) RemovePodGroup(logger klog.Logger, podGroup *schedulingv1beta1.PodGroup) {
+	if !cache.genericWorkloadEnabled {
+		return
+	}
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	key := fwk.PodGroupKey(podGroup.Namespace, podGroup.Name)
+	pgs, exists := cache.podGroupStates[key]
+	if !exists {
+		// This should not happen: the pod group state should have been already created by a prior pod group add action.
+		utilruntime.HandleErrorWithLogger(logger, nil, "Pod group state not found for removal", "podGroup", klog.KObj(podGroup))
+		return
+	}
+
+	if cache.compositePodGroupEnabled && podGroup.Spec.ParentCompositePodGroupName != nil {
+		parentKey := fwk.CompositePodGroupKey(podGroup.Namespace, *podGroup.Spec.ParentCompositePodGroupName)
+		if parent, exists := cache.compositePodGroupStates[parentKey]; exists {
+			parent.removeChild(key)
+			if parent.empty() {
+				// podGroupState can exist without the PodGroup object, but when any of the member pods exists.
+				delete(cache.compositePodGroupStates, parentKey)
+			}
+		}
+	}
+
+	pgs.removePodGroup()
+	if pgs.empty() {
+		delete(cache.podGroupStates, key)
+	}
+}
+
+// AddCompositePodGroup adds a composite pod group to the cache.
+func (cache *cacheImpl) AddCompositePodGroup(logger klog.Logger, cpg *schedulingv1alpha3.CompositePodGroup) {
+	if !cache.compositePodGroupEnabled {
+		return
+	}
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	key := fwk.CompositePodGroupKey(cpg.Namespace, cpg.Name)
+	cpgState, exists := cache.compositePodGroupStates[key]
+	if !exists {
+		cpgState = newCompositePodGroupState()
+		cache.compositePodGroupStates[key] = cpgState
+	}
+	cpgState.setCompositePodGroup(cpg)
+
+	if cpg.Spec.ParentCompositePodGroupName == nil {
+		return
+	}
+
+	parentKey := fwk.CompositePodGroupKey(cpg.Namespace, *cpg.Spec.ParentCompositePodGroupName)
+
+	parent, parentExists := cache.compositePodGroupStates[parentKey]
+	if !parentExists {
+		parent = newCompositePodGroupState()
+		cache.compositePodGroupStates[parentKey] = parent
+	}
+	parent.addChild(key)
+}
+
+// UpdateCompositePodGroup updates a composite pod group in the cache.
+func (cache *cacheImpl) UpdateCompositePodGroup(logger klog.Logger, oldCPG, newCPG *schedulingv1alpha3.CompositePodGroup) {
+	if !cache.compositePodGroupEnabled {
+		return
+	}
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	key := fwk.CompositePodGroupKey(newCPG.Namespace, newCPG.Name)
+	pgs, exists := cache.compositePodGroupStates[key]
+	if !exists {
+		// This should not happen: the pod group state should have been already created by a prior pod group add action.
+		utilruntime.HandleErrorWithLogger(logger, nil, "Pod group state not found for update, this indicates a missed add event", "podGroup", klog.KObj(newCPG))
+		return
+	}
+	pgs.setCompositePodGroup(newCPG)
+}
+
+// RemoveCompositePodGroup removes a composite pod group from the cache.
+func (cache *cacheImpl) RemoveCompositePodGroup(logger klog.Logger, cpg *schedulingv1alpha3.CompositePodGroup) {
+	if !cache.compositePodGroupEnabled {
+		return
+	}
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	key := fwk.CompositePodGroupKey(cpg.Namespace, cpg.Name)
+	cpgs, exists := cache.compositePodGroupStates[key]
+	if !exists {
+		// This should not happen: the pod group state should have been already created by a prior pod group add action.
+		utilruntime.HandleErrorWithLogger(logger, nil, "Composite pod group state not found for removal", "compositePodGroup", klog.KObj(cpg))
+		return
+	}
+
+	if cpgs.compositePodGroup != nil && cpgs.compositePodGroup.Spec.ParentCompositePodGroupName != nil {
+		parentKey := fwk.CompositePodGroupKey(cpg.Namespace, *cpgs.compositePodGroup.Spec.ParentCompositePodGroupName)
+		parent, exists := cache.compositePodGroupStates[parentKey]
+		if !exists {
+			return
+		}
+		parent.removeChild(key)
+		if parent.empty() {
+			delete(cache.compositePodGroupStates, parentKey)
+		}
+	}
+
+	cpgs.removeCompositePodGroup()
+	if cpgs.empty() {
+		delete(cache.compositePodGroupStates, key)
+	}
+}
+
+// BuildHierarchySnapshotFromPod returns a snapshot of the pod group hierarchy for the given pod.
+func (cache *cacheImpl) BuildHierarchySnapshotFromPod(pod *v1.Pod) (fwk.PodGroupManager, error) {
+	if pod.Spec.SchedulingGroup == nil {
+		return nil, fmt.Errorf("pod has no scheduling group")
+	}
+
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+
+	// 1. Find root CPG/PG by traversing upwards
+	currentKey := fwk.PodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
+	pgs, exists := cache.podGroupStates[currentKey]
+	if !exists {
+		return nil, fmt.Errorf("pod group state not found for %s", currentKey.String())
+	}
+
+	pg := pgs.podGroup
+	if pg == nil {
+		return nil, fmt.Errorf("pod group object not found in state for %s", currentKey.String())
+	}
+
+	if cache.compositePodGroupEnabled && pg.Spec.ParentCompositePodGroupName != nil {
+		currentKey = fwk.CompositePodGroupKey(pod.Namespace, *pg.Spec.ParentCompositePodGroupName)
+		for range schedulingv1alpha3.WorkloadMaxTreeDepth - 1 {
+			cpgs, exists := cache.compositePodGroupStates[currentKey]
+			if !exists {
+				return nil, fmt.Errorf("parent composite pod group state not found for %s", currentKey.String())
+			}
+			cpg := cpgs.compositePodGroup
+			if cpg == nil {
+				return nil, fmt.Errorf("composite pod group object not found in state for %s", currentKey.String())
+			}
+			if cpg.Spec.ParentCompositePodGroupName == nil {
+				break
+			}
+			currentKey = fwk.CompositePodGroupKey(pod.Namespace, *cpg.Spec.ParentCompositePodGroupName)
+		}
+	}
+
+	// 2. We have the root key. Now traverse downwards and update the snapshot.
+	snapshot := NewEmptySnapshot()
+	visited := sets.New[fwk.EntityKey]()
+	err := cache.buildPodGroupStateSnapshotTree(currentKey, snapshot, visited)
+	if err != nil {
+		return nil, err
+	}
+	return snapshot, nil
+}
+
+// buildPodGroupStateSnapshotTree recursively builds a snapshot of the pod group state tree starting from the given key.
+// It assumes that the cache lock is held by the caller.
+func (cache *cacheImpl) buildPodGroupStateSnapshotTree(key fwk.EntityKey, snapshot *Snapshot, visited sets.Set[fwk.EntityKey]) error {
+	if visited.Has(key) {
+		return fmt.Errorf("cycle detected in composite pod group hierarchy: %s", key.String())
+	}
+	visited.Insert(key)
+
+	switch key.Type {
+	case fwk.PodGroupKeyType:
+		pgs, exists := cache.podGroupStates[key]
+		if !exists {
+			return fmt.Errorf("pod group state not found for %s", key.String())
+		}
+		snapshot.podGroupStates[key] = &podGroupStateSnapshot{podGroupStateData: pgs.podGroupStateData.clone()}
+
+	case fwk.CompositePodGroupKeyType:
+		cpgs, exists := cache.compositePodGroupStates[key]
+		if !exists {
+			return fmt.Errorf("composite pod group state not found for %s", key.String())
+		}
+		snapshot.compositePodGroupStates[key] = &compositePodGroupStateSnapshot{compositePodGroupStateData: cpgs.compositePodGroupStateData.clone()}
+
+		children := cpgs.children.Clone()
+		for childKey := range children {
+			if err := cache.buildPodGroupStateSnapshotTree(childKey, snapshot, visited); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// GetRootKeyForGroup returns the root key of the given EntityKey.
+// The key must be of PodGroupKey or CompositePodGroupKey type.
+func (cache *cacheImpl) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bool, error) {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+
+	currentKey := key
+	visited := sets.New[fwk.EntityKey]()
+	for {
+		if visited.Has(currentKey) {
+			return fwk.EntityKey{}, false, fmt.Errorf("cycle detected in the hierarchy: %v", visited.UnsortedList())
+		}
+		visited.Insert(currentKey)
+
+		switch currentKey.Type {
+		case fwk.PodGroupKeyType:
+			pgs, exists := cache.podGroupStates[currentKey]
+			if !exists {
+				return fwk.EntityKey{}, false, nil
+			}
+			pg := pgs.podGroup
+			if pg == nil {
+				return fwk.EntityKey{}, false, nil
+			}
+			if !cache.compositePodGroupEnabled || pg.Spec.ParentCompositePodGroupName == nil {
+				return currentKey, true, nil
+			}
+			currentKey = fwk.CompositePodGroupKey(pg.Namespace, *pg.Spec.ParentCompositePodGroupName)
+		case fwk.CompositePodGroupKeyType:
+			cpgs, exists := cache.compositePodGroupStates[currentKey]
+			if !exists {
+				return fwk.EntityKey{}, false, nil
+			}
+			cpg := cpgs.compositePodGroup
+			if cpg == nil {
+				return fwk.EntityKey{}, false, nil
+			}
+			if cpg.Spec.ParentCompositePodGroupName == nil {
+				return currentKey, true, nil
+			}
+			currentKey = fwk.CompositePodGroupKey(cpg.Namespace, *cpg.Spec.ParentCompositePodGroupName)
+		case fwk.PodKeyType:
+			return fwk.EntityKey{}, false, fmt.Errorf("pod key type not supported in GetRootKeyForGroup for %s", currentKey.String())
+		}
+	}
 }

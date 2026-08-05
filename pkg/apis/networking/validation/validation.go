@@ -80,7 +80,7 @@ func ValidateNetworkPolicyPort(port *networking.NetworkPolicyPort, portPath *fie
 			}
 			if port.EndPort != nil {
 				if *port.EndPort < port.Port.IntVal {
-					allErrs = append(allErrs, field.Invalid(portPath.Child("endPort"), port.Port.IntVal, "must be greater than or equal to `port`"))
+					allErrs = append(allErrs, field.Invalid(portPath.Child("endPort"), *port.EndPort, "must be greater than or equal to `port`"))
 				}
 				for _, msg := range validation.IsValidPortNum(int(*port.EndPort)) {
 					allErrs = append(allErrs, field.Invalid(portPath.Child("endPort"), *port.EndPort, msg))
@@ -639,7 +639,7 @@ func validateIngressClassParametersReference(params *networking.IngressClassPara
 	}
 
 	if params.Kind == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), "")).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range content.IsPathSegmentName(params.Kind) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), params.Kind, msg))
@@ -647,7 +647,7 @@ func validateIngressClassParametersReference(params *networking.IngressClassPara
 	}
 
 	if params.Name == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "")).MarkCoveredByDeclarative()
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
 	} else {
 		for _, msg := range content.IsPathSegmentName(params.Name) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), params.Name, msg))
