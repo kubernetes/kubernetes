@@ -22,12 +22,10 @@ import (
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 	typedscheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -86,13 +84,11 @@ func (m *CRConverterFactory) NewConverter(crd *apiextensionsv1.CustomResourceDef
 		if version.Subresources != nil && version.Subresources.Scale != nil {
 			convertScale = true
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceFieldSelectors) {
-			fieldPaths := sets.New[string]()
-			for _, sf := range version.SelectableFields {
-				fieldPaths.Insert(strings.TrimPrefix(sf.JSONPath, "."))
-			}
-			selectableFields[gv] = fieldPaths
+		fieldPaths := sets.New[string]()
+		for _, sf := range version.SelectableFields {
+			fieldPaths.Insert(strings.TrimPrefix(sf.JSONPath, "."))
 		}
+		selectableFields[gv] = fieldPaths
 	}
 
 	unsafe = &crConverter{
@@ -130,11 +126,9 @@ func (c *crConverter) ConvertFieldLabel(gvk schema.GroupVersionKind, label, valu
 	case !c.clusterScoped && label == "metadata.namespace":
 		return label, value, nil
 	default:
-		if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceFieldSelectors) {
-			groupFields := c.selectableFields[gvk.GroupVersion()]
-			if groupFields != nil && groupFields.Has(label) {
-				return label, value, nil
-			}
+		groupFields := c.selectableFields[gvk.GroupVersion()]
+		if groupFields != nil && groupFields.Has(label) {
+			return label, value, nil
 		}
 		return "", "", fmt.Errorf("field label not supported: %s", label)
 	}
