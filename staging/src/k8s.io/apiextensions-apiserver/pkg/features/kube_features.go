@@ -38,12 +38,6 @@ const (
 	//
 	// Enables the tracking of observed generation in CRD status and conditions.
 	CRDObservedGenerationTracking featuregate.Feature = "CRDObservedGenerationTracking"
-
-	// owner: @alexzielenski
-	//
-	// Ignores errors raised on unchanged fields of Custom Resources
-	// across UPDATE/PATCH requests.
-	CRDValidationRatcheting featuregate.Feature = "CRDValidationRatcheting"
 )
 
 func init() {
@@ -60,10 +54,5 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	CRDObservedGenerationTracking: {
 		{Version: version.MustParse("1.35"), PreRelease: featuregate.Beta, Default: false},
 		{Version: version.MustParse("1.36"), PreRelease: featuregate.Beta, Default: true},
-	},
-	CRDValidationRatcheting: {
-		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.33"), Default: true, LockToDefault: true, PreRelease: featuregate.GA},
 	},
 }
