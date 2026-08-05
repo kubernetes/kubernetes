@@ -20,7 +20,6 @@ import (
 	"net/http"
 
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
-	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -92,7 +91,6 @@ func (wrapped *WrappedHandler) GenerateWebService(prefix string, returnType inte
 func WrapAggregatedDiscoveryToHandler(handler, aggHandler, peerAggregatedHandler http.Handler) *WrappedHandler {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(apidiscoveryv2.AddToScheme(scheme))
-	utilruntime.Must(apidiscoveryv2beta1.AddToScheme(scheme))
 	var opts []serializer.CodecFactoryOptionsMutator
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.CBORServingAndStorage) {
 		opts = append(opts, serializer.WithSerializer(cbor.NewSerializerInfo))
