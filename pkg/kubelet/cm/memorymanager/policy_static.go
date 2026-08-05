@@ -854,7 +854,12 @@ func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, po
 		// memory allocated for the container. This might happen after a
 		// kubelet restart, for example.
 		if containerBlocks != nil {
-			return regenerateHints(klog.LoggerWithValues(logger, "allocationScope", "container", "containerName", ctn.Name), pod, containerBlocks, reqRsrcs)
+			containerRequestedResources, err := getContainerRequestedResources(logger, pod, &ctn)
+			if err != nil {
+				logger.Error(err, "Failed to get container requested resources", "podUID", pod.UID, "containerName", ctn.Name)
+				return nil
+			}
+			return regenerateHints(klog.LoggerWithValues(logger, "allocationScope", "container", "containerName", ctn.Name), pod, containerBlocks, containerRequestedResources)
 		}
 	}
 
