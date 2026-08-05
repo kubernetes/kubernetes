@@ -2635,6 +2635,16 @@ func (kl *Kubelet) deletePod(ctx context.Context, pod *v1.Pod) error {
 	return nil
 }
 
+func (kl *Kubelet) filterAPIPodsForThisNode(pods []*v1.Pod) []*v1.Pod {
+	filtered := make([]*v1.Pod, 0, len(pods))
+	for _, pod := range pods {
+		if pod.Spec.NodeName == string(kl.nodeName) {
+			filtered = append(filtered, pod)
+		}
+	}
+	return filtered
+}
+
 // rejectPod records an event about the pod with the given reason and message,
 // and updates the pod to the failed phase in the status manager.
 func (kl *Kubelet) rejectPod(ctx context.Context, pod *v1.Pod, reason, message string) {
@@ -2753,6 +2763,9 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 		if !open {
 			logger.Error(nil, "Update channel is closed, exiting the sync loop")
 			return false
+		}
+		if u.Source == kubetypes.ApiserverSource {
+			u.Pods = kl.filterAPIPodsForThisNode(u.Pods)
 		}
 
 		switch u.Op {

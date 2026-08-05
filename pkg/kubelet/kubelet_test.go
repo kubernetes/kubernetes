@@ -581,6 +581,61 @@ func TestSyncLoopAbort(t *testing.T) {
 	kubelet.syncLoop(tCtx, ch, kubelet)
 }
 
+type recordingSyncHandler struct {
+	pods []*v1.Pod
+}
+
+func (h *recordingSyncHandler) HandlePodAdditions(_ context.Context, pods []*v1.Pod) {
+	h.pods = pods
+}
+
+func (h *recordingSyncHandler) HandlePodUpdates(context.Context, []*v1.Pod)   {}
+func (h *recordingSyncHandler) HandlePodRemoves(context.Context, []*v1.Pod)   {}
+func (h *recordingSyncHandler) HandlePodReconcile(context.Context, []*v1.Pod) {}
+func (h *recordingSyncHandler) HandlePodSyncs(context.Context, []*v1.Pod)     {}
+func (h *recordingSyncHandler) HandlePodCleanups(context.Context) error       { return nil }
+
+func TestSyncLoopIterationFiltersForeignAPIPods(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	localPod := podWithUIDNameNsSpec("local", "local", "default", v1.PodSpec{NodeName: string(kubelet.nodeName)})
+	foreignPod := podWithUIDNameNsSpec("foreign", "foreign", "default", v1.PodSpec{NodeName: "other-node"})
+	unscheduledPod := podWithUIDNameNsSpec("unscheduled", "unscheduled", "default", v1.PodSpec{})
+
+	for _, tc := range []struct {
+		name     string
+		source   string
+		expected []*v1.Pod
+	}{
+		{
+			name:     "apiserver source excludes foreign and unscheduled pods",
+			source:   kubetypes.ApiserverSource,
+			expected: []*v1.Pod{localPod},
+		},
+		{
+			name:     "file source is not filtered",
+			source:   kubetypes.FileSource,
+			expected: []*v1.Pod{localPod, foreignPod, unscheduledPod},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			configCh := make(chan kubetypes.PodUpdate, 1)
+			configCh <- kubetypes.PodUpdate{
+				Pods:   []*v1.Pod{localPod, foreignPod, unscheduledPod},
+				Op:     kubetypes.ADD,
+				Source: tc.source,
+			}
+			handler := &recordingSyncHandler{}
+
+			require.True(t, kubelet.syncLoopIteration(tCtx, configCh, handler, make(chan time.Time), make(chan time.Time), make(chan *pleg.PodLifecycleEvent)))
+			assert.Equal(t, tc.expected, handler.pods)
+		})
+	}
+}
+
 func TestSyncPodsStartPod(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
