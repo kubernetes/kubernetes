@@ -140,17 +140,20 @@ var _ = SIGDescribe("HugepageAwareMemoryReporting", framework.WithSlow(), framew
 			framework.Logf("disabled: availableBefore=%d availableAfter=%d hugepages=%d",
 				availableBefore, availableAfter, expectedHugepageBytes)
 
-			// With the feature gate disabled, hugepage reservation is NOT subtracted
-			// from memory.available. The cgroup-based calculation still counts hugepage
-			// memory as available, so the drop should be much smaller than the
-			// hugepage reservation.
+			// With the feature gate disabled, hugepage reservation is NOT explicitly
+			// subtracted from memory.available via adjustForHugePages. However, the
+			// cgroup-based WorkingSet already reflects some of the hugepage reservation
+			// because the kernel removes hugepages from the free pool, so AvailableBytes
+			// (= Limit - WorkingSet) drops naturally. The drop should still be smaller
+			// than the full hugepage reservation, since adjustForHugePages is not
+			// applied (it would subtract the entire hugepage capacity on top).
 			drop := uint64(0)
 			if availableBefore > availableAfter {
 				drop = availableBefore - availableAfter
 			}
 			gomega.Expect(drop).To(
-				gomega.BeNumerically("<", expectedHugepageBytes-margin),
-				"memory.available should NOT decrease by the hugepage reservation when feature gate is disabled")
+				gomega.BeNumerically("<", expectedHugepageBytes),
+				"memory.available should NOT decrease by the full hugepage reservation when feature gate is disabled")
 		})
 	})
 })
