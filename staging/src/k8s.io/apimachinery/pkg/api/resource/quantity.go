@@ -463,7 +463,19 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 	default:
 		// format must be BinarySI
 		number, exponent := rounded.AsCanonicalBase1024Bytes(out)
-		suffix, _ := quantitySuffixer.constructBytes(2, exponent*10, format)
+		suffix, ok := quantitySuffixer.constructBytes(2, exponent*10, format)
+		if !ok {
+			// BinarySI only defines suffixes up to "Ei" (2^60). For a larger
+			// exponent there is no suffix, so fall back to decimal exponent
+			// notation ("e") instead of dropping the suffix, which would
+			// silently corrupt the value (e.g. 2^70 serializing to "1").
+			// The base-1024 mantissa/exponent cannot be reused for "e"
+			// notation, so recompute the canonical mantissa and exponent in
+			// base 10.
+			number, exponent := rounded.AsCanonicalBytes(out)
+			suffix, _ := quantitySuffixer.constructBytes(10, exponent, DecimalExponent)
+			return number, suffix
+		}
 		return number, suffix
 	}
 }

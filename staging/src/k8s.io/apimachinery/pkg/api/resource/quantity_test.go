@@ -725,6 +725,14 @@ func TestQuantityString(t *testing.T) {
 		{decQuantity(1, 21, DecimalSI), "1e21", "1000E"},
 		{decQuantity(5, 21, DecimalSI), "5e21", "5000E"},
 		{decQuantity(1, 24, DecimalSI), "1e24", "1000000E"},
+		// BinarySI has no suffix beyond "Ei" (2^60). A value whose canonical
+		// base-1024 exponent exceeds that (a multiple of 2^70 or larger) has no
+		// binary suffix, so it must fall back to decimal exponent notation
+		// instead of dropping the suffix, otherwise e.g. 2^70 would serialize
+		// to "1". These values round-trip through parse.
+		{decQuantity(1, 70, BinarySI), "10e69", ""},
+		{decQuantity(2, 70, BinarySI), "20e69", ""},
+		{decQuantity(1, 72, BinarySI), "1e72", ""},
 		{decQuantity(1234567, 6, DecimalSI), "1234567M", ""},
 		{decQuantity(1234567, -3, BinarySI), "1234567m", ""},
 		{decQuantity(3, 3, DecimalSI), "3k", ""},
