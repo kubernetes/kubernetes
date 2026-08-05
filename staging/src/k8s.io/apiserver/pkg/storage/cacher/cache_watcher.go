@@ -566,6 +566,6 @@ func (c *cacheWatcher) observeDispatchMetrics(event *watchCacheEvent, builtAt, s
 	if !event.CacheReceived.IsZero() {
 		c.watcherMetrics.ObserveStage(metrics.StageStorageToCache, event.CacheReceived.Sub(event.RecordTime))
 	}
-	c.watcherMetrics.ObserveStage(metrics.StageCacheToWatcher, sentAt.Sub(builtAt))
+	c.watcherMetrics.ObserveStage(metrics.StageWatcherToClientHandler, sentAt.Sub(builtAt))
 	c.watcherMetrics.ObserveStage(metrics.StageTotal, sentAt.Sub(event.RecordTime))
 }
