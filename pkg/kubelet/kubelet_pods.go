@@ -34,18 +34,27 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	securejoin "github.com/cyphar/filepath-securejoin"
 
+	checkpointv1alpha1 "k8s.io/api/checkpoint/v1alpha1"
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/util/retry"
 	resourcehelper "k8s.io/component-helpers/resource"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/cri-streaming/pkg/streaming/portforward"
@@ -53,6 +62,7 @@ import (
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
+	checkpointutil "k8s.io/kubernetes/pkg/apis/checkpoint/util"
 	podshelper "k8s.io/kubernetes/pkg/apis/core/pods"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
@@ -61,6 +71,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -76,6 +87,7 @@ import (
 	volumevalidation "k8s.io/kubernetes/pkg/volume/validation"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
 	utilnet "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -1088,6 +1100,310 @@ func (kl *Kubelet) makePodDataDirs(pod *v1.Pod) error {
 	return nil
 }
 
+// podCheckpointGVR is the resource used to resolve a pod's
+// spec.restoreFrom.name to its on-node checkpoint directory.
+var podCheckpointGVR = schema.GroupVersionResource{
+	Group:    "checkpoint.k8s.io",
+	Version:  "v1alpha1",
+	Resource: "podcheckpoints",
+}
+
+// GetPodCheckpointPath resolves the pod's spec.restoreFrom.name (the name of a
+// PodCheckpoint in the pod's namespace) to the on-node checkpoint directory by
+// reading the PodCheckpoint object. Per KEP-5823 status.checkpointLocation is
+// stored relative to the kubelet's pod-checkpoints root, so this resolves it
+// against that root and returns the absolute path the container runtime needs. It
+// errors if the checkpoint is missing, not ready, or was taken on a different
+// node (cross-node restore is out of scope).
+func (kl *Kubelet) GetPodCheckpointPath(ctx context.Context, pod *v1.Pod) (string, error) {
+	if pod.Spec.RestoreFrom == nil || pod.Spec.RestoreFrom.Name == "" {
+		return "", fmt.Errorf("pod %v has no spec.restoreFrom.name set", klog.KObj(pod))
+	}
+	name := pod.Spec.RestoreFrom.Name
+	if kl.dynamicClient == nil {
+		return "", fmt.Errorf("cannot resolve checkpoint %q: kubelet has no API client", name)
+	}
+
+	obj, err := kl.dynamicClient.Resource(podCheckpointGVR).Namespace(pod.Namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to get PodCheckpoint %q: %w", name, err)
+	}
+	var pc checkpointv1alpha1.PodCheckpoint
+	if err := apiruntime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &pc); err != nil {
+		return "", fmt.Errorf("failed to read PodCheckpoint %q: %w", name, err)
+	}
+
+	if !apimeta.IsStatusConditionTrue(pc.Status.Conditions, checkpointv1alpha1.PodCheckpointReady) {
+		return "", &kubecontainer.RestoreError{Reason: events.CheckpointNotReady, Err: fmt.Errorf("PodCheckpoint %q is not ready", name)}
+	}
+	if ptr.Deref(pc.Status.NodeName, "") != string(kl.nodeName) {
+		return "", &kubecontainer.RestoreError{Reason: events.CheckpointWrongNode, Err: fmt.Errorf("PodCheckpoint %q was taken on node %q, cannot restore on node %q (cross-node restore is not supported)", name, ptr.Deref(pc.Status.NodeName, ""), kl.nodeName)}
+	}
+	src := pc.Status.CheckpointLocation
+	if src == nil || src.NodeLocal == nil || src.Type != checkpointv1alpha1.CheckpointSourceTypeNodeLocal {
+		return "", &kubecontainer.RestoreError{Reason: events.CheckpointNotReady, Err: fmt.Errorf("PodCheckpoint %q has no node-local checkpoint location recorded", name)}
+	}
+	rel := src.NodeLocal.Path
+
+	// Anti-tamper check: the restoring pod's spec must match the spec captured at
+	// checkpoint time, so a pod cannot be pointed at a foreign checkpoint to
+	// recreate its memory into a different container layout. Compare the
+	// sanitized specs (node-local fields and the restore invocation are
+	// normalized out on both sides). Fail closed if the checkpoint has no captured template: an
+	// absent template means the equality check cannot be performed, so the
+	// restore must be rejected rather than allowed unchecked.
+	if pc.Status.CheckpointedPodTemplate == nil {
+		return "", &kubecontainer.RestoreError{Reason: events.PodSpecMismatch, Err: fmt.Errorf("PodCheckpoint %q has no captured pod template to validate the restore against", name)}
+	}
+	want := pc.Status.CheckpointedPodTemplate.Spec
+	got := checkpointutil.SanitizePodTemplate(pod).Spec
+	if !apiequality.Semantic.DeepEqual(got, want) {
+		return "", &kubecontainer.RestoreError{Reason: events.PodSpecMismatch, Err: fmt.Errorf("restoring pod spec does not match PodCheckpoint %q", name)}
+	}
+
+	// Defense in depth: the checkpoint location comes from the PodCheckpoint status,
+	// which is controller-written, but the kubelet resolves it to a path it hands
+	// directly to the container runtime. Per KEP-5823 the location is stored
+	// relative to the kubelet's pod-checkpoints root (it must not expose an
+	// absolute host path), so reject absolute values, resolve the relative path
+	// against the root, and require the result to stay confined within it so a
+	// malformed or tampered status (e.g. via "..") cannot point the runtime at an
+	// arbitrary host path.
+	checkpointsDir, err := filepath.Abs(kl.getPodCheckpointsDir())
+	if err != nil {
+		return "", &kubecontainer.RestoreError{Reason: events.CheckpointNotReady, Err: fmt.Errorf("failed to resolve pod-checkpoints directory %q: %w", kl.getPodCheckpointsDir(), err)}
+	}
+	if rel == "" || rel == "." || !filepath.IsLocal(rel) {
+		return "", &kubecontainer.RestoreError{Reason: events.PodSpecMismatch, Err: fmt.Errorf("PodCheckpoint %q location %q must name a directory below the pod-checkpoints directory %q", name, rel, checkpointsDir)}
+	}
+	resolved := filepath.Join(checkpointsDir, rel)
+	info, err := os.Stat(resolved)
+	if err != nil {
+		return "", &kubecontainer.RestoreError{Reason: events.CheckpointNotReady, Err: fmt.Errorf("PodCheckpoint %q location %q is not accessible: %w", name, rel, err)}
+	}
+	if !info.IsDir() {
+		return "", &kubecontainer.RestoreError{Reason: events.CheckpointNotReady, Err: fmt.Errorf("PodCheckpoint %q location %q is not a directory", name, rel)}
+	}
+
+	// Resolve symlinks before handing the path to CRI. The lexical check above
+	// rejects traversal in status; this canonical check also rejects a symlink
+	// below the kubelet-owned root that targets a path outside it.
+	canonicalRoot, err := filepath.EvalSymlinks(checkpointsDir)
+	if err != nil {
+		return "", &kubecontainer.RestoreError{Reason: events.CheckpointNotReady, Err: fmt.Errorf("failed to resolve pod-checkpoints directory %q: %w", checkpointsDir, err)}
+	}
+	canonicalCheckpoint, err := filepath.EvalSymlinks(resolved)
+	if err != nil {
+		return "", &kubecontainer.RestoreError{Reason: events.CheckpointNotReady, Err: fmt.Errorf("failed to resolve PodCheckpoint %q location %q: %w", name, rel, err)}
+	}
+	canonicalRel, err := filepath.Rel(canonicalRoot, canonicalCheckpoint)
+	if err != nil || canonicalRel == "." || !filepath.IsLocal(canonicalRel) {
+		return "", &kubecontainer.RestoreError{Reason: events.PodSpecMismatch, Err: fmt.Errorf("PodCheckpoint %q location %q resolves outside the pod-checkpoints directory %q", name, rel, checkpointsDir)}
+	}
+
+	return canonicalCheckpoint, nil
+}
+
+// finalizePodCheckpoint writes the terminal outcome of an asynchronous checkpoint
+// to the named PodCheckpoint's status (KEP-5823). On success it sets the Ready
+// condition True/CheckpointCompleted and records checkpointLocation; on failure it
+// sets Ready False/CheckpointFailed with failureMessage. It re-fetches under
+// RetryOnConflict and mutates only the kubelet-owned fields (the Ready condition
+// and, on success, checkpointLocation), preserving the controller-written
+// nodeName, sourcePodUID, and checkpointedPodTemplate.
+func (kl *Kubelet) finalizePodCheckpoint(ctx context.Context, namespace, name string, success bool, checkpointLocation, failureMessage string) error {
+	if name == "" {
+		// No PodCheckpoint object to finalize (for example, a direct internal
+		// trigger). The checkpoint was still written; there is no status to record.
+		return nil
+	}
+	if kl.dynamicClient == nil {
+		return goerrors.New("cannot finalize PodCheckpoint: kubelet has no API client")
+	}
+
+	status := metav1.ConditionTrue
+	reason := checkpointv1alpha1.PodCheckpointReasonCompleted
+	message := "checkpoint completed successfully"
+	if !success {
+		status = metav1.ConditionFalse
+		reason = checkpointv1alpha1.PodCheckpointReasonFailed
+		message = failureMessage
+	}
+
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		obj, err := kl.dynamicClient.Resource(podCheckpointGVR).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		var pc checkpointv1alpha1.PodCheckpoint
+		if err := apiruntime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &pc); err != nil {
+			return fmt.Errorf("failed to read PodCheckpoint %q: %w", name, err)
+		}
+
+		apimeta.SetStatusCondition(&pc.Status.Conditions, metav1.Condition{
+			Type:               checkpointv1alpha1.PodCheckpointReady,
+			Status:             status,
+			Reason:             reason,
+			Message:            message,
+			ObservedGeneration: pc.Generation,
+		})
+		if success {
+			completionTime := metav1.NewTime(kl.clock.Now())
+			pc.Status.CompletionTime = &completionTime
+			if checkpointLocation != "" {
+				pc.Status.CheckpointLocation = &checkpointv1alpha1.CheckpointSource{
+					Type:      checkpointv1alpha1.CheckpointSourceTypeNodeLocal,
+					NodeLocal: &checkpointv1alpha1.NodeLocalCheckpointSource{Path: checkpointLocation},
+				}
+			}
+		}
+
+		statusMap, err := apiruntime.DefaultUnstructuredConverter.ToUnstructured(&pc.Status)
+		if err != nil {
+			return fmt.Errorf("failed to convert status to unstructured: %w", err)
+		}
+		if err := unstructured.SetNestedField(obj.Object, statusMap, "status"); err != nil {
+			return fmt.Errorf("failed to set status: %w", err)
+		}
+		_, err = kl.dynamicClient.Resource(podCheckpointGVR).Namespace(namespace).UpdateStatus(ctx, obj, metav1.UpdateOptions{})
+		return err
+	})
+}
+
+// finalizeInterruptedCheckpoints runs on kubelet startup. A CRI checkpoint is
+// not resumable, so any PodCheckpoint left CheckpointInProgress on this node by a
+// checkpoint that was running when the kubelet stopped is finalized as
+// CheckpointFailed, rather than hanging in progress forever (KEP-5823). The
+// initial list is retried until it succeeds or ctx is canceled, ensuring the
+// normal watch cannot race stale output after an API outage. It returns true
+// only when the recovery pass completed and the watch may start. Per-object
+// cleanup failures remain blocked for this process and are retried on the next
+// kubelet start.
+func (kl *Kubelet) finalizeInterruptedCheckpoints(ctx context.Context) bool {
+	return kl.finalizeInterruptedCheckpointsWithRetry(ctx, 5*time.Second)
+}
+
+func (kl *Kubelet) finalizeInterruptedCheckpointsWithRetry(ctx context.Context, retryPeriod time.Duration) bool {
+	logger := klog.FromContext(ctx)
+	if kl.dynamicClient == nil {
+		return false
+	}
+	var list *unstructured.UnstructuredList
+	if err := wait.PollUntilContextCancel(ctx, retryPeriod, true, func(ctx context.Context) (bool, error) {
+		var err error
+		list, err = kl.dynamicClient.Resource(podCheckpointGVR).Namespace(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			logger.Error(err, "Failed to list PodCheckpoints for startup checkpoint recovery; retrying before starting the watch")
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		logger.V(2).Info("Stopped startup checkpoint recovery before the PodCheckpoint list succeeded", "err", err)
+		return false
+	}
+	for i := range list.Items {
+		var pc checkpointv1alpha1.PodCheckpoint
+		if err := apiruntime.DefaultUnstructuredConverter.FromUnstructured(list.Items[i].Object, &pc); err != nil {
+			logger.Error(err, "Failed to read PodCheckpoint while finalizing interrupted checkpoints")
+			continue
+		}
+		// Only this node's checkpoints, and only ones still recorded in progress.
+		if ptr.Deref(pc.Status.NodeName, "") != string(kl.nodeName) {
+			continue
+		}
+		cond := apimeta.FindStatusCondition(pc.Status.Conditions, checkpointv1alpha1.PodCheckpointReady)
+		if cond == nil || cond.Status != metav1.ConditionFalse || cond.Reason != checkpointv1alpha1.PodCheckpointReasonInProgress {
+			continue
+		}
+		logger.Info("Finalizing checkpoint interrupted by kubelet restart as failed", "podCheckpoint", klog.KObj(&pc))
+		_, outputPath, pathErr := kl.podCheckpointOutputPath(pc.UID)
+		if pathErr != nil {
+			logger.Error(pathErr, "Failed to resolve interrupted checkpoint output; leaving PodCheckpoint in progress for startup cleanup retry", "podCheckpoint", klog.KObj(&pc))
+			kl.checkpointCleanupBlocked.Store(pc.UID, struct{}{})
+			continue
+		}
+		if cleanupErr := os.RemoveAll(outputPath); cleanupErr != nil {
+			logger.Error(cleanupErr, "Failed to remove interrupted checkpoint output; leaving PodCheckpoint in progress for startup cleanup retry", "podCheckpoint", klog.KObj(&pc), "checkpointPath", outputPath)
+			kl.checkpointCleanupBlocked.Store(pc.UID, struct{}{})
+			continue
+		}
+		if err := kl.finalizePodCheckpoint(ctx, pc.Namespace, pc.Name, false, "", "checkpoint aborted: kubelet restarted during the operation"); err != nil {
+			logger.Error(err, "Failed to finalize interrupted PodCheckpoint status", "podCheckpoint", klog.KObj(&pc))
+		}
+	}
+	return ctx.Err() == nil
+}
+
+// prepareContainerPathsForRestore creates the necessary directories and files that restored
+// containers expect to exist. These paths are normally created during container startup,
+// but must be created before calling RestorePod since restored containers are already running.
+// This includes:
+//   - /etc/hosts file (mounted from host)
+//   - Container directories for termination logs
+//
+// The paths created here are passed to the CRI runtime in the PodSandboxConfig.
+func (kl *Kubelet) prepareContainerPathsForRestore(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
+	podDir := kl.getPodDir(pod.UID)
+	logger := klog.FromContext(ctx)
+
+	logger.V(1).Info("Preparing container paths for pod restore", "pod", klog.KObj(pod), "podUID", pod.UID, "podDir", podDir)
+
+	// RestorePod needs the host mount to exist before it creates containers, but
+	// the first sync may not have a PodStatus yet. Create the file with any known
+	// IPs now; the runtime manager refreshes it after the restored sandbox has a
+	// CNI-assigned address.
+	var podIPs []string
+	if podStatus != nil {
+		podIPs = append(podIPs, podStatus.IPs...)
+	}
+	if err := kl.UpdatePodRestoreHosts(ctx, pod, podIPs); err != nil {
+		return err
+	}
+
+	// Create container directories for regular and restartable init containers.
+	// Completed init containers and ephemeral containers are not restored.
+	// The directory structure is: /var/lib/kubelet/pods/{pod-uid}/containers/{container-name}/{restart-count}
+	containersDir := filepath.Join(podDir, "containers")
+
+	allContainers := make([]v1.Container, 0, len(pod.Spec.InitContainers)+len(pod.Spec.Containers))
+	for i := range pod.Spec.InitContainers {
+		if podutil.IsRestartableInitContainer(&pod.Spec.InitContainers[i]) {
+			allContainers = append(allContainers, pod.Spec.InitContainers[i])
+		}
+	}
+	allContainers = append(allContainers, pod.Spec.Containers...)
+
+	logger.V(1).Info("Creating container directories for pod restore", "pod", klog.KObj(pod), "containersDir", containersDir, "containerCount", len(allContainers))
+	for _, container := range allContainers {
+		// Create directory for restart count 0 (restored containers start at 0)
+		// Format: /var/lib/kubelet/pods/{pod-uid}/containers/{container-name}/0
+		containerDir := filepath.Join(containersDir, container.Name, "0")
+		logger.V(1).Info("Creating container directory for pod restore", "pod", klog.KObj(pod), "containerName", container.Name, "containerDir", containerDir)
+		if err := os.MkdirAll(containerDir, 0750); err != nil && !os.IsExist(err) {
+			return fmt.Errorf("failed to create container directory %s: %w", containerDir, err)
+		}
+	}
+
+	logger.V(1).Info("Successfully prepared all container paths for pod restore", "pod", klog.KObj(pod))
+	return nil
+}
+
+// UpdatePodRestoreHosts refreshes the kubelet-managed /etc/hosts file with the
+// IPs reported after RestorePod creates the sandbox and configures networking.
+func (kl *Kubelet) UpdatePodRestoreHosts(ctx context.Context, pod *v1.Pod, podIPs []string) error {
+	hostsFilePath := getEtcHostsPath(kl.getPodDir(pod.UID))
+	hostName, hostDomainName, err := kl.GeneratePodHostNameAndDomain(klog.FromContext(ctx), pod)
+	if err != nil {
+		return fmt.Errorf("failed to determine restored pod hostname: %w", err)
+	}
+
+	klog.FromContext(ctx).V(1).Info("Updating etc-hosts file for pod restore", "pod", klog.KObj(pod), "hostsFilePath", hostsFilePath, "podIPs", podIPs, "hostName", hostName, "hostDomainName", hostDomainName)
+	if err := ensureHostsFile(hostsFilePath, podIPs, hostName, hostDomainName, pod.Spec.HostAliases, pod.Spec.HostNetwork); err != nil {
+		return fmt.Errorf("failed to update etc-hosts file for pod restore: %w", err)
+	}
+	return nil
+}
+
 // getPullSecretsForPod inspects the Pod and retrieves the referenced pull
 // secrets. The names of secrets that cannot be found are returned so we can
 // emit an event later if the image pull fails too.
@@ -2019,6 +2335,16 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 	if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) {
 		if podutil.AllContainersCouldRestart(&pod.Spec) {
 			s.Conditions = append(s.Conditions, status.GenerateAllContainersRestartingCondition(pod, podStatus, &oldPodStatus, s.Phase))
+		}
+	}
+	// Surface the Restoring condition for a pod being restored from a checkpoint
+	// (KEP-5823): True while its sandbox restore is in flight, False with reason
+	// RestoreInProgress while blocked on another restore of the same pod, and
+	// cleared (omitted) once the sandbox is up.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) &&
+		pod.Spec.RestoreFrom != nil && pod.Spec.RestoreFrom.Name != "" {
+		if c, ok := status.GenerateRestoringCondition(pod, &oldPodStatus, podStatus, kl.podRestoreBlocked(pod.UID)); ok {
+			s.Conditions = append(s.Conditions, c)
 		}
 	}
 	// set HostIP/HostIPs and initialize PodIP/PodIPs for host network pods

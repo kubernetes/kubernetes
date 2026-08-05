@@ -10730,11 +10730,16 @@ type CheckpointPodRequest struct {
 	ContainerIds []string `protobuf:"bytes,3,rep,name=container_ids,json=containerIds,proto3" json:"container_ids,omitempty"`
 	// Optional opaque runtime-specific checkpoint options supplied by the CRI
 	// caller. Keys are interpreted in the scope of the pod sandbox's runtime
-	// handler. Kubernetes does not expose these options in its alpha API and
-	// kubelet sends an empty map. Direct CRI callers may set keys documented by
-	// the selected runtime. The runtime must reject unsupported or invalid keys
-	// and values rather than silently ignore them. Options must not contain
-	// secrets.
+	// handler. When kubelet is the caller, these values originate only from
+	// PodCheckpoint.spec.checkpointOptions and are copied unchanged. Direct CRI
+	// callers may set keys documented by the selected runtime. The runtime must
+	// reject unsupported or invalid keys and values rather than silently ignore
+	// them. Options must not contain secrets.
+	//
+	// These options apply only while creating the checkpoint. If an option
+	// changes what is required to restore the checkpoint, the runtime must
+	// encode that requirement in its checkpoint data; the caller does not copy
+	// checkpoint options into RestorePodRequest.options.
 	Options       map[string]string `protobuf:"bytes,4,rep,name=options,proto3" json:"options,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -10857,11 +10862,17 @@ type RestorePodRequest struct {
 	// RunPodSandboxRequest. The runtime must reject an unknown non-empty handler.
 	RuntimeHandler string `protobuf:"bytes,3,opt,name=runtime_handler,json=runtimeHandler,proto3" json:"runtime_handler,omitempty"`
 	// Optional opaque runtime-specific restore options supplied by the CRI
-	// caller. Keys are interpreted in the scope of `runtime_handler`.
-	// Kubernetes does not expose these options in its alpha API and kubelet
-	// sends an empty map. Direct CRI callers may set keys documented by the
-	// selected runtime. The runtime must reject unsupported or invalid keys and
-	// values rather than silently ignore them. Options must not contain secrets.
+	// caller. Keys are interpreted in the scope of `runtime_handler`. When
+	// kubelet is the caller, these values originate only from the restoring
+	// Pod's spec.restoreFrom.options and are copied unchanged. Direct CRI
+	// callers may set keys documented by the selected runtime. The runtime must
+	// reject unsupported or invalid keys and values rather than silently ignore them.
+	// Options must not contain secrets.
+	//
+	// These options apply only to this restore attempt. They must not be
+	// inferred from CheckpointPodRequest.options or treated as defaults stored
+	// with the checkpoint. The runtime may separately read requirements encoded
+	// in its own checkpoint data.
 	Options map[string]string `protobuf:"bytes,4,rep,name=options,proto3" json:"options,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Complete restore-time configurations for all containers represented by
 	// the checkpoint. The list must be non-empty. Every entry must have a

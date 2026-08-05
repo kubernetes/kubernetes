@@ -659,6 +659,29 @@
         ],
         "type": "object"
       },
+      "io.k8s.api.core.v1.CheckpointReference": {
+        "description": "CheckpointReference identifies a PodCheckpoint and specifies options for restoring a Pod from it.",
+        "properties": {
+          "name": {
+            "default": "",
+            "description": "Name is the name of a PodCheckpoint in the Pod's namespace.",
+            "type": "string"
+          },
+          "options": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Options contains opaque runtime-specific options for this restore attempt. The kubelet passes these entries unchanged to RestorePodRequest.options. Keys and values must be documented by the runtime selected for this Pod. Unsupported entries cause the restore to fail. Options must not contain secrets.\n\nRestore options are independent of the options used to create the checkpoint and are not stored in the PodCheckpoint. Requirements intrinsic to the checkpoint are recorded in runtime-owned checkpoint data instead.",
+            "type": "object",
+            "x-kubernetes-map-type": "atomic"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "x-kubernetes-map-type": "atomic"
+      },
       "io.k8s.api.core.v1.CinderPersistentVolumeSource": {
         "description": "Represents a cinder volume resource in Openstack. A Cinder volume must exist before mounting to a container. The volume must also be in the same region as the kubelet. Cinder volumes support ownership management and SELinux relabeling.",
         "properties": {
@@ -5821,6 +5844,14 @@
           "restartPolicy": {
             "description": "Restart policy for all containers within the pod. One of Always, OnFailure, Never. In some contexts, only a subset of those values may be permitted. Default to Always. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy",
             "type": "string"
+          },
+          "restoreFrom": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.CheckpointReference"
+              }
+            ],
+            "description": "RestoreFrom specifies a PodCheckpoint in this Pod's namespace to restore this Pod from. When set, the Pod is restored from that checkpoint's archive instead of being created from scratch; the kubelet resolves the reference to the on-node archive via the PodCheckpoint's status. This field is immutable. Restoring from another checkpoint requires creating a new Pod; in-place restore of an existing Pod is not supported."
           },
           "runtimeClassName": {
             "description": "RuntimeClassName refers to a RuntimeClass object in the node.k8s.io group, which should be used to run this pod.  If no RuntimeClass resource matches the named class, the pod will not be run. If unset or empty, the \"legacy\" RuntimeClass will be used, which is an implicit class with an empty definition that uses the default runtime handler. More info: https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class",

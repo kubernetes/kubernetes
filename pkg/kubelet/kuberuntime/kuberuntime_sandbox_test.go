@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -29,6 +30,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
@@ -38,6 +40,33 @@ import (
 )
 
 const testPodLogsDirectory = "/var/log/pods"
+
+type recordingInternalContainerLifecycle struct {
+	preCreated []string
+	preStarted map[string]string
+	preStart   func(container *v1.Container, containerID string) error
+}
+
+func (r *recordingInternalContainerLifecycle) PreCreateContainer(_ klog.Logger, _ *v1.Pod, container *v1.Container, config *runtimeapi.ContainerConfig) error {
+	r.preCreated = append(r.preCreated, container.Name)
+	config.Annotations["test.kubernetes.io/pre-create"] = "called"
+	return nil
+}
+
+func (r *recordingInternalContainerLifecycle) PreStartContainer(_ klog.Logger, _ *v1.Pod, container *v1.Container, containerID string) error {
+	if r.preStarted == nil {
+		r.preStarted = make(map[string]string)
+	}
+	r.preStarted[container.Name] = containerID
+	if r.preStart != nil {
+		return r.preStart(container, containerID)
+	}
+	return nil
+}
+
+func (*recordingInternalContainerLifecycle) PostStopContainer(klog.Logger, string) error {
+	return nil
+}
 
 func TestGeneratePodSandboxConfig(t *testing.T) {
 	tCtx := ktesting.Init(t)
@@ -156,7 +185,7 @@ func TestCreatePodSandbox_RuntimeClass(t *testing.T) {
 	}{
 		"unspecified RuntimeClass": {rcn: nil, expectedHandler: ""},
 		"valid RuntimeClass":       {rcn: ptr.To(rctest.SandboxRuntimeClass), expectedHandler: rctest.SandboxRuntimeHandler},
-		"missing RuntimeClass":     {rcn: ptr.To("phantom"), expectError: true},
+		"missing RuntimeClass":     {rcn: new("phantom"), expectError: true},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -174,6 +203,343 @@ func TestCreatePodSandbox_RuntimeClass(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRestorePodSandbox_RuntimeClass(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	rcm := runtimeclass.NewManager(rctest.NewPopulatedClient())
+	defer rctest.StartManagerSync(rcm)()
+
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	m.runtimeClassManager = rcm
+
+	tests := map[string]struct {
+		runtimeClassName *string
+		expectedHandler  string
+		expectError      bool
+	}{
+		"unspecified RuntimeClass": {expectedHandler: ""},
+		"valid RuntimeClass":       {runtimeClassName: ptr.To(rctest.SandboxRuntimeClass), expectedHandler: rctest.SandboxRuntimeHandler},
+		"missing RuntimeClass":     {runtimeClassName: new("phantom"), expectError: true},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			fakeRuntime.RestoredPods = nil
+			pod := newTestPod()
+			restoreOptions := map[string]string{"example.runtime/target": "node-local"}
+			pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint", Options: restoreOptions}
+			pod.Spec.RuntimeClassName = test.runtimeClassName
+
+			_, _, err := m.restorePodSandbox(tCtx, pod, 1, nil)
+			if test.expectError {
+				require.Error(t, err)
+				assert.Empty(t, fakeRuntime.RestoredPods)
+				return
+			}
+			require.NoError(t, err)
+			require.Len(t, fakeRuntime.RestoredPods, 1)
+			restoreOptions["example.runtime/target"] = "changed-after-call"
+			assert.Equal(t, test.expectedHandler, fakeRuntime.RestoredPods[0].RuntimeHandler)
+			assert.Equal(t, map[string]string{"example.runtime/target": "node-local"}, fakeRuntime.RestoredPods[0].Options)
+		})
+	}
+}
+
+// TestRestorePodSandboxPidNamespaceFromSpec verifies that restorePodSandbox no
+// longer forces pod-level PID namespace sharing and instead derives the PID
+// namespace mode from the pod spec, matching the normal createPodSandbox path.
+func TestRestorePodSandboxPidNamespaceFromSpec(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	tests := []struct {
+		name     string
+		mutate   func(*v1.Pod)
+		expected runtimeapi.NamespaceMode
+	}{
+		{
+			name:     "default keeps per-container PID namespace",
+			mutate:   func(*v1.Pod) {},
+			expected: runtimeapi.NamespaceMode_CONTAINER,
+		},
+		{
+			name:     "ShareProcessNamespace shares the pod PID namespace",
+			mutate:   func(p *v1.Pod) { p.Spec.ShareProcessNamespace = new(true) },
+			expected: runtimeapi.NamespaceMode_POD,
+		},
+		{
+			name:     "HostPID uses the node PID namespace",
+			mutate:   func(p *v1.Pod) { p.Spec.HostPID = true },
+			expected: runtimeapi.NamespaceMode_NODE,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+
+			pod := newTestPod()
+			pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+			// NamespaceOptions are only derived when a PodSecurityContext is
+			// present (true on both the create and restore paths), so set one.
+			pod.Spec.SecurityContext = &v1.PodSecurityContext{}
+			tc.mutate(pod)
+
+			_, _, err = m.restorePodSandbox(tCtx, pod, 0, nil)
+			require.NoError(t, err)
+
+			require.Len(t, fakeRuntime.RestoredPods, 1)
+			cfg := fakeRuntime.RestoredPods[0].Config
+			require.NotNil(t, cfg)
+			require.NotNil(t, cfg.Linux)
+			require.NotNil(t, cfg.Linux.SecurityContext)
+			require.NotNil(t, cfg.Linux.SecurityContext.NamespaceOptions)
+			assert.Equal(t, tc.expected, cfg.Linux.SecurityContext.NamespaceOptions.Pid)
+		})
+	}
+}
+
+// TestRestorePodSandboxSelectsRestorableContainers verifies that only
+// long-running application containers are included in the restore request.
+func TestRestorePodSandboxSelectsRestorableContainers(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImageVolume, true)
+	tCtx := ktesting.Init(t)
+	fakeRuntime, fakeImage, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	expectedStartedContainers := 0
+	lifecycle := &recordingInternalContainerLifecycle{preStart: func(_ *v1.Container, _ string) error {
+		startedContainers := 0
+		for _, call := range fakeRuntime.GetCalls() {
+			if call == "StartContainer" {
+				startedContainers++
+			}
+		}
+		assert.Equal(t, expectedStartedContainers, startedContainers, "PreStartContainer must run before its StartContainer call")
+		expectedStartedContainers++
+		return nil
+	}}
+	m.internalLifecycle = lifecycle
+
+	pod := newTestPod()
+	pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+	pod.Spec.Volumes = []v1.Volume{{
+		Name: "image-data",
+		VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{
+			Reference:  "image-volume:latest",
+			PullPolicy: v1.PullAlways,
+		}},
+	}}
+	pod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{{Name: "image-data", MountPath: "/data"}}
+	pod.Spec.InitContainers = []v1.Container{
+		{Name: "completed-init", Image: "busybox"},
+		{Name: "sidecar", Image: "busybox", RestartPolicy: ptr.To(v1.ContainerRestartPolicyAlways)},
+	}
+	pod.Spec.EphemeralContainers = []v1.EphemeralContainer{
+		{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debugger"}},
+	}
+
+	_, _, err = m.restorePodSandbox(tCtx, pod, 0, nil)
+	require.NoError(t, err)
+
+	require.Len(t, fakeRuntime.RestoredPods, 1)
+	var names []string
+	for _, cc := range fakeRuntime.RestoredPods[0].ContainerConfigs {
+		names = append(names, cc.Metadata.Name)
+		require.NotNil(t, cc.Image)
+		assert.Equal(t, "busybox", cc.Image.Image)
+		assert.NotEmpty(t, cc.LogPath)
+		assert.NotEmpty(t, cc.Labels)
+		assert.Equal(t, "called", cc.Annotations["test.kubernetes.io/pre-create"])
+	}
+	assert.Contains(t, names, "foo") // regular container from newTestPod
+	assert.Contains(t, names, "sidecar")
+	assert.NotContains(t, names, "completed-init")
+	assert.NotContains(t, names, "debugger")
+	assert.ElementsMatch(t, []string{"sidecar", "foo"}, lifecycle.preCreated)
+	assert.Equal(t, map[string]string{
+		"sidecar": "fake-restored-container-sidecar",
+		"foo":     "fake-restored-container-foo",
+	}, lifecycle.preStarted)
+	assert.Equal(t, 2, expectedStartedContainers)
+	runtimeHelper := m.runtimeHelper.(*containertest.FakeRuntimeHelper)
+	imageVolume := runtimeHelper.ContainerImageVolumes["foo"]["image-data"]
+	require.NotNil(t, imageVolume)
+	assert.Equal(t, "image-volume:latest", imageVolume.UserSpecifiedImage)
+	assert.Contains(t, fakeImage.Called, "PullImage")
+}
+
+func TestRestorePodSandboxCleansUpWhenPreStartFails(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	m.internalLifecycle = &recordingInternalContainerLifecycle{preStart: func(container *v1.Container, _ string) error {
+		return fmt.Errorf("reject %s", container.Name)
+	}}
+	pod := newTestPod()
+	pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint"}
+
+	_, _, err = m.restorePodSandbox(tCtx, pod, 0, nil)
+	require.ErrorContains(t, err, "reject")
+	assert.Contains(t, fakeRuntime.GetCalls(), "StopPodSandbox")
+	assert.Contains(t, fakeRuntime.GetCalls(), "RemovePodSandbox")
+	assert.NotContains(t, fakeRuntime.GetCalls(), "StartContainer")
+	assert.Empty(t, fakeRuntime.Sandboxes)
+	assert.Empty(t, fakeRuntime.Containers)
+}
+
+func TestGenerateContainerConfigForRestoreDoesNotInspectImageUser(t *testing.T) {
+	tests := []struct {
+		name      string
+		runAsUser *int64
+		wantErr   string
+	}{
+		{name: "checkpoint credentials are authoritative"},
+		{name: "explicit root is rejected", runAsUser: ptr.To[int64](0), wantErr: "runAsUser breaks non-root policy"},
+		{name: "explicit non-root is preserved", runAsUser: ptr.To[int64](1000)},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if runtime.GOOS == "windows" && tc.runAsUser != nil {
+				t.Skip("runAsUser non-root policy enforcement and config.GetLinux() are Linux-only")
+			}
+			tCtx := ktesting.Init(t)
+			_, fakeImage, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+			pod := newTestPod()
+			pod.Spec.Containers[0].SecurityContext = &v1.SecurityContext{
+				RunAsNonRoot: new(true),
+				RunAsUser:    tc.runAsUser,
+			}
+
+			config, cleanup, err := m.generateContainerConfigForRestore(tCtx, &pod.Spec.Containers[0], pod, 0, "", pod.Spec.Containers[0].Image, nil, nil)
+			if cleanup != nil {
+				defer cleanup()
+			}
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, config)
+				if tc.runAsUser != nil {
+					require.Equal(t, *tc.runAsUser, config.GetLinux().GetSecurityContext().GetRunAsUser().GetValue())
+				}
+			}
+			assert.NotContains(t, fakeImage.Called, "ImageStatus")
+		})
+	}
+}
+
+func TestValidateRestorePodResponse(t *testing.T) {
+	request := &runtimeapi.RestorePodRequest{ContainerConfigs: []*runtimeapi.ContainerConfig{
+		{Metadata: &runtimeapi.ContainerMetadata{Name: "sidecar"}},
+		{Metadata: &runtimeapi.ContainerMetadata{Name: "app"}},
+	}}
+	valid := func() *runtimeapi.RestorePodResponse {
+		return &runtimeapi.RestorePodResponse{
+			PodSandboxId: "sandbox-id",
+			RestoredContainers: []*runtimeapi.RestoredContainer{
+				{Name: "sidecar", ContainerId: "sidecar-id"},
+				{Name: "app", ContainerId: "app-id"},
+			},
+		}
+	}
+
+	tests := []struct {
+		name     string
+		response func() *runtimeapi.RestorePodResponse
+		wantErr  string
+	}{
+		{name: "valid", response: valid},
+		{name: "nil response", response: func() *runtimeapi.RestorePodResponse { return nil }, wantErr: "response is nil"},
+		{name: "empty sandbox ID", response: func() *runtimeapi.RestorePodResponse { r := valid(); r.PodSandboxId = ""; return r }, wantErr: "pod sandbox ID is empty"},
+		{name: "missing container", response: func() *runtimeapi.RestorePodResponse {
+			r := valid()
+			r.RestoredContainers = r.RestoredContainers[:1]
+			return r
+		}, wantErr: "count"},
+		{name: "nil container", response: func() *runtimeapi.RestorePodResponse { r := valid(); r.RestoredContainers[1] = nil; return r }, wantErr: "is nil"},
+		{name: "unexpected name", response: func() *runtimeapi.RestorePodResponse { r := valid(); r.RestoredContainers[1].Name = "other"; return r }, wantErr: "unexpected name"},
+		{name: "duplicate name", response: func() *runtimeapi.RestorePodResponse {
+			r := valid()
+			r.RestoredContainers[1].Name = "sidecar"
+			return r
+		}, wantErr: "duplicate name"},
+		{name: "empty container ID", response: func() *runtimeapi.RestorePodResponse {
+			r := valid()
+			r.RestoredContainers[1].ContainerId = ""
+			return r
+		}, wantErr: "empty container ID"},
+		{name: "duplicate container ID", response: func() *runtimeapi.RestorePodResponse {
+			r := valid()
+			r.RestoredContainers[1].ContainerId = "sidecar-id"
+			return r
+		}, wantErr: "duplicate container ID"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ids, err := validateRestorePodResponse(request, tc.response())
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, map[string]string{"sidecar": "sidecar-id", "app": "app-id"}, ids)
+		})
+	}
+}
+
+// TestAcquireReleaseRestore verifies the per-pod in-flight restore guard:
+// acquiring a key succeeds once, blocks a second acquire of the same key, is
+// independent across keys, and can be re-acquired after release. The key is the
+// pod's namespace/name (not UID), since each restore attempt is admitted under
+// a fresh pod UID.
+func TestAcquireReleaseRestore(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	const keyA, keyB = "ns/pod-a", "ns/pod-b"
+
+	assert.True(t, m.acquireRestore(keyA), "first acquire should succeed")
+	assert.False(t, m.acquireRestore(keyA), "second acquire of the same key should be rejected")
+	assert.True(t, m.acquireRestore(keyB), "a different key is independent")
+
+	m.releaseRestore(keyA)
+	assert.True(t, m.acquireRestore(keyA), "acquire after release should succeed")
+}
+
+// TestRestorePodSandboxRejectsConcurrentRestore verifies that restorePodSandbox
+// rejects a restore while one is already in flight for the same pod UID without
+// calling the runtime, and that the guard is released after a restore finishes.
+func TestRestorePodSandboxRejectsConcurrentRestore(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	pod := newTestPod()
+	pod.Spec.RestoreFrom = &v1.CheckpointReference{Name: "checkpoint-1"}
+	restoreKey := pod.Namespace + "/" + pod.Name
+
+	// Simulate a restore already running for this pod.
+	require.True(t, m.acquireRestore(restoreKey))
+
+	// A second restore for the same pod is rejected without reaching the runtime.
+	_, msg, err := m.restorePodSandbox(tCtx, pod, 0, nil)
+	require.Error(t, err)
+	assert.Contains(t, msg, "already in progress")
+	assert.Empty(t, fakeRuntime.RestoredPods)
+
+	// Once the in-flight restore completes, a new restore proceeds.
+	m.releaseRestore(restoreKey)
+	_, _, err = m.restorePodSandbox(tCtx, pod, 0, nil)
+	require.NoError(t, err)
+	require.Len(t, fakeRuntime.RestoredPods, 1)
+
+	// A successful restore releases the guard, so the pod can be acquired again.
+	assert.True(t, m.acquireRestore(restoreKey), "guard should be released after a successful restore")
 }
 
 func newTestPod() *v1.Pod {

@@ -320,6 +320,14 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/checkpoint/v1alpha1
+		gvr("checkpoint.k8s.io", "v1alpha1", "podcheckpoints"): {
+			Stub:              `{"metadata": {"name": "pc1"}, "spec": {"sourcePod": {"name": "pod1"}}}`,
+			ExpectedEtcdPath:  "/registry/podcheckpoints/" + namespace + "/pc1",
+			IntroducedVersion: "1.37",
+			RemovedVersion:    "1.43",
+		},
+
 		// k8s.io/kubernetes/pkg/apis/coordination/v1alpha2
 		gvr("coordination.k8s.io", "v1alpha2", "leasecandidates"): {
 			Stub:              `{"metadata": {"name": "leasecandidatev1alpha2"}, "spec": {"leaseName": "lease", "binaryVersion": "0.1.0", "emulationVersion": "0.1.0", "strategy": "OldestEmulationVersion"}}`,

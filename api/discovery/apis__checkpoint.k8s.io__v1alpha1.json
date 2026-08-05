@@ -1,0 +1,35 @@
+{
+  "apiVersion": "v1",
+  "groupVersion": "checkpoint.k8s.io/v1alpha1",
+  "kind": "APIResourceList",
+  "resources": [
+    {
+      "kind": "PodCheckpoint",
+      "name": "podcheckpoints",
+      "namespaced": true,
+      "singularName": "podcheckpoint",
+      "storageVersionHash": "SpE6xrCj7mw=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "PodCheckpoint",
+      "name": "podcheckpoints/status",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    }
+  ]
+}
