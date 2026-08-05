@@ -44,8 +44,8 @@ func TestNewBuilder(t *testing.T) {
 		wantedSchema      string
 		wantedItemsSchema string
 
-		v2                bool // produce OpenAPIv2
-		version           string
+		v2      bool // produce OpenAPIv2
+		version string
 	}{
 		{
 			"nil",
