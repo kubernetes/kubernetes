@@ -27,7 +27,6 @@ import (
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -827,7 +826,7 @@ func (m *mockSharedLister) PodGroupStates() fwk.PodGroupStateLister {
 	return m.podGroupStateLister
 }
 
-func TestGangSchedulingFlow(t *testing.T) {
+func TestPreEnqueue(t *testing.T) {
 	gangPodGroup1 := st.MakePodGroup().Namespace("ns1").Name("pg1").WorkloadRef("t1", "gang-wl").MinCount(3).Obj()
 	gangPodGroup2 := st.MakePodGroup().Namespace("ns1").Name("pg2").WorkloadRef("t2", "gang-wl").MinCount(4).Obj()
 	basicPodGroup := st.MakePodGroup().Namespace("ns1").Name("pg3").WorkloadRef("1", "basic-wl").BasicPolicy().Obj()
@@ -897,372 +896,199 @@ func TestGangSchedulingFlow(t *testing.T) {
 	p2_1 := st.MakePod().Namespace("ns1").Name("p2_1").UID("p2_1").PodGroupName("pg-basic-2").Obj()
 
 	type testCase struct {
-		name                            string
-		pod                             *v1.Pod
-		initialPods                     []*v1.Pod
-		initialPodGroups                []*schedulingv1beta1.PodGroup
-		initialCompositePodGroups       []*schedulingv1alpha3.CompositePodGroup
-		podsWaitingOnPermit             []*v1.Pod
-		isDuringPodGroupSchedulingCycle bool
-		isCompositePodGroupEnabled      bool
-		wantPreEnqueueStatus            *fwk.Status
-		wantPermitStatus                *fwk.Status
-		wantActivatedPods               []*v1.Pod
-		wantAllowedPods                 []types.UID
+		name                       string
+		pod                        *v1.Pod
+		initialPods                []*v1.Pod
+		initialPodGroups           []*schedulingv1beta1.PodGroup
+		initialCompositePodGroups  []*schedulingv1alpha3.CompositePodGroup
+		isCompositePodGroupEnabled []bool
+		wantPreEnqueueStatus       *fwk.Status
 	}
 	baseTests := []testCase{
 		{
-			name:                       "non-gang pod succeeds immediately (CPG=false)",
-			pod:                        nonGangPod,
-			isCompositePodGroupEnabled: false,
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{gangPodGroup1, gangPodGroup2, basicPodGroup},
-			wantPreEnqueueStatus:       nil,
-			wantPermitStatus:           nil,
+			name:                 "non-gang pod succeeds immediately",
+			pod:                  nonGangPod,
+			initialPodGroups:     []*schedulingv1beta1.PodGroup{gangPodGroup1, gangPodGroup2, basicPodGroup},
+			wantPreEnqueueStatus: nil,
 		},
 		{
-			name:                       "non-gang pod succeeds immediately (CPG=true)",
-			pod:                        nonGangPod,
-			isCompositePodGroupEnabled: true,
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{gangPodGroup1, gangPodGroup2, basicPodGroup},
-			wantPreEnqueueStatus:       nil,
-			wantPermitStatus:           nil,
+			name:                 "basic policy pod succeeds immediately",
+			pod:                  basicPolicyPod,
+			initialPodGroups:     []*schedulingv1beta1.PodGroup{gangPodGroup1, gangPodGroup2, basicPodGroup},
+			wantPreEnqueueStatus: nil,
 		},
 		{
-			name:                       "basic policy pod succeeds immediately (CPG=false)",
-			pod:                        basicPolicyPod,
-			isCompositePodGroupEnabled: false,
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{gangPodGroup1, gangPodGroup2, basicPodGroup},
-			wantPreEnqueueStatus:       nil,
-			wantPermitStatus:           nil,
-		},
-		{
-			name:                       "basic policy pod succeeds immediately (CPG=true)",
-			pod:                        basicPolicyPod,
-			isCompositePodGroupEnabled: true,
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{gangPodGroup1, gangPodGroup2, basicPodGroup},
-			wantPreEnqueueStatus:       nil,
-			wantPermitStatus:           nil,
-		},
-		{
-			name:                       "gang pod fails PreEnqueue when pod group is not yet created (CPG=false)",
+			name:                       "gang pod fails PreEnqueue when pod group is not yet created",
 			pod:                        p1,
-			isCompositePodGroupEnabled: false,
+			isCompositePodGroupEnabled: []bool{false},
 			initialPods:                []*v1.Pod{p2, p3, p4, p5},
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{},
 			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `waiting for pods's pod group "pg1" to appear in scheduling queue`),
 		},
 		{
-			name:                       "gang pod fails PreEnqueue when pod group is not yet created (CPG=true)",
+			name:                       "gang pod fails PreEnqueue when pod group is not yet created",
 			pod:                        p1,
-			isCompositePodGroupEnabled: true,
+			isCompositePodGroupEnabled: []bool{true},
 			initialPods:                []*v1.Pod{p2, p3, p4, p5},
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{},
 			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "failed to build hierarchy snapshot: pod group object not found in state for podgroup/ns1/pg1"),
 		},
 		{
-			name:                       "gang pod fails PreEnqueue when quorum is not met (CPG=false)",
-			pod:                        p1,
-			isCompositePodGroupEnabled: false,
-			initialPods:                []*v1.Pod{p2, p4, p5},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{gangPodGroup1, gangPodGroup2},
-			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for minCount pods from a gang to appear in scheduling queue"),
+			name:                 "gang pod fails PreEnqueue when quorum is not met",
+			pod:                  p1,
+			initialPods:          []*v1.Pod{p2, p4, p5},
+			initialPodGroups:     []*schedulingv1beta1.PodGroup{gangPodGroup1, gangPodGroup2},
+			wantPreEnqueueStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for minCount pods from a gang to appear in scheduling queue"),
 		},
 		{
-			name:                       "gang pod fails PreEnqueue when quorum is not met (CPG=true)",
-			pod:                        p1,
-			isCompositePodGroupEnabled: true,
-			initialPods:                []*v1.Pod{p2, p4, p5},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{gangPodGroup1, gangPodGroup2},
-			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for minCount pods from a gang to appear in scheduling queue"),
+			name:                 "gang pod passes PreEnqueue",
+			pod:                  p1,
+			initialPods:          []*v1.Pod{p2, p3, p4, p5},
+			initialPodGroups:     []*schedulingv1beta1.PodGroup{gangPodGroup1, gangPodGroup2},
+			wantPreEnqueueStatus: nil,
 		},
 		{
-			name:                       "gang pod passes PreEnqueue, but waits at Permit (CPG=false)",
-			pod:                        p1,
-			isCompositePodGroupEnabled: false,
-			initialPods:                []*v1.Pod{p2, p3, p4, p5},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{gangPodGroup1, gangPodGroup2},
-			podsWaitingOnPermit:        []*v1.Pod{p2, p4, p5},
-			wantPreEnqueueStatus:       nil,
-			wantActivatedPods:          []*v1.Pod{p3},
-			wantPermitStatus:           fwk.NewStatus(fwk.Wait, "waiting for minCount pods from a gang to be scheduled"),
-		},
-		{
-			name:                       "gang pod passes PreEnqueue, but waits at Permit (CPG=true)",
-			pod:                        p1,
-			isCompositePodGroupEnabled: true,
-			initialPods:                []*v1.Pod{p2, p3, p4, p5},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{gangPodGroup1, gangPodGroup2},
-			podsWaitingOnPermit:        []*v1.Pod{p2, p4, p5},
-			wantPreEnqueueStatus:       nil,
-			wantActivatedPods:          []*v1.Pod{p3},
-			wantPermitStatus:           fwk.NewStatus(fwk.Wait, "waiting for minCount pods from a gang to be scheduled"),
-		},
-		{
-			name:                       "final gang pod arrives at Permit and allows all waiting pods from a gang (CPG=false)",
-			pod:                        p1,
-			isCompositePodGroupEnabled: false,
-			initialPods:                []*v1.Pod{p2, p3, p4, p5},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{gangPodGroup1, gangPodGroup2},
-			podsWaitingOnPermit:        []*v1.Pod{p2, p3, p4, p5},
-			wantPreEnqueueStatus:       nil,
-			wantPermitStatus:           nil,
-			wantAllowedPods:            []types.UID{"p1", "p2", "p3"},
-		},
-		{
-			name:                       "final gang pod arrives at Permit and allows all waiting pods from a gang (CPG=true)",
-			pod:                        p1,
-			isCompositePodGroupEnabled: true,
-			initialPods:                []*v1.Pod{p2, p3, p4, p5},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{gangPodGroup1, gangPodGroup2},
-			podsWaitingOnPermit:        []*v1.Pod{p2, p3, p4, p5},
-			wantPreEnqueueStatus:       nil,
-			wantPermitStatus:           nil,
-			wantAllowedPods:            []types.UID{"p1", "p2", "p3"},
-		},
-		{
-			name:                       "CPG Hierarchical Stage 1: No pods, tree not ready (CPG=true)",
+			name:                       "CPG Hierarchical Stage 1: No pods, tree not ready",
 			pod:                        p1CPG,
-			isCompositePodGroupEnabled: true,
+			isCompositePodGroupEnabled: []bool{true},
 			initialPods:                []*v1.Pod{},
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1, pg2, pg3, pg4, pg5, pg6, pg7},
 			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
 			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for composite pod group \"cpg-root\" tree to meet quorum"),
 		},
 		{
-			name:                       "CPG Hierarchical Stage 1: No pods, tree not ready (CPG=false)",
+			name:                       "CPG Hierarchical Stage 1: No pods, ready, as CPGs are ignored",
 			pod:                        p1CPG,
-			isCompositePodGroupEnabled: false,
+			isCompositePodGroupEnabled: []bool{false},
 			initialPods:                []*v1.Pod{},
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1, pg2, pg3, pg4, pg5, pg6, pg7},
 			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
 			wantPreEnqueueStatus:       nil,
-			wantPermitStatus:           nil,
 		},
 		{
-			name:                       "CPG Hierarchical Stage 2: Add p6, cpg-sub1 ready but root not ready (CPG=true)",
+			name:                       "CPG Hierarchical Stage 2: Add p6, cpg-sub1 ready but root not ready",
 			pod:                        p6CPG,
-			isCompositePodGroupEnabled: true,
+			isCompositePodGroupEnabled: []bool{true},
 			initialPods:                []*v1.Pod{p1CPG, p2CPG},
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1, pg2, pg3, pg4, pg5, pg6, pg7},
 			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
 			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for composite pod group \"cpg-root\" tree to meet quorum"),
 		},
 		{
-			name:                       "CPG Hierarchical Stage 2: Add p6 (CPG=false)",
+			name:                       "CPG Hierarchical Stage 2: Add p6, already ready",
 			pod:                        p6CPG,
-			isCompositePodGroupEnabled: false,
+			isCompositePodGroupEnabled: []bool{false},
 			initialPods:                []*v1.Pod{p1CPG, p2CPG},
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1, pg2, pg3, pg4, pg5, pg6, pg7},
 			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
 			wantPreEnqueueStatus:       nil,
-			wantPermitStatus:           nil,
 		},
 		{
-			name:                       "CPG Hierarchical Stage 3: Add p4, root becomes ready (CPG=true)",
+			name:                       "CPG Hierarchical Stage 3: Add p4, root becomes ready",
 			pod:                        p4CPG,
-			isCompositePodGroupEnabled: true,
-			initialPods:                []*v1.Pod{p1CPG, p2CPG, p6CPG},
-			podsWaitingOnPermit:        []*v1.Pod{p1CPG, p2CPG, p6CPG},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1, pg2, pg3, pg4, pg5, pg6, pg7},
-			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
-			wantPreEnqueueStatus:       nil,
-			wantPermitStatus:           nil,
-		},
-		{
-			name:                       "CPG Hierarchical Stage 3: Add p4 (CPG=false)",
-			pod:                        p4CPG,
-			isCompositePodGroupEnabled: false,
+			isCompositePodGroupEnabled: []bool{true},
 			initialPods:                []*v1.Pod{p1CPG, p2CPG, p6CPG},
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1, pg2, pg3, pg4, pg5, pg6, pg7},
 			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
 			wantPreEnqueueStatus:       nil,
 		},
 		{
-			name:                       "CPG Basic With Gang Stage 1: pg1 ready, root ready (CPG=true)",
+			name:                       "CPG Hierarchical Stage 3: Add p4, already ready",
+			pod:                        p4CPG,
+			isCompositePodGroupEnabled: []bool{false},
+			initialPods:                []*v1.Pod{p1CPG, p2CPG, p6CPG},
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1, pg2, pg3, pg4, pg5, pg6, pg7},
+			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
+			wantPreEnqueueStatus:       nil,
+		},
+		{
+			name:                       "CPG Basic With Gang Stage 1: pg1 ready, root ready",
 			pod:                        p2_1,
-			isCompositePodGroupEnabled: true,
+			isCompositePodGroupEnabled: []bool{true},
 			initialPods:                []*v1.Pod{p1_1, p1_2},
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pgBasic1, pgBasic2},
 			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgBasicRoot},
 			wantPreEnqueueStatus:       nil,
-			wantPermitStatus:           fwk.NewStatus(fwk.Wait, "waiting for composite pod group \"cpg-basic-root\" tree to meet quorum"),
 		},
 		{
-			name:                       "CPG Basic With Gang Stage 1: pg1 ready, root ready (CPG=false)",
+			name:                       "CPG Basic With Gang Stage 1: pg1 ready, root ready, pg2 not ready",
 			pod:                        p2_1,
-			isCompositePodGroupEnabled: false,
+			isCompositePodGroupEnabled: []bool{false},
 			initialPods:                []*v1.Pod{p1_1, p1_2},
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pgBasic1, pgBasic2},
 			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgBasicRoot},
 			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for minCount pods from a gang to appear in scheduling queue"),
-		},
-		{
-			name:                       "CPG Permit Wait: Hierarchical gang waits at permit if gang isn't fully scheduled (CPG=true)",
-			pod:                        p4CPG,
-			isCompositePodGroupEnabled: true,
-			initialPods:                []*v1.Pod{p1CPG, p2CPG, p6CPG},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1, pg2, pg3, pg4, pg5, pg6, pg7},
-			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
-			wantPreEnqueueStatus:       nil,
-			wantPermitStatus:           fwk.NewStatus(fwk.Wait, "waiting for composite pod group \"cpg-root\" tree to meet quorum"),
-		},
-		{
-			name:                       "CPG Permit Wait: Hierarchical gang waits at permit if gang isn't fully scheduled (CPG=false)",
-			pod:                        p4CPG,
-			isCompositePodGroupEnabled: false,
-			initialPods:                []*v1.Pod{p1CPG, p2CPG, p6CPG},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1, pg2, pg3, pg4, pg5, pg6, pg7},
-			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
-			wantPreEnqueueStatus:       nil,
-			wantPermitStatus:           nil,
 		},
 	}
 
 	for _, tt := range baseTests {
-		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
-			if tt.isCompositePodGroupEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareWorkloadScheduling, true)
-			}
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CompositePodGroup, tt.isCompositePodGroupEnabled)
-			logger, ctx := ktesting.NewTestContext(t)
-			cache := internalcache.New(ctx, nil, true, tt.isCompositePodGroupEnabled)
+		isCompositePodGroupEnabled := []bool{true, false}
+		if len(tt.isCompositePodGroupEnabled) > 0 {
+			isCompositePodGroupEnabled = tt.isCompositePodGroupEnabled
+		}
+		for _, isCPGEnabled := range isCompositePodGroupEnabled {
+			t.Run(fmt.Sprintf("%s (CPG enabled: %v)", tt.name, isCPGEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.GenericWorkload:                 true,
+					features.TopologyAwareWorkloadScheduling: isCPGEnabled,
+					features.CompositePodGroup:               isCPGEnabled,
+				})
+				logger, ctx := ktesting.NewTestContext(t)
+				cache := internalcache.New(ctx, nil, true, isCPGEnabled)
 
-			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(), 0)
-			podGroupInformer := informerFactory.Scheduling().V1beta1().PodGroups()
-			if tt.isCompositePodGroupEnabled {
-				informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer()
-			}
-			fakeActivator := &podActivatorMock{}
-			snapshot := internalcache.NewEmptySnapshot()
-			fh, err := frameworkruntime.NewFramework(ctx, nil, nil,
-				frameworkruntime.WithInformerFactory(informerFactory),
-				frameworkruntime.WithPodGroupManager(cache),
-				frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
-				frameworkruntime.WithPodActivator(fakeActivator),
-				frameworkruntime.WithSnapshotSharedLister(snapshot),
-			)
-			if err != nil {
-				t.Fatalf("Failed to create framework: %v", err)
-			}
-
-			// Populate informers and manager state for the test case.
-			for _, pg := range tt.initialPodGroups {
-				err := podGroupInformer.Informer().GetStore().Add(pg)
-				if err != nil {
-					t.Fatalf("Failed to add podGroup %s to store: %v", pg.Name, err)
+				informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(), 0)
+				podGroupInformer := informerFactory.Scheduling().V1beta1().PodGroups()
+				if isCPGEnabled {
+					informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer()
 				}
-				cache.AddPodGroup(pg)
-			}
-			if tt.isCompositePodGroupEnabled {
-				for _, cpg := range tt.initialCompositePodGroups {
-					err := informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer().GetStore().Add(cpg)
+				fakeActivator := &podActivatorMock{}
+				snapshot := internalcache.NewEmptySnapshot()
+				fh, err := frameworkruntime.NewFramework(ctx, nil, nil,
+					frameworkruntime.WithInformerFactory(informerFactory),
+					frameworkruntime.WithPodGroupManager(cache),
+					frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+					frameworkruntime.WithPodActivator(fakeActivator),
+					frameworkruntime.WithSnapshotSharedLister(snapshot),
+				)
+				if err != nil {
+					t.Fatalf("Failed to create framework: %v", err)
+				}
+
+				// Populate informers and manager state for the test case.
+				for _, pg := range tt.initialPodGroups {
+					err := podGroupInformer.Informer().GetStore().Add(pg)
 					if err != nil {
-						t.Fatalf("Failed to add cpg %s to store: %v", cpg.Name, err)
+						t.Fatalf("Failed to add podGroup %s to store: %v", pg.Name, err)
 					}
-					cache.AddCompositePodGroup(logger, cpg)
+					cache.AddPodGroup(pg)
 				}
-			}
-
-			for _, p := range tt.initialPods {
-				cache.AddPodGroupMember(p)
-			}
-			cache.AddPodGroupMember(tt.pod)
-
-			p, err := New(ctx, nil, fh, feature.Features{EnableGenericWorkload: true, EnableCompositePodGroup: tt.isCompositePodGroupEnabled})
-			if err != nil {
-				t.Fatalf("Failed to create plugin: %v", err)
-			}
-			pl := p.(*GangScheduling)
-
-			gotPreEnqueueStatus := pl.PreEnqueue(ctx, tt.pod)
-			if diff := cmp.Diff(tt.wantPreEnqueueStatus, gotPreEnqueueStatus); diff != "" {
-				t.Fatalf("Unexpected PreEnqueue status (-want,+got):\n%s", diff)
-			}
-			if !gotPreEnqueueStatus.IsSuccess() {
-				// Pod is rejected.
-				return
-			}
-
-			if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
-				t.Fatalf("Failed to update snapshot: %v", err)
-			}
-
-			// Simulate that other pods have already hit Permit and are now waiting.
-			for _, p := range tt.podsWaitingOnPermit {
-				pod := p.DeepCopy()
-				pod.Spec.NodeName = "some-node"
-				if err := cache.AssumePod(logger, pod); err != nil {
-					t.Fatalf("Failed to assume pod %q: %v", pod.Name, err)
+				if isCPGEnabled {
+					for _, cpg := range tt.initialCompositePodGroups {
+						err := informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer().GetStore().Add(cpg)
+						if err != nil {
+							t.Fatalf("Failed to add cpg %s to store: %v", cpg.Name, err)
+						}
+						cache.AddCompositePodGroup(logger, cpg)
+					}
 				}
-				status, _ := pl.Permit(ctx, schedulerframework.NewCycleState(), pod, "some-node")
-				if status.Code() != fwk.Wait {
-					t.Fatalf("Expected Wait status while permitting a pod %q: %v", pod.Name, status)
+
+				for _, p := range tt.initialPods {
+					cache.AddPodGroupMember(p)
 				}
-			}
+				cache.AddPodGroupMember(tt.pod)
 
-			// Clear activated pods to assert those activated in tt.pod Permit.
-			fakeActivator.activatedPods = nil
-
-			cycleState := schedulerframework.NewCycleState()
-			if tt.isDuringPodGroupSchedulingCycle {
-				cycleState.SetPodGroupSchedulingCycle(cycleState)
-			}
-
-			pod := tt.pod.DeepCopy()
-			pod.Spec.NodeName = "some-node"
-
-			// In a pod group scheduling cycle, a snapshot is taken after all
-			// waiting pods are assumed, so that Permit can read from it.
-			if tt.isDuringPodGroupSchedulingCycle {
-				if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
-					t.Fatalf("Failed to update snapshot: %v", err)
-				}
-				podInfo, err := schedulerframework.NewPodInfo(pod)
+				p, err := New(ctx, nil, fh, feature.Features{EnableGenericWorkload: true, EnableCompositePodGroup: isCPGEnabled})
 				if err != nil {
-					t.Fatalf("Failed to create pod info for %q: %v", pod.Name, err)
+					t.Fatalf("Failed to create plugin: %v", err)
 				}
-				// Assume pod in the snapshot, as in a pod group scheduling cycle.
-				if err := snapshot.AssumePod(podInfo); err != nil {
-					t.Fatalf("Failed to assume pod %q in snapshot: %v", pod.Name, err)
-				}
-			} else {
-				// Assume pod in the cache, as in a pod-by-pod scheduling cycle, where Permit reads from cache.
-				if err := cache.AssumePod(logger, pod); err != nil {
-					t.Fatalf("Failed to assume pod %q in cache: %v", pod.Name, err)
-				}
-				if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
-					t.Fatalf("Failed to update snapshot: %v", err)
-				}
-			}
+				pl := p.(*GangScheduling)
 
-			gotPermitStatus, _ := pl.Permit(ctx, cycleState, pod, "some-node")
-			if diff := cmp.Diff(tt.wantPermitStatus, gotPermitStatus); diff != "" {
-				t.Fatalf("Unexpected Permit status (-want, +got):\n%s", diff)
-			}
-			if gotPermitStatus.Code() == fwk.Wait {
-				// Pod waits for others from a gang. Simulate its eventual forget.
-				if tt.isDuringPodGroupSchedulingCycle {
-					if err := snapshot.ForgetPod(logger, pod); err != nil {
-						t.Fatalf("Failed to forget pod %q from snapshot: %v", pod.Name, err)
-					}
-				} else {
-					if err := cache.ForgetPod(logger, pod); err != nil {
-						t.Fatalf("Failed to forget pod %q from cache: %v", pod.Name, err)
-					}
+				gotPreEnqueueStatus := pl.PreEnqueue(ctx, tt.pod)
+				if diff := cmp.Diff(tt.wantPreEnqueueStatus, gotPreEnqueueStatus); diff != "" {
+					t.Fatalf("Unexpected PreEnqueue status (-want,+got):\n%s", diff)
 				}
-				return
-			}
-
-			if diff := cmp.Diff(tt.wantActivatedPods, fakeActivator.activatedPods); diff != "" {
-				t.Errorf("Unexpected activated pods (-want, +got):\n%s", diff)
-			}
-			for _, p := range tt.wantAllowedPods {
-				if wp := fh.GetWaitingPod(p); wp != nil {
-					t.Errorf("Expected pod %q to be allowed", p)
-				}
-			}
-		})
+			})
+		}
 	}
 }
 

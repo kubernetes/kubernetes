@@ -53,6 +53,11 @@ func RegisterQueueSortPlugin(pluginName string, pluginNewFunc runtime.PluginFact
 	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "QueueSort")
 }
 
+// RegisterPreEnqueuePlugin returns a function to register a PreEnqueue Plugin to a given registry.
+func RegisterPreEnqueuePlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
+	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "PreEnqueue")
+}
+
 // RegisterPreFilterPlugin returns a function to register a PreFilter Plugin to a given registry.
 func RegisterPreFilterPlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
 	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "PreFilter")
@@ -145,6 +150,8 @@ func getPluginSetByExtension(plugins *schedulerapi.Plugins, extension string) *s
 	switch extension {
 	case "QueueSort":
 		return &plugins.QueueSort
+	case "PreEnqueue":
+		return &plugins.PreEnqueue
 	case "Filter":
 		return &plugins.Filter
 	case "PostFilter":

@@ -4202,8 +4202,7 @@ func TestCPGSchedulingPlacementAlgorithm_Scoring(t *testing.T) {
 				tf.RegisterFilterPlugin(placementPlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 					return &placementPlugin, nil
 				}),
-				tf.RegisterPermitPlugin(gangscheduling.Name, gangPluginFactory),
-				tf.RegisterPluginAsExtensions(gangscheduling.Name, gangPluginFactory, "PlacementFeasible"),
+				tf.RegisterPreEnqueuePlugin(gangscheduling.Name, gangPluginFactory),
 			}
 
 			for i, placementScorePluginData := range tt.pluginData {
@@ -4991,8 +4990,7 @@ func TestCPGHierarchicalScheduling_Internal(t *testing.T) {
 		}),
 		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-		tf.RegisterPermitPlugin(gangscheduling.Name, gangPluginFactory),
-		tf.RegisterPluginAsExtensions(gangscheduling.Name, gangPluginFactory, "PlacementFeasible"),
+		tf.RegisterPreEnqueuePlugin(gangscheduling.Name, gangPluginFactory),
 	}
 
 	clientObjs := []runtime.Object{testNode, rootCPG, cpgSub1, cpgSub2, cpgSub3, pg1, pg2, pg3, pg4, pg5, pg6, pg7}
@@ -5228,8 +5226,7 @@ func TestCPGMinGroupCount_Internal(t *testing.T) {
 		}),
 		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-		tf.RegisterPermitPlugin(gangscheduling.Name, gangPluginFactory),
-		tf.RegisterPluginAsExtensions(gangscheduling.Name, gangPluginFactory, "PlacementFeasible"),
+		tf.RegisterPreEnqueuePlugin(gangscheduling.Name, gangPluginFactory),
 	}
 
 	queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
@@ -5455,8 +5452,7 @@ func TestCPGBasicWithGangChildren_Internal(t *testing.T) {
 		}),
 		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-		tf.RegisterPermitPlugin(gangscheduling.Name, gangPluginFactory),
-		tf.RegisterPluginAsExtensions(gangscheduling.Name, gangPluginFactory, "PlacementFeasible"),
+		tf.RegisterPreEnqueuePlugin(gangscheduling.Name, gangPluginFactory),
 	}
 
 	queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
