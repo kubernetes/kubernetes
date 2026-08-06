@@ -73,6 +73,12 @@ const (
 	// "application/apply-patch+yaml".
 	ClientsPreferCBOR Feature = "ClientsPreferCBOR"
 
+	// owner: @serathius
+	// beta: v1.36
+	//
+	// Enables concurrent watch object decoding while preserving watch event order.
+	ConcurrentWatchObjectDecode Feature = "ConcurrentWatchObjectDecode"
+
 	// owner: @deads2k
 	// beta: v1.33
 	//
@@ -123,6 +129,9 @@ var defaultVersionedKubernetesFeatureGates = map[Feature]VersionedSpecs{
 	},
 	ClientsPreferCBOR: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: Alpha},
+	},
+	ConcurrentWatchObjectDecode: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: Beta},
 	},
 	InOrderInformers: {
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: Beta},
