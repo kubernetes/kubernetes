@@ -377,6 +377,39 @@ func TestListWithNoFixturesAndTypedScheme(t *testing.T) {
 	}
 }
 
+func TestListWithVowelYKindAndTypedScheme(t *testing.T) {
+	gvr := schema.GroupVersionResource{Group: "gateway.networking.k8s.io", Version: "v1", Resource: "gateways"}
+	gvk := gvr.GroupVersion().WithKind("Gateway")
+
+	listGVK := gvk
+	listGVK.Kind += "List"
+
+	u := unstructured.Unstructured{}
+	u.SetGroupVersionKind(gvk)
+	u.SetName("name")
+	u.SetNamespace("namespace")
+
+	typedScheme := runtime.NewScheme()
+	typedScheme.AddKnownTypeWithName(gvk, &mockResource{})
+	typedScheme.AddKnownTypeWithName(listGVK, &mockResourceList{})
+
+	client := NewSimpleDynamicClient(typedScheme, &u)
+	list, err := client.Resource(gvr).Namespace("namespace").List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal("error listing", err)
+	}
+
+	expectedList := &unstructured.UnstructuredList{}
+	expectedList.SetGroupVersionKind(listGVK)
+	expectedList.SetResourceVersion("2") // One object created so far, initial value is 1.
+	expectedList.SetContinue("")
+	expectedList.Items = append(expectedList.Items, u)
+
+	if diff := cmp.Diff(expectedList, list); diff != "" {
+		t.Fatal("unexpected diff (-want, +got): ", diff)
+	}
+}
+
 // This test ensures list works when the dynamic client is seeded with an empty scheme and
 // unstructured typed fixtures
 func TestListWithNoScheme(t *testing.T) {
