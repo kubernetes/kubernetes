@@ -724,8 +724,13 @@ func (p *staticPolicy) allocateCPUs(logger klog.Logger, s state.State, numCPUs i
 	result.CPUs = result.CPUs.Union(remainingCPUs)
 	result.Aligned = p.topology.CheckAlignment(result.CPUs)
 
+	updatedDefaultCPUSet := s.GetDefaultCPUSet().Difference(result.CPUs)
+	if p.options.StrictCPUReservation && updatedDefaultCPUSet.IsEmpty() {
+		return topology.EmptyAllocation(), fmt.Errorf("exclusive CPU allocation would empty the shared CPU pool")
+	}
+
 	// Remove allocated CPUs from the shared CPUSet.
-	s.SetDefaultCPUSet(s.GetDefaultCPUSet().Difference(result.CPUs))
+	s.SetDefaultCPUSet(updatedDefaultCPUSet)
 
 	logger.Info("AllocateCPUs", "result", result.String())
 	return result, nil
