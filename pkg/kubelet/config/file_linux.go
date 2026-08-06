@@ -19,6 +19,7 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -46,16 +47,17 @@ func (e *retryableError) Error() string {
 	return e.message
 }
 
-func (s *sourceFile) startWatch(logger klog.Logger) {
+func (s *sourceFile) startWatch(ctx context.Context) {
+	logger := klog.FromContext(ctx)
 	backOff := flowcontrol.NewBackOff(retryPeriod, maxRetryPeriod)
 	backOffID := "watch"
 
-	go wait.Forever(func() {
+	go wait.UntilWithContext(ctx, func(ctx context.Context) {
 		if backOff.IsInBackOffSinceUpdate(backOffID, time.Now()) {
 			return
 		}
 
-		if err := s.doWatch(logger); err != nil {
+		if err := s.doWatch(ctx); err != nil {
 			logger.Error(err, "Unable to read config path", "path", s.path)
 			if _, retryable := err.(*retryableError); !retryable {
 				backOff.Next(backOffID, time.Now())
@@ -64,7 +66,8 @@ func (s *sourceFile) startWatch(logger klog.Logger) {
 	}, retryPeriod)
 }
 
-func (s *sourceFile) doWatch(logger klog.Logger) error {
+func (s *sourceFile) doWatch(ctx context.Context) error {
+	logger := klog.FromContext(ctx)
 	_, err := os.Stat(s.path)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -88,6 +91,8 @@ func (s *sourceFile) doWatch(logger klog.Logger) error {
 
 	for {
 		select {
+		case <-ctx.Done():
+			return nil
 		case event := <-w.Events:
 			if err = s.produceWatchEvent(logger, &event); err != nil {
 				return fmt.Errorf("error while processing inotify event (%+v): %v", event, err)
