@@ -19,6 +19,7 @@ package prober
 import (
 	"context"
 	"math/rand"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -71,6 +72,11 @@ type worker struct {
 
 	// If set, skip probing.
 	onHold bool
+
+	// startOnce guards against starting this worker's run() goroutine more
+	// than once if multiple call sites race to start the same worker.
+	startOnce sync.Once
+	started   bool
 
 	// proberResultsMetricLabels holds the labels attached to this worker
 	// for the ProberResults metric by result.
@@ -152,6 +158,15 @@ func newWorker(
 	w.proberDurationUnknownMetricLabels = deepCopyPrometheusLabels(proberDurationLabels)
 
 	return w
+}
+
+// Start begins this worker's probe loop exactly once. Safe to call more
+// than once or from multiple goroutines — only the first call has effect.
+func (w *worker) Start(ctx context.Context) {
+	w.startOnce.Do(func() {
+		w.started = true
+		go w.run(ctx)
+	})
 }
 
 // run periodically probes the container.
