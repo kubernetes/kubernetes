@@ -18,6 +18,7 @@ package protobuf
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -60,10 +61,13 @@ func (e errNotMarshalable) Status() metav1.Status {
 	}
 }
 
-// IsNotMarshalable checks the type of error, returns a boolean true if error is not nil and not marshalable false otherwise
+// IsNotMarshalable checks the type of error, returns a boolean true if error is not nil and not marshalable false otherwise.
 func IsNotMarshalable(err error) bool {
-	_, ok := err.(errNotMarshalable)
-	return err != nil && ok
+	if err == nil {
+		return false
+	}
+	var target errNotMarshalable
+	return errors.As(err, &target)
 }
 
 // NewSerializer creates a Protobuf serializer that handles encoding versioned objects into the proper wire form. If a typer
