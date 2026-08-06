@@ -33,7 +33,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -113,14 +112,6 @@ func testResourceSliceFieldSelectors(tCtx ktesting.TContext) {
 			poolNameField: resourceapi.ResourceSliceSelectorPoolName,
 			list: func(tCtx ktesting.TContext, options metav1.ListOptions) (runtime.Object, error) {
 				return tCtx.Client().ResourceV1().ResourceSlices().List(tCtx, options)
-			},
-		},
-		"v1beta1": {
-			driverField:   resourcev1beta1.ResourceSliceSelectorDriver,
-			nodeNameField: resourcev1beta1.ResourceSliceSelectorNodeName,
-			poolNameField: resourcev1beta1.ResourceSliceSelectorPoolName,
-			list: func(tCtx ktesting.TContext, options metav1.ListOptions) (runtime.Object, error) {
-				return tCtx.Client().ResourceV1beta1().ResourceSlices().List(tCtx, options)
 			},
 		},
 		"v1beta2": {

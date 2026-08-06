@@ -28,7 +28,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
-	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -262,21 +261,6 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, false) })
 			},
 		},
-		"v1beta1": {
-			apis: map[schema.GroupVersion]bool{
-				resourceapi.SchemeGroupVersion:     false,
-				resourcev1beta1.SchemeGroupVersion: true,
-			},
-			features: map[featuregate.Feature]bool{
-				features.DynamicResourceAllocation:    true,
-				features.DRADeviceCompatibilityGroups: true,
-			},
-			f: func(tCtx ktesting.TContext) {
-				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
-					testPublishResourceSlices(tCtx, false, features.DRAOptionalNodeOperations)
-				})
-			},
-		},
 		"v1beta2": {
 			apis: map[schema.GroupVersion]bool{
 				resourceapi.SchemeGroupVersion:     false,
@@ -295,7 +279,6 @@ func run(tCtx ktesting.TContext, whatRE string) {
 		},
 		"all": {
 			apis: map[schema.GroupVersion]bool{
-				resourcev1beta1.SchemeGroupVersion:  true,
 				resourcev1beta2.SchemeGroupVersion:  true,
 				resourcealphaapi.SchemeGroupVersion: true,
 				schedulingapi.SchemeGroupVersion:    true,
