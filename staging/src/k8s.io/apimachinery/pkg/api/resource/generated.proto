@@ -45,17 +45,18 @@ option go_package = "k8s.io/apimachinery/pkg/api/resource";
 //
 // 	(International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)
 //
-// <decimalSI>       ::= m | "" | k | M | G | T | P | E
+// <decimalSI>       ::= n | u | m | "" | k | M | G | T | P | E
 //
 // 	(Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)
+// 	(u is the ASCII stand-in for the SI micro prefix, µ: 1u = 10^-6.)
 //
 // <decimalExponent> ::= "e" <signedNumber> | "E" <signedNumber>
 // ```
 //
 // No matter which of the three exponent forms is used, no quantity may represent
-// a number greater than 2^63-1 in magnitude, nor may it have more than 3 decimal
+// a number greater than 2^63-1 in magnitude, nor may it have more than 9 decimal
 // places. Numbers larger or more precise will be capped or rounded up.
-// (E.g.: 0.1m will rounded up to 1m.)
+// (E.g.: 0.1n will be rounded up to 1n.)
 // This may be extended in the future if we require larger or smaller quantities.
 //
 // When a Quantity is parsed from a string, it will remember the type of suffix
