@@ -907,6 +907,39 @@ function indent() {
     done
 }
 
+function codegen::unversioned() {
+    kube::log::status "Generating unversioned helpers"
+
+    # Build the generator
+    go -C "${KUBE_ROOT}/hack/tools" install ./unversioned-helper-gen
+
+    # Find tagged files
+    local tagged_files=()
+    kube::util::read-array tagged_files < <(
+        grep -l --null '+k8s:unversioned-gen=' "${ALL_K8S_TAG_FILES[@]}" \
+            | while read -r -d $'\0' F; do echo "${F}"; done
+    )
+
+    if [[ "${#tagged_files[@]}" -eq 0 ]]; then
+        return
+    fi
+
+    local output_dirs=()
+    for file in "${tagged_files[@]}"; do
+        local out_dir
+        out_dir=$(unversioned-helper-gen -input-file="${file}")
+        output_dirs+=("${out_dir}")
+    done
+
+    # Get unique output dirs
+    local unique_dirs=()
+    kube::util::read-array unique_dirs < <(printf '%s\n' "${output_dirs[@]}" | sort -u)
+
+    for dir in "${unique_dirs[@]}"; do
+        kube::log::status "Running goimports on ${dir}..."
+        go -C "${KUBE_ROOT}/hack/tools" run golang.org/x/tools/cmd/goimports -w "${KUBE_ROOT}/${dir}"
+    done
+}
 function codegen::subprojects() {
     # Call generation on sub-projects.
     local subs=(
