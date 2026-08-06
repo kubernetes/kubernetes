@@ -7,6 +7,7 @@ package core
 
 import (
 	"fmt"
+	"iter"
 	"time"
 
 	"golang.org/x/tools/internal/event/label"
@@ -28,21 +29,14 @@ type Event struct {
 	dynamic []label.Label  // dynamically sized storage for remaining labels
 }
 
-// eventLabelMap implements label.Map for a the labels of an Event.
-type eventLabelMap struct {
-	event Event
-}
-
 func (ev Event) At() time.Time { return ev.at }
 
 func (ev Event) Format(f fmt.State, r rune) {
 	if !ev.at.IsZero() {
 		fmt.Fprint(f, ev.at.Format("2006/01/02 15:04:05 "))
 	}
-	for index := 0; ev.Valid(index); index++ {
-		if l := ev.Label(index); l.Valid() {
-			fmt.Fprintf(f, "\n\t%v", l)
-		}
+	for l := range ev.Labels() {
+		fmt.Fprintf(f, "\n\t%v", l)
 	}
 }
 
@@ -55,6 +49,22 @@ func (ev Event) Label(index int) label.Label {
 		return ev.static[index]
 	}
 	return ev.dynamic[index-len(ev.static)]
+}
+
+// Labels returns an iterator over the event's valid labels.
+func (ev Event) Labels() iter.Seq[label.Label] {
+	return func(yield func(label.Label) bool) {
+		for _, l := range ev.static {
+			if l.Valid() && !yield(l) {
+				return
+			}
+		}
+		for _, l := range ev.dynamic {
+			if l.Valid() && !yield(l) {
+				return
+			}
+		}
+	}
 }
 
 func (ev Event) Find(key label.Key) label.Label {

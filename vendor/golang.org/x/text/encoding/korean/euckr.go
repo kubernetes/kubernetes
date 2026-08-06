@@ -20,9 +20,9 @@ var All = []encoding.Encoding{EUCKR}
 var EUCKR encoding.Encoding = &eucKR
 
 var eucKR = internal.Encoding{
-	&internal.SimpleEncoding{eucKRDecoder{}, eucKREncoder{}},
-	"EUC-KR",
-	identifier.EUCKR,
+	Encoding: &internal.SimpleEncoding{Decoder: eucKRDecoder{}, Encoder: eucKREncoder{}},
+	Name:     "EUC-KR",
+	MIB:      identifier.EUCKR,
 }
 
 type eucKRDecoder struct{ transform.NopResetter }

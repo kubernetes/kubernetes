@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !(go1.27 && !http2legacy)
+
 package http2
 
 import (
@@ -25,7 +27,7 @@ type roundRobinWriteScheduler struct {
 }
 
 // newRoundRobinWriteScheduler constructs a new write scheduler.
-// The round robin scheduler priorizes control frames
+// The round robin scheduler prioritizes control frames
 // like SETTINGS and PING over DATA frames.
 // When there are no control frames to send, it performs a round-robin
 // selection from the ready streams.
