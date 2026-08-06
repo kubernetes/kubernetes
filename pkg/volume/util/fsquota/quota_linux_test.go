@@ -375,9 +375,9 @@ func fakeAssignQuota(path string, poduid types.UID, bytes int64, userNamespacesE
 	return AssignQuota(dummyQuotaTest(), path, poduid, resource.NewQuantity(bytes, resource.DecimalSI), userNamespacesEnabled)
 }
 
-func fakeClearQuota(path string, userNamespacesEnabled bool) error {
+func fakeClearQuota(path string) error {
 	dummySetFSInfo(path)
-	return ClearQuota(dummyQuotaTest(), path, userNamespacesEnabled)
+	return ClearQuota(dummyQuotaTest(), path)
 }
 
 type quotaTestCase struct {
@@ -553,7 +553,7 @@ func runCaseEnabled(t *testing.T, testcase quotaTestCase, seq int) bool {
 	case "Set":
 		err = fakeAssignQuota(testcase.path, testcase.poduid, testcase.bytes, testcase.userNamespacesEnabled)
 	case "Clear":
-		err = fakeClearQuota(testcase.path, testcase.userNamespacesEnabled)
+		err = fakeClearQuota(testcase.path)
 	case "GetConsumption":
 		_, err = GetConsumption(testcase.path)
 	case "GetInodes":
@@ -585,7 +585,7 @@ func runCaseDisabled(t *testing.T, testcase quotaTestCase, seq int) bool {
 	case "Set":
 		err = fakeAssignQuota(testcase.path, testcase.poduid, testcase.bytes, testcase.userNamespacesEnabled)
 	case "Clear":
-		err = fakeClearQuota(testcase.path, testcase.userNamespacesEnabled)
+		err = fakeClearQuota(testcase.path)
 	case "GetConsumption":
 		_, err = GetConsumption(testcase.path)
 	case "GetInodes":
@@ -755,4 +755,79 @@ func TestAddRemoveQuotasEnabled(t *testing.T) {
 
 func TestAddRemoveQuotasDisabled(t *testing.T) {
 	testAddRemoveQuotas(t, false)
+}
+
+// readProjectFilesForTest returns the current contents of the project files.
+func readProjectFilesForTest(t *testing.T) (string, string) {
+	t.Helper()
+	projects, err := os.ReadFile(projectsFile)
+	if err != nil {
+		t.Fatalf("Unable to read %s: %v", projectsFile, err)
+	}
+	projid, err := os.ReadFile(projidFile)
+	if err != nil {
+		t.Fatalf("Unable to read %s: %v", projidFile, err)
+	}
+	return string(projects), string(projid)
+}
+
+// TestClearQuotaReclaimsProjectID verifies that clearing a quota removes the
+// project ID mapping from the project files.
+//
+// The emptyDir unmounter is constructed from the pod UID alone, so the pod
+// spec -- and with it pod.Spec.HostUsers -- is not available at teardown time.
+// Clearing a quota therefore must not depend on knowing whether the pod ran in
+// a user namespace, or the project ID assigned during SetUp is leaked.
+func TestClearQuotaReclaimsProjectID(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolationFSQuotaMonitoring, true)
+
+	tmpProjectsFile, err := os.CreateTemp("", "projects")
+	if err != nil {
+		t.Fatalf("Unable to create fake projects file: %v", err)
+	}
+	if _, err := tmpProjectsFile.WriteString(projectsHeader); err != nil {
+		t.Fatalf("Unable to write fake projects file: %v", err)
+	}
+	tmpProjectsFile.Close()
+	projectsFile = tmpProjectsFile.Name()
+	defer os.Remove(projectsFile)
+
+	tmpProjidFile, err := os.CreateTemp("", "projid")
+	if err != nil {
+		t.Fatalf("Unable to create fake projid file: %v", err)
+	}
+	if _, err := tmpProjidFile.WriteString(projidHeader); err != nil {
+		t.Fatalf("Unable to write fake projid file: %v", err)
+	}
+	tmpProjidFile.Close()
+	projidFile = tmpProjidFile.Name()
+	defer os.Remove(projidFile)
+
+	providers = []common.LinuxVolumeQuotaProvider{
+		&VolumeProvider1{},
+		&VolumeProvider2{},
+	}
+
+	const path = "/quota1/teardown"
+	// Setting the volume up happens while the pod spec is still known, so a
+	// pod that requested a user namespace gets a quota assigned here.
+	if err := fakeAssignQuota(path, "teardownpod", 1024, true); err != nil {
+		t.Fatalf("Unable to assign quota to %s: %v", path, err)
+	}
+	projects, projid := readProjectFilesForTest(t)
+	if projects == projectsHeader || projid == projidHeader {
+		t.Fatalf("Expected a project ID mapping for %s to be recorded, got projects\n`%s`\nprojid\n`%s`", path, projects, projid)
+	}
+
+	// Tearing the volume down happens without the pod spec.
+	if err := fakeClearQuota(path); err != nil {
+		t.Fatalf("Unable to clear quota on %s: %v", path, err)
+	}
+	projects, projid = readProjectFilesForTest(t)
+	if projects != projectsHeader {
+		t.Errorf("Project ID mapping for %s leaked in projects file: expected\n`%s`\ngot\n`%s`", path, projectsHeader, projects)
+	}
+	if projid != projidHeader {
+		t.Errorf("Project ID mapping for %s leaked in projid file: expected\n`%s`\ngot\n`%s`", path, projidHeader, projid)
+	}
 }

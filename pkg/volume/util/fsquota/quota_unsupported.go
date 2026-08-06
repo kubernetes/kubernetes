@@ -58,6 +58,6 @@ func GetInodes(_ string) (*resource.Quantity, error) {
 }
 
 // ClearQuota -- dummy implementation
-func ClearQuota(_ mount.Interface, _ string, _ bool) error {
+func ClearQuota(_ mount.Interface, _ string) error {
 	return errNotImplemented
 }
