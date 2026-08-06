@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -382,6 +383,19 @@ func appendDNSConfig(existingDNSConfig *runtimeapi.DNSConfig, dnsConfig *v1.PodD
 	return existingDNSConfig
 }
 
+func filterScopedLinkLocalNameservers(logger klog.Logger, nameservers []string) []string {
+	filteredNameservers := nameservers[:0]
+	for _, nameserver := range nameservers {
+		addr, err := netip.ParseAddr(nameserver)
+		if err == nil && addr.Is6() && addr.IsLinkLocalUnicast() && addr.Zone() != "" {
+			logger.V(4).Info("Removed inherited scoped IPv6 link-local nameserver from pod DNS config", "nameserver", nameserver)
+			continue
+		}
+		filteredNameservers = append(filteredNameservers, nameserver)
+	}
+	return filteredNameservers
+}
+
 // GetPodDNS returns DNS settings for the pod.
 func (c *Configurer) GetPodDNS(ctx context.Context, pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
 	logger := klog.FromContext(ctx)
@@ -440,6 +454,14 @@ func (c *Configurer) GetPodDNS(ctx context.Context, pod *v1.Pod) (*runtimeapi.DN
 				dnsConfig.Servers = append(dnsConfig.Servers, "127.0.0.1")
 			}
 			dnsConfig.Searches = []string{"."}
+		}
+
+		if !kubecontainer.IsHostNetworkPod(pod) {
+			originalServerCount := len(dnsConfig.Servers)
+			dnsConfig.Servers = filterScopedLinkLocalNameservers(logger, dnsConfig.Servers)
+			if originalServerCount > 0 && len(dnsConfig.Servers) == 0 {
+				logger.Info("No inherited nameservers remain after filtering scoped IPv6 link-local addresses", "pod", klog.KObj(pod))
+			}
 		}
 	}
 
