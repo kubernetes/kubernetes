@@ -546,14 +546,65 @@ func (ctrl *PersistentVolumeController) syncBoundClaim(ctx context.Context, clai
 			return nil
 		} else {
 			// Claim is bound but volume has a different claimant.
+			// This is normally an error condition, but it also happens during the
+			// expected volume populator flow: a populator binds a PV to a temporary
+			// "prime" PVC, populates it, then rebinds the PV to the original PVC.
+			// After the rebind the prime PVC is still bound (spec.volumeName is
+			// immutable) but the PV now references the original claim. The Lost
+			// transition is still correct (lib-volume-populator polls for it), but
+			// the event should not be a Warning. Detect this by checking whether the
+			// PV's current claimant carries a dataSourceRef.
+			eventType := v1.EventTypeWarning
+			reason := "ClaimMisbound"
+			message := "Two claims are bound to the same volume, this one is bound incorrectly"
+			if ctrl.isVolumePopulatorRebind(volume) {
+				eventType = v1.EventTypeNormal
+				reason = "ClaimLost"
+				message = "Volume has been rebound to its target claim by a volume populator; this prime claim is no longer needed"
+			}
 			// Set the claim phase to 'Lost', which is a terminal
 			// phase.
-			if _, err = ctrl.updateClaimStatusWithEvent(ctx, claim, v1.ClaimLost, nil, v1.EventTypeWarning, "ClaimMisbound", "Two claims are bound to the same volume, this one is bound incorrectly"); err != nil {
+			if _, err = ctrl.updateClaimStatusWithEvent(ctx, claim, v1.ClaimLost, nil, eventType, reason, message); err != nil {
 				return err
 			}
 			return nil
 		}
 	}
+}
+
+// isVolumePopulatorRebind reports whether the given volume was rebound to its
+// target claim by a volume populator. Populators bind a PV to a temporary
+// "prime" PVC, populate it, then rebind the PV to the original PVC, which
+// carries a populator dataSourceRef. When that is the case, a prime PVC observing the
+// rebind is expected behavior rather than a misbinding error, so the PV
+// controller should not emit a Warning event for it. The lookup is
+// best-effort: if the target claim cannot be found it returns false and the
+// caller falls back to the default (Warning) behavior.
+func (ctrl *PersistentVolumeController) isVolumePopulatorRebind(volume *v1.PersistentVolume) bool {
+	if volume.Spec.ClaimRef == nil {
+		return false
+	}
+	claimName := claimrefToClaimKey(volume.Spec.ClaimRef)
+	obj, found, err := ctrl.claims.GetByKey(claimName)
+	if err != nil {
+		return false
+	}
+	if !found {
+		obj, err = ctrl.claimLister.PersistentVolumeClaims(volume.Spec.ClaimRef.Namespace).Get(volume.Spec.ClaimRef.Name)
+		if err != nil {
+			return false
+		}
+	}
+	targetClaim, ok := obj.(*v1.PersistentVolumeClaim)
+	if !ok {
+		return false
+	}
+	// Make sure the cached claim is the one the volume actually references,
+	// not a stale or recreated claim that happens to share the name.
+	if targetClaim.UID != volume.Spec.ClaimRef.UID {
+		return false
+	}
+	return storagehelpers.IsPopulatorDataSource(targetClaim)
 }
 
 // syncVolume is the main controller method to decide what to do with a volume.
