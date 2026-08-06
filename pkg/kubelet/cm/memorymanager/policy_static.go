@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
@@ -784,7 +785,17 @@ func getPodRequestedResources(logger klog.Logger, pod *v1.Pod) (map[v1.ResourceN
 	}
 
 	reqRsrcs := make(map[v1.ResourceName]uint64)
+	resourceNames := sets.New[v1.ResourceName]()
 	for rsrcName := range reqRsrcsByAppCtrs {
+		resourceNames.Insert(rsrcName)
+	}
+	for rsrcName := range reqRsrcsByRestartableInitCtrs {
+		resourceNames.Insert(rsrcName)
+	}
+	for rsrcName := range reqRsrcsByInitCtrs {
+		resourceNames.Insert(rsrcName)
+	}
+	for rsrcName := range resourceNames {
 		// Total resources requested by long-running containers.
 		reqRsrcsByLongRunningCtrs := reqRsrcsByAppCtrs[rsrcName] + reqRsrcsByRestartableInitCtrs[rsrcName]
 		reqRsrcs[rsrcName] = reqRsrcsByLongRunningCtrs
