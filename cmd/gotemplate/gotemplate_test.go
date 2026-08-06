@@ -18,6 +18,7 @@ package main
 
 import (
 	"bytes"
+	"io/fs"
 	"os"
 	"path"
 	"strings"
@@ -36,10 +37,14 @@ func TestGenerate(t *testing.T) {
 		files       map[string]string
 		expected    string
 		expectedErr string
+		errContains []string
+		errIs       error
 	}{
 		"missing-file": {
 			in:          `{{include "no-such-file.txt"}}`,
 			expectedErr: noFileErr.Error(),
+			errContains: []string{`include "no-such-file.txt"`},
+			errIs:       fs.ErrNotExist,
 		},
 		"data": {
 			in:       `{{.Hello}} {{.World}}`,
@@ -71,6 +76,12 @@ func TestGenerate(t *testing.T) {
 				require.Equal(t, tt.expected, out.String())
 			} else {
 				require.ErrorContains(t, err, tt.expectedErr)
+				for _, sub := range tt.errContains {
+					require.ErrorContains(t, err, sub)
+				}
+				if tt.errIs != nil {
+					require.ErrorIs(t, err, tt.errIs)
+				}
 			}
 		})
 	}
