@@ -3636,6 +3636,20 @@ func TestQueuedPodGroupInfo_AddCompositePodGroup(t *testing.T) {
 			},
 		},
 		{
+			name:       "Add duplicate child CPG to root",
+			initialCPG: cpgRoot,
+			cpgToAdd:   cpgChild,
+			subtree:    &PodGroupInfo{CompositePodGroup: cpgChild, Name: "cpg-child", Namespace: "ns1", Type: fwk.CompositePodGroupKeyType, Children: make([]*PodGroupInfo, 0)},
+			setup: func(qpgi *QueuedPodGroupInfo) {
+				qpgi.PodGroupInfo.Children = append(qpgi.PodGroupInfo.Children, &PodGroupInfo{CompositePodGroup: cpgChild, Name: "cpg-child", Namespace: "ns1", Type: fwk.CompositePodGroupKeyType, Children: make([]*PodGroupInfo, 0)})
+			},
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
+				if len(qpgi.PodGroupInfo.Children) != 1 {
+					t.Errorf("Duplicate CPG added")
+				}
+			},
+		},
+		{
 			name:       "Add CPG subtree with nested CPGs",
 			initialCPG: cpgRoot,
 			cpgToAdd:   cpgChild,
@@ -3903,6 +3917,7 @@ func TestQueuedPodGroupInfo_AddPodGroup(t *testing.T) {
 		name       string
 		initialCPG *schedulingv1alpha3.CompositePodGroup
 		pgToAdd    *schedulingv1beta1.PodGroup
+		setup      func(*QueuedPodGroupInfo)
 		verify     func(*testing.T, *QueuedPodGroupInfo)
 	}{
 		{
@@ -3915,6 +3930,19 @@ func TestQueuedPodGroupInfo_AddPodGroup(t *testing.T) {
 				}
 				if qpgi.PodGroupInfo.Children[0].Type != fwk.PodGroupKeyType {
 					t.Errorf("Child PG has wrong key type")
+				}
+			},
+		},
+		{
+			name:       "Add duplicate child PG to root CPG",
+			initialCPG: cpgRoot,
+			pgToAdd:    pgChild,
+			setup: func(qpgi *QueuedPodGroupInfo) {
+				qpgi.PodGroupInfo.Children = append(qpgi.PodGroupInfo.Children, &PodGroupInfo{PodGroup: pgChild, Name: pgChild.Name, Namespace: pgChild.Namespace, Type: fwk.PodGroupKeyType, Children: make([]*PodGroupInfo, 0)})
+			},
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo) {
+				if len(qpgi.PodGroupInfo.Children) != 1 {
+					t.Errorf("Duplicate PG added")
 				}
 			},
 		},
@@ -3951,6 +3979,9 @@ func TestQueuedPodGroupInfo_AddPodGroup(t *testing.T) {
 					Children:          make([]*PodGroupInfo, 0),
 				},
 				QueuedPodInfos: make(map[fwk.EntityKey][]*QueuedPodInfo),
+			}
+			if tt.setup != nil {
+				tt.setup(qpgi)
 			}
 			qpgi.AddPodGroup(tt.pgToAdd)
 			tt.verify(t, qpgi)
@@ -4104,6 +4135,20 @@ func TestQueuedPodGroupInfo_RemovePodGroup(t *testing.T) {
 				}
 				if len(qpgi.QueuedPodInfos[podKeyStandalone]) != 0 {
 					t.Errorf("Pod not removed from QueuedPodInfos map")
+				}
+			},
+		},
+		{
+			name:     "Remove non-existent PG (node == nil)",
+			removePG: st.MakePodGroup().Name("pg-nonexistent").Namespace("ns1").Obj(),
+			setup: func(qpgi *QueuedPodGroupInfo) {
+				qpgi.PodGroupInfo = &PodGroupInfo{
+					PodGroup: pgStandalone, Name: pgStandalone.Name, Namespace: pgStandalone.Namespace, Type: fwk.PodGroupKeyType, Children: make([]*PodGroupInfo, 0),
+				}
+			},
+			verify: func(t *testing.T, qpgi *QueuedPodGroupInfo, removed []*QueuedPodInfo) {
+				if len(removed) != 0 {
+					t.Errorf("Expected nil/empty removed pods for non-existent PG")
 				}
 			},
 		},
@@ -4422,6 +4467,53 @@ func TestPodGroupInfo_GetUnscheduledPods(t *testing.T) {
 			got := tt.pgi.GetUnscheduledPods()
 			if diff := cmp.Diff(tt.expected, got); diff != "" {
 				t.Errorf("GetUnscheduledPods() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestQueuedPodGroupInfo_HasQueuedPodInfos(t *testing.T) {
+	tests := []struct {
+		name string
+		qpgi *QueuedPodGroupInfo
+		want bool
+	}{
+		{
+			name: "QueuedPodInfos is nil",
+			qpgi: &QueuedPodGroupInfo{},
+			want: false,
+		},
+		{
+			name: "QueuedPodInfos is empty map",
+			qpgi: &QueuedPodGroupInfo{
+				QueuedPodInfos: make(map[fwk.EntityKey][]*QueuedPodInfo),
+			},
+			want: false,
+		},
+		{
+			name: "QueuedPodInfos map contains empty lists",
+			qpgi: &QueuedPodGroupInfo{
+				QueuedPodInfos: map[fwk.EntityKey][]*QueuedPodInfo{
+					fwk.PodGroupKey("ns", "name"): {},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "QueuedPodInfos has queued pods",
+			qpgi: &QueuedPodGroupInfo{
+				QueuedPodInfos: map[fwk.EntityKey][]*QueuedPodInfo{
+					fwk.PodGroupKey("ns", "name"): {{}},
+				},
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.qpgi.HasQueuedPodInfos(); got != tt.want {
+				t.Errorf("HasQueuedPodInfos() = %v, want %v", got, tt.want)
 			}
 		})
 	}
