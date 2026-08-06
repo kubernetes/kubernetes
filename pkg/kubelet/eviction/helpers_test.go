@@ -2180,6 +2180,7 @@ func TestAddContainerFsThresholds(t *testing.T) {
 		expectedContainerFsINodesHard evictionapi.Threshold
 		expectedContainerFsINodesSoft evictionapi.Threshold
 		expectErr                     bool
+		expectNoContainerFsInodes     bool
 		thresholdList                 []evictionapi.Threshold
 	}{
 		{
@@ -3116,6 +3117,219 @@ func TestAddContainerFsThresholds(t *testing.T) {
 				},
 			},
 		},
+		{
+			description:               "single filesystem; no inode thresholds (Windows-like)",
+			imageFs:                   false,
+			containerFs:               false,
+			expectNoContainerFsInodes: true,
+			expectedContainerFsHard: evictionapi.Threshold{
+				Signal:   evictionapi.SignalContainerFsAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("100Mi"),
+				},
+				MinReclaim: &evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("1Gi"),
+				},
+			},
+			expectedContainerFsSoft: evictionapi.Threshold{
+				Signal:   evictionapi.SignalContainerFsAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("200Mi"),
+				},
+				GracePeriod: gracePeriod,
+				MinReclaim: &evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("1Gi"),
+				},
+			},
+			thresholdList: []evictionapi.Threshold{
+				{
+					Signal:   evictionapi.SignalNodeFsAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("100Mi"),
+					},
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("1Gi"),
+					},
+				},
+				{
+					Signal:   evictionapi.SignalNodeFsAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("200Mi"),
+					},
+					GracePeriod: gracePeriod,
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("1Gi"),
+					},
+				},
+				{
+					Signal:   evictionapi.SignalImageFsAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("100Mi"),
+					},
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("1Gi"),
+					},
+				},
+				{
+					Signal:   evictionapi.SignalImageFsAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("300Mi"),
+					},
+					GracePeriod: gracePeriod,
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("2Gi"),
+					},
+				},
+			},
+		},
+		{
+			description:               "image filesystem; no inode thresholds (Windows-like)",
+			imageFs:                   true,
+			containerFs:               false,
+			expectNoContainerFsInodes: true,
+			expectedContainerFsHard: evictionapi.Threshold{
+				Signal:   evictionapi.SignalContainerFsAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("150Mi"),
+				},
+				MinReclaim: &evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("1.5Gi"),
+				},
+			},
+			expectedContainerFsSoft: evictionapi.Threshold{
+				Signal:   evictionapi.SignalContainerFsAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("300Mi"),
+				},
+				GracePeriod: gracePeriod,
+				MinReclaim: &evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("3Gi"),
+				},
+			},
+			thresholdList: []evictionapi.Threshold{
+				{
+					Signal:   evictionapi.SignalNodeFsAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("100Mi"),
+					},
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("1Gi"),
+					},
+				},
+				{
+					Signal:   evictionapi.SignalNodeFsAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("200Mi"),
+					},
+					GracePeriod: gracePeriod,
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("1Gi"),
+					},
+				},
+				{
+					Signal:   evictionapi.SignalImageFsAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("150Mi"),
+					},
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("1.5Gi"),
+					},
+				},
+				{
+					Signal:   evictionapi.SignalImageFsAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("300Mi"),
+					},
+					GracePeriod: gracePeriod,
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("3Gi"),
+					},
+				},
+			},
+		},
+		{
+			description:               "split image and container filesystem; no inode thresholds (Windows-like)",
+			imageFs:                   true,
+			containerFs:               true,
+			expectNoContainerFsInodes: true,
+			expectedContainerFsHard: evictionapi.Threshold{
+				Signal:   evictionapi.SignalContainerFsAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("100Mi"),
+				},
+				MinReclaim: &evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("1Gi"),
+				},
+			},
+			expectedContainerFsSoft: evictionapi.Threshold{
+				Signal:   evictionapi.SignalContainerFsAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("200Mi"),
+				},
+				GracePeriod: gracePeriod,
+				MinReclaim: &evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("1Gi"),
+				},
+			},
+			thresholdList: []evictionapi.Threshold{
+				{
+					Signal:   evictionapi.SignalNodeFsAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("100Mi"),
+					},
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("1Gi"),
+					},
+				},
+				{
+					Signal:   evictionapi.SignalNodeFsAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("200Mi"),
+					},
+					GracePeriod: gracePeriod,
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("1Gi"),
+					},
+				},
+				{
+					Signal:   evictionapi.SignalImageFsAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("150Mi"),
+					},
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("1.5Gi"),
+					},
+				},
+				{
+					Signal:   evictionapi.SignalImageFsAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("300Mi"),
+					},
+					GracePeriod: gracePeriod,
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("3Gi"),
+					},
+				},
+			},
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -3142,12 +3356,18 @@ func TestAddContainerFsThresholds(t *testing.T) {
 					softContainerFsMatch = idx
 				}
 				if val.Signal == evictionapi.SignalContainerFsInodesFree && isHardEvictionThreshold(val) {
+					if testCase.expectNoContainerFsInodes {
+						t.Fatalf("did not expect hard containerfs.inodesFree but found one")
+					}
 					if !reflect.DeepEqual(val, testCase.expectedContainerFsINodesHard) {
 						t.Fatalf("want %v got %v", testCase.expectedContainerFsINodesHard, val)
 					}
 					hardContainerFsINodesMatch = idx
 				}
 				if val.Signal == evictionapi.SignalContainerFsInodesFree && !isHardEvictionThreshold(val) {
+					if testCase.expectNoContainerFsInodes {
+						t.Fatalf("did not expect soft containerfs.inodesFree but found one")
+					}
 					if !reflect.DeepEqual(val, testCase.expectedContainerFsINodesSoft) {
 						t.Fatalf("want %v got %v", testCase.expectedContainerFsINodesSoft, val)
 					}
@@ -3160,11 +3380,13 @@ func TestAddContainerFsThresholds(t *testing.T) {
 			if softContainerFsMatch == -1 {
 				t.Fatalf("did not find soft containerfs.available")
 			}
-			if hardContainerFsINodesMatch == -1 {
-				t.Fatalf("did not find hard containerfs.inodesfree")
-			}
-			if softContainerFsINodesMatch == -1 {
-				t.Fatalf("did not find soft containerfs.inodesfree")
+			if !testCase.expectNoContainerFsInodes {
+				if hardContainerFsINodesMatch == -1 {
+					t.Fatalf("did not find hard containerfs.inodesFree")
+				}
+				if softContainerFsINodesMatch == -1 {
+					t.Fatalf("did not find soft containerfs.inodesFree")
+				}
 			}
 		})
 	}

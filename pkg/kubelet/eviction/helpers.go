@@ -241,11 +241,9 @@ func UpdateContainerFsThresholds(thresholds []evictionapi.Threshold, imageFs, se
 			softContainerFsDisk = idx
 		}
 		if threshold.Signal == evictionapi.SignalContainerFsInodesFree && isHardEvictionThreshold(threshold) {
-			err = errors.Join(fmt.Errorf("found containerfs.inodesFree for hard eviction. ignoring"))
 			hardContainerFsINodes = idx
 		}
 		if threshold.Signal == evictionapi.SignalContainerFsInodesFree && !isHardEvictionThreshold(threshold) {
-			err = errors.Join(fmt.Errorf("found containerfs.inodesFree for soft eviction. ignoring"))
 			softContainerFsINodes = idx
 		}
 	}
@@ -276,30 +274,42 @@ func UpdateContainerFsThresholds(thresholds []evictionapi.Threshold, imageFs, se
 				GracePeriod: softNodeFsDisk.GracePeriod,
 			})
 		}
-		if hardContainerFsINodes != -1 {
-			thresholds[hardContainerFsINodes] = evictionapi.Threshold{
-				Signal: evictionapi.SignalContainerFsInodesFree, Operator: hardNodeINodeDisk.Operator, Value: hardNodeINodeDisk.Value, MinReclaim: hardNodeINodeDisk.MinReclaim,
+		// Only add containerfs inode thresholds if the source nodefs inode threshold exists.
+		// If nodefs.inodesFree is not configured (e.g., on Windows where inodes are not
+		// supported, or on any platform where inode thresholds are simply not set), there
+		// is no meaningful value to derive for containerfs.inodesFree. Adding it anyway
+		// would cause the eviction manager to log frequent spurious
+		// "no observation found for eviction signal" messages.
+		if hardNodeINodeDisk.Signal != "" {
+			if hardContainerFsINodes != -1 {
+				err = errors.Join(err, fmt.Errorf("found containerfs.inodesFree for hard eviction. ignoring"))
+				thresholds[hardContainerFsINodes] = evictionapi.Threshold{
+					Signal: evictionapi.SignalContainerFsInodesFree, Operator: hardNodeINodeDisk.Operator, Value: hardNodeINodeDisk.Value, MinReclaim: hardNodeINodeDisk.MinReclaim,
+				}
+			} else {
+				thresholds = append(thresholds, evictionapi.Threshold{
+					Signal:     evictionapi.SignalContainerFsInodesFree,
+					Operator:   hardNodeINodeDisk.Operator,
+					Value:      hardNodeINodeDisk.Value,
+					MinReclaim: hardNodeINodeDisk.MinReclaim,
+				})
 			}
-		} else {
-			thresholds = append(thresholds, evictionapi.Threshold{
-				Signal:     evictionapi.SignalContainerFsInodesFree,
-				Operator:   hardNodeINodeDisk.Operator,
-				Value:      hardNodeINodeDisk.Value,
-				MinReclaim: hardNodeINodeDisk.MinReclaim,
-			})
 		}
-		if softContainerFsINodes != -1 {
-			thresholds[softContainerFsINodes] = evictionapi.Threshold{
-				Signal: evictionapi.SignalContainerFsInodesFree, GracePeriod: softNodeINodeDisk.GracePeriod, Operator: softNodeINodeDisk.Operator, Value: softNodeINodeDisk.Value, MinReclaim: softNodeINodeDisk.MinReclaim,
+		if softNodeINodeDisk.Signal != "" {
+			if softContainerFsINodes != -1 {
+				err = errors.Join(err, fmt.Errorf("found containerfs.inodesFree for soft eviction. ignoring"))
+				thresholds[softContainerFsINodes] = evictionapi.Threshold{
+					Signal: evictionapi.SignalContainerFsInodesFree, GracePeriod: softNodeINodeDisk.GracePeriod, Operator: softNodeINodeDisk.Operator, Value: softNodeINodeDisk.Value, MinReclaim: softNodeINodeDisk.MinReclaim,
+				}
+			} else {
+				thresholds = append(thresholds, evictionapi.Threshold{
+					Signal:      evictionapi.SignalContainerFsInodesFree,
+					Operator:    softNodeINodeDisk.Operator,
+					Value:       softNodeINodeDisk.Value,
+					MinReclaim:  softNodeINodeDisk.MinReclaim,
+					GracePeriod: softNodeINodeDisk.GracePeriod,
+				})
 			}
-		} else {
-			thresholds = append(thresholds, evictionapi.Threshold{
-				Signal:      evictionapi.SignalContainerFsInodesFree,
-				Operator:    softNodeINodeDisk.Operator,
-				Value:       softNodeINodeDisk.Value,
-				MinReclaim:  softNodeINodeDisk.MinReclaim,
-				GracePeriod: softNodeINodeDisk.GracePeriod,
-			})
 		}
 	}
 	// Separate image filesystem case
@@ -329,30 +339,42 @@ func UpdateContainerFsThresholds(thresholds []evictionapi.Threshold, imageFs, se
 				GracePeriod: softImageFsDisk.GracePeriod,
 			})
 		}
-		if hardContainerFsINodes != -1 {
-			thresholds[hardContainerFsINodes] = evictionapi.Threshold{
-				Signal: evictionapi.SignalContainerFsInodesFree, GracePeriod: hardImageINodeDisk.GracePeriod, Operator: hardImageINodeDisk.Operator, Value: hardImageINodeDisk.Value, MinReclaim: hardImageINodeDisk.MinReclaim,
+		// Only add containerfs inode thresholds if the source imagefs inode threshold exists.
+		// If imagefs.inodesFree is not configured (e.g., on Windows where inodes are not
+		// supported, or on any platform where inode thresholds are simply not set), there
+		// is no meaningful value to derive for containerfs.inodesFree. Adding it anyway
+		// would cause the eviction manager to log frequent spurious
+		// "no observation found for eviction signal" messages.
+		if hardImageINodeDisk.Signal != "" {
+			if hardContainerFsINodes != -1 {
+				err = errors.Join(err, fmt.Errorf("found containerfs.inodesFree for hard eviction. ignoring"))
+				thresholds[hardContainerFsINodes] = evictionapi.Threshold{
+					Signal: evictionapi.SignalContainerFsInodesFree, GracePeriod: hardImageINodeDisk.GracePeriod, Operator: hardImageINodeDisk.Operator, Value: hardImageINodeDisk.Value, MinReclaim: hardImageINodeDisk.MinReclaim,
+				}
+			} else {
+				thresholds = append(thresholds, evictionapi.Threshold{
+					Signal:     evictionapi.SignalContainerFsInodesFree,
+					Operator:   hardImageINodeDisk.Operator,
+					Value:      hardImageINodeDisk.Value,
+					MinReclaim: hardImageINodeDisk.MinReclaim,
+				})
 			}
-		} else {
-			thresholds = append(thresholds, evictionapi.Threshold{
-				Signal:     evictionapi.SignalContainerFsInodesFree,
-				Operator:   hardImageINodeDisk.Operator,
-				Value:      hardImageINodeDisk.Value,
-				MinReclaim: hardImageINodeDisk.MinReclaim,
-			})
 		}
-		if softContainerFsINodes != -1 {
-			thresholds[softContainerFsINodes] = evictionapi.Threshold{
-				Signal: evictionapi.SignalContainerFsInodesFree, GracePeriod: softImageINodeDisk.GracePeriod, Operator: softImageINodeDisk.Operator, Value: softImageINodeDisk.Value, MinReclaim: softImageINodeDisk.MinReclaim,
+		if softImageINodeDisk.Signal != "" {
+			if softContainerFsINodes != -1 {
+				err = errors.Join(err, fmt.Errorf("found containerfs.inodesFree for soft eviction. ignoring"))
+				thresholds[softContainerFsINodes] = evictionapi.Threshold{
+					Signal: evictionapi.SignalContainerFsInodesFree, GracePeriod: softImageINodeDisk.GracePeriod, Operator: softImageINodeDisk.Operator, Value: softImageINodeDisk.Value, MinReclaim: softImageINodeDisk.MinReclaim,
+				}
+			} else {
+				thresholds = append(thresholds, evictionapi.Threshold{
+					Signal:      evictionapi.SignalContainerFsInodesFree,
+					Operator:    softImageINodeDisk.Operator,
+					Value:       softImageINodeDisk.Value,
+					MinReclaim:  softImageINodeDisk.MinReclaim,
+					GracePeriod: softImageINodeDisk.GracePeriod,
+				})
 			}
-		} else {
-			thresholds = append(thresholds, evictionapi.Threshold{
-				Signal:      evictionapi.SignalContainerFsInodesFree,
-				Operator:    softImageINodeDisk.Operator,
-				Value:       softImageINodeDisk.Value,
-				MinReclaim:  softImageINodeDisk.MinReclaim,
-				GracePeriod: softImageINodeDisk.GracePeriod,
-			})
 		}
 	}
 	return thresholds, err
