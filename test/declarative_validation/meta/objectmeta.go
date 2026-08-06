@@ -291,7 +291,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.TooLong(fldPath.Child("managedFields").Index(0).Child("manager"), "", 128).MarkFromImperative(),
+				field.TooLong(fldPath.Child("managedFields").Index(0).Child("manager"), "", 128).WithOrigin("maxBytes").MarkAlpha(),
 			},
 		},
 		{
@@ -311,7 +311,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.TooLong(fldPath.Child("managedFields").Index(0).Child("subresource"), "", 0).MarkFromImperative(),
+				field.TooLong(fldPath.Child("managedFields").Index(0).Child("subresource"), "", 256).WithOrigin("maxBytes").MarkAlpha(),
 			},
 		},
 		{
@@ -611,7 +611,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.TooLong(fldPath.Child("managedFields").Index(0).Child("subresource"), "", 0).MarkFromImperative(),
+				field.TooLong(fldPath.Child("managedFields").Index(0).Child("subresource"), "", 256).WithOrigin("maxBytes").MarkAlpha(),
 			},
 		},
 		{
