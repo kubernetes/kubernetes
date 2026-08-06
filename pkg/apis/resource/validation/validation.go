@@ -1113,6 +1113,16 @@ func validateDevice(device resource.Device, oldDevice *resource.Device, fldPath 
 		if device.NodeSelector != nil {
 			setFields = append(setFields, "`nodeSelector`")
 			allErrs = append(allErrs, corevalidation.ValidateNodeSelector(device.NodeSelector, false, fldPath.Child("nodeSelector"))...)
+			// Per-device nodeSelector has the same single-term contract as the slice-level selector:
+			// the allocator's createNodeSelector merges a single term and hard-errors on more than one,
+			// which aborts the scheduling cycle. Enforce it here as the slice-level check already does.
+			// This check is new, so ratchet it like Capacity and Taints above: only enforce it on create
+			// or when the selector changes, so an existing slice with multiple terms can still be updated.
+			if oldDevice == nil || !apiequality.Semantic.DeepEqual(oldDevice.NodeSelector, device.NodeSelector) {
+				if len(device.NodeSelector.NodeSelectorTerms) != 1 {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeSelector", "nodeSelectorTerms"), device.NodeSelector.NodeSelectorTerms, "must have exactly one node selector term"))
+				}
+			}
 		}
 		if device.AllNodes != nil {
 			if *device.AllNodes {

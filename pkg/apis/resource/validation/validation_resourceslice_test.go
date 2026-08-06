@@ -236,6 +236,11 @@ func TestValidateResourceSlice(t *testing.T) {
 		VersionValues: []string{"1.0.0"},
 	}
 
+	twoTermNodeSelectorTerms := []core.NodeSelectorTerm{
+		{MatchExpressions: []core.NodeSelectorRequirement{{Key: "topology.example.com/rack", Operator: core.NodeSelectorOpIn, Values: []string{"a"}}}},
+		{MatchExpressions: []core.NodeSelectorRequirement{{Key: "topology.example.com/rack", Operator: core.NodeSelectorOpIn, Values: []string{"b"}}}},
+	}
+
 	scenarios := map[string]struct {
 		slice                                        *resourceapi.ResourceSlice
 		wantFailures                                 field.ErrorList
@@ -1352,6 +1357,29 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 		},
+		"device-node-selector-with-multiple-terms": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeSelector", "nodeSelectorTerms"), twoTermNodeSelectorTerms, "must have exactly one node selector term"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.PerDeviceNodeSelection = ptr.To(true)
+				slice.Spec.NodeName = nil
+				slice.Spec.Devices[0].NodeSelector = &core.NodeSelector{NodeSelectorTerms: twoTermNodeSelectorTerms}
+				return slice
+			}(),
+		},
+		"valid-device-node-selector-single-term": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.PerDeviceNodeSelection = ptr.To(true)
+				slice.Spec.NodeName = nil
+				slice.Spec.Devices[0].NodeSelector = &core.NodeSelector{NodeSelectorTerms: []core.NodeSelectorTerm{
+					{MatchExpressions: []core.NodeSelectorRequirement{{Key: "topology.example.com/rack", Operator: core.NodeSelectorOpIn, Values: []string{"a"}}}},
+				}}
+				return slice
+			}(),
+		},
 		"missing-name-shared-counters": {
 			wantFailures: field.ErrorList{
 				field.Required(field.NewPath("spec", "sharedCounters").Index(0).Child("name"), "").MarkCoveredByDeclarative(),
@@ -2058,6 +2086,25 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 		},
 	}
 
+	singleNodeSelectorTerm := []core.NodeSelectorTerm{
+		{MatchExpressions: []core.NodeSelectorRequirement{{Key: "topology.example.com/rack", Operator: core.NodeSelectorOpIn, Values: []string{"a"}}}},
+	}
+	multipleNodeSelectorTerms := []core.NodeSelectorTerm{
+		{MatchExpressions: []core.NodeSelectorRequirement{{Key: "topology.example.com/rack", Operator: core.NodeSelectorOpIn, Values: []string{"a"}}}},
+		{MatchExpressions: []core.NodeSelectorRequirement{{Key: "topology.example.com/rack", Operator: core.NodeSelectorOpIn, Values: []string{"b"}}}},
+	}
+	differentMultipleNodeSelectorTerms := []core.NodeSelectorTerm{
+		{MatchExpressions: []core.NodeSelectorRequirement{{Key: "topology.example.com/rack", Operator: core.NodeSelectorOpIn, Values: []string{"a"}}}},
+		{MatchExpressions: []core.NodeSelectorRequirement{{Key: "topology.example.com/rack", Operator: core.NodeSelectorOpIn, Values: []string{"c"}}}},
+	}
+	perDeviceSliceWithNodeSelector := func(terms []core.NodeSelectorTerm) *resourceapi.ResourceSlice {
+		slice := testResourceSlice(name, name, name, 1)
+		slice.Spec.NodeName = nil
+		slice.Spec.PerDeviceNodeSelection = ptr.To(true)
+		slice.Spec.Devices[0].NodeSelector = &core.NodeSelector{NodeSelectorTerms: terms}
+		return slice
+	}
+
 	scenarios := map[string]struct {
 		consumableCapacityFeatureGate      bool
 		fractionalCapacityRangeFeatureGate bool
@@ -2152,6 +2199,41 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 				device := slice.Spec.Devices[0].DeepCopy()
 				device.Name += "-other"
 				slice.Spec.Devices = append(slice.Spec.Devices, *device)
+				return slice
+			},
+		},
+		"valid-ratcheted-device-node-selector-with-multiple-terms": {
+			// Grandfathered: an existing device selector with multiple terms stays valid across an
+			// update that does not change the selector.
+			oldResourceSlice: perDeviceSliceWithNodeSelector(multipleNodeSelectorTerms),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Devices[0].Attributes["foo"] = resourceapi.DeviceAttribute{StringValue: ptr.To("bar")}
+				return slice
+			},
+		},
+		"invalid-update-device-node-selector-to-multiple-terms": {
+			wantFailures:     field.ErrorList{field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeSelector", "nodeSelectorTerms"), multipleNodeSelectorTerms, "must have exactly one node selector term")},
+			oldResourceSlice: perDeviceSliceWithNodeSelector(singleNodeSelectorTerm),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Devices[0].NodeSelector = &core.NodeSelector{NodeSelectorTerms: multipleNodeSelectorTerms}
+				return slice
+			},
+		},
+		"invalid-update-device-node-selector-to-different-multiple-terms": {
+			// Ratchet grandfathers only an unchanged value: changing one multi-term selector to a
+			// different multi-term selector is still rejected.
+			wantFailures:     field.ErrorList{field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeSelector", "nodeSelectorTerms"), differentMultipleNodeSelectorTerms, "must have exactly one node selector term")},
+			oldResourceSlice: perDeviceSliceWithNodeSelector(multipleNodeSelectorTerms),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Devices[0].NodeSelector = &core.NodeSelector{NodeSelectorTerms: differentMultipleNodeSelectorTerms}
+				return slice
+			},
+		},
+		"valid-update-device-node-selector-multiple-to-single-term": {
+			// The repair path: an existing multi-term selector can be fixed down to a single term.
+			oldResourceSlice: perDeviceSliceWithNodeSelector(multipleNodeSelectorTerms),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Devices[0].NodeSelector = &core.NodeSelector{NodeSelectorTerms: singleNodeSelectorTerm}
 				return slice
 			},
 		},
