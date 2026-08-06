@@ -93,6 +93,7 @@ func (s *LocationStreamer) InputStream(ctx context.Context, apiVersion, acceptHe
 
 	if s.ResponseChecker != nil {
 		if err = s.ResponseChecker.Check(resp); err != nil {
+			resp.Body.Close()
 			return nil, false, "", err
 		}
 	}
