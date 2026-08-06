@@ -79,6 +79,7 @@ const (
 // NewEndpointController returns a new *Controller.
 func NewEndpointController(ctx context.Context, podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer,
 	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface, endpointUpdatesBatchPeriod time.Duration) *Controller {
+	logger := klog.FromContext(ctx)
 	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: ControllerName})
 
@@ -94,27 +95,30 @@ func NewEndpointController(ctx context.Context, podInformer coreinformers.PodInf
 		workerLoopPeriod: time.Second,
 	}
 
-	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := serviceInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: e.onServiceUpdate,
 		UpdateFunc: func(old, cur interface{}) {
 			e.onServiceUpdate(cur)
 		},
 		DeleteFunc: e.onServiceDelete,
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 	e.serviceLister = serviceInformer.Lister()
 	e.servicesSynced = serviceInformer.Informer().HasSynced
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj interface{}) { e.onPodUpdate(nil, obj) },
 		UpdateFunc: e.onPodUpdate,
 		DeleteFunc: func(obj interface{}) { e.onPodUpdate(obj, nil) },
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 	e.podLister = podInformer.Lister()
 	e.podsSynced = podInformer.Informer().HasSynced
 
-	endpointsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = endpointsInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: e.onEndpointsDelete,
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 	e.endpointsLister = endpointsInformer.Lister()
 	e.endpointsSynced = endpointsInformer.Informer().HasSynced
 

@@ -102,7 +102,7 @@ func NewController(ctx context.Context, endpointsInformer coreinformers.Endpoint
 		workerLoopPeriod: time.Second,
 	}
 
-	endpointsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := endpointsInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			c.onEndpointsAdd(logger, obj)
 		},
@@ -112,17 +112,19 @@ func NewController(ctx context.Context, endpointsInformer coreinformers.Endpoint
 		DeleteFunc: func(obj interface{}) {
 			c.onEndpointsDelete(logger, obj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 	c.endpointsLister = endpointsInformer.Lister()
 	c.endpointsSynced = endpointsInformer.Informer().HasSynced
 
-	endpointSliceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = endpointSliceInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: c.onEndpointSliceAdd,
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			c.onEndpointSliceUpdate(logger, oldObj, newObj)
 		},
 		DeleteFunc: c.onEndpointSliceDelete,
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 
 	c.endpointSliceLister = endpointSliceInformer.Lister()
 	c.endpointSlicesSynced = endpointSliceInformer.Informer().HasSynced
@@ -130,11 +132,12 @@ func NewController(ctx context.Context, endpointsInformer coreinformers.Endpoint
 
 	c.serviceLister = serviceInformer.Lister()
 	c.servicesSynced = serviceInformer.Informer().HasSynced
-	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = serviceInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.onServiceAdd,
 		UpdateFunc: c.onServiceUpdate,
 		DeleteFunc: c.onServiceDelete,
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 
 	c.maxEndpointsPerSubset = maxEndpointsPerSubset
 
