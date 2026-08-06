@@ -1652,14 +1652,14 @@ test('DeployTimeSubstitutedFile throws error when source file path is invalid', 
 
   expect(() => {
     new s3deploy.DeployTimeSubstitutedFile(stack, 'MyFile', {
-      source: path.join(__dirname, 'non-existant-file.yaml'),
+      source: path.join(__dirname, 'non-existent-file.yaml'),
       destinationBucket: bucket,
       substitutions: {
         testMethod: 'changedTestMethodSuccess',
         mock: 'changedMockTypeSuccess',
       },
     });
-  }).toThrow(`No file found at 'source' path ${path.join(__dirname, 'non-existant-file.yaml')}`);
+  }).toThrow(`No file found at 'source' path ${path.join(__dirname, 'non-existent-file.yaml')}`);
 });
 
 test('DeployTimeSubstitutedFile does not make substitutions when no substitutions are passed in', () => {
