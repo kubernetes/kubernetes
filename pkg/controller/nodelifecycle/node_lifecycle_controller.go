@@ -764,12 +764,18 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 			nc.processTaintBaseEviction(ctx, node, currentReadyCondition)
 
 			_, needsRetry := nc.nodesToRetry.Load(node.Name)
-			switch {
-			case currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue:
-				// Report node event only once when status changed.
+			// 1. Determine the context triggers using clean boolean variables
+			nodeJustBecameNotReady := currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue
+			nodeStatusWentUnknown := currentReadyCondition.Status == v1.ConditionUnknown && observedReadyCondition.Status != v1.ConditionUnknown
+			failedAndNeedsRetry := needsRetry && observedReadyCondition.Status != v1.ConditionTrue
+
+			// 2. Perform the single-occurrence event logging
+			if nodeJustBecameNotReady {
 				controllerutil.RecordNodeStatusChange(logger, nc.recorder, node, "NodeNotReady")
-				fallthrough
-			case needsRetry && observedReadyCondition.Status != v1.ConditionTrue:
+			}
+
+			// 3. Evaluate if pods must be marked NotReady (without repeating the inner logic)
+			if nodeJustBecameNotReady || nodeStatusWentUnknown || failedAndNeedsRetry {
 				if err = controllerutil.MarkPodsNotReady(ctx, nc.kubeClient, nc.recorder, pods, node.Name); err != nil {
 					utilruntime.HandleErrorWithContext(ctx, err, "Unable to mark all pods NotReady on node; queuing for retry", "node", node.Name)
 					nc.nodesToRetry.Store(node.Name, struct{}{})
