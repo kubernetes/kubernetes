@@ -88,6 +88,14 @@ func (h *Histogram) DeprecatedVersion() *semver.Version {
 	return parseSemver(h.HistogramOpts.DeprecatedVersion)
 }
 
+// Reset resets the underlying prometheus Histogram to start counting from 0 again
+func (h *Histogram) Reset() {
+	if !h.IsCreated() {
+		return
+	}
+	h.setPrometheusHistogram(prometheus.NewHistogram(h.HistogramOpts.toPromHistogramOpts()))
+}
+
 // initializeMetric invokes the actual prometheus.Histogram object instantiation
 // and stores a reference to it
 func (h *Histogram) initializeMetric() {

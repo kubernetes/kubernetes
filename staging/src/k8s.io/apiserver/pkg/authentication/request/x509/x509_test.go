@@ -23,10 +23,13 @@ import (
 	"encoding/asn1"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"regexp"
 	"sort"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -39,6 +42,8 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 )
 
 const (
@@ -1277,4 +1282,79 @@ func TestCertificateIdentifier(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestClientCertificateExpirationSeconds(t *testing.T) {
+	clientCertificateExpirationHistogram.Reset()
+	defer clientCertificateExpirationHistogram.Reset()
+
+	certs := getCerts(t, clientCNCert)
+	req, err := http.NewRequest("GET", "/", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	req.TLS = &tls.ConnectionState{PeerCertificates: certs}
+
+	a := New(getDefaultVerifyOptions(t), CommonNameUserConversion)
+	if _, ok, err := a.AuthenticateRequest(req); err != nil || !ok {
+		t.Fatalf("AuthenticateRequest() = ok=%v err=%v", ok, err)
+	}
+
+	remaining, err := histogramSampleSum("apiserver_client_certificate_expiration_seconds")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := certificateExpirationMetricWant(remaining)
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(want), "apiserver_client_certificate_expiration_seconds"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func histogramSampleSum(name string) (float64, error) {
+	metricFamilies, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		return 0, err
+	}
+	for _, mf := range metricFamilies {
+		if mf.GetName() != name {
+			continue
+		}
+		if len(mf.Metric) != 1 {
+			return 0, fmt.Errorf("expected one sample for %s, got %d", name, len(mf.Metric))
+		}
+		return mf.Metric[0].GetHistogram().GetSampleSum(), nil
+	}
+	return 0, fmt.Errorf("metric %s not found", name)
+}
+
+func certificateExpirationMetricWant(remaining float64) string {
+	buckets := []float64{0, 1800, 3600, 7200, 21600, 43200, 86400, 172800, 345600, 604800, 2592000, 7776000, 15552000, 31104000}
+	var b strings.Builder
+	b.WriteString("# HELP apiserver_client_certificate_expiration_seconds [BETA] Distribution of the remaining lifetime on the certificate used to authenticate a request.\n")
+	b.WriteString("# TYPE apiserver_client_certificate_expiration_seconds histogram\n")
+	for _, le := range buckets {
+		count := 0
+		if remaining <= le {
+			count = 1
+		}
+		b.WriteString("apiserver_client_certificate_expiration_seconds_bucket{le=\"")
+		b.WriteString(formatHistogramBucketLE(le))
+		b.WriteString("\"} ")
+		b.WriteString(strconv.Itoa(count))
+		b.WriteString("\n")
+	}
+	b.WriteString("apiserver_client_certificate_expiration_seconds_bucket{le=\"+Inf\"} 1\n")
+	b.WriteString("apiserver_client_certificate_expiration_seconds_sum ")
+	b.WriteString(strconv.FormatFloat(remaining, 'f', -1, 64))
+	b.WriteString("\n")
+	b.WriteString("apiserver_client_certificate_expiration_seconds_count 1\n")
+	return b.String()
+}
+
+func formatHistogramBucketLE(le float64) string {
+	if le == 0 {
+		return "0"
+	}
+	return strconv.FormatFloat(le, 'f', -1, 64)
 }
