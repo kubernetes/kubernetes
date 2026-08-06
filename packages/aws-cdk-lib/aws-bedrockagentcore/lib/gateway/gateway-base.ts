@@ -11,6 +11,9 @@ import type * as kms from '../../../aws-kms';
 import { Resource } from '../../../core';
 import type { IResource, ResourceProps } from '../../../core';
 
+/** The operation dimension value for AgentCore Gateway invocation metrics. */
+const INVOKE_OPERATION = 'InvokeGateway';
+
 /******************************************************************************
  *                                 Enums
  *****************************************************************************/
@@ -346,8 +349,13 @@ export abstract class GatewayBase extends Resource implements IGateway {
   /**
    * Return the given named metric for this gateway.
    *
-   * By default, the metric will be calculated as a sum over a period of 5 minutes.
-   * You can customize this by using the `statistic` and `period` properties.
+   * The metric is scoped to this gateway. By default, the metric will be calculated
+   * as a sum over a period of 5 minutes. You can customize this by using the `statistic`
+   * and `period` properties.
+   *
+   * By default this emits the `Operation`, `Protocol`, and `Resource` dimensions. To target a
+   * different dimension combination, override or extend them via `props.dimensionsMap`; any
+   * dimensions you supply are merged on top of the defaults.
    *
    * @param metricName The name of the metric
    * @param props Optional metric configuration
@@ -357,7 +365,12 @@ export abstract class GatewayBase extends Resource implements IGateway {
       namespace: 'AWS/Bedrock-AgentCore',
       metricName,
       ...props,
-      dimensionsMap: { Resource: this.gatewayRef.gatewayArn, ...props?.dimensionsMap },
+      dimensionsMap: {
+        Operation: INVOKE_OPERATION,
+        Protocol: this.protocolConfiguration.protocolType,
+        Resource: this.gatewayRef.gatewayArn,
+        ...props?.dimensionsMap,
+      },
     };
     return this.configureMetric(metricProps);
   }
@@ -422,9 +435,13 @@ export abstract class GatewayBase extends Resource implements IGateway {
 
   /**
    * Return a metric containing the number of requests served by each target type for this gateway.
+   *
+   * By default this emits the `TargetType` and `Resource` dimensions. Any dimensions
+   * supplied via `props.dimensionsMap` are spread last, so a caller MAY add extra
+   * dimensions or override any default (including `TargetType`) by reusing its key.
    */
   public metricTargetType(targetType: string, props?: MetricOptions): Metric {
-    return this.metric('TargetType', { dimensionsMap: { TargetType: targetType }, statistic: Stats.SUM, ...props });
+    return this.metric('TargetType', { statistic: Stats.SUM, ...props, dimensionsMap: { TargetType: targetType, ...props?.dimensionsMap } });
   }
 
   /**
