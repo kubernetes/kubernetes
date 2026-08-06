@@ -877,6 +877,8 @@ new glue.ExternalTable(this, 'MyTable', {
 
 ## [Encryption](https://docs.aws.amazon.com/athena/latest/ug/encryption.html)
 
+When the table creates its own S3 bucket (i.e. you do not pass an explicit `bucket`), that bucket enforces SSL: a bucket policy denies any request made over plain HTTP. If you provide your own bucket, enabling `enforceSSL` on it is your responsibility.
+
 You can enable encryption on a Table's data:
 
 * [S3Managed](https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingServerSideEncryption.html) - (default) Server side encryption (`SSE-S3`) with an Amazon S3-managed key.

@@ -276,7 +276,8 @@
       "type": "aws:cdk:analytics:construct",
       "data": {
         "encryption": "KMS",
-        "encryptionKey": "*"
+        "encryptionKey": "*",
+        "enforceSSL": true
       }
     }
   ],
@@ -466,6 +467,14 @@
       "data": "MyEncryptedTableBucket7B28486D"
     }
   ],
+  "/aws-cdk-glue/MyEncryptedTable/Bucket/Policy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "bucket": "*"
+      }
+    }
+  ],
   "/aws-cdk-glue/MyUser/DefaultPolicy/Resource": [
     {
       "type": "aws:cdk:logicalId",
@@ -476,6 +485,12 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "AnotherUserDefaultPolicyDBDB9923"
+    }
+  ],
+  "/aws-cdk-glue/MyEncryptedTable/Bucket/Policy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyEncryptedTableBucketPolicy458C373C"
     }
   ]
 }

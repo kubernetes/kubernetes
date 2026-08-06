@@ -354,6 +354,53 @@
    "UpdateReplacePolicy": "Retain",
    "DeletionPolicy": "Retain"
   },
+  "MyEncryptedTableBucketPolicy458C373C": {
+   "Type": "AWS::S3::BucketPolicy",
+   "Properties": {
+    "Bucket": {
+     "Ref": "MyEncryptedTableBucket7B28486D"
+    },
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "s3:*",
+       "Condition": {
+        "Bool": {
+         "aws:SecureTransport": "false"
+        }
+       },
+       "Effect": "Deny",
+       "Principal": {
+        "AWS": "*"
+       },
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "MyEncryptedTableBucket7B28486D",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "MyEncryptedTableBucket7B28486D",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   }
+  },
   "MyEncryptedTable981A88C6": {
    "Type": "AWS::Glue::Table",
    "Properties": {
