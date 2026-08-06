@@ -70,6 +70,20 @@ func newGetTemplateFn(nodeName types.NodeName, getAddresses func() []v1.NodeAddr
 	}
 }
 
+type combinedCounter struct {
+	certificateRenewFailure      certificate.Counter
+	certificateRenewFailureTotal certificate.Counter
+}
+
+func (c combinedCounter) Inc() {
+	if c.certificateRenewFailure != nil {
+		c.certificateRenewFailure.Inc()
+	}
+	if c.certificateRenewFailureTotal != nil {
+		c.certificateRenewFailureTotal.Inc()
+	}
+}
+
 // NewKubeletServerCertificateManager creates a certificate manager for the kubelet when retrieving a server certificate
 // or returns an error.
 func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg *kubeletconfig.KubeletConfiguration, nodeName types.NodeName, getAddresses func() []v1.NodeAddress, certDirectory string) (certificate.Manager, error) {
@@ -90,13 +104,24 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 	}
 	var certificateRenewFailure = compbasemetrics.NewCounter(
 		&compbasemetrics.CounterOpts{
+			Subsystem:         metrics.KubeletSubsystem,
+			Name:              "server_expiration_renew_errors",
+			Help:              "Counter of certificate renewal errors. Deprecated in favor of kubelet_server_expiration_renew_errors_total",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.40.0",
+		},
+	)
+	legacyregistry.MustRegister(certificateRenewFailure)
+
+	var certificateRenewFailureTotal = compbasemetrics.NewCounter(
+		&compbasemetrics.CounterOpts{
 			Subsystem:      metrics.KubeletSubsystem,
-			Name:           "server_expiration_renew_errors",
+			Name:           "server_expiration_renew_errors_total",
 			Help:           "Counter of certificate renewal errors.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 	)
-	legacyregistry.MustRegister(certificateRenewFailure)
+	legacyregistry.MustRegister(certificateRenewFailureTotal)
 
 	certificateRotationAge := compbasemetrics.NewHistogram(
 		&compbasemetrics.HistogramOpts{
@@ -123,13 +148,16 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 	getTemplate := newGetTemplateFn(nodeName, getAddresses)
 
 	m, err := certificate.NewManager(&certificate.Config{
-		ClientsetFn:             clientsetFn,
-		GetTemplate:             getTemplate,
-		SignerName:              certificates.KubeletServingSignerName,
-		GetUsages:               certificate.DefaultKubeletServingGetUsages,
-		CertificateStore:        certificateStore,
-		CertificateRotation:     certificateRotationAge,
-		CertificateRenewFailure: certificateRenewFailure,
+		ClientsetFn:         clientsetFn,
+		GetTemplate:         getTemplate,
+		SignerName:          certificates.KubeletServingSignerName,
+		GetUsages:           certificate.DefaultKubeletServingGetUsages,
+		CertificateStore:    certificateStore,
+		CertificateRotation: certificateRotationAge,
+		CertificateRenewFailure: combinedCounter{
+			certificateRenewFailure:      certificateRenewFailure,
+			certificateRenewFailureTotal: certificateRenewFailureTotal,
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize server certificate manager: %v", err)
@@ -217,14 +245,26 @@ func NewKubeletClientCertificateManager(
 	}
 	var certificateRenewFailure = compbasemetrics.NewCounter(
 		&compbasemetrics.CounterOpts{
+			Namespace:         metrics.KubeletSubsystem,
+			Subsystem:         "certificate_manager",
+			Name:              "client_expiration_renew_errors",
+			Help:              "Counter of certificate renewal errors. Deprecated in favor of kubelet_certificate_manager_client_expiration_renew_errors_total",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.40.0",
+		},
+	)
+	_ = legacyregistry.Register(certificateRenewFailure)
+
+	var certificateRenewFailureTotal = compbasemetrics.NewCounter(
+		&compbasemetrics.CounterOpts{
 			Namespace:      metrics.KubeletSubsystem,
 			Subsystem:      "certificate_manager",
-			Name:           "client_expiration_renew_errors",
+			Name:           "client_expiration_renew_errors_total",
 			Help:           "Counter of certificate renewal errors.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 	)
-	legacyregistry.Register(certificateRenewFailure)
+	_ = legacyregistry.Register(certificateRenewFailureTotal)
 
 	m, err := certificate.NewManager(&certificate.Config{
 		ClientsetFn: clientsetFn,
@@ -243,8 +283,11 @@ func NewKubeletClientCertificateManager(
 		BootstrapCertificatePEM: bootstrapCertData,
 		BootstrapKeyPEM:         bootstrapKeyData,
 
-		CertificateStore:        certificateStore,
-		CertificateRenewFailure: certificateRenewFailure,
+		CertificateStore: certificateStore,
+		CertificateRenewFailure: combinedCounter{
+			certificateRenewFailure:      certificateRenewFailure,
+			certificateRenewFailureTotal: certificateRenewFailureTotal,
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize client certificate manager: %v", err)
