@@ -46,41 +46,97 @@
       initNodes: 100
       initPodGroups: 10
       podsPerGroup: 3
+  - name: 100Nodes_10Gangs_CompositePodGroupEnabled
+    labels: [integration-test]
+    params:
+      initNodes: 100
+      initPodGroups: 10
+      podsPerGroup: 3
+    featureGates:
+      CompositePodGroup: true
   - name: 5000Nodes_750Gangs_3000Pods
     labels: [performance]
     params:
       initNodes: 5000
       initPodGroups: 750
       podsPerGroup: 4
+  - name: 5000Nodes_750Gangs_3000Pods_CompositePodGroupEnabled
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPodGroups: 750
+      podsPerGroup: 4
+    featureGates:
+      CompositePodGroup: true
   - name: 5000Nodes_1500Gangs_6000Pods
     labels: [performance]
     params:
       initNodes: 5000
       initPodGroups: 1500
       podsPerGroup: 4
+  - name: 5000Nodes_1500Gangs_6000Pods_CompositePodGroupEnabled
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPodGroups: 1500
+      podsPerGroup: 4
+    featureGates:
+      CompositePodGroup: true
   - name: 5000Nodes_2250Gangs_9000Pods
     labels: [performance]
     params:
       initNodes: 5000
       initPodGroups: 2250
       podsPerGroup: 4
+  - name: 5000Nodes_2250Gangs_9000Pods_CompositePodGroupEnabled
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPodGroups: 2250
+      podsPerGroup: 4
+    featureGates:
+      CompositePodGroup: true
   - name: 5000Nodes_3Gangs_3000Pods_1000PerGroup
     labels: [performance]
     params:
       initNodes: 5000
       initPodGroups: 3
       podsPerGroup: 1000
+  - name: 5000Nodes_3Gangs_3000Pods_1000PerGroup_CompositePodGroupEnabled
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPodGroups: 3
+      podsPerGroup: 1000
+    featureGates:
+      CompositePodGroup: true
   - name: 5000Nodes_6Gangs_6000Pods_1000PerGroup
     labels: [performance]
     params:
       initNodes: 5000
       initPodGroups: 6
       podsPerGroup: 1000
+  - name: 5000Nodes_6Gangs_6000Pods_1000PerGroup_CompositePodGroupEnabled
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPodGroups: 6
+      podsPerGroup: 1000
+    featureGates:
+      CompositePodGroup: true
   - name: 5000Nodes_9Gangs_9000Pods_1000PerGroup
     labels: [performance]
     params:
       initNodes: 5000
       initPodGroups: 9
       podsPerGroup: 1000
+  - name: 5000Nodes_9Gangs_9000Pods_1000PerGroup_CompositePodGroupEnabled
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPodGroups: 9
+      podsPerGroup: 1000
+    featureGates:
+      CompositePodGroup: true
 
 
