@@ -1285,9 +1285,6 @@
             "type": "string"
           }
         },
-        "required": [
-          "replicas"
-        ],
         "type": "object"
       },
       "io.k8s.api.core.v1.AWSElasticBlockStoreVolumeSource": {

@@ -127,7 +127,7 @@ func (HorizontalPodAutoscalerBehavior) SwaggerDoc() map[string]string {
 var map_HorizontalPodAutoscalerCondition = map[string]string{
 	"":                   "HorizontalPodAutoscalerCondition describes the state of a HorizontalPodAutoscaler at a certain point.",
 	"type":               "type describes the current condition",
-	"status":             "status is the status of the condition (True, False, Unknown)",
+	"status":             "status is the status of the condition, one of True, False, Unknown.",
 	"lastTransitionTime": "lastTransitionTime is the last time the condition transitioned from one status to another",
 	"reason":             "reason is the reason for the condition's last transition.",
 	"message":            "message is a human-readable explanation containing details about the transition",
