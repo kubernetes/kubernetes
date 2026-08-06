@@ -17,7 +17,6 @@ limitations under the License.
 package headerrequest
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 
@@ -27,6 +26,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2/ktesting"
 )
 
 const (
@@ -89,6 +89,8 @@ func TestRequestHeaderAuthRequestController(t *testing.T) {
 
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
 			// test data
 			indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 			if err := indexer.Add(scenario.cm); err != nil {
@@ -98,7 +100,7 @@ func TestRequestHeaderAuthRequestController(t *testing.T) {
 			target.configmapLister = corev1listers.NewConfigMapLister(indexer).ConfigMaps(defConfigMapNamespace)
 
 			// act
-			err := target.sync()
+			err := target.sync(ctx)
 
 			if err != nil && !scenario.expectErr {
 				t.Errorf("got unexpected error %v", err)
@@ -177,6 +179,8 @@ func TestRequestHeaderAuthRequestControllerPreserveState(t *testing.T) {
 
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
 			// test data
 			if scenario.cm != nil {
 				indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
@@ -187,7 +191,7 @@ func TestRequestHeaderAuthRequestControllerPreserveState(t *testing.T) {
 			}
 
 			// act
-			err := target.sync()
+			err := target.sync(ctx)
 
 			if err != nil && !scenario.expectErr {
 				t.Errorf("got unexpected error %v", err)
@@ -230,7 +234,7 @@ func TestRequestHeaderAuthRequestControllerSyncOnce(t *testing.T) {
 			target.client = fakeKubeClient
 
 			// act
-			ctx := context.TODO()
+			_, ctx := ktesting.NewTestContext(t)
 			err := target.RunOnce(ctx)
 
 			if err != nil && !scenario.expectErr {
