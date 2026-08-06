@@ -20,6 +20,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/component-helpers/storage/volume"
@@ -124,7 +125,7 @@ func TestDeleteSync(t *testing.T) {
 				// happen)
 				claim := newClaim("claim8-7", "uid8-7", "10Gi", "volume8-7", v1.ClaimBound, nil)
 				reactor.AddClaimBoundToVolume(claim)
-				ctrl.claims.Add(claim)
+				require.NoError(t, ctrl.claims.Indexer().Add(claim))
 			}),
 		},
 		{
@@ -234,6 +235,21 @@ func TestDeleteSync(t *testing.T) {
 			expectedEvents:  noevents,
 			errors:          noerrors,
 			test:            wrapTestWithReclaimCalls(operationDelete, []error{nil}, testSyncVolume),
+		},
+		{
+			// A retained volume is already Released and its bound claim was
+			// deleted and recreated with the same name but a different UID. The
+			// controller must not re-check the recreated claim against the
+			// apiserver: doing so on every sync (every 15s per released PV) is
+			// pure load.
+			name:            "8-14 - released retained volume with recreated claim is not re-checked",
+			initialVolumes:  newVolumeArray("volume8-14", "1Gi", "uid8-14", "claim8-14", v1.VolumeReleased, v1.PersistentVolumeReclaimRetain, classEmpty, volume.AnnBoundByController),
+			expectedVolumes: newVolumeArray("volume8-14", "1Gi", "uid8-14", "claim8-14", v1.VolumeReleased, v1.PersistentVolumeReclaimRetain, classEmpty, volume.AnnBoundByController),
+			initialClaims:   newClaimArray("claim8-14", "uid8-14-x", "10Gi", "", v1.ClaimPending, nil),
+			expectedClaims:  newClaimArray("claim8-14", "uid8-14-x", "10Gi", "", v1.ClaimPending, nil),
+			expectedEvents:  noevents,
+			errors:          []pvtesting.ReactorError{{Verb: "get", Resource: "persistentvolumeclaims", Error: errors.New("unexpected GET of recreated claim for released volume")}},
+			test:            testSyncVolume,
 		},
 	}
 	runSyncTests(t, ctx, tests, []*storage.StorageClass{}, []*v1.Pod{})
