@@ -105,11 +105,28 @@ func DeleteAllStatefulSets(ctx context.Context, c clientset.Interface, ns string
 			framework.Logf("WARNING: Failed to list pvcs, retrying %v", err)
 			return false, nil
 		}
+		podList, err := c.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			framework.Logf("WARNING: Failed to list pods, retrying %v", err)
+			return false, nil
+		}
+		inUsePVCs := sets.NewString()
+		for _, pod := range podList.Items {
+			for _, vol := range pod.Spec.Volumes {
+				if vol.PersistentVolumeClaim != nil {
+					inUsePVCs.Insert(vol.PersistentVolumeClaim.ClaimName)
+				}
+			}
+		}
 		for _, pvc := range pvcList.Items {
 			pvNames.Insert(pvc.Spec.VolumeName)
-			// TODO: Double check that there are no pods referencing the pvc
+			if inUsePVCs.Has(pvc.Name) {
+				framework.Logf("Skipping deletion of pvc %v as it is still in use", pvc.Name)
+				continue
+			}
 			framework.Logf("Deleting pvc: %v with volume %v", pvc.Name, pvc.Spec.VolumeName)
-			if err := c.CoreV1().PersistentVolumeClaims(ns).Delete(ctx, pvc.Name, metav1.DeleteOptions{}); err != nil {
+			policy := metav1.DeletePropagationForeground
+			if err := c.CoreV1().PersistentVolumeClaims(ns).Delete(ctx, pvc.Name, metav1.DeleteOptions{PropagationPolicy: &policy}); err != nil {
 				return false, nil
 			}
 		}
