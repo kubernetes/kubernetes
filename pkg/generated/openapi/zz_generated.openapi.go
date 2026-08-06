@@ -56735,7 +56735,7 @@ func schema_k8sio_api_scheduling_v1alpha3_CompositeGangSchedulingPolicy(ref comm
 				Properties: map[string]spec.Schema{
 					"minGroupCount": {
 						SchemaProps: spec.SchemaProps{
-							Description: "minGroupCount is the minimum number of child groups that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer.",
+							Description: "minGroupCount is the minimum number of child groups that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer. This field is mutable to support workload scaling.\n\nNote that the scheduler operates on an eventually consistent model. Updates to minGroupCount may not be immediately reflected in scheduling decisions due to propagation delays. If minGroupCount is updated while a scheduling cycle is in progress for that group, the new value may not take effect until the next cycle. Moreover, minGroupCount is only enforced during scheduling, meaning that modifications to this field do not affect already-scheduled pods, applying only to those evaluated in future cycles.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -56886,18 +56886,18 @@ func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupSchedulingPolicy(ref 
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup. Exactly one policy must be set.",
+				Description: "CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup. Exactly one policy must be set. The policy is chosen at creation time by setting either the Basic or Gang field. The CompositePodGroup may not change policy after creation. Fields within chosen policy may be updated after creation when their individual fields allow it.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"basic": {
 						SchemaProps: spec.SchemaProps{
-							Description: "basic specifies that the groups of this composite group should be scheduled independently. This field is immutable.",
+							Description: "basic specifies that the groups of this composite group should be scheduled independently. Setting this field at group creation time opts this group to basic scheduling; this field cannot be changed afterward.",
 							Ref:         ref(schedulingv1alpha3.CompositeBasicSchedulingPolicy{}.OpenAPIModelName()),
 						},
 					},
 					"gang": {
 						SchemaProps: spec.SchemaProps{
-							Description: "gang specifies that the groups of this composite group should be scheduled using all-or-nothing semantics.",
+							Description: "gang specifies that the groups of this composite group should be scheduled using all-or-nothing semantics. Setting this field at group creation time opts this group to gang scheduling; this field cannot be set or unset afterward. The minGroupCount field within Gang scheduling policy remains mutable after group creation.",
 							Ref:         ref(schedulingv1alpha3.CompositeGangSchedulingPolicy{}.OpenAPIModelName()),
 						},
 					},
@@ -56943,7 +56943,7 @@ func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupSpec(ref common.Refer
 					},
 					"schedulingPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "schedulingPolicy defines the scheduling policy for this instance of the CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. This field is immutable.",
+							Description: "schedulingPolicy defines the scheduling policy for this instance of the CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(schedulingv1alpha3.CompositePodGroupSchedulingPolicy{}.OpenAPIModelName()),
 						},
@@ -58403,7 +58403,7 @@ func schema_k8sio_api_scheduling_v1beta1_CompositeGangSchedulingPolicy(ref commo
 				Properties: map[string]spec.Schema{
 					"minGroupCount": {
 						SchemaProps: spec.SchemaProps{
-							Description: "minGroupCount is the minimum number of child groups that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer.",
+							Description: "minGroupCount is the minimum number of child groups that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer. This field is mutable to support workload scaling.\n\nNote that the scheduler operates on an eventually consistent model. Updates to minGroupCount may not be immediately reflected in scheduling decisions due to propagation delays. If minGroupCount is updated while a scheduling cycle is in progress for that group, the new value may not take effect until the next cycle. Moreover, minGroupCount is only enforced during scheduling, meaning that modifications to this field do not affect already-scheduled pods, applying only to those evaluated in future cycles.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -58453,18 +58453,18 @@ func schema_k8sio_api_scheduling_v1beta1_CompositePodGroupSchedulingPolicy(ref c
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup. Exactly one policy must be set.",
+				Description: "CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup. Exactly one policy must be set. The policy is chosen at creation time by setting either the Basic or Gang field. The CompositePodGroup may not change policy after creation. Fields within chosen policy may be updated after creation when their individual fields allow it.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"basic": {
 						SchemaProps: spec.SchemaProps{
-							Description: "basic specifies that the groups of this composite group should be scheduled independently. This field is immutable.",
+							Description: "basic specifies that the groups of this composite group should be scheduled independently. Setting this field at group creation time opts this group to basic scheduling; this field cannot be changed afterward.",
 							Ref:         ref(schedulingv1beta1.CompositeBasicSchedulingPolicy{}.OpenAPIModelName()),
 						},
 					},
 					"gang": {
 						SchemaProps: spec.SchemaProps{
-							Description: "gang specifies that the groups of this composite group should be scheduled using all-or-nothing semantics.",
+							Description: "gang specifies that the groups of this composite group should be scheduled using all-or-nothing semantics. Setting this field at group creation time opts this group to gang scheduling; this field cannot be set or unset afterward. The minGroupCount field within Gang scheduling policy remains mutable after group creation.",
 							Ref:         ref(schedulingv1beta1.CompositeGangSchedulingPolicy{}.OpenAPIModelName()),
 						},
 					},
