@@ -537,6 +537,51 @@ func (ssc *defaultStatefulSetControl) processCondemned(ctx context.Context, set 
 	return true, ssc.podControl.DeleteStatefulPod(set, condemned[i])
 }
 
+// processCondemnedPods fixes retention-policy claims and processes Pods
+// whose ordinals are outside the desired replica range.
+func (ssc *defaultStatefulSetControl) processCondemnedPods(
+	ctx context.Context,
+	set *apps.StatefulSet,
+	updateSet *apps.StatefulSet,
+	firstUnavailablePod *v1.Pod,
+	monotonic bool,
+	condemned []*v1.Pod,
+	now time.Time,
+) (bool, error) {
+	fixPodClaim := func(i int) (bool, error) {
+		matchPolicy, err := ssc.podControl.ClaimsMatchRetentionPolicy(ctx, updateSet, condemned[i])
+		if err != nil {
+			return true, err
+		}
+
+		if !matchPolicy {
+			if err := ssc.podControl.UpdatePodClaimForRetentionPolicy(ctx, updateSet, condemned[i]); err != nil {
+				return true, err
+			}
+		}
+
+		return false, nil
+	}
+
+	if shouldExit, err := runForAll(condemned, fixPodClaim, monotonic); shouldExit || err != nil {
+		return shouldExit, err
+	}
+
+	processCondemnedFn := func(i int) (bool, error) {
+		return ssc.processCondemned(
+			ctx,
+			set,
+			firstUnavailablePod,
+			monotonic,
+			condemned,
+			i,
+			now,
+		)
+	}
+
+	return runForAll(condemned, processCondemnedFn, monotonic)
+}
+
 func runForAll(pods []*v1.Pod, fn func(i int) (bool, error), monotonic bool) (bool, error) {
 	if monotonic {
 		for i := range pods {
@@ -683,7 +728,26 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 		}
 	}
 
-	// First, process each living replica. Exit if we run into an error or something blocking in monotonic mode.
+	// Parallel Pod management does not require ordered processing. Process
+	// condemned Pods first so scale down can release resources before the
+	// controller attempts to create missing Pods in the desired ordinal range.
+	if !monotonic {
+		if shouldExit, err := ssc.processCondemnedPods(
+			ctx,
+			set,
+			updateSet,
+			firstUnavailablePod,
+			monotonic,
+			condemned,
+			now,
+		); shouldExit || err != nil {
+			updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, now, replicas, condemned)
+			return &status, err
+		}
+	}
+
+	// Process each living replica. Exit if we run into an error or something
+	// blocking in monotonic mode.
 	processReplicaFn := func(i int) (bool, error) {
 		return ssc.processReplica(ctx, set, updateSet, monotonic, replicas, i, now)
 	}
@@ -692,34 +756,20 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 		return &status, err
 	}
 
-	// Fix pod claims for condemned pods, if necessary.
-	fixPodClaim := func(i int) (bool, error) {
-		if matchPolicy, err := ssc.podControl.ClaimsMatchRetentionPolicy(ctx, updateSet, condemned[i]); err != nil {
-			return true, err
-		} else if !matchPolicy {
-			if err := ssc.podControl.UpdatePodClaimForRetentionPolicy(ctx, updateSet, condemned[i]); err != nil {
-				return true, err
-			}
+	// Preserve the existing processing order for OrderedReady StatefulSets.
+	if monotonic {
+		if shouldExit, err := ssc.processCondemnedPods(
+			ctx,
+			set,
+			updateSet,
+			firstUnavailablePod,
+			monotonic,
+			condemned,
+			now,
+		); shouldExit || err != nil {
+			updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, now, replicas, condemned)
+			return &status, err
 		}
-		return false, nil
-	}
-	if shouldExit, err := runForAll(condemned, fixPodClaim, monotonic); shouldExit || err != nil {
-		updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, now, replicas, condemned)
-		return &status, err
-	}
-
-	// At this point, in monotonic mode all of the current Replicas are Running, Ready and Available,
-	// and we can consider termination.
-	// We will wait for all predecessors to be Running and Available prior to attempting a deletion.
-	// We will terminate Pods in a monotonically decreasing order.
-	// Note that we do not resurrect Pods in this interval. Also note that scaling will take precedence over
-	// updates.
-	processCondemnedFn := func(i int) (bool, error) {
-		return ssc.processCondemned(ctx, set, firstUnavailablePod, monotonic, condemned, i, now)
-	}
-	if shouldExit, err := runForAll(condemned, processCondemnedFn, monotonic); shouldExit || err != nil {
-		updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, now, replicas, condemned)
-		return &status, err
 	}
 
 	updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, now, replicas, condemned)
