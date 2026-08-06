@@ -71,6 +71,9 @@ type Scheduler struct {
 	// by NodeLister and Algorithm.
 	Cache internalcache.Cache
 
+	// Extenders holds the same slice of extenders handed to the framework via WithExtenders.
+	// Algorithm-side code (filtering, scoring) reads Framework.Extenders(), while
+	// extendersBinding uses this field because binding is a Scheduler-level concern.
 	Extenders []fwk.Extender
 
 	// NextEntity should be a function that blocks until the next entity (pod or pod group)
@@ -81,11 +84,6 @@ type Scheduler struct {
 
 	// FailureHandler is called upon a scheduling failure.
 	FailureHandler FailureHandlerFn
-
-	// SchedulePod tries to schedule the given pod to one of the nodes in the node list.
-	// Return a struct of ScheduleResult with the name of suggested host on success,
-	// otherwise will return a FitError with reasons.
-	SchedulePod func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) (ScheduleResult, error)
 
 	// Close this to shut down the scheduler.
 	StopEverything <-chan struct{}
@@ -108,10 +106,6 @@ type Scheduler struct {
 
 	nodeInfoSnapshot *internalcache.Snapshot
 
-	percentageOfNodesToScore int32
-
-	nextStartNodeIndex int
-
 	// logger *must* be initialized when creating a Scheduler,
 	// otherwise logging functions will access a nil sink and
 	// panic.
@@ -123,10 +117,11 @@ type Scheduler struct {
 	nominatedNodeNameForExpectationEnabled              bool
 	genericWorkloadEnabled                              bool
 	inPlacePodVerticalScalingSchedulerPreemptionEnabled bool
+
+	algorithm *SchedulingAlgorithm
 }
 
 func (sched *Scheduler) applyDefaultHandlers() {
-	sched.SchedulePod = sched.schedulePod
 	sched.FailureHandler = sched.handleSchedulingFailure
 }
 
@@ -458,7 +453,6 @@ func New(ctx context.Context,
 		Cache:                                  schedulerCache,
 		client:                                 client,
 		nodeInfoSnapshot:                       snapshot,
-		percentageOfNodesToScore:               options.percentageOfNodesToScore,
 		Extenders:                              extenders,
 		StopEverything:                         stopEverything,
 		SchedulingQueue:                        podQueue,
@@ -470,6 +464,7 @@ func New(ctx context.Context,
 		genericWorkloadEnabled:                 feature.DefaultFeatureGate.Enabled(features.GenericWorkload),
 		inPlacePodVerticalScalingSchedulerPreemptionEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption),
 	}
+	sched.initAlgorithm(withPercentageOfNodesToScore(options.percentageOfNodesToScore))
 	sched.NextEntity = podQueue.Pop
 	sched.applyDefaultHandlers()
 
@@ -681,4 +676,27 @@ func (sched *Scheduler) CurrentCycle() int64 {
 		return sched.SchedulingQueue.SchedulingCycle()
 	}
 	return 0
+}
+
+// alg returns the scheduling algorithm, initializing it from the Scheduler's
+// fields on first use (tests construct Scheduler literals directly).
+func (sched *Scheduler) alg() *SchedulingAlgorithm {
+	if sched.algorithm == nil {
+		sched.initAlgorithm()
+	}
+	return sched.algorithm
+}
+
+func (sched *Scheduler) initAlgorithm(opts ...AlgorithmOption) {
+	a := NewSchedulingAlgorithm(sched.nodeInfoSnapshot, opts...)
+	a.cache = sched.Cache
+	a.cycleProvider = sched.CurrentCycle
+	sched.algorithm = a
+}
+
+// SchedulePod tries to schedule the given pod to one of the nodes in the node list.
+// Returns a ScheduleResult with the name of the suggested host on success,
+// otherwise a FitError with reasons.
+func (sched *Scheduler) SchedulePod(ctx context.Context, f framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) (ScheduleResult, error) {
+	return sched.alg().schedulePod(ctx, f, state, podInfo)
 }

@@ -972,7 +972,6 @@ func TestPodGroupCycle_FillsPodResultsOnFewerResults(t *testing.T) {
 	if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
 		t.Fatalf("Failed to update snapshot: %v", err)
 	}
-	sched.SchedulePod = sched.schedulePod
 
 	resultsMap := sched.runRootSchedulingAlgorithm(ctx, schedFwk, framework.NewCycleState(), podGroupInfo)
 	schedulePodResult := resultsMap[pgKey(podGroupInfo.PodGroupInfo)]
@@ -1152,7 +1151,6 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 				},
 			}
 
-			sched.SchedulePod = sched.schedulePod
 			if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
 				t.Fatalf("Failed to update snapshot: %v", err)
 			}
@@ -1505,7 +1503,6 @@ func TestPodGroupSchedulingAlgorithm(t *testing.T) {
 						SchedulingQueue:  queue,
 						Profiles:         profile.Map{"test-scheduler": schedFwk},
 					}
-					sched.SchedulePod = sched.schedulePod
 
 					if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
 						t.Fatalf("Failed to update snapshot: %v", err)
@@ -1885,6 +1882,7 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			schedulingQueue := internalqueue.NewTestQueue(ctx, schedFwk.QueueSortFunc(), internalqueue.WithClock(fakeClock))
+			schedFwk.SetPodNominator(schedulingQueue)
 			sched := &Scheduler{
 				client:          client,
 				Cache:           cache,
@@ -2860,7 +2858,6 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 					SchedulingQueue:  queue,
 					Profiles:         profile.Map{"test-scheduler": schedFwk},
 				}
-				sched.SchedulePod = sched.schedulePod
 
 				if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
 					t.Fatalf("Failed to update snapshot: %v", err)
@@ -3068,7 +3065,6 @@ func TestPodGroupSchedulingPlacementAlgorithm_Scoring(t *testing.T) {
 					SchedulingQueue:  queue,
 					Profiles:         profile.Map{"test-scheduler": schedFwk},
 				}
-				sched.SchedulePod = sched.schedulePod
 
 				if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
 					t.Fatalf("Failed to update snapshot: %v", err)
@@ -3238,7 +3234,6 @@ func TestPlacementCycleStateLifecycle(t *testing.T) {
 				SchedulingQueue:  queue,
 				Profiles:         profile.Map{"test-scheduler": schedFwk},
 			}
-			sched.SchedulePod = sched.schedulePod
 
 			if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
 				t.Fatalf("Failed to update snapshot: %v", err)
@@ -3507,7 +3502,6 @@ func TestPlacementCycleStateLifecycle_MultiLevel(t *testing.T) {
 		SchedulingQueue:  queue,
 		Profiles:         profile.Map{"test-scheduler": schedFwk},
 	}
-	sched.SchedulePod = sched.schedulePod
 
 	if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
 		t.Fatalf("Failed to update snapshot: %v", err)
@@ -3943,7 +3937,6 @@ func TestCPGSchedulingPlacementAlgorithm(t *testing.T) {
 				SchedulingQueue:  queue,
 				Profiles:         profile.Map{"test-scheduler": schedFwk},
 			}
-			sched.SchedulePod = sched.schedulePod
 
 			if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
 				t.Fatalf("Failed to update snapshot: %v", err)
@@ -4250,7 +4243,6 @@ func TestCPGSchedulingPlacementAlgorithm_Scoring(t *testing.T) {
 				SchedulingQueue:  queue,
 				Profiles:         profile.Map{"test-scheduler": schedFwk},
 			}
-			sched.SchedulePod = sched.schedulePod
 
 			if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
 				t.Fatalf("Failed to update snapshot: %v", err)
@@ -4373,7 +4365,7 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 
 	// Mock SchedulePod to return Unschedulable initially, and success on subsequent calls
 	callCount := 0
-	sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) (ScheduleResult, error) {
+	sched.alg().schedulePodOverride = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) (ScheduleResult, error) {
 		callCount++
 		if callCount <= 2 {
 			return ScheduleResult{}, &framework.FitError{Pod: podInfo.Pod, NumAllNodes: 1}
@@ -4737,9 +4729,10 @@ func TestCPGHierarchicalScheduling_ScheduleOnePodGroup(t *testing.T) {
 		client:           client,
 		SchedulingQueue:  internalqueue.NewTestQueue(ctx, nil),
 	}
+	schedFwk.SetPodNominator(sched.SchedulingQueue)
 
-	// Mock SchedulePod to return success for all pods
-	sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) (ScheduleResult, error) {
+	// Mock schedulePodOverride to return success for all pods
+	sched.alg().schedulePodOverride = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) (ScheduleResult, error) {
 		return ScheduleResult{SuggestedHost: "node1"}, nil
 	}
 
@@ -5039,7 +5032,6 @@ func TestCPGHierarchicalScheduling_Internal(t *testing.T) {
 			handledPods[p.Pod.Name] = status
 		},
 	}
-	sched.SchedulePod = sched.schedulePod
 
 	// Run the scheduling cycle
 	if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
@@ -5265,7 +5257,6 @@ func TestCPGMinGroupCount_Internal(t *testing.T) {
 			handledPods[p.Pod.Name] = status
 		},
 	}
-	sched.SchedulePod = sched.schedulePod
 
 	podGroupInfo := &framework.QueuedPodGroupInfo{
 		QueuedPodInfos: queuedPodInfos,
@@ -5492,7 +5483,6 @@ func TestCPGBasicWithGangChildren_Internal(t *testing.T) {
 			handledPods[p.Pod.Name] = status
 		},
 	}
-	sched.SchedulePod = sched.schedulePod
 
 	podGroupInfo := &framework.QueuedPodGroupInfo{
 		QueuedPodInfos: queuedPodInfos,
