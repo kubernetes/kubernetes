@@ -206,7 +206,8 @@ func TestEventSeriesWithEventSinkImplRace(t *testing.T) {
 	recorder.Eventf(&v1.ObjectReference{}, nil, v1.EventTypeNormal, "reason", "action", "", "")
 	recorder.Eventf(&v1.ObjectReference{}, nil, v1.EventTypeNormal, "reason", "action", "", "")
 
-	err := wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (done bool, err error) {
+	ctx := t.Context()
+	err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
 		events, err := kubeClient.EventsV1().Events(metav1.NamespaceDefault).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
