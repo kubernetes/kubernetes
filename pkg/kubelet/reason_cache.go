@@ -17,26 +17,20 @@ limitations under the License.
 package kubelet
 
 import (
-	"fmt"
+	"sync"
+
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/lru"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // ReasonCache stores the failure reason of the latest container start
-// in a string, keyed by <pod_UID>_<container_name>. The goal is to
-// propagate this reason to the container status. This endeavor is
-// "best-effort" for two reasons:
-//  1. The cache is not persisted.
-//  2. We use an LRU cache to avoid extra garbage collection work. This
-//     means that some entries may be recycled before a pod has been
-//     deleted.
-//
-// TODO(random-liu): Use more reliable cache which could collect garbage of failed pod.
-// TODO(random-liu): Move reason cache to somewhere better.
+// in a string, keyed by pod UID and container name. The goal is to
+// propagate this reason to the container status.
 type ReasonCache struct {
-	cache *lru.Cache
+	lock  sync.RWMutex
+	cache map[types.UID]map[string]*ReasonItem
 }
 
 // ReasonItem is the cached item in ReasonCache
@@ -45,23 +39,22 @@ type ReasonItem struct {
 	Message string
 }
 
-// maxReasonCacheEntries is the cache entry number in lru cache. 1000 is a proper number
-// for our 100 pods per node target. If we support more pods per node in the future, we
-// may want to increase the number.
-const maxReasonCacheEntries = 1000
-
 // NewReasonCache creates an instance of 'ReasonCache'.
 func NewReasonCache() *ReasonCache {
-	return &ReasonCache{cache: lru.New(maxReasonCacheEntries)}
-}
-
-func (c *ReasonCache) composeKey(uid types.UID, name string) string {
-	return fmt.Sprintf("%s_%s", uid, name)
+	return &ReasonCache{
+		cache: make(map[types.UID]map[string]*ReasonItem),
+	}
 }
 
 // add adds error reason into the cache
 func (c *ReasonCache) add(uid types.UID, name string, reason error, message string) {
-	c.cache.Add(c.composeKey(uid, name), ReasonItem{reason, message})
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if c.cache[uid] == nil {
+		c.cache[uid] = make(map[string]*ReasonItem)
+	}
+	c.cache[uid][name] = &ReasonItem{Err: reason, Message: message}
 }
 
 // Update updates the reason cache with the SyncPodResult. Only SyncResult with
@@ -82,17 +75,48 @@ func (c *ReasonCache) Update(uid types.UID, result kubecontainer.PodSyncResult) 
 
 // Remove removes error reason from the cache
 func (c *ReasonCache) Remove(uid types.UID, name string) {
-	c.cache.Remove(c.composeKey(uid, name))
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if podCache, ok := c.cache[uid]; ok {
+		delete(podCache, name)
+		if len(podCache) == 0 {
+			delete(c.cache, uid)
+		}
+	}
+}
+
+// RemovePod removes all error reasons for a specific pod from the cache
+func (c *ReasonCache) RemovePod(uid types.UID) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	delete(c.cache, uid)
+}
+
+// CleanupOrphanedPods removes error reasons for any pod not in the provided active set.
+func (c *ReasonCache) CleanupOrphanedPods(activePods sets.Set[types.UID]) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	for uid := range c.cache {
+		if !activePods.Has(uid) {
+			delete(c.cache, uid)
+		}
+	}
 }
 
 // Get gets error reason from the cache. The return values are error reason, error message and
 // whether an error reason is found in the cache. If no error reason is found, empty string will
 // be returned for error reason and error message.
 func (c *ReasonCache) Get(uid types.UID, name string) (*ReasonItem, bool) {
-	value, ok := c.cache.Get(c.composeKey(uid, name))
-	if !ok {
-		return nil, false
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	if podCache, ok := c.cache[uid]; ok {
+		if info, ok := podCache[name]; ok {
+			// Return a copy so the caller can't mutate the cache
+			infoCopy := *info
+			return &infoCopy, true
+		}
 	}
-	info := value.(ReasonItem)
-	return &info, true
+	return nil, false
 }

@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -47,6 +48,40 @@ func TestReasonCache(t *testing.T) {
 
 	reasonCache.Remove(uid, results[0].Target.(string))
 	assertReasonInfo(t, reasonCache, uid, results[0], false)
+}
+
+func TestReasonCacheCleanupOrphanedPods(t *testing.T) {
+	reasonCache := NewReasonCache()
+	uid1 := types.UID("pod_1")
+	uid2 := types.UID("pod_2")
+	uid3 := types.UID("pod_3")
+
+	reasonCache.add(uid1, "container_1", kubecontainer.ErrRunContainer, "message_1")
+	reasonCache.add(uid2, "container_1", kubecontainer.ErrRunContainer, "message_2")
+	reasonCache.add(uid3, "container_1", kubecontainer.ErrRunContainer, "message_3")
+
+	// Clean up all pods except pod_1 and pod_2
+	activePods := sets.New[types.UID](uid1, uid2)
+	reasonCache.CleanupOrphanedPods(activePods)
+
+	// pod_1 and pod_2 should still be in cache
+	if _, ok := reasonCache.Get(uid1, "container_1"); !ok {
+		t.Errorf("expected pod_1 to be in cache")
+	}
+	if _, ok := reasonCache.Get(uid2, "container_1"); !ok {
+		t.Errorf("expected pod_2 to be in cache")
+	}
+
+	// pod_3 should be removed
+	if _, ok := reasonCache.Get(uid3, "container_1"); ok {
+		t.Errorf("expected pod_3 to be removed from cache")
+	}
+
+	// Test RemovePod
+	reasonCache.RemovePod(uid1)
+	if _, ok := reasonCache.Get(uid1, "container_1"); ok {
+		t.Errorf("expected pod_1 to be removed from cache after RemovePod")
+	}
 }
 
 func assertReasonInfo(t *testing.T, cache *ReasonCache, uid types.UID, result *kubecontainer.SyncResult, found bool) {
