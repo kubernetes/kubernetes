@@ -61,14 +61,6 @@ func (m mapIntInt) Values(keys ...int) []int {
 	return values
 }
 
-func sum(xs []int) int {
-	var s int
-	for _, x := range xs {
-		s += x
-	}
-	return s
-}
-
 func mean(xs []int) float64 {
 	var sum float64
 	for _, x := range xs {
@@ -1030,8 +1022,14 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 					availableAfterAllocation := availableAfterAllocation.Clone()
 
 					// If this subset is not capable of allocating all
-					// remainder CPUs, continue to the next one.
-					if sum(availableAfterAllocation.Values(subset...)) < remainder {
+					// remainder CPUs in whole groups of 'cpuGroupSize',
+					// continue to the next one. Leftover CPUs smaller than a
+					// group cannot be handed out, so a raw CPU sum overcounts.
+					availableGroups := 0
+					for _, numa := range subset {
+						availableGroups += availableAfterAllocation[numa] / cpuGroupSize
+					}
+					if availableGroups*cpuGroupSize < remainder {
 						return Continue
 					}
 
