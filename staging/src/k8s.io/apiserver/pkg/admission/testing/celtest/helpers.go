@@ -17,6 +17,7 @@ limitations under the License.
 package celtest
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 
@@ -27,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utiljson "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apiserver/pkg/admission"
 	admissioncel "k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -141,7 +143,11 @@ func convertObjectToUnstructured(value interface{}) (*unstructured.Unstructured,
 	}
 	switch typed := value.(type) {
 	case map[string]interface{}:
-		return &unstructured.Unstructured{Object: deepCopyMap(typed)}, nil
+		normalized, err := normalizeUnstructuredNumbers(typed)
+		if err != nil {
+			return nil, err
+		}
+		return &unstructured.Unstructured{Object: normalized}, nil
 	case runtime.Object:
 		content, err := runtime.DefaultUnstructuredConverter.ToUnstructured(typed)
 		if err != nil {
@@ -157,6 +163,20 @@ func convertObjectToUnstructured(value interface{}) (*unstructured.Unstructured,
 	default:
 		return nil, fmt.Errorf("unsupported value type %T, must be map[string]interface{} or runtime.Object", value)
 	}
+}
+
+// normalizeUnstructuredNumbers rewrites whole-number float64 values to int64, so
+// CEL sees integers as the API server would (a plain JSON decode yields float64).
+func normalizeUnstructuredNumbers(value map[string]interface{}) (map[string]interface{}, error) {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return nil, err
+	}
+	var normalized map[string]interface{}
+	if err := utiljson.Unmarshal(data, &normalized); err != nil {
+		return nil, err
+	}
+	return normalized, nil
 }
 
 func resolveEquivalentGVK(input *AdmissionInput) schema.GroupVersionKind {
