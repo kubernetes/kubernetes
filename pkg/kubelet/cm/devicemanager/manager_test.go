@@ -1055,9 +1055,13 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		devs:             checkpoint.DevicesPerNUMA{0: []string{"dev3", "dev4"}},
 		topology:         false,
 	}
-	testResources := make([]TestResource, 2)
-	testResources = append(testResources, res1)
-	testResources = append(testResources, res2)
+	res3 := TestResource{
+		resourceName:     "domain3.com/resource3",
+		resourceQuantity: *resource.NewQuantity(int64(0), resource.DecimalSI),
+		devs:             checkpoint.DevicesPerNUMA{0: nil},
+		topology:         false,
+	}
+	testResources := []TestResource{res1, res2, res3}
 	as := require.New(t)
 	podsStub := activePodsStub{
 		activePods: []*v1.Pod{},
@@ -1079,6 +1083,8 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 			v1.ResourceName(res1.resourceName): res2.resourceQuantity}),
 		makePod(v1.ResourceList{
 			v1.ResourceName(res2.resourceName): res2.resourceQuantity}),
+		makePod(v1.ResourceList{
+			v1.ResourceName(res3.resourceName): res3.resourceQuantity}),
 	}
 	testCases := []struct {
 		description               string
@@ -1086,6 +1092,7 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		expectedContainerOptsLen  []int
 		expectedAllocatedResName1 int
 		expectedAllocatedResName2 int
+		expectedAllocatedResName3 int
 		expErr                    error
 	}{
 		{
@@ -1112,6 +1119,15 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 			expectedAllocatedResName2: 2,
 			expErr:                    nil,
 		},
+		{
+			description:               "Successful allocation of zero Res3 resources with zero healthy devices",
+			testPod:                   testPods[3],
+			expectedContainerOptsLen:  nil,
+			expectedAllocatedResName1: 2,
+			expectedAllocatedResName2: 2,
+			expectedAllocatedResName3: 0,
+			expErr:                    nil,
+		},
 	}
 	activePods := []*v1.Pod{}
 	for _, testCase := range testCases {
@@ -1136,8 +1152,8 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		}
 		as.Equal(testCase.expectedAllocatedResName1, testManager.allocatedDevices[res1.resourceName].Len())
 		as.Equal(testCase.expectedAllocatedResName2, testManager.allocatedDevices[res2.resourceName].Len())
+		as.Equal(testCase.expectedAllocatedResName3, testManager.allocatedDevices[res3.resourceName].Len())
 	}
-
 }
 
 func TestPodContainerDeviceToAllocate(t *testing.T) {
