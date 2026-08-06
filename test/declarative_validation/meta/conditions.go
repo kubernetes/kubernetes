@@ -61,6 +61,90 @@ func GenerateConditionTestCases(fldPath *field.Path) []ConditionTestCase {
 			},
 		},
 		{
+			Name: "invalid type format not a k8s label key",
+			Conditions: []metav1.Condition{
+				MkCondition(
+					TweakType("-InvalidType"),
+				),
+			},
+			ExpectedErrs: field.ErrorList{
+				field.Invalid(
+					fldPath.Index(0).Child("type"),
+					"-InvalidType",
+					"",
+				).WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
+		{
+			Name: "invalid type format uppercase prefix",
+			Conditions: []metav1.Condition{
+				MkCondition(
+					TweakType("Example.com/Ready"),
+				),
+			},
+			ExpectedErrs: field.ErrorList{
+				field.Invalid(
+					fldPath.Index(0).Child("type"),
+					"Example.com/Ready",
+					"",
+				).WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
+		{
+			Name: "invalid type format underscore in prefix",
+			Conditions: []metav1.Condition{
+				MkCondition(
+					TweakType("example_com/Ready"),
+				),
+			},
+			ExpectedErrs: field.ErrorList{
+				field.Invalid(
+					fldPath.Index(0).Child("type"),
+					"example_com/Ready",
+					"",
+				).WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
+		{
+			Name: "invalid type format multiple slashes",
+			Conditions: []metav1.Condition{
+				MkCondition(
+					TweakType("example.com/foo/Ready"),
+				),
+			},
+			ExpectedErrs: field.ErrorList{
+				field.Invalid(
+					fldPath.Index(0).Child("type"),
+					"example.com/foo/Ready",
+					"",
+				).WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
+		{
+			Name: "invalid type format empty prefix",
+			Conditions: []metav1.Condition{
+				MkCondition(
+					TweakType("/Ready"),
+				),
+			},
+			ExpectedErrs: field.ErrorList{
+				field.Invalid(
+					fldPath.Index(0).Child("type"),
+					"/Ready",
+					"",
+				).WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
+		{
+			Name: "valid type format with prefix as a k8s label key",
+			Conditions: []metav1.Condition{
+				MkCondition(
+					TweakType("example.com/Ready"),
+				),
+			},
+			ExpectedErrs: nil,
+		},
+		{
 			Name: "invalid missing status",
 			Conditions: []metav1.Condition{
 				MkCondition(TweakStatus("")),
