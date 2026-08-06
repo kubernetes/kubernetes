@@ -23506,6 +23506,11 @@ func schema_k8sio_api_core_v1_EventSeries(ref common.ReferenceCallback) common.O
 					},
 				},
 			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-map-type": "atomic",
+				},
+			},
 		},
 		Dependencies: []string{
 			metav1.MicroTime{}.OpenAPIModelName()},
@@ -35137,6 +35142,11 @@ func schema_k8sio_api_events_v1_EventSeries(ref common.ReferenceCallback) common
 				},
 				Required: []string{"count", "lastObservedTime"},
 			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-map-type": "atomic",
+				},
+			},
 		},
 		Dependencies: []string{
 			metav1.MicroTime{}.OpenAPIModelName()},
@@ -35346,6 +35356,11 @@ func schema_k8sio_api_events_v1beta1_EventSeries(ref common.ReferenceCallback) c
 					},
 				},
 				Required: []string{"count", "lastObservedTime"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-map-type": "atomic",
+				},
 			},
 		},
 		Dependencies: []string{
