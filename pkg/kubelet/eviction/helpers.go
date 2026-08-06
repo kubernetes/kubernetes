@@ -1147,13 +1147,18 @@ func isAllocatableEvictionThreshold(threshold evictionapi.Threshold) bool {
 	return threshold.Signal == evictionapi.SignalAllocatableMemoryAvailable
 }
 
-// buildSignalToRankFunc returns ranking functions associated with resources
-func buildSignalToRankFunc(withImageFs bool, imageContainerSplitFs bool) map[evictionapi.Signal]rankFunc {
-	signalToRankFunc := map[evictionapi.Signal]rankFunc{
+// buildNonDiskSignalToRankFunc returns ranking functions for non-disk resources (memory, PID)
+func buildNonDiskSignalToRankFunc() map[evictionapi.Signal]rankFunc {
+	return map[evictionapi.Signal]rankFunc{
 		evictionapi.SignalMemoryAvailable:            rankMemoryPressure,
 		evictionapi.SignalAllocatableMemoryAvailable: rankMemoryPressure,
 		evictionapi.SignalPIDAvailable:               rankPIDPressure,
 	}
+}
+
+// buildSignalToRankFunc returns ranking functions associated with resources
+func buildSignalToRankFunc(withImageFs bool, imageContainerSplitFs bool) map[evictionapi.Signal]rankFunc {
+	signalToRankFunc := buildNonDiskSignalToRankFunc()
 	// usage of an imagefs is optional
 	// We have a dedicated Image filesystem (images and containers are on same disk)
 	// then we assume it is just a separate imagefs
@@ -1316,3 +1321,27 @@ func getThresholdMetInfo(resourceToReclaim v1.ResourceName, thresholds []evictio
 	}
 	return nil, nil
 }
+
+// hasDiskSignal returns true if the signal is a disk-related signal.
+func hasDiskSignal(signal evictionapi.Signal) bool {
+	switch signal {
+	case evictionapi.SignalNodeFsAvailable, evictionapi.SignalNodeFsInodesFree,
+		evictionapi.SignalImageFsAvailable, evictionapi.SignalImageFsInodesFree,
+		evictionapi.SignalContainerFsAvailable, evictionapi.SignalContainerFsInodesFree:
+		return true
+	default:
+		return false
+	}
+}
+
+// filterDiskThresholds returns a new slice of thresholds with disk-related signals removed.
+func filterDiskThresholds(thresholds []evictionapi.Threshold) []evictionapi.Threshold {
+	var filtered []evictionapi.Threshold
+	for _, threshold := range thresholds {
+		if !hasDiskSignal(threshold.Signal) {
+			filtered = append(filtered, threshold)
+		}
+	}
+	return filtered
+}
+
