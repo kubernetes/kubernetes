@@ -320,7 +320,7 @@ func (c *ReplicaCalculator) GetObjectPerPodMetricReplicas(statusReplicas int32, 
 		// update number of replicas if change is large enough
 		replicaCount = int32(math.Ceil(float64(usage) / float64(targetAverageUsage)))
 	}
-	usage = int64(math.Ceil(float64(usage) / float64(statusReplicas)))
+	usage = getPerPodUsage(usage, statusReplicas)
 	return replicaCount, usage, timestamp, nil
 }
 
@@ -410,13 +410,20 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(statusReplicas int32
 			replicaCount = int32(replicaCountResult)
 		}
 	}
-	// Handle usage overflow cases
-	if float64(usage) >= float64(math.MaxInt64) {
-		usage = math.MaxInt64
-	} else {
-		usage = int64(math.Ceil(float64(usage) / float64(statusReplicas)))
-	}
+	usage = getPerPodUsage(usage, statusReplicas)
 	return replicaCount, usage, timestamp, nil
+}
+
+// getPerPodUsage calculates the per-pod usage based on total usage and replica count,
+// returning MaxInt64 on overflow to prevent wrapping and 0 when replicas is 0 to avoid division by zero.
+func getPerPodUsage(usage int64, statusReplicas int32) int64 {
+	if float64(usage) >= float64(math.MaxInt64) {
+		return math.MaxInt64
+	}
+	if statusReplicas == 0 {
+		return 0
+	}
+	return int64(math.Ceil(float64(usage) / float64(statusReplicas)))
 }
 
 func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1.ResourceName, cpuInitializationPeriod, delayOfInitialReadinessStatus time.Duration) (readyPodCount int, unreadyPods, missingPods, ignoredPods sets.Set[string]) {
