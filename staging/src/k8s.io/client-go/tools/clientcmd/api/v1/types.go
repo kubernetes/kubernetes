@@ -38,6 +38,7 @@ type Config struct {
 	APIVersion string `json:"apiVersion,omitempty"`
 	// Preferences holds general information to be use for cli interactions
 	// Deprecated: this field is deprecated in v1.34. It is not used by any of the Kubernetes components.
+	// +optional
 	Preferences Preferences `json:"preferences,omitzero"`
 	// Clusters is a map of referencable names to cluster configs
 	Clusters []NamedCluster `json:"clusters"`
