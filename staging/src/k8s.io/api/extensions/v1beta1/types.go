@@ -25,7 +25,7 @@ import (
 
 // describes the attributes of a scale subresource
 type ScaleSpec struct {
-	// desired number of instances for the scaled object.
+	// replicas is the desired number of instances for the scaled object.
 	// +optional
 	// +k8s:beta(since: "1.37")=+k8s:optional
 	// +default=0
@@ -35,7 +35,7 @@ type ScaleSpec struct {
 
 // represents the current status of a scale subresource.
 type ScaleStatus struct {
-	// actual number of observed instances of the scaled object.
+	// replicas is the actual number of observed instances of the scaled object.
 	Replicas int32 `json:"replicas" protobuf:"varint,1,opt,name=replicas"`
 
 	// selector is a label query over pods that should match the replicas count. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
@@ -43,7 +43,7 @@ type ScaleStatus struct {
 	// +mapType=atomic
 	Selector map[string]string `json:"selector,omitempty" protobuf:"bytes,2,rep,name=selector"`
 
-	// label selector for pods that should match the replicas count. This is a serializated
+	// targetSelector is the label selector for pods that should match the replicas count. This is a serializated
 	// version of both map-based and more expressive set-based selectors. This is done to
 	// avoid introspection in the clients. The string will be in the same format as the
 	// query-param syntax. If the target type only supports map-based selectors, both this
@@ -62,15 +62,15 @@ type ScaleStatus struct {
 // represents a scaling request for a resource.
 type Scale struct {
 	metav1.TypeMeta `json:""`
-	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
+	// spec defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
 	// +optional
 	Spec ScaleSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
-	// current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.
+	// status is current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.
 	// +optional
 	Status ScaleStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
@@ -91,63 +91,62 @@ type Scale struct {
 // +k8s:supportsSubresource="/status"
 type Deployment struct {
 	metav1.TypeMeta `json:""`
-	// Standard object metadata.
+	// metadata is the standard object metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Specification of the desired behavior of the Deployment.
+	// spec is the specification of the desired behavior of the Deployment.
 	// +optional
 	Spec DeploymentSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
-	// Most recently observed status of the Deployment.
+	// status is the most recently observed status of the Deployment.
 	// +optional
 	Status DeploymentStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 // DeploymentSpec is the specification of the desired behavior of the Deployment.
 type DeploymentSpec struct {
-	// Number of desired pods. This is a pointer to distinguish between explicit
+	// replicas is the number of desired pods. This is a pointer to distinguish between explicit
 	// zero and not specified. Defaults to 1.
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty" protobuf:"varint,1,opt,name=replicas"`
 
-	// Label selector for pods. Existing ReplicaSets whose pods are
+	// selector is the label selector for pods. Existing ReplicaSets whose pods are
 	// selected by this will be the ones affected by this deployment.
 	// +optional
 	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,2,opt,name=selector"`
 
-	// Template describes the pods that will be created.
+	// template describes the pods that will be created.
 	Template v1.PodTemplateSpec `json:"template" protobuf:"bytes,3,opt,name=template"`
 
-	// The deployment strategy to use to replace existing pods with new ones.
+	// strategy is the deployment strategy to use to replace existing pods with new ones.
 	// +optional
 	// +patchStrategy=retainKeys
 	Strategy DeploymentStrategy `json:"strategy,omitempty" patchStrategy:"retainKeys" protobuf:"bytes,4,opt,name=strategy"`
 
-	// Minimum number of seconds for which a newly created pod should be ready
+	// minReadySeconds is the minimum number of seconds for which a newly created pod should be ready
 	// without any of its container crashing, for it to be considered available.
 	// Defaults to 0 (pod will be considered available as soon as it is ready)
 	// +optional
 	MinReadySeconds int32 `json:"minReadySeconds,omitempty" protobuf:"varint,5,opt,name=minReadySeconds"`
 
-	// The number of old ReplicaSets to retain to allow rollback.
+	// revisionHistoryLimit is the number of old ReplicaSets to retain to allow rollback.
 	// This is a pointer to distinguish between explicit zero and not specified.
 	// This is set to the max value of int32 (i.e. 2147483647) by default, which
 	// means "retaining all old ReplicaSets".
 	// +optional
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty" protobuf:"varint,6,opt,name=revisionHistoryLimit"`
 
-	// Indicates that the deployment is paused and will not be processed by the
+	// paused indicates that the deployment is paused and will not be processed by the
 	// deployment controller.
 	// +optional
 	Paused bool `json:"paused,omitempty" protobuf:"varint,7,opt,name=paused"`
 
-	// DEPRECATED.
-	// The config this deployment is rolling back to. Will be cleared after rollback is done.
+	// rollbackTo is the config this deployment is rolling back to. Will be cleared after rollback is done. it is DEPRECATED.
 	// +optional
 	RollbackTo *RollbackConfig `json:"rollbackTo,omitempty" protobuf:"bytes,8,opt,name=rollbackTo"`
 
-	// The maximum time in seconds for a deployment to make progress before it
+	// progressDeadlineSeconds is the maximum time in seconds for a deployment to make progress before it
 	// is considered to be failed. The deployment controller will continue to
 	// process failed deployments and a condition with a ProgressDeadlineExceeded
 	// reason will be surfaced in the deployment status. Note that progress will
@@ -166,18 +165,18 @@ type DeploymentSpec struct {
 // DeploymentRollback stores the information required to rollback a deployment.
 type DeploymentRollback struct {
 	metav1.TypeMeta `json:""`
-	// Required: This must match the Name of a deployment.
+	// name is required: This must match the Name of a deployment.
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
-	// The annotations to be updated to a deployment
+	// updatedAnnotations are the annotations to be updated to a deployment
 	// +optional
 	UpdatedAnnotations map[string]string `json:"updatedAnnotations,omitempty" protobuf:"bytes,2,rep,name=updatedAnnotations"`
-	// The config of this deployment rollback.
+	// rollbackTo is the config of this deployment rollback.
 	RollbackTo RollbackConfig `json:"rollbackTo" protobuf:"bytes,3,opt,name=rollbackTo"`
 }
 
 // DEPRECATED.
 type RollbackConfig struct {
-	// The revision to rollback to. If set to 0, rollback to the last revision.
+	// revision is the revision to rollback to. If set to 0, rollback to the last revision.
 	// +optional
 	Revision int64 `json:"revision,omitempty" protobuf:"varint,1,opt,name=revision"`
 }
@@ -191,11 +190,11 @@ const (
 
 // DeploymentStrategy describes how to replace existing pods with new ones.
 type DeploymentStrategy struct {
-	// Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
+	// type is the type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
 	// +optional
 	Type DeploymentStrategyType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=DeploymentStrategyType"`
 
-	// Rolling update config params. Present only if DeploymentStrategyType =
+	// rollingUpdate is the rolling update config params. Present only if DeploymentStrategyType =
 	// RollingUpdate.
 	//---
 	// TODO: Update this to follow our convention for oneOf, whatever we decide it
@@ -216,7 +215,7 @@ const (
 
 // Spec to control the desired behavior of rolling update.
 type RollingUpdateDeployment struct {
-	// The maximum number of pods that can be unavailable during the update.
+	// maxUnavailable is the maximum number of pods that can be unavailable during the update.
 	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
 	// Absolute number is calculated from percentage by rounding down.
 	// This can not be 0 if MaxSurge is 0.
@@ -229,7 +228,7 @@ type RollingUpdateDeployment struct {
 	// +optional
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty" protobuf:"bytes,1,opt,name=maxUnavailable"`
 
-	// The maximum number of pods that can be scheduled above the desired number of
+	// maxSurge is the maximum number of pods that can be scheduled above the desired number of
 	// pods.
 	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
 	// This can not be 0 if MaxUnavailable is 0.
@@ -312,17 +311,17 @@ const (
 
 // DeploymentCondition describes the state of a deployment at a certain point.
 type DeploymentCondition struct {
-	// Type of deployment condition.
+	// type is the type of deployment condition.
 	Type DeploymentConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=DeploymentConditionType"`
-	// Status of the condition, one of True, False, Unknown.
+	// status is the status of the condition, one of True, False, Unknown.
 	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
-	// The last time this condition was updated.
+	// lastUpdateTime is the last time this condition was updated.
 	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty" protobuf:"bytes,6,opt,name=lastUpdateTime"`
-	// Last time the condition transitioned from one status to another.
+	// lastTransitionTime is the last time the condition transitioned from one status to another.
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,7,opt,name=lastTransitionTime"`
-	// The reason for the condition's last transition.
+	// reason is the reason for the condition's last transition.
 	Reason string `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
-	// A human readable message indicating details about the transition.
+	// message is a human readable message indicating details about the transition.
 	Message string `json:"message,omitempty" protobuf:"bytes,5,opt,name=message"`
 }
 
@@ -347,12 +346,12 @@ type DeploymentList struct {
 // controller will use to perform updates. It includes any additional parameters
 // necessary to perform the update for the indicated strategy.
 type DaemonSetUpdateStrategy struct {
-	// Type of daemon set update. Can be "RollingUpdate" or "OnDelete".
+	// type is the type of daemon set update. Can be "RollingUpdate" or "OnDelete".
 	// Default is OnDelete.
 	// +optional
 	Type DaemonSetUpdateStrategyType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type"`
 
-	// Rolling update config params. Present only if type = "RollingUpdate".
+	// rollingUpdate is the rolling update config params. Present only if type = "RollingUpdate".
 	//---
 	// TODO: Update this to follow our convention for oneOf, whatever we decide it
 	// to be. Same as Deployment `strategy.rollingUpdate`.
@@ -373,7 +372,7 @@ const (
 
 // Spec to control the desired behavior of daemon set rolling update.
 type RollingUpdateDaemonSet struct {
-	// The maximum number of DaemonSet pods that can be unavailable during the
+	// maxUnavailable is the maximum number of DaemonSet pods that can be unavailable during the
 	// update. Value can be an absolute number (ex: 5) or a percentage of total
 	// number of DaemonSet pods at the start of the update (ex: 10%). Absolute
 	// number is calculated from percentage by rounding up.
@@ -390,7 +389,7 @@ type RollingUpdateDaemonSet struct {
 	// +optional
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty" protobuf:"bytes,1,opt,name=maxUnavailable"`
 
-	// The maximum number of nodes with an existing available DaemonSet pod that
+	// maxSurge is the maximum number of nodes with an existing available DaemonSet pod that
 	// can have an updated DaemonSet pod during during an update.
 	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
 	// This can not be 0 if MaxUnavailable is 0.
@@ -415,38 +414,37 @@ type RollingUpdateDaemonSet struct {
 
 // DaemonSetSpec is the specification of a daemon set.
 type DaemonSetSpec struct {
-	// A label query over pods that are managed by the daemon set.
+	// selector is a label query over pods that are managed by the daemon set.
 	// Must match in order to be controlled.
 	// If empty, defaulted to labels on Pod template.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
 	// +optional
 	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,1,opt,name=selector"`
 
-	// An object that describes the pod that will be created.
+	// template is an object that describes the pod that will be created.
 	// The DaemonSet will create exactly one copy of this pod on every node
 	// that matches the template's node selector (or on every node if no node
 	// selector is specified).
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
 	Template v1.PodTemplateSpec `json:"template" protobuf:"bytes,2,opt,name=template"`
 
-	// An update strategy to replace existing DaemonSet pods with new pods.
+	// updateStrategy is an update strategy to replace existing DaemonSet pods with new pods.
 	// +optional
 	UpdateStrategy DaemonSetUpdateStrategy `json:"updateStrategy,omitempty" protobuf:"bytes,3,opt,name=updateStrategy"`
 
-	// The minimum number of seconds for which a newly created DaemonSet pod should
+	// minReadySeconds is the minimum number of seconds for which a newly created DaemonSet pod should
 	// be ready without any of its container crashing, for it to be considered
 	// available. Defaults to 0 (pod will be considered available as soon as it
 	// is ready).
 	// +optional
 	MinReadySeconds int32 `json:"minReadySeconds,omitempty" protobuf:"varint,4,opt,name=minReadySeconds"`
 
-	// DEPRECATED.
-	// A sequence number representing a specific generation of the template.
+	// templateGeneration is a sequence number representing a specific generation of the template, it is DEPRECATED.
 	// Populated by the system. It can be set only during the creation.
 	// +optional
 	TemplateGeneration int64 `json:"templateGeneration,omitempty" protobuf:"varint,5,opt,name=templateGeneration"`
 
-	// The number of old history to retain to allow rollback.
+	// revisionHistoryLimit is the number of old history to retain to allow rollback.
 	// This is a pointer to distinguish between explicit zero and not specified.
 	// Defaults to 10.
 	// +optional
@@ -515,17 +513,17 @@ type DaemonSetConditionType string
 
 // DaemonSetCondition describes the state of a DaemonSet at a certain point.
 type DaemonSetCondition struct {
-	// Type of DaemonSet condition.
+	// type is the type of DaemonSet condition.
 	Type DaemonSetConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=DaemonSetConditionType"`
-	// Status of the condition, one of True, False, Unknown.
+	// status is the status of the condition, one of True, False, Unknown.
 	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
-	// Last time the condition transitioned from one status to another.
+	// lastTransitionTime is the last time the condition transitioned from one status to another.
 	// +optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,3,opt,name=lastTransitionTime"`
-	// The reason for the condition's last transition.
+	// reason is the reason for the condition's last transition.
 	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
-	// A human readable message indicating details about the transition.
+	// message is a human readable message indicating details about the transition.
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,5,opt,name=message"`
 }
@@ -543,17 +541,17 @@ type DaemonSetCondition struct {
 // +k8s:supportsSubresource="/status"
 type DaemonSet struct {
 	metav1.TypeMeta `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// The desired behavior of this daemon set.
+	// spec is the desired behavior of this daemon set.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Spec DaemonSetSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
-	// The current status of this daemon set. This data may be
+	// status is the current status of this daemon set. This data may be
 	// out of date by some window of time.
 	// Populated by the system.
 	// Read-only.
@@ -608,17 +606,17 @@ type DaemonSetList struct {
 // +k8s:supportsSubresource="/status"
 type Ingress struct {
 	metav1.TypeMeta `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Spec is the desired state of the Ingress.
+	// spec is the desired state of the Ingress.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Spec IngressSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
-	// Status is the current state of the Ingress.
+	// status is the current state of the Ingress.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Status IngressStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
@@ -644,7 +642,7 @@ type IngressList struct {
 
 // IngressSpec describes the Ingress the user wishes to exist.
 type IngressSpec struct {
-	// IngressClassName is the name of the IngressClass cluster resource. The
+	// ingressClassName is the name of the IngressClass cluster resource. The
 	// associated IngressClass defines which controller will implement the
 	// resource. This replaces the deprecated `kubernetes.io/ingress.class`
 	// annotation. For backwards compatibility, when that annotation is set, it
@@ -657,14 +655,14 @@ type IngressSpec struct {
 	// +optional
 	IngressClassName *string `json:"ingressClassName,omitempty" protobuf:"bytes,4,opt,name=ingressClassName"`
 
-	// A default backend capable of servicing requests that don't match any
+	// backend is a default backend capable of servicing requests that don't match any
 	// rule. At least one of 'backend' or 'rules' must be specified. This field
 	// is optional to allow the loadbalancer controller or defaulting logic to
 	// specify a global default.
 	// +optional
 	Backend *IngressBackend `json:"backend,omitempty" protobuf:"bytes,1,opt,name=backend"`
 
-	// TLS configuration. Currently the Ingress only supports a single TLS
+	// tls is TLS configuration. Currently the Ingress only supports a single TLS
 	// port, 443. If multiple members of this list specify different hosts, they
 	// will be multiplexed on the same port according to the hostname specified
 	// through the SNI TLS extension, if the ingress controller fulfilling the
@@ -673,7 +671,7 @@ type IngressSpec struct {
 	// +listType=atomic
 	TLS []IngressTLS `json:"tls,omitempty" protobuf:"bytes,2,rep,name=tls"`
 
-	// A list of host rules used to configure the Ingress. If unspecified, or
+	// rules is a list of host rules used to configure the Ingress. If unspecified, or
 	// no rule matches, all traffic is sent to the default backend.
 	// +optional
 	// +listType=atomic
@@ -683,14 +681,14 @@ type IngressSpec struct {
 
 // IngressTLS describes the transport layer security associated with an Ingress.
 type IngressTLS struct {
-	// Hosts are a list of hosts included in the TLS certificate. The values in
+	// hosts are a list of hosts included in the TLS certificate. The values in
 	// this list must match the name/s used in the tlsSecret. Defaults to the
 	// wildcard host setting for the loadbalancer controller fulfilling this
 	// Ingress, if left unspecified.
 	// +optional
 	// +listType=atomic
 	Hosts []string `json:"hosts,omitempty" protobuf:"bytes,1,rep,name=hosts"`
-	// SecretName is the name of the secret used to terminate SSL traffic on 443.
+	// secretName is the name of the secret used to terminate SSL traffic on 443.
 	// Field is left optional to allow SSL routing based on SNI hostname alone.
 	// If the SNI host in a listener conflicts with the "Host" header field used
 	// by an IngressRule, the SNI host is used for termination and value of the
@@ -700,16 +698,16 @@ type IngressTLS struct {
 	// TODO: Consider specifying different modes of termination, protocols etc.
 }
 
-// IngressStatus describe the current state of the Ingress.
+// ingressStatus describe the current state of the Ingress.
 type IngressStatus struct {
-	// LoadBalancer contains the current status of the load-balancer.
+	// loadBalancer contains the current status of the load-balancer.
 	// +optional
 	LoadBalancer IngressLoadBalancerStatus `json:"loadBalancer,omitempty" protobuf:"bytes,1,opt,name=loadBalancer"`
 }
 
 // LoadBalancerStatus represents the status of a load-balancer.
 type IngressLoadBalancerStatus struct {
-	// Ingress is a list containing ingress points for the load-balancer.
+	// ingress is a list containing ingress points for the load-balancer.
 	// +optional
 	// +listType=atomic
 	Ingress []IngressLoadBalancerIngress `json:"ingress,omitempty" protobuf:"bytes,1,rep,name=ingress"`
@@ -717,15 +715,15 @@ type IngressLoadBalancerStatus struct {
 
 // IngressLoadBalancerIngress represents the status of a load-balancer ingress point.
 type IngressLoadBalancerIngress struct {
-	// IP is set for load-balancer ingress points that are IP based.
+	// ip is set for load-balancer ingress points that are IP based.
 	// +optional
 	IP string `json:"ip,omitempty" protobuf:"bytes,1,opt,name=ip"`
 
-	// Hostname is set for load-balancer ingress points that are DNS based.
+	// hostname is set for load-balancer ingress points that are DNS based.
 	// +optional
 	Hostname string `json:"hostname,omitempty" protobuf:"bytes,2,opt,name=hostname"`
 
-	// Ports provides information about the ports exposed by this LoadBalancer.
+	// ports provides information about the ports exposed by this LoadBalancer.
 	// +listType=atomic
 	// +optional
 	Ports []IngressPortStatus `json:"ports,omitempty" protobuf:"bytes,4,rep,name=ports"`
@@ -733,14 +731,14 @@ type IngressLoadBalancerIngress struct {
 
 // IngressPortStatus represents the error condition of a service port
 type IngressPortStatus struct {
-	// Port is the port number of the ingress port.
+	// port is the port number of the ingress port.
 	Port int32 `json:"port" protobuf:"varint,1,opt,name=port"`
 
-	// Protocol is the protocol of the ingress port.
+	// protocol is the protocol of the ingress port.
 	// The supported values are: "TCP", "UDP", "SCTP"
 	Protocol v1.Protocol `json:"protocol" protobuf:"bytes,2,opt,name=protocol,casttype=Protocol"`
 
-	// Error is to record the problem with the service port
+	// error is to record the problem with the service port
 	// The format of the error shall comply with the following rules:
 	// - built-in error values shall be specified in this file and those shall use
 	//   CamelCase names
@@ -759,7 +757,7 @@ type IngressPortStatus struct {
 // the related backend services. Incoming requests are first evaluated for a host
 // match, then routed to the backend associated with the matching IngressRuleValue.
 type IngressRule struct {
-	// Host is the fully qualified domain name of a network host, as defined by RFC 3986.
+	// host is the fully qualified domain name of a network host, as defined by RFC 3986.
 	// Note the following deviations from the "host" part of the
 	// URI as defined in RFC 3986:
 	// 1. IPs are not allowed. Currently an IngressRuleValue can only apply to
@@ -818,7 +816,7 @@ type IngressRuleValue struct {
 // to match against everything after the last '/' and before the first '?'
 // or '#'.
 type HTTPIngressRuleValue struct {
-	// A collection of paths that map requests to backends.
+	// paths is a collection of paths that map requests to backends.
 	// +listType=atomic
 	Paths []HTTPIngressPath `json:"paths" protobuf:"bytes,1,rep,name=paths"`
 	// TODO: Consider adding fields for ingress-type specific global
@@ -858,14 +856,14 @@ const (
 // HTTPIngressPath associates a path with a backend. Incoming urls matching the
 // path are forwarded to the backend.
 type HTTPIngressPath struct {
-	// Path is matched against the path of an incoming request. Currently it can
+	// path is matched against the path of an incoming request. Currently it can
 	// contain characters disallowed from the conventional "path" part of a URL
 	// as defined by RFC 3986. Paths must begin with a '/'. When unspecified,
 	// all paths from incoming requests are matched.
 	// +optional
 	Path string `json:"path,omitempty" protobuf:"bytes,1,opt,name=path"`
 
-	// PathType determines the interpretation of the Path matching. PathType can
+	// pathType determines the interpretation of the Path matching. PathType can
 	// be one of the following values:
 	// * Exact: Matches the URL path exactly.
 	// * Prefix: Matches based on a URL path prefix split by '/'. Matching is
@@ -882,22 +880,22 @@ type HTTPIngressPath struct {
 	// Defaults to ImplementationSpecific.
 	PathType *PathType `json:"pathType,omitempty" protobuf:"bytes,3,opt,name=pathType"`
 
-	// Backend defines the referenced service endpoint to which the traffic
+	// backend defines the referenced service endpoint to which the traffic
 	// will be forwarded to.
 	Backend IngressBackend `json:"backend" protobuf:"bytes,2,opt,name=backend"`
 }
 
 // IngressBackend describes all endpoints for a given service and port.
 type IngressBackend struct {
-	// Specifies the name of the referenced service.
+	// serviceName specifies the name of the referenced service.
 	// +optional
 	ServiceName string `json:"serviceName,omitempty" protobuf:"bytes,1,opt,name=serviceName"`
 
-	// Specifies the port of the referenced service.
+	// servicePort specifies the port of the referenced service.
 	// +optional
 	ServicePort intstr.IntOrString `json:"servicePort,omitempty" protobuf:"bytes,2,opt,name=servicePort"`
 
-	// Resource is an ObjectRef to another Kubernetes resource in the namespace
+	// resource is an ObjectRef to another Kubernetes resource in the namespace
 	// of the Ingress object. If resource is specified, serviceName and servicePort
 	// must not be specified.
 	// +optional
@@ -921,18 +919,19 @@ type IngressBackend struct {
 type ReplicaSet struct {
 	metav1.TypeMeta `json:""`
 
+	// metadata is the standard object metadata.
 	// If the Labels of a ReplicaSet are empty, they are defaulted to
 	// be the same as the Pod(s) that the ReplicaSet manages.
 	// Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Spec defines the specification of the desired behavior of the ReplicaSet.
+	// spec defines the specification of the desired behavior of the ReplicaSet.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Spec ReplicaSetSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
-	// Status is the most recently observed status of the ReplicaSet.
+	// status is the most recently observed status of the ReplicaSet.
 	// This data may be out of date by some window of time.
 	// Populated by the system.
 	// Read-only.
@@ -962,27 +961,27 @@ type ReplicaSetList struct {
 
 // ReplicaSetSpec is the specification of a ReplicaSet.
 type ReplicaSetSpec struct {
-	// Replicas is the number of desired pods.
+	// replicas is the number of desired pods.
 	// This is a pointer to distinguish between explicit zero and unspecified.
 	// Defaults to 1.
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty" protobuf:"varint,1,opt,name=replicas"`
 
-	// Minimum number of seconds for which a newly created pod should be ready
+	// minReadySeconds is the minimum number of seconds for which a newly created pod should be ready
 	// without any of its container crashing, for it to be considered available.
 	// Defaults to 0 (pod will be considered available as soon as it is ready)
 	// +optional
 	MinReadySeconds int32 `json:"minReadySeconds,omitempty" protobuf:"varint,4,opt,name=minReadySeconds"`
 
-	// Selector is a label query over pods that should match the replica count.
+	// selector is a label query over pods that should match the replica count.
 	// If the selector is empty, it is defaulted to the labels present on the pod template.
 	// Label keys and values that must match in order to be controlled by this replica set.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
 	// +optional
 	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,2,opt,name=selector"`
 
-	// Template is the object that describes the pod that will be created if
+	// template is the object that describes the pod that will be created if
 	// insufficient replicas are detected.
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/#pod-template
 	// +optional
@@ -1039,17 +1038,17 @@ const (
 
 // ReplicaSetCondition describes the state of a replica set at a certain point.
 type ReplicaSetCondition struct {
-	// Type of replica set condition.
+	// type of replica set condition.
 	Type ReplicaSetConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=ReplicaSetConditionType"`
-	// Status of the condition, one of True, False, Unknown.
+	// status of the condition, one of True, False, Unknown.
 	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
-	// The last time the condition transitioned from one status to another.
+	// lastTransitionTime is the last time the condition transitioned from one status to another.
 	// +optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,3,opt,name=lastTransitionTime"`
-	// The reason for the condition's last transition.
+	// reason is the reason for the condition's last transition.
 	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
-	// A human readable message indicating details about the transition.
+	// message is a human readable message indicating details about the transition.
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,5,opt,name=message"`
 }
@@ -1065,12 +1064,12 @@ type ReplicaSetCondition struct {
 // NetworkPolicy describes what network traffic is allowed for a set of Pods
 type NetworkPolicy struct {
 	metav1.TypeMeta `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Specification of the desired behavior for this NetworkPolicy.
+	// spec is the specification of the desired behavior for this NetworkPolicy.
 	// +optional
 	Spec NetworkPolicySpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
@@ -1094,14 +1093,14 @@ const (
 
 // DEPRECATED 1.9 - This group version of NetworkPolicySpec is deprecated by networking/v1/NetworkPolicySpec.
 type NetworkPolicySpec struct {
-	// Selects the pods to which this NetworkPolicy object applies.  The array of ingress rules
+	// podSelector selects the pods to which this NetworkPolicy object applies.  The array of ingress rules
 	// is applied to any pods selected by this field. Multiple network policies can select the
 	// same set of pods.  In this case, the ingress rules for each are combined additively.
 	// This field is NOT optional and follows standard label selector semantics.
 	// An empty podSelector matches all pods in this namespace.
 	PodSelector metav1.LabelSelector `json:"podSelector" protobuf:"bytes,1,opt,name=podSelector"`
 
-	// List of ingress rules to be applied to the selected pods.
+	// ingress is the list of ingress rules to be applied to the selected pods.
 	// Traffic is allowed to a pod if there are no NetworkPolicies selecting the pod
 	// OR if the traffic source is the pod's local node,
 	// OR if the traffic matches at least one ingress rule across all of the NetworkPolicy
@@ -1113,7 +1112,7 @@ type NetworkPolicySpec struct {
 	// +k8s:beta(since: "1.37")=+k8s:optional
 	Ingress []NetworkPolicyIngressRule `json:"ingress,omitempty" protobuf:"bytes,2,rep,name=ingress"`
 
-	// List of egress rules to be applied to the selected pods. Outgoing traffic is
+	// egress is the list of egress rules to be applied to the selected pods. Outgoing traffic is
 	// allowed if there are no NetworkPolicies selecting the pod (and cluster policy
 	// otherwise allows the traffic), OR if the traffic matches at least one egress rule
 	// across all of the NetworkPolicy objects whose podSelector matches the pod. If
@@ -1125,7 +1124,7 @@ type NetworkPolicySpec struct {
 	// +k8s:beta(since: "1.37")=+k8s:optional
 	Egress []NetworkPolicyEgressRule `json:"egress,omitempty" protobuf:"bytes,3,rep,name=egress"`
 
-	// List of rule types that the NetworkPolicy relates to.
+	// policyTypes is the list of rule types that the NetworkPolicy relates to.
 	// Valid options are ["Ingress"], ["Egress"], or ["Ingress", "Egress"].
 	// If this field is not specified, it will default based on the existence of Ingress or Egress rules;
 	// policies that contain an Egress section are assumed to affect Egress, and all policies
@@ -1143,7 +1142,7 @@ type NetworkPolicySpec struct {
 // DEPRECATED 1.9 - This group version of NetworkPolicyIngressRule is deprecated by networking/v1/NetworkPolicyIngressRule.
 // This NetworkPolicyIngressRule matches traffic if and only if the traffic matches both ports AND from.
 type NetworkPolicyIngressRule struct {
-	// List of ports which should be made accessible on the pods selected for this rule.
+	// ports is the list of ports which should be made accessible on the pods selected for this rule.
 	// Each item in this list is combined using a logical OR.
 	// If this field is empty or missing, this rule matches all ports (traffic not restricted by port).
 	// If this field is present and contains at least one item, then this rule allows traffic
@@ -1152,7 +1151,7 @@ type NetworkPolicyIngressRule struct {
 	// +listType=atomic
 	Ports []NetworkPolicyPort `json:"ports,omitempty" protobuf:"bytes,1,rep,name=ports"`
 
-	// List of sources which should be able to access the pods selected for this rule.
+	// from is the list of sources which should be able to access the pods selected for this rule.
 	// Items in this list are combined using a logical OR operation.
 	// If this field is empty or missing, this rule matches all sources (traffic not restricted by source).
 	// If this field is present and contains at least one item, this rule allows traffic only if the
@@ -1168,7 +1167,7 @@ type NetworkPolicyIngressRule struct {
 // matched by a NetworkPolicySpec's podSelector. The traffic must match both ports and to.
 // This type is beta-level in 1.8
 type NetworkPolicyEgressRule struct {
-	// List of destination ports for outgoing traffic.
+	// ports is the list of destination ports for outgoing traffic.
 	// Each item in this list is combined using a logical OR. If this field is
 	// empty or missing, this rule matches all ports (traffic not restricted by port).
 	// If this field is present and contains at least one item, then this rule allows
@@ -1177,7 +1176,7 @@ type NetworkPolicyEgressRule struct {
 	// +listType=atomic
 	Ports []NetworkPolicyPort `json:"ports,omitempty" protobuf:"bytes,1,rep,name=ports"`
 
-	// List of destinations for outgoing traffic of pods selected for this rule.
+	// to is the list of destinations for outgoing traffic of pods selected for this rule.
 	// Items in this list are combined using a logical OR operation. If this field is
 	// empty or missing, this rule matches all destinations (traffic not restricted by
 	// destination). If this field is present and contains at least one item, this rule
@@ -1190,19 +1189,19 @@ type NetworkPolicyEgressRule struct {
 
 // DEPRECATED 1.9 - This group version of NetworkPolicyPort is deprecated by networking/v1/NetworkPolicyPort.
 type NetworkPolicyPort struct {
-	// Optional.  The protocol (TCP, UDP, or SCTP) which traffic must match.
+	// protocol is the protocol (TCP, UDP, or SCTP) which traffic must match.
 	// If not specified, this field defaults to TCP.
 	// +optional
 	Protocol *v1.Protocol `json:"protocol,omitempty" protobuf:"bytes,1,opt,name=protocol,casttype=k8s.io/api/core/v1.Protocol"`
 
-	// The port on the given protocol. This can either be a numerical or named
+	// port is the port on the given protocol. This can either be a numerical or named
 	// port on a pod. If this field is not provided, this matches all port names and
 	// numbers.
 	// If present, only traffic on the specified protocol AND port will be matched.
 	// +optional
 	Port *intstr.IntOrString `json:"port,omitempty" protobuf:"bytes,2,opt,name=port"`
 
-	// If set, indicates that the range of ports from port to endPort, inclusive,
+	// endPort indicates that the range of ports from port to endPort, inclusive,
 	// should be allowed by the policy. This field cannot be defined if the port field
 	// is not defined or if the port field is defined as a named (string) port.
 	// The endPort must be equal or greater than port.
@@ -1215,12 +1214,12 @@ type NetworkPolicyPort struct {
 // to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs
 // that should not be included within this rule.
 type IPBlock struct {
-	// CIDR is a string representing the IP Block
+	// cidr is a string representing the IP Block
 	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
 	// +required
 	// +k8s:beta(since: "1.37")=+k8s:required
 	CIDR string `json:"cidr" protobuf:"bytes,1,name=cidr"`
-	// Except is a slice of CIDRs that should not be included within an IP Block
+	// except is a slice of CIDRs that should not be included within an IP Block
 	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
 	// Except values will be rejected if they are outside the CIDR range
 	// +optional
@@ -1230,7 +1229,7 @@ type IPBlock struct {
 
 // DEPRECATED 1.9 - This group version of NetworkPolicyPeer is deprecated by networking/v1/NetworkPolicyPeer.
 type NetworkPolicyPeer struct {
-	// This is a label selector which selects Pods. This field follows standard label
+	// podSelector is a label selector which selects Pods. This field follows standard label
 	// selector semantics; if present but empty, it selects all pods.
 	//
 	// If NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects
@@ -1239,7 +1238,7 @@ type NetworkPolicyPeer struct {
 	// +optional
 	PodSelector *metav1.LabelSelector `json:"podSelector,omitempty" protobuf:"bytes,1,opt,name=podSelector"`
 
-	// Selects Namespaces using cluster-scoped labels. This field follows standard label
+	// namespaceSelector selects Namespaces using cluster-scoped labels. This field follows standard label
 	// selector semantics; if present but empty, it selects all namespaces.
 	//
 	// If PodSelector is also set, then the NetworkPolicyPeer as a whole selects
@@ -1248,7 +1247,7 @@ type NetworkPolicyPeer struct {
 	// +optional
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty" protobuf:"bytes,2,opt,name=namespaceSelector"`
 
-	// IPBlock defines policy on a particular IPBlock. If this field is set then
+	// ipBlock defines policy on a particular IPBlock. If this field is set then
 	// neither of the other fields can be.
 	// +optional
 	// +k8s:beta(since: "1.37")=+k8s:optional
