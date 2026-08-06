@@ -61,6 +61,7 @@ func TestScale(t *testing.T) {
 		wasntUpdated map[string]bool
 
 		desiredReplicasAnnotations map[string]int32
+		expectedAnnotations        map[string]string
 	}{
 		{
 			name:          "normal scaling event: 10 -> 12",
@@ -250,6 +251,22 @@ func TestScale(t *testing.T) {
 			expectedNew: nil,
 			expectedOld: []*apps.ReplicaSet{rs("foo-v2", 10, nil, newTimestamp), rs("foo-v1", 4, nil, oldTimestamp)},
 		},
+		// Regression test for #135483: stale desired-replicas annotation must be refreshed
+		// even when RS.Spec.Replicas already matches deployment.Spec.Replicas.
+		{
+			name:          "stale annotation with matching replicas must be updated (issue #135483)",
+			deployment:    newDeployment("foo", 5, nil, nil, nil, nil),
+			oldDeployment: newDeployment("foo", 5, nil, nil, nil, nil),
+
+			newRS:  nil,
+			oldRSs: []*apps.ReplicaSet{rs("foo-v1", 5, nil, newTimestamp)},
+
+			expectedNew: nil,
+			expectedOld: []*apps.ReplicaSet{rs("foo-v1", 5, nil, newTimestamp)},
+
+			desiredReplicasAnnotations: map[string]int32{"foo-v1": int32(10)},
+			expectedAnnotations:        map[string]string{"foo-v1": "5"},
+		},
 		{
 			name:          "saturated but broken new replica set does not affect old pods",
 			deployment:    newDeployment("foo", 2, nil, ptr.To(intstr.FromInt32(1)), ptr.To(intstr.FromInt32(1)), nil),
@@ -335,6 +352,22 @@ func TestScale(t *testing.T) {
 				expected := test.expectedOld[n]
 				if *(expected.Spec.Replicas) != nameToSize[rs.Name] {
 					t.Errorf("%s: expected old (%s) replicas: %d, got: %d", test.name, rs.Name, *(expected.Spec.Replicas), nameToSize[rs.Name])
+				}
+			}
+
+			if len(test.expectedAnnotations) > 0 {
+				// Build a map of rs name → annotation value from UPDATE actions.
+				updatedAnnotations := make(map[string]string)
+				for _, action := range fake.Actions() {
+					updated := action.(testclient.UpdateAction).GetObject().(*apps.ReplicaSet)
+					updatedAnnotations[updated.Name] = updated.Annotations[deploymentutil.DesiredReplicasAnnotation]
+				}
+				for rsName, wantAnnotation := range test.expectedAnnotations {
+					if got, ok := updatedAnnotations[rsName]; !ok {
+						t.Errorf("%s: expected RS %q to be updated with annotation %q, but no update was issued", test.name, rsName, wantAnnotation)
+					} else if got != wantAnnotation {
+						t.Errorf("%s: RS %q desired-replicas annotation = %q, want %q", test.name, rsName, got, wantAnnotation)
+					}
 				}
 			}
 		})
