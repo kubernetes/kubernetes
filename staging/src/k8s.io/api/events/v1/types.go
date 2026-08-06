@@ -58,7 +58,8 @@ type Event struct {
 	// This field cannot be empty for new Events and it can have at most 128 characters.
 	Action string `json:"action,omitempty" protobuf:"bytes,6,name=action"`
 
-	// reason is why the action was taken. It is human-readable.
+	// reason is why the action was taken. It is a short, machine-readable
+	// CamelCase string, e.g. `FailedScheduling`.
 	// This field cannot be empty for new Events and it can have at most 128 characters.
 	Reason string `json:"reason,omitempty" protobuf:"bytes,7,name=reason"`
 
