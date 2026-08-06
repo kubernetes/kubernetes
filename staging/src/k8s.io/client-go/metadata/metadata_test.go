@@ -301,6 +301,82 @@ func TestClient(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "DeleteWithResult is able to convert a JSON object to PartialObjectMetadata",
+			handler: func(t *testing.T, w http.ResponseWriter, req *http.Request) {
+				if req.Header.Get("Accept") != "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1,application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1,application/json" {
+					t.Fatal(req.Header.Get("Accept"))
+				}
+				if req.Method != http.MethodDelete && req.URL.String() != "/apis/group/v1/namespaces/ns/resource/name" {
+					t.Fatal(req.URL.String())
+				}
+				writeJSON(t, w, &corev1.Pod{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Pod",
+						APIVersion: "v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "name",
+						Namespace: "ns",
+					},
+				})
+			},
+			want: func(ctx context.Context, t *testing.T, client *Client) {
+				res, err := client.Resource(gvr).Namespace("ns").DeleteWithResult(ctx, "name", metav1.DeleteOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				obj, err := res.Get()
+				if err != nil {
+					t.Fatal(err)
+				}
+				expect := &metav1.PartialObjectMetadata{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "name",
+						Namespace: "ns",
+					},
+				}
+				if !reflect.DeepEqual(expect, obj) {
+					t.Fatal(cmp.Diff(expect, obj))
+				}
+			},
+		},
+		{
+			name: "DeleteWithResult is able to decode status successfully",
+			handler: func(t *testing.T, w http.ResponseWriter, req *http.Request) {
+				if req.Header.Get("Accept") != "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1,application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1,application/json" {
+					t.Fatal(req.Header.Get("Accept"))
+				}
+				if req.Method != http.MethodDelete && req.URL.String() != "/apis/group/v1/namespaces/ns/resource/name" {
+					t.Fatal(req.URL.String())
+				}
+				writeJSON(t, w, &metav1.Status{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Status",
+						APIVersion: "v1",
+					},
+					Status: metav1.StatusSuccess,
+					Code:   http.StatusOK,
+				})
+			},
+			want: func(ctx context.Context, t *testing.T, client *Client) {
+				res, err := client.Resource(gvr).Namespace("ns").DeleteWithResult(ctx, "name", metav1.DeleteOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				obj, err := res.Get()
+				if err != nil {
+					t.Fatal(err)
+				}
+				expect := &metav1.Status{
+					Status: metav1.StatusSuccess,
+					Code:   http.StatusOK,
+				}
+				if !reflect.DeepEqual(expect, obj) {
+					t.Fatal(cmp.Diff(expect, obj))
+				}
+			},
+		},
 	}
 
 	for _, tt := range testCases {

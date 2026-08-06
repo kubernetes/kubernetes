@@ -41,6 +41,7 @@ type RoleBindingInterface interface {
 	Create(ctx context.Context, roleBinding *rbacv1alpha1.RoleBinding, opts v1.CreateOptions) (*rbacv1alpha1.RoleBinding, error)
 	Update(ctx context.Context, roleBinding *rbacv1alpha1.RoleBinding, opts v1.UpdateOptions) (*rbacv1alpha1.RoleBinding, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts v1.DeleteOptions) (v1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*rbacv1alpha1.RoleBinding, error)
 	List(ctx context.Context, opts v1.ListOptions) (*rbacv1alpha1.RoleBindingList, error)

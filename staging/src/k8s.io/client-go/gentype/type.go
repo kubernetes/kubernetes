@@ -258,6 +258,18 @@ func (c *Client[T]) Delete(ctx context.Context, name string, opts metav1.DeleteO
 		Error()
 }
 
+// DeleteWithResult takes name of the resource and deletes it. Returns an error if one occurs, or a metav1.APIResult on success.
+func (c *Client[T]) DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions) (metav1.APIResult, error) {
+	result := c.client.Delete().
+		UseProtobufAsDefaultIfPreferred(c.prefersProtobuf).
+		NamespaceIfScoped(c.namespace, c.namespace != "").
+		Resource(c.resource).
+		Name(name).
+		Body(&opts).
+		Do(ctx)
+	return rest.RestResultWrapper{Result: result}, result.Error()
+}
+
 // DeleteCollection deletes a collection of objects.
 func (l *alsoLister[T, L]) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	var timeout time.Duration

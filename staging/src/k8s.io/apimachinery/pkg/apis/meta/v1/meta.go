@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -61,6 +62,13 @@ type Object interface {
 	SetOwnerReferences([]OwnerReference)
 	GetManagedFields() []ManagedFieldsEntry
 	SetManagedFields(managedFields []ManagedFieldsEntry)
+}
+
+// APIResult is an interface that represents the result of an API operation.
+type APIResult interface {
+	Get() (runtime.Object, error)
+	StatusCode(statusCode *int) APIResult
+	Error() error
 }
 
 // ListMetaAccessor retrieves the list interface from an object

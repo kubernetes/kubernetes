@@ -41,6 +41,7 @@ type FischerInterface interface {
 	Create(ctx context.Context, fischer *wardlev1alpha1.Fischer, opts v1.CreateOptions) (*wardlev1alpha1.Fischer, error)
 	Update(ctx context.Context, fischer *wardlev1alpha1.Fischer, opts v1.UpdateOptions) (*wardlev1alpha1.Fischer, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts v1.DeleteOptions) (v1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*wardlev1alpha1.Fischer, error)
 	List(ctx context.Context, opts v1.ListOptions) (*wardlev1alpha1.FischerList, error)

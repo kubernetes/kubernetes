@@ -41,6 +41,7 @@ type RoleInterface interface {
 	Create(ctx context.Context, role *rbacv1.Role, opts metav1.CreateOptions) (*rbacv1.Role, error)
 	Update(ctx context.Context, role *rbacv1.Role, opts metav1.UpdateOptions) (*rbacv1.Role, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions) (metav1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*rbacv1.Role, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*rbacv1.RoleList, error)

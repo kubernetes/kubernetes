@@ -65,7 +65,7 @@ func ConfigFor(inConfig *rest.Config) *rest.Config {
 	config := rest.CopyConfig(inConfig)
 	config.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
 	config.ContentType = "application/vnd.kubernetes.protobuf"
-	config.NegotiatedSerializer = metainternalversionscheme.Codecs.WithoutConversion()
+	config.NegotiatedSerializer = &metadataNegotiatedSerializer{metainternalversionscheme.Codecs.WithoutConversion()}
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
@@ -157,6 +157,32 @@ func (c *client) Delete(ctx context.Context, name string, opts metav1.DeleteOpti
 		Body(deleteOptionsByte).
 		Do(ctx)
 	return result.Error()
+}
+
+// DeleteWithResult removes the provided resource from the server.
+func (c *client) DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions, subresources ...string) (metav1.APIResult, error) {
+	if len(name) == 0 {
+		return nil, fmt.Errorf("name is required")
+	}
+	// if DeleteOptions are delivered to Negotiator for serialization,
+	// HTTP-Request header will bring "Content-Type: application/vnd.kubernetes.protobuf"
+	// apiextensions-apiserver uses unstructuredNegotiatedSerializer to decode the input,
+	// server-side will reply with 406 errors.
+	// The special treatment here is to be compatible with CRD Handler
+	// see: https://github.com/kubernetes/kubernetes/blob/1a845ccd076bbf1b03420fe694c85a5cd3bd6bed/staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/customresource_handler.go#L843
+	deleteOptionsByte, err := runtime.Encode(deleteOptionsCodec.LegacyCodec(schema.GroupVersion{Version: "v1"}), &opts)
+	if err != nil {
+		return nil, err
+	}
+
+	result := c.client.client.
+		Delete().
+		AbsPath(append(c.makeURLSegments(name), subresources...)...).
+		SetHeader("Content-Type", runtime.ContentTypeJSON).
+		SetHeader("Accept", "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1,application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1,application/json").
+		Body(deleteOptionsByte).
+		Do(ctx)
+	return rest.RestResultWrapper{Result: result}, result.Error()
 }
 
 // DeleteCollection triggers deletion of all resources in the specified scope (namespace or cluster).
@@ -328,4 +354,51 @@ func (c *client) makeURLSegments(name string) []string {
 
 func isLikelyObjectMetadata(meta *metav1.PartialObjectMetadata) bool {
 	return len(meta.UID) > 0 || !meta.CreationTimestamp.IsZero() || len(meta.Name) > 0 || len(meta.GenerateName) > 0
+}
+
+type metadataNegotiatedSerializer struct {
+	runtime.NegotiatedSerializer
+}
+
+func (s *metadataNegotiatedSerializer) DecoderToVersion(serializer runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
+	originalDecoder := s.NegotiatedSerializer.DecoderToVersion(serializer, gv)
+	return &metadataDecoder{delegate: originalDecoder}
+}
+
+type metadataDecoder struct {
+	delegate runtime.Decoder
+}
+
+func (d *metadataDecoder) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
+	obj, gvk, err := d.delegate.Decode(data, defaults, into)
+	if err == nil {
+		return obj, gvk, nil
+	}
+
+	if runtime.IsNotRegisteredError(err) {
+		// Check if the raw JSON payload is a List (contains a root-level "items" array)
+		var objMap map[string]interface{}
+		if jsonErr := json.Unmarshal(data, &objMap); jsonErr == nil {
+			if items, hasItems := objMap["items"]; hasItems {
+				if _, isSlice := items.([]interface{}); isSlice {
+					var partialList metav1.PartialObjectMetadataList
+					if jsonErr := json.Unmarshal(data, &partialList); jsonErr == nil {
+						partialList.TypeMeta = metav1.TypeMeta{}
+						return &partialList, &schema.GroupVersionKind{Group: "meta.k8s.io", Version: "v1", Kind: "PartialObjectMetadataList"}, nil
+					}
+				}
+			}
+		}
+
+		// Otherwise, decode as a single PartialObjectMetadata
+		var partial metav1.PartialObjectMetadata
+		if jsonErr := json.Unmarshal(data, &partial); jsonErr == nil {
+			if isLikelyObjectMetadata(&partial) {
+				partial.TypeMeta = metav1.TypeMeta{}
+				return &partial, &schema.GroupVersionKind{Group: "meta.k8s.io", Version: "v1", Kind: "PartialObjectMetadata"}, nil
+			}
+		}
+	}
+
+	return nil, nil, err
 }
