@@ -150,7 +150,7 @@ func TestMicroTimeUnmarshalCBOR(t *testing.T) {
 		{name: "null", in: []byte{0xf6}, out: MicroTime{}}, // null
 		{name: "valid", in: []byte("\x58\x1b1998-05-05T05:05:05.000000Z"), out: MicroTime{Time: Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},                                    // '1998-05-05T05:05:05.000000Z'
 		{name: "invalid cbor type", in: []byte{0x07}, out: MicroTime{}, errMessage: "cbor: cannot unmarshal positive integer into Go value of type string"},                                // 7
-		{name: "malformed timestamp", in: []byte("\x45hello"), out: MicroTime{}, errMessage: `parsing time "hello" as "2006-01-02T15:04:05.000000Z07:00": cannot parse "hello" as "2006"`}, // 'hello'
+		{name: "malformed timestamp", in: []byte("\x45hello"), out: MicroTime{}, errMessage: `parsing time "hello" as "2006-01-02T15:04:05Z07:00": cannot parse "hello" as "2006"`}, // 'hello'
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var got MicroTime
@@ -397,6 +397,43 @@ func TestMicroTimeRoundtripCBOR(t *testing.T) {
 				t.Logf("failed to produce diagnostic encoding of 0x%x: %v", b, err)
 			}
 			t.Errorf("expected equal: %v, %v (cbor was '%s')", initial, final, diag)
+		}
+	}
+}
+
+func TestMicroTimeUnmarshalJSONFlexiblePrecision(t *testing.T) {
+	// MicroTime must accept any valid RFC3339 instant, like Time, not only the
+	// canonical 6-digit form. Regression for MicroTime rejecting millisecond
+	// (JavaScript Date.toISOString()), second, and nanosecond precision.
+	for _, tc := range []struct {
+		in   string
+		want string // canonical microsecond marshal
+	}{
+		{`"2024-01-02T03:04:05Z"`, `"2024-01-02T03:04:05.000000Z"`},
+		{`"2024-01-02T03:04:05.123Z"`, `"2024-01-02T03:04:05.123000Z"`},
+		{`"2024-01-02T03:04:05.123456Z"`, `"2024-01-02T03:04:05.123456Z"`},
+		{`"2024-01-02T03:04:05.123456789Z"`, `"2024-01-02T03:04:05.123456Z"`},
+	} {
+		var mt MicroTime
+		if err := json.Unmarshal([]byte(tc.in), &mt); err != nil {
+			t.Errorf("%s: unexpected error: %v", tc.in, err)
+			continue
+		}
+		var tm Time
+		if err := json.Unmarshal([]byte(tc.in), &tm); err != nil {
+			t.Errorf("%s: Time rejected an input MicroTime accepted: %v", tc.in, err)
+		}
+		got, err := json.Marshal(mt)
+		if err != nil {
+			t.Errorf("%s: marshal error: %v", tc.in, err)
+			continue
+		}
+		if string(got) != tc.want {
+			t.Errorf("%s: got %s, want %s", tc.in, got, tc.want)
+		}
+		var rt MicroTime
+		if err := json.Unmarshal(got, &rt); err != nil || !rt.Equal(&mt) {
+			t.Errorf("%s: round-trip failed: %s err=%v", tc.in, got, err)
 		}
 	}
 }
