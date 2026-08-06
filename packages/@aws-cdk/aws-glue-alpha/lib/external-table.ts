@@ -57,7 +57,7 @@ export class ExternalTable extends TableBase {
     addConstructMetadata(this, props);
     this.connection = props.connection;
     this.resource = new CfnTable(this, 'Table', {
-      catalogId: props.database.catalogId,
+      catalogId: props.database.catalog.catalogId,
 
       databaseName: props.database.databaseName,
 

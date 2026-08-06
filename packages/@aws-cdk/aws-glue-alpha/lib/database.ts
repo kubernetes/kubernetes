@@ -1,21 +1,19 @@
 import { CfnDatabase } from 'aws-cdk-lib/aws-glue';
 import type { IResource } from 'aws-cdk-lib/core';
 import { ArnFormat, Lazy, Names, Resource, Stack, UnscopedValidationError } from 'aws-cdk-lib/core';
-import { memoizedGetter, lit } from 'aws-cdk-lib/core/lib/helpers-internal';
+import { lit, memoizedGetter } from 'aws-cdk-lib/core/lib/helpers-internal';
 import { addConstructMetadata } from 'aws-cdk-lib/core/lib/metadata-resource';
 import { propertyInjectable } from 'aws-cdk-lib/core/lib/prop-injectable';
 import type { Construct } from 'constructs';
+import type { ICatalog } from './catalog';
+import { Catalog } from './catalog';
 
 export interface IDatabase extends IResource {
-  /**
-   * The ARN of the catalog.
-   */
-  readonly catalogArn: string;
 
   /**
-   * The catalog id of the database (usually, the AWS account id)
+   * The catalog this database belongs to.
    */
-  readonly catalogId: string;
+  readonly catalog: ICatalog;
 
   /**
    * The ARN of the database.
@@ -54,6 +52,13 @@ export interface DatabaseProps {
    * @default - no database description
    */
   readonly description?: string;
+
+  /**
+   * The catalog in which the database will be placed.
+   *
+   * @default The default, account-wide catalog.
+   */
+  readonly catalog?: ICatalog;
 }
 
 /**
@@ -70,27 +75,24 @@ export class Database extends Resource implements IDatabase {
     class Import extends Resource implements IDatabase {
       public databaseArn = databaseArn;
       public databaseName = stack.splitArn(databaseArn, ArnFormat.SLASH_RESOURCE_NAME).resourceName!;
-      public catalogArn = stack.formatArn({ service: 'glue', resource: 'catalog' });
-      public catalogId = stack.account;
+
+      // Materialize the account catalog only on access, so importing a database
+      // does not pre-empt Catalog.encryptAccount() for the stack.
+      @memoizedGetter
+      public get catalog(): ICatalog {
+        return Catalog.forAccount(this);
+      }
     }
 
     return new Import(scope, id);
   }
 
   /**
-   * ARN of the Glue catalog in which this database is stored.
-   */
-  public readonly catalogArn: string;
-
-  /**
-   * The catalog id of the database (usually, the AWS account id).
-   */
-  public readonly catalogId: string;
-
-  /**
    * Location URI of this database.
    */
   public locationUri?: string;
+
+  private readonly _catalog?: ICatalog;
 
   private resource: CfnDatabase;
 
@@ -122,17 +124,27 @@ export class Database extends Resource implements IDatabase {
       };
     }
 
-    this.catalogId = Stack.of(this).account;
+    this._catalog = props.catalog;
+
+    // When the database uses the implicit account catalog, its id is the
+    // account id. Reference that directly rather than materializing the account
+    // catalog singleton, so a plain `new Database()` does not pre-empt
+    // `Catalog.encryptAccount()` for the stack.
     this.resource = new CfnDatabase(this, 'Resource', {
-      catalogId: this.catalogId,
+      catalogId: this._catalog?.catalogId ?? Stack.of(this).account,
       databaseInput,
     });
+  }
 
-    // catalogId is implicitly the accountId, which is why we don't pass the catalogId here
-    this.catalogArn = Stack.of(this).formatArn({
-      service: 'glue',
-      resource: 'catalog',
-    });
+  /**
+   * The catalog this database belongs to.
+   *
+   * Defaults to the implicit, account-wide catalog, materialized on first
+   * access.
+   */
+  @memoizedGetter
+  public get catalog(): ICatalog {
+    return this._catalog ?? Catalog.forAccount(this);
   }
 
   @memoizedGetter

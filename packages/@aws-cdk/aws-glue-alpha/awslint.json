@@ -108,6 +108,7 @@
     "interface-extends-ref:@aws-cdk/aws-glue-alpha.IJob",
     "interface-extends-ref:@aws-cdk/aws-glue-alpha.ISecurityConfiguration",
     "interface-extends-ref:@aws-cdk/aws-glue-alpha.ITable",
-    "interface-extends-ref:@aws-cdk/aws-glue-alpha.IWorkflow"
+    "interface-extends-ref:@aws-cdk/aws-glue-alpha.IWorkflow",
+    "prefer-ref-interface:@aws-cdk/aws-glue-alpha.DatabaseProps.catalog"
   ]
 }

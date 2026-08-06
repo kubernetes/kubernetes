@@ -130,7 +130,7 @@ export class S3Table extends TableBase {
     this.encryptionKey = encryptionKey;
 
     this.resource = new CfnTable(this, 'Table', {
-      catalogId: props.database.catalogId,
+      catalogId: props.database.catalog.catalogId,
 
       databaseName: props.database.databaseName,
 
