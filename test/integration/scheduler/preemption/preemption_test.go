@@ -20,10 +20,7 @@ package preemption
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -44,21 +41,12 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
-	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
-	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
-	"k8s.io/kubernetes/pkg/scheduler/framework/preemption"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testfwk "k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/utils/ptr"
 )
 
 // imported from testutils
@@ -71,8 +59,6 @@ var (
 )
 
 const filterPluginName = "filter-plugin"
-
-var lowPriority, mediumPriority, highPriority = int32(100), int32(200), int32(300)
 
 const tokenFilterName = "token-filter"
 
@@ -144,7 +130,7 @@ func TestPreemption(t *testing.T) {
 	}
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: ptr.To(v1.DefaultSchedulerName),
+			SchedulerName: new(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
 				Filter: configv1.PluginSet{
 					Enabled: []configv1.Plugin{
@@ -187,7 +173,7 @@ func TestPreemption(t *testing.T) {
 			existingPods: []*v1.Pod{
 				initPausePod(&testutils.PausePodConfig{
 					Name:     "victim-pod",
-					Priority: &lowPriority,
+					Priority: &LowPriority,
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
 						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
@@ -196,7 +182,7 @@ func TestPreemption(t *testing.T) {
 			},
 			pod: initPausePod(&testutils.PausePodConfig{
 				Name:     "preemptor-pod",
-				Priority: &highPriority,
+				Priority: &HighPriority,
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
 					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
@@ -210,7 +196,7 @@ func TestPreemption(t *testing.T) {
 			existingPods: []*v1.Pod{
 				initPausePod(&testutils.PausePodConfig{
 					Name:     "victim-pod",
-					Priority: &lowPriority,
+					Priority: &LowPriority,
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
 						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
@@ -219,7 +205,7 @@ func TestPreemption(t *testing.T) {
 			},
 			pod: initPausePod(&testutils.PausePodConfig{
 				Name:     "preemptor-pod",
-				Priority: &highPriority,
+				Priority: &HighPriority,
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
 					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
@@ -238,7 +224,7 @@ func TestPreemption(t *testing.T) {
 			existingPods: []*v1.Pod{
 				initPausePod(&testutils.PausePodConfig{
 					Name:     "victim-pod",
-					Priority: &lowPriority,
+					Priority: &LowPriority,
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
 						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
@@ -247,7 +233,7 @@ func TestPreemption(t *testing.T) {
 			},
 			pod: initPausePod(&testutils.PausePodConfig{
 				Name:     "preemptor-pod",
-				Priority: &highPriority,
+				Priority: &HighPriority,
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
 					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
@@ -263,7 +249,7 @@ func TestPreemption(t *testing.T) {
 			existingPods: []*v1.Pod{
 				initPausePod(&testutils.PausePodConfig{
 					Name:     "victim-pod",
-					Priority: &lowPriority,
+					Priority: &LowPriority,
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
 						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
@@ -272,7 +258,7 @@ func TestPreemption(t *testing.T) {
 			},
 			pod: initPausePod(&testutils.PausePodConfig{
 				Name:     "preemptor-pod",
-				Priority: &highPriority,
+				Priority: &HighPriority,
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
 					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
@@ -286,13 +272,13 @@ func TestPreemption(t *testing.T) {
 			existingPods: []*v1.Pod{
 				initPausePod(&testutils.PausePodConfig{
 					Name:      "pod-0",
-					Priority:  &mediumPriority,
+					Priority:  &MediumPriority,
 					Labels:    map[string]string{"pod": "p0"},
 					Resources: defaultPodRes,
 				}),
 				initPausePod(&testutils.PausePodConfig{
 					Name:      "pod-1",
-					Priority:  &lowPriority,
+					Priority:  &LowPriority,
 					Labels:    map[string]string{"pod": "p1"},
 					Resources: defaultPodRes,
 					Affinity: &v1.Affinity{
@@ -318,7 +304,7 @@ func TestPreemption(t *testing.T) {
 			// A higher priority pod with anti-affinity.
 			pod: initPausePod(&testutils.PausePodConfig{
 				Name:      "preemptor-pod",
-				Priority:  &highPriority,
+				Priority:  &HighPriority,
 				Labels:    map[string]string{"pod": "preemptor"},
 				Resources: defaultPodRes,
 				Affinity: &v1.Affinity{
@@ -349,13 +335,13 @@ func TestPreemption(t *testing.T) {
 			existingPods: []*v1.Pod{
 				initPausePod(&testutils.PausePodConfig{
 					Name:      "pod-0",
-					Priority:  &mediumPriority,
+					Priority:  &MediumPriority,
 					Labels:    map[string]string{"pod": "p0"},
 					Resources: defaultPodRes,
 				}),
 				initPausePod(&testutils.PausePodConfig{
 					Name:      "pod-1",
-					Priority:  &highPriority,
+					Priority:  &HighPriority,
 					Labels:    map[string]string{"pod": "p1"},
 					Resources: defaultPodRes,
 					Affinity: &v1.Affinity{
@@ -381,7 +367,7 @@ func TestPreemption(t *testing.T) {
 			// A higher priority pod with anti-affinity.
 			pod: initPausePod(&testutils.PausePodConfig{
 				Name:      "preemptor-pod",
-				Priority:  &highPriority,
+				Priority:  &HighPriority,
 				Labels:    map[string]string{"pod": "preemptor"},
 				Resources: defaultPodRes,
 				Affinity: &v1.Affinity{
@@ -419,13 +405,13 @@ func TestPreemption(t *testing.T) {
 				}).Label("node", "node2").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Priority(lowPriority).BasicPolicy().
+				st.MakePodGroup().Name("pg1").Priority(LowPriority).BasicPolicy().
 					DisruptionModeAll().Obj(),
 			},
 			existingPods: []*v1.Pod{
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "pod-group-victim-1",
-					Priority:     &lowPriority,
+					Priority:     &LowPriority,
 					NodeSelector: map[string]string{"node": "node1"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
@@ -435,7 +421,7 @@ func TestPreemption(t *testing.T) {
 				}),
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "pod-group-victim-2",
-					Priority:     &lowPriority,
+					Priority:     &LowPriority,
 					NodeSelector: map[string]string{"node": "node2"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
@@ -446,7 +432,7 @@ func TestPreemption(t *testing.T) {
 			},
 			pod: initPausePod(&testutils.PausePodConfig{
 				Name:         "preemptor-pod",
-				Priority:     &highPriority,
+				Priority:     &HighPriority,
 				NodeSelector: map[string]string{"node": "node1"},
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
@@ -463,13 +449,13 @@ func TestPreemption(t *testing.T) {
 			initTokens:             maxTokens,
 			genericWorkloadEnabled: true,
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-single").Priority(lowPriority).BasicPolicy().
+				st.MakePodGroup().Name("pg-single").Priority(LowPriority).BasicPolicy().
 					DisruptionModeAll().Obj(),
 			},
 			existingPods: []*v1.Pod{
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "pod-group-victim-1",
-					Priority:     &lowPriority,
+					Priority:     &LowPriority,
 					NodeSelector: map[string]string{"node": "node1"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
@@ -479,7 +465,7 @@ func TestPreemption(t *testing.T) {
 				}),
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "pod-group-victim-2",
-					Priority:     &lowPriority,
+					Priority:     &LowPriority,
 					NodeSelector: map[string]string{"node": "node1"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
@@ -490,7 +476,7 @@ func TestPreemption(t *testing.T) {
 			},
 			pod: initPausePod(&testutils.PausePodConfig{
 				Name:         "preemptor-pod",
-				Priority:     &highPriority,
+				Priority:     &HighPriority,
 				NodeSelector: map[string]string{"node": "node1"},
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
@@ -513,15 +499,15 @@ func TestPreemption(t *testing.T) {
 				}).Label("node", "node2").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-low").Priority(lowPriority).BasicPolicy().
+				st.MakePodGroup().Name("pg-low").Priority(LowPriority).BasicPolicy().
 					DisruptionModeAll().Obj(),
-				st.MakePodGroup().Name("pg-medium").Priority(mediumPriority).BasicPolicy().
+				st.MakePodGroup().Name("pg-medium").Priority(MediumPriority).BasicPolicy().
 					DisruptionModeAll().Obj(),
 			},
 			existingPods: []*v1.Pod{
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "pg-low-node1",
-					Priority:     &lowPriority,
+					Priority:     &LowPriority,
 					NodeSelector: map[string]string{"node": "node1"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
@@ -531,7 +517,7 @@ func TestPreemption(t *testing.T) {
 				}),
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "pg-low-node2",
-					Priority:     &lowPriority,
+					Priority:     &LowPriority,
 					NodeSelector: map[string]string{"node": "node2"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
@@ -541,7 +527,7 @@ func TestPreemption(t *testing.T) {
 				}),
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "pg-medium-node1",
-					Priority:     &mediumPriority,
+					Priority:     &MediumPriority,
 					NodeSelector: map[string]string{"node": "node1"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
@@ -551,7 +537,7 @@ func TestPreemption(t *testing.T) {
 				}),
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "pg-medium-node2",
-					Priority:     &mediumPriority,
+					Priority:     &MediumPriority,
 					NodeSelector: map[string]string{"node": "node2"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
@@ -562,7 +548,7 @@ func TestPreemption(t *testing.T) {
 			},
 			pod: initPausePod(&testutils.PausePodConfig{
 				Name:         "preemptor-pod",
-				Priority:     &highPriority,
+				Priority:     &HighPriority,
 				NodeSelector: map[string]string{"node": "node1"},
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
@@ -585,13 +571,13 @@ func TestPreemption(t *testing.T) {
 				}).Label("node", "node2").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-victim").Priority(lowPriority).BasicPolicy().
+				st.MakePodGroup().Name("pg-victim").Priority(LowPriority).BasicPolicy().
 					DisruptionModeAll().Obj(),
 			},
 			existingPods: []*v1.Pod{
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "unpreemptible-pod",
-					Priority:     &highPriority,
+					Priority:     &HighPriority,
 					NodeSelector: map[string]string{"node": "node2"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
@@ -600,7 +586,7 @@ func TestPreemption(t *testing.T) {
 				}),
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "pg-victim-1",
-					Priority:     &lowPriority,
+					Priority:     &LowPriority,
 					NodeSelector: map[string]string{"node": "node2"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(150, resource.DecimalSI),
@@ -610,7 +596,7 @@ func TestPreemption(t *testing.T) {
 				}),
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "pg-victim-2",
-					Priority:     &lowPriority,
+					Priority:     &LowPriority,
 					NodeSelector: map[string]string{"node": "node2"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(150, resource.DecimalSI),
@@ -621,7 +607,7 @@ func TestPreemption(t *testing.T) {
 			},
 			pod: initPausePod(&testutils.PausePodConfig{
 				Name:         "preemptor-pod",
-				Priority:     &highPriority,
+				Priority:     &HighPriority,
 				NodeSelector: map[string]string{"node": "node2"},
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(600, resource.DecimalSI),
@@ -644,13 +630,13 @@ func TestPreemption(t *testing.T) {
 				}).Label("node", "node2").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-single-multi").Priority(lowPriority).BasicPolicy().
+				st.MakePodGroup().Name("pg-single-multi").Priority(LowPriority).BasicPolicy().
 					DisruptionModeSingle().Obj(),
 			},
 			existingPods: []*v1.Pod{
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "pg-single-multi-node1",
-					Priority:     &lowPriority,
+					Priority:     &LowPriority,
 					NodeSelector: map[string]string{"node": "node1"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
@@ -660,7 +646,7 @@ func TestPreemption(t *testing.T) {
 				}),
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "pg-single-multi-node2",
-					Priority:     &lowPriority,
+					Priority:     &LowPriority,
 					NodeSelector: map[string]string{"node": "node2"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
@@ -671,7 +657,7 @@ func TestPreemption(t *testing.T) {
 			},
 			pod: initPausePod(&testutils.PausePodConfig{
 				Name:         "preemptor-pod",
-				Priority:     &highPriority,
+				Priority:     &HighPriority,
 				NodeSelector: map[string]string{"node": "node1"},
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
@@ -696,16 +682,16 @@ func TestPreemption(t *testing.T) {
 				}).Label("node", "node2").Obj(),
 			},
 			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpg1").Priority(lowPriority).BasicPolicy().
+				st.MakeCompositePodGroup().Name("cpg1").Priority(LowPriority).BasicPolicy().
 					DisruptionModeAll().WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Priority(lowPriority).BasicPolicy().ParentCompositePodGroup("cpg1").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg1").Priority(LowPriority).BasicPolicy().ParentCompositePodGroup("cpg1").WorkloadRef("t1", "wl1").Obj(),
 			},
 			existingPods: []*v1.Pod{
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "pod-group-victim-1",
-					Priority:     &lowPriority,
+					Priority:     &LowPriority,
 					NodeSelector: map[string]string{"node": "node1"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
@@ -715,7 +701,7 @@ func TestPreemption(t *testing.T) {
 				}),
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "pod-group-victim-2",
-					Priority:     &lowPriority,
+					Priority:     &LowPriority,
 					NodeSelector: map[string]string{"node": "node2"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
@@ -726,7 +712,7 @@ func TestPreemption(t *testing.T) {
 			},
 			pod: initPausePod(&testutils.PausePodConfig{
 				Name:         "preemptor-pod",
-				Priority:     &highPriority,
+				Priority:     &HighPriority,
 				NodeSelector: map[string]string{"node": "node1"},
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
@@ -744,16 +730,16 @@ func TestPreemption(t *testing.T) {
 			genericWorkloadEnabled:   true,
 			compositePodGroupEnabled: true,
 			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpg-single").Priority(lowPriority).BasicPolicy().
+				st.MakeCompositePodGroup().Name("cpg-single").Priority(LowPriority).BasicPolicy().
 					DisruptionModeAll().WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-single").Priority(lowPriority).BasicPolicy().ParentCompositePodGroup("cpg-single").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg-single").Priority(LowPriority).BasicPolicy().ParentCompositePodGroup("cpg-single").WorkloadRef("t1", "wl1").Obj(),
 			},
 			existingPods: []*v1.Pod{
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "pod-group-victim-1",
-					Priority:     &lowPriority,
+					Priority:     &LowPriority,
 					NodeSelector: map[string]string{"node": "node1"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
@@ -763,7 +749,7 @@ func TestPreemption(t *testing.T) {
 				}),
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "pod-group-victim-2",
-					Priority:     &lowPriority,
+					Priority:     &LowPriority,
 					NodeSelector: map[string]string{"node": "node1"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
@@ -774,7 +760,7 @@ func TestPreemption(t *testing.T) {
 			},
 			pod: initPausePod(&testutils.PausePodConfig{
 				Name:         "preemptor-pod",
-				Priority:     &highPriority,
+				Priority:     &HighPriority,
 				NodeSelector: map[string]string{"node": "node1"},
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
@@ -798,19 +784,19 @@ func TestPreemption(t *testing.T) {
 				}).Label("node", "node2").Obj(),
 			},
 			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpg-low").Priority(lowPriority).BasicPolicy().
+				st.MakeCompositePodGroup().Name("cpg-low").Priority(LowPriority).BasicPolicy().
 					DisruptionModeAll().WorkloadRef("wl1", "t1").Obj(),
-				st.MakeCompositePodGroup().Name("cpg-medium").Priority(mediumPriority).BasicPolicy().
+				st.MakeCompositePodGroup().Name("cpg-medium").Priority(MediumPriority).BasicPolicy().
 					DisruptionModeAll().WorkloadRef("wl2", "t2").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-low").Priority(lowPriority).BasicPolicy().ParentCompositePodGroup("cpg-low").WorkloadRef("t1", "wl1").Obj(),
-				st.MakePodGroup().Name("pg-medium").Priority(mediumPriority).BasicPolicy().ParentCompositePodGroup("cpg-medium").WorkloadRef("t2", "wl2").Obj(),
+				st.MakePodGroup().Name("pg-low").Priority(LowPriority).BasicPolicy().ParentCompositePodGroup("cpg-low").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg-medium").Priority(MediumPriority).BasicPolicy().ParentCompositePodGroup("cpg-medium").WorkloadRef("t2", "wl2").Obj(),
 			},
 			existingPods: []*v1.Pod{
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "pg-low-node1",
-					Priority:     &lowPriority,
+					Priority:     &LowPriority,
 					NodeSelector: map[string]string{"node": "node1"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
@@ -820,7 +806,7 @@ func TestPreemption(t *testing.T) {
 				}),
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "pg-low-node2",
-					Priority:     &lowPriority,
+					Priority:     &LowPriority,
 					NodeSelector: map[string]string{"node": "node2"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
@@ -830,7 +816,7 @@ func TestPreemption(t *testing.T) {
 				}),
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "pg-medium-node1",
-					Priority:     &mediumPriority,
+					Priority:     &MediumPriority,
 					NodeSelector: map[string]string{"node": "node1"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
@@ -840,7 +826,7 @@ func TestPreemption(t *testing.T) {
 				}),
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "pg-medium-node2",
-					Priority:     &mediumPriority,
+					Priority:     &MediumPriority,
 					NodeSelector: map[string]string{"node": "node2"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
@@ -851,7 +837,7 @@ func TestPreemption(t *testing.T) {
 			},
 			pod: initPausePod(&testutils.PausePodConfig{
 				Name:         "preemptor-pod",
-				Priority:     &highPriority,
+				Priority:     &HighPriority,
 				NodeSelector: map[string]string{"node": "node1"},
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
@@ -875,16 +861,16 @@ func TestPreemption(t *testing.T) {
 				}).Label("node", "node2").Obj(),
 			},
 			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpg-victim").Priority(lowPriority).BasicPolicy().
+				st.MakeCompositePodGroup().Name("cpg-victim").Priority(LowPriority).BasicPolicy().
 					DisruptionModeAll().WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-victim").Priority(lowPriority).BasicPolicy().ParentCompositePodGroup("cpg-victim").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg-victim").Priority(LowPriority).BasicPolicy().ParentCompositePodGroup("cpg-victim").WorkloadRef("t1", "wl1").Obj(),
 			},
 			existingPods: []*v1.Pod{
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "unpreemptible-pod",
-					Priority:     &highPriority,
+					Priority:     &HighPriority,
 					NodeSelector: map[string]string{"node": "node2"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
@@ -893,7 +879,7 @@ func TestPreemption(t *testing.T) {
 				}),
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "pg-victim-1",
-					Priority:     &lowPriority,
+					Priority:     &LowPriority,
 					NodeSelector: map[string]string{"node": "node2"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(150, resource.DecimalSI),
@@ -903,7 +889,7 @@ func TestPreemption(t *testing.T) {
 				}),
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "pg-victim-2",
-					Priority:     &lowPriority,
+					Priority:     &LowPriority,
 					NodeSelector: map[string]string{"node": "node2"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(150, resource.DecimalSI),
@@ -914,7 +900,7 @@ func TestPreemption(t *testing.T) {
 			},
 			pod: initPausePod(&testutils.PausePodConfig{
 				Name:         "preemptor-pod",
-				Priority:     &highPriority,
+				Priority:     &HighPriority,
 				NodeSelector: map[string]string{"node": "node2"},
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(600, resource.DecimalSI),
@@ -938,16 +924,16 @@ func TestPreemption(t *testing.T) {
 				}).Label("node", "node2").Obj(),
 			},
 			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
-				st.MakeCompositePodGroup().Name("cpg-single-multi").Priority(lowPriority).BasicPolicy().
+				st.MakeCompositePodGroup().Name("cpg-single-multi").Priority(LowPriority).BasicPolicy().
 					DisruptionModeSingle().WorkloadRef("wl1", "t1").Obj(),
 			},
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg-single-multi").Priority(lowPriority).BasicPolicy().ParentCompositePodGroup("cpg-single-multi").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg-single-multi").Priority(LowPriority).BasicPolicy().ParentCompositePodGroup("cpg-single-multi").WorkloadRef("t1", "wl1").Obj(),
 			},
 			existingPods: []*v1.Pod{
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "pg-single-multi-node1",
-					Priority:     &lowPriority,
+					Priority:     &LowPriority,
 					NodeSelector: map[string]string{"node": "node1"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
@@ -957,7 +943,7 @@ func TestPreemption(t *testing.T) {
 				}),
 				initPausePod(&testutils.PausePodConfig{
 					Name:         "pg-single-multi-node2",
-					Priority:     &lowPriority,
+					Priority:     &LowPriority,
 					NodeSelector: map[string]string{"node": "node2"},
 					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
@@ -968,7 +954,7 @@ func TestPreemption(t *testing.T) {
 			},
 			pod: initPausePod(&testutils.PausePodConfig{
 				Name:         "preemptor-pod",
-				Priority:     &highPriority,
+				Priority:     &HighPriority,
 				NodeSelector: map[string]string{"node": "node1"},
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
@@ -1132,381 +1118,320 @@ func TestPreemption(t *testing.T) {
 }
 
 func TestAsyncPreemption(t *testing.T) {
-	const podBlockedInBindingName = "pod-blocked-in-binding"
-	const reservingPodName = "reserving-pod"
-	const blockingPodName = "blocking-pod"
-
-	type createPod struct {
-		pod *v1.Pod
-		// count is the number of times the pod should be created by this action.
-		// i.e., if you use it, you have to use GenerateName.
-		// By default, it's 1.
-		count *int
-	}
-
-	type schedulePod struct {
-		podName             string
-		expectSuccess       bool
-		expectUnschedulable bool
-	}
-
-	type scenario struct {
-		// name is this step's name, just for the debugging purpose.
-		name string
-
-		// Only one of the following actions should be set.
-
-		// createPod creates a Pod.
-		createPod *createPod
-		// createNode creates an additional Node.
-		createNode string
-		// schedulePod schedules one Pod that is at the top of the activeQ.
-		// You should give a Pod name that is supposed to be scheduled.
-		schedulePod *schedulePod
-		// completePreemption completes the preemption that is currently on-going.
-		// You should give a Pod name.
-		completePreemption string
-		// podGatedInQueue checks if the given Pod is in the scheduling queue and gated by the preemption.
-		// You should give a Pod name.
-		podGatedInQueue string
-		// podRunningPreemption checks if the given Pod is running preemption.
-		// You should give a Pod index representing the order of Pod creation.
-		// e.g., if you want to check the Pod created first in the test case, you should give 0.
-		podRunningPreemption *int
-		// activatePod moves the pod from unschedulable to active or backoff.
-		// The value is the name of the pod to activate.
-		activatePod string
-		// resumeBind resumes the binding operation that keeps the pod blocked.
-		// Note: The pod will only become blocked in the first place, if pod name matches string defined in podBlockedInBinding.
-		resumeBind bool
-		// verifyPodInUnschedulable waits for some time and confirms that the given pod is in the unschedulable pool.
-		// The value is the name of the checked pod.
-		verifyPodInUnschedulable string
-		// flushUnschedulable flushes the unschedulable queue.
-		flushUnschedulable bool
-		// waitForPodsDeleted waits for the specified pods to be deleted from the cluster.
-		// The value is the array of Pod indexes representing the order of Pod creation.
-		waitForPodsDeleted []int
-	}
-
-	tests := []struct {
-		name string
-		// scenarios after the first attempt of scheduling the pod.
-		scenarios []scenario
-	}{
+	tests := []AsyncPreemptionTest{
 		{
 			// Very basic test case: if it fails, the basic scenario is broken somewhere.
-			name: "basic: async preemption happens expectedly",
-			scenarios: []scenario{
+			Name: "basic: async preemption happens expectedly",
+			Steps: []Step{
 				{
-					name: "create scheduled Pod",
-					createPod: &createPod{
-						pod:   st.MakePod().GenerateName("victim-").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Node("node").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
-						count: ptr.To(2),
+					Name: "create scheduled Pod",
+					CreatePod: &CreatePod{
+						Pod:   st.MakePod().GenerateName("victim-").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Node("node").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+						Count: new(2),
 					},
 				},
 				{
-					name: "create a preemptor Pod",
-					createPod: &createPod{
-						pod: st.MakePod().Name("preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
+					Name: "create a preemptor Pod",
+					CreatePod: &CreatePod{
+						Pod: st.MakePod().Name("preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
 					},
 				},
 				{
-					name: "schedule the preemptor Pod",
-					schedulePod: &schedulePod{
-						podName:             "preemptor",
-						expectUnschedulable: true,
+					Name: "schedule the preemptor Pod",
+					SchedulePod: &SchedulePod{
+						PodName:             "preemptor",
+						ExpectUnschedulable: true,
 					},
 				},
 				{
-					name:            "check the pod is in the queue and gated",
-					podGatedInQueue: "preemptor",
+					Name:            "check the pod is in the queue and gated",
+					PodGatedInQueue: "preemptor",
 				},
 				{
-					name:                 "check the preemptor Pod making the preemption API calls",
-					podRunningPreemption: ptr.To(2),
+					Name:                 "check the preemptor Pod making the preemption API calls",
+					PodRunningPreemption: new(2),
 				},
 				{
-					name:               "complete the preemption API calls",
-					completePreemption: "preemptor",
+					Name:               "complete the preemption API calls",
+					CompletePreemption: "preemptor",
 				},
 				{
-					name: "schedule the preemptor Pod after the preemption",
-					schedulePod: &schedulePod{
-						podName:       "preemptor",
-						expectSuccess: true,
-					},
-				},
-			},
-		},
-		{
-			name: "basic async preemption with 1 victim, preemptor gated until preemption API call finishes",
-			scenarios: []scenario{
-				{
-					name: "create victim",
-					createPod: &createPod{
-						pod: st.MakePod().GenerateName("victim-").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("node").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
-					},
-				},
-				{
-					name: "create a preemptor Pod",
-					createPod: &createPod{
-						pod: st.MakePod().Name("preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
-					},
-				},
-				{
-					name: "schedule the preemptor Pod",
-					schedulePod: &schedulePod{
-						podName:             "preemptor",
-						expectUnschedulable: true,
-					},
-				},
-				{
-					name:            "check the preemptor Pod is in the queue and gated",
-					podGatedInQueue: "preemptor",
-				},
-				{
-					name:                 "check the preemptor Pod making the preemption API calls",
-					podRunningPreemption: ptr.To(1),
-				},
-				{
-					name:               "complete the preemption API call",
-					completePreemption: "preemptor",
-				},
-				{
-					name: "schedule the preemptor Pod again and expect it to be scheduled",
-					schedulePod: &schedulePod{
-						podName:       "preemptor",
-						expectSuccess: true,
+					Name: "schedule the preemptor Pod after the preemption",
+					SchedulePod: &SchedulePod{
+						PodName:       "preemptor",
+						ExpectSuccess: true,
 					},
 				},
 			},
 		},
 		{
-			name: "Lower priority Pod doesn't take over the place for higher priority Pod that is running the preemption",
-			scenarios: []scenario{
+			Name: "basic async preemption with 1 victim, preemptor gated until preemption API call finishes",
+			Steps: []Step{
 				{
-					name: "create scheduled Pod",
-					createPod: &createPod{
-						pod:   st.MakePod().GenerateName("victim-").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Node("node").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
-						count: ptr.To(2),
+					Name: "create victim",
+					CreatePod: &CreatePod{
+						Pod: st.MakePod().GenerateName("victim-").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("node").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
 					},
 				},
 				{
-					name: "create a preemptor Pod",
-					createPod: &createPod{
-						pod: st.MakePod().Name("preemptor-high-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
+					Name: "create a preemptor Pod",
+					CreatePod: &CreatePod{
+						Pod: st.MakePod().Name("preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
 					},
 				},
 				{
-					name: "schedule the preemptor Pod",
-					schedulePod: &schedulePod{
-						podName:             "preemptor-high-priority",
-						expectUnschedulable: true,
+					Name: "schedule the preemptor Pod",
+					SchedulePod: &SchedulePod{
+						PodName:             "preemptor",
+						ExpectUnschedulable: true,
 					},
 				},
 				{
-					name:            "check the pod is in the queue and gated",
-					podGatedInQueue: "preemptor-high-priority",
+					Name:            "check the preemptor Pod is in the queue and gated",
+					PodGatedInQueue: "preemptor",
 				},
 				{
-					name:                 "check the preemptor Pod making the preemption API calls",
-					podRunningPreemption: ptr.To(2),
+					Name:                 "check the preemptor Pod making the preemption API calls",
+					PodRunningPreemption: new(1),
+				},
+				{
+					Name:               "complete the preemption API call",
+					CompletePreemption: "preemptor",
+				},
+				{
+					Name: "schedule the preemptor Pod again and expect it to be scheduled",
+					SchedulePod: &SchedulePod{
+						PodName:       "preemptor",
+						ExpectSuccess: true,
+					},
+				},
+			},
+		},
+		{
+			Name: "Lower priority Pod doesn't take over the place for higher priority Pod that is running the preemption",
+			Steps: []Step{
+				{
+					Name: "create scheduled Pod",
+					CreatePod: &CreatePod{
+						Pod:   st.MakePod().GenerateName("victim-").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Node("node").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+						Count: new(2),
+					},
+				},
+				{
+					Name: "create a preemptor Pod",
+					CreatePod: &CreatePod{
+						Pod: st.MakePod().Name("preemptor-high-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
+					},
+				},
+				{
+					Name: "schedule the preemptor Pod",
+					SchedulePod: &SchedulePod{
+						PodName:             "preemptor-high-priority",
+						ExpectUnschedulable: true,
+					},
+				},
+				{
+					Name:            "check the pod is in the queue and gated",
+					PodGatedInQueue: "preemptor-high-priority",
+				},
+				{
+					Name:                 "check the preemptor Pod making the preemption API calls",
+					PodRunningPreemption: new(2),
 				},
 				{
 					// This Pod is lower priority than the preemptor Pod.
 					// Given the preemptor Pod is nominated to the node, this Pod should be unschedulable.
-					name: "create a second Pod that is lower priority than the first preemptor Pod",
-					createPod: &createPod{
-						pod: st.MakePod().Name("pod-mid-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(50).Obj(),
+					Name: "create a second Pod that is lower priority than the first preemptor Pod",
+					CreatePod: &CreatePod{
+						Pod: st.MakePod().Name("pod-mid-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(50).Obj(),
 					},
 				},
 				{
-					name: "schedule the mid-priority Pod",
-					schedulePod: &schedulePod{
-						podName:             "pod-mid-priority",
-						expectUnschedulable: true,
+					Name: "schedule the mid-priority Pod",
+					SchedulePod: &SchedulePod{
+						PodName:             "pod-mid-priority",
+						ExpectUnschedulable: true,
 					},
 				},
 				{
-					name:               "complete the preemption API calls",
-					completePreemption: "preemptor-high-priority",
+					Name:               "complete the preemption API calls",
+					CompletePreemption: "preemptor-high-priority",
 				},
 				{
 					// the preemptor pod should be popped from the queue before the mid-priority pod.
-					name: "schedule the preemptor Pod again",
-					schedulePod: &schedulePod{
-						podName:       "preemptor-high-priority",
-						expectSuccess: true,
+					Name: "schedule the preemptor Pod again",
+					SchedulePod: &SchedulePod{
+						PodName:       "preemptor-high-priority",
+						ExpectSuccess: true,
 					},
 				},
 				{
-					name: "schedule the mid-priority Pod again",
-					schedulePod: &schedulePod{
-						podName:             "pod-mid-priority",
-						expectUnschedulable: true,
+					Name: "schedule the mid-priority Pod again",
+					SchedulePod: &SchedulePod{
+						PodName:             "pod-mid-priority",
+						ExpectUnschedulable: true,
 					},
 				},
 			},
 		},
 		{
-			name: "Higher priority Pod takes over the place for lower priority Pod that is running the preemption",
-			scenarios: []scenario{
+			Name: "Higher priority Pod takes over the place for lower priority Pod that is running the preemption",
+			Steps: []Step{
 				{
-					name: "create scheduled Pod",
-					createPod: &createPod{
-						pod:   st.MakePod().GenerateName("victim-").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("node").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
-						count: ptr.To(4),
+					Name: "create scheduled Pod",
+					CreatePod: &CreatePod{
+						Pod:   st.MakePod().GenerateName("victim-").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("node").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+						Count: new(4),
 					},
 				},
 				{
-					name: "create a preemptor Pod",
-					createPod: &createPod{
-						pod: st.MakePod().Name("preemptor-high-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
+					Name: "create a preemptor Pod",
+					CreatePod: &CreatePod{
+						Pod: st.MakePod().Name("preemptor-high-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
 					},
 				},
 				{
-					name: "schedule the preemptor Pod",
-					schedulePod: &schedulePod{
-						podName:             "preemptor-high-priority",
-						expectUnschedulable: true,
+					Name: "schedule the preemptor Pod",
+					SchedulePod: &SchedulePod{
+						PodName:             "preemptor-high-priority",
+						ExpectUnschedulable: true,
 					},
 				},
 				{
-					name:            "check the pod is in the queue and gated",
-					podGatedInQueue: "preemptor-high-priority",
+					Name:            "check the pod is in the queue and gated",
+					PodGatedInQueue: "preemptor-high-priority",
 				},
 				{
-					name:                 "check the preemptor Pod making the preemption API calls",
-					podRunningPreemption: ptr.To(4),
+					Name:                 "check the preemptor Pod making the preemption API calls",
+					PodRunningPreemption: new(4),
 				},
 				{
 					// This Pod is higher priority than the preemptor Pod.
 					// Even though the preemptor Pod is nominated to the node, this Pod can take over the place.
-					name: "create a second Pod that is higher priority than the first preemptor Pod",
-					createPod: &createPod{
-						pod: st.MakePod().Name("preemptor-super-high-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(200).Obj(),
+					Name: "create a second Pod that is higher priority than the first preemptor Pod",
+					CreatePod: &CreatePod{
+						Pod: st.MakePod().Name("preemptor-super-high-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(200).Obj(),
 					},
 				},
 				{
-					name: "schedule the super-high-priority Pod",
-					schedulePod: &schedulePod{
-						podName:             "preemptor-super-high-priority",
-						expectUnschedulable: true,
+					Name: "schedule the super-high-priority Pod",
+					SchedulePod: &SchedulePod{
+						PodName:             "preemptor-super-high-priority",
+						ExpectUnschedulable: true,
 					},
 				},
 				{
-					name:                 "check the super-high-priority Pod making the preemption API calls",
-					podRunningPreemption: ptr.To(5),
+					Name:                 "check the super-high-priority Pod making the preemption API calls",
+					PodRunningPreemption: new(5),
 				},
 				{
 					// the super-high-priority preemptor should enter the preemption
 					// and select the place where the preemptor-high-priority selected.
 					// So, basically both goroutines are preempting the same Pods.
-					name:            "check the super-high-priority pod is in the queue and gated",
-					podGatedInQueue: "preemptor-super-high-priority",
+					Name:            "check the super-high-priority pod is in the queue and gated",
+					PodGatedInQueue: "preemptor-super-high-priority",
 				},
 				{
-					name:               "complete the preemption API calls of super-high-priority",
-					completePreemption: "preemptor-super-high-priority",
+					Name:               "complete the preemption API calls of super-high-priority",
+					CompletePreemption: "preemptor-super-high-priority",
 				},
 				{
-					name:               "complete the preemption API calls of high-priority",
-					completePreemption: "preemptor-high-priority",
+					Name:               "complete the preemption API calls of high-priority",
+					CompletePreemption: "preemptor-high-priority",
 				},
 				{
-					name: "schedule the super-high-priority Pod",
-					schedulePod: &schedulePod{
-						podName:       "preemptor-super-high-priority",
-						expectSuccess: true,
+					Name: "schedule the super-high-priority Pod",
+					SchedulePod: &SchedulePod{
+						PodName:       "preemptor-super-high-priority",
+						ExpectSuccess: true,
 					},
 				},
 				{
-					name: "schedule the high-priority Pod",
-					schedulePod: &schedulePod{
-						podName:             "preemptor-high-priority",
-						expectUnschedulable: true,
+					Name: "schedule the high-priority Pod",
+					SchedulePod: &SchedulePod{
+						PodName:             "preemptor-high-priority",
+						ExpectUnschedulable: true,
 					},
 				},
 			},
 		},
 		{
-			name: "Lower priority Pod can select the same place where the higher priority Pod is preempting if the node is big enough",
-			scenarios: []scenario{
+			Name: "Lower priority Pod can select the same place where the higher priority Pod is preempting if the node is big enough",
+			Steps: []Step{
 				{
-					name: "create scheduled Pod",
-					createPod: &createPod{
-						pod:   st.MakePod().GenerateName("victim-").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("node").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
-						count: ptr.To(4),
+					Name: "create scheduled Pod",
+					CreatePod: &CreatePod{
+						Pod:   st.MakePod().GenerateName("victim-").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("node").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+						Count: new(4),
 					},
 				},
 				{
 					// It will preempt two victims.
-					name: "create a preemptor Pod",
-					createPod: &createPod{
-						pod: st.MakePod().Name("preemptor-high-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Priority(100).Obj(),
+					Name: "create a preemptor Pod",
+					CreatePod: &CreatePod{
+						Pod: st.MakePod().Name("preemptor-high-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Priority(100).Obj(),
 					},
 				},
 				{
-					name: "schedule the preemptor Pod",
-					schedulePod: &schedulePod{
-						podName:             "preemptor-high-priority",
-						expectUnschedulable: true,
+					Name: "schedule the preemptor Pod",
+					SchedulePod: &SchedulePod{
+						PodName:             "preemptor-high-priority",
+						ExpectUnschedulable: true,
 					},
 				},
 				{
-					name:            "check the pod is in the queue and gated",
-					podGatedInQueue: "preemptor-high-priority",
+					Name:            "check the pod is in the queue and gated",
+					PodGatedInQueue: "preemptor-high-priority",
 				},
 				{
-					name:                 "check the preemptor Pod making the preemption API calls",
-					podRunningPreemption: ptr.To(4),
+					Name:                 "check the preemptor Pod making the preemption API calls",
+					PodRunningPreemption: new(4),
 				},
 				{
 					// This Pod is lower priority than the preemptor Pod.
 					// Given the preemptor Pod is nominated to the node, this Pod should be unschedulable.
 					// This Pod will trigger the preemption to target the two victims that the first Pod doesn't target.
-					name: "create a second Pod that is lower priority than the first preemptor Pod",
-					createPod: &createPod{
-						pod: st.MakePod().Name("preemptor-mid-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Priority(50).Obj(),
+					Name: "create a second Pod that is lower priority than the first preemptor Pod",
+					CreatePod: &CreatePod{
+						Pod: st.MakePod().Name("preemptor-mid-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Priority(50).Obj(),
 					},
 				},
 				{
-					name: "schedule the mid-priority Pod",
-					schedulePod: &schedulePod{
-						podName:             "preemptor-mid-priority",
-						expectUnschedulable: true,
+					Name: "schedule the mid-priority Pod",
+					SchedulePod: &SchedulePod{
+						PodName:             "preemptor-mid-priority",
+						ExpectUnschedulable: true,
 					},
 				},
 				{
-					name:            "check the mid-priority pod is in the queue and gated",
-					podGatedInQueue: "preemptor-mid-priority",
+					Name:            "check the mid-priority pod is in the queue and gated",
+					PodGatedInQueue: "preemptor-mid-priority",
 				},
 				{
-					name:                 "check the mid-priority Pod making the preemption API calls",
-					podRunningPreemption: ptr.To(5),
+					Name:                 "check the mid-priority Pod making the preemption API calls",
+					PodRunningPreemption: new(5),
 				},
 				{
-					name:               "complete the preemption API calls",
-					completePreemption: "preemptor-mid-priority",
+					Name:               "complete the preemption API calls",
+					CompletePreemption: "preemptor-mid-priority",
 				},
 				{
-					name:               "complete the preemption API calls",
-					completePreemption: "preemptor-high-priority",
+					Name:               "complete the preemption API calls",
+					CompletePreemption: "preemptor-high-priority",
 				},
 				{
 					// the preemptor pod should be popped from the queue before the mid-priority pod.
-					name: "schedule the preemptor Pod again",
-					schedulePod: &schedulePod{
-						podName:       "preemptor-high-priority",
-						expectSuccess: true,
+					Name: "schedule the preemptor Pod again",
+					SchedulePod: &SchedulePod{
+						PodName:       "preemptor-high-priority",
+						ExpectSuccess: true,
 					},
 				},
 				{
-					name: "schedule the mid-priority Pod again",
-					schedulePod: &schedulePod{
-						podName:       "preemptor-mid-priority",
-						expectSuccess: true,
+					Name: "schedule the mid-priority Pod again",
+					SchedulePod: &SchedulePod{
+						PodName:       "preemptor-mid-priority",
+						ExpectSuccess: true,
 					},
 				},
 			},
@@ -1516,47 +1441,47 @@ func TestAsyncPreemption(t *testing.T) {
 			// Scenario reproduces the issue:
 			// Victim pod takes long in binding. Preemptor pod attempts preemption, goes to unschedulable, then the victim is deleted.
 			// Preemptor pod is woken up by the Pod/Delete event and is being scheduled, even before the victim binding is terminated.
-			name: "victim blocked in binding, preemptor pod gets scheduled after victim-in-binding is deleted",
-			scenarios: []scenario{
+			Name: "victim blocked in binding, preemptor pod gets scheduled after victim-in-binding is deleted",
+			Steps: []Step{
 				{
-					name: "create victim Pod that is going to be blocked in binding",
-					createPod: &createPod{
-						pod: st.MakePod().Name(podBlockedInBindingName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+					Name: "create victim Pod that is going to be blocked in binding",
+					CreatePod: &CreatePod{
+						Pod: st.MakePod().Name(PodBlockedInBindingName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
 					},
 				},
 				{
-					name: "schedule victim Pod",
-					schedulePod: &schedulePod{
-						podName: podBlockedInBindingName,
+					Name: "schedule victim Pod",
+					SchedulePod: &SchedulePod{
+						PodName: PodBlockedInBindingName,
 					},
 				},
 				{
-					name: "create a preemptor Pod",
-					createPod: &createPod{
-						pod: st.MakePod().Name("preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
+					Name: "create a preemptor Pod",
+					CreatePod: &CreatePod{
+						Pod: st.MakePod().Name("preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
 					},
 				},
 				{
-					name: "schedule the preemptor Pod",
-					schedulePod: &schedulePod{
-						podName:             "preemptor",
-						expectUnschedulable: true,
+					Name: "schedule the preemptor Pod",
+					SchedulePod: &SchedulePod{
+						PodName:             "preemptor",
+						ExpectUnschedulable: true,
 					},
 				},
 				{
-					name:               "complete the preemption API call",
-					completePreemption: "preemptor",
+					Name:               "complete the preemption API call",
+					CompletePreemption: "preemptor",
 				},
 				{
-					name: "schedule the preemptor Pod again and expect it to be scheduled (assumed victim pod was forgotten)",
-					schedulePod: &schedulePod{
-						podName:       "preemptor",
-						expectSuccess: true,
+					Name: "schedule the preemptor Pod again and expect it to be scheduled (assumed victim pod was forgotten)",
+					SchedulePod: &SchedulePod{
+						PodName:       "preemptor",
+						ExpectSuccess: true,
 					},
 				},
 				{
-					name:       "resume binding of the blocked pod",
-					resumeBind: true,
+					Name:       "resume binding of the blocked pod",
+					ResumeBind: true,
 				},
 			},
 		},
@@ -1565,42 +1490,42 @@ func TestAsyncPreemption(t *testing.T) {
 			// Scenario reproduces the issue, but with a victim that is under graceful termination:
 			// Victim pod takes long in binding. Preemptor pod attempts preemption, goes to unschedulable, then the victim's graceful termination is initiated.
 			// Preemptor pod is woken up by the Pod/Update event (working like AssignedPodDeleted) and is being scheduled, even before the victim binding is terminated.
-			name: "victim blocked in binding, preemptor pod gets scheduled when victim-in-binding is under graceful termination",
-			scenarios: []scenario{
+			Name: "victim blocked in binding, preemptor pod gets scheduled when victim-in-binding is under graceful termination",
+			Steps: []Step{
 				{
-					name: "create victim Pod with long termination grace period that is going to be blocked in binding",
-					createPod: &createPod{
-						pod: st.MakePod().Name(podBlockedInBindingName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).TerminationGracePeriodSeconds(1000).Container("image").Priority(1).Obj(),
+					Name: "create victim Pod with long termination grace period that is going to be blocked in binding",
+					CreatePod: &CreatePod{
+						Pod: st.MakePod().Name(PodBlockedInBindingName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).TerminationGracePeriodSeconds(1000).Container("image").Priority(1).Obj(),
 					},
 				},
 				{
-					name: "schedule victim Pod",
-					schedulePod: &schedulePod{
-						podName: podBlockedInBindingName,
+					Name: "schedule victim Pod",
+					SchedulePod: &SchedulePod{
+						PodName: PodBlockedInBindingName,
 					},
 				},
 				{
-					name: "create a preemptor Pod",
-					createPod: &createPod{
-						pod: st.MakePod().Name("preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
+					Name: "create a preemptor Pod",
+					CreatePod: &CreatePod{
+						Pod: st.MakePod().Name("preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
 					},
 				},
 				{
-					name: "schedule the preemptor Pod",
-					schedulePod: &schedulePod{
-						podName:             "preemptor",
-						expectUnschedulable: true,
+					Name: "schedule the preemptor Pod",
+					SchedulePod: &SchedulePod{
+						PodName:             "preemptor",
+						ExpectUnschedulable: true,
 					},
 				},
 				{
-					name:               "complete the preemption API call",
-					completePreemption: "preemptor",
+					Name:               "complete the preemption API call",
+					CompletePreemption: "preemptor",
 				},
 				{
-					name: "schedule the preemptor Pod again and expect it to be scheduled (assumed victim pod was forgotten)",
-					schedulePod: &schedulePod{
-						podName:       "preemptor",
-						expectSuccess: true,
+					Name: "schedule the preemptor Pod again and expect it to be scheduled (assumed victim pod was forgotten)",
+					SchedulePod: &SchedulePod{
+						PodName:       "preemptor",
+						ExpectSuccess: true,
 					},
 				},
 			},
@@ -1610,47 +1535,47 @@ func TestAsyncPreemption(t *testing.T) {
 			// Scenario reproduces the issue, but with a victim that is under graceful termination:
 			// Victim pod takes long in binding. Preemptor pod attempts preemption, goes to unschedulable, then the victim's graceful termination is initiated.
 			// Preemptor pod is woken up by the Pod/Update event (working like AssignedPodDeleted) and is being scheduled, even before the victim binding is terminated.
-			name: "victim blocked in binding, preemptor pod gets scheduled when victim-in-binding is under graceful termination",
-			scenarios: []scenario{
+			Name: "victim blocked in binding, preemptor pod gets scheduled when victim-in-binding is under graceful termination",
+			Steps: []Step{
 				{
-					name: "create victim Pod with long termination grace period that is going to be blocked in binding",
-					createPod: &createPod{
-						pod: st.MakePod().Name(podBlockedInBindingName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").TerminationGracePeriodSeconds(1000).Priority(1).Obj(),
+					Name: "create victim Pod with long termination grace period that is going to be blocked in binding",
+					CreatePod: &CreatePod{
+						Pod: st.MakePod().Name(PodBlockedInBindingName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").TerminationGracePeriodSeconds(1000).Priority(1).Obj(),
 					},
 				},
 				{
-					name: "schedule victim Pod",
-					schedulePod: &schedulePod{
-						podName: podBlockedInBindingName,
+					Name: "schedule victim Pod",
+					SchedulePod: &SchedulePod{
+						PodName: PodBlockedInBindingName,
 					},
 				},
 				{
-					name: "create a preemptor Pod",
-					createPod: &createPod{
-						pod: st.MakePod().Name("preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
+					Name: "create a preemptor Pod",
+					CreatePod: &CreatePod{
+						Pod: st.MakePod().Name("preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
 					},
 				},
 				{
-					name: "schedule the preemptor Pod",
-					schedulePod: &schedulePod{
-						podName:             "preemptor",
-						expectUnschedulable: true,
+					Name: "schedule the preemptor Pod",
+					SchedulePod: &SchedulePod{
+						PodName:             "preemptor",
+						ExpectUnschedulable: true,
 					},
 				},
 				{
-					name:               "complete the preemption API call",
-					completePreemption: "preemptor",
+					Name:               "complete the preemption API call",
+					CompletePreemption: "preemptor",
 				},
 				{
-					name: "schedule the preemptor Pod again and expect it to be scheduled (assumed victim pod was forgotten)",
-					schedulePod: &schedulePod{
-						podName:       "preemptor",
-						expectSuccess: true,
+					Name: "schedule the preemptor Pod again and expect it to be scheduled (assumed victim pod was forgotten)",
+					SchedulePod: &SchedulePod{
+						PodName:       "preemptor",
+						ExpectSuccess: true,
 					},
 				},
 				{
-					name:       "resume binding of the blocked pod",
-					resumeBind: true,
+					Name:       "resume binding of the blocked pod",
+					ResumeBind: true,
 				},
 			},
 		},
@@ -1660,109 +1585,109 @@ func TestAsyncPreemption(t *testing.T) {
 			// Victim pod takes long in binding. Preemptor pod attempts preemption, goes to unschedulable, then the victim is deleted.
 			// Preemptor pod is woken up by the Pod/Update event (working like AssignedPodDeleted), but is still unschedulable, because victim has to unreserve its resources.
 			// After resuming binding for a victim, it releases the resources in its failure handler, preemptor is woken up again and ultimately scheduled.
-			name: "victim blocked in binding, preemptor pod gets scheduled after victim-in-binding is deleted and its resources are unreserved",
-			scenarios: []scenario{
+			Name: "victim blocked in binding, preemptor pod gets scheduled after victim-in-binding is deleted and its resources are unreserved",
+			Steps: []Step{
 				{
-					name: "create victim Pod that is going to be blocked in binding",
-					createPod: &createPod{
-						pod: st.MakePod().Name(podBlockedInBindingName + reservingPodName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+					Name: "create victim Pod that is going to be blocked in binding",
+					CreatePod: &CreatePod{
+						Pod: st.MakePod().Name(PodBlockedInBindingName + ReservingPodName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
 					},
 				},
 				{
-					name: "schedule victim Pod",
-					schedulePod: &schedulePod{
-						podName: podBlockedInBindingName + reservingPodName,
+					Name: "schedule victim Pod",
+					SchedulePod: &SchedulePod{
+						PodName: PodBlockedInBindingName + ReservingPodName,
 					},
 				},
 				{
-					name: "create a preemptor Pod",
-					createPod: &createPod{
-						pod: st.MakePod().Name("preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
+					Name: "create a preemptor Pod",
+					CreatePod: &CreatePod{
+						Pod: st.MakePod().Name("preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
 					},
 				},
 				{
-					name: "schedule the preemptor Pod",
-					schedulePod: &schedulePod{
-						podName:             "preemptor",
-						expectUnschedulable: true,
+					Name: "schedule the preemptor Pod",
+					SchedulePod: &SchedulePod{
+						PodName:             "preemptor",
+						ExpectUnschedulable: true,
 					},
 				},
 				{
-					name:               "complete the preemption API call",
-					completePreemption: "preemptor",
+					Name:               "complete the preemption API call",
+					CompletePreemption: "preemptor",
 				},
 				{
-					name: "schedule the preemptor Pod again and expect it to be unschedulable (resources are still reserved by the victim)",
-					schedulePod: &schedulePod{
-						podName:             "preemptor",
-						expectUnschedulable: true,
+					Name: "schedule the preemptor Pod again and expect it to be unschedulable (resources are still reserved by the victim)",
+					SchedulePod: &SchedulePod{
+						PodName:             "preemptor",
+						ExpectUnschedulable: true,
 					},
 				},
 				{
-					name:       "resume binding of the blocked pod",
-					resumeBind: true,
+					Name:       "resume binding of the blocked pod",
+					ResumeBind: true,
 				},
 				{
-					name: "schedule the preemptor Pod again and expect it to be scheduled (victim pod unreserved its resources)",
-					schedulePod: &schedulePod{
-						podName:       "preemptor",
-						expectSuccess: true,
+					Name: "schedule the preemptor Pod again and expect it to be scheduled (victim pod unreserved its resources)",
+					SchedulePod: &SchedulePod{
+						PodName:       "preemptor",
+						ExpectSuccess: true,
 					},
 				},
 			},
 		},
 		{
-			name: "gated preemptor is eventually scheduled even if victim deletion doesn't raise queue hints",
-			scenarios: []scenario{
+			Name: "gated preemptor is eventually scheduled even if victim deletion doesn't raise queue hints",
+			Steps: []Step{
 				{
-					name: "create victim pods",
-					createPod: &createPod{
-						pod:   st.MakePod().GenerateName(fmt.Sprintf("victim-%s-", blockingPodName)).Node("node").Priority(1).Container("image").ZeroTerminationGracePeriod().Obj(),
-						count: new(2),
+					Name: "create victim pods",
+					CreatePod: &CreatePod{
+						Pod:   st.MakePod().GenerateName(fmt.Sprintf("victim-%s-", BlockingPodName)).Node("node").Priority(1).Container("image").ZeroTerminationGracePeriod().Obj(),
+						Count: new(2),
 					},
 				},
 				{
-					name: "create preemptor",
-					createPod: &createPod{
-						pod: st.MakePod().Name("preemptor").Priority(100).Container("image").Obj(),
+					Name: "create preemptor",
+					CreatePod: &CreatePod{
+						Pod: st.MakePod().Name("preemptor").Priority(100).Container("image").Obj(),
 					},
 				},
 				{
-					name: "schedule preemptor",
-					schedulePod: &schedulePod{
-						podName:             "preemptor",
-						expectUnschedulable: true,
+					Name: "schedule preemptor",
+					SchedulePod: &SchedulePod{
+						PodName:             "preemptor",
+						ExpectUnschedulable: true,
 					},
 				},
 				{
-					name:                 "verify preemptor running preemption",
-					podRunningPreemption: new(2),
+					Name:                 "verify preemptor running preemption",
+					PodRunningPreemption: new(2),
 				},
 				{
-					name:            "gate preemptor",
-					podGatedInQueue: "preemptor",
+					Name:            "gate preemptor",
+					PodGatedInQueue: "preemptor",
 				},
 				{
-					name:               "complete preemption",
-					completePreemption: "preemptor",
+					Name:               "complete preemption",
+					CompletePreemption: "preemptor",
 				},
 				{
-					name:               "wait for victims to be deleted",
-					waitForPodsDeleted: []int{0, 1},
+					Name:               "wait for victims to be deleted",
+					WaitForPodsDeleted: []int{0, 1},
 				},
 				{
-					name:                     "verify preemptor is still in unschedulable queue",
-					verifyPodInUnschedulable: "preemptor",
+					Name:                     "verify preemptor is still in unschedulable queue",
+					VerifyPodInUnschedulable: "preemptor",
 				},
 				{
-					name:               "flush scheduling queue",
-					flushUnschedulable: true,
+					Name:               "flush scheduling queue",
+					FlushUnschedulable: true,
 				},
 				{
-					name: "verify preemptor scheduled",
-					schedulePod: &schedulePod{
-						podName:       "preemptor",
-						expectSuccess: true,
+					Name: "verify preemptor scheduled",
+					SchedulePod: &SchedulePod{
+						PodName:       "preemptor",
+						ExpectSuccess: true,
 					},
 				},
 			},
@@ -1773,658 +1698,153 @@ func TestAsyncPreemption(t *testing.T) {
 			// Victim pod takes long in binding. Preemptor pod attempts preemption, goes to unschedulable, then the victim's graceful termination is initiated.
 			// Preemptor pod is woken up by the Pod/Update event (working like AssignedPodDeleted), but is still unschedulable, because victim has to unreserve its resources.
 			// After resuming binding for a victim, it releases the resources in its failure handler, preemptor is woken up again and ultimately scheduled.
-			name: "victim blocked in binding, preemptor pod gets scheduled after victim-in-binding is under graceful termination and its resources are unreserved",
-			scenarios: []scenario{
+			Name: "victim blocked in binding, preemptor pod gets scheduled after victim-in-binding is under graceful termination and its resources are unreserved",
+			Steps: []Step{
 				{
-					name: "create victim Pod that is going to be blocked in binding",
-					createPod: &createPod{
-						pod: st.MakePod().Name(podBlockedInBindingName + reservingPodName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").TerminationGracePeriodSeconds(1000).Priority(1).Obj(),
+					Name: "create victim Pod that is going to be blocked in binding",
+					CreatePod: &CreatePod{
+						Pod: st.MakePod().Name(PodBlockedInBindingName + ReservingPodName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").TerminationGracePeriodSeconds(1000).Priority(1).Obj(),
 					},
 				},
 				{
-					name: "schedule victim Pod",
-					schedulePod: &schedulePod{
-						podName: podBlockedInBindingName + reservingPodName,
+					Name: "schedule victim Pod",
+					SchedulePod: &SchedulePod{
+						PodName: PodBlockedInBindingName + ReservingPodName,
 					},
 				},
 				{
-					name: "create a preemptor Pod",
-					createPod: &createPod{
-						pod: st.MakePod().Name("preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
+					Name: "create a preemptor Pod",
+					CreatePod: &CreatePod{
+						Pod: st.MakePod().Name("preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
 					},
 				},
 				{
-					name: "schedule the preemptor Pod",
-					schedulePod: &schedulePod{
-						podName:             "preemptor",
-						expectUnschedulable: true,
+					Name: "schedule the preemptor Pod",
+					SchedulePod: &SchedulePod{
+						PodName:             "preemptor",
+						ExpectUnschedulable: true,
 					},
 				},
 				{
-					name:               "complete the preemption API call",
-					completePreemption: "preemptor",
+					Name:               "complete the preemption API call",
+					CompletePreemption: "preemptor",
 				},
 				{
-					name: "schedule the preemptor Pod again and expect it to be unschedulable (resources are still reserved by the victim)",
-					schedulePod: &schedulePod{
-						podName:             "preemptor",
-						expectUnschedulable: true,
+					Name: "schedule the preemptor Pod again and expect it to be unschedulable (resources are still reserved by the victim)",
+					SchedulePod: &SchedulePod{
+						PodName:             "preemptor",
+						ExpectUnschedulable: true,
 					},
 				},
 				{
-					name:       "resume binding of the blocked pod",
-					resumeBind: true,
+					Name:       "resume binding of the blocked pod",
+					ResumeBind: true,
 				},
 				{
-					name: "schedule the preemptor Pod again and expect it to be scheduled (victim pod unreserved its resources)",
-					schedulePod: &schedulePod{
-						podName:       "preemptor",
-						expectSuccess: true,
+					Name: "schedule the preemptor Pod again and expect it to be scheduled (victim pod unreserved its resources)",
+					SchedulePod: &SchedulePod{
+						PodName:       "preemptor",
+						ExpectSuccess: true,
 					},
 				},
 			},
 		},
 		{
 			// Expected test outcome: lower priority Pod switches to another node, does not get stuck in unschedulable queue forever. (This part is in comment due to test name length limit.)
-			name: "While lower priority Pod is waiting for preemption, higher priority Pod takes its place on the node",
-			scenarios: []scenario{
+			Name: "While lower priority Pod is waiting for preemption, higher priority Pod takes its place on the node",
+			Steps: []Step{
 				{
-					name: "create N-1 victim Pods on the first node",
-					createPod: &createPod{
-						pod:   st.MakePod().GenerateName("victim-").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("node").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
-						count: ptr.To(3),
+					Name: "create N-1 victim Pods on the first node",
+					CreatePod: &CreatePod{
+						Pod:   st.MakePod().GenerateName("victim-").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("node").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+						Count: new(3),
 					},
 				},
 				{
-					name: "create the last victim Pod on the first node, that is going to be blocked in binding",
-					createPod: &createPod{
-						pod: st.MakePod().Name(podBlockedInBindingName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+					Name: "create the last victim Pod on the first node, that is going to be blocked in binding",
+					CreatePod: &CreatePod{
+						Pod: st.MakePod().Name(PodBlockedInBindingName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
 					},
 				},
 				{
-					name: "schedule the last victim Pod",
-					schedulePod: &schedulePod{
-						podName: podBlockedInBindingName,
+					Name: "schedule the last victim Pod",
+					SchedulePod: &SchedulePod{
+						PodName: PodBlockedInBindingName,
 					},
 				},
 				{
-					name: "create a mid-priority preemptor Pod",
-					createPod: &createPod{
-						pod: st.MakePod().Name("preemptor-mid-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(50).Obj(),
+					Name: "create a mid-priority preemptor Pod",
+					CreatePod: &CreatePod{
+						Pod: st.MakePod().Name("preemptor-mid-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(50).Obj(),
 					},
 				},
 				{
-					name: "schedule the mid-priority preemptor Pod",
-					schedulePod: &schedulePod{
-						podName: "preemptor-mid-priority",
+					Name: "schedule the mid-priority preemptor Pod",
+					SchedulePod: &SchedulePod{
+						PodName: "preemptor-mid-priority",
 					},
 				},
 				{
-					name:               "complete the preemption API calls",
-					completePreemption: "preemptor-mid-priority",
+					Name:               "complete the preemption API calls",
+					CompletePreemption: "preemptor-mid-priority",
 				},
 				{
-					name:            "check the mid-priority preemptor Pod is gated, waiting for the last victim to be preempted",
-					podGatedInQueue: "preemptor-mid-priority",
+					Name:            "check the mid-priority preemptor Pod is gated, waiting for the last victim to be preempted",
+					PodGatedInQueue: "preemptor-mid-priority",
 				},
 				{
-					name:       "create node2",
-					createNode: "node2",
+					Name:       "create node2",
+					CreateNode: "node2",
 				},
 				{
-					name: "create victim Pods on node2",
-					createPod: &createPod{
-						pod:   st.MakePod().GenerateName("victim-").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("node2").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
-						count: ptr.To(4),
+					Name: "create victim Pods on node2",
+					CreatePod: &CreatePod{
+						Pod:   st.MakePod().GenerateName("victim-").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("node2").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+						Count: new(4),
 					},
 				},
 				{
-					name: "create a high-priority preemptor Pod",
-					createPod: &createPod{
-						pod: st.MakePod().Name("preemptor-high-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Priority(100).Obj(),
+					Name: "create a high-priority preemptor Pod",
+					CreatePod: &CreatePod{
+						Pod: st.MakePod().Name("preemptor-high-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Priority(100).Obj(),
 					},
 				},
 				{
-					name: "schedule the high-priority preemptor Pod and expect it to get scheduled on node1",
+					Name: "schedule the high-priority preemptor Pod and expect it to get scheduled on node1",
 					// While we don't check explicitly that Pod is scheduled on node1, we can assume that because
 					// Pod won't fit on node2 without preemption and there are enough resources on node1.
-					schedulePod: &schedulePod{
-						podName:       "preemptor-high-priority",
-						expectSuccess: true,
+					SchedulePod: &SchedulePod{
+						PodName:       "preemptor-high-priority",
+						ExpectSuccess: true,
 					},
 				},
 				{
-					name:       "allow the preemption of the last victim Pod on node1 to finish",
-					resumeBind: true,
+					Name:       "allow the preemption of the last victim Pod on node1 to finish",
+					ResumeBind: true,
 				},
 				{
-					name: "check that mid-priority preemptor Pod got activated by completed preemption and try scheduling it again",
-					schedulePod: &schedulePod{
-						podName: "preemptor-mid-priority",
+					Name: "check that mid-priority preemptor Pod got activated by completed preemption and try scheduling it again",
+					SchedulePod: &SchedulePod{
+						PodName: "preemptor-mid-priority",
 						// Pod won't fit on node1 anymore and should trigger preemptions on node2.
-						expectUnschedulable: true,
+						ExpectUnschedulable: true,
 					},
 				},
 				{
-					name:               "complete the preemption API calls on node2",
-					completePreemption: "preemptor-mid-priority",
+					Name:               "complete the preemption API calls on node2",
+					CompletePreemption: "preemptor-mid-priority",
 				},
 				{
-					name: "check that mid-priority Pod got activated, schedule it on node2",
-					schedulePod: &schedulePod{
-						podName:       "preemptor-mid-priority",
-						expectSuccess: true,
+					Name: "check that mid-priority Pod got activated, schedule it on node2",
+					SchedulePod: &SchedulePod{
+						PodName:       "preemptor-mid-priority",
+						ExpectSuccess: true,
 					},
 				},
 			},
 		},
 	}
-
-	// All test cases have the same node.
-	node := st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
-
-	sharedAPICtx := testutils.InitTestAPIServer(t, "preemption", nil)
-
-	for _, asyncAPICallsEnabled := range []bool{true} {
-		for _, test := range tests {
-			t.Run(fmt.Sprintf("%s (Async API calls enabled: %v)", test.name, asyncAPICallsEnabled), func(t *testing.T) {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncAPICalls, asyncAPICallsEnabled)
-
-				// We need to use a custom preemption plugin to test async preemption behavior
-				delayedPreemptionPluginName := "delay-preemption"
-				var lock sync.Mutex
-				// keyed by the pod name
-				preemptionDoneChannels := make(map[string]chan struct{})
-				defer func() {
-					lock.Lock()
-					defer lock.Unlock()
-					for _, ch := range preemptionDoneChannels {
-						close(ch)
-					}
-				}()
-				registry := make(frameworkruntime.Registry)
-				var preemptionPlugin *defaultpreemption.DefaultPreemption
-				err := registry.Register(delayedPreemptionPluginName, func(c context.Context, r runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
-					p, err := frameworkruntime.FactoryAdapter(plfeature.Features{EnableAsyncPreemption: true}, defaultpreemption.New)(c, &config.DefaultPreemptionArgs{
-						// Set default values to pass the validation at the initialization, not related to the test.
-						MinCandidateNodesPercentage: 10,
-						MinCandidateNodesAbsolute:   100,
-					}, fh)
-					if err != nil {
-						return nil, fmt.Errorf("error creating default preemption plugin: %w", err)
-					}
-
-					var ok bool
-					preemptionPlugin, ok = p.(*defaultpreemption.DefaultPreemption)
-					if !ok {
-						return nil, fmt.Errorf("unexpected plugin type %T", p)
-					}
-
-					preemptPodFn := preemptionPlugin.Executor.PreemptPod
-					preemptionPlugin.Executor.PreemptPod = func(ctx context.Context, c preemption.Candidate, preemptor preemption.ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {
-						// block the preemption goroutine to complete until the test case allows it to proceed.
-						lock.Lock()
-						ch, ok := preemptionDoneChannels[preemptor.GetName()]
-						lock.Unlock()
-						if ok {
-							<-ch
-						}
-						return preemptPodFn(ctx, c, preemptor, victim, pluginName)
-					}
-
-					return preemptionPlugin, nil
-				})
-				if err != nil {
-					t.Fatalf("Error registering a filter: %v", err)
-				}
-
-				// Register fake bind plugin that will block on binding for the specified pod name, until it receives a resume signal via the blockBindingChannel.
-				blockBindingChannel := make(chan struct{})
-				defer close(blockBindingChannel)
-				blockingBindPluginName := "blockingBindPlugin"
-				err = registry.Register(blockingBindPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
-					db, err := defaultbinder.New(ctx, o, fh)
-					if err != nil {
-						t.Fatalf("Error creating a default binder plugin: %v", err)
-					}
-					var bindPlugin = blockingBindPlugin{
-						name:                blockingBindPluginName,
-						nameOfPodToBlock:    podBlockedInBindingName,
-						realPlugin:          db.(fwk.BindPlugin),
-						blockBindingChannel: blockBindingChannel,
-					}
-					return &bindPlugin, nil
-				})
-				if err != nil {
-					t.Fatalf("Error registering a bind plugin: %v", err)
-				}
-
-				// Register fake plugin that will reserve some fake resources for one pod.
-				// This could be used to check scheduler's behavior when the victim has to unreserve these resources to let the preemptor schedule.
-				reservingPluginName := "reservingPlugin"
-				err = registry.Register(reservingPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
-					return &reservingPlugin{
-						name:               reservingPluginName,
-						nameOfPodToReserve: reservingPodName,
-					}, nil
-				})
-				if err != nil {
-					t.Fatalf("Error registering a reserving plugin: %v", err)
-				}
-
-				// Register fake plugin that will filter nodes with a specific name.
-				// Importantly, this plugin always returns QueueSkip as the queue hint, simulating faulty queue hint implementation.
-				queueSkipFilterPluginName := "queueSkipFilterPlugin"
-				err = registry.Register(queueSkipFilterPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
-					return &queueSkipFilterPlugin{
-						name:              queueSkipFilterPluginName,
-						nameOfBlockingPod: blockingPodName,
-					}, nil
-				})
-				if err != nil {
-					t.Fatalf("Error registering a queueSkipFilterPlugin plugin: %v", err)
-				}
-
-				cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
-					Profiles: []configv1.KubeSchedulerProfile{{
-						SchedulerName: ptr.To(v1.DefaultSchedulerName),
-						Plugins: &configv1.Plugins{
-							MultiPoint: configv1.PluginSet{
-								Enabled: []configv1.Plugin{
-									{Name: blockingBindPluginName},
-									{Name: delayedPreemptionPluginName},
-									{Name: reservingPluginName},
-									{Name: queueSkipFilterPluginName},
-								},
-								Disabled: []configv1.Plugin{
-									{Name: names.DefaultPreemption},
-									{Name: names.DefaultBinder},
-								},
-							},
-						},
-					}},
-				})
-
-				// It initializes the scheduler, but doesn't start.
-				// We manually trigger the scheduling cycle.
-				testCtx := testutils.InitTestSchedulerWithOptions(t,
-					withNewNamespace(t, sharedAPICtx, "preemption"),
-					0,
-					scheduler.WithProfiles(cfg.Profiles...),
-					scheduler.WithFrameworkOutOfTreeRegistry(registry),
-					// disable backoff
-					scheduler.WithPodMaxBackoffSeconds(0),
-					scheduler.WithPodInitialBackoffSeconds(0),
-				)
-				defer testCtx.SchedulerCloseFn()
-				testutils.SyncSchedulerInformerFactory(testCtx)
-				cs := testCtx.ClientSet
-
-				if preemptionPlugin == nil {
-					t.Fatalf("the preemption plugin should be initialized")
-				}
-
-				logger, _ := ktesting.NewTestContext(t)
-				if testCtx.Scheduler.APIDispatcher != nil {
-					testCtx.Scheduler.APIDispatcher.Run(logger)
-					defer testCtx.Scheduler.APIDispatcher.Close()
-				}
-				testCtx.Scheduler.SchedulingQueue.Run(logger)
-				defer testCtx.Scheduler.SchedulingQueue.Close()
-
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, true)
-
-				createdPods := []*v1.Pod{}
-				defer func() {
-					testutils.CleanupPods(testCtx.Ctx, cs, t, createdPods)
-				}()
-
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-
-				if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
-					t.Fatalf("Failed to create an initial Node %q: %v", node.Name, err)
-				}
-				defer func() {
-					if err := cs.CoreV1().Nodes().Delete(ctx, node.Name, metav1.DeleteOptions{}); err != nil {
-						t.Fatalf("Failed to delete the Node %q: %v", node.Name, err)
-					}
-				}()
-
-				for _, scenario := range test.scenarios {
-					t.Logf("Running scenario: %s", scenario.name)
-					switch {
-					case scenario.createNode != "":
-						newNode := st.MakeNode().Name(scenario.createNode).Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
-						if _, err := cs.CoreV1().Nodes().Create(ctx, newNode, metav1.CreateOptions{}); err != nil {
-							t.Fatalf("Failed to create an initial Node %q: %v", newNode.Name, err)
-						}
-						defer func() {
-							if err := cs.CoreV1().Nodes().Delete(ctx, newNode.Name, metav1.DeleteOptions{}); err != nil {
-								t.Fatalf("Failed to delete the Node %q: %v", newNode.Name, err)
-							}
-						}()
-					case scenario.createPod != nil:
-						if scenario.createPod.count == nil {
-							scenario.createPod.count = ptr.To(1)
-						}
-
-						for i := 0; i < *scenario.createPod.count; i++ {
-							pod, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(ctx, scenario.createPod.pod, metav1.CreateOptions{})
-							if err != nil {
-								t.Fatalf("Failed to create a Pod %q: %v", pod.Name, err)
-							}
-							createdPods = append(createdPods, pod)
-						}
-					case scenario.schedulePod != nil:
-						lastFailure := ""
-						if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
-							if len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()) == 0 {
-								lastFailure = fmt.Sprintf("Expected the pod %s to be scheduled, but no pod arrives at the activeQ", scenario.schedulePod.podName)
-								return false, nil
-							}
-
-							if testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()[0].Name != scenario.schedulePod.podName {
-								// need to wait more because maybe the queue will get another Pod that higher priority than the current top pod.
-								lastFailure = fmt.Sprintf("The pod %s is expected to be scheduled, but the top Pod is %s", scenario.schedulePod.podName, testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()[0].Name)
-								return false, nil
-							}
-
-							return true, nil
-						}); err != nil {
-							t.Fatal(lastFailure)
-						}
-
-						lock.Lock()
-						preemptionDoneChannels[scenario.schedulePod.podName] = make(chan struct{})
-						lock.Unlock()
-						testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
-
-						if scenario.schedulePod.expectSuccess {
-							if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, testCtx.NS.Name, scenario.schedulePod.podName)); err != nil {
-								t.Fatalf("Expected the pod %s to be scheduled", scenario.schedulePod.podName)
-							}
-						} else if scenario.schedulePod.expectUnschedulable {
-							if !podInUnschedulablePodPool(t, testCtx.Scheduler.SchedulingQueue, scenario.schedulePod.podName) {
-								t.Fatalf("Expected the pod %s to be in the unschedulable queue after the scheduling attempt", scenario.schedulePod.podName)
-							}
-						}
-					case scenario.activatePod != "":
-						pod := unschedulablePod(t, testCtx.Scheduler.SchedulingQueue, scenario.activatePod)
-						if pod == nil {
-							t.Fatalf("Expected the pod %s to be in unschedulable queue before activation phase", scenario.activatePod)
-						}
-						m := map[string]*v1.Pod{scenario.activatePod: pod}
-						testCtx.Scheduler.SchedulingQueue.Activate(logger, m)
-					case scenario.completePreemption != "":
-						lock.Lock()
-						if _, ok := preemptionDoneChannels[scenario.completePreemption]; !ok {
-							t.Fatalf("The preemptor Pod %q is not running preemption", scenario.completePreemption)
-						}
-
-						close(preemptionDoneChannels[scenario.completePreemption])
-						delete(preemptionDoneChannels, scenario.completePreemption)
-						lock.Unlock()
-					case scenario.podGatedInQueue != "":
-						// make sure the Pod is in the queue in the first place.
-						if !podInUnschedulablePodPool(t, testCtx.Scheduler.SchedulingQueue, scenario.podGatedInQueue) {
-							t.Fatalf("Expected the pod %s to be in the queue", scenario.podGatedInQueue)
-						}
-
-						// Make sure this Pod is gated by the preemption at PreEnqueue extension point
-						// by activating the Pod and see if it's still in the unsched pod pool.
-						testCtx.Scheduler.SchedulingQueue.Activate(logger, map[string]*v1.Pod{scenario.podGatedInQueue: st.MakePod().Namespace(testCtx.NS.Name).Name(scenario.podGatedInQueue).Obj()})
-						if !podInUnschedulablePodPool(t, testCtx.Scheduler.SchedulingQueue, scenario.podGatedInQueue) {
-							t.Fatalf("Expected the pod %s to be in the queue even after the activation", scenario.podGatedInQueue)
-						}
-						if pInfo, _ := testCtx.Scheduler.SchedulingQueue.GetPod(scenario.podGatedInQueue, testCtx.NS.Name, nil); pInfo == nil || !pInfo.Gated() {
-							t.Fatalf("Expected the pod %s to be gated", scenario.podGatedInQueue)
-						}
-					case scenario.podRunningPreemption != nil:
-						if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
-							return preemptionPlugin.Executor.IsPodRunningPreemption(createdPods[*scenario.podRunningPreemption].GetUID()), nil
-						}); err != nil {
-							t.Fatalf("Expected the pod %s to be running preemption", createdPods[*scenario.podRunningPreemption].Name)
-						}
-					case scenario.resumeBind:
-						blockBindingChannel <- struct{}{}
-					case scenario.verifyPodInUnschedulable != "":
-						if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 200*time.Millisecond, false, func(ctx context.Context) (bool, error) {
-							if !podInUnschedulablePodPool(t, testCtx.Scheduler.SchedulingQueue, scenario.verifyPodInUnschedulable) {
-								return false, fmt.Errorf("expected the pod %s to remain in the unschedulable queue after the scheduling attempt", scenario.verifyPodInUnschedulable)
-							}
-							// Continue polling to confirm that pod remains in unschedulable queue and does not get activated.
-							return false, nil
-						}); err != nil && !errors.Is(err, context.DeadlineExceeded) {
-							// If timeout was reached or context was cancelled without finding that vanished from unschedulable, it means the state is as expected.
-							// If a different error occurred, it means that the pod got unexpectedly activated, or something else went wrong.
-							t.Fatalf("Error in scenario verifyPodInUnschedulable: %v", err)
-						}
-					case scenario.flushUnschedulable:
-						testCtx.Scheduler.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
-					case len(scenario.waitForPodsDeleted) != 0:
-						for _, podIndex := range scenario.waitForPodsDeleted {
-							podName := createdPods[podIndex].Name
-							if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodDeleted(testCtx.Ctx, cs, testCtx.NS.Name, podName)); err != nil {
-								t.Fatalf("Failed to wait for pod %s to be deleted: %v", podName, err)
-							}
-						}
-					}
-				}
-			})
-		}
-	}
-}
-
-// podInUnschedulablePodPool checks if the given Pod is in the unschedulable pod pool.
-func podInUnschedulablePodPool(t *testing.T, queue queue.SchedulingQueue, podName string) bool {
-	t.Helper()
-	// First, look for the pod in the activeQ.
-	for _, pod := range queue.PodsInActiveQ() {
-		if pod.Name == podName {
-			return false
-		}
-	}
-
-	pendingPods, _ := queue.PendingPods()
-	for _, pod := range pendingPods {
-		if pod.Name == podName {
-			return true
-		}
-	}
-	return false
-}
-
-// unschedulablePod checks if the given Pod is in the unschedulable queue and returns it.
-func unschedulablePod(t *testing.T, queue queue.SchedulingQueue, podName string) *v1.Pod {
-	t.Helper()
-	unschedPods := queue.UnschedulablePods()
-	for _, pod := range unschedPods {
-		if pod.Name == podName {
-			return pod
-		}
-	}
-	return nil
-}
-
-type queueSkipFilterPlugin struct {
-	name              string
-	nameOfBlockingPod string
-}
-
-func (fp *queueSkipFilterPlugin) EventsToRegister(context.Context) ([]fwk.ClusterEventWithHint, error) {
-	return []fwk.ClusterEventWithHint{
-		{
-			Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Delete},
-			QueueingHintFn: func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (fwk.QueueingHint, error) {
-				return fwk.QueueSkip, nil
-			},
-		},
-	}, nil
-}
-
-func (fp *queueSkipFilterPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
-	for _, scheduledPod := range nodeInfo.GetPods() {
-		if strings.Contains(scheduledPod.GetPod().Name, fp.nameOfBlockingPod) {
-			return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("node %s has blocking pod %s", nodeInfo.Node().Name, scheduledPod.GetPod().Name))
-		}
-	}
-	return nil
-}
-
-func (fp *queueSkipFilterPlugin) Name() string {
-	return fp.name
-}
-
-var _ fwk.FilterPlugin = &queueSkipFilterPlugin{}
-var _ fwk.EnqueueExtensions = &queueSkipFilterPlugin{}
-
-// blockingBindPlugin is a fake plugin that simulates a long binding operation.
-// Underneath it calls realPlugin.Bind(), after receiving a signal that binding can be unblocked.
-type blockingBindPlugin struct {
-	name                string
-	nameOfPodToBlock    string
-	realPlugin          fwk.BindPlugin
-	blockBindingChannel chan struct{}
-}
-
-func (bp *blockingBindPlugin) Name() string {
-	return bp.name
-}
-
-func (bp *blockingBindPlugin) Bind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
-	if strings.Contains(p.Name, bp.nameOfPodToBlock) {
-		// block the bind goroutine to complete until the test case allows it to proceed.
-		select {
-		case <-bp.blockBindingChannel:
-		case <-ctx.Done():
-		}
-	}
-	return bp.realPlugin.Bind(ctx, state, p, nodeName)
-}
-
-var _ fwk.BindPlugin = &blockingBindPlugin{}
-
-// reservingPlugin is a fake plugin that reserves some resource in memory for nameOfPodToReserve pod.
-// Other pods won't be scheduled, unless the resources are unreserved.
-type reservingPlugin struct {
-	lock               sync.Mutex
-	name               string
-	nameOfPodToReserve string
-	reserved           bool
-}
-
-func (rp *reservingPlugin) Name() string {
-	return rp.name
-}
-
-func (rp *reservingPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
-	return []fwk.ClusterEventWithHint{
-		// Plugin will wake up the pod on any Pod/Delete event.
-		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Delete}},
-	}, nil
-}
-
-const reservingPluginStateKey = "PreFilterReserving"
-
-type reservingPluginState struct {
-	reserved bool
-}
-
-func (s reservingPluginState) Clone() fwk.StateData {
-	return reservingPluginState{
-		reserved: s.reserved,
-	}
-}
-
-func (rp *reservingPlugin) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
-	rp.lock.Lock()
-	state.Write(reservingPluginStateKey, reservingPluginState{reserved: rp.reserved})
-	rp.lock.Unlock()
-	return nil, nil
-}
-
-func (rp *reservingPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
-	s, err := state.Read(reservingPluginStateKey)
-	if err != nil {
-		return fwk.AsStatus(err)
-	}
-	if s.(reservingPluginState).reserved {
-		return fwk.NewStatus(fwk.Unschedulable, "resources are reserved")
-	}
-	return nil
-}
-
-func (rp *reservingPlugin) Reserve(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
-	if strings.Contains(p.Name, rp.nameOfPodToReserve) {
-		rp.lock.Lock()
-		rp.reserved = true
-		rp.lock.Unlock()
-	}
-	return nil
-}
-
-func (rp *reservingPlugin) Unreserve(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) {
-	if strings.Contains(p.Name, rp.nameOfPodToReserve) {
-		rp.lock.Lock()
-		rp.reserved = false
-		rp.lock.Unlock()
-	}
-}
-
-func (rp *reservingPlugin) PreFilterExtensions() fwk.PreFilterExtensions {
-	return rp
-}
-
-func (rp *reservingPlugin) AddPod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
-	if strings.Contains(podInfoToAdd.GetPod().Name, rp.nameOfPodToReserve) {
-		state.Write(reservingPluginStateKey, reservingPluginState{reserved: true})
-	}
-	return nil
-}
-
-func (rp *reservingPlugin) RemovePod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
-	if strings.Contains(podInfoToRemove.GetPod().Name, rp.nameOfPodToReserve) {
-		state.Write(reservingPluginStateKey, reservingPluginState{reserved: false})
-	}
-	return nil
-}
-
-var _ fwk.PreFilterPlugin = &reservingPlugin{}
-var _ fwk.FilterPlugin = &reservingPlugin{}
-var _ fwk.PreFilterExtensions = &reservingPlugin{}
-var _ fwk.ReservePlugin = &reservingPlugin{}
-
-type blockedPod struct {
-	blocked chan struct{}
-}
-
-// blockingPermitPlugin is a Permit plugin that blocks until a signal is received.
-type blockingPermitPlugin struct {
-	podsToBlock map[string]*blockedPod
-}
-
-const blockingPermitPluginName = "blocking-permit-plugin"
-
-var _ fwk.PermitPlugin = &blockingPermitPlugin{}
-
-func newBlockingPermitPlugin(_ context.Context, _ runtime.Object, h fwk.Handle, podsToBlock map[string]*blockedPod) fwk.Plugin {
-	return &blockingPermitPlugin{
-		podsToBlock: podsToBlock,
-	}
-}
-
-func (pl *blockingPermitPlugin) Name() string {
-	return blockingPermitPluginName
-}
-
-func (pl *blockingPermitPlugin) Permit(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (*fwk.Status, time.Duration) {
-	if p, ok := pl.podsToBlock[pod.Name]; ok {
-		delete(pl.podsToBlock, pod.Name)
-		p.blocked <- struct{}{}
-		return fwk.NewStatus(fwk.Wait, "waiting"), time.Minute
-	}
-	return nil, 0
+	RunAsyncPreemptionScenarios(t, tests, false)
 }
 
 func TestPreemptionRespectsWaitingPod(t *testing.T) {
@@ -2443,15 +1863,15 @@ func TestPreemptionRespectsWaitingPod(t *testing.T) {
 	}
 	node := st.MakeNode().Name("big-node").Capacity(nodeRes).Obj()
 
-	victim := st.MakePod().Name("victim").Priority(lowPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "1Gi"}).Obj()
+	victim := st.MakePod().Name("victim").Priority(LowPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "1Gi"}).Obj()
 	// Preemptor requires more resources than the small node has.
-	preemptor := st.MakePod().Name("preemptor").Priority(highPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1.5", v1.ResourceMemory: "1.5Gi"}).Obj()
+	preemptor := st.MakePod().Name("preemptor").Priority(HighPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1.5", v1.ResourceMemory: "1.5Gi"}).Obj()
 
 	// Register the blocking plugin
-	victimToBlock := &blockedPod{
-		blocked: make(chan struct{}),
+	victimToBlock := &BlockedPod{
+		Blocked: make(chan struct{}),
 	}
-	podsToBlock := map[string]*blockedPod{
+	podsToBlock := map[string]*BlockedPod{
 		victim.Name: victimToBlock,
 	}
 
@@ -2465,7 +1885,7 @@ func TestPreemptionRespectsWaitingPod(t *testing.T) {
 
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: ptr.To(v1.DefaultSchedulerName),
+			SchedulerName: new(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
 				Permit: configv1.PluginSet{
 					Enabled: []configv1.Plugin{
@@ -2498,7 +1918,7 @@ func TestPreemptionRespectsWaitingPod(t *testing.T) {
 
 	t.Logf("Waiting for victim to reach WaitOnPermit")
 	select {
-	case <-victimToBlock.blocked:
+	case <-victimToBlock.Blocked:
 		t.Logf("Victim reached WaitOnPermit")
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("Timed out waiting for victim to reach WaitOnPermit")
@@ -2649,9 +2069,9 @@ func TestPreemptionRespectsBindingPod(t *testing.T) {
 		v1.ResourceMemory: "2Gi",
 	}).Obj()
 	// Victim requires full node resources.
-	victim := st.MakePod().Name("victim").Priority(lowPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "1Gi"}).Obj()
+	victim := st.MakePod().Name("victim").Priority(LowPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "1Gi"}).Obj()
 	// Preemptor also requires full node resources.
-	preemptor := st.MakePod().Name("preemptor").Priority(highPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1.5", v1.ResourceMemory: "1.5Gi"}).Obj()
+	preemptor := st.MakePod().Name("preemptor").Priority(HighPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1.5", v1.ResourceMemory: "1.5Gi"}).Obj()
 
 	// Register the blocking plugin.
 	victimBlockingPlugin := &perPodBlockingPlugin{
@@ -2678,7 +2098,7 @@ func TestPreemptionRespectsBindingPod(t *testing.T) {
 
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: ptr.To(v1.DefaultSchedulerName),
+			SchedulerName: new(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
 				PreBind: configv1.PluginSet{
 					Enabled: []configv1.Plugin{
@@ -2865,7 +2285,7 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 				{
 					name: "create pod-0",
 					createPod: &createPod{
-						pod: makePod("pod-0", mediumPriority, "pod", "p0"),
+						pod: makePod("pod-0", MediumPriority, "pod", "p0"),
 					},
 				},
 				{
@@ -2878,7 +2298,7 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 				{
 					name: "create low priority pod-1 that can be preempted by preemptor",
 					createPod: &createPod{
-						pod: makePodWithAntiAffinityNode("pod-1", lowPriority, "pod", "p1", "preemptor"),
+						pod: makePodWithAntiAffinityNode("pod-1", LowPriority, "pod", "p1", "preemptor"),
 					},
 				},
 				{
@@ -2891,7 +2311,7 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 				{
 					name: "create preemptor",
 					createPod: &createPod{
-						pod: makePodWithAntiAffinityNode("preemptor-pod", highPriority, "pod", "preemptor", "p0"),
+						pod: makePodWithAntiAffinityNode("preemptor-pod", HighPriority, "pod", "preemptor", "p0"),
 					},
 				},
 				{
@@ -2922,7 +2342,7 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 				{
 					name: "create pod-0",
 					createPod: &createPod{
-						pod: makePod("pod-0", mediumPriority, "pod", "p0"),
+						pod: makePod("pod-0", MediumPriority, "pod", "p0"),
 					},
 				},
 				{
@@ -2935,7 +2355,7 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 				{
 					name: "create high priority pod-1 that cannot be preempted by preemptor",
 					createPod: &createPod{
-						pod: makePodWithAntiAffinityNode("pod-1", highPriority, "pod", "p1", "preemptor"),
+						pod: makePodWithAntiAffinityNode("pod-1", HighPriority, "pod", "p1", "preemptor"),
 					},
 				},
 				{
@@ -2948,7 +2368,7 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 				{
 					name: "create preemptor",
 					createPod: &createPod{
-						pod: makePodWithAntiAffinityNode("preemptor-pod", highPriority, "pod", "preemptor", "p0"),
+						pod: makePodWithAntiAffinityNode("preemptor-pod", HighPriority, "pod", "preemptor", "p0"),
 					},
 				},
 				{
@@ -2975,7 +2395,7 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 				{
 					name: "create pod-0",
 					createPod: &createPod{
-						pod: makePod("pod-0", mediumPriority, "pod", "p0"),
+						pod: makePod("pod-0", MediumPriority, "pod", "p0"),
 					},
 				},
 				{
@@ -2988,7 +2408,7 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 				{
 					name: "create low priority pod-1 that can be preempted by preemptor",
 					createPod: &createPod{
-						pod: makePodWithAntiAffinityHostname("pod-1", lowPriority, "pod", "p1", "preemptor"),
+						pod: makePodWithAntiAffinityHostname("pod-1", LowPriority, "pod", "p1", "preemptor"),
 					},
 				},
 				{
@@ -3001,7 +2421,7 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 				{
 					name: "create preemptor",
 					createPod: &createPod{
-						pod: makePodWithAntiAffinityHostname("preemptor-pod", highPriority, "pod", "preemptor", "p0"),
+						pod: makePodWithAntiAffinityHostname("preemptor-pod", HighPriority, "pod", "preemptor", "p0"),
 					},
 				},
 				{
@@ -3069,7 +2489,7 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 
 							cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 								Profiles: []configv1.KubeSchedulerProfile{{
-									SchedulerName: ptr.To(v1.DefaultSchedulerName),
+									SchedulerName: new(v1.DefaultSchedulerName),
 									Plugins: &configv1.Plugins{
 										Filter: configv1.PluginSet{
 											Enabled: []configv1.Plugin{
