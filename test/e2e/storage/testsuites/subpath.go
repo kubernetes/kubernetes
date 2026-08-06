@@ -236,7 +236,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		TestBasicSubpath(ctx, f, f.Namespace.Name, l.pod)
 	})
 
-	f.It("should fail if subpath directory is outside the volume", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
+	f.It("should fail if subpath directory is outside the volume", "[LinuxOnly]", func(ctx context.Context) {
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
 
@@ -252,7 +252,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testPodFailSubpath(ctx, f, l.pod, false)
 	})
 
-	f.It("should fail if subpath file is outside the volume", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
+	f.It("should fail if subpath file is outside the volume", "[LinuxOnly]", func(ctx context.Context) {
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
 
@@ -263,7 +263,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testPodFailSubpath(ctx, f, l.pod, false)
 	})
 
-	f.It("should fail if non-existent subpath is outside the volume", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
+	f.It("should fail if non-existent subpath is outside the volume", "[LinuxOnly]", func(ctx context.Context) {
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
 
@@ -274,7 +274,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testPodFailSubpath(ctx, f, l.pod, false)
 	})
 
-	f.It("should fail if subpath with backstepping is outside the volume", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
+	f.It("should fail if subpath with backstepping is outside the volume", "[LinuxOnly]", func(ctx context.Context) {
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
 
@@ -290,7 +290,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testPodFailSubpath(ctx, f, l.pod, false)
 	})
 
-	f.It("should support creating multiple subpath from same volumes", f.WithSlow(), func(ctx context.Context) {
+	f.It("should support creating multiple subpath from same volumes", func(ctx context.Context) {
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
 
@@ -316,7 +316,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testMultipleReads(ctx, f, l.pod, 0, filepath1, filepath2)
 	})
 
-	f.It("should support restarting containers using directory as subpath", f.WithSlow(), func(ctx context.Context) {
+	f.It("should support restarting containers using directory as subpath", func(ctx context.Context) {
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
 
@@ -327,7 +327,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testPodContainerRestart(ctx, f, l.pod)
 	})
 
-	f.It("should support restarting containers using file as subpath", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
+	f.It("should support restarting containers using file as subpath", "[LinuxOnly]", func(ctx context.Context) {
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
 
@@ -337,7 +337,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testPodContainerRestart(ctx, f, l.pod)
 	})
 
-	f.It("should unmount if pod is gracefully deleted while kubelet is down", f.WithDisruptive(), f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
+	f.It("should unmount if pod is gracefully deleted while kubelet is down", f.WithDisruptive(), "[LinuxOnly]", func(ctx context.Context) {
 		e2eskipper.SkipUnlessSSHKeyPresent()
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
@@ -350,7 +350,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testSubpathReconstruction(ctx, f, l.hostExec, l.pod, false)
 	})
 
-	f.It("should unmount if pod is force deleted while kubelet is down", f.WithDisruptive(), f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
+	f.It("should unmount if pod is force deleted while kubelet is down", f.WithDisruptive(), "[LinuxOnly]", func(ctx context.Context) {
 		e2eskipper.SkipUnlessSSHKeyPresent()
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
@@ -364,7 +364,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 	})
 
 	f.It("should remount stale subpath bind mount after network filesystem disruption [LinuxOnly]",
-		f.WithDisruptive(), f.WithSlow(), func(ctx context.Context) {
+		f.WithDisruptive(), func(ctx context.Context) {
 			init(ctx)
 			ginkgo.DeferCleanup(cleanup)
 
@@ -433,7 +433,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testReadFile(ctx, f, l.filePathInSubpath, l.pod, 0)
 	})
 
-	f.It("should verify container cannot write to subpath readonly volumes", f.WithSlow(), func(ctx context.Context) {
+	f.It("should verify container cannot write to subpath readonly volumes", func(ctx context.Context) {
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
 		if l.roVolSource == nil {
