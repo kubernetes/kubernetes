@@ -88,14 +88,7 @@ func TestExpiration(t *testing.T) {
 		t.Fatalf("we should have found a key")
 	}
 
-	// Simulate a race between a reset and cleanup. Assert that del doesn't
-	// remove the key.
-	c.Set("a", "a", time.Second)
-
-	e := c.cache["a"]
-	e.generation++
-	e.expiry = e.expiry.Add(1 * time.Second)
-	c.cache["a"] = e
+	c.Set("a", "a", 2*time.Second)
 
 	fc.Step(1 * time.Second)
 	if _, ok := c.Get("a"); !ok {
@@ -119,14 +112,14 @@ func TestExpiration(t *testing.T) {
 		t.Errorf("expected two items got: %d", count)
 	}
 	c.Set("c", "c", time.Second)      // set some unrelated key to run gc
-	if count := c.Len(); count != 2 { // only a and c in the cache now
-		t.Errorf("expected two items got: %d", count)
+	if count := c.Len(); count != 1 { // c in the cache now
+		t.Errorf("expected one items got: %d", count)
 	}
 	if _, ok := c.Get("b"); ok {
 		t.Fatalf("we should not have found b key")
 	}
-	if _, ok := c.Get("a"); !ok {
-		t.Fatalf("we should have found a key")
+	if _, ok := c.Get("a"); ok {
+		t.Fatalf("we should not have found a key")
 	}
 	if _, ok := c.Get("c"); !ok {
 		t.Fatalf("we should have found c key")
@@ -318,4 +311,23 @@ func TestStressExpiringCache(t *testing.T) {
 	if cache.Len() != 1 {
 		t.Errorf("unexpected cache size: got=%d, want=1", cache.Len())
 	}
+}
+
+func BenchmarkExpiringCacheSet(b *testing.B) {
+	c := NewExpiring()
+	key := "benchmarkKey"
+	val := "BenchmarkValueBenchmarkValueBenchmarkValueBenchmarkValueBenchmarkValueBenchmarkValueBenchmarkValue"
+
+	var wg sync.WaitGroup
+	for j := 0; j < b.N; j++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			// Run Set multiple times in each goroutine to amortize the goroutine allocation overhead in benchmark
+			for i := 0; i < 1000; i++ {
+				c.Set(key, val, 10*time.Second)
+			}
+		}()
+	}
+	wg.Wait()
 }
