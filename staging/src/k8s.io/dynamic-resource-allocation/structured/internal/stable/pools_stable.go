@@ -55,7 +55,7 @@ func NodeMatches(node *v1.Node, nodeNameToMatch string, allNodesMatch bool, node
 // Out-dated slices are silently ignored. Pools may be incomplete (not all
 // required slices available) or invalid (for example, device names not unique).
 // Both is recorded in the result.
-func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node *v1.Node, features Features) ([]*Pool, error) {
+func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node *v1.Node, features Features, poolGenerations poolGenerationIndex) ([]*Pool, error) {
 	pools := make(map[PoolID][]*draapi.ResourceSlice)
 
 	for _, slice := range slices {
@@ -123,8 +123,31 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 	// We may have skipped slices with a higher generation
 	// if they are not relevant for the node, so we have to be
 	// careful with the "is incomplete" check.
+	// Slices in a pool generation must agree on ResourceSliceCount, but the checks
+	// below trust one slice's count. The disagreeing generations are found once per
+	// allocator over the full slice set (see analyzePoolGenerations).
+	inconsistentGenerations := poolGenerations.inconsistent
+	latestGeneration := poolGenerations.latestGeneration
+
 	result := make([]*Pool, 0, len(pools))
 	for poolID, slicesForPool := range pools {
+		ref := poolRef{driver: poolID.Driver.String(), pool: poolID.Pool.String()}
+		resolvedGeneration := slicesForPool[0].Spec.Pool.Generation
+		if inconsistentGenerations[poolGenerationRef{poolRef: ref, generation: resolvedGeneration}] {
+			// The slices in this generation disagree on ResourceSliceCount. If a newer
+			// generation exists the pool is being replaced, so ignore this one as
+			// obsolete; otherwise the revision is contradictory, so mark it invalid
+			// like a pool with non-unique device names.
+			if latestGeneration[ref] > resolvedGeneration {
+				continue
+			}
+			result = append(result, &Pool{
+				PoolID:        poolID,
+				IsInvalid:     true,
+				InvalidReason: "ResourceSlices in the pool generation declare inconsistent resourceSliceCount",
+			})
+			continue
+		}
 		// If we have all slices, we are done.
 		isComplete := int64(len(slicesForPool)) == slicesForPool[0].Spec.Pool.ResourceSliceCount
 		if isComplete {
@@ -180,6 +203,56 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 	}
 
 	return result, nil
+}
+
+// poolRef identifies a resource pool by driver and pool name.
+type poolRef struct {
+	driver string
+	pool   string
+}
+
+// poolGenerationRef identifies a single generation of a resource pool.
+type poolGenerationRef struct {
+	poolRef
+	generation int64
+}
+
+// poolGenerationIndex records, for a fixed set of slices, which pool generations
+// declare inconsistent ResourceSliceCount values and the highest generation seen for
+// each pool. It is built once per allocator from the full slice set and reused for
+// every node.
+type poolGenerationIndex struct {
+	inconsistent     map[poolGenerationRef]bool
+	latestGeneration map[poolRef]int64
+}
+
+// analyzePoolGenerations scans every slice once. GatherPools reads a generation's
+// ResourceSliceCount from a single slice, so a generation with disagreeing slices,
+// including ones dropped by node selection, would otherwise count as complete or not
+// depending on slice order (kubernetes/kubernetes#141117). The highest generation
+// lets an inconsistent but already superseded generation be ignored rather than
+// reported.
+func analyzePoolGenerations(slices []*resourceapi.ResourceSlice) poolGenerationIndex {
+	declaredCount := make(map[poolGenerationRef]int64)
+	index := poolGenerationIndex{
+		inconsistent:     make(map[poolGenerationRef]bool),
+		latestGeneration: make(map[poolRef]int64),
+	}
+	for _, slice := range slices {
+		ref := poolRef{driver: slice.Spec.Driver, pool: slice.Spec.Pool.Name}
+		genRef := poolGenerationRef{poolRef: ref, generation: slice.Spec.Pool.Generation}
+		if count, ok := declaredCount[genRef]; ok {
+			if count != slice.Spec.Pool.ResourceSliceCount {
+				index.inconsistent[genRef] = true
+			}
+		} else {
+			declaredCount[genRef] = slice.Spec.Pool.ResourceSliceCount
+		}
+		if gen, ok := index.latestGeneration[ref]; !ok || slice.Spec.Pool.Generation > gen {
+			index.latestGeneration[ref] = slice.Spec.Pool.Generation
+		}
+	}
+	return index
 }
 
 func addSlice(pools map[PoolID][]*draapi.ResourceSlice, s *resourceapi.ResourceSlice) error {
