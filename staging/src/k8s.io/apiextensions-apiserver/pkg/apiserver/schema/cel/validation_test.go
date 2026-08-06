@@ -22,6 +22,7 @@ import (
 	"flag"
 	"fmt"
 	"math"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -5027,6 +5028,71 @@ func BenchmarkCELValidationWithAndWithoutOldSelfReference(b *testing.B) {
 			}
 		})
 	}
+}
+
+// TestNewValidatorAllOfBoundedCost verifies that x-kubernetes-validations rules on a field whose
+// maxLength is declared only inside allOf members are cost estimated using that bound, exactly as
+// if the bound was declared directly on the field, and that NewValidator does not mutate the
+// input schema while folding the bounds.
+// Reproducer from https://github.com/kubernetes/kubernetes/issues/134029.
+func TestNewValidatorAllOfBoundedCost(t *testing.T) {
+	rule := "true && self.contains(self)"
+
+	allOfBounded := objectTypePtr(map[string]schema.Structural{
+		"text": withRule(schema.Structural{
+			Generic: schema.Generic{Type: "string"},
+			ValueValidation: &schema.ValueValidation{
+				AllOf: []schema.NestedValueValidation{
+					{ValueValidation: schema.ValueValidation{MaxLength: ptr.To[int64](10)}},
+					{ValueValidation: schema.ValueValidation{MaxLength: ptr.To[int64](20)}},
+				},
+			},
+		}, rule),
+	})
+	directBounded := objectTypePtr(map[string]schema.Structural{
+		"text": withRule(withMaxLength(stringType, ptr.To[int64](10)), rule),
+	})
+
+	original := allOfBounded.DeepCopy()
+
+	allOfCost := compiledRuleCost(t, allOfBounded)
+	directCost := compiledRuleCost(t, directBounded)
+
+	if allOfCost != directCost {
+		t.Errorf("estimated cost with maxLength inside allOf: %d, want the same as with maxLength directly on the field: %d", allOfCost, directCost)
+	}
+	// the per expression cost limit enforced at CRD write time is 10000000 (StaticEstimatedCostLimit
+	// in k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation); the reproducer rule must
+	// fit it once the allOf bound is taken into account
+	const perExpressionCostLimit = 10000000
+	if allOfCost > perExpressionCostLimit {
+		t.Errorf("estimated cost %d exceeds the per expression cost limit %d", allOfCost, perExpressionCostLimit)
+	}
+	if !reflect.DeepEqual(original, allOfBounded) {
+		t.Errorf("NewValidator must not mutate the input schema")
+	}
+}
+
+// compiledRuleCost returns the estimated cost of the single compiled rule on the "text" property
+// of the given root schema.
+func compiledRuleCost(t *testing.T, s *schema.Structural) uint64 {
+	t.Helper()
+	v := NewValidator(s, true, celconfig.PerCallLimit)
+	if v == nil {
+		t.Fatal("expected non nil validator")
+	}
+	fieldValidator, ok := v.Properties["text"]
+	if !ok {
+		t.Fatal("expected a validator for property text")
+	}
+	if len(fieldValidator.compiledRules) != 1 {
+		t.Fatalf("expected one compiled rule, got %d", len(fieldValidator.compiledRules))
+	}
+	result := fieldValidator.compiledRules[0]
+	if result.Error != nil {
+		t.Fatalf("expected no compilation error, got %v", result.Error)
+	}
+	return result.MaxCost
 }
 
 func primitiveType(typ, format string) schema.Structural {
