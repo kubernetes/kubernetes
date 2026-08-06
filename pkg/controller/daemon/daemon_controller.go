@@ -721,6 +721,12 @@ func (dsc *DaemonSetsController) deletePod(logger klog.Logger, obj interface{}) 
 	}
 	logger.V(4).Info("Pod deleted", "pod", klog.KObj(pod))
 	dsc.expectations.DeletionObserved(logger, dsKey)
+	// A delete observed from the informer is meaningful progress for the
+	// DaemonSet (e.g. rolling update removed an old pod). Clear rate-limiter
+	// state so earlier failed syncs (such as repeated admission webhook errors)
+	// do not keep the key on maximum backoff and delay reconciliation until the
+	// next delayed requeue. See https://issue.k8s.io/138280.
+	dsc.queue.Forget(dsKey)
 	dsc.enqueueDaemonSet(ds)
 }
 
