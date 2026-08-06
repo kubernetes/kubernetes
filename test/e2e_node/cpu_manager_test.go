@@ -1764,6 +1764,8 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 
 			gomega.Expect(pod).To(HaveSandboxQuota("max"))
 			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "max"))
+			gomega.Expect(pod).To(HaveContainerStatusCPULimits(ctnName, ""))
+			gomega.Expect(pod).To(HaveContainerStatusCPURequests(ctnName, ""))
 		})
 
 		ginkgo.It("should disable for guaranteed pod with exclusive single CPU assigned", func(ctx context.Context) {
@@ -1783,6 +1785,8 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 
 			gomega.Expect(pod).To(HaveSandboxQuota("max"))
 			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "max"))
+			gomega.Expect(pod).To(HaveContainerStatusCPULimits(ctnName, "1"))
+			gomega.Expect(pod).To(HaveContainerStatusCPURequests(ctnName, "1"))
 		})
 
 		ginkgo.It("should disable for guaranteed pod with exclusive four CPUs assigned", func(ctx context.Context) {
@@ -1802,6 +1806,8 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 
 			gomega.Expect(pod).To(HaveSandboxQuota("max"))
 			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "max"))
+			gomega.Expect(pod).To(HaveContainerStatusCPULimits(ctnName, "3"))
+			gomega.Expect(pod).To(HaveContainerStatusCPURequests(ctnName, "3"))
 
 			gomega.Expect(pod).To(HaveContainerCPUsCount(ctnName, 3))
 			gomega.Expect(pod).To(HaveContainerCPUsASubsetOf(ctnName, onlineCPUs))
@@ -1825,6 +1831,8 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 
 			gomega.Expect(pod).To(HaveSandboxQuota("50000"))
 			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "50000"))
+			gomega.Expect(pod).To(HaveContainerStatusCPULimits(ctnName, "500m"))
+			gomega.Expect(pod).To(HaveContainerStatusCPURequests(ctnName, "500m"))
 		})
 
 		ginkgo.It("should enforce for burstable pod", func(ctx context.Context) {
@@ -1843,6 +1851,8 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 
 			gomega.Expect(pod).To(HaveSandboxQuota("50000"))
 			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "50000"))
+			gomega.Expect(pod).To(HaveContainerStatusCPULimits(ctnName, "500m"))
+			gomega.Expect(pod).To(HaveContainerStatusCPURequests(ctnName, "100m"))
 		})
 
 		ginkgo.It("should not enforce with multiple containers without exclusive CPUs", func(ctx context.Context) {
@@ -1867,6 +1877,10 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			gomega.Expect(pod).To(HaveSandboxQuota("170000"))
 			gomega.Expect(pod).To(HaveContainerQuota("gu-container-non-int-values-1", "50000"))
 			gomega.Expect(pod).To(HaveContainerQuota("gu-container-non-int-values-2", "120000"))
+			gomega.Expect(pod).To(HaveContainerStatusCPULimits("gu-container-non-int-values-1", "500m"))
+			gomega.Expect(pod).To(HaveContainerStatusCPURequests("gu-container-non-int-values-1", "100m"))
+			gomega.Expect(pod).To(HaveContainerStatusCPULimits("gu-container-non-int-values-2", "1200m"))
+			gomega.Expect(pod).To(HaveContainerStatusCPURequests("gu-container-non-int-values-2", "300m"))
 		})
 
 		ginkgo.It("should not enforce with multiple containers only in the container with exclusive CPUs", func(ctx context.Context) {
@@ -1891,6 +1905,10 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			gomega.Expect(pod).To(HaveSandboxQuota("max"))
 			gomega.Expect(pod).To(HaveContainerQuota("gu-container-non-int-values", "50000"))
 			gomega.Expect(pod).To(HaveContainerQuota("gu-container-int-values", "max"))
+			gomega.Expect(pod).To(HaveContainerStatusCPULimits("gu-container-non-int-values", "500m"))
+			gomega.Expect(pod).To(HaveContainerStatusCPURequests("gu-container-non-int-values", "500m"))
+			gomega.Expect(pod).To(HaveContainerStatusCPULimits("gu-container-int-values", "1"))
+			gomega.Expect(pod).To(HaveContainerStatusCPURequests("gu-container-int-values", "1"))
 		})
 	})
 
@@ -3398,6 +3416,44 @@ func HaveStatusReasonMatchingRegex(expr string) types.GomegaMatcher {
 		}
 		return re.MatchString(actual.Status.Reason), nil
 	}).WithTemplate("Pod {{.Actual.Namespace}}/{{.Actual.Name}} UID {{.Actual.UID}} reason {{.Actual.Status.Reason}} does not match regexp {{.Data}}", expr)
+}
+
+func HaveContainerStatusCPULimits(ctnName, expected string) types.GomegaMatcher {
+	md := &msgData{
+		Name:         ctnName,
+		ExpectedCPUs: expected,
+	}
+	return gcustom.MakeMatcher(func(actual *v1.Pod) (bool, error) {
+		if actual != nil {
+			for _, ctnStatus := range actual.Status.ContainerStatuses {
+				if ctnStatus.Name == ctnName {
+					if ctnStatus.Resources != nil && ctnStatus.Resources.Limits != nil {
+						md.CurrentCPUs = ctnStatus.Resources.Limits.Cpu().String()
+					}
+				}
+			}
+		}
+		return md.ExpectedCPUs == md.CurrentCPUs, nil
+	}).WithTemplate("Pod {{.Actual.Namespace}}/{{.Actual.Name}} UID {{.Actual.UID}} has container resources CPU Limits status <{{.Data.CurrentCPUs}}> not matching expected value <{{.Data.ExpectedCPUs}}> for container {{.Data.Name}}", md)
+}
+
+func HaveContainerStatusCPURequests(ctnName, expected string) types.GomegaMatcher {
+	md := &msgData{
+		Name:         ctnName,
+		ExpectedCPUs: expected,
+	}
+	return gcustom.MakeMatcher(func(actual *v1.Pod) (bool, error) {
+		if actual != nil {
+			for _, ctnStatus := range actual.Status.ContainerStatuses {
+				if ctnStatus.Name == ctnName {
+					if ctnStatus.Resources != nil && ctnStatus.Resources.Limits != nil {
+						md.CurrentCPUs = ctnStatus.Resources.Requests.Cpu().String()
+					}
+				}
+			}
+		}
+		return md.ExpectedCPUs == md.CurrentCPUs, nil
+	}).WithTemplate("Pod {{.Actual.Namespace}}/{{.Actual.Name}} UID {{.Actual.UID}} has container resources CPU Requests status <{{.Data.CurrentCPUs}}> not matching expected value <{{.Data.ExpectedCPUs}}> for container {{.Data.Name}}", md)
 }
 
 type msgData struct {
