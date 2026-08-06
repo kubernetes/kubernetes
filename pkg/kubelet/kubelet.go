@@ -2217,7 +2217,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	}
 
 	// Create Mirror Pod for Static Pod if it doesn't already exist
-	kl.tryReconcileMirrorPods(ctx, pod, mirrorPod)
+	go kl.tryReconcileMirrorPods(ctx, pod, mirrorPod)
 
 	// Make data directories for the pod
 	if err := kl.makePodDataDirs(pod); err != nil {
