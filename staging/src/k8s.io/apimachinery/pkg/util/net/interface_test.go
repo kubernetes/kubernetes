@@ -288,6 +288,12 @@ func TestFinalIP(t *testing.T) {
 		{"link local v6", []net.Addr{addrStruct{val: "fe80::2f7:6fff:fe6e:2956/64"}}, familyIPv6, nil},
 		{"ip4", []net.Addr{addrStruct{val: "10.254.12.132/17"}}, familyIPv4, netutils.ParseIPSloppy("10.254.12.132")},
 		{"ip6", []net.Addr{addrStruct{val: "2001::5/64"}}, familyIPv6, netutils.ParseIPSloppy("2001::5")},
+		// IPv6 LLA with zone ID (e.g. as produced by intf.Addrs() on Linux for BGP-unnumbered
+		// interfaces) cannot be parsed by ParseCIDRSloppy. The function must skip it and
+		// continue scanning rather than returning an error.
+		{"ipv6 LLA with zone ID skipped", []net.Addr{addrStruct{val: "fe80::1%eth0/64"}}, familyIPv6, nil},
+		// Zone-ID address followed by a valid global address — the global address must be returned.
+		{"ipv6 LLA with zone ID, then global", []net.Addr{addrStruct{val: "fe80::1%eth0/64"}, addrStruct{val: "2001::5/64"}}, familyIPv6, netutils.ParseIPSloppy("2001::5")},
 
 		{"no addresses", []net.Addr{}, familyIPv4, nil},
 	}
@@ -551,6 +557,38 @@ func (_ networkInterfaceWithInvalidAddr) Interfaces() ([]net.Interface, error) {
 	return []net.Interface{upIntf}, nil
 }
 
+// bgpUnnumberedNetworkInterface simulates a BGP-unnumbered / RFC 5549 node where:
+//   - The physical interface (eth3) peers with a ToR switch using IPv6 link-local
+//     addresses as BGP nexthops. On Linux, intf.Addrs() returns these with a zone ID
+//     (e.g. "fe80::1%eth3/64") which ParseCIDRSloppy cannot parse.
+//   - The node's stable IPv4 identity (e.g. 10.244.0.1/32) lives on the loopback (lo).
+//
+// getMatchingGlobalIP must skip the zone-ID LLA so that chooseHostInterfaceFromRoute
+// can fall through to getIPFromLoopbackInterface and return the loopback IPv4 address.
+type bgpUnnumberedNetworkInterface struct{}
+
+func (bgpUnnumberedNetworkInterface) InterfaceByName(intfName string) (*net.Interface, error) {
+	if intfName == LoopbackInterfaceName {
+		return &loopbackIntf, nil
+	}
+	return &upIntf, nil
+}
+func (bgpUnnumberedNetworkInterface) Addrs(intf *net.Interface) ([]net.Addr, error) {
+	if intf.Name == LoopbackInterfaceName {
+		// Stable node IPv4 identity + standard loopback addresses.
+		return []net.Addr{
+			addrStruct{val: "127.0.0.1/8"},
+			addrStruct{val: "::1/128"},
+			addrStruct{val: "10.244.0.1/32"},
+		}, nil
+	}
+	// Physical interface: only an IPv6 LLA with a zone ID used as BGP nexthop.
+	return []net.Addr{addrStruct{val: "fe80::1%eth3/64"}}, nil
+}
+func (bgpUnnumberedNetworkInterface) Interfaces() ([]net.Interface, error) {
+	return []net.Interface{upIntf, loopbackIntf}, nil
+}
+
 func TestGetIPFromInterface(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
@@ -569,6 +607,10 @@ func TestGetIPFromInterface(t *testing.T) {
 		{"I/F get fail", "eth3", familyIPv4, noNetworkInterface{}, nil, "no such network interface"},
 		{"fail get addr", "eth3", familyIPv4, networkInterfaceFailGetAddrs{}, nil, "unable to get Addrs"},
 		{"bad addr", "eth3", familyIPv4, networkInterfaceWithInvalidAddr{}, nil, "invalid CIDR"},
+		// BGP-unnumbered: eth3 carries only an IPv6 LLA with a zone ID used as BGP nexthop
+		// to the ToR. getMatchingGlobalIP must skip it; no global address is found on eth3
+		// itself (the IPv4 node identity lives on lo, handled by chooseHostInterfaceFromRoute).
+		{"BGP-unnumbered eth3: IPv6 LLA with zone ID skipped, no global found", "eth3", familyIPv4, bgpUnnumberedNetworkInterface{}, nil, ""},
 	}
 	for _, tc := range testCases {
 		ip, err := getIPFromInterface(logger, tc.nwname, tc.family, tc.nw)
@@ -640,6 +682,14 @@ func TestChooseHostInterfaceFromRoute(t *testing.T) {
 		{"all LLA", routeV4, networkInterfaceWithOnlyLinkLocals{}, preferIPv4, nil},
 		{"no routes", noRoutes, validNetworkInterface{}, preferIPv4, nil},
 		{"fail get IP", routeV4, networkInterfaceFailGetAddrs{}, preferIPv4, nil},
+		// BGP-unnumbered / RFC 5549 with IPv4-on-loopback topology:
+		// The node peers with the ToR L3 switch over a point-to-point link whose only
+		// addresses are IPv6 link-locals with zone IDs (e.g. "fe80::1%eth3/64").
+		// The stable IPv4 node identity (10.244.0.1/32) is assigned to lo.
+		// The IPv4 default route transits eth3 via BGP-unnumbered.
+		// Expected: getMatchingGlobalIP skips the zone-ID LLA on eth3, the route scan
+		// falls through to getIPFromLoopbackInterface, and returns the loopback IPv4.
+		{"BGP-unnumbered IPv6 LLA nexthop, IPv4 identity on loopback", routeV4, bgpUnnumberedNetworkInterface{}, preferIPv4, netutils.ParseIPSloppy("10.244.0.1")},
 	}
 	for _, tc := range testCases {
 		ip, err := chooseHostInterfaceFromRoute(logger, tc.routes, tc.nw, tc.order)
@@ -692,6 +742,9 @@ func TestGetIPFromHostInterfaces(t *testing.T) {
 		{"single-stack ipv6, prefer ipv6", ipv6NetworkInterface{}, preferIPv6, netutils.ParseIPSloppy("2001::200"), ""},
 		{"dual stack", v4v6NetworkInterface{}, preferIPv4, netutils.ParseIPSloppy("10.254.71.145"), ""},
 		{"dual stack, prefer ipv6", v4v6NetworkInterface{}, preferIPv6, netutils.ParseIPSloppy("2001::10"), ""},
+		// BGP-unnumbered: physical interface has only an IPv6 LLA with zone ID.
+		// chooseIPFromHostInterfaces must skip it (no acceptable global address found).
+		{"BGP-unnumbered: IPv6 LLA with zone ID skipped", bgpUnnumberedNetworkInterface{}, preferIPv6, nil, "no acceptable"},
 	}
 
 	for _, tc := range testCases {
