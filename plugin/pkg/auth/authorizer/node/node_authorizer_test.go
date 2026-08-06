@@ -1087,7 +1087,7 @@ func TestNodeAuthorizerAddEphemeralContainers(t *testing.T) {
 	}
 	p := &graphPopulator{}
 	p.graph = g
-	p.addPod(pod)
+	p.processAddOrUpdatePod(pod)
 
 	testcases := []struct {
 		User      user.Info
@@ -1112,7 +1112,7 @@ func TestNodeAuthorizerAddEphemeralContainers(t *testing.T) {
 			newPod := &corev1.Pod{}
 			pod.DeepCopyInto(newPod)
 			newPod.Spec.EphemeralContainers = append(newPod.Spec.EphemeralContainers, *tc.EphCont)
-			p.updatePod(pod, newPod)
+			p.processAddOrUpdatePod(newPod)
 		}
 
 		if len(tc.Secret) > 0 {
@@ -1187,7 +1187,7 @@ func TestNodeAuthorizerUpdateExtendedResourceClaim(t *testing.T) {
 
 	p := &graphPopulator{}
 	p.graph = g
-	p.addPod(pod)
+	p.processAddOrUpdatePod(pod)
 
 	// Before the scheduler swaps the synthesized claim name, extended-claim-1
 	// is not in the graph and node1 should have no opinion on it.
@@ -1213,7 +1213,7 @@ func TestNodeAuthorizerUpdateExtendedResourceClaim(t *testing.T) {
 	// exit.
 	updatedPod := pod.DeepCopy()
 	updatedPod.Status.ExtendedResourceClaimStatus.ResourceClaimName = "extended-claim-1"
-	p.updatePod(pod, updatedPod)
+	p.processAddOrUpdatePod(updatedPod)
 
 	// The node that hosts the pod should now be permitted to read the claim.
 	decision, _, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{
@@ -1610,19 +1610,19 @@ func populate(graph *Graph, nodes []*corev1.Node, pods []*corev1.Pod, pvs []*cor
 	p := &graphPopulator{}
 	p.graph = graph
 	for _, pod := range pods {
-		p.addPod(pod)
+		p.processAddOrUpdatePod(pod)
 	}
 	for _, pv := range pvs {
-		p.addPV(pv)
+		p.processAddOrUpdatePV(pv)
 	}
 	for _, attachment := range attachments {
-		p.addVolumeAttachment(attachment)
+		p.processAddOrUpdateVolumeAttachment(attachment)
 	}
 	for _, slice := range slices {
-		p.addResourceSlice(slice)
+		p.processAddResourceSlice(slice)
 	}
 	for _, pcr := range pcrs {
-		p.addPCR(pcr)
+		p.processAddPCR(pcr)
 	}
 }
 
