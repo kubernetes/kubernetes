@@ -20,7 +20,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -35,15 +37,50 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	timedworkers "k8s.io/kubernetes/pkg/controller/tainteviction" // TODO (?): move this common helper somewhere else?
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/utils/ptr"
 )
+
+// unixPathMax is the maximum length of an AF_UNIX socket path on Linux.
+const unixPathMax = 108
+
+// validateEndpoint returns an error if driver endpoint
+// advertised by a plugin during registration is not acceptable.
+func (pm *DRAPluginManager) validateEndpoint(endpoint string) error {
+	if endpoint == "" {
+		return errors.New("empty DRA plugin endpoint")
+	}
+	// Relative endpoints are rejected outright. gRPC would resolve them
+	// against kubelet's current working directory (via "unix:" + endpoint),
+	// which is unspecified — it depends on how kubelet was started and can
+	// be changed at runtime — so accepting one would mean validating a
+	// different path than gRPC ultimately dials.
+	if !filepath.IsAbs(endpoint) {
+		return fmt.Errorf("DRA plugin endpoint %q must be an absolute path", endpoint)
+	}
+	if len(endpoint) >= unixPathMax {
+		return fmt.Errorf("DRA plugin endpoint %q must not be longer than %d bytes", endpoint, unixPathMax)
+	}
+	// The endpoint must resolve to a path inside rootDir (the kubelet
+	// root — /var/lib/kubelet by default — in production, so both
+	// /var/lib/kubelet/plugins and /var/lib/kubelet/plugins_registry
+	// layouts used by real DRA drivers are covered). Blocks a plugin from
+	// pointing kubelet at e.g. /run/some-other-socket.
+	cleaned := filepath.Clean(endpoint)
+	rel, err := filepath.Rel(pm.rootDir, cleaned)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("DRA plugin endpoint %q is not inside %q", endpoint, pm.rootDir)
+	}
+	return nil
+}
 
 // DRAPluginManager keeps track of how to reach plugins registered for DRA drivers.
 // Each plugin has a gRPC endpoint. There may be more than one plugin per driver.
@@ -63,6 +100,12 @@ type DRAPluginManager struct {
 	getNode       func(context.Context) (*v1.Node, error)
 	wipingDelay   time.Duration
 	streamHandler StreamHandler
+
+	// rootDir bounds where a plugin's advertised endpoint may live
+	// (typically the kubelet root — /var/lib/kubelet by default — so both
+	// /var/lib/kubelet/plugins and /var/lib/kubelet/plugins_registry are
+	// covered).
+	rootDir string
 
 	// withIdleTimeout is only for unit testing, ignore if <= 0.
 	withIdleTimeout time.Duration
@@ -145,10 +188,15 @@ func (m *monitoredPlugin) HandleConn(_ context.Context, stats grpcstats.ConnStat
 // NewDRAPluginManager creates a new DRAPluginManager, with support for wiping ResourceSlices
 // when the plugin(s) for a DRA driver are not available too long.
 //
+// rootDir bounds where plugin-advertised endpoints may live: any path
+// outside it is rejected at registration. Pass the kubelet root
+// (/var/lib/kubelet by default) so both /var/lib/kubelet/plugins and
+// /var/lib/kubelet/plugins_registry are covered.
+//
 // The context can be used to cancel all background activities.
 // If desired, Stop can be called in addition or instead of canceling
 // the context. It then also waits for background activities to stop.
-func NewDRAPluginManager(ctx context.Context, kubeClient kubernetes.Interface, getNode func(context.Context) (*v1.Node, error), streamHandler StreamHandler, wipingDelay time.Duration) *DRAPluginManager {
+func NewDRAPluginManager(ctx context.Context, kubeClient kubernetes.Interface, getNode func(context.Context) (*v1.Node, error), streamHandler StreamHandler, wipingDelay time.Duration, rootDir string) *DRAPluginManager {
 	ctx, cancel := context.WithCancelCause(ctx)
 	pm := &DRAPluginManager{
 		backgroundCtx: klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "DRA registration handler")),
@@ -157,6 +205,7 @@ func NewDRAPluginManager(ctx context.Context, kubeClient kubernetes.Interface, g
 		getNode:       getNode,
 		wipingDelay:   wipingDelay,
 		streamHandler: streamHandler,
+		rootDir:       rootDir,
 	}
 	pm.pendingWipes = timedworkers.CreateWorkerQueue(func(ctx context.Context, fireAt time.Time, args *timedworkers.WorkArgs) error {
 		pm.wipeResourceSlices(ctx, args.Object.Name)
@@ -324,6 +373,13 @@ func (pm *DRAPluginManager) get(driverName string) *DRAPlugin {
 // in advance which version to use resp. which optional services the plugin
 // supports.
 func (pm *DRAPluginManager) RegisterPlugin(_ context.Context, driverName string, endpoint string, supportedServices []string, pluginClientTimeout *time.Duration) error {
+	// Reuse CSI driver name validation to be consistent with pkg/apis/resource/validation
+	if errs := corevalidation.ValidateCSIDriverName(driverName, field.NewPath("driverName")); len(errs) > 0 {
+		return fmt.Errorf("invalid DRA driver name: %w", errs.ToAggregate())
+	}
+	if err := pm.validateEndpoint(endpoint); err != nil {
+		return err
+	}
 	chosenService, err := pm.validateSupportedServices(driverName, supportedServices)
 	if err != nil {
 		return fmt.Errorf("invalid supported gRPC versions of DRA driver plugin %s at endpoint %s: %w", driverName, endpoint, err)
@@ -553,6 +609,13 @@ func (pm *DRAPluginManager) usable(driverName string) bool {
 // The plugin manager calls it upon detection of a new registration socket
 // opened by DRA plugin.
 func (pm *DRAPluginManager) ValidatePlugin(_ context.Context, driverName string, endpoint string, supportedServices []string) error {
+	// Reuse CSI driver name validation to be consistent with pkg/apis/resource/validation APIs
+	if errs := corevalidation.ValidateCSIDriverName(driverName, field.NewPath("driverName")); len(errs) > 0 {
+		return fmt.Errorf("invalid DRA driver name: %w", errs.ToAggregate())
+	}
+	if err := pm.validateEndpoint(endpoint); err != nil {
+		return err
+	}
 	_, err := pm.validateSupportedServices(driverName, supportedServices)
 	if err != nil {
 		return fmt.Errorf("invalid supported gRPC versions of DRA driver plugin %s at endpoint %s: %w", driverName, endpoint, err)

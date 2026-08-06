@@ -105,6 +105,12 @@ type Manager struct {
 	// KubeClient reference
 	kubeClient clientset.Interface
 
+	// rootDir is the kubelet root directory (typically /var/lib/kubelet).
+	// It is where the DRA manager persists its checkpoint state and — in
+	// production — bounds the paths that plugin-advertised endpoints may
+	// live inside.
+	rootDir string
+
 	// healthInfoCache contains cached health info
 	healthInfoCache *healthInfoCache
 
@@ -112,7 +118,10 @@ type Manager struct {
 	update chan resourceupdates.Update
 }
 
-// NewManager creates a new DRA manager.
+// NewManager creates a new DRA manager. rootDir is the kubelet root
+// directory (typically /var/lib/kubelet); the manager persists its
+// checkpoint state under it and, in production, uses it to bound the
+// paths that plugin-advertised endpoints may live inside.
 //
 // Most errors returned by the manager show up in the context of a pod.
 // They try to adhere to the following convention:
@@ -121,13 +130,13 @@ type Manager struct {
 // - Don't include the namespace, it can be inferred from the context.
 // - Avoid repeated "failed to ...: failed to ..." when wrapping errors.
 // - Avoid wrapping when it does not provide relevant additional information to keep the user-visible error short.
-func NewManager(logger klog.Logger, kubeClient clientset.Interface, stateFileDirectory string) (*Manager, error) {
-	claimInfoCache, err := newClaimInfoCache(stateFileDirectory, draManagerStateFileName)
+func NewManager(logger klog.Logger, kubeClient clientset.Interface, rootDir string) (*Manager, error) {
+	claimInfoCache, err := newClaimInfoCache(rootDir, draManagerStateFileName)
 	if err != nil {
 		return nil, fmt.Errorf("create ResourceClaim cache: %w", err)
 	}
 
-	healthInfoCache, err := newHealthInfoCache(logger, filepath.Join(stateFileDirectory, "dra_health_state"))
+	healthInfoCache, err := newHealthInfoCache(logger, filepath.Join(rootDir, "dra_health_state"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create healthInfo cache: %w", err)
 	}
@@ -139,6 +148,7 @@ func NewManager(logger klog.Logger, kubeClient clientset.Interface, stateFileDir
 	manager := &Manager{
 		cache:           claimInfoCache,
 		kubeClient:      kubeClient,
+		rootDir:         rootDir,
 		reconcilePeriod: reconcilePeriod,
 		activePods:      nil,
 		sourcesReady:    nil,
@@ -180,7 +190,7 @@ func (m *Manager) Start(ctx context.Context, activePods ActivePodsFunc, getNode 
 // initPluginManager can be used instead of Start to make the manager useable
 // for calls to prepare/unprepare. It exists primarily for testing purposes.
 func (m *Manager) initDRAPluginManager(ctx context.Context, getNode GetNodeFunc, wipingDelay time.Duration) {
-	m.draPlugins = draplugin.NewDRAPluginManager(ctx, m.kubeClient, getNode, m, wipingDelay)
+	m.draPlugins = draplugin.NewDRAPluginManager(ctx, m.kubeClient, getNode, m, wipingDelay, m.rootDir)
 }
 
 // reconcileLoop ensures that any stale state in the manager's claimInfoCache gets periodically reconciled.

@@ -152,7 +152,8 @@ func setupFakeGRPCServer(ctx context.Context, service, addr string) (tearDown, e
 
 func TestGRPCConnIsReused(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	addr := path.Join(t.TempDir(), "dra.sock")
+	tmp := t.TempDir()
+	addr := path.Join(tmp, "dra.sock")
 	teardown, err := setupFakeGRPCServer(tCtx, "", addr)
 	require.NoError(t, err)
 	defer teardown()
@@ -164,7 +165,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 	driverName := "dummy-driver"
 
 	// ensure the plugin we are using is registered
-	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0, tmp)
 	tCtx.ExpectNoError(draPlugins.add(driverName, addr, drapbv1.DRAPluginService, drahealthv1.DRAResourceHealthService, defaultClientCallTimeout), "add plugin")
 	plugin, err := draPlugins.GetPlugin(driverName)
 	tCtx.ExpectNoError(err, "get plugin")
@@ -267,7 +268,8 @@ func TestGRPCConnIsReused(t *testing.T) {
 func TestGRPCConnUsableAfterIdle(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	service := drapbv1.DRAPluginService
-	addr := path.Join(t.TempDir(), "dra.sock")
+	tmp := t.TempDir()
+	addr := path.Join(tmp, "dra.sock")
 	teardown, err := setupFakeGRPCServer(tCtx, service, addr)
 	require.NoError(t, err)
 	defer teardown()
@@ -275,7 +277,7 @@ func TestGRPCConnUsableAfterIdle(t *testing.T) {
 	driverName := "dummy-driver"
 
 	// ensure the plugin we are using is registered
-	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0, tmp)
 	draPlugins.withIdleTimeout = 5 * time.Second
 	tCtx.ExpectNoError(draPlugins.add(driverName, addr, service, "", defaultClientCallTimeout), "add plugin")
 	plugin, err := draPlugins.GetPlugin(driverName)
@@ -305,7 +307,7 @@ func TestGRPCConnUsableAfterIdle(t *testing.T) {
 func TestGetDRAPlugin(t *testing.T) {
 	for _, test := range []struct {
 		description string
-		setup       func(*DRAPluginManager) error
+		setup       func(rootDir string, draPlugins *DRAPluginManager) error
 		driverName  string
 		shouldError bool
 	}{
@@ -320,17 +322,18 @@ func TestGetDRAPlugin(t *testing.T) {
 		},
 		{
 			description: "plugin exists",
-			setup: func(draPlugins *DRAPluginManager) error {
-				return draPlugins.add("dummy-driver", "/tmp/dra.sock", "", "", defaultClientCallTimeout)
+			setup: func(rootDir string, draPlugins *DRAPluginManager) error {
+				return draPlugins.add("dummy-driver", path.Join(rootDir, "dra.sock"), "", "", defaultClientCallTimeout)
 			},
 			driverName: "dummy-driver",
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
+			tmp := t.TempDir()
+			draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0, tmp)
 			if test.setup != nil {
-				require.NoError(t, test.setup(draPlugins), "setup plugin")
+				require.NoError(t, test.setup(tmp, draPlugins), "setup plugin")
 			}
 			plugin, err := draPlugins.GetPlugin(test.driverName)
 			if test.shouldError {
@@ -378,7 +381,8 @@ func TestGRPCMethods(t *testing.T) {
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			addr := path.Join(t.TempDir(), "dra.sock")
+			tmp := t.TempDir()
+			addr := path.Join(tmp, "dra.sock")
 			teardown, err := setupFakeGRPCServer(tCtx, test.service, addr)
 			if err != nil {
 				t.Fatal(err)
@@ -386,7 +390,7 @@ func TestGRPCMethods(t *testing.T) {
 			defer teardown()
 
 			driverName := "dummy-driver"
-			draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
+			draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0, tmp)
 			tCtx.ExpectNoError(draPlugins.add(driverName, addr, test.chosenService, "", defaultClientCallTimeout))
 
 			plugin, err := draPlugins.GetPlugin(driverName)
@@ -407,7 +411,8 @@ func TestGRPCWithTimeoutEnforced(t *testing.T) {
 	tCtx := ktesting.Init(t)
 
 	service := drapbv1.DRAPluginService
-	addr := path.Join(t.TempDir(), "dra.sock")
+	tmp := t.TempDir()
+	addr := path.Join(tmp, "dra.sock")
 
 	// we force NodePrepareResources to block, this will cause the timeout
 	// to elapse, as a consequence the client should abort.
@@ -425,7 +430,7 @@ func TestGRPCWithTimeoutEnforced(t *testing.T) {
 
 	driverName := "dummy-driver"
 	timeout := time.Second
-	manager := NewDRAPluginManager(tCtx, nil, nil, nil, 0)
+	manager := NewDRAPluginManager(tCtx, nil, nil, nil, 0, tmp)
 	err = manager.add(driverName, addr, service, "", timeout)
 	require.NoError(t, err, "unexpected error while adding the plugin")
 
@@ -531,13 +536,14 @@ func TestPlugin_WatchResources(t *testing.T) {
 	defer cancel()
 
 	driverName := "test-driver"
-	addr := path.Join(t.TempDir(), "dra.sock")
+	tmp := t.TempDir()
+	addr := path.Join(tmp, "dra.sock")
 
 	teardown, err := setupFakeGRPCServer(tCtx, "", addr)
 	require.NoError(t, err)
 	defer teardown()
 
-	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0, tmp)
 	err = draPlugins.add(driverName, addr, drapbv1beta1.DRAPluginService, drahealthv1.DRAResourceHealthService, 5*time.Second)
 	require.NoError(t, err)
 	defer draPlugins.remove(driverName, addr)
@@ -597,7 +603,8 @@ func TestPlugin_WatchResources_V1Alpha1(t *testing.T) {
 	defer cancel()
 
 	driverName := "test-driver"
-	addr := path.Join(t.TempDir(), "dra.sock")
+	tmp := t.TempDir()
+	addr := path.Join(tmp, "dra.sock")
 
 	listener, err := net.Listen("unix", addr)
 	require.NoError(t, err)
@@ -610,7 +617,7 @@ func TestPlugin_WatchResources_V1Alpha1(t *testing.T) {
 	}()
 	defer s.Stop()
 
-	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0, tmp)
 	err = draPlugins.add(driverName, addr, "", drahealthv1alpha1.DRAResourceHealthService, 5*time.Second)
 	require.NoError(t, err)
 	defer draPlugins.remove(driverName, addr)

@@ -19,11 +19,16 @@ package plugin
 import (
 	"fmt"
 	"math/rand/v2"
+	"path"
+	goruntime "runtime"
+	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	drahealthv1 "k8s.io/kubelet/pkg/apis/dra-health/v1"
 	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
+	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -70,15 +75,18 @@ func TestAddSameName(t *testing.T) {
 	driverName := fmt.Sprintf("dummy-driver-%d", rand.IntN(10000))
 
 	// ensure the plugin we are using is registered
-	draPlugins := NewDRAPluginManager(tCtx, nil, nil, nil, 0)
-	tCtx.ExpectNoError(draPlugins.add(driverName, "old.sock", "", "", defaultClientCallTimeout), "add first plugin")
+	tmp := t.TempDir()
+	oldSock := path.Join(tmp, "old.sock")
+	newSock := path.Join(tmp, "new.sock")
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, nil, 0, tmp)
+	tCtx.ExpectNoError(draPlugins.add(driverName, oldSock, "", "", defaultClientCallTimeout), "add first plugin")
 	p, err := draPlugins.GetPlugin(driverName)
 	tCtx.ExpectNoError(err, "get first plugin")
 
 	// Same name, same endpoint -> error.
-	require.Error(tCtx, draPlugins.add(driverName, "old.sock", "", "", defaultClientCallTimeout))
+	require.Error(tCtx, draPlugins.add(driverName, oldSock, "", "", defaultClientCallTimeout))
 
-	tCtx.ExpectNoError(draPlugins.add(driverName, "new.sock", "", "", defaultClientCallTimeout), "add second plugin")
+	tCtx.ExpectNoError(draPlugins.add(driverName, newSock, "", "", defaultClientCallTimeout), "add second plugin")
 	p2, err := draPlugins.GetPlugin(driverName)
 	tCtx.ExpectNoError(err, "get second plugin")
 	if p == p2 {
@@ -96,14 +104,97 @@ func TestAddSameName(t *testing.T) {
 	}
 }
 
+// TestRegisterPluginRejectsUntrustedInput ensures RegisterPlugin/ValidatePlugin
+// rejects invalid driver name or endpoint. The gRPC GetInfo response the values
+// come from is untrusted, so kubelet must not dial arbitrary UNIX socket paths
+// or let one plugin hijack another driver's registration by advertising its name.
+func TestRegisterPluginRejectsUntrustedInput(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		// This test uses hardcoded POSIX-style paths ("/var/lib/kubelet/...")
+		// which filepath.IsAbs does not treat as absolute on Windows. The
+		// validation code itself is portable; only the fixtures aren't.
+		t.Skip("test fixtures use POSIX-style paths")
+	}
+	services := []string{drapb.DRAPluginService}
+	longName := strings.Repeat("a", 64)
+	longEndpoint := "/var/lib/kubelet/plugins/example.com/very_long_endpoint_name_that_exceeds_the_unix_socket_limit_108_bytes.sock"
+	rootDir := "/var/lib/kubelet"
+
+	for _, tt := range []struct {
+		name       string
+		driverName string
+		endpoint   string
+		errFrag    string
+	}{
+		{"empty-driver", "", "/var/lib/kubelet/plugins/foo/plugin.sock", "Required value"},
+		{"driver-with-slash", "../evil", "/var/lib/kubelet/plugins/foo/plugin.sock", "invalid DRA driver name"},
+		{"driver-with-space", "evil driver", "/var/lib/kubelet/plugins/foo/plugin.sock", "invalid DRA driver name"},
+		{"driver-too-long", longName, "/var/lib/kubelet/plugins/foo/plugin.sock", "Too long"},
+		{"empty-endpoint", "good.example.com", "", "empty DRA plugin endpoint"},
+		{"relative-endpoint", "good.example.com", "plugin.sock", "must be an absolute path"},
+		{"endpoint-too-long", "good.example.com", longEndpoint, "longer than"},
+		{"endpoint-outside-rootDir", "good.example.com", "/run/some-other/socket.sock", "is not inside"},
+		{"endpoint-dotdot-escapes-rootDir", "good.example.com", "/var/lib/kubelet/../../etc/passwd", "is not inside"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			draPlugins := NewDRAPluginManager(tCtx, nil, nil, nil, 0, rootDir)
+			t.Cleanup(draPlugins.Stop)
+
+			err := draPlugins.RegisterPlugin(tCtx, tt.driverName, tt.endpoint, services, nil)
+			require.Error(t, err, "RegisterPlugin must reject untrusted input")
+			assert.Contains(t, err.Error(), tt.errFrag)
+
+			err = draPlugins.ValidatePlugin(tCtx, tt.driverName, tt.endpoint, services)
+			require.Error(t, err, "ValidatePlugin must reject untrusted input")
+			assert.Contains(t, err.Error(), tt.errFrag)
+		})
+	}
+}
+
+// TestRegisterPluginAcceptsEndpointInsideRootDir sanity-checks that the
+// containment rule is lexical, not literal: both plugins/ and
+// plugins_registry/ subtrees are accepted (real DRA drivers use each), and
+// dotdot components that Clean() reduces to a path inside rootDir don't
+// cause a false rejection.
+func TestRegisterPluginAcceptsEndpointInsideRootDir(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		// This test uses hardcoded POSIX-style paths ("/var/lib/kubelet/...")
+		// which filepath.IsAbs does not treat as absolute on Windows. The
+		// validation code itself is portable; only the fixtures aren't.
+		t.Skip("test fixtures use POSIX-style paths")
+	}
+	services := []string{drapb.DRAPluginService}
+	rootDir := "/var/lib/kubelet"
+
+	for _, endpoint := range []string{
+		"/var/lib/kubelet/plugins/example.com/dra.sock",
+		"/var/lib/kubelet/plugins/example.com/rolling/dra.sock",
+		"/var/lib/kubelet/plugins_registry/example.com-common.sock", // "1 common socket" layout
+		"/var/lib/kubelet/plugins/./example.com/../dra.sock",        // Clean() reduces to inside
+	} {
+		t.Run(endpoint, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			draPlugins := NewDRAPluginManager(tCtx, nil, nil, nil, 0, rootDir)
+			t.Cleanup(draPlugins.Stop)
+
+			// We don't spin up a gRPC server here — only checking that the
+			// validation step passes. ValidatePlugin does not open a
+			// connection, so it fully exercises the validation.
+			require.NoError(t, draPlugins.ValidatePlugin(tCtx, "example.com", endpoint, services))
+		})
+	}
+}
+
 func TestDelete(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	driverName := fmt.Sprintf("dummy-driver-%d", rand.IntN(10000))
-	socketFile := "dra.sock"
+	tmp := t.TempDir()
+	socketFile := path.Join(tmp, "dra.sock")
 
 	// ensure the plugin we are using is registered
-	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
-	tCtx.ExpectNoError(draPlugins.add(driverName, "dra.sock", "", "", defaultClientCallTimeout), "add plugin")
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0, tmp)
+	tCtx.ExpectNoError(draPlugins.add(driverName, socketFile, "", "", defaultClientCallTimeout), "add plugin")
 
 	draPlugins.remove(driverName, socketFile)
 
