@@ -23,6 +23,11 @@ import (
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utiljson "k8s.io/apimachinery/pkg/util/json"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	sigsyaml "sigs.k8s.io/yaml"
 )
 
@@ -45,9 +50,9 @@ type policyFile struct {
 // admissionInputFile represents a YAML file containing the runtime inputs for
 // admission CEL evaluation.
 type admissionInputFile struct {
-	Object          map[string]interface{}        `json:"object,omitempty"`
-	OldObject       map[string]interface{}        `json:"oldObject,omitempty"`
-	Params          map[string]interface{}        `json:"params,omitempty"`
+	Object          runtime.RawExtension          `json:"object,omitempty"`
+	OldObject       runtime.RawExtension          `json:"oldObject,omitempty"`
+	Params          runtime.RawExtension          `json:"params,omitempty"`
 	Request         *admissionv1.AdmissionRequest `json:"request,omitempty"`
 	Namespace       *corev1.Namespace             `json:"namespace,omitempty"`
 	NamespaceObject *corev1.Namespace             `json:"namespaceObject,omitempty"`
@@ -326,14 +331,53 @@ func parseAdmissionInput(data []byte) (*AdmissionInput, error) {
 	if namespace == nil {
 		namespace = file.NamespaceObject
 	}
+	object, err := decodeAdmissionInputResource(file.Object)
+	if err != nil {
+		return nil, fmt.Errorf("parsing admission input object: %w", err)
+	}
+	oldObject, err := decodeAdmissionInputResource(file.OldObject)
+	if err != nil {
+		return nil, fmt.Errorf("parsing admission input oldObject: %w", err)
+	}
+	params, err := decodeAdmissionInputResource(file.Params)
+	if err != nil {
+		return nil, fmt.Errorf("parsing admission input params: %w", err)
+	}
 
 	return &AdmissionInput{
-		object:    file.Object,
-		oldObject: file.OldObject,
-		params:    file.Params,
+		object:    object,
+		oldObject: oldObject,
+		params:    params,
 		request:   file.Request,
 		namespace: namespace,
 	}, nil
+}
+
+func decodeAdmissionInputResource(raw runtime.RawExtension) (interface{}, error) {
+	if len(raw.Raw) == 0 {
+		return nil, nil
+	}
+
+	var typeMeta metav1.TypeMeta
+	if err := utiljson.Unmarshal(raw.Raw, &typeMeta); err != nil {
+		return nil, err
+	}
+	if typeMeta.APIVersion != "" && typeMeta.Kind != "" {
+		gvk := schema.FromAPIVersionAndKind(typeMeta.APIVersion, typeMeta.Kind)
+		if clientgoscheme.Scheme.Recognizes(gvk) {
+			object, _, err := clientgoscheme.Codecs.UniversalDeserializer().Decode(raw.Raw, &gvk, nil)
+			if err != nil {
+				return nil, err
+			}
+			return object, nil
+		}
+	}
+
+	var object map[string]interface{}
+	if err := utiljson.Unmarshal(raw.Raw, &object); err != nil {
+		return nil, err
+	}
+	return object, nil
 }
 
 func parseAdmissionInputFile(path string) (*AdmissionInput, error) {

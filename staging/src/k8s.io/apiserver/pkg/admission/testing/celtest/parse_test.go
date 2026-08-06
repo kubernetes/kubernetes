@@ -25,6 +25,7 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 func TestParseAdmissionPolicy_Flat(t *testing.T) {
@@ -268,13 +269,19 @@ func TestParseAdmissionInputFile(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ParseAdmissionInputFile() error: %v", err)
 		}
-		object := input.object.(map[string]interface{})
-		if object["kind"] != "Pod" {
-			t.Errorf("object.kind = %v, want Pod", object["kind"])
+		object, ok := input.object.(*corev1.Pod)
+		if !ok {
+			t.Fatalf("object type = %T, want *corev1.Pod", input.object)
 		}
-		params := input.params.(map[string]interface{})
-		if params["kind"] != "ConfigMap" {
-			t.Errorf("params.kind = %v, want ConfigMap", params["kind"])
+		if object.Kind != "Pod" {
+			t.Errorf("object.kind = %v, want Pod", object.Kind)
+		}
+		params, ok := input.params.(*corev1.ConfigMap)
+		if !ok {
+			t.Fatalf("params type = %T, want *corev1.ConfigMap", input.params)
+		}
+		if params.Kind != "ConfigMap" {
+			t.Errorf("params.kind = %v, want ConfigMap", params.Kind)
 		}
 		if input.request == nil || input.request.Operation != admissionv1.Create {
 			t.Fatalf("request.operation = %v, want CREATE", input.request)
@@ -336,13 +343,19 @@ namespaceObject:
 	if err != nil {
 		t.Fatalf("ParseAdmissionInput() error: %v", err)
 	}
-	object := input.object.(map[string]interface{})
-	if object["kind"] != "Pod" {
-		t.Errorf("object.kind = %v, want Pod", object["kind"])
+	object, ok := input.object.(*corev1.Pod)
+	if !ok {
+		t.Fatalf("object type = %T, want *corev1.Pod", input.object)
 	}
-	params := input.params.(map[string]interface{})
-	if params["kind"] != "ConfigMap" {
-		t.Errorf("params.kind = %v, want ConfigMap", params["kind"])
+	if object.Kind != "Pod" {
+		t.Errorf("object.kind = %v, want Pod", object.Kind)
+	}
+	params, ok := input.params.(*corev1.ConfigMap)
+	if !ok {
+		t.Fatalf("params type = %T, want *corev1.ConfigMap", input.params)
+	}
+	if params.Kind != "ConfigMap" {
+		t.Errorf("params.kind = %v, want ConfigMap", params.Kind)
 	}
 	if input.request == nil || input.request.Operation != admissionv1.Create {
 		t.Fatalf("request.operation = %v, want CREATE", input.request)

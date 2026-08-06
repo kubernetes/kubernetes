@@ -27,10 +27,10 @@ limitations under the License.
 // rules ran. EvalMutation returns evaluated patch values; it does not apply
 // patches to objects or run the full apiserver patch application path.
 //
-// The package is scoped to CEL compilation and evaluation. It does not run API
-// server decoding, OpenAPI schema validation, conversion, or defaulting before
-// evaluation. Tests should pass objects in the shape the API server would expose
-// to admission CEL after those earlier admission pipeline phases have completed.
+// The package is scoped to CEL compilation and evaluation. Parsed inputs use
+// registered Kubernetes types when available and remain unstructured otherwise.
+// It does not run OpenAPI schema validation, conversion, or defaulting. Tests
+// should pass objects in the shape admission CEL receives after those phases.
 package celtest
 
 import (
@@ -855,9 +855,9 @@ func ParseAdmissionPolicyFile(path string) (*AdmissionPolicy, error) {
 
 // ParseAdmissionInput parses a YAML string into an AdmissionInput. The YAML may
 // include object, oldObject, params, request, namespace, and namespaceObject
-// fields. Params are passed to CEL as the top-level params object exactly as
-// provided. Object values are evaluated as provided; no OpenAPI schema
-// validation or defaulting is applied.
+// fields. Registered Kubernetes resources are decoded using the client-go
+// scheme; unknown resources remain unstructured. No OpenAPI schema validation,
+// conversion, or defaulting is applied.
 func ParseAdmissionInput(yamlContent string) (*AdmissionInput, error) {
 	return parseAdmissionInput([]byte(yamlContent))
 }
