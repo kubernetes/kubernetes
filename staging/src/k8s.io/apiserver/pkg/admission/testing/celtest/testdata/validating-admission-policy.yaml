@@ -1,0 +1,14 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+spec:
+  paramKind:
+    apiVersion: v1
+    kind: ConfigMap
+  matchConditions:
+    - name: enabled
+      expression: "params.data.enabled == 'true'"
+  validations:
+    - expression: "true"
+  auditAnnotations:
+    - key: pod-name
+      valueExpression: "string(object.metadata.name)"
