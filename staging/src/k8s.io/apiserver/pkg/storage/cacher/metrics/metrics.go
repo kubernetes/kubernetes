@@ -50,18 +50,18 @@ const (
 	// and when it is first processed by the cacher's reflector loop.
 	StageStorageToCache
 
-	// StageCacheToWatcher: watch.Event built -> written to watcher's result channel.
+	// StageWatcherToClientHandler: watch.Event built -> written to watcher's result channel.
 	// Captures time spent blocked handing the event off to the client,
 	// i.e. downstream (result channel) backpressure.
-	StageCacheToWatcher
+	StageWatcherToClientHandler
 
 	numDispatchStages
 )
 
 var dispatchStageName = [numDispatchStages]string{
-	StageTotal:          "total",
-	StageStorageToCache: "storage_to_cache",
-	StageCacheToWatcher: "cache_to_watcher",
+	StageTotal:                  "total",
+	StageStorageToCache:         "storage_to_cache",
+	StageWatcherToClientHandler: "watcher_to_client_handler",
 }
 
 /*
