@@ -315,7 +315,10 @@ func (c *csiDriverClient) NodeExpandVolume(ctx context.Context, opts csiResizeOp
 		return opts.newSize, errors.New("missing volume path")
 	}
 
-	if opts.newSize.Value() < 0 {
+	// Use Sign rather than Value to test for a negative size. Value can overflow
+	// an int64, and on overflow it does not preserve the sign, so a negative
+	// quantity such as "-9.5Gi" reports a positive Value and slips past the check.
+	if opts.newSize.Sign() < 0 {
 		return opts.newSize, errors.New("size can not be less than 0")
 	}
 
