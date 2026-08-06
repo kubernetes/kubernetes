@@ -18,6 +18,7 @@ package store
 
 import (
 	"fmt"
+	"iter"
 	"strings"
 	"sync"
 
@@ -43,13 +44,7 @@ type threadedStoreIndexer struct {
 	indexer indexer
 }
 
-var _ Snapshot = (*threadedStoreIndexer)(nil)
-
-func (si *threadedStoreIndexer) Count(prefix, continueKey string) (count int) {
-	si.lock.RLock()
-	defer si.lock.RUnlock()
-	return si.store.Count(prefix, continueKey)
-}
+var _ Reader = (*threadedStoreIndexer)(nil)
 
 func (si *threadedStoreIndexer) Clone() Snapshot {
 	// Clone should not be called concurrently.
@@ -257,18 +252,28 @@ func (s *btreeStore) getByKey(key string) (item interface{}, exists bool, err er
 }
 
 func (s *btreeStore) OrderedListPrefix(prefix, continueKey string) ([]interface{}, error) {
+	var result []interface{}
+	for elem, err := range s.RangePrefix(prefix, continueKey) {
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, elem)
+	}
+	return result, nil
+}
+
+func (s *btreeStore) RangePrefix(prefix, continueKey string) iter.Seq2[*Element, error] {
 	if continueKey == "" {
 		continueKey = prefix
 	}
-	var result []interface{}
-	s.tree.AscendGreaterOrEqual(&Element{Key: continueKey}, func(item *Element) bool {
-		if !strings.HasPrefix(item.Key, prefix) {
-			return false
-		}
-		result = append(result, item)
-		return true
-	})
-	return result, nil
+	return func(yield func(*Element, error) bool) {
+		s.tree.AscendGreaterOrEqual(&Element{Key: continueKey}, func(item *Element) bool {
+			if !strings.HasPrefix(item.Key, prefix) {
+				return false
+			}
+			return yield(item, nil)
+		})
+	}
 }
 
 func (s *btreeStore) Count(prefix, continueKey string) (count int) {

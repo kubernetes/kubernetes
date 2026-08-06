@@ -2322,27 +2322,6 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 	}
 }
 
-type fakeStorage struct {
-	pods []example.Pod
-	storage.Interface
-}
-
-func newObjectStorage(fakePods []example.Pod) *fakeStorage {
-	return &fakeStorage{
-		pods: fakePods,
-	}
-}
-
-func (m fakeStorage) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	podList := listObj.(*example.PodList)
-	podList.ListMeta = metav1.ListMeta{ResourceVersion: "12345"}
-	podList.Items = m.pods
-	return nil
-}
-func (m fakeStorage) Watch(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error) {
-	return cachertesting.NewMockWatch(), nil
-}
-
 func BenchmarkCacher_GetList(b *testing.B) {
 	testCases := []struct {
 		totalObjectNum  int
@@ -2390,14 +2369,7 @@ func BenchmarkCacher_GetList(b *testing.B) {
 				}
 
 				// build test cacher
-				store := newObjectStorage(fakePods)
-				cacher, _, err := newTestCacher(store)
-				if err != nil {
-					b.Fatalf("new cacher: %v", err)
-				}
-				defer cacher.Stop()
-				delegator := NewCacheDelegator(cacher, store)
-				defer delegator.Stop()
+				delegator := newDelegatorWithPods(b, fakePods)
 
 				// prepare result and pred
 				parsedField, err := fields.ParseSelector("spec.nodeName=node-0")
@@ -2484,6 +2456,67 @@ func BenchmarkCacher_GetList_AllPods(b *testing.B) {
 		if len(result.Items) != totalObjectNum {
 			b.Fatalf("expect %d but got %d", totalObjectNum, len(result.Items))
 		}
+	}
+}
+
+// BenchmarkCacher_GetList_LabelSelector measures LIST from the watch cache with
+// a label selector, both unpaginated and paginated, at two selectivities. The
+// selector cannot be served by an index, so every item in the requested range
+// is a candidate the cache must filter.
+func BenchmarkCacher_GetList_LabelSelector(b *testing.B) {
+	const totalObjectNum = 50_000
+	testCases := []struct {
+		matchPercent int
+		limit        int64
+	}{
+		{matchPercent: 10, limit: 0},
+		{matchPercent: 10, limit: 100},
+		{matchPercent: 100, limit: 0},
+		{matchPercent: 100, limit: 500},
+	}
+	for _, tc := range testCases {
+		b.Run(fmt.Sprintf("Objects=%d/MatchPercent=%d/Limit=%d", totalObjectNum, tc.matchPercent, tc.limit), func(b *testing.B) {
+			pods := benchmarkPods(totalObjectNum)
+			for i := range pods {
+				if i%100 < tc.matchPercent {
+					pods[i].Labels = map[string]string{"tier": "hot"}
+				}
+			}
+			expectedObjectNum := totalObjectNum * tc.matchPercent / 100
+			delegator := newDelegatorWithPods(b, pods)
+			selector := labels.SelectorFromSet(labels.Set{"tier": "hot"})
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				opts := storage.ListOptions{
+					Predicate: storage.SelectionPredicate{
+						Label: selector,
+						Field: fields.Everything(),
+						Limit: tc.limit,
+					},
+					Recursive:            true,
+					ResourceVersion:      "12345",
+					ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+				}
+				objects := 0
+				for {
+					result := &example.PodList{}
+					if err := delegator.GetList(context.TODO(), "/pods/", opts, result); err != nil {
+						b.Fatalf("GetList cache: %v", err)
+					}
+					objects += len(result.Items)
+					if result.Continue == "" {
+						break
+					}
+					opts.Predicate.Continue = result.Continue
+					opts.ResourceVersion = ""
+					opts.ResourceVersionMatch = ""
+				}
+				if objects != expectedObjectNum {
+					b.Fatalf("expect %d but got %d", expectedObjectNum, objects)
+				}
+			}
+		})
 	}
 }
 

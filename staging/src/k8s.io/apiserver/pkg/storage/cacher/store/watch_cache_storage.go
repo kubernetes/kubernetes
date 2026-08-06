@@ -18,6 +18,7 @@ package store
 
 import (
 	"fmt"
+	"iter"
 	"sort"
 	"sync/atomic"
 
@@ -60,10 +61,10 @@ type WatchCacheStorage struct {
 	snapshottingEnabled atomic.Bool
 }
 
-// StoreLocked returns the live store as a Snapshot.
+// StoreLocked returns the live store as a Reader.
 // Unlike GetExactSnapshotLocked this is not an immutable point-in-time copy.
 // The caller must hold the lock for the duration of use.
-func (w *WatchCacheStorage) StoreLocked() Snapshot {
+func (w *WatchCacheStorage) StoreLocked() Reader {
 	return w.store
 }
 
@@ -124,6 +125,12 @@ func orderedSnapshotResponseFromIndexer(indexer Indexer, key, continueKey string
 	return orderedListSnapshot{Items: items}, nil
 }
 
+// NewOrderedListSnapshot wraps an already ordered range as a Snapshot; it
+// answers with all of its items regardless of the prefix/continueKey asked.
+func NewOrderedListSnapshot(items []interface{}) Snapshot {
+	return orderedListSnapshot{Items: items}
+}
+
 type orderedListSnapshot struct {
 	Items []interface{}
 }
@@ -144,11 +151,31 @@ func (o orderedListSnapshot) OrderedListPrefix(prefix, continueKey string) ([]in
 	return o.Items, nil
 }
 
+func (o orderedListSnapshot) RangePrefix(prefix, continueKey string) iter.Seq2[*Element, error] {
+	return func(yield func(*Element, error) bool) {
+		for _, item := range o.Items {
+			elem, ok := item.(*Element)
+			if !ok {
+				yield(nil, fmt.Errorf("non *Element returned from storage: %v", item))
+				return
+			}
+			if !yield(elem, nil) {
+				return
+			}
+		}
+	}
+}
+
+func (o orderedListSnapshot) Count(prefix, continueKey string) int {
+	return len(o.Items)
+}
+
+// listSnapshot serves an unordered index bucket.
 type listSnapshot struct {
 	Items []interface{}
 }
 
-var _ Snapshot = (*listSnapshot)(nil)
+var _ Snapshot = listSnapshot{}
 
 func (l listSnapshot) GetByKey(key string) (interface{}, bool, error) {
 	for _, item := range l.Items {
@@ -177,6 +204,42 @@ func (l listSnapshot) OrderedListPrefix(prefix string, continueKey string) ([]in
 	}
 	sort.Sort(sortableStoreElements(result))
 	return result, nil
+}
+
+func (l listSnapshot) RangePrefix(prefix, continueKey string) iter.Seq2[*Element, error] {
+	return func(yield func(*Element, error) bool) {
+		items, err := l.OrderedListPrefix(prefix, continueKey)
+		if err != nil {
+			yield(nil, err)
+			return
+		}
+		for _, item := range items {
+			// OrderedListPrefix has already checked every item is an *Element.
+			if !yield(item.(*Element), nil) {
+				return
+			}
+		}
+	}
+}
+
+// Count returns the number of items RangePrefix(prefix, continueKey) would
+// yield, by applying its filter without allocating or sorting.
+func (l listSnapshot) Count(prefix, continueKey string) int {
+	count := 0
+	for _, item := range l.Items {
+		elem, ok := item.(*Element)
+		if !ok {
+			continue
+		}
+		if len(continueKey) > 0 && continueKey >= elem.Key {
+			continue
+		}
+		if !key.HasPathPrefix(elem.Key, prefix) {
+			continue
+		}
+		count++
+	}
+	return count
 }
 
 type sortableStoreElements []interface{}
