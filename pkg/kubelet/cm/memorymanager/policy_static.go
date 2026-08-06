@@ -685,37 +685,37 @@ func (p *staticPolicy) releaseMemory(s state.State, blocks []state.Block) {
 	s.SetMachineState(machineState)
 }
 
-func regenerateHints(logger klog.Logger, pod *v1.Pod, ctn *v1.Container, ctnBlocks []state.Block, reqRsrc map[v1.ResourceName]uint64) map[string][]topologymanager.TopologyHint {
+func regenerateHints(logger klog.Logger, pod *v1.Pod, blocks []state.Block, reqRsrc map[v1.ResourceName]uint64) map[string][]topologymanager.TopologyHint {
 	hints := map[string][]topologymanager.TopologyHint{}
 	for resourceName := range reqRsrc {
 		hints[string(resourceName)] = []topologymanager.TopologyHint{}
 	}
 
-	if len(ctnBlocks) != len(reqRsrc) {
-		logger.Info("The number of requested resources by the container differs from the number of memory blocks", "containerName", ctn.Name)
+	if len(blocks) != len(reqRsrc) {
+		logger.Info("The number of requested resources differs from the number of memory blocks")
 		return nil
 	}
 
-	for _, b := range ctnBlocks {
+	for _, b := range blocks {
 		if _, ok := reqRsrc[b.Type]; !ok {
-			logger.Info("Container requested resources but none available of this type", "containerName", ctn.Name, "type", b.Type)
+			logger.Info("Requested resources do not include the allocated memory block type", "type", b.Type)
 			return nil
 		}
 
 		if b.Size != reqRsrc[b.Type] {
-			logger.Info("Memory already allocated with different numbers than requested", "containerName", ctn.Name, "type", b.Type, "requestedResource", reqRsrc[b.Type], "allocatedSize", b.Size)
+			logger.Info("Memory already allocated with a different size than requested", "type", b.Type, "requestedResource", reqRsrc[b.Type], "allocatedSize", b.Size)
 			return nil
 		}
 
-		containerNUMAAffinity, err := bitmask.NewBitMask(b.NUMAAffinity...)
+		numaAffinity, err := bitmask.NewBitMask(b.NUMAAffinity...)
 		if err != nil {
-			logger.Error(err, "Failed to generate NUMA bitmask", "containerName", ctn.Name, "type", b.Type)
+			logger.Error(err, "Failed to generate NUMA bitmask", "type", b.Type)
 			return nil
 		}
 
-		logger.Info("Regenerating TopologyHints, resource was already allocated to pod", "resourceName", b.Type, "podUID", pod.UID, "containerName", ctn.Name)
+		logger.Info("Regenerating TopologyHints, resource was already allocated to pod", "resourceName", b.Type, "podUID", pod.UID)
 		hints[string(b.Type)] = append(hints[string(b.Type)], topologymanager.TopologyHint{
-			NUMANodeAffinity: containerNUMAAffinity,
+			NUMANodeAffinity: numaAffinity,
 			Preferred:        true,
 		})
 	}
@@ -841,13 +841,25 @@ func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, po
 		return nil
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		podBlocks := s.GetPodMemoryBlocks(string(pod.UID))
+		if podBlocks != nil {
+			return regenerateHints(klog.LoggerWithValues(logger, "allocationScope", "pod"), pod, podBlocks, reqRsrcs)
+		}
+	}
+
 	for _, ctn := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		containerBlocks := s.GetMemoryBlocks(string(pod.UID), ctn.Name)
 		// Short circuit to regenerate the same hints if there are already
 		// memory allocated for the container. This might happen after a
 		// kubelet restart, for example.
 		if containerBlocks != nil {
-			return regenerateHints(logger, pod, &ctn, containerBlocks, reqRsrcs)
+			containerRequestedResources, err := getContainerRequestedResources(logger, pod, &ctn)
+			if err != nil {
+				logger.Error(err, "Failed to get container requested resources", "podUID", pod.UID, "containerName", ctn.Name)
+				return nil
+			}
+			return regenerateHints(klog.LoggerWithValues(logger, "allocationScope", "container", "containerName", ctn.Name), pod, containerBlocks, containerRequestedResources)
 		}
 	}
 
@@ -890,7 +902,7 @@ func (p *staticPolicy) GetTopologyHints(logger klog.Logger, s state.State, pod *
 	// memory allocated for the container. This might happen after a
 	// kubelet restart, for example.
 	if containerBlocks != nil {
-		return regenerateHints(logger, pod, container, containerBlocks, requestedResources)
+		return regenerateHints(klog.LoggerWithValues(logger, "allocationScope", "container", "containerName", container.Name), pod, containerBlocks, requestedResources)
 	}
 
 	return p.calculateHints(s.GetMachineState(), pod, requestedResources)

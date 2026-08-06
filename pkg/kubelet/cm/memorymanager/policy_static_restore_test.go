@@ -49,6 +49,7 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 		podMemoryRequest                string
 		containers                      []containerSpec
 		expectPodBlocks                 bool
+		expectedAffinity                []int
 	}{
 		{
 			description:                     "PodLevelResources and PodLevelResourceManagers enabled",
@@ -58,7 +59,20 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 			containers: []containerSpec{
 				{name: "container1", memRequest: "100Mi", memLimit: "100Mi"},
 			},
-			expectPodBlocks: true,
+			expectPodBlocks:  true,
+			expectedAffinity: []int{0},
+		},
+		{
+			description:                     "Pod topology hint is restored from a multi-container pod allocation",
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			podMemoryRequest:                "128Mi",
+			containers: []containerSpec{
+				{name: "container1", memRequest: "50Mi", memLimit: "50Mi"},
+				{name: "container2", memRequest: "50Mi", memLimit: "50Mi"},
+			},
+			expectPodBlocks:  true,
+			expectedAffinity: []int{0},
 		},
 		{
 			description:                     "PodLevelResources enabled, PodLevelResourceManagers disabled",
@@ -79,7 +93,8 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 				{name: "container1", memRequest: "100Mi", memLimit: "100Mi"},
 				{name: "container2", memRequest: "100Mi", memLimit: "100Mi"},
 			},
-			expectPodBlocks: false,
+			expectPodBlocks:  false,
+			expectedAffinity: []int{0},
 		},
 		{
 			description:                     "Container-level pod, features disabled",
@@ -90,7 +105,8 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 				{name: "container1", memRequest: "100Mi", memLimit: "100Mi"},
 				{name: "container2", memRequest: "100Mi", memLimit: "100Mi"},
 			},
-			expectPodBlocks: false,
+			expectPodBlocks:  false,
+			expectedAffinity: []int{0},
 		},
 	}
 
@@ -184,6 +200,25 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 				}
 			} else if len(podBlocksRestored) > 0 {
 				t.Errorf("expected no pod memory blocks after restore, but got some")
+			}
+
+			hints := mgr2.GetPodTopologyHints(logger, pod, lifecycle.AddOperation)
+			memoryHints := hints[string(v1.ResourceMemory)]
+			if tc.expectedAffinity == nil {
+				if len(memoryHints) != 0 {
+					t.Fatalf("expected no restored memory hint, got %v", memoryHints)
+				}
+			} else {
+				if len(memoryHints) != 1 {
+					t.Fatalf("expected one restored memory hint, got %v", memoryHints)
+				}
+				if !memoryHints[0].Preferred {
+					t.Error("expected restored memory hint to be preferred")
+				}
+				expectedAffinity := newNUMAAffinity(tc.expectedAffinity...)
+				if !memoryHints[0].NUMANodeAffinity.IsEqual(expectedAffinity) {
+					t.Errorf("expected restored memory hint affinity %v, got %v", expectedAffinity, memoryHints[0].NUMANodeAffinity)
+				}
 			}
 
 			// Verify containers restored
