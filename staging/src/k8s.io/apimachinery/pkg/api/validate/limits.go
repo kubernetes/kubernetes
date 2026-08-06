@@ -128,6 +128,17 @@ func Maximum[T constraints.Integer](_ context.Context, _ operation.Operation, fl
 	return nil
 }
 
+// MultipleOf verifies that the specified value is a multiple of divisor.
+func MultipleOf[T constraints.Integer](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T, divisor T) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	if *value%divisor != 0 {
+		return field.ErrorList{field.Invalid(fldPath, *value, content.MultipleOfError(divisor)).WithOrigin("multipleOf")}
+	}
+	return nil
+}
+
 // MinLength verifies that the specified value is at least min characters, if non-nil.
 func MinLength[T ~string](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T, min int) field.ErrorList {
 	if value == nil {

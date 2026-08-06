@@ -677,3 +677,105 @@ func TestMinLength(t *testing.T) {
 		})
 	}
 }
+
+func TestMultipleOf(t *testing.T) {
+	testMultipleOfPositive[int](t)
+	testMultipleOfNegative[int](t)
+	testMultipleOfPositive[int8](t)
+	testMultipleOfNegative[int8](t)
+	testMultipleOfPositive[int16](t)
+	testMultipleOfNegative[int16](t)
+	testMultipleOfPositive[int32](t)
+	testMultipleOfNegative[int32](t)
+	testMultipleOfPositive[int64](t)
+	testMultipleOfNegative[int64](t)
+
+	testMultipleOfPositive[uint](t)
+	testMultipleOfPositive[uint8](t)
+	testMultipleOfPositive[uint16](t)
+	testMultipleOfPositive[uint32](t)
+	testMultipleOfPositive[uint64](t)
+}
+
+type multipleOfTestCase[T constraints.Integer] struct {
+	divisor  T
+	value    T
+	wantErrs field.ErrorList
+}
+
+func testMultipleOfPositive[T constraints.Integer](t *testing.T) {
+	t.Helper()
+	cases := []multipleOfTestCase[T]{{
+		divisor: 5,
+		value:   0,
+	}, {
+		divisor: 5,
+		value:   5,
+	}, {
+		divisor: 5,
+		value:   10,
+	}, {
+		divisor: 5,
+		value:   1,
+		wantErrs: field.ErrorList{
+			field.Invalid(field.NewPath("fldpath"), nil, "must be a multiple of").WithOrigin("multipleOf"),
+		},
+	}, {
+		divisor: 5,
+		value:   3,
+		wantErrs: field.ErrorList{
+			field.Invalid(field.NewPath("fldpath"), nil, "must be a multiple of").WithOrigin("multipleOf"),
+		},
+	}, {
+		divisor: 1000,
+		value:   1000,
+	}, {
+		divisor: 1000,
+		value:   2000,
+	}, {
+		divisor: 1000,
+		value:   999,
+		wantErrs: field.ErrorList{
+			field.Invalid(field.NewPath("fldpath"), nil, "must be a multiple of").WithOrigin("multipleOf"),
+		},
+	}}
+	doTestMultipleOf[T](t, cases)
+}
+
+func testMultipleOfNegative[T constraints.Signed](t *testing.T) {
+	t.Helper()
+	cases := []multipleOfTestCase[T]{{
+		divisor: 5,
+		value:   -5,
+	}, {
+		divisor: 5,
+		value:   -10,
+	}, {
+		divisor: 5,
+		value:   -1,
+		wantErrs: field.ErrorList{
+			field.Invalid(field.NewPath("fldpath"), nil, "must be a multiple of").WithOrigin("multipleOf"),
+		},
+	}, {
+		divisor: 5,
+		value:   -3,
+		wantErrs: field.ErrorList{
+			field.Invalid(field.NewPath("fldpath"), nil, "must be a multiple of").WithOrigin("multipleOf"),
+		},
+	}}
+
+	doTestMultipleOf[T](t, cases)
+}
+
+func doTestMultipleOf[T constraints.Integer](t *testing.T, cases []multipleOfTestCase[T]) {
+	t.Helper()
+	matcher := field.ErrorMatcher{}.ByOrigin().ByDetailSubstring().ByField().ByType()
+	for _, tc := range cases {
+		name := fmt.Sprintf("%T (%v %% %v == 0)", tc.value, tc.value, tc.divisor)
+		t.Run(name, func(t *testing.T) {
+			v := tc.value
+			gotErrs := MultipleOf(context.Background(), operation.Operation{}, field.NewPath("fldpath"), &v, nil, tc.divisor)
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}
