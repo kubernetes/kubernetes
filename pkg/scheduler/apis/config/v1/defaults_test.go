@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/feature"
 	componentbaseconfig "k8s.io/component-base/config/v1alpha1"
 	"k8s.io/component-base/featuregate"
@@ -926,5 +928,24 @@ func TestPluginArgsDefaults(t *testing.T) {
 				t.Errorf("Got unexpected defaults (-want, +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestPluginsNames(t *testing.T) {
+	plugins := &configv1.Plugins{}
+	val := reflect.ValueOf(plugins).Elem()
+
+	want := sets.New[string]()
+	for i := 0; i < val.NumField(); i++ {
+		name := val.Type().Field(i).Name
+		val.Field(i).Set(reflect.ValueOf(configv1.PluginSet{
+			Enabled: []configv1.Plugin{{Name: name}},
+		}))
+		want.Insert(name)
+	}
+
+	gotNames := pluginsNames(plugins)
+	if diff := cmp.Diff(sets.List(want), gotNames); diff != "" {
+		t.Errorf("pluginsNames() doesn't contain all extension points (-want,+got):\n%s", diff)
 	}
 }

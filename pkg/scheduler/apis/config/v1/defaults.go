@@ -59,6 +59,8 @@ func pluginsNames(p *configv1.Plugins) []string {
 		p.QueueSort,
 		p.PlacementGenerate,
 		p.PlacementScore,
+		p.PlacementFeasible,
+		p.PodGroupPostFilter,
 	}
 	n := sets.New[string]()
 	for _, e := range extensions {

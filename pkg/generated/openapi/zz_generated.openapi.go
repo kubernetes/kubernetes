@@ -74410,6 +74410,13 @@ func schema_k8sio_kube_scheduler_config_v1_Plugins(ref common.ReferenceCallback)
 							Ref:         ref(configv1.PluginSet{}.OpenAPIModelName()),
 						},
 					},
+					"placementFeasible": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PlacementFeasible is a list of plugins that should be invoked when evaluating if a placement is feasible for a pod group.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(configv1.PluginSet{}.OpenAPIModelName()),
+						},
+					},
 					"podGroupPostFilter": {
 						SchemaProps: spec.SchemaProps{
 							Description: "PodGroupPostFilter is a list of plugins that are invoked after the workload scheduling phase, but only when the PodGroup cannot be scheduled (equivalent to PostFilter for single pods).",
