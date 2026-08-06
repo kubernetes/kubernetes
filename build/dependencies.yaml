@@ -157,11 +157,7 @@ dependencies:
     refPaths:
     - path: test/conformance/image/Makefile
       match: BASE_IMAGE_VERSION\?=
-    - path: test/images/pets/peer-finder/BASEIMAGE
-      match: registry\.k8s\.io\/build-image\/debian-base-amd64:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
     - path: test/images/resource-consumer/BASEIMAGE
-      match: registry\.k8s\.io\/build-image\/debian-base-amd64:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
-    - path: test/images/pets/zookeeper-installer/BASEIMAGE
       match: registry\.k8s\.io\/build-image\/debian-base-amd64:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
     - path: test/images/nonroot/BASEIMAGE
       match: registry\.k8s\.io\/build-image\/debian-base-amd64:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
