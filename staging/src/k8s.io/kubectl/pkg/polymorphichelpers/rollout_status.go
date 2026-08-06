@@ -17,12 +17,17 @@ limitations under the License.
 package polymorphichelpers
 
 import (
+	"context"
 	"fmt"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
 )
 
@@ -32,11 +37,11 @@ type StatusViewer interface {
 }
 
 // StatusViewerFor returns a StatusViewer for the resource specified by kind.
-func StatusViewerFor(kind schema.GroupKind) (StatusViewer, error) {
+func StatusViewerFor(kind schema.GroupKind, client kubernetes.Interface) (StatusViewer, error) {
 	switch kind {
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("Deployment").GroupKind(),
 		appsv1.SchemeGroupVersion.WithKind("Deployment").GroupKind():
-		return &DeploymentStatusViewer{}, nil
+		return &DeploymentStatusViewer{client: client}, nil
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("DaemonSet").GroupKind(),
 		appsv1.SchemeGroupVersion.WithKind("DaemonSet").GroupKind():
 		return &DaemonSetStatusViewer{}, nil
@@ -47,7 +52,9 @@ func StatusViewerFor(kind schema.GroupKind) (StatusViewer, error) {
 }
 
 // DeploymentStatusViewer implements the StatusViewer interface.
-type DeploymentStatusViewer struct{}
+type DeploymentStatusViewer struct{
+	client kubernetes.Interface
+}
 
 // DaemonSetStatusViewer implements the StatusViewer interface.
 type DaemonSetStatusViewer struct{}
@@ -78,17 +85,54 @@ func (s *DeploymentStatusViewer) Status(obj runtime.Unstructured, revision int64
 			return "", false, fmt.Errorf("deployment %q exceeded its progress deadline", deployment.Name)
 		}
 		if deployment.Spec.Replicas != nil && deployment.Status.UpdatedReplicas < *deployment.Spec.Replicas {
-			return fmt.Sprintf("Waiting for deployment %q rollout to finish: %d out of %d new replicas have been updated...\n", deployment.Name, deployment.Status.UpdatedReplicas, *deployment.Spec.Replicas), false, nil
+			msg := fmt.Sprintf("Waiting for deployment %q rollout to finish: %d out of %d new replicas have been updated...\n", deployment.Name, deployment.Status.UpdatedReplicas, *deployment.Spec.Replicas)
+			return s.appendWarning(deployment, msg), false, nil
 		}
 		if deployment.Status.Replicas > deployment.Status.UpdatedReplicas {
-			return fmt.Sprintf("Waiting for deployment %q rollout to finish: %d old replicas are pending termination...\n", deployment.Name, deployment.Status.Replicas-deployment.Status.UpdatedReplicas), false, nil
+			msg := fmt.Sprintf("Waiting for deployment %q rollout to finish: %d old replicas are pending termination...\n", deployment.Name, deployment.Status.Replicas-deployment.Status.UpdatedReplicas)
+			return s.appendWarning(deployment, msg), false, nil
 		}
 		if deployment.Status.AvailableReplicas < deployment.Status.UpdatedReplicas {
-			return fmt.Sprintf("Waiting for deployment %q rollout to finish: %d of %d updated replicas are available...\n", deployment.Name, deployment.Status.AvailableReplicas, deployment.Status.UpdatedReplicas), false, nil
+			msg := fmt.Sprintf("Waiting for deployment %q rollout to finish: %d of %d updated replicas are available...\n", deployment.Name, deployment.Status.AvailableReplicas, deployment.Status.UpdatedReplicas)
+			return s.appendWarning(deployment, msg), false, nil
 		}
 		return fmt.Sprintf("deployment %q successfully rolled out\n", deployment.Name), true, nil
 	}
-	return fmt.Sprintf("Waiting for deployment spec update to be observed...\n"), false, nil
+	msg := fmt.Sprintf("Waiting for deployment spec update to be observed...\n")
+	return s.appendWarning(deployment, msg), false, nil
+}
+
+func (s *DeploymentStatusViewer) appendWarning(deployment *appsv1.Deployment, baseMsg string) string {
+	if s.client == nil {
+		return baseMsg
+	}
+
+	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+	if err != nil {
+		return baseMsg
+	}
+	pods, err := s.client.CoreV1().Pods(deployment.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
+	if err != nil {
+		return baseMsg
+	}
+
+	for _, pod := range pods.Items {
+		for _, cond := range pod.Status.Conditions {
+			if cond.Type == corev1.PodScheduled && cond.Status == corev1.ConditionFalse && cond.Reason == "Unschedulable" {
+				return fmt.Sprintf("%s (Warning: %s)\n", strings.TrimSpace(baseMsg), cond.Message)
+			}
+		}
+
+		for _, cStatus := range pod.Status.ContainerStatuses {
+			if cStatus.State.Waiting != nil {
+				reason := cStatus.State.Waiting.Reason
+				if reason == "ImagePullBackOff" || reason == "ErrImagePull" || reason == "CrashLoopBackOff" || reason == "CreateContainerConfigError" || reason == "CreateContainerError" {
+					return fmt.Sprintf("%s (Warning: %s - %s)\n", strings.TrimSpace(baseMsg), reason, cStatus.State.Waiting.Message)
+				}
+			}
+		}
+	}
+	return baseMsg
 }
 
 // Status returns a message describing daemon set status, and a bool value indicating if the status is considered done.
