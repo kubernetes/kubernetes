@@ -118,6 +118,36 @@ func TestExtractInto(t *testing.T) {
 			expectedOut:  map[string]interface{}{"status": map[string]interface{}{"replicas": int64(1)}},
 			subresource:  "status",
 		},
+		{
+			name:    "unstructured, manager owns fields absent from live object",
+			obj:     &unstructured.Unstructured{Object: map[string]interface{}{"spec": map[string]interface{}{"paused": true}}},
+			objType: parser.Type("io.k8s.api.apps.v1.Deployment"),
+			managedFields: []metav1.ManagedFieldsEntry{
+				applyFieldsEntry("mgr1", `{ "f:spec": { "f:replicas": {}}}`, ""),
+			},
+			fieldManager: "mgr1",
+			expectedOut:  map[string]interface{}{"spec": nil},
+		},
+		{
+			name:    "structured, manager owns fields absent from live object",
+			obj:     &fakeDeployment{Spec: fakeDeploymentSpec{Paused: true}},
+			objType: parser.Type("io.k8s.api.apps.v1.Deployment"),
+			managedFields: []metav1.ManagedFieldsEntry{
+				applyFieldsEntry("mgr1", `{ "f:spec": { "f:replicas": {}}}`, ""),
+			},
+			fieldManager: "mgr1",
+			expectedOut:  map[string]interface{}{"spec": map[string]interface{}{"replicas": nil}},
+		},
+		{
+			name:    "unstructured, manager owns only fields not present on live object",
+			obj:     &unstructured.Unstructured{Object: map[string]interface{}{}},
+			objType: parser.Type("io.k8s.api.apps.v1.Deployment"),
+			managedFields: []metav1.ManagedFieldsEntry{
+				applyFieldsEntry("mgr1", `{ "f:stringData": { "f:password": {}}}`, ""),
+			},
+			fieldManager: "mgr1",
+			expectedOut:  map[string]interface{}{},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
