@@ -165,7 +165,7 @@ func newTestManager() *manager {
 		&record.FakeRecorder{},
 	).(*manager)
 	// Don't actually execute probes.
-	m.prober.exec = fakeExecProber{probe.Success, nil}
+	m.prober.exec = fakeExecProber{probe.Success, "", nil}
 	return m
 }
 
@@ -177,11 +177,12 @@ func newTestWorker(m *manager, probeType probeType, probeSpec v1.Probe) *worker 
 
 type fakeExecProber struct {
 	result probe.Result
+	output string
 	err    error
 }
 
 func (p fakeExecProber) Probe(c exec.Cmd) (probe.Result, string, error) {
-	return p.result, "", p.err
+	return p.result, p.output, p.err
 }
 
 type syncExecProber struct {
