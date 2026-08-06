@@ -116,9 +116,10 @@ type VolumeManager interface {
 	WaitForUnmount(ctx context.Context, pod *v1.Pod) error
 
 	// WaitForAllPodsUnmount is a version of WaitForUnmount that blocks and
-	// waits until all the volumes belonging to all the pods are unmounted.
-	// An error is returned if there's at least one Pod with volumes not unmounted
-	// within the duration defined in podAttachAndMountTimeout.
+	// waits until all the volumes belonging to all the pods are unmounted and
+	// fully detached.
+	// An error is returned if volumes are not fully detached within the duration
+	// defined in podAttachAndMountTimeout.
 	WaitForAllPodsUnmount(ctx context.Context, pods []*v1.Pod) error
 
 	// GetMountedVolumesForPod returns a VolumeMap containing the volumes
@@ -535,18 +536,33 @@ func (vm *volumeManager) WaitForUnmount(ctx context.Context, pod *v1.Pod) error 
 }
 
 func (vm *volumeManager) WaitForAllPodsUnmount(ctx context.Context, pods []*v1.Pod) error {
-	if len(pods) == 0 {
-		return nil
+	if len(pods) > 0 {
+		funcs := make([]func() error, 0, len(pods))
+		for _, pod := range pods {
+			funcs = append(funcs, func() error {
+				return vm.WaitForUnmount(ctx, pod)
+			})
+		}
+
+		if err := utilerrors.AggregateGoroutines(funcs...); err != nil {
+			return err
+		}
 	}
 
-	funcs := make([]func() error, 0, len(pods))
-	for _, pod := range pods {
-		funcs = append(funcs, func() error {
-			return vm.WaitForUnmount(ctx, pod)
+	// Wait for all unmounted volumes to be fully detached.
+	err := wait.PollUntilContextTimeout(
+		ctx,
+		reconcilerLoopSleepPeriod,
+		podAttachAndMountTimeout,
+		true,
+		func(_ context.Context) (bool, error) {
+			return len(vm.actualStateOfWorld.GetUnmountedVolumes()) == 0, nil
 		})
+	if err != nil {
+		return fmt.Errorf("waiting for volumes to be fully detached: %w", err)
 	}
 
-	return utilerrors.AggregateGoroutines(funcs...)
+	return nil
 }
 
 func (vm *volumeManager) getVolumesNotInDSW(uniquePodName types.UniquePodName, expectedVolumes []string) []string {
