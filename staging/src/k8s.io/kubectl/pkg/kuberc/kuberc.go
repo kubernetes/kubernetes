@@ -247,14 +247,11 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 
 	for _, alias := range kuberc.Aliases {
 		p.aliases[alias.Name] = struct{}{}
-		if alias.Name != commandName {
-			continue
-		}
 
 		// do not allow shadowing built-ins
 		if _, _, err := rootCmd.Find([]string{alias.Name}); err == nil {
 			fmt.Fprintf(errOut, "Warning: Setting alias %q to a built-in command is not supported\n", alias.Name)
-			break
+			continue
 		}
 
 		commands := strings.Fields(alias.Command)
@@ -268,24 +265,24 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 		newCmd.Aliases = []string{}
 		aliasCmd := &newCmd
 
-		if alias.Name == commandName {
-			aliasArgs = &aliasing{
-				prependArgs:     alias.PrependArgs,
-				appendArgs:      alias.AppendArgs,
-				flags:           alias.Options,
-				command:         aliasCmd,
-				originalCommand: bytes.Buffer{},
-			}
-			aliasArgs.originalCommand.WriteString(alias.Command)
+		// register every defined alias on the root command, not just the one
+		// currently being invoked - making aliases discoverable in "help"
+		rootCmd.AddCommand(aliasCmd)
+
+		if alias.Name != commandName {
+			// this alias isn't the one being invoked; it has been registered
+			// above for suggestions - nothing more to do.
+			continue
 		}
 
-		if aliasArgs == nil {
-			// pursue with the current behavior.
-			// This might be a built-in command, external plugin, etc.
-			return args, nil
+		aliasArgs = &aliasing{
+			prependArgs:     alias.PrependArgs,
+			appendArgs:      alias.AppendArgs,
+			flags:           alias.Options,
+			command:         aliasCmd,
+			originalCommand: bytes.Buffer{},
 		}
-
-		rootCmd.AddCommand(aliasArgs.command)
+		aliasArgs.originalCommand.WriteString(alias.Command)
 
 		foundAliasCmd, _, err := rootCmd.Find([]string{commandName})
 		if err != nil {
