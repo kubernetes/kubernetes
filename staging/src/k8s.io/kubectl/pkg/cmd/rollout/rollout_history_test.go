@@ -18,6 +18,7 @@ package rollout
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"testing"
@@ -500,3 +501,73 @@ func TestValidate(t *testing.T) {
 		t.Fatalf("expected error %s, but got %s", expectedError, err.Error())
 	}
 }
+
+// errorWriter always returns an error on Write, used to simulate a broken pipe
+// or a closed downstream consumer.
+type errorWriter struct{ err error }
+
+func (w *errorWriter) Write(p []byte) (int, error) { return 0, w.err }
+
+func TestRolloutHistoryOutputWriteError(t *testing.T) {
+	ns := scheme.Codecs.WithoutConversion()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
+	encoder := ns.EncoderForVersion(info.Serializer, rolloutPauseGroupVersionEncoder)
+
+	tf.Client = &RolloutPauseRESTClient{
+		RESTClient: &fake.RESTClient{
+			GroupVersion:         rolloutPauseGroupVersionEncoder,
+			NegotiatedSerializer: ns,
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				switch p, m := req.URL.Path, req.Method; {
+				case p == "/namespaces/test/deployments/foo" && m == "GET":
+					responseDeployment := &appsv1.Deployment{}
+					responseDeployment.Name = "foo"
+					body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployment))))
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			}),
+		},
+	}
+
+	writeErr := fmt.Errorf("write error: broken pipe")
+	ew := &errorWriter{err: writeErr}
+
+	fhv := setupFakeHistoryViewer(t)
+	fhv.getHistoryFn = func(namespace, name string) (map[int64]runtime.Object, error) {
+		return map[int64]runtime.Object{
+			1: &appsv1.ReplicaSet{ObjectMeta: v1.ObjectMeta{Name: "rev1"}},
+			2: &appsv1.ReplicaSet{ObjectMeta: v1.ObjectMeta{Name: "rev2"}},
+		}, nil
+	}
+
+	streams := genericiooptions.NewTestIOStreamsDiscard()
+	streams.Out = ew
+	o := NewRolloutHistoryOptions(streams)
+
+	outputFormat := "yaml"
+	o.PrintFlags = &genericclioptions.PrintFlags{
+		JSONYamlPrintFlags: &genericclioptions.JSONYamlPrintFlags{
+			ShowManagedFields: true,
+		},
+		OutputFormat: &outputFormat,
+		OutputFlagSpecified: func() bool {
+			return true
+		},
+	}
+
+	if err := o.Complete(tf, nil, []string{"deployment/foo"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	err := o.Run()
+	if err == nil {
+		t.Fatal("expected an error from printer write failure, got nil")
+	}
+}
+
