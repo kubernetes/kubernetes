@@ -164,12 +164,42 @@ func NewDefinitionNamer(schemes ...*runtime.Scheme) *DefinitionNamer {
 	return ret
 }
 
-// GetDefinitionName returns the name and tags for a given definition
+// GetDefinitionName returns the name and tags for a given definition.
+//
+// For types that implement OpenAPIModelName(), the code generator and
+// NewDefinitionNamer both use the model name (e.g. "io.k8s.api.core.v1.Pod"),
+// so the direct lookup succeeds.
+//
+// For types that do NOT implement OpenAPIModelName(), there is a mismatch:
+//   - The code generator keys definitions by Go type path
+//     (e.g. "example.com/api/v1.MyType")
+//   - NewDefinitionNamer keys the GVK map by the REST-friendly form from
+//     ToOpenAPIDefinitionName (e.g. "com.example.api.v1.MyType")
+//
+// The fallback handles this by converting Go type paths to REST-friendly
+// names before retrying the GVK lookup. This also ensures definition names
+// never contain "/" (a JSON Pointer special character), which would cause
+// $ref mismatches in the OpenAPI spec.
+//
+// Before the OpenAPIModelName() migration, ToRESTFriendlyName was applied
+// unconditionally to all names. It cannot be applied unconditionally now
+// because it would mangle names already in REST-friendly form (reversing
+// the dot-separated segments). The "/" check distinguishes Go type paths
+// (need conversion) from model names (already correct).
 func (d *DefinitionNamer) GetDefinitionName(name string) (string, spec.Extensions) {
 	if groupVersionKinds, ok := d.typeGroupVersionKinds[name]; ok {
 		return name, spec.Extensions{
 			extensionGVK: groupVersionKinds.JSON(),
 		}
+	}
+	if strings.Contains(name, "/") {
+		restFriendlyName := util.ToRESTFriendlyName(name)
+		if groupVersionKinds, ok := d.typeGroupVersionKinds[restFriendlyName]; ok {
+			return restFriendlyName, spec.Extensions{
+				extensionGVK: groupVersionKinds.JSON(),
+			}
+		}
+		return restFriendlyName, nil
 	}
 	return name, nil
 }
