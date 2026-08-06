@@ -53,7 +53,7 @@ func (SimpleMetaFactory) Interpret(data []byte) (*schema.GroupVersionKind, error
 		Kind string `json:"kind,omitempty"`
 	}{}
 	if err := json.Unmarshal(data, &findKind); err != nil {
-		return nil, fmt.Errorf("couldn't get version/kind; json parse error: %v", err)
+		return nil, fmt.Errorf("couldn't get version/kind; json parse error: %w", err)
 	}
 	gv, err := schema.ParseGroupVersion(findKind.APIVersion)
 	if err != nil {

@@ -16,7 +16,11 @@ limitations under the License.
 
 package json
 
-import "testing"
+import (
+	"encoding/json"
+	"errors"
+	"testing"
+)
 
 func TestSimpleMetaFactoryInterpret(t *testing.T) {
 	factory := SimpleMetaFactory{}
@@ -41,5 +45,19 @@ func TestSimpleMetaFactoryInterpret(t *testing.T) {
 	_, err = factory.Interpret([]byte(`{`))
 	if err == nil {
 		t.Errorf("unexpected non-error")
+	}
+}
+
+func TestSimpleMetaFactoryInterpretInvalidKindType(t *testing.T) {
+	factory := SimpleMetaFactory{}
+	_, err := factory.Interpret([]byte(`{"kind":true}`))
+	if err == nil {
+		t.Fatalf("expected an error for invalid kind type, got nil")
+	}
+	// The underlying json error must be recoverable via errors.As so that
+	// callers can classify it as a client (4xx) error instead of a 500.
+	var typeErr *json.UnmarshalTypeError
+	if !errors.As(err, &typeErr) {
+		t.Errorf("expected wrapped *json.UnmarshalTypeError, got %T: %v", err, err)
 	}
 }
