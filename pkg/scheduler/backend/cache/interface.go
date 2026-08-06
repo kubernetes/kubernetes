@@ -162,6 +162,10 @@ type Cache interface {
 
 	// GetRootKeyForGroup returns the root key of the given EntityKey.
 	GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bool, error)
+
+	// GetRootGroup returns the RootGroup containing the root key, PodGroup/PodGroupState (if root is a PodGroup),
+	// or CompositePodGroup/CompositePodGroupState (if root is a CompositePodGroup) for the given EntityKey.
+	GetRootGroup(key fwk.EntityKey) (fwk.RootGroup, error)
 }
 
 // Dump is a dump of the cache state.

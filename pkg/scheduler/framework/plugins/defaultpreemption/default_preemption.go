@@ -177,30 +177,26 @@ func (pl *DefaultPreemption) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Sta
 			}
 			rootUID = pg.GetUID()
 		} else {
-			snapshot, err := pl.fh.PodGroupManager().BuildHierarchySnapshotFromPod(p)
 			// If the root group cannot be resolved, do not block the pod. It's not a default preemption responsibility
 			// to block pods from a pod group whose root group is missing from entering the queue.
+			podGroupKey := fwk.PodGroupKey(p.Namespace, *p.Spec.SchedulingGroup.PodGroupName)
+			rootGroup, err := pl.fh.PodGroupManager().GetRootGroup(podGroupKey)
 			if err != nil {
 				return nil
 			}
-			podGroupKey := fwk.PodGroupKey(p.Namespace, *p.Spec.SchedulingGroup.PodGroupName)
-			rootKey, ok, err := snapshot.GetRootKeyForGroup(podGroupKey)
-			if !ok || err != nil {
-				return nil
-			}
-			switch rootKey.Type {
+			switch rootGroup.Key.Type {
 			case fwk.PodGroupKeyType:
-				pg, err := snapshot.PodGroups().Get(rootKey.Namespace, rootKey.Name)
-				if err != nil {
+				if rootGroup.PodGroup == nil {
 					return nil
 				}
-				rootUID = pg.GetUID()
+				rootUID = rootGroup.PodGroup.GetUID()
 			case fwk.CompositePodGroupKeyType:
-				cpg, err := snapshot.CompositePodGroups().Get(rootKey.Namespace, rootKey.Name)
-				if err != nil {
+				if rootGroup.CompositePodGroup == nil {
 					return nil
 				}
-				rootUID = cpg.GetUID()
+				rootUID = rootGroup.CompositePodGroup.GetUID()
+			default:
+				return nil
 			}
 		}
 		if pl.Executor.IsPodGroupRunningPreemption(rootUID) {

@@ -932,7 +932,6 @@ func (cache *cacheImpl) updatePodGroupMember(logger klog.Logger, oldPod, newPod 
 		utilruntime.HandleErrorWithLogger(logger, nil, "Pod group state not found for update, this indicates a missed add event", "pod", klog.KObj(newPod), "fwk.EntityKey", key)
 		return
 	}
-
 	podGroupState.updatePod(oldPod, newPod)
 }
 
@@ -945,6 +944,7 @@ func (cache *cacheImpl) removePodGroupMember(pod *v1.Pod) {
 		return
 	}
 	podGroupState.deletePod(pod.UID)
+
 	if podGroupState.empty() {
 		// podGroupState can exist without the member pods, but when the PodGroup object exists.
 		// Only when there are no member pods and the PodGroup object is removed, the podGroupState can be removed.
@@ -962,6 +962,7 @@ func (cache *cacheImpl) assumePodGroupMember(pod *v1.Pod) {
 		podGroupState.allPods[pod.UID] = pod
 		cache.podGroupStates[key] = podGroupState
 	}
+
 	podGroupState.assumePod(pod)
 }
 
@@ -971,10 +972,10 @@ func (cache *cacheImpl) forgetPodGroupMember(logger klog.Logger, pod *v1.Pod) {
 	key := fwk.PodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
 	pgs, exists := cache.podGroupStates[key]
 	if !exists {
-		// This should not happen: the pod group state should have been already created by a prior pod add or assume action.
 		utilruntime.HandleErrorWithLogger(logger, nil, "Pod group state not found for forget, this indicates a missed add or assume event", "pod", klog.KObj(pod), "fwk.EntityKey", key)
 		return
 	}
+
 	pgs.forgetPod(pod.UID)
 }
 
@@ -1154,6 +1155,7 @@ func (cache *cacheImpl) AddPodGroup(podGroup *schedulingv1beta1.PodGroup) {
 		parent = newCompositePodGroupState()
 		cache.compositePodGroupStates[parentKey] = parent
 	}
+
 	parent.addChild(key)
 }
 
@@ -1246,6 +1248,7 @@ func (cache *cacheImpl) UpdateCompositePodGroup(logger klog.Logger, oldCPG, newC
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 	key := fwk.CompositePodGroupKey(newCPG.Namespace, newCPG.Name)
+
 	pgs, exists := cache.compositePodGroupStates[key]
 	if !exists {
 		// This should not happen: the pod group state should have been already created by a prior pod group add action.
@@ -1273,13 +1276,11 @@ func (cache *cacheImpl) RemoveCompositePodGroup(logger klog.Logger, cpg *schedul
 
 	if cpgs.compositePodGroup != nil && cpgs.compositePodGroup.Spec.ParentCompositePodGroupName != nil {
 		parentKey := fwk.CompositePodGroupKey(cpg.Namespace, *cpgs.compositePodGroup.Spec.ParentCompositePodGroupName)
-		parent, exists := cache.compositePodGroupStates[parentKey]
-		if !exists {
-			return
-		}
-		parent.removeChild(key)
-		if parent.empty() {
-			delete(cache.compositePodGroupStates, parentKey)
+		if parent, exists := cache.compositePodGroupStates[parentKey]; exists {
+			parent.removeChild(key)
+			if parent.empty() {
+				delete(cache.compositePodGroupStates, parentKey)
+			}
 		}
 	}
 
@@ -1372,12 +1373,7 @@ func (cache *cacheImpl) buildPodGroupStateSnapshotTree(key fwk.EntityKey, snapsh
 	return nil
 }
 
-// GetRootKeyForGroup returns the root key of the given EntityKey.
-// The key must be of PodGroupKey or CompositePodGroupKey type.
-func (cache *cacheImpl) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bool, error) {
-	cache.mu.RLock()
-	defer cache.mu.RUnlock()
-
+func (cache *cacheImpl) getRootKeyForGroupWithoutLock(key fwk.EntityKey) (fwk.EntityKey, bool, error) {
 	currentKey := key
 	visited := sets.New[fwk.EntityKey]()
 	for {
@@ -1416,5 +1412,55 @@ func (cache *cacheImpl) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bo
 		case fwk.PodKeyType:
 			return fwk.EntityKey{}, false, fmt.Errorf("pod key type not supported in GetRootKeyForGroup for %s", currentKey.String())
 		}
+	}
+}
+
+// GetRootKeyForGroup returns the root key of the given EntityKey.
+// The key must be of PodGroupKey or CompositePodGroupKey type.
+func (cache *cacheImpl) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bool, error) {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+
+	return cache.getRootKeyForGroupWithoutLock(key)
+}
+
+// GetRootGroup returns the RootGroup containing the root key, PodGroup/PodGroupState (if root is a PodGroup),
+// or CompositePodGroup/CompositePodGroupState (if root is a CompositePodGroup) for the given EntityKey.
+// It executes under a single cache read lock to ensure consistent state.
+func (cache *cacheImpl) GetRootGroup(key fwk.EntityKey) (fwk.RootGroup, error) {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+
+	rootKey, exists, err := cache.getRootKeyForGroupWithoutLock(key)
+	if err != nil {
+		return fwk.RootGroup{}, err
+	}
+	if !exists {
+		return fwk.RootGroup{}, fmt.Errorf("root group not found for %s", key.String())
+	}
+
+	switch rootKey.Type {
+	case fwk.PodGroupKeyType:
+		pgs, ok := cache.podGroupStates[rootKey]
+		if !ok || pgs.podGroup == nil {
+			return fwk.RootGroup{}, fmt.Errorf("pod group state not found for pod group %s", rootKey.String())
+		}
+		return fwk.RootGroup{
+			Key:           rootKey,
+			PodGroup:      pgs.podGroup,
+			PodGroupState: pgs,
+		}, nil
+	case fwk.CompositePodGroupKeyType:
+		cpgs, ok := cache.compositePodGroupStates[rootKey]
+		if !ok || cpgs.compositePodGroup == nil {
+			return fwk.RootGroup{}, fmt.Errorf("composite pod group state not found for pod group %s", rootKey.String())
+		}
+		return fwk.RootGroup{
+			Key:                    rootKey,
+			CompositePodGroup:      cpgs.compositePodGroup,
+			CompositePodGroupState: cpgs,
+		}, nil
+	default:
+		return fwk.RootGroup{}, fmt.Errorf("unsupported root key type %s for %s", rootKey.Type, key.String())
 	}
 }
