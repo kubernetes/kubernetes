@@ -434,6 +434,9 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		baseObj.Spec.JobTemplate.Spec.Template.Spec.EvictionResponders = responders
 		baseObj.Spec.JobTemplate.Spec.Template.Spec.SchedulingGroup = schedulingGroup
 	})
+	poddeclarativevalidation.RunDeclarativeValidateActiveDeadlineSecondsTestCases(t, ctx, registry.Strategy, field.NewPath("spec", "jobTemplate", "spec", "template", "spec"), new(mkCronJob()), func(baseObj *batch.CronJob, val *int64) {
+		baseObj.Spec.JobTemplate.Spec.Template.Spec.ActiveDeadlineSeconds = val
+	})
 }
 
 func tweakJobSchedulingBasic() func(*batch.CronJob) {
