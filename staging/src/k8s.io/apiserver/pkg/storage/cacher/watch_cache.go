@@ -68,8 +68,10 @@ type watchCacheEvent struct {
 	Key             string
 	ResourceVersion uint64
 	RecordTime      time.Time
-	// CacheReceived is the time the event was received by the cacher.
-	CacheReceived time.Time
+	// timeline carries the shared, pre-fan-out dispatch-lifecycle timestamps of
+	// this event (currently PointCacheReceived). Per-watcher points are filled in
+	// on delivery.
+	timeline metrics.DispatchTimeline
 }
 
 // watchCache implements a Store interface.
@@ -236,8 +238,9 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 		Key:             key,
 		ResourceVersion: resourceVersion,
 		RecordTime:      recordTime,
-		CacheReceived:   cacheReceived,
 	}
+	wcEvent.timeline.MarkAt(metrics.PointStorageDecoded, recordTime)
+	wcEvent.timeline.MarkAt(metrics.PointCacheReceived, cacheReceived)
 
 	// We can call w.storage.Get() outside of a critical section,
 	// because the w.storage itself is thread-safe and the only

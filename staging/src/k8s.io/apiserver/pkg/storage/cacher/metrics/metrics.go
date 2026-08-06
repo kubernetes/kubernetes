@@ -33,35 +33,49 @@ const (
 	subsystem = "watch_cache"
 )
 
-// DispatchStage identifies a single stage of an event's lifecycle as it moves
-// through the watch cache dispatch pipeline. It is used as the "stage" label
-// value on the dispatchStageDuration metric.
-//
-// StageTotal is the end-to-end latency of a successfully delivered event.
-// The remaining stages measure individual segments of that path.
-type DispatchStage int
+// DispatchPoint identifies a point in a watch event's dispatch lifecycle. The
+// duration between two points forms a labeled "stage" of the dispatch_duration
+// metric.
+type DispatchPoint int
 
 const (
-	// StageTotal: end-to-end, etcd decode -> written to the result channel.
-	StageTotal DispatchStage = iota
+	// PointStorageDecoded: the event was decoded from the storage backend (etcd).
+	PointStorageDecoded DispatchPoint = iota
+	// PointCacheReceived: the event was first processed by the cacher's reflector loop.
+	PointCacheReceived
+	// PointEventBuilt: the outgoing watch.Event was built (filter + convert).
+	PointEventBuilt
+	// PointSentToClient: the watch.Event was written to the watcher's result channel.
+	PointSentToClient
 
-	// StageStorageToCache: event decoded from etcd -> event received by cacher.
-	// Captures the delay between when an event is decoded from the storage backend
-	// and when it is first processed by the cacher's reflector loop.
-	StageStorageToCache
-
-	// StageCacheToWatcher: watch.Event built -> written to watcher's result channel.
-	// Captures time spent blocked handing the event off to the client,
-	// i.e. downstream (result channel) backpressure.
-	StageCacheToWatcher
-
-	numDispatchStages
+	numDispatchPoints
 )
 
-var dispatchStageName = [numDispatchStages]string{
-	StageTotal:          "total",
-	StageStorageToCache: "storage_to_cache",
-	StageCacheToWatcher: "cache_to_watcher",
+// DispatchTimeline records the timestamp at which each DispatchPoint was reached
+// for a single event delivery. Points that occur before fan-out are shared and
+// carried on the event; per-watcher points are filled in on delivery.
+//
+// Because DispatchTimeline is an array value, callers sharing a timeline across
+// goroutines (such as during watch event fan-out) should copy it by value
+// (e.g. tl := event.timeline) before calling MarkAt to avoid data races on
+// shared event state.
+type DispatchTimeline [numDispatchPoints]time.Time
+
+// MarkAt records a (previously captured) timestamp for the given point. Callers
+// pass their own time source so that the injectable clock and cross-goroutine
+// timestamps are respected.
+func (tl *DispatchTimeline) MarkAt(p DispatchPoint, t time.Time) { tl[p] = t }
+
+// dispatchStages declares the labeled intervals emitted from a DispatchTimeline.
+// Adding a stage is a single entry here; "total" spans the whole delivery. The
+// additive stages need not partition "total" (only a subset of points may be set).
+var dispatchStages = []struct {
+	label    string
+	from, to DispatchPoint
+}{
+	{"storage_to_cache", PointStorageDecoded, PointCacheReceived},
+	{"cache_to_watcher", PointEventBuilt, PointSentToClient},
+	{"total", PointStorageDecoded, PointSentToClient},
 }
 
 /*
@@ -352,24 +366,29 @@ func RecordsWatchCacheCapacityChange(groupResource schema.GroupResource, old, ne
 // WatcherMetricsObservers holds pre-resolved (group, resource) observers for
 // every dispatch stage, so the hot path never touches the label map.
 type WatcherMetricsObservers struct {
-	stageDurations [numDispatchStages]compbasemetrics.ObserverMetric
+	// stageDurations is indexed by position in dispatchStages.
+	stageDurations []compbasemetrics.ObserverMetric
 }
 
 // NewWatcherMetricsObservers creates a pre-resolved metrics observer for watch connections.
 func NewWatcherMetricsObservers(groupResource schema.GroupResource) *WatcherMetricsObservers {
-	o := &WatcherMetricsObservers{}
-	for s := range numDispatchStages {
-		o.stageDurations[s] = DispatchStageDuration.WithLabelValues(groupResource.Group, groupResource.Resource, dispatchStageName[s])
+	o := &WatcherMetricsObservers{stageDurations: make([]compbasemetrics.ObserverMetric, len(dispatchStages))}
+	for i, s := range dispatchStages {
+		o.stageDurations[i] = DispatchStageDuration.WithLabelValues(groupResource.Group, groupResource.Resource, s.label)
 	}
 	return o
 }
 
-// ObserveStage records the duration spent in the given dispatch stage.
-func (d *WatcherMetricsObservers) ObserveStage(stage DispatchStage, duration time.Duration) {
-	if stage < 0 || stage >= numDispatchStages {
-		return
+// ObserveTimeline emits the duration of every dispatch stage whose two endpoints
+// are both set on the timeline; stages with a missing endpoint are skipped.
+func (d *WatcherMetricsObservers) ObserveTimeline(tl *DispatchTimeline) {
+	for i, stage := range dispatchStages {
+		from, to := tl[stage.from], tl[stage.to]
+		if from.IsZero() || to.IsZero() {
+			continue
+		}
+		observe(d.stageDurations[i], to.Sub(from))
 	}
-	observe(d.stageDurations[stage], duration)
 }
 
 func observe(m compbasemetrics.ObserverMetric, duration time.Duration) {
@@ -387,9 +406,9 @@ var noopObs noopObserver
 
 // NewNoopWatcherMetricsObservers returns a metrics observers struct that does nothing.
 func NewNoopWatcherMetricsObservers() *WatcherMetricsObservers {
-	o := &WatcherMetricsObservers{}
-	for s := range o.stageDurations {
-		o.stageDurations[s] = noopObs
+	o := &WatcherMetricsObservers{stageDurations: make([]compbasemetrics.ObserverMetric, len(dispatchStages))}
+	for i := range o.stageDurations {
+		o.stageDurations[i] = noopObs
 	}
 	return o
 }
