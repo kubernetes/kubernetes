@@ -25,7 +25,6 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -251,11 +250,6 @@ func (c *NamingConditionController) sync(ctx context.Context, key string) error 
 	}
 	if err != nil {
 		return err
-	}
-
-	// Skip checking names if Spec and Status names are same.
-	if equality.Semantic.DeepEqual(inCustomResourceDefinition.Spec.Names, inCustomResourceDefinition.Status.AcceptedNames) {
-		return nil
 	}
 
 	acceptedNames, namingCondition, establishedCondition := c.calculateNamesAndConditions(inCustomResourceDefinition)
