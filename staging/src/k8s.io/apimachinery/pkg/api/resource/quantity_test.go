@@ -542,6 +542,10 @@ func TestQuantityParse(t *testing.T) {
 		"-3.01i",
 		"-3.01e-",
 
+		// an exponent outside the int32 scale is rejected rather than truncated
+		// to an unrelated value; 1e4294967297 would otherwise parse as 1e1
+		"1e4294967297",
+
 		// trailing whitespace is forbidden
 		" 1",
 		"1 ",
@@ -550,6 +554,34 @@ func TestQuantityParse(t *testing.T) {
 		_, err := ParseQuantity(item)
 		if err == nil {
 			t.Errorf("%v parsed unexpectedly", item)
+		}
+	}
+}
+
+func TestInterpretExponentInt32Bounds(t *testing.T) {
+	// interpret parses the exponent at 64 bits but stores it in an int32 scale
+	// that is later negated, so it accepts [-MaxInt32, MaxInt32] and rejects
+	// anything past it, instead of narrowing it to an unrelated value. This
+	// checks interpret's suffix-layer bounds only, not what the rest of
+	// ParseQuantity does with an accepted exponent.
+	cases := []struct {
+		suffix  string
+		wantExp int32
+		wantOK  bool
+	}{
+		{"e14", 14, true},
+		{"E2147483647", 2147483647, true},   // MaxInt32
+		{"E-2147483647", -2147483647, true}, // -MaxInt32
+		{"E2147483648", 0, false},           // MaxInt32 + 1
+		{"E-2147483648", 0, false},          // MinInt32; -MinInt32 overflows int32
+		{"E4294967297", 0, false},           // 2^32 + 1, truncates to 1 today
+		{"E6024865272343", 0, false},        // far past int32
+	}
+	for _, tc := range cases {
+		base, exp, format, ok := quantitySuffixer.interpret(suffix(tc.suffix))
+		if ok != tc.wantOK || (ok && (exp != tc.wantExp || base != 10 || format != DecimalExponent)) {
+			t.Errorf("interpret(%q) = (base=%d, exp=%d, %v, ok=%t), want exp=%d ok=%t",
+				tc.suffix, base, exp, format, ok, tc.wantExp, tc.wantOK)
 		}
 	}
 }
