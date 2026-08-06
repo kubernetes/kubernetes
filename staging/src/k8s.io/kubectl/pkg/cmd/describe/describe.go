@@ -21,9 +21,9 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
@@ -31,6 +31,7 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/describe"
+	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -108,6 +109,28 @@ func (flags *DescribeFlags) AddFlags(cmd *cobra.Command) {
 	cmdutil.AddChunkSizeFlag(cmd, &flags.DescriberSettings.ChunkSize)
 }
 
+type describeRESTMapper struct {
+	meta.RESTMapper
+}
+
+func (m *describeRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
+	mappings, err := m.RESTMapper.RESTMappings(gk)
+	if err != nil {
+		return m.RESTMapper.RESTMapping(gk, versions...)
+	}
+
+	versionsForGroup := scheme.Scheme.PrioritizedVersionsForGroup(gk.Group)
+	for _, gv := range versionsForGroup {
+		for _, mapping := range mappings {
+			if mapping.GroupVersionKind.GroupVersion() == gv {
+				return mapping, nil
+			}
+		}
+	}
+
+	return m.RESTMapper.RESTMapping(gk, versions...)
+}
+
 // ToOptions converts from CLI inputs to runtime input
 func (flags *DescribeFlags) ToOptions(parent string, args []string) (*DescribeOptions, error) {
 
@@ -131,11 +154,20 @@ func (flags *DescribeFlags) ToOptions(parent string, args []string) (*DescribeOp
 		return describe.DescriberFn(flags.Factory, mapping)
 	}
 
+	newBuilder := func() *resource.Builder {
+		builder := flags.Factory.NewBuilder()
+		mapper, err := flags.Factory.ToRESTMapper()
+		if err == nil {
+			builder.WithRESTMapper(&describeRESTMapper{mapper})
+		}
+		return builder
+	}
+
 	o := &DescribeOptions{
 		Selector:                flags.Selector,
 		Namespace:               namespace,
 		Describer:               describer,
-		NewBuilder:              flags.Factory.NewBuilder,
+		NewBuilder:              newBuilder,
 		BuilderArgs:             builderArgs,
 		EnforceNamespace:        enforceNamespace,
 		AllNamespaces:           flags.AllNamespaces,
@@ -186,6 +218,7 @@ func (o *DescribeOptions) Run() error {
 		ResourceTypeOrNameArgs(true, o.BuilderArgs...).
 		RequestChunksOf(o.DescriberSettings.ChunkSize).
 		Flatten().
+		Latest().
 		Do()
 	err := r.Err()
 	if err != nil {
@@ -217,7 +250,7 @@ func (o *DescribeOptions) Run() error {
 			errs.Insert(err.Error())
 			continue
 		}
-		s, err := describer.Describe(info.Namespace, info.Name, *o.DescriberSettings)
+		s, err := describer.Describe(info.Object, *o.DescriberSettings)
 		if err != nil {
 			if errs.Has(err.Error()) {
 				continue
@@ -272,7 +305,7 @@ func (o *DescribeOptions) DescribeMatchingResources(originalError error, resourc
 		info := infos[ix]
 		if strings.HasPrefix(info.Name, prefix) {
 			isFound = true
-			s, err := describer.Describe(info.Namespace, info.Name, *o.DescriberSettings)
+			s, err := describer.Describe(info.Object, *o.DescriberSettings)
 			if err != nil {
 				return err
 			}
