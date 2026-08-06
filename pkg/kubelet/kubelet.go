@@ -267,6 +267,7 @@ var (
 		topologymanager.ErrorTopologyAffinity,
 		nodeshutdown.NodeShutdownNotAdmittedReason,
 		volumemanager.VolumeAttachmentLimitExceededReason,
+		volumemanager.VolumeNodeAffinityReason,
 	)
 
 	// This is exposed for unit tests.
@@ -2228,10 +2229,9 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 
 	// Wait for volumes to attach/mount
 	if err := kl.volumeManager.WaitForAttachAndMount(ctx, pod); err != nil {
-		var volumeAttachLimitErr *volumemanager.VolumeAttachLimitExceededError
-		if errors.As(err, &volumeAttachLimitErr) {
-			kl.rejectPod(ctx, pod, volumemanager.VolumeAttachmentLimitExceededReason, volumeAttachLimitErr.Error())
-			recordAdmissionRejection(volumemanager.VolumeAttachmentLimitExceededReason)
+		if rejectErr, ok := errors.AsType[*volumemanager.RejectingPodError](err); ok {
+			kl.rejectPod(ctx, pod, rejectErr.Reason, rejectErr.Error())
+			recordAdmissionRejection(rejectErr.Reason)
 			return true, nil, nil
 		}
 		if !wait.Interrupted(err) {
