@@ -33,6 +33,7 @@ func TestNewFSPullRecordsAccessor(t *testing.T) {
 		initRoot        bool
 		initIntents     []string
 		initPulled      []string
+		initPreloaded   []string
 		modIntent       func(string) string
 		modPulledRecord func(string) string
 		wantErr         bool // TODO: do I ever want an error?
@@ -113,6 +114,14 @@ func TestNewFSPullRecordsAccessor(t *testing.T) {
 			},
 		},
 		{
+			name:     "only preloaded records",
+			initRoot: true,
+			initPreloaded: []string{
+				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
+				"sha256-0eeec2fec6456af3efdeaf15c8d3a64b2f3388b5f0df1f12e0ddcbb18aa664d3",
+			},
+		},
+		{
 			name:     "everything altogether",
 			initRoot: true,
 			initIntents: []string{
@@ -134,6 +143,10 @@ func TestNewFSPullRecordsAccessor(t *testing.T) {
 			modPulledRecord: func(intent string) string {
 				return strings.Replace(intent, "kubelet.config.k8s.io/v1alpha1", "kubelet.config.k8s.io/v1beta1", 1)
 			},
+			initPreloaded: []string{
+				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
+				"sha256-0eeec2fec6456af3efdeaf15c8d3a64b2f3388b5f0df1f12e0ddcbb18aa664d3",
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -145,6 +158,7 @@ func TestNewFSPullRecordsAccessor(t *testing.T) {
 
 			intentsDir := filepath.Join(kubeletDir, "image_manager", "pulling")
 			pulledRecordsDir := filepath.Join(kubeletDir, "image_manager", "pulled")
+			preloadedRecordsDir := filepath.Join(kubeletDir, "image_manager", "observed-preloaded")
 
 			expectedIntents := teeTestData(t, intentsDir, "pulling", tt.initIntents)
 			if tt.modIntent != nil {
@@ -158,6 +172,9 @@ func TestNewFSPullRecordsAccessor(t *testing.T) {
 					pulledRecordBytes[i] = tt.modPulledRecord(pulledRecordBytes[i])
 				}
 			}
+
+			// preloaded record currently only exist in the beta API so these should stay as-is
+			preloadedRecordBytes := teeTestData(t, preloadedRecordsDir, "observed-preloaded", tt.initPreloaded)
 
 			_, err := NewFSPullRecordsAccessor(logger, kubeletDir)
 			if (err != nil) != tt.wantErr {
@@ -184,6 +201,11 @@ func TestNewFSPullRecordsAccessor(t *testing.T) {
 
 			for pulled, expectedContent := range pulledRecordBytes {
 				filePath := filepath.Join(pulledRecordsDir, pulled)
+				testFileContentMatch(t, filePath, expectedContent)
+			}
+
+			for preloaded, expectedContent := range preloadedRecordBytes {
+				filePath := filepath.Join(preloadedRecordsDir, preloaded)
 				testFileContentMatch(t, filePath, expectedContent)
 			}
 		})
