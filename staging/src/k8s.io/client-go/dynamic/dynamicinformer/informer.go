@@ -77,9 +77,10 @@ func (f *dynamicSharedInformerFactory) ForResource(gvr schema.GroupVersionResour
 
 	key := gvr
 	informer, exists := f.informers[key]
-	if exists {
+	if exists && !informer.Informer().IsStopped() {
 		return informer
 	}
+	delete(f.startedInformers, key)
 
 	informer = NewFilteredDynamicInformer(f.client, gvr, f.namespace, f.defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 	f.informers[key] = informer
