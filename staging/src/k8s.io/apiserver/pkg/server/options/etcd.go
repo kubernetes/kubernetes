@@ -130,7 +130,8 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&s.EtcdServersOverrides, "etcd-servers-overrides", s.EtcdServersOverrides, ""+
 		"Per-resource etcd servers overrides, comma separated. The individual override "+
 		"format: group/resource#servers, where servers are URLs, semicolon separated. "+
-		"Note that this applies only to resources compiled into this server binary. "+
+		"This applies to resources compiled into this server binary as well as to "+
+		"custom resources served by it. "+
 		`e.g. "/pods#http://etcd4:2379;http://etcd5:2379,/events#http://etcd6:2379"`)
 
 	fs.StringVar(&s.DefaultStorageMediaType, "storage-media-type", s.DefaultStorageMediaType, ""+
