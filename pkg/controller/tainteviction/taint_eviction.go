@@ -113,7 +113,7 @@ func deletePodHandler(c clientset.Interface, emitEventFunc func(types.Namespaced
 			emitEventFunc(args.Object.NamespacedName)
 		}
 		var err error
-		for i := 0; i < retries; i++ {
+		for range retries {
 			err = addConditionAndDeletePod(ctx, c, name, ns)
 			if err == nil {
 				metrics.PodDeletionsTotal.Inc()
@@ -527,6 +527,35 @@ func (tc *Controller) handlePodUpdate(ctx context.Context, podUpdate podUpdateIt
 	if !ok {
 		return
 	}
+
+	// Revalidate only when the cached state would cause immediate eviction.
+	allTolerated, _ := v1helper.GetMatchingTolerations(
+		logger,
+		taints,
+		pod.Spec.Tolerations,
+	)
+	if !allTolerated {
+		node, err := tc.client.CoreV1().Nodes().Get(
+			ctx,
+			nodeName,
+			metav1.GetOptions{},
+		)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				tc.cancelWorkWithEvent(logger, podNamespacedName)
+				return
+			}
+			utilruntime.HandleError(fmt.Errorf("get live node %q: %w", nodeName, err))
+			return
+		}
+
+		taints = getNoExecuteTaints(node.Spec.Taints)
+		if len(taints) == 0 {
+			tc.cancelWorkWithEvent(logger, podNamespacedName)
+			return
+		}
+	}
+
 	tc.processPodOnNode(ctx, podNamespacedName, nodeName, pod.Spec.Tolerations, taints, time.Now())
 }
 
