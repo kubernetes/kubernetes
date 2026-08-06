@@ -36,27 +36,29 @@ import (
 //
 // The serialization format is:
 //
-// ```
-// <quantity>        ::= <signedNumber><suffix>
+// - `quantity`: `signedNumber suffix`
 //
-//	(Note that <suffix> may be empty, from the "" case in <decimalSI>.)
+// - `digit`: `0 | 1 | ... | 9`
 //
-// <digit>           ::= 0 | 1 | ... | 9
-// <digits>          ::= <digit> | <digit><digits>
-// <number>          ::= <digits> | <digits>.<digits> | <digits>. | .<digits>
-// <sign>            ::= "+" | "-"
-// <signedNumber>    ::= <number> | <sign><number>
-// <suffix>          ::= <binarySI> | <decimalExponent> | <decimalSI>
-// <binarySI>        ::= Ki | Mi | Gi | Ti | Pi | Ei
+// - `digits`: `digit | digit digits`
 //
-//	(International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)
+// - `number`: `digits | digits "." digits | digits "." | "." digits`
 //
-// <decimalSI>       ::= m | "" | k | M | G | T | P | E
+// - `sign`: `"+" | "-"`
 //
-//	(Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)
+// - `signedNumber`: `number | sign number`
 //
-// <decimalExponent> ::= "e" <signedNumber> | "E" <signedNumber>
-// ```
+// - `suffix`: `binarySI | decimalExponent | decimalSI`
+//
+// - `binarySI`: `Ki | Mi | Gi | Ti | Pi | Ei`
+//
+// - `decimalSI`: `m | "" | k | M | G | T | P | E`
+//
+// - `decimalExponent`: `("e" | "E") signedNumber`
+//
+// Note that suffix may be empty, from the "" case in decimalSI.
+// For binarySI, 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.
+// See http://physics.nist.gov/cuu/Units/binary.html.
 //
 // No matter which of the three exponent forms is used, no quantity may represent
 // a number greater than 2^63-1 in magnitude, nor may it have more than 3 decimal
@@ -72,7 +74,9 @@ import (
 // corresponding increase or decrease in Mantissa) such that:
 //
 // - No precision is lost
+//
 // - No fractional digits will be emitted
+//
 // - The exponent (or suffix) is as large as possible.
 //
 // The sign will be omitted unless the number is negative.
@@ -80,6 +84,7 @@ import (
 // Examples:
 //
 // - 1.5 will be serialized as "1500m"
+//
 // - 1.5Gi will be serialized as "1536Mi"
 //
 // Note that the quantity will NEVER be internally represented by a
