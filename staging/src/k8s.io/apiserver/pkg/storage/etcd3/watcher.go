@@ -62,7 +62,9 @@ const (
 // defaultWatcherMaxLimit is used to facilitate construction tests
 var defaultWatcherMaxLimit int64 = maxLimit
 
-// fatalOnDecodeError is used during testing to panic the server if watcher encounters a decoding error
+// fatalOnDecodeError is used during testing to panic the server if watcher encounters a decoding error.
+// It is only the default for watchers created from this point on: each watcher captures the value at
+// construction time, see watcher.fatalOnDecodeError.
 var fatalOnDecodeError atomic.Bool
 
 func init() {
@@ -79,6 +81,11 @@ type TestingTB interface {
 }
 
 // TestOnlySetFatalOnDecodeError should only be used for cases where decode errors are expected and need to be tested. e.g. conversion webhooks.
+//
+// The setting is captured by each watcher when it is constructed, so it must be called before the
+// storage under test is created. Watchers created while it is in effect keep the relaxed behavior
+// for their whole lifetime, including on event-processing goroutines that are still draining after
+// the test's cleanup has restored the previous value.
 func TestOnlySetFatalOnDecodeError(tb TestingTB, b bool) {
 	tb.Helper()
 	old := fatalOnDecodeError.Swap(b)
@@ -97,6 +104,14 @@ type watcher struct {
 	transformer              value.Transformer
 	getCurrentStorageRV      func(context.Context) (uint64, error)
 	getResourceSizeEstimator func() *resourceSizeEstimator
+
+	// fatalOnDecodeError is a snapshot of the package-level fatalOnDecodeError taken when this
+	// watcher was constructed. Watch events are decoded on goroutines that outlive the watch
+	// (see concurrentOrderedEventProcessing.scheduleEventProcessing), and in tests those
+	// goroutines can outlive the test that created the watcher. Reading the process-global
+	// value at decode time would let a decode error that one test legitimately expects panic
+	// the whole binary once another test has restored the global to true.
+	fatalOnDecodeError bool
 }
 
 // watchChan implements watch.Interface.
@@ -828,7 +843,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 		if err != nil {
 			return nil, nil, err
 		}
-		curObj, err = decodeObj(wc.watcher.codec, wc.watcher.versioner, data, e.rev)
+		curObj, err = decodeObj(wc.watcher.codec, wc.watcher.versioner, data, e.rev, wc.watcher.fatalOnDecodeError)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -845,7 +860,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 		}
 		// Note that this sends the *old* object with the etcd revision for the time at
 		// which it gets deleted.
-		oldObj, err = decodeObj(wc.watcher.codec, wc.watcher.versioner, data, e.rev)
+		oldObj, err = decodeObj(wc.watcher.codec, wc.watcher.versioner, data, e.rev, wc.watcher.fatalOnDecodeError)
 		if err != nil {
 			return nil, nil, wc.watcher.transformIfCorruptObjectError(e, err)
 		}
@@ -875,10 +890,10 @@ func (w *watcher) transformIfCorruptObjectError(e *event, err error) error {
 	return &corruptObjectDeletedError{err: corruptObjErr}
 }
 
-func decodeObj(codec runtime.Codec, versioner storage.Versioner, data []byte, rev int64) (_ runtime.Object, err error) {
+func decodeObj(codec runtime.Codec, versioner storage.Versioner, data []byte, rev int64, fatalOnDecodeError bool) (_ runtime.Object, err error) {
 	obj, err := runtime.Decode(codec, []byte(data))
 	if err != nil {
-		if fatalOnDecodeError.Load() {
+		if fatalOnDecodeError {
 			// we are running in a test environment and thus an
 			// error here is due to a coder mistake if the defer
 			// does not catch it
