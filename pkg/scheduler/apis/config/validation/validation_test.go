@@ -23,7 +23,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	componentbaseconfig "k8s.io/component-base/config"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
 	"k8s.io/utils/ptr"
@@ -196,8 +199,9 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 	invalidPlugins.Profiles[0].Plugins.Score.Enabled = append(invalidPlugins.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "GCEPDLimits"})
 
 	scenarios := map[string]struct {
-		config   *config.KubeSchedulerConfiguration
-		wantErrs field.ErrorList
+		featureOverrides featuregatetesting.FeatureOverrides
+		config           *config.KubeSchedulerConfiguration
+		wantErrs         field.ErrorList
 	}{
 		"good": {
 			config: validConfig,
@@ -253,6 +257,110 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 				&field.Error{
 					Type:  field.ErrorTypeInvalid,
 					Field: "percentageOfNodesToScore",
+				},
+			},
+		},
+		"percentage-of-placements-to-score-forbidden-with-tas-disabled": {
+			featureOverrides: featuregatetesting.FeatureOverrides{
+				features.TopologyAwareWorkloadScheduling: false,
+			},
+			config: setPercentageOfPlacementsToScore(validConfig, 50),
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeForbidden,
+					Field: "percentageOfPlacementsToScore",
+				},
+			},
+		},
+		"percentage-of-placements-to-score-lower-bound": {
+			featureOverrides: featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+			},
+			config: setPercentageOfPlacementsToScore(validConfig, 0),
+		},
+		"percentage-of-placements-to-score-upper-bound": {
+			featureOverrides: featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+			},
+			config: setPercentageOfPlacementsToScore(validConfig, 100),
+		},
+		"percentage-of-placements-to-score-greater-than-100": {
+			featureOverrides: featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+			},
+			config: setPercentageOfPlacementsToScore(validConfig, 101),
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "percentageOfPlacementsToScore",
+				},
+			},
+		},
+		"percentage-of-placements-to-score-less-than-0": {
+			featureOverrides: featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+			},
+			config: setPercentageOfPlacementsToScore(validConfig, -1),
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "percentageOfPlacementsToScore",
+				},
+			},
+		},
+		"profile-percentage-of-placements-to-score-forbidden-with-tas-disabled": {
+			featureOverrides: featuregatetesting.FeatureOverrides{
+				features.TopologyAwareWorkloadScheduling: false,
+			},
+			config: setProfilePercentageOfPlacementsToScore(validConfig, 50),
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeForbidden,
+					Field: "profiles[0].percentageOfPlacementsToScore",
+				},
+			},
+		},
+		"profile-percentage-of-placements-to-score-lower-bound": {
+			featureOverrides: featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+			},
+			config: setProfilePercentageOfPlacementsToScore(validConfig, 0),
+		},
+		"profile-percentage-of-placements-to-score-upper-bound": {
+			featureOverrides: featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+			},
+			config: setProfilePercentageOfPlacementsToScore(validConfig, 100),
+		},
+		"profile-percentage-of-placements-to-score-greater-than-100": {
+			featureOverrides: featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+			},
+			config: setProfilePercentageOfPlacementsToScore(validConfig, 101),
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "profiles[0].percentageOfPlacementsToScore",
+				},
+			},
+		},
+		"profile-percentage-of-placements-to-score-less-than-0": {
+			featureOverrides: featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+			},
+			config: setProfilePercentageOfPlacementsToScore(validConfig, -1),
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "profiles[0].percentageOfPlacementsToScore",
 				},
 			},
 		},
@@ -401,6 +509,7 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, scenario.featureOverrides)
 			errs := ValidateKubeSchedulerConfiguration(scenario.config)
 			diff := cmp.Diff(scenario.wantErrs.ToAggregate(), errs, ignoreBadValueDetail)
 			if diff != "" {
@@ -408,4 +517,16 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 			}
 		})
 	}
+}
+
+func setPercentageOfPlacementsToScore(config *config.KubeSchedulerConfiguration, value int32) *config.KubeSchedulerConfiguration {
+	newConfig := config.DeepCopy()
+	newConfig.PercentageOfPlacementsToScore = &value
+	return newConfig
+}
+
+func setProfilePercentageOfPlacementsToScore(config *config.KubeSchedulerConfiguration, value int32) *config.KubeSchedulerConfiguration {
+	newConfig := config.DeepCopy()
+	newConfig.Profiles[0].PercentageOfPlacementsToScore = &value
+	return newConfig
 }
