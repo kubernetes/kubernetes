@@ -46,11 +46,13 @@ import (
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	resourcehelper "k8s.io/component-helpers/resource"
@@ -6953,11 +6955,11 @@ func ValidatePodBinding(binding *core.Binding) field.ErrorList {
 
 	if len(binding.Target.Kind) != 0 && binding.Target.Kind != "Node" {
 		// TODO: When validation becomes versioned, this gets more complicated.
-		allErrs = append(allErrs, field.NotSupported(field.NewPath("target", "kind"), binding.Target.Kind, []string{"Node", "<empty>"}))
+		allErrs = append(allErrs, field.NotSupported(field.NewPath("target", "kind"), binding.Target.Kind, []string{"Node", "<empty>"}).MarkAlpha())
 	}
 	if len(binding.Target.Name) == 0 {
 		// TODO: When validation becomes versioned, this gets more complicated.
-		allErrs = append(allErrs, field.Required(field.NewPath("target", "name"), ""))
+		allErrs = append(allErrs, field.Required(field.NewPath("target", "name"), "").MarkCoveredByDeclarative())
 	} else if len(binding.Target.Kind) == 0 || binding.Target.Kind == "Node" {
 		// Validate node name format when binding to a Node (or when Kind is empty, which defaults to Node)
 		for _, msg := range ValidateNodeName(binding.Target.Name, false) {
@@ -6966,6 +6968,16 @@ func ValidatePodBinding(binding *core.Binding) field.ErrorList {
 	}
 
 	return allErrs
+}
+
+// ValidatePodBindingCreate is the single composition of handwritten and declarative
+// Binding validation invoked by BindingREST.Create. Binding's custom REST handling
+// bypasses genericregistry.Store, so declarative validation must be invoked
+// explicitly here rather than through a RESTCreateStrategy.
+func ValidatePodBindingCreate(ctx context.Context, scheme *runtime.Scheme, binding *core.Binding) field.ErrorList {
+	errs := ValidatePodBinding(binding)
+	dv := rest.DeclarativeValidation{Scheme: scheme}
+	return dv.ValidateDeclaratively(ctx, binding, nil, errs, operation.Create, rest.DeclarativeValidationConfig{})
 }
 
 // ValidatePodTemplate tests if required fields in the pod template are set.
