@@ -460,6 +460,10 @@ func (asw *actualStateOfWorld) IsVolumeDeviceReconstructed(volumeName v1.UniqueV
 }
 
 func (asw *actualStateOfWorld) CheckAndMarkVolumeAsUncertainViaReconstruction(opts operationexecutor.MarkVolumeOpts) (bool, error) {
+	if opts.VolumeSpec == nil {
+		return false, fmt.Errorf("volume spec is nil")
+	}
+
 	asw.Lock()
 	defer asw.Unlock()
 
@@ -787,6 +791,9 @@ func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.M
 	blockVolumeMapper := markVolumeOpts.BlockVolumeMapper
 	volumeGIDValue := markVolumeOpts.VolumeGIDVolume
 	volumeSpec := markVolumeOpts.VolumeSpec
+	if volumeSpec == nil {
+		return fmt.Errorf("volume spec is nil")
+	}
 	asw.Lock()
 	defer asw.Unlock()
 
