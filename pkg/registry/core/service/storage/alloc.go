@@ -53,7 +53,7 @@ type ServiceNodePort struct {
 	NodePort int32
 }
 
-// This is a trasitionary function to facilitate service REST flattening.
+// This is a transitional function to facilitate service REST flattening.
 func makeAlloc(defaultFamily api.IPFamily, ipAllocs map[api.IPFamily]ipallocator.Interface, portAlloc portallocator.Interface) Allocators {
 	return Allocators{
 		defaultServiceIPFamily:      defaultFamily,
