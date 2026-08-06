@@ -157,6 +157,24 @@ func GenerateConditionTestCases(fldPath *field.Path) []ConditionTestCase {
 				field.TooLong(fldPath.Index(0).Child("reason"), "", 1024).WithOrigin("maxBytes").MarkAlpha(),
 			},
 		},
+		{
+			Name: "invalid message",
+			Conditions: []metav1.Condition{
+				MkCondition(TweakMessage(strings.Repeat("a", 32769))),
+			},
+			ExpectedErrs: field.ErrorList{
+				field.TooLongCharacters(fldPath.Index(0).Child("message"), "", 1024).WithOrigin("maxBytes").MarkAlpha(),
+			},
+		},
+		{
+			Name: "invalid non ascii characters message",
+			Conditions: []metav1.Condition{
+				MkCondition(TweakMessage(strings.Repeat("आ", 32769))),
+			},
+			ExpectedErrs: field.ErrorList{
+				field.TooLongCharacters(fldPath.Index(0).Child("message"), "", 1024).WithOrigin("maxBytes").MarkAlpha(),
+			},
+		},
 	}
 }
 
@@ -211,6 +229,12 @@ func TweakObservedGeneration(gen int64) func(*metav1.Condition) {
 func TweakLastTransitionTime(t metav1.Time) func(*metav1.Condition) {
 	return func(c *metav1.Condition) {
 		c.LastTransitionTime = t
+	}
+}
+
+func TweakMessage(message string) func(*metav1.Condition) {
+	return func(c *metav1.Condition) {
+		c.Message = message
 	}
 }
 
