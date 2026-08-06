@@ -18,7 +18,9 @@ package kubeletplugin
 
 import (
 	"context"
+	"errors"
 	"net"
+	"os"
 	"path"
 	"testing"
 
@@ -52,4 +54,54 @@ func TestEndpointListener(t *testing.T) {
 	require.NoError(t, err, "listen")
 	assert.NoFileExists(t, path.Join(tempDir, socketname))
 	assert.Nil(t, listener)
+}
+
+// closeErrorListener is a net.Listener whose Close returns a fixed error. Only
+// Close is called here, so the embedded Listener is left nil.
+type closeErrorListener struct {
+	net.Listener
+	closeErr error
+}
+
+func (l closeErrorListener) Close() error { return l.closeErr }
+
+// unremovableSocket puts something at the socket path that os.Remove refuses to
+// delete. A directory that is not empty fails without depending on file
+// permissions or on which user runs the test.
+func unremovableSocket(t *testing.T, dir, file string) {
+	t.Helper()
+	require.NoError(t, os.Mkdir(path.Join(dir, file), 0700))
+	require.NoError(t, os.WriteFile(path.Join(dir, file, "occupied"), nil, 0600))
+}
+
+func TestEndpointCloseReportsFailedSocketRemoval(t *testing.T) {
+	tempDir := t.TempDir()
+	socketname := "test.sock"
+	unremovableSocket(t, tempDir, socketname)
+	listener := &unixListener{
+		Listener: closeErrorListener{},
+		endpoint: endpoint{dir: tempDir, file: socketname},
+	}
+
+	err := listener.Close()
+
+	require.Error(t, err, "closing must report the socket that was left behind")
+	assert.Contains(t, err.Error(), "remove Unix domain socket")
+}
+
+func TestEndpointCloseKeepsBothErrors(t *testing.T) {
+	tempDir := t.TempDir()
+	socketname := "test.sock"
+	unremovableSocket(t, tempDir, socketname)
+	closeErr := errors.New("close failed")
+	listener := &unixListener{
+		Listener: closeErrorListener{closeErr: closeErr},
+		endpoint: endpoint{dir: tempDir, file: socketname},
+	}
+
+	err := listener.Close()
+
+	require.Error(t, err)
+	require.ErrorIs(t, err, closeErr, "the listener's own error")
+	assert.Contains(t, err.Error(), "remove Unix domain socket", "the removal error")
 }
