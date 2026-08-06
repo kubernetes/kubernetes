@@ -1589,6 +1589,48 @@ func TestPodResourcesDefaults(t *testing.T) {
 					},
 				},
 			},
+		}, {
+			// pids is limit-only: a pod whose only pod-level entry is
+			// limits.pids must not have pod-level requests materialized from
+			// container aggregates (that would alter QOS classification).
+			name:                     "pod limits=pids only, container requests=set",
+			podLevelResourcesEnabled: true,
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							"cpu":    resource.MustParse("2m"),
+							"memory": resource.MustParse("1Mi"),
+						},
+						Limits: v1.ResourceList{
+							"cpu":    resource.MustParse("2m"),
+							"memory": resource.MustParse("1Mi"),
+						},
+					},
+				},
+			},
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{v1.ResourcePID: resource.MustParse("2048")},
+			},
+			expectedPodSpec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{v1.ResourcePID: resource.MustParse("2048")},
+				},
+				Containers: []v1.Container{
+					{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								"cpu":    resource.MustParse("2m"),
+								"memory": resource.MustParse("1Mi"),
+							},
+							Limits: v1.ResourceList{
+								"cpu":    resource.MustParse("2m"),
+								"memory": resource.MustParse("1Mi"),
+							},
+						},
+					},
+				},
+			},
 		}}
 
 	for _, tc := range cases {
