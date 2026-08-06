@@ -19,6 +19,7 @@ package cp
 import (
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -90,6 +91,13 @@ func newRemotePath(fileName string) remotePath {
 	// we assume remote file is a linux container but we need to convert
 	// windows path separators to unix style for consistent processing
 	file := strings.ReplaceAll(stripTrailingSlash(fileName), `\`, "/")
+
+	// Strip Windows drive letters from tar entries, e.g. "C:/path" -> "/path".
+	// This handles the case where tar entries contain absolute Windows paths
+	// similar to how bsdtar behaves by default without the -P flag (though in
+	// bsdtar's case it also strips the leading slash).
+	file = stripWindowsDriveLetter(file)
+
 	return remotePath{file: file}
 }
 
@@ -138,14 +146,62 @@ func stripLeadingSlash(file string) string {
 	return strings.TrimLeft(file, `/\`)
 }
 
+// isWindowsAbsolutePath checks if the given path is a Windows absolute path
+// such as, for example, C:\foo or c:/foo.
+func isWindowsAbsolutePath(path string) bool {
+	return isWindowsAbsolutePathForOS(path, runtime.GOOS)
+}
+
+// isWindowsAbsolutePathForOS is the OS-parameterized implementation of
+// isWindowsAbsolutePath. The goos argument (as reported by runtime.GOOS) is
+// taken explicitly so the detection logic can be unit tested regardless of the
+// OS running the tests.
+func isWindowsAbsolutePathForOS(path, goos string) bool {
+	if goos != "windows" {
+		return false
+	}
+
+	return len(path) >= 3 && path[1] == ':' && (path[2] == '\\' || path[2] == '/') &&
+		((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z'))
+}
+
+// stripWindowsDriveLetter strips the Windows drive letter from a path. For
+// example, it converts "C:/foo" to "/foo" or "c:\\foo" to "\foo". If the path
+// does not have a drive letter, or if the runtime is not Windows, it returns
+// the path unchanged.
+func stripWindowsDriveLetter(path string) string {
+	return stripWindowsDriveLetterForOS(path, runtime.GOOS)
+}
+
+// stripWindowsDriveLetterForOS is the OS-parameterized implementation of
+// stripWindowsDriveLetter, taking goos explicitly so it can be unit tested on
+// any OS.
+func stripWindowsDriveLetterForOS(path, goos string) string {
+	if goos != "windows" || !isWindowsAbsolutePathForOS(path, goos) {
+		return path
+	}
+
+	// Strip drive letter if present, e.g. "C:/path" -> "/path".
+	return path[2:]
+}
+
 // stripPathShortcuts removes any leading or trailing "../" from a given path
 func stripPathShortcuts(p string) string {
 	newPath := p
 	trimmed := strings.TrimPrefix(newPath, "../")
 
+	if runtime.GOOS == "windows" {
+		// On Windows, we also need to handle \ as a path separator.
+		trimmed = strings.TrimPrefix(trimmed, `..\`)
+	}
+
 	for trimmed != newPath {
 		newPath = trimmed
 		trimmed = strings.TrimPrefix(newPath, "../")
+
+		if runtime.GOOS == "windows" {
+			trimmed = strings.TrimPrefix(trimmed, `..\`)
+		}
 	}
 
 	// trim leftover {".", ".."}
@@ -153,7 +209,10 @@ func stripPathShortcuts(p string) string {
 		newPath = ""
 	}
 
-	if len(newPath) > 0 && string(newPath[0]) == "/" {
+	newPath = stripWindowsDriveLetter(newPath)
+
+	if len(newPath) > 0 &&
+		(runtime.GOOS == "windows" && string(newPath[0]) == "\\" || string(newPath[0]) == "/") {
 		return newPath[1:]
 	}
 
