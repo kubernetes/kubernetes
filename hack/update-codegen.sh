@@ -809,7 +809,7 @@ function codegen::clients() {
         --input-base="k8s.io/api" \
         --plural-exceptions "${PLURAL_EXCEPTIONS}" \
         --apply-configuration-package "${APPLYCONFIG_PKG}" \
-        --prefers-protobuf \
+        --prefers-protobuf="${KUBE_PREFERS_PROTOBUF:-true}" \
         $(printf -- " --input %s" "${gv_dirs[@]}") \
         "$@"
 

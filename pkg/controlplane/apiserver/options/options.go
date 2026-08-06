@@ -83,6 +83,8 @@ type Options struct {
 	EnableAggregatorRouting             bool
 	AggregatorRejectForwardingRedirects bool
 
+	EnableLoopbackClientProtobuf bool
+
 	ServiceAccountSigningKeyFile     string
 	ServiceAccountIssuer             serviceaccount.TokenGenerator
 	ServiceAccountTokenMaxExpiration time.Duration
@@ -128,6 +130,7 @@ func NewOptions() *Options {
 		EnableLogsHandler:                   false,
 		EventTTL:                            1 * time.Hour,
 		AggregatorRejectForwardingRedirects: true,
+		EnableLoopbackClientProtobuf:        true,
 		SystemNamespaces:                    []string{metav1.NamespaceSystem, metav1.NamespacePublic, metav1.NamespaceDefault},
 		CoordinatedLeadershipLeaseDuration:  15 * time.Second,
 		CoordinatedLeadershipRenewDeadline:  10 * time.Second,
@@ -164,6 +167,10 @@ func (s *Options) AddFlags(fss *cliflag.NamedFlagSets) {
 
 	fs.BoolVar(&s.EnableLogsHandler, "enable-logs-handler", s.EnableLogsHandler,
 		"If true, install a /logs handler for the apiserver logs.")
+
+	fs.BoolVar(&s.EnableLoopbackClientProtobuf, "enable-loopback-client-protobuf", s.EnableLoopbackClientProtobuf, ""+
+		"If true, the loopback client used for kube-apiserver self-communication relies on protobuf. "+
+		"If false, it uses JSON.")
 
 	fs.Int64Var(&s.MaxConnectionBytesPerSec, "max-connection-bytes-per-sec", s.MaxConnectionBytesPerSec, ""+
 		"If non-zero, throttle each user connection to this number of bytes/sec. "+

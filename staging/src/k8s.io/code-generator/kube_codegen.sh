@@ -630,8 +630,12 @@ function kube::codegen::gen_client() {
                 plural_exceptions="$2"
                 shift 2
                 ;;
-            "--prefers-protobuf")
+            "--prefers-protobuf" | "--prefers-protobuf=true")
                 prefers_protobuf="true"
+                shift
+                ;;
+            "--prefers-protobuf=false")
+                prefers_protobuf="false"
                 shift
                 ;;
             "--lint-rules")
