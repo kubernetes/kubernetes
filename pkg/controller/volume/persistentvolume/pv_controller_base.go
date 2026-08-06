@@ -344,7 +344,7 @@ func (ctrl *PersistentVolumeController) Run(ctx context.Context) {
 	volumeutil.RegisterMetrics()
 
 	wg.Go(func() {
-		wait.Until(func() { ctrl.resync(ctx) }, ctrl.resyncPeriod, ctx.Done())
+		wait.UntilWithContext(ctx, func(ctx context.Context) { ctrl.resync(ctx) }, ctrl.resyncPeriod)
 	})
 	wg.Go(func() {
 		wait.UntilWithContext(ctx, ctrl.volumeWorker, time.Second)
