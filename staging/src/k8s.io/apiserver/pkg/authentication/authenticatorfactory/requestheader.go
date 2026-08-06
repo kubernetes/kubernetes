@@ -34,6 +34,7 @@ type RequestHeaderConfig struct {
 	// CAContentProvider the options for verifying incoming connections using mTLS.  Generally this points to CA bundle file which is used verify the identity of the front proxy.
 	//	It may produce different options at will.
 	CAContentProvider dynamiccertificates.CAContentProvider
-	// AllowedClientNames is a list of common names that may be presented by the authenticating front proxy.  Empty means: accept any.
+	// AllowedClientNames is a list of common names that may be presented by the authenticating front proxy.
+	// Empty values from ordinary providers accept any; a CommonNameRestrictionFunc may reject all common names.
 	AllowedClientNames headerrequest.StringSliceProvider
 }

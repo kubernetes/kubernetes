@@ -264,12 +264,24 @@ func (a *Verifier) AuthenticateRequest(req *http.Request) (*authenticator.Respon
 }
 
 func (a *Verifier) verifySubject(subject pkix.Name) error {
+	if restriction, ok := a.allowedCommonNames.(CommonNameRestrictionFunc); ok {
+		allowedCommonNames, rejectAll := restriction()
+		if rejectAll {
+			return fmt.Errorf("x509: subject with cn=%s is not in the allowed list", subject.CommonName)
+		}
+		return verifyCommonName(subject, allowedCommonNames)
+	}
+
+	return verifyCommonName(subject, a.allowedCommonNames.Value())
+}
+
+func verifyCommonName(subject pkix.Name, allowedCommonNames []string) error {
 	// No CN restrictions
-	if len(a.allowedCommonNames.Value()) == 0 {
+	if len(allowedCommonNames) == 0 {
 		return nil
 	}
 	// Enforce CN restrictions
-	for _, allowedCommonName := range a.allowedCommonNames.Value() {
+	for _, allowedCommonName := range allowedCommonNames {
 		if allowedCommonName == subject.CommonName {
 			return nil
 		}

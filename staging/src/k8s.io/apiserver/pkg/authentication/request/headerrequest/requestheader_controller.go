@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	x509request "k8s.io/apiserver/pkg/authentication/request/x509"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
@@ -58,7 +59,12 @@ type requestHeaderBundle struct {
 	UIDHeaders          []string
 	GroupHeaders        []string
 	ExtraHeaderPrefixes []string
-	AllowedClientNames  []string
+	// AllowedClientNames may be nil or empty to allow all common names when
+	// RejectAllClientNames is false.
+	AllowedClientNames []string
+	// RejectAllClientNames represents deleted or unavailable ConfigMap state and
+	// rejects all common names, even when AllowedClientNames is nil or empty.
+	RejectAllClientNames bool
 }
 
 // RequestHeaderAuthRequestController a controller that exposes a set of methods for dynamically filling parts of RequestHeaderConfig struct.
@@ -78,7 +84,8 @@ type RequestHeaderAuthRequestController struct {
 
 	queue workqueue.TypedRateLimitingInterface[string]
 
-	// exportedRequestHeaderBundle is a requestHeaderBundle that contains the last read, non-zero length content of the configmap
+	// exportedRequestHeaderBundle contains the current request header configuration.
+	// It is initialized and cleared to a fail-closed bundle while the ConfigMap is unavailable.
 	exportedRequestHeaderBundle atomic.Value
 
 	usernameHeadersKey     string
@@ -148,6 +155,7 @@ func NewRequestHeaderAuthRequestController(
 
 	c.configmapLister = corev1listers.NewConfigMapLister(c.configmapInformer.GetIndexer()).ConfigMaps(c.configmapNamespace)
 	c.configmapInformerSynced = c.configmapInformer.HasSynced
+	c.clearRequestHeaderBundle()
 
 	return c
 }
@@ -169,7 +177,23 @@ func (c *RequestHeaderAuthRequestController) ExtraHeaderPrefixes() []string {
 }
 
 func (c *RequestHeaderAuthRequestController) AllowedClientNames() []string {
-	return c.loadRequestHeaderFor(c.allowedClientNamesKey)
+	return c.AllowedClientNamesFunc().Value()
+}
+
+// AllowedClientNamesFunc returns the current common name restriction from a
+// single request header bundle snapshot.
+func (c *RequestHeaderAuthRequestController) AllowedClientNamesFunc() x509request.CommonNameRestrictionFunc {
+	return func() ([]string, bool) {
+		rawHeaderBundle := c.exportedRequestHeaderBundle.Load()
+		if rawHeaderBundle == nil {
+			return nil, true
+		}
+		headerBundle, ok := rawHeaderBundle.(*requestHeaderBundle)
+		if !ok || headerBundle == nil {
+			return nil, true
+		}
+		return headerBundle.AllowedClientNames, headerBundle.RejectAllClientNames
+	}
 }
 
 // Run starts RequestHeaderAuthRequestController controller and blocks until stopCh is closed.
@@ -193,12 +217,12 @@ func (c *RequestHeaderAuthRequestController) Run(ctx context.Context, workers in
 	<-ctx.Done()
 }
 
-// // RunOnce runs a single sync loop
+// RunOnce runs a single sync loop
 func (c *RequestHeaderAuthRequestController) RunOnce(ctx context.Context) error {
 	configMap, err := c.client.CoreV1().ConfigMaps(c.configmapNamespace).Get(ctx, c.configmapName, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
-		// ignore, authConfigMap is nil now
+		c.clearRequestHeaderBundle()
 		return nil
 	case errors.IsForbidden(err):
 		klog.Warningf("Unable to get configmap/%s in %s.  Usually fixed by "+
@@ -240,9 +264,20 @@ func (c *RequestHeaderAuthRequestController) processNextWorkItem() bool {
 func (c *RequestHeaderAuthRequestController) sync() error {
 	configMap, err := c.configmapLister.Get(c.configmapName)
 	if err != nil {
+		if errors.IsNotFound(err) {
+			// the configmap has been deleted, clear the stored bundle
+			c.clearRequestHeaderBundle()
+			return nil
+		}
 		return err
 	}
 	return c.syncConfigMap(configMap)
+}
+
+func (c *RequestHeaderAuthRequestController) clearRequestHeaderBundle() {
+	c.exportedRequestHeaderBundle.Store(&requestHeaderBundle{
+		RejectAllClientNames: true,
+	})
 }
 
 func (c *RequestHeaderAuthRequestController) syncConfigMap(configMap *corev1.ConfigMap) error {
