@@ -901,12 +901,17 @@ func (n *NodeWrapper) UID(s string) *NodeWrapper {
 	return n
 }
 
-// Label applies a {k,v} label pair to the inner node.
 func (n *NodeWrapper) Label(k, v string) *NodeWrapper {
-	if n.Labels == nil {
-		n.Labels = make(map[string]string)
+	if n.Node.Labels == nil {
+		n.Node.Labels = make(map[string]string)
 	}
-	n.Labels[k] = v
+	n.Node.Labels[k] = v
+	return n
+}
+
+// Labels applies a map of {k,v} label pairs to the inner node.
+func (n *NodeWrapper) Labels(labels map[string]string) *NodeWrapper {
+	n.Node.Labels = labels
 	return n
 }
 
