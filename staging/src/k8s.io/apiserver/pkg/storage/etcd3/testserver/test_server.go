@@ -18,9 +18,11 @@ package testserver
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"net/url"
 	"os"
+	"os/exec"
 	"strconv"
 	"sync"
 	"testing"
@@ -119,12 +121,79 @@ func RunEtcd(t testing.TB, cfg *embed.Config) *kubernetes.Client {
 		t.Fatal(err)
 	}
 
-	client, err := kubernetes.New(clientv3.Config{
-		TLS:         tlsConfig,
-		Endpoints:   e.Server.Cluster().ClientURLs(),
-		DialTimeout: 10 * time.Second,
-		Logger:      zaptest.NewLogger(t, zaptest.Level(zapcore.ErrorLevel)).Named("etcd-client"),
+	return newTestClient(t, clientv3.Config{
+		TLS:       tlsConfig,
+		Endpoints: e.Server.Cluster().ClientURLs(),
 	})
+}
+
+// RunExternalEtcd starts an external etcd subprocess and returns a client connected to the server.
+// The external etcd process is terminated when the test ends.
+func RunExternalEtcd(t testing.TB) *kubernetes.Client {
+	t.Helper()
+	ports, err := getAvailablePorts(2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clientPort := ports[0]
+	peerPort := ports[1]
+
+	clientURL := fmt.Sprintf("http://127.0.0.1:%d", clientPort)
+	peerURL := fmt.Sprintf("http://127.0.0.1:%d", peerPort)
+
+	dir := t.TempDir()
+
+	cmd := exec.Command("etcd",
+		"--data-dir", dir,
+		"--listen-client-urls", clientURL,
+		"--advertise-client-urls", clientURL,
+		"--listen-peer-urls", peerURL,
+		"--initial-advertise-peer-urls", peerURL,
+		"--initial-cluster", fmt.Sprintf("default=%s", peerURL),
+		"--quota-backend-bytes", strconv.FormatInt(8*1024*1024*1024, 10),
+		"--log-level", "warn",
+	)
+
+	cmd.Stdout = io.Discard
+	cmd.Stderr = io.Discard
+
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("failed to start external etcd: %v", err)
+	}
+
+	ready := false
+	for i := 0; i < 50; i++ {
+		conn, err := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(clientPort)), 100*time.Millisecond)
+		if err == nil {
+			conn.Close()
+			ready = true
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if !ready {
+		cmd.Process.Kill()
+		t.Fatal("external etcd failed to start")
+	}
+
+	t.Cleanup(func() {
+		cmd.Process.Kill()
+		cmd.Wait()
+	})
+
+	return newTestClient(t, clientv3.Config{
+		Endpoints: []string{clientURL},
+	})
+}
+
+func newTestClient(t testing.TB, config clientv3.Config) *kubernetes.Client {
+	if config.Logger == nil {
+		config.Logger = zaptest.NewLogger(t, zaptest.Level(zapcore.ErrorLevel)).Named("etcd-client")
+	}
+	if config.DialTimeout == 0 {
+		config.DialTimeout = 10 * time.Second
+	}
+	client, err := kubernetes.New(config)
 	if err != nil {
 		t.Fatal(err)
 	}
