@@ -171,11 +171,9 @@ func IsCorruptObject(err error) bool {
 }
 
 func isErrCode(err error, code int) bool {
-	if err == nil {
-		return false
-	}
-	if e, ok := err.(*StorageError); ok {
-		return e.Code == code
+	var storageErr *StorageError
+	if errors.As(err, &storageErr) {
+		return storageErr.Code == code
 	}
 	return false
 }
