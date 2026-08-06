@@ -376,6 +376,12 @@ func (h *hostpathCSIDriver) PrepareTest(ctx context.Context, f *framework.Framew
 		framework.Failf("deploying %s driver: %v", h.driverInfo.Name, err)
 	}
 
+	if h.driverInfo.Capabilities[storageframework.CapSnapshotMetadata] {
+		if err := utils.CreateSnapshotMetadataTLSSecret(ctx, f, driverns); err != nil {
+			framework.Failf("creating snapshot metadata TLS secret: %v", err)
+		}
+	}
+
 	cleanupFunc := generateDriverCleanupFunc(
 		f,
 		h.driverInfo.Name,
