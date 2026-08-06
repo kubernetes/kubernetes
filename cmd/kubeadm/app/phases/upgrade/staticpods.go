@@ -293,12 +293,13 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 		return true, errors.Wrap(err, "etcd cluster is not healthy")
 	}
 
-	// Backing up etcd data store
+	// Backing up etcd data store. Use a live-dir-aware copy instead of plain
+	// `cp -r`: etcd may rename member/wal/*.tmp WAL pre-allocation files while
+	// the backup is in progress (see kubernetes/kubeadm#3324).
 	backupEtcdDir := pathMgr.BackupEtcdDir()
 	runningEtcdDir := cfg.Etcd.Local.DataDir
-	output, err := filesutil.CopyDir(runningEtcdDir, backupEtcdDir)
-	if err != nil {
-		return true, errors.Wrapf(err, "failed to back up etcd data, output: %q", output)
+	if err := etcdutil.BackupDataDirectory(runningEtcdDir, backupEtcdDir); err != nil {
+		return true, errors.Wrap(err, "failed to back up etcd data")
 	}
 
 	// Get the desired etcd version. That's either the one specified by the user in cfg.Etcd.Local.ImageTag
