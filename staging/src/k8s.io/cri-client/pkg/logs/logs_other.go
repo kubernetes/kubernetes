@@ -20,7 +20,12 @@ package logs
 
 import (
 	"os"
+	"path/filepath"
 )
+
+func evalSymlinks(path string) (string, error) {
+	return filepath.EvalSymlinks(path)
+}
 
 func openFileShareDelete(path string) (*os.File, error) {
 	// Noop. Only relevant for Windows.
