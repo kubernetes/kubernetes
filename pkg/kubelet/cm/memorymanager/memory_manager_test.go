@@ -116,7 +116,7 @@ func (p *mockPolicy) GetPodTopologyHints(klog.Logger, state.State, *v1.Pod, life
 	return nil
 }
 
-func (p *mockPolicy) AllocatePod(_ klog.Logger, s state.State, pod *v1.Pod, _ lifecycle.Operation) error {
+func (p *mockPolicy) AllocatePod(_ klog.Logger, _ state.State, _ *v1.Pod, _ lifecycle.Operation) error {
 	return p.err
 }
 
@@ -129,7 +129,7 @@ type mockRuntimeService struct {
 	err error
 }
 
-func (rt mockRuntimeService) UpdateContainerResources(_ context.Context, id string, resources *runtimeapi.ContainerResources) error {
+func (rt mockRuntimeService) UpdateContainerResources(_ context.Context, _ string, _ *runtimeapi.ContainerResources) error {
 	return rt.err
 }
 
@@ -138,7 +138,7 @@ type mockPodStatusProvider struct {
 	found     bool
 }
 
-func (psp mockPodStatusProvider) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
+func (psp mockPodStatusProvider) GetPodStatus(_ types.UID) (v1.PodStatus, bool) {
 	return psp.podStatus, psp.found
 }
 

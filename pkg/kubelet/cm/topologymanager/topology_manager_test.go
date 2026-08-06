@@ -223,19 +223,19 @@ type mockHintProvider struct {
 	//allocateError error
 }
 
-func (m *mockHintProvider) GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container, _ lifecycle.Operation) map[string][]TopologyHint {
+func (m *mockHintProvider) GetTopologyHints(_ klog.Logger, _ *v1.Pod, _ *v1.Container, _ lifecycle.Operation) map[string][]TopologyHint {
 	return m.th
 }
 
-func (m *mockHintProvider) GetPodTopologyHints(logger klog.Logger, pod *v1.Pod, _ lifecycle.Operation) map[string][]TopologyHint {
+func (m *mockHintProvider) GetPodTopologyHints(_ klog.Logger, _ *v1.Pod, _ lifecycle.Operation) map[string][]TopologyHint {
 	return m.th
 }
 
-func (m *mockHintProvider) AllocatePod(logger klog.Logger, pod *v1.Pod, _ lifecycle.Operation) error {
+func (m *mockHintProvider) AllocatePod(_ klog.Logger, _ *v1.Pod, _ lifecycle.Operation) error {
 	return nil
 }
 
-func (m *mockHintProvider) Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container, _ lifecycle.Operation) error {
+func (m *mockHintProvider) Allocate(_ context.Context, _ *v1.Pod, _ *v1.Container, _ lifecycle.Operation) error {
 	//return allocateError
 	return nil
 }
@@ -245,7 +245,7 @@ type mockPolicy struct {
 	ph []map[string][]TopologyHint
 }
 
-func (p *mockPolicy) Merge(logger klog.Logger, providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
+func (p *mockPolicy) Merge(_ klog.Logger, providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
 	p.ph = providersHints
 	return TopologyHint{}, true
 }
@@ -611,22 +611,22 @@ type trackingHintProvider struct {
 	hints                   map[string][]TopologyHint
 }
 
-func (m *trackingHintProvider) GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) map[string][]TopologyHint {
+func (m *trackingHintProvider) GetTopologyHints(_ klog.Logger, _ *v1.Pod, _ *v1.Container, _ lifecycle.Operation) map[string][]TopologyHint {
 	m.containerHintsCalled = true
 	return m.hints
 }
 
-func (m *trackingHintProvider) GetPodTopologyHints(logger klog.Logger, pod *v1.Pod, operation lifecycle.Operation) map[string][]TopologyHint {
+func (m *trackingHintProvider) GetPodTopologyHints(_ klog.Logger, _ *v1.Pod, _ lifecycle.Operation) map[string][]TopologyHint {
 	m.podHintsCalled = true
 	return m.hints
 }
 
-func (m *trackingHintProvider) AllocatePod(logger klog.Logger, pod *v1.Pod, operation lifecycle.Operation) error {
+func (m *trackingHintProvider) AllocatePod(_ klog.Logger, _ *v1.Pod, _ lifecycle.Operation) error {
 	m.allocatePodCalled = true
 	return nil
 }
 
-func (m *trackingHintProvider) Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) error {
+func (m *trackingHintProvider) Allocate(_ context.Context, _ *v1.Pod, _ *v1.Container, _ lifecycle.Operation) error {
 	m.allocateContainerCalled = true
 	return nil
 }

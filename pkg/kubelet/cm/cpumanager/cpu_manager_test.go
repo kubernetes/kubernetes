@@ -171,31 +171,31 @@ func (p *mockPolicy) Name() string {
 	return "mock"
 }
 
-func (p *mockPolicy) Start(_ klog.Logger, s state.State) error {
+func (p *mockPolicy) Start(_ klog.Logger, _ state.State) error {
 	return p.err
 }
 
-func (p *mockPolicy) Allocate(_ klog.Logger, s state.State, pod *v1.Pod, container *v1.Container, _ lifecycle.Operation) error {
+func (p *mockPolicy) Allocate(_ klog.Logger, _ state.State, _ *v1.Pod, _ *v1.Container, _ lifecycle.Operation) error {
 	return p.err
 }
 
-func (p *mockPolicy) RemoveContainer(_ klog.Logger, s state.State, podUID string, containerName string) error {
+func (p *mockPolicy) RemoveContainer(_ klog.Logger, _ state.State, _ string, _ string) error {
 	return p.err
 }
 
-func (p *mockPolicy) GetTopologyHints(_ klog.Logger, s state.State, pod *v1.Pod, container *v1.Container, _ lifecycle.Operation) map[string][]topologymanager.TopologyHint {
+func (p *mockPolicy) GetTopologyHints(_ klog.Logger, _ state.State, _ *v1.Pod, _ *v1.Container, _ lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 
-func (p *mockPolicy) GetPodTopologyHints(_ klog.Logger, s state.State, pod *v1.Pod, _ lifecycle.Operation) map[string][]topologymanager.TopologyHint {
+func (p *mockPolicy) GetPodTopologyHints(_ klog.Logger, _ state.State, _ *v1.Pod, _ lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 
-func (p *mockPolicy) AllocatePod(_ klog.Logger, s state.State, pod *v1.Pod, _ lifecycle.Operation) error {
+func (p *mockPolicy) AllocatePod(_ klog.Logger, _ state.State, _ *v1.Pod, _ lifecycle.Operation) error {
 	return p.err
 }
 
-func (p *mockPolicy) GetAllocatableCPUs(m state.State) cpuset.CPUSet {
+func (p *mockPolicy) GetAllocatableCPUs(_ state.State) cpuset.CPUSet {
 	return cpuset.New()
 }
 
@@ -203,7 +203,7 @@ type mockRuntimeService struct {
 	err error
 }
 
-func (rt mockRuntimeService) UpdateContainerResources(_ context.Context, id string, resources *runtimeapi.ContainerResources) error {
+func (rt mockRuntimeService) UpdateContainerResources(_ context.Context, _ string, _ *runtimeapi.ContainerResources) error {
 	return rt.err
 }
 
@@ -212,7 +212,7 @@ type mockPodStatusProvider struct {
 	found     bool
 }
 
-func (psp mockPodStatusProvider) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
+func (psp mockPodStatusProvider) GetPodStatus(_ types.UID) (v1.PodStatus, bool) {
 	return psp.podStatus, psp.found
 }
 

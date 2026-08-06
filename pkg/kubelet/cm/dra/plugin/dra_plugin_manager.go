@@ -101,14 +101,14 @@ type monitoredPlugin struct {
 
 var _ grpcstats.Handler = &monitoredPlugin{}
 
-func (m *monitoredPlugin) TagRPC(ctx context.Context, info *grpcstats.RPCTagInfo) context.Context {
+func (m *monitoredPlugin) TagRPC(ctx context.Context, _ *grpcstats.RPCTagInfo) context.Context {
 	return ctx
 }
 
 func (m *monitoredPlugin) HandleRPC(context.Context, grpcstats.RPCStats) {
 }
 
-func (m *monitoredPlugin) TagConn(ctx context.Context, info *grpcstats.ConnTagInfo) context.Context {
+func (m *monitoredPlugin) TagConn(ctx context.Context, _ *grpcstats.ConnTagInfo) context.Context {
 	return ctx
 }
 
@@ -565,7 +565,7 @@ func (pm *DRAPluginManager) ValidatePlugin(_ context.Context, driverName string,
 // NodePrepareResources and NodeUnprepareResources and returns its name
 // (e.g. [drapbv1beta1.DRAPluginService]). An error is returned if the plugin
 // is unusable.
-func (pm *DRAPluginManager) validateSupportedServices(driverName string, supportedServices []string) (string, error) {
+func (pm *DRAPluginManager) validateSupportedServices(_ string, supportedServices []string) (string, error) {
 	if len(supportedServices) == 0 {
 		return "", errors.New("empty list of supported gRPC services (aka supported versions)")
 	}

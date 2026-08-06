@@ -280,7 +280,7 @@ func (p *staticPolicy) validateState(logger klog.Logger, s state.State) error {
 }
 
 // GetAllocatableCPUs returns the total set of CPUs available for allocation.
-func (p *staticPolicy) GetAllocatableCPUs(s state.State) cpuset.CPUSet {
+func (p *staticPolicy) GetAllocatableCPUs(_ state.State) cpuset.CPUSet {
 	return p.topology.CPUDetails.CPUs().Difference(p.reservedCPUs)
 }
 

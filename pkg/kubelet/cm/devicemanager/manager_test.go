@@ -846,14 +846,14 @@ func (m *MockEndpoint) getPreferredAllocation(_ context.Context, available, must
 	return nil, nil
 }
 
-func (m *MockEndpoint) allocate(ctx context.Context, devs []string) (*pluginapi.AllocateResponse, error) {
+func (m *MockEndpoint) allocate(_ context.Context, devs []string) (*pluginapi.AllocateResponse, error) {
 	if m.allocateFunc != nil {
 		return m.allocateFunc(devs)
 	}
 	return nil, nil
 }
 
-func (m *MockEndpoint) setStopTime(t time.Time) {}
+func (m *MockEndpoint) setStopTime(_ time.Time) {}
 
 func (m *MockEndpoint) isStopped() bool { return false }
 
