@@ -316,6 +316,7 @@ func (q *delayingType[T]) waitingLoop(logger klog.Logger) {
 			nextReadyAtTimer = q.clock.NewTimer(entry.readyAt.Sub(now))
 			nextReadyAt = nextReadyAtTimer.C()
 		}
+		q.metrics.delayedCount(len(waitingEntryByData))
 
 		select {
 		case <-q.stopCh:
