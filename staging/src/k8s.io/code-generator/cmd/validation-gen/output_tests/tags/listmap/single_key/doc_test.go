@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	field "k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func TestUniqueness(t *testing.T) {
@@ -137,8 +136,8 @@ func TestRatcheting(t *testing.T) {
 			{"key2", "two"},
 		},
 		ListNonComparableField: []NonComparableStruct{
-			{"key1", ptr.To("one")},
-			{"key2", ptr.To("two")},
+			{"key1", new("one")},
+			{"key2", new("two")},
 		},
 	}
 
@@ -149,8 +148,8 @@ func TestRatcheting(t *testing.T) {
 			{"key1", "one"},
 		},
 		ListNonComparableField: []NonComparableStruct{
-			{"key2", ptr.To("two")},
-			{"key1", ptr.To("one")},
+			{"key2", new("two")},
+			{"key1", new("one")},
 		},
 	}
 	st.Value(&struct1).ExpectValidateFalseByPath(map[string][]string{
@@ -168,9 +167,9 @@ func TestUniquenessPtrKey(t *testing.T) {
 
 	st.Value(&Struct{
 		ListPtrKeyField: []PtrKeyStruct{
-			{ptr.To("key1"), "one"},
-			{ptr.To("key2"), "two"},
-			{ptr.To("key2"), "three"}, // duplicate key
+			{new("key1"), "one"},
+			{new("key2"), "two"},
+			{new("key2"), "three"}, // duplicate key
 			{nil, "four"},
 			{nil, "five"}, // duplicate nil key
 		},

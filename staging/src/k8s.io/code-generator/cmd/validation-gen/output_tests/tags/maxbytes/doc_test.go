@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -33,44 +32,44 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		Max10Field:                      strings.Repeat("x", 1),
-		Max10PtrField:                   ptr.To(strings.Repeat("x", 1)),
+		Max10PtrField:                   new(strings.Repeat("x", 1)),
 		Max10UnvalidatedTypedefField:    UnvalidatedStringType(strings.Repeat("x", 1)),
-		Max10UnvalidatedTypedefPtrField: ptr.To(UnvalidatedStringType(strings.Repeat("x", 1))),
+		Max10UnvalidatedTypedefPtrField: new(UnvalidatedStringType(strings.Repeat("x", 1))),
 		Max10ValidatedTypedefField:      Max10Type(strings.Repeat("x", 1)),
-		Max10ValidatedTypedefPtrField:   ptr.To(Max10Type(strings.Repeat("x", 1))),
+		Max10ValidatedTypedefPtrField:   new(Max10Type(strings.Repeat("x", 1))),
 	}).ExpectValid()
 
 	st.Value(&Struct{
 		Max10Field:                      strings.Repeat("x", 9),
-		Max10PtrField:                   ptr.To(strings.Repeat("x", 9)),
+		Max10PtrField:                   new(strings.Repeat("x", 9)),
 		Max10UnvalidatedTypedefField:    UnvalidatedStringType(strings.Repeat("x", 9)),
-		Max10UnvalidatedTypedefPtrField: ptr.To(UnvalidatedStringType(strings.Repeat("x", 9))),
+		Max10UnvalidatedTypedefPtrField: new(UnvalidatedStringType(strings.Repeat("x", 9))),
 		Max10ValidatedTypedefField:      Max10Type(strings.Repeat("x", 9)),
-		Max10ValidatedTypedefPtrField:   ptr.To(Max10Type(strings.Repeat("x", 9))),
+		Max10ValidatedTypedefPtrField:   new(Max10Type(strings.Repeat("x", 9))),
 	}).ExpectValid()
 
 	st.Value(&Struct{
 		Max10Field:                      strings.Repeat("x", 10),
-		Max10PtrField:                   ptr.To(strings.Repeat("x", 10)),
+		Max10PtrField:                   new(strings.Repeat("x", 10)),
 		Max10UnvalidatedTypedefField:    UnvalidatedStringType(strings.Repeat("x", 10)),
-		Max10UnvalidatedTypedefPtrField: ptr.To(UnvalidatedStringType(strings.Repeat("x", 10))),
+		Max10UnvalidatedTypedefPtrField: new(UnvalidatedStringType(strings.Repeat("x", 10))),
 		Max10ValidatedTypedefField:      Max10Type(strings.Repeat("x", 10)),
-		Max10ValidatedTypedefPtrField:   ptr.To(Max10Type(strings.Repeat("x", 10))),
+		Max10ValidatedTypedefPtrField:   new(Max10Type(strings.Repeat("x", 10))),
 	}).ExpectValid()
 
 	testVal := &Struct{
 		Max0Field:                       strings.Repeat("x", 1),
-		Max0PtrField:                    ptr.To(strings.Repeat("x", 1)),
+		Max0PtrField:                    new(strings.Repeat("x", 1)),
 		Max10Field:                      strings.Repeat("x", 11),
-		Max10PtrField:                   ptr.To(strings.Repeat("x", 11)),
+		Max10PtrField:                   new(strings.Repeat("x", 11)),
 		Max0UnvalidatedTypedefField:     UnvalidatedStringType(strings.Repeat("x", 1)),
-		Max0UnvalidatedTypedefPtrField:  ptr.To(UnvalidatedStringType(strings.Repeat("x", 1))),
+		Max0UnvalidatedTypedefPtrField:  new(UnvalidatedStringType(strings.Repeat("x", 1))),
 		Max10UnvalidatedTypedefField:    UnvalidatedStringType(strings.Repeat("x", 11)),
-		Max10UnvalidatedTypedefPtrField: ptr.To(UnvalidatedStringType(strings.Repeat("x", 11))),
+		Max10UnvalidatedTypedefPtrField: new(UnvalidatedStringType(strings.Repeat("x", 11))),
 		Max0ValidatedTypedefField:       Max0Type(strings.Repeat("x", 1)),
-		Max0ValidatedTypedefPtrField:    ptr.To(Max0Type(strings.Repeat("x", 1))),
+		Max0ValidatedTypedefPtrField:    new(Max0Type(strings.Repeat("x", 1))),
 		Max10ValidatedTypedefField:      Max10Type(strings.Repeat("x", 11)),
-		Max10ValidatedTypedefPtrField:   ptr.To(Max10Type(strings.Repeat("x", 11))),
+		Max10ValidatedTypedefPtrField:   new(Max10Type(strings.Repeat("x", 11))),
 	}
 	st.Value(testVal).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.TooLong(field.NewPath("max0Field"), "", 0),
@@ -90,29 +89,29 @@ func Test(t *testing.T) {
 	// Test validation ratcheting
 	st.Value(&Struct{
 		Max0Field:                       strings.Repeat("x", 1),
-		Max0PtrField:                    ptr.To(strings.Repeat("x", 1)),
+		Max0PtrField:                    new(strings.Repeat("x", 1)),
 		Max10Field:                      strings.Repeat("x", 11),
-		Max10PtrField:                   ptr.To(strings.Repeat("x", 11)),
+		Max10PtrField:                   new(strings.Repeat("x", 11)),
 		Max0UnvalidatedTypedefField:     UnvalidatedStringType(strings.Repeat("x", 1)),
-		Max0UnvalidatedTypedefPtrField:  ptr.To(UnvalidatedStringType(strings.Repeat("x", 1))),
+		Max0UnvalidatedTypedefPtrField:  new(UnvalidatedStringType(strings.Repeat("x", 1))),
 		Max10UnvalidatedTypedefField:    UnvalidatedStringType(strings.Repeat("x", 11)),
-		Max10UnvalidatedTypedefPtrField: ptr.To(UnvalidatedStringType(strings.Repeat("x", 11))),
+		Max10UnvalidatedTypedefPtrField: new(UnvalidatedStringType(strings.Repeat("x", 11))),
 		Max0ValidatedTypedefField:       Max0Type(strings.Repeat("x", 1)),
-		Max0ValidatedTypedefPtrField:    ptr.To(Max0Type(strings.Repeat("x", 1))),
+		Max0ValidatedTypedefPtrField:    new(Max0Type(strings.Repeat("x", 1))),
 		Max10ValidatedTypedefField:      Max10Type(strings.Repeat("x", 11)),
-		Max10ValidatedTypedefPtrField:   ptr.To(Max10Type(strings.Repeat("x", 11))),
+		Max10ValidatedTypedefPtrField:   new(Max10Type(strings.Repeat("x", 11))),
 	}).OldValue(&Struct{
 		Max0Field:                       strings.Repeat("x", 1),
-		Max0PtrField:                    ptr.To(strings.Repeat("x", 1)),
+		Max0PtrField:                    new(strings.Repeat("x", 1)),
 		Max10Field:                      strings.Repeat("x", 11),
-		Max10PtrField:                   ptr.To(strings.Repeat("x", 11)),
+		Max10PtrField:                   new(strings.Repeat("x", 11)),
 		Max0UnvalidatedTypedefField:     UnvalidatedStringType(strings.Repeat("x", 1)),
-		Max0UnvalidatedTypedefPtrField:  ptr.To(UnvalidatedStringType(strings.Repeat("x", 1))),
+		Max0UnvalidatedTypedefPtrField:  new(UnvalidatedStringType(strings.Repeat("x", 1))),
 		Max10UnvalidatedTypedefField:    UnvalidatedStringType(strings.Repeat("x", 11)),
-		Max10UnvalidatedTypedefPtrField: ptr.To(UnvalidatedStringType(strings.Repeat("x", 11))),
+		Max10UnvalidatedTypedefPtrField: new(UnvalidatedStringType(strings.Repeat("x", 11))),
 		Max0ValidatedTypedefField:       Max0Type(strings.Repeat("x", 1)),
-		Max0ValidatedTypedefPtrField:    ptr.To(Max0Type(strings.Repeat("x", 1))),
+		Max0ValidatedTypedefPtrField:    new(Max0Type(strings.Repeat("x", 1))),
 		Max10ValidatedTypedefField:      Max10Type(strings.Repeat("x", 11)),
-		Max10ValidatedTypedefPtrField:   ptr.To(Max10Type(strings.Repeat("x", 11))),
+		Max10ValidatedTypedefPtrField:   new(Max10Type(strings.Repeat("x", 11))),
 	}).ExpectValid()
 }
