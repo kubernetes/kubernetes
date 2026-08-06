@@ -172,7 +172,7 @@ func TestCategories(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	expected := []string{"all"}
+	expected := []string{"all", "podautoscalers"}
 	registrytest.AssertCategories(t, storage, expected)
 }
 
