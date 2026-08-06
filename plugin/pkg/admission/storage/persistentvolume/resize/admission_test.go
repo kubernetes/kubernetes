@@ -69,9 +69,9 @@ func TestPVCResizeAdmission(t *testing.T) {
 	expectNoError := func(err error) bool {
 		return err == nil
 	}
-	expectDynamicallyProvisionedError := func(err error) bool {
-		return strings.Contains(err.Error(), "only dynamically provisioned pvc can be resized and "+
-			"the storageclass that provisions the pvc must support resize")
+	expectStorageClassError := func(err error) bool {
+		return strings.Contains(err.Error(), "for resizing, the PVC must have a storageclass that "+
+			"has the AllowVolumeExpansion field set to true")
 	}
 	tests := []struct {
 		name        string
@@ -114,7 +114,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 			checkError: expectNoError,
 		},
 		{
-			name:     "pvc-resize, update, dynamically provisioned error",
+			name:     "pvc-resize, update, storageclass error",
 			resource: api.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
 			oldObj: &api.PersistentVolumeClaim{
 				Spec: api.PersistentVolumeClaimSpec{
@@ -140,10 +140,10 @@ func TestPVCResizeAdmission(t *testing.T) {
 					Phase:    api.ClaimBound,
 				},
 			},
-			checkError: expectDynamicallyProvisionedError,
+			checkError: expectStorageClassError,
 		},
 		{
-			name:     "pvc-resize, update, dynamically provisioned error",
+			name:     "pvc-resize, update, storage class error",
 			resource: api.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
 			oldObj: &api.PersistentVolumeClaim{
 				Spec: api.PersistentVolumeClaimSpec{
@@ -171,7 +171,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 					Phase:    api.ClaimBound,
 				},
 			},
-			checkError: expectDynamicallyProvisionedError,
+			checkError: expectStorageClassError,
 		},
 		{
 			name:     "PVC update with no change in size",
