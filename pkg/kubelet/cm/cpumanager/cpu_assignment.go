@@ -90,11 +90,12 @@ func standardDeviation(xs []int) float64 {
 
 // numaOrSocketsFirstFuncs defines the interface for topology-aware CPU allocation.
 //
-// For resize operations, the goal is to keep retained CPUs and newly allocated CPUs as close
-// as possible in the topology hierarchy (same NUMA node, same socket, same UncoreCache, same core).
-// When sorting NUMA nodes / Sockets / UncoreCaches / Cores, prioritize those that already have
-// CPUs allocated to this container. After sorting allocated topology elements, sort the remaining
-// available topology elements.
+// ## Resize Operations
+// For resize operations, the goal is to allocate new CPUs as close as possible
+// to the retained CPUs in the topology hierarchy (same NUMA node, same socket, and same core).
+// When sorting topology elements (NUMA nodes, sockets, or cores), prioritize elements that already
+// have CPUs allocated to this container (retained CPUs), followed by remaining available elements.
+// This minimizes topology changes and maintains performance characteristics.
 //
 // ## Why Separate ForResize Functions
 // Conceptually, Pod add can be viewed as a special case of Pod resize where the retained CPUs
@@ -105,7 +106,7 @@ func standardDeviation(xs []int) float64 {
 //  2. **Alpha Scope**: This PR targets alpha release, where the primary goal is to deliver working
 //     resize functionality with minimal risk to existing features.
 //  3. **Future Refactoring**: After code freeze and with more resize testing coverage, we can
-//     safely refactor and unify the add/resize code paths in a future release (likely in the next cycle).
+//     safely refactor and unify the add/resize code paths in a future release (likely in the Beta).
 type numaOrSocketsFirstFuncs interface {
 	takeFullFirstLevel()
 	takeFullSecondLevel()
@@ -226,16 +227,11 @@ func (s *socketsFirst) sortAvailableCores() []int {
 	return result
 }
 
-// Sort the UncoreCaches within the NUMA nodes for resize.
-// For resize, this function sorts UncoreCaches in a specific order to maintain
-// topology continuity during CPU resource changes:
-// 1. First, UncoreCaches that already have CPUs allocated to this container (intersection of allocated and available)
-// 2. Then, other available UncoreCaches that don't have CPUs allocated to this container yet
-//
-// This ordering ensures that during resize operations, the CPU allocator prefers to keep
-// CPUs on the same UncoreCaches that were previously allocated, minimizing topology changes
-// and maintaining performance characteristics.
-// see comment https://github.com/kubernetes/kubernetes/pull/140629#discussion_r3595055804 about partitioning
+// Sort the UncoreCaches within NUMA nodes for resize.
+// For resize operation, this function sorts UncoreCaches in a specific order to maintain topology continuity.
+// Within each NUMA node (already sorted by sortAvailableNUMANodesForResize):
+// 1. First, UncoreCaches with allocated CPUs for this container (retained CPUs)
+// 2. Then, other available UncoreCaches
 func (a *cpuAccumulator) sortAvailableUncoreCachesForResize() []int {
 	var result []int
 	for _, numa := range a.sortAvailableNUMANodesForResize() {
@@ -268,14 +264,9 @@ func (n *numaFirst) takeFullSecondLevelForResize() {
 }
 
 // Sort available NUMA nodes for resize when NUMA nodes are higher than sockets in the memory hierarchy.
-// For resize, this function sorts NUMA nodes in a specific order to maintain topology continuity:
-// 1. First, NUMA nodes that already have CPUs allocated to this container,
-// 2. Then, other available NUMA nodes that don't have CPUs allocated to this container yet
-//
-// This ordering ensures that during resize operations, the CPU allocator prefers to keep
-// CPUs on the same NUMA nodes that were previously allocated, minimizing topology changes
-// and maintaining performance characteristics.
-// see comment https://github.com/kubernetes/kubernetes/pull/140629#discussion_r3595055804 about partitioning
+// For resize operation, this function sorts NUMA nodes in a specific order to maintain topology continuity.
+// 1. First, NUMA nodes with allocated CPUs for this container (retained CPUs)
+// 2. Then, other available NUMA nodes
 func (n *numaFirst) sortAvailableNUMANodesForResize() []int {
 	var result []int
 
@@ -295,14 +286,10 @@ func (n *numaFirst) sortAvailableNUMANodesForResize() []int {
 }
 
 // Sort available sockets for resize when NUMA nodes are higher than sockets in the memory hierarchy.
-// For resize, this function sorts sockets in a specific order to maintain topology continuity:
-// 1. First, within each NUMA node (already sorted by sortAvailableNUMANodesForResize), sockets that have CPUs allocated to this container
-// 2. Then, other available sockets in the same NUMA node that don't have CPUs allocated yet
-//
-// This two-level ordering (NUMA nodes first, then sockets within each NUMA node) ensures that
-// during resize operations, the CPU allocator maintains affinity with previously allocated
-// topology elements, minimizing cross-NUMA and cross-socket memory access penalties.
-// see comment https://github.com/kubernetes/kubernetes/pull/140629#discussion_r3595055804 about partitioning
+// For resize operation, this function sorts sockets in a specific order to maintain topology continuity.
+// Within each NUMA node (already sorted by sortAvailableNUMANodesForResize):
+// 1. First, sockets with allocated CPUs for this container (retained CPUs)
+// 2. Then, other available sockets
 func (n *numaFirst) sortAvailableSocketsForResize() []int {
 	var result []int
 
@@ -324,14 +311,10 @@ func (n *numaFirst) sortAvailableSocketsForResize() []int {
 }
 
 // Sort available cores for resize when NUMA nodes are higher than sockets in the memory hierarchy.
-// For resize, this function sorts cores in a specific order to maintain topology continuity:
-// 1. First, within each socket (already sorted by sortAvailableSocketsForResize), cores that have CPUs allocated to this container
-// 2. Then, other available cores in the same socket that don't have CPUs allocated yet
-//
-// This three-level ordering (NUMA nodes -> sockets -> cores) ensures that during resize operations,
-// the CPU allocator maintains affinity with previously allocated topology elements at all levels,
-// minimizing cross-NUMA, cross-socket, and cross-core memory access penalties.
-// see comment https://github.com/kubernetes/kubernetes/pull/140629#discussion_r3595055804 about partitioning
+// For resize operation, this function sorts cores in a specific order to maintain topology continuity.
+// Within each socket (already sorted by sortAvailableSocketsForResize):
+// 1. First, cores with allocated CPUs for this container (retained CPUs)
+// 2. Then, other available cores
 func (n *numaFirst) sortAvailableCoresForResize() []int {
 	var result []int
 
@@ -354,27 +337,21 @@ func (n *numaFirst) sortAvailableCoresForResize() []int {
 
 // If sockets are higher in the memory hierarchy than NUMA nodes, then we take
 // from the set of NUMA Nodes as the first level for resize.
-// see comment https://github.com/kubernetes/kubernetes/pull/140629#discussion_r3595055804 about partitioning
 func (s *socketsFirst) takeFullFirstLevelForResize() {
 	s.acc.takeFullSocketsForResize()
 }
 
 // If sockets are higher in the memory hierarchy than NUMA nodes, then we take
 // from the set of sockets as the second level for resize.
-// see comment https://github.com/kubernetes/kubernetes/pull/140629#discussion_r3595055804 about partitioning
 func (s *socketsFirst) takeFullSecondLevelForResize() {
 	s.acc.takeFullNUMANodesForResize()
 }
 
 // Sort available NUMA nodes for resize when sockets are higher than NUMA nodes in the memory hierarchy.
-// For resize, this function sorts NUMA nodes in a specific order to maintain topology continuity:
-// 1. First, within each socket (already sorted by sortAvailableSocketsForResize), NUMA nodes that have CPUs allocated to this container
-// 2. Then, other available NUMA nodes in the same socket that don't have CPUs allocated yet
-//
-// This two-level ordering (sockets first, then NUMA nodes within each socket) ensures that during
-// resize operations, the CPU allocator maintains affinity with previously allocated topology elements,
-// minimizing cross-socket and cross-NUMA memory access penalties.
-// see comment https://github.com/kubernetes/kubernetes/pull/140629#discussion_r3595055804 about partitioning
+// For resize operation, this function sorts NUMA nodes in a specific order to maintain topology continuity.
+// Within each socket (already sorted by sortAvailableSocketsForResize):
+// 1. First, NUMA nodes with allocated CPUs for this container (retained CPUs)
+// 2. Then, other available NUMA nodes
 func (s *socketsFirst) sortAvailableNUMANodesForResize() []int {
 	var result []int
 
@@ -396,13 +373,9 @@ func (s *socketsFirst) sortAvailableNUMANodesForResize() []int {
 }
 
 // Sort available sockets for resize when sockets are higher than NUMA nodes in the memory hierarchy.
-// For resize, this function sorts sockets in a specific order to maintain topology continuity:
-// 1. First, sockets that have CPUs allocated to this container (intersection of allocated and available)
-// 2. Then, other available sockets that don't have CPUs allocated to this container yet
-//
-// This ordering ensures that during resize operations, the CPU allocator maintains affinity with
-// previously allocated sockets, minimizing cross-socket memory access penalties.
-// see comment https://github.com/kubernetes/kubernetes/pull/140629#discussion_r3595055804 about partitioning
+// For resize operation, this function sorts sockets in a specific order to maintain topology continuity.
+// 1. First, sockets with allocated CPUs for this container (retained CPUs)
+// 2. Then, other available sockets
 func (s *socketsFirst) sortAvailableSocketsForResize() []int {
 	var result []int
 
@@ -423,14 +396,10 @@ func (s *socketsFirst) sortAvailableSocketsForResize() []int {
 }
 
 // Sort available cores for resize when sockets are higher than NUMA nodes in the memory hierarchy.
-// For resize, this function sorts cores in a specific order to maintain topology continuity:
-// 1. First, within each NUMA node (already sorted by sortAvailableNUMANodesForResize), cores that have CPUs allocated to this container
-// 2. Then, other available cores in the same NUMA node that don't have CPUs allocated yet
-//
-// This three-level ordering (sockets -> NUMA nodes -> cores) ensures that during resize operations,
-// the CPU allocator maintains affinity with previously allocated topology elements at all levels,
-// minimizing cross-socket, cross-NUMA, and cross-core memory access penalties.
-// see comment https://github.com/kubernetes/kubernetes/pull/140629#discussion_r3595055804 about partitioning
+// For resize operation, this function sorts cores in a specific order to maintain topology continuity.
+// Within each NUMA node (already sorted by sortAvailableNUMANodesForResize):
+// 1. First, cores with allocated CPUs for this container (retained CPUs)
+// 2. Then, other available cores
 func (s *socketsFirst) sortAvailableCoresForResize() []int {
 	var result []int
 
@@ -585,11 +554,11 @@ func newCPUAccumulator(logger klog.Logger, topo *topology.CPUTopology, available
 // newCPUAccumulatorForResize creates a cpuAccumulator for CPU resize operations.
 //
 // Resizing operations involve two partitions (see https://github.com/kubernetes/kubernetes/pull/140629#discussion_r3595055804):
-// - Partition A: The initial priority seed - all allocations MUST include this
+// - Partition A: the initial priority seed - all allocations MUST include this
 // - Partition B: The grow pool
 //
 // For scale-up and scale-down, the partitions are determined differently:
-// - Partition A (seeded in this function):
+// - Partition A (retained CPUs):
 //   - For scale-up: currentlyAllocatedCPUs
 //   - For scale-down: baselineCPUs
 //
@@ -601,7 +570,7 @@ func newCPUAccumulator(logger klog.Logger, topo *topology.CPUTopology, available
 //   - baselineCPUs ⊆ currentlyAllocatedCPUs (baselineCPUs must be a subset of currentlyAllocatedCPUs)
 //   - baselineCPUs.Size() <= numCPUs (the number of CPUs to retain cannot exceed the requested total)
 //
-// TODO: In the next cycle, consider refactoring so that Partition A is also determined at the caller level.
+// TODO: In the beta stage, consider refactoring so that Partition A is also determined at the caller level.
 // This way, this function would only need to know about Partition A and Partition B, without needing
 // to distinguish between scale-up and scale-down scenarios.
 func newCPUAccumulatorForResize(logger klog.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuSortingStrategy CPUSortingStrategy, currentlyAllocatedCPUs cpuset.CPUSet, baselineCPUs cpuset.CPUSet) *cpuAccumulator {
@@ -731,22 +700,22 @@ func (a *cpuAccumulator) freeCPUs() []int {
 	return a.availableCPUSorter.sort()
 }
 
-// Return true if this NUMA node can be fully claimed by this Container (no CPUs allocated to other containers)
+// Returns true if this NUMA node can be fully claimed by this Container (no CPUs in this NUMA node allocated to other containers)
 func (a *cpuAccumulator) isFullNUMANodeForResize(numaID int) bool {
 	return a.resultDetails.CPUsInNUMANodes(numaID).Size()+a.details.CPUsInNUMANodes(numaID).Size() == a.topo.CPUDetails.CPUsInNUMANodes(numaID).Size()
 }
 
-// Return true if this socket can be fully claimed by this Container (no CPUs in this socket are allocated to other containers).
+// Returns true if this socket can be fully claimed by this Container (no CPUs in this socket are allocated to other containers).
 func (a *cpuAccumulator) isFullSocketForResize(socketID int) bool {
 	return a.resultDetails.CPUsInSockets(socketID).Size()+a.details.CPUsInSockets(socketID).Size() == a.topo.CPUDetails.CPUsInSockets(socketID).Size()
 }
 
-// Return true if this Core can be fully claimed by this Container (no CPUs in this Core are allocated to other containers).
+// Returns true if this Core can be fully claimed by this Container (no CPUs in this Core are allocated to other containers).
 func (a *cpuAccumulator) isFullCoreForResize(coreID int) bool {
 	return a.resultDetails.CPUsInCores(coreID).Size()+a.details.CPUsInCores(coreID).Size() == a.topo.CPUDetails.CPUsInCores(coreID).Size()
 }
 
-// Return true if this UncoreCache can be fully claimed by this Container (no CPUs in this UncoreCache are allocated to other containers).
+// Returns true if this UncoreCache can be fully claimed by this Container (no CPUs in this UncoreCache are allocated to other containers).
 func (a *cpuAccumulator) isFullUncoreCacheForResize(uncoreID int) bool {
 	return a.resultDetails.CPUsInUncoreCaches(uncoreID).Size()+a.details.CPUsInUncoreCaches(uncoreID).Size() == a.topo.CPUDetails.CPUsInUncoreCaches(uncoreID).Size()
 }
@@ -881,53 +850,57 @@ func (a *cpuAccumulator) sortAvailableCPUsSpread() []int {
 }
 
 // Sort all NUMA nodes with at least one free CPU for resize.
+//
+// The sorting follows a nested two-part ordering: elements with retained CPUs first, then other available elements. (different from add operation)
+// Within each part, elements are sorted by number of free CPUs they contain (ascending). (Same as add operation)
+//
+// If NUMA nodes are higher than sockets in the memory hierarchy (each NUMA node contains more than one socket),
+// the NUMA nodes are sorted directly: NUMA nodes with retained CPUs first, then other NUMA nodes.
+//
+// If instead sockets are higher in the memory hierarchy than NUMA nodes (each socket contains more than one NUMA node),
+//   1. First, sort sockets: sockets with retained CPUs first, then other sockets.
+//   2. Within each socket, sort NUMA nodes: NUMA nodes with retained CPUs first, then other NUMA nodes.
 func (a *cpuAccumulator) sortAvailableNUMANodesForResize() []int {
 	return a.numaOrSocketsFirst.sortAvailableNUMANodesForResize()
 }
 
 // Sort all sockets with at least one free CPU for resize.
+//
+// The sorting follows a nested two-part ordering: elements with retained CPUs first, then other available elements. (different from add operation)
+// Within each part, elements are sorted by number of free CPUs they contain (ascending). (Same as add operation)
+//
+// If NUMA nodes are higher in the memory hierarchy than sockets (each NUMA node contains more than one socket),
+//   1. First, sort NUMA nodes: NUMA nodes with retained CPUs first, then other NUMA nodes.
+//   2. Within each NUMA node, sort sockets: sockets with retained CPUs first, then other sockets.
+//
+// If instead sockets are higher than NUMA nodes in the memory hierarchy (each socket contains more than one NUMA node),
+// the sockets are sorted directly: sockets with retained CPUs first, then other sockets.
 func (a *cpuAccumulator) sortAvailableSocketsForResize() []int {
 	return a.numaOrSocketsFirst.sortAvailableSocketsForResize()
 }
 
-// Sort all cores with at least one free CPU.
+// Sort all cores with at least one free CPU for resize.
 //
-// If sockets are higher in the memory hierarchy than NUMA nodes, meaning that sockets contain a
-// bigger number of CPUs (free and busy) than NUMA nodes, or equivalently that each socket contains
-// more than one NUMA node, the cores are sorted as follows.
-// First part, sort the cores which contains the CPUs allocated to Container. and these cores
-// are sorted by number of free CPUs that they contain.
-// Second part, sort the cores contained in the NUMA nodes which contains the CPUs allocated to Container,
-// but exclude the cores in first part. these cores sorted by the rule as below
-// First, they are sorted by number of
-// free CPUs that their sockets contain. Then, for each socket, the cores in it are sorted by number
-// of free CPUs that their NUMA nodes contain. Then, for each NUMA node, the cores in it are sorted
-// by number of free CPUs that they contain. The order is always ascending.
-
-// If instead NUMA nodes are higher in the memory hierarchy than sockets, the sorting happens in the
-// same way as described in the previous paragraph.
+// The sorting follows a nested two-part ordering: elements with retained CPUs first, then other available elements. (different from add operation)
+// Within each part, elements are sorted by number of free CPUs they contain (ascending). (Same as add operation)
+//
+// If NUMA nodes are higher in the memory hierarchy than sockets (each NUMA node contains more than one socket), 
+//   1. First, sort NUMA nodes: NUMA nodes with retained CPUs first, then other NUMA nodes.
+//   2. Within each NUMA node, sort sockets: sockets with retained CPUs first, then other sockets.
+//   3. Within each socket, sort cores: cores with retained CPUs first, then other cores.
+//
+// If instead sockets are higher in the memory hierarchy than NUMA nodes (each socket contains more than one NUMA node),
+//   1. First, sort sockets: sockets with retained CPUs first, then other sockets.
+//   2. Within each socket, sort NUMA nodes: NUMA nodes with retained CPUs first, then other NUMA nodes.
+//   3. Within each NUMA node, sort cores: cores with retained CPUs first, then other cores.
 func (a *cpuAccumulator) sortAvailableCoresForResize() []int {
 	return a.numaOrSocketsFirst.sortAvailableCoresForResize()
 }
 
-// Sort all free CPUs.
+// Sort all free CPUs for resize.
 //
-// If sockets are higher in the memory hierarchy than NUMA nodes, meaning that sockets contain a
-// bigger number of CPUs (free and busy) than NUMA nodes, or equivalently that each socket contains
-// more than one NUMA node, the CPUs are sorted as follows.
-// First part, sort the cores which contains the CPUs allocated to Container. and these cores
-// are sorted by number of free CPUs that they contain. for each core, the CPUs in it are
-// sorted by numerical ID.
-// Second part, sort the cores contained in the NUMA nodes which contains the CPUs allocated to Container,
-// but exclude the cores in first part. these cores sorted by the rule as below
-// First, they are sorted by number of
-// free CPUs that their sockets contain. Then, for each socket, the CPUs in it are sorted by number
-// of free CPUs that their NUMA nodes contain. Then, for each NUMA node, the CPUs in it are sorted
-// by number of free CPUs that their cores contain. Finally, for each core, the CPUs in it are
-// sorted by numerical ID. The order is always ascending.
-//
-// If instead NUMA nodes are higher in the memory hierarchy than sockets, the sorting happens in the
-// same way as described in the previous paragraph.
+// First, uses sortAvailableCoresForResize() to determine the core ordering.
+// Then, sorts CPUs within each core by numerical ID. (Same as sortAvailableCPUsPacked)
 func (a *cpuAccumulator) sortAvailableCPUsPackedForResize() []int {
 	var result []int
 	for _, core := range a.sortAvailableCoresForResize() {
@@ -937,9 +910,10 @@ func (a *cpuAccumulator) sortAvailableCPUsPackedForResize() []int {
 	return result
 }
 
-// Sort all available CPUs:
-// - First by core using sortAvailableSocketsForResize().
-// - Then within each socket, sort cpus directly using the sort() algorithm defined above.
+// Sort all available CPUs for resize.
+//
+// First, uses sortAvailableSocketsForResize() to determine the socket ordering.
+// Then, sorts CPUs within each socket by numerical ID. (Same as sortAvailableCPUsSpread)
 func (a *cpuAccumulator) sortAvailableCPUsSpreadForResize() []int {
 	var result []int
 	for _, socket := range a.sortAvailableSocketsForResize() {
@@ -1075,6 +1049,8 @@ func (a *cpuAccumulator) takeRemainingCPUs() {
 	}
 }
 
+// takeFullUncoreForResize is the resize-aware variant of takeFullUncore.
+// Algorithm structure is identical, but calls isFullUncoreCacheForResize and sortAvailableUncoreCachesForResize.
 func (a *cpuAccumulator) takeFullUncoreForResize() {
 	for _, uncore := range a.sortAvailableUncoreCachesForResize() {
 		if a.isFullUncoreCacheForResize(uncore) {
@@ -1088,6 +1064,10 @@ func (a *cpuAccumulator) takeFullUncoreForResize() {
 	}
 }
 
+// takePartialUncoreForResize is the resize-aware variant of takePartialUncore.
+// But calls isFullCoreForResize and other ForResize functions.
+// Key difference: First, allocate CPUs from cores that already have retained CPUs in this UncoreCache.
+// Then, follow the same strategy as takePartialUncore to allocate remaining CPUs.
 func (a *cpuAccumulator) takePartialUncoreForResize(uncoreID int) {
 	// First to take the cores with allocated CPUs in this uncore when SMT/hyperthread is enabled
 	if a.topo.CPUsPerCore() != 1 {
@@ -1149,6 +1129,9 @@ func (a *cpuAccumulator) takePartialUncoreForResize(uncoreID int) {
 	a.take(freeCPUs)
 }
 
+// takeUncoreCacheForResize is the resize-aware variant of takeUncoreCache.
+// But calls takeFullUncoreForResize, takePartialUncoreForResize and sortAvailableUncoreCachesForResize.
+// Optimization: takeFullUncoreForResize is called once before the for loop (instead of inside the loop)
 func (a *cpuAccumulator) takeUncoreCacheForResize() {
 	// take full UncoreCache if the CPUs needed is greater than free UncoreCache size
 	a.takeFullUncoreForResize()
@@ -1165,6 +1148,8 @@ func (a *cpuAccumulator) takeUncoreCacheForResize() {
 	}
 }
 
+// takeFullNUMANodesForResize is the resize-aware variant of takeFullNUMANodes.
+// Algorithm structure is identical, but calls isFullNUMANodeForResize and sortAvailableNUMANodesForResize.
 func (a *cpuAccumulator) takeFullNUMANodesForResize() {
 	for _, numa := range a.sortAvailableNUMANodesForResize() {
 		if a.isFullNUMANodeForResize(numa) {
@@ -1178,6 +1163,8 @@ func (a *cpuAccumulator) takeFullNUMANodesForResize() {
 	}
 }
 
+// takeFullSocketsForResize is the resize-aware variant of takeFullSockets.
+// Algorithm structure is identical, but calls isFullSocketForResize and sortAvailableSocketsForResize.
 func (a *cpuAccumulator) takeFullSocketsForResize() {
 	for _, socket := range a.sortAvailableSocketsForResize() {
 		if a.isFullSocketForResize(socket) {
@@ -1191,6 +1178,8 @@ func (a *cpuAccumulator) takeFullSocketsForResize() {
 	}
 }
 
+// takeFullCoresForResize is the resize-aware variant of takeFullCores.
+// Algorithm structure is identical, but calls isFullCoreForResize and sortAvailableCoresForResize.
 func (a *cpuAccumulator) takeFullCoresForResize() {
 	for _, core := range a.sortAvailableCoresForResize() {
 		if a.isFullCoreForResize(core) {
@@ -1204,6 +1193,8 @@ func (a *cpuAccumulator) takeFullCoresForResize() {
 	}
 }
 
+// takeRemainingCPUsForResize is the resize-aware variant of takeRemainingCPUs.
+// Algorithm structure is identical, but calls sortForResize on availableCPUSorter.
 func (a *cpuAccumulator) takeRemainingCPUsForResize() {
 	for _, cpu := range a.availableCPUSorter.sortForResize() {
 		a.logger.V(4).Info("takeRemainingCPUsForResize: claiming CPU", "cpu", cpu)
@@ -1722,8 +1713,29 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 }
 
 // NUMA Distributed Strategy for Resize
-// When distributing CPUs evenly across NUMA nodes, this strategy considers CPUs already allocated to this container.
-// This ensures both retained CPUs and newly allocated CPUs are balanced across NUMA nodes during resize operations.
+//
+// When distributing CPUs evenly across NUMA nodes, this strategy considers retained CPUs
+// (currentlyAllocatedCPUs for scale-up, baselineCPUs for scale-down).
+// This ensures both retained CPUs and newly allocated CPUs are balanced across NUMA nodes
+// during resize operations.
+//
+// Key differences from add operation (takeByTopologyNUMADistributed):
+// 1. **Retained CPUs preservation**: Before allocating new CPUs, the function preserves
+//    retained CPUs.
+//    These CPUs must be included in the final result.
+// 2. **NUMA node sorting priority**: When sorting NUMA nodes, prioritize nodes that have
+//    retained CPUs, ensuring topology continuity during resize operations.
+// 3. **NUMA node combination constraint**: The selected NUMA node combination must include
+//    all NUMA nodes with retained CPUs. minNUMAs cannot be less than the number of
+//    NUMA nodes with retained CPUs.
+// 4. **CPU group calculation**: When calculating the number of CPU groups, consider both
+//    available CPUs (acc.details) and retained CPUs (acc.resultDetails), not just available CPUs.
+// 5. **Remainder CPU allocation**: Subtract allocatedRemainder when calculating remainder CPUs
+//    to avoid double-counting retained CPUs.
+// 6. **Balance score calculation**: When calculating the balance score, consider the impact of
+//    retained CPUs on the balance across NUMA nodes.
+// 7. **Final CPU allocation**: Call takeByTopologyNUMAPackedForResize with retained CPUs,
+//    and only take the difference (newly allocated CPUs) to avoid duplicating retained CPUs.
 func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuGroupSize int, cpuSortingStrategy CPUSortingStrategy, alignBySocket bool, currentlyAllocatedCPUs cpuset.CPUSet, baselineCPUs cpuset.CPUSet) (cpuset.CPUSet, error) {
 	// If the number of CPUs requested cannot be handed out in chunks of
 	// 'cpuGroupSize', then we just call out the packing algorithm since we
@@ -1743,7 +1755,7 @@ func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.C
 	}
 
 	// Otherwise build an accumulator to start allocating CPUs from.
-	// For resize: Using newCPUAccumulatorForResize to take the
+	// For resize operations, use newCPUAccumulatorForResize to take the
 	// retained CPU (currentlyAllocatedCPUs for scale up, baselineCPUs for scale down) first.
 	acc := newCPUAccumulatorForResize(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy, currentlyAllocatedCPUs, baselineCPUs)
 	if acc.isSatisfied() {
@@ -1754,7 +1766,7 @@ func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.C
 	}
 
 	// Get the list of NUMA nodes represented by the set of CPUs in 'availableCPUs'.
-	// For resize: Using sortAvailableNUMANodesForResize to prioritize NUMA nodes that already have CPUs allocated to this container,
+	// For resize operations, use sortAvailableNUMANodesForResize to prioritize NUMA nodes with retained CPUs,
 	// ensuring topology continuity during resize operations.
 	numas := acc.sortAvailableNUMANodesForResize()
 
@@ -1762,9 +1774,9 @@ func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.C
 	// could satisfy this request. This is used to optimize how many iterations
 	// of the loop we need to go through below.
 	minNUMAs, maxNUMAs := acc.rangeNUMANodesNeededToSatisfy(cpuGroupSize, numCPUs)
-	// For resize: During resize, minNUMAs should not be less than the number of
-	// NUMA nodes that already have CPUs allocated to this container, ensuring we
-	// consider combinations that include all currently allocated NUMA nodes.
+	// For resize operations, minNUMAs should not be less than the number of
+	// NUMA nodes with retained CPUs, ensuring we consider combinations that
+	// include all NUMA nodes with retained CPUs.
 	minNUMAs = max(minNUMAs, acc.resultDetails.NUMANodes().Size())
 
 	// Try combinations of 1,2,3,... NUMA nodes until we find a combination
@@ -1787,7 +1799,7 @@ func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.C
 				return Break
 			}
 
-			// For resize: Ensure the combination includes all NUMA nodes that already have CPUs allocated to this container.
+			// For resize operations, ensure the combination includes all NUMA nodes with retained CPUs.
 			comboSet := cpuset.New(combo...)
 			if !acc.resultDetails.NUMANodes().IsSubsetOf(comboSet) {
 				return Continue
@@ -1796,7 +1808,7 @@ func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.C
 			// Check that this combination of NUMA nodes has enough CPUs to
 			// satisfy the allocation overall.
 			cpus := acc.details.CPUsInNUMANodes(combo...)
-			// For resize: acc.result contains already allocated CPUs that should be counted.
+			// For resize operations, acc.result contains retained CPUs that should be counted.
 			if (cpus.Size() + acc.result.Size()) < numCPUs {
 				return Continue
 			}
@@ -1805,7 +1817,7 @@ func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.C
 			// 'cpuGroupSize' across the NUMA nodes in this combo.
 			numCPUGroups := 0
 			for _, numa := range combo {
-				// For resize: Count both available CPUs (acc.details) and already allocated CPUs (acc.resultDetails)
+				// For resize operations, count both available CPUs (acc.details) and retained CPUs (acc.resultDetails)
 				// to determine how many CPU groups can be formed from this NUMA node.
 				numCPUGroups += ((acc.details.CPUsInNUMANodes(numa).Size() + acc.resultDetails.CPUsInNUMANodes(numa).Size()) / cpuGroupSize)
 			}
@@ -1820,7 +1832,7 @@ func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.C
 				for _, numa := range combo {
 					// distribution should not be more than available CPUs
 					// in each NUMA node in combo if alignBySocket is set.
-					// For resize: Count both available CPUs (acc.details) and already allocated CPUs (acc.resultDetails)
+					// For resize operations, count both available CPUs (acc.details) and retained CPUs (acc.resultDetails)
 					// to determine the maximum CPUs that can be assigned from this NUMA node.
 					availableCPUsInNUMA := (acc.details.CPUsInNUMANodes(numa).Size() + acc.resultDetails.CPUsInNUMANodes(numa).Size()) / cpuGroupSize * cpuGroupSize
 					if distribution > availableCPUsInNUMA {
@@ -1830,7 +1842,7 @@ func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.C
 			}
 			// Check that each NUMA node in this combination can allocate
 			// an even distribution of CPUs in groups of size 'cpuGroupSize'.
-			// For resize: Each NUMA node can have at most
+			// For resize operations, each NUMA node can have at most
 			// (distribution + neededRemainder) CPUs because a single NUMA node could
 			// potentially receive all neededRemainder CPUs.
 			// allocatedRemainder tracks how many remainder CPUs have already been allocated
@@ -1842,12 +1854,13 @@ func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.C
 			for _, numa := range combo {
 				cpus := acc.details.CPUsInNUMANodes(numa)
 				allocateCpus := acc.resultDetails.CPUsInNUMANodes(numa)
-				// For resize: Skip NUMA early if its total CPUs (available + already allocated) has less CPUs than distribution or has more CPUs than (distribution + neededRemainder).
+				// For resize operations, skip NUMA early if its total CPUs (available + retained) is less than distribution
+				// or has more CPUs than (distribution + neededRemainder).
 				if (cpus.Size()+allocateCpus.Size()) < distribution || allocateCpus.Size() > (distribution+neededRemainder) {
 					return Continue
 				}
-				// For resize: Increase total allocated remainder by remainder CPUs (beyond the base distribution)
-				// already allocated to this NUMA node.
+				// For resize operations, increase total allocated remainder by remainder CPUs (beyond the base distribution)
+				// on this NUMA node.
 				if allocateCpus.Size() > distribution {
 					allocatedRemainder += allocateCpus.Size() - distribution
 				}
@@ -1862,12 +1875,12 @@ func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.C
 				availableAfterAllocation[numa] = acc.details.CPUsInNUMANodes(numa).Size()
 			}
 			for _, numa := range combo {
-				// For resize: Update availableAfterAllocation considering already allocated CPUs.
+				// For resize operations, update availableAfterAllocation considering retained CPUs.
 				if acc.resultDetails.CPUsInNUMANodes(numa).Size() > distribution {
-					// For resize: If already allocated exceeds distribution, subtract the already allocated amount
+					// For resize operations, if retained CPUs exceed distribution, subtract the retained amount
 					availableAfterAllocation[numa] -= acc.resultDetails.CPUsInNUMANodes(numa).Size()
 				} else {
-					// For resize: Can still receive more CPUs up to distribution
+					// For resize operations, this NUMA node can still receive more CPUs up to distribution
 					availableAfterAllocation[numa] -= (distribution - acc.resultDetails.CPUsInNUMANodes(numa).Size())
 				}
 			}
@@ -1875,11 +1888,11 @@ func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.C
 			// Check if there are any remaining CPUs to distribute across the
 			// NUMA nodes once CPUs have been evenly distributed in groups of
 			// size 'cpuGroupSize'.
-			// For resize: Subtract allocatedRemainder when calculating remainder,
+			// For resize operations, subtract allocatedRemainder when calculating remainder
 			remainder := numCPUs - (distribution * len(combo)) - allocatedRemainder
 
-			// For resize: If remainder is negative, it means the initial allocation is unbalanced across NUMA nodes
-			// (more NUMA nodes have more than distribution CPUs but smaller the distribution + neededRemainder). Skip this combo.
+			// For resize operations, if remainder is negative, it means the initial allocation is unbalanced across NUMA nodes
+			// (more NUMA nodes have more than distribution CPUs but less than distribution + neededRemainder). Skip this combo.
 			if remainder < 0 {
 				return Continue
 			}
@@ -2008,15 +2021,15 @@ func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.C
 		// consider alignBySocket); that happened when choosing bestCombo. Here we
 		// only ensure we do not ask any selected NUMA node for more CPUs than it can provide.
 		for _, numa := range bestCombo {
-			// For resize: Count both available CPUs (acc.details) and already allocated CPUs (acc.resultDetails)
+			// For resize operations, count both available CPUs (acc.details) and retained CPUs (acc.resultDetails)
 			// to determine the maximum CPUs that can be assigned from this NUMA node.
 			availableCPUsInNUMA := (acc.details.CPUsInNUMANodes(numa).Size() + acc.resultDetails.CPUsInNUMANodes(numa).Size()) / cpuGroupSize * cpuGroupSize
 			if distribution > availableCPUsInNUMA {
 				distribution = availableCPUsInNUMA
 			}
 		}
-		// For resize: Allocate 'distribution' CPUs from each NUMA node in bestCombo.
-		// Pass already allocated CPUs (allocatedCPUs) to takeByTopologyNUMAPackedForResize,
+		// For resize operations, allocate 'distribution' CPUs from each NUMA node in bestCombo.
+		// Pass retained CPUs (allocatedCPUs) to takeByTopologyNUMAPackedForResize,
 		// which will preserve them and only allocate additional CPUs.
 		// Skip NUMA nodes that have already reached or exceeded the distribution target.
 		for _, numa := range bestCombo {
@@ -2033,7 +2046,7 @@ func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.C
 
 		// Then allocate any remaining CPUs in groups of size 'cpuGroupSize'
 		// from each NUMA node in the remainder set for remainder > 0.
-		// For resize: Subtract bestAllocatedRemainder because those Remainder have already allocated.
+		// For resize operations, subtract bestAllocatedRemainder because those remainder CPUs are already allocated.
 		remainder := numCPUs - (distribution * len(bestCombo)) - bestAllocatedRemainder
 		for remainder > 0 {
 			for _, numa := range bestRemainder {
@@ -2043,8 +2056,8 @@ func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.C
 				if acc.details.CPUsInNUMANodes(numa).Size() < cpuGroupSize {
 					continue
 				}
-				// For resize: Allocate 1 extra cpuGroupSize to this NUMA node as remainder.
-				// Pass already allocated CPUs (allocatedCPUs) to takeByTopologyNUMAPackedForResize,
+				// For resize operations, allocate 1 extra cpuGroupSize to this NUMA node as remainder.
+				// Pass retained CPUs (allocatedCPUs) to takeByTopologyNUMAPackedForResize,
 				// which will preserve them and allocate additional CPUs to reach needCPUsInNuma.
 				allocatedCPUs := acc.resultDetails.CPUsInNUMANodes(numa)
 				needCPUsInNuma := allocatedCPUs.Size() + cpuGroupSize
@@ -2078,10 +2091,25 @@ func takeByTopologyNUMADistributedForResize(logger klog.Logger, topo *topology.C
 	return takeByTopologyNUMAPackedForResize(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy, false, currentlyAllocatedCPUs, baselineCPUs)
 }
 
-// NUMA Packed Strategy for Resize
-// Packs CPUs tightly on NUMA nodes while considering CPUs already allocated to this container.
-// This ensures both retained CPUs and newly allocated CPUs are as close as possible in the topology hierarchy during resize operations.
-// Algorithm structure is identical to takeByTopologyNUMAPacked - the only difference is calling the ForResize variants.
+// takeByTopologyNUMAPackedForResize returns a CPUSet of size 'numCPUs' for resize operations.
+//
+// Algorithm structure is identical to takeByTopologyNUMAPacked, but calls different functions
+// with "ForResize" suffix that are aware of retained CPUs.
+//
+// Key differences from takeByTopologyNUMAPacked:
+//
+// 1. **Retained CPUs are preserved**: Before allocating new CPUs, the function preserves
+//    CPUs that should be retained (currentlyAllocatedCPUs for scale-up, baselineCPUs for scale-down).
+//    These retained CPUs must be included in the final result.
+//
+// 2. **Priority to retained topology elements**: When sorting each topology elements (NUMA nodes,
+//    sockets, UncoreCache, cores), elements that have retained CPUs are prioritized, followed by
+//    other available elements. This two-part ordering ensures topology continuity and keeps
+//    retained and newly allocated CPUs close in the topology hierarchy.
+//
+// 3. **Two-part CPU pool consideration**: When determining if a topology element can be fully
+//    claimed, both available CPUs (free pool) and retained CPUs (to this container) are
+//    considered together.
 func takeByTopologyNUMAPackedForResize(logger klog.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuSortingStrategy CPUSortingStrategy, preferAlignByUncoreCache bool, currentlyAllocatedCPUs cpuset.CPUSet, baselineCPUs cpuset.CPUSet) (cpuset.CPUSet, error) {
 
 	// If the number of CPUs requested to be retained is not a subset
@@ -2092,6 +2120,7 @@ func takeByTopologyNUMAPackedForResize(logger klog.Logger, topo *topology.CPUTop
 		}
 	}
 
+	// Resize Step 1: Preserve retained CPUs (currentlyAllocatedCPUs for scale-up, baselineCPUs for scale-down)
 	acc := newCPUAccumulatorForResize(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy, currentlyAllocatedCPUs, baselineCPUs)
 	if acc.isSatisfied() {
 		return acc.result, nil
@@ -2105,6 +2134,7 @@ func takeByTopologyNUMAPackedForResize(logger klog.Logger, topo *topology.CPUTop
 	//    requires at least a NUMA node or socket's-worth of CPUs. If NUMA
 	//    Nodes map to 1 or more sockets, pull from NUMA nodes first.
 	//    Otherwise pull from sockets first.
+	// Resize Step 2: Take full NUMA nodes/sockets with retained CPUs first, then other full NUMA nodes/sockets.
 	acc.numaOrSocketsFirst.takeFullFirstLevelForResize()
 	if acc.isSatisfied() {
 		return acc.result, nil
@@ -2118,6 +2148,7 @@ func takeByTopologyNUMAPackedForResize(logger klog.Logger, topo *topology.CPUTop
 	// 2. If PreferAlignByUncoreCache is enabled, acquire whole UncoreCaches
 	//    if available and the container requires at least a UncoreCache's-worth
 	//    of CPUs. Otherwise, acquire CPUs from the least amount of UncoreCaches.
+	// Resize Step 3: Within each sorted NUMA node/socket, take full UncoreCaches with retained CPUs first, then other full UncoreCaches.
 	if preferAlignByUncoreCache {
 		acc.takeUncoreCacheForResize()
 		if acc.isSatisfied() {
@@ -2128,6 +2159,7 @@ func takeByTopologyNUMAPackedForResize(logger klog.Logger, topo *topology.CPUTop
 	// 3. Acquire whole cores, if available and the container requires at least
 	//    a core's-worth of CPUs.
 	//    If `CPUSortingStrategySpread` is specified, skip taking the whole core.
+	// Resize Step 4: Within each sorted NUMA node/socket, take full cores with retained CPUs first, then other full cores.
 	if cpuSortingStrategy != CPUSortingStrategySpread {
 		acc.takeFullCoresForResize()
 		if acc.isSatisfied() {
@@ -2138,6 +2170,7 @@ func takeByTopologyNUMAPackedForResize(logger klog.Logger, topo *topology.CPUTop
 	// 4. Acquire single threads, preferring to fill partially-allocated cores
 	//    on the same sockets as the whole cores we have already taken in this
 	//    allocation.
+	// Resize Step 5: Within each sorted cores, take partially-allocated cores first, then other CPUs.
 	acc.takeRemainingCPUsForResize()
 	if acc.isSatisfied() {
 		return acc.result, nil
