@@ -97,6 +97,8 @@ var (
 	ErrResizePodInPlace = errors.New("ResizePodInPlaceError")
 	// ErrRemoveContainer returned when runtime failed to remove a container.
 	ErrRemoveContainer = errors.New("RemoveContainerError")
+	// ErrPrepareDynamicResources returned when runtime failed to prepare dynamic resources for a pod.
+	ErrPrepareDynamicResources = errors.New("PrepareDynamicResourcesError")
 )
 
 // SyncAction indicates different kind of actions in SyncPod() and KillPod(). Now there are only actions
@@ -120,6 +122,8 @@ const (
 	ResizePodInPlace SyncAction = "ResizePodInPlace"
 	// RemoveContainer action
 	RemoveContainer SyncAction = "RemoveContainer"
+	// PrepareDynamicResources action
+	PrepareDynamicResources SyncAction = "PrepareDynamicResources"
 )
 
 // SyncResult is the result of sync action.
