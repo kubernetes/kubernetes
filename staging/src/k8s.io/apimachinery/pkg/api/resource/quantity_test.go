@@ -560,8 +560,10 @@ func TestQuantityParse(t *testing.T) {
 
 func TestInterpretExponentInt32Bounds(t *testing.T) {
 	// interpret parses the exponent at 64 bits but stores it in an int32 scale
-	// that is later negated, so the usable range is [-MaxInt32, MaxInt32].
-	// Anything outside it is rejected, not truncated to an unrelated value.
+	// that is later negated, so it accepts [-MaxInt32, MaxInt32] and rejects
+	// anything past it, instead of narrowing it to an unrelated value. This
+	// checks interpret's suffix-layer bounds only, not what the rest of
+	// ParseQuantity does with an accepted exponent.
 	cases := []struct {
 		suffix  string
 		wantExp int32
