@@ -53,6 +53,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.CPUCFSQuota = true
 			obj.EventBurst = 10
 			obj.EventRecordQPS = 5
+			obj.EventNamespace = ""
 			obj.EnableControllerAttachDetach = true
 			obj.EnableDebuggingHandlers = true
 			obj.EnableSystemLogQuery = false
