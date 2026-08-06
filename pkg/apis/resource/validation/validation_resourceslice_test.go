@@ -2069,6 +2069,28 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 			oldResourceSlice: validResourceSlice,
 			update:           func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice { return slice },
 		},
+		"disable-allow-multiple-keeps-request-policy": {
+			consumableCapacityFeatureGate: true,
+			oldResourceSlice:              testResourceSliceWithConsumableCapacity(name, name, name, 1),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Devices[0].AllowMultipleAllocations = ptr.To(false)
+				return slice
+			},
+			wantFailures: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "devices").Index(0).Child("capacity").Key("a").Child("requestPolicy"), "allowMultipleAllocations must be true"),
+			},
+		},
+		"unset-allow-multiple-keeps-request-policy": {
+			consumableCapacityFeatureGate: true,
+			oldResourceSlice:              testResourceSliceWithConsumableCapacity(name, name, name, 1),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Devices[0].AllowMultipleAllocations = nil
+				return slice
+			},
+			wantFailures: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "devices").Index(0).Child("capacity").Key("a").Child("requestPolicy"), "allowMultipleAllocations must be true"),
+			},
+		},
 		"invalid-name-update": {
 			oldResourceSlice: validResourceSlice,
 			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
