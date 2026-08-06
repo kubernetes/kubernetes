@@ -19,12 +19,14 @@ package yaml
 import (
 	"bufio"
 	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"strings"
 	"unicode"
+	"unicode/utf16"
 	"unicode/utf8"
 
 	jsonutil "k8s.io/apimachinery/pkg/util/json"
@@ -276,10 +278,14 @@ func (e YAMLSyntaxError) Error() string {
 // or JSON documents from the given reader as a stream. bufferSize determines
 // how far into the stream the decoder will look to figure out whether this
 // is a JSON stream (has whitespace followed by an open brace).
+//
+// Input that begins with a UTF-16 BOM is transcoded to UTF-8 first so that
+// line-oriented YAML framing (which assumes UTF-8 newlines) does not corrupt
+// the stream. This matches kubectl/cli-runtime file loading behavior.
 func NewYAMLOrJSONDecoder(r io.Reader, bufferSize int) *YAMLOrJSONDecoder {
 	d := &YAMLOrJSONDecoder{}
 
-	reader, _, mightBeJSON := GuessJSONStream(r, bufferSize)
+	reader, _, mightBeJSON := GuessJSONStream(readerWithUTF8(r), bufferSize)
 	d.stream = reader
 	if mightBeJSON {
 		d.json = json.NewDecoder(reader)
@@ -395,9 +401,57 @@ type YAMLReader struct {
 }
 
 func NewYAMLReader(r *bufio.Reader) *YAMLReader {
-	return &YAMLReader{
-		reader: &LineReader{reader: r},
+	utf8Reader := readerWithUTF8(r)
+	br, ok := utf8Reader.(*bufio.Reader)
+	if !ok {
+		br = bufio.NewReader(utf8Reader)
 	}
+	return &YAMLReader{
+		reader: &LineReader{reader: br},
+	}
+}
+
+// readerWithUTF8 returns a reader that yields UTF-8 bytes.
+// If r begins with a UTF-16 LE/BE BOM, the remainder is decoded to UTF-8.
+// Otherwise r is returned buffered and unchanged (including UTF-8 BOM).
+func readerWithUTF8(r io.Reader) io.Reader {
+	br := bufio.NewReader(r)
+	bom, err := br.Peek(2)
+	if len(bom) < 2 {
+		return br
+	}
+	if err != nil && err != io.EOF { //nolint:errorlint
+		return br
+	}
+
+	var order binary.ByteOrder
+	switch {
+	case bom[0] == 0xff && bom[1] == 0xfe:
+		order = binary.LittleEndian
+	case bom[0] == 0xfe && bom[1] == 0xff:
+		order = binary.BigEndian
+	default:
+		return br
+	}
+
+	// Consume the BOM; remaining bytes are UTF-16 code units.
+	if _, err := br.Discard(2); err != nil {
+		return br
+	}
+	rest, err := io.ReadAll(br)
+	if err != nil {
+		return io.MultiReader(bytes.NewReader(bom), bytes.NewReader(rest), br)
+	}
+	if len(rest)%2 != 0 {
+		// Incomplete UTF-16; pass the original bytes through unchanged.
+		return bytes.NewReader(append(append([]byte{}, bom...), rest...))
+	}
+
+	u16s := make([]uint16, len(rest)/2)
+	for i := range u16s {
+		u16s[i] = order.Uint16(rest[i*2:])
+	}
+	return bytes.NewReader([]byte(string(utf16.Decode(u16s))))
 }
 
 // Read returns a full YAML document.
