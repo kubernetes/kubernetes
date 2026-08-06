@@ -226,7 +226,7 @@ var _ = SIGDescribe("InitContainer", framework.WithNodeConformance(), func() {
 		event, err := watchtools.Until(ctx, startedPod.ResourceVersion, w,
 			recordEvents(events, conditions.PodCompleted),
 		)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to watchtools.Until(ctx, startedPod.ResourceVersion, w,")
 
 		checkInvariants(events, containerInitInvariant)
 		endPod := event.Object.(*v1.Pod)
@@ -305,7 +305,7 @@ var _ = SIGDescribe("InitContainer", framework.WithNodeConformance(), func() {
 		ctx, cancel := watchtools.ContextWithOptionalTimeout(ctx, framework.PodStartTimeout)
 		defer cancel()
 		event, err := watchtools.Until(ctx, startedPod.ResourceVersion, w, recordEvents(events, conditions.PodRunning))
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to watchtools.Until(ctx, startedPod.ResourceVersion, w, recordEvents(events, con...")
 
 		checkInvariants(events, containerInitInvariant)
 		endPod := event.Object.(*v1.Pod)
@@ -437,7 +437,7 @@ var _ = SIGDescribe("InitContainer", framework.WithNodeConformance(), func() {
 				}
 			},
 		)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to watchtools.Until(")
 
 		checkInvariants(events, containerInitInvariant)
 		endPod := event.Object.(*v1.Pod)
@@ -552,7 +552,7 @@ var _ = SIGDescribe("InitContainer", framework.WithNodeConformance(), func() {
 				}),
 			recordEvents(events, conditions.PodCompleted),
 		)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to watchtools.Until(")
 
 		checkInvariants(events, containerInitInvariant)
 		endPod := event.Object.(*v1.Pod)

@@ -57,10 +57,10 @@ func (r *ReplicaSetUpgradeTest) Setup(ctx context.Context, f *framework.Framewor
 	ginkgo.By(fmt.Sprintf("Creating replicaset %s in namespace %s", rsName, ns))
 	replicaSet := newReplicaSet(rsName, ns, 1, map[string]string{"test": "upgrade"}, "nginx", nginxImage)
 	rs, err := c.AppsV1().ReplicaSets(ns).Create(ctx, replicaSet, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.AppsV1().ReplicaSets(ns).Create(ctx, replicaSet, metav1.CreateOptions{})")
 
 	ginkgo.By(fmt.Sprintf("Waiting for replicaset %s to have all of its replicas ready", rsName))
-	framework.ExpectNoError(e2ereplicaset.WaitForReadyReplicaSet(ctx, c, ns, rsName))
+	framework.ExpectNoError(e2ereplicaset.WaitForReadyReplicaSet(ctx, c, ns, rsName), "failed to e2ereplicaset.WaitForReadyReplicaSet(ctx, c, ns, rsName)")
 
 	r.UID = rs.UID
 }
@@ -78,23 +78,23 @@ func (r *ReplicaSetUpgradeTest) Test(ctx context.Context, f *framework.Framework
 	// Verify the RS is the same (survives) after the upgrade
 	ginkgo.By(fmt.Sprintf("Checking UID to verify replicaset %s survives upgrade", rsName))
 	upgradedRS, err := rsClient.Get(ctx, rsName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to rsClient.Get(ctx, rsName, metav1.GetOptions{})")
 	if upgradedRS.UID != r.UID {
-		framework.ExpectNoError(fmt.Errorf("expected same replicaset UID: %v got: %v", r.UID, upgradedRS.UID))
+		framework.ExpectNoError(fmt.Errorf("expected same replicaset UID: %v got: %v", r.UID, upgradedRS.UID), "failed to rsClient.Get(ctx, rsName, metav1.GetOptions{})")
 	}
 
 	ginkgo.By(fmt.Sprintf("Waiting for replicaset %s to have all of its replicas ready after upgrade", rsName))
-	framework.ExpectNoError(e2ereplicaset.WaitForReadyReplicaSet(ctx, c, ns, rsName))
+	framework.ExpectNoError(e2ereplicaset.WaitForReadyReplicaSet(ctx, c, ns, rsName), "failed to e2ereplicaset.WaitForReadyReplicaSet(ctx, c, ns, rsName)")
 
 	// Verify the upgraded RS is active by scaling up the RS to scaleNum and ensuring all pods are Ready
 	ginkgo.By(fmt.Sprintf("Scaling up replicaset %s to %d", rsName, scaleNum))
 	_, err = e2ereplicaset.UpdateReplicaSetWithRetries(c, ns, rsName, func(rs *appsv1.ReplicaSet) {
 		*rs.Spec.Replicas = scaleNum
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2ereplicaset.UpdateReplicaSetWithRetries(c, ns, rsName, func(rs *appsv1.Repl...")
 
 	ginkgo.By(fmt.Sprintf("Waiting for replicaset %s to have all of its replicas ready after scaling", rsName))
-	framework.ExpectNoError(e2ereplicaset.WaitForReadyReplicaSet(ctx, c, ns, rsName))
+	framework.ExpectNoError(e2ereplicaset.WaitForReadyReplicaSet(ctx, c, ns, rsName), "failed to e2ereplicaset.WaitForReadyReplicaSet(ctx, c, ns, rsName)")
 }
 
 // Teardown cleans up any remaining resources.

@@ -592,7 +592,7 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 			nodes := drautils.NewNodesNow(tCtx, 1, 4)
 			if tc.requiresHugepages {
 				node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodes.NodeNames[0], metav1.GetOptions{})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Nodes().Get(ctx, nodes.NodeNames[0], metav1.GetOptions{})")
 				if limit, exists := node.Status.Allocatable[v1.ResourceName("hugepages-2Mi")]; !exists || limit.IsZero() {
 					ginkgo.Skip("Skipping hugepages test because Node does not support hugepages-2Mi")
 				}
@@ -630,7 +630,7 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 			// Verify Pod-level cgroups on the node
 			ginkgo.By("verifying pod cgroup limits on the node")
 			err := cgroups.VerifyPodCgroups(ctx, f, pod, &tc.expectedPodCgroup)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to cgroups.VerifyPodCgroups(ctx, f, pod, &tc.expectedPodCgroup)")
 
 			ginkgo.By("verifying containers cgroup limits on the node")
 			onCgroupV2 := cgroups.IsPodOnCgroupv2Node(f, pod.Name, pod.Spec.Containers[0].Name)
@@ -643,25 +643,25 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 					expectedContainer.Resources.Requests = container.Resources.Requests
 				}
 				err = cgroups.VerifyContainerCgroupValues(ctx, f, pod, expectedContainer, onCgroupV2)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "failed to cgroups.VerifyContainerCgroupValues(ctx, f, pod, expectedContainer, onCgroupV2)")
 			}
 
 			if tc.requiresHugepages {
 				ginkgo.By("verifying pod hugepages limits on the node")
 				err = cgroups.VerifyPodHugepagesLimit(ctx, f, pod, "2MB", tc.expectedPodHugepagesLimit, onCgroupV2)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "failed to cgroups.VerifyPodHugepagesLimit(ctx, f, pod, '2MB', tc.expectedPodHugepagesLi...")
 
 				ginkgo.By("verifying containers hugepages limits on the node")
 				for i, container := range pod.Spec.Containers {
 					err = cgroups.VerifyContainerHugepagesLimit(ctx, f, pod, container.Name, "2MB", tc.expectedContainerHugepagesLimits[i], onCgroupV2)
-					framework.ExpectNoError(err)
+					framework.ExpectNoError(err, "failed to cgroups.VerifyContainerHugepagesLimit(ctx, f, pod, container.Name, '2MB', tc....")
 				}
 			}
 
 			ginkgo.By("verifying containers oom_score_adj matches QoS rules with overhead")
 			// Retrieve node capacity to check exact adjustment
 			node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, pod.Spec.NodeName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Nodes().Get(ctx, pod.Spec.NodeName, metav1.GetOptions{})")
 			nodeMemBytes := node.Status.Capacity.Memory().Value()
 
 			qosClass := v1qos.GetPodQOS(pod)
@@ -676,7 +676,7 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 					expectedScore = computeExpectedOomScoreAdj(tc.expectedContainersScoreMemRequest[i], nodeMemBytes)
 				}
 				err = cgroups.VerifyOomScoreAdjValue(f, pod, container.Name, fmt.Sprintf("%d", expectedScore))
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "failed to cgroups.VerifyOomScoreAdjValue(f, pod, container.Name, fmt.Sprintf('%d', expe...")
 			}
 
 			ginkgo.By("deleting pods")
@@ -886,14 +886,14 @@ func doNodeAllocatableResizeTests(f *framework.Framework) {
 
 			ginkgo.By("patching the pod for resize")
 			patchedPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Patch(ctx, pod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Pods(f.Namespace.Name).Patch(ctx, pod.Name, types.Strate...")
 
 			ginkgo.By("waiting for resize actuation to complete")
 			resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, pod, desiredContainers)
 
 			ginkgo.By("verifying updated pod cgroup limits after resize")
 			err = cgroups.VerifyPodCgroups(ctx, f, resizedPod, &tc.expectedPodCgroupAfterResize)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to cgroups.VerifyPodCgroups(ctx, f, resizedPod, &tc.expectedPodCgroupAfterResize)")
 
 			ginkgo.By("verifying updated container cgroup limits after resize")
 			onCgroupV2 := cgroups.IsPodOnCgroupv2Node(f, resizedPod.Name, resizedPod.Spec.Containers[0].Name)
@@ -906,11 +906,11 @@ func doNodeAllocatableResizeTests(f *framework.Framework) {
 					expectedContainer.Resources.Requests = container.Resources.Requests
 				}
 				err = cgroups.VerifyContainerCgroupValues(ctx, f, resizedPod, expectedContainer, onCgroupV2)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "failed to cgroups.VerifyContainerCgroupValues(ctx, f, resizedPod, expectedContainer, on...")
 			}
 
 			ginkgo.By("verifying pod status updates match spec after resize")
-			framework.ExpectNoError(verifyDRAPodLevelStatusResources(resizedPod, tc.expectedPodAllocatedResourcesAfterResize))
+			framework.ExpectNoError(verifyDRAPodLevelStatusResources(resizedPod, tc.expectedPodAllocatedResourcesAfterResize), "failed to verifyDRAPodLevelStatusResources(resizedPod, tc.expectedPodAllocatedResources...")
 
 			ginkgo.By("verifying pod spec resources after patch")
 			podresize.VerifyPodResources(patchedPod, desiredContainers, desiredPodResources)

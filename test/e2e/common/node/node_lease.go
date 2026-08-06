@@ -45,7 +45,7 @@ var _ = SIGDescribe("NodeLease", framework.WithNodeConformance(), func() {
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)")
 		nodeName = node.Name
 	})
 
@@ -65,7 +65,7 @@ var _ = SIGDescribe("NodeLease", framework.WithNodeConformance(), func() {
 				return nil
 			}, 5*time.Minute, 5*time.Second).Should(gomega.BeNil())
 			// check basic expectations for the lease
-			framework.ExpectNoError(expectLease(lease, nodeName))
+			framework.ExpectNoError(expectLease(lease, nodeName), "failed to expectLease(lease, nodeName)")
 
 			ginkgo.By("check that node lease is updated at least once within the lease duration")
 			gomega.Eventually(ctx, func() error {
@@ -127,7 +127,7 @@ var _ = SIGDescribe("NodeLease", framework.WithNodeConformance(), func() {
 				return nil
 			}, 5*time.Minute, 5*time.Second).Should(gomega.BeNil())
 			// check basic expectations for the lease
-			framework.ExpectNoError(expectLease(lease, nodeName))
+			framework.ExpectNoError(expectLease(lease, nodeName), "failed to expectLease(lease, nodeName)")
 			leaseDuration := time.Duration(*lease.Spec.LeaseDurationSeconds) * time.Second
 
 			ginkgo.By("verify NodeStatus report period is longer than lease duration")
@@ -180,7 +180,7 @@ var _ = SIGDescribe("NodeLease", framework.WithNodeConformance(), func() {
 			// running as cluster e2e test, because node e2e test does not create and
 			// run controller manager, i.e., no node lifecycle controller.
 			node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})")
 			_, readyCondition := testutils.GetNodeCondition(&node.Status, v1.NodeReady)
 			gomega.Expect(readyCondition.Status).To(gomega.Equal(v1.ConditionTrue))
 		})
@@ -189,7 +189,7 @@ var _ = SIGDescribe("NodeLease", framework.WithNodeConformance(), func() {
 
 func getHeartbeatTimeAndStatus(ctx context.Context, clientSet clientset.Interface, nodeName string) (time.Time, v1.NodeStatus) {
 	node, err := clientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to clientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})")
 	_, readyCondition := testutils.GetNodeCondition(&node.Status, v1.NodeReady)
 	gomega.Expect(readyCondition.Status).To(gomega.Equal(v1.ConditionTrue))
 	heartbeatTime := readyCondition.LastHeartbeatTime.Time

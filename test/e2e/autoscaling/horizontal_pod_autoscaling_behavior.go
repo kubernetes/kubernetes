@@ -172,7 +172,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (non-default behavi
 
 			ginkgo.By("verifying number of replicas")
 			replicas, err := rc.GetReplicas(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to rc.GetReplicas(ctx)")
 			gomega.Expect(replicas).To(gomega.BeNumerically("==", initPods), "had %s replicas, still have %s replicas after time deadline", initPods, replicas)
 		})
 
@@ -209,7 +209,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (non-default behavi
 
 			ginkgo.By("verifying number of replicas")
 			replicas, err := rc.GetReplicas(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to rc.GetReplicas(ctx)")
 			gomega.Expect(replicas).To(gomega.BeNumerically("==", initPods), "had %s replicas, still have %s replicas after time deadline", initPods, replicas)
 		})
 
@@ -541,7 +541,7 @@ var _ = SIGDescribe(feature.HPA, framework.WithSlow(), framework.WithFeatureGate
 
 				ginkgo.By("verifying number of replicas")
 				replicas, err := rc.GetReplicas(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "failed to rc.GetReplicas(ctx)")
 				gomega.Expect(replicas).To(gomega.BeNumerically("==", initPods), "had %s replicas, still have %s replicas after time deadline", initPods, replicas)
 			})
 		})

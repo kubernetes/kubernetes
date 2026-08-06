@@ -192,12 +192,12 @@ func testReplicaSetServeImageOrFail(ctx context.Context, f *framework.Framework,
 	newRS := newRS(name, replicas, rsLabels, name, image, []string{"serve-hostname"})
 	newRS.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{ContainerPort: 9376}}
 	_, err := f.ClientSet.AppsV1().ReplicaSets(f.Namespace.Name).Create(ctx, newRS, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to f.ClientSet.AppsV1().ReplicaSets(f.Namespace.Name).Create(ctx, newRS, metav1....")
 
 	// Check that pods for the new RS were created.
 	// TODO: Maybe switch PodsCreated to just check owner references.
 	pods, err := e2epod.PodsCreatedByLabel(ctx, f.ClientSet, f.Namespace.Name, name, replicas, labels.SelectorFromSet(rsLabels))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2epod.PodsCreatedByLabel(ctx, f.ClientSet, f.Namespace.Name, name, replicas,...")
 
 	// Wait for the pods to enter the running state. Waiting loops until the pods
 	// are running so non-running pods cause a timeout for this test.
@@ -216,7 +216,7 @@ func testReplicaSetServeImageOrFail(ctx context.Context, f *framework.Framework,
 				err = fmt.Errorf("pod %q never run: %w", pod.Name, err)
 			}
 		}
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to fmt.Errorf('pod %q never run: %w', pod.Name, err)")
 		framework.Logf("Pod %q is running (conditions: %+v)", pod.Name, pod.Status.Conditions)
 		running++
 	}
@@ -226,7 +226,7 @@ func testReplicaSetServeImageOrFail(ctx context.Context, f *framework.Framework,
 
 	// Verify that something is listening.
 	framework.Logf("Trying to dial the pod")
-	framework.ExpectNoError(e2epod.WaitForPodsResponding(ctx, f.ClientSet, f.Namespace.Name, name, labels.SelectorFromSet(rsLabels), true, 2*time.Minute, pods))
+	framework.ExpectNoError(e2epod.WaitForPodsResponding(ctx, f.ClientSet, f.Namespace.Name, name, labels.SelectorFromSet(rsLabels), true, 2*time.Minute, pods), "failed to e2epod.WaitForPodsResponding(ctx, f.ClientSet, f.Namespace.Name, name, labels...")
 }
 
 // 1. Create a quota restricting pods in the current namespace to 2.
@@ -241,7 +241,7 @@ func testReplicaSetConditionCheck(ctx context.Context, f *framework.Framework) {
 	ginkgo.By(fmt.Sprintf("Creating quota %q that allows only two pods to run in the current namespace", name))
 	quota := newPodQuota(name, "2")
 	_, err := c.CoreV1().ResourceQuotas(namespace).Create(ctx, quota, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.CoreV1().ResourceQuotas(namespace).Create(ctx, quota, metav1.CreateOptions{})")
 
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
 		quota, err = c.CoreV1().ResourceQuotas(namespace).Get(ctx, name, metav1.GetOptions{})
@@ -255,12 +255,12 @@ func testReplicaSetConditionCheck(ctx context.Context, f *framework.Framework) {
 	if wait.Interrupted(err) {
 		err = fmt.Errorf("resource quota %q never synced", name)
 	}
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to fmt.Errorf('resource quota %q never synced', name)")
 
 	ginkgo.By(fmt.Sprintf("Creating replica set %q that asks for more than the allowed pod quota", name))
 	rs := newRS(name, 3, map[string]string{"name": name}, AgnhostImageName, AgnhostImage, nil)
 	rs, err = c.AppsV1().ReplicaSets(namespace).Create(ctx, rs, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.AppsV1().ReplicaSets(namespace).Create(ctx, rs, metav1.CreateOptions{})")
 
 	ginkgo.By(fmt.Sprintf("Checking replica set %q has the desired failure condition set", name))
 	generation := rs.Generation
@@ -283,14 +283,14 @@ func testReplicaSetConditionCheck(ctx context.Context, f *framework.Framework) {
 	if wait.Interrupted(err) {
 		err = fmt.Errorf("rs controller never added the failure condition for replica set %q: %#v", name, conditions)
 	}
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to fmt.Errorf('rs controller never added the failure condition for replica set %...")
 
 	ginkgo.By(fmt.Sprintf("Scaling down replica set %q to satisfy pod quota", name))
 	rs, err = e2ereplicaset.UpdateReplicaSetWithRetries(c, namespace, name, func(update *appsv1.ReplicaSet) {
 		x := int32(2)
 		update.Spec.Replicas = &x
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2ereplicaset.UpdateReplicaSetWithRetries(c, namespace, name, func(update *ap...")
 
 	ginkgo.By(fmt.Sprintf("Checking replica set %q has no failure condition set", name))
 	generation = rs.Generation
@@ -312,7 +312,7 @@ func testReplicaSetConditionCheck(ctx context.Context, f *framework.Framework) {
 	if wait.Interrupted(err) {
 		err = fmt.Errorf("rs controller never removed the failure condition for rs %q: %#v", name, conditions)
 	}
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to fmt.Errorf('rs controller never removed the failure condition for rs %q: %#v'...")
 }
 
 func testRSAdoptMatchingAndReleaseNotMatching(ctx context.Context, f *framework.Framework) {
@@ -339,7 +339,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(ctx context.Context, f *framework.
 	rsSt := newRS(name, replicas, rsLabels, name, AgnhostImage, nil)
 	rsSt.Spec.Selector = &metav1.LabelSelector{MatchLabels: rsLabels}
 	rs, err := f.ClientSet.AppsV1().ReplicaSets(f.Namespace.Name).Create(ctx, rsSt, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to f.ClientSet.AppsV1().ReplicaSets(f.Namespace.Name).Create(ctx, rsSt, metav1.C...")
 
 	ginkgo.By("Then the orphan pod is adopted")
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
@@ -348,7 +348,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(ctx context.Context, f *framework.
 		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, p.Name, metav1.GetOption...")
 		for _, owner := range p2.OwnerReferences {
 			if *owner.Controller && owner.UID == rs.UID {
 				// pod adopted
@@ -358,16 +358,16 @@ func testRSAdoptMatchingAndReleaseNotMatching(ctx context.Context, f *framework.
 		// pod still not adopted
 		return false, nil
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, p.Na...")
 
 	ginkgo.By("When the matched label of one of its pods change")
 	pods, err := e2epod.PodsCreatedByLabel(ctx, f.ClientSet, f.Namespace.Name, rs.Name, replicas, labels.SelectorFromSet(rsLabels))
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2epod.PodsCreatedByLabel(ctx, f.ClientSet, f.Namespace.Name, rs.Name, replic...")
 
 	p = &pods.Items[0]
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
 		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, p.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, p.Name, metav1.GetOption...")
 
 		pod.Labels = map[string]string{"name": "not-matching-name"}
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Update(ctx, pod, metav1.UpdateOptions{})
@@ -379,12 +379,12 @@ func testRSAdoptMatchingAndReleaseNotMatching(ctx context.Context, f *framework.
 		}
 		return true, nil
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Pods(f.Namespace.Name).Update(ctx, p...")
 
 	ginkgo.By("Then the pod is released")
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
 		p2, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, p.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, p.Name, metav1.GetOption...")
 		for _, owner := range p2.OwnerReferences {
 			if *owner.Controller && owner.UID == rs.UID {
 				// pod still belonging to the replicaset
@@ -394,7 +394,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(ctx context.Context, f *framework.
 		// pod already released
 		return true, nil
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, p.Na...")
 }
 
 func testRSScaleSubresources(ctx context.Context, f *framework.Framework) {
@@ -413,7 +413,7 @@ func testRSScaleSubresources(ctx context.Context, f *framework.Framework) {
 	ginkgo.By(fmt.Sprintf("Creating replica set %q that asks for more than the allowed pod quota", rsName))
 	rs := newRS(rsName, replicas, rsPodLabels, AgnhostImageName, AgnhostImage, nil)
 	createdRS, err := c.AppsV1().ReplicaSets(ns).Create(ctx, rs, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.AppsV1().ReplicaSets(ns).Create(ctx, rs, metav1.CreateOptions{})")
 
 	// Verify that the required pods have come up.
 	err = e2ereplicaset.WaitForReplicaSetTargetAvailableReplicas(ctx, c, createdRS, replicas)
@@ -492,7 +492,7 @@ func testRSLifeCycle(ctx context.Context, f *framework.Framework) {
 	// Create a ReplicaSet
 	rs := newRS(rsName, replicas, rsPodLabels, AgnhostImageName, AgnhostImage, nil)
 	createdRS, err := c.AppsV1().ReplicaSets(ns).Create(ctx, rs, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.AppsV1().ReplicaSets(ns).Create(ctx, rs, metav1.CreateOptions{})")
 	gomega.Expect(createdRS).To(apimachineryutils.HaveValidResourceVersion())
 
 	// Verify that the required pods have come up.
@@ -579,7 +579,7 @@ func listRSDeleteCollection(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("Create a ReplicaSet")
 	rs := newRS(rsName, replicas, rsPodLabels, AgnhostImageName, AgnhostImage, nil)
 	_, err := rsClient.Create(ctx, rs, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to rsClient.Create(ctx, rs, metav1.CreateOptions{})")
 
 	ginkgo.By("Verify that the required pods have come up")
 	err = e2epod.VerifyPodsRunning(ctx, c, ns, podName, labels.SelectorFromSet(map[string]string{"name": podName}), false, replicas)
@@ -631,7 +631,7 @@ func testRSStatus(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("Create a Replicaset")
 	rs := newRS(rsName, replicas, rsPodLabels, AgnhostImageName, AgnhostImage, nil)
 	testReplicaSet, err := c.AppsV1().ReplicaSets(ns).Create(ctx, rs, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.AppsV1().ReplicaSets(ns).Create(ctx, rs, metav1.CreateOptions{})")
 
 	ginkgo.By("Verify that the required pods have come up.")
 	err = e2epod.VerifyPodsRunning(ctx, c, ns, podName, labels.SelectorFromSet(map[string]string{"name": podName}), false, replicas)

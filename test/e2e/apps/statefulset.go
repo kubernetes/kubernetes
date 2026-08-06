@@ -124,7 +124,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Creating service " + headlessSvcName + " in namespace " + ns)
 			headlessService := e2eservice.CreateServiceSpec(headlessSvcName, "", true, labels)
 			_, err := c.CoreV1().Services(ns).Create(ctx, headlessService, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.CoreV1().Services(ns).Create(ctx, headlessService, metav1.CreateOptions{})")
 		})
 
 		ginkgo.AfterEach(func(ctx context.Context) {
@@ -144,45 +144,45 @@ var _ = SIGDescribe("StatefulSet", func() {
 			e2estatefulset.PauseNewPods(ss)
 
 			_, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 
 			ginkgo.By("Saturating stateful set " + ss.Name)
 			e2estatefulset.Saturate(ctx, c, ss)
 
 			ginkgo.By("Verifying statefulset mounted data directory is usable")
-			framework.ExpectNoError(e2estatefulset.CheckMount(ctx, c, ss, "/data"))
+			framework.ExpectNoError(e2estatefulset.CheckMount(ctx, c, ss, "/data"), "failed to e2estatefulset.CheckMount(ctx, c, ss, '/data')")
 
 			ginkgo.By("Verifying statefulset provides a stable hostname for each pod")
-			framework.ExpectNoError(e2estatefulset.CheckHostname(ctx, c, ss))
+			framework.ExpectNoError(e2estatefulset.CheckHostname(ctx, c, ss), "failed to e2estatefulset.CheckHostname(ctx, c, ss)")
 
 			ginkgo.By("Verifying statefulset set proper service name")
-			framework.ExpectNoError(e2estatefulset.CheckServiceName(ss, headlessSvcName))
+			framework.ExpectNoError(e2estatefulset.CheckServiceName(ss, headlessSvcName), "failed to e2estatefulset.CheckServiceName(ss, headlessSvcName)")
 
 			ginkgo.By("checking the index label and value of all pods")
-			framework.ExpectNoError(e2estatefulset.CheckPodIndexLabel(ctx, c, ss))
+			framework.ExpectNoError(e2estatefulset.CheckPodIndexLabel(ctx, c, ss), "failed to e2estatefulset.CheckPodIndexLabel(ctx, c, ss)")
 
 			cmd := "echo $(hostname) | dd of=/data/hostname conv=fsync"
 			ginkgo.By("Running " + cmd + " in all stateful pods")
-			framework.ExpectNoError(e2estatefulset.ExecInStatefulPods(ctx, c, ss, cmd))
+			framework.ExpectNoError(e2estatefulset.ExecInStatefulPods(ctx, c, ss, cmd), "failed to e2estatefulset.ExecInStatefulPods(ctx, c, ss, cmd)")
 
 			cmd = "ln -s /data/hostname /data/hostname-symlink"
 			ginkgo.By("Running " + cmd + " in all stateful pods")
-			framework.ExpectNoError(e2estatefulset.ExecInStatefulPods(ctx, c, ss, cmd))
+			framework.ExpectNoError(e2estatefulset.ExecInStatefulPods(ctx, c, ss, cmd), "failed to e2estatefulset.ExecInStatefulPods(ctx, c, ss, cmd)")
 
 			ginkgo.By("Restarting statefulset " + ss.Name)
 			e2estatefulset.Restart(ctx, c, ss)
 			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
 
 			ginkgo.By("Verifying statefulset mounted data directory is usable")
-			framework.ExpectNoError(e2estatefulset.CheckMount(ctx, c, ss, "/data"))
+			framework.ExpectNoError(e2estatefulset.CheckMount(ctx, c, ss, "/data"), "failed to e2estatefulset.CheckMount(ctx, c, ss, '/data')")
 
 			cmd = "if [ \"$(cat /data/hostname)\" = \"$(hostname)\" ]; then exit 0; else exit 1; fi"
 			ginkgo.By("Running " + cmd + " in all stateful pods")
-			framework.ExpectNoError(e2estatefulset.ExecInStatefulPods(ctx, c, ss, cmd))
+			framework.ExpectNoError(e2estatefulset.ExecInStatefulPods(ctx, c, ss, cmd), "failed to e2estatefulset.ExecInStatefulPods(ctx, c, ss, cmd)")
 
 			cmd = "if [ \"$(cat /data/hostname-symlink)\" = \"$(hostname)\" ]; then exit 0; else exit 1; fi"
 			ginkgo.By("Running " + cmd + " in all stateful pods")
-			framework.ExpectNoError(e2estatefulset.ExecInStatefulPods(ctx, c, ss, cmd))
+			framework.ExpectNoError(e2estatefulset.ExecInStatefulPods(ctx, c, ss, cmd), "failed to e2estatefulset.ExecInStatefulPods(ctx, c, ss, cmd)")
 		})
 
 		// This can't be Conformance yet because it depends on a default
@@ -197,13 +197,13 @@ var _ = SIGDescribe("StatefulSet", func() {
 			// Save Kind since it won't be populated in the returned ss.
 			kind := ss.Kind
 			ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 			ss.Kind = kind
 
 			ginkgo.By("Saturating stateful set " + ss.Name)
 			e2estatefulset.Saturate(ctx, c, ss)
 			pods, err := e2estatefulset.GetPodList(ctx, c, ss)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2estatefulset.GetPodList(ctx, c, ss)")
 
 			gomega.Expect(pods.Items).To(gomega.HaveLen(int(*ss.Spec.Replicas)))
 
@@ -281,7 +281,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			e2estatefulset.PauseNewPods(ss)
 
 			_, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 
 			e2estatefulset.WaitForRunning(ctx, c, 1, 0, ss)
 
@@ -346,14 +346,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 				}(),
 			}
 			ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
 			ss = waitForStatus(ctx, c, ss)
 			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
 			gomega.Expect(currentRevision).To(gomega.Equal(updateRevision), "StatefulSet %s/%s created with update revision %s not equal to current revision %s",
 				ss.Namespace, ss.Name, updateRevision, currentRevision)
 			pods, err := e2estatefulset.GetPodList(ctx, c, ss)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2estatefulset.GetPodList(ctx, c, ss)")
 
 			for i := range pods.Items {
 				gomega.Expect(pods.Items[i].Labels).To(gomega.HaveKeyWithValue(appsv1.StatefulSetRevisionLabel, currentRevision), "Pod %s/%s revision %s is not equal to currentRevision %s",
@@ -370,7 +370,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 				update.Spec.Template.Spec.Containers[0].Image = newImage
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.Statefu...")
 
 			ginkgo.By("Creating a new revision")
 			ss = waitForStatus(ctx, c, ss)
@@ -410,7 +410,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					}(),
 				}
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(up...")
 			ss, pods = waitForPartitionedRollingUpdate(ctx, c, ss)
 			for i := range pods.Items {
 				if i < int(*ss.Spec.UpdateStrategy.RollingUpdate.Partition) {
@@ -444,7 +444,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			e2estatefulset.WaitForRunningAndReady(ctx, c, 3, ss)
 			ss = getStatefulSet(ctx, c, ss.Namespace, ss.Name)
 			pods, err = e2estatefulset.GetPodList(ctx, c, ss)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2estatefulset.GetPodList(ctx, c, ss)")
 
 			for i := range pods.Items {
 				if i < int(*ss.Spec.UpdateStrategy.RollingUpdate.Partition) {
@@ -485,7 +485,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 						}(),
 					}
 				})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "failed to updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(up...")
 				ss, pods = waitForPartitionedRollingUpdate(ctx, c, ss)
 				for i := range pods.Items {
 					if i < int(*ss.Spec.UpdateStrategy.RollingUpdate.Partition) {
@@ -577,14 +577,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 				},
 			}
 			ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
 			ss = waitForStatus(ctx, c, ss)
 			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
 			gomega.Expect(currentRevision).To(gomega.Equal(updateRevision), "StatefulSet %s/%s created with update revision %s not equal to current revision %s",
 				ss.Namespace, ss.Name, updateRevision, currentRevision)
 			pods, err := e2estatefulset.GetPodList(ctx, c, ss)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2estatefulset.GetPodList(ctx, c, ss)")
 
 			for i := range pods.Items {
 				gomega.Expect(pods.Items[i].Labels).To(gomega.HaveKeyWithValue(appsv1.StatefulSetRevisionLabel, currentRevision), "Pod %s/%s revision %s is not equal to currentRevision %s",
@@ -601,7 +601,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 				update.Spec.Template.Spec.Containers[0].Image = newImage
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.Statefu...")
 
 			ginkgo.By("Creating a new revision")
 			ss = waitForStatus(ctx, c, ss)
@@ -644,14 +644,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 				Type: appsv1.OnDeleteStatefulSetStrategyType,
 			}
 			ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
 			ss = waitForStatus(ctx, c, ss)
 			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
 			gomega.Expect(currentRevision).To(gomega.Equal(updateRevision), "StatefulSet %s/%s created with update revision %s not equal to current revision %s",
 				ss.Namespace, ss.Name, updateRevision, currentRevision)
 			pods, err := e2estatefulset.GetPodList(ctx, c, ss)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2estatefulset.GetPodList(ctx, c, ss)")
 
 			for i := range pods.Items {
 				gomega.Expect(pods.Items[i].Labels).To(gomega.HaveKeyWithValue(appsv1.StatefulSetRevisionLabel, currentRevision), "Pod %s/%s revision %s is not equal to current revision %s",
@@ -668,7 +668,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			e2estatefulset.WaitForRunningAndReady(ctx, c, 3, ss)
 			ss = getStatefulSet(ctx, c, ss.Namespace, ss.Name)
 			pods, err = e2estatefulset.GetPodList(ctx, c, ss)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2estatefulset.GetPodList(ctx, c, ss)")
 
 			for i := range pods.Items {
 				gomega.Expect(pods.Items[i].Labels).To(gomega.HaveKeyWithValue(appsv1.StatefulSetRevisionLabel, currentRevision), "Pod %s/%s revision %s is not equal to current revision %s",
@@ -685,7 +685,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 				update.Spec.Template.Spec.Containers[0].Image = newImage
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.Statefu...")
 
 			ginkgo.By("Creating a new revision")
 			ss = waitForStatus(ctx, c, ss)
@@ -699,7 +699,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			e2estatefulset.WaitForRunningAndReady(ctx, c, 3, ss)
 			ss = getStatefulSet(ctx, c, ss.Namespace, ss.Name)
 			pods, err = e2estatefulset.GetPodList(ctx, c, ss)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2estatefulset.GetPodList(ctx, c, ss)")
 
 			for i := range pods.Items {
 				gomega.Expect(pods.Items[i].Spec.Containers[0].Image).To(gomega.Equal(newImage), "Pod %s/%s has image %s not equal to new image %s",
@@ -732,7 +732,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			pl, err := f.ClientSet.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{
 				LabelSelector: psLabels.AsSelector().String(),
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Pods(ns).List(ctx, metav1.ListOptions")
 
 			// Verify that stateful set will be scaled up in order.
 			wg := sync.WaitGroup{}
@@ -762,7 +762,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, psLabels)
 			setHTTPProbe(ss)
 			ss, err = c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 
 			ginkgo.By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
 			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
@@ -780,13 +780,13 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Verifying that stateful set " + ssName + " was scaled up in order")
 			wg.Wait()
-			framework.ExpectNoError(orderErr)
+			framework.ExpectNoError(orderErr, "failed to orderErr")
 
 			ginkgo.By("Scale down will halt with unhealthy stateful pod")
 			pl, err = f.ClientSet.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{
 				LabelSelector: psLabels.AsSelector().String(),
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Pods(ns).List(ctx, metav1.ListOptions")
 
 			// Verify that stateful set will be scaled down in order.
 			wg.Add(1)
@@ -822,7 +822,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Verifying that stateful set " + ssName + " was scaled down in reverse order")
 			wg.Wait()
-			framework.ExpectNoError(orderErr)
+			framework.ExpectNoError(orderErr, "failed to orderErr")
 		})
 
 		/*
@@ -838,7 +838,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 			setHTTPProbe(ss)
 			ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 
 			ginkgo.By("Waiting until all stateful set " + ssName + " replicas will be running in namespace " + ns)
 			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
@@ -877,7 +877,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			statefulPodName := ssName + "-0"
 			ginkgo.By("Looking for a node to schedule stateful set and pod")
 			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)")
 
 			ginkgo.By("Creating pod with conflicting port in namespace " + f.Namespace.Name)
 			conflictingPort := v1.ContainerPort{HostPort: 21017, ContainerPort: 21017, Name: "conflict"}
@@ -897,7 +897,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				},
 			}
 			pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOpt...")
 			ginkgo.By("Waiting until pod " + podName + " will start running in namespace " + f.Namespace.Name)
 			if err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, podName, f.Namespace.Name); err != nil {
 				framework.Failf("Pod %v did not start running: %v", podName, err)
@@ -909,7 +909,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			statefulPodContainer.Ports = append(statefulPodContainer.Ports, conflictingPort)
 			ss.Spec.Template.Spec.NodeName = node.Name
 			_, err = f.ClientSet.AppsV1().StatefulSets(f.Namespace.Name).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to f.ClientSet.AppsV1().StatefulSets(f.Namespace.Name).Create(ctx, ss, metav1.Cr...")
 
 			var initialStatefulPodUID types.UID
 			ginkgo.By("Waiting until stateful pod " + statefulPodName + " will be recreated and deleted at least once in namespace " + f.Namespace.Name)
@@ -918,7 +918,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			pl, err := f.ClientSet.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{
 				FieldSelector: fieldSelector,
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Pods(ns).List(ctx, metav1.ListOptions")
 			if len(pl.Items) > 0 {
 				pod := pl.Items[0]
 				framework.Logf("Observed stateful pod in namespace: %v, name: %v, uid: %v, status phase: %v. Waiting for statefulset controller to delete.",
@@ -956,7 +956,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Removing pod with conflicting port in namespace " + f.Namespace.Name)
 			err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, pod.Name, *metav1.New...")
 
 			ginkgo.By("Waiting when stateful pod " + statefulPodName + " will be recreated in namespace " + f.Namespace.Name + " and will be in running state")
 			// we may catch delete event, that's why we are waiting for running phase like this, and not with watchtools.UntilWithoutRetry
@@ -986,7 +986,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels)
 			setHTTPProbe(ss)
 			ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
 			waitForStatus(ctx, c, ss)
 
@@ -1056,7 +1056,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, ssPodLabels)
 			setHTTPProbe(ss)
 			ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 			gomega.Expect(ss).To(apimachineryutils.HaveValidResourceVersion())
 			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
 			waitForStatus(ctx, c, ss)
@@ -1129,14 +1129,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels)
 			setHTTPProbe(ss)
 			ss, err = c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
 			waitForStatus(ctx, c, ss)
 
 			ginkgo.By("Patch Statefulset to include a label")
 			payload := []byte(`{"metadata":{"labels":{"e2e":"testing"}}}`)
 			ss, err = ssClient.Patch(ctx, ssName, types.StrategicMergePatchType, payload, metav1.PatchOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to ssClient.Patch(ctx, ssName, types.StrategicMergePatchType, payload, metav1.Pa...")
 
 			ginkgo.By("Getting /status")
 			ssResource := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "statefulsets"}
@@ -1251,7 +1251,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Creating service " + headlessSvcName + " in namespace " + ns)
 			headlessService := e2eservice.CreateServiceSpec(headlessSvcName, "", true, labels)
 			_, err := c.CoreV1().Services(ns).Create(ctx, headlessService, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.CoreV1().Services(ns).Create(ctx, headlessService, metav1.CreateOptions{})")
 			ss = e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 5, nil, nil, labels)
 			setHTTPProbe(ss)
 			ss.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
@@ -1270,14 +1270,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Creating a new StatefulSet")
 			var err error
 			ss, err = c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
 			ss = waitForStatus(ctx, c, ss)
 			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
 			gomega.Expect(currentRevision).To(gomega.Equal(updateRevision), "StatefulSet %s/%s created with update revision %s not equal to current revision %s",
 				ss.Namespace, ss.Name, updateRevision, currentRevision)
 			pods, err := e2estatefulset.GetPodList(ctx, c, ss)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2estatefulset.GetPodList(ctx, c, ss)")
 			for i := range pods.Items {
 				gomega.Expect(pods.Items[i].Labels).To(gomega.HaveKeyWithValue(appsv1.StatefulSetRevisionLabel, currentRevision), "Pod %s/%s revision %s is not equal to currentRevision %s",
 					pods.Items[i].Namespace,
@@ -1294,12 +1294,12 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 				update.Spec.Template.Spec.Containers[0].Image = newImage
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.Statefu...")
 
 			ginkgo.By("Creating a new revision")
 			ss = waitForStatus(ctx, c, ss)
 			pods, err = e2estatefulset.GetPodList(ctx, c, ss)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2estatefulset.GetPodList(ctx, c, ss)")
 
 			ginkgo.By("Verifying StatefulSet status reflects completed update")
 			for i := range pods.Items {
@@ -1330,14 +1330,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Creating a new StatefulSet")
 			var err error
 			ss, err = c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
 			ss = waitForStatus(ctx, c, ss)
 			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
 			gomega.Expect(currentRevision).To(gomega.Equal(updateRevision), "StatefulSet %s/%s created with update revision %s not equal to current revision %s",
 				ss.Namespace, ss.Name, updateRevision, currentRevision)
 			pods, err := e2estatefulset.GetPodList(ctx, c, ss)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2estatefulset.GetPodList(ctx, c, ss)")
 			for i := range pods.Items {
 				gomega.Expect(pods.Items[i].Labels).To(gomega.HaveKeyWithValue(appsv1.StatefulSetRevisionLabel, currentRevision), "Pod %s/%s revision %s is not equal to currentRevision %s",
 					pods.Items[i].Namespace,
@@ -1354,7 +1354,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 				update.Spec.Template.Spec.Containers[0].Image = newImage
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.Statefu...")
 			ss = waitForStatus(ctx, c, ss)
 
 			ginkgo.By("Waiting for pods to be stuck in ImagePullBackOff")
@@ -1370,12 +1370,12 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 				update.Spec.Template.Spec.Containers[0].Image = newImage
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.Statefu...")
 
 			ginkgo.By("Creating a new revision")
 			ss = waitForStatus(ctx, c, ss)
 			pods, err = e2estatefulset.GetPodList(ctx, c, ss)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2estatefulset.GetPodList(ctx, c, ss)")
 
 			ginkgo.By("Verifying StatefulSet status reflects completed update")
 			for i := range pods.Items {
@@ -1412,14 +1412,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss.Spec.PodManagementPolicy = appsv1.ParallelPodManagement
 			var err error
 			ss, err = c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
 			ss = waitForStatus(ctx, c, ss)
 			currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
 			gomega.Expect(currentRevision).To(gomega.Equal(updateRevision), "StatefulSet %s/%s created with update revision %s not equal to current revision %s",
 				ss.Namespace, ss.Name, updateRevision, currentRevision)
 			pods, err := e2estatefulset.GetPodList(ctx, c, ss)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2estatefulset.GetPodList(ctx, c, ss)")
 			for i := range pods.Items {
 				gomega.Expect(pods.Items[i].Labels).To(gomega.HaveKeyWithValue(appsv1.StatefulSetRevisionLabel, currentRevision), "Pod %s/%s revision %s is not equal to currentRevision %s",
 					pods.Items[i].Namespace,
@@ -1436,7 +1436,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 				update.Spec.Template.Spec.Containers[0].Image = newImage
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.Statefu...")
 			ss = waitForStatus(ctx, c, ss)
 			e2estatefulset.WaitForFailedWithImagePullErr(ctx, c, 5, ss)
 
@@ -1448,10 +1448,10 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 				update.Spec.Template.Spec.Containers[0].Image = newImage
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.Statefu...")
 			ss = waitForStatus(ctx, c, ss)
 			pods, err = e2estatefulset.GetPodList(ctx, c, ss)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2estatefulset.GetPodList(ctx, c, ss)")
 
 			ginkgo.By("Verifying StatefulSet status reflects completed update")
 			for i := range pods.Items {
@@ -1516,7 +1516,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, ssPodLabels)
 		setHTTPProbe(ss)
 		ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 		e2estatefulset.WaitForStatusAvailableReplicas(ctx, c, ss, 1)
 	})
 
@@ -1532,12 +1532,12 @@ var _ = SIGDescribe("StatefulSet", func() {
 		ss.Spec.MinReadySeconds = 30
 		setHTTPProbe(ss)
 		ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 		e2estatefulset.WaitForStatusAvailableReplicas(ctx, c, ss, 0)
 		// let's check that the availableReplicas have still not updated
 		time.Sleep(5 * time.Second)
 		ss, err = c.AppsV1().StatefulSets(ns).Get(ctx, ss.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Get(ctx, ss.Name, metav1.GetOptions{})")
 		if ss.Status.AvailableReplicas != 0 {
 			framework.Failf("invalid number of availableReplicas: expected=%v received=%v", 0, ss.Status.AvailableReplicas)
 		}
@@ -1546,19 +1546,19 @@ var _ = SIGDescribe("StatefulSet", func() {
 		ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 			update.Spec.MinReadySeconds = 3600
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.Statefu...")
 		// We don't expect replicas to be updated till 1 hour, so the availableReplicas should be 0
 		e2estatefulset.WaitForStatusAvailableReplicas(ctx, c, ss, 0)
 
 		ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 			update.Spec.MinReadySeconds = 0
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.Statefu...")
 		e2estatefulset.WaitForStatusAvailableReplicas(ctx, c, ss, 2)
 
 		ginkgo.By("check availableReplicas are shown in status")
 		out, err := e2ekubectl.RunKubectl(ns, "get", "statefulset", ss.Name, "-o=yaml")
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2ekubectl.RunKubectl(ns, 'get', 'statefulset', ss.Name, '-o=yaml')")
 		if !strings.Contains(out, "availableReplicas: 2") {
 			framework.Failf("invalid number of availableReplicas: expected=%v received=%v", 2, out)
 		}
@@ -1582,7 +1582,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Creating service " + headlessSvcName + " in namespace " + ns)
 			headlessService := e2eservice.CreateServiceSpec(headlessSvcName, "", true, labels)
 			_, err := c.CoreV1().Services(ns).Create(ctx, headlessService, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.CoreV1().Services(ns).Create(ctx, headlessService, metav1.CreateOptions{})")
 		})
 
 		ginkgo.AfterEach(func(ctx context.Context) {
@@ -1601,19 +1601,19 @@ var _ = SIGDescribe("StatefulSet", func() {
 				WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
 			}
 			_, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 
 			ginkgo.By("Confirming all 3 PVCs exist with their owner refs")
 			err = verifyStatefulSetPVCsExistWithOwnerRefs(ctx, c, ss, []int{0, 1, 2}, true, false)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to verifyStatefulSetPVCsExistWithOwnerRefs(ctx, c, ss, []int{0, 1, 2}, true, false)")
 
 			ginkgo.By("Deleting stateful set " + ss.Name)
 			err = c.AppsV1().StatefulSets(ns).Delete(ctx, ss.Name, metav1.DeleteOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Delete(ctx, ss.Name, metav1.DeleteOptions{})")
 
 			ginkgo.By("Verifying PVCs deleted")
 			err = verifyStatefulSetPVCsExist(ctx, c, ss, []int{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to verifyStatefulSetPVCsExist(ctx, c, ss, []int{})")
 		})
 
 		ginkgo.It("should delete PVCs with a OnScaledown policy", func(ctx context.Context) {
@@ -1624,19 +1624,19 @@ var _ = SIGDescribe("StatefulSet", func() {
 				WhenScaled: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
 			}
 			_, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 
 			ginkgo.By("Confirming all 3 PVCs exist")
 			err = verifyStatefulSetPVCsExist(ctx, c, ss, []int{0, 1, 2})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to verifyStatefulSetPVCsExist(ctx, c, ss, []int{0, 1, 2})")
 
 			ginkgo.By("Scaling stateful set " + ss.Name + " to one replica")
 			ss, err = e2estatefulset.Scale(ctx, c, ss, 1)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2estatefulset.Scale(ctx, c, ss, 1)")
 
 			ginkgo.By("Verifying all but one PVC deleted")
 			err = verifyStatefulSetPVCsExist(ctx, c, ss, []int{0})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to verifyStatefulSetPVCsExist(ctx, c, ss, []int{0})")
 		})
 
 		ginkgo.It("should not delete PVC with OnScaledown policy if another controller owns the PVC", func(ctx context.Context) {
@@ -1644,11 +1644,11 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			*(ss.Spec.Replicas) = 3
 			_, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 
 			ginkgo.By("Confirm PVC has been created")
 			err = verifyStatefulSetPVCsExist(ctx, c, ss, []int{0, 1, 2})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to verifyStatefulSetPVCsExist(ctx, c, ss, []int{0, 1, 2})")
 
 			ginkgo.By("Create configmap to use as dummy controller")
 			dummyConfigMap, err := c.CoreV1().ConfigMaps(ns).Create(ctx, &v1.ConfigMap{
@@ -1657,7 +1657,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					Namespace:    ns,
 				},
 			}, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.CoreV1().ConfigMaps(ns).Create(ctx, &v1.ConfigMap{")
 			defer func() {
 				// Will be cleaned up with the namespace if this fails.
 				_ = c.CoreV1().ConfigMaps(ns).Delete(ctx, dummyConfigMap.Name, metav1.DeleteOptions{})
@@ -1676,7 +1676,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					},
 				}
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to updatePVCWithRetries(ctx, c, ns, pvc1Name, func(update *v...")
 
 			ginkgo.By("Update StatefulSet retention policy")
 			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
@@ -1684,37 +1684,37 @@ var _ = SIGDescribe("StatefulSet", func() {
 					WhenScaled: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
 				}
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.Statefu...")
 
 			ginkgo.By("Scale StatefulSet down to 0")
 			_, err = e2estatefulset.Scale(ctx, c, ss, 0)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2estatefulset.Scale(ctx, c, ss, 0)")
 
 			ginkgo.By("Verify PVC 1 still exists")
 			err = verifyStatefulSetPVCsExist(ctx, c, ss, []int{1})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to verifyStatefulSetPVCsExist(ctx, c, ss, []int{1})")
 
 			ginkgo.By("Remove PVC 1 owner ref")
 			_, err = updatePVCWithRetries(ctx, c, ns, pvc1Name, func(update *v1.PersistentVolumeClaim) {
 				update.OwnerReferences = nil
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to updatePVCWithRetries(ctx, c, ns, pvc1Name, func(update *v1.PersistentVolumeCl...")
 
 			ginkgo.By("Scale set back up to 2")
 			_, err = e2estatefulset.Scale(ctx, c, ss, 2)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2estatefulset.Scale(ctx, c, ss, 2)")
 
 			ginkgo.By("Confirm PVCs scaled up as well")
 			err = verifyStatefulSetPVCsExist(ctx, c, ss, []int{0, 1})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to verifyStatefulSetPVCsExist(ctx, c, ss, []int{0, 1})")
 
 			ginkgo.By("Scale set down to 1")
 			_, err = e2estatefulset.Scale(ctx, c, ss, 1)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2estatefulset.Scale(ctx, c, ss, 1)")
 
 			ginkgo.By("Confirm PVC 1 deleted this time")
 			err = verifyStatefulSetPVCsExist(ctx, c, ss, []int{0})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to verifyStatefulSetPVCsExist(ctx, c, ss, []int{0})")
 		})
 
 		ginkgo.It("should delete PVCs after adopting pod (WhenDeleted)", func(ctx context.Context) {
@@ -1725,11 +1725,11 @@ var _ = SIGDescribe("StatefulSet", func() {
 				WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
 			}
 			_, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 
 			ginkgo.By("Confirming all 3 PVCs exist with their owner refs")
 			err = verifyStatefulSetPVCsExistWithOwnerRefs(ctx, c, ss, []int{0, 1, 2}, true, false)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to verifyStatefulSetPVCsExistWithOwnerRefs(ctx, c, ss, []int{0, 1, 2}, true, false)")
 
 			ginkgo.By("Orphaning the 3rd pod")
 			patch, err := json.Marshal(metav1.ObjectMeta{
@@ -1741,11 +1741,11 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Deleting stateful set " + ss.Name)
 			err = c.AppsV1().StatefulSets(ns).Delete(ctx, ss.Name, metav1.DeleteOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Delete(ctx, ss.Name, metav1.DeleteOptions{})")
 
 			ginkgo.By("Verifying PVCs deleted")
 			err = verifyStatefulSetPVCsExist(ctx, c, ss, []int{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to verifyStatefulSetPVCsExist(ctx, c, ss, []int{})")
 		})
 
 		ginkgo.It("should delete PVCs after adopting pod (WhenScaled)", func(ctx context.Context) {
@@ -1756,11 +1756,11 @@ var _ = SIGDescribe("StatefulSet", func() {
 				WhenScaled: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
 			}
 			_, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 
 			ginkgo.By("Confirming all 3 PVCs exist")
 			err = verifyStatefulSetPVCsExist(ctx, c, ss, []int{0, 1, 2})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to verifyStatefulSetPVCsExist(ctx, c, ss, []int{0, 1, 2})")
 
 			ginkgo.By("Confirming all pods are running and ready")
 			e2estatefulset.WaitForStatusAvailableReplicas(ctx, c, ss, 3)
@@ -1775,11 +1775,11 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Scaling stateful set " + ss.Name + " to one replica")
 			ss, err = e2estatefulset.Scale(ctx, c, ss, 1)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2estatefulset.Scale(ctx, c, ss, 1)")
 
 			ginkgo.By("Verifying all but one PVC deleted")
 			err = verifyStatefulSetPVCsExist(ctx, c, ss, []int{0})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to verifyStatefulSetPVCsExist(ctx, c, ss, []int{0})")
 		})
 
 		ginkgo.It("should not delete PVCs when there is another controller", func(ctx context.Context) {
@@ -1788,11 +1788,11 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			*(ss.Spec.Replicas) = 4
 			_, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 
 			ginkgo.By("Confirming all 4 PVCs exist")
 			err = verifyStatefulSetPVCsExist(ctx, c, ss, []int{0, 1, 2, 3})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to verifyStatefulSetPVCsExist(ctx, c, ss, []int{0, 1, 2, 3})")
 
 			claimNames := make([]string, 4)
 			for i := range 4 {
@@ -1806,7 +1806,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					Namespace:    ns,
 				},
 			}, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.CoreV1().ConfigMaps(ns).Create(ctx, &v1.ConfigMap{")
 			defer func() {
 				// Will be cleaned up by the namespace delete if this fails
 				_ = c.CoreV1().ConfigMaps(ns).Delete(ctx, randomConfigMap.Name, metav1.DeleteOptions{})
@@ -1824,7 +1824,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			_, err = updatePVCWithRetries(ctx, c, ns, claimNames[1], func(update *v1.PersistentVolumeClaim) {
 				update.SetOwnerReferences(expectedExternalRef)
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to updatePVCWithRetries(ctx, c, ns, claimNames[1], func(update *v1.PersistentVol...")
 
 			ginkgo.By("Add stale statefulset controller to PVC 3, with finalizer to prevent garbage collection")
 			expectedStaleRef := []metav1.OwnerReference{
@@ -1841,7 +1841,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				update.SetOwnerReferences(expectedStaleRef)
 				update.SetFinalizers([]string{"keep-with/stale-ref"})
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to updatePVCWithRetries(ctx, c, ns, claimNames[3], func(update *v1.PersistentVol...")
 
 			defer func() {
 				if _, err := c.CoreV1().PersistentVolumeClaims(ns).Get(ctx, claimNames[3], metav1.GetOptions{}); apierrors.IsNotFound(err) {
@@ -1850,7 +1850,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				_, err := updatePVCWithRetries(ctx, c, ns, claimNames[3], func(update *v1.PersistentVolumeClaim) {
 					update.SetFinalizers([]string{})
 				})
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "failed to updatePVCWithRetries(ctx, c, ns, claimNames[3], func(update *v1.PersistentVol...")
 			}()
 
 			ginkgo.By("Check references updated")
@@ -1871,7 +1871,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				}
 				return true, nil // found them all!
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.CoreV1().PersistentVolumeClaims(ns).Get(ctx, claimNames...")
 
 			ginkgo.By("Update retention policy to delete to force claims to resync")
 			var ssUID types.UID
@@ -1881,7 +1881,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				}
 				ssUID = update.GetUID()
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to updateStatefulSetWithRetries(ctx, c, ns, ssName, func(upd...")
 
 			expectedOwnerRef := []metav1.OwnerReference{
 				{
@@ -1921,7 +1921,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				}
 				return true, nil // found them all!
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.CoreV1().PersistentVolumeClaims(ns).Get(ctx, claimNames...")
 
 			ginkgo.By("Remove controller flag from claim 0")
 			_, err = updatePVCWithRetries(ctx, c, ns, claimNames[0], func(update *v1.PersistentVolumeClaim) {
@@ -1936,7 +1936,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					},
 				})
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to updatePVCWithRetries(ctx, c, ns, claimNames[0], func(upda...")
 
 			ginkgo.By("Update statefulset to provoke a reconcile")
 			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ssName, func(update *appsv1.StatefulSet) {
@@ -1945,7 +1945,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					WhenScaled:  appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
 				}
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to updateStatefulSetWithRetries(ctx, c, ns, ssName, func(upd...")
 			ginkgo.By("Expect controller flag for claim 0 to reconcile back to true")
 			err = wait.PollUntilContextTimeout(ctx, e2estatefulset.StatefulSetPoll, e2estatefulset.StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
 				claim, err := c.CoreV1().PersistentVolumeClaims(ns).Get(ctx, claimNames[0], metav1.GetOptions{})
@@ -1957,14 +1957,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 				}
 				return false, nil // retry
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.CoreV1().PersistentVolumeClaims(ns).Get(ctx, claimNames...")
 
 			// Claim 1 has an external owner, and 3 has a finalizer still, so they will not be deleted.
 			ginkgo.By("Delete the stateful set and wait for claims 0 and 2 but not 1 and 3 to disappear")
 			err = c.AppsV1().StatefulSets(ns).Delete(ctx, ssName, metav1.DeleteOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Delete(ctx, ssName, metav1.DeleteOptions{})")
 			err = verifyStatefulSetPVCsExist(ctx, c, ss, []int{1, 3})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to verifyStatefulSetPVCsExist(ctx, c, ss, []int{1, 3})")
 		})
 	})
 
@@ -1995,44 +1995,44 @@ var _ = SIGDescribe("StatefulSet", func() {
 			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
 
 			readyNode, err := e2enode.GetRandomReadySchedulableNode(ctx, c)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2enode.GetRandomReadySchedulableNode(ctx, c)")
 			hostLabel := "kubernetes.io/hostname"
 			hostLabelVal := readyNode.Labels[hostLabel]
 
 			ss.Spec.Template.Spec.NodeSelector = map[string]string{hostLabel: hostLabelVal} // force the pod on a specific node
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			_, err = c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 
 			ginkgo.By("Confirming PVC exists")
 			err = verifyStatefulSetPVCsExist(ctx, c, ss, []int{0})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to verifyStatefulSetPVCsExist(ctx, c, ss, []int{0})")
 
 			ginkgo.By("Confirming Pod is ready")
 			e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, 1)
 			podName := getStatefulSetPodNameAtIndex(0, ss)
 			pod, err := c.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})")
 
 			nodeName := pod.Spec.NodeName
 			gomega.Expect(nodeName).To(gomega.Equal(readyNode.Name))
 			node, err := c.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})")
 
 			oldData, err := json.Marshal(node)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to json.Marshal(node)")
 
 			node.Spec.Unschedulable = true
 
 			newData, err := json.Marshal(node)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to json.Marshal(node)")
 
 			// cordon node, to make sure pod does not get scheduled to the node until the pvc is deleted
 			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})")
 			ginkgo.By("Cordoning Node")
 			_, err = c.CoreV1().Nodes().Patch(ctx, nodeName, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.CoreV1().Nodes().Patch(ctx, nodeName, types.StrategicMergePatchType, patchB...")
 			cordoned := true
 
 			defer func() {
@@ -2046,33 +2046,33 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Deleting Pod")
 			err = c.CoreV1().Pods(ns).Delete(ctx, podName, metav1.DeleteOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.CoreV1().Pods(ns).Delete(ctx, podName, metav1.DeleteOptions{})")
 
 			// wait for the pod to be recreated
 			waitForStatusCurrentReplicas(ctx, c, ss, 1)
 			_, err = c.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})")
 
 			pvcList, err := c.CoreV1().PersistentVolumeClaims(ns).List(ctx, metav1.ListOptions{LabelSelector: klabels.Everything().String()})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.CoreV1().PersistentVolumeClaims(ns).List(ctx, metav1.ListOptions{LabelSelec...")
 			gomega.Expect(pvcList.Items).To(gomega.HaveLen(1))
 			pvcName := pvcList.Items[0].Name
 
 			ginkgo.By("Deleting PVC")
 			err = c.CoreV1().PersistentVolumeClaims(ns).Delete(ctx, pvcName, metav1.DeleteOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.CoreV1().PersistentVolumeClaims(ns).Delete(ctx, pvcName, metav1.DeleteOptio...")
 
 			uncordonNode(ctx, c, oldData, newData, nodeName)
 			cordoned = false
 
 			ginkgo.By("Confirming PVC recreated")
 			err = verifyStatefulSetPVCsExist(ctx, c, ss, []int{0})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to verifyStatefulSetPVCsExist(ctx, c, ss, []int{0})")
 
 			ginkgo.By("Confirming Pod is ready after being recreated")
 			e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, 1)
 			pod, err = c.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})")
 			gomega.Expect(pod.Spec.NodeName).To(gomega.Equal(readyNode.Name)) // confirm the pod was scheduled back to the original node
 		})
 	})
@@ -2092,7 +2092,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Creating service " + headlessSvcName + " in namespace " + ns)
 			headlessService := e2eservice.CreateServiceSpec(headlessSvcName, "", true, labels)
 			_, err := c.CoreV1().Services(ns).Create(ctx, headlessService, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.CoreV1().Services(ns).Create(ctx, headlessService, metav1.CreateOptions{})")
 		})
 
 		ginkgo.AfterEach(func(ctx context.Context) {
@@ -2107,17 +2107,17 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			*(ss.Spec.Replicas) = 2
 			_, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 			waitForStatus(ctx, c, ss)
 			e2estatefulset.WaitForStatusReplicas(ctx, c, ss, 2)
 			e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, 2)
 
 			ginkgo.By("Confirming 2 replicas, with start ordinal 0")
 			pods, err := e2estatefulset.GetPodList(ctx, c, ss)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2estatefulset.GetPodList(ctx, c, ss)")
 
 			err = expectPodNames(pods, []string{"ss-0", "ss-1"})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to expectPodNames(pods, []string{'ss-0', 'ss-1'})")
 
 			ginkgo.By("Setting .spec.replicas = 3 .spec.ordinals.start = 2")
 			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
@@ -2126,7 +2126,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				}
 				*(update.Spec.Replicas) = 3
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(up...")
 
 			// we need to ensure we wait for all the new ones to show up, not
 			// just for any random 3
@@ -2144,17 +2144,17 @@ var _ = SIGDescribe("StatefulSet", func() {
 				Start: 2,
 			}
 			_, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 			waitForStatus(ctx, c, ss)
 			e2estatefulset.WaitForStatusReplicas(ctx, c, ss, 2)
 			e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, 2)
 
 			ginkgo.By("Confirming 2 replicas, with start ordinal 2")
 			pods, err := e2estatefulset.GetPodList(ctx, c, ss)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2estatefulset.GetPodList(ctx, c, ss)")
 
 			err = expectPodNames(pods, []string{"ss-2", "ss-3"})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to expectPodNames(pods, []string{'ss-2', 'ss-3'})")
 
 			ginkgo.By("Increasing .spec.ordinals.start = 4")
 			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ssName, func(update *appsv1.StatefulSet) {
@@ -2162,7 +2162,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					Start: 4,
 				}
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to updateStatefulSetWithRetries(ctx, c, ns, ssName, func(update *appsv1.Stateful...")
 
 			// since we are replacing 2 pods for 2, we need to ensure we wait
 			// for the new ones to show up, not just for any random 2
@@ -2180,17 +2180,17 @@ var _ = SIGDescribe("StatefulSet", func() {
 				Start: 3,
 			}
 			_, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 			waitForStatus(ctx, c, ss)
 			e2estatefulset.WaitForStatusReplicas(ctx, c, ss, 2)
 			e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, 2)
 
 			ginkgo.By("Confirming 2 replicas, with start ordinal 3")
 			pods, err := e2estatefulset.GetPodList(ctx, c, ss)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2estatefulset.GetPodList(ctx, c, ss)")
 
 			err = expectPodNames(pods, []string{"ss-3", "ss-4"})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to expectPodNames(pods, []string{'ss-3', 'ss-4'})")
 
 			ginkgo.By("Decreasing .spec.ordinals.start = 2")
 			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ssName, func(update *appsv1.StatefulSet) {
@@ -2198,7 +2198,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					Start: 2,
 				}
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to updateStatefulSetWithRetries(ctx, c, ns, ssName, func(update *appsv1.Stateful...")
 
 			// since we are replacing 2 pods for 2, we need to ensure we wait
 			// for the new ones to show up, not just for any random 2
@@ -2216,22 +2216,22 @@ var _ = SIGDescribe("StatefulSet", func() {
 				Start: 3,
 			}
 			_, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 			e2estatefulset.WaitForStatusReplicas(ctx, c, ss, 2)
 			e2estatefulset.WaitForStatusReadyReplicas(ctx, c, ss, 2)
 
 			ginkgo.By("Confirming 2 replicas, with start ordinal 3")
 			pods, err := e2estatefulset.GetPodList(ctx, c, ss)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2estatefulset.GetPodList(ctx, c, ss)")
 
 			err = expectPodNames(pods, []string{"ss-3", "ss-4"})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to expectPodNames(pods, []string{'ss-3', 'ss-4'})")
 
 			ginkgo.By("Removing .spec.ordinals")
 			ss, err = updateStatefulSetWithRetries(ctx, c, ns, ssName, func(update *appsv1.StatefulSet) {
 				update.Spec.Ordinals = nil
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to updateStatefulSetWithRetries(ctx, c, ns, ssName, func(update *appsv1.Stateful...")
 
 			// since we are replacing 2 pods for 2, we need to ensure we wait
 			// for the new ones to show up, not just for any random 2
@@ -2248,9 +2248,9 @@ func uncordonNode(ctx context.Context, c clientset.Interface, oldData, newData [
 	ginkgo.By("Uncordoning Node")
 	// uncordon node, by reverting patch
 	revertPatchBytes, err := strategicpatch.CreateTwoWayMergePatch(newData, oldData, v1.Node{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to strategicpatch.CreateTwoWayMergePatch(newData, oldData, v1.Node{})")
 	_, err = c.CoreV1().Nodes().Patch(ctx, nodeName, types.StrategicMergePatchType, revertPatchBytes, metav1.PatchOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.CoreV1().Nodes().Patch(ctx, nodeName, types.StrategicMergePatchType, revert...")
 }
 
 type statefulPodTester interface {
@@ -2354,14 +2354,14 @@ func pollReadWithTimeout(ctx context.Context, statefulPod statefulPodTester, sta
 func rollbackTest(ctx context.Context, c clientset.Interface, ns string, ss *appsv1.StatefulSet) {
 	setHTTPProbe(ss)
 	ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 	e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
 	ss = waitForStatus(ctx, c, ss)
 	currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
 	gomega.Expect(currentRevision).To(gomega.Equal(updateRevision), "StatefulSet %s/%s created with update revision %s not equal to current revision %s",
 		ss.Namespace, ss.Name, updateRevision, currentRevision)
 	pods, err := e2estatefulset.GetPodList(ctx, c, ss)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2estatefulset.GetPodList(ctx, c, ss)")
 
 	for i := range pods.Items {
 		gomega.Expect(pods.Items[i].Labels).To(gomega.HaveKeyWithValue(appsv1.StatefulSetRevisionLabel, currentRevision), "Pod %s/%s revision %s is not equal to current revision %s",
@@ -2372,7 +2372,7 @@ func rollbackTest(ctx context.Context, c clientset.Interface, ns string, ss *app
 	}
 	e2estatefulset.SortStatefulPods(pods)
 	err = breakPodHTTPProbe(ss, &pods.Items[1])
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to breakPodHTTPProbe(ss, &pods.Items[1])")
 	ss, _ = waitForPodNotReady(ctx, c, ss, pods.Items[1].Name)
 	newImage := AgnhostImage
 	oldImage := ss.Spec.Template.Spec.Containers[0].Image
@@ -2382,7 +2382,7 @@ func rollbackTest(ctx context.Context, c clientset.Interface, ns string, ss *app
 	ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 		update.Spec.Template.Spec.Containers[0].Image = newImage
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.Statefu...")
 
 	ginkgo.By("Creating a new revision")
 	ss = waitForStatus(ctx, c, ss)
@@ -2391,11 +2391,11 @@ func rollbackTest(ctx context.Context, c clientset.Interface, ns string, ss *app
 
 	ginkgo.By("Updating Pods in reverse ordinal order")
 	pods, err = e2estatefulset.GetPodList(ctx, c, ss)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2estatefulset.GetPodList(ctx, c, ss)")
 
 	e2estatefulset.SortStatefulPods(pods)
 	err = restorePodHTTPProbe(ss, &pods.Items[1])
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to restorePodHTTPProbe(ss, &pods.Items[1])")
 	ss, _ = e2estatefulset.WaitForPodReady(ctx, c, ss, pods.Items[1].Name)
 	ss, pods = waitForRollingUpdate(ctx, c, ss)
 	gomega.Expect(ss.Status.CurrentRevision).To(gomega.Equal(updateRevision), "StatefulSet %s/%s current revision %s does not equal update revision %s on update completion",
@@ -2418,13 +2418,13 @@ func rollbackTest(ctx context.Context, c clientset.Interface, ns string, ss *app
 
 	ginkgo.By("Rolling back to a previous revision")
 	err = breakPodHTTPProbe(ss, &pods.Items[1])
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to breakPodHTTPProbe(ss, &pods.Items[1])")
 	ss, _ = waitForPodNotReady(ctx, c, ss, pods.Items[1].Name)
 	priorRevision := currentRevision
 	ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 		update.Spec.Template.Spec.Containers[0].Image = oldImage
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.Statefu...")
 	ss = waitForStatus(ctx, c, ss)
 	currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
 	gomega.Expect(priorRevision).To(gomega.Equal(updateRevision), "Prior revision should equal update revision during roll back")
@@ -2432,7 +2432,7 @@ func rollbackTest(ctx context.Context, c clientset.Interface, ns string, ss *app
 
 	ginkgo.By("Rolling back update in reverse ordinal order")
 	pods, err = e2estatefulset.GetPodList(ctx, c, ss)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2estatefulset.GetPodList(ctx, c, ss)")
 
 	e2estatefulset.SortStatefulPods(pods)
 	restorePodHTTPProbe(ss, &pods.Items[1])
@@ -2470,14 +2470,14 @@ func deletingPodForRollingUpdatePartitionTest(ctx context.Context, f *framework.
 		}(),
 	}
 	ss, err := c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.AppsV1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})")
 	e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
 	ss = waitForStatus(ctx, c, ss)
 	currentRevision, updateRevision := ss.Status.CurrentRevision, ss.Status.UpdateRevision
 	gomega.Expect(currentRevision).To(gomega.Equal(updateRevision), fmt.Sprintf("StatefulSet %s/%s created with update revision %s not equal to current revision %s",
 		ss.Namespace, ss.Name, updateRevision, currentRevision))
 	pods, err := e2estatefulset.GetPodList(ctx, c, ss)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2estatefulset.GetPodList(ctx, c, ss)")
 
 	for i := range pods.Items {
 		gomega.Expect(pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel]).To(gomega.Equal(currentRevision), fmt.Sprintf("Pod %s/%s revision %s is not equal to currentRevision %s",
@@ -2490,10 +2490,10 @@ func deletingPodForRollingUpdatePartitionTest(ctx context.Context, f *framework.
 	ginkgo.By("Adding finalizer for pod-0")
 	pod0name := getStatefulSetPodNameAtIndex(0, ss)
 	pod0, err := c.CoreV1().Pods(ns).Get(ctx, pod0name, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.CoreV1().Pods(ns).Get(ctx, pod0name, metav1.GetOptions{})")
 	pod0.Finalizers = append(pod0.Finalizers, testFinalizer)
 	pod0, err = c.CoreV1().Pods(ss.Namespace).Update(ctx, pod0, metav1.UpdateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to c.CoreV1().Pods(ss.Namespace).Update(ctx, pod0, metav1.UpdateOptions{})")
 	pods.Items[0] = *pod0
 	defer e2epod.NewPodClient(f).RemoveFinalizer(ctx, pod0.Name, testFinalizer)
 
@@ -2505,7 +2505,7 @@ func deletingPodForRollingUpdatePartitionTest(ctx context.Context, f *framework.
 	ss, err = updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 		update.Spec.Template.Spec.Containers[0].Image = newImage
 	})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to updateStatefulSetWithRetries(ctx, c, ns, ss.Name, func(update *appsv1.Statefu...")
 
 	ginkgo.By("Creating a new revision")
 	ss = waitForStatus(ctx, c, ss)
@@ -2571,7 +2571,7 @@ func deletingPodForRollingUpdatePartitionTest(ctx context.Context, f *framework.
 
 	ginkgo.By("Verify pod images after pod-0 deletion and recreation")
 	pods, err = e2estatefulset.GetPodList(ctx, c, ss)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2estatefulset.GetPodList(ctx, c, ss)")
 
 	for i := range pods.Items {
 		if i < int(*ss.Spec.UpdateStrategy.RollingUpdate.Partition) {
@@ -2607,7 +2607,7 @@ func confirmStatefulPodCount(ctx context.Context, c clientset.Interface, count i
 	deadline := start.Add(timeout)
 	for t := time.Now(); t.Before(deadline) && ctx.Err() == nil; t = time.Now() {
 		podList, err := e2estatefulset.GetPodList(ctx, c, ss)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to e2estatefulset.GetPodList(ctx, c, ss)")
 
 		statefulPodCount := len(podList.Items)
 		if statefulPodCount != count {

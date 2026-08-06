@@ -65,7 +65,7 @@ var _ = SIGDescribe("ImageCredentialProvider", feature.KubeletCredentialProvider
 			},
 		}
 		_, err := serviceAccountClient.Create(ctx, serviceAccount, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "failed to serviceAccountClient.Create(ctx, serviceAccount, metav1.CreateOptions{})")
 
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{

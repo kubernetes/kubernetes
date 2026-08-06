@@ -60,11 +60,11 @@ func cleanupJob(ctx context.Context, f *framework.Framework, job *batchv1.Job) {
 		j.ObjectMeta.Finalizers = slices.DeleteFunc(j.ObjectMeta.Finalizers, func(actual string) bool { return actual == dummyFinalizer })
 	}
 	_, err := updateJobWithRetries(ctx, c, ns, job.Name, removeFinalizerFunc)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to updateJobWithRetries(ctx, c, ns, job.Name, removeFinalizerFunc)")
 	e2ejob.WaitForJobGone(ctx, c, ns, job.Name, wait.ForeverTestTimeout)
 
 	err = e2ejob.WaitForAllJobPodsGone(ctx, c, ns, job.Name)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2ejob.WaitForAllJobPodsGone(ctx, c, ns, job.Name)")
 }
 
 func testFinishedJob(ctx context.Context, f *framework.Framework) {
@@ -83,19 +83,19 @@ func testFinishedJob(ctx context.Context, f *framework.Framework) {
 
 	framework.Logf("Create a Job %s/%s with TTL", ns, job.Name)
 	job, err := e2ejob.CreateJob(ctx, c, ns, job)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2ejob.CreateJob(ctx, c, ns, job)")
 
 	framework.Logf("Wait for the Job to finish")
 	err = e2ejob.WaitForJobFinish(ctx, c, ns, job.Name)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2ejob.WaitForJobFinish(ctx, c, ns, job.Name)")
 
 	framework.Logf("Wait for TTL after finished controller to delete the Job")
 	err = waitForJobDeleting(ctx, c, ns, job.Name)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to waitForJobDeleting(ctx, c, ns, job.Name)")
 
 	framework.Logf("Check Job's deletionTimestamp and compare with the time when the Job finished")
 	job, err = e2ejob.GetJob(ctx, c, ns, job.Name)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "failed to e2ejob.GetJob(ctx, c, ns, job.Name)")
 	jobFinishTime := finishTime(job)
 	finishTimeUTC := jobFinishTime.UTC()
 	if jobFinishTime.IsZero() {
