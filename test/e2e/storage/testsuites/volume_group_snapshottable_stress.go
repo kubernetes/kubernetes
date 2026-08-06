@@ -147,6 +147,11 @@ func (t *volumeGroupSnapshottableStressTestSuite) DefineTests(driver storagefram
 		volumeResource := storageframework.CreateVolumeResource(ctx, driver, stressTest.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange)
 		stressTest.volumeResources = append(stressTest.volumeResources, volumeResource)
 
+		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+		driverVolumeSizeRange := driverInfo.SupportedSizeRange
+		claimSize, err := storageutils.GetSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
+		framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
+
 		// Create StatefulSet with volumeClaimTemplates
 		// StatefulSet name must be ≤52 chars so the auto-generated controller-revision-hash
 		// label (format: "<name>-<10-char-hash>") stays within Kubernetes' 63-byte label limit.
@@ -205,7 +210,7 @@ func (t *volumeGroupSnapshottableStressTestSuite) DefineTests(driver storagefram
 							},
 							Resources: v1.VolumeResourceRequirements{
 								Requests: v1.ResourceList{
-									v1.ResourceStorage: resource.MustParse(t.GetTestSuiteInfo().SupportedSizeRange.Min),
+									v1.ResourceStorage: resource.MustParse(claimSize),
 								},
 							},
 							StorageClassName: &volumeResource.Sc.Name,
@@ -215,7 +220,6 @@ func (t *volumeGroupSnapshottableStressTestSuite) DefineTests(driver storagefram
 			},
 		}
 
-		var err error
 		stressTest.statefulSet, err = cs.AppsV1().StatefulSets(f.Namespace.Name).Create(ctx, statefulSet, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create StatefulSet")
 
