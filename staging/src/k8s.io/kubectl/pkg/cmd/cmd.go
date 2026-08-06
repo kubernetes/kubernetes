@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -422,6 +423,41 @@ func addCmdHeaderHooks(cmds *cobra.Command, kubeConfigFlags *genericclioptions.C
 
 func runHelp(cmd *cobra.Command, args []string) {
 	cmd.Help()
+
+	// Print aliases defined in kuberc if the feature is enabled
+	if !cmdutil.KubeRC.IsDisabled() {
+		printAliases(cmd)
+	}
+}
+
+// printAliases prints aliases defined in kuberc to the help output.
+func printAliases(cmd *cobra.Command) {
+	aliases, err := kuberc.GetAliasesForDisplay(io.Discard)
+	if err != nil || len(aliases) == 0 {
+		return
+	}
+
+	out := cmd.OutOrStdout()
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, i18n.T("Aliases (defined in kuberc):"))
+	for _, alias := range aliases {
+		desc := formatAliasDescription(alias.Command, alias.PrependArgs, alias.AppendArgs)
+		fmt.Fprintf(out, "  %-15s %s\n", alias.Name, desc)
+	}
+}
+
+// formatAliasDescription creates a description string for an alias showing what command it expands to.
+func formatAliasDescription(command string, prependArgs, appendArgs []string) string {
+	var parts []string
+	parts = append(parts, command)
+	if len(prependArgs) > 0 {
+		parts = append(parts, strings.Join(prependArgs, " "))
+	}
+	if len(appendArgs) > 0 {
+		parts = append(parts, "[args...]")
+		parts = append(parts, strings.Join(appendArgs, " "))
+	}
+	return strings.Join(parts, " ")
 }
 
 func registerCompletionFuncForGlobalFlags(cmd *cobra.Command, f cmdutil.Factory) {
