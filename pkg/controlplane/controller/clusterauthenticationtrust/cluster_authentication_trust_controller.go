@@ -452,7 +452,7 @@ func (c *Controller) Enqueue() {
 
 // Run the controller until stopped.
 func (c *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	// make sure the work queue is shutdown which will trigger workers to end
 	defer c.queue.ShutDown()
 
