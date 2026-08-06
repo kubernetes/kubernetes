@@ -103,7 +103,9 @@ func SetReady(dir string) {
 		klog.Errorf("Can't touch %s: %v", readyFile, err)
 		return
 	}
-	file.Close()
+	if err := file.Close(); err != nil {
+		klog.Errorf("Can't close %s: %v", readyFile, err)
+	}
 }
 
 // GetSecretForPV locates secret by name and namespace, verifies the secret type, and returns secret map

@@ -34,7 +34,9 @@ func (s *server) GetPluginHandler(ctx context.Context) cache.PluginHandler {
 	if f, err := os.Create(s.socketDir + "DEPRECATION"); err != nil {
 		logger.Error(err, "Failed to create deprecation file at socket dir", "path", s.socketDir)
 	} else {
-		f.Close()
+		if closeErr := f.Close(); closeErr != nil {
+			logger.Error(closeErr, "Failed to close deprecation file", "path", f.Name())
+		}
 		logger.V(4).Info("Created deprecation file", "path", f.Name())
 	}
 	return s
