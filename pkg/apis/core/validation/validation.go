@@ -7904,7 +7904,7 @@ func validatePodResourceName(resourceName core.ResourceName, fldPath *field.Path
 func ValidateResourceQuotaResourceName(value core.ResourceName, fldPath *field.Path) field.ErrorList {
 	allErrs := validateResourceName(value, fldPath)
 
-	if len(strings.Split(string(value), "/")) == 1 {
+	if len(strings.Split(string(value), "/")) == 1 || strings.Contains(strings.ToLower(string(value)), "kubernetes.io/") {
 		if !helper.IsStandardQuotaResourceName(value) {
 			return append(allErrs, field.Invalid(fldPath, value, isInvalidQuotaResource))
 		}
