@@ -1755,6 +1755,31 @@ func TestConditionFuncFor(t *testing.T) {
 			condition:   []string{"jsonpath={.status.phase}=Running", "jsonpath={.metadata.name}=foo"},
 			expectedErr: None,
 		},
+		{
+			name:        "jsonpath filtering with != and a value",
+			condition:   []string{`jsonpath={.status.conditions[?(@.type!="Failed")].status}=True`},
+			expectedErr: None,
+		},
+		{
+			name:        "jsonpath filtering with != without a value",
+			condition:   []string{`jsonpath={.status.conditions[?(@.type!="Failed")].status}`},
+			expectedErr: None,
+		},
+		{
+			name:        "jsonpath filtering with >=",
+			condition:   []string{"jsonpath={.status.conditions[?(@.observedGeneration>=2)].status}=True"},
+			expectedErr: None,
+		},
+		{
+			name:        "jsonpath filtering with <=",
+			condition:   []string{"jsonpath={.status.conditions[?(@.observedGeneration<=2)].status}=True"},
+			expectedErr: None,
+		},
+		{
+			name:        "jsonpath filtering with != relaxed parsing",
+			condition:   []string{`jsonpath=status.conditions[?(@.type!="Failed")].status=True`},
+			expectedErr: None,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -1769,6 +1794,61 @@ func TestConditionFuncFor(t *testing.T) {
 					t.Fatalf("expected error %q, got %q", test.expectedErr, err.Error())
 				}
 			}
+		})
+	}
+}
+
+// TestSplitJSONPathInput tests that the input is only split on the '=' separating the expression from its value.
+func TestSplitJSONPathInput(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		{
+			name:     "documented example",
+			input:    "a.b.c====d.e.f===g.h.i===",
+			expected: []string{"a.b.c====d.e.f==", "g.h.i==", ""},
+		},
+		{
+			name:     "expression and value",
+			input:    "{.status.readyReplicas}=3",
+			expected: []string{"{.status.readyReplicas}", "3"},
+		},
+		{
+			name:     "expression without value",
+			input:    "{.status.readyReplicas}",
+			expected: []string{"{.status.readyReplicas}"},
+		},
+		{
+			name:     "equality filter is preserved",
+			input:    `{.status.conditions[?(@.type=="Complete")].status}=True`,
+			expected: []string{`{.status.conditions[?(@.type=="Complete")].status}`, "True"},
+		},
+		{
+			name:     "inequality filter is preserved",
+			input:    `{.status.conditions[?(@.type!="Failed")].status}=True`,
+			expected: []string{`{.status.conditions[?(@.type!="Failed")].status}`, "True"},
+		},
+		{
+			name:     "greater-or-equal filter is preserved",
+			input:    "{.status.conditions[?(@.observedGeneration>=2)].status}=True",
+			expected: []string{"{.status.conditions[?(@.observedGeneration>=2)].status}", "True"},
+		},
+		{
+			name:     "less-or-equal filter is preserved",
+			input:    "{.status.conditions[?(@.observedGeneration<=2)].status}=True",
+			expected: []string{"{.status.conditions[?(@.observedGeneration<=2)].status}", "True"},
+		},
+		{
+			name:     "ambiguous value is still split",
+			input:    "{.metadata.name}='test=wrong'",
+			expected: []string{"{.metadata.name}", "'test", "wrong'"},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.Equal(t, test.expected, splitJSONPathInput(test.input))
 		})
 	}
 }
