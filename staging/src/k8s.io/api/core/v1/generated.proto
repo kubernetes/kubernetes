@@ -5876,6 +5876,8 @@ message ResourceQuotaSpec {
   // If not specified, the quota matches all objects.
   // +optional
   // +listType=atomic
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:immutable
   repeated string scopes = 2;
 
   // scopeSelector is also a collection of filters like scopes that must match each object tracked by a quota

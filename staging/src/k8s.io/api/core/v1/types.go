@@ -8182,6 +8182,8 @@ type ResourceQuotaSpec struct {
 	// If not specified, the quota matches all objects.
 	// +optional
 	// +listType=atomic
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:immutable
 	Scopes []ResourceQuotaScope `json:"scopes,omitempty" protobuf:"bytes,2,rep,name=scopes,casttype=ResourceQuotaScope"`
 	// scopeSelector is also a collection of filters like scopes that must match each object tracked by a quota
 	// but expressed using ScopeSelectorOperator in combination with possible values.

@@ -8569,7 +8569,7 @@ func ValidateResourceQuotaUpdate(newResourceQuota, oldResourceQuota *core.Resour
 		oldScopes.Insert(string(scope))
 	}
 	if !oldScopes.Equal(newScopes) {
-		allErrs = append(allErrs, field.Invalid(fldPath, newResourceQuota.Spec.Scopes, fieldImmutableErrorMsg))
+		allErrs = append(allErrs, field.Invalid(fldPath, newResourceQuota.Spec.Scopes, fieldImmutableErrorMsg).WithOrigin("immutable").MarkCoveredByDeclarative())
 	}
 
 	return allErrs
