@@ -43,6 +43,21 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type Binding
+	scheme.AddValidationFunc(
+		(*corev1.Binding)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/", "/binding":
+				return Validate_Binding(
+					ctx, op, nil, /* fldPath */
+					obj.(*corev1.Binding),
+					safe.Cast[*corev1.Binding](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type ConfigMap
 	scheme.AddValidationFunc(
 		(*corev1.ConfigMap)(nil),
@@ -269,6 +284,50 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 			}
 		})
 	return nil
+}
+
+// Validate_Binding validates an instance of Binding according
+// to declarative validation rules in the API schema.
+func Validate_Binding(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.Binding) (errs field.ErrorList) {
+
+	// field corev1.Binding.TypeMeta has no validation
+	// field corev1.Binding.ObjectMeta has no validation
+
+	{ // field corev1.Binding.Target
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.ObjectReference,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			func() { // cohort = "name"
+				earlyReturn := false
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "name",
+					func(o *corev1.ObjectReference) *string { return &o.Name }, validate.DirectEqual, validate.RequiredValue).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.Binding) *corev1.ObjectReference {
+				return &oldObj.Target
+			})
+		errs = append(errs, fn(fldPath.Child("target"), &obj.Target, oldVal, oldObj != nil)...)
+	}
+
+	return errs
 }
 
 // Validate_ConfigMap validates an instance of ConfigMap according
