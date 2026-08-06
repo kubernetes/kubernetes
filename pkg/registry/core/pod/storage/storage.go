@@ -170,8 +170,26 @@ func (r *BindingREST) Destroy() {
 	// we don't destroy it here explicitly.
 }
 
+// ProducesMIMETypes returns the list of MIME types the specified HTTP verb (GET, POST, DELETE, PATCH) can respond with.
+func (r *BindingREST) ProducesMIMETypes(verb string) []string {
+  // Return nil to use the default MIME types from the serializer
+  return nil
+}
+
+// ProducesObject returns the type of object produced by this storage for the given verb.
+// Binding creation returns a Status object, not a Binding object.
+func (r *BindingREST) ProducesObject(verb string) interface{} {
+    switch verb {
+    case "POST", "CREATE":
+        return &metav1.Status{}
+    default:
+        return &api.Binding{}
+    }
+}
+
 var _ = rest.NamedCreater(&BindingREST{})
 var _ = rest.SubresourceObjectMetaPreserver(&BindingREST{})
+var _ = rest.StorageMetadata(&BindingREST{})
 
 // Create ensures a pod is bound to a specific host.
 func (r *BindingREST) Create(ctx context.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (out runtime.Object, err error) {
@@ -299,6 +317,7 @@ func (r *BindingREST) assignPod(ctx context.Context, podUID types.UID, podResour
 }
 
 var _ = rest.Creater(&LegacyBindingREST{})
+var _ = rest.StorageMetadata(&LegacyBindingREST{})
 
 // LegacyBindingREST implements the REST endpoint for binding pods to nodes when etcd is in use.
 type LegacyBindingREST struct {
@@ -332,6 +351,16 @@ func (r *LegacyBindingREST) Create(ctx context.Context, obj runtime.Object, crea
 
 func (r *LegacyBindingREST) GetSingularName() string {
 	return "binding"
+}
+
+// ProducesMIMETypes returns the list of MIME types the specified HTTP verb (GET, POST, DELETE, PATCH) can respond with.
+func (r *LegacyBindingREST) ProducesMIMETypes(verb string) []string {
+  return r.bindingRest.ProducesMIMETypes(verb)
+}
+
+// ProducesObject returns the type of object produced by this storage for the given verb.
+func (r *LegacyBindingREST) ProducesObject(verb string) interface{} {
+  return r.bindingRest.ProducesObject(verb)
 }
 
 // StatusREST implements the REST endpoint for changing the status of a pod.
