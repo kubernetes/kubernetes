@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	endpointsliceutil "k8s.io/endpointslice/util"
 	"k8s.io/kubernetes/pkg/apis/discovery/validation"
 	netutils "k8s.io/utils/net"
@@ -229,13 +228,6 @@ func endpointsControllerKey(endpointSlice *discovery.EndpointSlice) (string, err
 func skipMirror(labels map[string]string) bool {
 	skipMirror, _ := labels[discovery.LabelSkipMirror]
 	return skipMirror == "true"
-}
-
-// hasLeaderElection returns true if the LeaderElectionRecordAnnotationKey is
-// set as an annotation.
-func hasLeaderElection(annotations map[string]string) bool {
-	_, ok := annotations[resourcelock.LeaderElectionRecordAnnotationKey]
-	return ok
 }
 
 // cloneAndRemoveKeys is a copy of CloneAndRemoveLabels

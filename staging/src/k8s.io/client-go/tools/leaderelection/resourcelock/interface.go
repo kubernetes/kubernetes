@@ -31,12 +31,15 @@ import (
 )
 
 const (
+	// Deprecated: This annotation was used by the endpoints and configmap-based leader election
+	// resource locks, which have been removed. Leader election now uses Leases exclusively.
 	LeaderElectionRecordAnnotationKey = "control-plane.alpha.kubernetes.io/leader"
-	endpointsResourceLock             = "endpoints"
-	configMapsResourceLock            = "configmaps"
-	LeasesResourceLock                = "leases"
-	endpointsLeasesResourceLock       = "endpointsleases"
-	configMapsLeasesResourceLock      = "configmapsleases"
+
+	endpointsResourceLock        = "endpoints"
+	configMapsResourceLock       = "configmaps"
+	LeasesResourceLock           = "leases"
+	endpointsLeasesResourceLock  = "endpointsleases"
+	configMapsLeasesResourceLock = "configmapsleases"
 )
 
 // LeaderElectionRecord is the record that is stored in the leader election annotation.

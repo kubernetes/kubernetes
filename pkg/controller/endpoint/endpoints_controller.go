@@ -36,7 +36,6 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/endpointslice"
@@ -622,14 +621,6 @@ func (e *Controller) checkLeftoverEndpoints() {
 		return
 	}
 	for _, ep := range list {
-		if _, ok := ep.Annotations[resourcelock.LeaderElectionRecordAnnotationKey]; ok {
-			// when there are multiple controller-manager instances,
-			// we observe that it will delete leader-election endpoints after 5min
-			// and cause re-election
-			// so skip the delete here
-			// as leader-election only have endpoints without service
-			continue
-		}
 		key, err := controller.KeyFunc(ep)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("Unable to get key for endpoint %#v", ep))
