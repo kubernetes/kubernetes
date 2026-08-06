@@ -184,6 +184,14 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 			ginkgo.Context("LimitedSwap", func() {
 				tempSetCurrentKubeletConfig(f, enableLimitedSwap)
 
+				// tempSetCurrentKubeletConfig registers AfterEach on this context that restarts the kubelet.
+				// That AfterEach runs before the Describe-level addAfterEachForCleaningUpPods (deeper nesting runs first),
+				// so without an earlier hook we would restart kubelet while swap-stress pods still hold memory.
+				ginkgo.JustAfterEach(func(ctx context.Context) {
+					ginkgo.By("Deleting swap stress pods before kubelet config is restored")
+					deleteSyncPodsInTestNamespace(ctx, f)
+				})
+
 				getRequestBySwapLimit := func(swapPercentage int64) *resource.Quantity {
 					gomega.ExpectWithOffset(1, swapPercentage).To(gomega.And(
 						gomega.BeNumerically(">=", 1),
@@ -203,7 +211,7 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 					return pod
 				}
 
-				ginkgo.It("should be able to use more than the node memory capacity", func() {
+				ginkgo.It("should be able to use more than the node memory capacity", func(ctx context.Context) {
 					stressSize := cloneQuantity(nodeTotalMemory)
 
 					stressPod := getStressPod(stressSize)
@@ -234,12 +242,11 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 						return nil
 					}, 5*time.Minute, 1*time.Second).Should(gomega.Succeed(), "swap usage is above zero: %s", swapUsage.String())
 
-					// Better to delete the stress pod ASAP to avoid node failures
-					err := podClient.Delete(context.Background(), stressPod.Name, metav1.DeleteOptions{})
-					framework.ExpectNoError(err)
+					// Wait for removal so the node is not under extreme memory pressure when kubelet restores config.
+					podClient.DeleteSync(ctx, stressPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 				})
 
-				ginkgo.It("should be able to use more memory than memory limits", func() {
+				ginkgo.It("should be able to use more memory than memory limits", func(ctx context.Context) {
 					stressSize := divideQuantity(nodeTotalMemory, 5)
 					ginkgo.By("Creating a stress pod with stress size: " + stressSize.String())
 					stressPod := getStressPod(stressSize)
@@ -284,9 +291,7 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 						return nil
 					}, 5*time.Minute, 1*time.Second).Should(gomega.Succeed())
 
-					// Better to delete the stress pod ASAP to avoid node failures
-					err := podClient.Delete(context.Background(), stressPod.Name, metav1.DeleteOptions{})
-					framework.ExpectNoError(err)
+					podClient.DeleteSync(ctx, stressPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 				})
 
 				ginkgo.It("ensure summary API properly reports swap", func() {
