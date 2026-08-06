@@ -1090,16 +1090,18 @@ func copyServerDefaults(desiredSlice, actualSlice *resourceapi.ResourceSlice) bo
 // slices are read-only.
 func copyTaintTimeAdded(from, to []resourceapi.Device) []resourceapi.Device {
 	to = slices.Clone(to)
-	for i, toDevice := range to {
+	for i := range to {
 		index := slices.IndexFunc(from, func(fromDevice resourceapi.Device) bool {
-			return fromDevice.Name == toDevice.Name
+			return fromDevice.Name == to[i].Name
 		})
 		if index < 0 {
 			// No matching device.
 			continue
 		}
 		fromDevice := from[index]
-		for j, toTaint := range toDevice.Taints {
+		cloned := false
+		for j := range to[i].Taints {
+			toTaint := to[i].Taints[j]
 			if toTaint.TimeAdded != nil {
 				// Already set.
 				continue
@@ -1114,10 +1116,14 @@ func copyTaintTimeAdded(from, to []resourceapi.Device) []resourceapi.Device {
 				// No matching old taint.
 				continue
 			}
-			// In practice, devices are unlikely to have many
-			// taints.  Just clone the entire device before we
-			// motify it, it's unlikely that we do this more than once.
-			to[i] = *toDevice.DeepCopy()
+			// In practice, devices are unlikely to have many taints.
+			// Just clone the entire device before we modify it, and
+			// only once: cloning again would restore the taints
+			// preserved so far from the unmodified input.
+			if !cloned {
+				to[i] = *to[i].DeepCopy()
+				cloned = true
+			}
 			to[i].Taints[j].TimeAdded = fromDevice.Taints[index].TimeAdded
 		}
 	}
