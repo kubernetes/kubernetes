@@ -311,18 +311,18 @@ func TestCadvisorListPodStats(t *testing.T) {
 	assert.EqualValues(t, p0Time.Unix(), ps.StartTime.Time.Unix())
 	checkNetworkStats(t, "Pod0", seedPod0Infra, ps.Network)
 	checkEphemeralStats(t, "Pod0", []int{seedPod0Container0, seedPod0Container1}, []int{seedEphemeralVolume1, seedEphemeralVolume2}, nil, ps.EphemeralStorage)
-	if ps.CPU != nil {
-		checkCPUStats(t, "Pod0", seedPod0Infra, ps.CPU)
-	}
-	if ps.Memory != nil {
-		checkMemoryStats(t, "Pod0", seedPod0Infra, infos["/pod0-i"], ps.Memory)
-	}
+	// Pod-level stats are now aggregated from individual container stats
+	// (containers c0 and c1) instead of the pod cgroup.
+	require.NotNil(t, ps.CPU, "Pod0.CPU")
+	assert.Equal(t, uint64(seedPod0Container0+offsetCPUUsageCoreSeconds)+uint64(seedPod0Container1+offsetCPUUsageCoreSeconds), *ps.CPU.UsageCoreNanoSeconds, "Pod0.CPU.UsageCoreNanoSeconds")
+	assert.Equal(t, uint64(seedPod0Container0+offsetCPUUsageCores)+uint64(seedPod0Container1+offsetCPUUsageCores), *ps.CPU.UsageNanoCores, "Pod0.CPU.UsageNanoCores")
+	require.NotNil(t, ps.Memory, "Pod0.Memory")
+	assert.Equal(t, uint64(seedPod0Container0+offsetMemUsageBytes)+uint64(seedPod0Container1+offsetMemUsageBytes), *ps.Memory.UsageBytes, "Pod0.Memory.UsageBytes")
+	assert.Equal(t, uint64(seedPod0Container0+offsetMemWorkingSetBytes)+uint64(seedPod0Container1+offsetMemWorkingSetBytes), *ps.Memory.WorkingSetBytes, "Pod0.Memory.WorkingSetBytes")
+	assert.Equal(t, uint64(seedPod0Container0+offsetMemRSSBytes)+uint64(seedPod0Container1+offsetMemRSSBytes), *ps.Memory.RSSBytes, "Pod0.Memory.RSSBytes")
 	if ps.Swap != nil {
-		checkSwapStats(t, "Pod0", seedPod0Infra, infos["/pod0-i"], ps.Swap)
+		assert.Equal(t, uint64(seedPod0Container0+offsetMemSwapUsageBytes)+uint64(seedPod0Container1+offsetMemSwapUsageBytes), *ps.Swap.SwapUsageBytes, "Pod0.Swap.UsageBytes")
 		checkContainersSwapStats(t, ps, infos["/pod0-c0"], infos["/pod0-c1"])
-	}
-	if ps.IO != nil {
-		checkIOStats(t, "Pod0", seedPod0Infra, infos["/pod0-i"], ps.IO)
 	}
 
 	// Validate Pod1 Results
@@ -600,14 +600,15 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 	assert.Nil(t, ps.VolumeStats)
 	assert.Nil(t, ps.Network)
 	assert.Nil(t, con.IO)
-	if ps.CPU != nil {
-		checkCPUStats(t, "Pod0", seedPod0Infra, ps.CPU)
-	}
-	if ps.Memory != nil {
-		checkMemoryStats(t, "Pod0", seedPod0Infra, infos["/pod0-i"], ps.Memory)
-	}
+	// Pod-level stats are now aggregated from individual container stats.
+	require.NotNil(t, ps.CPU, "Pod0.CPU")
+	assert.Equal(t, uint64(seedPod0Container0+offsetCPUUsageCoreSeconds)+uint64(seedPod0Container1+offsetCPUUsageCoreSeconds), *ps.CPU.UsageCoreNanoSeconds, "Pod0.CPU.UsageCoreNanoSeconds")
+	assert.Equal(t, uint64(seedPod0Container0+offsetCPUUsageCores)+uint64(seedPod0Container1+offsetCPUUsageCores), *ps.CPU.UsageNanoCores, "Pod0.CPU.UsageNanoCores")
+	require.NotNil(t, ps.Memory, "Pod0.Memory")
+	assert.Equal(t, uint64(seedPod0Container0+offsetMemUsageBytes)+uint64(seedPod0Container1+offsetMemUsageBytes), *ps.Memory.UsageBytes, "Pod0.Memory.UsageBytes")
+	assert.Equal(t, uint64(seedPod0Container0+offsetMemWorkingSetBytes)+uint64(seedPod0Container1+offsetMemWorkingSetBytes), *ps.Memory.WorkingSetBytes, "Pod0.Memory.WorkingSetBytes")
 	if ps.Swap != nil {
-		checkSwapStats(t, "Pod0", seedPod0Infra, infos["/pod0-i"], ps.Swap)
+		assert.Equal(t, uint64(seedPod0Container0+offsetMemSwapUsageBytes)+uint64(seedPod0Container1+offsetMemSwapUsageBytes), *ps.Swap.SwapUsageBytes, "Pod0.Swap.UsageBytes")
 		checkContainersSwapStats(t, ps, infos["/pod0-c0"], infos["/pod0-c1"])
 	}
 
