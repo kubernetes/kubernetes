@@ -52,15 +52,15 @@ func bigDec(i *big.Int, exponent int) infDecAmount {
 }
 
 func decQuantity(i int64, exponent int, format Format) Quantity {
-	return Quantity{d: dec(i, exponent), Format: format}
+	return Quantity{quantityState: &quantityState{d: dec(i, exponent)}, Format: format}
 }
 
 func bigDecQuantity(i *big.Int, exponent int, format Format) Quantity {
-	return Quantity{d: bigDec(i, exponent), Format: format}
+	return Quantity{quantityState: &quantityState{d: bigDec(i, exponent)}, Format: format}
 }
 
 func intQuantity(i int64, exponent Scale, format Format) Quantity {
-	return Quantity{i: int64Amount{value: i, scale: exponent}, Format: format}
+	return Quantity{quantityState: &quantityState{i: int64Amount{value: i, scale: exponent}}, Format: format}
 }
 
 func TestDec(t *testing.T) {
@@ -190,7 +190,7 @@ func TestQuantitySubZeroPreservesSuffix(t *testing.T) {
 func TestQuantityCanocicalizeZero(t *testing.T) {
 	val := MustParse("1000m")
 	val.i.Sub(int64Amount{value: 1})
-	zero := Quantity{i: val.i, Format: DecimalSI}
+	zero := Quantity{quantityState: &quantityState{i: val.i}, Format: DecimalSI}
 	if expected, actual := "0", zero.String(); expected != actual {
 		t.Errorf("Expected %v, actual %v", expected, actual)
 	}
@@ -231,8 +231,8 @@ func TestQuantityCmp(t *testing.T) {
 		{dec(-10, 0).Dec, nil, -1},
 	}
 	for _, testCase := range table2 {
-		q1 := Quantity{d: infDecAmount{testCase.x}, Format: DecimalSI}
-		q2 := Quantity{d: infDecAmount{testCase.y}, Format: DecimalSI}
+		q1 := Quantity{quantityState: &quantityState{d: infDecAmount{testCase.x}}, Format: DecimalSI}
+		q2 := Quantity{quantityState: &quantityState{d: infDecAmount{testCase.y}}, Format: DecimalSI}
 		if result := q1.Cmp(q2); result != testCase.expect {
 			t.Errorf("X: %v, Y: %v, Expected: %v, Actual: %v", testCase.x, testCase.y, testCase.expect, result)
 		}
@@ -375,8 +375,8 @@ func TestQuantityParse(t *testing.T) {
 		{"0.9n", decQuantity(1, -9, DecimalSI)},
 		{"0.00000012345", decQuantity(124, -9, DecimalSI)},
 		{"0.00000012354", decQuantity(124, -9, DecimalSI)},
-		{"9Ei", Quantity{d: maxAllowed, Format: BinarySI}},
-		{"9223372036854775807Ki", Quantity{d: maxAllowed, Format: BinarySI}},
+		{"9Ei", Quantity{quantityState: &quantityState{d: maxAllowed}, Format: BinarySI}},
+		{"9223372036854775807Ki", Quantity{quantityState: &quantityState{d: maxAllowed}, Format: BinarySI}},
 		{"12E", decQuantity(12, 18, DecimalSI)},
 
 		// We'll accept fractional binary stuff, too.
@@ -489,7 +489,7 @@ func TestQuantityParse(t *testing.T) {
 
 		// Try the negative version of everything
 		desired := &inf.Dec{}
-		expect := Quantity{d: infDecAmount{Dec: desired}}
+		expect := Quantity{quantityState: &quantityState{d: infDecAmount{Dec: desired}}}
 		for _, item := range table {
 			got, err := ParseQuantity("-" + strings.TrimLeftFunc(item.input, unicode.IsSpace))
 			if err != nil {
@@ -775,7 +775,7 @@ func TestQuantityString(t *testing.T) {
 	}
 	desired := &inf.Dec{} // Avoid modifying the values in the table.
 	for _, item := range table {
-		if item.in.Cmp(Quantity{}) == 0 {
+		if item.in.Cmp(Quantity{quantityState: &quantityState{}}) == 0 {
 			// Don't expect it to print "-0" ever
 			continue
 		}
@@ -819,7 +819,7 @@ func TestQuantityParseEmit(t *testing.T) {
 			t.Errorf("Couldn't parse %v", item.in)
 			continue
 		}
-		if q.Cmp(Quantity{}) == 0 {
+		if q.Cmp(Quantity{quantityState: &quantityState{}}) == 0 {
 			continue
 		}
 		if e, a := "-"+item.expect, q.String(); e != a {
@@ -830,6 +830,9 @@ func TestQuantityParseEmit(t *testing.T) {
 
 var fuzzer = randfill.New().Funcs(
 	func(q *Quantity, c randfill.Continue) {
+		if q.quantityState == nil {
+			q.quantityState = &quantityState{}
+		}
 		q.i = Zero
 		if c.Bool() {
 			q.Format = BinarySI
@@ -869,11 +872,13 @@ var fuzzer = randfill.New().Funcs(
 
 func TestQuantityDeepCopy(t *testing.T) {
 	// Test when d is nil
+	// TODO: test cloning q.d.
 	slice := []string{"0", "100m", "50m", "10000T"}
 	for _, testCase := range slice {
 		q := MustParse(testCase)
-		if result := q.DeepCopy(); result != q {
-			t.Errorf("Expected: %v, Actual: %v", q, result)
+		result := q.DeepCopy()
+		if *result.quantityState != *q.quantityState {
+			t.Errorf("Expected: %v, Actual: %v", *q.quantityState, *result.quantityState)
 		}
 	}
 	table := []*inf.Dec{
@@ -883,12 +888,12 @@ func TestQuantityDeepCopy(t *testing.T) {
 	}
 	// Test when i is {0,0}
 	for _, testCase := range table {
-		q := Quantity{d: infDecAmount{testCase}, Format: DecimalSI}
+		q := Quantity{quantityState: &quantityState{d: infDecAmount{testCase}}, Format: DecimalSI}
 		result := q.DeepCopy()
 		if q.d.Cmp(result.AsDec()) != 0 {
 			t.Errorf("Expected: %v, Actual: %v", q.String(), result.String())
 		}
-		result = Quantity{d: infDecAmount{dec(2, 0).Dec}, Format: DecimalSI}
+		result = Quantity{quantityState: &quantityState{d: infDecAmount{dec(2, 0).Dec}}, Format: DecimalSI}
 		if q.d.Cmp(result.AsDec()) == 0 {
 			t.Errorf("Modifying result has affected q")
 		}
@@ -1337,8 +1342,8 @@ func TestQuantityAsApproximateFloat64(t *testing.T) {
 		{decQuantity(7*1024*1024, -8, DecimalExponent), (7 * 1024 * 1024) / float64(100000000)},
 
 		// very large numbers
-		{Quantity{d: maxAllowed, Format: DecimalSI}, math.MaxInt64},
-		{Quantity{d: maxAllowed, Format: BinarySI}, math.MaxInt64},
+		{Quantity{quantityState: &quantityState{d: maxAllowed}, Format: DecimalSI}, math.MaxInt64},
+		{Quantity{quantityState: &quantityState{d: maxAllowed}, Format: BinarySI}, math.MaxInt64},
 		{decQuantity(12, 18, DecimalSI), 1.2e19},
 
 		// infinities caused due to float64 overflow
@@ -1408,8 +1413,8 @@ func TestQuantityAsFloat64Slow(t *testing.T) {
 		{decQuantity(7*1024*1024, -8, DecimalExponent), (7 * 1024 * 1024) / float64(100000000)},
 
 		// very large numbers
-		{Quantity{d: maxAllowed, Format: DecimalSI}, math.MaxInt64},
-		{Quantity{d: maxAllowed, Format: BinarySI}, math.MaxInt64},
+		{Quantity{quantityState: &quantityState{d: maxAllowed}, Format: DecimalSI}, math.MaxInt64},
+		{Quantity{quantityState: &quantityState{d: maxAllowed}, Format: BinarySI}, math.MaxInt64},
 		{decQuantity(12, 18, DecimalSI), 1.2e19},
 
 		// infinities caused due to float64 overflow
@@ -1752,17 +1757,17 @@ func TestQuantityUnmarshalCBOR(t *testing.T) {
 		{
 			name: "text string input",
 			in:   []byte("\x621M"), // "1M"
-			want: Quantity{i: int64Amount{value: 1, scale: 6}},
+			want: Quantity{quantityState: &quantityState{i: int64Amount{value: 1, scale: 6}}},
 		},
 		{
 			name: "byte string input",
 			in:   []byte("\x421M"), // '1M'
-			want: Quantity{i: int64Amount{value: 1, scale: 6}},
+			want: Quantity{quantityState: &quantityState{i: int64Amount{value: 1, scale: 6}}},
 		},
 		{
 			name: "whitespace",
 			in:   []byte("\x4a \t\n\r1M \t\n\r"), // h'20090a0d314d20090a0d'
-			want: Quantity{i: int64Amount{value: 1, scale: 6}},
+			want: Quantity{quantityState: &quantityState{i: int64Amount{value: 1, scale: 6}}},
 		},
 		{
 			name:       "empty byte string",
