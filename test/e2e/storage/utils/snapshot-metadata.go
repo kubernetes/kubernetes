@@ -29,6 +29,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -145,7 +146,11 @@ func createTLSSecret(ctx context.Context, f *framework.Framework, driverNamespac
 
 	client := f.ClientSet.CoreV1().Secrets(driverNamespace)
 	if _, err := client.Create(ctx, tlsSecret, metav1.CreateOptions{}); err != nil {
-		return fmt.Errorf("failed to create or update TLS secret: %w", err)
+		if apierrors.IsAlreadyExists(err) {
+			framework.Logf("TLS secret already exists: %s", tlsSecret.Name)
+			return nil
+		}
+		return fmt.Errorf("failed to create TLS secret: %w", err)
 	}
 
 	framework.Logf("TLS secret created successfully: %s", tlsSecret.Name)
@@ -211,6 +216,28 @@ func createSnapshotMetdataServiceCR(ctx context.Context, f *framework.Framework,
 
 	if _, err := f.DynamicClient.Resource(gvr).Create(ctx, sms, metav1.CreateOptions{}); err != nil {
 		return fmt.Errorf("failed to create SnapshotMetadataService: %w", err)
+	}
+
+	return nil
+}
+
+// CreateSnapshotMetadataTLSSecret creates only the TLS secret needed by the
+// csi-snapshot-metadata sidecar. Use this in PrepareTest when CapSnapshotMetadata
+// is enabled so the driver pod can mount the secret without requiring the full
+// set of snapshot metadata resources (Service, SnapshotMetadataService CR).
+func CreateSnapshotMetadataTLSSecret(ctx context.Context, f *framework.Framework, driverNamespace string) error {
+	caCert, caPrivateKey, err := generateCA()
+	if err != nil {
+		return fmt.Errorf("failed to generate CA certificate: %w", err)
+	}
+
+	serverCertBytes, serverKeyBytes, err := generateServerCert(driverNamespace, caCert, caPrivateKey)
+	if err != nil {
+		return fmt.Errorf("failed to generate server certificate: %w", err)
+	}
+
+	if err := createTLSSecret(ctx, f, driverNamespace, serverCertBytes, serverKeyBytes); err != nil {
+		return fmt.Errorf("failed to create TLS secret: %w", err)
 	}
 
 	return nil
