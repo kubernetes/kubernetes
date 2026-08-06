@@ -87,11 +87,15 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 	}
 
 	// For watch requests we want to set the cost low if they aren't requesting for init events,
-	// either via the explicit SendInitialEvents param or via legacy watches that have RV=0 or unset.
+	// either via the explicit SendInitialEvents param or via legacy watches that have RV=0 or unset
+	// Watch requests that pass this filter (isWatchList) serialize objects incrementally
+	// with bounded memory via the watch protocol.
+	var isWatchList bool
 	if requestInfo.Verb == "watch" {
 		sendInitEvents := listOptions.SendInitialEvents != nil && *listOptions.SendInitialEvents
-		legacyWatch := listOptions.ResourceVersion == "" || listOptions.ResourceVersion == "0"
-		if !sendInitEvents && !legacyWatch {
+		legacyWatch := listOptions.SendInitialEvents == nil && (listOptions.ResourceVersion == "" || listOptions.ResourceVersion == "0")
+		isWatchList = sendInitEvents || legacyWatch
+		if !isWatchList {
 			return WorkEstimate{InitialSeats: e.config.MinimumSeats}
 		}
 	}
@@ -104,7 +108,10 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 	} else {
 		listFromStorage = result.ShouldDelegate
 	}
-	isListFromCache := requestInfo.Verb == "watch" || !listFromStorage
+	isListFromCache := !listFromStorage
+	usesListCacheCostEstimate := isWatchList || isListFromCache
+
+	isStreamed := isWatchList || (isListFromCache && apirequest.StreamingCollectionEncodingFrom(r.Context()))
 
 	stats, err := e.statsGetterFn(key(requestInfo))
 	switch {
@@ -137,9 +144,9 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 
 	var seats uint64
 	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
-		seats = e.seatsBasedOnObjectSize(stats, listOptions, isListFromCache, matchesSingle)
+		seats = e.seatsBasedOnObjectSize(stats, listOptions, usesListCacheCostEstimate, isStreamed, matchesSingle)
 	} else {
-		seats = e.seatsBasedOnObjectCount(stats, listOptions, isListFromCache, matchesSingle)
+		seats = e.seatsBasedOnObjectCount(stats, listOptions, usesListCacheCostEstimate, matchesSingle)
 	}
 
 	// make sure we never return a seat of zero
@@ -152,7 +159,7 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 	return WorkEstimate{InitialSeats: seats}
 }
 
-func (e *listWorkEstimator) seatsBasedOnObjectCount(stats storage.Stats, listOptions metav1.ListOptions, isListFromCache bool, matchesSingle bool) uint64 {
+func (e *listWorkEstimator) seatsBasedOnObjectCount(stats storage.Stats, listOptions metav1.ListOptions, usesListCacheCostEstimate bool, matchesSingle bool) uint64 {
 	numStored := stats.ObjectCount
 	limit := numStored
 	if listOptions.Limit > 0 && listOptions.Limit < numStored {
@@ -164,7 +171,7 @@ func (e *listWorkEstimator) seatsBasedOnObjectCount(stats storage.Stats, listOpt
 	switch {
 	case matchesSingle:
 		estimatedObjectsToBeProcessed = 1
-	case isListFromCache:
+	case usesListCacheCostEstimate:
 		// TODO: For resources that implement indexes at the watchcache level,
 		//  we need to adjust the cost accordingly
 		estimatedObjectsToBeProcessed = numStored
@@ -181,7 +188,7 @@ func (e *listWorkEstimator) seatsBasedOnObjectCount(stats storage.Stats, listOpt
 	return uint64(math.Ceil(float64(estimatedObjectsToBeProcessed) / e.config.ObjectsPerSeat))
 }
 
-func (e *listWorkEstimator) seatsBasedOnObjectSize(stats storage.Stats, listOptions metav1.ListOptions, isListFromCache bool, matchesSingle bool) uint64 {
+func (e *listWorkEstimator) seatsBasedOnObjectSize(stats storage.Stats, listOptions metav1.ListOptions, usesListCacheCostEstimate bool, isStreamed bool, matchesSingle bool) uint64 {
 	if stats.EstimatedAverageObjectSizeBytes <= 0 && stats.ObjectCount != 0 {
 		stats.EstimatedAverageObjectSizeBytes = maxObjectSize
 	}
@@ -193,7 +200,7 @@ func (e *listWorkEstimator) seatsBasedOnObjectSize(stats storage.Stats, listOpti
 	switch {
 	case matchesSingle:
 		objectsLoadedInMemory = 1
-	case isListFromCache:
+	case usesListCacheCostEstimate:
 		objectsLoadedInMemory = limited
 	case listOptions.FieldSelector != "" || listOptions.LabelSelector != "":
 		objectsLoadedInMemory = max(limited, stats.ObjectCount/2)
@@ -202,8 +209,7 @@ func (e *listWorkEstimator) seatsBasedOnObjectSize(stats storage.Stats, listOpti
 	}
 
 	memoryUsedAtOnce := objectsLoadedInMemory * stats.EstimatedAverageObjectSizeBytes
-	if isListFromCache {
-		// TODO: Identify if the resource is streamed
+	if isStreamed {
 		memoryUsedAtOnce = min(memoryUsedAtOnce, cacheWithStreamingMaxMemoryUsage)
 	}
 	return uint64(math.Ceil(float64(memoryUsedAtOnce) / bytesPerSeat))
