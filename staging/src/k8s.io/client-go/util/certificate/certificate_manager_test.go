@@ -23,6 +23,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"net"
@@ -1623,4 +1624,114 @@ func certificateString(c *tls.Certificate) string {
 		return "certificate.Leaf == nil"
 	}
 	return c.Leaf.Subject.CommonName
+}
+
+func TestTemplateChangedDuringWait(t *testing.T) {
+	logger := ktesting.NewLogger(t, ktesting.NewConfig(
+		ktesting.BufferLogs(true),
+		ktesting.Verbosity(2),
+	))
+	ctx := klog.NewContext(context.Background(), logger)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Initial store with a valid cert
+	store := &fakeStore{
+		cert: &tls.Certificate{
+			Leaf: &x509.Certificate{
+				Subject: pkix.Name{
+					CommonName: "system:node:initial-name",
+				},
+				NotBefore: time.Now().Add(-1 * time.Hour),
+				NotAfter:  time.Now().Add(1 * time.Hour),
+			},
+		},
+	}
+
+	var mu sync.Mutex
+	templateCN := "system:node:name-A"
+	getTemplate := func() *x509.CertificateRequest {
+		mu.Lock()
+		defer mu.Unlock()
+		return &x509.CertificateRequest{
+			Subject: pkix.Name{
+				Organization: []string{"system:nodes"},
+				CommonName:   templateCN,
+			},
+		}
+	}
+
+	csrCreated := make(chan string, 10)
+	f := fake.NewSimpleClientset()
+	f.PrependReactor("create", "certificatesigningrequests", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+		createAction := action.(clienttesting.CreateAction)
+		switch action.GetResource().Version {
+		case "v1":
+			csr := createAction.GetObject().(*certificatesv1.CertificateSigningRequest)
+			block, _ := pem.Decode(csr.Spec.Request)
+			req, _ := x509.ParseCertificateRequest(block.Bytes)
+			csrCreated <- req.Subject.CommonName
+			return true, &certificatesv1.CertificateSigningRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fake-csr-name",
+					UID:  "fake-uid",
+				},
+			}, nil
+		default:
+			return false, nil, nil
+		}
+	})
+	f.PrependReactor("list", "certificatesigningrequests", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+		switch action.GetResource().Version {
+		case "v1":
+			return true, &certificatesv1.CertificateSigningRequestList{}, nil
+		default:
+			return false, nil, nil
+		}
+	})
+	f.PrependWatchReactor("certificatesigningrequests", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
+		// return a watch that never sends events, simulating waiting for approval
+		return true, watch.NewFake(), nil
+	})
+
+	m, err := NewManager(&Config{
+		Ctx:              &ctx,
+		GetTemplate:      getTemplate,
+		SignerName:       "kubernetes.io/kube-apiserver-client-kubelet",
+		Usages:           []certificatesv1.KeyUsage{certificatesv1.UsageClientAuth},
+		CertificateStore: store,
+		ClientsetFn: func(_ *tls.Certificate) (clientset.Interface, error) {
+			return f, nil
+		},
+	})
+	require.NoError(t, err, "initialize the certificate manager")
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		m.(*manager).run()
+	}()
+	defer m.Stop()
+
+	// Wait for the first CSR to be created (should have common name A)
+	select {
+	case cn := <-csrCreated:
+		require.Equal(t, "system:node:name-A", cn)
+	case <-time.After(30 * time.Second):
+		t.Fatal("timeout waiting for first CSR")
+	}
+
+	// Change template CN to name-B
+	mu.Lock()
+	templateCN = "system:node:name-B"
+	mu.Unlock()
+
+	// The manager should detect the change, cancel the wait, and issue a new CSR with name-B
+	select {
+	case cn := <-csrCreated:
+		require.Equal(t, "system:node:name-B", cn)
+	case <-time.After(30 * time.Second):
+		t.Fatal("timeout waiting for second CSR - WaitForCertificate was not interrupted")
+	}
 }
