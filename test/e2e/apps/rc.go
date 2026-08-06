@@ -412,7 +412,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 			}
 			return actualWatchEvents
 		}, func() (err error) {
-			_ = f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test-rc-static=true"})
+			framework.ExpectNoError(f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test-rc-static=true"}), "deleting replication controllers")
 			return err
 		})
 	})
