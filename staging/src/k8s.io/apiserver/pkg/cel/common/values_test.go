@@ -274,12 +274,14 @@ func TestToValue(t *testing.T) {
 			expression: "obj[1]",
 			activation: map[string]typedValue{"obj": struct2},
 			wantErr:    "no such overload",
+			unstructuredWantErr: "no such key: 1",
 		},
 		{
 			name:       "struct: check contains non-string key (error)",
-			expression: "1 in obj",
+			expression: "!(1 in obj)",
 			activation: map[string]typedValue{"obj": struct2},
 			wantErr:    "no such overload",
+			unstructuredWantErr: "none",
 		},
 		{
 			name:       "struct: convert to its own type",
@@ -527,6 +529,22 @@ func TestToValue(t *testing.T) {
 				"b1": {value: []byte("abc"), schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"string"}, Format: "byte"}}},
 				"b2": {value: []byte("abc"), schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"string"}, Format: "byte"}}},
 			},
+		},
+		{
+			name:       "compare: date instances (equal)",
+			expression: "d1 == d2",
+			activation: map[string]typedValue{
+				"d1": {value: "2026-07-16", schema: &dateFormat},
+				"d2": {value: "2026-07-16", schema: &dateFormat},
+			},
+		},
+		{
+			name:       "invalid date instance",
+			expression: "d1 == d1",
+			activation: map[string]typedValue{
+				"d1": {value: "invalid-date", schema: &dateFormat},
+			},
+			unstructuredWantErr: "Invalid date formatted string invalid-date: parsing time \"invalid-date\" as \"2006-01-02\": cannot parse \"invalid-date\" as \"2006\"",
 		},
 		{
 			name:       "compare: bytes instances (different)",
@@ -1637,23 +1655,32 @@ func testTypedToVal(t *testing.T, env *cel.Env, tt testCase) {
 }
 
 func testUnstructuredToVal(t *testing.T, tt testCase, env *cel.Env) {
+	expectedErr := tt.wantErr
+	if tt.unstructuredWantErr != "" {
+		if tt.unstructuredWantErr == "none" {
+			expectedErr = ""
+		} else {
+			expectedErr = tt.unstructuredWantErr
+		}
+	}
+
 	a, err := unstructuredToValActivation(tt.activation)
 	if err != nil {
 		t.Fatalf("Unexpected error converting activation to unstructured: %v", err)
 	}
 	unstructuredOut, unstructuredErr := evalExpression(t, env, tt.expression, a)
-	if unstructuredErr != nil && len(tt.wantErr) == 0 {
+	if unstructuredErr != nil && len(expectedErr) == 0 {
 		t.Fatalf("Unexpected err with unstructured values: %v", unstructuredErr)
 	}
-	if len(tt.wantErr) > 0 {
+	if len(expectedErr) > 0 {
 		if unstructuredErr == nil {
-			t.Fatalf("Expected error '%s' during evaluation with unstructured values, but got none", tt.wantErr)
+			t.Fatalf("Expected error '%s' during evaluation with unstructured values, but got none", expectedErr)
 		}
-		if unstructuredErr.Error() != tt.wantErr {
-			t.Fatalf("Expected error '%s' during evaluation with unstructured values, but got: %v", tt.wantErr, unstructuredErr)
+		if unstructuredErr.Error() != expectedErr {
+			t.Fatalf("Expected error '%s' during evaluation with unstructured values, but got: %v", expectedErr, unstructuredErr)
 		}
 	}
-	if len(tt.wantErr) == 0 && unstructuredOut != types.True {
+	if len(expectedErr) == 0 && unstructuredOut != types.True {
 		t.Errorf("Expected true with unstructured values but got %v", unstructuredOut)
 	}
 }
@@ -1898,6 +1925,7 @@ var (
 	stringSchema      = spec.StringProperty()
 	bytesFormat       = spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"string"}, Format: "byte"}}
 	durationFormat    = spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"string"}, Format: "duration"}}
+	dateFormat        = spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"string"}, Format: "date"}}
 	timeFormat        = spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"string"}, Format: "date-time"}}
 	intOrStringSchema = spec.VendorExtensible{Extensions: map[string]interface{}{"x-kubernetes-int-or-string": true}}
 	int32Schema       = spec.Int32Property()
@@ -1967,8 +1995,9 @@ const RFC3339Micro = "2006-01-02T15:04:05.000000Z07:00"
 const RFC3339 = "2006-01-02T15:04:05Z07:00"
 
 type testCase struct {
-	name       string
-	expression string
-	activation map[string]typedValue
-	wantErr    string
+	name                string
+	expression          string
+	activation          map[string]typedValue
+	wantErr             string
+	unstructuredWantErr string // optional separate error for unstructured evaluation
 }

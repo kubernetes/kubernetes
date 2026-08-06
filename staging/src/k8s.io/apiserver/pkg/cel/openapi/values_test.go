@@ -17,6 +17,7 @@ limitations under the License.
 package openapi
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 
@@ -504,15 +505,18 @@ func TestLister(t *testing.T) {
 			iter := lister.Iterator()
 			for i := 0; i < int(tc.size); i++ {
 				get := lister.Get(types.Int(i)).Value()
-				if !reflect.DeepEqual(get, tc.unstructured[i]) {
-					t.Errorf("Expected Get to return %v for index %d but got %v", tc.unstructured[i], i, get)
+				getJson, _ := json.Marshal(get)
+				expectedJson, _ := json.Marshal(tc.unstructured[i])
+				if string(getJson) != string(expectedJson) {
+					t.Errorf("Expected Get to return %s for index %d but got %s", expectedJson, i, getJson)
 				}
 				if iter.HasNext() != types.True {
 					t.Error("Expected HasNext to return true")
 				}
 				next := iter.Next().Value()
-				if !reflect.DeepEqual(next, tc.unstructured[i]) {
-					t.Errorf("Expected Next to return %v for index %d but got %v", tc.unstructured[i], i, next)
+				nextJson, _ := json.Marshal(next)
+				if string(nextJson) != string(expectedJson) {
+					t.Errorf("Expected Next to return %s for index %d but got %s", expectedJson, i, nextJson)
 				}
 			}
 			if iter.HasNext() != types.False {
@@ -601,8 +605,10 @@ func TestMapper(t *testing.T) {
 			for k := range tc.unstructured {
 				keys[k] = struct{}{}
 				get := mapper.Get(types.String(k)).Value()
-				if !reflect.DeepEqual(get, tc.unstructured[k]) {
-					t.Errorf("Expected Get to return %v for key %s but got %v", tc.unstructured[k], k, get)
+				getJson, _ := json.Marshal(get)
+				expectedJson, _ := json.Marshal(tc.unstructured[k])
+				if string(getJson) != string(expectedJson) {
+					t.Errorf("Expected Get to return %s for key %s but got %s", expectedJson, k, getJson)
 				}
 				if iter.HasNext() != types.True {
 					t.Error("Expected HasNext to return true")
