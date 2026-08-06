@@ -262,6 +262,35 @@ stuff: 1
 	}
 }
 
+func TestDecodeBrokenYAMLMultiDoc(t *testing.T) {
+	s := NewYAMLOrJSONDecoder(bytes.NewReader([]byte(`---
+stuff: 1
+---
+stuff: 2
+---
+stuff: 3
+		test-foo: 1
+
+---
+  `)), 100)
+	obj := generic{}
+	if err := s.Decode(&obj); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	obj = generic{}
+	if err := s.Decode(&obj); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	obj = generic{}
+	err := s.Decode(&obj)
+	if err == nil {
+		t.Fatal("expected error with yaml: violate, got no error")
+	}
+	if !strings.Contains(err.Error(), "yaml: line 7:") {
+		t.Fatalf("expected %q to have 'yaml: line 7:' found a tab character", err.Error())
+	}
+}
+
 func TestDecodeBrokenJSON(t *testing.T) {
 	s := NewYAMLOrJSONDecoder(bytes.NewReader([]byte(`{
 	"foo": {
