@@ -285,10 +285,14 @@ func (q *Typed[T]) Get() (item T, shutdown bool) {
 
 // Done marks item as done processing, and if it has been marked as dirty again
 // while it was being processed, it will be re-added to the queue for
-// re-processing.
+// re-processing. Spurious Done calls for items not in processing are ignored.
 func (q *Typed[T]) Done(item T) {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
+
+	if !q.processing.Has(item) {
+		return
+	}
 
 	q.metrics.done(item)
 
@@ -297,7 +301,8 @@ func (q *Typed[T]) Done(item T) {
 		q.queue.Push(item)
 		q.cond.Signal()
 	} else if q.processing.Len() == 0 {
-		q.cond.Signal()
+		// Wake ShutDownWithDrain and any workers waiting on shutdown.
+		q.cond.Broadcast()
 	}
 }
 
@@ -319,11 +324,12 @@ func (q *Typed[T]) ShutDown() {
 }
 
 // ShutDownWithDrain is equivalent to ShutDown but waits until all items
-// in the queue have been processed.
+// in the queue have been processed (both queued and in-flight).
 // ShutDown can be called after ShutDownWithDrain to force
 // ShutDownWithDrain to stop waiting.
-// Workers must call Done on an item after processing it, otherwise
-// ShutDownWithDrain will block indefinitely.
+// Workers must continue to call Get until they receive the shutdown signal and
+// must call Done on each item after processing it, otherwise ShutDownWithDrain
+// will block indefinitely.
 func (q *Typed[T]) ShutDownWithDrain() {
 	defer q.wg.Wait()
 	q.stopOnce.Do(func() {
@@ -336,7 +342,10 @@ func (q *Typed[T]) ShutDownWithDrain() {
 	q.shuttingDown = true
 	q.cond.Broadcast()
 
-	for q.processing.Len() != 0 && q.drain {
+	// Wait until nothing is in-flight and nothing remains queued. Checking only
+	// processing is insufficient: Done on the last in-flight item can leave
+	// other keys sitting in the queue with processing empty.
+	for q.drain && (q.processing.Len() != 0 || q.queue.Len() != 0) {
 		q.cond.Wait()
 	}
 }
