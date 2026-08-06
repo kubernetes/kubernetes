@@ -41,6 +41,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/storage"
+	cachermetrics "k8s.io/apiserver/pkg/storage/cacher/metrics"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/tracing"
@@ -416,6 +417,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	watchEncoder := newWatchEncoder(req.Context(), gvr, s.EmbeddedEncoder, s.Encoder, recorder)
+	serveStages := cachermetrics.NewServeStageObservers(gvr.GroupResource())
 	ch := s.Watching.ResultChan()
 	done := req.Context().Done()
 
@@ -440,6 +442,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 				// End of results.
 				return
 			}
+			receivedAt := time.Now()
 			isWatchListLatencyRecordingRequired := shouldRecordWatchListLatency(req.Context(), event)
 
 			if err := watchEncoder.Encode(event); err != nil {
@@ -447,6 +450,8 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 				// client disconnect.
 				return
 			}
+			encodedAt := time.Now()
+			serveStages.ObserveEncode(encodedAt.Sub(receivedAt))
 			recorder.RecordEvent()
 
 			if len(ch) == 0 {
@@ -455,6 +460,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 					return
 				}
 			}
+			serveStages.ObserveWrite(time.Since(encodedAt))
 			if isWatchListLatencyRecordingRequired {
 				// Record completion of initial listing phase for WatchList
 				receivedTimestamp, ok := apirequest.ReceivedTimestampFrom(req.Context())

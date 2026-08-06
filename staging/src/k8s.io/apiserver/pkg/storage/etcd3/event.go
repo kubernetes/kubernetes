@@ -58,6 +58,7 @@ func parseKV(kv *mvccpb.KeyValue) *event {
 		isDeleted:      false,
 		isCreated:      true,
 		isInitialEvent: true,
+		recordTime:     time.Now(),
 	}
 }
 
