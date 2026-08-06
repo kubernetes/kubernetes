@@ -282,9 +282,9 @@ export class ServiceManagedVolume extends Construct {
     // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ecs-service-servicemanagedebsvolumeconfiguration.html#cfn-ecs-service-servicemanagedebsvolumeconfiguration-sizeingib
     const sizeInGiBRanges = {
       [ec2.EbsDeviceVolumeType.GP2]: { minSize: 1, maxSize: 16384 },
-      [ec2.EbsDeviceVolumeType.GP3]: { minSize: 1, maxSize: 16384 },
+      [ec2.EbsDeviceVolumeType.GP3]: { minSize: 1, maxSize: 65536 },
       [ec2.EbsDeviceVolumeType.IO1]: { minSize: 4, maxSize: 16384 },
-      [ec2.EbsDeviceVolumeType.IO2]: { minSize: 4, maxSize: 16384 },
+      [ec2.EbsDeviceVolumeType.IO2]: { minSize: 4, maxSize: 65536 },
       [ec2.EbsDeviceVolumeType.SC1]: { minSize: 125, maxSize: 16384 },
       [ec2.EbsDeviceVolumeType.ST1]: { minSize: 125, maxSize: 16384 },
       [ec2.EbsDeviceVolumeType.STANDARD]: { minSize: 1, maxSize: 1024 },
