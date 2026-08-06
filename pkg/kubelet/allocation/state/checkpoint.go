@@ -27,7 +27,7 @@ import (
 var _ checkpointmanager.Checkpoint = &Checkpoint{}
 
 type PodResourceCheckpointInfo struct {
-	Entries PodResourceInfoMap `json:"entries,omitempty"`
+	PodEntries PodResourceInfoMap `json:"podEntries,omitempty"`
 }
 
 // Checkpoint represents a structure to store pod resource allocation checkpoint data
