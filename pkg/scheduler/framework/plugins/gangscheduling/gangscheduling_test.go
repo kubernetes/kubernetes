@@ -1824,7 +1824,7 @@ func TestPlacementFeasible(t *testing.T) {
 					mockState.scheduledPodsCount++
 				}
 
-				args := schedulerframework.PlacementProgress{
+				args := fwk.PlacementProgress{
 					Remaining: tc.childrenCount - (i + 1),
 					Scheduled: scheduled,
 				}
