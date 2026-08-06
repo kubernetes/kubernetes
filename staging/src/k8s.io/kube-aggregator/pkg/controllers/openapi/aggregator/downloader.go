@@ -90,6 +90,73 @@ func (d *cacheableDownloader) get() (*spec.Swagger, string, error) {
 	return d.spec, d.etag, nil
 }
 
+// CacheableBytesDownloader is the bytes-mode variant of CacheableDownloader,
+// used when the OpenAPIV2BytesCache feature is enabled. It caches the raw
+// marshaled JSON spec instead of parsed spec structures.
+type CacheableBytesDownloader interface {
+	UpdateHandler(http.Handler)
+	Get() ([]byte, string, error)
+}
+
+// cacheableBytesDownloader mirrors cacheableDownloader but retains only the
+// downloaded JSON bytes and the etag.
+type cacheableBytesDownloader struct {
+	name       string
+	downloader *Downloader
+	// handler is the http Handler for the apiservice that can be replaced
+	handler atomic.Pointer[http.Handler]
+	etag    string
+	spec    []byte
+}
+
+// NewCacheableBytesDownloader creates a downloader that returns the raw spec
+// bytes and the etag, making it useful to use as a cached dependency without
+// retaining parsed spec structures.
+func NewCacheableBytesDownloader(apiServiceName string, downloader *Downloader, handler http.Handler) CacheableBytesDownloader {
+	c := &cacheableBytesDownloader{
+		name:       apiServiceName,
+		downloader: downloader,
+	}
+	c.handler.Store(&handler)
+	return c
+}
+
+func (d *cacheableBytesDownloader) UpdateHandler(handler http.Handler) {
+	d.handler.Store(&handler)
+}
+
+func (d *cacheableBytesDownloader) Get() ([]byte, string, error) {
+	spec, etag, err := d.get()
+	if err != nil {
+		return spec, etag, fmt.Errorf("failed to download %v: %w", d.name, err)
+	}
+	return spec, etag, err
+}
+
+func (d *cacheableBytesDownloader) get() ([]byte, string, error) {
+	h := *d.handler.Load()
+	data, etag, status, err := d.downloader.DownloadBytes(h, d.etag)
+	if err != nil {
+		return nil, "", err
+	}
+	switch status {
+	case http.StatusNotModified:
+		// Nothing has changed, do nothing.
+	case http.StatusOK:
+		if data != nil {
+			d.etag = etag
+			d.spec = data
+			break
+		}
+		fallthrough
+	case http.StatusNotFound:
+		return nil, "", ErrAPIServiceNotFound
+	default:
+		return nil, "", fmt.Errorf("invalid status code: %v", status)
+	}
+	return d.spec, d.etag, nil
+}
+
 // Downloader is the OpenAPI downloader type. It will try to download spec from /openapi/v2 or /swagger.json endpoint.
 type Downloader struct {
 }
@@ -113,6 +180,21 @@ func etagFor(data []byte) string {
 // Download downloads openAPI spec from /openapi/v2 endpoint of the given handler.
 // httpStatus is only valid if err == nil
 func (s *Downloader) Download(handler http.Handler, etag string) (returnSpec *spec.Swagger, newEtag string, httpStatus int, err error) {
+	data, newEtag, httpStatus, err := s.DownloadBytes(handler, etag)
+	if err != nil || httpStatus != http.StatusOK {
+		return nil, newEtag, httpStatus, err
+	}
+	openAPISpec := &spec.Swagger{}
+	if err := openAPISpec.UnmarshalJSON(data); err != nil {
+		return nil, "", 0, err
+	}
+	return openAPISpec, newEtag, http.StatusOK, nil
+}
+
+// DownloadBytes downloads the raw JSON openAPI spec from the /openapi/v2
+// endpoint of the given handler without parsing it.
+// httpStatus is only valid if err == nil
+func (s *Downloader) DownloadBytes(handler http.Handler, etag string) (returnSpec []byte, newEtag string, httpStatus int, err error) {
 	handler = s.handlerWithUser(handler, &user.DefaultInfo{Name: aggregatorUser})
 	handler = http.TimeoutHandler(handler, specDownloadTimeout, "request timed out")
 
@@ -140,10 +222,6 @@ func (s *Downloader) Download(handler http.Handler, etag string) (returnSpec *sp
 		// Gracefully skip 404, assuming the server won't provide any spec
 		return nil, "", http.StatusNotFound, nil
 	case http.StatusOK:
-		openAPISpec := &spec.Swagger{}
-		if err := openAPISpec.UnmarshalJSON(writer.Data()); err != nil {
-			return nil, "", 0, err
-		}
 		newEtag = writer.Header().Get("Etag")
 		if len(newEtag) == 0 {
 			newEtag = etagFor(writer.Data())
@@ -157,7 +235,7 @@ func (s *Downloader) Download(handler http.Handler, etag string) (returnSpec *sp
 				}
 			}
 		}
-		return openAPISpec, newEtag, http.StatusOK, nil
+		return writer.Data(), newEtag, http.StatusOK, nil
 	default:
 		return nil, "", 0, fmt.Errorf("failed to retrieve openAPI spec, http error: %s", writer.String())
 	}

@@ -43,6 +43,13 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/controller/openapi/builder"
 )
 
+// SpecUpdater updates the OpenAPI v2 spec served by an apiserver. It is
+// implemented by *handler.OpenAPIService and, when the OpenAPIV2BytesCache
+// feature gate is enabled, by *routes.OpenAPIV2BytesService.
+type SpecUpdater interface {
+	UpdateSpecLazy(swagger cached.Value[*spec.Swagger])
+}
+
 // Controller watches CustomResourceDefinitions and publishes validation schema
 type Controller struct {
 	crdLister  listers.CustomResourceDefinitionLister
@@ -55,7 +62,7 @@ type Controller struct {
 
 	staticSpec *spec.Swagger
 
-	openAPIService *handler.OpenAPIService
+	openAPIService SpecUpdater
 
 	// specs by name. The specs are lazily constructed on request.
 	// The lock is for the map only.
@@ -134,7 +141,7 @@ func NewController(crdInformer informers.CustomResourceDefinitionInformer) *Cont
 }
 
 // Run sets openAPIAggregationManager and starts workers
-func (c *Controller) Run(staticSpec *spec.Swagger, openAPIService *handler.OpenAPIService, stopCh <-chan struct{}) {
+func (c *Controller) Run(staticSpec *spec.Swagger, openAPIService SpecUpdater, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 	defer klog.Infof("Shutting down OpenAPI controller")
