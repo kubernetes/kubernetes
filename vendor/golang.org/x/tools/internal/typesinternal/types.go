@@ -22,11 +22,10 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"iter"
 	"reflect"
-	"unsafe"
 
 	"golang.org/x/tools/go/ast/inspector"
-	"golang.org/x/tools/internal/aliases"
 )
 
 func SetUsesCgo(conf *types.Config) bool {
@@ -40,8 +39,7 @@ func SetUsesCgo(conf *types.Config) bool {
 		}
 	}
 
-	addr := unsafe.Pointer(f.UnsafeAddr())
-	*(*bool)(addr) = true
+	*(*bool)(f.Addr().UnsafePointer()) = true
 
 	return true
 }
@@ -144,7 +142,7 @@ var (
 func Origin(t NamedOrAlias) NamedOrAlias {
 	switch t := t.(type) {
 	case *types.Alias:
-		return aliases.Origin(t)
+		return t.Origin()
 	case *types.Named:
 		return t.Origin()
 	}
@@ -196,4 +194,79 @@ func Imports(pkg *types.Package, path string) bool {
 		}
 	}
 	return false
+}
+
+// ObjectKind returns a description of the object's kind.
+//
+// from objectKind in go/types
+func ObjectKind(obj types.Object) string {
+	switch obj := obj.(type) {
+	case *types.PkgName:
+		return "package name"
+	case *types.Const:
+		return "constant"
+	case *types.TypeName:
+		if obj.IsAlias() {
+			return "type alias"
+		} else if _, ok := obj.Type().(*types.TypeParam); ok {
+			return "type parameter"
+		} else {
+			return "defined type"
+		}
+	case *types.Var:
+		switch obj.Kind() {
+		case PackageVar:
+			return "package-level variable"
+		case LocalVar:
+			return "local variable"
+		case RecvVar:
+			return "receiver"
+		case ParamVar:
+			return "parameter"
+		case ResultVar:
+			return "result variable"
+		case FieldVar:
+			return "struct field"
+		}
+	case *types.Func:
+		if obj.Signature().Recv() != nil {
+			return "method"
+		} else {
+			return "function"
+		}
+	case *types.Label:
+		return "label"
+	case *types.Builtin:
+		return "built-in function"
+	case *types.Nil:
+		return "untyped nil"
+	}
+	return "unknown symbol"
+}
+
+// ImplicitFieldSelections returns the sequence of implicit embedded fields
+// traversed by the given selection. It skips the final leaf field or method.
+// The boolean component indicates whether the traversal traversed a pointer.
+func ImplicitFieldSelections(seln types.Selection) iter.Seq2[*types.Var, bool] {
+	return func(yield func(*types.Var, bool) bool) {
+		var (
+			t       = seln.Recv()
+			indices = seln.Index()
+		)
+		for _, idx := range indices[:len(indices)-1] {
+			ptr, isPtr := t.Underlying().(*types.Pointer)
+			if isPtr {
+				t = ptr.Elem()
+			}
+			structType, ok := t.Underlying().(*types.Struct)
+			if !ok {
+				break
+			}
+			field := structType.Field(idx)
+			if !yield(field, isPtr) {
+				break
+			}
+			t = field.Type()
+		}
+	}
 }
