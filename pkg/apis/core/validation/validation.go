@@ -8240,8 +8240,16 @@ func ValidateConfigMapUpdate(newCfg, oldCfg *core.ConfigMap) field.ErrorList {
 }
 
 func validateBasicResource(quantity resource.Quantity, fldPath *field.Path) field.ErrorList {
-	if quantity.Value() < 0 {
-		return field.ErrorList{field.Invalid(fldPath, quantity.Value(), "must be a valid resource quantity")}
+	// Sign() rather than Value(): the check only cares about the sign, and Value()
+	// does not report it reliably. It overflows to a positive number for negative
+	// quantities such as -9.5Gi, and falls back to zero when its conversion fails,
+	// as for -1e30 -- both of which pass a "Value() < 0" test. Sign() is correct
+	// for every quantity, and does not depend on how overflow is handled.
+	//
+	// String() rather than Value() in the error for the same reason: the reported
+	// value would otherwise be the overflowed one rather than what was submitted.
+	if quantity.Sign() < 0 {
+		return field.ErrorList{field.Invalid(fldPath, quantity.String(), "must be a valid resource quantity")}
 	}
 	return field.ErrorList{}
 }
