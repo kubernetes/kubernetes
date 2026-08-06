@@ -125,7 +125,7 @@ func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC, O2P, O2, O2L, O2AC]) U
 			})
 		case useV1beta2API:
 			return putWithConversion(obj, func(obj *O2) (*O2, error) {
-				return t.v1beta1.(funcsWithStatus[O2, O2L, O2AC]).UpdateStatus(ctx, obj, opts)
+				return t.v1beta2.(funcsWithStatus[O2, O2L, O2AC]).UpdateStatus(ctx, obj, opts)
 			})
 		default:
 			return t.native.(funcsWithStatus[N, NL, NAC]).UpdateStatus(ctx, obj, opts)
