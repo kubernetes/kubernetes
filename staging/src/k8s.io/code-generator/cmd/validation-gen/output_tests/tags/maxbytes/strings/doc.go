@@ -19,7 +19,7 @@ limitations under the License.
 
 // This is a test package.
 // +k8s:validation-gen-nolint
-package maxbytes
+package strings
 
 import "k8s.io/code-generator/cmd/validation-gen/testscheme"
 
@@ -79,3 +79,4 @@ type Max0Type string
 // that use the type definition.
 // +k8s:maxBytes=10
 type Max10Type string
+
