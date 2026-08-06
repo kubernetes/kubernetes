@@ -603,6 +603,115 @@ func TestMoreImportantVictim(t *testing.T) {
 	}
 }
 
+func TestLessByStartTimeThenIdentity(t *testing.T) {
+	newPodInfo := func(p *v1.Pod) fwk.PodInfo {
+		pi, _ := framework.NewPodInfo(p)
+		return pi
+	}
+
+	now := &metav1.Time{Time: time.Unix(1000, 0)}
+	before := &metav1.Time{Time: time.Unix(500, 0)}
+
+	tests := []struct {
+		name string
+		vi1  *victim
+		vi2  *victim
+		want bool
+	}{
+		{
+			name: "earlier start time wins",
+			vi1: &victim{
+				pods:              []fwk.PodInfo{newPodInfo(st.MakePod().Name("a").UID("uid-a").Obj())},
+				earliestStartTime: before,
+				keyType:           fwk.PodKeyType,
+			},
+			vi2: &victim{
+				pods:              []fwk.PodInfo{newPodInfo(st.MakePod().Name("b").UID("uid-b").Obj())},
+				earliestStartTime: now,
+				keyType:           fwk.PodKeyType,
+			},
+			want: true,
+		},
+		{
+			name: "later start time loses",
+			vi1: &victim{
+				pods:              []fwk.PodInfo{newPodInfo(st.MakePod().Name("a").UID("uid-a").Obj())},
+				earliestStartTime: now,
+				keyType:           fwk.PodKeyType,
+			},
+			vi2: &victim{
+				pods:              []fwk.PodInfo{newPodInfo(st.MakePod().Name("b").UID("uid-b").Obj())},
+				earliestStartTime: before,
+				keyType:           fwk.PodKeyType,
+			},
+			want: false,
+		},
+		{
+			name: "equal start time, lower UID wins",
+			vi1: &victim{
+				pods:              []fwk.PodInfo{newPodInfo(st.MakePod().Name("a").UID("aaa").Obj())},
+				earliestStartTime: now,
+				keyType:           fwk.PodKeyType,
+			},
+			vi2: &victim{
+				pods:              []fwk.PodInfo{newPodInfo(st.MakePod().Name("b").UID("zzz").Obj())},
+				earliestStartTime: now,
+				keyType:           fwk.PodKeyType,
+			},
+			want: true,
+		},
+		{
+			name: "equal start time, higher UID loses",
+			vi1: &victim{
+				pods:              []fwk.PodInfo{newPodInfo(st.MakePod().Name("a").UID("zzz").Obj())},
+				earliestStartTime: now,
+				keyType:           fwk.PodKeyType,
+			},
+			vi2: &victim{
+				pods:              []fwk.PodInfo{newPodInfo(st.MakePod().Name("b").UID("aaa").Obj())},
+				earliestStartTime: now,
+				keyType:           fwk.PodKeyType,
+			},
+			want: false,
+		},
+		{
+			name: "equal start time, equal UID returns false",
+			vi1: &victim{
+				pods:              []fwk.PodInfo{newPodInfo(st.MakePod().Name("a").UID("same-uid").Obj())},
+				earliestStartTime: now,
+				keyType:           fwk.PodKeyType,
+			},
+			vi2: &victim{
+				pods:              []fwk.PodInfo{newPodInfo(st.MakePod().Name("b").UID("same-uid").Obj())},
+				earliestStartTime: now,
+				keyType:           fwk.PodKeyType,
+			},
+			want: false,
+		},
+		{
+			name: "nil start times, falls back to UID comparison",
+			vi1: &victim{
+				pods:    []fwk.PodInfo{newPodInfo(st.MakePod().Name("a").UID("aaa").Obj())},
+				keyType: fwk.PodKeyType,
+			},
+			vi2: &victim{
+				pods:    []fwk.PodInfo{newPodInfo(st.MakePod().Name("b").UID("zzz").Obj())},
+				keyType: fwk.PodKeyType,
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := MoreImportantVictim(tt.vi1, tt.vi2)
+			if got != tt.want {
+				t.Errorf("MoreImportantVictim() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestPodTerminatingByPreemption(t *testing.T) {
 	tests := []struct {
 		name string
