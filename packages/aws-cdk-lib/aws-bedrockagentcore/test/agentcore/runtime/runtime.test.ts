@@ -1501,21 +1501,115 @@ describe('Runtime metrics and grant methods tests', () => {
       MetricName: 'Invocations',
       Namespace: 'AWS/Bedrock-AgentCore',
       Statistic: 'Sum',
+      // Dimensions synth in alphabetical order by Name. Assert each dimension
+      // in its own arrayWith, not in one ordered array.
+      Dimensions: Match.arrayWith([
+        Match.objectLike({ Name: 'Operation', Value: 'InvokeAgentRuntime' }),
+      ]),
+    });
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'Invocations',
+      Dimensions: Match.arrayWith([
+        Match.objectLike({ Name: 'Name', Value: Match.stringLikeRegexp('.*::DEFAULT$') }),
+      ]),
+    });
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'Invocations',
       Dimensions: Match.arrayWith([
         Match.objectLike({ Name: 'Resource', Value: { 'Fn::GetAtt': [Match.stringLikeRegexp('.*'), 'AgentRuntimeArn'] } }),
       ]),
     });
+    // Regression guard: the buggy shape emitted a `Service` dimension.
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'Invocations',
+      Dimensions: Match.not(Match.arrayWith([
+        Match.objectLike({ Name: 'Service' }),
+      ])),
+    });
   });
 
-  test('metricInvocationsAggregated() produces Invocations with Resource dimension', () => {
+  test('metricLatency() emits per-resource Operation/Name/Resource dimensions and no Service', () => {
+    alarmForMetric('LatencyDimAlarm', runtime.metricLatency());
+
+    const template = Template.fromStack(stack);
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'Latency',
+      Namespace: 'AWS/Bedrock-AgentCore',
+      Statistic: 'Average',
+      Dimensions: Match.arrayWith([
+        Match.objectLike({ Name: 'Operation', Value: 'InvokeAgentRuntime' }),
+      ]),
+    });
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'Latency',
+      Dimensions: Match.arrayWith([
+        Match.objectLike({ Name: 'Name', Value: Match.stringLikeRegexp('.*::DEFAULT$') }),
+      ]),
+    });
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'Latency',
+      Dimensions: Match.arrayWith([
+        Match.objectLike({ Name: 'Resource', Value: { 'Fn::GetAtt': [Match.stringLikeRegexp('.*'), 'AgentRuntimeArn'] } }),
+      ]),
+    });
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'Latency',
+      Dimensions: Match.not(Match.arrayWith([
+        Match.objectLike({ Name: 'Service' }),
+      ])),
+    });
+  });
+
+  test('metricInvocationsAggregated() produces Invocations with only the AggregateOperation dimension', () => {
     alarmForMetric('InvocAggAlarm', runtime.metricInvocationsAggregated());
 
     const template = Template.fromStack(stack);
     template.hasResourceProperties('AWS::CloudWatch::Alarm', {
       MetricName: 'Invocations',
       Namespace: 'AWS/Bedrock-AgentCore',
+      Statistic: 'Sum',
+      // Aggregated metrics carry one dimension: AggregateOperation.
+      Dimensions: [{ Name: 'AggregateOperation', Value: 'InvokeAgentRuntime' }],
+    });
+    // Guard: per-resource dimensions must be absent on the aggregated metric.
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'Invocations',
+      Dimensions: Match.not(Match.arrayWith([
+        Match.objectLike({ Name: 'Operation' }),
+      ])),
+    });
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'Invocations',
+      Dimensions: Match.not(Match.arrayWith([
+        Match.objectLike({ Name: 'Name' }),
+      ])),
+    });
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'Invocations',
+      Dimensions: Match.not(Match.arrayWith([
+        Match.objectLike({ Name: 'Resource' }),
+      ])),
+    });
+  });
+
+  test('metricInvocationsAggregated() merges a caller-supplied dimension onto the AggregateOperation path', () => {
+    alarmForMetric('InvocAggOverrideAlarm', runtime.metricInvocationsAggregated({
+      dimensionsMap: { Foo: 'bar' },
+    }));
+
+    const template = Template.fromStack(stack);
+    // The caller dimension merges onto the aggregated metric.
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'Invocations',
       Dimensions: Match.arrayWith([
-        Match.objectLike({ Name: 'Resource', Value: 'All' }),
+        Match.objectLike({ Name: 'Foo', Value: 'bar' }),
+      ]),
+    });
+    // The AggregateOperation dimension stays present with the override.
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'Invocations',
+      Dimensions: Match.arrayWith([
+        Match.objectLike({ Name: 'AggregateOperation', Value: 'InvokeAgentRuntime' }),
       ]),
     });
   });
@@ -1586,15 +1680,83 @@ describe('Runtime metrics and grant methods tests', () => {
     });
   });
 
-  test('metricSessionsAggregated() produces Sessions with Resource dimension', () => {
+  test('metricSessionsAggregated() produces Sessions with only the AggregateOperation dimension', () => {
     alarmForMetric('SessionsAggAlarm', runtime.metricSessionsAggregated());
 
     const template = Template.fromStack(stack);
     template.hasResourceProperties('AWS::CloudWatch::Alarm', {
       MetricName: 'Sessions',
       Namespace: 'AWS/Bedrock-AgentCore',
+      Statistic: 'Sum',
+      Dimensions: [{ Name: 'AggregateOperation', Value: 'InvokeAgentRuntime' }],
+    });
+    // Guard: per-resource dimensions must be absent on the aggregated metric.
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'Sessions',
+      Dimensions: Match.not(Match.arrayWith([
+        Match.objectLike({ Name: 'Operation' }),
+      ])),
+    });
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'Sessions',
+      Dimensions: Match.not(Match.arrayWith([
+        Match.objectLike({ Name: 'Name' }),
+      ])),
+    });
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'Sessions',
+      Dimensions: Match.not(Match.arrayWith([
+        Match.objectLike({ Name: 'Resource' }),
+      ])),
+    });
+  });
+
+  test('caller-supplied dimensionsMap overrides the per-resource defaults', () => {
+    alarmForMetric('OverrideAlarm', runtime.metricInvocations({
+      dimensionsMap: { Operation: 'CustomOp', Resource: 'custom-resource' },
+    }));
+
+    const template = Template.fromStack(stack);
+    // Overridden dimensions win (order-independent per-dimension assertions).
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'Invocations',
       Dimensions: Match.arrayWith([
-        Match.objectLike({ Name: 'Resource', Value: 'All' }),
+        Match.objectLike({ Name: 'Operation', Value: 'CustomOp' }),
+      ]),
+    });
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'Invocations',
+      Dimensions: Match.arrayWith([
+        Match.objectLike({ Name: 'Resource', Value: 'custom-resource' }),
+      ]),
+    });
+    // The un-overridden default (Name) is still present.
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'Invocations',
+      Dimensions: Match.arrayWith([
+        Match.objectLike({ Name: 'Name', Value: Match.stringLikeRegexp('.*::DEFAULT$') }),
+      ]),
+    });
+  });
+
+  test('unnamed runtime resolves Name to a concrete synth string ending ::DEFAULT', () => {
+    // A runtime without runtimeName gets a Lazy token (Names.uniqueResourceName)
+    // that resolves at synth to a plain string, NOT an Fn::Join.
+    const repository = new ecr.Repository(stack, 'TokenRepository', {
+      repositoryName: 'token-agent-runtime',
+    });
+    const agentRuntimeArtifact = AgentRuntimeArtifact.fromEcrRepository(repository, 'v1.0.0');
+    const unnamed = new Runtime(stack, 'unnamed-runtime', {
+      agentRuntimeArtifact,
+    });
+
+    alarmForMetric('TokenNameAlarm', unnamed.metricInvocations());
+
+    const template = Template.fromStack(stack);
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'Invocations',
+      Dimensions: Match.arrayWith([
+        Match.objectLike({ Name: 'Name', Value: Match.stringLikeRegexp('^[^{]*::DEFAULT$') }),
       ]),
     });
   });
