@@ -723,11 +723,19 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods 
 		for _, pod := range podsToDelete {
 			go func(targetPod *v1.Pod) {
 				defer wg.Done()
-				if err := rsc.podControl.DeletePod(ctx, rs.Namespace, targetPod.Name, rs); err != nil {
+				opts := metav1.DeleteOptions{
+					Preconditions: &metav1.Preconditions{
+						ResourceVersion: &targetPod.ResourceVersion,
+					},
+				}
+				if err := rsc.podControl.DeletePod(ctx, rs.Namespace, targetPod.Name, rs, opts); err != nil {
 					// Decrement the expected number of deletes because the informer won't observe this deletion
 					podKey := controller.PodKey(targetPod)
 					rsc.expectations.DeletionObserved(logger, rsKey, podKey)
-					if !apierrors.IsNotFound(err) {
+					if apierrors.IsConflict(err) {
+						logger.V(4).Info("Conflict deleting pod, decremented expectations", "pod", podKey, "kind", rsc.Kind, "replicaSet", klog.KObj(rs))
+						errCh <- err
+					} else if !apierrors.IsNotFound(err) {
 						logger.V(2).Info("Failed to delete pod, decremented expectations", "pod", podKey, "kind", rsc.Kind, "replicaSet", klog.KObj(rs))
 						errCh <- err
 					}
