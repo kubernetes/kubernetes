@@ -404,21 +404,6 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 		})
 
 		ginkgo.It("should report Memory pressure in PSI metrics", func(ctx context.Context) {
-			runtime, _, err := getCRIClient(ctx)
-			framework.ExpectNoError(err)
-			resp, err := runtime.Version(ctx, "")
-			framework.ExpectNoError(err)
-
-			if resp.GetRuntimeName() == "cri-o" {
-				// Skip this test for CRI-O (used on Fedora CoreOS in test CI) until automatic
-				// memory.high configuration is available. The test fails on Fedora CoreOS due to
-				// different page cache reclaim behavior. CRI-O is implementing a fix to automatically
-				// set memory.high to 95% of memory.max for cgroup v2 containers.
-				// See: https://github.com/cri-o/cri-o/pull/9714
-				// See: https://github.com/coreos/fedora-coreos-tracker/issues/2094
-				ginkgo.Skip("Skipping for CRI-O until automatic memory.high configuration is available")
-			}
-
 			podName := "memory-pressure-pod"
 			ginkgo.By("Creating a pod to generate Memory pressure")
 			// Create a pod that generates memory pressure by continuously writing to files,
@@ -426,10 +411,14 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 			podSpec := getStressTestPod(podName, "memory-stress", []string{})
 			podSpec.Spec.Containers[0].Command = []string{"/bin/sh", "-c"}
 			podSpec.Spec.Containers[0].Args = []string{
-				// This command runs an infinite loop that uses `dd` to write 50MB files,
-				// cycling through 5 files to target 250MB of reclaimable file cache usage.
-				// This exceeds the 200MB memory limit, forcing the kernel to reclaim memory and generate pressure stalls.
-				"i=0; while true; do dd if=/dev/zero of=testfile.$i bs=1M count=50 &>/dev/null; i=$(((i+1)%5)); sleep 0.1; done",
+				// Write 50MB files in an infinite loop, cycling through 5 file names, so
+				// the kernel must keep reclaiming file cache inside the 200MB limit.
+				// The first pass writes small 10MB files: without that ramp, the very
+				// first pass fills the whole limit with dirty pages before writeback has
+				// started, and on filesystems that hold dirty data longer (XFS on Fedora
+				// CoreOS) the kernel OOM kills the container instead of reclaiming.
+				"i=0; while [ $i -lt 5 ]; do dd if=/dev/zero of=testfile.$i bs=1M count=10 &>/dev/null; i=$((i+1)); sleep 0.1; done; " +
+					"i=0; while true; do dd if=/dev/zero of=testfile.$i bs=1M count=50 &>/dev/null; i=$(((i+1)%5)); sleep 0.1; done",
 			}
 			podSpec.Spec.Containers[0].Resources = v1.ResourceRequirements{
 				Limits: v1.ResourceList{
@@ -444,16 +433,28 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 			ginkgo.By("Waiting for the pod to start")
 			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
 
-			ginkgo.By("Validating that Memory PSI metrics reflect pressure")
-			gomega.Eventually(ctx, func(g gomega.Gomega) {
-				summary, err := getNodeSummary(ctx)
-				framework.ExpectNoError(err)
-				g.Expect(summary.Pods).To(gstruct.MatchElements(summaryObjectID, gstruct.IgnoreExtras, gstruct.Elements{
-					fmt.Sprintf("%s::%s", f.Namespace.Name, podName): gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-						"Memory": pressureDetected("full", 0.1),
-					}),
-				}))
-			}, 2*time.Minute, 15*time.Second).Should(gomega.Succeed())
+			// Linux 6.16 and newer reclaim this workload's file cache without
+			// blocking the pod for long, so Full.Avg10 stays at zero and a
+			// check on the average cannot pass there. The total stall time
+			// still grows on every kernel, so check that Full.Total becomes
+			// positive and then keeps growing while the workload runs. An idle
+			// pod adds no stall time, so growth proves the pressure comes from
+			// this pod.
+			ginkgo.By("Validating that Memory PSI metrics report stall time")
+			var baselineTotal uint64
+			gomega.Eventually(ctx, func(ctx context.Context) (uint64, error) {
+				total, err := podMemoryPSIFullTotal(ctx, f.Namespace.Name, podName)
+				if err != nil {
+					return 0, err
+				}
+				baselineTotal = total
+				return total, nil
+			}, 2*time.Minute, 15*time.Second).Should(gomega.BeNumerically(">", uint64(0)))
+
+			ginkgo.By("Validating that Memory PSI total stall time grows under sustained pressure")
+			gomega.Eventually(ctx, func(ctx context.Context) (uint64, error) {
+				return podMemoryPSIFullTotal(ctx, f.Namespace.Name, podName)
+			}, 2*time.Minute, 15*time.Second).Should(gomega.BeNumerically(">", baselineTotal))
 			framework.ExpectNoError(e2epod.NewPodClient(f).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
 		})
 
@@ -713,4 +714,23 @@ func pressureDetected(level string, threshold float64) types.GomegaMatcher {
 	return gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 		"PSI": gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, fields)),
 	}))
+}
+
+// podMemoryPSIFullTotal returns the memory PSI full total stall time in
+// microseconds reported for the given pod in /stats/summary.
+func podMemoryPSIFullTotal(ctx context.Context, namespace, podName string) (uint64, error) {
+	summary, err := getNodeSummary(ctx)
+	if err != nil {
+		return 0, err
+	}
+	for _, pod := range summary.Pods {
+		if pod.PodRef.Namespace != namespace || pod.PodRef.Name != podName {
+			continue
+		}
+		if pod.Memory == nil || pod.Memory.PSI == nil {
+			return 0, fmt.Errorf("pod %s/%s has no memory PSI data in summary", namespace, podName)
+		}
+		return pod.Memory.PSI.Full.Total, nil
+	}
+	return 0, fmt.Errorf("pod %s/%s not found in summary", namespace, podName)
 }
