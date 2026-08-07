@@ -297,6 +297,11 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 	}
 	m.recordContainerEvent(ctx, pod, container, containerID, v1.EventTypeNormal, events.StartedContainer, "Container started")
 
+	// Start probing this container instance. Doing it here, rather than leaving
+	// the probe manager to notice the container later, is what anchors probe
+	// timing to the container actually starting.
+	m.probes().StartProbes(ctx, pod, container, kubecontainer.ContainerID{Type: m.runtimeName, ID: containerID}, podIPs, time.Now())
+
 	// Symlink container logs to the legacy container log location for cluster logging
 	// support.
 	// TODO(random-liu): Remove this after cluster logging supports CRI container log path.
@@ -863,6 +868,14 @@ func (m *kubeGenericRuntimeManager) restoreSpecsFromContainerLabels(ctx context.
 // * Stop the container.
 func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.Pod, containerID kubecontainer.ContainerID, containerName string, message string, reason containerKillReason, gracePeriodOverride *int64, ordering *terminationOrdering) error {
 	logger := klog.FromContext(ctx)
+
+	// Stop liveness and startup probing before anything else: this container is
+	// already being killed, so nothing is gained by probing it further, and
+	// running exec or network probes inside a container being torn down wastes
+	// resources and produces spurious errors. Readiness keeps going, so that a
+	// container draining through its PreStop hook and grace period is taken out of service.
+	m.probes().StopLivenessAndStartupProbes(containerID)
+
 	var containerSpec *v1.Container
 	if pod != nil {
 		if containerSpec = kubecontainer.GetContainerSpec(pod, containerName); containerSpec == nil {
@@ -920,6 +933,10 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 	}
 	logger.V(3).Info("Container exited normally", "pod", klog.KObj(pod), "podUID", pod.UID,
 		"containerName", containerName, "containerID", containerID.String())
+
+	// The container is gone, so its readiness probe and its cached results are
+	// too. This is skipped when the stop failed above; the next sync reconciles.
+	m.probes().StopProbes(containerID)
 
 	if ordering != nil {
 		ordering.containerTerminated(containerName)

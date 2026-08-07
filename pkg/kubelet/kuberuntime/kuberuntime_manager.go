@@ -133,6 +133,10 @@ type kubeGenericRuntimeManager struct {
 	readinessManager proberesults.Manager
 	startupManager   proberesults.Manager
 
+	// probeLifecycle is told when the containers being probed start and stop.
+	// Read it through probes(), which tolerates it not being set.
+	probeLifecycle kubecontainer.ContainerProbeLifecycle
+
 	// If false, pass "memory.oom.group" to container cgroups when using cgroups v2 to cause processes
 	// in those cgroups to be killed as a unit by the OOM killer.
 	// It must be nil except for linux
@@ -386,6 +390,35 @@ func NewKubeGenericRuntimeManager(
 
 	return kubeRuntimeManager, imageGCHooks, nil
 }
+
+// SetContainerProbeLifecycle sets the hook that is told when the containers
+// this runtime manages start and stop.
+//
+// It is a setter rather than a constructor parameter because of a construction
+// cycle: the probe manager needs this runtime manager as its command runner, so
+// it cannot exist yet when this runtime manager is built. That mirrors how the
+// kubelet already late-binds its own runner.
+func (m *kubeGenericRuntimeManager) SetContainerProbeLifecycle(probeLifecycle kubecontainer.ContainerProbeLifecycle) {
+	m.probeLifecycle = probeLifecycle
+}
+
+// probes returns where to report container starts and stops. Until a probe
+// manager is wired in -- and in tests that never wire one -- that is nowhere.
+func (m *kubeGenericRuntimeManager) probes() kubecontainer.ContainerProbeLifecycle {
+	if m.probeLifecycle == nil {
+		return noopProbeLifecycle{}
+	}
+	return m.probeLifecycle
+}
+
+type noopProbeLifecycle struct{}
+
+func (noopProbeLifecycle) StartProbes(context.Context, *v1.Pod, *v1.Container, kubecontainer.ContainerID, []string, time.Time) {
+}
+
+func (noopProbeLifecycle) StopLivenessAndStartupProbes(kubecontainer.ContainerID) {}
+
+func (noopProbeLifecycle) StopProbes(kubecontainer.ContainerID) {}
 
 // Type returns the type of the container runtime.
 func (m *kubeGenericRuntimeManager) Type() string {
