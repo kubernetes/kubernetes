@@ -612,8 +612,8 @@ type QueueingParams struct {
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
 	// latency for an entity.
 	InitialAttemptTimestamp *time.Time
-	// UnschedulablePlugins records the plugin names that the entity failed with Unschedulable or UnschedulableAndUnresolvable status
-	// at specific extension points: PreFilter, Filter, Reserve, or Permit (WaitOnPermit).
+	// UnschedulablePlugins records the plugin names that the entity failed with Wait, Unschedulable or UnschedulableAndUnresolvable status
+	// at specific extension points: PreFilter, Filter, Reserve, Permit (WaitOnPermit) or PlacementFeasible.
 	// If entities are rejected at other extension points,
 	// they're assumed to be unexpected errors (e.g., temporal network issue, plugin implementation issue, etc)
 	// and retried soon after a backoff period.

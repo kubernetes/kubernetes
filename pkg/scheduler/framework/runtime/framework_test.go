@@ -1226,7 +1226,7 @@ func TestRunPlacementFeasiblePlugins(t *testing.T) {
 				{name: "p1", status: fwk.NewStatus(fwk.Skip, "error")},
 				{name: "p2", status: nil},
 			},
-			expectedStatus: fwk.AsStatus(fmt.Errorf("unexpected status from PlacementFeasible plugin: Skip")).WithPlugin("p1"),
+			expectedStatus: fwk.AsStatus(fmt.Errorf("unexpected status code (Skip) from PlacementFeasible plugin: error")).WithPlugin("p1"),
 			expectedCalled: []bool{true, false},
 		},
 	}

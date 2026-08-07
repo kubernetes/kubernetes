@@ -1493,6 +1493,127 @@ func TestHandleSchedulingFailureForDeferredResizePod(t *testing.T) {
 	}
 }
 
+func TestHandleSchedulingFailure_PodGroupFitErrorCloned(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	pg := st.MakePodGroup().Name("pg1").Namespace("ns").MinCount(2).Obj()
+	pod1 := st.MakePod().Name("pod1").Namespace("ns").UID("uid1").PodGroupName("pg1").SchedulerName(testSchedulerName).Obj()
+	pod2 := st.MakePod().Name("pod2").Namespace("ns").UID("uid2").PodGroupName("pg1").SchedulerName(testSchedulerName).Obj()
+
+	client := clientsetfake.NewClientset(pod1, pod2)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+	schedFramework, err := tf.NewFramework(ctx,
+		[]tf.RegisterPluginFunc{
+			tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+			tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+		},
+		testSchedulerName,
+		frameworkruntime.WithClientSet(client),
+		frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
+		frameworkruntime.WithInformerFactory(informerFactory),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ar := metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())
+	queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar))
+	sched := &Scheduler{
+		client:          client,
+		SchedulingQueue: queue,
+	}
+
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
+
+	queue.AddPodGroup(logger, pg)
+	queue.Add(ctx, pod1)
+	queue.Add(ctx, pod2)
+
+	entity, err := queue.Pop(logger)
+	if err != nil {
+		t.Fatalf("Failed to pop pod group: %v", err)
+	}
+	pgInfo := entity.(*framework.QueuedPodGroupInfo)
+
+	var poppedPods []*framework.QueuedPodInfo
+	pgInfo.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+		poppedPods = append(poppedPods, pInfo)
+		return true
+	})
+	if len(poppedPods) != 2 {
+		t.Fatalf("Expected 2 popped pods, got %d", len(poppedPods))
+	}
+
+	fitError := &podGroupFitError{
+		status:               fwk.NewStatus(fwk.Unschedulable, "pod group unschedulable"),
+		unschedulablePlugins: sets.New("pluginA", "pluginB"),
+		pendingPlugins:       sets.New("pluginC"),
+	}
+	status := fwk.NewStatus(fwk.Unschedulable, "gang unschedulable").WithError(fitError)
+
+	for _, pInfo := range poppedPods {
+		sched.handleSchedulingFailure(ctx, schedFramework, pInfo, status.Clone(), nil, time.Now())
+	}
+
+	queuedPod1, ok := queue.GetPod(pod1.Name, pod1.Namespace, pod1.Spec.SchedulingGroup)
+	if !ok {
+		t.Fatalf("Failed to get pod1 from the queue")
+	}
+	queuedPod2, ok := queue.GetPod(pod2.Name, pod2.Namespace, pod2.Spec.SchedulingGroup)
+	if !ok {
+		t.Fatalf("Failed to get pod2 from the queue")
+	}
+
+	wantUnschedulable := sets.New("pluginA", "pluginB")
+	wantPending := sets.New("pluginC")
+
+	if diff := cmp.Diff(wantUnschedulable, queuedPod1.UnschedulablePlugins); diff != "" {
+		t.Fatalf("Unexpected unschedulablePlugins for pod1 (-want, +got):\n%s", diff)
+	}
+	if diff := cmp.Diff(wantPending, queuedPod1.PendingPlugins); diff != "" {
+		t.Fatalf("Unexpected pendingPlugins for pod1 (-want, +got):\n%s", diff)
+	}
+	if diff := cmp.Diff(wantUnschedulable, queuedPod2.UnschedulablePlugins); diff != "" {
+		t.Fatalf("Unexpected unschedulablePlugins for pod2 (-want, +got):\n%s", diff)
+	}
+	if diff := cmp.Diff(wantPending, queuedPod2.PendingPlugins); diff != "" {
+		t.Fatalf("Unexpected pendingPlugins for pod2 (-want, +got):\n%s", diff)
+	}
+
+	// Verify mutations to each plugin sets don't propagate to others.
+	queuedPod1.UnschedulablePlugins.Insert("pluginPod1")
+	queuedPod1.PendingPlugins.Insert("pluginPod1")
+	queuedPod2.UnschedulablePlugins.Insert("pluginPod2")
+	queuedPod2.PendingPlugins.Insert("pluginPod2")
+	fitError.unschedulablePlugins.Insert("pluginFit")
+	fitError.pendingPlugins.Insert("pluginFit")
+
+	if diff := cmp.Diff(sets.New("pluginA", "pluginB", "pluginPod1"), queuedPod1.UnschedulablePlugins); diff != "" {
+		t.Fatalf("Unexpected unschedulablePlugins for pod1 (-want, +got):\n%s", diff)
+	}
+	if diff := cmp.Diff(sets.New("pluginC", "pluginPod1"), queuedPod1.PendingPlugins); diff != "" {
+		t.Fatalf("Unexpected pendingPlugins for pod1 (-want, +got):\n%s", diff)
+	}
+	if diff := cmp.Diff(sets.New("pluginA", "pluginB", "pluginPod2"), queuedPod2.UnschedulablePlugins); diff != "" {
+		t.Fatalf("Unexpected unschedulablePlugins for pod2 (-want, +got):\n%s", diff)
+	}
+	if diff := cmp.Diff(sets.New("pluginC", "pluginPod2"), queuedPod2.PendingPlugins); diff != "" {
+		t.Fatalf("Unexpected pendingPlugins for pod2 (-want, +got):\n%s", diff)
+	}
+	if diff := cmp.Diff(sets.New("pluginA", "pluginB", "pluginFit"), fitError.unschedulablePlugins); diff != "" {
+		t.Fatalf("Unexpected unschedulablePlugins for fitError (-want, +got):\n%s", diff)
+	}
+	if diff := cmp.Diff(sets.New("pluginC", "pluginFit"), fitError.pendingPlugins); diff != "" {
+		t.Fatalf("Unexpected pendingPlugins for fitError (-want, +got):\n%s", diff)
+	}
+}
+
 type constSigPluginConfig struct {
 	name       string
 	signature  []fwk.SignFragment

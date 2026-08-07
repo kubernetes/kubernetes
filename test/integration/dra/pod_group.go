@@ -208,7 +208,7 @@ func testPodGroup(tCtx ktesting.TContext) {
 		pod1.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": "worker-1"}
 		pod1 = createPod(tCtx, namespace, "-1", pod1, claimObj)
 
-		expectPodUnschedulable(tCtx, pod0, "pod group is unschedulable, minCount (2) cannot be satisfied")
+		expectPodUnschedulable(tCtx, pod0, "parent pod group is unschedulable: minCount (2) cannot be satisfied")
 		expectPodUnschedulable(tCtx, pod1, "1 resourceclaim not available on the node")
 	})
 }

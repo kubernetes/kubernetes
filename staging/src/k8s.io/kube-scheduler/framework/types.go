@@ -372,18 +372,18 @@ type QueuedEntityInfo interface {
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
 	// latency for an entity.
 	GetInitialAttemptTimestamp() *time.Time
-	// GetUnschedulablePlugins records the plugin names that the entity failed with Unschedulable or UnschedulableAndUnresolvable status
-	// at specific extension points: PreFilter, Filter, Reserve, or Permit (WaitOnPermit).
+	// GetUnschedulablePlugins returns the plugin names that the entity failed with Wait, Unschedulable or UnschedulableAndUnresolvable status
+	// at specific extension points: PreFilter, Filter, Reserve, Permit (WaitOnPermit) or PlacementFeasible.
 	// If entities are rejected at other extension points,
 	// they're assumed to be unexpected errors (e.g., temporal network issue, plugin implementation issue, etc)
 	// and retried soon after a backoff period.
 	// That is because such failures could be solved regardless of incoming cluster events (registered in EventsToRegister).
 	GetUnschedulablePlugins() sets.Set[string]
-	// GetPendingPlugins records the plugin names that the entity failed with Pending status.
+	// GetPendingPlugins returns the plugin names that the entity failed with Pending status.
 	GetPendingPlugins() sets.Set[string]
-	// GetGatingPlugin records the plugin name that gated the entity at PreEnqueue.
+	// GetGatingPlugin returns the plugin name that gated the entity at PreEnqueue.
 	GetGatingPlugin() string
-	// GetGatingPluginEvents records the events registered by the plugin that gated the entity at PreEnqueue.
+	// GetGatingPluginEvents returns the events registered by the plugin that gated the entity at PreEnqueue.
 	// We have it as a cache purpose to avoid re-computing which event(s) might ungate the entity.
 	GetGatingPluginEvents() []ClusterEvent
 }
