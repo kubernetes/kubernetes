@@ -474,6 +474,12 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}, initialEventsEnd
 	if wc.progressNotify {
 		opts = append(opts, clientv3.WithProgressNotify())
 	}
+
+	// Log etcd client watch buffer backlog for the watch cache's internal watch at v>=3.
+	if wc.recordTimestamps && klog.V(3).Enabled() {
+		opts = append(opts, clientv3.WithWatchBufLog())
+	}
+
 	wch := wc.watcher.client.Watch(wc.ctx, wc.key, opts...)
 	estimator := wc.getResourceSizeEstimator()
 	for wres := range wch {
