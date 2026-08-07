@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	dyfake "k8s.io/client-go/dynamic/fake"
@@ -52,6 +53,7 @@ import (
 	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
+	internalworkloadmanager "k8s.io/kubernetes/pkg/scheduler/backend/workloadmanager"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
@@ -822,13 +824,28 @@ func TestUpdatePod(t *testing.T) {
 
 	scheduledPodOtherNode := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node2").SchedulerName("supported-scheduler").Obj()
 
+	// Pods sharing the name of the fixtures above, but with a different UID. They
+	// stand for a Pod that was deleted and recreated under the same name, which the
+	// informer can deliver as a single update event instead of a delete and an add.
+	recreatedPod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod2").ResourceVersion("2").SchedulerName("supported-scheduler").Obj()
+	recreatedScheduledPod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod2").ResourceVersion("2").Node("node1").SchedulerName("supported-scheduler").Obj()
+	recreatedScheduledPodOtherNode := st.MakePod().Name("pod1").Namespace("ns1").UID("pod2").ResourceVersion("2").Node("node2").SchedulerName("supported-scheduler").Obj()
+
+	workloadRef := &v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}
+	unscheduledWorkloadPod := st.MakePod().Name("pod1").Namespace("ns1").UID("wlpod1").SchedulerName("supported-scheduler").WorkloadRef(workloadRef).Obj()
+	scheduledWorkloadPod := st.MakePod().Name("pod1").Namespace("ns1").UID("wlpod1").Node("node1").SchedulerName("supported-scheduler").WorkloadRef(workloadRef).Obj()
+	recreatedUnscheduledWorkloadPod := st.MakePod().Name("pod1").Namespace("ns1").UID("wlpod2").ResourceVersion("2").SchedulerName("supported-scheduler").WorkloadRef(workloadRef).Obj()
+
 	tests := []struct {
-		name          string
-		oldPod        *v1.Pod
-		assumedPod    *v1.Pod
-		newPod        *v1.Pod
-		expectInQueue *v1.Pod
-		expectInCache *v1.Pod
+		name                            string
+		oldPod                          *v1.Pod
+		assumedPod                      *v1.Pod
+		newPod                          *v1.Pod
+		waitingOnPermit                 bool
+		expectInQueue                   *v1.Pod
+		expectInActiveQ                 bool
+		expectInCache                   *v1.Pod
+		expectInWorkloadPodGroupUnsched bool
 	}{
 		{
 			name:          "update unscheduled pod",
@@ -892,6 +909,55 @@ func TestUpdatePod(t *testing.T) {
 			assumedPod: scheduledPod,
 			newPod:     podWithDeletionTimestamp,
 		},
+		{
+			name:            "recreated pod with a different UID, not scheduled yet",
+			oldPod:          scheduledPod,
+			newPod:          recreatedPod,
+			expectInQueue:   recreatedPod,
+			expectInActiveQ: true,
+		},
+		{
+			name:          "recreated pod with a different UID, scheduled to a different node",
+			oldPod:        scheduledPod,
+			newPod:        recreatedScheduledPodOtherNode,
+			expectInCache: recreatedScheduledPodOtherNode,
+		},
+		{
+			name:          "recreated pod with a different UID, scheduled to the same node",
+			oldPod:        scheduledPod,
+			newPod:        recreatedScheduledPod,
+			expectInCache: recreatedScheduledPod,
+		},
+		{
+			name:            "recreated unscheduled pod with a different UID",
+			oldPod:          pod,
+			newPod:          recreatedPod,
+			expectInQueue:   recreatedPod,
+			expectInActiveQ: true,
+		},
+		{
+			name:            "recreated pod with a different UID while the previous one waits on permit",
+			oldPod:          pod,
+			assumedPod:      scheduledPod,
+			newPod:          recreatedPod,
+			waitingOnPermit: true,
+			expectInQueue:   recreatedPod,
+			expectInActiveQ: true,
+		},
+		{
+			name:                            "recreated unscheduled workload pod with a different UID",
+			oldPod:                          unscheduledWorkloadPod,
+			newPod:                          recreatedUnscheduledWorkloadPod,
+			expectInQueue:                   recreatedUnscheduledWorkloadPod,
+			expectInWorkloadPodGroupUnsched: true,
+		},
+		{
+			name:                            "recreated scheduled workload pod with a different UID, not scheduled yet",
+			oldPod:                          scheduledWorkloadPod,
+			newPod:                          recreatedUnscheduledWorkloadPod,
+			expectInQueue:                   recreatedUnscheduledWorkloadPod,
+			expectInWorkloadPodGroupUnsched: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -902,6 +968,9 @@ func TestUpdatePod(t *testing.T) {
 			registerPluginFuncs := []tf.RegisterPluginFunc{
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}
+			if tt.waitingOnPermit {
+				registerPluginFuncs = append(registerPluginFuncs, tf.RegisterPermitPlugin("FakePermit", tf.NewFakePermitPlugin(fwk.NewStatus(fwk.Wait), time.Minute)))
 			}
 			waitingPods := frameworkruntime.NewWaitingPodsMap()
 			schedFramework, err := tf.NewFramework(
@@ -916,22 +985,57 @@ func TestUpdatePod(t *testing.T) {
 			sched := &Scheduler{
 				Cache:           internalcache.New(ctx, 0, nil),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
+				WorkloadManager: internalworkloadmanager.New(),
 				logger:          logger,
 				Profiles: profile.Map{
 					"supported-scheduler": schedFramework,
 				},
 			}
 
+			var waitOnPermitDone chan struct{}
 			if tt.assumedPod != nil {
 				err := sched.Cache.AssumePod(logger, tt.assumedPod)
 				if err != nil {
 					t.Fatalf("Failed to assume pod: %v", err)
+				}
+				if tt.waitingOnPermit {
+					if status := schedFramework.RunPermitPlugins(ctx, framework.NewCycleState(), tt.assumedPod, ""); status.Code() != fwk.Wait {
+						t.Fatalf("Expected RunPermitPlugins to return Wait, got %v", status)
+					}
+					waitOnPermitDone = make(chan struct{})
+					go func() {
+						defer close(waitOnPermitDone)
+						schedFramework.WaitOnPermit(ctx, tt.assumedPod)
+					}()
 				}
 			} else {
 				sched.addPod(tt.oldPod)
 			}
 
 			sched.updatePod(tt.oldPod, tt.newPod)
+
+			if tt.waitingOnPermit {
+				err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, 1*time.Second, true, func(ctx context.Context) (bool, error) {
+					return schedFramework.GetWaitingPod(tt.assumedPod.UID) == nil, nil
+				})
+				if err != nil {
+					t.Errorf("Expected pod %v to be removed from waiting pods", tt.assumedPod.UID)
+				}
+				select {
+				case <-waitOnPermitDone:
+				case <-time.After(wait.ForeverTestTimeout):
+					t.Fatalf("timeout on WaitOnPermit %v", tt.assumedPod.UID)
+				}
+			}
+
+			// A Pod that was rejected on Permit is deliberately left in the cache by
+			// handleAssumedPodDeletion: its binding cycle unwinds through
+			// handleBindingCycleError on the binding goroutine, which this test does not run.
+			if tt.oldPod.UID != tt.newPod.UID && !tt.waitingOnPermit {
+				if oldCached, err := sched.Cache.GetPod(tt.oldPod); err == nil {
+					t.Errorf("Expected pod UID %v to be evicted from cache, but it is still there", oldCached.UID)
+				}
+			}
 
 			qPod, ok := sched.SchedulingQueue.GetPod(tt.newPod.Name, tt.newPod.Namespace)
 			if tt.expectInQueue != nil {
@@ -943,6 +1047,18 @@ func TestUpdatePod(t *testing.T) {
 			} else if ok {
 				t.Errorf("Expected pod not to be in scheduling queue")
 			}
+			if tt.expectInActiveQ {
+				var found bool
+				for _, p := range sched.SchedulingQueue.PodsInActiveQ() {
+					if p.UID == tt.newPod.UID {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("Expected pod %v to be in activeQ", tt.newPod.UID)
+				}
+			}
 			pod, err := sched.Cache.GetPod(tt.newPod)
 			if tt.expectInCache != nil {
 				if err != nil {
@@ -952,6 +1068,21 @@ func TestUpdatePod(t *testing.T) {
 				}
 			} else if err == nil {
 				t.Errorf("Expected pod not to be in cache")
+			}
+			if tt.newPod.Spec.WorkloadRef == nil {
+				return
+			}
+			pgInfo, err := sched.WorkloadManager.PodGroupInfo(tt.oldPod.Namespace, tt.oldPod.Spec.WorkloadRef)
+			if err != nil {
+				t.Fatalf("Expected pod group info to exist, got error: %v", err)
+			}
+
+			if tt.oldPod.UID != tt.newPod.UID && pgInfo.AllPods().Has(tt.oldPod.UID) {
+				t.Errorf("Expected pod UID %v to be dropped from WorkloadManager, but it is still there", tt.oldPod.UID)
+			}
+
+			if inUnscheduled := pgInfo.UnscheduledPods()[tt.newPod.Name] != nil; inUnscheduled != tt.expectInWorkloadPodGroupUnsched {
+				t.Errorf("pod in UnscheduledPods of PodGroupInfo: got %v, want %v", inUnscheduled, tt.expectInWorkloadPodGroupUnsched)
 			}
 		})
 	}
