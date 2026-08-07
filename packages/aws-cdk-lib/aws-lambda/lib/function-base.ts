@@ -554,11 +554,11 @@ export abstract class FunctionBase extends Resource implements IFunction, ec2.IC
     // Memoize the result so subsequent grantInvoke() calls are idempotent
     let grant = this._invocationGrants[identifier];
     if (!grant) {
-      let resouceArns = [`${this.functionArn}:${version.version}`];
+      let resourceArns = [`${this.functionArn}:${version.version}`];
       if (version == this.latestVersion) {
-        resouceArns.push(this.functionArn);
+        resourceArns.push(this.functionArn);
       }
-      grant = this.grant(grantee, identifier, 'lambda:InvokeFunction', resouceArns);
+      grant = this.grant(grantee, identifier, 'lambda:InvokeFunction', resourceArns);
       this._invocationGrants[identifier] = grant;
     }
     return grant;
