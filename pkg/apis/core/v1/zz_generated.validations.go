@@ -967,7 +967,38 @@ func Validate_NodeSpec(
 	obj, oldObj *corev1.NodeSpec) (errs field.ErrorList) {
 
 	// field corev1.NodeSpec.PodCIDR has no validation
-	// field corev1.NodeSpec.PodCIDRs has no validation
+
+	{ // field corev1.NodeSpec.PodCIDRs
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.ValSliceUpdate(ctx, op, fldPath, obj, oldObj, nil, validate.NoUnset).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.NodeSpec) []string {
+				return oldObj.PodCIDRs
+			})
+		errs = append(errs, fn(fldPath.Child("podCIDRs"), obj.PodCIDRs, oldVal, oldObj != nil)...)
+	}
 
 	{ // field corev1.NodeSpec.ProviderID
 		fn := func(

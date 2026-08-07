@@ -7689,15 +7689,13 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 
 	// Allow the controller manager to assign a CIDR to a node if it doesn't have one.
 	if len(oldNode.Spec.PodCIDRs) > 0 {
-		// compare the entire slice
-		if len(oldNode.Spec.PodCIDRs) != len(node.Spec.PodCIDRs) {
+		if len(node.Spec.PodCIDRs) == 0 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "podCIDRs"), nil, "field cannot be cleared once set").WithOrigin("update").MarkCoveredByDeclarative())
+		} else if !apiequality.Semantic.DeepEqual(oldNode.Spec.PodCIDRs, node.Spec.PodCIDRs) {
+			// Modification of an already-assigned podCIDRs is not expressible with
+			// +k8s:update yet: NoModify is rejected on list fields, and the
+			// per-item form does not correlate changed values in a listType=set.
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "podCIDRs"), "node updates may not change podCIDR except from \"\" to valid"))
-		} else {
-			for idx, value := range oldNode.Spec.PodCIDRs {
-				if value != node.Spec.PodCIDRs[idx] {
-					allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "podCIDRs"), "node updates may not change podCIDR except from \"\" to valid"))
-				}
-			}
 		}
 	}
 
