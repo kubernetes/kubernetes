@@ -27,8 +27,10 @@ package encoding
 
 import (
 	"io"
+	"slices"
 	"strings"
 
+	"google.golang.org/grpc/encoding/internal"
 	"google.golang.org/grpc/internal/grpcutil"
 )
 
@@ -36,12 +38,26 @@ import (
 // It is intended for grpc internal use only.
 const Identity = "identity"
 
+func init() {
+	internal.RegisterCompressorForTesting = func(c Compressor) func() {
+		name := c.Name()
+		curCompressor, found := registeredCompressor[name]
+		RegisterCompressor(c)
+		return func() {
+			if found {
+				registeredCompressor[name] = curCompressor
+				return
+			}
+			delete(registeredCompressor, name)
+			grpcutil.RegisteredCompressorNames = slices.DeleteFunc(grpcutil.RegisteredCompressorNames, func(s string) bool {
+				return s == name
+			})
+		}
+	}
+}
+
 // Compressor is used for compressing and decompressing when sending or
 // receiving messages.
-//
-// If a Compressor implements `DecompressedSize(compressedBytes []byte) int`,
-// gRPC will invoke it to determine the size of the buffer allocated for the
-// result of decompression.  A return value of -1 indicates unknown size.
 type Compressor interface {
 	// Compress writes the data written to wc to w after compressing it.  If an
 	// error occurs while initializing the compressor, that error is returned

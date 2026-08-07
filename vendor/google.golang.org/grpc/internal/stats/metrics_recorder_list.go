@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	estats "google.golang.org/grpc/experimental/stats"
+	"google.golang.org/grpc/internal"
 	"google.golang.org/grpc/stats"
 )
 
@@ -28,6 +29,7 @@ import (
 // It eats any record calls where the label values provided do not match the
 // number of label keys.
 type MetricsRecorderList struct {
+	internal.EnforceMetricsRecorderEmbedding
 	// metricsRecorders are the metrics recorders this list will forward to.
 	metricsRecorders []estats.MetricsRecorder
 }
@@ -61,6 +63,16 @@ func (l *MetricsRecorderList) RecordInt64Count(handle *estats.Int64CountHandle, 
 
 	for _, metricRecorder := range l.metricsRecorders {
 		metricRecorder.RecordInt64Count(handle, incr, labels...)
+	}
+}
+
+// RecordInt64UpDownCount records the measurement alongside labels on the int
+// count associated with the provided handle.
+func (l *MetricsRecorderList) RecordInt64UpDownCount(handle *estats.Int64UpDownCountHandle, incr int64, labels ...string) {
+	verifyLabels(handle.Descriptor(), labels...)
+
+	for _, metricRecorder := range l.metricsRecorders {
+		metricRecorder.RecordInt64UpDownCount(handle, incr, labels...)
 	}
 }
 
@@ -102,4 +114,62 @@ func (l *MetricsRecorderList) RecordInt64Gauge(handle *estats.Int64GaugeHandle, 
 	for _, metricRecorder := range l.metricsRecorders {
 		metricRecorder.RecordInt64Gauge(handle, incr, labels...)
 	}
+}
+
+// RegisterAsyncReporter forwards the registration to all underlying metrics
+// recorders.
+//
+// It returns a cleanup function that, when called, invokes the cleanup function
+// returned by each underlying recorder, ensuring the reporter is unregistered
+// from all of them.
+func (l *MetricsRecorderList) RegisterAsyncReporter(reporter estats.AsyncMetricReporter, metrics ...estats.AsyncMetric) func() {
+	descriptorsMap := make(map[*estats.MetricDescriptor]bool, len(metrics))
+	for _, m := range metrics {
+		descriptorsMap[m.Descriptor()] = true
+	}
+	unregisterFns := make([]func(), 0, len(l.metricsRecorders))
+	for _, mr := range l.metricsRecorders {
+		// Wrap the AsyncMetricsRecorder to intercept calls to RecordInt64Gauge
+		// and validate the labels.
+		wrappedCallback := func(recorder estats.AsyncMetricsRecorder) error {
+			wrappedRecorder := &asyncRecorderWrapper{
+				delegate:    recorder,
+				descriptors: descriptorsMap,
+			}
+			return reporter.Report(wrappedRecorder)
+		}
+		unregisterFns = append(unregisterFns, mr.RegisterAsyncReporter(estats.AsyncMetricReporterFunc(wrappedCallback), metrics...))
+	}
+
+	// Wrap the cleanup function using the internal delegate.
+	// In production, this returns realCleanup as-is.
+	// In tests, the leak checker can swap this to track the registration lifetime.
+	return internal.AsyncReporterCleanupDelegate(defaultCleanUp(unregisterFns))
+}
+
+func defaultCleanUp(unregisterFns []func()) func() {
+	return func() {
+		for _, unregister := range unregisterFns {
+			unregister()
+		}
+	}
+}
+
+type asyncRecorderWrapper struct {
+	delegate    estats.AsyncMetricsRecorder
+	descriptors map[*estats.MetricDescriptor]bool
+}
+
+// RecordIntAsync64Gauge records the measurement alongside labels on the int
+// gauge associated with the provided handle.
+func (w *asyncRecorderWrapper) RecordInt64AsyncGauge(handle *estats.Int64AsyncGaugeHandle, value int64, labels ...string) {
+	// Ensure only metrics for descriptors passed during callback registration
+	// are emitted.
+	d := handle.Descriptor()
+	if _, ok := w.descriptors[d]; !ok {
+		return
+	}
+	// Validate labels and delegate.
+	verifyLabels(d, labels...)
+	w.delegate.RecordInt64AsyncGauge(handle, value, labels...)
 }

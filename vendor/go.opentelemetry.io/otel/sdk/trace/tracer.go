@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel/sdk/instrumentation"
+	"go.opentelemetry.io/otel/sdk/trace/internal/observ"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/embedded"
 )
@@ -17,6 +18,8 @@ type tracer struct {
 
 	provider             *TracerProvider
 	instrumentationScope instrumentation.Scope
+
+	inst observ.Tracer
 }
 
 var _ trace.Tracer = &tracer{}
@@ -26,7 +29,11 @@ var _ trace.Tracer = &tracer{}
 // The Span is created with the provided name and as a child of any existing
 // span context found in the passed context. The created Span will be
 // configured appropriately by any SpanOption passed.
-func (tr *tracer) Start(ctx context.Context, name string, options ...trace.SpanStartOption) (context.Context, trace.Span) {
+func (tr *tracer) Start(
+	ctx context.Context,
+	name string,
+	options ...trace.SpanStartOption,
+) (context.Context, trace.Span) {
 	config := trace.NewSpanStartConfig(options...)
 
 	if ctx == nil {
@@ -42,17 +49,32 @@ func (tr *tracer) Start(ctx context.Context, name string, options ...trace.SpanS
 	}
 
 	s := tr.newSpan(ctx, name, &config)
+	newCtx := trace.ContextWithSpan(ctx, s)
+	if tr.inst.Enabled() {
+		if o, ok := s.(interface{ setOrigCtx(context.Context) }); ok {
+			// If this is a recording span, store the original context.
+			// This allows later retrieval of baggage and other information
+			// that may have been stored in the context at span start time and
+			// to avoid the allocation of repeatedly calling
+			// trace.ContextWithSpan.
+			o.setOrigCtx(newCtx)
+		}
+		psc := trace.SpanContextFromContext(ctx)
+		tr.inst.SpanStarted(newCtx, psc, s)
+	}
+
 	if rw, ok := s.(ReadWriteSpan); ok && s.IsRecording() {
 		sps := tr.provider.getSpanProcessors()
 		for _, sp := range sps {
+			// Use original context.
 			sp.sp.OnStart(ctx, rw)
 		}
 	}
 	if rtt, ok := s.(runtimeTracer); ok {
-		ctx = rtt.runtimeTrace(ctx)
+		newCtx = rtt.runtimeTrace(newCtx)
 	}
 
-	return trace.ContextWithSpan(ctx, s), s
+	return newCtx, s
 }
 
 type runtimeTracer interface {
@@ -108,11 +130,17 @@ func (tr *tracer) newSpan(ctx context.Context, name string, config *trace.SpanCo
 	if !isRecording(samplingResult) {
 		return tr.newNonRecordingSpan(sc)
 	}
-	return tr.newRecordingSpan(psc, sc, name, samplingResult, config)
+	return tr.newRecordingSpan(ctx, psc, sc, name, samplingResult, config)
 }
 
 // newRecordingSpan returns a new configured recordingSpan.
-func (tr *tracer) newRecordingSpan(psc, sc trace.SpanContext, name string, sr SamplingResult, config *trace.SpanConfig) *recordingSpan {
+func (tr *tracer) newRecordingSpan(
+	ctx context.Context,
+	psc, sc trace.SpanContext,
+	name string,
+	sr SamplingResult,
+	config *trace.SpanConfig,
+) *recordingSpan {
 	startTime := config.Timestamp()
 	if startTime.IsZero() {
 		startTime = time.Now()
@@ -143,6 +171,13 @@ func (tr *tracer) newRecordingSpan(psc, sc trace.SpanContext, name string, sr Sa
 
 	s.SetAttributes(sr.Attributes...)
 	s.SetAttributes(config.Attributes()...)
+
+	if tr.inst.Enabled() {
+		// Propagate any existing values from the context with the new span to
+		// the measurement context.
+		ctx = trace.ContextWithSpan(ctx, s)
+		tr.inst.SpanLive(ctx, s)
+	}
 
 	return s
 }
