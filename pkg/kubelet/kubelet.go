@@ -993,17 +993,10 @@ func NewMainKubelet(ctx context.Context,
 		}
 	}
 
-	if kubeDeps.ProbeManager != nil {
-		klet.probeManager = kubeDeps.ProbeManager
-	} else {
-		klet.probeManager = prober.NewManager(
-			klet.statusManager,
-			klet.livenessManager,
-			klet.readinessManager,
-			klet.startupManager,
-			klet.runner,
-			kubeDeps.Recorder)
-	}
+	klet.probeManager = newProbeManager(ctx, klet, kubeDeps)
+	// Let the runtime report container starts and stops. With the legacy probe
+	// manager this wires up three no-ops.
+	runtime.SetContainerProbeLifecycle(klet.probeManager)
 
 	var clusterTrustBundleManager clustertrustbundle.Manager = &clustertrustbundle.NoopManager{}
 	if kubeDeps.KubeClient != nil && utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundleProjection) {
@@ -1206,6 +1199,38 @@ func NewMainKubelet(ctx context.Context,
 
 type serviceLister interface {
 	List(labels.Selector) ([]*v1.Service, error)
+}
+
+// newProbeManager picks the probe manager the kubelet will use.
+//
+// This is the only place ContainerScopedProbes is consulted. Both managers
+// satisfy the same interfaces, so every call site -- in the kubelet and in the
+// container runtime -- is branch-free.
+func newProbeManager(ctx context.Context, klet *Kubelet, kubeDeps *Dependencies) prober.Manager {
+	if kubeDeps.ProbeManager != nil {
+		return kubeDeps.ProbeManager
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerScopedProbes) {
+		// Probe workers are started and stopped with the containers they probe,
+		// so this manager has no reason to watch the status manager to find
+		// them. Its workers outlive any pod sync context, hence ctx.
+		return prober.NewInstanceBoundManager(
+			ctx,
+			klet.livenessManager,
+			klet.readinessManager,
+			klet.startupManager,
+			klet.runner,
+			kubeDeps.Recorder)
+	}
+
+	return prober.NewManager(
+		klet.statusManager,
+		klet.livenessManager,
+		klet.readinessManager,
+		klet.startupManager,
+		klet.runner,
+		kubeDeps.Recorder)
 }
 
 // Kubelet is the main kubelet implementation.

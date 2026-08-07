@@ -217,6 +217,11 @@ type KubeGenericRuntime interface {
 	kubecontainer.Runtime
 	kubecontainer.StreamingRuntime
 	kubecontainer.CommandRunner
+
+	// SetContainerProbeLifecycle sets the hook that is told when the containers
+	// this runtime manages start and stop. See the method's implementation for
+	// why this is a setter.
+	SetContainerProbeLifecycle(kubecontainer.ContainerProbeLifecycle)
 }
 
 // NewKubeGenericRuntimeManager creates a new kubeGenericRuntimeManager
