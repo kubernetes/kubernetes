@@ -353,6 +353,30 @@ type Taskstats struct {
 	Wpcopy_delay_total        uint64
 	Irq_count                 uint64
 	Irq_delay_total           uint64
+	Cpu_delay_max             uint64
+	Cpu_delay_min             uint64
+	Blkio_delay_max           uint64
+	Blkio_delay_min           uint64
+	Swapin_delay_max          uint64
+	Swapin_delay_min          uint64
+	Freepages_delay_max       uint64
+	Freepages_delay_min       uint64
+	Thrashing_delay_max       uint64
+	Thrashing_delay_min       uint64
+	Compact_delay_max         uint64
+	Compact_delay_min         uint64
+	Wpcopy_delay_max          uint64
+	Wpcopy_delay_min          uint64
+	Irq_delay_max             uint64
+	Irq_delay_min             uint64
+	Cpu_delay_max_ts          KernelTimespec
+	Blkio_delay_max_ts        KernelTimespec
+	Swapin_delay_max_ts       KernelTimespec
+	Freepages_delay_max_ts    KernelTimespec
+	Thrashing_delay_max_ts    KernelTimespec
+	Compact_delay_max_ts      KernelTimespec
+	Wpcopy_delay_max_ts       KernelTimespec
+	Irq_delay_max_ts          KernelTimespec
 }
 
 type cpuMask uint64
@@ -703,3 +727,7 @@ type SysvShmDesc struct {
 	_      uint64
 	_      uint64
 }
+
+const (
+	GPIO_GET_CHIPINFO_IOCTL = 0x8044b401
+)

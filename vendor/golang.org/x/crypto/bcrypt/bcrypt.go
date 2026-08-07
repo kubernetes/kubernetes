@@ -50,7 +50,7 @@ func (ih InvalidHashPrefixError) Error() string {
 type InvalidCostError int
 
 func (ic InvalidCostError) Error() string {
-	return fmt.Sprintf("crypto/bcrypt: cost %d is outside allowed range (%d,%d)", int(ic), MinCost, MaxCost)
+	return fmt.Sprintf("crypto/bcrypt: cost %d is outside allowed inclusive range %d..%d", int(ic), MinCost, MaxCost)
 }
 
 const (

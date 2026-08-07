@@ -321,6 +321,8 @@ func NewCallbackCDecl(fn interface{}) uintptr {
 //sys	SetConsoleOutputCP(cp uint32) (err error) = kernel32.SetConsoleOutputCP
 //sys	WriteConsole(console Handle, buf *uint16, towrite uint32, written *uint32, reserved *byte) (err error) = kernel32.WriteConsoleW
 //sys	ReadConsole(console Handle, buf *uint16, toread uint32, read *uint32, inputControl *byte) (err error) = kernel32.ReadConsoleW
+//sys	GetNumberOfConsoleInputEvents(console Handle, numevents *uint32) (err error) = kernel32.GetNumberOfConsoleInputEvents
+//sys	FlushConsoleInputBuffer(console Handle) (err error) = kernel32.FlushConsoleInputBuffer
 //sys	resizePseudoConsole(pconsole Handle, size uint32) (hr error) = kernel32.ResizePseudoConsole
 //sys	CreateToolhelp32Snapshot(flags uint32, processId uint32) (handle Handle, err error) [failretval==InvalidHandle] = kernel32.CreateToolhelp32Snapshot
 //sys	Module32First(snapshot Handle, moduleEntry *ModuleEntry32) (err error) = kernel32.Module32FirstW
@@ -450,6 +452,7 @@ func NewCallbackCDecl(fn interface{}) uintptr {
 //sys	RtlInitString(destinationString *NTString, sourceString *byte) = ntdll.RtlInitString
 //sys	NtCreateFile(handle *Handle, access uint32, oa *OBJECT_ATTRIBUTES, iosb *IO_STATUS_BLOCK, allocationSize *int64, attributes uint32, share uint32, disposition uint32, options uint32, eabuffer uintptr, ealength uint32) (ntstatus error) = ntdll.NtCreateFile
 //sys	NtCreateNamedPipeFile(pipe *Handle, access uint32, oa *OBJECT_ATTRIBUTES, iosb *IO_STATUS_BLOCK, share uint32, disposition uint32, options uint32, typ uint32, readMode uint32, completionMode uint32, maxInstances uint32, inboundQuota uint32, outputQuota uint32, timeout *int64) (ntstatus error) = ntdll.NtCreateNamedPipeFile
+//sys	NtQueryInformationFile(handle Handle, iosb *IO_STATUS_BLOCK, outBuffer *byte, outBufferLen uint32, class uint32) (ntstatus error) = ntdll.NtQueryInformationFile
 //sys	NtSetInformationFile(handle Handle, iosb *IO_STATUS_BLOCK, inBuffer *byte, inBufferLen uint32, class uint32) (ntstatus error) = ntdll.NtSetInformationFile
 //sys	RtlDosPathNameToNtPathName(dosName *uint16, ntName *NTUnicodeString, ntFileNamePart *uint16, relativeName *RTL_RELATIVE_NAME) (ntstatus error) = ntdll.RtlDosPathNameToNtPathName_U_WithStatus
 //sys	RtlDosPathNameToRelativeNtPathName(dosName *uint16, ntName *NTUnicodeString, ntFileNamePart *uint16, relativeName *RTL_RELATIVE_NAME) (ntstatus error) = ntdll.RtlDosPathNameToRelativeNtPathName_U_WithStatus
@@ -458,6 +461,8 @@ func NewCallbackCDecl(fn interface{}) uintptr {
 //sys	NtSetInformationProcess(proc Handle, procInfoClass int32, procInfo unsafe.Pointer, procInfoLen uint32) (ntstatus error) = ntdll.NtSetInformationProcess
 //sys	NtQuerySystemInformation(sysInfoClass int32, sysInfo unsafe.Pointer, sysInfoLen uint32, retLen *uint32) (ntstatus error) = ntdll.NtQuerySystemInformation
 //sys	NtSetSystemInformation(sysInfoClass int32, sysInfo unsafe.Pointer, sysInfoLen uint32) (ntstatus error) = ntdll.NtSetSystemInformation
+//sys	NtQueryEaFile(handle Handle, iosb *IO_STATUS_BLOCK, outBuffer *byte, outBufferLen uint32, returnSingleEntry bool, eaList *byte, eaListLen uint32, eaIndex *uint32, restartScan bool) (ntstatus error) = ntdll.NtQueryEaFile
+//sys	NtSetEaFile(handle Handle, iosb *IO_STATUS_BLOCK, inBuffer *byte, inBufferLen uint32) (ntstatus error) = ntdll.NtSetEaFile
 //sys	RtlAddFunctionTable(functionTable *RUNTIME_FUNCTION, entryCount uint32, baseAddress uintptr) (ret bool) = ntdll.RtlAddFunctionTable
 //sys	RtlDeleteFunctionTable(functionTable *RUNTIME_FUNCTION) (ret bool) = ntdll.RtlDeleteFunctionTable
 
@@ -870,6 +875,7 @@ const socket_error = uintptr(^uint32(0))
 //sys	WSARecvFrom(s Handle, bufs *WSABuf, bufcnt uint32, recvd *uint32, flags *uint32,  from *RawSockaddrAny, fromlen *int32, overlapped *Overlapped, croutine *byte) (err error) [failretval==socket_error] = ws2_32.WSARecvFrom
 //sys	WSASendTo(s Handle, bufs *WSABuf, bufcnt uint32, sent *uint32, flags uint32, to *RawSockaddrAny, tolen int32,  overlapped *Overlapped, croutine *byte) (err error) [failretval==socket_error] = ws2_32.WSASendTo
 //sys	WSASocket(af int32, typ int32, protocol int32, protoInfo *WSAProtocolInfo, group uint32, flags uint32) (handle Handle, err error) [failretval==InvalidHandle] = ws2_32.WSASocketW
+//sys	WSADuplicateSocket(s Handle, processID uint32, info *WSAProtocolInfo) (err error) [failretval!=0] = ws2_32.WSADuplicateSocketW
 //sys	GetHostByName(name string) (h *Hostent, err error) [failretval==nil] = ws2_32.gethostbyname
 //sys	GetServByName(name string, proto string) (s *Servent, err error) [failretval==nil] = ws2_32.getservbyname
 //sys	Ntohs(netshort uint16) (u uint16) = ws2_32.ntohs
@@ -889,10 +895,19 @@ const socket_error = uintptr(^uint32(0))
 //sys	MultiByteToWideChar(codePage uint32, dwFlags uint32, str *byte, nstr int32, wchar *uint16, nwchar int32) (nwrite int32, err error) = kernel32.MultiByteToWideChar
 //sys	getBestInterfaceEx(sockaddr unsafe.Pointer, pdwBestIfIndex *uint32) (errcode error) = iphlpapi.GetBestInterfaceEx
 //sys   GetIfEntry2Ex(level uint32, row *MibIfRow2) (errcode error) = iphlpapi.GetIfEntry2Ex
+//sys   GetIfTable2Ex(level uint32, table **MibIfTable2) (errcode error) = iphlpapi.GetIfTable2Ex
+//sys   GetIpForwardEntry2(row *MibIpForwardRow2) (errcode error) = iphlpapi.GetIpForwardEntry2
+//sys   GetIpForwardTable2(family uint16, table **MibIpForwardTable2) (errcode error) = iphlpapi.GetIpForwardTable2
+//sys   GetIpInterfaceEntry(row *MibIpInterfaceRow) (errcode error) = iphlpapi.GetIpInterfaceEntry
+//sys   GetIpInterfaceTable(family uint16, table **MibIpInterfaceTable) (errcode error) = iphlpapi.GetIpInterfaceTable
 //sys   GetUnicastIpAddressEntry(row *MibUnicastIpAddressRow) (errcode error) = iphlpapi.GetUnicastIpAddressEntry
+//sys   GetUnicastIpAddressTable(family uint16, table **MibUnicastIpAddressTable) (errcode error) = iphlpapi.GetUnicastIpAddressTable
+//sys   FreeMibTable(memory unsafe.Pointer) = iphlpapi.FreeMibTable
 //sys   NotifyIpInterfaceChange(family uint16, callback uintptr, callerContext unsafe.Pointer, initialNotification bool, notificationHandle *Handle) (errcode error) = iphlpapi.NotifyIpInterfaceChange
+//sys   NotifyRouteChange2(family uint16, callback uintptr, callerContext unsafe.Pointer, initialNotification bool, notificationHandle *Handle) (errcode error) = iphlpapi.NotifyRouteChange2
 //sys   NotifyUnicastIpAddressChange(family uint16, callback uintptr, callerContext unsafe.Pointer, initialNotification bool, notificationHandle *Handle) (errcode error) = iphlpapi.NotifyUnicastIpAddressChange
 //sys   CancelMibChangeNotify2(notificationHandle Handle) (errcode error) = iphlpapi.CancelMibChangeNotify2
+//sys	IsProcessorFeaturePresent(ProcessorFeature uint32) (ret bool) = kernel32.IsProcessorFeaturePresent
 
 // For testing: clients can set this flag to force
 // creation of IPv6 sockets to return EAFNOSUPPORT.
@@ -911,6 +926,17 @@ type RawSockaddrInet6 struct {
 	Flowinfo uint32
 	Addr     [16]byte /* in6_addr */
 	Scope_id uint32
+}
+
+// RawSockaddrInet is a union that contains an IPv4, an IPv6 address, or an address family. See
+// https://learn.microsoft.com/en-us/windows/win32/api/ws2ipdef/ns-ws2ipdef-sockaddr_inet.
+//
+// A [*RawSockaddrInet] may be converted to a [*RawSockaddrInet4] or [*RawSockaddrInet6] using
+// unsafe, depending on the address family.
+type RawSockaddrInet struct {
+	Family uint16
+	Port   uint16
+	Data   [6]uint32
 }
 
 type RawSockaddr struct {
@@ -1471,20 +1497,6 @@ func Getgid() (gid int)                  { return -1 }
 func Getegid() (egid int)                { return -1 }
 func Getgroups() (gids []int, err error) { return nil, syscall.EWINDOWS }
 
-type Signal int
-
-func (s Signal) Signal() {}
-
-func (s Signal) String() string {
-	if 0 <= s && int(s) < len(signals) {
-		str := signals[s]
-		if str != "" {
-			return str
-		}
-	}
-	return "signal " + itoa(int(s))
-}
-
 func LoadCreateSymbolicLink() error {
 	return procCreateSymbolicLinkW.Find()
 }
@@ -1688,18 +1700,22 @@ func NewNTUnicodeString(s string) (*NTUnicodeString, error) {
 	if err != nil {
 		return nil, err
 	}
-	n := uint16(len(s16) * 2)
+	n := len(s16) * 2
+	if n > (1<<16)-1 {
+		return nil, syscall.EINVAL
+	}
 	return &NTUnicodeString{
-		Length:        n - 2, // subtract 2 bytes for the NULL terminator
-		MaximumLength: n,
+		Length:        uint16(n) - 2, // subtract 2 bytes for the NULL terminator
+		MaximumLength: uint16(n),
 		Buffer:        &s16[0],
 	}, nil
 }
 
 // Slice returns a uint16 slice that aliases the data in the NTUnicodeString.
 func (s *NTUnicodeString) Slice() []uint16 {
-	slice := unsafe.Slice(s.Buffer, s.MaximumLength)
-	return slice[:s.Length]
+	// Note: this rounds the length down, if it happens
+	// to (incorrectly) be odd. Probably safer than rounding up.
+	return unsafe.Slice(s.Buffer, s.MaximumLength/2)[:s.Length/2]
 }
 
 func (s *NTUnicodeString) String() string {

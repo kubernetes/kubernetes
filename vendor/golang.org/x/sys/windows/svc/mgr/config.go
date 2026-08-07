@@ -121,7 +121,11 @@ func (s *Service) Config() (Config, error) {
 }
 
 func updateDescription(handle windows.Handle, desc string) error {
-	d := windows.SERVICE_DESCRIPTION{Description: toPtr(desc)}
+	descPointer, err := toPtr(desc)
+	if err != nil {
+		return err
+	}
+	d := windows.SERVICE_DESCRIPTION{Description: descPointer}
 	return windows.ChangeServiceConfig2(handle,
 		windows.SERVICE_CONFIG_DESCRIPTION, (*byte)(unsafe.Pointer(&d)))
 }
@@ -141,10 +145,30 @@ func updateStartUp(handle windows.Handle, isDelayed bool) error {
 
 // UpdateConfig updates service s configuration parameters.
 func (s *Service) UpdateConfig(c Config) error {
-	err := windows.ChangeServiceConfig(s.Handle, c.ServiceType, c.StartType,
-		c.ErrorControl, toPtr(c.BinaryPathName), toPtr(c.LoadOrderGroup),
-		nil, toStringBlock(c.Dependencies), toPtr(c.ServiceStartName),
-		toPtr(c.Password), toPtr(c.DisplayName))
+	binaryPathNamePointer, err := toPtr(c.BinaryPathName)
+	if err != nil {
+		return err
+	}
+	loadOrderGroupPointer, err := toPtr(c.LoadOrderGroup)
+	if err != nil {
+		return err
+	}
+	serviceStartNamePointer, err := toPtr(c.ServiceStartName)
+	if err != nil {
+		return err
+	}
+	passwordPointer, err := toPtr(c.Password)
+	if err != nil {
+		return err
+	}
+	displayNamePointer, err := toPtr(c.DisplayName)
+	if err != nil {
+		return err
+	}
+	err = windows.ChangeServiceConfig(s.Handle, c.ServiceType, c.StartType,
+		c.ErrorControl, binaryPathNamePointer, loadOrderGroupPointer,
+		nil, toStringBlock(c.Dependencies), serviceStartNamePointer,
+		passwordPointer, displayNamePointer)
 	if err != nil {
 		return err
 	}

@@ -13,6 +13,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -150,8 +151,8 @@ func newModuleResolver(e *ProcessEnv, moduleCacheCache *DirInfoCache) (*ModuleRe
 				Path: "",
 				Dir:  filepath.Join(filepath.Dir(goWork), "vendor"),
 			}
-			r.modsByModPath = append(append([]*gocommand.ModuleJSON{}, mainModsVendor...), r.dummyVendorMod)
-			r.modsByDir = append(append([]*gocommand.ModuleJSON{}, mainModsVendor...), r.dummyVendorMod)
+			r.modsByModPath = append(slices.Clone(mainModsVendor), r.dummyVendorMod)
+			r.modsByDir = append(slices.Clone(mainModsVendor), r.dummyVendorMod)
 		}
 	} else {
 		// Vendor mode is off, so run go list -m ... to find everything.
@@ -678,11 +679,11 @@ func modRelevance(mod *gocommand.ModuleJSON) float64 {
 
 	_, versionString, ok := module.SplitPathVersion(mod.Path)
 	if ok {
-		index := strings.Index(versionString, "v")
-		if index == -1 {
+		_, after, ok := strings.Cut(versionString, "v")
+		if !ok {
 			return relevance
 		}
-		if versionNumber, err := strconv.ParseFloat(versionString[index+1:], 64); err == nil {
+		if versionNumber, err := strconv.ParseFloat(after, 64); err == nil {
 			relevance += versionNumber / 1000
 		}
 	}

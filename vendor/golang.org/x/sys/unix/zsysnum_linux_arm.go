@@ -426,4 +426,9 @@ const (
 	SYS_GETXATTRAT                   = 464
 	SYS_LISTXATTRAT                  = 465
 	SYS_REMOVEXATTRAT                = 466
+	SYS_OPEN_TREE_ATTR               = 467
+	SYS_FILE_GETATTR                 = 468
+	SYS_FILE_SETATTR                 = 469
+	SYS_LISTNS                       = 470
+	SYS_RSEQ_SLICE_YIELD             = 471
 )

@@ -8,5 +8,55 @@ package cpu
 
 const cacheLineSize = 64
 
+// Bit fields for CPUCFG registers, Related reference documents:
+// https://loongson.github.io/LoongArch-Documentation/LoongArch-Vol1-EN.html#_cpucfg
+const (
+	// CPUCFG1 bits
+	cpucfg1_CRC32 = 1 << 25
+
+	// CPUCFG2 bits
+	cpucfg2_LAM_BH      = 1 << 27
+	cpucfg2_LAMCAS      = 1 << 28
+	cpucfg2_LLACQ_SCREL = 1 << 29
+	cpucfg2_SCQ         = 1 << 30
+
+	// CPUCFG3 bits
+	cpucfg3_DBAR_HINTS = 1 << 17
+)
+
 func initOptions() {
+	options = []option{
+		{Name: "lsx", Feature: &Loong64.HasLSX},
+		{Name: "lasx", Feature: &Loong64.HasLASX},
+		{Name: "crc32", Feature: &Loong64.HasCRC32},
+		{Name: "lam_bh", Feature: &Loong64.HasLAM_BH},
+		{Name: "lamcas", Feature: &Loong64.HasLAMCAS},
+		{Name: "llacq_screl", Feature: &Loong64.HasLLACQ_SCREL},
+		{Name: "scq", Feature: &Loong64.HasSCQ},
+		{Name: "dbar_hints", Feature: &Loong64.HasDBAR_HINTS},
+	}
+
+	// The CPUCFG data on Loong64 only reflects the hardware capabilities,
+	// not the kernel support status, so features such as LSX and LASX that
+	// require kernel support cannot be obtained from the CPUCFG data.
+	//
+	// These features only require hardware capability support and do not
+	// require kernel specific support, so they can be obtained directly
+	// through CPUCFG
+	cfg1 := get_cpucfg(1)
+	cfg2 := get_cpucfg(2)
+	cfg3 := get_cpucfg(3)
+
+	Loong64.HasCRC32 = cfgIsSet(cfg1, cpucfg1_CRC32)
+	Loong64.HasLAMCAS = cfgIsSet(cfg2, cpucfg2_LAMCAS)
+	Loong64.HasLAM_BH = cfgIsSet(cfg2, cpucfg2_LAM_BH)
+	Loong64.HasLLACQ_SCREL = cfgIsSet(cfg2, cpucfg2_LLACQ_SCREL)
+	Loong64.HasSCQ = cfgIsSet(cfg2, cpucfg2_SCQ)
+	Loong64.HasDBAR_HINTS = cfgIsSet(cfg3, cpucfg3_DBAR_HINTS)
+}
+
+func get_cpucfg(reg uint32) uint32
+
+func cfgIsSet(cfg uint32, val uint32) bool {
+	return cfg&val != 0
 }

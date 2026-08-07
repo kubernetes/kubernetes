@@ -91,9 +91,10 @@ type mux struct {
 
 	incomingChannels chan NewChannel
 
-	globalSentMu     sync.Mutex
-	globalResponses  chan interface{}
-	incomingRequests chan *Request
+	globalSentMu      sync.Mutex
+	globalSentPending atomic.Bool
+	globalResponses   chan interface{}
+	incomingRequests  chan *Request
 
 	errCond *sync.Cond
 	err     error
@@ -141,6 +142,27 @@ func (m *mux) SendRequest(name string, wantReply bool, payload []byte) (bool, []
 	if wantReply {
 		m.globalSentMu.Lock()
 		defer m.globalSentMu.Unlock()
+
+		// Open the gate so that responses arriving while this request is in
+		// flight are allowed to reach globalResponses. Any response arriving
+		// while no request is pending is dropped by handleGlobalPacket.
+		m.globalSentPending.Store(true)
+		defer m.globalSentPending.Store(false)
+
+		// Drain any spurious responses that may have been buffered. This prevents
+		// a previously buffered unexpected response from being consumed instead
+		// of the actual response for this request.
+	drain:
+		for {
+			select {
+			case _, ok := <-m.globalResponses:
+				if !ok {
+					break drain
+				}
+			default:
+				break drain
+			}
+		}
 	}
 
 	if err := m.sendMessage(globalRequestMsg{
@@ -267,7 +289,16 @@ func (m *mux) handleGlobalPacket(packet []byte) error {
 			mux:       m,
 		}
 	case *globalRequestSuccessMsg, *globalRequestFailureMsg:
-		m.globalResponses <- msg
+		// Drop responses that arrive when no SendRequest is waiting, to
+		// prevent a malicious peer from staging responses for a future
+		// caller.
+		if !m.globalSentPending.Load() {
+			return nil
+		}
+		select {
+		case m.globalResponses <- msg:
+		default:
+		}
 	default:
 		panic(fmt.Sprintf("not a global message %#v", msg))
 	}

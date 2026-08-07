@@ -3,6 +3,10 @@
 // license that can be found in the LICENSE file.
 
 // Package salsa provides low-level access to functions in the Salsa family.
+//
+// Deprecated: this package exposes unsafe low-level operations. New applications
+// should consider using the AEAD construction in golang.org/x/crypto/chacha20poly1305
+// instead. Existing users should migrate to golang.org/x/crypto/salsa20.
 package salsa
 
 import "math/bits"

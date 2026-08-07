@@ -68,6 +68,7 @@ const (
 	CS8                              = 0x30
 	CSIZE                            = 0x30
 	CSTOPB                           = 0x40
+	DM_MPATH_PROBE_PATHS             = 0x2000fd12
 	ECCGETLAYOUT                     = 0x41484d11
 	ECCGETSTATS                      = 0x40104d12
 	ECHOCTL                          = 0x200
@@ -114,6 +115,8 @@ const (
 	IEXTEN                           = 0x100
 	IN_CLOEXEC                       = 0x80000
 	IN_NONBLOCK                      = 0x80
+	IOCTL_MEI_NOTIFY_GET             = 0x40044803
+	IOCTL_MEI_NOTIFY_SET             = 0x80044802
 	IOCTL_VM_SOCKETS_GET_LOCAL_CID   = 0x200007b9
 	IPV6_FLOWINFO_MASK               = 0xffffff0f
 	IPV6_FLOWLABEL_MASK              = 0xffff0f00
@@ -153,6 +156,7 @@ const (
 	NFDBITS                          = 0x20
 	NLDLY                            = 0x100
 	NOFLSH                           = 0x80
+	NS_GET_ID                        = 0x4008b70d
 	NS_GET_MNTNS_ID                  = 0x4008b705
 	NS_GET_NSTYPE                    = 0x2000b703
 	NS_GET_OWNER_UID                 = 0x2000b704
@@ -301,6 +305,7 @@ const (
 	RTC_WKALM_SET                    = 0x8028700f
 	SCM_DEVMEM_DMABUF                = 0x4f
 	SCM_DEVMEM_LINEAR                = 0x4e
+	SCM_INQ                          = 0x54
 	SCM_TIMESTAMPING                 = 0x25
 	SCM_TIMESTAMPING_OPT_STATS       = 0x36
 	SCM_TIMESTAMPING_PKTINFO         = 0x3a
@@ -348,6 +353,7 @@ const (
 	SO_ERROR                         = 0x1007
 	SO_INCOMING_CPU                  = 0x31
 	SO_INCOMING_NAPI_ID              = 0x38
+	SO_INQ                           = 0x54
 	SO_KEEPALIVE                     = 0x8
 	SO_LINGER                        = 0x80
 	SO_LOCK_FILTER                   = 0x2c
@@ -359,6 +365,7 @@ const (
 	SO_OOBINLINE                     = 0x100
 	SO_PASSCRED                      = 0x11
 	SO_PASSPIDFD                     = 0x4c
+	SO_PASSRIGHTS                    = 0x53
 	SO_PASSSEC                       = 0x22
 	SO_PEEK_OFF                      = 0x2a
 	SO_PEERCRED                      = 0x12
@@ -371,6 +378,7 @@ const (
 	SO_RCVBUFFORCE                   = 0x21
 	SO_RCVLOWAT                      = 0x1004
 	SO_RCVMARK                       = 0x4b
+	SO_RCVPRIORITY                   = 0x52
 	SO_RCVTIMEO                      = 0x1006
 	SO_RCVTIMEO_NEW                  = 0x42
 	SO_RCVTIMEO_OLD                  = 0x1006
@@ -592,6 +600,8 @@ const (
 	EDESTADDRREQ    = syscall.Errno(0x60)
 	EDOTDOT         = syscall.Errno(0x49)
 	EDQUOT          = syscall.Errno(0x46d)
+	EFSBADCRC       = syscall.Errno(0x4d)
+	EFSCORRUPTED    = syscall.Errno(0x87)
 	EHOSTDOWN       = syscall.Errno(0x93)
 	EHOSTUNREACH    = syscall.Errno(0x94)
 	EHWPOISON       = syscall.Errno(0xa8)
@@ -809,7 +819,7 @@ var errorList = [...]struct {
 	{132, "ENOBUFS", "no buffer space available"},
 	{133, "EISCONN", "transport endpoint is already connected"},
 	{134, "ENOTCONN", "transport endpoint is not connected"},
-	{135, "EUCLEAN", "structure needs cleaning"},
+	{135, "EFSCORRUPTED", "structure needs cleaning"},
 	{137, "ENOTNAM", "not a XENIX named type file"},
 	{138, "ENAVAIL", "no XENIX semaphores available"},
 	{139, "EISNAM", "is a named type file"},

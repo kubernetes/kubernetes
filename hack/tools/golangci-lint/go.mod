@@ -1,6 +1,8 @@
 module k8s.io/kubernetes/hack/tools/golangci-lint
 
-go 1.24.0
+go 1.25.0
+
+godebug default=go1.24
 
 tool (
 	github.com/golangci/golangci-lint/v2/cmd/golangci-lint

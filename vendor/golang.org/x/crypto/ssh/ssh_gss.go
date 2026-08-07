@@ -106,6 +106,13 @@ func parseGSSAPIPayload(payload []byte) (*userAuthRequestGSSAPI, error) {
 	if !ok {
 		return nil, errors.New("parse uint32 failed")
 	}
+	// Each ASN.1 encoded OID must have a minimum
+	// of 2 bytes; 64 maximum mechanisms is an
+	// arbitrary, but reasonable ceiling.
+	const maxMechs = 64
+	if n > maxMechs || int(n)*2 > len(rest) {
+		return nil, errors.New("invalid mechanism count")
+	}
 	s := &userAuthRequestGSSAPI{
 		N:    n,
 		OIDS: make([]asn1.ObjectIdentifier, n),
@@ -122,7 +129,6 @@ func parseGSSAPIPayload(payload []byte) (*userAuthRequestGSSAPI, error) {
 		if rest, err = asn1.Unmarshal(desiredMech, &s.OIDS[i]); err != nil {
 			return nil, err
 		}
-
 	}
 	return s, nil
 }

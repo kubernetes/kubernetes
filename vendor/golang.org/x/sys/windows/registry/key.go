@@ -164,7 +164,12 @@ loopItems:
 func CreateKey(k Key, path string, access uint32) (newk Key, openedExisting bool, err error) {
 	var h syscall.Handle
 	var d uint32
-	err = regCreateKeyEx(syscall.Handle(k), syscall.StringToUTF16Ptr(path),
+	var pathPointer *uint16
+	pathPointer, err = syscall.UTF16PtrFromString(path)
+	if err != nil {
+		return 0, false, err
+	}
+	err = regCreateKeyEx(syscall.Handle(k), pathPointer,
 		0, nil, _REG_OPTION_NON_VOLATILE, access, nil, &h, &d)
 	if err != nil {
 		return 0, false, err
@@ -174,7 +179,11 @@ func CreateKey(k Key, path string, access uint32) (newk Key, openedExisting bool
 
 // DeleteKey deletes the subkey path of key k and its values.
 func DeleteKey(k Key, path string) error {
-	return regDeleteKey(syscall.Handle(k), syscall.StringToUTF16Ptr(path))
+	pathPointer, err := syscall.UTF16PtrFromString(path)
+	if err != nil {
+		return err
+	}
+	return regDeleteKey(syscall.Handle(k), pathPointer)
 }
 
 // A KeyInfo describes the statistics of a key. It is returned by Stat.
@@ -189,7 +198,20 @@ type KeyInfo struct {
 
 // ModTime returns the key's last write time.
 func (ki *KeyInfo) ModTime() time.Time {
-	return time.Unix(0, ki.lastWriteTime.Nanoseconds())
+	lastHigh, lastLow := ki.lastWriteTime.HighDateTime, ki.lastWriteTime.LowDateTime
+	// 100-nanosecond intervals since January 1, 1601
+	hsec := uint64(lastHigh)<<32 + uint64(lastLow)
+	// Convert _before_ gauging; the nanosecond difference between Epoch (00:00:00
+	// UTC, January 1, 1970) and Filetime's zero offset (January 1, 1601) is out
+	// of bounds for int64: -11644473600*1e7*1e2 < math.MinInt64
+	sec := int64(hsec/1e7) - 11644473600
+	nsec := int64(hsec%1e7) * 100
+	return time.Unix(sec, nsec)
+}
+
+// modTimeZero reports whether the key's last write time is zero.
+func (ki *KeyInfo) modTimeZero() bool {
+	return ki.lastWriteTime.LowDateTime == 0 && ki.lastWriteTime.HighDateTime == 0
 }
 
 // Stat retrieves information about the open key k.

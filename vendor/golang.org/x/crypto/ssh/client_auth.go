@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 )
 
@@ -19,6 +20,12 @@ const (
 	authPartialSuccess
 	authSuccess
 )
+
+// maxAuthClientTried bounds the total number of authentication attempts
+// (failures and partial successes combined) the client makes before
+// aborting the loop, to prevent unbounded growth when an AuthCallback
+// keeps supplying methods.
+const maxAuthClientTried = 64
 
 // clientAuthenticate authenticates with the remote server. See RFC 4252.
 func (c *connection) clientAuthenticate(config *ClientConfig) error {
@@ -66,38 +73,68 @@ func (c *connection) clientAuthenticate(config *ClientConfig) error {
 	// then any untried methods suggested by the server.
 	var tried []string
 	var lastMethods []string
+	var partialSuccess []string
 
 	sessionID := c.transport.getSessionID()
 	for auth := AuthMethod(new(noneAuth)); auth != nil; {
 		ok, methods, err := auth.auth(sessionID, config.User, c.transport, config.Rand, extensions)
 		if err != nil {
 			// On disconnect, return error immediately
-			if _, ok := err.(*disconnectMsg); ok {
+			if _, isDisconnect := err.(*disconnectMsg); isDisconnect {
 				return err
 			}
-			// We return the error later if there is no other method left to
-			// try.
+			// We return the error later if there is no other method
+			// left to try.
 			ok = authFailure
 		}
-		if ok == authSuccess {
-			// success
+
+		switch ok {
+		case authSuccess:
 			return nil
-		} else if ok == authFailure {
-			if m := auth.method(); !contains(tried, m) {
-				tried = append(tried, m)
-			}
+		case authPartialSuccess:
+			partialSuccess = append(partialSuccess, auth.method())
+		case authFailure:
+			tried = append(tried, auth.method())
 		}
+		if len(partialSuccess)+len(tried) > maxAuthClientTried {
+			return fmt.Errorf("ssh: too many authentication attempts (%d), aborting",
+				len(partialSuccess)+len(tried))
+		}
+
 		if methods == nil {
 			methods = lastMethods
 		}
 		lastMethods = methods
+
+		// If AuthCallback is set it takes precedence: it picks the next
+		// AuthMethod dynamically. The returned method need not be in
+		// config.Auth. If the callback returns (nil, nil) we fall back to
+		// selecting the next untried method from config.Auth below; on
+		// (nil, error) the handshake aborts.
+		if config.AuthCallback != nil {
+			ctx := &ClientAuthContext{
+				Metadata:              c,
+				Algorithms:            c.Algorithms(),
+				AllowedMethods:        slices.Clone(methods),
+				PartialSuccessMethods: slices.Clone(partialSuccess),
+				TriedMethods:          slices.Clone(tried),
+			}
+			altAuth, cbErr := config.AuthCallback(ctx)
+			if cbErr != nil {
+				return cbErr
+			}
+			if altAuth != nil {
+				auth = altAuth
+				continue
+			}
+		}
 
 		auth = nil
 
 	findNext:
 		for _, a := range config.Auth {
 			candidateMethod := a.method()
-			if contains(tried, candidateMethod) {
+			if slices.Contains(tried, candidateMethod) {
 				continue
 			}
 			for _, meth := range methods {
@@ -115,15 +152,6 @@ func (c *connection) clientAuthenticate(config *ClientConfig) error {
 		}
 	}
 	return fmt.Errorf("ssh: unable to authenticate, attempted methods %v, no supported methods remain", tried)
-}
-
-func contains(list []string, e string) bool {
-	for _, s := range list {
-		if s == e {
-			return true
-		}
-	}
-	return false
 }
 
 // An AuthMethod represents an instance of an RFC 4252 authentication method.
@@ -255,7 +283,7 @@ func pickSignatureAlgorithm(signer Signer, extensions map[string][]byte) (MultiA
 		// Fallback to use if there is no "server-sig-algs" extension or a
 		// common algorithm cannot be found. We use the public key format if the
 		// MultiAlgorithmSigner supports it, otherwise we return an error.
-		if !contains(as.Algorithms(), underlyingAlgo(keyFormat)) {
+		if !slices.Contains(as.Algorithms(), underlyingAlgo(keyFormat)) {
 			return "", fmt.Errorf("ssh: no common public key signature algorithm, server only supports %q for key type %q, signer only supports %v",
 				underlyingAlgo(keyFormat), keyFormat, as.Algorithms())
 		}
@@ -282,14 +310,18 @@ func pickSignatureAlgorithm(signer Signer, extensions map[string][]byte) (MultiA
 	}
 
 	// Filter algorithms based on those supported by MultiAlgorithmSigner.
+	// Iterate over the signer's algorithms first to preserve its preference order.
+	supportedKeyAlgos := algorithmsForKeyFormat(keyFormat)
 	var keyAlgos []string
-	for _, algo := range algorithmsForKeyFormat(keyFormat) {
-		if contains(as.Algorithms(), underlyingAlgo(algo)) {
-			keyAlgos = append(keyAlgos, algo)
+	for _, signerAlgo := range as.Algorithms() {
+		if idx := slices.IndexFunc(supportedKeyAlgos, func(algo string) bool {
+			return underlyingAlgo(algo) == signerAlgo
+		}); idx >= 0 {
+			keyAlgos = append(keyAlgos, supportedKeyAlgos[idx])
 		}
 	}
 
-	algo, err := findCommon("public key signature algorithm", keyAlgos, serverAlgos)
+	algo, err := findCommon("public key signature algorithm", keyAlgos, serverAlgos, true)
 	if err != nil {
 		// If there is no overlap, return the fallback algorithm to support
 		// servers that fail to list all supported algorithms.
@@ -334,7 +366,7 @@ func (cb publicKeyCallback) auth(session []byte, user string, c packetConn, rand
 		// the key try to use the obtained algorithm as if "server-sig-algs" had
 		// not been implemented if supported from the algorithm signer.
 		if !ok && idx < origSignersLen && isRSACert(algo) && algo != CertAlgoRSAv01 {
-			if contains(as.Algorithms(), KeyAlgoRSA) {
+			if slices.Contains(as.Algorithms(), KeyAlgoRSA) {
 				// We retry using the compat algorithm after all signers have
 				// been tried normally.
 				signers = append(signers, &multiAlgorithmSigner{
@@ -381,11 +413,11 @@ func (cb publicKeyCallback) auth(session []byte, user string, c packetConn, rand
 			return authFailure, nil, err
 		}
 
-		// If authentication succeeds or the list of available methods does not
-		// contain the "publickey" method, do not attempt to authenticate with any
-		// other keys.  According to RFC 4252 Section 7, the latter can occur when
-		// additional authentication methods are required.
-		if success == authSuccess || !contains(methods, cb.method()) {
+		// If authentication succeeds or partially succeeds, return immediately
+		// so the caller can select the next auth method. According to RFC 4252
+		// Section 7, if the server no longer lists "publickey" among its
+		// allowed methods, do not attempt to authenticate with any other keys.
+		if success == authSuccess || success == authPartialSuccess || !slices.Contains(methods, cb.method()) {
 			return success, methods, err
 		}
 	}
@@ -434,7 +466,7 @@ func confirmKeyAck(key PublicKey, c packetConn) (bool, error) {
 			// servers send the key type instead. OpenSSH allows any algorithm
 			// that matches the public key, so we do the same.
 			// https://github.com/openssh/openssh-portable/blob/86bdd385/sshconnect2.c#L709
-			if !contains(algorithmsForKeyFormat(key.Type()), msg.Algo) {
+			if !slices.Contains(algorithmsForKeyFormat(key.Type()), msg.Algo) {
 				return false, nil
 			}
 			if !bytes.Equal(msg.PubKey, pubKey) {
