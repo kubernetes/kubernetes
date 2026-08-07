@@ -1125,9 +1125,9 @@ func (cache *cacheImpl) applyPVCRefCountDelta(snapshot *Snapshot) error {
 	return nil
 }
 
-// AddAbstractPodGroup adds an abstract pod group object to the cache,
+// AddGenericPodGroup adds an generic pod group object to the cache,
 // and links it to its parent composite pod group if one is specified.
-func (cache *cacheImpl) AddAbstractPodGroup(apg *framework.AbstractPodGroup) {
+func (cache *cacheImpl) AddGenericPodGroup(apg *framework.GenericPodGroup) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
@@ -1169,8 +1169,8 @@ func (cache *cacheImpl) AddAbstractPodGroup(apg *framework.AbstractPodGroup) {
 	parent.addChild(key)
 }
 
-// UpdateAbstractPodGroup updates an existing abstract pod group object in the cache.
-func (cache *cacheImpl) UpdateAbstractPodGroup(logger klog.Logger, apg *framework.AbstractPodGroup) {
+// UpdateGenericPodGroup updates an existing generic pod group object in the cache.
+func (cache *cacheImpl) UpdateGenericPodGroup(logger klog.Logger, apg *framework.GenericPodGroup) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
@@ -1195,8 +1195,8 @@ func (cache *cacheImpl) UpdateAbstractPodGroup(logger klog.Logger, apg *framewor
 	}
 }
 
-// RemoveAbstractPodGroup removes an abstract pod group object from the cache.
-func (cache *cacheImpl) RemoveAbstractPodGroup(logger klog.Logger, apg *framework.AbstractPodGroup) {
+// RemoveGenericPodGroup removes an generic pod group object from the cache.
+func (cache *cacheImpl) RemoveGenericPodGroup(logger klog.Logger, apg *framework.GenericPodGroup) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 

@@ -246,7 +246,7 @@ func TestUnschedulablePodGroups_Unified(t *testing.T) {
 
 	pgInfo := &framework.QueuedPodGroupInfo{
 		PodGroupInfo: &framework.PodGroupInfo{
-			AbstractPodGroup: framework.NewAbstractPodGroup(st.MakePodGroup().Name("pg1").Namespace("ns1").Obj()),
+			GenericPodGroup: framework.NewGenericPodGroup(st.MakePodGroup().Name("pg1").Namespace("ns1").Obj()),
 		},
 		QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{
 			fwk.PodGroupKey("ns1", "pg1"): {

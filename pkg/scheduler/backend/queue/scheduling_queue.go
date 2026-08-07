@@ -132,13 +132,13 @@ type SchedulingQueue interface {
 	// Important Note: preCheck shouldn't include anything that depends on the in-tree plugins' logic.
 	// (e.g., filter Pods based on added/updated Node's capacity, etc.)
 	MoveAllToActiveOrBackoffQueue(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck)
-	// AddAbstractPodGroup adds a PodGroup or CompositePodGroup object to the queue,
+	// AddGenericPodGroup adds a PodGroup or CompositePodGroup object to the queue,
 	// requeuing all pods associated with the group.
-	AddAbstractPodGroup(logger klog.Logger, apg *framework.AbstractPodGroup)
-	// UpdateAbstractPodGroup updates an existing PodGroup or CompositePodGroup object in the queue.
-	UpdateAbstractPodGroup(logger klog.Logger, apg *framework.AbstractPodGroup)
-	// DeleteAbstractPodGroup removes a PodGroup or CompositePodGroup object from the queue.
-	DeleteAbstractPodGroup(logger klog.Logger, apg *framework.AbstractPodGroup)
+	AddGenericPodGroup(logger klog.Logger, apg *framework.GenericPodGroup)
+	// UpdateGenericPodGroup updates an existing PodGroup or CompositePodGroup object in the queue.
+	UpdateGenericPodGroup(logger klog.Logger, apg *framework.GenericPodGroup)
+	// DeleteGenericPodGroup removes a PodGroup or CompositePodGroup object from the queue.
+	DeleteGenericPodGroup(logger klog.Logger, apg *framework.GenericPodGroup)
 
 	// Close closes the SchedulingQueue so that the goroutine which is
 	// waiting to pop items can exit gracefully.
@@ -1550,13 +1550,13 @@ func (p *PriorityQueue) deletePod(pod *v1.Pod) {
 	}
 }
 
-// AddAbstractPodGroup adds a PodGroup or CompositePodGroup object to the queue,
+// AddGenericPodGroup adds a PodGroup or CompositePodGroup object to the queue,
 // requeuing all pods associated with the group.
-func (p *PriorityQueue) AddAbstractPodGroup(logger klog.Logger, apg *framework.AbstractPodGroup) {
+func (p *PriorityQueue) AddGenericPodGroup(logger klog.Logger, apg *framework.GenericPodGroup) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	p.workloadForest.addAbstractPodGroup(apg)
+	p.workloadForest.addGenericPodGroup(apg)
 
 	rootInfoLookup, hasRoot := p.workloadForest.getRootLookupInfo(apg)
 	if !hasRoot {
@@ -1590,12 +1590,12 @@ func (p *PriorityQueue) AddAbstractPodGroup(logger klog.Logger, apg *framework.A
 	logger.V(5).Info("New group was added to the root group and its pods were attempted to be moved from incompletePodGroupPods to the queue", "rootType", rootInfoLookup.Type(), "root", klog.KObj(rootInfoLookup), "groupType", apg.GetType(), "group", klog.KObj(apg), "podsLen", len(pInfos))
 }
 
-// UpdateAbstractPodGroup updates an existing PodGroup or CompositePodGroup object in the queue.
-func (p *PriorityQueue) UpdateAbstractPodGroup(logger klog.Logger, apg *framework.AbstractPodGroup) {
+// UpdateGenericPodGroup updates an existing PodGroup or CompositePodGroup object in the queue.
+func (p *PriorityQueue) UpdateGenericPodGroup(logger klog.Logger, apg *framework.GenericPodGroup) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	p.workloadForest.updateAbstractPodGroup(apg)
+	p.workloadForest.updateGenericPodGroup(apg)
 	rootInfoLookup, hasRoot := p.workloadForest.getRootLookupInfo(apg)
 	if !hasRoot {
 		return
@@ -1607,23 +1607,23 @@ func (p *PriorityQueue) UpdateAbstractPodGroup(logger klog.Logger, apg *framewor
 			return
 		}
 		rootInfo := entity.(*framework.QueuedPodGroupInfo)
-		rootInfo.UpdateAbstractPodGroup(apg)
+		rootInfo.UpdateGenericPodGroup(apg)
 		logger.V(5).Info("Group in the scheduling queue was updated for the root group", "rootType", rootInfo.Type(), "root", klog.KObj(rootInfo), "groupType", apg.GetType(), "group", klog.KObj(apg))
 	})
 }
 
-// DeleteAbstractPodGroup removes a PodGroup or CompositePodGroup object from the queue.
-func (p *PriorityQueue) DeleteAbstractPodGroup(logger klog.Logger, apg *framework.AbstractPodGroup) {
+// DeleteGenericPodGroup removes a PodGroup or CompositePodGroup object from the queue.
+func (p *PriorityQueue) DeleteGenericPodGroup(logger klog.Logger, apg *framework.GenericPodGroup) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
 	rootInfoLookup, hadRoot := p.workloadForest.getRootLookupInfo(apg)
 	if !hadRoot {
-		p.workloadForest.deleteAbstractPodGroup(apg)
+		p.workloadForest.deleteGenericPodGroup(apg)
 		return
 	}
 	leafPGs := p.workloadForest.getLeafPodGroups(logger, rootInfoLookup)
-	p.workloadForest.deleteAbstractPodGroup(apg)
+	p.workloadForest.deleteGenericPodGroup(apg)
 
 	entity, strategy := p.deleteFromAnyQueue(rootInfoLookup)
 	if entity == nil {
@@ -1655,7 +1655,7 @@ func (p *PriorityQueue) DeleteAbstractPodGroup(logger klog.Logger, apg *framewor
 	}
 
 	rootInfo := entity.(*framework.QueuedPodGroupInfo)
-	removedPods := rootInfo.RemoveAbstractPodGroup(apg)
+	removedPods := rootInfo.RemoveGenericPodGroup(apg)
 	for _, pInfo := range removedPods {
 		p.incompletePodGroupPods.add(pInfo)
 	}
@@ -2191,7 +2191,7 @@ func (p *PriorityQueue) runPreQueueingHintPlugins(logger klog.Logger, event fwk.
 func newPodGroupInfoForLookup(namespace, name string) *framework.QueuedPodGroupInfo {
 	return &framework.QueuedPodGroupInfo{
 		PodGroupInfo: &framework.PodGroupInfo{
-			AbstractPodGroup: framework.NewAbstractPodGroup(&schedulingv1beta1.PodGroup{
+			GenericPodGroup: framework.NewGenericPodGroup(&schedulingv1beta1.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: namespace,
 					Name:      name,
@@ -2204,7 +2204,7 @@ func newPodGroupInfoForLookup(namespace, name string) *framework.QueuedPodGroupI
 func newCompositePodGroupInfoForLookup(namespace, name string) *framework.QueuedPodGroupInfo {
 	return &framework.QueuedPodGroupInfo{
 		PodGroupInfo: &framework.PodGroupInfo{
-			AbstractPodGroup: framework.NewAbstractCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
+			GenericPodGroup: framework.NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: namespace,
 					Name:      name,

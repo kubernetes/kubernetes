@@ -1084,7 +1084,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 
 		if scheduleAsPodGroup {
 			internalCache.AddPodGroupMember(item.sendPod)
-			internalCache.AddAbstractPodGroup(framework.NewAbstractPodGroup(podGroup))
+			internalCache.AddGenericPodGroup(framework.NewGenericPodGroup(podGroup))
 		}
 		cache := &fakecache.Cache{
 			Cache: internalCache,
@@ -1167,7 +1167,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		informerFactory.WaitForCacheSync(ctx.Done())
 
 		if scheduleAsPodGroup {
-			queue.AddAbstractPodGroup(logger, framework.NewAbstractPodGroup(podGroup))
+			queue.AddGenericPodGroup(logger, framework.NewGenericPodGroup(podGroup))
 		}
 		queue.Add(ctx, item.sendPod)
 

@@ -137,14 +137,14 @@ type Cache interface {
 	// RemovePodGroupMember removes a pod from its pod group state.
 	RemovePodGroupMember(pod *v1.Pod)
 
-	// AddAbstractPodGroup adds an abstract pod group object to the cache.
-	AddAbstractPodGroup(apg *framework.AbstractPodGroup)
+	// AddGenericPodGroup adds an generic pod group object to the cache.
+	AddGenericPodGroup(apg *framework.GenericPodGroup)
 
-	// UpdateAbstractPodGroup updates an abstract pod group object in the cache.
-	UpdateAbstractPodGroup(logger klog.Logger, apg *framework.AbstractPodGroup)
+	// UpdateGenericPodGroup updates an generic pod group object in the cache.
+	UpdateGenericPodGroup(logger klog.Logger, apg *framework.GenericPodGroup)
 
-	// RemoveAbstractPodGroup removes an abstract pod group object from the cache.
-	RemoveAbstractPodGroup(logger klog.Logger, apg *framework.AbstractPodGroup)
+	// RemoveGenericPodGroup removes an generic pod group object from the cache.
+	RemoveGenericPodGroup(logger klog.Logger, apg *framework.GenericPodGroup)
 
 	// BuildHierarchySnapshotFromPod returns a snapshot of the pod group hierarchy for the given pod.
 	BuildHierarchySnapshotFromPod(pod *v1.Pod) (fwk.PodGroupManager, error)

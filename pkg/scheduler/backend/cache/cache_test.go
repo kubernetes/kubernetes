@@ -744,7 +744,7 @@ func Test_AddPodGroupMember(t *testing.T) {
 			t.Run(fmt.Sprintf("%v, cpgEnabled=%v", tt.name, cpgEnabled), func(t *testing.T) {
 				cache := newCache(context.Background(), time.Second, nil, tt.genericWorkloadEnabled, cpgEnabled)
 				if tt.initPodGroup != nil {
-					cache.AddAbstractPodGroup(framework.NewAbstractPodGroup(tt.initPodGroup))
+					cache.AddGenericPodGroup(framework.NewGenericPodGroup(tt.initPodGroup))
 				}
 
 				cache.AddPodGroupMember(tt.pod)
@@ -937,7 +937,7 @@ func Test_RemovePodGroupMember(t *testing.T) {
 				cache := newCache(context.Background(), time.Second, nil, tt.genericWorkloadEnabled, cpgEnabled)
 
 				if tt.initPodGroup != nil {
-					cache.AddAbstractPodGroup(framework.NewAbstractPodGroup(tt.initPodGroup))
+					cache.AddGenericPodGroup(framework.NewGenericPodGroup(tt.initPodGroup))
 				}
 
 				for _, pod := range tt.initPods {
@@ -1087,10 +1087,10 @@ func Test_AddPodGroup(t *testing.T) {
 				cache.AddPodGroupMember(tt.initPod)
 			}
 			for _, cpg := range tt.initialCPGs {
-				cache.AddAbstractPodGroup(framework.NewAbstractCompositePodGroup(cpg))
+				cache.AddGenericPodGroup(framework.NewGenericCompositePodGroup(cpg))
 			}
 			for _, pg := range tt.podGroupsToAdd {
-				cache.AddAbstractPodGroup(framework.NewAbstractPodGroup(pg))
+				cache.AddGenericPodGroup(framework.NewGenericPodGroup(pg))
 			}
 
 			gotPodGroups := make(map[fwk.EntityKey]*schedulingv1beta1.PodGroup)
@@ -1141,9 +1141,9 @@ func Test_UpdatePodGroup(t *testing.T) {
 			t.Run(fmt.Sprintf("%v, cpgEnabled=%v", tt.name, cpgEnabled), func(t *testing.T) {
 				logger, ctx := ktesting.NewTestContext(t)
 				cache := newCache(ctx, time.Second, nil, true, cpgEnabled)
-				cache.AddAbstractPodGroup(framework.NewAbstractPodGroup(tt.oldPodGroup))
+				cache.AddGenericPodGroup(framework.NewGenericPodGroup(tt.oldPodGroup))
 
-				cache.UpdateAbstractPodGroup(logger, framework.NewAbstractPodGroup(tt.newPodGroup))
+				cache.UpdateGenericPodGroup(logger, framework.NewGenericPodGroup(tt.newPodGroup))
 
 				gotPodGroup, err := cache.PodGroups().Get(tt.newPodGroup.Namespace, tt.newPodGroup.Name)
 				if tt.expectPodGroup != nil {
@@ -1231,13 +1231,13 @@ func Test_RemovePodGroup(t *testing.T) {
 				cache.AddPodGroupMember(tt.initPod)
 			}
 			for _, cpg := range tt.initialCPGs {
-				cache.AddAbstractPodGroup(framework.NewAbstractCompositePodGroup(cpg))
+				cache.AddGenericPodGroup(framework.NewGenericCompositePodGroup(cpg))
 			}
 			for _, pg := range tt.initialPodGroups {
-				cache.AddAbstractPodGroup(framework.NewAbstractPodGroup(pg))
+				cache.AddGenericPodGroup(framework.NewGenericPodGroup(pg))
 			}
 
-			cache.RemoveAbstractPodGroup(klog.FromContext(ctx), framework.NewAbstractPodGroup(tt.podGroupToDelete))
+			cache.RemoveGenericPodGroup(klog.FromContext(ctx), framework.NewGenericPodGroup(tt.podGroupToDelete))
 
 			_, err := cache.PodGroups().Get(tt.podGroupToDelete.Namespace, tt.podGroupToDelete.Name)
 			if err == nil {
@@ -3326,10 +3326,10 @@ func Test_AddCompositePodGroup(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			cache := newCache(ctx, time.Second, nil, true, true)
 			for _, pg := range tt.initialPGs {
-				cache.AddAbstractPodGroup(framework.NewAbstractPodGroup(pg))
+				cache.AddGenericPodGroup(framework.NewGenericPodGroup(pg))
 			}
 			for _, cpg := range tt.cpgsToAdd {
-				cache.AddAbstractPodGroup(framework.NewAbstractCompositePodGroup(cpg))
+				cache.AddGenericPodGroup(framework.NewGenericCompositePodGroup(cpg))
 			}
 
 			gotCPGs := make(map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup)
@@ -3416,13 +3416,13 @@ func Test_RemoveCompositePodGroup(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			cache := newCache(ctx, time.Second, nil, true, true)
 			for _, pg := range tt.initialPGs {
-				cache.AddAbstractPodGroup(framework.NewAbstractPodGroup(pg))
+				cache.AddGenericPodGroup(framework.NewGenericPodGroup(pg))
 			}
 			for _, cpg := range tt.initialCPGs {
-				cache.AddAbstractPodGroup(framework.NewAbstractCompositePodGroup(cpg))
+				cache.AddGenericPodGroup(framework.NewGenericCompositePodGroup(cpg))
 			}
 
-			cache.RemoveAbstractPodGroup(klog.FromContext(ctx), framework.NewAbstractCompositePodGroup(tt.cpgToDelete))
+			cache.RemoveGenericPodGroup(klog.FromContext(ctx), framework.NewGenericCompositePodGroup(tt.cpgToDelete))
 
 			gotCPGs := make(map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup)
 			gotChildren := make(map[fwk.EntityKey]sets.Set[fwk.EntityKey])
@@ -3555,10 +3555,10 @@ func Test_BuildHierarchySnapshotFromPod(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled, tt.compositePodGroupEnabled)
 			for _, pg := range tt.initialPGs {
-				cache.AddAbstractPodGroup(framework.NewAbstractPodGroup(pg))
+				cache.AddGenericPodGroup(framework.NewGenericPodGroup(pg))
 			}
 			for _, cpg := range tt.initialCPGs {
-				cache.AddAbstractPodGroup(framework.NewAbstractCompositePodGroup(cpg))
+				cache.AddGenericPodGroup(framework.NewGenericCompositePodGroup(cpg))
 			}
 
 			snapshot, err := cache.BuildHierarchySnapshotFromPod(tt.pod)

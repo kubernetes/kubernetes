@@ -1152,7 +1152,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Failed to add podGroup %s to store: %v", pg.Name, err)
 				}
-				cache.AddAbstractPodGroup(schedulerframework.NewAbstractPodGroup(pg))
+				cache.AddGenericPodGroup(schedulerframework.NewGenericPodGroup(pg))
 			}
 			if tt.isCompositePodGroupEnabled {
 				for _, cpg := range tt.initialCompositePodGroups {
@@ -1160,7 +1160,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 					if err != nil {
 						t.Fatalf("Failed to add cpg %s to store: %v", cpg.Name, err)
 					}
-					cache.AddAbstractPodGroup(schedulerframework.NewAbstractCompositePodGroup(cpg))
+					cache.AddGenericPodGroup(schedulerframework.NewGenericCompositePodGroup(cpg))
 				}
 			}
 

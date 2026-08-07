@@ -1016,17 +1016,17 @@ func (pgqi *QueuedPodGroupInfo) AddSubtree(subtree *PodGroupInfo) {
 	}
 }
 
-// UpdateAbstractPodGroup updates an abstract pod group in the queued pod group info hierarchy.
-func (pgqi *QueuedPodGroupInfo) UpdateAbstractPodGroup(apg *AbstractPodGroup) {
+// UpdateGenericPodGroup updates an generic pod group in the queued pod group info hierarchy.
+func (pgqi *QueuedPodGroupInfo) UpdateGenericPodGroup(apg *GenericPodGroup) {
 	node, _ := findNodeAndParent(pgqi.PodGroupInfo, nil, apg.GetName())
 	if node != nil {
-		node.AbstractPodGroup = apg
+		node.GenericPodGroup = apg
 	}
 }
 
-// RemoveAbstractPodGroup removes an abstract pod group from the queued pod group info hierarchy.
+// RemoveGenericPodGroup removes an generic pod group from the queued pod group info hierarchy.
 // It returns a slice of all pods within the hierarchy of the removed pod group / composite pod group.
-func (pgqi *QueuedPodGroupInfo) RemoveAbstractPodGroup(apg *AbstractPodGroup) []*QueuedPodInfo {
+func (pgqi *QueuedPodGroupInfo) RemoveGenericPodGroup(apg *GenericPodGroup) []*QueuedPodInfo {
 	node, parent := findNodeAndParent(pgqi.PodGroupInfo, nil, apg.GetName())
 	if node == nil {
 		return nil
@@ -1080,16 +1080,16 @@ func (pgqi *QueuedPodGroupInfo) deleteSubtreePods(curr *PodGroupInfo) []*QueuedP
 func newQueuedPodGroupInfo(pg *schedulingv1beta1.PodGroup) *QueuedPodGroupInfo {
 	return &QueuedPodGroupInfo{
 		PodGroupInfo: &PodGroupInfo{
-			AbstractPodGroup: NewAbstractPodGroup(pg),
-			Children:         make([]*PodGroupInfo, 0),
+			GenericPodGroup: NewGenericPodGroup(pg),
+			Children:        make([]*PodGroupInfo, 0),
 		},
 		QueuedPodInfos: make(map[fwk.EntityKey][]*QueuedPodInfo),
 	}
 }
 
-// AbstractPodGroup is a wrapper around either a PodGroup or a CompositePodGroup API object,
+// GenericPodGroup is a wrapper around either a PodGroup or a CompositePodGroup API object,
 // providing a unified interface for scheduler's internal operations on PodGroup objects.
-type AbstractPodGroup struct {
+type GenericPodGroup struct {
 	// PodGroup is a PodGroup API object.
 	PodGroup *schedulingv1beta1.PodGroup
 	// CompositePodGroup is a CompositePodGroup API object.
@@ -1097,56 +1097,56 @@ type AbstractPodGroup struct {
 	CompositePodGroup *schedulingv1alpha3.CompositePodGroup
 }
 
-// NewAbstractPodGroup returns an AbstractPodGroup for a PodGroup.
-func NewAbstractPodGroup(pg *schedulingv1beta1.PodGroup) *AbstractPodGroup {
-	return &AbstractPodGroup{PodGroup: pg}
+// NewGenericPodGroup returns an GenericPodGroup for a PodGroup.
+func NewGenericPodGroup(pg *schedulingv1beta1.PodGroup) *GenericPodGroup {
+	return &GenericPodGroup{PodGroup: pg}
 }
 
-// NewAbstractCompositePodGroup returns an AbstractPodGroup for a CompositePodGroup.
-func NewAbstractCompositePodGroup(cpg *schedulingv1alpha3.CompositePodGroup) *AbstractPodGroup {
-	return &AbstractPodGroup{CompositePodGroup: cpg}
+// NewGenericCompositePodGroup returns an GenericPodGroup for a CompositePodGroup.
+func NewGenericCompositePodGroup(cpg *schedulingv1alpha3.CompositePodGroup) *GenericPodGroup {
+	return &GenericPodGroup{CompositePodGroup: cpg}
 }
 
-func (apg *AbstractPodGroup) GetName() string {
+func (apg *GenericPodGroup) GetName() string {
 	if apg.PodGroup != nil {
 		return apg.PodGroup.Name
 	}
 	return apg.CompositePodGroup.Name
 }
 
-func (apg *AbstractPodGroup) GetNamespace() string {
+func (apg *GenericPodGroup) GetNamespace() string {
 	if apg.PodGroup != nil {
 		return apg.PodGroup.Namespace
 	}
 	return apg.CompositePodGroup.Namespace
 }
 
-func (apg *AbstractPodGroup) GetType() fwk.EntityKeyType {
+func (apg *GenericPodGroup) GetType() fwk.EntityKeyType {
 	if apg.PodGroup != nil {
 		return fwk.PodGroupKeyType
 	}
 	return fwk.CompositePodGroupKeyType
 }
 
-func (apg *AbstractPodGroup) GetKey() fwk.EntityKey {
+func (apg *GenericPodGroup) GetKey() fwk.EntityKey {
 	if apg.PodGroup != nil {
 		return fwk.PodGroupKey(apg.PodGroup.Namespace, apg.PodGroup.Name)
 	}
 	return fwk.CompositePodGroupKey(apg.CompositePodGroup.Namespace, apg.CompositePodGroup.Name)
 }
 
-func (apg *AbstractPodGroup) GetParentCompositePodGroupName() *string {
+func (apg *GenericPodGroup) GetParentCompositePodGroupName() *string {
 	if apg.PodGroup != nil {
 		return apg.PodGroup.Spec.ParentCompositePodGroupName
 	}
 	return apg.CompositePodGroup.Spec.ParentCompositePodGroupName
 }
 
-func (apg *AbstractPodGroup) HasParent() bool {
+func (apg *GenericPodGroup) HasParent() bool {
 	return apg.GetParentCompositePodGroupName() != nil
 }
 
-func (apg *AbstractPodGroup) GetParentKey() (fwk.EntityKey, bool) {
+func (apg *GenericPodGroup) GetParentKey() (fwk.EntityKey, bool) {
 	parentName := apg.GetParentCompositePodGroupName()
 	if parentName == nil {
 		return fwk.EntityKey{}, false
@@ -1154,14 +1154,14 @@ func (apg *AbstractPodGroup) GetParentKey() (fwk.EntityKey, bool) {
 	return fwk.CompositePodGroupKey(apg.GetNamespace(), *parentName), true
 }
 
-func (apg *AbstractPodGroup) GetPriority() int32 {
+func (apg *GenericPodGroup) GetPriority() int32 {
 	if apg.PodGroup != nil {
 		return schedutil.PodGroupPriority(apg.PodGroup)
 	}
 	return schedutil.CompositePodGroupPriority(apg.CompositePodGroup)
 }
 
-func (apg *AbstractPodGroup) GetCreationTimestamp() time.Time {
+func (apg *GenericPodGroup) GetCreationTimestamp() time.Time {
 	if apg.PodGroup != nil {
 		return apg.PodGroup.CreationTimestamp.Time
 	}
@@ -1171,7 +1171,7 @@ func (apg *AbstractPodGroup) GetCreationTimestamp() time.Time {
 // PodGroupInfo is a wrapper around the PodGroup API object together with a list of pods that belong to the pod group.
 // Typically used as an input to pod group scheduling cycle plugins.
 type PodGroupInfo struct {
-	*AbstractPodGroup
+	*GenericPodGroup
 	// UnscheduledPods are pods that are currently being considered for scheduling.
 	// It can be useful to also retrieve the scheduled (assumed or assigned) pods.
 	// PodGroupManager.PodGroupState can be used for that.
