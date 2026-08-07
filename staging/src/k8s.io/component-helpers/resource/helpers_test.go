@@ -4799,7 +4799,7 @@ func TestPodResourcesAreStableAcrossCalls(t *testing.T) {
 	expectedRequests := PodRequests(pod, PodResourcesOptions{})
 	expectedLimits := PodLimits(pod, PodResourcesOptions{})
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if got := PodRequests(pod, PodResourcesOptions{}); !equality.Semantic.DeepEqual(expectedRequests, got) {
 			t.Errorf("PodRequests drifted on call %d: %s", i+2, diff.Diff(expectedRequests, got))
 		}
