@@ -102,6 +102,16 @@ func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, s
 
 	result, output, err := pb.runProbeWithRetries(ctx, probeType, probeSpec, pod, status, container, containerID, maxProbeRetries)
 
+	// A canceled probe context means the worker was stopped or the container is
+	// being killed. Whatever the handler returned says nothing about container
+	// health -- some handlers report cancellation as a plain Failure -- so
+	// report it as an error and let the caller discard it instead of recording
+	// a spurious Failure and an Unhealthy event.
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		logger.V(4).Info("Probe canceled", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "err", ctxErr)
+		return results.Failure, ctxErr
+	}
+
 	if err != nil {
 		// Handle probe error
 		logger.V(1).Info("Probe errored", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "probeResult", result, "err", err)
@@ -145,6 +155,11 @@ func (pb *prober) runProbeWithRetries(ctx context.Context, probeType probeType, 
 		if err == nil {
 			return result, output, nil
 		}
+		// Do not burn retries on a probe whose worker has been stopped or
+		// whose container is being killed; the caller discards the result.
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return result, output, ctxErr
+		}
 	}
 	return result, output, err
 }
@@ -173,6 +188,9 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 			headers := p.HTTPGet.HTTPHeaders
 			loggerV4.Info("HTTP-Probe", "scheme", scheme, "host", host, "port", port, "path", path, "timeout", timeout, "headers", headers, "probeType", probeType)
 		}
+		// Bind the request to the probe context so an in-flight HTTP probe is
+		// aborted when the worker is stopped or its container is killed.
+		req = req.WithContext(ctx)
 		if p.HTTPGet.Protocol != nil && *p.HTTPGet.Protocol == v1.HTTPProtocolHTTP2 &&
 			utilfeature.DefaultFeatureGate.Enabled(features.H2CContainerProbe) {
 			return pb.http.ProbeH2C(req, timeout)
@@ -190,7 +208,7 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 			host = status.PodIP
 		}
 		logger.V(4).Info("TCP-Probe", "host", host, "port", port, "timeout", timeout)
-		return pb.tcp.Probe(host, port, timeout)
+		return pb.tcp.Probe(ctx, host, port, timeout)
 
 	case p.GRPC != nil:
 		host := status.PodIP
@@ -201,7 +219,7 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 		useTLS := utilfeature.DefaultFeatureGate.Enabled(features.GRPCContainerProbeTLS) &&
 			p.GRPC.Mode != nil && *p.GRPC.Mode == v1.GRPCProbeModeTLS
 		logger.V(4).Info("GRPC-Probe", "host", host, "service", service, "port", p.GRPC.Port, "timeout", timeout, "tls", useTLS)
-		return pb.grpc.Probe(host, service, int(p.GRPC.Port), timeout, grpcprobe.ProbeOptions{UseTLS: useTLS})
+		return pb.grpc.Probe(ctx, host, service, int(p.GRPC.Port), timeout, grpcprobe.ProbeOptions{UseTLS: useTLS})
 
 	default:
 		logger.V(4).Info("Failed to find probe builder for container", "containerName", container.Name)
