@@ -546,6 +546,37 @@ describe('certificates', () => {
       },
     });
   });
+
+  test('warns when minimumProtocolVersion is set without a certificate', () => {
+    new Distribution(stack, 'Dist', {
+      defaultBehavior: { origin: defaultOrigin() },
+      minimumProtocolVersion: SecurityPolicyProtocol.TLS_V1_2016,
+    });
+
+    Annotations.fromStack(stack).hasWarning('/Stack/Dist', Match.stringLikeRegexp('.*minimumProtocolVersion.*without.*certificate.*'));
+  });
+
+  test('warns when sslSupportMethod is set without a certificate', () => {
+    new Distribution(stack, 'Dist', {
+      defaultBehavior: { origin: defaultOrigin() },
+      sslSupportMethod: SSLMethod.SNI,
+    });
+
+    Annotations.fromStack(stack).hasWarning('/Stack/Dist', Match.stringLikeRegexp('.*sslSupportMethod.*without.*certificate.*'));
+  });
+
+  test('does not warn about minimumProtocolVersion when certificate is provided', () => {
+    const certificate = acm.Certificate.fromCertificateArn(stack, 'Cert', 'arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012');
+
+    new Distribution(stack, 'Dist', {
+      defaultBehavior: { origin: defaultOrigin() },
+      domainNames: ['example.com'],
+      minimumProtocolVersion: SecurityPolicyProtocol.TLS_V1_2016,
+      certificate,
+    });
+
+    Annotations.fromStack(stack).hasNoWarning('/Stack/Dist', Match.stringLikeRegexp('.*minimumProtocolVersion.*'));
+  });
 });
 
 describe('custom error responses', () => {
