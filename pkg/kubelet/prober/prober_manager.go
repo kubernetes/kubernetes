@@ -193,11 +193,8 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 	// the pod NotReady during graceful termination. Workers are stopped
 	// explicitly via their stop channel (RemovePod/CleanupPods).
 	//
-	// TODO(#140977): This also means nothing cancels an in-flight probe. worker.stop()
-	// only signals stopCh, which is checked between probes, so an exec probe that is
-	// already running keeps executing in a container that is being killed until its
-	// own TimeoutSeconds elapses. The fix is a per-worker cancellable context
-	// cancelled by stop(), not the pod sync context, which cancels too early.
+	// In-flight probes are aborted by the worker's own derived context, which
+	// stop() cancels; see worker.run.
 	ctx = context.WithoutCancel(ctx)
 	key := probeKey{podUID: pod.UID}
 	for _, c := range append(pod.Spec.Containers, getRestartableInitContainers(pod)...) {

@@ -57,7 +57,7 @@ func TestTcpHealthChecker(t *testing.T) {
 
 	prober := New()
 	for i, tt := range tests {
-		status, _, err := prober.Probe(tt.host, tt.port, 1*time.Second)
+		status, _, err := prober.Probe(t.Context(), tt.host, tt.port, 1*time.Second)
 		if status != tt.expectedStatus {
 			t.Errorf("#%d: expected status=%v, get=%v", i, tt.expectedStatus, status)
 		}

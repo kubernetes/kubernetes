@@ -42,7 +42,7 @@ type ProbeOptions struct {
 
 // Prober is an interface that defines the Probe function for doing GRPC readiness/liveness/startup checks.
 type Prober interface {
-	Probe(host, service string, port int, timeout time.Duration, options ProbeOptions) (probe.Result, string, error)
+	Probe(ctx context.Context, host, service string, port int, timeout time.Duration, options ProbeOptions) (probe.Result, string, error)
 }
 
 type grpcProber struct {
@@ -56,8 +56,9 @@ func New() Prober {
 // Probe executes a grpc call to check the liveness/readiness/startup of container.
 // Returns the Result status, command output, and errors if any.
 // Any failure is considered as a probe failure to mimic grpc_health_probe tool behavior.
+// The call is aborted if ctx is canceled before it completes.
 // err is always nil
-func (p grpcProber) Probe(host, service string, port int, timeout time.Duration, options ProbeOptions) (probe.Result, string, error) {
+func (p grpcProber) Probe(ctx context.Context, host, service string, port int, timeout time.Duration, options ProbeOptions) (probe.Result, string, error) {
 	v := version.Get()
 
 	var transportCreds credentials.TransportCredentials
@@ -78,7 +79,7 @@ func (p grpcProber) Probe(host, service string, port int, timeout time.Duration,
 		}),
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	addr := net.JoinHostPort(host, fmt.Sprintf("%d", port))
