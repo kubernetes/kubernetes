@@ -2178,7 +2178,7 @@ func (f *frameworkImpl) RunPlacementFeasiblePlugins(ctx context.Context, placeme
 		if plStatus.IsError() {
 			return fwk.AsStatus(fmt.Errorf("running PlacementFeasible plugin: %w", plStatus.AsError())).WithPlugin(pl.Name())
 		}
-		return fwk.AsStatus(fmt.Errorf("unexpected status from PlacementFeasible plugin: %v", plStatus.Code())).WithPlugin(pl.Name())
+		return fwk.AsStatus(fmt.Errorf("unexpected status code (%v) from PlacementFeasible plugin: %v", plStatus.Code(), plStatus.Message())).WithPlugin(pl.Name())
 	}
 
 	return status
