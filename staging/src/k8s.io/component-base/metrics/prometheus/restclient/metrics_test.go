@@ -85,6 +85,21 @@ func TestClientGOMetrics(t *testing.T) {
 				`,
 		},
 		{
+			description: "Number of exec plugin policy checks",
+			name:        "rest_client_exec_plugin_policy_call_total",
+			metric:      execPluginPolicyCalls,
+			update: func() {
+				metrics.ExecPluginPolicyCalls.Increment("allowed")
+				metrics.ExecPluginPolicyCalls.Increment("denied")
+			},
+			want: `
+			            # HELP rest_client_exec_plugin_policy_call_total [ALPHA] Number of comparisons of an exec plugin to the plugin policy and allowlist (if any), partitioned by whether or not the policy permits the plugin
+			            # TYPE rest_client_exec_plugin_policy_call_total counter
+			            rest_client_exec_plugin_policy_call_total{status="allowed"} 1
+			            rest_client_exec_plugin_policy_call_total{status="denied"} 1
+				`,
+		},
+		{
 			description: "Number of calls to get a new transport",
 			name:        "rest_client_transport_create_calls_total",
 			metric:      transportCacheCalls,

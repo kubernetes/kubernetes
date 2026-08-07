@@ -173,7 +173,7 @@ var (
 				"and allowlist (if any), partitioned by whether or not the policy " +
 				"permits the plugin",
 		},
-		[]string{"allowed", "denied"},
+		[]string{"status"},
 	)
 
 	transportCacheEntries = k8smetrics.NewGauge(
@@ -254,6 +254,7 @@ func init() {
 			legacyregistry.RawMustRegister(execPluginCertTTL)
 			legacyregistry.MustRegister(execPluginCertRotation)
 			legacyregistry.MustRegister(execPluginCalls)
+			legacyregistry.MustRegister(execPluginPolicyCalls)
 			legacyregistry.MustRegister(transportCacheEntries)
 			legacyregistry.MustRegister(transportCacheCalls)
 			legacyregistry.MustRegister(transportCAReloads)
