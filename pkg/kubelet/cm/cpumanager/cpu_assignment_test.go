@@ -873,6 +873,7 @@ func TestTakeByTopologyWithSpreadPhysicalCPUsPreferredOption(t *testing.T) {
 type takeByTopologyExtendedTestCase struct {
 	description   string
 	topo          *topology.CPUTopology
+	opts          StaticPolicyOptions
 	availableCPUs cpuset.CPUSet
 	numCPUs       int
 	cpuGroupSize  int
@@ -1059,11 +1060,34 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 			expErr:        "",
 			expResult:     mustParseCPUSet(t, "43-47,75-79,96,101-105,171-174,203-206,229-232"),
 		},
+		// availableCPUs: Socket 0 has 126 CPUs, Socket 1 has 126 CPUs
+		// Socket 0: NUMA 0: CPU 0-15, 128-143   (32 CPUs);  NUMA 1: CPU 16-31, 144-159   (32 CPUs)
+		//           NUMA 2: CPU 32-47, 160-175  (32 CPUs);  NUMA 3: CPU 48-62, 176-190   (30 CPUs)
+		// Socket 1: NUMA 4: CPU 64-79, 192-207  (32 CPUs);  NUMA 5: CPU 80-95, 208-223   (32 CPUs)
+		//           NUMA 6: CPU 96-111, 224-239 (32 CPUs);  NUMA 7: CPU 112-126, 240-254 (30 CPUs)
+		//
+		// expResult: 120 CPUs from Socket 0 only (30 CPUs per NUMA × 4 NUMA nodes)
+		// Socket 0: NUMA 0: CPU 0-14, 128-142   (30 CPUs);  NUMA 1: CPU 16-30, 144-158   (30 CPUs)
+		//           NUMA 2: CPU 32-46, 160-174  (30 CPUs);  NUMA 3: CPU 48-62, 176-190   (30 CPUs)
+		//
+		// With AlignBySocket=true, should prefer NUMA nodes within the same socket.
+		// Without deep copy (bestCombo = combo), result will be wrong: CPUs from NUMA 0,1,3,6 (cross-socket)
+		// Fix: use deep copy bestCombo = append([]int(nil), combo...)
+		{
+			description:   "distribute 120 CPUs across 4 NUMA nodes within same Socket 0, with AlignBySocket=true from dual socket multi-NUMA with HT (large)",
+			topo:          topoDualSocketMultiNumaPerSocketHTLarge,
+			opts:          StaticPolicyOptions{AlignBySocket: true},
+			availableCPUs: mustParseCPUSet(t, "0-62,64-126,128-190,192-254"),
+			numCPUs:       120,
+			cpuGroupSize:  1,
+			expErr:        "",
+			expResult:     mustParseCPUSet(t, "0-14,16-30,32-46,48-62,128-142,144-158,160-174,176-190"),
+		},
 	}...)
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			result, err := takeByTopologyNUMADistributed(logger, tc.topo, tc.availableCPUs, tc.numCPUs, tc.cpuGroupSize, CPUSortingStrategyPacked, false)
+			result, err := takeByTopologyNUMADistributed(logger, tc.topo, tc.availableCPUs, tc.numCPUs, tc.cpuGroupSize, CPUSortingStrategyPacked, tc.opts.AlignBySocket)
 			if err != nil {
 				if tc.expErr == "" {
 					t.Errorf("unexpected error [%v]", err)
