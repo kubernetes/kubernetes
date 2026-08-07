@@ -69,13 +69,18 @@ var ProberDuration = metrics.NewHistogramVec(
 )
 
 // Manager manages pod probing. It creates a probe "worker" for every container that specifies a
-// probe (AddPod). The worker periodically probes its assigned container and caches the results. The
+// probe. The worker periodically probes its assigned container and caches the results. The
 // manager use the cached probe results to set the appropriate Ready state in the PodStatus when
 // requested (UpdatePodStatus). Updating probe parameters is not currently supported.
 type Manager interface {
-	// AddPod creates new probe workers for every container probe. This should be called for every
-	// pod created.
-	AddPod(ctx context.Context, pod *v1.Pod)
+	// Every probe manager can be handed to the container runtime, so that the
+	// runtime never has to know which one is installed. The legacy manager
+	// implements these as no-ops.
+	kubecontainer.ContainerProbeLifecycle
+
+	// EnsureProbes makes sure the pod's containers are being probed, given the
+	// runtime's current view of them. It should be called on every pod sync.
+	EnsureProbes(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus)
 
 	// StopLivenessAndStartup handles stopping liveness and startup probes during termination.
 	StopLivenessAndStartup(pod *v1.Pod)
@@ -92,6 +97,11 @@ type Manager interface {
 	// container based on container running status, cached probe results and worker states.
 	UpdatePodStatus(context.Context, *v1.Pod, *v1.PodStatus)
 }
+
+var (
+	_ Manager = &manager{}
+	_ Manager = &instanceBoundManager{}
+)
 
 type manager struct {
 	// Map of active workers for probes
@@ -182,7 +192,12 @@ func getRestartableInitContainers(pod *v1.Pod) []v1.Container {
 	return restartableInitContainers
 }
 
-func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
+// EnsureProbes creates a probe worker for every container probe that does not
+// have one yet.
+//
+// This manager's workers find their containers by polling the status manager,
+// so the runtime's view of the pod is of no use to it and is ignored.
+func (m *manager) EnsureProbes(ctx context.Context, pod *v1.Pod, _ *kubecontainer.PodStatus) {
 	m.workerLock.Lock()
 	defer m.workerLock.Unlock()
 
@@ -237,6 +252,18 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 		}
 	}
 }
+
+// StartProbes, StopLivenessAndStartupProbes and StopProbes are no-ops for this
+// manager: its workers discover containers by polling the status manager, so
+// there is nothing for the container runtime to tell it. They exist so that the
+// runtime can call the hooks unconditionally, without knowing which probe
+// manager is installed.
+func (m *manager) StartProbes(_ context.Context, _ *v1.Pod, _ *v1.Container, _ kubecontainer.ContainerID, _ []string, _ time.Time) {
+}
+
+func (m *manager) StopLivenessAndStartupProbes(_ kubecontainer.ContainerID) {}
+
+func (m *manager) StopProbes(_ kubecontainer.ContainerID) {}
 
 func (m *manager) StopLivenessAndStartup(pod *v1.Pod) {
 	m.workerLock.RLock()

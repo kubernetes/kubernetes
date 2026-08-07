@@ -18,10 +18,12 @@ package testing
 
 import (
 	"context"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // FakeManager simulates a prober.Manager for testing.
@@ -29,8 +31,18 @@ type FakeManager struct{}
 
 // Unused methods below.
 
-// AddPod simulates adding a Pod.
-func (FakeManager) AddPod(_ context.Context, _ *v1.Pod) {}
+// EnsureProbes simulates reconciling a Pod's probes.
+func (FakeManager) EnsureProbes(_ context.Context, _ *v1.Pod, _ *kubecontainer.PodStatus) {}
+
+// StartProbes simulates starting a container's probes.
+func (FakeManager) StartProbes(_ context.Context, _ *v1.Pod, _ *v1.Container, _ kubecontainer.ContainerID, _ []string, _ time.Time) {
+}
+
+// StopLivenessAndStartupProbes simulates stopping a container's liveness and startup probes.
+func (FakeManager) StopLivenessAndStartupProbes(_ kubecontainer.ContainerID) {}
+
+// StopProbes simulates stopping a container's probes.
+func (FakeManager) StopProbes(_ kubecontainer.ContainerID) {}
 
 // RemovePod simulates removing a Pod.
 func (FakeManager) RemovePod(_ *v1.Pod) {}

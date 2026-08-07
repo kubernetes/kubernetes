@@ -85,6 +85,17 @@ func NewInstanceBoundManager(
 	readinessManager results.Manager,
 	startupManager results.Manager,
 	runner kubecontainer.CommandRunner,
+	recorder record.EventRecorderLogger) Manager {
+
+	return newInstanceBoundManager(ctx, livenessManager, readinessManager, startupManager, runner, recorder)
+}
+
+func newInstanceBoundManager(
+	ctx context.Context,
+	livenessManager results.Manager,
+	readinessManager results.Manager,
+	startupManager results.Manager,
+	runner kubecontainer.CommandRunner,
 	recorder record.EventRecorderLogger) *instanceBoundManager {
 
 	return &instanceBoundManager{

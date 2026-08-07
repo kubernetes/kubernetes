@@ -103,13 +103,13 @@ func testAddRemovePods(tCtx ktesting.TContext) {
 	}
 
 	// Adding a pod with no probes should be a no-op.
-	m.AddPod(tCtx, &noProbePod)
+	m.EnsureProbes(tCtx, &noProbePod, nil)
 	if err := expectProbes(m, nil); err != nil {
 		t.Error(err)
 	}
 
 	// Adding a pod with probes.
-	m.AddPod(tCtx, &probePod)
+	m.EnsureProbes(tCtx, &probePod, nil)
 	probePaths := []probeKey{
 		{"probe_pod", "readiness", readiness},
 		{"probe_pod", "liveness", liveness},
@@ -141,11 +141,11 @@ func testAddRemovePods(tCtx ktesting.TContext) {
 	}
 }
 
-func TestAddPodContinuesAfterExistingWorker(t *testing.T) {
-	ktesting.Init(t).SyncTest("", testAddPodContinuesAfterExistingWorker)
+func TestEnsureProbesContinuesAfterExistingWorker(t *testing.T) {
+	ktesting.Init(t).SyncTest("", testEnsureProbesContinuesAfterExistingWorker)
 }
 
-func testAddPodContinuesAfterExistingWorker(tCtx ktesting.TContext) {
+func testEnsureProbesContinuesAfterExistingWorker(tCtx ktesting.TContext) {
 	defer tCtx.Cancel("test completed")
 	t := tCtx.TB()
 	ctx := tCtx.Context
@@ -171,29 +171,29 @@ func testAddPodContinuesAfterExistingWorker(tCtx ktesting.TContext) {
 	m := newTestManager()
 	defer cleanup(t, m)
 
-	// First AddPod: registers workers for both containers.
-	m.AddPod(ctx, &pod)
+	// First EnsureProbes: registers workers for both containers.
+	m.EnsureProbes(ctx, &pod, nil)
 	if err := expectProbes(m, []probeKey{
 		{"test_pod", "container_a", readiness},
 		{"test_pod", "container_b", readiness},
 	}); err != nil {
-		t.Fatalf("after first AddPod: %v", err)
+		t.Fatalf("after first EnsureProbes: %v", err)
 	}
 
 	// Simulate container_b's worker being removed while container_a's is still present.
 	m.workers[probeKey{"test_pod", "container_b", readiness}].stop()
 	synctest.Wait()
 
-	// Second AddPod: should re-register container_b's missing worker.
+	// Second EnsureProbes: should re-register container_b's missing worker.
 	// Previously, hitting container_a's existing worker caused an early return,
 	// so container_b was never re-registered.
-	m.AddPod(ctx, &pod)
+	m.EnsureProbes(ctx, &pod, nil)
 
 	if err := expectProbes(m, []probeKey{
 		{"test_pod", "container_a", readiness},
 		{"test_pod", "container_b", readiness},
 	}); err != nil {
-		t.Errorf("container_b worker was not re-registered after second AddPod: %v", err)
+		t.Errorf("container_b worker was not re-registered after second EnsureProbes: %v", err)
 	}
 }
 
@@ -258,7 +258,7 @@ func TestAddRemovePodsWithRestartableInitContainer(t *testing.T) {
 			}
 
 			// Adding a pod with probes.
-			m.AddPod(tCtx, &probePod)
+			m.EnsureProbes(tCtx, &probePod, nil)
 			if err := expectProbes(m, tc.probePaths); err != nil {
 				t.Error(err)
 			}
@@ -323,8 +323,8 @@ func testCleanupPods(tCtx ktesting.TContext) {
 			}},
 		},
 	}
-	m.AddPod(tCtx, &podToCleanup)
-	m.AddPod(tCtx, &podToKeep)
+	m.EnsureProbes(tCtx, &podToCleanup, nil)
+	m.EnsureProbes(tCtx, &podToKeep, nil)
 
 	desiredPods := map[types.UID]sets.Empty{}
 	desiredPods[podToKeep.UID] = sets.Empty{}
@@ -371,7 +371,7 @@ func testCleanupRepeated(tCtx ktesting.TContext) {
 	for i := 0; i < numTestPods; i++ {
 		pod := podTemplate
 		pod.UID = types.UID(strconv.Itoa(i))
-		m.AddPod(tCtx, &pod)
+		m.EnsureProbes(tCtx, &pod, nil)
 	}
 
 	for i := 0; i < 10; i++ {
@@ -664,7 +664,7 @@ func testUpdateReadiness(tCtx ktesting.TContext) {
 
 	m.statusManager.SetPodStatus(logger, testPod, getTestRunningStatus())
 
-	m.AddPod(tCtx, testPod)
+	m.EnsureProbes(tCtx, testPod, nil)
 	probePaths := []probeKey{{testPodUID, testContainerName, readiness}}
 	if err := expectProbes(m, probePaths); err != nil {
 		t.Error(err)
@@ -786,7 +786,7 @@ func (r ctxAwareRunner) RunInContainer(ctx context.Context, id kubecontainer.Con
 }
 
 // TestProbeWorkersSurviveSyncContextCancellation verifies that probe workers
-// keep probing after the context passed to AddPod is canceled. The pod worker
+// keep probing after the context passed to EnsureProbes is canceled. The pod worker
 // cancels its sync context when a pod begins terminating, and readiness probes
 // must keep executing through termination so a failing probe can mark the pod
 // NotReady. Regression test for https://github.com/kubernetes/kubernetes/issues/140881.
@@ -810,7 +810,7 @@ func testProbeWorkersSurviveSyncContextCancellation(tCtx ktesting.TContext) {
 	m.statusManager.SetPodStatus(logger, testPod, getTestRunningStatus())
 
 	ctx, cancel := context.WithCancel(tCtx)
-	m.AddPod(ctx, testPod)
+	m.EnsureProbes(ctx, testPod, nil)
 	// Simulate the pod worker canceling the sync context at the start of
 	// pod termination.
 	cancel()

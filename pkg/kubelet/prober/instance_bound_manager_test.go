@@ -37,7 +37,7 @@ import (
 var testProbeSpec = v1.Probe{FailureThreshold: 1000}
 
 func newTestInstanceBoundManager(tCtx ktesting.TContext) *instanceBoundManager {
-	m := NewInstanceBoundManager(
+	m := newInstanceBoundManager(
 		tCtx,
 		results.NewManager(),
 		results.NewManager(),
