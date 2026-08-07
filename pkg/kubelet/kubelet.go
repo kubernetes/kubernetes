@@ -802,12 +802,26 @@ func NewMainKubelet(ctx context.Context,
 		}
 	}
 
+	klet.runner = kubecontainer.NewCommandRunner(kubeDeps.RemoteRuntimeService)
+	if kubeDeps.ProbeManager != nil {
+		klet.probeManager = kubeDeps.ProbeManager
+	} else {
+		klet.probeManager = prober.NewManager(
+			klet.statusManager,
+			klet.livenessManager,
+			klet.readinessManager,
+			klet.startupManager,
+			klet.runner,
+			kubeDeps.Recorder)
+	}
+
 	runtime, postImageGCHooks, err := kuberuntime.NewKubeGenericRuntimeManager(
 		ctx,
 		kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 		klet.livenessManager,
 		klet.readinessManager,
 		klet.startupManager,
+		klet.probeManager,
 		rootDirectory,
 		podLogsDirectory,
 		machineInfo,
@@ -850,7 +864,6 @@ func NewMainKubelet(ctx context.Context,
 	}
 	klet.containerRuntime = runtime
 	klet.streamingRuntime = runtime
-	klet.runner = kubecontainer.NewCommandRunner(kubeDeps.RemoteRuntimeService)
 	resizeAdmitHandler := allocation.NewPodResizesAdmitHandler(klet.containerManager, runtime, klet.allocationManager)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime, runtimeCacheRefreshPeriod)
@@ -994,18 +1007,6 @@ func NewMainKubelet(ctx context.Context,
 				kubeDeps.TLSConfig.ClientCAs = clientCAs
 			}
 		}
-	}
-
-	if kubeDeps.ProbeManager != nil {
-		klet.probeManager = kubeDeps.ProbeManager
-	} else {
-		klet.probeManager = prober.NewManager(
-			klet.statusManager,
-			klet.livenessManager,
-			klet.readinessManager,
-			klet.startupManager,
-			klet.runner,
-			kubeDeps.Recorder)
 	}
 
 	var clusterTrustBundleManager clustertrustbundle.Manager = &clustertrustbundle.NoopManager{}
