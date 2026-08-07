@@ -84,10 +84,27 @@ var (
 	)
 
 	// EndpointSliceChanges tracks the number of changes to Endpoint Slices.
+	//
+	// Deprecated: use EndpointSliceChangesTotal. The old name lacks the
+	// conventional _total suffix required for counters.
 	EndpointSliceChanges = metrics.NewCounterVec(
 		&metrics.CounterOpts{
+			Subsystem:         EndpointSliceSubsystem,
+			Name:              "changes",
+			Help:              "Number of EndpointSlice changes",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.37.0",
+		},
+		[]string{"operation"},
+	)
+
+	// EndpointSliceChangesTotal tracks the number of changes to Endpoint Slices.
+	// Introduced at ALPHA; a follow-up can graduate it to BETA after the
+	// required soak period (new metrics cannot be introduced at BETA).
+	EndpointSliceChangesTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
 			Subsystem:      EndpointSliceSubsystem,
-			Name:           "changes",
+			Name:           "changes_total",
 			Help:           "Number of EndpointSlice changes",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -144,6 +161,7 @@ func RegisterMetrics() {
 		legacyregistry.MustRegister(NumEndpointSlices)
 		legacyregistry.MustRegister(DesiredEndpointSlices)
 		legacyregistry.MustRegister(EndpointSliceChanges)
+		legacyregistry.MustRegister(EndpointSliceChangesTotal)
 		legacyregistry.MustRegister(EndpointSlicesChangedPerSync)
 		legacyregistry.MustRegister(EndpointSliceSyncs)
 		legacyregistry.MustRegister(ServicesCountByTrafficDistribution)

@@ -57,7 +57,7 @@ var exceptionMetrics = []string{
 
 	// attach-detach controller
 	"attach_detach_controller_attachdetach_controller_forced_detaches", // counter metrics should have "_total" suffix
-	"endpoint_slice_controller_changes",                                // counter metrics should have "_total" suffix
+	"endpoint_slice_controller_changes",                                // counter metrics should have "_total" suffix; renamed to endpoint_slice_controller_changes_total
 	"endpoint_slice_controller_syncs",                                  // counter metrics should have "_total" suffix
 	"endpoint_slice_mirroring_controller_changes",                      // counter metrics should have "_total" suffix
 

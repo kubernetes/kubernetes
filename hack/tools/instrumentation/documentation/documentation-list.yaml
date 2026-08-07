@@ -2775,6 +2775,17 @@
   subsystem: endpoint_slice_controller
   help: Number of EndpointSlice changes
   type: Counter
+  deprecatedVersion: 1.37.0
+  stabilityLevel: ALPHA
+  labels:
+  - operation
+  componentEndpoints:
+  - component: kube-controller-manager
+    endpoint: /metrics
+- name: changes_total
+  subsystem: endpoint_slice_controller
+  help: Number of EndpointSlice changes
+  type: Counter
   stabilityLevel: ALPHA
   labels:
   - operation
