@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
@@ -73,9 +74,6 @@ func (r *revertFns) revert() {
 	}
 	*r = nil
 }
-
-// errPodGroupUnschedulable is used to describe that the pod group is unschedulable.
-var errPodGroupUnschedulable = fmt.Errorf("pod group is unschedulable")
 
 // scheduleOnePodGroup does the entire workload-aware scheduling workflow for a single pod group.
 func (sched *Scheduler) scheduleOnePodGroup(ctx context.Context, podGroupInfo *framework.QueuedPodGroupInfo) {
@@ -473,7 +471,8 @@ func (sched *Scheduler) runRootSchedulingAlgorithm(ctx context.Context, schedFwk
 		revertFns = childRevertFns
 		if rootResult.status.IsSuccess() && !rootResult.anyScheduled {
 			// The framework requires at least 1 pod to be scheduled in order to return a success status.
-			rootResult.status = fwk.NewStatus(fwk.Unschedulable).WithError(errPodGroupUnschedulable)
+			fitError := newPodGroupFitError(fwk.NewStatus(fwk.Unschedulable, "no pods were schedulable"))
+			rootResult.status = fwk.NewStatus(fwk.Unschedulable).WithError(fitError)
 		}
 		return result
 	}
@@ -482,7 +481,8 @@ func (sched *Scheduler) runRootSchedulingAlgorithm(ctx context.Context, schedFwk
 
 	if result.status.IsSuccess() && !result.anyScheduled {
 		// The framework requires at least 1 pod to be scheduled in order to return a success status.
-		result.status = fwk.NewStatus(fwk.Unschedulable).WithError(errPodGroupUnschedulable)
+		fitError := newPodGroupFitError(fwk.NewStatus(fwk.Unschedulable, "no pods were schedulable"))
+		result.status = fwk.NewStatus(fwk.Unschedulable).WithError(fitError)
 	}
 	return map[fwk.EntityKey]*podGroupAlgorithmResult{pgKey(result.podGroupInfo): result}
 }
@@ -566,7 +566,7 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 	result = &podGroupAlgorithmResult{
 		podGroupInfo:        podGroupInfo,
 		podResults:          make([]algorithmResult, 0, len(queuedPodInfos)),
-		status:              fwk.NewStatus(fwk.Unschedulable).WithError(errPodGroupUnschedulable),
+		status:              fwk.NewStatus(fwk.Unschedulable),
 		waitingOnPreemption: false,
 		placementCycleState: placementCycleState,
 	}
@@ -586,18 +586,11 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 		Remaining: len(podGroupInfo.GetUnscheduledPods()),
 		Scheduled: podGroupState.ScheduledPodsCount(),
 	}
-	placementFeasibleStatus := schedFwk.RunPlacementFeasiblePlugins(ctx, placementCycleState, podGroupInfo, placementProgress)
+	proceed, placementFeasibleStatus := podGroupPotentiallyFeasible(ctx, schedFwk, placementCycleState, podGroupInfo, placementProgress)
 	result.status = placementFeasibleStatus
-	if placementFeasibleStatus.IsError() {
-		// Do not evaluate any pods if PlacementFeasible plugins return error or unexpected status.
-		result.status = fwk.AsStatus(fmt.Errorf("failed to evaluate placement feasibility: %w", placementFeasibleStatus.AsError()))
-		return result, nil
-	}
-	if placementFeasibleStatus.Code() == fwk.Unschedulable {
-		// Unschedulable from PlacementFeasible plugins indicates that the pod group
-		// cannot meet its constraints, even if we succeed in scheduling all the pods.
+	if !proceed {
+		// PlacementFeasible plugins said not to proceed to the subsequent pods.
 		// Exit early from the pod group algorithm.
-		result.status = fwk.NewStatus(fwk.Unschedulable, result.status.Reasons()...).WithError(errPodGroupUnschedulable)
 		return result, nil
 	}
 
@@ -620,31 +613,43 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 		if podResult.status.IsSuccess() {
 			placementProgress.Scheduled++
 		}
-		placementFeasibleStatus := schedFwk.RunPlacementFeasiblePlugins(ctx, placementCycleState, podGroupInfo, placementProgress)
-		if placementFeasibleStatus.IsError() {
-			// Stop evaluating the rest of the pods if PlacementFeasible plugins return error or unexpected status.
-			result.status = fwk.AsStatus(fmt.Errorf("failed to evaluate placement feasibility: %w", placementFeasibleStatus.AsError()))
-			break
-		}
-
+		proceed, placementFeasibleStatus := podGroupPotentiallyFeasible(ctx, schedFwk, placementCycleState, podGroupInfo, placementProgress)
 		result.status = placementFeasibleStatus
-
-		// Unschedulable from PlacementFeasible plugins indicates that the pod group
-		// cannot meet its constraints regardless of how many more pods we check.
-		// We can stop the scheduling loop early.
-		if placementFeasibleStatus.Code() == fwk.Unschedulable {
-			break
+		if !proceed {
+			// PlacementFeasible plugins said not to proceed to the subsequent pods.
+			// We can stop the scheduling loop early.
+			return result, nil
 		}
-
 		anyScheduled = anyScheduled || podResult.status.IsSuccess()
-	}
-
-	if result.status.IsWait() {
-		result.status = fwk.NewStatus(fwk.Unschedulable, result.status.Reasons()...).WithError(errPodGroupUnschedulable)
 	}
 
 	result.anyScheduled = anyScheduled
 	return result, revertFns
+}
+
+// runPlacementFeasible runs placement feasible plugins and returns a status indicating whether
+// the (composite) pod group can meet its constraints based on the placement progress.
+// It returns true when the scheduling should proceed, false otherwise.
+// Returned status is modified to be fine to be copied directly to the podGroupAlgorithmResult.
+func podGroupPotentiallyFeasible(ctx context.Context, schedFwk framework.Framework, placementCycleState *framework.CycleState, podGroupInfo *framework.PodGroupInfo, placementProgress framework.PlacementProgress) (bool, *fwk.Status) {
+	status := schedFwk.RunPlacementFeasiblePlugins(ctx, placementCycleState, podGroupInfo, placementProgress)
+	switch status.Code() {
+	case fwk.Error:
+		// Do not evaluate more children if PlacementFeasible plugins return error or unexpected status.
+		return false, fwk.AsStatus(fmt.Errorf("failed to evaluate placement feasibility: %w", status.AsError()))
+	case fwk.Unschedulable:
+		// Unschedulable from PlacementFeasible plugins indicates that the (composite) pod group
+		// cannot meet its constraints, even if we succeed in scheduling all the children.
+		fitError := newPodGroupFitError(status)
+		return false, fwk.NewStatus(fwk.Unschedulable).WithError(fitError)
+	case fwk.Wait:
+		// Wait status indicates the scheduling should proceed,
+		// while at the same time, if it's a terminal status, the outcome should be Unschedulable.
+		fitError := newPodGroupFitError(status)
+		return true, fwk.NewStatus(fwk.Unschedulable).WithError(fitError)
+	default:
+		return true, status
+	}
 }
 
 // podGroupPodSchedulingAlgorithm runs a scheduling algorithm for individual pod from a pod group.
@@ -755,7 +760,7 @@ func completeCompositePodGroupAlgorithmResultMap(ctx context.Context, podGroupIn
 	if !ok || (!parentResult.status.IsSuccess() && result.status.IsSuccess()) {
 		result = &podGroupAlgorithmResult{
 			podGroupInfo: podGroupInfo,
-			status:       parentResult.status,
+			status:       parentResult.status.Clone(),
 		}
 		pgResults[key] = result
 	}
@@ -792,11 +797,11 @@ func applyPodGroupPostFilterResult(completePGResults map[fwk.EntityKey]*podGroup
 	}
 	if status.IsError() {
 		for _, pgResult := range completePGResults {
-			pgResult.status = status
+			pgResult.status = status.Clone()
 		}
 	} else {
 		for _, pgResult := range completePGResults {
-			pgResult.status.AppendReason(status.String())
+			pgResult.status.AppendReason(status.Message())
 		}
 	}
 }
@@ -862,12 +867,11 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 				case podGroupResult.status.IsRejected():
 					if podGroupResult.waitingOnPreemption {
 						// Pod has to come back to the scheduling queue as unschedulable, waiting for preemption to complete.
-						sched.FailureHandler(ctx, schedFwk, pInfo, podGroupResult.status, podResult.scheduleResult.nominatingInfo, podSchedulingStart)
+						sched.FailureHandler(ctx, schedFwk, pInfo, podGroupResult.status.Clone(), podResult.scheduleResult.nominatingInfo, podSchedulingStart)
 					} else {
 						// Pod group is unschedulable, so the pod has to be marked as unschedulable.
 						// Its rejection status is set to the pod group's status message.
-						status := fwk.NewStatus(fwk.Unschedulable, podGroupResult.status.Message()).WithError(errPodGroupUnschedulable)
-						sched.FailureHandler(ctx, schedFwk, pInfo, status, clearNominatedNode, podSchedulingStart)
+						sched.FailureHandler(ctx, schedFwk, pInfo, podGroupResult.status.Clone(), clearNominatedNode, podSchedulingStart)
 					}
 					unschedulablePods++
 				default:
@@ -913,7 +917,7 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 				Type:    schedulingapi.PodGroupInitiallyScheduled,
 				Status:  metav1.ConditionFalse,
 				Reason:  schedulingapi.PodGroupReasonSchedulerError,
-				Message: podGroupResult.status.AsError().Error(),
+				Message: podGroupResult.status.Message(),
 			}
 			utilruntime.HandleErrorWithContext(ctx, podGroupResult.status.AsError(), "Error scheduling pod group", "podGroup", klog.KObj(pgi), "errorPods", len(queuedPodInfos))
 		}
@@ -1038,7 +1042,8 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	if len(successfulResults) == 0 {
 		// We need to send events and set the status for pods in case all simulations were infeasible.
 		// The selection of which simulation we report is arbitrary for now, but may change in the future.
-		anyResult.status = fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("0/%d placements are available, first placement status: %v", len(placements), anyResult.status.AsError())).WithError(errPodGroupUnschedulable)
+		fitError := newPodGroupPlacementFitError(anyResult.status, len(placements))
+		anyResult.status = fwk.NewStatus(fwk.Unschedulable).WithError(fitError)
 		return anyResult, nil
 	}
 
@@ -1138,7 +1143,8 @@ func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx contex
 		// We need to send events and set the status for pods in case all simulations were infeasible.
 		// The selection of which simulation we report is arbitrary for now, but may change in the future.
 		anyResultRoot := anyResultSubtree[pgKey(podGroupInfo)]
-		anyResultRoot.status = fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("0/%d placements are available, first placement status: %v", len(placements), anyResultRoot.status.AsError())).WithError(errPodGroupUnschedulable)
+		fitError := newPodGroupPlacementFitError(anyResultRoot.status, len(placements))
+		anyResultRoot.status = fwk.NewStatus(fwk.Unschedulable).WithError(fitError)
 		// It is critical to copy the entire anyResultSubtree into results.
 		// If omitted, the pod results are reconstructed later using the generic parent error
 		// (errPodGroupUnschedulable) rather than their original *framework.FitError.
@@ -1331,18 +1337,22 @@ func (sched *Scheduler) compositePodGroupSchedulingDefaultAlgorithm(ctx context.
 		}
 	}()
 
+	// Run PlacementFeasible plugins to check if the composite pod group can meet its constraints
+	// before even attempting to schedule any children.
 	placementProgress := framework.PlacementProgress{
 		Remaining: len(podGroupInfo.Children),
 	}
-	placementFeasibleStatus := schedFwk.RunPlacementFeasiblePlugins(ctx, placementCycleState, podGroupInfo, placementProgress)
-
-	if placementFeasibleStatus.Code() == fwk.Unschedulable || placementFeasibleStatus.Code() == fwk.Error {
+	proceed, placementFeasibleStatus := podGroupPotentiallyFeasible(ctx, schedFwk, placementCycleState, podGroupInfo, placementProgress)
+	if !proceed {
+		// PlacementFeasible plugins said not to proceed to the subsequent children.
+		// Exit early from the pod group algorithm.
 		return &podGroupAlgorithmResult{
 			podGroupInfo:        podGroupInfo,
 			status:              placementFeasibleStatus,
 			placementCycleState: placementCycleState,
 		}, revertFns
 	}
+
 	anyScheduled := false
 	for _, childPGInfo := range podGroupInfo.GetChildGroups() {
 		childPodGroupState := framework.NewCycleState()
@@ -1361,15 +1371,18 @@ func (sched *Scheduler) compositePodGroupSchedulingDefaultAlgorithm(ctx context.
 		if childResult.status.IsSuccess() {
 			placementProgress.Scheduled++
 		}
-		placementFeasibleStatus = schedFwk.RunPlacementFeasiblePlugins(ctx, placementCycleState, podGroupInfo, placementProgress)
-		if placementFeasibleStatus.Code() == fwk.Unschedulable || placementFeasibleStatus.Code() == fwk.Error {
-			break
+		proceed, placementFeasibleStatus = podGroupPotentiallyFeasible(ctx, schedFwk, placementCycleState, podGroupInfo, placementProgress)
+		if !proceed {
+			// PlacementFeasible plugins said not to proceed to the subsequent children.
+			// We can stop the scheduling loop early.
+			return &podGroupAlgorithmResult{
+				podGroupInfo:        podGroupInfo,
+				status:              placementFeasibleStatus,
+				placementCycleState: placementCycleState,
+			}, revertFns
 		}
 	}
 
-	if placementFeasibleStatus.IsWait() {
-		placementFeasibleStatus = fwk.NewStatus(fwk.Unschedulable, placementFeasibleStatus.Reasons()...).WithError(errPodGroupUnschedulable)
-	}
 	return &podGroupAlgorithmResult{
 		podGroupInfo:        podGroupInfo,
 		status:              placementFeasibleStatus,
@@ -1445,4 +1458,59 @@ func successfulLeafResults(root *framework.PodGroupInfo, results map[fwk.EntityK
 		}
 		walk(root)
 	}
+}
+
+// podGroupFitError describes a fit error for a PodGroup or CompositePodGroup
+type podGroupFitError struct {
+	// status is a PodGroup rejection status.
+	status *fwk.Status
+	// numPlacements is the number of generated placements.
+	numPlacements int
+	// unschedulablePlugins are plugins that returned Unschedulable or UnschedulableAndUnresolvable.
+	unschedulablePlugins sets.Set[string]
+	// pendingPlugins are plugins that returned Pending.
+	pendingPlugins sets.Set[string]
+}
+
+// newPodGroupFitError creates a new PodGroupFitError without placement context.
+func newPodGroupFitError(s *fwk.Status) *podGroupFitError {
+	return newPodGroupPlacementFitError(s, 0)
+}
+
+// newPodGroupPlacementFitError creates a new PodGroupFitError within placement algorithm.
+func newPodGroupPlacementFitError(s *fwk.Status, numPlacements int) *podGroupFitError {
+	fe := &podGroupFitError{
+		status:        s,
+		numPlacements: numPlacements,
+	}
+	fe.addPluginStatus(s)
+	return fe
+}
+
+// addPluginStatus updates the fit error with plugin status.
+func (fe *podGroupFitError) addPluginStatus(s *fwk.Status) {
+	if s.Plugin() == "" {
+		return
+	}
+	if s.IsRejected() {
+		if fe.unschedulablePlugins == nil {
+			fe.unschedulablePlugins = sets.New[string]()
+		}
+		fe.unschedulablePlugins.Insert(s.Plugin())
+	}
+	if s.Code() == fwk.Pending {
+		if fe.pendingPlugins == nil {
+			fe.pendingPlugins = sets.New[string]()
+		}
+		fe.pendingPlugins.Insert(s.Plugin())
+	}
+}
+
+// Error returns the error message for the fit error.
+// In case of non-placement algorithm's error, it will not contain any placement context.
+func (fe *podGroupFitError) Error() string {
+	if fe.numPlacements == 0 {
+		return fe.status.AsError().Error()
+	}
+	return fmt.Sprintf("0/%d placements are available, first placement status: %v", fe.numPlacements, fe.status.AsError())
 }

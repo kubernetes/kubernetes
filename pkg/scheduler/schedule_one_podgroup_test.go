@@ -2611,7 +2611,7 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 						status: fwk.NewStatus(fwk.Unschedulable, "0/1 nodes are available:"),
 					},
 				},
-				status: fwk.NewStatus(fwk.Unschedulable, "0/2 placements are available, first placement status: injected placementFeasible status").WithError(errPodGroupUnschedulable),
+				status: fwk.NewStatus(fwk.Unschedulable, "0/2 placements are available, first placement status: injected placementFeasible status"),
 			},
 		},
 		"when all placements are infeasible, but pods are feasible, returns unschedulable": {
@@ -2651,7 +2651,7 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 						status: nil,
 					},
 				},
-				status: fwk.NewStatus(fwk.Unschedulable, "0/2 placements are available, first placement status: injected placementFeasible status").WithError(errPodGroupUnschedulable),
+				status: fwk.NewStatus(fwk.Unschedulable, "0/2 placements are available, first placement status: injected placementFeasible status"),
 			},
 		},
 		"filters out infeasible placements": {
@@ -3786,7 +3786,7 @@ func TestCPGSchedulingPlacementAlgorithm(t *testing.T) {
 			},
 			expectedResults: map[string]podGroupAlgorithmResult{
 				rootPGInfo.GetKey(): {
-					status: fwk.NewStatus(fwk.Unschedulable, "pod group is unschedulable"),
+					status: fwk.NewStatus(fwk.Unschedulable, "no pods were schedulable"),
 				},
 				childPGInfo1.GetKey(): {
 					podResults: []algorithmResult{
@@ -3803,6 +3803,80 @@ func TestCPGSchedulingPlacementAlgorithm(t *testing.T) {
 							status:  fwk.NewStatus(fwk.Unschedulable, "0/1 nodes are available: 1 node1 rejected."),
 						},
 					},
+				},
+			},
+		},
+		"returns unschedulable if no pods got scheduled and placement feasible rejected pods": {
+			placementPlugin: fakePlacementPlugin{
+				generatePlacementsResult: defaultPlacementResults,
+				scorePlacementsResult: map[string]map[string]int64{
+					rootPGInfo.GetKey(): {
+						"placement1": 2,
+						"placement2": 1,
+					},
+					childPGInfo1.GetKey(): {
+						"placement1": 5,
+						"placement2": 1,
+						"placement3": 1,
+						"placement4": 1,
+					},
+					childPGInfo2.GetKey(): {
+						"placement1": 5,
+						"placement2": 1,
+						"placement3": 1,
+						"placement4": 1,
+					},
+				},
+				filterStatus: map[string]*fwk.Status{
+					nodes[0].Name: fwk.NewStatus(fwk.Unschedulable, "node1 rejected"),
+					nodes[1].Name: fwk.NewStatus(fwk.Unschedulable, "node2 rejected"),
+					nodes[2].Name: fwk.NewStatus(fwk.Unschedulable, "node3 rejected"),
+					nodes[3].Name: fwk.NewStatus(fwk.Unschedulable, "node4 rejected"),
+				},
+			},
+			placementFeasibleStatuses: [][]fwk.Code{
+				// cpg, p1
+				{fwk.Wait, fwk.Wait, fwk.Unschedulable},
+				// pg1, p1
+				{fwk.Wait, fwk.Unschedulable},
+				// pg1, p2
+				{fwk.Wait, fwk.Unschedulable},
+				// pg2, p1
+				{fwk.Wait, fwk.Unschedulable},
+				// pg2, p2
+				{fwk.Wait, fwk.Unschedulable},
+				// cpg, p2
+				{fwk.Wait, fwk.Wait, fwk.Unschedulable},
+				// pg1, p3
+				{fwk.Wait, fwk.Unschedulable},
+				// pg1, p4
+				{fwk.Wait, fwk.Unschedulable},
+				// pg2, p3
+				{fwk.Wait, fwk.Unschedulable},
+				// pg2, p4
+				{fwk.Wait, fwk.Unschedulable},
+			},
+			expectedResults: map[string]podGroupAlgorithmResult{
+				rootPGInfo.GetKey(): {
+					status: fwk.NewStatus(fwk.Unschedulable, "0/2 placements are available, first placement status: injected placementFeasible status"),
+				},
+				childPGInfo1.GetKey(): {
+					podResults: []algorithmResult{
+						{
+							podInfo: queuedPodInfo1,
+							status:  fwk.NewStatus(fwk.Unschedulable, "0/1 nodes are available: 1 node1 rejected."),
+						},
+					},
+					status: fwk.NewStatus(fwk.Unschedulable, "0/2 placements are available, first placement status: injected placementFeasible status"),
+				},
+				childPGInfo2.GetKey(): {
+					podResults: []algorithmResult{
+						{
+							podInfo: queuedPodInfo2,
+							status:  fwk.NewStatus(fwk.Unschedulable, "0/1 nodes are available: 1 node1 rejected."),
+						},
+					},
+					status: fwk.NewStatus(fwk.Unschedulable, "0/2 placements are available, first placement status: injected placementFeasible status"),
 				},
 			},
 		},
@@ -5981,5 +6055,87 @@ func buildHierarchicalQueuedPodGroupInfo(
 	return &framework.QueuedPodGroupInfo{
 		PodGroupInfo:   rootInfo,
 		QueuedPodInfos: queuedPodInfos,
+	}
+}
+
+func TestPodGroupPotentiallyFeasible(t *testing.T) {
+	tests := []struct {
+		name               string
+		injectedStatus     fwk.Code
+		expectedProceed    bool
+		expectedStatusCode fwk.Code
+	}{
+		{
+			name:               "PlacementFeasible returns Success",
+			injectedStatus:     fwk.Success,
+			expectedProceed:    true,
+			expectedStatusCode: fwk.Success,
+		},
+		{
+			name:               "PlacementFeasible returns Wait",
+			injectedStatus:     fwk.Wait,
+			expectedProceed:    true,
+			expectedStatusCode: fwk.Unschedulable,
+		},
+		{
+			name:               "PlacementFeasible returns Unschedulable",
+			injectedStatus:     fwk.Unschedulable,
+			expectedProceed:    false,
+			expectedStatusCode: fwk.Unschedulable,
+		},
+		{
+			name:               "PlacementFeasible returns Error",
+			injectedStatus:     fwk.Error,
+			expectedProceed:    false,
+			expectedStatusCode: fwk.Error,
+		},
+		{
+			name:               "PlacementFeasible returns UnschedulableAndUnresolvable (unsupported code)",
+			injectedStatus:     fwk.UnschedulableAndUnresolvable,
+			expectedProceed:    false,
+			expectedStatusCode: fwk.Error,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+
+			_, ctx := ktesting.NewTestContext(t)
+			placementFeasiblePlugin := &fakePlacementFeasiblePlugin{
+				placementFeasibleStatuses: [][]fwk.Code{{tt.injectedStatus}},
+			}
+			registry := []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				tf.RegisterPermitPlugin(placementFeasiblePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return placementFeasiblePlugin, nil
+				}),
+			}
+			schedFwk, err := tf.NewFramework(ctx, registry, "test-scheduler")
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+
+			placementCycleState := framework.NewCycleState()
+			podGroupInfo := &framework.PodGroupInfo{
+				UnscheduledPods: []*v1.Pod{
+					st.MakePod().Name("pod").UID("pod").PodGroupName("pg").Obj(),
+				},
+				PodGroup: st.MakePodGroup().Name("pg").Obj(),
+			}
+			placementProgress := framework.PlacementProgress{
+				Remaining: 1,
+				Scheduled: 0,
+			}
+
+			proceed, status := podGroupPotentiallyFeasible(ctx, schedFwk, placementCycleState, podGroupInfo, placementProgress)
+			if proceed != tt.expectedProceed {
+				t.Errorf("Expected proceed: %v, got: %v", tt.expectedProceed, proceed)
+			}
+			if status.Code() != tt.expectedStatusCode {
+				t.Errorf("Expected status code: %v, got: %v", tt.expectedStatusCode, status.Code())
+			}
+		})
 	}
 }

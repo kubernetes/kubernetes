@@ -1192,7 +1192,9 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 		podInfo.UnschedulablePlugins = fitError.Diagnosis.UnschedulablePlugins
 		podInfo.PendingPlugins = fitError.Diagnosis.PendingPlugins
 		logger.V(2).Info("Unable to schedule pod; no fit; waiting", "pod", klog.KObj(pod), "err", errMsg)
-	} else if errors.Is(err, errPodGroupUnschedulable) {
+	} else if fitError, ok := err.(*podGroupFitError); ok {
+		podInfo.UnschedulablePlugins = fitError.unschedulablePlugins
+		podInfo.PendingPlugins = fitError.pendingPlugins
 		logger.V(2).Info("Unable to schedule pod belonging to a pod group; waiting", "pod", klog.KObj(pod), "err", errMsg)
 	} else {
 		utilruntime.HandleErrorWithContext(ctx, err, "Error scheduling pod; retrying", "pod", klog.KObj(pod))
