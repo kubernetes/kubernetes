@@ -801,6 +801,9 @@ func TestStatefulSetPodSubdomain(t *testing.T) {
 
 func TestRecreateStatefulSetUpdate(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetRecreateStrategy, true)
+	// Disable the consistency store so it doesn't block reconcile when the
+	// informer cache lags behind the controller's writes in CI.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StaleControllerConsistencyStatefulSet, false)
 	tCtx, closeFn, rm, informers, c := scSetup(t)
 	defer closeFn()
 	ns := framework.CreateNamespaceOrDie(c, "test-recreate-update", t)
