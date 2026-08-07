@@ -612,7 +612,7 @@ func TestPostFilter(t *testing.T) {
 
 				cache := internalcache.New(ctx, apiDispatcher, tt.features.EnableGenericWorkload, false)
 				for _, podGroup := range tt.podGroups {
-					cache.AddPodGroup(podGroup)
+					cache.AddGenericPodGroup(framework.NewGenericPodGroup(podGroup))
 				}
 				snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.pods, tt.nodes, tt.podGroups)
 
@@ -2028,10 +2028,10 @@ func TestCustomSelection(t *testing.T) {
 			informerFactory.WaitForCacheSync(ctx.Done())
 			cache := internalcache.New(ctx, nil, tt.features.EnableGenericWorkload, tt.features.EnableCompositePodGroup)
 			for _, pg := range tt.podGroups {
-				cache.AddPodGroup(pg)
+				cache.AddGenericPodGroup(framework.NewGenericPodGroup(pg))
 			}
 			for _, cpg := range tt.compositePodGroups {
-				cache.AddCompositePodGroup(logger, cpg)
+				cache.AddGenericPodGroup(framework.NewGenericCompositePodGroup(cpg))
 			}
 			snapshot := internalcache.NewTestSnapshotWithCompositePodGroups(tt.pods, nodes, tt.podGroups, tt.compositePodGroups)
 			fwk, err := tf.NewFramework(
@@ -2351,10 +2351,10 @@ func TestCustomOrdering(t *testing.T) {
 
 			cache := internalcache.New(ctx, nil, tt.features.EnableGenericWorkload, tt.features.EnableCompositePodGroup)
 			for _, pg := range tt.podGroups {
-				cache.AddPodGroup(pg)
+				cache.AddGenericPodGroup(framework.NewGenericPodGroup(pg))
 			}
 			for _, cpg := range tt.compositePodGroups {
-				cache.AddCompositePodGroup(logger, cpg)
+				cache.AddGenericPodGroup(framework.NewGenericCompositePodGroup(cpg))
 			}
 
 			fwk, err := tf.NewFramework(
@@ -2581,10 +2581,10 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			}
 			cache := internalcache.New(ctx, nil, test.features.EnableGenericWorkload, test.features.EnableCompositePodGroup)
 			for _, pg := range test.podGroups {
-				cache.AddPodGroup(pg)
+				cache.AddGenericPodGroup(framework.NewGenericPodGroup(pg))
 			}
 			for _, cpg := range test.compositePodGroups {
-				cache.AddCompositePodGroup(logger, cpg)
+				cache.AddGenericPodGroup(framework.NewGenericCompositePodGroup(cpg))
 			}
 			snapshot := internalcache.NewTestSnapshotWithCompositePodGroups(test.pods, nodes, test.podGroups, test.compositePodGroups)
 			f, err := tf.NewFramework(ctx, registeredPlugins, "",
@@ -3447,7 +3447,7 @@ func TestSelectVictimsOnNode(t *testing.T) {
 
 			cache := internalcache.New(ctx, nil, tt.features.EnableGenericWorkload, false /* CompositePodGroup */)
 			for _, pg := range tt.podGroups {
-				cache.AddPodGroup(pg)
+				cache.AddGenericPodGroup(framework.NewGenericPodGroup(pg))
 			}
 			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.initPods, nodes, tt.podGroups)
 
@@ -3753,10 +3753,10 @@ func TestPreEnqueue(t *testing.T) {
 
 			cache := internalcache.New(ctx, nil, tt.features.EnableGenericWorkload, tt.features.EnableCompositePodGroup)
 			for _, podGroup := range allPgs {
-				cache.AddPodGroup(podGroup)
+				cache.AddGenericPodGroup(framework.NewGenericPodGroup(podGroup))
 			}
 			for _, cpg := range allCpgs {
-				cache.AddCompositePodGroup(logger, cpg)
+				cache.AddGenericPodGroup(framework.NewGenericCompositePodGroup(cpg))
 			}
 
 			snapshot := internalcache.NewTestSnapshotWithCompositePodGroups(pods, []*v1.Node{st.MakeNode().Name("node1").Capacity(onePodRes).Obj()}, allPgs, allCpgs)
@@ -3894,10 +3894,10 @@ func TestDefaultPreemption_PodGroupPostFilter_ErrorWrapping(t *testing.T) {
 
 			cache := internalcache.New(ctx, nil, true, tt.enableCompositePodGroup)
 			for _, pg := range pgs {
-				cache.AddPodGroup(pg)
+				cache.AddGenericPodGroup(framework.NewGenericPodGroup(pg))
 			}
 			for _, cpg := range cpgs {
-				cache.AddCompositePodGroup(logger, cpg)
+				cache.AddGenericPodGroup(framework.NewGenericCompositePodGroup(cpg))
 			}
 
 			snapshot := internalcache.NewTestSnapshotWithCompositePodGroups(testPods, nodes, pgs, cpgs)
@@ -4007,7 +4007,7 @@ func TestDefaultPreemption_PodGroupPostFilter_InvalidSnapshot(t *testing.T) {
 				pg = st.MakePodGroup().Name("preemptor-pg-ok").Priority(highPriority).Obj()
 				client = clientsetfake.NewClientset(pod, pg)
 				cache = internalcache.New(ctx, nil, true, false)
-				cache.AddPodGroup(pg)
+				cache.AddGenericPodGroup(framework.NewGenericPodGroup(pg))
 				snapshot = internalcache.NewTestSnapshotWithPodGroups(testPods, nodes, []*v1beta1.PodGroup{pg})
 			} else {
 				priorityVal := highPriority
@@ -4061,18 +4061,13 @@ func TestDefaultPreemption_PodGroupPostFilter_InvalidSnapshot(t *testing.T) {
 			var pgInfo *framework.PodGroupInfo
 			if !tt.isCPG {
 				pgInfo = &framework.PodGroupInfo{
-					Name:            pg.Name,
-					Namespace:       pg.Namespace,
+					GenericPodGroup: framework.NewGenericPodGroup(pg),
 					UnscheduledPods: preemptorPods,
-					PodGroup:        pg,
 				}
 			} else {
 				pgInfo = &framework.PodGroupInfo{
-					Name:              cpg.Name,
-					Namespace:         cpg.Namespace,
-					Type:              fwk.CompositePodGroupKeyType,
-					UnscheduledPods:   preemptorPods,
-					CompositePodGroup: cpg,
+					GenericPodGroup: framework.NewGenericCompositePodGroup(cpg),
+					UnscheduledPods: preemptorPods,
 				}
 			}
 			state := framework.NewCycleState()
@@ -4101,7 +4096,7 @@ func TestDefaultPreemption_PodGroupPostFilter_CompositePodGroup(t *testing.T) {
 	}
 
 	cache := internalcache.New(ctx, nil, true, true /* compositePodGroupEnabled */)
-	cache.AddPodGroup(pgOk)
+	cache.AddGenericPodGroup(framework.NewGenericPodGroup(pgOk))
 
 	snapshot := internalcache.NewEmptySnapshot()
 	f, err := tf.NewFramework(ctx, registeredPlugins, "",
@@ -4138,11 +4133,8 @@ func TestDefaultPreemption_PodGroupPostFilter_CompositePodGroup(t *testing.T) {
 		},
 	}
 	pgInfo := &framework.PodGroupInfo{
-		Name:              cpg.Name,
-		Namespace:         cpg.Namespace,
-		Type:              fwk.CompositePodGroupKeyType,
-		UnscheduledPods:   preemptorPods,
-		CompositePodGroup: cpg,
+		GenericPodGroup: framework.NewGenericCompositePodGroup(cpg),
+		UnscheduledPods: preemptorPods,
 	}
 
 	_, gotStatus := pl.PodGroupPostFilter(ctx, framework.NewCycleState(), pgInfo, mockSchedulingFunc)
@@ -4226,7 +4218,7 @@ func TestDefaultPreemption_PodGroupPostFilter_WorkloadPreemptionAttempts(t *test
 			expectedStatus := tt.status.Code().String()
 			stateBefore := captureWorkloadPreemptionAttempts(testRegistry, expectedStatus)
 
-			pgInfo := &framework.PodGroupInfo{PodGroup: st.MakePodGroup().Obj()}
+			pgInfo := &framework.PodGroupInfo{GenericPodGroup: framework.NewGenericPodGroup(st.MakePodGroup().Obj())}
 			pl.PodGroupPostFilter(ctx, nil, pgInfo, nil)
 
 			stateAfter := captureWorkloadPreemptionAttempts(testRegistry, expectedStatus)
@@ -4259,26 +4251,19 @@ func getCounterFromGatherer(g componentmetrics.Gatherer, name string, resultLabe
 	return uint64(vals[resultLabelValue]), nil
 }
 
-// newPGInfo creates a PodGroupInfo representing a standalone PodGroup.
 func newPGInfo(pg *v1beta1.PodGroup, pods ...*v1.Pod) *framework.PodGroupInfo {
 	return &framework.PodGroupInfo{
-		Name:            pg.Name,
-		Namespace:       pg.Namespace,
-		Type:            fwk.PodGroupKeyType,
+		GenericPodGroup: framework.NewGenericPodGroup(pg),
 		UnscheduledPods: pods,
-		PodGroup:        pg,
 	}
 }
 
 // newCPGInfo creates a PodGroupInfo representing a CompositePodGroup hierarchy.
 func newCPGInfo(cpg *v1alpha3.CompositePodGroup, children []*framework.PodGroupInfo, pods ...*v1.Pod) *framework.PodGroupInfo {
 	return &framework.PodGroupInfo{
-		Name:              cpg.Name,
-		Namespace:         cpg.Namespace,
-		Type:              fwk.CompositePodGroupKeyType,
-		UnscheduledPods:   pods,
-		CompositePodGroup: cpg,
-		Children:          children,
+		GenericPodGroup: framework.NewGenericCompositePodGroup(cpg),
+		UnscheduledPods: pods,
+		Children:        children,
 	}
 }
 

@@ -1480,7 +1480,7 @@ func TestUpdatePodGroup(t *testing.T) {
 				logger:          logger,
 			}
 
-			sched.Cache.AddPodGroup(tt.oldPodGroup)
+			sched.Cache.AddGenericPodGroup(framework.NewGenericPodGroup(tt.oldPodGroup))
 
 			sched.updatePodGroup(tt.oldPodGroup, tt.newPodGroup)
 
@@ -1528,7 +1528,7 @@ func TestDeletePodGroup(t *testing.T) {
 			}
 
 			if tt.initPodGroup != nil {
-				sched.Cache.AddPodGroup(tt.initPodGroup)
+				sched.Cache.AddGenericPodGroup(framework.NewGenericPodGroup(tt.initPodGroup))
 			}
 
 			sched.deletePodGroup(tt.podGroupToDelete)
@@ -1626,9 +1626,9 @@ func TestAddCompositePodGroup(t *testing.T) {
 
 			if tt.triggerQueueingHint {
 				cpgObj := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg1").Obj()
-				queue.AddCompositePodGroup(logger, cpgObj)
+				queue.AddGenericPodGroup(logger, framework.NewGenericCompositePodGroup(cpgObj))
 				pg := st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("cpg1").Obj()
-				queue.AddPodGroup(logger, pg)
+				queue.AddGenericPodGroup(logger, framework.NewGenericPodGroup(pg))
 
 				queue.Add(ctx, pod)
 				poppedEntity, _ := queue.Pop(logger)
@@ -1782,14 +1782,14 @@ func TestUpdateCompositePodGroup(t *testing.T) {
 			}
 
 			if tt.cpgEnabled {
-				sched.Cache.AddCompositePodGroup(logger, oldCPG)
+				sched.Cache.AddGenericPodGroup(framework.NewGenericCompositePodGroup(oldCPG))
 			}
 
 			if tt.triggerQueueingHint {
 				cpgObj := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg1").Obj()
-				queue.AddCompositePodGroup(logger, cpgObj)
+				queue.AddGenericPodGroup(logger, framework.NewGenericCompositePodGroup(cpgObj))
 				pg := st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("cpg1").Obj()
-				queue.AddPodGroup(logger, pg)
+				queue.AddGenericPodGroup(logger, framework.NewGenericPodGroup(pg))
 
 				queue.Add(ctx, pod)
 				poppedEntity, _ := queue.Pop(logger)
@@ -1921,9 +1921,9 @@ func TestDeleteCompositePodGroup(t *testing.T) {
 
 			if tt.triggerQueueingHint {
 				cpgObj := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg1").Obj()
-				queue.AddCompositePodGroup(logger, cpgObj)
+				queue.AddGenericPodGroup(logger, framework.NewGenericCompositePodGroup(cpgObj))
 				pg := st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("cpg1").Obj()
-				queue.AddPodGroup(logger, pg)
+				queue.AddGenericPodGroup(logger, framework.NewGenericPodGroup(pg))
 
 				queue.Add(ctx, pod)
 				poppedEntity, _ := queue.Pop(logger)
@@ -1936,7 +1936,7 @@ func TestDeleteCompositePodGroup(t *testing.T) {
 			}
 
 			if tt.initCPG != nil && tt.cpgEnabled {
-				sched.Cache.AddCompositePodGroup(logger, tt.initCPG)
+				sched.Cache.AddGenericPodGroup(framework.NewGenericCompositePodGroup(tt.initCPG))
 			}
 
 			sched.deleteCompositePodGroup(tt.cpgToDelete)

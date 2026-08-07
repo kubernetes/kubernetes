@@ -42,15 +42,15 @@ func TestWorkloadForest_AddPodGroup(t *testing.T) {
 		isCompositePodGroupEnabled bool
 		initialCPGs                []*schedulingv1alpha3.CompositePodGroup
 		podGroupsToAdd             []*schedulingv1beta1.PodGroup
-		wantPodGroups              map[fwk.EntityKey]*schedulingv1beta1.PodGroup
+		want                       map[fwk.EntityKey]*framework.GenericPodGroup
 		wantChildren               map[fwk.EntityKey]sets.Set[fwk.EntityKey]
 	}{
 		{
 			name:                       "add single pod group",
 			isCompositePodGroupEnabled: true,
 			podGroupsToAdd:             []*schedulingv1beta1.PodGroup{pg1},
-			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
-				fwk.PodGroupKey("ns1", "pg1"): pg1,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.PodGroupKey("ns1", "pg1"): framework.NewGenericPodGroup(pg1),
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
 		},
@@ -58,9 +58,9 @@ func TestWorkloadForest_AddPodGroup(t *testing.T) {
 			name:                       "add multiple pod groups",
 			isCompositePodGroupEnabled: true,
 			podGroupsToAdd:             []*schedulingv1beta1.PodGroup{pg1, pg2},
-			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
-				fwk.PodGroupKey("ns1", "pg1"): pg1,
-				fwk.PodGroupKey("ns1", "pg2"): pg2,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.PodGroupKey("ns1", "pg1"): framework.NewGenericPodGroup(pg1),
+				fwk.PodGroupKey("ns1", "pg2"): framework.NewGenericPodGroup(pg2),
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
 		},
@@ -68,8 +68,8 @@ func TestWorkloadForest_AddPodGroup(t *testing.T) {
 			name:                       "add pod group with parent, parent not in children",
 			isCompositePodGroupEnabled: true,
 			podGroupsToAdd:             []*schedulingv1beta1.PodGroup{pg3WithParent},
-			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
-				fwk.PodGroupKey("ns1", "pg3"): pg3WithParent,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.PodGroupKey("ns1", "pg3"): framework.NewGenericPodGroup(pg3WithParent),
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
 				fwk.CompositePodGroupKey("ns1", "cpg1"): sets.New(fwk.PodGroupKey("ns1", "pg3")),
@@ -79,9 +79,9 @@ func TestWorkloadForest_AddPodGroup(t *testing.T) {
 			name:                       "add pod group with parent, parent already in children",
 			isCompositePodGroupEnabled: true,
 			podGroupsToAdd:             []*schedulingv1beta1.PodGroup{pg3WithParent, pg4WithParent},
-			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
-				fwk.PodGroupKey("ns1", "pg3"): pg3WithParent,
-				fwk.PodGroupKey("ns1", "pg4"): pg4WithParent,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.PodGroupKey("ns1", "pg3"): framework.NewGenericPodGroup(pg3WithParent),
+				fwk.PodGroupKey("ns1", "pg4"): framework.NewGenericPodGroup(pg4WithParent),
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
 				fwk.CompositePodGroupKey("ns1", "cpg1"): sets.New(fwk.PodGroupKey("ns1", "pg3"), fwk.PodGroupKey("ns1", "pg4")),
@@ -92,8 +92,9 @@ func TestWorkloadForest_AddPodGroup(t *testing.T) {
 			isCompositePodGroupEnabled: true,
 			initialCPGs:                []*schedulingv1alpha3.CompositePodGroup{cpgChild},
 			podGroupsToAdd:             []*schedulingv1beta1.PodGroup{pg3WithParent},
-			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
-				fwk.PodGroupKey("ns1", "pg3"): pg3WithParent,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.CompositePodGroupKey("ns1", "cpgChild"): framework.NewGenericCompositePodGroup(cpgChild),
+				fwk.PodGroupKey("ns1", "pg3"):               framework.NewGenericPodGroup(pg3WithParent),
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
 				fwk.CompositePodGroupKey("ns1", "cpg1"): sets.New(fwk.CompositePodGroupKey("ns1", "cpgChild"), fwk.PodGroupKey("ns1", "pg3")),
@@ -103,8 +104,8 @@ func TestWorkloadForest_AddPodGroup(t *testing.T) {
 			name:                       "add pod group with parent, feature disabled",
 			isCompositePodGroupEnabled: false,
 			podGroupsToAdd:             []*schedulingv1beta1.PodGroup{pg3WithParent},
-			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
-				fwk.PodGroupKey("ns1", "pg3"): pg3WithParent,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.PodGroupKey("ns1", "pg3"): framework.NewGenericPodGroup(pg3WithParent),
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
 		},
@@ -112,8 +113,8 @@ func TestWorkloadForest_AddPodGroup(t *testing.T) {
 			name:                       "add same pod group again, feature enabled",
 			isCompositePodGroupEnabled: true,
 			podGroupsToAdd:             []*schedulingv1beta1.PodGroup{pg1, pg1},
-			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
-				fwk.PodGroupKey("ns1", "pg1"): pg1,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.PodGroupKey("ns1", "pg1"): framework.NewGenericPodGroup(pg1),
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
 		},
@@ -121,8 +122,8 @@ func TestWorkloadForest_AddPodGroup(t *testing.T) {
 			name:                       "add same pod group again, feature disabled",
 			isCompositePodGroupEnabled: false,
 			podGroupsToAdd:             []*schedulingv1beta1.PodGroup{pg1, pg1},
-			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
-				fwk.PodGroupKey("ns1", "pg1"): pg1,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.PodGroupKey("ns1", "pg1"): framework.NewGenericPodGroup(pg1),
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
 		},
@@ -130,8 +131,8 @@ func TestWorkloadForest_AddPodGroup(t *testing.T) {
 			name:                       "add same pod group with parent again, feature enabled",
 			isCompositePodGroupEnabled: true,
 			podGroupsToAdd:             []*schedulingv1beta1.PodGroup{pg3WithParent, pg3WithParent},
-			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
-				fwk.PodGroupKey("ns1", "pg3"): pg3WithParent,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.PodGroupKey("ns1", "pg3"): framework.NewGenericPodGroup(pg3WithParent),
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
 				fwk.CompositePodGroupKey("ns1", "cpg1"): sets.New(fwk.PodGroupKey("ns1", "pg3")),
@@ -141,8 +142,8 @@ func TestWorkloadForest_AddPodGroup(t *testing.T) {
 			name:                       "add same pod group with parent again, feature disabled",
 			isCompositePodGroupEnabled: false,
 			podGroupsToAdd:             []*schedulingv1beta1.PodGroup{pg3WithParent, pg3WithParent},
-			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
-				fwk.PodGroupKey("ns1", "pg3"): pg3WithParent,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.PodGroupKey("ns1", "pg3"): framework.NewGenericPodGroup(pg3WithParent),
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
 		},
@@ -152,13 +153,13 @@ func TestWorkloadForest_AddPodGroup(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			wf := newWorkloadForest(tt.isCompositePodGroupEnabled)
 			for _, cpg := range tt.initialCPGs {
-				wf.addCompositePodGroup(cpg)
+				wf.addGenericPodGroup(framework.NewGenericCompositePodGroup(cpg))
 			}
 			for _, pg := range tt.podGroupsToAdd {
-				wf.addPodGroup(pg)
+				wf.addGenericPodGroup(framework.NewGenericPodGroup(pg))
 			}
 
-			if diff := cmp.Diff(tt.wantPodGroups, wf.podGroups); diff != "" {
+			if diff := cmp.Diff(tt.want, wf.podGroups); diff != "" {
 				t.Errorf("Unexpected podGroups (-want,+got)\n%s", diff)
 			}
 			if diff := cmp.Diff(tt.wantChildren, wf.children); diff != "" {
@@ -177,23 +178,23 @@ func TestWorkloadForest_UpdatePodGroup(t *testing.T) {
 		name             string
 		initialPodGroups []*schedulingv1beta1.PodGroup
 		podGroupToUpdate *schedulingv1beta1.PodGroup
-		want             map[fwk.EntityKey]*schedulingv1beta1.PodGroup
+		want             map[fwk.EntityKey]*framework.GenericPodGroup
 	}{
 		{
 			name:             "update existing pod group",
 			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1},
 			podGroupToUpdate: updatedPG1,
-			want: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
-				fwk.PodGroupKey("ns1", "pg1"): updatedPG1,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.PodGroupKey("ns1", "pg1"): framework.NewGenericPodGroup(updatedPG1),
 			},
 		},
 		{
 			name:             "update non-existent pod group adds it",
 			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1},
 			podGroupToUpdate: pg2,
-			want: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
-				fwk.PodGroupKey("ns1", "pg1"): pg1,
-				fwk.PodGroupKey("ns1", "pg2"): pg2,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.PodGroupKey("ns1", "pg1"): framework.NewGenericPodGroup(pg1),
+				fwk.PodGroupKey("ns1", "pg2"): framework.NewGenericPodGroup(pg2),
 			},
 		},
 	}
@@ -202,10 +203,10 @@ func TestWorkloadForest_UpdatePodGroup(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			wf := newWorkloadForest(true)
 			for _, pg := range tt.initialPodGroups {
-				wf.addPodGroup(pg)
+				wf.addGenericPodGroup(framework.NewGenericPodGroup(pg))
 			}
 
-			wf.updatePodGroup(tt.podGroupToUpdate)
+			wf.updateGenericPodGroup(framework.NewGenericPodGroup(tt.podGroupToUpdate))
 
 			if diff := cmp.Diff(tt.want, wf.podGroups); diff != "" {
 				t.Errorf("Unexpected podGroups (-want,+got)\n%s", diff)
@@ -221,13 +222,15 @@ func TestWorkloadForest_DeletePodGroup(t *testing.T) {
 	pg4WithParent := st.MakePodGroup().Name("pg4").Namespace("ns1").UID("uid4").ParentCompositePodGroup("cpg1").Obj()
 	cpgChild := st.MakeCompositePodGroup().Name("cpgChild").Namespace("ns1").ParentCompositePodGroup("cpg1").Obj()
 
+	cpg1 := st.MakeCompositePodGroup().Name("cpg1").Namespace("ns1").Obj()
+
 	tests := []struct {
 		name                       string
 		isCompositePodGroupEnabled bool
 		initialPodGroups           []*schedulingv1beta1.PodGroup
 		initialCPGs                []*schedulingv1alpha3.CompositePodGroup
 		podGroupToDelete           *schedulingv1beta1.PodGroup
-		wantPodGroups              map[fwk.EntityKey]*schedulingv1beta1.PodGroup
+		want                       map[fwk.EntityKey]*framework.GenericPodGroup
 		wantChildren               map[fwk.EntityKey]sets.Set[fwk.EntityKey]
 	}{
 		{
@@ -235,8 +238,8 @@ func TestWorkloadForest_DeletePodGroup(t *testing.T) {
 			isCompositePodGroupEnabled: true,
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1, pg2},
 			podGroupToDelete:           pg1,
-			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
-				fwk.PodGroupKey("ns1", "pg2"): pg2,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.PodGroupKey("ns1", "pg2"): framework.NewGenericPodGroup(pg2),
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
 		},
@@ -245,8 +248,8 @@ func TestWorkloadForest_DeletePodGroup(t *testing.T) {
 			isCompositePodGroupEnabled: true,
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1},
 			podGroupToDelete:           pg2,
-			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
-				fwk.PodGroupKey("ns1", "pg1"): pg1,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.PodGroupKey("ns1", "pg1"): framework.NewGenericPodGroup(pg1),
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
 		},
@@ -255,25 +258,27 @@ func TestWorkloadForest_DeletePodGroup(t *testing.T) {
 			isCompositePodGroupEnabled: true,
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg3WithParent},
 			podGroupToDelete:           pg3WithParent,
-			wantPodGroups:              map[fwk.EntityKey]*schedulingv1beta1.PodGroup{},
+			want:                       map[fwk.EntityKey]*framework.GenericPodGroup{},
 			wantChildren:               map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
 		},
 		{
 			name:                       "delete pod group with parent, where parent CPG exists in compositePodGroups",
 			isCompositePodGroupEnabled: true,
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg3WithParent},
-			initialCPGs:                []*schedulingv1alpha3.CompositePodGroup{st.MakeCompositePodGroup().Name("cpg1").Namespace("ns1").Obj()},
+			initialCPGs:                []*schedulingv1alpha3.CompositePodGroup{cpg1},
 			podGroupToDelete:           pg3WithParent,
-			wantPodGroups:              map[fwk.EntityKey]*schedulingv1beta1.PodGroup{},
-			wantChildren:               map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.CompositePodGroupKey("ns1", "cpg1"): framework.NewGenericCompositePodGroup(cpg1),
+			},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
 		},
 		{
 			name:                       "delete pod group with parent, parent has other pod group children",
 			isCompositePodGroupEnabled: true,
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg3WithParent, pg4WithParent},
 			podGroupToDelete:           pg3WithParent,
-			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
-				fwk.PodGroupKey("ns1", "pg4"): pg4WithParent,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.PodGroupKey("ns1", "pg4"): framework.NewGenericPodGroup(pg4WithParent),
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
 				fwk.CompositePodGroupKey("ns1", "cpg1"): sets.New(fwk.PodGroupKey("ns1", "pg4")),
@@ -285,7 +290,9 @@ func TestWorkloadForest_DeletePodGroup(t *testing.T) {
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg3WithParent},
 			initialCPGs:                []*schedulingv1alpha3.CompositePodGroup{cpgChild},
 			podGroupToDelete:           pg3WithParent,
-			wantPodGroups:              map[fwk.EntityKey]*schedulingv1beta1.PodGroup{},
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.CompositePodGroupKey("ns1", "cpgChild"): framework.NewGenericCompositePodGroup(cpgChild),
+			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
 				fwk.CompositePodGroupKey("ns1", "cpg1"): sets.New(fwk.CompositePodGroupKey("ns1", "cpgChild")),
 			},
@@ -295,7 +302,7 @@ func TestWorkloadForest_DeletePodGroup(t *testing.T) {
 			isCompositePodGroupEnabled: false,
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg3WithParent},
 			podGroupToDelete:           pg3WithParent,
-			wantPodGroups:              map[fwk.EntityKey]*schedulingv1beta1.PodGroup{},
+			want:                       map[fwk.EntityKey]*framework.GenericPodGroup{},
 			wantChildren:               map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
 		},
 	}
@@ -304,15 +311,15 @@ func TestWorkloadForest_DeletePodGroup(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			wf := newWorkloadForest(tt.isCompositePodGroupEnabled)
 			for _, pg := range tt.initialPodGroups {
-				wf.addPodGroup(pg)
+				wf.addGenericPodGroup(framework.NewGenericPodGroup(pg))
 			}
 			for _, cpg := range tt.initialCPGs {
-				wf.addCompositePodGroup(cpg)
+				wf.addGenericPodGroup(framework.NewGenericCompositePodGroup(cpg))
 			}
 
-			wf.deletePodGroup(tt.podGroupToDelete)
+			wf.deleteGenericPodGroup(framework.NewGenericPodGroup(tt.podGroupToDelete))
 
-			if diff := cmp.Diff(tt.wantPodGroups, wf.podGroups); diff != "" {
+			if diff := cmp.Diff(tt.want, wf.podGroups); diff != "" {
 				t.Errorf("Unexpected podGroups (-want,+got)\n%s", diff)
 			}
 			if diff := cmp.Diff(tt.wantChildren, wf.children); diff != "" {
@@ -366,10 +373,16 @@ func TestWorkloadForest_GetPodGroup(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			wf := newWorkloadForest(tt.isCompositePodGroupEnabled)
 			for _, pg := range tt.initialPodGroups {
-				wf.addPodGroup(pg)
+				wf.addGenericPodGroup(framework.NewGenericPodGroup(pg))
 			}
 
-			gotPG, gotFound := wf.getPodGroup(tt.podGroupLookup)
+			gotGPG, gotFound := wf.podGroups[framework.NewGenericPodGroup(tt.podGroupLookup).GetKey()]
+			var gotPG *schedulingv1beta1.PodGroup
+			if gotFound && gotGPG.PodGroup != nil {
+				gotPG = gotGPG.PodGroup
+			} else {
+				gotFound = false
+			}
 			if wantFound := tt.wantPodGroup != nil; gotFound != wantFound {
 				t.Errorf("Expected found: %v, got: %v", wantFound, gotFound)
 			}
@@ -407,10 +420,16 @@ func TestWorkloadForest_GetCompositePodGroup(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			wf := newWorkloadForest(true)
 			for _, cpg := range tt.initialCompositePodGroups {
-				wf.addCompositePodGroup(cpg)
+				wf.addGenericPodGroup(framework.NewGenericCompositePodGroup(cpg))
 			}
 
-			gotCPG, gotFound := wf.getCompositePodGroup(tt.cpgLookup)
+			gotGPG, gotFound := wf.podGroups[framework.NewGenericCompositePodGroup(tt.cpgLookup).GetKey()]
+			var gotCPG *schedulingv1alpha3.CompositePodGroup
+			if gotFound && gotGPG.CompositePodGroup != nil {
+				gotCPG = gotGPG.CompositePodGroup
+			} else {
+				gotFound = false
+			}
 			if wantFound := tt.wantCompositePodGroup != nil; gotFound != wantFound {
 				t.Errorf("Expected found: %v, got: %v", wantFound, gotFound)
 			}
@@ -433,31 +452,31 @@ func TestWorkloadForest_AddCompositePodGroup(t *testing.T) {
 		name         string
 		initialPGs   []*schedulingv1beta1.PodGroup
 		cpgsToAdd    []*schedulingv1alpha3.CompositePodGroup
-		wantCPGs     map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup
+		want         map[fwk.EntityKey]*framework.GenericPodGroup
 		wantChildren map[fwk.EntityKey]sets.Set[fwk.EntityKey]
 	}{
 		{
 			name:      "add single composite pod group",
 			cpgsToAdd: []*schedulingv1alpha3.CompositePodGroup{cpg1},
-			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
-				fwk.CompositePodGroupKey("ns1", "cpg1"): cpg1,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.CompositePodGroupKey("ns1", "cpg1"): framework.NewGenericCompositePodGroup(cpg1),
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
 		},
 		{
 			name:      "add multiple composite pod groups",
 			cpgsToAdd: []*schedulingv1alpha3.CompositePodGroup{cpg1, cpg2},
-			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
-				fwk.CompositePodGroupKey("ns1", "cpg1"): cpg1,
-				fwk.CompositePodGroupKey("ns1", "cpg2"): cpg2,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.CompositePodGroupKey("ns1", "cpg1"): framework.NewGenericCompositePodGroup(cpg1),
+				fwk.CompositePodGroupKey("ns1", "cpg2"): framework.NewGenericCompositePodGroup(cpg2),
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
 		},
 		{
 			name:      "add composite pod group with parent, parent not in children",
 			cpgsToAdd: []*schedulingv1alpha3.CompositePodGroup{cpg3WithParent},
-			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
-				fwk.CompositePodGroupKey("ns1", "cpg3"): cpg3WithParent,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.CompositePodGroupKey("ns1", "cpg3"): framework.NewGenericCompositePodGroup(cpg3WithParent),
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
 				fwk.CompositePodGroupKey("ns1", "cpg1"): sets.New(fwk.CompositePodGroupKey("ns1", "cpg3")),
@@ -466,9 +485,9 @@ func TestWorkloadForest_AddCompositePodGroup(t *testing.T) {
 		{
 			name:      "add composite pod group with parent, parent already has other composite pod group child",
 			cpgsToAdd: []*schedulingv1alpha3.CompositePodGroup{cpg3WithParent, cpg4WithParent},
-			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
-				fwk.CompositePodGroupKey("ns1", "cpg3"): cpg3WithParent,
-				fwk.CompositePodGroupKey("ns1", "cpg4"): cpg4WithParent,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.CompositePodGroupKey("ns1", "cpg3"): framework.NewGenericCompositePodGroup(cpg3WithParent),
+				fwk.CompositePodGroupKey("ns1", "cpg4"): framework.NewGenericCompositePodGroup(cpg4WithParent),
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
 				fwk.CompositePodGroupKey("ns1", "cpg1"): sets.New(fwk.CompositePodGroupKey("ns1", "cpg3"), fwk.CompositePodGroupKey("ns1", "cpg4")),
@@ -478,8 +497,9 @@ func TestWorkloadForest_AddCompositePodGroup(t *testing.T) {
 			name:       "add composite pod group with parent, parent already has pod group child",
 			initialPGs: []*schedulingv1beta1.PodGroup{pgChild},
 			cpgsToAdd:  []*schedulingv1alpha3.CompositePodGroup{cpg3WithParent},
-			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
-				fwk.CompositePodGroupKey("ns1", "cpg3"): cpg3WithParent,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.PodGroupKey("ns1", "pgChild"):       framework.NewGenericPodGroup(pgChild),
+				fwk.CompositePodGroupKey("ns1", "cpg3"): framework.NewGenericCompositePodGroup(cpg3WithParent),
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
 				fwk.CompositePodGroupKey("ns1", "cpg1"): sets.New(fwk.PodGroupKey("ns1", "pgChild"), fwk.CompositePodGroupKey("ns1", "cpg3")),
@@ -488,16 +508,16 @@ func TestWorkloadForest_AddCompositePodGroup(t *testing.T) {
 		{
 			name:      "add same composite pod group again",
 			cpgsToAdd: []*schedulingv1alpha3.CompositePodGroup{cpg1, cpg1},
-			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
-				fwk.CompositePodGroupKey("ns1", "cpg1"): cpg1,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.CompositePodGroupKey("ns1", "cpg1"): framework.NewGenericCompositePodGroup(cpg1),
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
 		},
 		{
 			name:      "add same composite pod group with parent again",
 			cpgsToAdd: []*schedulingv1alpha3.CompositePodGroup{cpg3WithParent, cpg3WithParent},
-			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
-				fwk.CompositePodGroupKey("ns1", "cpg3"): cpg3WithParent,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.CompositePodGroupKey("ns1", "cpg3"): framework.NewGenericCompositePodGroup(cpg3WithParent),
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
 				fwk.CompositePodGroupKey("ns1", "cpg1"): sets.New(fwk.CompositePodGroupKey("ns1", "cpg3")),
@@ -509,13 +529,13 @@ func TestWorkloadForest_AddCompositePodGroup(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			wf := newWorkloadForest(true)
 			for _, pg := range tt.initialPGs {
-				wf.addPodGroup(pg)
+				wf.addGenericPodGroup(framework.NewGenericPodGroup(pg))
 			}
 			for _, cpg := range tt.cpgsToAdd {
-				wf.addCompositePodGroup(cpg)
+				wf.addGenericPodGroup(framework.NewGenericCompositePodGroup(cpg))
 			}
 
-			if diff := cmp.Diff(tt.wantCPGs, wf.compositePodGroups); diff != "" {
+			if diff := cmp.Diff(tt.want, wf.podGroups); diff != "" {
 				t.Errorf("Unexpected compositePodGroups (-want,+got)\n%s", diff)
 			}
 			if diff := cmp.Diff(tt.wantChildren, wf.children); diff != "" {
@@ -534,23 +554,23 @@ func TestWorkloadForest_UpdateCompositePodGroup(t *testing.T) {
 		name        string
 		initialCPGs []*schedulingv1alpha3.CompositePodGroup
 		cpgToUpdate *schedulingv1alpha3.CompositePodGroup
-		want        map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup
+		want        map[fwk.EntityKey]*framework.GenericPodGroup
 	}{
 		{
 			name:        "update existing composite pod group",
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{cpg1},
 			cpgToUpdate: updatedCPG1,
-			want: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
-				fwk.CompositePodGroupKey("ns1", "cpg1"): updatedCPG1,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.CompositePodGroupKey("ns1", "cpg1"): framework.NewGenericCompositePodGroup(updatedCPG1),
 			},
 		},
 		{
 			name:        "update non-existent composite pod group adds it",
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{cpg1},
 			cpgToUpdate: cpg2,
-			want: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
-				fwk.CompositePodGroupKey("ns1", "cpg1"): cpg1,
-				fwk.CompositePodGroupKey("ns1", "cpg2"): cpg2,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.CompositePodGroupKey("ns1", "cpg1"): framework.NewGenericCompositePodGroup(cpg1),
+				fwk.CompositePodGroupKey("ns1", "cpg2"): framework.NewGenericCompositePodGroup(cpg2),
 			},
 		},
 	}
@@ -559,12 +579,12 @@ func TestWorkloadForest_UpdateCompositePodGroup(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			wf := newWorkloadForest(true)
 			for _, cpg := range tt.initialCPGs {
-				wf.addCompositePodGroup(cpg)
+				wf.addGenericPodGroup(framework.NewGenericCompositePodGroup(cpg))
 			}
 
-			wf.updateCompositePodGroup(tt.cpgToUpdate)
+			wf.updateGenericPodGroup(framework.NewGenericCompositePodGroup(tt.cpgToUpdate))
 
-			if diff := cmp.Diff(tt.want, wf.compositePodGroups); diff != "" {
+			if diff := cmp.Diff(tt.want, wf.podGroups); diff != "" {
 				t.Errorf("Unexpected compositePodGroups (-want,+got)\n%s", diff)
 			}
 		})
@@ -586,21 +606,21 @@ func TestWorkloadForest_DeleteCompositePodGroup(t *testing.T) {
 		initialPGs   []*schedulingv1beta1.PodGroup
 		initialCPGs  []*schedulingv1alpha3.CompositePodGroup
 		cpgToDelete  *schedulingv1alpha3.CompositePodGroup
-		wantCPGs     map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup
+		want         map[fwk.EntityKey]*framework.GenericPodGroup
 		wantChildren map[fwk.EntityKey]sets.Set[fwk.EntityKey]
 	}{
 		{
 			name:         "delete existing composite pod group without parent",
 			initialCPGs:  []*schedulingv1alpha3.CompositePodGroup{cpg1},
 			cpgToDelete:  cpg1,
-			wantCPGs:     map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{},
+			want:         map[fwk.EntityKey]*framework.GenericPodGroup{},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
 		},
 		{
 			name:         "delete composite pod group with parent, cleans up children map",
 			initialCPGs:  []*schedulingv1alpha3.CompositePodGroup{cpg3WithParent},
 			cpgToDelete:  cpg3WithParent,
-			wantCPGs:     map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{},
+			want:         map[fwk.EntityKey]*framework.GenericPodGroup{},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
 		},
 		{
@@ -608,7 +628,9 @@ func TestWorkloadForest_DeleteCompositePodGroup(t *testing.T) {
 			initialPGs:  []*schedulingv1beta1.PodGroup{pgChild},
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{cpg3WithParent},
 			cpgToDelete: cpg3WithParent,
-			wantCPGs:    map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{},
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.PodGroupKey("ns1", "pgChild"): framework.NewGenericPodGroup(pgChild),
+			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
 				fwk.CompositePodGroupKey("ns1", "cpg1"): sets.New(fwk.PodGroupKey("ns1", "pgChild")),
 			},
@@ -617,8 +639,8 @@ func TestWorkloadForest_DeleteCompositePodGroup(t *testing.T) {
 			name:        "delete composite pod group with parent, parent has other composite pod group child",
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{cpg3WithParent, cpg4WithParent},
 			cpgToDelete: cpg3WithParent,
-			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
-				fwk.CompositePodGroupKey("ns1", "cpg4"): cpg4WithParent,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.CompositePodGroupKey("ns1", "cpg4"): framework.NewGenericCompositePodGroup(cpg4WithParent),
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
 				fwk.CompositePodGroupKey("ns1", "cpg1"): sets.New(fwk.CompositePodGroupKey("ns1", "cpg4")),
@@ -629,8 +651,9 @@ func TestWorkloadForest_DeleteCompositePodGroup(t *testing.T) {
 			initialPGs:  []*schedulingv1beta1.PodGroup{pgChild},
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{cpg3WithParent, cpg4WithParent},
 			cpgToDelete: cpg3WithParent,
-			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
-				fwk.CompositePodGroupKey("ns1", "cpg4"): cpg4WithParent,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.PodGroupKey("ns1", "pgChild"):       framework.NewGenericPodGroup(pgChild),
+				fwk.CompositePodGroupKey("ns1", "cpg4"): framework.NewGenericCompositePodGroup(cpg4WithParent),
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
 				fwk.CompositePodGroupKey("ns1", "cpg1"): sets.New(fwk.PodGroupKey("ns1", "pgChild"), fwk.CompositePodGroupKey("ns1", "cpg4")),
@@ -641,8 +664,9 @@ func TestWorkloadForest_DeleteCompositePodGroup(t *testing.T) {
 			initialPGs:  []*schedulingv1beta1.PodGroup{pgLeaf},
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{cpg1, cpgMid},
 			cpgToDelete: cpgMid,
-			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
-				fwk.CompositePodGroupKey("ns1", "cpg1"): cpg1,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.CompositePodGroupKey("ns1", "cpg1"): framework.NewGenericCompositePodGroup(cpg1),
+				fwk.PodGroupKey("ns1", "pgLeaf"):        framework.NewGenericPodGroup(pgLeaf),
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
 				fwk.CompositePodGroupKey("ns1", "cpgMid"): sets.New(fwk.PodGroupKey("ns1", "pgLeaf")),
@@ -652,8 +676,8 @@ func TestWorkloadForest_DeleteCompositePodGroup(t *testing.T) {
 			name:        "delete non-existent composite pod group",
 			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{cpg3WithParent},
 			cpgToDelete: cpg1,
-			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
-				fwk.CompositePodGroupKey("ns1", "cpg3"): cpg3WithParent,
+			want: map[fwk.EntityKey]*framework.GenericPodGroup{
+				fwk.CompositePodGroupKey("ns1", "cpg3"): framework.NewGenericCompositePodGroup(cpg3WithParent),
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
 				fwk.CompositePodGroupKey("ns1", "cpg1"): sets.New(fwk.CompositePodGroupKey("ns1", "cpg3")),
@@ -665,15 +689,15 @@ func TestWorkloadForest_DeleteCompositePodGroup(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			wf := newWorkloadForest(true)
 			for _, pg := range tt.initialPGs {
-				wf.addPodGroup(pg)
+				wf.addGenericPodGroup(framework.NewGenericPodGroup(pg))
 			}
 			for _, cpg := range tt.initialCPGs {
-				wf.addCompositePodGroup(cpg)
+				wf.addGenericPodGroup(framework.NewGenericCompositePodGroup(cpg))
 			}
 
-			wf.deleteCompositePodGroup(tt.cpgToDelete)
+			wf.deleteGenericPodGroup(framework.NewGenericCompositePodGroup(tt.cpgToDelete))
 
-			if diff := cmp.Diff(tt.wantCPGs, wf.compositePodGroups); diff != "" {
+			if diff := cmp.Diff(tt.want, wf.podGroups); diff != "" {
 				t.Errorf("Unexpected compositePodGroups (-want,+got)\n%s", diff)
 			}
 			if diff := cmp.Diff(tt.wantChildren, wf.children); diff != "" {
@@ -706,9 +730,7 @@ func TestWorkloadForest_GetRootLookupInfoForPod(t *testing.T) {
 			pod:              podWithPG1,
 			wantInfo: &framework.QueuedPodGroupInfo{
 				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: "ns1",
-					Name:      "pg1",
-					Type:      fwk.PodGroupKeyType,
+					GenericPodGroup: framework.NewGenericPodGroup(pg1),
 				},
 			},
 			isCompositePodGroupEnabled: true,
@@ -720,9 +742,7 @@ func TestWorkloadForest_GetRootLookupInfoForPod(t *testing.T) {
 			pod:              podWithPG2,
 			wantInfo: &framework.QueuedPodGroupInfo{
 				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: "ns1",
-					Name:      "cpg1",
-					Type:      fwk.CompositePodGroupKeyType,
+					GenericPodGroup: framework.NewGenericCompositePodGroup(cpg1),
 				},
 			},
 			isCompositePodGroupEnabled: true,
@@ -740,9 +760,7 @@ func TestWorkloadForest_GetRootLookupInfoForPod(t *testing.T) {
 			pod:              podWithPG1,
 			wantInfo: &framework.QueuedPodGroupInfo{
 				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: "ns1",
-					Name:      "pg1",
-					Type:      fwk.PodGroupKeyType,
+					GenericPodGroup: framework.NewGenericPodGroup(pg1),
 				},
 			},
 			isCompositePodGroupEnabled: false,
@@ -754,9 +772,7 @@ func TestWorkloadForest_GetRootLookupInfoForPod(t *testing.T) {
 			pod:              podWithPG2,
 			wantInfo: &framework.QueuedPodGroupInfo{
 				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: "ns1",
-					Name:      "pg2",
-					Type:      fwk.PodGroupKeyType,
+					GenericPodGroup: framework.NewGenericPodGroup(pg2WithParent),
 				},
 			},
 			isCompositePodGroupEnabled: false,
@@ -774,10 +790,10 @@ func TestWorkloadForest_GetRootLookupInfoForPod(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			wf := newWorkloadForest(tt.isCompositePodGroupEnabled)
 			for _, pg := range tt.initialPodGroups {
-				wf.addPodGroup(pg)
+				wf.addGenericPodGroup(framework.NewGenericPodGroup(pg))
 			}
 			for _, cpg := range tt.initialCPGs {
-				wf.addCompositePodGroup(cpg)
+				wf.addGenericPodGroup(framework.NewGenericCompositePodGroup(cpg))
 			}
 
 			gotInfo, gotFound := wf.getRootLookupInfoForPod(tt.pod)
@@ -812,9 +828,7 @@ func TestWorkloadForest_GetRootLookupInfoForPodGroup(t *testing.T) {
 			podGroup:         pg1,
 			wantInfo: &framework.QueuedPodGroupInfo{
 				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: "ns1",
-					Name:      "pg1",
-					Type:      fwk.PodGroupKeyType,
+					GenericPodGroup: framework.NewGenericPodGroup(pg1),
 				},
 			},
 			isCompositePodGroupEnabled: true,
@@ -826,9 +840,7 @@ func TestWorkloadForest_GetRootLookupInfoForPodGroup(t *testing.T) {
 			podGroup:         pg2WithParent,
 			wantInfo: &framework.QueuedPodGroupInfo{
 				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: "ns1",
-					Name:      "cpg1",
-					Type:      fwk.CompositePodGroupKeyType,
+					GenericPodGroup: framework.NewGenericCompositePodGroup(cpg1),
 				},
 			},
 			isCompositePodGroupEnabled: true,
@@ -853,9 +865,7 @@ func TestWorkloadForest_GetRootLookupInfoForPodGroup(t *testing.T) {
 			podGroup:         pg1,
 			wantInfo: &framework.QueuedPodGroupInfo{
 				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: "ns1",
-					Name:      "pg1",
-					Type:      fwk.PodGroupKeyType,
+					GenericPodGroup: framework.NewGenericPodGroup(pg1),
 				},
 			},
 			isCompositePodGroupEnabled: false,
@@ -867,9 +877,7 @@ func TestWorkloadForest_GetRootLookupInfoForPodGroup(t *testing.T) {
 			podGroup:         pg2WithParent,
 			wantInfo: &framework.QueuedPodGroupInfo{
 				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: "ns1",
-					Name:      "pg2",
-					Type:      fwk.PodGroupKeyType,
+					GenericPodGroup: framework.NewGenericPodGroup(pg2WithParent),
 				},
 			},
 			isCompositePodGroupEnabled: false,
@@ -880,9 +888,7 @@ func TestWorkloadForest_GetRootLookupInfoForPodGroup(t *testing.T) {
 			podGroup:         pg3WithNonExistentParent,
 			wantInfo: &framework.QueuedPodGroupInfo{
 				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: "ns1",
-					Name:      "pg3",
-					Type:      fwk.PodGroupKeyType,
+					GenericPodGroup: framework.NewGenericPodGroup(pg3WithNonExistentParent),
 				},
 			},
 			isCompositePodGroupEnabled: false,
@@ -900,13 +906,13 @@ func TestWorkloadForest_GetRootLookupInfoForPodGroup(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			wf := newWorkloadForest(tt.isCompositePodGroupEnabled)
 			for _, pg := range tt.initialPodGroups {
-				wf.addPodGroup(pg)
+				wf.addGenericPodGroup(framework.NewGenericPodGroup(pg))
 			}
 			for _, cpg := range tt.initialCPGs {
-				wf.addCompositePodGroup(cpg)
+				wf.addGenericPodGroup(framework.NewGenericCompositePodGroup(cpg))
 			}
 
-			gotInfo, gotFound := wf.getRootLookupInfoForPodGroup(tt.podGroup)
+			gotInfo, gotFound := wf.getRootLookupInfo(framework.NewGenericPodGroup(tt.podGroup))
 			if wantFound := tt.wantInfo != nil; gotFound != wantFound {
 				t.Errorf("Expected found: %v, got: %v", wantFound, gotFound)
 			}
@@ -935,9 +941,7 @@ func TestWorkloadForest_GetRootLookupInfoForCPG(t *testing.T) {
 			cpg:         cpg1,
 			wantInfo: &framework.QueuedPodGroupInfo{
 				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: "ns1",
-					Name:      "cpg1",
-					Type:      fwk.CompositePodGroupKeyType,
+					GenericPodGroup: framework.NewGenericCompositePodGroup(cpg1),
 				},
 			},
 		},
@@ -947,9 +951,7 @@ func TestWorkloadForest_GetRootLookupInfoForCPG(t *testing.T) {
 			cpg:         cpg2WithParent,
 			wantInfo: &framework.QueuedPodGroupInfo{
 				PodGroupInfo: &framework.PodGroupInfo{
-					Namespace: "ns1",
-					Name:      "cpg1",
-					Type:      fwk.CompositePodGroupKeyType,
+					GenericPodGroup: framework.NewGenericCompositePodGroup(cpg1),
 				},
 			},
 		},
@@ -971,10 +973,10 @@ func TestWorkloadForest_GetRootLookupInfoForCPG(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			wf := newWorkloadForest(true)
 			for _, cpg := range tt.initialCPGs {
-				wf.addCompositePodGroup(cpg)
+				wf.addGenericPodGroup(framework.NewGenericCompositePodGroup(cpg))
 			}
 
-			gotInfo, gotFound := wf.getRootLookupInfoForCPG(tt.cpg)
+			gotInfo, gotFound := wf.getRootLookupInfo(framework.NewGenericCompositePodGroup(tt.cpg))
 			if wantFound := tt.wantInfo != nil; gotFound != wantFound {
 				t.Errorf("Expected found: %v, got: %v", wantFound, gotFound)
 			}
@@ -1002,68 +1004,54 @@ func TestWorkloadForest_GetLeafPodGroups(t *testing.T) {
 		isCompositePodGroupEnabled bool
 	}{
 		{
-			name:             "single pod group lookup",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1},
-			rootLookupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{Namespace: "ns1", Name: "pg1", Type: fwk.PodGroupKeyType},
-			},
+			name:                       "single pod group lookup",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1},
+			rootLookupInfo:             newQueuedPodGroupInfoForLookup("ns1", "pg1", fwk.PodGroupKeyType),
 			wantLeaves:                 []*schedulingv1beta1.PodGroup{pg1},
 			isCompositePodGroupEnabled: true,
 		},
 		{
-			name:             "cpg with direct pod group child",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{pg2WithParent},
-			initialCPGs:      []*schedulingv1alpha3.CompositePodGroup{cpg1},
-			rootLookupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{Namespace: "ns1", Name: "cpg1", Type: fwk.CompositePodGroupKeyType},
-			},
+			name:                       "cpg with direct pod group child",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg2WithParent},
+			initialCPGs:                []*schedulingv1alpha3.CompositePodGroup{cpg1},
+			rootLookupInfo:             newQueuedPodGroupInfoForLookup("ns1", "cpg1", fwk.CompositePodGroupKeyType),
 			wantLeaves:                 []*schedulingv1beta1.PodGroup{pg2WithParent},
 			isCompositePodGroupEnabled: true,
 		},
 		{
-			name:             "cpg with nested pod group child",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{pg2WithParent, pg3WithParent},
-			initialCPGs:      []*schedulingv1alpha3.CompositePodGroup{cpg1, cpg2WithParent},
-			rootLookupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{Namespace: "ns1", Name: "cpg1", Type: fwk.CompositePodGroupKeyType},
-			},
+			name:                       "cpg with nested pod group child",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg2WithParent, pg3WithParent},
+			initialCPGs:                []*schedulingv1alpha3.CompositePodGroup{cpg1, cpg2WithParent},
+			rootLookupInfo:             newQueuedPodGroupInfoForLookup("ns1", "cpg1", fwk.CompositePodGroupKeyType),
 			wantLeaves:                 []*schedulingv1beta1.PodGroup{pg2WithParent, pg3WithParent},
 			isCompositePodGroupEnabled: true,
 		},
 		{
-			name:             "missing root",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{},
-			rootLookupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{Namespace: "ns1", Name: "missing", Type: fwk.CompositePodGroupKeyType},
-			},
+			name:                       "missing root",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{},
+			rootLookupInfo:             newQueuedPodGroupInfoForLookup("ns1", "missing", fwk.CompositePodGroupKeyType),
 			wantLeaves:                 nil,
 			isCompositePodGroupEnabled: true,
 		},
 		{
-			name:             "single pod group lookup (CPG=false)",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1},
-			rootLookupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{Namespace: "ns1", Name: "pg1", Type: fwk.PodGroupKeyType},
-			},
+			name:                       "single pod group lookup (CPG=false)",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1},
+			rootLookupInfo:             newQueuedPodGroupInfoForLookup("ns1", "pg1", fwk.PodGroupKeyType),
 			wantLeaves:                 []*schedulingv1beta1.PodGroup{pg1},
 			isCompositePodGroupEnabled: false,
 		},
 		{
-			name:             "pg with direct pod group child lookup (CPG=false)",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{pg2WithParent},
-			initialCPGs:      []*schedulingv1alpha3.CompositePodGroup{cpg1},
-			rootLookupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{Namespace: "ns1", Name: "pg2", Type: fwk.PodGroupKeyType},
-			},
+			name:                       "pg with direct pod group child lookup (CPG=false)",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg2WithParent},
+			initialCPGs:                []*schedulingv1alpha3.CompositePodGroup{cpg1},
+			rootLookupInfo:             newQueuedPodGroupInfoForLookup("ns1", "pg2", fwk.PodGroupKeyType),
 			wantLeaves:                 []*schedulingv1beta1.PodGroup{pg2WithParent},
 			isCompositePodGroupEnabled: false,
 		},
 		{
-			name:             "missing root (CPG=false)",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{},
-			rootLookupInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{Namespace: "ns1", Name: "missing", Type: fwk.CompositePodGroupKeyType},
-			},
+			name:                       "missing root (CPG=false)",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{},
+			rootLookupInfo:             newQueuedPodGroupInfoForLookup("ns1", "missing", fwk.CompositePodGroupKeyType),
 			wantLeaves:                 nil,
 			isCompositePodGroupEnabled: false,
 		},
@@ -1073,10 +1061,10 @@ func TestWorkloadForest_GetLeafPodGroups(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			wf := newWorkloadForest(tt.isCompositePodGroupEnabled)
 			for _, pg := range tt.initialPodGroups {
-				wf.addPodGroup(pg)
+				wf.addGenericPodGroup(framework.NewGenericPodGroup(pg))
 			}
 			for _, cpg := range tt.initialCPGs {
-				wf.addCompositePodGroup(cpg)
+				wf.addGenericPodGroup(framework.NewGenericCompositePodGroup(cpg))
 			}
 
 			logger, _ := ktesting.NewTestContext(t)
@@ -1113,11 +1101,8 @@ func TestWorkloadForest_BuildPodGroupInfoForPG(t *testing.T) {
 			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1},
 			pg:               pg1,
 			wantInfo: &framework.PodGroupInfo{
-				Namespace: "ns1",
-				Name:      "pg1",
-				Type:      fwk.PodGroupKeyType,
-				PodGroup:  pg1,
-				Children:  []*framework.PodGroupInfo{},
+				GenericPodGroup: framework.NewGenericPodGroup(pg1),
+				Children:        []*framework.PodGroupInfo{},
 			},
 			isCompositePodGroupEnabled: true,
 		},
@@ -1126,11 +1111,8 @@ func TestWorkloadForest_BuildPodGroupInfoForPG(t *testing.T) {
 			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1},
 			pg:               pg1,
 			wantInfo: &framework.PodGroupInfo{
-				Namespace: "ns1",
-				Name:      "pg1",
-				Type:      fwk.PodGroupKeyType,
-				PodGroup:  pg1,
-				Children:  []*framework.PodGroupInfo{},
+				GenericPodGroup: framework.NewGenericPodGroup(pg1),
+				Children:        []*framework.PodGroupInfo{},
 			},
 			isCompositePodGroupEnabled: false,
 		},
@@ -1140,12 +1122,12 @@ func TestWorkloadForest_BuildPodGroupInfoForPG(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			wf := newWorkloadForest(tt.isCompositePodGroupEnabled)
 			for _, pg := range tt.initialPodGroups {
-				wf.addPodGroup(pg)
+				wf.addGenericPodGroup(framework.NewGenericPodGroup(pg))
 			}
 
 			logger, _ := ktesting.NewTestContext(t)
 			visited := sets.New[fwk.EntityKey]()
-			gotInfo := wf.buildPodGroupInfoForPG(logger, tt.pg, visited)
+			gotInfo := wf.buildPodGroupInfo(logger, framework.NewGenericPodGroup(tt.pg), visited)
 
 			if diff := cmp.Diff(tt.wantInfo, gotInfo); diff != "" {
 				t.Errorf("Unexpected PodGroupInfo (-want,+got)\n%s", diff)
@@ -1172,17 +1154,11 @@ func TestWorkloadForest_BuildPodGroupInfoForCPG(t *testing.T) {
 			initialCPGs:      []*schedulingv1alpha3.CompositePodGroup{cpg1},
 			cpg:              cpg1,
 			wantInfo: &framework.PodGroupInfo{
-				Namespace:         "ns1",
-				Name:              "cpg1",
-				Type:              fwk.CompositePodGroupKeyType,
-				CompositePodGroup: cpg1,
+				GenericPodGroup: framework.NewGenericCompositePodGroup(cpg1),
 				Children: []*framework.PodGroupInfo{
 					{
-						Namespace: "ns1",
-						Name:      "pg1",
-						Type:      fwk.PodGroupKeyType,
-						PodGroup:  pg1WithParent,
-						Children:  []*framework.PodGroupInfo{},
+						GenericPodGroup: framework.NewGenericPodGroup(pg1WithParent),
+						Children:        []*framework.PodGroupInfo{},
 					},
 				},
 			},
@@ -1194,11 +1170,8 @@ func TestWorkloadForest_BuildPodGroupInfoForCPG(t *testing.T) {
 			initialCPGs:      []*schedulingv1alpha3.CompositePodGroup{cpg1},
 			cpg:              cpg1,
 			wantInfo: &framework.PodGroupInfo{
-				Namespace:         "ns1",
-				Name:              "cpg1",
-				Type:              fwk.CompositePodGroupKeyType,
-				CompositePodGroup: cpg1,
-				Children:          []*framework.PodGroupInfo{},
+				GenericPodGroup: framework.NewGenericCompositePodGroup(cpg1),
+				Children:        []*framework.PodGroupInfo{},
 			},
 			isCompositePodGroupEnabled: false,
 		},
@@ -1208,15 +1181,15 @@ func TestWorkloadForest_BuildPodGroupInfoForCPG(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			wf := newWorkloadForest(tt.isCompositePodGroupEnabled)
 			for _, pg := range tt.initialPodGroups {
-				wf.addPodGroup(pg)
+				wf.addGenericPodGroup(framework.NewGenericPodGroup(pg))
 			}
 			for _, cpg := range tt.initialCPGs {
-				wf.addCompositePodGroup(cpg)
+				wf.addGenericPodGroup(framework.NewGenericCompositePodGroup(cpg))
 			}
 
 			logger, _ := ktesting.NewTestContext(t)
 			visited := sets.New[fwk.EntityKey]()
-			gotInfo := wf.buildPodGroupInfoForCPG(logger, tt.cpg, visited)
+			gotInfo := wf.buildPodGroupInfo(logger, framework.NewGenericCompositePodGroup(tt.cpg), visited)
 
 			// Note: Children are sorted by name in buildPodGroupInfoForCPG, so it is deterministic.
 			if diff := cmp.Diff(tt.wantInfo, gotInfo); diff != "" {
