@@ -31,6 +31,14 @@ type Manager interface {
 	// Set sets the cached result for the container with the given ID.
 	// The pod is only included to be sent with the update.
 	Set(kubecontainer.ContainerID, Result, *v1.Pod)
+	// Seed sets the cached result for the container with the given ID without
+	// sending anything on Updates().
+	//
+	// It is for reconstructing state that consumers of Updates() already know
+	// about -- adopting containers that were already running when the kubelet
+	// started -- where an update would be spurious. Every other write must go
+	// through Set, or the sync loop will not learn about the result.
+	Seed(kubecontainer.ContainerID, Result)
 	// Remove clears the cached result for the container with the given ID.
 	Remove(kubecontainer.ContainerID)
 	// Updates creates a channel that receives an Update whenever its result changes (but not
@@ -114,6 +122,10 @@ func (m *manager) Set(id kubecontainer.ContainerID, result Result, pod *v1.Pod) 
 	if m.setInternal(id, result) {
 		m.updates <- Update{id, result, pod.UID}
 	}
+}
+
+func (m *manager) Seed(id kubecontainer.ContainerID, result Result) {
+	m.setInternal(id, result)
 }
 
 // Internal helper for locked portion of set. Returns whether an update should be sent.
