@@ -1080,8 +1080,12 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 
 			if isBetter {
 				bestBalance = bestLocalBalance
-				bestRemainder = bestLocalRemainder
-				bestCombo = combo
+				// Deep copy to avoid slice reference bug.
+				// iterateCombinations reuses the same underlying array for different subsets.
+				// Without deep copy, bestLocalRemainder and bestCombo would reference the same array
+				// as bestLocalRemainder/combo, causing them to be overwritten in subsequent iterations.
+				bestRemainder = append([]int(nil), bestLocalRemainder...)
+				bestCombo = append([]int(nil), combo...)
 				if alignBySocket {
 					bestBalanceInOneSocket = inSameSocket
 				}
