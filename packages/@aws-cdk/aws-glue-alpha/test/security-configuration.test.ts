@@ -52,6 +52,11 @@ test('a security configuration with an encryption configuration requiring kms ke
 
   Template.fromStack(stack).resourceCountIs('AWS::KMS::Key', 1);
 
+  // Auto-created keys have rotation enabled.
+  Template.fromStack(stack).hasResourceProperties('AWS::KMS::Key', {
+    EnableKeyRotation: true,
+  });
+
   Template.fromStack(stack).hasResourceProperties('AWS::Glue::SecurityConfiguration', {
     Name: 'SecurityConfiguration',
     EncryptionConfiguration: {
