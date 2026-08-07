@@ -156,6 +156,20 @@ func (sched *Scheduler) updatePod(oldObj, newObj interface{}) {
 		return
 	}
 
+	// The informer identifies objects by namespace/name; ObjectMeta.UID is not part
+	// of that identity. If a Pod is deleted and recreated under the same name while
+	// the watch is broken, the relist that follows reconciles by name only, so the
+	// deletion is never detected and both objects arrive as a single update event.
+	// This is documented behavior of SharedInformer, which leaves the detection to
+	// the consumer. Split the event back into the delete and the add that actually
+	// happened, so that the recreated Pod is routed to the cache or to the
+	// scheduling queue depending on whether it is already assigned to a node.
+	if oldPod.UID != newPod.UID {
+		sched.deletePod(oldPod)
+		sched.addPod(newPod)
+		return
+	}
+
 	if assignedPod(oldPod) {
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && responsibleForPod(newPod, sched.Profiles) {
 			oldDeferred := resource.IsPodResizeDeferred(oldPod)
