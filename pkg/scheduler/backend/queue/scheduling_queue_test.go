@@ -7993,11 +7993,11 @@ func TestAddPodGroup(t *testing.T) {
 			q.AddGenericPodGroup(logger, framework.NewGenericPodGroup(podGroup))
 
 			pgLookup := newPodGroupInfoForLookup(podGroup.Namespace, podGroup.Name)
-			gotAPG, ok := q.workloadForest.podGroups[fwk.PodGroupKey(podGroup.Namespace, podGroup.Name)]
+			gotGPG, ok := q.workloadForest.podGroups[fwk.PodGroupKey(podGroup.Namespace, podGroup.Name)]
 			if !ok {
 				t.Fatalf("Expected pod group to be in workloadForest")
 			}
-			if diff := cmp.Diff(podGroup, gotAPG.PodGroup); diff != "" {
+			if diff := cmp.Diff(podGroup, gotGPG.PodGroup); diff != "" {
 				t.Errorf("Unexpected pod group object (-want +got):\n%s", diff)
 			}
 
@@ -8116,11 +8116,11 @@ func TestUpdatePodGroup(t *testing.T) {
 
 			q.UpdateGenericPodGroup(logger, framework.NewGenericPodGroup(updatedPodGroup))
 
-			gotAPG, ok := q.workloadForest.podGroups[fwk.PodGroupKey(podGroup.Namespace, podGroup.Name)]
+			gotGPG, ok := q.workloadForest.podGroups[fwk.PodGroupKey(podGroup.Namespace, podGroup.Name)]
 			if !ok {
 				t.Fatalf("Expected pod group to be in workloadForest")
 			}
-			if diff := cmp.Diff(updatedPodGroup, gotAPG.PodGroup); diff != "" {
+			if diff := cmp.Diff(updatedPodGroup, gotGPG.PodGroup); diff != "" {
 				t.Errorf("Unexpected pod group object (-want +got):\n%s", diff)
 			}
 

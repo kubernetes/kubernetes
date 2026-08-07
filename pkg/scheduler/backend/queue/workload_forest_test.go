@@ -376,10 +376,10 @@ func TestWorkloadForest_GetPodGroup(t *testing.T) {
 				wf.addGenericPodGroup(framework.NewGenericPodGroup(pg))
 			}
 
-			gotAPG, gotFound := wf.podGroups[framework.NewGenericPodGroup(tt.podGroupLookup).GetKey()]
+			gotGPG, gotFound := wf.podGroups[framework.NewGenericPodGroup(tt.podGroupLookup).GetKey()]
 			var gotPG *schedulingv1beta1.PodGroup
-			if gotFound && gotAPG.PodGroup != nil {
-				gotPG = gotAPG.PodGroup
+			if gotFound && gotGPG.PodGroup != nil {
+				gotPG = gotGPG.PodGroup
 			} else {
 				gotFound = false
 			}
@@ -423,10 +423,10 @@ func TestWorkloadForest_GetCompositePodGroup(t *testing.T) {
 				wf.addGenericPodGroup(framework.NewGenericCompositePodGroup(cpg))
 			}
 
-			gotAPG, gotFound := wf.podGroups[framework.NewGenericCompositePodGroup(tt.cpgLookup).GetKey()]
+			gotGPG, gotFound := wf.podGroups[framework.NewGenericCompositePodGroup(tt.cpgLookup).GetKey()]
 			var gotCPG *schedulingv1alpha3.CompositePodGroup
-			if gotFound && gotAPG.CompositePodGroup != nil {
-				gotCPG = gotAPG.CompositePodGroup
+			if gotFound && gotGPG.CompositePodGroup != nil {
+				gotCPG = gotGPG.CompositePodGroup
 			} else {
 				gotFound = false
 			}

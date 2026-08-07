@@ -327,7 +327,12 @@ func TestQueuedPodGroupInfoOrdering(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pg := st.MakePodGroup().Namespace("default").Name("pg1").Obj()
-			pgqi := newQueuedPodGroupInfo(pg)
+			pgqi := &QueuedPodGroupInfo{
+				PodGroupInfo: &PodGroupInfo{
+					GenericPodGroup: NewGenericPodGroup(pg),
+				},
+				QueuedPodInfos: make(map[fwk.EntityKey][]*QueuedPodInfo),
+			}
 			for _, p := range tt.podsToAdd {
 				pgqi.AddPod(p)
 			}

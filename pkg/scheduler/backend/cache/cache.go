@@ -351,11 +351,11 @@ func (cache *cacheImpl) updateCompositePodGroupStateSnapshot(snapshot *Snapshot)
 		}
 	}
 	// Clone only pod group states that changed since the last snapshot.
-	for key, cpgState := range cache.compositePodGroupStates {
-		if existing, ok := snapshot.compositePodGroupStates[key]; ok && existing.generation == cpgState.generation {
+	for key, cpgs := range cache.compositePodGroupStates {
+		if existing, ok := snapshot.compositePodGroupStates[key]; ok && existing.generation == cpgs.generation {
 			continue
 		}
-		snapshot.compositePodGroupStates[key] = cpgState.snapshot()
+		snapshot.compositePodGroupStates[key] = cpgs.snapshot()
 	}
 }
 
@@ -1127,27 +1127,27 @@ func (cache *cacheImpl) applyPVCRefCountDelta(snapshot *Snapshot) error {
 
 // AddGenericPodGroup adds an generic pod group object to the cache,
 // and links it to its parent composite pod group if one is specified.
-func (cache *cacheImpl) AddGenericPodGroup(apg *framework.GenericPodGroup) {
+func (cache *cacheImpl) AddGenericPodGroup(gpg *framework.GenericPodGroup) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
-	key := apg.GetKey()
+	key := gpg.GetKey()
 
-	switch apg.GetType() {
+	switch gpg.GetType() {
 	case fwk.PodGroupKeyType:
 		pgs, exists := cache.podGroupStates[key]
 		if !exists {
 			pgs = newPodGroupState()
 			cache.podGroupStates[key] = pgs
 		}
-		pgs.setPodGroup(apg.PodGroup)
+		pgs.setPodGroup(gpg.PodGroup)
 	case fwk.CompositePodGroupKeyType:
-		cpgState, exists := cache.compositePodGroupStates[key]
+		cpgs, exists := cache.compositePodGroupStates[key]
 		if !exists {
-			cpgState = newCompositePodGroupState()
-			cache.compositePodGroupStates[key] = cpgState
+			cpgs = newCompositePodGroupState()
+			cache.compositePodGroupStates[key] = cpgs
 		}
-		cpgState.setCompositePodGroup(apg.CompositePodGroup)
+		cpgs.setCompositePodGroup(gpg.CompositePodGroup)
 	}
 
 	// Both PodGroups and CompositePodGroups can specify a parent CompositePodGroup.
@@ -1156,7 +1156,7 @@ func (cache *cacheImpl) AddGenericPodGroup(apg *framework.GenericPodGroup) {
 	if !cache.compositePodGroupEnabled {
 		return
 	}
-	parentKey, hasParent := apg.GetParentKey()
+	parentKey, hasParent := gpg.GetParentKey()
 	if !hasParent {
 		return
 	}
@@ -1170,41 +1170,42 @@ func (cache *cacheImpl) AddGenericPodGroup(apg *framework.GenericPodGroup) {
 }
 
 // UpdateGenericPodGroup updates an existing generic pod group object in the cache.
-func (cache *cacheImpl) UpdateGenericPodGroup(logger klog.Logger, apg *framework.GenericPodGroup) {
+func (cache *cacheImpl) UpdateGenericPodGroup(logger klog.Logger, gpg *framework.GenericPodGroup) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
-	key := apg.GetKey()
+	key := gpg.GetKey()
 
-	switch apg.GetType() {
+	switch gpg.GetType() {
 	case fwk.PodGroupKeyType:
 		pgs, exists := cache.podGroupStates[key]
 		if !exists {
 			// This should not happen: the pod group state should have been already created by a prior add action.
-			utilruntime.HandleErrorWithLogger(logger, nil, "Pod group state not found for update, this indicates a missed add event", "podGroup", klog.KObj(apg))
+			utilruntime.HandleErrorWithLogger(logger, nil, "Pod group state not found for update, this indicates a missed add event", "podGroup", klog.KObj(gpg))
 			return
 		}
-		pgs.setPodGroup(apg.PodGroup)
+		pgs.setPodGroup(gpg.PodGroup)
 	case fwk.CompositePodGroupKeyType:
-		cpgState, exists := cache.compositePodGroupStates[key]
+		cpgs, exists := cache.compositePodGroupStates[key]
 		if !exists {
-			utilruntime.HandleErrorWithLogger(logger, nil, "Composite pod group state not found for update, this indicates a missed add event", "compositePodGroup", klog.KObj(apg))
+			// This should not happen: the composite pod group state should have been already created by a prior add action.
+			utilruntime.HandleErrorWithLogger(logger, nil, "Composite pod group state not found for update, this indicates a missed add event", "compositePodGroup", klog.KObj(gpg))
 			return
 		}
-		cpgState.setCompositePodGroup(apg.CompositePodGroup)
+		cpgs.setCompositePodGroup(gpg.CompositePodGroup)
 	}
 }
 
 // RemoveGenericPodGroup removes an generic pod group object from the cache.
-func (cache *cacheImpl) RemoveGenericPodGroup(logger klog.Logger, apg *framework.GenericPodGroup) {
+func (cache *cacheImpl) RemoveGenericPodGroup(logger klog.Logger, gpg *framework.GenericPodGroup) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
-	key := apg.GetKey()
+	key := gpg.GetKey()
 
 	// Remove this group from its parent's child tracking if composite pod groups are enabled.
 	if cache.compositePodGroupEnabled {
-		if parentKey, hasParent := apg.GetParentKey(); hasParent {
+		if parentKey, hasParent := gpg.GetParentKey(); hasParent {
 			if parent, exists := cache.compositePodGroupStates[parentKey]; exists {
 				parent.removeChild(key)
 				if parent.empty() {
@@ -1215,11 +1216,11 @@ func (cache *cacheImpl) RemoveGenericPodGroup(logger klog.Logger, apg *framework
 		}
 	}
 
-	switch apg.GetType() {
+	switch gpg.GetType() {
 	case fwk.PodGroupKeyType:
 		pgs, exists := cache.podGroupStates[key]
 		if !exists {
-			utilruntime.HandleErrorWithLogger(logger, nil, "Pod group state not found for removal", "podGroup", klog.KObj(apg))
+			utilruntime.HandleErrorWithLogger(logger, nil, "Pod group state not found for removal", "podGroup", klog.KObj(gpg))
 			return
 		}
 		pgs.removePodGroup()
@@ -1229,7 +1230,7 @@ func (cache *cacheImpl) RemoveGenericPodGroup(logger klog.Logger, apg *framework
 	case fwk.CompositePodGroupKeyType:
 		cpgs, exists := cache.compositePodGroupStates[key]
 		if !exists {
-			utilruntime.HandleErrorWithLogger(logger, nil, "Composite pod group state not found for removal", "compositePodGroup", klog.KObj(apg))
+			utilruntime.HandleErrorWithLogger(logger, nil, "Composite pod group state not found for removal", "compositePodGroup", klog.KObj(gpg))
 			return
 		}
 		cpgs.removeCompositePodGroup()
