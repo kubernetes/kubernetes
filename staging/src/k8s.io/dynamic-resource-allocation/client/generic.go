@@ -360,7 +360,10 @@ func (w *watchSomething[NP, N, OP]) run() {
 		select {
 		case w.resultChan <- e:
 		case <-w.stopChan:
-			break
+			// Return rather than break: a break would only leave the select and
+			// the loop would keep draining the upstream watch. Returning runs the
+			// deferred close(w.resultChan), which is what consumers wait for.
+			return
 		}
 	}
 }
