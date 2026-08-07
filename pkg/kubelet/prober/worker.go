@@ -44,12 +44,17 @@ type worker struct {
 	// Channel for triggering the probe manually.
 	manualTriggerCh chan struct{}
 
-	// cancelMu guards cancel. cancel is set once by run() before the probe
-	// loop starts, and read by stop() to cancel a probe that is currently
-	// in flight; the mutex protects against stop() being called concurrently
-	// with (or before) that initial assignment.
+	// cancelMu guards cancel and stopped. cancel is set once by run() before
+	// the probe loop starts, and read by stop() to cancel a probe that is
+	// currently in flight. stopped is set by stop() and read by run(); it
+	// covers the case where stop() runs before run() has set cancel (e.g.
+	// RemovePod immediately following AddPod), so run() knows not to start
+	// probing a container that is already being torn down. The mutex
+	// protects against stop() being called concurrently with (or before)
+	// run()'s initial assignment.
 	cancelMu sync.Mutex
 	cancel   context.CancelFunc
+	stopped  bool
 
 	// The pod containing this probe (read-only)
 	pod *v1.Pod
@@ -173,23 +178,12 @@ func (w *worker) run(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 	w.cancelMu.Lock()
 	w.cancel = cancel
+	stopped := w.stopped
 	w.cancelMu.Unlock()
 	defer cancel()
 
-	probeTickerPeriod := time.Duration(w.spec.PeriodSeconds) * time.Second
-
-	// If kubelet restarted the probes could be started in rapid succession.
-	// Let the worker wait for a random portion of tickerPeriod before probing.
-	// Do it only if the kubelet has started recently.
-	if probeTickerPeriod > time.Since(w.probeManager.start) {
-		time.Sleep(time.Duration(rand.Float64() * float64(probeTickerPeriod)))
-	}
-
-	probeTicker := time.NewTicker(probeTickerPeriod)
-
 	defer func() {
 		// Clean up.
-		probeTicker.Stop()
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Remove(w.containerID)
 		}
@@ -201,6 +195,37 @@ func (w *worker) run(ctx context.Context) {
 		ProberDuration.Delete(w.proberDurationSuccessfulMetricLabels)
 		ProberDuration.Delete(w.proberDurationUnknownMetricLabels)
 	}()
+
+	if stopped {
+		// stop() already ran before we could install w.cancel above (e.g.
+		// RemovePod immediately following AddPod). There's nothing in
+		// flight to cancel, and nothing left to probe.
+		return
+	}
+
+	probeTickerPeriod := time.Duration(w.spec.PeriodSeconds) * time.Second
+
+	// If kubelet restarted the probes could be started in rapid succession.
+	// Let the worker wait for a random portion of tickerPeriod before probing.
+	// Do it only if the kubelet has started recently. The wait is done via
+	// select rather than time.Sleep so that stop() can end it promptly
+	// instead of leaving the worker (and the probe it's about to run) stuck
+	// here for up to probeTickerPeriod.
+	if probeTickerPeriod > time.Since(w.probeManager.start) {
+		jitter := time.NewTimer(time.Duration(rand.Float64() * float64(probeTickerPeriod)))
+		select {
+		case <-jitter.C:
+		case <-w.stopCh:
+			jitter.Stop()
+			return
+		case <-ctx.Done():
+			jitter.Stop()
+			return
+		}
+	}
+
+	probeTicker := time.NewTicker(probeTickerPeriod)
+	defer probeTicker.Stop()
 
 probeLoop:
 	for w.doProbe(ctx) {
@@ -230,10 +255,10 @@ func (w *worker) stop() {
 
 	// Cancel a probe that may currently be in flight, so it doesn't keep
 	// running against a container that is being torn down. cancel is nil
-	// if run() hasn't started yet; in that case there's nothing in flight
-	// to cancel, and run() will observe stopCh (or ctx cancellation, once
-	// it derives it) as usual.
+	// if run() hasn't started yet; in that case set stopped so run() knows,
+	// once it does start, not to begin probing at all.
 	w.cancelMu.Lock()
+	w.stopped = true
 	cancel := w.cancel
 	w.cancelMu.Unlock()
 	if cancel != nil {

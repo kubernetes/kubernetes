@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -39,6 +40,7 @@ import (
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/exec"
 )
 
 func init() {
@@ -1221,5 +1223,102 @@ func TestWorkerStopCancelsInFlightExecProbe(t *testing.T) {
 	// and ran its cleanup, rather than e.g. panicking past it).
 	if _, ok := m.readinessManager.Get(w.containerID); ok {
 		t.Error("expected the result to have been removed by run()'s cleanup after the worker stopped")
+	}
+}
+
+// countingExecProber wraps fakeExecProber and counts how many times Probe is
+// called, so tests can assert a container was never probed at all.
+type countingExecProber struct {
+	fakeExecProber
+	calls int32
+}
+
+func (p *countingExecProber) Probe(c exec.Cmd) (probe.Result, string, error) {
+	atomic.AddInt32(&p.calls, 1)
+	return p.fakeExecProber.Probe(c)
+}
+
+// TestWorkerStopBeforeRunPreventsProbing covers the race where stop() is
+// called before run() has had a chance to install w.cancel, e.g. RemovePod
+// immediately following AddPod. Before the fix, w.cancel was still nil when
+// stop() ran, so stop() had nothing to cancel; run() then went on to install
+// a fresh, uncancelled context and probe the container anyway.
+func TestWorkerStopBeforeRunPreventsProbing(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+
+	prober := &countingExecProber{fakeExecProber: fakeExecProber{probe.Success, nil}}
+	m.prober.exec = prober
+
+	w := newTestWorker(m, readiness, v1.Probe{})
+	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatusWithStarted(true))
+	key := probeKey{w.pod.UID, w.container.Name, w.probeType}
+	m.workers[key] = w
+
+	// Simulate RemovePod immediately following AddPod: stop() runs before
+	// run() is ever scheduled.
+	w.stop()
+
+	runDone := make(chan struct{})
+	go func() {
+		defer close(runDone)
+		w.run(ctx)
+	}()
+
+	select {
+	case <-runDone:
+	case <-time.After(10 * time.Second):
+		t.Fatal("run() did not return after stop() was called before it started")
+	}
+
+	if calls := atomic.LoadInt32(&prober.calls); calls != 0 {
+		t.Errorf("expected the container to never be probed, but the prober was called %d time(s)", calls)
+	}
+	if err := waitForWorkerExit(t, m, []probeKey{key}); err != nil {
+		t.Fatalf("error waiting for worker exit: %v", err)
+	}
+}
+
+// TestWorkerStopDuringInitialJitterIsPrompt covers run()'s random startup
+// jitter wait (used to spread out probes after a kubelet restart): before
+// the fix it used time.Sleep, which ignores context cancellation and can
+// block worker shutdown for up to PeriodSeconds. A large PeriodSeconds here
+// makes that delay obvious if the fix regresses.
+func TestWorkerStopDuringInitialJitterIsPrompt(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+
+	w := newTestWorker(m, readiness, v1.Probe{PeriodSeconds: 300})
+	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatusWithStarted(true))
+
+	runDone := make(chan struct{})
+	go func() {
+		defer close(runDone)
+		w.run(ctx)
+	}()
+
+	// Wait for run() to have installed w.cancel before stopping it, so this
+	// test exercises the jitter-wait cancellation path specifically, rather
+	// than the earlier "stop() arrived before cancel was installed" path
+	// already covered by TestWorkerStopBeforeRunPreventsProbing.
+	cancelInstalled := func() (bool, error) {
+		w.cancelMu.Lock()
+		defer w.cancelMu.Unlock()
+		return w.cancel != nil, nil
+	}
+	if err := wait.Poll(time.Millisecond, wait.ForeverTestTimeout, cancelInstalled); err != nil {
+		t.Fatalf("run() never installed w.cancel: %v", err)
+	}
+
+	stopStart := time.Now()
+	w.stop()
+
+	select {
+	case <-runDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("worker did not exit while stopped during its initial jitter wait")
+	}
+	if elapsed := time.Since(stopStart); elapsed > 2*time.Second {
+		t.Errorf("worker took %v to stop during its initial jitter wait; expected prompt cancellation instead of waiting out PeriodSeconds", elapsed)
 	}
 }
