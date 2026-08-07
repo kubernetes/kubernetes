@@ -803,17 +803,7 @@ func NewMainKubelet(ctx context.Context,
 	}
 
 	klet.runner = kubecontainer.NewCommandRunner(kubeDeps.RemoteRuntimeService)
-	if kubeDeps.ProbeManager != nil {
-		klet.probeManager = kubeDeps.ProbeManager
-	} else {
-		klet.probeManager = prober.NewManager(
-			klet.statusManager,
-			klet.livenessManager,
-			klet.readinessManager,
-			klet.startupManager,
-			klet.runner,
-			kubeDeps.Recorder)
-	}
+	klet.probeManager = newProbeManager(ctx, klet, kubeDeps)
 
 	runtime, postImageGCHooks, err := kuberuntime.NewKubeGenericRuntimeManager(
 		ctx,
@@ -1210,6 +1200,31 @@ func NewMainKubelet(ctx context.Context,
 
 type serviceLister interface {
 	List(labels.Selector) ([]*v1.Service, error)
+}
+
+// newProbeManager selects the probe manager based on the ContainerScopedProbes gate.
+func newProbeManager(ctx context.Context, klet *Kubelet, kubeDeps *Dependencies) prober.Manager {
+	if kubeDeps.ProbeManager != nil {
+		return kubeDeps.ProbeManager
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerScopedProbes) {
+		return prober.NewContainerBoundManager(
+			ctx,
+			klet.livenessManager,
+			klet.readinessManager,
+			klet.startupManager,
+			klet.runner,
+			kubeDeps.Recorder)
+	}
+
+	return prober.NewManager(
+		klet.statusManager,
+		klet.livenessManager,
+		klet.readinessManager,
+		klet.startupManager,
+		klet.runner,
+		kubeDeps.Recorder)
 }
 
 // Kubelet is the main kubelet implementation.
