@@ -171,6 +171,16 @@ const (
 	// Enable a single container to restart even if the pod has restart policy "Never".
 	ContainerRestartRules featuregate.Feature = "ContainerRestartRules"
 
+	// owner: @troychiu
+	//
+	// Binds the probe lifecycle to the container lifecycle: probe workers are
+	// started when a container starts and stopped when it is killed or observed
+	// dead, and each worker is bound to a single container instance for its
+	// whole life. Replaces the status-manager polling in the probe worker and
+	// the wall-clock heuristics used to reconstruct probe state after a kubelet
+	// restart. See https://github.com/kubernetes/kubernetes/issues/139865.
+	ContainerScopedProbes featuregate.Feature = "ContainerScopedProbes"
+
 	// owner: @sreeram-venkitesh
 	//
 	// Enables configuring custom stop signals for containers from container lifecycle
@@ -1440,6 +1450,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	ContainerScopedProbes: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	ContainerStopSignals: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2573,6 +2587,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	ContainerCheckpoint: {},
 
 	ContainerRestartRules: {},
+
+	ContainerScopedProbes: {},
 
 	ContainerStopSignals: {},
 
