@@ -117,10 +117,11 @@ func signerFromRSAPrivateKey(keyPair *rsa.PrivateKey) (jose.Signer, error) {
 		return nil, fmt.Errorf("failed to derive keyID: %v", err)
 	}
 
-	// IMPORTANT: If this function is updated to support additional key sizes,
-	// algorithmForPublicKey in serviceaccount/openidmetadata.go and
-	// validateJWTHeader in externaljwt/pkg/plugin/plugin.go must also
-	// be updated to support the same key sizes. Today we only support RS256.
+	// IMPORTANT: The RSA algorithms listed below must be kept in sync with:
+	// - pkg/serviceaccount/externaljwt/plugin/plugin.go validateJWTHeader
+	// - pkg/serviceaccount/jwt.go signerFromRSAPrivateKey
+	// - pkg/serviceaccount/jwt.go signerFromECDSAPrivateKey
+	// - test/images/agnhost/openidmetadata/openidmetadata.go validate SupportedSigningAlgs
 
 	// Wrap the RSA keypair in a JOSE JWK with the designated key ID.
 	privateJWK := &jose.JSONWebKey{
@@ -148,9 +149,11 @@ func signerFromRSAPrivateKey(keyPair *rsa.PrivateKey) (jose.Signer, error) {
 func signerFromECDSAPrivateKey(keyPair *ecdsa.PrivateKey) (jose.Signer, error) {
 	var alg jose.SignatureAlgorithm
 
-	// IMPORTANT: If this function is updated to support additional algorithms,
-	// validateJWTHeader in externaljwt/pkg/plugin/plugin.go must also be updated
-	// to support the same Algorithms. Today we only support "ES256", "ES384", "ES512".
+	// IMPORTANT: The EC algorithms listed below must be kept in sync with:
+	// - pkg/serviceaccount/externaljwt/plugin/plugin.go validateJWTHeader
+	// - pkg/serviceaccount/jwt.go signerFromRSAPrivateKey
+	// - pkg/serviceaccount/jwt.go signerFromECDSAPrivateKey
+	// - test/images/agnhost/openidmetadata/openidmetadata.go validate SupportedSigningAlgs
 
 	switch keyPair.Curve {
 	case elliptic.P256():
