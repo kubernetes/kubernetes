@@ -753,6 +753,34 @@ func runStaticPolicyTestCaseWithFeatureGate(t *testing.T, testCase staticPolicyT
 	runStaticPolicyTestCase(t, testCase)
 }
 
+func TestStaticPolicyAllocatePreservesSharedCPU(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	policy, err := NewStaticPolicy(
+		logger,
+		topoSingleSocketHT,
+		1,
+		cpuset.New(0),
+		topologymanager.NewFakeManager(logger),
+		map[string]string{StrictCPUReservationOption: "true"},
+	)
+	require.NoError(t, err)
+
+	sharedCPUs := cpuset.New(1, 2, 3, 4, 5, 6, 7)
+	sharedCPUCount := sharedCPUs.Size()
+	st := &mockState{
+		assignments:   state.ContainerCPUAssignments{},
+		defaultCPUSet: sharedCPUs,
+	}
+	pod := makePod("testPod", "testContainer", "7000m", "7000m")
+	container := &pod.Spec.Containers[0]
+
+	err = policy.Allocate(logger, st, pod, container, lifecycle.AddOperation)
+	require.EqualError(t, err, fmt.Sprintf("refusing to allocate %d exclusive CPUs because it would leave the shared CPU pool empty", sharedCPUCount))
+	require.True(t, st.GetDefaultCPUSet().Equals(sharedCPUs), "default CPUSet changed after rejected allocation")
+	_, assigned := st.GetCPUSet(string(pod.UID), container.Name)
+	require.False(t, assigned, "container received CPUs after rejected allocation")
+}
+
 func TestStaticPolicyAllocateRecordsBaseline(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, true)
 
