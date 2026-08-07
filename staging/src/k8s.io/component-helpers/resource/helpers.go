@@ -175,7 +175,12 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 func applyPodLevelResources(result, effectiveResources v1.ResourceList) {
 	for resourceName, quantity := range effectiveResources {
 		if IsSupportedPodLevelResource(resourceName) {
-			result[resourceName] = quantity
+			// DeepCopy is required because a Quantity holds a *inf.Dec for values
+			// that do not fit the int64 fast path (for example 1.5Gi). Storing the
+			// value directly would make the returned list share that pointer with
+			// pod.Spec.Resources, so later arithmetic on the result - such as the
+			// pod overhead accumulation below - would mutate the caller's Pod.
+			result[resourceName] = quantity.DeepCopy()
 		}
 	}
 }
