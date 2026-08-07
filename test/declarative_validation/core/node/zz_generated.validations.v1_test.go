@@ -61,6 +61,9 @@ func init() {
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"spec.podCIDRs": {
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
+			},
 			"spec.podPreemptionPolicy": {
 				{ErrorType: "FieldValueForbidden"},
 			},

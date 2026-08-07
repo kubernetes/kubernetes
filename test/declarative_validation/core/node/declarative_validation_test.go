@@ -197,6 +197,51 @@ func testDeclarativeValidateNodeUpdate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec", "providerID"), nil, "field cannot be cleared once set").WithOrigin("update").MarkAlpha(),
 			},
 		},
+		"no change with podCIDRs": {
+			old: mkValidNode(func(n *core.Node) {
+				n.Spec.PodCIDRs = []string{"10.0.0.0/24"}
+			}),
+			update: mkValidNode(func(n *core.Node) {
+				n.Spec.PodCIDRs = []string{"10.0.0.0/24"}
+			}),
+		},
+		"set podCIDRs from empty": {
+			old: mkValidNode(),
+			update: mkValidNode(func(n *core.Node) {
+				n.Spec.PodCIDRs = []string{"10.0.0.0/24"}
+			}),
+		},
+		"clear podCIDRs": {
+			old: mkValidNode(func(n *core.Node) {
+				n.Spec.PodCIDRs = []string{"10.0.0.0/24"}
+			}),
+			update: mkValidNode(),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podCIDRs"), nil, "field cannot be cleared once set").WithOrigin("update").MarkAlpha(),
+			},
+		},
+		// Modification of an assigned podCIDRs is still hand-written only:
+		// +k8s:update=NoModify is rejected on list fields.
+		"modify podCIDRs": {
+			old: mkValidNode(func(n *core.Node) {
+				n.Spec.PodCIDRs = []string{"10.0.0.0/24"}
+			}),
+			update: mkValidNode(func(n *core.Node) {
+				n.Spec.PodCIDRs = []string{"10.0.1.0/24"}
+			}),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "podCIDRs"), "node updates may not change podCIDR except from \"\" to valid").MarkFromImperative(),
+			},
+		},
+		"clear dual-stack podCIDRs": {
+			old: mkValidNode(func(n *core.Node) {
+				n.Spec.PodCIDRs = []string{"10.0.0.0/24", "fd00::/64"}
+			}),
+			update: mkValidNode(),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podCIDRs"), nil, "field cannot be cleared once set").WithOrigin("update").MarkAlpha(),
+			},
+		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
