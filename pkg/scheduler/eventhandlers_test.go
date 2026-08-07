@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	dyfake "k8s.io/client-go/dynamic/fake"
@@ -899,13 +900,28 @@ func TestUpdatePod(t *testing.T) {
 
 	scheduledPodOtherNode := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node2").SchedulerName("supported-scheduler").Obj()
 
+	// Pods sharing the name of the fixtures above, but with a different UID. They
+	// stand for a Pod that was deleted and recreated under the same name, which the
+	// informer can deliver as a single update event instead of a delete and an add.
+	recreatedPod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod2").ResourceVersion("2").SchedulerName("supported-scheduler").Obj()
+	recreatedScheduledPod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod2").ResourceVersion("2").Node("node1").SchedulerName("supported-scheduler").Obj()
+	recreatedScheduledPodOtherNode := st.MakePod().Name("pod1").Namespace("ns1").UID("pod2").ResourceVersion("2").Node("node2").SchedulerName("supported-scheduler").Obj()
+
+	unscheduledPodGroupMember := st.MakePod().Name("pod1").Namespace("ns1").UID("pgpod1").SchedulerName("supported-scheduler").PodGroupName("pg1").Obj()
+	scheduledPodGroupMember := st.MakePod().Name("pod1").Namespace("ns1").UID("pgpod1").Node("node1").SchedulerName("supported-scheduler").PodGroupName("pg1").Obj()
+	recreatedUnscheduledPodGroupMember := st.MakePod().Name("pod1").Namespace("ns1").UID("pgpod2").ResourceVersion("2").SchedulerName("supported-scheduler").PodGroupName("pg1").Obj()
+
 	tests := []struct {
-		name          string
-		oldPod        *v1.Pod
-		assumedPod    *v1.Pod
-		newPod        *v1.Pod
-		expectInQueue *v1.Pod
-		expectInCache *v1.Pod
+		name                             string
+		oldPod                           *v1.Pod
+		assumedPod                       *v1.Pod
+		newPod                           *v1.Pod
+		genericWorkloadEnabled           bool
+		waitingOnPermit                  bool
+		expectInQueue                    *v1.Pod
+		expectInActiveQ                  bool
+		expectInCache                    *v1.Pod
+		expectInPodGroupStateUnscheduled bool
 	}{
 		{
 			name:          "update unscheduled pod",
@@ -969,6 +985,57 @@ func TestUpdatePod(t *testing.T) {
 			assumedPod: scheduledPod,
 			newPod:     podWithDeletionTimestamp,
 		},
+		{
+			name:            "recreated pod with a different UID, not scheduled yet",
+			oldPod:          scheduledPod,
+			newPod:          recreatedPod,
+			expectInQueue:   recreatedPod,
+			expectInActiveQ: true,
+		},
+		{
+			name:          "recreated pod with a different UID, scheduled to a different node",
+			oldPod:        scheduledPod,
+			newPod:        recreatedScheduledPodOtherNode,
+			expectInCache: recreatedScheduledPodOtherNode,
+		},
+		{
+			name:          "recreated pod with a different UID, scheduled to the same node",
+			oldPod:        scheduledPod,
+			newPod:        recreatedScheduledPod,
+			expectInCache: recreatedScheduledPod,
+		},
+		{
+			name:            "recreated unscheduled pod with a different UID",
+			oldPod:          pod,
+			newPod:          recreatedPod,
+			expectInQueue:   recreatedPod,
+			expectInActiveQ: true,
+		},
+		{
+			name:            "recreated pod with a different UID while the previous one waits on permit",
+			oldPod:          pod,
+			assumedPod:      scheduledPod,
+			newPod:          recreatedPod,
+			waitingOnPermit: true,
+			expectInQueue:   recreatedPod,
+			expectInActiveQ: true,
+		},
+		{
+			name:                             "recreated unscheduled pod group member with a different UID",
+			oldPod:                           unscheduledPodGroupMember,
+			newPod:                           recreatedUnscheduledPodGroupMember,
+			genericWorkloadEnabled:           true,
+			expectInQueue:                    recreatedUnscheduledPodGroupMember,
+			expectInPodGroupStateUnscheduled: true,
+		},
+		{
+			name:                             "recreated scheduled pod group member with a different UID, not scheduled yet",
+			oldPod:                           scheduledPodGroupMember,
+			newPod:                           recreatedUnscheduledPodGroupMember,
+			genericWorkloadEnabled:           true,
+			expectInQueue:                    recreatedUnscheduledPodGroupMember,
+			expectInPodGroupStateUnscheduled: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -991,7 +1058,7 @@ func TestUpdatePod(t *testing.T) {
 				t.Fatalf("Failed to create framework: %v", err)
 			}
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, nil, false),
+				Cache:           internalcache.New(ctx, nil, tt.genericWorkloadEnabled),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 				Profiles: profile.Map{
@@ -999,16 +1066,51 @@ func TestUpdatePod(t *testing.T) {
 				},
 			}
 
+			var waitOnPermitDone chan struct{}
 			if tt.assumedPod != nil {
+				if tt.oldPod.Spec.SchedulingGroup != nil {
+					sched.Cache.AddPodGroupMember(tt.oldPod)
+				}
 				err := sched.Cache.AssumePod(logger, tt.assumedPod)
 				if err != nil {
 					t.Fatalf("Failed to assume pod: %v", err)
+				}
+				if tt.waitingOnPermit {
+					waitOnPermitDone = make(chan struct{})
+					schedFramework.AddWaitingPod(tt.assumedPod, nil)
+					go func() {
+						defer close(waitOnPermitDone)
+						schedFramework.WaitOnPermit(ctx, tt.assumedPod)
+					}()
 				}
 			} else {
 				sched.addPod(tt.oldPod)
 			}
 
 			sched.updatePod(tt.oldPod, tt.newPod)
+
+			if tt.waitingOnPermit {
+				err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, 1*time.Second, true, func(ctx context.Context) (bool, error) {
+					return schedFramework.GetWaitingPod(tt.assumedPod.UID) == nil, nil
+				})
+				if err != nil {
+					t.Errorf("Expected pod %v to be removed from waiting pods", tt.assumedPod.UID)
+				}
+				select {
+				case <-waitOnPermitDone:
+				case <-time.After(wait.ForeverTestTimeout):
+					t.Fatalf("timeout on WaitOnPermit %v", tt.assumedPod.UID)
+				}
+			}
+
+			// A Pod that was rejected on Permit is deliberately left in the cache by
+			// handleAssumedPodDeletion: its binding cycle unwinds through
+			// handleBindingCycleError on the binding goroutine, which this test does not run.
+			if tt.oldPod.UID != tt.newPod.UID && !tt.waitingOnPermit {
+				if oldCached, err := sched.Cache.GetPod(tt.oldPod); err == nil {
+					t.Errorf("Expected pod UID %v to be evicted from cache, but it is still there", oldCached.UID)
+				}
+			}
 
 			qPod, ok := sched.SchedulingQueue.GetPod(tt.newPod.Name, tt.newPod.Namespace)
 			if tt.expectInQueue != nil {
@@ -1020,6 +1122,18 @@ func TestUpdatePod(t *testing.T) {
 			} else if ok {
 				t.Errorf("Expected pod not to be in scheduling queue")
 			}
+			if tt.expectInActiveQ {
+				var found bool
+				for _, p := range sched.SchedulingQueue.PodsInActiveQ() {
+					if p.UID == tt.newPod.UID {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("Expected pod %v to be in activeQ", tt.newPod.UID)
+				}
+			}
 			pod, err := sched.Cache.GetPod(tt.newPod)
 			if tt.expectInCache != nil {
 				if err != nil {
@@ -1029,6 +1143,21 @@ func TestUpdatePod(t *testing.T) {
 				}
 			} else if err == nil {
 				t.Errorf("Expected pod not to be in cache")
+			}
+			if tt.newPod.Spec.SchedulingGroup == nil || !tt.genericWorkloadEnabled {
+				return
+			}
+			pgs, err := sched.Cache.PodGroupStates().Get(tt.oldPod.Namespace, *tt.oldPod.Spec.SchedulingGroup.PodGroupName)
+			if err != nil {
+				t.Fatalf("Expected pod group state to exist, got error: %v", err)
+			}
+
+			if tt.oldPod.UID != tt.newPod.UID && pgs.AllPods().Has(tt.oldPod.UID) {
+				t.Errorf("Expected pod UID %v to be dropped from the pod group state, but it is still there", tt.oldPod.UID)
+			}
+
+			if inUnscheduled := pgs.UnscheduledPods()[tt.newPod.Name] != nil; inUnscheduled != tt.expectInPodGroupStateUnscheduled {
+				t.Errorf("pod in UnscheduledPods of PodGroupState: got %v, want %v", inUnscheduled, tt.expectInPodGroupStateUnscheduled)
 			}
 		})
 	}
