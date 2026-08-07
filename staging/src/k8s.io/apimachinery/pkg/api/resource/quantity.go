@@ -451,12 +451,27 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 	switch format {
 	case DecimalExponent, DecimalSI:
 		number, exponent := q.AsCanonicalBytes(out)
-		suffix, _ := quantitySuffixer.constructBytes(10, exponent, format)
+		suffix, ok := quantitySuffixer.constructBytes(10, exponent, format)
+		if !ok {
+			// The magnitude is outside the range covered by the decimal SI
+			// suffixes (which stop at E, 10^18). Returning the mantissa without a
+			// suffix would silently change the value, so fall back to the
+			// exponent form, which can represent any magnitude.
+			suffix, _ = quantitySuffixer.constructBytes(10, exponent, DecimalExponent)
+		}
 		return number, suffix
 	default:
 		// format must be BinarySI
 		number, exponent := rounded.AsCanonicalBase1024Bytes(out)
-		suffix, _ := quantitySuffixer.constructBytes(2, exponent*10, format)
+		suffix, ok := quantitySuffixer.constructBytes(2, exponent*10, format)
+		if !ok {
+			// The magnitude is outside the range covered by the binary suffixes
+			// (which stop at Ei, 2^60). Fall back to the decimal exponent form
+			// rather than emitting a mantissa whose scale has been dropped.
+			decNumber, decExponent := q.AsCanonicalBytes(out)
+			decSuffix, _ := quantitySuffixer.constructBytes(10, decExponent, DecimalExponent)
+			return decNumber, decSuffix
+		}
 		return number, suffix
 	}
 }
