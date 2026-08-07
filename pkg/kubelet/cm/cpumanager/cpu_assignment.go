@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"maps"
 	"math"
+	"slices"
 	"sort"
 
 	"k8s.io/klog/v2"
@@ -1080,8 +1081,12 @@ func takeByTopologyNUMADistributed(logger klog.Logger, topo *topology.CPUTopolog
 
 			if isBetter {
 				bestBalance = bestLocalBalance
-				bestRemainder = bestLocalRemainder
-				bestCombo = combo
+				// Deep copy to avoid slice reference bug.
+				// iterateCombinations reuses the same underlying array for different subsets.
+				// Without deep copy, bestLocalRemainder and bestCombo would reference the same array
+				// as bestLocalRemainder/combo, causing them to be overwritten in subsequent iterations.
+				bestRemainder = slices.Clone(bestLocalRemainder)
+				bestCombo = slices.Clone(combo)
 				if alignBySocket {
 					bestBalanceInOneSocket = inSameSocket
 				}
