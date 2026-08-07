@@ -47,7 +47,7 @@ func TestWatchSomethingStopTerminatesRun(t *testing.T) {
 	const queued = 5
 
 	upstream := &stalledWatch{ch: make(chan watch.Event, queued)}
-	for i := 0; i < queued; i++ {
+	for range queued {
 		upstream.ch <- watch.Event{
 			Type:   watch.Added,
 			Object: &resourcev1.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "slice"}},
