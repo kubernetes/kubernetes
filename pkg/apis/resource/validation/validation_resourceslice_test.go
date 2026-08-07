@@ -1526,6 +1526,23 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 		},
+		"negative-counter-consumes-counter": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters").Key("memory").Child("value"), "-1Gi", "must be greater than or equal to 0"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
+					{
+						CounterSet: "counterset-0",
+						Counters: map[string]resourceapi.Counter{
+							"memory": {Value: resource.MustParse("-1Gi")},
+						},
+					},
+				}
+				return slice
+			}(),
+		},
 		"max-device-counter-consumption-for-device": {
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
