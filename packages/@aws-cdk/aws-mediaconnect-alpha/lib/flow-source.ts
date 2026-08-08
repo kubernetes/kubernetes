@@ -91,7 +91,6 @@ export interface FlowSourceAttributes {
 
 /**
  * Shared base for both real and imported flow sources.
- * @internal
  */
 abstract class FlowSourceBase extends Resource implements IFlowSource {
   public abstract readonly flowSourceArn: string;

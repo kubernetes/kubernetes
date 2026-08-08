@@ -92,9 +92,9 @@ const flow = new mediaconnect.Flow(stack, 'RouterSourceFlow', {
   flowName: 'router-source-flow',
   availabilityZone: stack.availabilityZones[0],
   vpcInterfaces: [outputVpcInterface],
-  maintenance: {
-    maintenanceDay: mediaconnect.MaintenanceDay.FRIDAY,
-    maintenanceStartHour: '02:00',
+  maintenanceConfiguration: {
+    day: mediaconnect.MaintenanceDay.FRIDAY,
+    time: '02:00',
   },
   source: mediaconnect.SourceConfiguration.router({
     routerOutput: sourceRouterOutput,
@@ -106,12 +106,14 @@ const flow = new mediaconnect.Flow(stack, 'RouterSourceFlow', {
 });
 
 // Output 1: Router Output (flow → router input)
-const routerFlowOutput = flow.addOutput('RouterFlowOutput', mediaconnect.OutputConfiguration.router({
-  encryption: {
-    role: encryptionRole,
-    secret: encryptionSecret,
-  },
-}));
+const routerFlowOutput = flow.addOutput('RouterFlowOutput', {
+  output: mediaconnect.OutputConfiguration.router({
+    encryption: {
+      role: encryptionRole,
+      secret: encryptionSecret,
+    },
+  }),
+});
 
 const destRouterNI = new mediaconnect.RouterNetworkInterface(stack, 'DestRouterNI', {
   routerNetworkInterfaceName: 'dest-router-ni',
@@ -172,7 +174,7 @@ new mediaconnect.FlowOutput(stack, 'VpcOutput', {
   output: mediaconnect.OutputConfiguration.rist({
     destination: '10.0.1.100',
     port: 6000,
-    vpcInterfaceAttachment: outputVpcInterface,
+    vpcInterfaceAttachmentName: outputVpcInterface.name,
   }),
 });
 

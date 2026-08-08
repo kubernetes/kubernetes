@@ -502,12 +502,12 @@ test('MediaConnect flow with flowoutput on helper method', () => {
     ],
   });
 
-  flow.addOutput('monitoring-output',
-    OutputConfiguration.rtp({
+  flow.addOutput('monitoring-output', {
+    output: OutputConfiguration.rtp({
       destination: '198.51.100.100',
       port: 5004,
     }),
-  );
+  });
 
   Template.fromStack(stack).hasResourceProperties('AWS::MediaConnect::Flow', {
     Source: {
@@ -1048,9 +1048,9 @@ test('Flow name validation - valid name', () => {
 test('Flow with maintenance window', () => {
   new Flow(stack, 'flow', {
     flowName: 'maintenance-flow',
-    maintenance: {
-      maintenanceDay: MaintenanceDay.MONDAY,
-      maintenanceStartHour: '02:00',
+    maintenanceConfiguration: {
+      day: MaintenanceDay.MONDAY,
+      time: '02:00',
     },
     source: SourceConfiguration.rtp({
       flowSourceName: 'source',
@@ -1070,9 +1070,9 @@ test('Flow with maintenance window', () => {
 test('Flow maintenance time validation - invalid format', () => {
   expect(() => {
     new Flow(stack, 'flow', {
-      maintenance: {
-        maintenanceDay: MaintenanceDay.TUESDAY,
-        maintenanceStartHour: '02:30',
+      maintenanceConfiguration: {
+        day: MaintenanceDay.TUESDAY,
+        time: '02:30',
       },
       source: SourceConfiguration.rtp({
         flowSourceName: 'source',
@@ -1353,7 +1353,7 @@ test('fails - NDI output without NDI config on the flow', () => {
     }),
   });
 
-  expect(() => flow.addOutput('out', OutputConfiguration.ndi())).toThrow(/NDI outputs require ndiConfig/);
+  expect(() => flow.addOutput('out', { output: OutputConfiguration.ndi() })).toThrow(/NDI outputs require ndiConfig/);
 });
 
 test('fails - NDI output when ndiState is DISABLED', () => {
@@ -1367,7 +1367,7 @@ test('fails - NDI output when ndiState is DISABLED', () => {
     }),
   });
 
-  expect(() => flow.addOutput('out', OutputConfiguration.ndi())).toThrow(/NDI outputs require ndiConfig/);
+  expect(() => flow.addOutput('out', { output: OutputConfiguration.ndi() })).toThrow(/NDI outputs require ndiConfig/);
 });
 
 test('NDI output succeeds when ndiState is ENABLED', () => {
@@ -1381,10 +1381,12 @@ test('NDI output succeeds when ndiState is ENABLED', () => {
     }),
   });
 
-  flow.addOutput('out', OutputConfiguration.ndi({
-    ndiProgramName: 'program-1',
-    ndiSpeedHqQuality: 150,
-  }));
+  flow.addOutput('out', {
+    output: OutputConfiguration.ndi({
+      ndiProgramName: 'program-1',
+      ndiSpeedHqQuality: 150,
+    }),
+  });
 
   Template.fromStack(stack).hasResourceProperties('AWS::MediaConnect::FlowOutput', {
     Protocol: 'ndi-speed-hq',
@@ -1399,7 +1401,7 @@ test('NDI output on imported flow does not enforce ndiState (state unknown)', ()
   });
 
   // Imported flows have unknown ndi state, so addOutput passes synth — service catches mismatch at deploy.
-  expect(() => imported.addOutput('out', OutputConfiguration.ndi())).not.toThrow();
+  expect(() => imported.addOutput('out', { output: OutputConfiguration.ndi() })).not.toThrow();
 });
 
 test('fails - second NDI output on the same flow', () => {
@@ -1413,9 +1415,9 @@ test('fails - second NDI output on the same flow', () => {
     }),
   });
 
-  flow.addOutput('first', OutputConfiguration.ndi());
+  flow.addOutput('first', { output: OutputConfiguration.ndi() });
 
-  expect(() => flow.addOutput('second', OutputConfiguration.ndi())).toThrow(/maximum of 1 NDI output/);
+  expect(() => flow.addOutput('second', { output: OutputConfiguration.ndi() })).toThrow(/maximum of 1 NDI output/);
 });
 
 test('fails - NDI output when source is also NDI (passthrough not supported)', () => {
@@ -1428,7 +1430,7 @@ test('fails - NDI output when source is also NDI (passthrough not supported)', (
     }),
   });
 
-  expect(() => flow.addOutput('out', OutputConfiguration.ndi())).toThrow(/NDI passthrough is not supported/);
+  expect(() => flow.addOutput('out', { output: OutputConfiguration.ndi() })).toThrow(/NDI passthrough is not supported/);
 });
 
 test('fails - NDI source without encodingConfig', () => {

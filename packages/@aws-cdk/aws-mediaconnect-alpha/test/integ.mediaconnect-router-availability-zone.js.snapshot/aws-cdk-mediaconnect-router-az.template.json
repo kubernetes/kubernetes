@@ -1,0 +1,219 @@
+{
+ "Resources": {
+  "Network1C6012B5": {
+   "Type": "AWS::MediaConnect::RouterNetworkInterface",
+   "Properties": {
+    "Configuration": {
+     "Public": {
+      "AllowRules": [
+       {
+        "Cidr": "10.0.0.0/16"
+       }
+      ]
+     }
+    },
+    "Name": "az-test-network"
+   }
+  },
+  "OutboundOnlyNetwork85FAC02D": {
+   "Type": "AWS::MediaConnect::RouterNetworkInterface",
+   "Properties": {
+    "Configuration": {
+     "Public": {
+      "AllowRules": []
+     }
+    },
+    "Name": "az-outbound-only"
+   }
+  },
+  "StandardInputA2C31267": {
+   "Type": "AWS::MediaConnect::RouterInput",
+   "Properties": {
+    "AvailabilityZone": "us-east-1c",
+    "Configuration": {
+     "Standard": {
+      "NetworkInterfaceArn": {
+       "Fn::GetAtt": [
+        "Network1C6012B5",
+        "Arn"
+       ]
+      },
+      "Protocol": "RTP",
+      "ProtocolConfiguration": {
+       "Rtp": {
+        "Port": 5000
+       }
+      }
+     }
+    },
+    "MaintenanceConfiguration": {
+     "Default": {}
+    },
+    "MaximumBitrate": 10000000,
+    "Name": "az-standard-input",
+    "RegionName": "us-east-1",
+    "RoutingScope": "REGIONAL",
+    "Tier": "INPUT_20",
+    "TransitEncryption": {
+     "EncryptionKeyConfiguration": {
+      "Automatic": {}
+     },
+     "EncryptionKeyType": "AUTOMATIC"
+    }
+   }
+  },
+  "FailoverInputA7E26348": {
+   "Type": "AWS::MediaConnect::RouterInput",
+   "Properties": {
+    "AvailabilityZone": "us-east-1c",
+    "Configuration": {
+     "Failover": {
+      "NetworkInterfaceArn": {
+       "Fn::GetAtt": [
+        "Network1C6012B5",
+        "Arn"
+       ]
+      },
+      "ProtocolConfigurations": [
+       {
+        "Rtp": {
+         "Port": 6000
+        }
+       },
+       {
+        "Rtp": {
+         "Port": 6001
+        }
+       }
+      ],
+      "SourcePriorityMode": "NO_PRIORITY"
+     }
+    },
+    "MaintenanceConfiguration": {
+     "Default": {}
+    },
+    "MaximumBitrate": 10000000,
+    "Name": "az-failover-input",
+    "RegionName": "us-east-1",
+    "RoutingScope": "REGIONAL",
+    "Tier": "INPUT_20",
+    "TransitEncryption": {
+     "EncryptionKeyConfiguration": {
+      "Automatic": {}
+     },
+     "EncryptionKeyType": "AUTOMATIC"
+    }
+   }
+  },
+  "MergeInput32C493CC": {
+   "Type": "AWS::MediaConnect::RouterInput",
+   "Properties": {
+    "AvailabilityZone": "us-east-1c",
+    "Configuration": {
+     "Merge": {
+      "MergeRecoveryWindowMilliseconds": 500,
+      "NetworkInterfaceArn": {
+       "Fn::GetAtt": [
+        "Network1C6012B5",
+        "Arn"
+       ]
+      },
+      "ProtocolConfigurations": [
+       {
+        "Rist": {
+         "Port": 7000,
+         "RecoveryLatencyMilliseconds": 200
+        }
+       },
+       {
+        "Rist": {
+         "Port": 7002,
+         "RecoveryLatencyMilliseconds": 200
+        }
+       }
+      ]
+     }
+    },
+    "MaintenanceConfiguration": {
+     "Default": {}
+    },
+    "MaximumBitrate": 10000000,
+    "Name": "az-merge-input",
+    "RegionName": "us-east-1",
+    "RoutingScope": "REGIONAL",
+    "Tier": "INPUT_20",
+    "TransitEncryption": {
+     "EncryptionKeyConfiguration": {
+      "Automatic": {}
+     },
+     "EncryptionKeyType": "AUTOMATIC"
+    }
+   }
+  },
+  "StandardOutput1BB126BE": {
+   "Type": "AWS::MediaConnect::RouterOutput",
+   "Properties": {
+    "AvailabilityZone": "us-east-1c",
+    "Configuration": {
+     "Standard": {
+      "NetworkInterfaceArn": {
+       "Fn::GetAtt": [
+        "Network1C6012B5",
+        "Arn"
+       ]
+      },
+      "Protocol": "RTP",
+      "ProtocolConfiguration": {
+       "Rtp": {
+        "DestinationAddress": "198.51.100.10",
+        "DestinationPort": 5000
+       }
+      }
+     }
+    },
+    "MaintenanceConfiguration": {
+     "Default": {}
+    },
+    "MaximumBitrate": 10000000,
+    "Name": "az-standard-output",
+    "RegionName": "us-east-1",
+    "RoutingScope": "REGIONAL",
+    "Tier": "OUTPUT_20"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

@@ -462,6 +462,12 @@ export interface StandardOutputConfigurationProps {
   readonly networkInterface: IRouterNetworkInterface;
   /** Protocol configuration for the output */
   readonly protocol: RouterOutputProtocol;
+  /**
+   * The availability zone where the router output is located.
+   *
+   * @default - assigned by the MediaConnect service
+   */
+  readonly availabilityZone?: string;
 }
 
 /**
@@ -664,6 +670,7 @@ class StandardRouterOutputConfig extends RouterOutputConfiguration {
           protocolConfiguration: protocol.config,
         },
       },
+      availabilityZone: this.props.availabilityZone,
       grant: protocol.grant,
     };
   }
@@ -959,7 +966,8 @@ export class RouterOutput extends RouterOutputBase implements IRouterOutput {
     const configBind = props.configuration._bind(this, routerOutputArn);
 
     // Check to see if region specified is also compatible with AZ configured for some of the Router Outputs configurations
-    if (configBind.availabilityZone && !configBind.availabilityZone.startsWith(targetRegion)) {
+    if (configBind.availabilityZone && !Token.isUnresolved(configBind.availabilityZone) && !Token.isUnresolved(targetRegion)
+      && !configBind.availabilityZone.startsWith(targetRegion)) {
       throw new ValidationError(lit`RouterOutputAzRegionMismatch`, `Availability zone '${configBind.availabilityZone}' must be within region '${targetRegion}'`, this);
     }
 
@@ -968,7 +976,7 @@ export class RouterOutput extends RouterOutputBase implements IRouterOutput {
       maximumBitrate: props.maximumBitrate.toBps(),
       routingScope: props.routingScope.value,
       tier: (props.tier ?? RouterOutputTier.OUTPUT_20).value,
-      availabilityZone: configBind.availabilityZone, // Only specified for MediaConnect Flow and MediaLive inputs (with no connection).
+      availabilityZone: configBind.availabilityZone,
       maintenanceConfiguration: props.maintenanceConfiguration ? {
         preferredDayTime: props.maintenanceConfiguration,
       } : {

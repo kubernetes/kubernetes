@@ -7,7 +7,7 @@ import { addConstructMetadata } from 'aws-cdk-lib/core/lib/metadata-resource';
 import { propertyInjectable } from 'aws-cdk-lib/core/lib/prop-injectable';
 import type { Construct } from 'constructs';
 import type { IFlow } from './flow';
-import type { SrtPasswordEncryption, StaticKeyEncryption, TransitEncryption, VpcInterfaceConfig } from './shared';
+import type { SrtPasswordEncryption, StaticKeyEncryption, TransitEncryption } from './shared';
 import { State, isOpenCidr, renderSrtPasswordEncryption, renderStaticKeyEncryption, renderTransitEncryption } from './shared';
 
 /**
@@ -121,7 +121,7 @@ export interface RtpOutputConfig {
    *
    * @default - no VPC interface attachment
    */
-  readonly vpcInterfaceAttachment?: VpcInterfaceConfig;
+  readonly vpcInterfaceAttachmentName?: string;
 }
 
 /**
@@ -163,11 +163,11 @@ export interface ZixiPullOutputConfig {
    */
   readonly encryption?: StaticKeyEncryption;
   /**
-   * The VPC interface attachment to use for this output.
+   * The name of the VPC interface attachment to use for this output.
    *
    * @default - no VPC interface attachment
    */
-  readonly vpcInterfaceAttachment?: VpcInterfaceConfig;
+  readonly vpcInterfaceAttachmentName?: string;
 }
 
 /**
@@ -204,11 +204,11 @@ export interface ZixiPushOutputConfig {
    */
   readonly port: number;
   /**
-   * The VPC interface attachment to use for this output.
+   * The name of the VPC interface attachment to use for this output.
    *
    * @default - no VPC interface attachment
    */
-  readonly vpcInterfaceAttachment?: VpcInterfaceConfig;
+  readonly vpcInterfaceAttachmentName?: string;
 }
 
 /**
@@ -246,11 +246,11 @@ export interface SrtCallerOutputConfig {
    */
   readonly encryption?: SrtPasswordEncryption;
   /**
-   * The VPC interface attachment to use for this output.
+   * The name of the VPC interface attachment to use for this output.
    *
    * @default - no VPC interface attachment
    */
-  readonly vpcInterfaceAttachment?: VpcInterfaceConfig;
+  readonly vpcInterfaceAttachmentName?: string;
 }
 
 /**
@@ -285,11 +285,11 @@ export interface SrtListenerOutputConfig {
    */
   readonly encryption?: SrtPasswordEncryption;
   /**
-   * The VPC interface attachment to use for this output.
+   * The name of the VPC interface attachment to use for this output.
    *
    * @default - no VPC interface attachment
    */
-  readonly vpcInterfaceAttachment?: VpcInterfaceConfig;
+  readonly vpcInterfaceAttachmentName?: string;
 }
 
 /**
@@ -374,7 +374,7 @@ export class OutputConfiguration {
       destination: input.destination,
       port: input.port,
       smoothingLatency: input.smoothingLatency?.toMilliseconds(),
-      vpcInterfaceAttachment: parseVpcInterfaceAttachment(input.vpcInterfaceAttachment),
+      vpcInterfaceAttachment: toVpcInterfaceAttachment(input.vpcInterfaceAttachmentName),
     });
   }
 
@@ -387,7 +387,7 @@ export class OutputConfiguration {
       destination: input.destination,
       port: input.port,
       smoothingLatency: input.smoothingLatency?.toMilliseconds(),
-      vpcInterfaceAttachment: parseVpcInterfaceAttachment(input.vpcInterfaceAttachment),
+      vpcInterfaceAttachment: toVpcInterfaceAttachment(input.vpcInterfaceAttachmentName),
     });
   }
 
@@ -400,7 +400,7 @@ export class OutputConfiguration {
       destination: input.destination,
       port: input.port,
       smoothingLatency: input.smoothingLatency?.toMilliseconds(),
-      vpcInterfaceAttachment: parseVpcInterfaceAttachment(input.vpcInterfaceAttachment),
+      vpcInterfaceAttachment: toVpcInterfaceAttachment(input.vpcInterfaceAttachmentName),
     });
   }
 
@@ -416,7 +416,7 @@ export class OutputConfiguration {
       maxLatency: input.maxLatency.toMilliseconds(),
       cidrAllowList: input.cidrAllowList,
       staticKeyEncryption: input.encryption,
-      vpcInterfaceAttachment: parseVpcInterfaceAttachment(input.vpcInterfaceAttachment),
+      vpcInterfaceAttachment: toVpcInterfaceAttachment(input.vpcInterfaceAttachmentName),
     });
   }
 
@@ -431,7 +431,7 @@ export class OutputConfiguration {
       maxLatency: input.maxLatency.toMilliseconds(),
       cidrAllowList: input.cidrAllowList,
       staticKeyEncryption: input.encryption,
-      vpcInterfaceAttachment: parseVpcInterfaceAttachment(input.vpcInterfaceAttachment),
+      vpcInterfaceAttachment: toVpcInterfaceAttachment(input.vpcInterfaceAttachmentName),
     });
   }
 
@@ -446,7 +446,7 @@ export class OutputConfiguration {
       minLatency: input.minLatency?.toMilliseconds(),
       streamId: input.streamId,
       srtPasswordEncryption: input.encryption,
-      vpcInterfaceAttachment: parseVpcInterfaceAttachment(input.vpcInterfaceAttachment),
+      vpcInterfaceAttachment: toVpcInterfaceAttachment(input.vpcInterfaceAttachmentName),
     });
   }
 
@@ -460,7 +460,7 @@ export class OutputConfiguration {
       minLatency: input.minLatency?.toMilliseconds(),
       cidrAllowList: input.cidrAllowList,
       srtPasswordEncryption: input.encryption,
-      vpcInterfaceAttachment: parseVpcInterfaceAttachment(input.vpcInterfaceAttachment),
+      vpcInterfaceAttachment: toVpcInterfaceAttachment(input.vpcInterfaceAttachmentName),
     });
   }
 
@@ -500,7 +500,6 @@ export class OutputConfiguration {
 
 /**
  * Shared base for both real and imported flow outputs.
- * @internal
  */
 abstract class FlowOutputBase extends Resource implements IFlowOutput {
   public abstract readonly flowOutputArn: string;
@@ -582,6 +581,13 @@ export class FlowOutput extends FlowOutputBase {
 }
 
 /**
+ * Convert an optional VPC interface name to the CFN attachment property shape.
+ */
+function toVpcInterfaceAttachment(name?: string): CfnFlowOutput.VpcInterfaceAttachmentProperty | undefined {
+  return name ? { vpcInterfaceName: name } : undefined;
+}
+
+/**
  * Resolve the output's key-based encryption (either static-key or SRT-password) to its
  * CFN shape. At most one of the two encryption fields is set on a given output.
  */
@@ -595,12 +601,3 @@ function renderOutputEncryption(
   if (srtPassword) return renderSrtPasswordEncryption(scope, srtPassword, sourceArn);
   return undefined;
 }
-
-/**
- * Helper function to parse VPC interface attachment from L2 type to L1 property.
- */
-function parseVpcInterfaceAttachment(vpcInterface?: VpcInterfaceConfig): CfnFlowOutput.VpcInterfaceAttachmentProperty | undefined {
-  if (!vpcInterface) return undefined;
-  return { vpcInterfaceName: vpcInterface.name };
-}
-

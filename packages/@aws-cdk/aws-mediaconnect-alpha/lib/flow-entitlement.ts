@@ -89,7 +89,6 @@ export interface FlowEntitlementProps {
 
 /**
  * Shared base for both real and imported flow entitlements.
- * @internal
  */
 abstract class FlowEntitlementBase extends Resource implements IFlowEntitlement {
   public abstract readonly entitlementArn: string;

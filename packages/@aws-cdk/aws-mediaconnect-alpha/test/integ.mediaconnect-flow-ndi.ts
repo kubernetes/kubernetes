@@ -120,7 +120,7 @@ const outputDefaultsFlow = new Flow(stack, 'outputDefaultsFlow', {
   }),
 });
 
-outputDefaultsFlow.addOutput('NdiOutput', OutputConfiguration.ndi());
+outputDefaultsFlow.addOutput('NdiOutput', { output: OutputConfiguration.ndi() });
 
 const test = new IntegTest(app, 'cdk-integ-emx-flow-ndi', {
   testCases: [stack],

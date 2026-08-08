@@ -710,6 +710,12 @@ export interface StandardConfigurationProps {
   readonly networkInterface: IRouterNetworkInterface;
   /** Protocol configuration for the input */
   readonly protocol: RouterInputProtocol;
+  /**
+   * The availability zone where the router input is located.
+   *
+   * @default - assigned by the MediaConnect service
+   */
+  readonly availabilityZone?: string;
 }
 
 /**
@@ -726,6 +732,12 @@ export interface FailoverConfigurationProps {
    * @default SourcePriorityConfig.none()
    */
   readonly sourcePriority?: SourcePriorityConfig;
+  /**
+   * The availability zone where the router input is located.
+   *
+   * @default - assigned by the MediaConnect service
+   */
+  readonly availabilityZone?: string;
 }
 
 /**
@@ -738,6 +750,12 @@ export interface MergeConfigurationProps {
   readonly protocols: RouterInputProtocol[];
   /** Recovery window for merge operation */
   readonly mergeRecoveryWindow: Duration;
+  /**
+   * The availability zone where the router input is located.
+   *
+   * @default - assigned by the MediaConnect service
+   */
+  readonly availabilityZone?: string;
 }
 
 /**
@@ -977,6 +995,7 @@ class StandardRouterInputConfig extends RouterInputConfiguration {
           protocolConfiguration: protocol.config,
         },
       },
+      availabilityZone: this.props.availabilityZone,
     };
   }
 
@@ -1006,6 +1025,7 @@ class FailoverRouterInputConfig extends RouterInputConfiguration {
           primarySourceIndex: priority.primarySourceIndex,
         },
       },
+      availabilityZone: this.props.availabilityZone,
     };
   }
 
@@ -1037,6 +1057,7 @@ class MergeRouterInputConfig extends RouterInputConfiguration {
           mergeRecoveryWindowMilliseconds: this.props.mergeRecoveryWindow.toMilliseconds(),
         },
       },
+      availabilityZone: this.props.availabilityZone,
     };
   }
 
@@ -1406,7 +1427,8 @@ export class RouterInput extends RouterInputBase implements IRouterInput {
     const configBind = props.configuration._bind(this, routerInputArn);
 
     // Validate AZ matches region if provided
-    if (configBind.availabilityZone && !configBind.availabilityZone.startsWith(targetRegion)) {
+    if (configBind.availabilityZone && !Token.isUnresolved(configBind.availabilityZone) && !Token.isUnresolved(targetRegion)
+      && !configBind.availabilityZone.startsWith(targetRegion)) {
       throw new ValidationError(lit`RouterInputAzRegionMismatch`, `Availability zone '${configBind.availabilityZone}' must be within region '${targetRegion}'`, this);
     }
 
@@ -1448,4 +1470,3 @@ export class RouterInput extends RouterInputBase implements IRouterInput {
     this.grants = RouterInputGrants.fromRouterInput(this);
   }
 }
-
