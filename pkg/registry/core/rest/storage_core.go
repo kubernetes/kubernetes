@@ -107,7 +107,8 @@ type legacyProvider struct {
 	serviceNodePortAllocator         *portallocator.PortAllocator
 	authorizer                       authorizer.UnconditionalAuthorizer
 
-	startServiceNodePortsRepair, startServiceClusterIPRepair func(onFirstSuccess func(), stopCh chan struct{})
+	startServiceNodePortsRepair func(onFirstSuccess func(), stopCh chan struct{}, initialServiceCacheDeadline time.Time)
+	startServiceClusterIPRepair func(onFirstSuccess func(), stopCh chan struct{})
 }
 
 func New(c Config, authorizer authorizer.UnconditionalAuthorizer) (*legacyProvider, error) {
@@ -130,7 +131,7 @@ func New(c Config, authorizer authorizer.UnconditionalAuthorizer) (*legacyProvid
 	if err != nil {
 		return nil, err
 	}
-	p.startServiceNodePortsRepair = portallocatorcontroller.NewRepair(c.Services.IPRepairInterval, client.CoreV1(), client.EventsV1(), c.Services.NodePortRange, rangeRegistries.nodePort).RunUntil
+	p.startServiceNodePortsRepair = portallocatorcontroller.NewRepair(c.Services.IPRepairInterval, client.CoreV1(), c.Informers.Core().V1().Services(), client.EventsV1(), c.Services.NodePortRange, rangeRegistries.nodePort).RunUntil
 
 	// create service cluster ip repair controller
 	if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
@@ -519,11 +520,18 @@ func (p *legacyProvider) PostStartHook() (string, genericapiserver.PostStartHook
 		// Additionally, we ensure that we don't wait for it for longer
 		// than 1 minute for backward compatibility of failing the whole
 		// apiserver if we can't repair them.
+		const startupTimeout = time.Minute
+		startupTimer := time.NewTimer(startupTimeout)
+		defer startupTimer.Stop()
+		// Reserve half the startup window for completing the repair after a
+		// freshness timeout. This deadline also includes time spent syncing the
+		// informer and reading allocations; retries must not extend it.
+		serviceCacheDeadline := time.Now().Add(startupTimeout / 2)
 		wg := sync.WaitGroup{}
 		wg.Add(2)
 		runner := async.NewRunner(
 			func(stopCh chan struct{}) { p.startServiceClusterIPRepair(wg.Done, stopCh) },
-			func(stopCh chan struct{}) { p.startServiceNodePortsRepair(wg.Done, stopCh) },
+			func(stopCh chan struct{}) { p.startServiceNodePortsRepair(wg.Done, stopCh, serviceCacheDeadline) },
 		)
 		runner.Start()
 		go func() {
@@ -545,7 +553,7 @@ func (p *legacyProvider) PostStartHook() (string, genericapiserver.PostStartHook
 		case <-context.Done():
 			return goerrors.New("unable to perform initial IP and Port allocation check (context cancelled)")
 
-		case <-time.After(time.Minute):
+		case <-startupTimer.C:
 			return goerrors.New("unable to perform initial IP and Port allocation check (timeout)")
 		}
 

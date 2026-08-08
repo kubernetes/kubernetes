@@ -53,6 +53,19 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+	// nodePortRepairLeakCleanupDeferred indicates the number of repair loop runs that kept
+	// apparently leaked ports allocated because the Service informer could not be proven
+	// to be up to date with storage, broken down by reason: stale, error.
+	nodePortRepairLeakCleanupDeferred = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "leak_cleanup_deferred_total",
+			Help:           "Number of repair loop runs that deferred leaked port cleanup because the Service informer was not proven up to date, broken down by reason: stale, error",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"reason"},
+	)
 )
 
 var registerMetricsOnce sync.Once
@@ -61,5 +74,6 @@ func registerMetrics() {
 	registerMetricsOnce.Do(func() {
 		legacyregistry.MustRegister(nodePortRepairPortErrors)
 		legacyregistry.MustRegister(nodePortRepairReconcileErrors)
+		legacyregistry.MustRegister(nodePortRepairLeakCleanupDeferred)
 	})
 }
