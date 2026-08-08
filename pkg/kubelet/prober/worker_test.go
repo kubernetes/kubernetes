@@ -1301,12 +1301,12 @@ func TestWorkerStopDuringInitialJitterIsPrompt(t *testing.T) {
 	// test exercises the jitter-wait cancellation path specifically, rather
 	// than the earlier "stop() arrived before cancel was installed" path
 	// already covered by TestWorkerStopBeforeRunPreventsProbing.
-	cancelInstalled := func() (bool, error) {
+	cancelInstalled := func(context.Context) (bool, error) {
 		w.cancelMu.Lock()
 		defer w.cancelMu.Unlock()
 		return w.cancel != nil, nil
 	}
-	if err := wait.Poll(time.Millisecond, wait.ForeverTestTimeout, cancelInstalled); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, time.Millisecond, wait.ForeverTestTimeout, false, cancelInstalled); err != nil {
 		t.Fatalf("run() never installed w.cancel: %v", err)
 	}
 
