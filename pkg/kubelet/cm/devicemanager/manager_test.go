@@ -29,6 +29,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"github.com/stretchr/testify/assert"
@@ -70,7 +71,11 @@ const (
 func newWrappedManagerImpl(logger klog.Logger, socketPath string, manager *ManagerImpl) *wrappedManagerImpl {
 	w := &wrappedManagerImpl{
 		ManagerImpl: manager,
-		callback:    manager.genericDeviceUpdateCallback,
+		// The wrapper callback keeps the legacy 3-arg shape; structured health
+		// (the 4th arg) is exercised by calling genericDeviceUpdateCallback directly.
+		callback: func(logger klog.Logger, r string, devices []*pluginapi.Device) {
+			manager.genericDeviceUpdateCallback(logger, r, devices, nil)
+		},
 	}
 	w.socketdir, _ = filepath.Split(socketPath)
 	w.server, _ = plugin.NewServer(logger, socketPath, w, w)
@@ -392,7 +397,9 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 		{ID: "Device2", Health: pluginapi.Healthy},
 		{ID: "Device3", Health: pluginapi.Unhealthy},
 	}
-	callback := testManager.genericDeviceUpdateCallback
+	callback := func(logger klog.Logger, resourceName string, devices []*pluginapi.Device) {
+		testManager.genericDeviceUpdateCallback(logger, resourceName, devices, nil)
+	}
 
 	// Adds three devices for resource1, two healthy and one unhealthy.
 	// Expects capacity for resource1 to be 2.
@@ -543,7 +550,7 @@ func TestGetAllocatableDevicesMultipleResources(t *testing.T) {
 	resourceName1 := "domain1.com/resource1"
 	e1 := &endpointImpl{}
 	testManager.endpoints[resourceName1] = endpointInfo{e: e1, opts: nil}
-	testManager.genericDeviceUpdateCallback(logger, resourceName1, resource1Devs)
+	testManager.genericDeviceUpdateCallback(logger, resourceName1, resource1Devs, nil)
 
 	resource2Devs := []*pluginapi.Device{
 		{ID: "R2Device1", Health: pluginapi.Healthy},
@@ -551,7 +558,7 @@ func TestGetAllocatableDevicesMultipleResources(t *testing.T) {
 	resourceName2 := "other.domain2.org/resource2"
 	e2 := &endpointImpl{}
 	testManager.endpoints[resourceName2] = endpointInfo{e: e2, opts: nil}
-	testManager.genericDeviceUpdateCallback(logger, resourceName2, resource2Devs)
+	testManager.genericDeviceUpdateCallback(logger, resourceName2, resource2Devs, nil)
 
 	allocatableDevs := testManager.GetAllocatableDevices(logger)
 	as.Len(allocatableDevs, 2)
@@ -591,7 +598,7 @@ func TestGetAllocatableDevicesHealthTransition(t *testing.T) {
 	e1 := &endpointImpl{}
 	testManager.endpoints[resourceName1] = endpointInfo{e: e1, opts: nil}
 
-	testManager.genericDeviceUpdateCallback(logger, resourceName1, resource1Devs)
+	testManager.genericDeviceUpdateCallback(logger, resourceName1, resource1Devs, nil)
 
 	allocatableDevs := testManager.GetAllocatableDevices(logger)
 	as.Len(allocatableDevs, 1)
@@ -605,7 +612,7 @@ func TestGetAllocatableDevicesHealthTransition(t *testing.T) {
 		{ID: "R1Device2", Health: pluginapi.Healthy},
 		{ID: "R1Device3", Health: pluginapi.Healthy},
 	}
-	testManager.genericDeviceUpdateCallback(logger, resourceName1, resource1Devs)
+	testManager.genericDeviceUpdateCallback(logger, resourceName1, resource1Devs, nil)
 
 	allocatableDevs = testManager.GetAllocatableDevices(logger)
 	as.Len(allocatableDevs, 1)
@@ -1922,7 +1929,7 @@ func TestGetTopologyHintsWithUpdates(t *testing.T) {
 				defer wg.Done()
 				for i := 0; i < test.count; i++ {
 					// simulate the device plugin to send device updates
-					mimpl.genericDeviceUpdateCallback(logger, testResourceName, devs)
+					mimpl.genericDeviceUpdateCallback(logger, testResourceName, devs, nil)
 				}
 				updated.Store(true)
 			}()
@@ -1983,7 +1990,7 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 	testManager.genericDeviceUpdateCallback(logger, resourceName, []*pluginapi.Device{
 		{ID: "dev1", Health: pluginapi.Healthy},
 		{ID: "dev2", Health: pluginapi.Unhealthy},
-	})
+	}, nil)
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2097,7 +2104,7 @@ func TestFeatureGateResourceHealthStatus(t *testing.T) {
 	for i := 0; i < deviceUpdateNumber; i++ {
 		testManager.genericDeviceUpdateCallback(logger, resourceName, []*pluginapi.Device{
 			{ID: "dev1", Health: pluginapi.Healthy},
-		})
+		}, nil)
 	}
 	// update chan no data
 	assert.Empty(t, testManager.update)
@@ -2106,7 +2113,7 @@ func TestFeatureGateResourceHealthStatus(t *testing.T) {
 	for i := 0; i < deviceUpdateNumber; i++ {
 		testManager.genericDeviceUpdateCallback(logger, resourceName, []*pluginapi.Device{
 			{ID: fmt.Sprintf("dev%d", i), Health: pluginapi.Unhealthy},
-		})
+		}, nil)
 	}
 	for i := 0; i < deviceUpdateChanBuffer; i++ {
 		u := <-testManager.update
@@ -2171,7 +2178,7 @@ func TestDeviceHealthUpdateWithDuplicateDeviceIDs(t *testing.T) {
 	// The device of resource2 becomes unhealthy: only pod2 must be notified.
 	testManager.genericDeviceUpdateCallback(logger, resourceName2, []*pluginapi.Device{
 		{ID: deviceID, Health: pluginapi.Unhealthy},
-	})
+	}, nil)
 	u := <-testManager.update
 	assert.Equal(t, resourceupdates.Update{PodUIDs: []string{"pod2"}}, u)
 	assert.Empty(t, testManager.update)
@@ -2179,7 +2186,7 @@ func TestDeviceHealthUpdateWithDuplicateDeviceIDs(t *testing.T) {
 	// The device of resource1 becomes unhealthy: only pod1 must be notified.
 	testManager.genericDeviceUpdateCallback(logger, resourceName1, []*pluginapi.Device{
 		{ID: deviceID, Health: pluginapi.Unhealthy},
-	})
+	}, nil)
 	u = <-testManager.update
 	assert.Equal(t, resourceupdates.Update{PodUIDs: []string{"pod1"}}, u)
 	assert.Empty(t, testManager.update)
@@ -2293,7 +2300,7 @@ func TestEndpointSyncOnDisconnect(t *testing.T) {
 		{ID: "Device2", Health: pluginapi.Healthy},
 		{ID: "Device3", Health: pluginapi.Unhealthy},
 	}
-	manager.genericDeviceUpdateCallback(logger, resourceName, devs)
+	manager.genericDeviceUpdateCallback(logger, resourceName, devs, nil)
 
 	// Disconnect should result in all devices for this resource
 	// moved to the unhealthy set.
@@ -2478,4 +2485,80 @@ func TestLifecycleAllocatePod(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestStructuredDeviceHealthDegraded verifies the alpha structured-health
+// behavior gated behind DevicePluginDegradedHealth: a DEGRADED device stays in
+// capacity but is withheld from allocatable, and only plugins that advertise the
+// supports_structured_health capability may report structured health.
+func TestStructuredDeviceHealthDegraded(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DevicePluginDegradedHealth, true)
+
+	_, socketName, _, err := tmpSocketDir()
+	require.NoError(t, err)
+	topologyStore := topologymanager.NewFakeManager(logger)
+	testManager, err := newManagerImpl(logger, socketName, nil, topologyStore)
+	require.NoError(t, err)
+	as := assert.New(t)
+
+	resourceName := "domain1.com/gpu"
+	devs := []*pluginapi.Device{
+		{ID: "gpu0", Health: pluginapi.Healthy},
+		{ID: "gpu1", Health: pluginapi.Healthy},
+	}
+	healthMap := map[string]*pluginapi.DeviceHealthDetail{
+		"gpu1": {
+			State:      pluginapi.HealthState_HEALTH_STATE_DEGRADED,
+			Message:    "correctable ECC errors",
+			VendorCode: "XID_63",
+		},
+	}
+
+	t.Run("opted-in plugin: degraded excluded from allocatable", func(t *testing.T) {
+		testManager.endpoints[resourceName] = endpointInfo{
+			e:    &endpointImpl{},
+			opts: &pluginapi.DevicePluginOptions{SupportsStructuredHealth: true},
+		}
+		testManager.genericDeviceUpdateCallback(logger, resourceName, devs, healthMap)
+
+		testManager.mutex.Lock()
+		as.True(testManager.degradedDevices[resourceName].Has("gpu1"))
+		as.True(testManager.healthyDevices[resourceName].Has("gpu0"))
+		as.False(testManager.healthyDevices[resourceName].Has("gpu1"))
+		testManager.mutex.Unlock()
+
+		capacity, allocatable, _ := testManager.GetCapacity(logger)
+		as.Equal(int64(2), capacity[v1.ResourceName(resourceName)].Value())
+		as.Equal(int64(1), allocatable[v1.ResourceName(resourceName)].Value())
+	})
+
+	t.Run("legacy plugin: structured health ignored", func(t *testing.T) {
+		testManager.endpoints[resourceName] = endpointInfo{e: &endpointImpl{}, opts: nil}
+		testManager.genericDeviceUpdateCallback(logger, resourceName, devs, healthMap)
+
+		testManager.mutex.Lock()
+		as.Equal(0, testManager.degradedDevices[resourceName].Len())
+		as.True(testManager.healthyDevices[resourceName].Has("gpu1"))
+		testManager.mutex.Unlock()
+
+		_, allocatable, _ := testManager.GetCapacity(logger)
+		as.Equal(int64(2), allocatable[v1.ResourceName(resourceName)].Value())
+	})
+}
+
+// TestTruncateMessageAndSanitizeVendorCode verifies the input-hardening helpers.
+func TestTruncateMessageAndSanitizeVendorCode(t *testing.T) {
+	as := assert.New(t)
+
+	as.Equal("short", truncateMessage("short"))
+	long := strings.Repeat("a", maxHealthMessageBytes+50)
+	as.Len(truncateMessage(long), maxHealthMessageBytes)
+	// Truncation must not split a multi-byte rune: build a string that would be
+	// cut mid-rune at the byte boundary and confirm the result stays valid UTF-8.
+	multibyte := strings.Repeat("a", maxHealthMessageBytes-1) + "€"
+	as.True(utf8.ValidString(truncateMessage(multibyte)))
+
+	as.Equal("XID_63", sanitizeVendorCode("XID_63"))
+	as.Equal("ABC", sanitizeVendorCode("A\x00B\x07C\x7f"))
 }

@@ -19,6 +19,10 @@ message DevicePluginOptions {
 	bool pre_start_required = 1;
 	// Indicates if GetPreferredAllocation is implemented and available for calling
 	bool get_preferred_allocation_available = 2;
+	// Indicates that the device plugin understands the structured health model
+	// and may populate device_health_map in ListAndWatchResponse. Kubelet ignores
+	// device_health_map from plugins that do not set this flag.
+	bool supports_structured_health = 3;
 }
 
 message RegisterRequest {
@@ -70,6 +74,43 @@ service DevicePlugin {
 // returns the new list
 message ListAndWatchResponse {
 	repeated Device devices = 1;
+	// device_health_map carries optional structured health details keyed by
+	// device ID. It is only honored when the plugin advertised
+	// supports_structured_health in DevicePluginOptions.
+	//
+	// The binary Device.health field remains authoritative for backward
+	// compatibility. When a device appears here, the plugin MUST keep
+	// Device.health consistent with the structured state: "Healthy" for
+	// HEALTH_STATE_HEALTHY or HEALTH_STATE_DEGRADED, "Unhealthy" for
+	// HEALTH_STATE_UNHEALTHY. A device ID absent from this map keeps its
+	// previously reported structured state.
+	map<string, DeviceHealthDetail> device_health_map = 2;
+}
+
+// HealthState is the structured, three-state health model for a device.
+// The zero value is UNSPECIFIED so that an unset or malformed message is never
+// silently interpreted as HEALTHY.
+enum HealthState {
+	HEALTH_STATE_UNSPECIFIED = 0;
+	HEALTH_STATE_HEALTHY = 1;
+	HEALTH_STATE_DEGRADED = 2;
+	HEALTH_STATE_UNHEALTHY = 3;
+}
+
+// DeviceHealthDetail carries structured health for a single device.
+message DeviceHealthDetail {
+	// Structured health state for the device.
+	HealthState state = 1;
+	// Optional freeform, human-readable message describing the condition
+	// (for example "ECC double-bit error" or "thermal throttling"). Kubelet
+	// truncates this to at most 1024 bytes on a UTF-8 rune boundary.
+	string message = 2;
+	// Optional vendor-specific error code (for example "XID_63"). Restricted
+	// by kubelet to printable ASCII; other bytes are stripped.
+	string vendor_code = 3;
+	// Unix time in nanoseconds when the device transitioned to this state.
+	// 0 means unset; kubelet substitutes the observation time.
+	int64 last_transition_time = 4;
 }
 
 message TopologyInfo {

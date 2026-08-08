@@ -318,6 +318,15 @@ const (
 	// Enables support for reserving and replicating templated ResourceClaims for an entire PodGroup.
 	DRAWorkloadResourceClaims featuregate.Feature = "DRAWorkloadResourceClaims"
 
+	// owner: @richardokonicha
+	// kep: https://kep.k8s.io/NNNN (number assigned when the enhancement PR is opened)
+	//
+	// Enables structured health reporting for device plugins. Adds an optional
+	// three-state health model (HEALTHY/DEGRADED/UNHEALTHY) via device_health_map
+	// in ListAndWatchResponse, gated behind the supports_structured_health
+	// capability flag.
+	DevicePluginDegradedHealth featuregate.Feature = "DevicePluginDegradedHealth"
+
 	// owner: @atiratree
 	// kep: http://kep.k8s.io/3973
 	//
@@ -1472,6 +1481,11 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	// Target milestone is provisional and will be set by SIG Node when the KEP is accepted.
+	DevicePluginDegradedHealth: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	DeploymentReplicaSetTerminatingReplicas: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
@@ -2508,6 +2522,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DRASchedulerFilterTimeout: {DynamicResourceAllocation},
 
 	DRAWorkloadResourceClaims: {DynamicResourceAllocation, GenericWorkload},
+
+	DevicePluginDegradedHealth: {},
 
 	DeploymentReplicaSetTerminatingReplicas: {},
 

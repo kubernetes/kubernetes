@@ -24,8 +24,10 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"k8s.io/klog/v2"
@@ -86,6 +88,12 @@ type ManagerImpl struct {
 
 	// unhealthyDevices contains all the unhealthy devices and their exported device IDs.
 	unhealthyDevices map[string]sets.Set[string]
+
+	// degradedDevices contains devices reported as DEGRADED via the structured
+	// health model: still usable by already-allocated pods, but not offered for
+	// new allocations. Populated only when the DevicePluginDegradedHealth feature
+	// gate is enabled and the plugin advertised supports_structured_health.
+	degradedDevices map[string]sets.Set[string]
 
 	// allocatedDevices contains allocated deviceIds, keyed by resourceName.
 	allocatedDevices map[string]sets.Set[string]
@@ -153,6 +161,7 @@ func newManagerImpl(logger klog.Logger, socketPath string, topology []cadvisorap
 		allDevices:            NewResourceDeviceInstances(),
 		healthyDevices:        make(map[string]sets.Set[string]),
 		unhealthyDevices:      make(map[string]sets.Set[string]),
+		degradedDevices:       make(map[string]sets.Set[string]),
 		allocatedDevices:      make(map[string]sets.Set[string]),
 		podDevices:            newPodDevices(),
 		numaNodes:             numaNodes,
@@ -287,17 +296,32 @@ func (m *ManagerImpl) PluginDisconnected(logger klog.Logger, resourceName string
 // is captured. Also, registered device and device to container allocation
 // information is checkpointed to the disk.
 func (m *ManagerImpl) PluginListAndWatchReceiver(logger klog.Logger, resourceName string, resp *pluginapi.ListAndWatchResponse) {
-	m.genericDeviceUpdateCallback(logger, resourceName, resp.Devices)
+	m.genericDeviceUpdateCallback(logger, resourceName, resp.Devices, resp.DeviceHealthMap)
 }
 
-func (m *ManagerImpl) genericDeviceUpdateCallback(logger klog.Logger, resourceName string, devices []*pluginapi.Device) {
+func (m *ManagerImpl) genericDeviceUpdateCallback(logger klog.Logger, resourceName string, devices []*pluginapi.Device, healthMap map[string]*pluginapi.DeviceHealthDetail) {
 	healthyCount := 0
 	m.mutex.Lock()
 	m.healthyDevices[resourceName] = sets.New[string]()
 	m.unhealthyDevices[resourceName] = sets.New[string]()
+	m.degradedDevices[resourceName] = sets.New[string]()
 	oldDevices := m.allDevices[resourceName]
 	podsToUpdate := sets.New[string]()
 	m.allDevices[resourceName] = make(map[string]*pluginapi.Device)
+
+	// Structured health is only honored when the feature gate is enabled AND the
+	// plugin explicitly advertised the supports_structured_health capability.
+	// Legacy plugins (opts == nil) and plugins that did not opt in cannot inject
+	// structured health, so their healthMap is ignored entirely.
+	structuredHealthEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DevicePluginDegradedHealth)
+	if structuredHealthEnabled {
+		if ep, ok := m.endpoints[resourceName]; !ok || ep.opts == nil || !ep.opts.SupportsStructuredHealth {
+			healthMap = nil
+		}
+	} else {
+		healthMap = nil
+	}
+
 	for _, dev := range devices {
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {
@@ -320,7 +344,19 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(logger klog.Logger, resourceNa
 		}
 
 		m.allDevices[resourceName][dev.ID] = dev
-		if dev.Health == pluginapi.Healthy {
+
+		// Resolve the effective health state. The binary Device.health field
+		// stays authoritative: a device the plugin marks Unhealthy is never
+		// downgraded to healthy/degraded by structured health. DEGRADED is only
+		// meaningful for a device that is otherwise Healthy.
+		if detail, ok := healthMap[dev.ID]; ok && dev.Health == pluginapi.Healthy &&
+			detail.State == pluginapi.HealthState_HEALTH_STATE_DEGRADED {
+			m.degradedDevices[resourceName].Insert(dev.ID)
+			logger.V(4).Info("Device reported DEGRADED",
+				"resourceName", resourceName, "deviceID", dev.ID,
+				"vendorCode", sanitizeVendorCode(detail.VendorCode),
+				"message", truncateMessage(detail.Message))
+		} else if dev.Health == pluginapi.Healthy {
 			m.healthyDevices[resourceName].Insert(dev.ID)
 			healthyCount++
 		} else {
@@ -343,6 +379,35 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(logger klog.Logger, resourceNa
 		logger.Error(err, "Writing checkpoint encountered")
 	}
 	logger.V(2).Info("Processed device updates for resource", "resourceName", resourceName, "totalCount", len(devices), "healthyCount", healthyCount)
+}
+
+// maxHealthMessageBytes bounds the freeform message from a device plugin so a
+// misbehaving plugin cannot force kubelet to log or retain unbounded data.
+const maxHealthMessageBytes = 1024
+
+// truncateMessage returns msg truncated to at most maxHealthMessageBytes,
+// cutting on a UTF-8 rune boundary so the result is always valid UTF-8.
+func truncateMessage(msg string) string {
+	if len(msg) <= maxHealthMessageBytes {
+		return msg
+	}
+	truncated := msg[:maxHealthMessageBytes]
+	for len(truncated) > 0 && !utf8.ValidString(truncated) {
+		truncated = truncated[:len(truncated)-1]
+	}
+	return truncated
+}
+
+// sanitizeVendorCode strips any non printable-ASCII bytes from a vendor code so
+// it is safe to place in logs and metric labels.
+func sanitizeVendorCode(code string) string {
+	var b strings.Builder
+	for i := 0; i < len(code); i++ {
+		if c := code[i]; c >= 32 && c <= 126 {
+			b.WriteByte(c)
+		}
+	}
+	return b.String()
 }
 
 // GetWatcherHandler returns the plugin handler
@@ -451,10 +516,15 @@ func (m *ManagerImpl) markResourceUnhealthy(logger klog.Logger, resourceName str
 		healthyDevices = m.healthyDevices[resourceName]
 		m.healthyDevices[resourceName] = sets.New[string]()
 	}
+	degradedDevices := sets.New[string]()
+	if _, ok := m.degradedDevices[resourceName]; ok {
+		degradedDevices = m.degradedDevices[resourceName]
+		m.degradedDevices[resourceName] = sets.New[string]()
+	}
 	if _, ok := m.unhealthyDevices[resourceName]; !ok {
 		m.unhealthyDevices[resourceName] = sets.New[string]()
 	}
-	m.unhealthyDevices[resourceName] = m.unhealthyDevices[resourceName].Union(healthyDevices)
+	m.unhealthyDevices[resourceName] = m.unhealthyDevices[resourceName].Union(healthyDevices).Union(degradedDevices)
 }
 
 // GetCapacity is expected to be called when Kubelet updates its node status.
@@ -503,11 +573,29 @@ func (m *ManagerImpl) GetCapacity(logger klog.Logger) (v1.ResourceList, v1.Resou
 			capacity[v1.ResourceName(resourceName)] = capacityCount
 		}
 	}
+	// Degraded devices remain part of capacity (so already-running pods keep
+	// their node bookkeeping) but are deliberately excluded from allocatable so
+	// the scheduler does not place new pods on a degraded device.
+	for resourceName, devices := range m.degradedDevices {
+		eI, ok := m.endpoints[resourceName]
+		if (ok && eI.e.stopGracePeriodExpired()) || !ok {
+			if !ok {
+				logger.Info("Unexpected: degradedDevices and endpoints became out of sync")
+			}
+			deletedResources.Insert(resourceName)
+		} else {
+			capacityCount := capacity[v1.ResourceName(resourceName)]
+			degradedCount := *resource.NewQuantity(int64(devices.Len()), resource.DecimalSI)
+			capacityCount.Add(degradedCount)
+			capacity[v1.ResourceName(resourceName)] = capacityCount
+		}
+	}
 
 	for resourceName := range deletedResources {
 		delete(m.endpoints, resourceName)
 		delete(m.healthyDevices, resourceName)
 		delete(m.unhealthyDevices, resourceName)
+		delete(m.degradedDevices, resourceName)
 	}
 
 	m.mutex.Unlock()
@@ -563,6 +651,9 @@ func (m *ManagerImpl) readCheckpoint(logger klog.Logger) error {
 		// will stay zero till the corresponding device plugin re-registers.
 		m.healthyDevices[resource] = sets.New[string]()
 		m.unhealthyDevices[resource] = sets.New[string]()
+		// Structured health is not persisted; it is rebuilt when the plugin
+		// re-registers and re-reports via ListAndWatch.
+		m.degradedDevices[resource] = sets.New[string]()
 		m.endpoints[resource] = endpointInfo{e: newStoppedEndpointImpl(resource), opts: nil}
 	}
 
@@ -653,8 +744,17 @@ func (m *ManagerImpl) devicesToAllocate(ctx context.Context, podUID, contName, r
 		return nil, fmt.Errorf("no healthy devices present; cannot allocate unhealthy devices %s", resource)
 	}
 
-	// Check if all the previously allocated devices are healthy
-	if !healthyDevices.IsSuperset(devices) {
+	// Check if all the previously allocated devices are still usable. A device
+	// that has since transitioned to DEGRADED is still usable by the pod it is
+	// already allocated to (it is only withheld from *new* allocations), so we
+	// treat healthy+degraded as the set of devices that may remain allocated.
+	usableDevices := healthyDevices
+	if utilfeature.DefaultFeatureGate.Enabled(features.DevicePluginDegradedHealth) {
+		if degraded, ok := m.degradedDevices[resource]; ok && degraded.Len() > 0 {
+			usableDevices = healthyDevices.Union(degraded)
+		}
+	}
+	if !usableDevices.IsSuperset(devices) {
 		return nil, fmt.Errorf("previously allocated devices are no longer healthy; cannot allocate unhealthy devices %s", resource)
 	}
 
@@ -1190,6 +1290,14 @@ func (m *ManagerImpl) UpdateAllocatedResourcesStatus(logger klog.Logger, pod *v1
 				health := v1.ResourceHealthStatusHealthy
 				if d.Health != pluginapi.Healthy {
 					health = v1.ResourceHealthStatusUnhealthy
+				}
+				// A device reported as DEGRADED is still functioning but impaired.
+				// Surface it as Unknown rather than Healthy so the condition is
+				// visible in pod status without claiming the device is fully healthy.
+				if utilfeature.DefaultFeatureGate.Enabled(features.DevicePluginDegradedHealth) {
+					if degraded, ok := m.degradedDevices[resourceName]; ok && degraded.Has(id) {
+						health = v1.ResourceHealthStatusUnknown
+					}
 				}
 				resourceStatus.Resources = append(resourceStatus.Resources, v1.ResourceHealth{
 					ResourceID: v1.ResourceID(id),

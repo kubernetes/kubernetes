@@ -39,14 +39,73 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// HealthState is the structured, three-state health model for a device.
+// The zero value is UNSPECIFIED so that an unset or malformed message is never
+// silently interpreted as HEALTHY.
+type HealthState int32
+
+const (
+	HealthState_HEALTH_STATE_UNSPECIFIED HealthState = 0
+	HealthState_HEALTH_STATE_HEALTHY     HealthState = 1
+	HealthState_HEALTH_STATE_DEGRADED    HealthState = 2
+	HealthState_HEALTH_STATE_UNHEALTHY   HealthState = 3
+)
+
+// Enum value maps for HealthState.
+var (
+	HealthState_name = map[int32]string{
+		0: "HEALTH_STATE_UNSPECIFIED",
+		1: "HEALTH_STATE_HEALTHY",
+		2: "HEALTH_STATE_DEGRADED",
+		3: "HEALTH_STATE_UNHEALTHY",
+	}
+	HealthState_value = map[string]int32{
+		"HEALTH_STATE_UNSPECIFIED": 0,
+		"HEALTH_STATE_HEALTHY":     1,
+		"HEALTH_STATE_DEGRADED":    2,
+		"HEALTH_STATE_UNHEALTHY":   3,
+	}
+)
+
+func (x HealthState) Enum() *HealthState {
+	p := new(HealthState)
+	*p = x
+	return p
+}
+
+func (x HealthState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (HealthState) Descriptor() protoreflect.EnumDescriptor {
+	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_enumTypes[0].Descriptor()
+}
+
+func (HealthState) Type() protoreflect.EnumType {
+	return &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_enumTypes[0]
+}
+
+func (x HealthState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use HealthState.Descriptor instead.
+func (HealthState) EnumDescriptor() ([]byte, []int) {
+	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{0}
+}
+
 type DevicePluginOptions struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Indicates if PreStartContainer call is required before each container start
 	PreStartRequired bool `protobuf:"varint,1,opt,name=pre_start_required,json=preStartRequired,proto3" json:"pre_start_required,omitempty"`
 	// Indicates if GetPreferredAllocation is implemented and available for calling
 	GetPreferredAllocationAvailable bool `protobuf:"varint,2,opt,name=get_preferred_allocation_available,json=getPreferredAllocationAvailable,proto3" json:"get_preferred_allocation_available,omitempty"`
-	unknownFields                   protoimpl.UnknownFields
-	sizeCache                       protoimpl.SizeCache
+	// Indicates that the device plugin understands the structured health model
+	// and may populate device_health_map in ListAndWatchResponse. Kubelet ignores
+	// device_health_map from plugins that do not set this flag.
+	SupportsStructuredHealth bool `protobuf:"varint,3,opt,name=supports_structured_health,json=supportsStructuredHealth,proto3" json:"supports_structured_health,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *DevicePluginOptions) Reset() {
@@ -89,6 +148,13 @@ func (x *DevicePluginOptions) GetPreStartRequired() bool {
 func (x *DevicePluginOptions) GetGetPreferredAllocationAvailable() bool {
 	if x != nil {
 		return x.GetPreferredAllocationAvailable
+	}
+	return false
+}
+
+func (x *DevicePluginOptions) GetSupportsStructuredHealth() bool {
+	if x != nil {
+		return x.SupportsStructuredHealth
 	}
 	return false
 }
@@ -206,10 +272,21 @@ func (*Empty) Descriptor() ([]byte, []int) {
 // Whenever a Device state change or a Device disappears, ListAndWatch
 // returns the new list
 type ListAndWatchResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Devices       []*Device              `protobuf:"bytes,1,rep,name=devices,proto3" json:"devices,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Devices []*Device              `protobuf:"bytes,1,rep,name=devices,proto3" json:"devices,omitempty"`
+	// device_health_map carries optional structured health details keyed by
+	// device ID. It is only honored when the plugin advertised
+	// supports_structured_health in DevicePluginOptions.
+	//
+	// The binary Device.health field remains authoritative for backward
+	// compatibility. When a device appears here, the plugin MUST keep
+	// Device.health consistent with the structured state: "Healthy" for
+	// HEALTH_STATE_HEALTHY or HEALTH_STATE_DEGRADED, "Unhealthy" for
+	// HEALTH_STATE_UNHEALTHY. A device ID absent from this map keeps its
+	// previously reported structured state.
+	DeviceHealthMap map[string]*DeviceHealthDetail `protobuf:"bytes,2,rep,name=device_health_map,json=deviceHealthMap,proto3" json:"device_health_map,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *ListAndWatchResponse) Reset() {
@@ -249,6 +326,90 @@ func (x *ListAndWatchResponse) GetDevices() []*Device {
 	return nil
 }
 
+func (x *ListAndWatchResponse) GetDeviceHealthMap() map[string]*DeviceHealthDetail {
+	if x != nil {
+		return x.DeviceHealthMap
+	}
+	return nil
+}
+
+// DeviceHealthDetail carries structured health for a single device.
+type DeviceHealthDetail struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Structured health state for the device.
+	State HealthState `protobuf:"varint,1,opt,name=state,proto3,enum=v1beta1.HealthState" json:"state,omitempty"`
+	// Optional freeform, human-readable message describing the condition
+	// (for example "ECC double-bit error" or "thermal throttling"). Kubelet
+	// truncates this to at most 1024 bytes on a UTF-8 rune boundary.
+	Message string `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	// Optional vendor-specific error code (for example "XID_63"). Restricted
+	// by kubelet to printable ASCII; other bytes are stripped.
+	VendorCode string `protobuf:"bytes,3,opt,name=vendor_code,json=vendorCode,proto3" json:"vendor_code,omitempty"`
+	// Unix time in nanoseconds when the device transitioned to this state.
+	// 0 means unset; kubelet substitutes the observation time.
+	LastTransitionTime int64 `protobuf:"varint,4,opt,name=last_transition_time,json=lastTransitionTime,proto3" json:"last_transition_time,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *DeviceHealthDetail) Reset() {
+	*x = DeviceHealthDetail{}
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeviceHealthDetail) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeviceHealthDetail) ProtoMessage() {}
+
+func (x *DeviceHealthDetail) ProtoReflect() protoreflect.Message {
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeviceHealthDetail.ProtoReflect.Descriptor instead.
+func (*DeviceHealthDetail) Descriptor() ([]byte, []int) {
+	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *DeviceHealthDetail) GetState() HealthState {
+	if x != nil {
+		return x.State
+	}
+	return HealthState_HEALTH_STATE_UNSPECIFIED
+}
+
+func (x *DeviceHealthDetail) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *DeviceHealthDetail) GetVendorCode() string {
+	if x != nil {
+		return x.VendorCode
+	}
+	return ""
+}
+
+func (x *DeviceHealthDetail) GetLastTransitionTime() int64 {
+	if x != nil {
+		return x.LastTransitionTime
+	}
+	return 0
+}
+
 type TopologyInfo struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Nodes         []*NUMANode            `protobuf:"bytes,1,rep,name=nodes,proto3" json:"nodes,omitempty"`
@@ -258,7 +419,7 @@ type TopologyInfo struct {
 
 func (x *TopologyInfo) Reset() {
 	*x = TopologyInfo{}
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[4]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -270,7 +431,7 @@ func (x *TopologyInfo) String() string {
 func (*TopologyInfo) ProtoMessage() {}
 
 func (x *TopologyInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[4]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -283,7 +444,7 @@ func (x *TopologyInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TopologyInfo.ProtoReflect.Descriptor instead.
 func (*TopologyInfo) Descriptor() ([]byte, []int) {
-	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{4}
+	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *TopologyInfo) GetNodes() []*NUMANode {
@@ -302,7 +463,7 @@ type NUMANode struct {
 
 func (x *NUMANode) Reset() {
 	*x = NUMANode{}
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[5]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -314,7 +475,7 @@ func (x *NUMANode) String() string {
 func (*NUMANode) ProtoMessage() {}
 
 func (x *NUMANode) ProtoReflect() protoreflect.Message {
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[5]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -327,7 +488,7 @@ func (x *NUMANode) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NUMANode.ProtoReflect.Descriptor instead.
 func (*NUMANode) Descriptor() ([]byte, []int) {
-	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{5}
+	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *NUMANode) GetID() int64 {
@@ -362,7 +523,7 @@ type Device struct {
 
 func (x *Device) Reset() {
 	*x = Device{}
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[6]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -374,7 +535,7 @@ func (x *Device) String() string {
 func (*Device) ProtoMessage() {}
 
 func (x *Device) ProtoReflect() protoreflect.Message {
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[6]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -387,7 +548,7 @@ func (x *Device) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Device.ProtoReflect.Descriptor instead.
 func (*Device) Descriptor() ([]byte, []int) {
-	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{6}
+	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Device) GetID() string {
@@ -424,7 +585,7 @@ type PreStartContainerRequest struct {
 
 func (x *PreStartContainerRequest) Reset() {
 	*x = PreStartContainerRequest{}
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[7]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -436,7 +597,7 @@ func (x *PreStartContainerRequest) String() string {
 func (*PreStartContainerRequest) ProtoMessage() {}
 
 func (x *PreStartContainerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[7]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -449,7 +610,7 @@ func (x *PreStartContainerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreStartContainerRequest.ProtoReflect.Descriptor instead.
 func (*PreStartContainerRequest) Descriptor() ([]byte, []int) {
-	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{7}
+	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *PreStartContainerRequest) GetDevicesIds() []string {
@@ -468,7 +629,7 @@ type PreStartContainerResponse struct {
 
 func (x *PreStartContainerResponse) Reset() {
 	*x = PreStartContainerResponse{}
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[8]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -480,7 +641,7 @@ func (x *PreStartContainerResponse) String() string {
 func (*PreStartContainerResponse) ProtoMessage() {}
 
 func (x *PreStartContainerResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[8]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -493,7 +654,7 @@ func (x *PreStartContainerResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreStartContainerResponse.ProtoReflect.Descriptor instead.
 func (*PreStartContainerResponse) Descriptor() ([]byte, []int) {
-	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{8}
+	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{9}
 }
 
 // PreferredAllocationRequest is passed via a call to GetPreferredAllocation()
@@ -510,7 +671,7 @@ type PreferredAllocationRequest struct {
 
 func (x *PreferredAllocationRequest) Reset() {
 	*x = PreferredAllocationRequest{}
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[9]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -522,7 +683,7 @@ func (x *PreferredAllocationRequest) String() string {
 func (*PreferredAllocationRequest) ProtoMessage() {}
 
 func (x *PreferredAllocationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[9]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -535,7 +696,7 @@ func (x *PreferredAllocationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreferredAllocationRequest.ProtoReflect.Descriptor instead.
 func (*PreferredAllocationRequest) Descriptor() ([]byte, []int) {
-	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{9}
+	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *PreferredAllocationRequest) GetContainerRequests() []*ContainerPreferredAllocationRequest {
@@ -559,7 +720,7 @@ type ContainerPreferredAllocationRequest struct {
 
 func (x *ContainerPreferredAllocationRequest) Reset() {
 	*x = ContainerPreferredAllocationRequest{}
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[10]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -571,7 +732,7 @@ func (x *ContainerPreferredAllocationRequest) String() string {
 func (*ContainerPreferredAllocationRequest) ProtoMessage() {}
 
 func (x *ContainerPreferredAllocationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[10]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -584,7 +745,7 @@ func (x *ContainerPreferredAllocationRequest) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use ContainerPreferredAllocationRequest.ProtoReflect.Descriptor instead.
 func (*ContainerPreferredAllocationRequest) Descriptor() ([]byte, []int) {
-	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{10}
+	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ContainerPreferredAllocationRequest) GetAvailableDeviceIDs() []string {
@@ -619,7 +780,7 @@ type PreferredAllocationResponse struct {
 
 func (x *PreferredAllocationResponse) Reset() {
 	*x = PreferredAllocationResponse{}
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[11]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -631,7 +792,7 @@ func (x *PreferredAllocationResponse) String() string {
 func (*PreferredAllocationResponse) ProtoMessage() {}
 
 func (x *PreferredAllocationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[11]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -644,7 +805,7 @@ func (x *PreferredAllocationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreferredAllocationResponse.ProtoReflect.Descriptor instead.
 func (*PreferredAllocationResponse) Descriptor() ([]byte, []int) {
-	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{11}
+	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *PreferredAllocationResponse) GetContainerResponses() []*ContainerPreferredAllocationResponse {
@@ -663,7 +824,7 @@ type ContainerPreferredAllocationResponse struct {
 
 func (x *ContainerPreferredAllocationResponse) Reset() {
 	*x = ContainerPreferredAllocationResponse{}
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[12]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -675,7 +836,7 @@ func (x *ContainerPreferredAllocationResponse) String() string {
 func (*ContainerPreferredAllocationResponse) ProtoMessage() {}
 
 func (x *ContainerPreferredAllocationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[12]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -688,7 +849,7 @@ func (x *ContainerPreferredAllocationResponse) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use ContainerPreferredAllocationResponse.ProtoReflect.Descriptor instead.
 func (*ContainerPreferredAllocationResponse) Descriptor() ([]byte, []int) {
-	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{12}
+	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ContainerPreferredAllocationResponse) GetDeviceIDs() []string {
@@ -713,7 +874,7 @@ type AllocateRequest struct {
 
 func (x *AllocateRequest) Reset() {
 	*x = AllocateRequest{}
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[13]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -725,7 +886,7 @@ func (x *AllocateRequest) String() string {
 func (*AllocateRequest) ProtoMessage() {}
 
 func (x *AllocateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[13]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -738,7 +899,7 @@ func (x *AllocateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AllocateRequest.ProtoReflect.Descriptor instead.
 func (*AllocateRequest) Descriptor() ([]byte, []int) {
-	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{13}
+	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *AllocateRequest) GetContainerRequests() []*ContainerAllocateRequest {
@@ -757,7 +918,7 @@ type ContainerAllocateRequest struct {
 
 func (x *ContainerAllocateRequest) Reset() {
 	*x = ContainerAllocateRequest{}
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[14]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -769,7 +930,7 @@ func (x *ContainerAllocateRequest) String() string {
 func (*ContainerAllocateRequest) ProtoMessage() {}
 
 func (x *ContainerAllocateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[14]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -782,7 +943,7 @@ func (x *ContainerAllocateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ContainerAllocateRequest.ProtoReflect.Descriptor instead.
 func (*ContainerAllocateRequest) Descriptor() ([]byte, []int) {
-	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{14}
+	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ContainerAllocateRequest) GetDevicesIds() []string {
@@ -806,7 +967,7 @@ type CDIDevice struct {
 
 func (x *CDIDevice) Reset() {
 	*x = CDIDevice{}
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[15]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -818,7 +979,7 @@ func (x *CDIDevice) String() string {
 func (*CDIDevice) ProtoMessage() {}
 
 func (x *CDIDevice) ProtoReflect() protoreflect.Message {
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[15]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -831,7 +992,7 @@ func (x *CDIDevice) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CDIDevice.ProtoReflect.Descriptor instead.
 func (*CDIDevice) Descriptor() ([]byte, []int) {
-	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{15}
+	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *CDIDevice) GetName() string {
@@ -858,7 +1019,7 @@ type AllocateResponse struct {
 
 func (x *AllocateResponse) Reset() {
 	*x = AllocateResponse{}
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[16]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -870,7 +1031,7 @@ func (x *AllocateResponse) String() string {
 func (*AllocateResponse) ProtoMessage() {}
 
 func (x *AllocateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[16]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -883,7 +1044,7 @@ func (x *AllocateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AllocateResponse.ProtoReflect.Descriptor instead.
 func (*AllocateResponse) Descriptor() ([]byte, []int) {
-	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{16}
+	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *AllocateResponse) GetContainerResponses() []*ContainerAllocateResponse {
@@ -911,7 +1072,7 @@ type ContainerAllocateResponse struct {
 
 func (x *ContainerAllocateResponse) Reset() {
 	*x = ContainerAllocateResponse{}
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[17]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -923,7 +1084,7 @@ func (x *ContainerAllocateResponse) String() string {
 func (*ContainerAllocateResponse) ProtoMessage() {}
 
 func (x *ContainerAllocateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[17]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -936,7 +1097,7 @@ func (x *ContainerAllocateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ContainerAllocateResponse.ProtoReflect.Descriptor instead.
 func (*ContainerAllocateResponse) Descriptor() ([]byte, []int) {
-	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{17}
+	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ContainerAllocateResponse) GetEnvs() map[string]string {
@@ -990,7 +1151,7 @@ type Mount struct {
 
 func (x *Mount) Reset() {
 	*x = Mount{}
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[18]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1002,7 +1163,7 @@ func (x *Mount) String() string {
 func (*Mount) ProtoMessage() {}
 
 func (x *Mount) ProtoReflect() protoreflect.Message {
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[18]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1015,7 +1176,7 @@ func (x *Mount) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Mount.ProtoReflect.Descriptor instead.
 func (*Mount) Descriptor() ([]byte, []int) {
-	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{18}
+	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *Mount) GetContainerPath() string {
@@ -1057,7 +1218,7 @@ type DeviceSpec struct {
 
 func (x *DeviceSpec) Reset() {
 	*x = DeviceSpec{}
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[19]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1069,7 +1230,7 @@ func (x *DeviceSpec) String() string {
 func (*DeviceSpec) ProtoMessage() {}
 
 func (x *DeviceSpec) ProtoReflect() protoreflect.Message {
-	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[19]
+	mi := &file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1082,7 +1243,7 @@ func (x *DeviceSpec) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeviceSpec.ProtoReflect.Descriptor instead.
 func (*DeviceSpec) Descriptor() ([]byte, []int) {
-	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{19}
+	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *DeviceSpec) GetContainerPath() string {
@@ -1110,18 +1271,29 @@ var File_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto prot
 
 const file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDesc = "" +
 	"\n" +
-	"Bstaging/src/k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1/api.proto\x12\av1beta1\"\x90\x01\n" +
+	"Bstaging/src/k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1/api.proto\x12\av1beta1\"\xce\x01\n" +
 	"\x13DevicePluginOptions\x12,\n" +
 	"\x12pre_start_required\x18\x01 \x01(\bR\x10preStartRequired\x12K\n" +
-	"\"get_preferred_allocation_available\x18\x02 \x01(\bR\x1fgetPreferredAllocationAvailable\"\xa4\x01\n" +
+	"\"get_preferred_allocation_available\x18\x02 \x01(\bR\x1fgetPreferredAllocationAvailable\x12<\n" +
+	"\x1asupports_structured_health\x18\x03 \x01(\bR\x18supportsStructuredHealth\"\xa4\x01\n" +
 	"\x0fRegisterRequest\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x12\x1a\n" +
 	"\bendpoint\x18\x02 \x01(\tR\bendpoint\x12#\n" +
 	"\rresource_name\x18\x03 \x01(\tR\fresourceName\x126\n" +
 	"\aoptions\x18\x04 \x01(\v2\x1c.v1beta1.DevicePluginOptionsR\aoptions\"\a\n" +
-	"\x05Empty\"A\n" +
+	"\x05Empty\"\x82\x02\n" +
 	"\x14ListAndWatchResponse\x12)\n" +
-	"\adevices\x18\x01 \x03(\v2\x0f.v1beta1.DeviceR\adevices\"7\n" +
+	"\adevices\x18\x01 \x03(\v2\x0f.v1beta1.DeviceR\adevices\x12^\n" +
+	"\x11device_health_map\x18\x02 \x03(\v22.v1beta1.ListAndWatchResponse.DeviceHealthMapEntryR\x0fdeviceHealthMap\x1a_\n" +
+	"\x14DeviceHealthMapEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x121\n" +
+	"\x05value\x18\x02 \x01(\v2\x1b.v1beta1.DeviceHealthDetailR\x05value:\x028\x01\"\xad\x01\n" +
+	"\x12DeviceHealthDetail\x12*\n" +
+	"\x05state\x18\x01 \x01(\x0e2\x14.v1beta1.HealthStateR\x05state\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1f\n" +
+	"\vvendor_code\x18\x03 \x01(\tR\n" +
+	"vendorCode\x120\n" +
+	"\x14last_transition_time\x18\x04 \x01(\x03R\x12lastTransitionTime\"7\n" +
 	"\fTopologyInfo\x12'\n" +
 	"\x05nodes\x18\x01 \x03(\v2\x11.v1beta1.NUMANodeR\x05nodes\"\x1a\n" +
 	"\bNUMANode\x12\x0e\n" +
@@ -1174,7 +1346,12 @@ const file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_ra
 	"DeviceSpec\x12%\n" +
 	"\x0econtainer_path\x18\x01 \x01(\tR\rcontainerPath\x12\x1b\n" +
 	"\thost_path\x18\x02 \x01(\tR\bhostPath\x12 \n" +
-	"\vpermissions\x18\x03 \x01(\tR\vpermissions2F\n" +
+	"\vpermissions\x18\x03 \x01(\tR\vpermissions*|\n" +
+	"\vHealthState\x12\x1c\n" +
+	"\x18HEALTH_STATE_UNSPECIFIED\x10\x00\x12\x18\n" +
+	"\x14HEALTH_STATE_HEALTHY\x10\x01\x12\x19\n" +
+	"\x15HEALTH_STATE_DEGRADED\x10\x02\x12\x1a\n" +
+	"\x16HEALTH_STATE_UNHEALTHY\x10\x032F\n" +
 	"\fRegistration\x126\n" +
 	"\bRegister\x12\x18.v1beta1.RegisterRequest\x1a\x0e.v1beta1.Empty\"\x002\xa3\x03\n" +
 	"\fDevicePlugin\x12H\n" +
@@ -1196,62 +1373,69 @@ func file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_raw
 	return file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDescData
 }
 
-var file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_goTypes = []any{
-	(*DevicePluginOptions)(nil),                  // 0: v1beta1.DevicePluginOptions
-	(*RegisterRequest)(nil),                      // 1: v1beta1.RegisterRequest
-	(*Empty)(nil),                                // 2: v1beta1.Empty
-	(*ListAndWatchResponse)(nil),                 // 3: v1beta1.ListAndWatchResponse
-	(*TopologyInfo)(nil),                         // 4: v1beta1.TopologyInfo
-	(*NUMANode)(nil),                             // 5: v1beta1.NUMANode
-	(*Device)(nil),                               // 6: v1beta1.Device
-	(*PreStartContainerRequest)(nil),             // 7: v1beta1.PreStartContainerRequest
-	(*PreStartContainerResponse)(nil),            // 8: v1beta1.PreStartContainerResponse
-	(*PreferredAllocationRequest)(nil),           // 9: v1beta1.PreferredAllocationRequest
-	(*ContainerPreferredAllocationRequest)(nil),  // 10: v1beta1.ContainerPreferredAllocationRequest
-	(*PreferredAllocationResponse)(nil),          // 11: v1beta1.PreferredAllocationResponse
-	(*ContainerPreferredAllocationResponse)(nil), // 12: v1beta1.ContainerPreferredAllocationResponse
-	(*AllocateRequest)(nil),                      // 13: v1beta1.AllocateRequest
-	(*ContainerAllocateRequest)(nil),             // 14: v1beta1.ContainerAllocateRequest
-	(*CDIDevice)(nil),                            // 15: v1beta1.CDIDevice
-	(*AllocateResponse)(nil),                     // 16: v1beta1.AllocateResponse
-	(*ContainerAllocateResponse)(nil),            // 17: v1beta1.ContainerAllocateResponse
-	(*Mount)(nil),                                // 18: v1beta1.Mount
-	(*DeviceSpec)(nil),                           // 19: v1beta1.DeviceSpec
-	nil,                                          // 20: v1beta1.ContainerAllocateResponse.EnvsEntry
-	nil,                                          // 21: v1beta1.ContainerAllocateResponse.AnnotationsEntry
+	(HealthState)(0),                             // 0: v1beta1.HealthState
+	(*DevicePluginOptions)(nil),                  // 1: v1beta1.DevicePluginOptions
+	(*RegisterRequest)(nil),                      // 2: v1beta1.RegisterRequest
+	(*Empty)(nil),                                // 3: v1beta1.Empty
+	(*ListAndWatchResponse)(nil),                 // 4: v1beta1.ListAndWatchResponse
+	(*DeviceHealthDetail)(nil),                   // 5: v1beta1.DeviceHealthDetail
+	(*TopologyInfo)(nil),                         // 6: v1beta1.TopologyInfo
+	(*NUMANode)(nil),                             // 7: v1beta1.NUMANode
+	(*Device)(nil),                               // 8: v1beta1.Device
+	(*PreStartContainerRequest)(nil),             // 9: v1beta1.PreStartContainerRequest
+	(*PreStartContainerResponse)(nil),            // 10: v1beta1.PreStartContainerResponse
+	(*PreferredAllocationRequest)(nil),           // 11: v1beta1.PreferredAllocationRequest
+	(*ContainerPreferredAllocationRequest)(nil),  // 12: v1beta1.ContainerPreferredAllocationRequest
+	(*PreferredAllocationResponse)(nil),          // 13: v1beta1.PreferredAllocationResponse
+	(*ContainerPreferredAllocationResponse)(nil), // 14: v1beta1.ContainerPreferredAllocationResponse
+	(*AllocateRequest)(nil),                      // 15: v1beta1.AllocateRequest
+	(*ContainerAllocateRequest)(nil),             // 16: v1beta1.ContainerAllocateRequest
+	(*CDIDevice)(nil),                            // 17: v1beta1.CDIDevice
+	(*AllocateResponse)(nil),                     // 18: v1beta1.AllocateResponse
+	(*ContainerAllocateResponse)(nil),            // 19: v1beta1.ContainerAllocateResponse
+	(*Mount)(nil),                                // 20: v1beta1.Mount
+	(*DeviceSpec)(nil),                           // 21: v1beta1.DeviceSpec
+	nil,                                          // 22: v1beta1.ListAndWatchResponse.DeviceHealthMapEntry
+	nil,                                          // 23: v1beta1.ContainerAllocateResponse.EnvsEntry
+	nil,                                          // 24: v1beta1.ContainerAllocateResponse.AnnotationsEntry
 }
 var file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_depIdxs = []int32{
-	0,  // 0: v1beta1.RegisterRequest.options:type_name -> v1beta1.DevicePluginOptions
-	6,  // 1: v1beta1.ListAndWatchResponse.devices:type_name -> v1beta1.Device
-	5,  // 2: v1beta1.TopologyInfo.nodes:type_name -> v1beta1.NUMANode
-	4,  // 3: v1beta1.Device.topology:type_name -> v1beta1.TopologyInfo
-	10, // 4: v1beta1.PreferredAllocationRequest.container_requests:type_name -> v1beta1.ContainerPreferredAllocationRequest
-	12, // 5: v1beta1.PreferredAllocationResponse.container_responses:type_name -> v1beta1.ContainerPreferredAllocationResponse
-	14, // 6: v1beta1.AllocateRequest.container_requests:type_name -> v1beta1.ContainerAllocateRequest
-	17, // 7: v1beta1.AllocateResponse.container_responses:type_name -> v1beta1.ContainerAllocateResponse
-	20, // 8: v1beta1.ContainerAllocateResponse.envs:type_name -> v1beta1.ContainerAllocateResponse.EnvsEntry
-	18, // 9: v1beta1.ContainerAllocateResponse.mounts:type_name -> v1beta1.Mount
-	19, // 10: v1beta1.ContainerAllocateResponse.devices:type_name -> v1beta1.DeviceSpec
-	21, // 11: v1beta1.ContainerAllocateResponse.annotations:type_name -> v1beta1.ContainerAllocateResponse.AnnotationsEntry
-	15, // 12: v1beta1.ContainerAllocateResponse.cdi_devices:type_name -> v1beta1.CDIDevice
-	1,  // 13: v1beta1.Registration.Register:input_type -> v1beta1.RegisterRequest
-	2,  // 14: v1beta1.DevicePlugin.GetDevicePluginOptions:input_type -> v1beta1.Empty
-	2,  // 15: v1beta1.DevicePlugin.ListAndWatch:input_type -> v1beta1.Empty
-	9,  // 16: v1beta1.DevicePlugin.GetPreferredAllocation:input_type -> v1beta1.PreferredAllocationRequest
-	13, // 17: v1beta1.DevicePlugin.Allocate:input_type -> v1beta1.AllocateRequest
-	7,  // 18: v1beta1.DevicePlugin.PreStartContainer:input_type -> v1beta1.PreStartContainerRequest
-	2,  // 19: v1beta1.Registration.Register:output_type -> v1beta1.Empty
-	0,  // 20: v1beta1.DevicePlugin.GetDevicePluginOptions:output_type -> v1beta1.DevicePluginOptions
-	3,  // 21: v1beta1.DevicePlugin.ListAndWatch:output_type -> v1beta1.ListAndWatchResponse
-	11, // 22: v1beta1.DevicePlugin.GetPreferredAllocation:output_type -> v1beta1.PreferredAllocationResponse
-	16, // 23: v1beta1.DevicePlugin.Allocate:output_type -> v1beta1.AllocateResponse
-	8,  // 24: v1beta1.DevicePlugin.PreStartContainer:output_type -> v1beta1.PreStartContainerResponse
-	19, // [19:25] is the sub-list for method output_type
-	13, // [13:19] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	1,  // 0: v1beta1.RegisterRequest.options:type_name -> v1beta1.DevicePluginOptions
+	8,  // 1: v1beta1.ListAndWatchResponse.devices:type_name -> v1beta1.Device
+	22, // 2: v1beta1.ListAndWatchResponse.device_health_map:type_name -> v1beta1.ListAndWatchResponse.DeviceHealthMapEntry
+	0,  // 3: v1beta1.DeviceHealthDetail.state:type_name -> v1beta1.HealthState
+	7,  // 4: v1beta1.TopologyInfo.nodes:type_name -> v1beta1.NUMANode
+	6,  // 5: v1beta1.Device.topology:type_name -> v1beta1.TopologyInfo
+	12, // 6: v1beta1.PreferredAllocationRequest.container_requests:type_name -> v1beta1.ContainerPreferredAllocationRequest
+	14, // 7: v1beta1.PreferredAllocationResponse.container_responses:type_name -> v1beta1.ContainerPreferredAllocationResponse
+	16, // 8: v1beta1.AllocateRequest.container_requests:type_name -> v1beta1.ContainerAllocateRequest
+	19, // 9: v1beta1.AllocateResponse.container_responses:type_name -> v1beta1.ContainerAllocateResponse
+	23, // 10: v1beta1.ContainerAllocateResponse.envs:type_name -> v1beta1.ContainerAllocateResponse.EnvsEntry
+	20, // 11: v1beta1.ContainerAllocateResponse.mounts:type_name -> v1beta1.Mount
+	21, // 12: v1beta1.ContainerAllocateResponse.devices:type_name -> v1beta1.DeviceSpec
+	24, // 13: v1beta1.ContainerAllocateResponse.annotations:type_name -> v1beta1.ContainerAllocateResponse.AnnotationsEntry
+	17, // 14: v1beta1.ContainerAllocateResponse.cdi_devices:type_name -> v1beta1.CDIDevice
+	5,  // 15: v1beta1.ListAndWatchResponse.DeviceHealthMapEntry.value:type_name -> v1beta1.DeviceHealthDetail
+	2,  // 16: v1beta1.Registration.Register:input_type -> v1beta1.RegisterRequest
+	3,  // 17: v1beta1.DevicePlugin.GetDevicePluginOptions:input_type -> v1beta1.Empty
+	3,  // 18: v1beta1.DevicePlugin.ListAndWatch:input_type -> v1beta1.Empty
+	11, // 19: v1beta1.DevicePlugin.GetPreferredAllocation:input_type -> v1beta1.PreferredAllocationRequest
+	15, // 20: v1beta1.DevicePlugin.Allocate:input_type -> v1beta1.AllocateRequest
+	9,  // 21: v1beta1.DevicePlugin.PreStartContainer:input_type -> v1beta1.PreStartContainerRequest
+	3,  // 22: v1beta1.Registration.Register:output_type -> v1beta1.Empty
+	1,  // 23: v1beta1.DevicePlugin.GetDevicePluginOptions:output_type -> v1beta1.DevicePluginOptions
+	4,  // 24: v1beta1.DevicePlugin.ListAndWatch:output_type -> v1beta1.ListAndWatchResponse
+	13, // 25: v1beta1.DevicePlugin.GetPreferredAllocation:output_type -> v1beta1.PreferredAllocationResponse
+	18, // 26: v1beta1.DevicePlugin.Allocate:output_type -> v1beta1.AllocateResponse
+	10, // 27: v1beta1.DevicePlugin.PreStartContainer:output_type -> v1beta1.PreStartContainerResponse
+	22, // [22:28] is the sub-list for method output_type
+	16, // [16:22] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_init() }
@@ -1264,13 +1448,14 @@ func file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_ini
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDesc), len(file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   22,
+			NumEnums:      1,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   2,
 		},
 		GoTypes:           file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_goTypes,
 		DependencyIndexes: file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_depIdxs,
+		EnumInfos:         file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_enumTypes,
 		MessageInfos:      file_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto_msgTypes,
 	}.Build()
 	File_staging_src_k8s_io_kubelet_pkg_apis_deviceplugin_v1beta1_api_proto = out.File
