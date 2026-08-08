@@ -26,7 +26,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/metrics/testutil"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
@@ -53,6 +55,23 @@ func (r *mockRangeRegistry) CreateOrUpdate(alloc *api.RangeAllocation) error {
 	return r.updateErr
 }
 
+func newTestRepair(t *testing.T, fakeClient *fake.Clientset, portRange net.PortRange, registry *mockRangeRegistry) *Repair {
+	t.Helper()
+
+	informerFactory := informers.NewSharedInformerFactory(fakeClient, 0)
+	serviceInformer := informerFactory.Core().V1().Services()
+	repair := NewRepair(0, serviceInformer, fakeClient.EventsV1(), portRange, registry)
+
+	stopCh := make(chan struct{})
+	t.Cleanup(func() { close(stopCh) })
+	informerFactory.Start(stopCh)
+	if !cache.WaitForCacheSync(stopCh, repair.servicesSynced) {
+		t.Fatal("failed to sync Service informer cache")
+	}
+
+	return repair
+}
+
 func TestRepair(t *testing.T) {
 	clearMetrics()
 	fakeClient := fake.NewSimpleClientset()
@@ -60,7 +79,7 @@ func TestRepair(t *testing.T) {
 		item: &api.RangeAllocation{Range: "100-200"},
 	}
 	pr, _ := net.ParsePortRange(registry.item.Range)
-	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), *pr, registry)
+	r := newTestRepair(t, fakeClient, *pr, registry)
 
 	if err := r.runOnce(); err != nil {
 		t.Fatal(err)
@@ -80,7 +99,7 @@ func TestRepair(t *testing.T) {
 		item:      &api.RangeAllocation{Range: "100-200"},
 		updateErr: fmt.Errorf("test error"),
 	}
-	r = NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), *pr, registry)
+	r = newTestRepair(t, fakeClient, *pr, registry)
 	if err := r.runOnce(); !strings.Contains(err.Error(), ": test error") {
 		t.Fatal(err)
 	}
@@ -120,7 +139,7 @@ func TestRepairLeak(t *testing.T) {
 		},
 	}
 
-	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), *pr, registry)
+	r := newTestRepair(t, fakeClient, *pr, registry)
 	// Run through the "leak detection holdoff" loops.
 	for i := 0; i < (numRepairsBeforeLeakCleanup - 1); i++ {
 		if err := r.runOnce(); err != nil {
@@ -217,7 +236,7 @@ func TestRepairWithExisting(t *testing.T) {
 			Data:  dst.Data,
 		},
 	}
-	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), *pr, registry)
+	r := newTestRepair(t, fakeClient, *pr, registry)
 	if err := r.runOnce(); err != nil {
 		t.Fatal(err)
 	}
