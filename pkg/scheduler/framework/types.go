@@ -587,6 +587,8 @@ type QueuedPodInfo struct {
 	// indicate queueing hint misconfigurations or event handling bugs.
 	// This flag is cleared when the pod returns to the queue for any reason.
 	WasFlushedFromUnschedulable bool
+	// FlushTimestamp tracks the last time this pod was flushed from the unschedulable queue.
+	FlushTimestamp time.Time
 	// The time when the pod is added to the queue for the first time. The pod may be added
 	// back to the queue multiple times before it's successfully scheduled.
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
@@ -659,11 +661,16 @@ func (pqi *QueuedPodInfo) Gated() bool {
 	return pqi.GatingPlugin != ""
 }
 
+func (qp *QueuedPodInfo) GetFlushTimestamp() time.Time {
+	return qp.FlushTimestamp
+}
+
 // DeepCopy returns a deep copy of the QueuedPodInfo object.
 func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 	return &QueuedPodInfo{
 		PodInfo:                 pqi.PodInfo.DeepCopy(),
 		Timestamp:               pqi.Timestamp,
+		FlushTimestamp:          pqi.FlushTimestamp,
 		Attempts:                pqi.Attempts,
 		UnschedulableCount:      pqi.UnschedulableCount,
 		InitialAttemptTimestamp: pqi.InitialAttemptTimestamp,
@@ -691,6 +698,10 @@ func (pqi *QueuedPodInfo) ClearRejectorPlugins() {
 	pqi.PendingPlugins.Clear()
 	pqi.GatingPlugin = ""
 	pqi.GatingPluginEvents = nil
+}
+
+func (pqi *QueuedPodInfo) SetFlushTimestamp(t time.Time) {
+	pqi.FlushTimestamp = t
 }
 
 // QueuedPodGroupInfo is a PodGroupInfo wrapper with additional information related to

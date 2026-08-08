@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -486,6 +487,7 @@ func TestPreemption(t *testing.T) {
 func TestAsyncPreemption(t *testing.T) {
 	const podBlockedInBindingName = "pod-blocked-in-binding"
 	const reservingPodName = "reserving-pod"
+	const blockingPodName = "blocking-pod"
 
 	type createPod struct {
 		pod *v1.Pod
@@ -533,6 +535,11 @@ func TestAsyncPreemption(t *testing.T) {
 		// verifyPodInUnschedulable waits for some time and confirms that the given pod is in the unschedulable pool.
 		// The value is the name of the checked pod.
 		verifyPodInUnschedulable string
+		// flushUnschedulable flushes the unschedulable queue.
+		flushUnschedulable bool
+		// waitForPodsDeleted waits for the specified pods to be deleted from the cluster.
+		// The value is the array of Pod indexes representing the order of Pod creation.
+		waitForPodsDeleted []int
 	}
 
 	tests := []struct {
@@ -1058,6 +1065,62 @@ func TestAsyncPreemption(t *testing.T) {
 			},
 		},
 		{
+			name: "gated preemptor is eventually scheduled even if victim deletion doesn't raise queue hints",
+			scenarios: []scenario{
+				{
+					name: "create victim pods",
+					createPod: &createPod{
+						pod:   st.MakePod().GenerateName(fmt.Sprintf("victim-%s-", blockingPodName)).Node("node").Priority(1).Container("image").ZeroTerminationGracePeriod().Obj(),
+						count: new(2),
+					},
+				},
+				{
+					name: "create preemptor",
+					createPod: &createPod{
+						pod: st.MakePod().Name("preemptor").Priority(100).Container("image").Obj(),
+					},
+				},
+				{
+					name: "schedule preemptor",
+					schedulePod: &schedulePod{
+						podName:             "preemptor",
+						expectUnschedulable: true,
+					},
+				},
+				{
+					name:                 "verify preemptor running preemption",
+					podRunningPreemption: new(2),
+				},
+				{
+					name:            "gate preemptor",
+					podGatedInQueue: "preemptor",
+				},
+				{
+					name:               "complete preemption",
+					completePreemption: "preemptor",
+				},
+				{
+					name:               "wait for victims to be deleted",
+					waitForPodsDeleted: []int{0, 1},
+				},
+				{
+					name:                     "verify preemptor is still in unschedulable queue",
+					verifyPodInUnschedulable: "preemptor",
+				},
+				{
+					name:               "flush scheduling queue",
+					flushUnschedulable: true,
+				},
+				{
+					name: "verify preemptor scheduled",
+					schedulePod: &schedulePod{
+						podName:       "preemptor",
+						expectSuccess: true,
+					},
+				},
+			},
+		},
+		{
 			// This scenario verifies the fix for https://github.com/kubernetes/kubernetes/issues/134217
 			// Scenario reproduces the issue, but with a victim that is under graceful termination and sis reserving some resources required by the preemptor:
 			// Victim pod takes long in binding. Preemptor pod attempts preemption, goes to unschedulable, then the victim's graceful termination is initiated.
@@ -1299,6 +1362,19 @@ func TestAsyncPreemption(t *testing.T) {
 					t.Fatalf("Error registering a reserving plugin: %v", err)
 				}
 
+				// Register fake plugin that will filter nodes with a specific name.
+				// Importantly, this plugin always returns QueueSkip as the queue hint, simulating faulty queue hint implementation.
+				queueSkipFilterPluginName := "queueSkipFilterPlugin"
+				err = registry.Register(queueSkipFilterPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+					return &queueSkipFilterPlugin{
+						name:              queueSkipFilterPluginName,
+						nameOfBlockingPod: blockingPodName,
+					}, nil
+				})
+				if err != nil {
+					t.Fatalf("Error registering a queueSkipFilterPlugin plugin: %v", err)
+				}
+
 				cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 					Profiles: []configv1.KubeSchedulerProfile{{
 						SchedulerName: ptr.To(v1.DefaultSchedulerName),
@@ -1308,6 +1384,7 @@ func TestAsyncPreemption(t *testing.T) {
 									{Name: blockingBindPluginName},
 									{Name: delayedPreemptionPluginName},
 									{Name: reservingPluginName},
+									{Name: queueSkipFilterPluginName},
 								},
 								Disabled: []configv1.Plugin{
 									{Name: names.DefaultPreemption},
@@ -1447,6 +1524,9 @@ func TestAsyncPreemption(t *testing.T) {
 						if !podInUnschedulablePodPool(t, testCtx.Scheduler.SchedulingQueue, scenario.podGatedInQueue) {
 							t.Fatalf("Expected the pod %s to be in the queue even after the activation", scenario.podGatedInQueue)
 						}
+						if pInfo, _ := testCtx.Scheduler.SchedulingQueue.GetPod(scenario.podGatedInQueue, testCtx.NS.Name); pInfo == nil || !pInfo.Gated() {
+							t.Fatalf("Expected the pod %s to be gated", scenario.podGatedInQueue)
+						}
 					case scenario.podRunningPreemption != nil:
 						if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 							return preemptionPlugin.Executor.IsPodRunningPreemption(createdPods[*scenario.podRunningPreemption].GetUID()), nil
@@ -1466,6 +1546,15 @@ func TestAsyncPreemption(t *testing.T) {
 							// If timeout was reached or context was cancelled without finding that vanished from unschedulable, it means the state is as expected.
 							// If a different error occurred, it means that the pod got unexpectedly activated, or something else went wrong.
 							t.Fatalf("Error in scenario verifyPodInUnschedulable: %v", err)
+						}
+					case scenario.flushUnschedulable:
+						testCtx.Scheduler.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
+					case len(scenario.waitForPodsDeleted) != 0:
+						for _, podIndex := range scenario.waitForPodsDeleted {
+							podName := createdPods[podIndex].Name
+							if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodDeleted(testCtx.Ctx, cs, testCtx.NS.Name, podName)); err != nil {
+								t.Fatalf("Failed to wait for pod %s to be deleted: %v", podName, err)
+							}
 						}
 					}
 				}
@@ -1504,6 +1593,38 @@ func unschedulablePod(t *testing.T, queue queue.SchedulingQueue, podName string)
 	}
 	return nil
 }
+
+type queueSkipFilterPlugin struct {
+	name              string
+	nameOfBlockingPod string
+}
+
+func (fp *queueSkipFilterPlugin) EventsToRegister(context.Context) ([]fwk.ClusterEventWithHint, error) {
+	return []fwk.ClusterEventWithHint{
+		{
+			Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Delete},
+			QueueingHintFn: func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (fwk.QueueingHint, error) {
+				return fwk.QueueSkip, nil
+			},
+		},
+	}, nil
+}
+
+func (fp *queueSkipFilterPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	for _, scheduledPod := range nodeInfo.GetPods() {
+		if strings.Contains(scheduledPod.GetPod().Name, fp.nameOfBlockingPod) {
+			return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("node %s has blocking pod %s", nodeInfo.Node().Name, scheduledPod.GetPod().Name))
+		}
+	}
+	return nil
+}
+
+func (fp *queueSkipFilterPlugin) Name() string {
+	return fp.name
+}
+
+var _ fwk.FilterPlugin = &queueSkipFilterPlugin{}
+var _ fwk.EnqueueExtensions = &queueSkipFilterPlugin{}
 
 // blockingBindPlugin is a fake plugin that simulates a long binding operation.
 // Underneath it calls realPlugin.Bind(), after receiving a signal that binding can be unblocked.

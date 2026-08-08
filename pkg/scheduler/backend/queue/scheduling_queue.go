@@ -693,6 +693,9 @@ func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, pInfo *framework.Queue
 			if p.unschedulablePods.get(pInfo.Pod) == nil {
 				logger.V(5).Info("Pod moved to an internal scheduling queue, because the pod is gated", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", unschedulableQ)
 			}
+			// Clearing WasFlushedFromUnschedulable is typically done on scheduling failure, but in case the flushed pod was gated, it never attempts scheduling.
+			// We clear it here to ensure it's not set the next time the pod is woken up by a non-flush event.
+			pInfo.WasFlushedFromUnschedulable = false
 			p.unschedulablePods.addOrUpdate(pInfo, gatedBefore, event)
 			return
 		}
@@ -726,6 +729,9 @@ func (p *PriorityQueue) moveToBackoffQ(logger klog.Logger, pInfo *framework.Queu
 			if p.unschedulablePods.get(pInfo.Pod) == nil {
 				logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", unschedulableQ)
 			}
+			// Clearing WasFlushedFromUnschedulable is typically done on scheduling failure, but in case the flushed pod was gated, it never attempts scheduling.
+			// We clear it here to ensure it's not set the next time the pod is woken up by a non-flush event.
+			pInfo.WasFlushedFromUnschedulable = false
 			p.unschedulablePods.addOrUpdate(pInfo, gatedBefore, event)
 			return false
 		}
@@ -937,6 +943,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 	pInfo.BackoffExpiration = time.Time{}
 	// Clear the flush flag since the pod is returning to the queue after a scheduling attempt.
 	pInfo.WasFlushedFromUnschedulable = false
+	pInfo.FlushTimestamp = time.Time{}
 
 	if !p.isSchedulingQueueHintEnabled {
 		// fall back to the old behavior which doesn't depend on the queueing hint.
@@ -990,9 +997,13 @@ func (p *PriorityQueue) flushUnschedulablePodsLeftover(logger klog.Logger) {
 	currentTime := p.clock.Now()
 	for _, pInfo := range p.unschedulablePods.podInfoMap {
 		lastScheduleTime := pInfo.Timestamp
+		if flushTime := pInfo.GetFlushTimestamp(); flushTime.After(lastScheduleTime) {
+			lastScheduleTime = flushTime
+		}
 		if currentTime.Sub(lastScheduleTime) > p.podMaxInUnschedulablePodsDuration {
 			// Mark this pod as flushed so we can detect if it schedules soon after
 			pInfo.WasFlushedFromUnschedulable = true
+			pInfo.SetFlushTimestamp(currentTime)
 			podsToMove = append(podsToMove, pInfo)
 		}
 	}
@@ -1313,7 +1324,10 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 
 	activated := false
 	for _, pInfo := range podInfoList {
-		if pInfo.Gated() && !framework.MatchAnyClusterEvent(event, pInfo.GatingPluginEvents) {
+		// As an optimization, we avoid re-evaluating gated pods for events unrelated to their gating plugin.
+		// However, wildcard events (e.g., periodic flushes) always trigger re-evaluation to ensure pods don't
+		// get stuck due to incomplete or incorrect queueing hints.
+		if pInfo.Gated() && !framework.ClusterEventIsWildCard(event) && !framework.MatchAnyClusterEvent(event, pInfo.GatingPluginEvents) {
 			// This event doesn't interest the gating plugin of this Pod,
 			// which means this event never moves this Pod to activeQ.
 			continue
