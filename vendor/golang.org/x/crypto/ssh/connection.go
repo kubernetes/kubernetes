@@ -91,9 +91,17 @@ func DiscardRequests(in <-chan *Request) {
 	}
 }
 
+// A connTransport represents the transport for a connection.
+type connTransport interface {
+	packetConn
+	getAlgorithms() NegotiatedAlgorithms
+	getSessionID() []byte
+	waitSession() error
+}
+
 // A connection represents an incoming connection.
 type connection struct {
-	transport *handshakeTransport
+	transport connTransport
 	sshConn
 
 	// The connection protocol.

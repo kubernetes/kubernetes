@@ -21,6 +21,12 @@ const (
 	authSuccess
 )
 
+// maxAuthClientTried bounds the total number of authentication attempts
+// (failures and partial successes combined) the client makes before
+// aborting the loop, to prevent unbounded growth when an AuthCallback
+// keeps supplying methods.
+const maxAuthClientTried = 64
+
 // clientAuthenticate authenticates with the remote server. See RFC 4252.
 func (c *connection) clientAuthenticate(config *ClientConfig) error {
 	// initiate user auth session
@@ -67,31 +73,61 @@ func (c *connection) clientAuthenticate(config *ClientConfig) error {
 	// then any untried methods suggested by the server.
 	var tried []string
 	var lastMethods []string
+	var partialSuccess []string
 
 	sessionID := c.transport.getSessionID()
 	for auth := AuthMethod(new(noneAuth)); auth != nil; {
 		ok, methods, err := auth.auth(sessionID, config.User, c.transport, config.Rand, extensions)
 		if err != nil {
 			// On disconnect, return error immediately
-			if _, ok := err.(*disconnectMsg); ok {
+			if _, isDisconnect := err.(*disconnectMsg); isDisconnect {
 				return err
 			}
-			// We return the error later if there is no other method left to
-			// try.
+			// We return the error later if there is no other method
+			// left to try.
 			ok = authFailure
 		}
-		if ok == authSuccess {
-			// success
+
+		switch ok {
+		case authSuccess:
 			return nil
-		} else if ok == authFailure {
-			if m := auth.method(); !slices.Contains(tried, m) {
-				tried = append(tried, m)
-			}
+		case authPartialSuccess:
+			partialSuccess = append(partialSuccess, auth.method())
+		case authFailure:
+			tried = append(tried, auth.method())
 		}
+		if len(partialSuccess)+len(tried) > maxAuthClientTried {
+			return fmt.Errorf("ssh: too many authentication attempts (%d), aborting",
+				len(partialSuccess)+len(tried))
+		}
+
 		if methods == nil {
 			methods = lastMethods
 		}
 		lastMethods = methods
+
+		// If AuthCallback is set it takes precedence: it picks the next
+		// AuthMethod dynamically. The returned method need not be in
+		// config.Auth. If the callback returns (nil, nil) we fall back to
+		// selecting the next untried method from config.Auth below; on
+		// (nil, error) the handshake aborts.
+		if config.AuthCallback != nil {
+			ctx := &ClientAuthContext{
+				Metadata:              c,
+				Algorithms:            c.Algorithms(),
+				AllowedMethods:        slices.Clone(methods),
+				PartialSuccessMethods: slices.Clone(partialSuccess),
+				TriedMethods:          slices.Clone(tried),
+			}
+			altAuth, cbErr := config.AuthCallback(ctx)
+			if cbErr != nil {
+				return cbErr
+			}
+			if altAuth != nil {
+				auth = altAuth
+				continue
+			}
+		}
 
 		auth = nil
 
@@ -274,10 +310,14 @@ func pickSignatureAlgorithm(signer Signer, extensions map[string][]byte) (MultiA
 	}
 
 	// Filter algorithms based on those supported by MultiAlgorithmSigner.
+	// Iterate over the signer's algorithms first to preserve its preference order.
+	supportedKeyAlgos := algorithmsForKeyFormat(keyFormat)
 	var keyAlgos []string
-	for _, algo := range algorithmsForKeyFormat(keyFormat) {
-		if slices.Contains(as.Algorithms(), underlyingAlgo(algo)) {
-			keyAlgos = append(keyAlgos, algo)
+	for _, signerAlgo := range as.Algorithms() {
+		if idx := slices.IndexFunc(supportedKeyAlgos, func(algo string) bool {
+			return underlyingAlgo(algo) == signerAlgo
+		}); idx >= 0 {
+			keyAlgos = append(keyAlgos, supportedKeyAlgos[idx])
 		}
 	}
 
@@ -373,11 +413,11 @@ func (cb publicKeyCallback) auth(session []byte, user string, c packetConn, rand
 			return authFailure, nil, err
 		}
 
-		// If authentication succeeds or the list of available methods does not
-		// contain the "publickey" method, do not attempt to authenticate with any
-		// other keys.  According to RFC 4252 Section 7, the latter can occur when
-		// additional authentication methods are required.
-		if success == authSuccess || !slices.Contains(methods, cb.method()) {
+		// If authentication succeeds or partially succeeds, return immediately
+		// so the caller can select the next auth method. According to RFC 4252
+		// Section 7, if the server no longer lists "publickey" among its
+		// allowed methods, do not attempt to authenticate with any other keys.
+		if success == authSuccess || success == authPartialSuccess || !slices.Contains(methods, cb.method()) {
 			return success, methods, err
 		}
 	}

@@ -76,7 +76,7 @@ func parsePubKey(in []byte, algo string) (pubKey PublicKey, rest []byte, err err
 	case InsecureKeyAlgoDSA:
 		return parseDSA(in)
 	case KeyAlgoECDSA256, KeyAlgoECDSA384, KeyAlgoECDSA521:
-		return parseECDSA(in)
+		return parseECDSA(in, algo)
 	case KeyAlgoSKECDSA256:
 		return parseSKECDSA(in)
 	case KeyAlgoED25519:
@@ -469,6 +469,12 @@ func parseRSA(in []byte) (out PublicKey, rest []byte, err error) {
 		return nil, nil, err
 	}
 
+	// 8192 bits is also the maximum RSA key size accepted by crypto/tls for
+	// signature verification:
+	// https://github.com/golang/go/blob/69801b25/src/crypto/tls/handshake_client.go#L1096
+	if w.N.BitLen() > 8192 {
+		return nil, nil, errors.New("ssh: rsa modulus too large")
+	}
 	if w.E.BitLen() > 24 {
 		return nil, nil, errors.New("ssh: exponent too large")
 	}
@@ -574,6 +580,24 @@ func checkDSAParams(param *dsa.Parameters) error {
 		return fmt.Errorf("ssh: unsupported DSA key size %d", l)
 	}
 
+	// FIPS 186-2 specifies that Q must be exactly 160 bits. We must enforce
+	// this to prevent DoS attacks where an attacker sends a huge Q which makes
+	// verification slow.
+	if l := param.Q.BitLen(); l != 160 {
+		return fmt.Errorf("ssh: unsupported DSA sub-prime size %d", l)
+	}
+
+	// The generator G is an element of the group, so it must be strictly less
+	// than the modulus P.
+	if param.G.Cmp(param.P) >= 0 {
+		return errors.New("ssh: DSA generator larger than modulus")
+	}
+
+	// G must be positive.
+	if param.G.Sign() <= 0 {
+		return errors.New("ssh: DSA generator must be positive")
+	}
+
 	return nil
 }
 
@@ -594,6 +618,14 @@ func parseDSA(in []byte) (out PublicKey, rest []byte, err error) {
 	}
 	if err := checkDSAParams(&param); err != nil {
 		return nil, nil, err
+	}
+
+	// The public value Y must be a non-zero element of the group, i.e.
+	// strictly between 0 and P. crypto/dsa.Verify does not range-check Y,
+	// so we reject out-of-range values here to prevent a maliciously
+	// oversized Y from slowing verification.
+	if w.Y.Sign() <= 0 || w.Y.Cmp(w.P) >= 0 {
+		return nil, nil, errors.New("ssh: DSA public value Y out of range")
 	}
 
 	key := &dsaPublicKey{
@@ -774,7 +806,7 @@ func supportedEllipticCurve(curve elliptic.Curve) bool {
 }
 
 // parseECDSA parses an ECDSA key according to RFC 5656, section 3.1.
-func parseECDSA(in []byte) (out PublicKey, rest []byte, err error) {
+func parseECDSA(in []byte, expectedType string) (out PublicKey, rest []byte, err error) {
 	var w struct {
 		Curve    string
 		KeyBytes []byte
@@ -783,6 +815,12 @@ func parseECDSA(in []byte) (out PublicKey, rest []byte, err error) {
 
 	if err := Unmarshal(in, &w); err != nil {
 		return nil, nil, err
+	}
+
+	actualType := "ecdsa-sha2-" + w.Curve
+	if expectedType != actualType {
+		return nil, nil, fmt.Errorf("ssh: algorithm type mismatch: expected %q, found curve %q (type %q)",
+			expectedType, w.Curve, actualType)
 	}
 
 	key := new(ecdsa.PublicKey)
@@ -869,11 +907,25 @@ type skFields struct {
 	Counter uint32
 }
 
+// flagUserPresence is the "user present" bit (UP) in the SK signature
+// flags, matching the FIDO CTAP2 authenticatorData UP flag. See
+// openssh/PROTOCOL.u2f.
+const flagUserPresence = 0x01
+
+// errSKMissingUserPresence is returned by SK key Verify methods when
+// the signature does not assert user presence and the key was not
+// marked as no-touch-required.
+var errSKMissingUserPresence = errors.New("ssh: signature missing required user presence flag")
+
 type skECDSAPublicKey struct {
 	// application is a URL-like string, typically "ssh:" for SSH.
 	// see openssh/PROTOCOL.u2f for details.
 	application string
 	ecdsa.PublicKey
+	// noTouchRequired, when true, disables the default user-presence
+	// check in Verify. It is set by skKeyWithoutUP on a clone of the
+	// key, never on an instance shared across authentication attempts.
+	noTouchRequired bool
 }
 
 func (k *skECDSAPublicKey) Type() string {
@@ -959,6 +1011,10 @@ func (k *skECDSAPublicKey) Verify(data []byte, sig *Signature) error {
 		return err
 	}
 
+	if skf.Flags&flagUserPresence == 0 && !k.noTouchRequired {
+		return errSKMissingUserPresence
+	}
+
 	blob := struct {
 		ApplicationDigest []byte `ssh:"rest"`
 		Flags             byte
@@ -992,6 +1048,10 @@ type skEd25519PublicKey struct {
 	// see openssh/PROTOCOL.u2f for details.
 	application string
 	ed25519.PublicKey
+	// noTouchRequired, when true, disables the default user-presence
+	// check in Verify. It is set by skKeyWithoutUP on a clone of the
+	// key, never on an instance shared across authentication attempts.
+	noTouchRequired bool
 }
 
 func (k *skEd25519PublicKey) Type() string {
@@ -1064,6 +1124,10 @@ func (k *skEd25519PublicKey) Verify(data []byte, sig *Signature) error {
 	var skf skFields
 	if err := Unmarshal(sig.Rest, &skf); err != nil {
 		return err
+	}
+
+	if skf.Flags&flagUserPresence == 0 && !k.noTouchRequired {
+		return errSKMissingUserPresence
 	}
 
 	blob := struct {
@@ -1408,6 +1472,17 @@ func passphraseProtectedOpenSSHKey(passphrase []byte) openSSHDecryptFunc {
 			return nil, err
 		}
 
+		// OpenSSH does not impose an upper bound on the bcrypt round count
+		// stored in the key file, but bcrypt_pbkdf cost is linear in rounds:
+		// the default is 16, ssh-keygen lets users pick anything up to
+		// INT_MAX. Cap at 2048 (128x the default, a few seconds of CPU) so
+		// that an oversized value in the file cannot tie up the caller for
+		// months.
+		const maxRounds = 1 << 11
+		if opts.Rounds > maxRounds {
+			return nil, fmt.Errorf("ssh: bcrypt KDF rounds %d exceed maximum %d", opts.Rounds, maxRounds)
+		}
+
 		k, err := bcrypt_pbkdf.Key(passphrase, []byte(opts.Salt), int(opts.Rounds), 32+16)
 		if err != nil {
 			return nil, err
@@ -1577,10 +1652,28 @@ func parseOpenSSHPrivateKey(key []byte, decrypt openSSHDecryptFunc) (crypto.Priv
 			return nil, err
 		}
 
+		// Mirror the validation done in parseRSA for public keys: cap the
+		// modulus at the same limit enforced by crypto/tls, reject oversized
+		// or invalid exponents, and additionally bound the prime factors to
+		// avoid the expensive CRT coefficient recomputation in pk.Precompute.
+		if key.N.BitLen() > 8192 {
+			return nil, errors.New("ssh: rsa modulus too large")
+		}
+		if key.P.BitLen() > 4096 || key.Q.BitLen() > 4096 {
+			return nil, errors.New("ssh: rsa prime too large")
+		}
+		if key.E.BitLen() > 24 {
+			return nil, errors.New("ssh: exponent too large")
+		}
+		e := key.E.Int64()
+		if e < 3 || e&1 == 0 {
+			return nil, errors.New("ssh: incorrect exponent")
+		}
+
 		pk := &rsa.PrivateKey{
 			PublicKey: rsa.PublicKey{
 				N: key.N,
-				E: int(key.E.Int64()),
+				E: int(e),
 			},
 			D:      key.D,
 			Primes: []*big.Int{key.P, key.Q},
