@@ -948,3 +948,79 @@ func TestResourceFullyQualifiedName(t *testing.T) {
 		})
 	}
 }
+
+func TestIPSloppy(t *testing.T) {
+	ctx := context.Background()
+	fldPath := field.NewPath("test")
+
+	testCases := []struct {
+		name     string
+		input    string
+		wantErrs field.ErrorList
+	}{{
+		name:     "valid ipv4",
+		input:    "192.168.1.1",
+		wantErrs: nil,
+	}, {
+		name:     "valid ipv4 all zeros",
+		input:    "0.0.0.0",
+		wantErrs: nil,
+	}, {
+		name:     "valid ipv4 broadcast",
+		input:    "255.255.255.255",
+		wantErrs: nil,
+	}, {
+		name:     "valid ipv6",
+		input:    "2001:db8::1",
+		wantErrs: nil,
+	}, {
+		name:     "valid ipv6 loopback",
+		input:    "::1",
+		wantErrs: nil,
+	}, {
+		name:     "valid ipv6 unspecified",
+		input:    "::",
+		wantErrs: nil,
+	}, {
+		name:     "valid sloppy ipv4 leading zeros",
+		input:    "192.168.01.1",
+		wantErrs: nil,
+	}, {
+		name:     "valid sloppy ipv4 octets leading zeros",
+		input:    "010.002.003.004",
+		wantErrs: nil,
+	}, {
+		name:  "invalid empty string",
+		input: "",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "", "must be a valid IP address").WithOrigin("format=k8s-ip"),
+		},
+	}, {
+		name:  "invalid not an ip",
+		input: "not-an-ip",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "not-an-ip", "must be a valid IP address").WithOrigin("format=k8s-ip"),
+		},
+	}, {
+		name:  "invalid out of range octet",
+		input: "192.168.1.256",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "192.168.1.256", "must be a valid IP address").WithOrigin("format=k8s-ip"),
+		},
+	}, {
+		name:  "invalid incomplete ipv4",
+		input: "192.168.1",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, "192.168.1", "must be a valid IP address").WithOrigin("format=k8s-ip"),
+		},
+	}}
+
+	matcher := field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			value := tc.input
+			gotErrs := IPSloppy(ctx, operation.Operation{}, fldPath, &value, nil)
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}
