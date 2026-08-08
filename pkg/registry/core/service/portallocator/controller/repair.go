@@ -139,9 +139,17 @@ func (c *Repair) doRunOnce() error {
 	// the service collection. The caching layer keeps per-collection RVs,
 	// and this is proper, since in theory the collections could be hosted
 	// in separate etcd (or even non-etcd) instances.
-	list, err := c.serviceClient.Services(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+	var list *corev1.ServiceList
+	err = wait.PollUntilContextTimeout(context.Background(), time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+		list, err = c.serviceClient.Services(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			runtime.HandleError(fmt.Errorf("unable to refresh the port block: %w", err))
+			return false, nil
+		}
+		return true, nil
+	})
 	if err != nil {
-		return fmt.Errorf("unable to refresh the port block: %v", err)
+		return fmt.Errorf("unable to refresh the port block: %w", err)
 	}
 
 	rebuilt, err := portallocator.NewInMemory(c.portRange)
