@@ -549,16 +549,16 @@ var _ = SIGDescribe("Downward API", feature.PodLevelResources, framework.WithFea
 
 			// Wait for client pod to complete.
 			err := e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, createdPod.Name, f.Namespace.Name, f.Timeouts.PodStart)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, createdPod.Name,...")
 
 			// Grab its logs.  Get host first.
 			podStatus, err := podClient.Get(ctx, createdPod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to podClient.Get(ctx, createdPod.Name, metav1.GetOptions{})")
 
 			// Get the node allocatable resources
 			nodeName := podStatus.Spec.NodeName
 			node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})")
 			// Prepare expectations based on node allocatable resources
 			expectations := []string{
 				// Although the CPU limit for Pod Level Resources is set to 1250m (which would be 1.25),
@@ -570,13 +570,13 @@ var _ = SIGDescribe("Downward API", feature.PodLevelResources, framework.WithFea
 			}
 
 			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, podStatus.Name, cName)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, podStatus.Name, cName)")
 
 			ginkgo.By(fmt.Sprintf("Checking logs from node %s pod %s container %s", nodeName, podStatus.Name, cName))
 			for _, expected := range expectations {
 				m := gomega.MatchRegexp(expected)
 				matches, err := m.Match(logs)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "failed to m.Match(logs)")
 				gomega.Expect(matches).To(gomega.BeTrueBecause("expected %q in container output: %s", expected, logs))
 			}
 		})

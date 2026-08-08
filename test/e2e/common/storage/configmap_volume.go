@@ -232,7 +232,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 
 		ginkgo.By("Creating the pod")
 		e2epod.NewPodClient(f).Create(ctx, pod)
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "failed to e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespa...")
 
 		pollLogs1 := func() (string, error) {
 			return e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)

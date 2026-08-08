@@ -159,10 +159,10 @@ var _ = SIGDescribe("Kubelet", func() {
 			pod = podClient.Create(ctx, pod)
 			ginkgo.By("Waiting for pod completion")
 			err := e2epod.WaitForPodNoLongerRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2epod.WaitForPodNoLongerRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Nam...")
 
 			rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(ctx)")
 			defer rc.Close()
 			buf := new(bytes.Buffer)
 			buf.ReadFrom(rc)
@@ -245,14 +245,14 @@ var _ = SIGDescribe("Kubelet with pods in a privileged namespace", func() {
 			pod = podClient.Create(ctx, pod)
 			ginkgo.By("Waiting for pod completion")
 			err := e2epod.WaitForPodNoLongerRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to e2epod.WaitForPodNoLongerRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Nam...")
 
 			rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(ctx)")
 			defer rc.Close() // nolint:errcheck
 			buf := new(bytes.Buffer)
 			_, err = buf.ReadFrom(rc)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "failed to buf.ReadFrom(rc)")
 			hostsFileContent := buf.String()
 
 			errMsg := fmt.Sprintf("expected hosts file to contain entries from HostAliases. Got:\n%+v", hostsFileContent)
