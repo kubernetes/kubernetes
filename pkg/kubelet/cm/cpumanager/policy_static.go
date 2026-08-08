@@ -411,6 +411,51 @@ func (p *staticPolicy) allocatePodForAdd(logger klog.Logger, s state.State, pod 
 		}
 	}()
 
+	// Checking the checkpoint state before any validation means that existing
+	// allocations are preserved even if they violate the current policy: after
+	// a kubelet restart the pod must keep the exact same CPUs it had before.
+	// This mirrors the container-scope behavior (see allocateForAdd).
+	if podCPUSet, ok := s.GetPodCPUSet(podUID); ok && !podCPUSet.IsEmpty() {
+		switch podAllocationStaleness(s, pod, podCPUSet) {
+		case notStale:
+			logger.V(4).Info("Static policy: pod-level CPU set already present in state, restoring", "podCPUSet", podCPUSet)
+			return p.restorePodAllocation(logger, s, pod, podCPUSet)
+		case staleOverlap:
+			// The pod-level CPU set overlaps the default CPU set: the kubelet
+			// stopped in the middle of an interrupted release (see the failure
+			// path of restorePodAllocation and the pod-level branch of
+			// RemoveContainer), after the CPUs went back to the default CPU
+			// set but before the pod-level entry was dropped. Restoring the
+			// entry would hand out CPUs which are also in the shared pool, so
+			// complete the release instead and allocate from scratch.
+			logger.V(4).Info("Static policy: dropping the stale pod-level CPU set overlapping the default CPU set",
+				"podCPUSet", podCPUSet, "defaultCPUSet", s.GetDefaultCPUSet(), "overlap", podCPUSet.Intersection(s.GetDefaultCPUSet()))
+			s.DeletePod(podUID)
+			p.updateMetricsFromState(logger, s)
+		case staleNonPrefix:
+			// The allocation paths write the container assignments in spec
+			// order, one checkpoint write at a time, so the assignments of a
+			// partially admitted pod always cover a prefix of its containers.
+			// Any other shape is a leftover of the interrupted cleanup of a
+			// previous, already terminated instance of the pod:
+			// removeStaleState deletes the assignments of an inactive pod in
+			// no particular order, and a pod re-created with the same UID
+			// (e.g. a static pod re-created from an identical manifest) can
+			// then be re-admitted over such leftovers. No container is running
+			// with those CPUs anymore, so release everything and allocate from
+			// scratch.
+			logger.V(4).Info("Static policy: releasing the stale pod-level allocation, the restored container assignments do not form a prefix of the pod spec", "podCPUSet", podCPUSet)
+			p.releasePodAllocation(logger, s, podUID, podCPUSet)
+		default:
+			// Unknown staleness kind: treat the allocation as stale and
+			// release it. Falling back to restoring an allocation which was
+			// not explicitly classified as restorable could hand out CPUs
+			// which are no longer exclusively owned by the pod.
+			logger.Info("Static policy: releasing the pod-level allocation, unknown staleness classification", "podCPUSet", podCPUSet)
+			p.releasePodAllocation(logger, s, podUID, podCPUSet)
+		}
+	}
+
 	// 2. Validate for the "empty shared pool" case.
 	// Even though this is checked during hint generation, we must re-evaluate it here.
 	// If the Topology Manager is running with the "best-effort" or "none" policies,
@@ -433,82 +478,335 @@ func (p *staticPolicy) allocatePodForAdd(logger klog.Logger, s state.State, pod 
 		logger.Error(err, "Unable to allocate CPUs for pod", "totalPodCPUs", totalPodCPUs)
 		return err
 	}
-	p.updateMetricsOnAllocate(logger, s, podAllocation)
 	logger.V(4).Info("Allocated pod-level CPU bubble", "allocation", podAllocation.CPUs)
 
 	// Store the pod-level allocation in the state.
 	s.SetPodCPUSet(podUID, podAllocation.CPUs)
 
+	// Update metrics after the pod-level allocation is set, as metrics recalculation requires it.
+	p.updateMetricsOnAllocate(logger, s, podAllocation)
+
+	// From this point on the pod owns the whole bubble: if the partitioning
+	// below fails, every CPU taken from the default CPU set must go back to
+	// it, or the CPUs would leak out of the shared pool with no pod able to
+	// ever use them again.
+	defer func() {
+		if rerr != nil {
+			p.releasePodAllocation(logger, s, podUID, podAllocation.CPUs)
+			logger.Error(rerr, "Incomplete pod-level CPU allocation rolled back, released pod CPUs", "podCPUSet", podAllocation.CPUs)
+		}
+	}()
+
 	// 5. Partition the pod's allocation, handling init container CPU reuse correctly.
+	result, err := p.partitionPodCPUs(logger, pod, podAllocation.CPUs, nil)
+	if err != nil {
+		return err
+	}
+	logger.V(4).Info("Partitioned pod-level CPU allocation", "exclusiveCPUs", podCPUAllocationToString(result.exclusiveCPUs), "podSharedPool", result.podSharedPool)
+
+	// 6. Save all container assignments to the state.
+	p.savePodContainerAssignments(s, podUID, pod, result, nil)
+
+	return nil
+}
+
+// podPartitionResult holds the output of partitioning a pod-level CPU set
+// among the pod's containers.
+type podPartitionResult struct {
+	// exclusiveCPUs maps each container name with exclusive CPUs to its CPU set.
+	exclusiveCPUs map[string]cpuset.CPUSet
+	// podSharedPool is the set of CPUs available to containers that don't have
+	// an exclusive allocation.
+	podSharedPool cpuset.CPUSet
+	// missing is the number of containers whose assignment was not found in the
+	// restored map and had to be freshly allocated.
+	missing int
+}
+
+// partitionPodCPUs partitions the given pod-level CPU set among the pod's
+// containers, mirroring the logic used by allocatePodForAdd.
+//
+// If restored is non-nil (restorePodAllocation path), each container's
+// assignment is first looked up in restored: if present, the checkpointed
+// CPU set is reused as-is; otherwise it is freshly allocated from the
+// pod-level CPU set with takeByTopology. The caller must guarantee that
+// restored assignments form a prefix of the pod's containers in spec order
+// (see assignmentsFormSpecPrefix), so that pinning and allocating in spec
+// order can never hand a restored CPU to a missing container.
+//
+// If restored is nil (allocatePodForAdd path), every container's assignment
+// is freshly allocated.
+func (p *staticPolicy) partitionPodCPUs(
+	logger klog.Logger,
+	pod *v1.Pod,
+	podCPUSet cpuset.CPUSet,
+	restored map[string]cpuset.CPUSet,
+) (*podPartitionResult, error) {
 	exclusiveCPUs := make(map[string]cpuset.CPUSet)
 	sidecarCPUs := cpuset.New()
+	missing := 0
+
+	// isRestore is true when we are restoring from a checkpoint.
+	isRestore := restored != nil
 
 	// First, iterate through all init containers and allocate their CPUs from the initial pod bubble.
 	for _, c := range pod.Spec.InitContainers {
 		if numCPUs := p.guaranteedCPUs(logger, pod, &c); numCPUs > 0 {
 			metrics.CPUManagerPinningRequestsTotal.Inc()
-			// The pool available for this init container is the entire pod allocation
-			// minus what's already taken by sidecars.
-			runnablePool := podAllocation.CPUs.Difference(sidecarCPUs)
-			cset, err := p.takeByTopology(logger, runnablePool, numCPUs)
-			if err != nil {
-				return err
+			cset, ok := restored[c.Name]
+			if !ok {
+				// The pool available for this init container is the entire pod
+				// allocation minus what's already taken by sidecars. Exclusive
+				// CPUs of app containers are not excluded on purpose: regular
+				// init containers run before app containers, so they can share
+				// the same CPUs. Every restored sidecar is already accounted in
+				// sidecarCPUs: the restored assignments form a prefix of the
+				// spec order, so no container after this missing one is
+				// restored.
+				var err error
+				cset, err = p.takeByTopology(logger, podCPUSet.Difference(sidecarCPUs), numCPUs)
+				if err != nil {
+					return nil, err
+				}
+				missing++
+				metrics.ResourceManagerContainerAssignments.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerExclusivePod).Inc()
+				if isRestore {
+					logger.V(4).Info("Allocated CPUs for init container missing from the restored state", "containerName", c.Name, "cpus", cset)
+				}
 			}
-			metrics.ResourceManagerContainerAssignments.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerExclusivePod).Inc()
 			exclusiveCPUs[c.Name] = cset
 
 			// If it's a restartable sidecar, its CPUs are permanently consumed.
 			if podutil.IsRestartableInitContainer(&c) {
 				sidecarCPUs = sidecarCPUs.Union(cset)
 			}
-		} else {
-			// Restartable init containers will access the main pod shared pool.
-			if podutil.IsRestartableInitContainer(&c) {
-				continue
-			}
+			continue
+		}
 
-			// Non restartable init containers will have access to the whole pod pool
-			// amount minus the sidecar exclusive CPUs up to that point.
-			runnablePool := podAllocation.CPUs.Difference(sidecarCPUs)
+		// Restartable init containers without exclusive CPUs use the pod shared
+		// pool, assigned in the final loop in savePodContainerAssignments.
+		if podutil.IsRestartableInitContainer(&c) {
+			if _, ok := restored[c.Name]; !ok {
+				missing++
+			}
+			continue
+		}
+
+		// Non-restartable init containers have access to the whole pod-level
+		// CPU set minus the sidecar exclusive CPUs known up to this point.
+		if cset, ok := restored[c.Name]; ok {
+			exclusiveCPUs[c.Name] = cset
+		} else {
+			exclusiveCPUs[c.Name] = podCPUSet.Difference(sidecarCPUs)
+			missing++
 			metrics.ResourceManagerContainerAssignments.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerSharedPod).Inc()
-			exclusiveCPUs[c.Name] = runnablePool
 		}
 	}
 
-	// Explicitly record that the full CPU bubble is available again, minus what sidecars are using.
-	// This avoids carrying forward complex accounting from standard init containers.
-	podSharedPool := podAllocation.CPUs.Difference(sidecarCPUs)
+	// The pool app containers draw their exclusive CPUs from: the whole
+	// pod-level CPU set minus the sidecar CPUs. Exclusive CPUs of regular init
+	// containers are deliberately not excluded: app containers reuse them,
+	// exactly like in allocatePodForAdd. Restored assignments always precede
+	// the missing ones (prefix), so pinning and allocating in spec order can
+	// never hand a restored CPU to a missing container.
+	podSharedPool := podCPUSet.Difference(sidecarCPUs)
 
 	// Second, iterate through regular containers, allocating from the remaining pool.
 	for _, c := range pod.Spec.Containers {
-		if numCPUs := p.guaranteedCPUs(logger, pod, &c); numCPUs > 0 {
-			metrics.CPUManagerPinningRequestsTotal.Inc()
-			cset, err := p.takeByTopology(logger, podSharedPool, numCPUs)
-			if err != nil {
-				return err
+		numCPUs := p.guaranteedCPUs(logger, pod, &c)
+		if numCPUs == 0 {
+			// Shared pod pool consumer, assigned in the final loop in savePodContainerAssignments.
+			if _, ok := restored[c.Name]; !ok {
+				missing++
 			}
-			metrics.ResourceManagerContainerAssignments.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerExclusivePod).Inc()
-			exclusiveCPUs[c.Name] = cset
-			// Consume CPUs from the app container pool.
-			podSharedPool = podSharedPool.Difference(cset)
+			continue
 		}
+		metrics.CPUManagerPinningRequestsTotal.Inc()
+		if cset, ok := restored[c.Name]; ok {
+			exclusiveCPUs[c.Name] = cset
+			podSharedPool = podSharedPool.Difference(cset)
+			continue
+		}
+		cset, err := p.takeByTopology(logger, podSharedPool, numCPUs)
+		if err != nil {
+			return nil, err
+		}
+		missing++
+		metrics.ResourceManagerContainerAssignments.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerExclusivePod).Inc()
+		if isRestore {
+			logger.V(4).Info("Allocated CPUs for app container missing from the restored state", "containerName", c.Name, "cpus", cset)
+		}
+		exclusiveCPUs[c.Name] = cset
+		podSharedPool = podSharedPool.Difference(cset)
 	}
 
-	logger.V(4).Info("Partitioned pod-level CPU allocation", "exclusiveCPUs", podCPUAllocationToString(exclusiveCPUs), "podSharedPool", podSharedPool)
+	return &podPartitionResult{
+		exclusiveCPUs: exclusiveCPUs,
+		podSharedPool: podSharedPool,
+		missing:       missing,
+	}, nil
+}
 
-	// 6. Save all container assignments to the state.
+// savePodContainerAssignments writes all container assignments to the state.
+// Containers with exclusive CPUs get their exclusive set; all others get the
+// pod shared pool.
+//
+// If restored is non-nil (restorePodAllocation path), metrics are only
+// incremented for containers that were not present in the checkpoint (the
+// freshly allocated ones). If restored is nil (allocatePodForAdd path),
+// metrics are incremented for every container.
+func (p *staticPolicy) savePodContainerAssignments(
+	s state.State,
+	podUID string,
+	pod *v1.Pod,
+	result *podPartitionResult,
+	restored map[string]cpuset.CPUSet,
+) {
 	for _, c := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		if cset, isExclusive := exclusiveCPUs[c.Name]; isExclusive {
+		if cset, isExclusive := result.exclusiveCPUs[c.Name]; isExclusive {
 			s.SetCPUSet(podUID, c.Name, cset)
 		} else {
-			s.SetCPUSet(podUID, c.Name, podSharedPool)
-			metrics.ResourceManagerContainerAssignments.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerSharedPod).Inc()
+			s.SetCPUSet(podUID, c.Name, result.podSharedPool)
+			if _, ok := restored[c.Name]; !ok {
+				metrics.ResourceManagerContainerAssignments.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerSharedPod).Inc()
+			}
 		}
 
-		metrics.ResourceManagerAllocationsTotal.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerPod).Inc()
+		if _, ok := restored[c.Name]; !ok {
+			metrics.ResourceManagerAllocationsTotal.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerPod).Inc()
+		}
+	}
+}
+
+// restorePodAllocation completes the CPU allocation of a pod whose pod-level
+// CPU set is already present in the state, restored from the checkpoint file
+// (e.g. when the pod is re-admitted after a kubelet restart).
+//
+// All the container assignments found in the state are preserved exactly as
+// they were checkpointed and are never re-allocated. Only the assignments
+// which are missing (because the kubelet stopped after checkpointing the
+// pod-level CPU set but before checkpointing all the container assignments)
+// are computed here, carving the CPUs out of the restored pod-level CPU set
+// with the same partitioning logic used by allocatePodForAdd.
+//
+// The restored assignments are guaranteed by the caller to form a prefix of
+// the pod's containers in spec order (see assignmentsFormSpecPrefix): once a
+// container is missing, everything after it is missing too. The partitioning
+// below relies on this: pinning and allocating in spec order can never hand
+// a restored CPU to a missing container.
+//
+// If a missing assignment cannot be satisfied, all the resources held by the
+// pod are released back to the default CPU set and a regular allocation error
+// is returned, so the pod admission fails and no CPU is leaked: the union of
+// the default CPU set and of all the pod-level CPU sets keeps covering all
+// the CPUs.
+func (p *staticPolicy) restorePodAllocation(logger klog.Logger, s state.State, pod *v1.Pod, podCPUSet cpuset.CPUSet) (rerr error) {
+	podUID := string(pod.UID)
+	restored := s.GetCPUAssignments()[podUID]
+
+	defer func() {
+		if rerr == nil {
+			return
+		}
+		// The pod cannot be admitted. Release everything it holds so no CPU
+		// is leaked.
+		p.releasePodAllocation(logger, s, podUID, podCPUSet)
+		logger.Error(rerr, "Unable to complete restored pod-level CPU allocation, released pod CPUs", "podCPUSet", podCPUSet)
+	}()
+
+	// Re-partition the pod-level CPU set mirroring allocatePodForAdd, pinning
+	// the assignments restored from the checkpoint.
+	result, err := p.partitionPodCPUs(logger, pod, podCPUSet, restored)
+	if err != nil {
+		return err
 	}
 
+	if result.missing == 0 {
+		// The full allocation was restored from the checkpoint, nothing to update.
+		logger.V(2).Info("Pod-level CPU allocation fully restored from checkpoint", "podCPUSet", podCPUSet)
+		return nil
+	}
+
+	logger.V(4).Info("Completed partially restored pod-level CPU allocation", "exclusiveCPUs", podCPUAllocationToString(result.exclusiveCPUs), "podSharedPool", result.podSharedPool)
+
+	// Save the assignments of all containers to the state. Restored assignments
+	// are written back unchanged; containers without exclusive CPUs get the
+	// recomputed pod shared pool, which accounts for the newly allocated CPUs.
+	p.savePodContainerAssignments(s, podUID, pod, result, restored)
+	p.updateMetricsFromState(logger, s)
+
 	return nil
+}
+
+// staleKind classifies the state of a pod-level CPU set found in the
+// checkpoint during (re-)admission.
+type staleKind int
+
+const (
+	// notStale means the pod-level CPU set is valid and should be restored.
+	notStale staleKind = iota
+	// staleOverlap means the pod-level CPU set overlaps the default CPU set:
+	// an interrupted release left the CPUs in the shared pool but did not drop
+	// the pod-level entry.
+	staleOverlap
+	// staleNonPrefix means the container assignments do not form a prefix of
+	// the pod spec: leftovers of an interrupted cleanup of a previous pod
+	// instance.
+	staleNonPrefix
+)
+
+// podAllocationStaleness classifies a pod-level CPU set found in the state
+// during (re-)admission. It is shared by allocatePodForAdd (which cleans up
+// stale state before allocating) and getPodTopologyHintsForAdd (which must
+// avoid regenerating hints from a pod CPU set that allocatePodForAdd will
+// later classify as stale, or the Topology Manager could reject the pod
+// before the cleanup runs).
+func podAllocationStaleness(s state.State, pod *v1.Pod, podCPUSet cpuset.CPUSet) staleKind {
+	if overlap := podCPUSet.Intersection(s.GetDefaultCPUSet()); !overlap.IsEmpty() {
+		return staleOverlap
+	}
+	if !assignmentsFormSpecPrefix(pod, s.GetCPUAssignments()[string(pod.UID)]) {
+		return staleNonPrefix
+	}
+	return notStale
+}
+
+// assignmentsFormSpecPrefix reports whether the container assignments cover a
+// prefix of the pod's containers in spec order (init containers first, then
+// app containers) and contain no container unknown to the pod. The allocation
+// paths write the assignments in this exact order, one checkpoint write at a
+// time, so the assignments of a partially admitted pod always form such a
+// prefix; any other shape is a leftover of an interrupted cleanup.
+func assignmentsFormSpecPrefix(pod *v1.Pod, assignments map[string]cpuset.CPUSet) bool {
+	matched := 0
+	missingSeen := false
+	for _, c := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+		if _, ok := assignments[c.Name]; !ok {
+			missingSeen = true
+			continue
+		}
+		if missingSeen {
+			return false
+		}
+		matched++
+	}
+	return matched == len(assignments)
+}
+
+// releasePodAllocation releases every CPU resource the pod holds in the
+// state: the container assignments are dropped and the whole pod-level CPU
+// set goes back to the default CPU set. The default CPU set is updated before
+// the pod-level entry is removed: every mutation is a separate checkpoint
+// write, and each intermediate state must keep all the CPUs accounted for, or
+// validateState would refuse to start the policy after a crash between the
+// writes.
+func (p *staticPolicy) releasePodAllocation(logger klog.Logger, s state.State, podUID string, podCPUSet cpuset.CPUSet) {
+	for containerName := range s.GetCPUAssignments()[podUID] {
+		s.Delete(podUID, containerName)
+	}
+	s.SetDefaultCPUSet(s.GetDefaultCPUSet().Union(podCPUSet))
+	s.DeletePod(podUID)
+	p.updateMetricsOnRelease(logger, s)
 }
 
 func podCPUAllocationToString(alloc map[string]cpuset.CPUSet) string {
@@ -674,7 +972,7 @@ func (p *staticPolicy) RemoveContainer(logger klog.Logger, s state.State, podUID
 				updatedCPUSets := s.GetDefaultCPUSet().Union(podCPUSet)
 				s.SetDefaultCPUSet(updatedCPUSets)
 				s.DeletePod(podUID) // Clean up all state for the pod.
-				p.updateMetricsOnRelease(logger, s, podCPUSet)
+				p.updateMetricsOnRelease(logger, s)
 				logger.Info("Released pod-level CPUs", "defaultCPUSet", updatedCPUSets)
 			}
 			// If other containers still exist, do not release any CPUs yet.
@@ -688,7 +986,7 @@ func (p *staticPolicy) RemoveContainer(logger klog.Logger, s state.State, podUID
 	toRelease = toRelease.Difference(cpusInUse)
 	updatedCPUs := s.GetDefaultCPUSet().Union(toRelease)
 	s.SetDefaultCPUSet(updatedCPUs)
-	p.updateMetricsOnRelease(logger, s, toRelease)
+	p.updateMetricsOnRelease(logger, s)
 	logger.Info("RemoveContainer end", "defaultCPUSet", updatedCPUs)
 	return nil
 }
@@ -930,12 +1228,54 @@ func (p *staticPolicy) getPodTopologyHintsForAdd(logger klog.Logger, s state.Sta
 		return nil
 	}
 
-	// Validate that if a pod has containers that will be placed in a shared pool,
-	// there are actually CPUs left over for that pool after accounting for all
-	// exclusive allocations. If the sum of exclusive CPU requests consumes the
-	// entire pod-level CPU budget, no hints will be generated, causing the pod
-	// to be rejected by the Topology Manager.
+	// Short circuit to regenerate the same hints if a pod-level CPU set is
+	// already assigned to the pod in the state. This might happen after a
+	// kubelet restart, when the allocation is restored from the checkpoint,
+	// even if not all the container assignments were checkpointed before the
+	// restart. The restored pod-level CPU set defines the alignment of the
+	// whole pod, so it takes precedence over the container assignments.
+	//
+	// Do not regenerate hints from a stale pod-level CPU set: allocatePodForAdd
+	// will classify it as stale (interrupted release or non-prefix leftovers)
+	// and release the CPUs back to the default pool before allocating from
+	// scratch. Regenerating hints from the stale set would constrain the NUMA
+	// affinity to the old CPUs, which may conflict with other hint providers
+	// under the restricted policy and reject the pod before the cleanup runs.
+	// Fall through to the normal hint generation, which accounts for the CPUs
+	// that will be released back to the default pool.
+	staleCPUs := cpuset.New()
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		if allocated, exists := s.GetPodCPUSet(string(pod.UID)); exists && !allocated.IsEmpty() {
+			if podAllocationStaleness(s, pod, allocated) == notStale {
+				if allocated.Size() != requested {
+					logger.V(2).Info("Pod-level CPUs already allocated with a different number than requested", "requested", requested, "allocated", allocated.Size())
+					// An empty list of hints will be treated as a preference that cannot be satisfied.
+					// In definition of hints this is equal to: TopologyHint[NUMANodeAffinity: nil, Preferred: false].
+					// For all but the best-effort policy, the Topology Manager will throw a pod-admission error.
+					return map[string][]topologymanager.TopologyHint{
+						string(v1.ResourceCPU): {},
+					}
+				}
+				logger.V(2).Info("Regenerating TopologyHints for pod-level CPUs already allocated")
+				return map[string][]topologymanager.TopologyHint{
+					string(v1.ResourceCPU): p.generateCPUTopologyHints(allocated, cpuset.New(), requested),
+				}
+			}
+			// The pod-level CPU set is stale: allocatePodForAdd will release it
+			// back to the default CPU set before allocating from scratch. Keep
+			// the CPUs around so the fresh hints below are generated for the
+			// pool as it will look then. The container assignments of the pod
+			// are stale as well and will be dropped by the same release, so
+			// they must not be taken into account either.
+			staleCPUs = allocated
+			logger.V(2).Info("Pod-level CPU set is stale, generating fresh hints accounting for the CPUs to be released", "podCPUSet", staleCPUs)
+		}
+
+		// Validate that if a pod has containers that will be placed in a shared pool,
+		// there are actually CPUs left over for that pool after accounting for all
+		// exclusive allocations. If the sum of exclusive CPU requests consumes the
+		// entire pod-level CPU budget, no hints will be generated, causing the pod
+		// to be rejected by the Topology Manager.
 		if err := p.validatePodScopeResources(logger, pod); err != nil {
 			logger.V(2).Info("Invalid pod spec. Sum of exclusive container requests equals pod budget, leaving no CPUs for shared containers")
 			return map[string][]topologymanager.TopologyHint{
@@ -945,36 +1285,54 @@ func (p *staticPolicy) getPodTopologyHintsForAdd(logger klog.Logger, s state.Sta
 	}
 
 	assignedCPUs := cpuset.New()
-	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		logger_ := klog.LoggerWithValues(logger, "containerName", container.Name)
+	// The container assignments are only meaningful as long as the pod-level
+	// allocation they belong to is not stale. Stale assignments are about to be
+	// released, so taking them into account here could reject the pod (a
+	// non-guaranteed container holds a shared pool CPU set which never matches
+	// its zero request) or constrain the NUMA affinity to CPUs the pod is not
+	// going to keep.
+	if staleCPUs.IsEmpty() {
+		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+			logger_ := klog.LoggerWithValues(logger, "containerName", container.Name)
 
-		requestedByContainer := p.guaranteedCPUs(logger, pod, &container)
-		// Short circuit to regenerate the same hints if there are already
-		// guaranteed CPUs allocated to the Container. This might happen after a
-		// kubelet restart, for example.
-		if allocated, exists := s.GetCPUSet(string(pod.UID), container.Name); exists {
-			if allocated.Size() != requestedByContainer {
-				logger_.Info("CPUs already allocated to container with different number than request", "allocatedSize", requested, "requestedByContainer", requestedByContainer, "allocatedSize", allocated.Size())
-				// An empty list of hints will be treated as a preference that cannot be satisfied.
-				// In definition of hints this is equal to: TopologyHint[NUMANodeAffinity: nil, Preferred: false].
-				// For all but the best-effort policy, the Topology Manager will throw a pod-admission error.
-				return map[string][]topologymanager.TopologyHint{
-					string(v1.ResourceCPU): {},
+			requestedByContainer := p.guaranteedCPUs(logger, pod, &container)
+			// Short circuit to regenerate the same hints if there are already
+			// guaranteed CPUs allocated to the Container. This might happen after a
+			// kubelet restart, for example.
+			if allocated, exists := s.GetCPUSet(string(pod.UID), container.Name); exists {
+				if allocated.Size() != requestedByContainer {
+					logger_.Info("CPUs already allocated to container with different number than request", "requestedByContainer", requestedByContainer, "allocatedSize", allocated.Size())
+					// An empty list of hints will be treated as a preference that cannot be satisfied.
+					// In definition of hints this is equal to: TopologyHint[NUMANodeAffinity: nil, Preferred: false].
+					// For all but the best-effort policy, the Topology Manager will throw a pod-admission error.
+					return map[string][]topologymanager.TopologyHint{
+						string(v1.ResourceCPU): {},
+					}
 				}
+				// A set of CPUs already assigned to containers in this pod
+				assignedCPUs = assignedCPUs.Union(allocated)
 			}
-			// A set of CPUs already assigned to containers in this pod
-			assignedCPUs = assignedCPUs.Union(allocated)
 		}
-	}
-	if assignedCPUs.Size() == requested {
-		logger.Info("Regenerating TopologyHints for CPUs already allocated")
-		return map[string][]topologymanager.TopologyHint{
-			string(v1.ResourceCPU): p.generateCPUTopologyHints(assignedCPUs, cpuset.New(), requested),
+		if assignedCPUs.Size() == requested {
+			logger.Info("Regenerating TopologyHints for CPUs already allocated")
+			return map[string][]topologymanager.TopologyHint{
+				string(v1.ResourceCPU): p.generateCPUTopologyHints(assignedCPUs, cpuset.New(), requested),
+			}
 		}
 	}
 
 	// Get a list of available CPUs.
 	available := p.GetAvailableCPUs(s)
+	if !staleCPUs.IsEmpty() {
+		// The stale pod-level CPU set will be released back to the default CPU
+		// set during the allocation, so the pool the pod will actually be
+		// allocated from is the default CPU set plus those CPUs, minus the
+		// reserved ones. Computing it this way, instead of unioning the stale
+		// CPUs into the available set, keeps the reserved CPUs out even if the
+		// reserved set changed while the stale entry was sitting in the
+		// checkpoint.
+		available = s.GetDefaultCPUSet().Union(staleCPUs).Difference(p.reservedCPUs)
+	}
 
 	// Get a list of reusable CPUs (e.g. CPUs reused from initContainers).
 	// It should be an empty CPUSet for a newly created pod.
@@ -1098,39 +1456,51 @@ func (p *staticPolicy) getAlignedCPUs(numaAffinity bitmask.BitMask, allocatableC
 }
 
 func (p *staticPolicy) initializeMetrics(logger klog.Logger, s state.State) {
-	metrics.CPUManagerSharedPoolSizeMilliCores.Set(float64(p.GetAvailableCPUs(s).Size() * 1000))
 	metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Add(0) // ensure the value exists
 	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Add(0)        // ensure the value exists
 	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedUncoreCache).Add(0)        // ensure the value exists
-	totalAssignedCPUs := getTotalAssignedExclusiveCPUs(s)
-	metrics.CPUManagerExclusiveCPUsAllocationCount.Set(float64(totalAssignedCPUs.Size()))
-	updateAllocationPerNUMAMetric(logger, p.topology, totalAssignedCPUs)
+	p.updateMetricsFromState(logger, s)
+}
+
+// updateMetricsFromState recomputes from the state the gauges tracking the
+// exclusive CPU allocations: the size of the shared CPU pool, the number of
+// exclusively allocated CPUs and their distribution across NUMA nodes.
+// Deriving the values from the state, rather than applying deltas on every
+// allocation and release, guarantees the gauges always match what has been
+// taken out of the default CPU set (a CPU reused from an init container is
+// counted once) and keeps them consistent across kubelet restarts. It must
+// be called only once the state mutation is complete.
+func (p *staticPolicy) updateMetricsFromState(logger klog.Logger, s state.State) {
+	metrics.CPUManagerSharedPoolSizeMilliCores.Set(float64(p.GetAvailableCPUs(s).Size() * 1000))
+	totalExclusiveCPUs := getTotalAssignedExclusiveCPUs(s)
+	metrics.CPUManagerExclusiveCPUsAllocationCount.Set(float64(totalExclusiveCPUs.Size()))
+	updateAllocationPerNUMAMetric(logger, p.topology, totalExclusiveCPUs)
 }
 
 func (p *staticPolicy) updateMetricsOnAllocate(logger klog.Logger, s state.State, cpuAlloc topology.Allocation) {
-	ncpus := cpuAlloc.CPUs.Size()
-	metrics.CPUManagerExclusiveCPUsAllocationCount.Add(float64(ncpus))
-	metrics.CPUManagerSharedPoolSizeMilliCores.Add(float64(-ncpus * 1000))
 	if cpuAlloc.Aligned.UncoreCache {
 		metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedUncoreCache).Inc()
 	}
-	totalAssignedCPUs := getTotalAssignedExclusiveCPUs(s)
-	updateAllocationPerNUMAMetric(logger, p.topology, totalAssignedCPUs)
+	p.updateMetricsFromState(logger, s)
 }
 
-func (p *staticPolicy) updateMetricsOnRelease(logger klog.Logger, s state.State, cset cpuset.CPUSet) {
-	ncpus := cset.Size()
-	metrics.CPUManagerExclusiveCPUsAllocationCount.Add(float64(-ncpus))
-	metrics.CPUManagerSharedPoolSizeMilliCores.Add(float64(ncpus * 1000))
-	totalAssignedCPUs := getTotalAssignedExclusiveCPUs(s)
-	updateAllocationPerNUMAMetric(logger, p.topology, totalAssignedCPUs.Difference(cset))
+func (p *staticPolicy) updateMetricsOnRelease(logger klog.Logger, s state.State) {
+	p.updateMetricsFromState(logger, s)
 }
 
+// getTotalAssignedExclusiveCPUs returns the set of CPUs exclusively allocated on the node.
+// This is union of all CPU sets allocated for containers using exclusive CPUs and
+// pods using pod-level exclusive CPU sets (the "bubble" allocation for whole pod is used).
 func getTotalAssignedExclusiveCPUs(s state.State) cpuset.CPUSet {
 	totalAssignedCPUs := cpuset.New()
 	for _, assignment := range s.GetCPUAssignments() {
 		for _, cset := range assignment {
 			totalAssignedCPUs = totalAssignedCPUs.Union(cset)
+		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
+		for _, podEntry := range s.GetPodCPUAssignments() {
+			totalAssignedCPUs = totalAssignedCPUs.Union(podEntry.CPUSet)
 		}
 	}
 	return totalAssignedCPUs
@@ -1150,8 +1520,11 @@ func updateAllocationPerNUMAMetric(logger klog.Logger, topo *topology.CPUTopolog
 		numaCount[numaNode]++
 	}
 
-	// Update metric
-	for numaNode, count := range numaCount {
-		metrics.CPUManagerAllocationPerNUMA.WithLabelValues(strconv.Itoa(numaNode)).Set(float64(count))
+	// Update the metric for every NUMA node known to the topology: a NUMA
+	// node with no allocated CPUs must be explicitly reset to zero, or the
+	// gauge would keep reporting the last non-zero value after all the CPUs
+	// of that node went back to the shared pool.
+	for _, numaNode := range topo.CPUDetails.NUMANodes().UnsortedList() {
+		metrics.CPUManagerAllocationPerNUMA.WithLabelValues(strconv.Itoa(numaNode)).Set(float64(numaCount[numaNode]))
 	}
 }
