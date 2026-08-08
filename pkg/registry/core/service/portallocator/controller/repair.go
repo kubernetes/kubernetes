@@ -23,7 +23,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -51,9 +51,14 @@ type Repair struct {
 	recorder    events.EventRecorder
 }
 
-// How many times we need to detect a leak before we clean up.  This is to
-// avoid races between allocating a ports and using it.
-const numRepairsBeforeLeakCleanup = 3
+const (
+	// How many times we need to detect a leak before we clean up.  This is to
+	// avoid races between allocating a ports and using it.
+	numRepairsBeforeLeakCleanup = 3
+
+	repairRetryInterval = time.Second
+	repairRetryTimeout  = 30 * time.Second
+)
 
 // NewRepair creates a controller that periodically ensures that all ports are uniquely allocated across the cluster
 // and generates informational warnings for a cluster that is not in sync.
@@ -111,9 +116,13 @@ func (c *Repair) doRunOnce() error {
 
 	// If etcd server is not running we should wait for some time and fail only then. This is particularly
 	// important when we start apiserver and etcd at the same time.
+	// Use one deadline for both bootstrap reads so the repair remains within the one-minute post-start hook timeout.
+	retryCtx, cancel := context.WithTimeout(context.Background(), repairRetryTimeout)
+	defer cancel()
+
 	var snapshot *api.RangeAllocation
 	var err error
-	err = wait.PollUntilContextTimeout(context.Background(), time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextCancel(retryCtx, repairRetryInterval, true, func(ctx context.Context) (bool, error) {
 		snapshot, err = c.alloc.Get()
 		if err != nil {
 			runtime.HandleError(fmt.Errorf("unable to refresh the port allocations: %w", err))
@@ -139,9 +148,26 @@ func (c *Repair) doRunOnce() error {
 	// the service collection. The caching layer keeps per-collection RVs,
 	// and this is proper, since in theory the collections could be hosted
 	// in separate etcd (or even non-etcd) instances.
-	list, err := c.serviceClient.Services(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+	var list *corev1.ServiceList
+	var lastRetryableErr error
+	err = wait.PollUntilContextCancel(retryCtx, repairRetryInterval, true, func(ctx context.Context) (bool, error) {
+		var listErr error
+		list, listErr = c.serviceClient.Services(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+		if listErr == nil {
+			return true, nil
+		}
+		if apierrors.IsTooManyRequests(listErr) {
+			lastRetryableErr = listErr
+			runtime.HandleError(fmt.Errorf("unable to list Services while repairing NodePort allocations: %w", listErr))
+			return false, nil
+		}
+		return false, listErr
+	})
 	if err != nil {
-		return fmt.Errorf("unable to refresh the port block: %v", err)
+		if wait.Interrupted(err) && lastRetryableErr != nil {
+			return fmt.Errorf("unable to list Services while repairing NodePort allocations before the bootstrap deadline: %w", lastRetryableErr)
+		}
+		return fmt.Errorf("unable to list Services while repairing NodePort allocations: %w", err)
 	}
 
 	rebuilt, err := portallocator.NewInMemory(c.portRange)
@@ -221,7 +247,7 @@ func (c *Repair) doRunOnce() error {
 	}
 
 	if err := c.alloc.CreateOrUpdate(snapshot); err != nil {
-		if errors.IsConflict(err) {
+		if apierrors.IsConflict(err) {
 			return err
 		}
 		return fmt.Errorf("unable to persist the updated port allocations: %v", err)
