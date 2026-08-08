@@ -413,12 +413,19 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 
 			claim := resourceClaims[types.UID(claimUID)]
 
-			// Add the prepared CDI devices to the claim info
+			// Add the prepared CDI devices to the claim info. The
+			// driver's response is authoritative for this (claim, driver)
+			// pair, so drop any previously appended devices before
+			// rebuilding the list. Otherwise a retry of a prepare that
+			// had partially succeeded (this driver appended devices,
+			// another driver in the batch failed, setPrepared was
+			// skipped) would end up with the devices duplicated.
 			err := m.cache.withLock(logger, func() error {
 				info, exists := m.cache.get(claim.Name, claim.Namespace)
 				if !exists {
 					return fmt.Errorf("internal error: unable to get claim info for ResourceClaim %s in namespace %s", claim.Name, claim.Namespace)
 				}
+				info.resetDevices(plugin.DriverName())
 				for _, device := range result.GetDevices() {
 					info.addDevice(plugin.DriverName(), state.Device{PoolName: device.PoolName,
 						DeviceName: device.DeviceName, ShareID: (*types.UID)(device.ShareId),
