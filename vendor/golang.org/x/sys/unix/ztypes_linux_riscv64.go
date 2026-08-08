@@ -374,6 +374,14 @@ type Taskstats struct {
 	Wpcopy_delay_min          uint64
 	Irq_delay_max             uint64
 	Irq_delay_min             uint64
+	Cpu_delay_max_ts          KernelTimespec
+	Blkio_delay_max_ts        KernelTimespec
+	Swapin_delay_max_ts       KernelTimespec
+	Freepages_delay_max_ts    KernelTimespec
+	Thrashing_delay_max_ts    KernelTimespec
+	Compact_delay_max_ts      KernelTimespec
+	Wpcopy_delay_max_ts       KernelTimespec
+	Irq_delay_max_ts          KernelTimespec
 }
 
 type cpuMask uint64
@@ -783,4 +791,8 @@ const (
 	RISCV_HWPROBE_MISALIGNED_MASK        = 0x7
 	RISCV_HWPROBE_KEY_ZICBOZ_BLOCK_SIZE  = 0x6
 	RISCV_HWPROBE_WHICH_CPUS             = 0x1
+)
+
+const (
+	GPIO_GET_CHIPINFO_IOCTL = 0x8044b401
 )

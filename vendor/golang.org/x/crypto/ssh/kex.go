@@ -16,6 +16,7 @@ import (
 	"io"
 	"math/big"
 	"slices"
+	"sync"
 
 	"golang.org/x/crypto/curve25519"
 )
@@ -718,15 +719,9 @@ func (gex *dhGEXSHA) Server(c packetConn, randSource io.Reader, magics *handshak
 			kexDHGexRequest.MaxBits, kexDHGexRequest.PreferredBits)
 	}
 
-	var p *big.Int
-	// We hardcode sending Oakley Group 14 (2048 bits), Oakley Group 15 (3072
-	// bits) or Oakley Group 16 (4096 bits), based on the requested max size.
-	if kexDHGexRequest.MaxBits < 3072 {
-		p, _ = new(big.Int).SetString(oakleyGroup14, 16)
-	} else if kexDHGexRequest.MaxBits < 4096 {
-		p, _ = new(big.Int).SetString(oakleyGroup15, 16)
-	} else {
-		p, _ = new(big.Int).SetString(oakleyGroup16, 16)
+	p, err := chooseDH(kexDHGexRequest)
+	if err != nil {
+		return nil, err
 	}
 
 	g := big.NewInt(2)
@@ -804,4 +799,66 @@ func (gex *dhGEXSHA) Server(c packetConn, randSource io.Reader, magics *handshak
 		Signature: sig,
 		Hash:      gex.hashFunc,
 	}, err
+}
+
+type dhKEXGroup struct {
+	size int
+	p    *big.Int
+}
+
+// supportedDHKEXGroups returns the DH groups the server is willing to offer
+// for diffie-hellman-group-exchange-* key exchanges. The list is built lazily
+// on first use to keep the hex-to-big.Int parse out of package initialization.
+var supportedDHKEXGroups = sync.OnceValue(func() []dhKEXGroup {
+	specs := []struct {
+		size int
+		hex  string
+	}{
+		{2048, oakleyGroup14},
+		{3072, oakleyGroup15},
+		{4096, oakleyGroup16},
+	}
+	out := make([]dhKEXGroup, 0, len(specs))
+	for _, s := range specs {
+		p, _ := new(big.Int).SetString(s.hex, 16)
+		out = append(out, dhKEXGroup{size: s.size, p: p})
+	}
+	return out
+})
+
+// chooseDH picks a DH group for the given client request, mirroring the
+// algorithm used by OpenSSH's choose_dh in dh.c: prefer the smallest known
+// group larger than  or equal to the client's PreferredBits, and otherwise pick
+// the largest group within the accepted [MinBits, MaxBits] range.
+func chooseDH(req kexDHGexRequestMsg) (*big.Int, error) {
+	var best *big.Int
+	bestSize := 0
+	wantBits := int(req.PreferredBits)
+
+	for _, group := range supportedDHKEXGroups() {
+		if uint32(group.size) < req.MinBits || uint32(group.size) > req.MaxBits {
+			continue
+		}
+
+		if bestSize == 0 {
+			best = group.p
+			bestSize = group.size
+			continue
+		}
+
+		closerFromAbove := group.size >= wantBits && group.size < bestSize
+		closerFromBelow := group.size > bestSize && bestSize < wantBits
+
+		if closerFromAbove || closerFromBelow {
+			best = group.p
+			bestSize = group.size
+		}
+	}
+
+	if bestSize == 0 {
+		return nil, fmt.Errorf("ssh: no suitable DH group found for request min: %d, preferred: %d, max: %d",
+			req.MinBits, req.PreferredBits, req.MaxBits)
+	}
+
+	return best, nil
 }
