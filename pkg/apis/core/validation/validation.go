@@ -582,7 +582,7 @@ func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volNam
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("gcePersistentDisk"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
-			allErrs = append(allErrs, validateGCEPersistentDiskVolumeSource(source.GCEPersistentDisk, fldPath.Child("persistentDisk"))...)
+			allErrs = append(allErrs, validateGCEPersistentDiskVolumeSource(source.GCEPersistentDisk, fldPath.Child("gcePersistentDisk"))...)
 		}
 	}
 	if source.AWSElasticBlockStore != nil {
@@ -663,7 +663,7 @@ func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volNam
 	}
 	if source.CephFS != nil {
 		if numVolumes > 0 {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("cephFS"), "may not specify more than 1 volume type"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("cephfs"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
 			allErrs = append(allErrs, validateCephFSVolumeSource(source.CephFS, fldPath.Child("cephfs"))...)
@@ -679,7 +679,7 @@ func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volNam
 	}
 	if source.DownwardAPI != nil {
 		if numVolumes > 0 {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("downwarAPI"), "may not specify more than 1 volume type"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("downwardAPI"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
 			allErrs = append(allErrs, validateDownwardAPIVolumeSource(source.DownwardAPI, fldPath.Child("downwardAPI"), opts)...)
@@ -866,14 +866,14 @@ func validateISCSIVolumeSource(iscsi *core.ISCSIVolumeSource, fldPath *field.Pat
 	if iscsi.InitiatorName != nil {
 		initiator := *iscsi.InitiatorName
 		if !strings.HasPrefix(initiator, "iqn") && !strings.HasPrefix(initiator, "eui") && !strings.HasPrefix(initiator, "naa") {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("initiatorname"), initiator, "must be valid format starting with iqn, eui, or naa"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("initiatorName"), initiator, "must be valid format starting with iqn, eui, or naa"))
 		}
 		if strings.HasPrefix(initiator, "iqn") && !iscsiInitiatorIqnRegex.MatchString(initiator) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("initiatorname"), initiator, "must be valid format"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("initiatorName"), initiator, "must be valid format"))
 		} else if strings.HasPrefix(initiator, "eui") && !iscsiInitiatorEuiRegex.MatchString(initiator) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("initiatorname"), initiator, "must be valid format"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("initiatorName"), initiator, "must be valid format"))
 		} else if strings.HasPrefix(initiator, "naa") && !iscsiInitiatorNaaRegex.MatchString(initiator) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("initiatorname"), initiator, "must be valid format"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("initiatorName"), initiator, "must be valid format"))
 		}
 	}
 	return allErrs
@@ -886,7 +886,7 @@ func validateISCSIPersistentVolumeSource(iscsi *core.ISCSIPersistentVolumeSource
 	}
 	if iscsi.InitiatorName != nil && len(pvName+":"+iscsi.TargetPortal) > 64 {
 		tooLongErr := "Total length of <volume name>:<iscsi.targetPortal> must be under 64 characters if iscsi.initiatorName is specified."
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("targetportal"), iscsi.TargetPortal, tooLongErr))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("targetPortal"), iscsi.TargetPortal, tooLongErr))
 	}
 	if len(iscsi.IQN) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("iqn"), ""))
@@ -915,14 +915,14 @@ func validateISCSIPersistentVolumeSource(iscsi *core.ISCSIPersistentVolumeSource
 	if iscsi.InitiatorName != nil {
 		initiator := *iscsi.InitiatorName
 		if !strings.HasPrefix(initiator, "iqn") && !strings.HasPrefix(initiator, "eui") && !strings.HasPrefix(initiator, "naa") {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("initiatorname"), initiator, "must be valid format"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("initiatorName"), initiator, "must be valid format"))
 		}
 		if strings.HasPrefix(initiator, "iqn") && !iscsiInitiatorIqnRegex.MatchString(initiator) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("initiatorname"), initiator, "must be valid format"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("initiatorName"), initiator, "must be valid format"))
 		} else if strings.HasPrefix(initiator, "eui") && !iscsiInitiatorEuiRegex.MatchString(initiator) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("initiatorname"), initiator, "must be valid format"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("initiatorName"), initiator, "must be valid format"))
 		} else if strings.HasPrefix(initiator, "naa") && !iscsiInitiatorNaaRegex.MatchString(initiator) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("initiatorname"), initiator, "must be valid format"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("initiatorName"), initiator, "must be valid format"))
 		}
 	}
 	return allErrs
@@ -2075,7 +2075,7 @@ func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName stri
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("gcePersistentDisk"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
-			allErrs = append(allErrs, validateGCEPersistentDiskVolumeSource(pvSpec.GCEPersistentDisk, fldPath.Child("persistentDisk"))...)
+			allErrs = append(allErrs, validateGCEPersistentDiskVolumeSource(pvSpec.GCEPersistentDisk, fldPath.Child("gcePersistentDisk"))...)
 		}
 	}
 	if pvSpec.AWSElasticBlockStore != nil {
@@ -2128,7 +2128,7 @@ func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName stri
 	}
 	if pvSpec.CephFS != nil {
 		if numVolumes > 0 {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("cephFS"), "may not specify more than 1 volume type"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("cephfs"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
 			allErrs = append(allErrs, validateCephFSPersistentVolumeSource(pvSpec.CephFS, fldPath.Child("cephfs"))...)
@@ -4820,7 +4820,7 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 		}
 	}
 	if deprecatedServiceAccount := spec.DeprecatedServiceAccount; deprecatedServiceAccount != spec.ServiceAccountName { //nolint:staticcheck // SA1019 enforce the deprecated field stays in sync
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("deprecatedServiceAccount"), deprecatedServiceAccount, fmt.Sprintf("must be the same as serviceAccountName: %q", spec.ServiceAccountName)))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("serviceAccount"), deprecatedServiceAccount, fmt.Sprintf("must be the same as serviceAccountName: %q", spec.ServiceAccountName)))
 	}
 
 	if len(spec.NodeName) > 0 {
@@ -7616,7 +7616,7 @@ func ValidateNode(node *core.Node) field.ErrorList {
 	// All status fields are optional and can be updated later.
 	// That said, if specified, we need to ensure they are valid.
 	allErrs = append(allErrs, ValidateNodeResources(node)...)
-	allErrs = append(allErrs, validateNodeSwapStatus(node.Status.NodeInfo.Swap, fldPath.Child("nodeSwapStatus"))...)
+	allErrs = append(allErrs, validateNodeSwapStatus(node.Status.NodeInfo.Swap, fldPath.Child("swap"))...)
 	statusField := field.NewPath("status")
 	allErrs = append(allErrs, validateNodeDeclaredFeatures(node.Status.DeclaredFeatures, statusField.Child("declaredFeatures"))...)
 
@@ -10110,7 +10110,7 @@ func validateVolumeStatus(volumeStatus *core.VolumeStatus, fldPath *field.Path) 
 
 	if volumeStatus.Image != nil {
 		numStatuses++
-		allErrors = append(allErrors, validateImageVolumeStatus(volumeStatus.Image, fldPath.Child("imageVolumeStatus"))...)
+		allErrors = append(allErrors, validateImageVolumeStatus(volumeStatus.Image, fldPath.Child("image"))...)
 	}
 
 	if numStatuses > 1 {
