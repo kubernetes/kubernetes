@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	"math"
 	"math/big"
 	"strconv"
 
@@ -31,6 +32,26 @@ type Scale int32
 // infScale adapts a Scale value to an inf.Scale value.
 func (s Scale) infScale() inf.Scale {
 	return inf.Scale(-s) // inf.Scale is upside-down
+}
+
+// canInfScale reports whether infScale is faithful for s. Scale is int32 and
+// infScale negates it, so math.MinInt32 is the one scale whose negation
+// overflows back to itself and cannot be represented as an inf.Scale.
+func (s Scale) canInfScale() bool {
+	return s != math.MinInt32
+}
+
+// canAlignInfScale reports whether a subtraction between scales s and other can
+// be represented on the inf.Dec fallback: both scales must be representable as
+// an inf.Scale, and their alignment delta must fit in int32 so aligning the two
+// operands there does not overflow. The delta is computed in int64 here so the
+// check itself does not overflow. It does not bound the cost of that alignment.
+func (s Scale) canAlignInfScale(other Scale) bool {
+	if !s.canInfScale() || !other.canInfScale() {
+		return false
+	}
+	delta := int64(s) - int64(other)
+	return delta >= -int64(math.MaxInt32) && delta <= int64(math.MaxInt32)
 }
 
 const (
@@ -198,8 +219,18 @@ func (a *int64Amount) Add(b int64Amount) bool {
 	return true
 }
 
-// Sub removes the value of b from the current amount, or returns false if underflow would result.
+// Sub removes b from a. It returns false without mutating a when this
+// subtraction cannot be performed safely on the int64 fast path and the caller
+// can represent the operands and their alignment in the decimal fallback.
 func (a *int64Amount) Sub(b int64Amount) bool {
+	if b.value == mostNegative && a.scale.canAlignInfScale(b.scale) {
+		// -b.value overflows int64, so leave a unchanged and let the caller fall
+		// back to inf.Dec. That fallback aligns both operands, so it is only
+		// correct when both scales and their alignment delta can be represented
+		// there; anything else stays on the int64 path and keeps its existing
+		// wrapped result.
+		return false
+	}
 	return a.Add(int64Amount{value: -b.value, scale: b.scale})
 }
 
