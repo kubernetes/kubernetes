@@ -155,10 +155,11 @@ type Proxier struct {
 	endpointsChanges *proxy.EndpointsChangeTracker
 	serviceChanges   *proxy.ServiceChangeTracker
 
-	mu             sync.Mutex // protects the following fields
-	svcPortMap     proxy.ServicePortMap
-	endpointsMap   proxy.EndpointsMap
-	topologyLabels map[string]string
+	mu                 sync.Mutex // protects the following fields
+	svcPortMap         proxy.ServicePortMap
+	endpointsMap       proxy.EndpointsMap
+	deletedUDPServices proxy.ServicePortMap
+	topologyLabels     map[string]string
 	// initialSync is a bool indicating if the proxier is syncing for the first time.
 	// It is set to true when a new proxier is initialized and then set to false on all
 	// future syncs.
@@ -346,8 +347,8 @@ func NewProxier(
 	proxier := &Proxier{
 		ipFamily:              ipFamily,
 		svcPortMap:            make(proxy.ServicePortMap),
-		serviceChanges:        proxy.NewServiceChangeTracker(ipFamily, newServiceInfo, nil),
 		endpointsMap:          make(proxy.EndpointsMap),
+		deletedUDPServices:    make(proxy.ServicePortMap),
 		endpointsChanges:      proxy.NewEndpointsChangeTracker(ipFamily, nodeName, nil, nil),
 		initialSync:           true,
 		syncPeriod:            syncPeriod,
@@ -377,6 +378,9 @@ func NewProxier(
 		gracefuldeleteManager: NewGracefulTerminationManager(ipvs),
 		logger:                logger,
 	}
+
+	proxier.serviceChanges = proxy.NewServiceChangeTracker(ipFamily, newServiceInfo, proxier.serviceMapChange)
+
 	// initialize ipsetList with all sets we needed
 	proxier.ipsetList = make(map[string]*IPSet)
 	for _, is := range ipsetInfo {
@@ -653,6 +657,21 @@ func (proxier *Proxier) OnTopologyChange(topologyLabels map[string]string) {
 // OnServiceCIDRsChanged is called whenever a change is observed
 // in any of the ServiceCIDRs, and provides complete list of service cidrs.
 func (proxier *Proxier) OnServiceCIDRsChanged(_ []string) {}
+
+// serviceMapChange is called by the ServiceChangeTracker when services change.
+// It captures deleted UDP services so their stale conntrack entries can be
+// cleaned up later in the same sync, even though they are no longer in svcPortMap.
+func (proxier *Proxier) serviceMapChange(previous, current proxy.ServicePortMap) {
+	for svcPortName, svc := range previous {
+		if _, ok := current[svcPortName]; ok {
+			continue
+		}
+		if svc.Protocol() != v1.ProtocolUDP {
+			continue
+		}
+		proxier.deletedUDPServices[svcPortName] = svc
+	}
+}
 
 // This is where all of the ipvs calls happen.
 func (proxier *Proxier) syncProxyRules() (retryError error) {
@@ -1246,9 +1265,10 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("internal", string(proxier.ipFamily)).Set(float64(proxier.serviceNoLocalEndpointsInternal.Len()))
 	metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("external", string(proxier.ipFamily)).Set(float64(proxier.serviceNoLocalEndpointsExternal.Len()))
 
-	if endpointUpdateResult.ConntrackCleanupRequired {
+	if endpointUpdateResult.ConntrackCleanupRequired || len(proxier.deletedUDPServices) > 0 {
 		// Finish housekeeping, clear stale conntrack entries for UDP Services
-		conntrack.CleanStaleEntries(proxier.conntrack, proxier.ipFamily, proxier.svcPortMap, proxier.endpointsMap)
+		conntrack.CleanStaleEntries(proxier.conntrack, proxier.ipFamily, proxier.svcPortMap, proxier.endpointsMap, proxier.deletedUDPServices)
+		proxier.deletedUDPServices = make(proxy.ServicePortMap)
 	}
 	return
 }

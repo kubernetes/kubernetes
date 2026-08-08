@@ -43,7 +43,8 @@ import (
 // List existing conntrack entries and calculate the desired conntrack state
 // based on the current Services and Endpoints.
 func CleanStaleEntries(ct Interface, ipFamily v1.IPFamily,
-	svcPortMap proxy.ServicePortMap, endpointsMap proxy.EndpointsMap) {
+	svcPortMap proxy.ServicePortMap, endpointsMap proxy.EndpointsMap,
+	deletedUDPServices proxy.ServicePortMap) {
 
 	start := time.Now()
 	klog.V(4).InfoS("Started to reconcile conntrack entries", "ipFamily", ipFamily)
@@ -63,6 +64,28 @@ func CleanStaleEntries(ct Interface, ipFamily v1.IPFamily,
 	serviceIPEndpoints := make(map[string]sets.Set[string])
 	// serviceNodePortEndpoints maps service NodePort to the set of serving endpoints  (Endpoint IP and Port).
 	serviceNodePortEndpoints := make(map[int]sets.Set[string])
+
+	// Deleted UDP services are no longer in svcPortMap, but may still have
+	// stale conntrack entries pointing to their frontend IPs. Process them
+	// with a forced empty endpoint set, skipping NodePort cleanup for the
+	// same reason as services without serving endpoints.
+	// Process deleted services first so current services overwrite empty endpoint
+	// sets if the same frontend IP:port is reused by a live service.
+	for _, svc := range deletedUDPServices {
+		if svc.Protocol() != v1.ProtocolUDP {
+			continue
+		}
+
+		endpoints := sets.New[string]()
+		portStr := strconv.Itoa(svc.Port())
+		serviceIPEndpoints[net.JoinHostPort(svc.ClusterIP().String(), portStr)] = endpoints
+		for _, loadBalancerIP := range svc.LoadBalancerVIPs() {
+			serviceIPEndpoints[net.JoinHostPort(loadBalancerIP.String(), portStr)] = endpoints
+		}
+		for _, externalIP := range svc.ExternalIPs() {
+			serviceIPEndpoints[net.JoinHostPort(externalIP.String(), portStr)] = endpoints
+		}
+	}
 
 	for svcName, svc := range svcPortMap {
 		// we are only interested in UDP services

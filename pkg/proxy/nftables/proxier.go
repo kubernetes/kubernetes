@@ -154,10 +154,11 @@ type Proxier struct {
 	endpointsChanges *proxy.EndpointsChangeTracker
 	serviceChanges   *proxy.ServiceChangeTracker
 
-	mu             sync.Mutex // protects the following fields
-	svcPortMap     proxy.ServicePortMap
-	endpointsMap   proxy.EndpointsMap
-	topologyLabels map[string]string
+	mu                 sync.Mutex // protects the following fields
+	svcPortMap         proxy.ServicePortMap
+	endpointsMap       proxy.EndpointsMap
+	deletedUDPServices proxy.ServicePortMap
+	topologyLabels     map[string]string
 	// endpointSlicesSynced, and servicesSynced are set to true
 	// when corresponding objects are synced after startup. This is used to avoid
 	// updating nftables with some partial data after kube-proxy restart.
@@ -260,8 +261,8 @@ func NewProxier(ctx context.Context,
 	proxier := &Proxier{
 		ipFamily:                 ipFamily,
 		svcPortMap:               make(proxy.ServicePortMap),
-		serviceChanges:           proxy.NewServiceChangeTracker(ipFamily, newServiceInfo, nil),
 		endpointsMap:             make(proxy.EndpointsMap),
+		deletedUDPServices:       make(proxy.ServicePortMap),
 		endpointsChanges:         proxy.NewEndpointsChangeTracker(ipFamily, nodeName, newEndpointInfo, nil),
 		needFullSync:             true,
 		syncPeriod:               syncPeriod,
@@ -289,6 +290,8 @@ func NewProxier(ctx context.Context,
 		hairpinConnections:       newNFTElementStorage("set", hairpinConnectionsSet),
 		localhostNodePortRejects: newNFTElementStorage("map", localhostNodePortRejectMap),
 	}
+
+	proxier.serviceChanges = proxy.NewServiceChangeTracker(ipFamily, newServiceInfo, proxier.serviceMapChange)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeProxyNFTablesLocalhostNodePorts) {
 		proxier.localhostNodePortsEnabled = true
@@ -1169,6 +1172,21 @@ func (proxier *Proxier) logFailure(tx *knftables.Transaction) {
 	}
 }
 
+// serviceMapChange is called by the ServiceChangeTracker when services change.
+// It captures deleted UDP services so their stale conntrack entries can be
+// cleaned up later in the same sync, even though they are no longer in svcPortMap.
+func (proxier *Proxier) serviceMapChange(previous, current proxy.ServicePortMap) {
+	for svcPortName, svc := range previous {
+		if _, ok := current[svcPortName]; ok {
+			continue
+		}
+		if svc.Protocol() != v1.ProtocolUDP {
+			continue
+		}
+		proxier.deletedUDPServices[svcPortName] = svc
+	}
+}
+
 // This is where all of the nftables calls happen.
 // This assumes proxier.mu is NOT held
 func (proxier *Proxier) syncProxyRules() (retryError error) {
@@ -1913,9 +1931,10 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		proxier.localhostNodePortProxy.SyncNodePorts(localhostNodePorts)
 	}
 
-	if endpointUpdateResult.ConntrackCleanupRequired {
+	if endpointUpdateResult.ConntrackCleanupRequired || len(proxier.deletedUDPServices) > 0 {
 		// Finish housekeeping, clear stale conntrack entries for UDP Services
-		conntrack.CleanStaleEntries(proxier.conntrack, proxier.ipFamily, proxier.svcPortMap, proxier.endpointsMap)
+		conntrack.CleanStaleEntries(proxier.conntrack, proxier.ipFamily, proxier.svcPortMap, proxier.endpointsMap, proxier.deletedUDPServices)
+		proxier.deletedUDPServices = make(proxy.ServicePortMap)
 	}
 	return
 }
