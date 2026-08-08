@@ -4227,6 +4227,103 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 	}
 }
 
+// TestConvertToAPIContainerStatuses_StartedNotInheritedOnContainerRestart verifies
+// that after a container restart (new containerID), the Started field is NOT
+// inherited from the previous container's status, but after a kubelet restart
+// (same containerID), it IS preserved. Regression test for
+// https://github.com/kubernetes/kubernetes/issues/141155
+func TestConvertToAPIContainerStatuses_StartedNotInheritedOnContainerRestart(t *testing.T) {
+	tests := []struct {
+		name            string
+		featureEnabled  bool
+		oldContainerID  string
+		newContainerID  kubecontainer.ContainerID
+		expectInherited bool
+	}{
+		{
+			name:            "container restart, feature disabled (v1.35+, regression case)",
+			featureEnabled:  false,
+			oldContainerID:  "containerd://old-container-id",
+			newContainerID:  kubecontainer.ContainerID{Type: "containerd", ID: "new-container-id"},
+			expectInherited: false,
+		},
+		{
+			name:            "container restart, feature enabled (v1.34-)",
+			featureEnabled:  true,
+			oldContainerID:  "containerd://old-container-id",
+			newContainerID:  kubecontainer.ContainerID{Type: "containerd", ID: "new-container-id"},
+			expectInherited: false,
+		},
+		{
+			name:            "kubelet restart, feature disabled (same containerID, Started preserved)",
+			featureEnabled:  false,
+			oldContainerID:  "containerd://same-container-id",
+			newContainerID:  kubecontainer.ContainerID{Type: "containerd", ID: "same-container-id"},
+			expectInherited: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ChangeContainerStatusOnKubeletRestart, tc.featureEnabled)
+			tCtx := ktesting.Init(t)
+
+			pod := &v1.Pod{
+				Spec: v1.PodSpec{
+					NodeName:      "machine",
+					Containers:    []v1.Container{{Name: "containerA"}},
+					RestartPolicy: v1.RestartPolicyAlways,
+				},
+			}
+
+			started := true
+			previousStatus := []v1.ContainerStatus{
+				{
+					Name:        "containerA",
+					ContainerID: tc.oldContainerID,
+					State: v1.ContainerState{
+						Running: &v1.ContainerStateRunning{},
+					},
+					Started: &started,
+				},
+			}
+
+			currentStatus := &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						Name:      "containerA",
+						ID:        tc.newContainerID,
+						State:     kubecontainer.ContainerStateRunning,
+						StartedAt: time.Now(),
+					},
+				},
+			}
+
+			kubelet := &Kubelet{}
+			kubelet.reasonCache = NewReasonCache()
+
+			containerStatuses := kubelet.convertToAPIContainerStatuses(
+				tCtx,
+				pod,
+				currentStatus,
+				previousStatus,
+				pod.Spec.Containers,
+				nil,   // imageVolumeNames
+				false, // hasInitContainers
+				false, // isInitContainer
+				false, // podRestarting
+			)
+
+			if assert.Len(t, containerStatuses, 1) {
+				cs := containerStatuses[0]
+				inherited := cs.Started != nil && *cs.Started
+				assert.Equal(t, tc.expectInherited, inherited,
+					"Started inherited mismatch (oldID=%q, newID=%q)", tc.oldContainerID, cs.ContainerID)
+			}
+		})
+	}
+}
+
 // imageDigestRuntime is a simple wrapper that returns a fixed digest for image volumes
 type imageDigestRuntime struct {
 	*containertest.FakeRuntime

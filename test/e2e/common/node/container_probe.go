@@ -402,6 +402,113 @@ var _ = SIGDescribe("Probing container", func() {
 	})
 
 	/*
+		Release: v1.38
+		Testname: Pod startup probe re-gates liveness after container restart
+		Description: A Pod with startup and liveness probes restarts due to
+		liveness failure. The restarted container MUST pass startup probe
+		before liveness probe begins.
+	*/
+	f.It("should not run liveness probe before startup probe succeeds after container restart", f.WithNodeConformance(), func(ctx context.Context) {
+		// 1. Create pod: startup passes only for initial container,
+		//    liveness passes only for initial container without fail-liveness flag.
+		// 2. Trigger liveness failure via "touch /state/fail-liveness" → container restarts.
+		// 3. After restart: liveness always fails. If startup correctly gates
+		//    liveness, it never runs → restartCount == 1. If bug exists,
+		//    liveness runs before startup → restartCount >= 2.
+		cmd := []string{"/bin/sh", "-c", `
+instance=initial
+if test -f /state/container-seen; then
+  instance=replacement
+else
+  touch /state/container-seen
+fi
+echo "$instance" > /state/instance
+sleep 3600
+`}
+		startupProbe := &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				Exec: &v1.ExecAction{
+					Command: []string{"/bin/sh", "-c", `test "$(cat /state/instance)" = "initial"`},
+				},
+			},
+			PeriodSeconds:    1,
+			FailureThreshold: 100,
+		}
+		livenessProbe := &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				Exec: &v1.ExecAction{
+					Command: []string{"/bin/sh", "-c", `test "$(cat /state/instance)" = "initial" && test ! -f /state/fail-liveness`},
+				},
+			},
+			PeriodSeconds:    1,
+			FailureThreshold: 1,
+		}
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "startup-restart-" + string(uuid.NewUUID()),
+				Labels: map[string]string{"test": "startup-restart"},
+			},
+			Spec: v1.PodSpec{
+				TerminationGracePeriodSeconds: ptr.To[int64](2),
+				Containers: []v1.Container{
+					{
+						Name:          "busybox",
+						Image:         imageutils.GetE2EImage(imageutils.BusyBox),
+						Command:       cmd,
+						LivenessProbe: livenessProbe,
+						StartupProbe:  startupProbe,
+						VolumeMounts: []v1.VolumeMount{
+							{Name: "state", MountPath: "/state"},
+						},
+					},
+				},
+				Volumes: []v1.Volume{
+					{
+						Name:         "state",
+						VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
+					},
+				},
+			},
+		}
+
+		podClient := e2epod.NewPodClient(f)
+		ginkgo.DeferCleanup(func(ctx context.Context) error {
+			return podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))
+		})
+
+		ginkgo.By("Creating the pod and waiting for startup probe to pass")
+		podClient.Create(ctx, pod)
+		framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "container started", 60*time.Second, func(pod *v1.Pod) (bool, error) {
+			if len(pod.Status.ContainerStatuses) == 0 {
+				return false, nil
+			}
+			return pod.Status.ContainerStatuses[0].Started != nil && *pod.Status.ContainerStatuses[0].Started, nil
+		}))
+
+		ginkgo.By("Triggering liveness probe failure to restart the container")
+		stdout, stderr, err := e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, "busybox", "/bin/sh", "-c", "touch /state/fail-liveness")
+		framework.Logf("exec stdout=%q stderr=%q err=%v", stdout, stderr, err)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Waiting for container to restart")
+		framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "container restarted", 60*time.Second, func(pod *v1.Pod) (bool, error) {
+			if len(pod.Status.ContainerStatuses) == 0 {
+				return false, nil
+			}
+			return pod.Status.ContainerStatuses[0].RestartCount >= 1, nil
+		}))
+
+		ginkgo.By("Verifying startup probe gates liveness after restart")
+		time.Sleep(10 * time.Second)
+		pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		restartCount := pod.Status.ContainerStatuses[0].RestartCount
+		gomega.Expect(restartCount).To(gomega.BeNumerically("==", 1),
+			"Expected exactly 1 restart, but got %d. Liveness probe ran before startup probe after restart.", restartCount)
+	})
+
+	/*
 		Release: v1.16
 		Testname: Pod readiness probe, delayed by startup probe
 		Description: A Pod is created with startup and readiness probes. The Container is started by creating /tmp/startup after 45 seconds, delaying the ready state by this amount of time. This is similar to the "Pod readiness probe, with initial delay" test.
