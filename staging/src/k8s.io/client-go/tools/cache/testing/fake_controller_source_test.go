@@ -17,8 +17,10 @@ limitations under the License.
 package framework
 
 import (
+	"errors"
 	"sync"
 	"testing"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -133,4 +135,47 @@ func TestResetWatch(t *testing.T) {
 	go consume(t, w, []string{"4"}, wg)
 	source.Shutdown()
 	wg.Wait()
+}
+
+func TestShutdownDoesNotBlockListOrWatch(t *testing.T) {
+	source := NewFakeControllerSource()
+	source.Shutdown()
+
+	tests := []struct {
+		name string
+		call func() error
+	}{
+		{
+			name: "list",
+			call: func() error {
+				_, err := source.List(metav1.ListOptions{})
+				return err
+			},
+		},
+		{
+			name: "watch",
+			call: func() error {
+				_, err := source.Watch(metav1.ListOptions{ResourceVersion: "0"})
+				return err
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			errCh := make(chan error, 1)
+			go func() {
+				errCh <- test.call()
+			}()
+
+			select {
+			case err := <-errCh:
+				if !errors.Is(err, errFakeControllerSourceShutdown) {
+					t.Fatalf("expected shutdown error, got %v", err)
+				}
+			case <-time.After(time.Second):
+				t.Fatal("call blocked after fake controller source shutdown")
+			}
+		})
+	}
 }
