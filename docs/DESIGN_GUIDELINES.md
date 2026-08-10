@@ -201,8 +201,7 @@ applications. For example, the
 architecture that includes an AWS Fargate container cluster employing an
 Application Load Balancer (ALB). These patterns are typically difficult to
 design to be one-size-fits-all and are best suited to be published as separate
-libraries, rather than included directly in the CDK. The patterns that currently
-exist in the CDK will be removed in the next CDK major version (CDKv2).
+libraries, rather than included directly in the CDK.
 
 ## Mixins, Facades, and Traits
 
@@ -276,9 +275,7 @@ bucket regardless of any external consumer.
 
 Facades are always specific to a particular resource type — that is why it is
 `BucketGrants` and not just `Grants`. While Facades for different resources look
-similar, each contains resource-specific logic. A Facade can also provide a
-[Trait](#traits) implementation for its resource (e.g., `BucketGrants` provides
-the `IResourceWithPolicyV2` trait for buckets).
+similar, each contains resource-specific logic.
 
 Some Facades are auto-generated and available for most resources (e.g.,
 `BucketMetrics`, `BucketReflection`). Others are handwritten for resources that
@@ -320,14 +317,9 @@ any resource that has a resource policy, whether it is a bucket, a queue, or a
 topic.
 
 Traits enable Facades to discover capabilities of resources without requiring a
-full L2 implementation. A Facade can provide a Trait implementation for its
-resource type (e.g., registering an `IResourcePolicyFactory` for
-`AWS::S3::Bucket` so that any Grants class can add statements to a bucket's
-resource policy).
-
-Examples: `IEncryptedResource` (via `IEncryptedResourceFactory`),
-`IResourceWithPolicyV2` (via `IResourcePolicyFactory`), `IConnectable`,
-`IGrantable`.
+full L2 implementation. Examples: `IEncryptedResource` (via 
+`IEncryptedResourceFactory`), `IResourceWithPolicyV2` (via 
+`IResourcePolicyFactory`), `IConnectable`, `IGrantable`.
 
 Traits are primarily an implementation detail used by Facades and the grant
 system. They are not typically part of the public-facing API that end users
@@ -450,8 +442,15 @@ Construct classes should extend only one of the following classes
 * The **Construct** class (if it represents an abstract component)
 * The **XxxBase** class (which, in turn extends **Resource**)
 
-All constructs must define a static type check method called **isFoo** with the
-following implementation [_awslint:static-type-check_]:
+In the CDK, we can't reliably use `instanceof` for type comparison at runtime,
+for a number of reasons: there may be multiple copies of the same package in 
+`node_modules`, multiple versions in one tree, jsii cross-language boundaries.
+In all these cases, `instanceOf` could return false even for the same shape (for
+example, two occurrences of the `Stack` class, in different paths inside 
+`node_modules`).
+
+Instead, if you need to compare specific types, define a static type check
+method called **isFoo** with the following implementation:
 
 ```ts
 const IS_FOO = Symbol.for('@aws-cdk/aws-foo.Foo');
@@ -837,12 +836,6 @@ the user. Aligning with the console also makes it easier for users to jump back
 and forth between the AWS Console (the web frontend of AWS) and the CDK (the
 “programmatic frontend” of AWS).
 
-AWS constructs should *not* have a “props” property
-[_awslint:props-no-property_].
-
-Construct props should expose the *full set* of capabilities of the AWS service
-through a declarative interface [_awslint:props-coverage_].
-
 This section describes guidelines for construct props.
 
 #### Types
@@ -858,22 +851,6 @@ encapsulate the low-level surface [_awslint:props-no-cfn-types_].
 Do not use the **Token** type. It provides zero type safety, and is a functional
 interface that may not translate cleanly in other JSII runtimes. Therefore, it should
 be avoided wherever possible [_awslint:props-no-tokens_].
-
-**deCDK** allows users to synthesize CDK stacks through a CloudFormation-like
-  template, similar to SAM. CDK constructs are represented in deCDK templates
-  like CloudFormation resources. Technically, this means that when a construct
-  is defined, users supply an ID, type and a set of properties. In order to
-  allow users to instantiate all AWS Construct Library constructs through the
-  deCDK syntax, we impose restrictions on prop types _[awslint:props-decdk]_:
-
-* Primitives (string, number, boolean, date)
-* Collections (list, map)
-* Structs
-* Enums
-* Enum-like classes
-* Union-like classes
-* References to other constructs (through their construct interface)
-* Integration interfaces (interfaces that have a “**bind**” method)
 
 #### Defaults
 
@@ -952,7 +929,7 @@ minCapacity?: number;
 #### Flat
 
 Do not introduce artificial nesting for props. It hinders discoverability and
-makes it cumbersome to use in some languages (like Java) [_awslint:props-flat_].
+makes it cumbersome to use in some languages (like Java).
 
 You can use a shared prefix for related properties to make them appear next to
 each other in documentation and code completion:
@@ -982,14 +959,9 @@ new Bucket(this, 'MyBucket', {
 Property names should be short and concise as possible and take into
 consideration the ample context in which the property is used. Being concise
 doesn't mean inventing new semantics. It just means that you can remove
-redundant context from the property names.
-
-Being concise doesn't mean you should invent new service semantics (see next
-item). It just means that you can remove redundant context from the property
-names. For example, there is no need to repeat the resource type, the property
-type or indicate that this is a "configuration".
-
-For example, prefer “readCapacity” versus “readCapacityUnits”.
+redundant context from the property names. For example, there is no need to 
+repeat the resource type, the property type or indicate that this is a 
+"configuration". Prefer “readCapacity” versus “readCapacityUnits”.
 
 #### Naming
 
@@ -1054,9 +1026,9 @@ new BoomBoom(this, 'Boom', {
 });
 ```
 
-Suggestion for alternative syntax for custom options? Motivation: if we make
-everything go through static factories, it will look more regular (I'm fine not
-pursuing this, just popped into my head):
+Alternatively, you can also force users to go through static factory methods to
+get values. This can be useful when there is some transformation you want to do
+in the user-provided data:
 
 ```ts
 export class MyOption {
@@ -1065,6 +1037,10 @@ export class MyOption {
 
   public static custom(value: string) {
     return new MyOption(value);
+  }
+  
+  public static specialCase(value: string) {
+    return new MyOption(value + '-some-suffix-or-whatever');
   }
 
   // 'protected' iso. 'private' so that someone that really wants to can still
@@ -1106,23 +1082,18 @@ physical names, URLs, etc. These attributes are commonly late-bound, which means
 they can only be resolved during deployment, when AWS CloudFormation actually
 provisions the resource.
 
-AWS constructs must expose all resource attributes defined in the underlying
-CloudFormation resource as readonly properties of the class
-_[awslint:resource-attribute]_.
-
 All properties that represent resource attributes must include the JSDoc tag
 **@attribute** _[awslint:attribute-tag]_.
 
-All attribute names must begin with the type name as a prefix
-(e.g. ***bucket*Arn** instead of just **arn**) _[awslint:attribute-name]_. This
-implies that if a property begins with the type name, it must have an
-**@attribute** tag.
+All attribute names must begin with the type name as a prefix (e.g. 
+***bucket*Arn** instead of just **arn**). This implies that if a property begins
+with the type name, it must have an **@attribute** tag.
 
 All resource attributes must be represented as readonly properties of the
 resource interface _[awslint:attribute-readonly]_.
 
 Resource attributes should use a type that corresponds to the resolved AWS
-CloudFormation type (e.g. **string**, **string[]**) _[awslint:attribute-type]_.
+CloudFormation type (e.g. **string**, **string[]**).
 
 > Resource attributes almost always represent string values (URL, ARN,
   name). Sometimes they might also represent a list of strings. Since attribute
@@ -1138,8 +1109,7 @@ the **Token.isUnresolved(x)** method.
 
 To ensure users are aware that the value returned by attribute properties should
 be treated as an opaque token, the JSDoc “@returns” annotation should begin with
-“**@returns a $token representing the xxxxx**”
-[_awslint:attribute-doc-returns-token_].
+“**@returns a $token representing the xxxxx**”.
 
 ### Configuration
 
@@ -1169,7 +1139,7 @@ dependencies.
 To help avoid the common mistake of exposing non-configuration APIs on the
 construct class (versus the construct interface), we require that configuration
 APIs (methods/properties) defined on the construct class will be annotated with
-the **@config** jsdoc tag [_awslint:config-explicit_].
+the **@config** jsdoc tag.
 
 ```ts
 interface IFoo extends IConstruct {
@@ -1235,8 +1205,7 @@ Users should be able to define secondary resources either by directly
 instantiating their construct class (like any other construct), and passing in a
 reference to the primary resource's construct interface *or* it is recommended
 to implement convenience methods on the primary resource that will facilitate
-defining secondary resources. This improves discoverability and ergonomics
-_[awslint:factory-method]_.
+defining secondary resources. This improves discoverability and ergonomics.
 
 For example, **lambda.Function.addLayer** can be used to add a layer to the
 function, **apigw.RestApi.addResource** can be used to add to an API.
@@ -1260,8 +1229,7 @@ Notice that:
 
 In order to reuse the set of props used to configure the secondary resource,
 define a base interface for **FooProps** called **FooOptions** to allow
-secondary resource factory methods to reuse props
-_[awslint:factory-method-options]_:
+secondary resource factory methods to reuse props:
 
 ```ts
 export interface LogStreamOptions {
@@ -1281,7 +1249,7 @@ export interface ILogGroup {
 
 > "Referenced resources" were formerly called "imported resources", but that may lead to confusion
 > because there is also a feature called "cdk import" that actually brings unowned
-> resources under CloudFormation's control. Therefore the current preferred terminology
+> resources under CloudFormation's control. Therefore, the current preferred terminology
 > here has changed to "referencing" instead.
 
 Construct classes should expose a set of static factory methods with a
@@ -1360,8 +1328,7 @@ Constructs that represent such resources should conform to the following
 guidelines.
 
 An optional prop called **role** of type **iam.IRoleRef** should be exposed to allow
-users to "bring their own role", and use either an owned or unowned role
-_[awslint:role-config-prop]_.
+users to "bring their own role", and use either an owned or unowned role.
 
 If the construct is going to grant permissions to the role, which is usually the case,
 the type should include **iam.IGrantable**, in a type intersection as follows:
@@ -1378,7 +1345,7 @@ interface FooProps {
 ```
 
 The construct interface should expose a **role** property, and extend
-**iam.IGrantable** _[awslint:role-property]_:
+**iam.IGrantable**:
 
 ```ts
 interface IFoo extends iam.IGrantable {
@@ -1393,7 +1360,7 @@ This property will be `undefined` if this is an unowned construct (e.g. was not
 defined within the current app).
 
 An **addToRolePolicy** method must be exposed on the construct interface to
-allow adding statements to the role's policy _[awslint:role-add-to-policy]_:
+allow adding statements to the role's policy:
 
 ```ts
 interface IFoo {
@@ -1511,8 +1478,9 @@ topicGrants.publish(role);
 topicGrants.subscribe(role);
 ```
 
-For every resource that has an accompanying Grants class, the construct interface should
-include a public **grants** property that returns an instance of the Grants class:
+For every resource that has an accompanying Grants class, the construct interface
+should include a public **grants** property that returns an instance of the 
+Grants class:
 
 ```ts
 export abstract class TopicBase extends Resource implements ITopic, IEncryptedResource {
@@ -1528,9 +1496,10 @@ To enable grant methods to work with L1 constructs, the CDK uses factory
 interfaces called [Traits](#traits) that wrap L1 resources into objects
 exposing higher-level interfaces:
 
-- `IResourcePolicyFactory` wraps an L1 into an object implementing `IResourceWithPolicyV2`, enabling resource policy
-manipulation.
-- `IEncryptedResourceFactory` wraps an L1 into an object implementing `IEncryptedResource`, enabling KMS key grants.
+- `IResourcePolicyFactory` wraps an L1 into an object implementing 
+`IResourceWithPolicyV2`, enabling resource policy manipulation.
+- `IEncryptedResourceFactory` wraps an L1 into an object implementing 
+`IEncryptedResource`, enabling KMS key grants.
 
 `IResourceWithPolicyV2` and `IEncryptedResource` are collectively called "traits". These are the two
 traits currently in use. More may be added if other common patterns in L1 resources can be
@@ -1627,13 +1596,12 @@ Almost all AWS resources emit CloudWatch metrics, which can be used with alarms
 and dashboards.
 
 AWS construct interfaces should include a set of “metric” methods which
-represent the CloudWatch metrics emitted from this resource
-_[awslint:metrics-on-interface]_.
+represent the CloudWatch metrics emitted from this resource.
 
 At a minimum (and enforced by IResource), all resources should have a single
 method called **metric**, which returns a **cloudwatch.Metric** object
 associated with this instance (usually this method will simply set the right
-metrics namespace and dimensions [_awslint:metrics-generic-method_]:
+metrics namespace and dimensions:
 
 ```ts
 metric(metricName: string, options?: cloudwatch.MetricOptions): cloudwatch.Metric;
@@ -1643,7 +1611,7 @@ metric(metricName: string, options?: cloudwatch.MetricOptions): cloudwatch.Metri
     be excluded
 
 Additional metric methods should be exposed with the official metric name as a
-suffix and adhere to the following rules _[awslint:metrics-method-signature]:_
+suffix and adhere to the following rules:
 
 * Name should be “metricXxx” where “Xxx” is the official metric name
 * Accepts a single “options” argument of type **MetricOptions**
@@ -1659,9 +1627,8 @@ interface IFunction {
 
 It is sometimes desirable to use a metric that applies to all resources of a
 certain type within the account. To facilitate this, resources should expose a
-static method called **metricAll** _[awslint:metrics-static-all]_. Additional
-**metricAll** static methods can also be exposed
-_[awslint:metrics-all-methods]_.
+static method called **metricAll**. Additional **metricAll** static methods can
+also be exposed.
 
 <!-- markdownlint-disable MD013 -->
 ```ts
@@ -2060,7 +2027,11 @@ information that can be obtained from the stack trace.
 
 ### Tokens
 
-* Do not use FnSub
+Do not use `Fn::Sub` in constructs. It forces you to embed logical IDs and
+references as literal strings, which couples your code to implementation
+details and bypasses CDK's automatic reference and dependency tracking.
+Compose strings from token-returning APIs instead (`Stack.of(scope).formatArn()`,
+resource attribute properties like `bucket.bucketArn`, `Fn.join`, `Fn.ref`).
 
 ### Deferred Values
 
@@ -2154,7 +2125,7 @@ All public APIs must be documented when first introduced
 
 Do not add documentation on overrides/implementations. The public reference
 documentation will automatically copy the base documentation to the derived
-APIs, so it's better to avoid the confusion [_awslint:docs-no-duplicates_].
+APIs, so it's better to avoid the confusion.
 
 Use the following JSDoc tags: **@param**, **@returns**, **@default**, **@see**,
 **@example.**
@@ -2185,7 +2156,10 @@ Use the following JSDoc tags: **@param**, **@returns**, **@default**, **@see**,
 
 ### Versioning
 
-* Semantic versioning Construct ID changes or scope hierarchy
+* Changing a construct's ID or its position in the scope hierarchy changes the
+  derived CloudFormation logical ID, which replaces the underlying resources
+  (causing data loss). Treat such changes as breaking changes under semantic
+  versioning — they are only permitted in `-alpha` modules.
 
 ## Naming & Style
 

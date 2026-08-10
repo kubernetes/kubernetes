@@ -34,7 +34,7 @@ This script will also update the relevant changelog file.
 
 ## `scripts/resolve-version.js`
 
-The script evaluates evaluates the configuration in `release.json` and exports an
+The script evaluates the configuration in `release.json` and exports an
 object like this:
 
 ```js

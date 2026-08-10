@@ -229,6 +229,44 @@ describe('CallApiGatewayRestApiEndpoint', () => {
     });
   });
 
+  test('JSONata expression as apiPath is passed through to state JSON', () => {
+    // GIVEN
+    const stack = new cdk.Stack();
+    const restApi = new apigateway.RestApi(stack, 'RestApi');
+
+    // WHEN
+    const task = CallApiGatewayRestApiEndpoint.jsonata(stack, 'Call', {
+      api: restApi,
+      method: HttpMethod.GET,
+      stageName: 'dev',
+      apiPath: '{% "/path/" & $states.input.path_suffix %}',
+    });
+
+    // THEN
+    expect(stack.resolve(task.toStateJson())).toMatchObject({
+      Type: 'Task',
+      QueryLanguage: 'JSONata',
+      End: true,
+      Arguments: {
+        Method: 'GET',
+        Path: '{% "/path/" & $states.input.path_suffix %}',
+        Stage: 'dev',
+      },
+      Resource: {
+        'Fn::Join': [
+          '',
+          [
+            'arn:',
+            {
+              Ref: 'AWS::Partition',
+            },
+            ':states:::apigateway:invoke',
+          ],
+        ],
+      },
+    });
+  });
+
   test('wait for task token - missing token', () => {
     // GIVEN
     const stack = new cdk.Stack();

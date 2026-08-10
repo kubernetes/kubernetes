@@ -276,6 +276,10 @@ function sameAspect(a: AspectVisit, b: AspectVisit) {
  * Returns whether `a` is an ancestor of `b` (or if they are the same construct)
  */
 function isAncestorOf(a: Construct, b: Construct) {
+  // The root construct has an empty path and is an ancestor of every construct.
+  // Guarding against it explicitly avoids the `'' + '/'` === '/' pitfall, which
+  // would otherwise make `startsWith` fail for every non-root descendant.
+  if (a.node.path === '') return true;
   return b.node.path === a.node.path || b.node.path.startsWith(a.node.path + '/');
 }
 

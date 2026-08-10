@@ -1,0 +1,13 @@
+{
+  "targets": {
+    "java": {
+      "package": "software.amazon.awscdk.services.wellarchitected"
+    },
+    "dotnet": {
+      "namespace": "Amazon.CDK.AWS.WellArchitected"
+    },
+    "python": {
+      "module": "aws_cdk.aws_wellarchitected"
+    }
+  }
+}

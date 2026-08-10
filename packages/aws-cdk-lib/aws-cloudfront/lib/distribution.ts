@@ -205,7 +205,7 @@ export interface DistributionProps {
   readonly geoRestriction?: GeoRestriction;
 
   /**
-   * Specify the maximum HTTP version that you want viewers to use to communicate with CloudFront.
+   * The HTTP version(s) to enable on the distribution.
    *
    * For viewers and CloudFront to use HTTP/2, viewers must support TLS 1.2 or later, and must support server name identification (SNI).
    *
@@ -385,7 +385,7 @@ export class Distribution extends Resource implements IDistribution {
     addConstructMetadata(this, props);
 
     if (props.certificate) {
-      const certificateRegion = Stack.of(this).splitArn(props.certificate.certificateRef.certificateId, ArnFormat.SLASH_RESOURCE_NAME).region;
+      const certificateRegion = Stack.of(this).splitArn(props.certificate.certificateRef.certificateArn, ArnFormat.SLASH_RESOURCE_NAME).region;
       if (!Token.isUnresolved(certificateRegion) && certificateRegion !== 'us-east-1') {
         throw new ValidationError(lit`DistributionCertificateMustBeInUsEast1`, `Distribution certificates must be in the us-east-1 region and the certificate you provided is in ${certificateRegion}.`, this);
       }
@@ -393,6 +393,20 @@ export class Distribution extends Resource implements IDistribution {
       if ((props.domainNames ?? []).length === 0) {
         Annotations.of(this).addWarningV2('@aws-cdk/aws-cloudfront:emptyDomainNames', 'No domain names are specified. You will need to specify it after running associate-alias CLI command manually. See the "Moving an alternate domain name to a different distribution" section of module\'s README for more info.');
       }
+    }
+
+    if (props.minimumProtocolVersion && !props.certificate) {
+      Annotations.of(this).addWarningV2(
+        '@aws-cdk/aws-cloudfront:minimumProtocolVersionWithoutCertificate',
+        "Ignoring 'minimumProtocolVersion': it has no effect without a custom 'certificate'. The distribution uses the CloudFront default certificate, whose security policy is fixed at TLSv1.",
+      );
+    }
+
+    if (props.sslSupportMethod && !props.certificate) {
+      Annotations.of(this).addWarningV2(
+        '@aws-cdk/aws-cloudfront:sslSupportMethodWithoutCertificate',
+        "Ignoring 'sslSupportMethod': it has no effect without a custom 'certificate'. The distribution uses the CloudFront default certificate, which is served to all viewers.",
+      );
     }
 
     this.httpVersion = props.httpVersion ?? HttpVersion.HTTP2;
@@ -870,7 +884,7 @@ export class Distribution extends Resource implements IDistribution {
     const sslSupportMethod = sslSupportMethodProp ?? SSLMethod.SNI;
 
     return {
-      acmCertificateArn: certificate.certificateRef.certificateId,
+      acmCertificateArn: certificate.certificateRef.certificateArn,
       minimumProtocolVersion: minimumProtocolVersion,
       sslSupportMethod: sslSupportMethod,
     };
@@ -887,7 +901,13 @@ export class Distribution extends Resource implements IDistribution {
   }
 }
 
-/** Maximum HTTP version to support */
+/**
+ * The HTTP version(s) to enable on the distribution.
+ *
+ * Note: Setting `HTTP3` enables HTTP 3 only (not HTTP 2). To support both HTTP 2 and HTTP 3, use `HTTP2_AND_3`.
+ *
+ * @see https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_UpdateDistribution.html#cloudfront-UpdateDistribution-request-HttpVersion
+ */
 export enum HttpVersion {
   /** HTTP 1.1 */
   HTTP1_1 = 'http1.1',
@@ -895,7 +915,7 @@ export enum HttpVersion {
   HTTP2 = 'http2',
   /** HTTP 2 and HTTP 3 */
   HTTP2_AND_3 = 'http2and3',
-  /** HTTP 3 */
+  /** HTTP 3 only (does not include HTTP 2) */
   HTTP3 = 'http3',
 }
 

@@ -321,8 +321,8 @@ export class DomainName extends Resource implements IDomainName {
     const mtlsConfig = this.configureMTLS(props.mtls);
     const resource = new CfnDomainName(this, 'Resource', {
       domainName: props.domainName,
-      certificateArn: edge ? props.certificate.certificateRef.certificateId : undefined,
-      regionalCertificateArn: edge ? undefined : props.certificate.certificateRef.certificateId,
+      certificateArn: edge ? props.certificate.certificateRef.certificateArn : undefined,
+      regionalCertificateArn: edge ? undefined : props.certificate.certificateRef.certificateArn,
       endpointConfiguration: { types: [this.endpointType] },
       mutualTlsAuthentication: mtlsConfig,
       securityPolicy: props.securityPolicy,

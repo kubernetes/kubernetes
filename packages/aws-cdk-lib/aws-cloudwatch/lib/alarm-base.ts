@@ -1,4 +1,6 @@
 import type { IAlarmAction } from './alarm-action';
+import type { AlarmMuteRuleOptions } from './alarm-mute-rule';
+import { AlarmMuteRule } from './alarm-mute-rule';
 import type { IResource } from '../../core';
 import { Resource } from '../../core';
 import type { IArrayBox } from '../../core/lib/helpers-internal';
@@ -111,5 +113,12 @@ export abstract class AlarmBase extends Resource implements IAlarm {
    */
   public addOkAction(...actions: IAlarmAction[]) {
     this._okActionArns.push(...actions.map(a => a.bind(this, this).alarmActionArn));
+  }
+
+  /**
+   * Add an alarm mute rule.
+   */
+  public addAlarmMuteRule(id: string, options: AlarmMuteRuleOptions) {
+    return new AlarmMuteRule(this, id, { ...options, alarms: [this] });
   }
 }

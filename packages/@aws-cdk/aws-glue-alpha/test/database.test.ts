@@ -86,11 +86,11 @@ test('fromDatabase', () => {
   // THEN
   expect(database.databaseArn).toEqual('arn:aws:glue:us-east-1:123456789012:database/db1');
   expect(database.databaseName).toEqual('db1');
-  expect(stack.resolve(database.catalogArn)).toEqual({
+  expect(stack.resolve(database.catalog.catalogArn)).toEqual({
     'Fn::Join': ['',
       ['arn:', { Ref: 'AWS::Partition' }, ':glue:', { Ref: 'AWS::Region' }, ':', { Ref: 'AWS::AccountId' }, ':catalog']],
   });
-  expect(stack.resolve(database.catalogId)).toEqual({ Ref: 'AWS::AccountId' });
+  expect(stack.resolve(database.catalog.catalogId)).toEqual({ Ref: 'AWS::AccountId' });
 });
 
 test('locationUri length must be >= 1', () => {

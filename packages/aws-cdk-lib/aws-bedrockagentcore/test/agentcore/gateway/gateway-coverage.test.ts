@@ -596,12 +596,33 @@ describe('Gateway metric methods tests', () => {
     alarmForMetric(stack, 'CustomAlarm', metric);
 
     const template = Template.fromStack(stack);
+    // Operation is always emitted.
     template.hasResourceProperties('AWS::CloudWatch::Alarm', {
       MetricName: 'CustomMetric',
       Namespace: 'AWS/Bedrock-AgentCore',
       Dimensions: Match.arrayWith([
-        Match.objectLike({ Name: 'CustomDimension', Value: 'value' }),
+        Match.objectLike({ Name: 'Operation', Value: 'InvokeGateway' }),
+      ]),
+    });
+    // Protocol comes from the gateway's protocol type.
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'CustomMetric',
+      Dimensions: Match.arrayWith([
+        Match.objectLike({ Name: 'Protocol', Value: 'MCP' }),
+      ]),
+    });
+    // Resource is this gateway's ARN.
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'CustomMetric',
+      Dimensions: Match.arrayWith([
         Match.objectLike({ Name: 'Resource', Value: { 'Fn::GetAtt': [Match.stringLikeRegexp('.*'), 'GatewayArn'] } }),
+      ]),
+    });
+    // A caller dimension merges over the defaults.
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'CustomMetric',
+      Dimensions: Match.arrayWith([
+        Match.objectLike({ Name: 'CustomDimension', Value: 'value' }),
       ]),
     });
   });
@@ -614,6 +635,24 @@ describe('Gateway metric methods tests', () => {
       MetricName: 'Invocations',
       Namespace: 'AWS/Bedrock-AgentCore',
       Statistic: 'Sum',
+    });
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'Invocations',
+      Dimensions: Match.arrayWith([
+        Match.objectLike({ Name: 'Operation', Value: 'InvokeGateway' }),
+      ]),
+    });
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'Invocations',
+      Dimensions: Match.arrayWith([
+        Match.objectLike({ Name: 'Protocol', Value: 'MCP' }),
+      ]),
+    });
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'Invocations',
+      Dimensions: Match.arrayWith([
+        Match.objectLike({ Name: 'Resource', Value: { 'Fn::GetAtt': [Match.stringLikeRegexp('.*'), 'GatewayArn'] } }),
+      ]),
     });
   });
 
@@ -692,6 +731,68 @@ describe('Gateway metric methods tests', () => {
       Namespace: 'AWS/Bedrock-AgentCore',
       Statistic: 'Sum',
       Dimensions: Match.arrayWith([
+        Match.objectLike({ Name: 'TargetType', Value: 'Lambda' }),
+      ]),
+    });
+    // Operation and Protocol are also emitted on this metric.
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'TargetType',
+      Dimensions: Match.arrayWith([
+        Match.objectLike({ Name: 'Operation', Value: 'InvokeGateway' }),
+      ]),
+    });
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'TargetType',
+      Dimensions: Match.arrayWith([
+        Match.objectLike({ Name: 'Protocol', Value: 'MCP' }),
+      ]),
+    });
+  });
+
+  test('metric() on imported gateway emits expected dimensions', () => {
+    const importedGateway = Gateway.fromGatewayAttributes(stack, 'ImportedGw', {
+      gatewayArn: 'arn:aws:bedrock-agentcore:us-east-1:123456789012:gateway/test-id',
+      gatewayId: 'test-id',
+      gatewayName: 'test-name',
+      role: iam.Role.fromRoleArn(stack, 'ImportedRole', 'arn:aws:iam::123456789012:role/r'),
+    });
+    alarmForMetric(stack, 'ImportedGwAlarm', importedGateway.metric('Invocations'));
+
+    const template = Template.fromStack(stack);
+    // An imported gateway emits the same dimensions.
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'Invocations',
+      Namespace: 'AWS/Bedrock-AgentCore',
+      Dimensions: Match.arrayWith([
+        Match.objectLike({ Name: 'Operation', Value: 'InvokeGateway' }),
+      ]),
+    });
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'Invocations',
+      Dimensions: Match.arrayWith([
+        Match.objectLike({ Name: 'Protocol', Value: 'MCP' }),
+      ]),
+    });
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'Invocations',
+      Dimensions: Match.arrayWith([
+        Match.objectLike({ Name: 'Resource', Value: 'arn:aws:bedrock-agentcore:us-east-1:123456789012:gateway/test-id' }),
+      ]),
+    });
+  });
+
+  test('metricTargetType() retains TargetType when caller supplies extra dimensionsMap', () => {
+    alarmForMetric(stack, 'TargetTypeExtraDimAlarm', gateway.metricTargetType('Lambda', { dimensionsMap: { Foo: 'bar' } }));
+
+    const template = Template.fromStack(stack);
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'TargetType',
+      Namespace: 'AWS/Bedrock-AgentCore',
+      Statistic: 'Sum',
+      // CloudWatch renders dimensions alphabetically, so the ordered subsequence [Foo, TargetType]
+      // is intentional here (a future dimension rename could reorder this).
+      Dimensions: Match.arrayWith([
+        Match.objectLike({ Name: 'Foo', Value: 'bar' }),
         Match.objectLike({ Name: 'TargetType', Value: 'Lambda' }),
       ]),
     });

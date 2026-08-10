@@ -1,0 +1,13 @@
+{
+  "targets": {
+    "java": {
+      "package": "software.amazon.awscdk.services.cognitosync"
+    },
+    "dotnet": {
+      "namespace": "Amazon.CDK.AWS.CognitoSync"
+    },
+    "python": {
+      "module": "aws_cdk.aws_cognitosync"
+    }
+  }
+}

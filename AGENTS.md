@@ -104,7 +104,8 @@ Standard constructor: `constructor(scope: Construct, id: string, props: FooProps
 
 ### Static Type Check (never use `instanceof`)
 
-All L1 (`Cfn*`) constructs and some core constructs have this auto-generated.
+L1 `Cfn*` constructs have it auto-generated (via `spec2cdk`); some core classes, such as `App`,
+`Stack` and `Stage`, implement the same pattern by hand.
 
 ```ts
 public static isFoo(x: any): x is Foo {

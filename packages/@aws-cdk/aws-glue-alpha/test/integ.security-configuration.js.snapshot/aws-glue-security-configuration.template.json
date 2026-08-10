@@ -75,6 +75,7 @@
   "KeylessSCKey4D3DE803": {
    "Type": "AWS::KMS::Key",
    "Properties": {
+    "EnableKeyRotation": true,
     "KeyPolicy": {
      "Statement": [
       {

@@ -143,7 +143,11 @@ export class CallApiGatewayRestApiEndpoint extends CallApiGatewayEndpointBase {
     super(scope, id, props);
 
     this.apiEndpoint = this.getApiEndpoint(props.region);
-    this.arnForExecuteApi = props.api.arnForExecuteApi(props.method, props.apiPath, props.stageName);
+    this.arnForExecuteApi = props.api.arnForExecuteApi(
+      props.method,
+      (props.apiPath && /^{%(.*)%}$/s.test(props.apiPath)) ? '/*' : props.apiPath,
+      props.stageName,
+    );
     this.stageName = props.stageName;
 
     this.taskPolicies = this.createPolicyStatements();

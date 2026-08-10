@@ -104,7 +104,7 @@ new FlowOutput(stack, 'RtpVpcOutput', {
   output: OutputConfiguration.rtp({
     destination: '10.1.172.10',
     port: 6100,
-    vpcInterfaceAttachment: vpcInterface,
+    vpcInterfaceAttachmentName: vpcInterface.name,
   }),
 });
 
@@ -113,7 +113,7 @@ new FlowOutput(stack, 'RistVpcOutput', {
   output: OutputConfiguration.rist({
     destination: '10.1.172.20',
     port: 6200,
-    vpcInterfaceAttachment: vpcInterface,
+    vpcInterfaceAttachmentName: vpcInterface.name,
   }),
 });
 
@@ -123,7 +123,7 @@ new FlowOutput(stack, 'SrtCallerVpcOutput', {
     destination: '10.1.172.30',
     port: 6300,
     minLatency: cdk.Duration.millis(120),
-    vpcInterfaceAttachment: vpcInterface,
+    vpcInterfaceAttachmentName: vpcInterface.name,
   }),
 });
 

@@ -1,5 +1,6 @@
 // AWS::Glue CloudFormation Resources:
 
+export * from './catalog';
 export * from './code';
 export * from './connection';
 export * from './data-format';

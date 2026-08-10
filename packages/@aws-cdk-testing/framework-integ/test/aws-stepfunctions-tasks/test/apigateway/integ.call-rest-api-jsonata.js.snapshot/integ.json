@@ -1,0 +1,13 @@
+{
+  "version": "53.0.0",
+  "testCases": {
+    "StateMachineDefaultRoleTrust/DefaultTest": {
+      "stacks": [
+        "aws-StepFunctionsTasks-rest-api-JSONataExpression"
+      ],
+      "assertionStack": "StateMachineDefaultRoleTrust/DefaultTest/DeployAssert",
+      "assertionStackName": "StateMachineDefaultRoleTrustDefaultTestDeployAssertB3EBC6CB"
+    }
+  },
+  "minimumCliVersion": "2.1119.0"
+}

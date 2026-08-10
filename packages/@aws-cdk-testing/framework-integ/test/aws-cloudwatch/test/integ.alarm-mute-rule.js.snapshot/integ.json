@@ -1,0 +1,13 @@
+{
+  "version": "54.0.0",
+  "testCases": {
+    "cdk-cloudwatch-alarms-mute-rules-integ-test/DefaultTest": {
+      "stacks": [
+        "AlarmMuteRuleIntegrationTest"
+      ],
+      "assertionStack": "cdk-cloudwatch-alarms-mute-rules-integ-test/DefaultTest/DeployAssert",
+      "assertionStackName": "cdkcloudwatchalarmsmuterulesintegtestDefaultTestDeployAssertBBE9CAEB"
+    }
+  },
+  "minimumCliVersion": "2.1126.0"
+}

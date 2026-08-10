@@ -130,7 +130,7 @@ export class S3Table extends TableBase {
     this.encryptionKey = encryptionKey;
 
     this.resource = new CfnTable(this, 'Table', {
-      catalogId: props.database.catalogId,
+      catalogId: props.database.catalog.catalogId,
 
       databaseName: props.database.databaseName,
 
@@ -295,11 +295,18 @@ function createBucket(table: S3Table, props: S3TableProps) {
   // create the bucket if none was provided
   if (!bucket) {
     if (encryption === TableEncryption.CLIENT_SIDE_KMS) {
-      bucket = new s3.Bucket(table, 'Bucket');
+      // The `encryptionKey` here is used for client-side encryption (granted to
+      // principals via the grant* methods), not for the bucket's SSE. The bucket
+      // still gets server-side encryption at rest as defense in depth.
+      bucket = new s3.Bucket(table, 'Bucket', {
+        encryption: encryptionMappings[encryption],
+        enforceSSL: true,
+      });
     } else {
       bucket = new s3.Bucket(table, 'Bucket', {
         encryption: encryptionMappings[encryption],
         encryptionKey,
+        enforceSSL: true,
       });
       encryptionKey = bucket.encryptionKey;
     }

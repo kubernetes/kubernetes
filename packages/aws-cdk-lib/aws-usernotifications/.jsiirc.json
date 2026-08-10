@@ -1,0 +1,13 @@
+{
+  "targets": {
+    "java": {
+      "package": "software.amazon.awscdk.services.usernotifications"
+    },
+    "dotnet": {
+      "namespace": "Amazon.CDK.AWS.UserNotifications"
+    },
+    "python": {
+      "module": "aws_cdk.aws_usernotifications"
+    }
+  }
+}

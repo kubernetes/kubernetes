@@ -1,7 +1,7 @@
 name: Pending Maintainer Action Check
 on:
   schedule:
-    - cron: "0 8 * * *" # Runs daily at 08:00 UTC
+    - cron: "0 21 * * *" # Runs daily at 21:00 UTC
   workflow_dispatch: # Manual trigger
     inputs:
       dry_run:

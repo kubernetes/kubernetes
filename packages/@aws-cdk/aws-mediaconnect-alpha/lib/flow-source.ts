@@ -48,10 +48,7 @@ export interface IFlowSource extends IResource, IFlowSourceRef {
  */
 export interface FlowSourceProps {
   /**
-   * Additional Source Configuration.
-   *
-   * Set the source's name via `name` on the configuration (e.g. `SourceConfiguration.rtp({ name })`).
-   * When no name is set there, one is generated from construct naming.
+   * Flow Source Configuration.
    */
   readonly source: SourceConfiguration;
 
@@ -94,7 +91,6 @@ export interface FlowSourceAttributes {
 
 /**
  * Shared base for both real and imported flow sources.
- * @internal
  */
 abstract class FlowSourceBase extends Resource implements IFlowSource {
   public abstract readonly flowSourceArn: string;

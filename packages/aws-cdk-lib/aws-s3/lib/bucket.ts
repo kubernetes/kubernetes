@@ -400,6 +400,7 @@ export interface IBucket extends IResource, IBucketRef {
   /**
    * Enables event bridge notification, causing all events below to be sent to EventBridge:
    *
+   * - Object Created
    * - Object Deleted (DeleteObject)
    * - Object Deleted (Lifecycle expiration)
    * - Object Restore Initiated

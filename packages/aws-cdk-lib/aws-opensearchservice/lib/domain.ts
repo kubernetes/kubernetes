@@ -2088,7 +2088,7 @@ export class Domain extends DomainBase implements IDomain, ec2.IConnectable {
         ...props.customEndpoint && {
           customEndpointEnabled: true,
           customEndpoint: props.customEndpoint.domainName,
-          customEndpointCertificateArn: customEndpointCertificate!.certificateRef.certificateId,
+          customEndpointCertificateArn: customEndpointCertificate!.certificateRef.certificateArn,
         },
       },
       advancedSecurityOptions: advancedSecurityEnabled

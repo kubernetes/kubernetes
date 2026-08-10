@@ -22,6 +22,18 @@ export abstract class RuleTargetInput {
    * The Rule Target input value will be a single string: the string you pass
    * here.  Do not use this method to pass a complex value like a JSON object to
    * a Rule Target.  Use `RuleTargetInput.fromObject()` instead.
+   *
+   * The target `Input` field must be valid JSON, so the text is JSON-encoded
+   * when the template is synthesized. As a result a plain string is wrapped in
+   * double quotes: `fromText('something')` renders as `Input: '"something"'`.
+   * The quotes are part of the required JSON encoding, not an extra value added
+   * by CDK, and cannot be removed.
+   *
+   * Whether those quotes are visible to the recipient depends on the target
+   * service. Some targets deliver the JSON-encoded value as-is, so the recipient
+   * sees the surrounding quotes (for example, an SNS topic delivering to an
+   * email subscriber shows `"something"`). To send a structured payload, use
+   * `RuleTargetInput.fromObject()` instead.
    */
   public static fromText(text: string): RuleTargetInput {
     return new FieldAwareEventInput(text, InputType.Text);
@@ -35,6 +47,10 @@ export abstract class RuleTargetInput {
    *
    * May contain strings returned by `EventField.from()` to substitute in parts
    * of the matched event.
+   *
+   * As with `fromText`, each line is JSON-encoded, so every line is wrapped in
+   * double quotes in the synthesized template. Whether those quotes are visible
+   * to the recipient depends on the target service.
    */
   public static fromMultilineText(text: string): RuleTargetInput {
     return new FieldAwareEventInput(text, InputType.Multiline);

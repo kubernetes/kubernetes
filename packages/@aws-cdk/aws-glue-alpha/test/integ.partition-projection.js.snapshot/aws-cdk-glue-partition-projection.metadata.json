@@ -58,7 +58,8 @@
       "type": "aws:cdk:analytics:construct",
       "data": {
         "encryption": "S3_MANAGED",
-        "encryptionKey": "*"
+        "encryptionKey": "*",
+        "enforceSSL": true
       }
     }
   ],
@@ -73,7 +74,8 @@
       "type": "aws:cdk:analytics:construct",
       "data": {
         "encryption": "S3_MANAGED",
-        "encryptionKey": "*"
+        "encryptionKey": "*",
+        "enforceSSL": true
       }
     }
   ],
@@ -88,7 +90,8 @@
       "type": "aws:cdk:analytics:construct",
       "data": {
         "encryption": "S3_MANAGED",
-        "encryptionKey": "*"
+        "encryptionKey": "*",
+        "enforceSSL": true
       }
     }
   ],
@@ -103,7 +106,8 @@
       "type": "aws:cdk:analytics:construct",
       "data": {
         "encryption": "S3_MANAGED",
-        "encryptionKey": "*"
+        "encryptionKey": "*",
+        "enforceSSL": true
       }
     }
   ],
@@ -118,7 +122,8 @@
       "type": "aws:cdk:analytics:construct",
       "data": {
         "encryption": "S3_MANAGED",
-        "encryptionKey": "*"
+        "encryptionKey": "*",
+        "enforceSSL": true
       }
     }
   ],
@@ -134,10 +139,26 @@
       "data": "TableIntegerBucketD9685175"
     }
   ],
+  "/aws-cdk-glue-partition-projection/TableInteger/Bucket/Policy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "bucket": "*"
+      }
+    }
+  ],
   "/aws-cdk-glue-partition-projection/TableDate/Bucket/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "TableDateBucket859C392D"
+    }
+  ],
+  "/aws-cdk-glue-partition-projection/TableDate/Bucket/Policy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "bucket": "*"
+      }
     }
   ],
   "/aws-cdk-glue-partition-projection/TableEnum/Bucket/Resource": [
@@ -146,16 +167,70 @@
       "data": "TableEnumBucket1019891D"
     }
   ],
+  "/aws-cdk-glue-partition-projection/TableEnum/Bucket/Policy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "bucket": "*"
+      }
+    }
+  ],
   "/aws-cdk-glue-partition-projection/TableInjected/Bucket/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "TableInjectedBucketD6778F64"
     }
   ],
+  "/aws-cdk-glue-partition-projection/TableInjected/Bucket/Policy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "bucket": "*"
+      }
+    }
+  ],
   "/aws-cdk-glue-partition-projection/TableMultiple/Bucket/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "TableMultipleBucketC9DE89BA"
+    }
+  ],
+  "/aws-cdk-glue-partition-projection/TableMultiple/Bucket/Policy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "bucket": "*"
+      }
+    }
+  ],
+  "/aws-cdk-glue-partition-projection/TableInteger/Bucket/Policy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "TableIntegerBucketPolicy55B680EC"
+    }
+  ],
+  "/aws-cdk-glue-partition-projection/TableDate/Bucket/Policy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "TableDateBucketPolicy2BF90355"
+    }
+  ],
+  "/aws-cdk-glue-partition-projection/TableEnum/Bucket/Policy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "TableEnumBucketPolicy91FAB493"
+    }
+  ],
+  "/aws-cdk-glue-partition-projection/TableInjected/Bucket/Policy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "TableInjectedBucketPolicy6C7F0A8C"
+    }
+  ],
+  "/aws-cdk-glue-partition-projection/TableMultiple/Bucket/Policy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "TableMultipleBucketPolicy7F0D5A02"
     }
   ]
 }

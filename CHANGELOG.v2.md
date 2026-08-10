@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [2.264.0](https://github.com/aws/aws-cdk/compare/v2.263.0...v2.264.0) (2026-08-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **bedrockagentcore:** `Gateway` metric helpers now emit corrected CloudWatch dimensions per-gateway
+ metrics use `{ Operation, Protocol, Resource }` (was `{ Resource }`). Alarms/dashboards built on the
+ old dimensions must be updated.
+* **bedrockagentcore:** `RuntimeBase` metric helpers now emit corrected CloudWatch dimensions per-resource metrics use `{ Operation, Name, Resource }` (was `{ Resource }`) and aggregated metrics use `{ AggregateOperation }` (was `{ Resource: 'All' }`). Alarms/dashboards built on the old dimensions must be updated.
+
+### Features
+
+* update L1 CloudFormation resource definitions ([#38526](https://github.com/aws/aws-cdk/issues/38526)) ([b5693cb](https://github.com/aws/aws-cdk/commit/b5693cbaea1e54ab027d18ca09c2c154dfc1fef1))
+* **cloudwatch:** support alarm mute rules ([#37504](https://github.com/aws/aws-cdk/issues/37504)) ([c3540bb](https://github.com/aws/aws-cdk/commit/c3540bbe3fc10467be331c82494abe46ecfd61fd)), closes [#37502](https://github.com/aws/aws-cdk/issues/37502)
+* update L1 CloudFormation resource definitions ([#38479](https://github.com/aws/aws-cdk/issues/38479)) ([279340d](https://github.com/aws/aws-cdk/commit/279340df42d2a9e5609b2f441eb341252448ed24))
+
+
+### Bug Fixes
+
+* **bedrockagentcore:** gateway metrics emit correct CloudWatch dimension ([#38487](https://github.com/aws/aws-cdk/issues/38487)) ([5a7d360](https://github.com/aws/aws-cdk/commit/5a7d360215479b345759a0aed77e003c9d2b5cbe))
+* **bedrockagentcore:** runtime metrics emit correct CloudWatch dimensions ([#38486](https://github.com/aws/aws-cdk/issues/38486)) ([4e44f24](https://github.com/aws/aws-cdk/commit/4e44f244f9079527923ee079f1dca9d3c5f01679))
+* **cloudfront:** warn when minimumProtocolVersion is set without a certificate ([#37250](https://github.com/aws/aws-cdk/issues/37250)) ([52ec5f7](https://github.com/aws/aws-cdk/commit/52ec5f76f1fd2cc3fa39f29a67cc32dc95074a03)), closes [#35404](https://github.com/aws/aws-cdk/issues/35404)
+* **ec2:** allow EBS gp3 and io2 volumes up to 64 TiB ([#37049](https://github.com/aws/aws-cdk/issues/37049)) ([10711ba](https://github.com/aws/aws-cdk/commit/10711bae19a620543d32a6f2d413815bb3f7c485)), closes [#37045](https://github.com/aws/aws-cdk/issues/37045)
+* **stepfunctions-tasks:** call-rest-api `CallApiGatewayRestApiEndpoint` does not support `JsonATA` for api_path ([#37738](https://github.com/aws/aws-cdk/issues/37738)) ([9f0afdc](https://github.com/aws/aws-cdk/commit/9f0afdc2ba501862c1097d7ad2938b7563b66c46)), closes [#37728](https://github.com/aws/aws-cdk/issues/37728) [/github.com/aws/aws-cdk/blob/e207b76cc2503701b3c4e2c87023617b485b2fde/packages/aws-cdk-lib/aws-stepfunctions/lib/private/jsonata.ts#L1](https://github.com/aws//github.com/aws/aws-cdk/blob/e207b76cc2503701b3c4e2c87023617b485b2fde/packages/aws-cdk-lib/aws-stepfunctions/lib/private/jsonata.ts/issues/L1)
+
 ## [2.263.0](https://github.com/aws/aws-cdk/compare/v2.262.2...v2.263.0) (2026-07-31)
 
 ### Features

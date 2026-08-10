@@ -33,7 +33,7 @@
     "jsii-reflect": "1.138.0",
     "jsii-rosetta": "~5.9.56",
     "lerna": "^8.2.4",
-    "nx": "^20",
+    "nx": "^22",
     "semver": "^7.8.5",
     "standard-version": "^9.5.0",
     "ts-jest": "^29.4.11",

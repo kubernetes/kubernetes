@@ -1,0 +1,86 @@
+{
+  "/aws-cdk-mediaconnect-router-az/Network": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-mediaconnect-router-az/OutboundOnlyNetwork": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-mediaconnect-router-az/StandardInput": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-mediaconnect-router-az/FailoverInput": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-mediaconnect-router-az/MergeInput": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-mediaconnect-router-az/StandardOutput": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-mediaconnect-router-az/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/aws-cdk-mediaconnect-router-az/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/aws-cdk-mediaconnect-router-az/Network/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Network1C6012B5"
+    }
+  ],
+  "/aws-cdk-mediaconnect-router-az/OutboundOnlyNetwork/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "OutboundOnlyNetwork85FAC02D"
+    }
+  ],
+  "/aws-cdk-mediaconnect-router-az/StandardInput/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "StandardInputA2C31267"
+    }
+  ],
+  "/aws-cdk-mediaconnect-router-az/FailoverInput/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "FailoverInputA7E26348"
+    }
+  ],
+  "/aws-cdk-mediaconnect-router-az/MergeInput/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MergeInput32C493CC"
+    }
+  ],
+  "/aws-cdk-mediaconnect-router-az/StandardOutput/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "StandardOutput1BB126BE"
+    }
+  ]
+}

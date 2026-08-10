@@ -2626,6 +2626,8 @@ export class OracleEngineVersion {
   public static readonly VER_19_0_0_0_2025_01_R1 = OracleEngineVersion.of('19.0.0.0.ru-2025-01.rur-2025-01.r1', '19');
   /** Version "19.0.0.0.ru-2025-07.rur-2025-07.r1". */
   public static readonly VER_19_0_0_0_2025_07_R1 = OracleEngineVersion.of('19.0.0.0.ru-2025-07.rur-2025-07.r1', '19');
+  /** Version "19.0.0.0.ru-2025-10.rur-2025-10.r1". */
+  public static readonly VER_19_0_0_0_2025_10_R1 = OracleEngineVersion.of('19.0.0.0.ru-2025-10.rur-2025-10.r1', '19');
 
   /** Version "21" (only a major version, without a specific minor version). */
   public static readonly VER_21 = OracleEngineVersion.of('21', '21');

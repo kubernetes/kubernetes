@@ -50,7 +50,9 @@
   "/aws-glue-security-configuration/KeylessSC/Key": [
     {
       "type": "aws:cdk:analytics:construct",
-      "data": "*"
+      "data": {
+        "enableKeyRotation": true
+      }
     }
   ],
   "/aws-glue-security-configuration/KeylessSC/Resource": [

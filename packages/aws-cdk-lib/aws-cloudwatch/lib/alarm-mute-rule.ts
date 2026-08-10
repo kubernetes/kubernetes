@@ -1,0 +1,393 @@
+import type { Construct } from 'constructs';
+import type { AlarmMuteRuleReference, IAlarmMuteRuleRef, IAlarmRef } from './cloudwatch.generated';
+import { CfnAlarmMuteRule } from './cloudwatch.generated';
+import * as cdk from '../../core';
+import type { IArrayBox } from '../../core/lib/helpers-internal';
+import { Box, lit, memoizedGetter } from '../../core/lib/helpers-internal';
+import { addConstructMetadata, MethodMetadata } from '../../core/lib/metadata-resource';
+import { propertyInjectable } from '../../core/lib/prop-injectable';
+
+/**
+ * Represents an instance of a CloudWatch alarm mute rule.
+ */
+export interface IAlarmMuteRule extends cdk.IResource, IAlarmMuteRuleRef {
+  /**
+   * The ARN of the alarm mute rule.
+   *
+   * @attribute
+   */
+  readonly alarmMuteRuleArn: string;
+
+  /**
+   * The name of the alarm mute rule.
+   *
+   * @attribute
+   */
+  readonly alarmMuteRuleName: string;
+}
+
+/**
+ * Represents a calendar date and time.
+ */
+export interface CalendarDateTime {
+  /**
+   * The year of the date.
+   */
+  readonly year: number;
+  /**
+   * The month of the date. Valid range: 1-12
+   */
+  readonly month: number;
+  /**
+   * The day of the date. Valid range: 1-31
+   */
+  readonly day: number;
+  /**
+   * The hour of the time. Valid range: 0-23
+   */
+  readonly hour: number;
+  /**
+   * The minute of the time. Valid range: 0-59
+   */
+  readonly minute: number;
+}
+
+/**
+ * Schedule expression for CloudWatch alarm mute rule
+ *
+ * You can choose from three schedule types when configuring your schedule: cron-based and one-time schedules.
+ * Cron-based schedule is recurring schedule.
+ *
+ * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/alarm-mute-rules.html#defining-alarm-mute-rules
+ */
+export abstract class ScheduleExpression {
+  /**
+   * Construct a one-time schedule from a date.
+   *
+   * @param date The date and time to use. The millisecond part will be ignored.
+   * @param timeZone The time zone to use for interpreting the date. Default: - UTC
+   */
+  public static at(date: CalendarDateTime, timeZone?: cdk.TimeZone): ScheduleExpression {
+    const literal = formatDate(date);
+    return new LiteralScheduleExpression(`at(${literal})`, timeZone);
+  }
+
+  /**
+   * Construct a schedule from a literal schedule expression
+   * @param expression The expression to use. Must be in a format that CloudWatch will recognize
+   * @param timeZone The time zone to use for interpreting the expression. Default: - UTC
+   */
+  public static expression(expression: string, timeZone?: cdk.TimeZone): ScheduleExpression {
+    return new LiteralScheduleExpression(expression, timeZone);
+  }
+
+  /**
+   * Create a recurring schedule from a set of cron fields and time zone.
+   */
+  public static cron(options: CronOptions): ScheduleExpression {
+    if (options.weekDay !== undefined && options.day !== undefined) {
+      throw new cdk.UnscopedValidationError(lit`CannotSupplyBothDayAndWeekDay`, 'Cannot supply both \'day\' and \'weekDay\', use at most one');
+    }
+
+    const minute = options.minute;
+    const hour = options.hour ?? '*';
+    const day = options.day ?? '*';
+    const month = options.month ?? '*';
+    const weekDay = options.weekDay ?? '*';
+
+    const expressionString = `cron(${minute} ${hour} ${day} ${month} ${weekDay})`;
+    return new LiteralScheduleExpression(expressionString, options.timeZone);
+  }
+
+  /**
+   * Retrieve the expression for this schedule
+   */
+  public abstract readonly expressionString: string;
+
+  /**
+   * Retrieve the expression for this schedule
+   */
+  public abstract readonly timeZone?: cdk.TimeZone;
+
+  protected constructor() { }
+}
+
+/**
+ * Options to configure a cron expression
+ *
+ * All fields are strings so you can use complex expressions.
+ * Absence of a field implies '*'.
+ *
+ * @see https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/alarm-mute-rules.html#defining-alarm-mute-rules
+ */
+export interface CronOptions {
+  /**
+   * The minute to run this rule at
+   */
+  readonly minute: string;
+
+  /**
+   * The hour to run this rule at
+   *
+   * @default - Every hour
+   */
+  readonly hour?: string;
+
+  /**
+   * The day of the month to run this rule at
+   *
+   * @default - Every day of the month
+   */
+  readonly day?: string;
+
+  /**
+   * The month to run this rule at
+   *
+   * @default - Every month
+   */
+  readonly month?: string;
+
+  /**
+   * The day of the week to run this rule at
+   *
+   * @default - Any day of the week
+   */
+  readonly weekDay?: string;
+
+  /**
+   * The timezone to run the schedule in
+   *
+   * @default - TimeZone.ETC_UTC
+   */
+  readonly timeZone?: cdk.TimeZone;
+}
+
+class LiteralScheduleExpression extends ScheduleExpression {
+  constructor(public readonly expressionString: string, public readonly timeZone?: cdk.TimeZone) {
+    super();
+  }
+}
+
+/**
+ * Options used to configure a CloudWatch alarm mute rule.
+ */
+export interface AlarmMuteRuleOptions {
+  /**
+   * The name of the alarm mute rule. This name must be unique within your AWS account and region.
+   * @default - generated by CloudFormation
+   */
+  readonly alarmMuteRuleName?: string;
+
+  /**
+   * A description of the alarm mute rule that helps you identify its purpose.
+   * @default - no description
+   */
+  readonly description?: string;
+
+  /**
+   * The schedule defines when alarms should be muted.
+   */
+  readonly schedule: ScheduleExpression;
+
+  /**
+   * The length of time that alarms remain muted when the schedule activates.
+   *
+   * Minimum: 1 minute,
+   * Maximum: 15 days
+   */
+  readonly duration: cdk.Duration;
+
+  /**
+   * The date and time after which the mute rule takes effect.
+   * If not specified, the mute rule takes effect immediately upon creation and the mutes are applied as per the schedule expression.
+   *
+   * This date and time is interpreted according to the schedule timezone, or UTC if no timezone is specified.
+   *
+   * @default - no configuration
+   */
+  readonly start?: CalendarDateTime;
+
+  /**
+   * The date and time when the mute rule expires and is no longer evaluated.
+   * After this time, the rule status becomes EXPIRED and will no longer mute the targeted alarms.
+   *
+   * This date and time is interpreted according to the schedule timezone, or UTC if no timezone is specified.
+   *
+   * @default - no configuration
+   */
+  readonly expire?: CalendarDateTime;
+
+  /**
+   * A list of tags associated with the alarm mute rule.
+   * Tags help you organize and categorize your AWS resources.
+   *
+   * @default - No tags are applied
+   */
+  readonly tags?: { [key: string]: string };
+}
+
+/**
+ * Properties used to configure a CloudWatch alarm mute rule.
+ */
+export interface AlarmMuteRuleProps extends AlarmMuteRuleOptions {
+  /**
+   * The list of alarms that this mute rule targets. You can specify up to 100 alarms.
+   *
+   * @default - no target alarms
+   */
+  readonly alarms?: IAlarmRef[];
+}
+
+/**
+ * A CloudWatch Alarm Mute Rule.
+ */
+@propertyInjectable
+export class AlarmMuteRule extends cdk.Resource implements IAlarmMuteRule {
+  /** Uniquely identifies this class. */
+  public static readonly PROPERTY_INJECTION_ID: string = 'aws-cdk-lib.aws-cloudwatch.AlarmMuteRule';
+
+  /**
+   * Import an existing CloudWatch alarm mute rule provided an Name.
+   *
+   * @param scope The parent creating construct (usually `this`)
+   * @param id The construct's name
+   * @param alarmMuteRuleName Alarm Mute Rule Name
+   */
+  public static fromAlarmMuteRuleName(scope: Construct, id: string, alarmMuteRuleName: string): IAlarmMuteRule {
+    return this.fromAlarmMuteRuleArn(scope, id, cdk.Stack.of(scope).formatArn({
+      service: 'cloudwatch',
+      resource: 'alarm-mute-rule',
+      resourceName: alarmMuteRuleName,
+      arnFormat: cdk.ArnFormat.COLON_RESOURCE_NAME,
+    }));
+  }
+
+  /**
+   * Import an existing CloudWatch alarm mute rule provided an ARN.
+   *
+   * @param scope The parent creating construct (usually `this`)
+   * @param id The construct's name
+   * @param alarmMuteRuleArn Alarm Mute Rule ARN
+   */
+  public static fromAlarmMuteRuleArn(scope: Construct, id: string, alarmMuteRuleArn: string): IAlarmMuteRule {
+    class Import extends cdk.Resource implements IAlarmMuteRule {
+      public readonly alarmMuteRuleArn = alarmMuteRuleArn;
+      public readonly alarmMuteRuleName = cdk.Stack.of(scope).splitArn(alarmMuteRuleArn, cdk.ArnFormat.COLON_RESOURCE_NAME).resourceName!;
+      public readonly alarmMuteRuleRef = { alarmMuteRuleArn };
+    }
+    return new Import(scope, id);
+  }
+
+  private readonly alarms: IArrayBox<IAlarmRef> = Box.fromArray([]);
+  private readonly alarmMuteRule: CfnAlarmMuteRule;
+
+  constructor(scope: Construct, id: string, props: AlarmMuteRuleProps) {
+    super(scope, id, {
+      physicalName: props.alarmMuteRuleName,
+    });
+    // Enhanced CDK Analytics Telemetry
+    addConstructMetadata(this, props);
+
+    if (
+      props.alarmMuteRuleName !== undefined && !cdk.Token.isUnresolved(props.alarmMuteRuleName) &&
+      (props.alarmMuteRuleName.length < 1 || props.alarmMuteRuleName.length > 255)
+    ) {
+      throw new cdk.ValidationError(lit`InvalidAlarmMuteRuleNameLength`, `Alarm mute rule name must be between 1 and 255 characters, got ${props.alarmMuteRuleName.length} characters.`, this);
+    }
+    if (props.duration && !props.duration.isUnresolved()) {
+      if (props.duration.toMinutes() < 1) {
+        throw new cdk.ValidationError(lit`DurationTooShort`, `Duration must be greater than or equal to 1 minute, got ${props.duration.toMinutes()} minutes.`, this);
+      }
+      if (props.duration.toDays({ integral: false }) > 15) {
+        throw new cdk.ValidationError(lit`DurationTooLong`, `Duration must be less than or equal to 15 days, got ${props.duration.toDays({ integral: false })} days.`, this);
+      }
+    }
+
+    for (const alarm of props.alarms ?? []) {
+      this.addAlarm(alarm);
+    }
+
+    this.alarmMuteRule = new CfnAlarmMuteRule(this, 'Resource', {
+      name: props.alarmMuteRuleName,
+      description: props.description,
+      muteTargets: this.alarms.derive((alarms) => {
+        if (alarms.length > 100) {
+          throw new cdk.ValidationError(lit`TargetAlarmsTooMany`, `The maximum number of target alarms is 100. Got ${this.alarms.length} alarms.`, this);
+        }
+        return { alarmNames: alarms.map((alarm) => alarm.alarmRef.alarmName) };
+      }),
+      rule: {
+        schedule: {
+          duration: props.duration.toIsoString(),
+          expression: props.schedule.expressionString,
+          timezone: props.schedule.timeZone?.timezoneName,
+        },
+      },
+      startDate: props.start ? formatDate(props.start) : undefined,
+      expireDate: props.expire ? formatDate(props.expire) : undefined,
+      tags: props.tags ? Object.entries(props.tags).map(([key, value]) => ({ key, value })) : undefined,
+    });
+  }
+
+  public get alarmMuteRuleRef(): AlarmMuteRuleReference {
+    return {
+      alarmMuteRuleArn: this.alarmMuteRuleArn,
+    };
+  }
+
+  /**
+   * ARN of this alarm mute rule.
+   *
+   * @attribute
+   */
+  @memoizedGetter
+  public get alarmMuteRuleArn(): string {
+    return this.getResourceArnAttribute(this.alarmMuteRule.attrArn, {
+      service: 'cloudwatch',
+      resource: 'alarm-mute-rule',
+      resourceName: this.physicalName,
+      arnFormat: cdk.ArnFormat.COLON_RESOURCE_NAME,
+    });
+  }
+
+  /**
+   * Name of this alarm mute rule.
+   *
+   * @attribute
+   */
+  @memoizedGetter
+  public get alarmMuteRuleName(): string {
+    return this.getResourceNameAttribute(this.alarmMuteRule.ref);
+  }
+
+  /**
+   * Add a CloudWatch alarm to mute rule target alarms.
+   */
+  @MethodMetadata()
+  public addAlarm(alarm: IAlarmRef): void {
+    this.alarms.push(alarm);
+  }
+}
+
+/**
+ * Validate and format a CalendarDateTime to 'yyyy-MM-ddThh:mm'
+ * CFN error message: "At expressions must be a valid date in 'yyyy-MM-ddThh:mm' format"
+ */
+function formatDate(date: CalendarDateTime): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+
+  if (!cdk.Token.isUnresolved(date.month) && (date.month < 1 || date.month > 12)) {
+    throw new cdk.UnscopedValidationError(lit`InvalidDateTime`, 'The specified date is invalid. (month out of range: 1-12).');
+  }
+  if (!cdk.Token.isUnresolved(date.day) && (date.day < 1 || date.day > 31)) {
+    throw new cdk.UnscopedValidationError(lit`InvalidDateTime`, 'The specified date is invalid. (day out of range: 1-31).');
+  }
+  if (!cdk.Token.isUnresolved(date.hour) && (date.hour < 0 || date.hour > 23)) {
+    throw new cdk.UnscopedValidationError(lit`InvalidDateTime`, 'The specified date is invalid. (hour out of range: 0-23).');
+  }
+  if (!cdk.Token.isUnresolved(date.minute) && (date.minute < 0 || date.minute > 59)) {
+    throw new cdk.UnscopedValidationError(lit`InvalidDateTime`, 'The specified date is invalid. (minute out of range: 0-59).');
+  }
+
+  return `${date.year}-${pad(date.month)}-${pad(date.day)}T${pad(date.hour)}:${pad(date.minute)}`;
+}

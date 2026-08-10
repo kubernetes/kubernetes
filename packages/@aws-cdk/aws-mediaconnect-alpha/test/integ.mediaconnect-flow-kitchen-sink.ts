@@ -80,9 +80,9 @@ const flow = new mediaconnect.Flow(stack, 'KitchenSinkFlow', {
   availabilityZone: stack.availabilityZones[0],
   flowSize: mediaconnect.FlowSize.LARGE,
   vpcInterfaces: [ndiVpcInterface],
-  maintenance: {
-    maintenanceDay: mediaconnect.MaintenanceDay.SUNDAY,
-    maintenanceStartHour: '06:00',
+  maintenanceConfiguration: {
+    day: mediaconnect.MaintenanceDay.SUNDAY,
+    time: '06:00',
   },
   ndiConfig: {
     ndiState: mediaconnect.State.ENABLED,

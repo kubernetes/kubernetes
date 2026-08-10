@@ -22,7 +22,7 @@ state resource `Creates`, `Updates` or `Deletes` are performed.
 ```text
       ╔══════════════════╗
       ║                  ║
-      ║  <nonexistant>   ║──────────────────┐
+      ║  <nonexistent>   ║──────────────────┐
       ║                  ║                  ▼
       ╚══════════════════╝       ┌────────────────────┐
                 │                │                    │
@@ -147,7 +147,7 @@ be immediately followed by delete and an update back to the original state, resp
 ```text
                                   ╔════════════════════════╗
                                   ║                        ║
-                                  ║     <nonexistant>      ║
+                                  ║     <nonexistent>      ║
                                   ║                        ║
                                   ╚════════════════════════╝
                                                │

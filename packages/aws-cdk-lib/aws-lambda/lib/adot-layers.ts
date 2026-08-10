@@ -83,7 +83,14 @@ function getLayerArn(scope: IConstruct, type: string, version: string, architect
 }
 
 /**
- * Properties for an ADOT instrumentation in Lambda
+ * Properties for an ADOT instrumentation in Lambda.
+ *
+ * **Note:** This uses the legacy ADOT Lambda layers that bundle an embedded collector.
+ * For the recommended optimized ADOT Lambda layers (the `AWSOpenTelemetryDistro*` family),
+ * add the layer via `Function.addLayers()` and set the `AWS_LAMBDA_EXEC_WRAPPER`
+ * environment variable to `/opt/otel-instrument` instead.
+ *
+ * @see https://aws-otel.github.io/docs/getting-started/lambda
  */
 export interface AdotInstrumentationConfig {
   /**
@@ -99,6 +106,10 @@ export interface AdotInstrumentationConfig {
 
 /**
  * An ADOT Lambda layer version that's specific to a lambda layer type and an architecture.
+ *
+ * **Note:** These resolve to the legacy ADOT Lambda layers with an embedded collector.
+ * For the recommended optimized layers, use `LayerVersion.fromLayerVersionArn()` with
+ * an `AWSOpenTelemetryDistro*` layer ARN instead.
  */
 export abstract class AdotLayerVersion {
   /**
@@ -169,6 +180,10 @@ export abstract class AdotLayerVersion {
 /**
  * The wrapper script to be used for the Lambda function in order to enable auto instrumentation
  * with ADOT.
+ *
+ * **Note:** These wrappers are for the legacy ADOT Lambda layers with an embedded collector.
+ * The recommended optimized ADOT Lambda layers use `/opt/otel-instrument` set via the
+ * `AWS_LAMBDA_EXEC_WRAPPER` environment variable directly.
  */
 export enum AdotLambdaExecWrapper {
   /**
@@ -214,7 +229,9 @@ abstract class AdotLambdaLayerVersion {
 }
 
 /**
- * The collection of versions of the ADOT Lambda Layer for Java SDK
+ * The collection of versions of the ADOT Lambda Layer for Java SDK.
+ *
+ * **Note:** These are legacy ADOT Lambda layers with an embedded collector.
  */
 export class AdotLambdaLayerJavaSdkVersion extends AdotLambdaLayerVersion {
   /**
@@ -259,7 +276,9 @@ export class AdotLambdaLayerJavaSdkVersion extends AdotLambdaLayerVersion {
 }
 
 /**
- * The collection of versions of the ADOT Lambda Layer for Java auto-instrumentation
+ * The collection of versions of the ADOT Lambda Layer for Java auto-instrumentation.
+ *
+ * **Note:** These are legacy ADOT Lambda layers with an embedded collector.
  */
 export class AdotLambdaLayerJavaAutoInstrumentationVersion extends AdotLambdaLayerVersion {
   /**
@@ -304,7 +323,9 @@ export class AdotLambdaLayerJavaAutoInstrumentationVersion extends AdotLambdaLay
 }
 
 /**
- * The collection of versions of the ADOT Lambda Layer for Python SDK
+ * The collection of versions of the ADOT Lambda Layer for Python SDK.
+ *
+ * **Note:** These are legacy ADOT Lambda layers with an embedded collector.
  */
 export class AdotLambdaLayerPythonSdkVersion extends AdotLambdaLayerVersion {
   /**
@@ -384,7 +405,9 @@ export class AdotLambdaLayerPythonSdkVersion extends AdotLambdaLayerVersion {
 }
 
 /**
- * The collection of versions of the ADOT Lambda Layer for JavaScript SDK
+ * The collection of versions of the ADOT Lambda Layer for JavaScript SDK.
+ *
+ * **Note:** These are legacy ADOT Lambda layers with an embedded collector.
  */
 export class AdotLambdaLayerJavaScriptSdkVersion extends AdotLambdaLayerVersion {
   /**
@@ -429,7 +452,9 @@ export class AdotLambdaLayerJavaScriptSdkVersion extends AdotLambdaLayerVersion 
 }
 
 /**
- * The collection of versions of the ADOT Lambda Layer for generic purpose
+ * The collection of versions of the ADOT Lambda Layer for generic purpose.
+ *
+ * **Note:** These are legacy ADOT Lambda layers with an embedded collector.
  */
 export class AdotLambdaLayerGenericVersion extends AdotLambdaLayerVersion {
   /**

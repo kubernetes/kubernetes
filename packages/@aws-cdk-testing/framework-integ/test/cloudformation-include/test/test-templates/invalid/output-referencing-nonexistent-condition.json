@@ -1,7 +1,7 @@
 {
   "Outputs": {
     "SomeOutput": {
-      "Condition": "NonexistantCondition"
+      "Condition": "NonexistentCondition"
     }
   }
 }

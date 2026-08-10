@@ -206,7 +206,7 @@ export class SecurityConfiguration extends cdk.Resource implements ISecurityConf
       (props.s3Encryption && props.s3Encryption.mode === S3EncryptionMode.KMS && !props.s3Encryption.kmsKey) ||
       (props.cloudWatchEncryption && !props.cloudWatchEncryption.kmsKey) ||
       (props.jobBookmarksEncryption && !props.jobBookmarksEncryption.kmsKey);
-    const autoCreatedKmsKey = kmsKeyCreationRequired ? new kms.Key(this, 'Key') : undefined;
+    const autoCreatedKmsKey = kmsKeyCreationRequired ? new kms.Key(this, 'Key', { enableKeyRotation: true }) : undefined;
 
     let cloudWatchEncryption;
     if (props.cloudWatchEncryption) {

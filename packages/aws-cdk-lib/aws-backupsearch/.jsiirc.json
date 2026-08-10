@@ -1,0 +1,13 @@
+{
+  "targets": {
+    "java": {
+      "package": "software.amazon.awscdk.services.backupsearch"
+    },
+    "dotnet": {
+      "namespace": "Amazon.CDK.AWS.BackupSearch"
+    },
+    "python": {
+      "module": "aws_cdk.aws_backupsearch"
+    }
+  }
+}

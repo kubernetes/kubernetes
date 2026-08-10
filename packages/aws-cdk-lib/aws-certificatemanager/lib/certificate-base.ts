@@ -21,7 +21,7 @@ export abstract class CertificateBase extends Resource implements ICertificate {
 
   public get certificateRef(): CertificateReference {
     return {
-      certificateId: this.certificateArn,
+      certificateArn: this.certificateArn,
     };
   }
 

@@ -1316,9 +1316,50 @@ to learn more about AWS Lambda's X-Ray support.
 
 ## Lambda with AWS Distro for OpenTelemetry layer
 
-To have automatic integration with XRay without having to add dependencies or change your code, you can use the
-[AWS Distro for OpenTelemetry Lambda (ADOT) layer](https://aws-otel.github.io/docs/getting-started/lambda).
-Consuming the latest ADOT layer can be done with the following snippet:
+You can add [AWS Distro for OpenTelemetry (ADOT) Lambda layers](https://aws-otel.github.io/docs/getting-started/lambda)
+to automatically instrument your Lambda functions with OpenTelemetry.
+
+### Optimized ADOT Lambda layers (recommended)
+
+The recommended approach uses the optimized ADOT Lambda layers (the `AWSOpenTelemetryDistro*` layer family).
+These layers provide a plug-and-play experience with support for
+[CloudWatch Application Signals](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Application-Signals.html)
+and do not bundle an embedded collector, resulting in lower overhead.
+
+To use the optimized layers, add the layer ARN for your region and runtime from the
+[ADOT Lambda Layer ARNs](https://aws-otel.github.io/docs/getting-started/lambda#adot-lambda-layer-arns) table,
+set the `AWS_LAMBDA_EXEC_WRAPPER` environment variable to `/opt/otel-instrument`, and attach the
+`CloudWatchLambdaApplicationSignalsExecutionRolePolicy` managed IAM policy:
+
+```ts
+const fn = new lambda.Function(this, 'MyFunction', {
+  runtime: lambda.Runtime.NODEJS_LATEST,
+  handler: 'index.handler',
+  code: lambda.Code.fromInline('exports.handler = function(event, ctx, cb) { return cb(null, "hi"); }'),
+  environment: {
+    AWS_LAMBDA_EXEC_WRAPPER: '/opt/otel-instrument',
+  },
+});
+
+fn.addLayers(lambda.LayerVersion.fromLayerVersionArn(this, 'AdotLayer',
+  // Replace with the actual ARN for your region and runtime from:
+  // https://aws-otel.github.io/docs/getting-started/lambda#adot-lambda-layer-arns
+  'arn:aws:lambda:us-east-1:615299751070:layer:AWSOpenTelemetryDistroJs:7',
+));
+
+fn.role?.addManagedPolicy(
+  iam.ManagedPolicy.fromAwsManagedPolicyName('CloudWatchLambdaApplicationSignalsExecutionRolePolicy'),
+);
+```
+
+### Legacy ADOT Lambda layers (using `adotInstrumentation`)
+
+> **Note:** The `adotInstrumentation` property and its associated helpers (`AdotLayerVersion`,
+> `AdotLambdaExecWrapper`, and the `AdotLambdaLayer*Version` classes) use the legacy ADOT Lambda
+> layers that bundle an embedded collector. The ADOT project considers these layers
+> [not recommended](https://aws-otel.github.io/docs/getting-started/lambda#not-recommended-using-the-legacy-adot-lambda-layers-with-embedded-collector)
+> for the standard CloudWatch/X-Ray path. They may still be useful if you need to export
+> telemetry to a non-CloudWatch endpoint via a custom collector configuration.
 
 ```ts
 import {
@@ -1338,7 +1379,7 @@ const fn = new lambda.Function(this, 'MyFunction', {
 });
 ```
 
-To use a different layer version, use one of the following helper functions for the `layerVersion` prop:
+The legacy helper functions for the `layerVersion` prop are:
 
 * `AdotLayerVersion.fromJavaScriptSdkLayerVersion`
 * `AdotLayerVersion.fromPythonSdkLayerVersion`
@@ -1356,7 +1397,7 @@ Each helper function expects a version value from a corresponding enum-like clas
 
 For more examples, see our [the integration test](test/integ.lambda-adot.ts).
 
-If you want to retrieve the ARN of the ADOT Lambda layer without enabling ADOT in a Lambda function:
+If you want to retrieve the ARN of a legacy ADOT Lambda layer without enabling ADOT in a Lambda function:
 
 ```ts
 declare const fn: lambda.Function;

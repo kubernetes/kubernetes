@@ -1,5 +1,5 @@
 import * as cdk from 'aws-cdk-lib';
-import { Template } from 'aws-cdk-lib/assertions';
+import { Match, Template } from 'aws-cdk-lib/assertions';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as kms from 'aws-cdk-lib/aws-kms';
 import * as s3 from 'aws-cdk-lib/aws-s3';
@@ -76,6 +76,41 @@ test('encrypted table: SSE-S3', () => {
           },
         },
       ],
+    },
+  });
+});
+
+test.each([
+  glue.TableEncryption.S3_MANAGED,
+  glue.TableEncryption.KMS,
+  glue.TableEncryption.KMS_MANAGED,
+  glue.TableEncryption.CLIENT_SIDE_KMS,
+])('CDK-created bucket enforces SSL for %s encryption', (encryption) => {
+  const stack = new cdk.Stack();
+  const database = new glue.Database(stack, 'Database');
+
+  new glue.S3Table(stack, 'Table', {
+    database,
+    columns: [{
+      name: 'col',
+      type: glue.Schema.STRING,
+    }],
+    encryption,
+    dataFormat: glue.DataFormat.JSON,
+  });
+
+  // A bucket policy denying non-TLS requests is attached to the auto-created bucket.
+  Template.fromStack(stack).hasResourceProperties('AWS::S3::BucketPolicy', {
+    PolicyDocument: {
+      Statement: Match.arrayWith([
+        Match.objectLike({
+          Action: 's3:*',
+          Effect: 'Deny',
+          Condition: {
+            Bool: { 'aws:SecureTransport': 'false' },
+          },
+        }),
+      ]),
     },
   });
 });
@@ -346,6 +381,20 @@ test('encrypted table: CSE-KMS (implicitly created key)', () => {
   expect(table.bucket?.encryptionKey).toEqual(undefined);
 
   Template.fromStack(stack).resourceCountIs('AWS::KMS::Key', 1);
+
+  // The bucket still enables server-side encryption at rest (SSE-S3) as defense
+  // in depth; the KMS key is used for client-side encryption, not bucket SSE.
+  Template.fromStack(stack).hasResourceProperties('AWS::S3::Bucket', {
+    BucketEncryption: {
+      ServerSideEncryptionConfiguration: [
+        {
+          ServerSideEncryptionByDefault: {
+            SSEAlgorithm: 'AES256',
+          },
+        },
+      ],
+    },
+  });
 
   Template.fromStack(stack).hasResourceProperties('AWS::Glue::Table', {
     CatalogId: {
