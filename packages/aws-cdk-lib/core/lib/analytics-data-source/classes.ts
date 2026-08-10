@@ -1724,6 +1724,23 @@ export const AWS_CDK_CONSTRUCTOR_PROPS: { [key: string]: any } = {
     }
   },
   '@aws-cdk.aws-glue-alpha': {
+    'Catalog': {
+      'catalogName': '*',
+      'description': '*',
+      'encryptionAtRest': '*',
+      'connectionPasswordEncryption': {
+        'kmsKey': '*',
+        'returnConnectionPasswordEncrypted': 'boolean'
+      }
+    },
+    'AccountCatalog': {
+      'encryptionAtRest': '*',
+      'connectionPasswordEncryption': {
+        'kmsKey': '*',
+        'returnConnectionPasswordEncrypted': 'boolean'
+      }
+    },
+    'ImportedCatalog': {},
     'Connection': {
       'type': '*',
       'connectionName': '*',
@@ -1774,7 +1791,19 @@ export const AWS_CDK_CONSTRUCTOR_PROPS: { [key: string]: any } = {
     'Database': {
       'databaseName': '*',
       'locationUri': '*',
-      'description': '*'
+      'description': '*',
+      'catalog': {
+        'catalogId': '*',
+        'catalogArn': '*',
+        'encryptionKey': '*',
+        'connectionPasswordKey': '*',
+        'stack': '*',
+        'node': '*',
+        'env': {
+          'account': '*',
+          'region': '*'
+        }
+      }
     },
     'ExternalTable': {
       'connection': {
@@ -1791,16 +1820,20 @@ export const AWS_CDK_CONSTRUCTOR_PROPS: { [key: string]: any } = {
       'tableName': '*',
       'description': '*',
       'database': {
-        'catalogArn': '*',
-        'catalogId': '*',
+        'catalog': {
+          'catalogId': '*',
+          'catalogArn': '*',
+          'encryptionKey': '*',
+          'connectionPasswordKey': '*',
+          'stack': '*',
+          'node': '*',
+          'env': {
+            'account': '*',
+            'region': '*'
+          }
+        },
         'databaseArn': '*',
-        'databaseName': '*',
-        'stack': '*',
-        'node': '*',
-        'env': {
-          'account': '*',
-          'region': '*'
-        }
+        'databaseName': '*'
       },
       'columns': {
         'name': '*',
@@ -1895,16 +1928,20 @@ export const AWS_CDK_CONSTRUCTOR_PROPS: { [key: string]: any } = {
       'tableName': '*',
       'description': '*',
       'database': {
-        'catalogArn': '*',
-        'catalogId': '*',
+        'catalog': {
+          'catalogId': '*',
+          'catalogArn': '*',
+          'encryptionKey': '*',
+          'connectionPasswordKey': '*',
+          'stack': '*',
+          'node': '*',
+          'env': {
+            'account': '*',
+            'region': '*'
+          }
+        },
         'databaseArn': '*',
-        'databaseName': '*',
-        'stack': '*',
-        'node': '*',
-        'env': {
-          'account': '*',
-          'region': '*'
-        }
+        'databaseName': '*'
       },
       'columns': {
         'name': '*',
@@ -3776,9 +3813,9 @@ export const AWS_CDK_CONSTRUCTOR_PROPS: { [key: string]: any } = {
       'flowName': '*',
       'availabilityZone': '*',
       'flowSize': '*',
-      'maintenance': {
-        'maintenanceDay': 'MaintenanceDay',
-        'maintenanceStartHour': '*'
+      'maintenanceConfiguration': {
+        'day': 'MaintenanceDay',
+        'time': '*'
       },
       'mediaStreams': '*',
       'ndiConfig': {
@@ -10587,6 +10624,31 @@ export const AWS_CDK_CONSTRUCTOR_PROPS: { [key: string]: any } = {
     }
   },
   'aws-cdk-lib.aws-cloudwatch': {
+    'AlarmMuteRule': {
+      'alarms': '*',
+      'alarmMuteRuleName': '*',
+      'description': '*',
+      'schedule': '*',
+      'duration': '*',
+      'start': {
+        'year': '*',
+        'month': '*',
+        'day': '*',
+        'hour': '*',
+        'minute': '*'
+      },
+      'expire': {
+        'year': '*',
+        'month': '*',
+        'day': '*',
+        'hour': '*',
+        'minute': '*'
+      },
+      'tags': '*',
+      'addAlarm': [
+        '*'
+      ]
+    },
     'Alarm': {
       'metric': {
         'warnings': '*',
