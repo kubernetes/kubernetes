@@ -4793,7 +4793,7 @@ func TestValidateVolumes(t *testing.T) {
 				},
 			},
 		}, {
-			name: "assigned.cpuset ignored test with feature gate disable",
+			name: "assigned.cpuset invalid test with feature gate disable",
 			vol: core.Volume{
 				Name: "downwardapi",
 				VolumeSource: core.VolumeSource{
@@ -4811,6 +4811,10 @@ func TestValidateVolumes(t *testing.T) {
 			opts: PodValidationOptions{
 				AllowDownwardAPIAssignedResources: false,
 			},
+			errs: []verr{{
+				etype: field.ErrorTypeNotSupported,
+				field: "field[0].downwardAPI.resourceFieldRef.resource",
+			}},
 		}, {
 			name: "assigned.cpuset valid test with feature gate enabled",
 			vol: core.Volume{
