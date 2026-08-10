@@ -417,12 +417,17 @@ export class Catalog extends CatalogBase {
  * The implicit, account-wide Data Catalog. Not a CloudFormation resource; only
  * the encryption settings it carries are synthesized.
  */
+@propertyInjectable
 class AccountCatalog extends CatalogBase {
+  /** Uniquely identifies this class. */
+  public static readonly PROPERTY_INJECTION_ID: string = '@aws-cdk.aws-glue-alpha.AccountCatalog';
   public readonly catalogId: string;
   public readonly catalogArn: string;
 
   constructor(scope: Construct, id: string, encryption: CatalogEncryptionOptions) {
     super(scope, id);
+    // Enhanced CDK Analytics Telemetry
+    addConstructMetadata(this, encryption);
     const stack = Stack.of(this);
     this.catalogId = stack.account;
     // The account catalog's id is implicitly the account id, so the ARN has no resource name.
@@ -436,12 +441,17 @@ class AccountCatalog extends CatalogBase {
  * An imported catalog. A pure identity handle: it emits no resources and does
  * not manage the imported catalog's encryption.
  */
+@propertyInjectable
 class ImportedCatalog extends CatalogBase {
+  /** Uniquely identifies this class. */
+  public static readonly PROPERTY_INJECTION_ID: string = '@aws-cdk.aws-glue-alpha.ImportedCatalog';
   public readonly catalogId: string;
   public readonly catalogArn: string;
 
   constructor(scope: Construct, id: string, catalogId: string, catalogArn: string) {
     super(scope, id);
+    // Enhanced CDK Analytics Telemetry
+    addConstructMetadata(this, catalogId);
     this.catalogId = catalogId;
     this.catalogArn = catalogArn;
   }

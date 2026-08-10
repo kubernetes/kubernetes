@@ -422,6 +422,13 @@
       "UDP"
     ]
   },
+  "aws-cdk/packages/@aws-cdk/aws-glue-alpha/lib/catalog.ts": {
+    "CatalogEncryptionMode": [
+      "DISABLED",
+      "SSE-KMS",
+      "SSE-KMS-WITH-SERVICE-ROLE"
+    ]
+  },
   "aws-cdk/packages/@aws-cdk/aws-glue-alpha/lib/constants.ts": {
     "WorkerType": [
       "Standard",

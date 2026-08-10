@@ -2979,7 +2979,8 @@
       "OPENSEARCH_2_19",
       "OPENSEARCH_3_1",
       "OPENSEARCH_3_3",
-      "OPENSEARCH_3_5"
+      "OPENSEARCH_3_5",
+      "OPENSEARCH_3_7"
     ]
   },
   "aws-cdk/packages/aws-cdk-lib/aws-rds/lib/ca-certificate.ts": {
@@ -3797,6 +3798,7 @@
       "VER_19_0_0_0_2024_10_R1",
       "VER_19_0_0_0_2025_01_R1",
       "VER_19_0_0_0_2025_07_R1",
+      "VER_19_0_0_0_2025_10_R1",
       "VER_21",
       "VER_21_0_0_0_2022_01_R1",
       "VER_21_0_0_0_2022_04_R1",

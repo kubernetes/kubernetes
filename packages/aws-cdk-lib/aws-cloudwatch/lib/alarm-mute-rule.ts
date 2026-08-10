@@ -4,7 +4,7 @@ import { CfnAlarmMuteRule } from './cloudwatch.generated';
 import * as cdk from '../../core';
 import type { IArrayBox } from '../../core/lib/helpers-internal';
 import { Box, lit, memoizedGetter } from '../../core/lib/helpers-internal';
-import { addConstructMetadata } from '../../core/lib/metadata-resource';
+import { addConstructMetadata, MethodMetadata } from '../../core/lib/metadata-resource';
 import { propertyInjectable } from '../../core/lib/prop-injectable';
 
 /**
@@ -363,6 +363,7 @@ export class AlarmMuteRule extends cdk.Resource implements IAlarmMuteRule {
   /**
    * Add a CloudWatch alarm to mute rule target alarms.
    */
+  @MethodMetadata()
   public addAlarm(alarm: IAlarmRef): void {
     this.alarms.push(alarm);
   }

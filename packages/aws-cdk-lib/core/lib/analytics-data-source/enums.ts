@@ -645,6 +645,11 @@ export const AWS_CDK_ENUMS: { [key: string]: any } = {
     "ON_DEMAND",
     "CAPACITY_BLOCK"
   ],
+  "CatalogEncryptionMode": [
+    "DISABLED",
+    "SSE-KMS",
+    "SSE-KMS-WITH-SERVICE-ROLE"
+  ],
   "CfnCapabilities": [
     "",
     "CAPABILITY_IAM",
