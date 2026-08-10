@@ -976,7 +976,13 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 		// We need to send events and set the status for pods in case all simulations were infeasible.
 		// anyResult is the nominated placement's result when one was evaluated, otherwise the first
 		// placement tried. Which one we report is otherwise arbitrary and may change in the future.
-		fitError := newPodGroupPlacementFitError(anyResult.status, len(placements))
+		// A feasible nominated placement that scheduled no new pod leaves anyResult with a Success
+		// status and no message; report an actionable reason rather than an empty one.
+		reportStatus := anyResult.status
+		if reportStatus.IsSuccess() {
+			reportStatus = fwk.NewStatus(fwk.Unschedulable, "nominated placement is feasible but no pending pod was scheduled")
+		}
+		fitError := newPodGroupPlacementFitError(reportStatus, len(placements))
 		anyResult.status = fwk.NewStatus(fwk.Unschedulable).WithError(fitError)
 		return anyResult, nil
 	}
