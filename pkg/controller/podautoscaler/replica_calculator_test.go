@@ -256,7 +256,7 @@ func newFakePodClient(f *calcScenario) *fake.Clientset {
 	fakeClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &v1.PodList{}
 		podsCount := int(f.currentReplicas)
-		// Failed pods aren't included in currentReplicas.
+		// Terminal pods aren't included in currentReplicas.
 		if f.podPhase != nil && len(f.podPhase) > podsCount {
 			podsCount = len(f.podPhase)
 		}
@@ -864,6 +864,54 @@ func TestReplicaCalcResourceScale(t *testing.T) {
 			assertResourceReplicas(t,
 				tc.expectedReplicas, tc.expectedUtilization, tc.expectedRawValue, tc.fixture.timestamp, tc.expectedError,
 				replicas, util, raw, ts, err,
+			)
+		})
+	}
+}
+
+func TestReplicaCalcRawResourceIgnoresSucceededPods(t *testing.T) {
+	testCases := []struct {
+		name             string
+		levels           [][]int64
+		targetUsage      int64
+		expectedReplicas int32
+		expectedUsage    int64
+	}{
+		{
+			name:             "scale up",
+			levels:           makePodMetricLevels(2000, 2000),
+			targetUsage:      1000,
+			expectedReplicas: 4,
+			expectedUsage:    2000,
+		},
+		{
+			name:             "scale down",
+			levels:           makePodMetricLevels(400, 400),
+			targetUsage:      1000,
+			expectedReplicas: 1,
+			expectedUsage:    400,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fixture := calcScenario{
+				currentReplicas: 2,
+				podPhase:        []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodSucceeded, v1.PodSucceeded},
+				container:       "container1",
+				resource: &cpuResource{
+					levels: tc.levels,
+				},
+			}
+			h := newReplicaCalcSetup(t, &fixture)
+
+			replicas, usage, ts, err := h.calc.GetRawResourceReplicas(
+				h.ctx, fixture.currentReplicas, tc.targetUsage,
+				v1.ResourceCPU, h.tolerances, h.namespace, h.selector, fixture.container,
+			)
+			assertMetricReplicas(t,
+				tc.expectedReplicas, tc.expectedUsage, fixture.timestamp, nil,
+				replicas, usage, ts, err,
 			)
 		})
 	}
@@ -1769,7 +1817,7 @@ func TestGroupPods(t *testing.T) {
 						Name: "bentham",
 					},
 					Status: v1.PodStatus{
-						Phase: v1.PodSucceeded,
+						Phase: v1.PodRunning,
 					},
 				},
 			},
@@ -1789,7 +1837,7 @@ func TestGroupPods(t *testing.T) {
 						Name: "lucretius",
 					},
 					Status: v1.PodStatus{
-						Phase: v1.PodSucceeded,
+						Phase: v1.PodRunning,
 						StartTime: &metav1.Time{
 							Time: time.Now(),
 						},
@@ -1812,7 +1860,7 @@ func TestGroupPods(t *testing.T) {
 						Name: "bentham",
 					},
 					Status: v1.PodStatus{
-						Phase: v1.PodSucceeded,
+						Phase: v1.PodRunning,
 						StartTime: &metav1.Time{
 							Time: time.Now().Add(-1 * time.Minute),
 						},
@@ -1842,7 +1890,7 @@ func TestGroupPods(t *testing.T) {
 						Name: "bentham",
 					},
 					Status: v1.PodStatus{
-						Phase: v1.PodSucceeded,
+						Phase: v1.PodRunning,
 						StartTime: &metav1.Time{
 							Time: time.Now().Add(-1 * time.Minute),
 						},
@@ -1872,7 +1920,7 @@ func TestGroupPods(t *testing.T) {
 						Name: "lucretius",
 					},
 					Status: v1.PodStatus{
-						Phase: v1.PodSucceeded,
+						Phase: v1.PodRunning,
 						StartTime: &metav1.Time{
 							Time: time.Now().Add(-10 * time.Minute),
 						},
@@ -1902,7 +1950,7 @@ func TestGroupPods(t *testing.T) {
 						Name: "bentham",
 					},
 					Status: v1.PodStatus{
-						Phase: v1.PodSucceeded,
+						Phase: v1.PodRunning,
 						StartTime: &metav1.Time{
 							Time: time.Now().Add(-3 * time.Minute),
 						},
@@ -1932,7 +1980,7 @@ func TestGroupPods(t *testing.T) {
 						Name: "lucretius",
 					},
 					Status: v1.PodStatus{
-						Phase: v1.PodSucceeded,
+						Phase: v1.PodRunning,
 						StartTime: &metav1.Time{
 							Time: time.Now().Add(-10 * time.Minute),
 						},
@@ -1962,7 +2010,7 @@ func TestGroupPods(t *testing.T) {
 						Name: "lucretius",
 					},
 					Status: v1.PodStatus{
-						Phase: v1.PodSucceeded,
+						Phase: v1.PodRunning,
 						StartTime: &metav1.Time{
 							Time: time.Now().Add(-10 * time.Minute),
 						},
@@ -1992,7 +2040,7 @@ func TestGroupPods(t *testing.T) {
 						Name: "epicurus",
 					},
 					Status: v1.PodStatus{
-						Phase: v1.PodSucceeded,
+						Phase: v1.PodRunning,
 						StartTime: &metav1.Time{
 							Time: time.Now().Add(-3 * time.Minute),
 						},
@@ -2013,7 +2061,7 @@ func TestGroupPods(t *testing.T) {
 						Name: "lucretius",
 					},
 					Status: v1.PodStatus{
-						Phase: v1.PodSucceeded,
+						Phase: v1.PodRunning,
 						StartTime: &metav1.Time{
 							Time: time.Now(),
 						},
@@ -2024,7 +2072,7 @@ func TestGroupPods(t *testing.T) {
 						Name: "niccolo",
 					},
 					Status: v1.PodStatus{
-						Phase: v1.PodSucceeded,
+						Phase: v1.PodRunning,
 						StartTime: &metav1.Time{
 							Time: time.Now().Add(-3 * time.Minute),
 						},
@@ -2042,7 +2090,7 @@ func TestGroupPods(t *testing.T) {
 						Name: "epicurus",
 					},
 					Status: v1.PodStatus{
-						Phase: v1.PodSucceeded,
+						Phase: v1.PodRunning,
 						StartTime: &metav1.Time{
 							Time: time.Now().Add(-3 * time.Minute),
 						},
@@ -2117,6 +2165,26 @@ func TestGroupPods(t *testing.T) {
 			expectUnreadyPods:   sets.New[string](),
 			expectMissingPods:   sets.New[string](),
 			expectIgnoredPods:   sets.New[string]("failed"),
+		}, {
+			name: "ignore pods in a succeeded state",
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "succeeded",
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodSucceeded,
+					},
+				},
+			},
+			metrics: metricsclient.PodMetricsInfo{
+				"succeeded": metricsclient.PodMetric{Value: 1},
+			},
+			resource:            v1.ResourceCPU,
+			expectReadyPodCount: 0,
+			expectUnreadyPods:   sets.New[string](),
+			expectMissingPods:   sets.New[string](),
+			expectIgnoredPods:   sets.New[string]("succeeded"),
 		},
 	}
 	for _, tc := range tests {
