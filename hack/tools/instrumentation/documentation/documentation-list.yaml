@@ -2775,7 +2775,7 @@
   subsystem: endpoint_slice_controller
   help: Number of EndpointSlice changes
   type: Counter
-  deprecatedVersion: 1.37.0
+  deprecatedVersion: 1.38.0
   stabilityLevel: ALPHA
   labels:
   - operation
