@@ -122,6 +122,53 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 			},
 		},
 		{
+			name: "jsonPatch with constant complex struct object as value",
+			policies: []*v1beta1.MutatingAdmissionPolicy{
+				mutatingPolicy("json-patch-complex-struct-object", v1beta1.NeverReinvocationPolicy, matchEndpointResources, nil, v1beta1.Mutation{
+					PatchType: v1beta1.PatchTypeJSONPatch,
+					JSONPatch: &v1beta1.JSONPatch{
+						Expression: `[
+							JSONPatch{op: "add", path: "/subsets/0/addresses", value: [Object.subsets.addresses{ip: "10.0.0.1"}]}
+						]`,
+					},
+				}),
+			},
+			bindings: []*v1beta1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("json-patch-complex-struct-object", nil, nil),
+			},
+			requestOperation: admissionregistrationv1.Create,
+			requestResource:  corev1.SchemeGroupVersion.WithResource("endpoints"),
+			requestObject: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "json-patch-complex-struct-object",
+					Namespace: "default",
+				},
+				Subsets: []corev1.EndpointSubset{
+					{
+						NotReadyAddresses: []corev1.EndpointAddress{
+							{IP: "1.2.3.4"},
+						},
+					},
+				},
+			},
+			expected: &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "json-patch-complex-struct-object",
+					Namespace: "default",
+				},
+				Subsets: []corev1.EndpointSubset{
+					{
+						Addresses: []corev1.EndpointAddress{
+							{IP: "10.0.0.1"},
+						},
+						NotReadyAddresses: []corev1.EndpointAddress{
+							{IP: "1.2.3.4"},
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "multiple policies",
 			policies: []*v1beta1.MutatingAdmissionPolicy{
 				mutatingPolicy("multi-policy-1", v1beta1.NeverReinvocationPolicy, matchEndpointResources, nil, v1beta1.Mutation{
@@ -553,6 +600,7 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 					DryRun:       []string{metav1.DryRunAll},
 					FieldManager: "integration-test",
 				}, tc.subresources...)
+				require.NoError(t, err)
 			case admissionregistrationv1.Update:
 				resultObj, err = rsrcClient.Update(ctx, unstructuredRequestObj, metav1.UpdateOptions{
 					DryRun:       []string{metav1.DryRunAll},
@@ -1279,6 +1327,9 @@ func withMutatingWaitReadyConstraintAndExpression(policy *v1beta1.MutatingAdmiss
 		if m.ApplyConfiguration != nil {
 			bypass := `object.metadata.?labels["mutation-marker"].hasValue() ? Object{} : `
 			m.ApplyConfiguration.Expression = bypass + m.ApplyConfiguration.Expression
+		} else if m.JSONPatch != nil {
+			bypass := `object.metadata.?labels["mutation-marker"].hasValue() ? [] : `
+			m.JSONPatch.Expression = bypass + m.JSONPatch.Expression
 		}
 	}
 	policy.Spec.Mutations = append([]v1beta1.Mutation{{
