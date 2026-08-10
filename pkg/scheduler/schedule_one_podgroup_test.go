@@ -3017,8 +3017,9 @@ func TestPodGroupSchedulingPlacementAlgorithm_NominatedNode(t *testing.T) {
 		// rootIsCPG makes the scheduling root a CompositePodGroup, which gates off the NNN fast path.
 		rootIsCPG bool
 		// expectedHost is the node the gang should land on. Empty means unschedulable.
-		expectedHost string
-		expectError  bool
+		expectedHost   string
+		expectedStatus *fwk.Status
+		expectError    bool
 	}{
 		"nominated placement short-circuits scoring even with a lower score": {
 			placementPlugin: fakePlacementPlugin{
@@ -3134,6 +3135,24 @@ func TestPodGroupSchedulingPlacementAlgorithm_NominatedNode(t *testing.T) {
 			nominatedNodeName:         nodes[1].Name,
 			expectedHost:              nodes[0].Name,
 		},
+		"feasible nominated placement that schedules no new pod reports an actionable reason": {
+			placementPlugin: fakePlacementPlugin{
+				generatePlacementsResult: map[string]map[string][]string{
+					podGroupKey: {
+						"placement2": {nodes[1].Name},
+					},
+				},
+				filterStatus: map[string]*fwk.Status{
+					nodes[1].Name: fwk.NewStatus(fwk.Unschedulable),
+				},
+			},
+			placementFeasibleStatuses: [][]fwk.Code{{fwk.Success}},
+			nominatedNodeName:         nodes[1].Name,
+			expectedStatus: fwk.NewStatus(
+				fwk.Unschedulable,
+				"0/1 placements are available, reported placement status: nominated placement is feasible but no pending pod was scheduled",
+			).WithError(errPodGroupUnschedulable),
+		},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -3229,6 +3248,12 @@ func TestPodGroupSchedulingPlacementAlgorithm_NominatedNode(t *testing.T) {
 			if tt.expectError {
 				if result.status == nil || !result.status.IsError() {
 					t.Fatalf("expected an error status, got %v", result.status)
+				}
+				return
+			}
+			if tt.expectedStatus != nil {
+				if diff := cmp.Diff(tt.expectedStatus, result.status, statusCmpOpt); diff != "" {
+					t.Fatalf("unexpected status (-want,+got):\n%s", diff)
 				}
 				return
 			}

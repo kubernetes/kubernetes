@@ -1064,7 +1064,11 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 		// We need to send events and set the status for pods in case all simulations were infeasible.
 		// anyResult is the nominated placement's result when one was evaluated, otherwise the first
 		// placement tried. Which one we report is otherwise arbitrary and may change in the future.
-		anyResult.status = fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("0/%d placements are available, reported placement status: %v", len(placements), anyResult.status.AsError())).WithError(errPodGroupUnschedulable)
+		reason := "nominated placement is feasible but no pending pod was scheduled"
+		if err := anyResult.status.AsError(); err != nil {
+			reason = err.Error()
+		}
+		anyResult.status = fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("0/%d placements are available, reported placement status: %s", len(placements), reason)).WithError(errPodGroupUnschedulable)
 		return anyResult, nil
 	}
 

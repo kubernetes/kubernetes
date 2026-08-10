@@ -1639,7 +1639,7 @@ func TestTopologyAwareSchedulingNominatedNode(t *testing.T) {
 			},
 		},
 		{
-			name: "pod falls back when its nominated placement is full after minCount was met",
+			name: "NNN outside the selected TAS domain does not prevent scheduling",
 			steps: []stepsframework.Step{
 				{
 					Name: "Create a one-CPU node in rack-1 and a four-CPU node in rack-2",
@@ -1706,11 +1706,11 @@ func TestTopologyAwareSchedulingNominatedNode(t *testing.T) {
 					CreatePodGroup: makeGangPodGroup("pg1", "rack", 2),
 				},
 				{
-					Name:                 "Verify the third pod falls back and schedules",
+					Name:                 "Verify the third pod schedules in the selected TAS domain",
 					WaitForPodsScheduled: []string{"p3"},
 				},
 				{
-					Name: "Verify the third pod landed on rack-2 instead of the full nominated node",
+					Name: "Verify the third pod landed on rack-2; its rack-1 NNN was outside the generated placement",
 					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p3"},
 						Nodes: sets.New("node-rack2"),
