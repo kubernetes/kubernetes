@@ -2,7 +2,7 @@
 
 module k8s.io/apimachinery
 
-go 1.24.0
+go 1.25.0
 
 godebug default=go1.24
 
@@ -19,7 +19,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/net v0.38.0
+	golang.org/x/net v0.56.0
 	golang.org/x/time v0.9.0
 	gopkg.in/evanphx/json-patch.v4 v4.12.0
 	gopkg.in/inf.v0 v0.9.1
@@ -49,7 +49,7 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/text v0.23.0 // indirect
+	golang.org/x/text v0.39.0 // indirect
 	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
