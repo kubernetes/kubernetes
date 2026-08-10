@@ -70,6 +70,20 @@ func memqosReadCgroupInt64(cgroupPath, fileName string) (int64, error) {
 	return strconv.ParseInt(val, 10, 64)
 }
 
+// memqosReadControlState reads the effective cgroup v2 memory controls used by
+// MemoryQoS conformance checks.
+func memqosReadControlState(cgroupPath string) (map[string]string, error) {
+	state := make(map[string]string, 4)
+	for _, control := range []string{cgroupMemoryMin, cgroupMemoryLow, cgroupMemoryHigh, cgroupMemoryMax} {
+		value, err := memqosReadCgroupFile(cgroupPath, control)
+		if err != nil {
+			return nil, fmt.Errorf("read %s: %w", control, err)
+		}
+		state[control] = value
+	}
+	return state, nil
+}
+
 // memqosReadMemoryEvents reads memory.events and returns a map of counter names to values.
 func memqosReadMemoryEvents(cgroupPath string) (map[string]int64, error) {
 	data, err := memqosReadCgroupFile(cgroupPath, cgroupMemoryEvents)
@@ -425,6 +439,55 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 	f.Describe("memory.high throttling", func() {
 		ginkgo.AfterEach(func(ctx context.Context) { restoreConfig(ctx) })
 
+		ginkgo.It("should realize the effective controls derived from the admitted Pod", func(ctx context.Context) {
+			throttlingFactor := 0.9
+			configureMemoryQoSWithPolicy(ctx, throttlingFactor, kubeletconfig.TieredReservationMemoryReservationPolicy)
+
+			pod := memqosMakePod("memqos-effective-state", f.Namespace.Name,
+				v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi")},
+				v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+			)
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			gomega.Expect(pod.Status.QOSClass).To(gomega.Equal(v1.PodQOSBurstable))
+
+			container := pod.Spec.Containers[0]
+			requestBytes := container.Resources.Requests.Memory().Value()
+			limitBytes := container.Resources.Limits.Memory().Value()
+			expectedHigh := memqosExpectedMemoryHigh(requestBytes, limitBytes, throttlingFactor)
+
+			expectedPod := map[string]string{
+				cgroupMemoryMin:  "0",
+				cgroupMemoryLow:  strconv.FormatInt(requestBytes, 10),
+				cgroupMemoryHigh: "max",
+				cgroupMemoryMax:  strconv.FormatInt(limitBytes, 10),
+			}
+			expectedContainer := map[string]string{
+				cgroupMemoryMin:  "0",
+				cgroupMemoryLow:  strconv.FormatInt(requestBytes, 10),
+				cgroupMemoryHigh: strconv.FormatInt(expectedHigh, 10),
+				cgroupMemoryMax:  strconv.FormatInt(limitBytes, 10),
+			}
+
+			podCgroupPath := memqosGetPodCgroupPath(pod, cgroupDriver)
+			observedPod, err := memqosReadControlState(podCgroupPath)
+			framework.ExpectNoError(err, "reading Pod MemoryQoS controls")
+
+			containerCgroupPath := memqosGetContainerCgroupPath(
+				podCgroupPath,
+				pod.Status.ContainerStatuses[0].ContainerID,
+				cgroupDriver,
+			)
+			observedContainer, err := memqosReadControlState(containerCgroupPath)
+			framework.ExpectNoError(err, "reading container MemoryQoS controls")
+
+			podResult := memqosCheckControlState(expectedPod, observedPod)
+			containerResult := memqosCheckControlState(expectedContainer, observedContainer)
+			framework.Logf("Pod MemoryQoS conformance: %s", podResult.String())
+			framework.Logf("Container MemoryQoS conformance: %s", containerResult.String())
+			gomega.Expect(podResult.Verdict).To(gomega.Equal(memqosConformanceFulfilled), podResult.String())
+			gomega.Expect(containerResult.Verdict).To(gomega.Equal(memqosConformanceFulfilled), containerResult.String())
+		})
+
 		ginkgo.It("should set memory.high for Burstable pod using formula", func(ctx context.Context) {
 			throttlingFactor := 0.9
 			configureMemoryQoS(ctx, throttlingFactor)
@@ -443,13 +506,17 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			for _, cs := range pod.Status.ContainerStatuses {
 				containerCgroupPath := memqosGetContainerCgroupPath(podCgroupPath, cs.ContainerID, cgroupDriver)
 
-				containerMemHigh, err := memqosReadCgroupInt64(containerCgroupPath, cgroupMemoryHigh)
+				containerMemHigh, err := memqosReadCgroupFile(containerCgroupPath, cgroupMemoryHigh)
 				framework.ExpectNoError(err, "reading container memory.high")
 
 				expected := memqosExpectedMemoryHigh(requestsMem.Value(), limitsMem.Value(), throttlingFactor)
-				framework.Logf("Container %s memory.high: got=%d, expected=%d", cs.Name, containerMemHigh, expected)
-				gomega.Expect(containerMemHigh).To(gomega.Equal(expected),
-					"memory.high should match formula: floor[(req + factor * (limit - req)) / pageSize] * pageSize")
+				result := memqosCheckControlState(
+					map[string]string{cgroupMemoryHigh: strconv.FormatInt(expected, 10)},
+					map[string]string{cgroupMemoryHigh: containerMemHigh},
+				)
+				framework.Logf("Container %s MemoryQoS conformance: %s", cs.Name, result.String())
+				gomega.Expect(result.Verdict).To(gomega.Equal(memqosConformanceFulfilled),
+					"effective memory.high should match the value derived from the admitted resources: %s", result.String())
 			}
 		})
 
