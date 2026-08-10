@@ -750,11 +750,15 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 		}
 
 		if currentReadyCondition != nil {
+			// 1. Determine the context triggers using clean boolean variables
+			nodeJustBecameNotReady := currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue
+			nodeStatusWentUnknown := currentReadyCondition.Status == v1.ConditionUnknown && observedReadyCondition.Status != v1.ConditionUnknown
+
 			pods, err := nc.getPodsAssignedToNode(node.Name)
 			if err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Unable to list pods of node", node.Name)
-				if currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue {
-					// If error happened during node status transition (Ready -> NotReady)
+				if nodeJustBecameNotReady || nodeStatusWentUnknown {
+					// If error happened during node status transition that requires marking pods NotReady,
 					// we need to mark node for retry to force MarkPodsNotReady execution
 					// in the next iteration.
 					nc.nodesToRetry.Store(node.Name, struct{}{})
@@ -764,9 +768,6 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 			nc.processTaintBaseEviction(ctx, node, currentReadyCondition)
 
 			_, needsRetry := nc.nodesToRetry.Load(node.Name)
-			// 1. Determine the context triggers using clean boolean variables
-			nodeJustBecameNotReady := currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue
-			nodeStatusWentUnknown := currentReadyCondition.Status == v1.ConditionUnknown && observedReadyCondition.Status != v1.ConditionUnknown
 			failedAndNeedsRetry := needsRetry && observedReadyCondition.Status != v1.ConditionTrue
 
 			// 2. Perform the single-occurrence event logging
