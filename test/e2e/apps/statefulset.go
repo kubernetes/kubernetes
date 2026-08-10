@@ -1383,7 +1383,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					pods.Items[i].Namespace,
 					pods.Items[i].Name,
 					pods.Items[i].Spec.Containers[0].Image,
-					oldImage)
+					newImage)
 				gomega.Expect(pods.Items[i].Labels).To(gomega.HaveKeyWithValue(appsv1.StatefulSetRevisionLabel, ss.Status.CurrentRevision), "Pod %s/%s has revision %s not equal to current revision %s",
 					pods.Items[i].Namespace,
 					pods.Items[i].Name,
@@ -1449,6 +1449,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				update.Spec.Template.Spec.Containers[0].Image = newImage
 			})
 			framework.ExpectNoError(err)
+			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
 			ss = waitForStatus(ctx, c, ss)
 			pods, err = e2estatefulset.GetPodList(ctx, c, ss)
 			framework.ExpectNoError(err)
@@ -1459,7 +1460,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					pods.Items[i].Namespace,
 					pods.Items[i].Name,
 					pods.Items[i].Spec.Containers[0].Image,
-					oldImage)
+					newImage)
 				gomega.Expect(pods.Items[i].Labels).To(gomega.HaveKeyWithValue(appsv1.StatefulSetRevisionLabel, ss.Status.CurrentRevision), "Pod %s/%s has revision %s not equal to current revision %s",
 					pods.Items[i].Namespace,
 					pods.Items[i].Name,
