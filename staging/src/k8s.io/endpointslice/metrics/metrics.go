@@ -93,7 +93,7 @@ var (
 			Name:              "changes",
 			Help:              "Number of EndpointSlice changes",
 			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.37.0",
+			DeprecatedVersion: "1.38.0",
 		},
 		[]string{"operation"},
 	)
