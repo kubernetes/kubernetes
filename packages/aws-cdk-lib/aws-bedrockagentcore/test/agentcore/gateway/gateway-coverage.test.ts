@@ -1310,6 +1310,10 @@ describe('MCPProtocolVersion.of() escape hatch', () => {
 describe('McpGatewaySearchType.of() escape hatch', () => {
   test('renders custom search type in the template', () => {
     const stack = new cdk.Stack();
+    cdk.Validations.of(stack).acknowledge({
+      id: 'CloudFormation-Validate::F3018',
+      reason: 'This test intentionally uses a search type not currently supported by CloudFormation to verify escape-hatch passthrough',
+    });
     new Gateway(stack, 'TestGateway', {
       gatewayName: 'test-search',
       protocolConfiguration: GatewayProtocol.mcp({

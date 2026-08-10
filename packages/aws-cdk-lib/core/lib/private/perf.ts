@@ -35,6 +35,11 @@ export const TELEMETRY_FIELD = 'telemetry';
  */
 export const SKIPCOUNT_FIELD = 'skipCount';
 
+/**
+ * The field in `detail` that overrides the amount added to the counter.
+ */
+export const COUNT_FIELD = 'count';
+
 interface PerformanceMeasureEntry extends PerformanceEntry {
   detail?: Record<string, unknown>;
 }
@@ -123,6 +128,21 @@ export function profileSpan(key: string, options?: ProfileOptions): Disposable {
 }
 
 /**
+ * Add an arbitrary value to a performance counter without recording a duration.
+ */
+export function recordCounter(key: string, count: number, options?: Pick<ProfileOptions, 'telemetry'>): void {
+  const now = performance.now();
+  performance.measure(key, {
+    start: now,
+    end: now,
+    detail: {
+      [TELEMETRY_FIELD]: !!options?.telemetry,
+      [COUNT_FIELD]: count,
+    },
+  });
+}
+
+/**
  * Make all functions on this given object (exclusively) profiled
  */
 export function profileObj(objName: string, options?: ProfileOptions) {
@@ -185,7 +205,10 @@ export function readPerfCounters(options?: ReadCountersOptions): PerfCounters {
       continue;
     }
 
-    const count = (entry.detail)?.[SKIPCOUNT_FIELD] ? 0 : 1;
+    const recordedCount = entry.detail?.[COUNT_FIELD];
+    const count = typeof recordedCount === 'number'
+      ? recordedCount
+      : entry.detail?.[SKIPCOUNT_FIELD] ? 0 : 1;
 
     const ctr = counters[entry.name];
     if (ctr) {

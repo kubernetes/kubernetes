@@ -1,13 +1,16 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { performance } from 'perf_hooks';
 import type { PolicyValidationReportJson } from '@aws-cdk/cloud-assembly-schema';
 import { Construct } from 'constructs';
 import * as cxapi from '../../../cx-api';
 import * as core from '../../lib';
+import { readPerfCounters } from '../../lib/private/perf';
 
 let consoleErrorMock: jest.SpyInstance;
 beforeEach(() => {
+  performance.clearMeasures();
   consoleErrorMock = jest.spyOn(console, 'error').mockImplementation(() => { return true; });
   jest.spyOn(console, 'log').mockImplementation(() => { return true; });
   process.exitCode = undefined;
@@ -300,6 +303,60 @@ describe('CloudFormationValidatePlugin', () => {
 
     fs.rmSync(tmpDir, { recursive: true });
   });
+
+  test('records validation calls, duration, and diagnostic counts by severity', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cdk-validate-metrics-'));
+    const templatePaths = ['one.json', 'two.json'].map(fileName => path.join(tmpDir, fileName));
+    for (const templatePath of templatePaths) {
+      fs.writeFileSync(templatePath, JSON.stringify({ Resources: {} }));
+    }
+
+    try {
+      const plugin = new core.CloudFormationValidatePlugin();
+      const validateDetailed = jest.spyOn((plugin as any).engine, 'validateDetailed')
+        .mockReturnValueOnce({
+          diagnostics: [
+            { ruleId: 'F0001', severity: 'FATAL', message: 'fatal diagnostic' },
+            { ruleId: 'E0001', severity: 'ERROR', message: 'error diagnostic' },
+            { ruleId: 'W0001', severity: 'WARN', message: 'warning diagnostic' },
+          ],
+        })
+        .mockReturnValueOnce({
+          diagnostics: [
+            { ruleId: 'I0001', severity: 'INFO', message: 'informational diagnostic' },
+            { ruleId: 'D0001', severity: 'DEBUG', message: 'debug diagnostic' },
+          ],
+        });
+
+      plugin.validate({
+        templatePaths,
+        stackTemplates: templatePaths.map((templatePath, index) => ({
+          stackConstructPath: `TestStack${index + 1}`,
+          templatePath,
+        })),
+        appConstruct: new Construct(undefined as any, ''),
+        accountId: undefined,
+        region: undefined,
+      });
+
+      const counters = readPerfCounters({ telemetry: true });
+      expect(validateDetailed).toHaveBeenCalledTimes(2);
+      expect(counters).toMatchObject({
+        [VALIDATE_DETAILED_METRIC]: {
+          count: 2,
+          total: expect.any(Number),
+        },
+        [DIAGNOSTICS_METRIC]: { count: 5, total: 0 },
+        [`${DIAGNOSTICS_METRIC}.FATAL`]: { count: 1, total: 0 },
+        [`${DIAGNOSTICS_METRIC}.ERROR`]: { count: 1, total: 0 },
+        [`${DIAGNOSTICS_METRIC}.WARN`]: { count: 1, total: 0 },
+        [`${DIAGNOSTICS_METRIC}.INFO`]: { count: 1, total: 0 },
+        [`${DIAGNOSTICS_METRIC}.DEBUG`]: { count: 1, total: 0 },
+      });
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true });
+    }
+  });
 });
 
 describe('CDK_VALIDATION environment variable', () => {
@@ -361,6 +418,9 @@ describe('CDK_VALIDATION environment variable', () => {
     expect(() => app.synth()).toThrow(/BogusProperty/);
   });
 });
+
+const VALIDATE_DETAILED_METRIC = 'CloudFormationValidate.validate';
+const DIAGNOSTICS_METRIC = 'CloudFormationValidate.diagnostics';
 
 function loadValidationReport(asm: cxapi.CloudAssembly) {
   const p = path.join(asm.directory, 'validation-report.json');
