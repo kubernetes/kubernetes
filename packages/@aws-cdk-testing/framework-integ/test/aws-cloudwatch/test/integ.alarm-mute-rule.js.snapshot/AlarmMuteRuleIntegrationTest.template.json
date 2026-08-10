@@ -1,0 +1,109 @@
+{
+ "Resources": {
+  "Alarm1F9009D71": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+    "EvaluationPeriods": 3,
+    "MetricName": "Metric",
+    "Namespace": "CDK/Test",
+    "Period": 300,
+    "Statistic": "Average",
+    "Threshold": 100
+   }
+  },
+  "Alarm1MuteRule1710E45B5": {
+   "Type": "AWS::CloudWatch::AlarmMuteRule",
+   "Properties": {
+    "Description": "Alarm mute rule integration test",
+    "ExpireDate": "2030-12-31T00:00",
+    "MuteTargets": {
+     "AlarmNames": [
+      {
+       "Ref": "Alarm1F9009D71"
+      },
+      {
+       "Ref": "Alarm2A7122E13"
+      }
+     ]
+    },
+    "Name": "AlarmMuteRuleIntegTest",
+    "Rule": {
+     "Schedule": {
+      "Duration": "PT1M",
+      "Expression": "cron(0 0 * * *)"
+     }
+    },
+    "StartDate": "2030-01-01T00:00"
+   }
+  },
+  "Alarm2A7122E13": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+    "EvaluationPeriods": 3,
+    "MetricName": "Metric",
+    "Namespace": "CDK/Test",
+    "Period": 300,
+    "Statistic": "Average",
+    "Threshold": 100
+   }
+  },
+  "MuteRule239F86ED4": {
+   "Type": "AWS::CloudWatch::AlarmMuteRule",
+   "Properties": {
+    "MuteTargets": {
+     "AlarmNames": [
+      {
+       "Ref": "Alarm1F9009D71"
+      },
+      {
+       "Ref": "Alarm2A7122E13"
+      }
+     ]
+    },
+    "Rule": {
+     "Schedule": {
+      "Duration": "P15D",
+      "Expression": "at(2030-02-01T00:00)",
+      "Timezone": "Asia/Tokyo"
+     }
+    }
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

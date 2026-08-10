@@ -590,6 +590,33 @@ new cloudwatch.CompositeAlarm(this, 'CompositeAlarm', {
 });
 ```
 
+## Alarm Mute Rules
+
+Alarm Mute Rules is a CloudWatch feature that provides you a mechanism to
+automatically mute alarm actions during predefined time windows.
+When you create a mute rule, you define specific time periods and target
+alarms whose actions will be muted.
+CloudWatch will continue monitoring and evaluating alarm states while preventing
+unwanted notifications or automated alarm actions during expected operational events.
+
+```ts
+declare const alarm1: cloudwatch.Alarm;
+declare const alarm2: cloudwatch.Alarm;
+
+const alarmMuteRule = new cloudwatch.AlarmMuteRule(this, 'AlarmMuteRule', {
+  alarms: [alarm1],
+  // Defines the mute period begins at 0:00 everyday in UTC
+  schedule: cloudwatch.ScheduleExpression.cron({ minute: '0', hour: '0' }),
+  // Specifies the mute rule lasts 1 hour.
+  duration: Duration.hours(1),
+})
+
+// The mute target can be added after construction.
+alarmMuteRule.addAlarm(alarm2);
+```
+
+For more information on alarm mute rules, see the [AWS documentation](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/alarm-mute-rules.html).
+
 ## Dashboards
 
 Dashboards are set of Widgets stored server-side which can be accessed quickly
