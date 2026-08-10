@@ -69,19 +69,19 @@ func Unmarshal(s string, k protoreflect.Kind, evs protoreflect.EnumValueDescript
 			}
 		}
 	case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind:
-		if v, err := strconv.ParseInt(s, 10, 32); err == nil {
+		if v, err := strconv.ParseInt(s, 0, 32); err == nil {
 			return protoreflect.ValueOfInt32(int32(v)), nil, nil
 		}
 	case protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
-		if v, err := strconv.ParseInt(s, 10, 64); err == nil {
+		if v, err := strconv.ParseInt(s, 0, 64); err == nil {
 			return protoreflect.ValueOfInt64(int64(v)), nil, nil
 		}
 	case protoreflect.Uint32Kind, protoreflect.Fixed32Kind:
-		if v, err := strconv.ParseUint(s, 10, 32); err == nil {
+		if v, err := strconv.ParseUint(s, 0, 32); err == nil {
 			return protoreflect.ValueOfUint32(uint32(v)), nil, nil
 		}
 	case protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
-		if v, err := strconv.ParseUint(s, 10, 64); err == nil {
+		if v, err := strconv.ParseUint(s, 0, 64); err == nil {
 			return protoreflect.ValueOfUint64(uint64(v)), nil, nil
 		}
 	case protoreflect.FloatKind, protoreflect.DoubleKind:
