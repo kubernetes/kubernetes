@@ -11,6 +11,12 @@ export interface DestinationConfig {
    * @default - S3 destination is not used.
    */
   readonly extendedS3DestinationConfiguration?: CfnDeliveryStream.ExtendedS3DestinationConfigurationProperty;
+  /**
+   * Datadog destination configuration properties.
+   *
+   * @default - HTTP destination is not used.
+   */
+  readonly httpEndpointDestinationConfiguration?: CfnDeliveryStream.HttpEndpointDestinationConfigurationProperty;
 
   /**
    * Any resources that were created by the destination when binding it to the stack that must be deployed before the delivery stream is deployed.

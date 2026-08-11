@@ -207,6 +207,8 @@ function renderDataProcessor(
   };
 }
 
+export function createBackupConfig(scope: Construct, role: iam.IRole, props: DestinationS3BackupProps & { mode: NonNullable<DestinationS3BackupProps['mode']> }): DestinationBackupConfig;
+export function createBackupConfig(scope: Construct, role: iam.IRole, props?: DestinationS3BackupProps): DestinationBackupConfig | undefined;
 export function createBackupConfig(scope: Construct, role: iam.IRole, props?: DestinationS3BackupProps): DestinationBackupConfig | undefined {
   if (!props || (props.mode === undefined && !props.bucket)) {
     return undefined;
