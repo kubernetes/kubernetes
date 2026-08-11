@@ -22,6 +22,7 @@ import (
 	"crypto/x509"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"reflect"
@@ -158,8 +159,12 @@ func TestTLSConfigKey(t *testing.T) {
 				GetCertHolder: getCert,
 			},
 		},
-		"http2, http1.1": {TLS: TLSConfig{NextProtos: []string{"h2", "http/1.1"}}},
-		"http1.1-only":   {TLS: TLSConfig{NextProtos: []string{"http/1.1"}}},
+		"http2, http1.1":              {TLS: TLSConfig{NextProtos: []string{"h2", "http/1.1"}}},
+		"http1.1-only":                {TLS: TLSConfig{NextProtos: []string{"http/1.1"}}},
+		"http2 read idle 5s":          {HTTP2ReadIdleTimeout: 5 * time.Second},
+		"http2 read idle 10s":         {HTTP2ReadIdleTimeout: 10 * time.Second},
+		"http2 ping 5s":               {HTTP2PingTimeout: 5 * time.Second},
+		"http2 read idle 5s, ping 5s": {HTTP2ReadIdleTimeout: 5 * time.Second, HTTP2PingTimeout: 5 * time.Second},
 	}
 	for nameA, valueA := range uniqueConfigurations {
 		for nameB, valueB := range uniqueConfigurations {
@@ -996,4 +1001,73 @@ func installFakeMetrics(t *testing.T) (*recordingCreateCalls, *recordingCacheGCC
 		metrics.TransportCacheEntries = origEntries
 	})
 	return createCalls, gcCalls, rotationGCCalls, cacheEntries
+}
+
+func TestTLSConfigKeyHTTP2Timeouts(t *testing.T) {
+	a := &Config{TLS: TLSConfig{ServerName: "x"}, HTTP2ReadIdleTimeout: 5 * time.Second, HTTP2PingTimeout: 5 * time.Second}
+	b := &Config{TLS: TLSConfig{ServerName: "x"}, HTTP2ReadIdleTimeout: 5 * time.Second, HTTP2PingTimeout: 5 * time.Second}
+	keyA, canCacheA, err := tlsConfigKey(a)
+	if err != nil || !canCacheA {
+		t.Fatalf("unexpected: err=%v canCache=%v", err, canCacheA)
+	}
+	keyB, _, err := tlsConfigKey(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if keyA != keyB {
+		t.Errorf("expected identical keys, got:\n\t%s\n\t%s", keyA, keyB)
+	}
+
+	c := &Config{TLS: TLSConfig{ServerName: "x"}, HTTP2ReadIdleTimeout: 10 * time.Second, HTTP2PingTimeout: 5 * time.Second}
+	keyC, _, err := tlsConfigKey(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if keyA == keyC {
+		t.Errorf("expected different keys for different timeouts, got identical:\n\t%s", keyA)
+	}
+
+	keyDefault, _, err := tlsConfigKey(&Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if keyDefault != (tlsCacheKey{}) {
+		t.Errorf("expected empty key for empty config, got: %s", keyDefault)
+	}
+}
+
+func TestNewWithHTTP2Timeouts(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	rt, err := New(&Config{
+		TLS:                  TLSConfig{Insecure: true},
+		HTTP2ReadIdleTimeout: 5 * time.Second,
+		HTTP2PingTimeout:     5 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error building round tripper: %v", err)
+	}
+	req, err := http.NewRequest(http.MethodGet, server.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("unexpected round trip error: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+
+	rt2, err := New(&Config{HTTP2ReadIdleTimeout: 5 * time.Second})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rt2 == http.DefaultTransport {
+		t.Errorf("expected a dedicated transport, got http.DefaultTransport")
+	}
 }

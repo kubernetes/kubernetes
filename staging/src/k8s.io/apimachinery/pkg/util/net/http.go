@@ -126,16 +126,29 @@ func SetOldTransportDefaults(t *http.Transport) *http.Transport {
 	return t
 }
 
+const (
+	defaultHTTP2ReadIdleTimeoutSeconds = 30
+	defaultHTTP2PingTimeoutSeconds     = 15
+)
+
 // SetTransportDefaults applies the defaults from http.DefaultTransport
 // for the Proxy, Dial, and TLSHandshakeTimeout fields if unset
 func SetTransportDefaults(t *http.Transport) *http.Transport {
+	return SetTransportDefaultsWithHTTP2Timeouts(t, 0, 0)
+}
+
+// SetTransportDefaultsWithHTTP2Timeouts is like SetTransportDefaults but overrides the
+// HTTP/2 health check timeouts. A zero value keeps the default (30s read-idle / 15s
+// ping); the HTTP2_READ_IDLE_TIMEOUT_SECONDS and HTTP2_PING_TIMEOUT_SECONDS env vars
+// still take precedence.
+func SetTransportDefaultsWithHTTP2Timeouts(t *http.Transport, readIdleTimeout, pingTimeout time.Duration) *http.Transport {
 	t = SetOldTransportDefaults(t)
 	// Allow clients to disable http2 if needed.
 	if s := os.Getenv("DISABLE_HTTP2"); len(s) > 0 {
 		//nolint:logcheck // Should be rare, not worth converting.
 		klog.Info("HTTP2 has been explicitly disabled")
 	} else if allowsHTTP2(t) {
-		if err := configureHTTP2Transport(t); err != nil {
+		if err := configureHTTP2Transport(t, readIdleTimeout, pingTimeout); err != nil {
 			//nolint:logcheck // Should be rare, not worth converting.
 			klog.Warningf("Transport failed http2 configuration: %v", err)
 		}
@@ -143,8 +156,8 @@ func SetTransportDefaults(t *http.Transport) *http.Transport {
 	return t
 }
 
-func readIdleTimeoutSeconds() int {
-	ret := 30
+func readIdleTimeoutSeconds(defaultSeconds int) int {
+	ret := defaultSeconds
 	// User can set the readIdleTimeout to 0 to disable the HTTP/2
 	// connection health check.
 	if s := os.Getenv("HTTP2_READ_IDLE_TIMEOUT_SECONDS"); len(s) > 0 {
@@ -160,8 +173,8 @@ func readIdleTimeoutSeconds() int {
 	return ret
 }
 
-func pingTimeoutSeconds() int {
-	ret := 15
+func pingTimeoutSeconds(defaultSeconds int) int {
+	ret := defaultSeconds
 	if s := os.Getenv("HTTP2_PING_TIMEOUT_SECONDS"); len(s) > 0 {
 		i, err := strconv.Atoi(s)
 		if err != nil {
@@ -175,7 +188,7 @@ func pingTimeoutSeconds() int {
 	return ret
 }
 
-func configureHTTP2Transport(t *http.Transport) error {
+func configureHTTP2Transport(t *http.Transport, readIdleTimeout, pingTimeout time.Duration) error {
 	t2, err := http2.ConfigureTransports(t)
 	if err != nil {
 		return err
@@ -188,9 +201,24 @@ func configureHTTP2Transport(t *http.Transport) error {
 	// by default, which caused
 	// https://github.com/kubernetes/client-go/issues/374 and
 	// https://github.com/kubernetes/kubernetes/issues/87615.
-	t2.ReadIdleTimeout = time.Duration(readIdleTimeoutSeconds()) * time.Second
-	t2.PingTimeout = time.Duration(pingTimeoutSeconds()) * time.Second
+	readIdleDefaultSeconds := overrideTimeoutSeconds(readIdleTimeout, defaultHTTP2ReadIdleTimeoutSeconds)
+	pingDefaultSeconds := overrideTimeoutSeconds(pingTimeout, defaultHTTP2PingTimeoutSeconds)
+	t2.ReadIdleTimeout = time.Duration(readIdleTimeoutSeconds(readIdleDefaultSeconds)) * time.Second
+	t2.PingTimeout = time.Duration(pingTimeoutSeconds(pingDefaultSeconds)) * time.Second
 	return nil
+}
+
+// overrideTimeoutSeconds rounds to whole seconds,with a floor of 1s so it never
+// rounds to 0 (which disables the health check). Zero or negative returns default.
+func overrideTimeoutSeconds(override time.Duration, defaultSeconds int) int {
+	if override <= 0 {
+		return defaultSeconds
+	}
+	seconds := int(override.Round(time.Second) / time.Second)
+	if seconds < 1 {
+		seconds = 1
+	}
+	return seconds
 }
 
 func allowsHTTP2(t *http.Transport) bool {

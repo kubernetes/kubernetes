@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"time"
 )
 
 // Config holds various options for establishing a transport.
@@ -77,6 +78,13 @@ type Config struct {
 	//
 	// socks5 proxying does not currently support spdy streaming endpoints.
 	Proxy func(*http.Request) (*url.URL, error)
+
+	// HTTP2ReadIdleTimeout and HTTP2PingTimeout, if non-zero, override the HTTP/2
+	// connection health check timeouts for this transport. A zero value keeps the
+	// default (30s read-idle / 15s ping). Useful to detect broken connections to
+	// same-cluster backends faster.
+	HTTP2ReadIdleTimeout time.Duration
+	HTTP2PingTimeout     time.Duration
 }
 
 // DialHolder is used to make the wrapped function comparable so that it can be used as a map key.

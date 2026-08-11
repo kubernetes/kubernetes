@@ -28,6 +28,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	netutils "k8s.io/utils/net"
@@ -917,25 +918,58 @@ func TestIsProbableEOF(t *testing.T) {
 
 func TestReadIdleTimeoutSeconds(t *testing.T) {
 	t.Setenv("HTTP2_READ_IDLE_TIMEOUT_SECONDS", "60")
-	if e, a := 60, readIdleTimeoutSeconds(); e != a {
+	if e, a := 60, readIdleTimeoutSeconds(defaultHTTP2ReadIdleTimeoutSeconds); e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
 
 	t.Setenv("HTTP2_READ_IDLE_TIMEOUT_SECONDS", "illegal value")
-	if e, a := 30, readIdleTimeoutSeconds(); e != a {
+	if e, a := 30, readIdleTimeoutSeconds(defaultHTTP2ReadIdleTimeoutSeconds); e != a {
+		t.Errorf("expected %d, got %d", e, a)
+	}
+
+	t.Setenv("HTTP2_READ_IDLE_TIMEOUT_SECONDS", "")
+	if e, a := 5, readIdleTimeoutSeconds(5); e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
 }
 
 func TestPingTimeoutSeconds(t *testing.T) {
 	t.Setenv("HTTP2_PING_TIMEOUT_SECONDS", "60")
-	if e, a := 60, pingTimeoutSeconds(); e != a {
+	if e, a := 60, pingTimeoutSeconds(defaultHTTP2PingTimeoutSeconds); e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
 
 	t.Setenv("HTTP2_PING_TIMEOUT_SECONDS", "illegal value")
-	if e, a := 15, pingTimeoutSeconds(); e != a {
+	if e, a := 15, pingTimeoutSeconds(defaultHTTP2PingTimeoutSeconds); e != a {
 		t.Errorf("expected %d, got %d", e, a)
+	}
+
+	t.Setenv("HTTP2_PING_TIMEOUT_SECONDS", "")
+	if e, a := 5, pingTimeoutSeconds(5); e != a {
+		t.Errorf("expected %d, got %d", e, a)
+	}
+}
+
+func TestOverrideTimeoutSeconds(t *testing.T) {
+	tests := []struct {
+		name           string
+		override       time.Duration
+		defaultSeconds int
+		want           int
+	}{
+		{name: "zero uses default", override: 0, defaultSeconds: 30, want: 30},
+		{name: "negative uses default", override: -5 * time.Second, defaultSeconds: 15, want: 15},
+		{name: "whole seconds", override: 5 * time.Second, defaultSeconds: 30, want: 5},
+		{name: "rounds to nearest second", override: 1500 * time.Millisecond, defaultSeconds: 30, want: 2},
+		{name: "rounds down", override: 1400 * time.Millisecond, defaultSeconds: 30, want: 1},
+		{name: "sub-second positive rounds to one second, never zero", override: 100 * time.Millisecond, defaultSeconds: 30, want: 1},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := overrideTimeoutSeconds(tc.override, tc.defaultSeconds); got != tc.want {
+				t.Errorf("overrideTimeoutSeconds(%s, %d) = %d, want %d", tc.override, tc.defaultSeconds, got, tc.want)
+			}
+		})
 	}
 }
 

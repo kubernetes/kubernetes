@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"net/url"
 	"sync/atomic"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/proxy"
@@ -42,6 +43,12 @@ import (
 
 const (
 	aggregatorComponent string = "aggregator"
+
+	// Aggregated apiservers are same-cluster backends, so drop broken HTTP/2
+	// connections within seconds instead of the client-go default ~45s.
+	// See https://github.com/kubernetes/kubernetes/issues/141318.
+	aggregatedAPIServerReadIdleTimeout = 5 * time.Second
+	aggregatedAPIServerPingTimeout     = 5 * time.Second
 )
 
 type certKeyFunc func() ([]byte, []byte)
@@ -225,6 +232,8 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIServ
 		x509MissingSANCounter,
 		x509InsecureSHA1Counter,
 	))
+	transportConfig.HTTP2ReadIdleTimeout = aggregatedAPIServerReadIdleTimeout
+	transportConfig.HTTP2PingTimeout = aggregatedAPIServerPingTimeout
 
 	newInfo := proxyHandlingInfo{
 		name:             apiService.Name,

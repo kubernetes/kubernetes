@@ -1320,3 +1320,35 @@ func backendKey() []byte { return readTestFile("server-key.pem") }
 func backendCaCertificate() []byte { return readTestFile("server-ca.pem") }
 
 func clientCaCrt() []byte { return readTestFile("client-ca.pem") }
+
+func TestUpdateAPIServiceSetsHTTP2Timeouts(t *testing.T) {
+	handler := &proxyHandler{
+		localDelegate:              http.NewServeMux(),
+		proxyCurrentCertKeyContent: func() ([]byte, []byte) { return emptyCert(), emptyCert() },
+	}
+
+	apiService := &apiregistration.APIService{
+		ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
+		Spec: apiregistration.APIServiceSpec{
+			Service: &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: ptr.To[int32](443)},
+			Group:   "foo",
+			Version: "v1",
+		},
+	}
+
+	handler.updateAPIService(apiService)
+
+	info, ok := handler.handlingInfo.Load().(proxyHandlingInfo)
+	if !ok {
+		t.Fatalf("expected handlingInfo to be set")
+	}
+	if info.transportConfig == nil {
+		t.Fatalf("expected a transport config to be built")
+	}
+	if got, want := info.transportConfig.HTTP2ReadIdleTimeout, aggregatedAPIServerReadIdleTimeout; got != want {
+		t.Errorf("HTTP2ReadIdleTimeout = %s, want %s", got, want)
+	}
+	if got, want := info.transportConfig.HTTP2PingTimeout, aggregatedAPIServerPingTimeout; got != want {
+		t.Errorf("HTTP2PingTimeout = %s, want %s", got, want)
+	}
+}

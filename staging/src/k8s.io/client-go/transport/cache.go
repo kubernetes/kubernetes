@@ -54,16 +54,18 @@ func newTLSCache() *tlsTransportCache {
 }
 
 type tlsCacheKey struct {
-	insecure           bool
-	caData             string
-	caFile             string
-	certData           string
-	keyData            string `datapolicy:"security-key"`
-	certFile           string
-	keyFile            string
-	serverName         string
-	nextProtos         string
-	disableCompression bool
+	insecure             bool
+	caData               string
+	caFile               string
+	certData             string
+	keyData              string `datapolicy:"security-key"`
+	certFile             string
+	keyFile              string
+	serverName           string
+	nextProtos           string
+	disableCompression   bool
+	http2ReadIdleTimeout time.Duration
+	http2PingTimeout     time.Duration
 	// these functions are wrapped to allow them to be used as map keys
 	getCert *GetCertHolder
 	dial    *DialHolder
@@ -74,8 +76,8 @@ func (t tlsCacheKey) String() string {
 	if len(t.keyData) > 0 {
 		keyText = "<redacted>"
 	}
-	return fmt.Sprintf("insecure:%v, caData:%#v, caFile:%s, certData:%#v, keyData:%s, serverName:%s, disableCompression:%t, getCert:%p, dial:%p",
-		t.insecure, t.caData, t.caFile, t.certData, keyText, t.serverName, t.disableCompression, t.getCert, t.dial)
+	return fmt.Sprintf("insecure:%v, caData:%#v, caFile:%s, certData:%#v, keyData:%s, serverName:%s, disableCompression:%t, http2ReadIdleTimeout:%s, http2PingTimeout:%s, getCert:%p, dial:%p",
+		t.insecure, t.caData, t.caFile, t.certData, keyText, t.serverName, t.disableCompression, t.http2ReadIdleTimeout, t.http2PingTimeout, t.getCert, t.dial)
 }
 
 func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
@@ -110,7 +112,8 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		return nil, err
 	}
 	// The options didn't require a custom TLS config
-	if tlsConfig == nil && config.DialHolder == nil && config.Proxy == nil {
+	if tlsConfig == nil && config.DialHolder == nil && config.Proxy == nil &&
+		config.HTTP2ReadIdleTimeout == 0 && config.HTTP2PingTimeout == 0 {
 		return http.DefaultTransport, nil
 	}
 
@@ -144,14 +147,14 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		proxy = config.Proxy
 	}
 
-	httpTransport := utilnet.SetTransportDefaults(&http.Transport{
+	httpTransport := utilnet.SetTransportDefaultsWithHTTP2Timeouts(&http.Transport{
 		Proxy:               proxy,
 		TLSHandshakeTimeout: 10 * time.Second,
 		TLSClientConfig:     tlsConfig,
 		MaxIdleConnsPerHost: idleConnsPerHost,
 		DialContext:         dial,
 		DisableCompression:  config.DisableCompression,
-	})
+	}, config.HTTP2ReadIdleTimeout, config.HTTP2PingTimeout)
 	var transport http.RoundTripper = httpTransport
 
 	if config.TLS.ReloadCAFiles && tlsConfig != nil && tlsConfig.RootCAs != nil && len(config.TLS.CAFile) > 0 {
@@ -262,12 +265,14 @@ func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
 	}
 
 	k := tlsCacheKey{
-		insecure:           c.TLS.Insecure,
-		serverName:         c.TLS.ServerName,
-		nextProtos:         strings.Join(c.TLS.NextProtos, ","),
-		disableCompression: c.DisableCompression,
-		getCert:            c.TLS.GetCertHolder,
-		dial:               c.DialHolder,
+		insecure:             c.TLS.Insecure,
+		serverName:           c.TLS.ServerName,
+		nextProtos:           strings.Join(c.TLS.NextProtos, ","),
+		disableCompression:   c.DisableCompression,
+		http2ReadIdleTimeout: c.HTTP2ReadIdleTimeout,
+		http2PingTimeout:     c.HTTP2PingTimeout,
+		getCert:              c.TLS.GetCertHolder,
+		dial:                 c.DialHolder,
 	}
 
 	if c.TLS.ReloadTLSFiles {
