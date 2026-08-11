@@ -894,7 +894,7 @@ const sg = ec2.SecurityGroup.fromLookupById(this, 'SecurityGroupLookup', 'sg-123
 ```
 
 The result of `SecurityGroup.fromLookupByName` and `SecurityGroup.fromLookupById` operations will be
-written to a file called `cdk.context.json`. 
+written to a file called `cdk.context.json`.
 You must commit this file to source control so that the lookup values are available in non-privileged
 environments such as CI build steps, and to ensure your template builds are repeatable.
 
@@ -983,7 +983,7 @@ examples of images you might want to use:
 > `cdk.context.json`, or use the `cdk context` command. For more information, see
 > [Runtime Context](https://docs.aws.amazon.com/cdk/latest/guide/context.html) in the CDK
 > developer guide.
-> 
+>
 > To customize the cache key, use the `additionalCacheKey` parameter.
 > This allows you to have multiple lookups with the same parameters
 > cache their values separately. This can be useful if you want to
@@ -2625,6 +2625,23 @@ To use [AWS Systems Manager parameters instead of AMI IDs](https://docs.aws.amaz
 const launchTemplate = new ec2.LaunchTemplate(this, 'LaunchTemplate', {
   machineImage: ec2.MachineImage.resolveSsmParameterAtLaunch('parameterName'),
 });
+```
+
+To specify the EBS Provisioned Rate for Volume Initialization for a snapshot-backed EBS volume in a launch template, use the `volumeInitializationRate` property. The snapshot can be specified explicitly with `BlockDeviceVolume.ebsFromSnapshot(...)` or inherited from the AMI block device mapping when overriding an existing AMI device such as the root volume.
+
+```ts
+const launchTemplate = new ec2.LaunchTemplate(this, 'LaunchTemplate', {
+  blockDevices: [
+    {
+      deviceName: 'deviceName',
+      volume: ec2.BlockDeviceVolume.ebsFromSnapshot('snap-1234567890abcdef0', {
+        volumeSize: 150,
+        volumeInitializationRate: Size.mebibytes(200),
+      }),
+    },
+  ],
+});
+
 ```
 
 ### Placement Group

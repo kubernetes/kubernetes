@@ -1,0 +1,336 @@
+{
+  "/launchtemplate-volume-initialization-rate-stack/LTWithVolumeInitRate": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "blockDevices": [
+          {
+            "deviceName": "*",
+            "volume": "*"
+          }
+        ]
+      }
+    }
+  ],
+  "/launchtemplate-volume-initialization-rate-stack/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/launchtemplate-volume-initialization-rate-stack/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/launchtemplate-volume-initialization-rate-stack/SnapshotProvider/Handler": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "runtime": "*",
+        "handler": "*",
+        "timeout": "*",
+        "entry": "*",
+        "code": "*"
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "runtime": "*",
+        "handler": "*",
+        "timeout": "*",
+        "entry": "*"
+      }
+    }
+  ],
+  "/launchtemplate-volume-initialization-rate-stack/SnapshotProvider/Resource": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": "*"
+    }
+  ],
+  "/launchtemplate-volume-initialization-rate-stack/LTWithVolumeInitRate/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "LTWithVolumeInitRate7F8BB1FD"
+    }
+  ],
+  "/launchtemplate-volume-initialization-rate-stack/SnapshotProvider/Handler/ServiceRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        },
+        "managedPolicies": [
+          {
+            "managedPolicyArn": "*"
+          }
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    }
+  ],
+  "/launchtemplate-volume-initialization-rate-stack/SnapshotProvider/Handler/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SnapshotProviderHandler36BDD770"
+    }
+  ],
+  "/launchtemplate-volume-initialization-rate-stack/SnapshotProvider/Handler/LogGroup": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "logGroupName": "*"
+      }
+    }
+  ],
+  "/launchtemplate-volume-initialization-rate-stack/SnapshotProvider/Provider/framework-onEvent": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "code": "*",
+        "description": "*",
+        "runtime": "*",
+        "handler": "*",
+        "timeout": "*",
+        "loggingFormat": "JSON",
+        "applicationLogLevelV2": "FATAL",
+        "logGroup": "*",
+        "vpc": "*",
+        "vpcSubnets": "*",
+        "securityGroups": "*",
+        "role": "*",
+        "functionName": "*",
+        "environmentEncryption": "*"
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addEnvironment": [
+          "*",
+          "*"
+        ]
+      }
+    }
+  ],
+  "/launchtemplate-volume-initialization-rate-stack/SnapshotProvider/Resource/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SnapshotProviderABC26AF9"
+    }
+  ],
+  "/launchtemplate-volume-initialization-rate-stack/SnapshotProvider/Handler/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SnapshotProviderHandlerServiceRoleFF00CA3B"
+    }
+  ],
+  "/launchtemplate-volume-initialization-rate-stack/SnapshotProvider/Handler/ServiceRole/DefaultPolicy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/launchtemplate-volume-initialization-rate-stack/SnapshotProvider/Handler/Code/AssetBucket": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/launchtemplate-volume-initialization-rate-stack/SnapshotProvider/Handler/LogGroup/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SnapshotProviderHandlerLogGroupCA728552"
+    }
+  ],
+  "/launchtemplate-volume-initialization-rate-stack/SnapshotProvider/Provider/framework-onEvent/ServiceRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        },
+        "managedPolicies": [
+          {
+            "managedPolicyArn": "*"
+          }
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/launchtemplate-volume-initialization-rate-stack/SnapshotProvider/Provider/framework-onEvent/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SnapshotProviderframeworkonEvent9E28A114"
+    }
+  ],
+  "/launchtemplate-volume-initialization-rate-stack/SnapshotProvider/Provider/framework-onEvent/LogGroup": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "logGroupName": "*"
+      }
+    }
+  ],
+  "/launchtemplate-volume-initialization-rate-stack/SnapshotProvider/Handler/ServiceRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SnapshotProviderHandlerServiceRoleDefaultPolicy9829E406"
+    }
+  ],
+  "/launchtemplate-volume-initialization-rate-stack/SnapshotProvider/Provider/framework-onEvent/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SnapshotProviderframeworkonEventServiceRoleBC575D66"
+    }
+  ],
+  "/launchtemplate-volume-initialization-rate-stack/SnapshotProvider/Provider/framework-onEvent/ServiceRole/DefaultPolicy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/launchtemplate-volume-initialization-rate-stack/SnapshotProvider/Provider/framework-onEvent/Code/AssetBucket": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/launchtemplate-volume-initialization-rate-stack/SnapshotProvider/Provider/framework-onEvent/LogGroup/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SnapshotProviderframeworkonEventLogGroupC20E42B4"
+    }
+  ],
+  "/launchtemplate-volume-initialization-rate-stack/SnapshotProvider/Provider/framework-onEvent/ServiceRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SnapshotProviderframeworkonEventServiceRoleDefaultPolicy93F4DFCE"
+    }
+  ]
+}

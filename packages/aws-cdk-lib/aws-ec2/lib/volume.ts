@@ -104,6 +104,18 @@ export interface EbsDeviceOptionsBase {
    * @default - 125 MiB/s.
    */
   readonly throughput?: number;
+
+  /**
+   * The Amazon EBS Provisioned Rate for Volume Initialization, at which to download
+   * the snapshot blocks from Amazon S3 to the volume.
+   *
+   * Valid range is between 100 and 300 MiB/s.
+   * This parameter is supported only for volumes created from snapshots.
+   *
+   * @see https://docs.aws.amazon.com/ebs/latest/userguide/initalize-volume.html#volume-initialization-rate
+   * @default undefined - The volume initialization rate is not set.
+   */
+  readonly volumeInitializationRate?: Size;
 }
 
 /**
