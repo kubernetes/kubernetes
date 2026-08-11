@@ -50,31 +50,33 @@ func scaledValue(unscaled *big.Int, scale, newScale int64) (int64, bool) {
 	// 10^log10MaxInt64 is the first power of ten that exceeds maxint.
 	const log10MaxInt64 = 19
 
-	// Scale up: multiply by 10^(-dif). Zero stays zero, and once -dif reaches
+	// Scale up: multiply by 10^(-dif). Zero stays zero; once -dif reaches
 	// log10MaxInt64 the power alone exceeds maxint, so any nonzero value
-	// overflows; saturate there instead of materializing an enormous power (an
-	// extreme scale can drive -dif into the billions).
+	// overflows. Below that an int64 coefficient scales on the int64 path and a
+	// larger one already cannot fit, so no big.Int is built here.
 	if dif < 0 {
 		if unscaled.Sign() == 0 {
 			return 0, true
 		}
-		if -dif >= log10MaxInt64 {
+		// dif <= -log10MaxInt64 rather than -dif >= log10MaxInt64 keeps an
+		// extreme (near MinInt64) dif from being negated before it is bounded.
+		if dif <= -log10MaxInt64 {
 			if unscaled.Sign() < 0 {
 				return mostNegative, false
 			}
 			return mostPositive, false
 		}
-		exp := intPool.Get().(*big.Int)
-		pow := intPool.Get().(*big.Int)
-		scaled := intPool.Get().(*big.Int)
-		defer func() {
-			intPool.Put(exp)
-			intPool.Put(pow)
-			intPool.Put(scaled)
-		}()
-		pow.Exp(bigTen, exp.SetInt64(-dif), nil)
-		scaled.Mul(unscaled, pow)
-		return bigToInt64Saturated(scaled)
+		// A coefficient already outside int64 only grows when multiplied by a
+		// positive power of ten, so it stays out of range.
+		if !unscaled.IsInt64() {
+			if unscaled.Sign() < 0 {
+				return mostNegative, false
+			}
+			return mostPositive, false
+		}
+		// -dif is below log10MaxInt64 and the coefficient fits int64, so scale it
+		// on the int64 path without allocating a big.Int.
+		return positiveScaleInt64(unscaled.Int64(), Scale(-dif))
 	}
 
 	// Scale down: divide by 10^dif, rounding the quotient away from zero.
