@@ -66,7 +66,7 @@
      {
       "NetworkOutput": {
        "IpAddress": "192.168.1.100",
-       "Name": "bridge-network-output",
+       "Name": "bridge_network_output",
        "NetworkName": "network-1",
        "Port": 5000,
        "Protocol": "rtp",

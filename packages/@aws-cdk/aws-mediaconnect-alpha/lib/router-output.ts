@@ -926,8 +926,8 @@ export class RouterOutput extends RouterOutputBase implements IRouterOutput {
       if (props.routerOutputName.length > 128) {
         throw new ValidationError(lit`RouterOutputNameLength`, `Router output name must be between 1 and 128 characters, got ${props.routerOutputName.length}`, this);
       }
-      if (!/^[a-zA-Z0-9-]+$/.test(props.routerOutputName)) {
-        throw new ValidationError(lit`RouterOutputNameFormat`, `Router output name must contain only alphanumeric characters and hyphens, got '${props.routerOutputName}'`, this);
+      if (!/^[a-zA-Z0-9_-]+$/.test(props.routerOutputName)) {
+        throw new ValidationError(lit`RouterOutputNameFormat`, `Router output name must contain only alphanumeric characters, hyphens, and underscores, got '${props.routerOutputName}'`, this);
       }
     }
 

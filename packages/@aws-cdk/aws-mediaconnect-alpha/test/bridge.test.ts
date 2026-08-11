@@ -174,7 +174,7 @@ test('Bridge name validation - invalid characters', () => {
         networkOutputs: [],
       }),
     });
-  }).toThrow('Bridge name must contain only alphanumeric characters and hyphens');
+  }).toThrow('Bridge name must contain only alphanumeric characters, hyphens, and underscores');
 });
 
 test('Bridge name validation - valid name', () => {

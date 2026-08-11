@@ -16,7 +16,7 @@
           },
           "violatingConstructs": [
             {
-              "constructPath": "cdk-integ-emx-router-output/DefaultTest/DeployAssert",
+              "constructPath": "cdk-integ-emx-router-network-interface/DefaultTest/DeployAssert",
               "constructFqn": "constructs.Construct",
               "libraryVersion": "10.6.0"
             }

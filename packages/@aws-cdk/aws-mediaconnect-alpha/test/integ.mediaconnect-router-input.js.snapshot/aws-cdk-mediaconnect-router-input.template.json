@@ -39,7 +39,7 @@
      "Default": {}
     },
     "MaximumBitrate": 10000000,
-    "Name": "test",
+    "Name": "test_input",
     "RegionName": {
      "Ref": "AWS::Region"
     },

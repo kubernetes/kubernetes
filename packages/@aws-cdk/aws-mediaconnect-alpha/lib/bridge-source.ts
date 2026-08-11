@@ -124,8 +124,8 @@ export class BridgeSource extends Resource implements IBridgeSource {
       if (props.bridgeSourceName.length > 64) {
         throw new ValidationError(lit`BridgeSourceNameLength`, `Bridge source name must be between 1 and 64 characters, got ${props.bridgeSourceName.length}`, this);
       }
-      if (!/^[a-zA-Z0-9-]+$/.test(props.bridgeSourceName)) {
-        throw new ValidationError(lit`BridgeSourceNameFormat`, `Bridge source name must contain only alphanumeric characters and hyphens, got '${props.bridgeSourceName}'`, this);
+      if (!/^[a-zA-Z0-9_-]+$/.test(props.bridgeSourceName)) {
+        throw new ValidationError(lit`BridgeSourceNameFormat`, `Bridge source name must contain only alphanumeric characters, hyphens, and underscores, got '${props.bridgeSourceName}'`, this);
       }
     }
 

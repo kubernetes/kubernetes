@@ -40,7 +40,7 @@
      "Default": {}
     },
     "MaximumBitrate": 10000000,
-    "Name": "test-rtp-output",
+    "Name": "test_rtp_output",
     "RegionName": {
      "Ref": "AWS::Region"
     },

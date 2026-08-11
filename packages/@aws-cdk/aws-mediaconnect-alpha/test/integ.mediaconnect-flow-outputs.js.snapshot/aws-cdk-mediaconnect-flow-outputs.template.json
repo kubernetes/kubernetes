@@ -352,7 +352,7 @@
   "FlowA74D6E88": {
    "Type": "AWS::MediaConnect::Flow",
    "Properties": {
-    "Name": "outputs-integ-flow",
+    "Name": "outputs_integ_flow",
     "Source": {
      "IngestPort": 5000,
      "Name": "ingest",
