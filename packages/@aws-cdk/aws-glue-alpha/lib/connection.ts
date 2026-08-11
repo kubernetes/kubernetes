@@ -5,6 +5,7 @@ import { memoizedGetter } from 'aws-cdk-lib/core/lib/helpers-internal';
 import { addConstructMetadata, MethodMetadata } from 'aws-cdk-lib/core/lib/metadata-resource';
 import { propertyInjectable } from 'aws-cdk-lib/core/lib/prop-injectable';
 import type * as constructs from 'constructs';
+import { warnOnPlaintextSecrets } from './private/secret-detection';
 
 /**
  * The type of the glue connection
@@ -373,7 +374,19 @@ export class Connection extends cdk.Resource implements IConnection {
     this.resource = new CfnConnection(this, 'Resource', {
       catalogId: cdk.Stack.of(this).account,
       connectionInput: {
-        connectionProperties: cdk.Lazy.any({ produce: () => Object.keys(this.properties).length > 0 ? this.properties : undefined }),
+        connectionProperties: cdk.Lazy.any({
+          produce: () => {
+            // Inspect the final property set at synthesis time so properties
+            // added via `addProperty` are covered as well.
+            warnOnPlaintextSecrets(
+              this,
+              this.properties,
+              '@aws-cdk/aws-glue-alpha:plaintextConnectionSecret',
+              'Reference a Secrets Manager secret through the connection\'s `SECRET_ID` property instead.',
+            );
+            return Object.keys(this.properties).length > 0 ? this.properties : undefined;
+          },
+        }),
         connectionType: props.type.name,
         description: props.description,
         matchCriteria: props.matchCriteria,
