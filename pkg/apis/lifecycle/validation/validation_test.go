@@ -440,7 +440,7 @@ func TestValidateEvictionStatusUpdate(t *testing.T) {
 		},
 		// Full Eviction progression/lifecycle
 		"mark active and started": {
-			oldInput: mkValidEvictionStatus(2),
+			oldInput: mkValidEvictionStatus(0),
 			input: mkValidEvictionStatus(2,
 				setStateFor(lifecycle.ResponderStateActive, 0),
 				setRespondersStartTime(clock, 0, 1)),
