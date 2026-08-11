@@ -684,7 +684,7 @@ func TestRealFIFO_ReplaceMakesDeletions(t *testing.T) {
 		}
 	}
 
-	// Now try syncing it first to ensure the delete use the latest version
+	// Now try syncing it first to ensure the delete uses the latest version
 	f = NewRealFIFO(
 		testFifoObjectKeyFunc,
 		literalListerGetter(func() []testFifoObject {
@@ -770,7 +770,7 @@ func TestRealFIFO_ReplaceMakesDeletionsReplaced(t *testing.T) {
 	}
 }
 
-// ATTENTION: difference with delta_fifo_test, the previous value was hardcoded as use "Replace" so I've eliminated the option to set it differently
+// ATTENTION: difference with delta_fifo_test, the previous value was hardcoded to use "Replace" so I've eliminated the option to set it differently
 //func TestRealFIFO_ReplaceDeltaType(t *testing.T) {
 
 func TestRealFIFO_UpdateResyncRace(t *testing.T) {
@@ -961,7 +961,7 @@ func TestRealFIFO_HasSynced(t *testing.T) {
 			action(f)
 		}
 		if e, a := test.expectedSynced, f.HasSynced(); a != e {
-			t.Errorf("test case %v failed, expected: %v , got %v", i, e, a)
+			t.Errorf("test case %v failed, expected: %v, got %v", i, e, a)
 		}
 	}
 }
@@ -1210,8 +1210,8 @@ func TestRealFIFO_PopMultipleDeltaInBatch(t *testing.T) {
 func TestRealFIFO_PopBrokenItemsInBatch(t *testing.T) {
 	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.InOrderInformersBatchProcess, true)
 	const unlimitedBatchSize = 999999
-	sucessObj1 := mkFifoObj("foo1", 5)
-	sucessObj2 := mkFifoObj("foo2", 5)
+	successObj1 := mkFifoObj("foo1", 5)
+	successObj2 := mkFifoObj("foo2", 5)
 	failObj3 := mkFifoObj("foo3", 5)
 	failObj4 := mkFifoObj("foo4", 5)
 	testDeltaType := Added
@@ -1233,30 +1233,30 @@ func TestRealFIFO_PopBrokenItemsInBatch(t *testing.T) {
 		{
 			name: "nth item is broken",
 			incomingItems: []testFifoObject{
-				sucessObj1, sucessObj2, failObj3,
+				successObj1, successObj2, failObj3,
 			},
 			expectedBatches: [][]Delta{
-				{{testDeltaType, sucessObj1}, {testDeltaType, sucessObj2}, {testDeltaType, failObj3}},
+				{{testDeltaType, successObj1}, {testDeltaType, successObj2}, {testDeltaType, failObj3}},
 			},
 		},
 		{
 			name: "multiple nth items are broken",
 			incomingItems: []testFifoObject{
-				sucessObj1, sucessObj2, failObj3, failObj4,
+				successObj1, successObj2, failObj3, failObj4,
 			},
 			expectedBatches: [][]Delta{
-				{{testDeltaType, sucessObj1}, {testDeltaType, sucessObj2}, {testDeltaType, failObj3}},
+				{{testDeltaType, successObj1}, {testDeltaType, successObj2}, {testDeltaType, failObj3}},
 				{{testDeltaType, failObj4}},
 			},
 		},
 		{
 			name: "mixed 1st and nth items are broken",
 			incomingItems: []testFifoObject{
-				failObj3, sucessObj1, failObj4,
+				failObj3, successObj1, failObj4,
 			},
 			expectedBatches: [][]Delta{
 				{{testDeltaType, failObj3}},
-				{{testDeltaType, sucessObj1}, {testDeltaType, failObj4}},
+				{{testDeltaType, successObj1}, {testDeltaType, failObj4}},
 			},
 		},
 	}
@@ -1505,7 +1505,7 @@ func TestRealFIFO_ResyncAtomic(t *testing.T) {
 			actualDeltasWithKnownObjects := popN(f, len(f.getItems()))
 			actualAsDeltas := collapseDeltas(actualDeltasWithKnownObjects)
 
-			// Resync appends to the list, so we enable checking preserving the order
+			// Resync appends to the list, so we enable checking that the order is preserved
 			if !reflect.DeepEqual(tt.expectedDeltas, actualAsDeltas) {
 				t.Errorf("expected %#v, got %#v", tt.expectedDeltas, actualAsDeltas)
 			}
