@@ -37,6 +37,10 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-base/metrics/legacyregistry"
+	metricstestutil "k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/controller/tainteviction/metrics"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 )
 
@@ -1001,4 +1005,38 @@ func TestPodDeletionEvent(t *testing.T) {
 			t.Errorf("emitPodDeletionEvent() returned data (-want,+got):\n%s", diff)
 		}
 	})
+}
+
+// The histogram is documented and bucketed in seconds, so the handler must
+// observe seconds rather than a raw Duration scaled by time.Second.
+func TestDeletePodHandlerObservesLatencyInSeconds(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	metrics.Register() // the histogram is only instantiated once registered
+	pod := testutil.NewPod("pod1", "node1")
+	fakeClientset := fake.NewSimpleClientset(pod)
+
+	before := podDeletionLatencySum(t)
+
+	fireAt := time.Now().Add(-2 * time.Second)
+	handler := deletePodHandler(fakeClientset, nil, "test")
+	if err := handler(ctx, fireAt, NewWorkArgs(pod.Name, pod.Namespace)); err != nil {
+		t.Fatalf("deletePodHandler: %v", err)
+	}
+
+	// The observation is a wall-clock delta of ~2s. Allow generous slack for a
+	// slow machine while staying far below the nanosecond-scaled value the bug
+	// produced (~2e18).
+	if observed := podDeletionLatencySum(t) - before; observed < 1 || observed > 60 {
+		t.Errorf("observed pod deletion latency = %v seconds, want a value near 2", observed)
+	}
+}
+
+func podDeletionLatencySum(t *testing.T) float64 {
+	t.Helper()
+	vec, err := metricstestutil.GetHistogramVecFromGatherer(legacyregistry.DefaultGatherer,
+		"taint_eviction_controller_pod_deletion_duration_seconds", map[string]string{})
+	if err != nil {
+		t.Fatalf("gather pod deletion latency: %v", err)
+	}
+	return vec.GetAggregatedSampleSum()
 }
