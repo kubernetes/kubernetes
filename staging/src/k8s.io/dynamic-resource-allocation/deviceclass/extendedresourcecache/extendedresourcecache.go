@@ -48,6 +48,13 @@ type ExtendedResourceCache struct {
 	resourceName2class map[v1.ResourceName]*resourceapi.DeviceClass
 	// class2ResourceName maps device class name to extended resource name
 	class2ResourceName map[string]string
+
+	// testHook is invoked between the forward and reverse mapping updates of
+	// updateMappings, while the write lock is held. Tests use it to suspend
+	// an event mid-flight and verify that readers cannot observe a partial
+	// update. It must not call any method on the cache, because that would
+	// deadlock while the write lock is held. Nil except in tests.
+	testHook func()
 }
 
 var _ cache.ResourceEventHandler = &ExtendedResourceCache{}
@@ -113,8 +120,7 @@ func (c *ExtendedResourceCache) OnAdd(obj interface{}, isInInitialList bool) {
 		return
 	}
 	c.logger.V(5).Info("DeviceClass added", "deviceClass", klog.KObj(deviceClass))
-	c.updateResourceName2class(deviceClass, nil)
-	c.updateClass2ResourceName(deviceClass)
+	c.updateMappings(deviceClass, nil)
 
 	for _, handler := range c.handlers {
 		handler.OnAdd(obj, isInInitialList)
@@ -134,8 +140,7 @@ func (c *ExtendedResourceCache) OnUpdate(oldObj, newObj interface{}) {
 		return
 	}
 	c.logger.V(5).Info("DeviceClass updated", "deviceClass", klog.KObj(deviceClass))
-	c.updateResourceName2class(deviceClass, oldDeviceClass)
-	c.updateClass2ResourceName(deviceClass)
+	c.updateMappings(deviceClass, oldDeviceClass)
 
 	for _, handler := range c.handlers {
 		handler.OnUpdate(oldObj, newObj)
@@ -162,8 +167,7 @@ func (c *ExtendedResourceCache) OnDelete(obj interface{}) {
 		return
 	}
 	c.logger.V(5).Info("DeviceClass deleted", "deviceClass", className)
-	c.removeResourceName2class(className)
-	c.removeClass2ResourceName(className)
+	c.removeMappings(className)
 
 	for _, handler := range c.handlers {
 		handler.OnDelete(obj)
@@ -184,6 +188,32 @@ func betterDeviceClass(a, b *resourceapi.DeviceClass) bool {
 	return a.Name < b.Name
 }
 
+// updateMappings updates the forward and reverse mappings for one device
+// class event under a single write lock. Readers therefore never observe the
+// two maps in a state where only one of them reflects the event. Handlers
+// must be invoked by the caller after this returns.
+func (c *ExtendedResourceCache) updateMappings(newDeviceClass, oldDeviceClass *resourceapi.DeviceClass) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	c.updateResourceName2class(newDeviceClass, oldDeviceClass)
+	if c.testHook != nil {
+		c.testHook()
+	}
+	c.updateClass2ResourceName(newDeviceClass)
+}
+
+// removeMappings removes the forward and reverse mappings for one device
+// class under a single write lock, for the same atomicity reason as
+// updateMappings. Handlers must be invoked by the caller after this returns.
+func (c *ExtendedResourceCache) removeMappings(className string) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	c.removeResourceName2class(className)
+	c.removeClass2ResourceName(className)
+}
+
 // updateResourceName2class updates the cache with the device class mapping.
 // It first removes any existing mappings for this device class to handle
 // ExtendedResourceName changes, then adds the new mappings.
@@ -197,10 +227,9 @@ func betterDeviceClass(a, b *resourceapi.DeviceClass) bool {
 // (it cannot appear in a different class as ExtendedResourceName, prevented
 // by validation), so it is registered independently of the explicit name
 // arbitration.
+//
+// Must be called with c.mutex held.
 func (c *ExtendedResourceCache) updateResourceName2class(newDeviceClass, oldDeviceClass *resourceapi.DeviceClass) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
 	// Drop this class from the candidates of all explicit names, not just
 	// the one in the old object, because the old object's
 	// ExtendedResourceName may be stale.
@@ -260,10 +289,8 @@ func (c *ExtendedResourceCache) recomputeWinner(explicitName string) {
 }
 
 // updateClass2ResourceName updates the cache with the device class mapping.
+// Must be called with c.mutex held.
 func (c *ExtendedResourceCache) updateClass2ResourceName(deviceClass *resourceapi.DeviceClass) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
 	if deviceClass.Spec.ExtendedResourceName == nil {
 		delete(c.class2ResourceName, deviceClass.Name)
 		return
@@ -277,10 +304,9 @@ func (c *ExtendedResourceCache) updateClass2ResourceName(deviceClass *resourceap
 // The class is dropped from the candidates of all explicit names, because the
 // ExtendedResourceName in the deleted object may be stale, and the next best
 // candidate is promoted, if any.
+//
+// Must be called with c.mutex held.
 func (c *ExtendedResourceCache) removeResourceName2class(className string) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
 	// The default mapping is unique to the class and cannot be shared.
 	delete(c.resourceName2class, v1.ResourceName(resourceapi.ResourceDeviceClassPrefix+className))
 
@@ -303,10 +329,8 @@ func (c *ExtendedResourceCache) removeResourceName2class(className string) {
 }
 
 // removeClass2ResourceName removes the device class mapping from the cache.
+// Must be called with c.mutex held.
 func (c *ExtendedResourceCache) removeClass2ResourceName(className string) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
 	delete(c.class2ResourceName, className)
 	c.logger.V(5).Info("Removed device class", "deviceClass", className)
 }

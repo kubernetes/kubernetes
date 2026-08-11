@@ -392,6 +392,59 @@ func newDeviceClass(name, explicitName string, created time.Time) *resourceapi.D
 	return class
 }
 
+func TestReadersCannotObservePartialUpdate(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	cache := NewExtendedResourceCache(logger)
+
+	class := newDeviceClass("class-a", "example.com/gpu", time.Unix(100, 0))
+	cache.OnAdd(class, false)
+
+	renamed := class.DeepCopy()
+	renamed.Spec.ExtendedResourceName = new(string)
+	*renamed.Spec.ExtendedResourceName = "my.com/gpu"
+
+	// Suspend the update right between the forward and reverse mapping
+	// updates, then check that readers still observe a consistent state.
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	cache.testHook = func() {
+		close(entered)
+		<-release
+	}
+
+	updateDone := make(chan struct{})
+	go func() {
+		cache.OnUpdate(class, renamed)
+		close(updateDone)
+	}()
+
+	<-entered
+	// The forward mapping was updated already, the reverse mapping is not
+	// yet. A reader starting now must not observe anything until the whole
+	// event has been applied.
+	read := make(chan string, 1)
+	go func() {
+		read <- cache.GetExtendedResource("class-a")
+	}()
+	select {
+	case name := <-read:
+		close(release)
+		t.Fatalf("reader observed the reverse mapping while the update was in flight: %q", name)
+	case <-time.After(time.Second):
+	}
+	close(release)
+	<-updateDone
+	if name := <-read; name != "my.com/gpu" {
+		t.Errorf("expected the reverse mapping to be updated atomically with the forward mapping, got %q", name)
+	}
+	if got := cache.GetDeviceClass("my.com/gpu"); got != renamed {
+		t.Errorf("expected the new explicit mapping to be visible, got %v", got)
+	}
+	if got := cache.GetDeviceClass("example.com/gpu"); got != nil {
+		t.Errorf("expected the old explicit mapping to be removed, got %v", got)
+	}
+}
+
 func TestSameClassUpdateReplacesStaleObject(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	cache := NewExtendedResourceCache(logger)
@@ -411,6 +464,9 @@ func TestSameClassUpdateReplacesStaleObject(t *testing.T) {
 	}
 	if got := cache.GetDeviceClass("deviceclass.resource.kubernetes.io/class-a"); got != updated {
 		t.Errorf("expected default mapping to point at the updated object, got %v", got)
+	}
+	if got := cache.GetExtendedResource("class-a"); got != "example.com/gpu" {
+		t.Errorf("expected the reverse mapping to be preserved, got %q", got)
 	}
 }
 
@@ -455,6 +511,9 @@ func TestCollisionLoserDeleteKeepsWinner(t *testing.T) {
 	if got := cache.GetDeviceClass("deviceclass.resource.kubernetes.io/class-loser"); got != nil {
 		t.Errorf("expected the loser's default mapping to be removed, got %v", got)
 	}
+	if got := cache.GetExtendedResource("class-loser"); got != "" {
+		t.Errorf("expected the loser's reverse mapping to be removed, got %q", got)
+	}
 }
 
 func TestCollisionWinnerDeletePromotesRunnerUp(t *testing.T) {
@@ -478,6 +537,9 @@ func TestCollisionWinnerDeletePromotesRunnerUp(t *testing.T) {
 	}
 	if got := cache.GetDeviceClass("deviceclass.resource.kubernetes.io/class-newer"); got != nil {
 		t.Errorf("expected the winner's default mapping to be removed, got %v", got)
+	}
+	if got := cache.GetExtendedResource("class-newer"); got != "" {
+		t.Errorf("expected the winner's reverse mapping to be removed, got %q", got)
 	}
 }
 
@@ -505,6 +567,9 @@ func TestCollisionWinnerRenamePromotesRunnerUp(t *testing.T) {
 	if got := cache.GetDeviceClass("deviceclass.resource.kubernetes.io/class-newer"); got != renamed {
 		t.Errorf("expected the renamed class's default mapping to be updated, got %v", got)
 	}
+	if got := cache.GetExtendedResource("class-newer"); got != "new.example.com/gpu" {
+		t.Errorf("expected the renamed class's reverse mapping to be updated, got %q", got)
+	}
 }
 
 func TestCollisionLoserRenameKeepsWinner(t *testing.T) {
@@ -531,6 +596,9 @@ func TestCollisionLoserRenameKeepsWinner(t *testing.T) {
 	}
 	if got := cache.GetDeviceClass("deviceclass.resource.kubernetes.io/class-loser"); got != renamed {
 		t.Errorf("expected the renamed class's default mapping to be updated, got %v", got)
+	}
+	if got := cache.GetExtendedResource("class-loser"); got != "new.example.com/gpu" {
+		t.Errorf("expected the renamed loser's reverse mapping to be updated, got %q", got)
 	}
 }
 
@@ -608,6 +676,9 @@ func TestCollisionEqualTimestampTieBreak(t *testing.T) {
 	}
 	if got := cache.GetDeviceClass("new.example.com/gpu"); got != renamed {
 		t.Errorf("expected the renamed class to own its new name, got %v", got)
+	}
+	if got := cache.GetExtendedResource("class-a"); got != "new.example.com/gpu" {
+		t.Errorf("expected the renamed class's reverse mapping to be updated, got %q", got)
 	}
 }
 
