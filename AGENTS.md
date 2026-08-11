@@ -332,7 +332,7 @@ Required for: new CFN resource types, new CFN properties, cross-service integrat
 
 - Module scope optional for repo-wide changes: `chore: update dependencies`
 - Lowercase, no period at end
-- `feat` and `fix` PRs MUST reference an issue: `fixes #<issue>` or `closes #<issue>`
+- You SHOULD reference an issue in every `feat` and `fix` PR: `fixes #<issue>` or `closes #<issue>`. A PR with no linked issue is routed to a lower-priority review queue, so link one to keep the PR in the normal queue. If no issue exists, open one before raising the PR.
 - `feat()` PRs require unit tests, integration snapshots, and README updates
 - Breaking changes are only allowed in `-alpha` libraries. Declare with `BREAKING CHANGE:` in the PR body before the `---` line
 - One concern per PR — submit cosmetic changes separately
