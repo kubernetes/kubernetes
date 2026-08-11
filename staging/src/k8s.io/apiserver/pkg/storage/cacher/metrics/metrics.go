@@ -230,6 +230,20 @@ var (
 			Buckets:        []float64{0.005, 0.025, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3},
 		}, []string{"group", "resource"})
 
+	// WatchersBlockedOnResult complements the StageCacheToWatcher histogram,
+	// which can only report a wait once it has ended. A watcher wedged
+	// indefinitely is visible here and in no histogram.
+	WatchersBlockedOnResult = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "watchers_blocked_on_result",
+			Help:           "Number of watchers currently blocked handing an event to the watch serve loop, i.e. whose serve loop is not consuming right now.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+
 	ConsistentReadTotal = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Namespace:      namespace,
@@ -299,6 +313,7 @@ func Register() {
 		legacyregistry.MustRegister(WatchCacheInitializationErrors)
 		legacyregistry.MustRegister(WatchCacheInitializationDuration)
 		legacyregistry.MustRegister(WatchCacheReadWait)
+		legacyregistry.MustRegister(WatchersBlockedOnResult)
 		legacyregistry.MustRegister(ConsistentReadTotal)
 		legacyregistry.MustRegister(StorageConsistencyCheckTotal)
 		if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {

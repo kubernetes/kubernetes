@@ -221,15 +221,19 @@ type WatchListCompleteHook func()
 // It is thread-safe, as long as underlying io.Writer is thread-safe.
 // Once all Write calls for a given watch event have finished, RecordEvent must be called.
 type watchEventMetricsRecorder struct {
-	writer      io.Writer
-	countMetric compbasemetrics.CounterMetric
-	sizeMetric  compbasemetrics.ObserverMetric
-	byteCount   atomic.Int64
+	writer              io.Writer
+	countMetric         compbasemetrics.CounterMetric
+	sizeMetric          compbasemetrics.ObserverMetric
+	writeDurationMetric compbasemetrics.ObserverMetric
+	byteCount           atomic.Int64
+	writeDurationNanos  atomic.Int64
 }
 
 // Write implements io.Writer.
 func (c *watchEventMetricsRecorder) Write(p []byte) (n int, err error) {
+	start := time.Now()
 	n, err = c.writer.Write(p)
+	c.writeDurationNanos.Add(int64(time.Since(start)))
 	c.byteCount.Add(int64(n))
 	return
 }
@@ -238,6 +242,15 @@ func (c *watchEventMetricsRecorder) Write(p []byte) (n int, err error) {
 func (c *watchEventMetricsRecorder) RecordEvent() {
 	c.countMetric.Inc()
 	c.sizeMetric.Observe(float64(c.byteCount.Swap(0)))
+	c.RecordWriteDuration()
+}
+
+// RecordWriteDuration reports only the time spent writing, and must be called
+// even when the event failed to encode. A write that blocks and then fails is
+// the signature of a client that stopped reading, so dropping it would make the
+// stall look like it happened during serialization instead.
+func (c *watchEventMetricsRecorder) RecordWriteDuration() {
+	c.writeDurationMetric.Observe(time.Duration(c.writeDurationNanos.Swap(0)).Seconds())
 }
 
 // watchGzipPool is a no-op until the first Get call (https://pkg.go.dev/sync#Pool.Get).
@@ -410,9 +423,18 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	gvr := s.Scope.Resource
 
 	recorder := &watchEventMetricsRecorder{
-		writer:      framer,
-		countMetric: metrics.WatchEvents.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource),
-		sizeMetric:  metrics.WatchEventsSizes.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource),
+		writer:              framer,
+		countMetric:         metrics.WatchEvents.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource),
+		sizeMetric:          metrics.WatchEventsSizes.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource),
+		writeDurationMetric: metrics.WatchEventWriteDuration.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource),
+	}
+	encodeDurationMetric := metrics.WatchEventEncodeDuration.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource)
+	flushDurationMetric := metrics.WatchEventFlushDuration.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource)
+	timedFlush := func() error {
+		start := time.Now()
+		err := rw.Flush()
+		flushDurationMetric.Observe(time.Since(start).Seconds())
+		return err
 	}
 
 	watchEncoder := newWatchEncoder(req.Context(), gvr, s.EmbeddedEncoder, s.Encoder, recorder)
@@ -442,7 +464,11 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 			isWatchListLatencyRecordingRequired := shouldRecordWatchListLatency(req.Context(), event)
 
-			if err := watchEncoder.Encode(event); err != nil {
+			encodeStart := time.Now()
+			err := watchEncoder.Encode(event)
+			encodeDurationMetric.Observe(time.Since(encodeStart).Seconds())
+			if err != nil {
+				recorder.RecordWriteDuration()
 				utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to encode watch event")
 				// client disconnect.
 				return
@@ -450,7 +476,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 			recorder.RecordEvent()
 
 			if len(ch) == 0 {
-				if err := rw.Flush(); err != nil {
+				if err := timedFlush(); err != nil {
 					utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to flush watch response")
 					return
 				}
@@ -471,7 +497,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 					s.watchListCompleteHook()
 				}
 				// release the gzip writer back to the pool so idle watches don't hold gzip state.
-				if err := rw.Flush(); err != nil {
+				if err := timedFlush(); err != nil {
 					utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to flush watch response after initial events")
 					return
 				}

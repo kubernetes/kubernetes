@@ -171,6 +171,41 @@ var (
 		},
 		[]string{"group", "version", "resource"},
 	)
+	// The three histograms below decompose the per-event cost of the watch serve
+	// loop. WatchEventEncodeDuration covers the whole of watchEncoder.Encode, so
+	// the time spent serializing an event (including waiting for another watcher
+	// to finish the shared serialization of a CachingObject) is
+	// WatchEventEncodeDuration minus WatchEventWriteDuration.
+	WatchEventEncodeDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Subsystem:      APIServerComponent,
+			Name:           "watch_event_encode_duration_seconds",
+			Help:           "Time the watch serve loop spent encoding a single watch event, including the writes it issues to the response writer.",
+			Buckets:        []float64{0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 10},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "version", "resource"},
+	)
+	WatchEventWriteDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Subsystem:      APIServerComponent,
+			Name:           "watch_event_write_duration_seconds",
+			Help:           "Time the watch serve loop spent inside the response writer chain (framer, optional gzip, HTTP transport) for a single watch event.",
+			Buckets:        []float64{0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 10},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "version", "resource"},
+	)
+	WatchEventFlushDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Subsystem:      APIServerComponent,
+			Name:           "watch_event_flush_duration_seconds",
+			Help:           "Time the watch serve loop spent flushing buffered watch events to the client. For HTTP/2 this is where a stream or connection flow control stall becomes visible.",
+			Buckets:        []float64{0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 10},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "version", "resource"},
+	)
 	// Because of volatility of the base metric this is pre-aggregated one. Instead of reporting current usage all the time
 	// it reports maximal usage during the last second.
 	currentInflightRequests = compbasemetrics.NewGaugeVec(
@@ -294,6 +329,9 @@ var (
 		TLSHandshakeErrors,
 		WatchEvents,
 		WatchEventsSizes,
+		WatchEventEncodeDuration,
+		WatchEventWriteDuration,
+		WatchEventFlushDuration,
 		currentInflightRequests,
 		currentInqueueRequests,
 		requestTerminationsTotal,

@@ -438,6 +438,25 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sen
 	default:
 	}
 
+	// Fast path: the serve loop is keeping up, so this watcher is not blocked
+	// and must not be counted below.
+	select {
+	case c.result <- *watchEvent:
+		c.markBookmarkAfterRvSent(event)
+		return builtAt, c.clock.Now()
+	case <-c.done:
+		return builtAt, time.Time{}
+	default:
+	}
+
+	// The result buffer is full, so the serve loop (encode plus write to the
+	// client) is not draining it. StageCacheToWatcher times this same wait but
+	// can only report it once the wait ends, so a watcher that is wedged
+	// indefinitely is visible only in this gauge.
+	blocked := metrics.WatchersBlockedOnResult.WithLabelValues(c.groupResource.Group, c.groupResource.Resource)
+	blocked.Inc()
+	defer blocked.Dec()
+
 	select {
 	case c.result <- *watchEvent:
 		c.markBookmarkAfterRvSent(event)

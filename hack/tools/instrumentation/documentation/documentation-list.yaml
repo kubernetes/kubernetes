@@ -2240,6 +2240,97 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
+- name: watchers_blocked_on_result
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Number of watchers currently blocked handing an event to the watch serve loop,
+    i.e. whose serve loop is not consuming right now.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: watch_event_encode_duration_seconds
+  subsystem: apiserver
+  help: Time the watch serve loop spent encoding a single watch event, including the
+    writes it issues to the response writer.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  - version
+  buckets:
+  - 0.0001
+  - 0.0005
+  - 0.001
+  - 0.005
+  - 0.01
+  - 0.05
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 10
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: watch_event_flush_duration_seconds
+  subsystem: apiserver
+  help: Time the watch serve loop spent flushing buffered watch events to the client.
+    For HTTP/2 this is where a stream or connection flow control stall becomes visible.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  - version
+  buckets:
+  - 0.0001
+  - 0.0005
+  - 0.001
+  - 0.005
+  - 0.01
+  - 0.05
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 10
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: watch_event_write_duration_seconds
+  subsystem: apiserver
+  help: Time the watch serve loop spent inside the response writer chain (framer,
+    optional gzip, HTTP transport) for a single watch event.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  - version
+  buckets:
+  - 0.0001
+  - 0.0005
+  - 0.001
+  - 0.005
+  - 0.01
+  - 0.05
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 10
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
 - name: dispatch_duration_seconds
   subsystem: watch_events
   namespace: apiserver

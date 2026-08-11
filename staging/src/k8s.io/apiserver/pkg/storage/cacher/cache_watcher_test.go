@@ -80,6 +80,62 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 	}
 }
 
+// verifies that a watcher whose serve loop has stopped consuming is counted by
+// apiserver_watch_cache_watchers_blocked_on_result while the send is in flight.
+// The StageCacheToWatcher histogram covers the same wait but only once it ends,
+// so the gauge is the only signal for a watcher that is wedged indefinitely.
+func TestCacheWatcherBlockedOnResultGauge(t *testing.T) {
+	metrics.WatchersBlockedOnResult.Reset()
+	t.Cleanup(metrics.WatchersBlockedOnResult.Reset)
+	// The metric is a no-op until it has been registered somewhere.
+	registry := compbasemetrics.NewKubeRegistry()
+	if err := registry.Register(metrics.WatchersBlockedOnResult); err != nil {
+		t.Fatalf("failed to register metric: %v", err)
+	}
+
+	groupResource := schema.GroupResource{Resource: "pods"}
+	blocked := func() float64 {
+		t.Helper()
+		value, err := testutil.GetGaugeMetricValue(metrics.WatchersBlockedOnResult.WithLabelValues(groupResource.Group, groupResource.Resource))
+		if err != nil {
+			t.Fatalf("failed to read metric: %v", err)
+		}
+		return value
+	}
+
+	filter := func(string, labels.Set, fields.Set, runtime.Object) bool { return true }
+	w := newCacheWatcher(1, filter, func(bool) {}, storage.APIObjectVersioner{}, time.Now(), false, groupResource, metrics.NewNoopWatcherMetricsObservers(), nil, "")
+
+	// The result buffer has room, so this send does not block and is not counted.
+	if _, sentAt := w.sendWatchCacheEvent(&watchCacheEvent{Object: &v1.Pod{}}); sentAt.IsZero() {
+		t.Fatal("expected a non-blocking send to report when it was sent")
+	}
+	if got := blocked(); got != 0 {
+		t.Fatalf("expected no watcher counted for a non-blocking send, got %v", got)
+	}
+
+	// The buffer is now full, so this send blocks until the reader drains it.
+	sent := make(chan struct{})
+	go func() {
+		defer close(sent)
+		w.sendWatchCacheEvent(&watchCacheEvent{Object: &v1.Pod{}})
+	}()
+	select {
+	case <-sent:
+		t.Fatal("expected the send to block on the full result buffer")
+	case <-time.After(100 * time.Millisecond):
+	}
+	if got := blocked(); got != 1 {
+		t.Errorf("expected 1 watcher blocked while the send is in flight, got %v", got)
+	}
+
+	<-w.result
+	<-sent
+	if got := blocked(); got != 0 {
+		t.Errorf("expected the gauge to return to 0 after the send completed, got %v", got)
+	}
+}
+
 func TestCacheWatcherHandlesFiltering(t *testing.T) {
 	filter := func(_ string, _ labels.Set, field fields.Set, _ runtime.Object) bool {
 		return field["spec.nodeName"] == "host"

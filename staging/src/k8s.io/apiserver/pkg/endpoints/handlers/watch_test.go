@@ -43,6 +43,7 @@ import (
 	endpointstesting "k8s.io/apiserver/pkg/endpoints/testing"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
+	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	metricstestutil "k8s.io/component-base/metrics/testutil"
 )
@@ -420,6 +421,9 @@ func TestWatchEventSizes(t *testing.T) {
 
 			metrics.WatchEventsSizes.Reset()
 			metrics.WatchEvents.Reset()
+			metrics.WatchEventEncodeDuration.Reset()
+			metrics.WatchEventWriteDuration.Reset()
+			metrics.WatchEventFlushDuration.Reset()
 
 			watcher := watch.NewFake()
 			timeoutCh := make(chan time.Time)
@@ -484,6 +488,18 @@ apiserver_watch_events_total{group="group",resource="resource",version="version"
 
 			err = metricstestutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), "apiserver_watch_events_sizes", "apiserver_watch_events_total")
 			require.NoError(t, err)
+
+			// The durations themselves are not reproducible, so only assert that
+			// every event is accounted for in each stage of the serve loop.
+			for name, metric := range map[string]*compbasemetrics.HistogramVec{
+				"apiserver_watch_event_encode_duration_seconds": metrics.WatchEventEncodeDuration,
+				"apiserver_watch_event_write_duration_seconds":  metrics.WatchEventWriteDuration,
+				"apiserver_watch_event_flush_duration_seconds":  metrics.WatchEventFlushDuration,
+			} {
+				count, err := metricstestutil.GetHistogramMetricCount(metric.WithLabelValues(gvr.Group, gvr.Version, gvr.Resource))
+				require.NoError(t, err)
+				require.Equal(t, uint64(2), count, "unexpected sample count for %s", name)
+			}
 		})
 	}
 }
