@@ -114,7 +114,7 @@
      "--enable-observability-metrics": "true"
     },
     "ExecutionClass": "FLEX",
-    "GlueVersion": "3.0",
+    "GlueVersion": "5.0",
     "JobRunQueuingEnabled": false,
     "NumberOfWorkers": 10,
     "Role": {

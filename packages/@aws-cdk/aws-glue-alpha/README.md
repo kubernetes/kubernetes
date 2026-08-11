@@ -190,7 +190,7 @@ new glue.PySparkStreamingJob(stack, 'PySparkStreamingJob', {
 
 The flexible execution class is appropriate for non-urgent jobs such as
 pre-production jobs, testing, and one-time data loads. Flexible jobs default
-to Glue version 3.0 and worker type `G_2X`. The following best practice
+to Glue version 5.0 and worker type `G_2X`. The following best practice
 features are enabled by default:
 `—enable-metrics, —enable-spark-ui, —enable-continuous-cloudwatch-log`
 

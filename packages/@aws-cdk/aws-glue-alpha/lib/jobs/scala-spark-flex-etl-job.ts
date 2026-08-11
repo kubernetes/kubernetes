@@ -103,7 +103,7 @@ export class ScalaSparkFlexEtlJob extends SparkJob {
         name: JobType.ETL,
         scriptLocation: this.codeS3ObjectUrl(props.script),
       },
-      glueVersion: props.glueVersion ? props.glueVersion : GlueVersion.V3_0,
+      glueVersion: props.glueVersion ? props.glueVersion : GlueVersion.V5_0,
       workerType: props.workerType ? props.workerType : WorkerType.G_1X,
       numberOfWorkers: props.numberOfWorkers ? props.numberOfWorkers : 10,
       maxRetries: props.maxRetries,
