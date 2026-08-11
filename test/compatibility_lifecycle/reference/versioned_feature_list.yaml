@@ -587,6 +587,7 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.37"
+    minCompatibilityVersion: "1.37"
 - name: DRAListTypeAttributes
   versionedSpecs:
   - default: false
