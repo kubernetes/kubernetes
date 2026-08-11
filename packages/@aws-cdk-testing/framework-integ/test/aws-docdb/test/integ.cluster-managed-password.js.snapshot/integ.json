@@ -1,0 +1,14 @@
+{
+  "version": "54.0.0",
+  "testCases": {
+    "aws-cdk-docdb-cluster-managed-password-integ/DefaultTest": {
+      "stacks": [
+        "aws-cdk-docdb-cluster-managed-password"
+      ],
+      "assertionStack": "aws-cdk-docdb-cluster-managed-password-integ/DefaultTest/DeployAssert",
+      "assertionStackName": "awscdkdocdbclustermanagedpasswordintegDefaultTestDeployAssert234F4A4F"
+    }
+  },
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
+}
