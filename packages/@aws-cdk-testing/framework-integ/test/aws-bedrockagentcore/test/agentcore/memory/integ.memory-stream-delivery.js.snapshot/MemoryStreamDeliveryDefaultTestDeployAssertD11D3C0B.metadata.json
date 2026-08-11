@@ -1,0 +1,97 @@
+{
+  "/MemoryStreamDelivery/DefaultTest/DeployAssert": [
+    {
+      "type": "aws:cdk:warning",
+      "data": "No cross-stack-reference strength configured, defaulting to \"strong\". We recommend you set feature flag \"@aws-cdk/core:defaultCrossStackReferences\" to \"both\", then deploy everywhere, then set it to \"weak\". Alternatively, set it to \"strong\" explicitly to lock in the current producer-protecting behavior. (See: https://github.com/aws/aws-cdk/blob/main/packages/aws-cdk-lib/README.md#reference-strength) [ack: @aws-cdk/core:crossStackReferencesDefaultStrong]",
+      "trace": [
+        "Annotations.addMessage (/Users/catenarentalsystem/Documents/aws-cdk/packages/aws-cdk-lib/core/lib/annotations.js:244:29)",
+        "Annotations.addWarningV2 (/Users/catenarentalsystem/Documents/aws-cdk/packages/aws-cdk-lib/core/lib/annotations.js:113:18)",
+        "resolveValue (/Users/catenarentalsystem/Documents/aws-cdk/packages/aws-cdk-lib/core/lib/private/refs.js:204:54)",
+        "resolveReferences (/Users/catenarentalsystem/Documents/aws-cdk/packages/aws-cdk-lib/core/lib/private/refs.js:128:30)",
+        "prepareApp (/Users/catenarentalsystem/Documents/aws-cdk/packages/aws-cdk-lib/core/lib/private/prepare-app.js:45:36)",
+        "synthesize (/Users/catenarentalsystem/Documents/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:72:36)",
+        "App.synth (/Users/catenarentalsystem/Documents/aws-cdk/packages/aws-cdk-lib/core/lib/stage.js:230:96)",
+        "App.synth (/Users/catenarentalsystem/Documents/aws-cdk/packages/aws-cdk-lib/core/lib/app.js:217:27)",
+        "process.<anonymous> (/Users/catenarentalsystem/Documents/aws-cdk/packages/aws-cdk-lib/core/lib/app.js:163:51)",
+        "Object.onceWrapper (node:events:634:26)",
+        "process.emit (node:events:519:28)"
+      ]
+    }
+  ],
+  "/MemoryStreamDelivery/DefaultTest/DeployAssert/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/MemoryStreamDelivery/DefaultTest/DeployAssert/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/MemoryStreamDelivery/DefaultTest/DeployAssert/AwsApiCallbedrock-agentcore-controlgetMemory659ff5667e1a0d36101b95ec02b6d7ba/Default": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": "*"
+    }
+  ],
+  "/MemoryStreamDelivery/DefaultTest/DeployAssert/AwsApiCallbedrock-agentcore-controlgetMemory659ff5667e1a0d36101b95ec02b6d7ba/AssertionResults": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AssertionResultsAwsApiCallbedrockagentcorecontrolgetMemory659ff5667e1a0d36101b95ec02b6d7ba"
+    }
+  ],
+  "/MemoryStreamDelivery/DefaultTest/DeployAssert/SingletonFunction1488541a7b23466481b69b4408076b81/Role": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction1488541a7b23466481b69b4408076b81Role37ABCE73"
+    }
+  ],
+  "/MemoryStreamDelivery/DefaultTest/DeployAssert/SingletonFunction1488541a7b23466481b69b4408076b81/Handler": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction1488541a7b23466481b69b4408076b81HandlerCD40AE9F"
+    }
+  ],
+  "/MemoryStreamDelivery/DefaultTest/DeployAssert/AwsApiCallbedrock-agentcore-controlgetMemory2388938cf8b6ff4d12ddda4b82ed3676/Default": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": "*"
+    }
+  ],
+  "/MemoryStreamDelivery/DefaultTest/DeployAssert/AwsApiCallbedrock-agentcore-controlgetMemory2388938cf8b6ff4d12ddda4b82ed3676/AssertionResults": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AssertionResultsAwsApiCallbedrockagentcorecontrolgetMemory2388938cf8b6ff4d12ddda4b82ed3676"
+    }
+  ],
+  "/MemoryStreamDelivery/DefaultTest/DeployAssert/AwsApiCallbedrock-agentcore-controlgetMemory659ff5667e1a0d36101b95ec02b6d7ba/Default/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AwsApiCallbedrockagentcorecontrolgetMemory659ff5667e1a0d36101b95ec02b6d7ba"
+    }
+  ],
+  "/MemoryStreamDelivery/DefaultTest/DeployAssert/AwsApiCallbedrock-agentcore-controlgetMemory2388938cf8b6ff4d12ddda4b82ed3676/Default/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AwsApiCallbedrockagentcorecontrolgetMemory2388938cf8b6ff4d12ddda4b82ed3676"
+    }
+  ]
+}
