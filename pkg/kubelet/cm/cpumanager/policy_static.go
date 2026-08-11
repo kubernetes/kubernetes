@@ -534,7 +534,7 @@ func (p *staticPolicy) releasePodAllocation(logger klog.Logger, s state.State, p
 	}
 	s.SetDefaultCPUSet(s.GetDefaultCPUSet().Union(podCPUSet))
 	s.DeletePod(podUID)
-	p.updateMetricsOnRelease(logger, s)
+	p.updateMetricsFromState(logger, s)
 }
 
 func podCPUAllocationToString(alloc map[string]cpuset.CPUSet) string {
@@ -700,7 +700,7 @@ func (p *staticPolicy) RemoveContainer(logger klog.Logger, s state.State, podUID
 				updatedCPUSets := s.GetDefaultCPUSet().Union(podCPUSet)
 				s.SetDefaultCPUSet(updatedCPUSets)
 				s.DeletePod(podUID) // Clean up all state for the pod.
-				p.updateMetricsOnRelease(logger, s)
+				p.updateMetricsFromState(logger, s)
 				logger.Info("Released pod-level CPUs", "defaultCPUSet", updatedCPUSets)
 			}
 			// If other containers still exist, do not release any CPUs yet.
@@ -714,7 +714,7 @@ func (p *staticPolicy) RemoveContainer(logger klog.Logger, s state.State, podUID
 	toRelease = toRelease.Difference(cpusInUse)
 	updatedCPUs := s.GetDefaultCPUSet().Union(toRelease)
 	s.SetDefaultCPUSet(updatedCPUs)
-	p.updateMetricsOnRelease(logger, s)
+	p.updateMetricsFromState(logger, s)
 	logger.Info("RemoveContainer end", "defaultCPUSet", updatedCPUs)
 	return nil
 }
@@ -1149,10 +1149,6 @@ func (p *staticPolicy) updateMetricsOnAllocate(logger klog.Logger, s state.State
 	if cpuAlloc.Aligned.UncoreCache {
 		metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedUncoreCache).Inc()
 	}
-	p.updateMetricsFromState(logger, s)
-}
-
-func (p *staticPolicy) updateMetricsOnRelease(logger klog.Logger, s state.State) {
 	p.updateMetricsFromState(logger, s)
 }
 
