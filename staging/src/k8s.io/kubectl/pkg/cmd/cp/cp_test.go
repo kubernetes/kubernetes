@@ -27,6 +27,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	runtimeStd "runtime"
 	"strings"
 	"testing"
 
@@ -115,6 +116,208 @@ func TestExtractFileSpec(t *testing.T) {
 		if specFile != test.expectedFile {
 			t.Errorf("expected: %s, saw: %s", test.expectedFile, specFile)
 		}
+	}
+}
+
+func TestExtractFileSpecWithWindowsPaths(t *testing.T) {
+	// This test will fail on anything but Windows.
+	if runtimeStd.GOOS != "windows" {
+		return
+	}
+
+	tests := []struct {
+		name         string
+		spec         string
+		expectedFile string
+		expectErr    bool
+	}{
+		{
+			name:         "Windows absolute path with drive letter",
+			spec:         `C:\Temp\foobar.txt`,
+			expectedFile: `C:\Temp\foobar.txt`,
+			expectErr:    false,
+		},
+		{
+			name:         "Windows absolute path with lowercase drive letter",
+			spec:         `c:\Temp\foobar.txt`,
+			expectedFile: `c:\Temp\foobar.txt`,
+			expectErr:    false,
+		},
+		{
+			name:         "Windows absolute path with forward slashes",
+			spec:         `C:/Temp/foobar.txt`,
+			expectedFile: `C:/Temp/foobar.txt`,
+			expectErr:    false,
+		},
+		{
+			name:         "Windows absolute path with different drive",
+			spec:         `D:\folder\file.dat`,
+			expectedFile: `D:\folder\file.dat`,
+			expectErr:    false,
+		},
+		{
+			name:         "Regular pod specification should still work",
+			spec:         "pod:/some/file",
+			expectedFile: "/some/file",
+			expectErr:    false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			spec, err := extractFileSpec(test.spec)
+			if test.expectErr && err == nil {
+				t.Errorf("expected error but got none")
+				return
+			}
+			if err != nil && !test.expectErr {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+			if err != nil {
+				return // Expected error case.
+			}
+
+			specFile := ""
+			if spec.File != nil {
+				specFile = spec.File.String()
+			}
+			if specFile != test.expectedFile {
+				t.Errorf("expected file: %s, got: %s", test.expectedFile, specFile)
+			}
+
+			// Make sure no pod name was set for absolute Windows paths.
+			if len(test.spec) >= 3 &&
+				(strings.HasPrefix(strings.ToLower(test.spec), "c:\\") ||
+					strings.HasPrefix(strings.ToLower(test.spec), "d:\\")) {
+				if spec.PodName != "" {
+					t.Errorf("expected no pod name for Windows path, got: %s", spec.PodName)
+				}
+			}
+		})
+	}
+}
+
+func TestIsWindowsAbsolutePath(t *testing.T) {
+	// This test will fail on anything but Windows.
+	if runtimeStd.GOOS != "windows" {
+		return
+	}
+
+	tests := []struct {
+		name     string
+		path     string
+		expected bool
+	}{
+		{
+			name:     "Windows absolute path with uppercase drive",
+			path:     `C:\foo`,
+			expected: true,
+		},
+		{
+			name:     "Windows absolute path with lowercase drive",
+			path:     `c:\foo`,
+			expected: true,
+		},
+		{
+			name:     "Windows absolute path with forward slash",
+			path:     `C:/foo`,
+			expected: true,
+		},
+		{
+			name:     "Relative path",
+			path:     `foo\bar`,
+			expected: false,
+		},
+		{
+			name:     "Unix absolute path",
+			path:     `/foo/bar`,
+			expected: false,
+		},
+		{
+			name:     "Pod specification",
+			path:     `pod:/foo/bar`,
+			expected: false,
+		},
+		{
+			name:     "Invalid drive format",
+			path:     `:\foo`,
+			expected: false,
+		},
+		{
+			name:     "Invalid drive character",
+			path:     `1:\foo`,
+			expected: false,
+		},
+		{
+			name:     "Too short",
+			path:     `C:`,
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := isWindowsAbsolutePath(test.path)
+			if result != test.expected {
+				t.Errorf("isWindowsAbsolutePath(%q) = %v, expected %v", test.path, result, test.expected)
+			}
+		})
+	}
+}
+
+// TestIsWindowsAbsolutePathForOS exercises the drive-letter detection logic on
+// all platforms by passing goos explicitly, so the behavior is covered in CI
+// regardless of the OS running the tests.
+func TestIsWindowsAbsolutePathForOS(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		goos     string
+		expected bool
+	}{
+		{name: "windows: uppercase drive with backslash", path: `C:\foo`, goos: "windows", expected: true},
+		{name: "windows: lowercase drive with forward slash", path: "c:/foo", goos: "windows", expected: true},
+		{name: "windows: drive root", path: `D:\`, goos: "windows", expected: true},
+		{name: "windows: unix absolute path", path: "/foo/bar", goos: "windows", expected: false},
+		{name: "windows: pod spec", path: "pod:/foo", goos: "windows", expected: false},
+		{name: "windows: drive-relative without separator", path: "C:foo", goos: "windows", expected: false},
+		{name: "windows: non-letter drive", path: `1:\foo`, goos: "windows", expected: false},
+		{name: "windows: too short", path: "C:", goos: "windows", expected: false},
+		// The same drive-letter-looking paths must never be treated as absolute
+		// on non-Windows, preserving existing pod:file parsing.
+		{name: "linux: drive path is not absolute", path: `C:\foo`, goos: "linux", expected: false},
+		{name: "linux: drive path forward slash is not absolute", path: "c:/foo", goos: "linux", expected: false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := isWindowsAbsolutePathForOS(test.path, test.goos); got != test.expected {
+				t.Errorf("isWindowsAbsolutePathForOS(%q, %q) = %v, expected %v", test.path, test.goos, got, test.expected)
+			}
+		})
+	}
+}
+
+// TestStripWindowsDriveLetterForOS verifies drive-letter stripping on all
+// platforms via an explicit goos argument.
+func TestStripWindowsDriveLetterForOS(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		goos     string
+		expected string
+	}{
+		{name: "windows: forward slash", path: "C:/foo/bar", goos: "windows", expected: "/foo/bar"},
+		{name: "windows: backslash", path: `c:\foo\bar`, goos: "windows", expected: `\foo\bar`},
+		{name: "windows: no drive letter is unchanged", path: "/foo/bar", goos: "windows", expected: "/foo/bar"},
+		{name: "linux: drive path is left unchanged", path: "C:/foo/bar", goos: "linux", expected: "C:/foo/bar"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := stripWindowsDriveLetterForOS(test.path, test.goos); got != test.expected {
+				t.Errorf("stripWindowsDriveLetterForOS(%q, %q) = %q, expected %q", test.path, test.goos, got, test.expected)
+			}
+		})
 	}
 }
 
@@ -431,7 +634,8 @@ func TestTarUntar(t *testing.T) {
 		} else if file.fileType == SymLink {
 			dest, err := os.Readlink(filePath)
 			if file.omitted {
-				if err != nil && strings.Contains(err.Error(), "no such file or directory") {
+				if err != nil && (strings.Contains(err.Error(), "no such file or directory") ||
+					strings.Contains(err.Error(), "cannot find the file")) { // Windows error message.
 					continue
 				}
 				t.Fatalf("expected to omit symlink for %s", filePath)
@@ -895,16 +1099,16 @@ func TestUntar(t *testing.T) {
 	files := []file{{
 		// Absolute file within dest
 		path:     basedir + "/" + "abs",
-		expected: basedir + basedir + "/" + "abs",
+		expected: basedir + stripWindowsDriveLetter(basedir) + "/" + "abs",
 	}, { // Absolute file outside dest
 		path:     testdir + "/" + "abs-out",
-		expected: basedir + testdir + "/" + "abs-out",
+		expected: basedir + stripWindowsDriveLetter(testdir) + "/" + "abs-out",
 	}, { // Absolute nested file within dest
 		path:     basedir + "/" + "nested/nest-abs",
-		expected: basedir + basedir + "/" + "nested/nest-abs",
+		expected: basedir + stripWindowsDriveLetter(basedir) + "/" + "nested/nest-abs",
 	}, { // Absolute nested file outside dest
 		path:     basedir + "/" + "nested/../../nest-abs-out",
-		expected: basedir + testdir + "/" + "nest-abs-out",
+		expected: basedir + stripWindowsDriveLetter(testdir) + "/" + "nest-abs-out",
 	}, { // Relative file inside dest
 		path:     "relative",
 		expected: basedir + "/" + "relative",
@@ -993,7 +1197,9 @@ func TestUntar(t *testing.T) {
 	expectations := map[string]bool{}
 	for _, f := range files {
 		if f.expected != "" {
-			expectations[f.expected] = false
+			// Normalize expected paths to use forward slashes for consistent comparisons.
+			normalizedExpected := filepath.ToSlash(f.expected)
+			expectations[normalizedExpected] = false
 		}
 		if f.linkTarget == "" {
 			hdr := &tar.Header{
@@ -1031,10 +1237,12 @@ func TestUntar(t *testing.T) {
 		if info.IsDir() {
 			return nil // Ignore directories.
 		}
-		if _, ok := expectations[path]; !ok {
+		// Normalize path separators for consistent comparisons.
+		normalizedPath := filepath.ToSlash(path)
+		if _, ok := expectations[normalizedPath]; !ok {
 			t.Errorf("Unexpected file at %s", path)
 		} else {
-			expectations[path] = true
+			expectations[normalizedPath] = true
 		}
 		return nil
 	})
