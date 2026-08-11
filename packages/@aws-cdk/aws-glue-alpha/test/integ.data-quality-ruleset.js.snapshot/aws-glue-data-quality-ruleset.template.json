@@ -14,7 +14,9 @@
     "DatabaseInput": {
      "Name": "my_database"
     }
-   }
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain"
   },
   "CSVTableE499CABA": {
    "Type": "AWS::Glue::Table",
@@ -100,7 +102,9 @@
       "Ref": "CSVTableE499CABA"
      }
     }
-   }
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain"
   }
  },
  "Parameters": {

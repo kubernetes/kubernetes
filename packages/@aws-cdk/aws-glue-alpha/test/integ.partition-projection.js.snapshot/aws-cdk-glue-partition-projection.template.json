@@ -9,7 +9,9 @@
     "DatabaseInput": {
      "Name": "partition_projection_test"
     }
-   }
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain"
   },
   "TableIntegerBucketD9685175": {
    "Type": "AWS::S3::Bucket",

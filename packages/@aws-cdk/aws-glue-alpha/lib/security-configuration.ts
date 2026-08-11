@@ -140,6 +140,13 @@ export interface SecurityConfigurationProps {
    * @default no s3 encryption.
    */
   readonly s3Encryption?: S3Encryption;
+
+  /**
+   * Policy to apply when the security configuration is removed from the stack.
+   *
+   * @default - resource will be destroyed
+   */
+  readonly removalPolicy?: cdk.RemovalPolicy;
 }
 
 /**
@@ -248,6 +255,8 @@ export class SecurityConfiguration extends cdk.Resource implements ISecurityConf
     });
 
     this.resource = resource;
+
+    this.resource.applyRemovalPolicy(props.removalPolicy);
   }
 
   @memoizedGetter

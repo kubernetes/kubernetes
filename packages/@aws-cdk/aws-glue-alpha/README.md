@@ -657,6 +657,19 @@ new glue.Database(this, 'MyDatabase', {
 });
 ```
 
+Because a database is a container for tables and their metadata, it is retained
+by default when removed from the stack, to avoid accidental data loss. Set
+`removalPolicy` to `RemovalPolicy.DESTROY` to have it deleted instead:
+
+```ts
+import { RemovalPolicy } from 'aws-cdk-lib';
+
+new glue.Database(this, 'MyDatabase', {
+  databaseName: 'my_database',
+  removalPolicy: RemovalPolicy.DESTROY,
+});
+```
+
 ## Table
 
 A Glue table describes a table of data in S3: its structure (column names and types), location of data (S3 objects with a common prefix in a S3 bucket), and format for the files (Json, Avro, Parquet, etc.):

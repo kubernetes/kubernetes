@@ -73,3 +73,17 @@ test('a data quality ruleset with tags', () => {
     },
   });
 });
+
+test('removalPolicy can be overridden to DESTROY', () => {
+  const stack = new cdk.Stack();
+  new glue.DataQualityRuleset(stack, 'DataQualityRuleset', {
+    rulesetDqdl: 'ruleset_dqdl',
+    targetTable: new glue.DataQualityTargetTable('database_name', 'table_name'),
+    removalPolicy: cdk.RemovalPolicy.DESTROY,
+  });
+
+  Template.fromStack(stack).hasResource('AWS::Glue::DataQualityRuleset', {
+    DeletionPolicy: 'Delete',
+    UpdateReplacePolicy: 'Delete',
+  });
+});

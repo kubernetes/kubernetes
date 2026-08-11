@@ -1,4 +1,4 @@
-import { App, Stack } from 'aws-cdk-lib';
+import { App, RemovalPolicy, Stack } from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
 import * as glue from '../lib';
 
@@ -125,5 +125,25 @@ test('can specify a physical name', () => {
     DatabaseInput: {
       Name: 'my_database',
     },
+  });
+});
+
+test('is retained by default', () => {
+  new glue.Database(stack, 'Database');
+
+  Template.fromStack(stack).hasResource('AWS::Glue::Database', {
+    DeletionPolicy: 'Retain',
+    UpdateReplacePolicy: 'Retain',
+  });
+});
+
+test('removalPolicy can be overridden to DESTROY', () => {
+  new glue.Database(stack, 'Database', {
+    removalPolicy: RemovalPolicy.DESTROY,
+  });
+
+  Template.fromStack(stack).hasResource('AWS::Glue::Database', {
+    DeletionPolicy: 'Delete',
+    UpdateReplacePolicy: 'Delete',
   });
 });

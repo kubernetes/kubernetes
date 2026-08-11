@@ -17,6 +17,12 @@
       "data": "*"
     }
   ],
+  "/aws-glue-data-quality-ruleset/@aws-cdk.aws-glue-alpha.AccountCatalog": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
   "/aws-glue-data-quality-ruleset/DataQualityRuleset": [
     {
       "type": "aws:cdk:analytics:construct",
