@@ -91,7 +91,7 @@ var (
 		&metrics.CounterOpts{
 			Subsystem:         EndpointSliceSubsystem,
 			Name:              "changes",
-			Help:              "Number of EndpointSlice changes",
+			Help:              "Number of EndpointSlice changes. Deprecated in favor of endpoint_slice_controller_changes_total.",
 			StabilityLevel:    metrics.ALPHA,
 			DeprecatedVersion: "1.38.0",
 		},
