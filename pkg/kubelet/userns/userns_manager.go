@@ -22,6 +22,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -154,6 +155,13 @@ func MakeUserNsManager(logger klog.Logger, kl userNsPodsManager, idsPerPod *int6
 	if kubeletMappingID < userNsLength {
 		// We don't allow to map 0, as security is circumvented.
 		return nil, fmt.Errorf("kubelet user assigned ID %v must be greater or equal to %v", kubeletMappingID, userNsLength)
+	}
+	if uint64(kubeletMappingID)+uint64(kubeletMappingLen) > math.MaxUint32 {
+		// 2^32-1 is INVALID_UID in the kernel, and anything going past
+		// that is going to cause issues in allocateOne().
+		return nil, fmt.Errorf("kubelet user assigned IDs %v-%v must end below %v",
+			kubeletMappingID, uint64(kubeletMappingID)+uint64(kubeletMappingLen)-1,
+			uint64(math.MaxUint32))
 	}
 	if kubeletMappingLen%userNsLength != 0 {
 		return nil, fmt.Errorf("kubelet user assigned IDs length %v is not a multiple of %v", kubeletMappingLen, userNsLength)
