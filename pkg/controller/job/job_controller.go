@@ -430,7 +430,7 @@ func (jm *Controller) addPod(logger klog.Logger, obj interface{}) {
 	// Otherwise, it's an orphan.
 	// Clean the finalizer.
 	if hasJobTrackingFinalizer(pod) {
-		jm.enqueueOrphanPod(pod)
+		jm.enqueueOrphanPod(pod, false)
 	}
 	// Get a list of all matching controllers and sync
 	// them to see if anyone wants to adopt it.
@@ -503,7 +503,7 @@ func (jm *Controller) updatePod(logger klog.Logger, old, cur interface{}) {
 	// Otherwise, it's an orphan.
 	// Clean the finalizer.
 	if hasJobTrackingFinalizer(curPod) {
-		jm.enqueueOrphanPod(curPod)
+		jm.enqueueOrphanPod(curPod, false)
 	}
 	// If anything changed, sync matching controllers
 	// to see if anyone wants to adopt it now.
@@ -546,7 +546,7 @@ func (jm *Controller) deletePod(logger klog.Logger, obj interface{}, final bool)
 		// No controller should care about orphans being deleted.
 		// But this pod might have belonged to a Job and the GC removed the reference.
 		if hasFinalizer {
-			jm.enqueueOrphanPod(pod)
+			jm.enqueueOrphanPod(pod, false)
 		}
 		return
 	}
@@ -554,7 +554,7 @@ func (jm *Controller) deletePod(logger klog.Logger, obj interface{}, final bool)
 	if job == nil || util.IsJobFinished(job) {
 		// syncJob will not remove this finalizer.
 		if hasFinalizer {
-			jm.enqueueOrphanPod(pod)
+			jm.enqueueOrphanPod(pod, false)
 		}
 		return
 	}
@@ -717,13 +717,17 @@ func (jm *Controller) enqueueSyncJobInternal(logger klog.Logger, obj interface{}
 	jm.queue.AddAfter(key, delay)
 }
 
-func (jm *Controller) enqueueOrphanPod(obj *v1.Pod) {
+func (jm *Controller) enqueueOrphanPod(obj *v1.Pod, backoff bool) {
 	orphanPodKey := orphanPodKey{
 		kind:      OrphanPodKeyKindName,
 		namespace: obj.Namespace,
 		value:     obj.Name,
 	}
-	jm.orphanQueue.Add(orphanPodKey)
+	if backoff {
+		jm.orphanQueue.AddRateLimited(orphanPodKey)
+	} else {
+		jm.orphanQueue.Add(orphanPodKey)
+	}
 }
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
@@ -818,6 +822,7 @@ func (jm *Controller) syncOrphanPodsBySelector(ctx context.Context, namespace st
 	for _, pod := range pods {
 		if err := jm.handleSingleOrphanPod(ctx, pod); err != nil {
 			logger.Error(err, "syncing orphan pod failed", "pod", klog.KObj(pod))
+			jm.enqueueOrphanPod(pod, true)
 		}
 	}
 	return nil
