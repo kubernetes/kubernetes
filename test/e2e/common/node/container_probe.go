@@ -458,13 +458,14 @@ exit 0
 			FailureThreshold: 1,
 		}
 
+		var grace int64 = 2
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   "startup-restart-" + string(uuid.NewUUID()),
 				Labels: map[string]string{"test": "startup-restart"},
 			},
 			Spec: v1.PodSpec{
-				TerminationGracePeriodSeconds: ptr.To[int64](2),
+				TerminationGracePeriodSeconds: &grace,
 				Containers: []v1.Container{
 					{
 						Name:           "busybox",
