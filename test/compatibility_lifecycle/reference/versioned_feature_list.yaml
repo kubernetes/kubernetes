@@ -2297,7 +2297,7 @@
     version: "1.37"
 - name: WatchCacheStallResume
   versionedSpecs:
-  - default: false
+  - default: true
     lockToDefault: false
     preRelease: Alpha
     version: "1.38"
