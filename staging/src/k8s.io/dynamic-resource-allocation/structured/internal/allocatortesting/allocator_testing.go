@@ -21,6 +21,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"math"
 	"slices"
 	"testing"
 	"time"
@@ -971,8 +972,8 @@ type AllocatorTestCase struct {
 	expectResults []any
 	expectError   types.GomegaMatcher // can be used to check for no error or match specific error
 
-	// Test case setting expectNumAllocateOneInvocations do not run against the "stable" variant of the allocator,
-	// which doesn't provide the stats and also falls over with excessive runtime for them.
+	// Expected allocateOne invocations, asserted for every variant. A variant
+	// that searches differently overrides this through the map below.
 	expectNumAllocateOneInvocations int64
 
 	// expectNumAllocateOneInvocationsByChannel overrides expectNumAllocateOneInvocations with
@@ -1046,6 +1047,78 @@ func TestAllocator(t *testing.T,
 
 	testcases := map[string]AllocatorTestCase{
 		"empty": {},
+		// Two counts that are each representable but together overflow the native
+		// int accumulator to a negative value, rejected before the sum is formed.
+		// The value comes from math.MaxInt so it also triggers on 32-bit builds.
+		"exact-count-total-overflows-claim-limit": {
+			claimsToAllocate: objects(claim(claim0).withRequests(
+				deviceRequest(req0, classA, int64(math.MaxInt/2+1)),
+				deviceRequest(req1, classA, int64(math.MaxInt/2+1)),
+			)),
+			classes:     objects(class(classA, driverA)),
+			expectError: gomega.MatchError(gomega.ContainSubstring("exceeds the claim limit")),
+		},
+		// Four counts that would wrap a naive int accumulator back to zero rather
+		// than negative; each is rejected against remaining capacity before summing.
+		"exact-count-total-would-wrap-to-zero": {
+			claimsToAllocate: objects(claim(claim0).withRequests(
+				deviceRequest(req0, classA, int64(math.MaxInt/2+1)),
+				deviceRequest(req1, classA, int64(math.MaxInt/2+1)),
+				deviceRequest(req2, classA, int64(math.MaxInt/2+1)),
+				deviceRequest(req3, classA, int64(math.MaxInt/2+1)),
+			)),
+			classes:     objects(class(classA, driverA)),
+			expectError: gomega.MatchError(gomega.ContainSubstring("exceeds the claim limit")),
+		},
+		// Two counts each within the limit but exceeding it once summed. The
+		// rejection names the offending request, not just the claim.
+		"exact-count-sum-exceeds-claim-limit": {
+			claimsToAllocate: objects(claim(claim0).withRequests(
+				deviceRequest(req0, classA, 20),
+				deviceRequest(req1, classA, 20),
+			)),
+			classes: objects(class(classA, driverA)),
+			expectError: gomega.MatchError(gomega.And(
+				gomega.ContainSubstring("request "+req1),
+				gomega.ContainSubstring("exceeds the claim limit"),
+			)),
+		},
+		// A prioritized list is worth at least its smallest alternative, so the
+		// pre-flight check reads that. min(20, 24) leaves the claim over the
+		// limit before any device is looked at.
+		"prioritized-list-minimum-sum-exceeds-claim-limit": {
+			features: Features{PrioritizedList: true},
+			claimsToAllocate: objects(claim(claim0).withRequests(
+				deviceRequest(req0, classA, 20),
+				requestWithPrioritizedList(req1,
+					subRequest(subReq0, classA, 20),
+					subRequest(subReq1, classA, 24),
+				),
+			)),
+			classes: objects(class(classA, driverA)),
+			expectError: gomega.MatchError(gomega.And(
+				gomega.ContainSubstring("request "+req1),
+				gomega.ContainSubstring("exceeds the claim limit"),
+			)),
+		},
+		// Two counts whose sum exactly fills the per-claim limit both allocate;
+		// this pins the pre-flight comparison as > and not >=.
+		"exact-count-sum-exactly-fills-claim-limit": {
+			claimsToAllocate: objects(claim(claim0).withRequests(
+				deviceRequest(req0, classA, resourceapi.AllocationResultsMaxSize/2),
+				deviceRequest(req1, classA, resourceapi.AllocationResultsMaxSize/2),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices:  unwrapResourceSlices(sliceWithMultipleDevices(slice1, node1, pool1, driverA, resourceapi.AllocationResultsMaxSize)),
+			node:    node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				slices.Concat(
+					multipleDeviceAllocationResults(req0, driverA, pool1, resourceapi.AllocationResultsMaxSize/2, 0),
+					multipleDeviceAllocationResults(req1, driverA, pool1, resourceapi.AllocationResultsMaxSize/2, resourceapi.AllocationResultsMaxSize/2),
+				)...,
+			)},
+		},
 		// Two requests in one claim, both landing on the same counter set with the
 		// same compatibility group: they can be co-allocated.
 		"compatibility-groups-compatible": {
@@ -3468,6 +3541,32 @@ func TestAllocator(t *testing.T,
 				localNodeSelector(node1),
 				deviceAllocationResult(req0SubReq1, driverA, pool1, device1, false),
 			)},
+		},
+		// A huge FirstAvailable count sits behind a device already allocated for
+		// the claim, the case that overflowed the per-request limit check. The
+		// oversized alternative is pruned and the small one taken; the pinned
+		// invocation count proves the allocator does not descend into it.
+		"prioritized-list-overflowing-first-subrequest-is-pruned": {
+			features: Features{PrioritizedList: true},
+			claimsToAllocate: objects(claim(claim0).withRequests(
+				deviceRequest(req0, classA, 1),
+				requestWithPrioritizedList(req1,
+					subRequest(subReq0, classA, int64(math.MaxInt)),
+					subRequest(subReq1, classA, 1),
+				),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
+				device(device1, nil, nil),
+				device(device2, nil, nil),
+			)),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req1SubReq1, driverA, pool1, device2, false),
+			)},
+			expectNumAllocateOneInvocations: 8,
 		},
 		"partitionable-devices-single-device": {
 			features: Features{
