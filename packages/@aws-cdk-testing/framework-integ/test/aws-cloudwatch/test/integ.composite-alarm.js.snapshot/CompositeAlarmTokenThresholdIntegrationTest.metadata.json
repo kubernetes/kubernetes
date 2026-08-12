@@ -1,0 +1,91 @@
+{
+  "/CompositeAlarmTokenThresholdIntegrationTest/Alarm1": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "metric": {
+          "warnings": "*",
+          "warningsV2": "*"
+        },
+        "threshold": "*",
+        "evaluationPeriods": "*"
+      }
+    }
+  ],
+  "/CompositeAlarmTokenThresholdIntegrationTest/Alarm2": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "metric": {
+          "warnings": "*",
+          "warningsV2": "*"
+        },
+        "threshold": "*",
+        "evaluationPeriods": "*"
+      }
+    }
+  ],
+  "/CompositeAlarmTokenThresholdIntegrationTest/Alarm3": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "metric": {
+          "warnings": "*",
+          "warningsV2": "*"
+        },
+        "threshold": "*",
+        "evaluationPeriods": "*"
+      }
+    }
+  ],
+  "/CompositeAlarmTokenThresholdIntegrationTest/AtLeastCount": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AtLeastCount"
+    }
+  ],
+  "/CompositeAlarmTokenThresholdIntegrationTest/CompositeAlarmWithTokenThreshold": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "alarmRule": "*"
+      }
+    }
+  ],
+  "/CompositeAlarmTokenThresholdIntegrationTest/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/CompositeAlarmTokenThresholdIntegrationTest/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/CompositeAlarmTokenThresholdIntegrationTest/Alarm1/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Alarm1F9009D71"
+    }
+  ],
+  "/CompositeAlarmTokenThresholdIntegrationTest/Alarm2/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Alarm2A7122E13"
+    }
+  ],
+  "/CompositeAlarmTokenThresholdIntegrationTest/Alarm3/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Alarm32341D8D9"
+    }
+  ],
+  "/CompositeAlarmTokenThresholdIntegrationTest/CompositeAlarmWithTokenThreshold/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CompositeAlarmWithTokenThreshold8A62D58A"
+    }
+  ]
+}

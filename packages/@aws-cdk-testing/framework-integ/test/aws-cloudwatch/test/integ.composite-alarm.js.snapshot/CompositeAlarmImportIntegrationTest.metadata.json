@@ -1,0 +1,26 @@
+{
+  "/CompositeAlarmImportIntegrationTest/AlarmName": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AlarmName"
+    }
+  ],
+  "/CompositeAlarmImportIntegrationTest/AlarmArn": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AlarmArn"
+    }
+  ],
+  "/CompositeAlarmImportIntegrationTest/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/CompositeAlarmImportIntegrationTest/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ]
+}

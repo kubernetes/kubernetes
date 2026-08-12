@@ -36,83 +36,19 @@
     "Threshold": 10000
    }
   },
-  "Alarm4671832C8": {
-   "Type": "AWS::CloudWatch::Alarm",
-   "Properties": {
-    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
-    "EvaluationPeriods": 3,
-    "MetricName": "Metric",
-    "Namespace": "CDK/Test",
-    "Period": 300,
-    "Statistic": "Average",
-    "Threshold": 100000
-   }
-  },
-  "Alarm548383B2F": {
-   "Type": "AWS::CloudWatch::Alarm",
-   "Properties": {
-    "AlarmName": "Alarm with space in name",
-    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
-    "EvaluationPeriods": 3,
-    "MetricName": "Metric",
-    "Namespace": "CDK/Test",
-    "Period": 300,
-    "Statistic": "Average",
-    "Threshold": 100000
-   }
-  },
-  "CompositeAlarmF4C3D082": {
+  "CompositeAlarmWithTokenThreshold8A62D58A": {
    "Type": "AWS::CloudWatch::CompositeAlarm",
    "Properties": {
-    "ActionsSuppressor": {
-     "Fn::GetAtt": [
-      "Alarm548383B2F",
-      "Arn"
-     ]
-    },
-    "ActionsSuppressorExtensionPeriod": 60,
-    "ActionsSuppressorWaitPeriod": 60,
-    "AlarmName": "CompositeAlarmIntegrationTestCompositeAlarm742D2FBA",
+    "AlarmName": "CompositeAlarmTokenThresholdIntegrationTestCompositeAlarmWithTokenThreshold6E6F8F6C",
     "AlarmRule": {
      "Fn::Join": [
       "",
       [
-       "(((ALARM(\"",
+       "AT_LEAST(",
        {
-        "Fn::GetAtt": [
-         "Alarm1F9009D71",
-         "Arn"
-        ]
+        "Ref": "AtLeastCount"
        },
-       "\") OR OK(\"",
-       {
-        "Fn::GetAtt": [
-         "Alarm2A7122E13",
-         "Arn"
-        ]
-       },
-       "\") OR ALARM(\"",
-       {
-        "Fn::GetAtt": [
-         "Alarm32341D8D9",
-         "Arn"
-        ]
-       },
-       "\") OR ALARM(\"",
-       {
-        "Fn::GetAtt": [
-         "Alarm548383B2F",
-         "Arn"
-        ]
-       },
-       "\")) AND (NOT (INSUFFICIENT_DATA(\"",
-       {
-        "Fn::GetAtt": [
-         "Alarm4671832C8",
-         "Arn"
-        ]
-       },
-       "\"))) AND AT_LEAST(2, ALARM, (\"",
+       ", ALARM, (\"",
        {
         "Fn::GetAtt": [
          "Alarm1F9009D71",
@@ -133,28 +69,7 @@
          "Arn"
         ]
        },
-       "\")) AND AT_LEAST(60%, NOT OK, (\"",
-       {
-        "Fn::GetAtt": [
-         "Alarm1F9009D71",
-         "Arn"
-        ]
-       },
-       "\", \"",
-       {
-        "Fn::GetAtt": [
-         "Alarm2A7122E13",
-         "Arn"
-        ]
-       },
-       "\", \"",
-       {
-        "Fn::GetAtt": [
-         "Alarm32341D8D9",
-         "Arn"
-        ]
-       },
-       "\"))) OR FALSE)"
+       "\"))"
       ]
      ]
     }
@@ -162,6 +77,11 @@
   }
  },
  "Parameters": {
+  "AtLeastCount": {
+   "Type": "Number",
+   "Default": 2,
+   "Description": "Minimum number of alarms that must be in ALARM state"
+  },
   "BootstrapVersion": {
    "Type": "AWS::SSM::Parameter::Value<String>",
    "Default": "/cdk-bootstrap/hnb659fds/version",
