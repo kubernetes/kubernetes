@@ -185,7 +185,7 @@ func RunAsyncPreemptionSteps(ctx context.Context, t *testing.T, steps []Step, te
 	}
 }
 
-// AsyncPreemptionTestConfig is a config for initialising the enviroment for async preemption tests.
+// AsyncPreemptionTestConfig is a config for initialising the environment for async preemption tests.
 type AsyncPreemptionTestConfig struct {
 	EnableWAP              bool
 	PreemptionDoneChannels *sync.Map
