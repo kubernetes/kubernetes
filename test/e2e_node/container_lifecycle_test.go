@@ -6406,7 +6406,7 @@ exit 0
 		initialContainerID := pod.Status.ContainerStatuses[0].ContainerID
 
 		ginkgo.By("Finding the pod sandbox")
-		runtimeService, _, err := getCRIClient(ctx)
+		runtimeService, _, err := getCRIClient()
 		framework.ExpectNoError(err)
 		sandboxes, err := runtimeService.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{})
 		framework.ExpectNoError(err)
