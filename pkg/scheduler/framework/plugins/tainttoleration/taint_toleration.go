@@ -88,16 +88,17 @@ func (pl *TaintToleration) isSchedulableAfterNodeChange(logger klog.Logger, pod 
 	}
 
 	wasUntolerated := true
+	var warning error
 	if originalNode != nil {
-		_, wasUntolerated, err = v1helper.FindMatchingUntoleratedTaint(logger, originalNode.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc(), pl.enableTaintTolerationComparisonOperators)
-		if err != nil {
-			logger.V(4).Info(taintComparisonFailedLogMessage, "node", klog.KObj(originalNode), "pod", klog.KObj(pod), "err", err)
+		_, wasUntolerated, warning = v1helper.FindMatchingUntoleratedTaint(logger, originalNode.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc(), pl.enableTaintTolerationComparisonOperators)
+		if warning != nil {
+			logger.V(4).Info(taintComparisonFailedLogMessage, "node", klog.KObj(originalNode), "pod", klog.KObj(pod), "warning", warning)
 		}
 	}
 
-	_, isUntolerated, err := v1helper.FindMatchingUntoleratedTaint(logger, modifiedNode.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc(), pl.enableTaintTolerationComparisonOperators)
-	if err != nil {
-		logger.V(4).Info(taintComparisonFailedLogMessage, "node", klog.KObj(modifiedNode), "pod", klog.KObj(pod), "err", err)
+	_, isUntolerated, warning := v1helper.FindMatchingUntoleratedTaint(logger, modifiedNode.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc(), pl.enableTaintTolerationComparisonOperators)
+	if warning != nil {
+		logger.V(4).Info(taintComparisonFailedLogMessage, "node", klog.KObj(modifiedNode), "pod", klog.KObj(pod), "warning", warning)
 	}
 
 	if wasUntolerated && !isUntolerated {
@@ -130,14 +131,14 @@ func (pl *TaintToleration) Filter(ctx context.Context, state fwk.CycleState, pod
 	logger := klog.FromContext(ctx)
 	node := nodeInfo.Node()
 
-	taint, isUntolerated, err := v1helper.FindMatchingUntoleratedTaint(logger, node.Spec.Taints, pod.Spec.Tolerations,
+	taint, isUntolerated, warning := v1helper.FindMatchingUntoleratedTaint(logger, node.Spec.Taints, pod.Spec.Tolerations,
 		helper.DoNotScheduleTaintsFilterFunc(),
 		pl.enableTaintTolerationComparisonOperators)
 	if !isUntolerated {
 		return nil
 	}
-	if err != nil {
-		logger.V(4).Info(taintComparisonFailedLogMessage, "node", klog.KObj(node), "pod", klog.KObj(pod), "untoleratedTaint", taint, "err", err)
+	if warning != nil {
+		logger.V(4).Info(taintComparisonFailedLogMessage, "node", klog.KObj(node), "pod", klog.KObj(pod), "untoleratedTaint", taint, "warning", warning)
 	} else {
 		logger.V(4).Info("node had untolerated taints", "node", klog.KObj(node), "pod", klog.KObj(pod), "untoleratedTaint", taint)
 	}
@@ -197,9 +198,9 @@ func (pl *TaintToleration) countIntolerableTaintsPreferNoSchedule(logger klog.Lo
 			continue
 		}
 
-		tolerated, err := v1helper.TolerationsTolerateTaint(logger, tolerations, &taint, pl.enableTaintTolerationComparisonOperators)
-		if err != nil {
-			logger.V(4).Info(taintComparisonFailedLogMessage, "node", klog.KObj(node), "pod", klog.KObj(pod), "taint", taint, "err", err)
+		tolerated, warning := v1helper.TolerationsTolerateTaint(logger, tolerations, &taint, pl.enableTaintTolerationComparisonOperators)
+		if warning != nil {
+			logger.V(4).Info(taintComparisonFailedLogMessage, "node", klog.KObj(node), "pod", klog.KObj(pod), "taint", taint, "warning", warning)
 		}
 		if !tolerated {
 			intolerableTaints++

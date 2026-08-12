@@ -652,7 +652,7 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 		taints                      []v1.Taint
 		applyFilter                 taintsFilterFunc
 		expectTolerated             bool
-		expectError                 bool
+		expectWarning               bool
 		expectUntoleratedTaint      *v1.Taint
 		enableComparisonOperatorsFG bool
 	}{
@@ -834,7 +834,7 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 			},
 			applyFilter:                 func(t *v1.Taint) bool { return true },
 			expectTolerated:             false,
-			expectError:                 true,
+			expectWarning:               true,
 			enableComparisonOperatorsFG: true,
 		},
 		{
@@ -861,7 +861,7 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 			},
 			applyFilter:     func(t *v1.Taint) bool { return true },
 			expectTolerated: false,
-			expectError:     false,
+			expectWarning:   false,
 			expectUntoleratedTaint: &v1.Taint{
 				Key:    "dedicated",
 				Value:  "gpu",
@@ -893,7 +893,7 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 			},
 			applyFilter:     func(t *v1.Taint) bool { return true },
 			expectTolerated: false,
-			expectError:     false,
+			expectWarning:   false,
 			expectUntoleratedTaint: &v1.Taint{
 				Key:    "dedicated",
 				Value:  "gpu",
@@ -930,9 +930,9 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		untoleratedTaint, untolerated, err := FindMatchingUntoleratedTaint(logger, tc.taints, tc.tolerations, tc.applyFilter, tc.enableComparisonOperatorsFG)
-		if (err != nil) != tc.expectError {
-			t.Errorf("[%s] expect error %v, got %v", tc.description, tc.expectError, err)
+		untoleratedTaint, untolerated, warning := FindMatchingUntoleratedTaint(logger, tc.taints, tc.tolerations, tc.applyFilter, tc.enableComparisonOperatorsFG)
+		if (warning != nil) != tc.expectWarning {
+			t.Errorf("[%s] expect error %v, got %v", tc.description, tc.expectWarning, warning)
 		}
 		if tc.expectTolerated != !untolerated {
 			filteredTaints := []v1.Taint{}
