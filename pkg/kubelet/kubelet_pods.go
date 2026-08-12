@@ -124,19 +124,31 @@ func parseGetSubIdsOutput(input string) (uint32, uint32, error) {
 	return uint32(num1), uint32(num2), nil
 }
 
+// defaultKubeletMappings returns the range of IDs to use for user namespaces when there is no
+// specific configuration for the kubelet user. It is the entire ID range except the IDs below
+// idsPerPod and the last idsPerPod IDs.
+func defaultKubeletMappings(idsPerPod uint32) (uint32, uint32) {
+	firstID := idsPerPod
+	// The last idsPerPod IDs are left unmapped since the kernel considers user
+	// 2^32-1 an invalid user (see man 7 user_namespaces)
+	//
+	// We cast firstID to 64 bits, as otherwise any operation (including subtraction)
+	// fires the overflow detection (go is not smart enough to realize that if we subtract a
+	// non-negative number, it fits in 32 bits).
+	// Then we cast it back to 32 bits, as this what the function returns.
+	length := uint32((1 << 32) - uint64(firstID) - uint64(idsPerPod))
+	return firstID, length
+}
+
 // getKubeletMappings returns the range of IDs that can be used to configure user namespaces.
 // If subordinate user or group ID ranges are specified for the kubelet user and the getsubids tool
 // is installed, then the single mapping specified both for user and group IDs will be used.
 // If the tool is not installed, or there are no IDs configured, the default mapping is returned.
-// The default mapping includes the entire IDs range except IDs below idsPerPod.
+// The default mapping includes the entire IDs range except IDs below idsPerPod and the
+// last idsPerPod IDs (since the last user in the range is invalid from the kernel's POV).
 func (kl *Kubelet) getKubeletMappings(logger klog.Logger, idsPerPod uint32) (uint32, uint32, error) {
 	// default mappings to return if there is no specific configuration
-	defaultFirstID := idsPerPod
-	// We cast defaultFirstID to 64 bits, as otherwise any operation (including subtraction)
-	// fires the overflow detection (go is not smart enough to realize that if we subtract a
-	// non-negative number, it fits in 32 bits).
-	// Then we cast it back to 32 bits, as this what the function returns.
-	defaultLen := uint32((1 << 32) - uint64(defaultFirstID))
+	defaultFirstID, defaultLen := defaultKubeletMappings(idsPerPod)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
 		return defaultFirstID, defaultLen, nil
