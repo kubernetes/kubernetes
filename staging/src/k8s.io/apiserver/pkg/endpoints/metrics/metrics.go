@@ -186,15 +186,20 @@ var (
 		},
 		[]string{"group", "version", "resource"},
 	)
+	// The size_bucket label is split on HTTP/2's 4KiB handler write buffer
+	// (handlerChunkWriteSize): an event larger than the buffer pushes to the
+	// wire from inside Write, a smaller one only buffers and pays that cost on
+	// Flush instead. Without the label the size effect and the load effect can
+	// only be separated by comparing time windows.
 	WatchEventWriteDuration = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Subsystem:      APIServerComponent,
 			Name:           "watch_event_write_duration_seconds",
-			Help:           "Time the watch serve loop spent inside the response writer chain (framer, optional gzip, HTTP transport) for a single watch event.",
+			Help:           "Time the watch serve loop spent inside the response writer chain (framer, optional gzip, HTTP transport) for a single watch event, broken by serialized event size.",
 			Buckets:        []float64{0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 10},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"group", "version", "resource"},
+		[]string{"group", "version", "resource", "size_bucket"},
 	)
 	WatchEventFlushDuration = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
@@ -202,6 +207,22 @@ var (
 			Name:           "watch_event_flush_duration_seconds",
 			Help:           "Time the watch serve loop spent flushing buffered watch events to the client. For HTTP/2 this is where a stream or connection flow control stall becomes visible.",
 			Buckets:        []float64{0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 10},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "version", "resource"},
+	)
+	// WatchServeIdleDuration is the counterpart to the three histograms above:
+	// they measure what the serve loop spends time doing, this measures the time
+	// it had nothing to do. A serve loop that is killed for being unresponsive
+	// while showing meaningful idle time was blocked in the transport waiting on
+	// its client; one showing near-zero idle time had run out of capacity. It is
+	// a counter rather than a utilization gauge because the stalls last
+	// milliseconds and the scrape interval is seconds.
+	WatchServeIdleDuration = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Subsystem:      APIServerComponent,
+			Name:           "watch_serve_idle_seconds_total",
+			Help:           "Cumulative time watch serve loops spent blocked waiting for their next event, i.e. with no work to do.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"group", "version", "resource"},
@@ -332,6 +353,7 @@ var (
 		WatchEventEncodeDuration,
 		WatchEventWriteDuration,
 		WatchEventFlushDuration,
+		WatchServeIdleDuration,
 		currentInflightRequests,
 		currentInqueueRequests,
 		requestTerminationsTotal,

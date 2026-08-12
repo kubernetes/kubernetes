@@ -221,12 +221,45 @@ type WatchListCompleteHook func()
 // It is thread-safe, as long as underlying io.Writer is thread-safe.
 // Once all Write calls for a given watch event have finished, RecordEvent must be called.
 type watchEventMetricsRecorder struct {
-	writer              io.Writer
-	countMetric         compbasemetrics.CounterMetric
-	sizeMetric          compbasemetrics.ObserverMetric
-	writeDurationMetric compbasemetrics.ObserverMetric
+	writer      io.Writer
+	countMetric compbasemetrics.CounterMetric
+	sizeMetric  compbasemetrics.ObserverMetric
+	// writeDurationBySize is indexed by watchEventSizeBucket, pre-resolved so
+	// that picking a bucket on the hot path costs an array index rather than a
+	// label lookup.
+	writeDurationBySize [numWatchEventSizeBuckets]compbasemetrics.ObserverMetric
 	byteCount           atomic.Int64
 	writeDurationNanos  atomic.Int64
+}
+
+// watchEventSizeBucket splits events on HTTP/2's handler write buffer size,
+// which determines whether the cost of putting an event on the wire lands in
+// Write or in Flush.
+type watchEventSizeBucket int
+
+const (
+	watchEventSizeSmall watchEventSizeBucket = iota
+	watchEventSizeMedium
+	watchEventSizeLarge
+
+	numWatchEventSizeBuckets
+)
+
+var watchEventSizeBucketName = [numWatchEventSizeBuckets]string{
+	watchEventSizeSmall:  "<4Ki",
+	watchEventSizeMedium: "4-16Ki",
+	watchEventSizeLarge:  ">16Ki",
+}
+
+func sizeBucketFor(bytes int64) watchEventSizeBucket {
+	switch {
+	case bytes < 4<<10:
+		return watchEventSizeSmall
+	case bytes <= 16<<10:
+		return watchEventSizeMedium
+	default:
+		return watchEventSizeLarge
+	}
 }
 
 // Write implements io.Writer.
@@ -241,8 +274,9 @@ func (c *watchEventMetricsRecorder) Write(p []byte) (n int, err error) {
 // Record reports the metrics and resets the byte count.
 func (c *watchEventMetricsRecorder) RecordEvent() {
 	c.countMetric.Inc()
-	c.sizeMetric.Observe(float64(c.byteCount.Swap(0)))
-	c.RecordWriteDuration()
+	bytes := c.byteCount.Swap(0)
+	c.sizeMetric.Observe(float64(bytes))
+	c.recordWriteDuration(bytes)
 }
 
 // RecordWriteDuration reports only the time spent writing, and must be called
@@ -250,7 +284,12 @@ func (c *watchEventMetricsRecorder) RecordEvent() {
 // the signature of a client that stopped reading, so dropping it would make the
 // stall look like it happened during serialization instead.
 func (c *watchEventMetricsRecorder) RecordWriteDuration() {
-	c.writeDurationMetric.Observe(time.Duration(c.writeDurationNanos.Swap(0)).Seconds())
+	c.recordWriteDuration(c.byteCount.Swap(0))
+}
+
+func (c *watchEventMetricsRecorder) recordWriteDuration(bytes int64) {
+	elapsed := time.Duration(c.writeDurationNanos.Swap(0))
+	c.writeDurationBySize[sizeBucketFor(bytes)].Observe(elapsed.Seconds())
 }
 
 // watchGzipPool is a no-op until the first Get call (https://pkg.go.dev/sync#Pool.Get).
@@ -423,12 +462,16 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	gvr := s.Scope.Resource
 
 	recorder := &watchEventMetricsRecorder{
-		writer:              framer,
-		countMetric:         metrics.WatchEvents.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource),
-		sizeMetric:          metrics.WatchEventsSizes.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource),
-		writeDurationMetric: metrics.WatchEventWriteDuration.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource),
+		writer:      framer,
+		countMetric: metrics.WatchEvents.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource),
+		sizeMetric:  metrics.WatchEventsSizes.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource),
+	}
+	for bucket := range numWatchEventSizeBuckets {
+		recorder.writeDurationBySize[bucket] = metrics.WatchEventWriteDuration.WithContext(req.Context()).
+			WithLabelValues(gvr.Group, gvr.Version, gvr.Resource, watchEventSizeBucketName[bucket])
 	}
 	encodeDurationMetric := metrics.WatchEventEncodeDuration.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource)
+	idleDurationMetric := metrics.WatchServeIdleDuration.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource)
 	flushDurationMetric := metrics.WatchEventFlushDuration.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource)
 	timedFlush := func() error {
 		start := time.Now()
@@ -443,6 +486,10 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 
 	span.AddEvent("About to start writing response")
 	for {
+		// Time spent in the select below is time this serve loop had no work.
+		// Only the event branch reports it; every other branch returns, and a
+		// loop that is shutting down has no headroom to report.
+		idleStart := time.Now()
 		select {
 		case <-s.ServerShuttingDownCh:
 			// the server has signaled that it is shutting down (not accepting
@@ -462,6 +509,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 				// End of results.
 				return
 			}
+			idleDurationMetric.Add(time.Since(idleStart).Seconds())
 			isWatchListLatencyRecordingRequired := shouldRecordWatchListLatency(req.Context(), event)
 
 			encodeStart := time.Now()

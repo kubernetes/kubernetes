@@ -20,12 +20,15 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apiserver/pkg/util/watchexperiment"
 	"k8s.io/utils/clock"
 )
 
 const (
+	// refreshPerSecond is deliberately not part of the experiment: it sets the
+	// sustained rate at which dispatch may block, and raising it would change
+	// average behaviour rather than just the burst ceiling.
 	refreshPerSecond = 50 * time.Millisecond
-	maxBudget        = 100 * time.Millisecond
 )
 
 // timeBudget implements a budget of time that you can use and is
@@ -62,7 +65,7 @@ func newTimeBudget() timeBudget {
 		clock:     clock.RealClock{},
 		budget:    time.Duration(0),
 		refresh:   refreshPerSecond,
-		maxBudget: maxBudget,
+		maxBudget: watchexperiment.MaxDispatchBudget(),
 	}
 	result.last = result.clock.Now()
 	return result
