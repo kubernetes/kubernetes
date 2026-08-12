@@ -816,6 +816,11 @@ func (jm *Controller) syncOrphanPodsBySelector(ctx context.Context, namespace st
 	for _, pod := range pods {
 		if err := jm.handleSingleOrphanPod(ctx, pod); err != nil {
 			logger.Error(err, "syncing orphan pod failed", "pod", klog.KObj(pod))
+			jm.orphanQueue.AddRateLimited(orphanPodKey{
+				kind:      OrphanPodKeyKindName,
+				namespace: pod.Namespace,
+				value:     pod.Name,
+			})
 		}
 	}
 	return nil
