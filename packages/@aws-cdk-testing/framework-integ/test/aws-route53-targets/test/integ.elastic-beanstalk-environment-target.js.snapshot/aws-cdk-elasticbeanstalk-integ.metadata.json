@@ -1,25 +1,8 @@
 {
-  "/aws-cdk-elasticbeanstalk-integ": [
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:160:18)",
-        "...node internals..."
-      ]
-    }
-  ],
   "/aws-cdk-elasticbeanstalk-integ/EbsHostedZoneMapping": [
     {
       "type": "aws:cdk:logicalId",
       "data": "EbsHostedZoneMapping"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new TestStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:54:38)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:160:18)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-elasticbeanstalk-integ/Bucket": [
@@ -34,28 +17,12 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "Application"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new TestStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:67:21)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:160:18)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-elasticbeanstalk-integ/ApplicationVersion": [
     {
       "type": "aws:cdk:logicalId",
       "data": "ApplicationVersion"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new TestStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:68:28)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:160:18)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-elasticbeanstalk-integ/EbsEc2Role": [
@@ -83,28 +50,12 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "EbsInstanceProfile"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new TestStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:81:33)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:160:18)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-elasticbeanstalk-integ/Environment": [
     {
       "type": "aws:cdk:logicalId",
       "data": "Environment"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new TestStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:84:20)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:160:18)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-elasticbeanstalk-integ/AWS679f53fac002430cb0da5b7982bd2287": [
@@ -186,59 +137,18 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "BootstrapVersion"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "addBootstrapVersionRule (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:302:19)",
-        "DefaultStackSynthesizer.addBootstrapVersionRule (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:202:9)",
-        "DefaultStackSynthesizer.synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/default-synthesizer.js:343:18)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:474: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:474:3)",
-        "visit (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:531:9)",
-        "visit (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:528:9)",
-        "synthesizeTree (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:467:5)",
-        "synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:95:5)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stage.js:220:96)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/app.js:208:27)"
-      ]
     }
   ],
   "/aws-cdk-elasticbeanstalk-integ/CheckBootstrapVersion": [
     {
       "type": "aws:cdk:logicalId",
       "data": "CheckBootstrapVersion"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "addBootstrapVersionRule (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:310:5)",
-        "DefaultStackSynthesizer.addBootstrapVersionRule (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:202:9)",
-        "DefaultStackSynthesizer.synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/default-synthesizer.js:343:18)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:474: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:474:3)",
-        "visit (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:531:9)",
-        "visit (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:528:9)",
-        "synthesizeTree (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:467:5)",
-        "synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:95:5)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stage.js:220:96)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/app.js:208:27)"
-      ]
     }
   ],
   "/aws-cdk-elasticbeanstalk-integ/Bucket/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "Bucket83908E77"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Bucket (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-s3/lib/bucket.js:1447:30)",
-        "new Bucket (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Bucket (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new TestStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:60:26)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:160:18)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-elasticbeanstalk-integ/Asset/AssetBucket": [
@@ -251,16 +161,6 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "EbsEc2Role8269CA5F"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/role.js:491:34)",
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new TestStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:77:30)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:160:18)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-elasticbeanstalk-integ/GetEnvironmentUrl/Provider": [
@@ -382,135 +282,42 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "AWS679f53fac002430cb0da5b7982bd22872D164C4C"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/function.js:732:29)",
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "AwsCustomResourceSingletonFunction.ensureLambda (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/singleton-lambda.js:313:20)",
-        "new SingletonFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/singleton-lambda.js:176:40)",
-        "new SingletonFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new AwsCustomResourceSingletonFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resource-handlers/dist/custom-resources/aws-custom-resource-provider.generated.js:42:9)",
-        "new AwsCustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resources/lib/aws-custom-resource/aws-custom-resource.js:304:30)",
-        "new AwsCustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new TestStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:112:33)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:160:18)"
-      ]
     }
   ],
   "/aws-cdk-elasticbeanstalk-integ/HostedZone/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "HostedZoneDB99F866"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new HostedZone (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-route53/lib/hosted-zone.js:290:30)",
-        "new HostedZone (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new HostedZone (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PublicHostedZone (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-route53/lib/hosted-zone.js:482:13)",
-        "new PublicHostedZone (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new TestStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:126:22)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:160:18)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-elasticbeanstalk-integ/Alias/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "Alias325C5727"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new RecordSet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-route53/lib/record-set.js:391:31)",
-        "new RecordSet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new ARecord (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-route53/lib/record-set.js:560:13)",
-        "new ARecord (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new TestStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:130:42)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:160:18)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-elasticbeanstalk-integ/AliasWithHealthCheck/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "AliasWithHealthCheck61B4E872"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new RecordSet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-route53/lib/record-set.js:391:31)",
-        "new RecordSet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new ARecord (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-route53/lib/record-set.js:560:13)",
-        "new ARecord (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new TestStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:140:38)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:160:18)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-elasticbeanstalk-integ/GetEnvironmentUrl/Resource/Default": [
     {
       "type": "aws:cdk:logicalId",
       "data": "GetEnvironmentUrl8ABBCF5A"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new CustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/custom-resource.js:141:29)",
-        "new CustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new CustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new AwsCustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resources/lib/aws-custom-resource/aws-custom-resource.js:331:35)",
-        "new AwsCustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new TestStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:112:33)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:160:18)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-elasticbeanstalk-integ/GetEnvironmentUrl/CustomResourcePolicy/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "GetEnvironmentUrlCustomResourcePolicy09B7289C"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Policy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/policy.js:158:30)",
-        "new Policy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Policy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new AwsCustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resources/lib/aws-custom-resource/aws-custom-resource.js:372:32)",
-        "new AwsCustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new TestStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:112:33)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-route53-targets/test/integ.elastic-beanstalk-environment-target.js:160:18)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-elasticbeanstalk-integ/AWS679f53fac002430cb0da5b7982bd2287/ServiceRole/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "AWS679f53fac002430cb0da5b7982bd2287ServiceRoleC1EA0FF2"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/role.js:491:34)",
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/function.js:647:39)",
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "AwsCustomResourceSingletonFunction.ensureLambda (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/singleton-lambda.js:313:20)",
-        "new SingletonFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/singleton-lambda.js:176:40)",
-        "new SingletonFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new AwsCustomResourceSingletonFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resource-handlers/dist/custom-resources/aws-custom-resource-provider.generated.js:42:9)",
-        "new AwsCustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resources/lib/aws-custom-resource/aws-custom-resource.js:304:30)",
-        "new AwsCustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)"
-      ]
     }
   ],
   "/aws-cdk-elasticbeanstalk-integ/AWS679f53fac002430cb0da5b7982bd2287/Code/AssetBucket": [

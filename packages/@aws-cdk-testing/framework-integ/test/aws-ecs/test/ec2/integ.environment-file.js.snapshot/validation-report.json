@@ -3,36 +3,22 @@
   "title": "Validation Report",
   "pluginReports": [
     {
-      "pluginName": "Construct Annotations",
+      "pluginName": "CloudFormation Validate",
+      "pluginVersion": "1.6.0",
       "conclusion": "success",
       "violations": [
         {
-          "ruleName": "@aws-cdk/aws-ecs:shouldUseCircuitBreaker",
-          "description": "Enable the 'circuitBreaker' property to trigger a quicker deployment failure if tasks are failing to come start (without this setting deployments may take up to 3 hours to fail). [ack: @aws-cdk/aws-ecs:shouldUseCircuitBreaker]",
+          "ruleName": "F0001",
+          "description": "Resources section must exist and be non-empty",
           "severity": "warning",
+          "ruleMetadata": {
+            "category": "Structure"
+          },
           "violatingConstructs": [
             {
-              "constructPath": "aws-ecs-integ/Service",
-              "constructFqn": "aws-cdk-lib.aws_ecs.Ec2Service",
-              "libraryVersion": "0.0.0",
-              "stackTraces": [
-                "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-ecs/test/ec2/integ.environment-file.js:50:15)\nRun with '--debug' to include location info"
-              ]
-            }
-          ]
-        },
-        {
-          "ruleName": "@aws-cdk/aws-ecs:minHealthyPercent",
-          "description": "minHealthyPercent has not been configured so the default value of 50% is used. The number of running tasks will decrease below the desired count during deployments etc. See https://github.com/aws/aws-cdk/issues/31705 [ack: @aws-cdk/aws-ecs:minHealthyPercent]",
-          "severity": "warning",
-          "violatingConstructs": [
-            {
-              "constructPath": "aws-ecs-integ/Service",
-              "constructFqn": "aws-cdk-lib.aws_ecs.Ec2Service",
-              "libraryVersion": "0.0.0",
-              "stackTraces": [
-                "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-ecs/test/ec2/integ.environment-file.js:50:15)\nRun with '--debug' to include location info"
-              ]
+              "constructPath": "Integ/DefaultTest/DeployAssert",
+              "constructFqn": "aws-cdk-lib.Stack",
+              "libraryVersion": "0.0.0"
             }
           ]
         }

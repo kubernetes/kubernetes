@@ -163,7 +163,7 @@ const pipelineStack = new PipelineStack(app, 'CdkPipelineStepFunctionsActionStac
   },
 );
 
-pipelineStack.addDependency(stepFunctionStack);
+pipelineStack.addStackDependency(stepFunctionStack);
 
 new integ.IntegTest(app, 'integ-cross-account-pipeline-sfn-action', {
   testCases: [stepFunctionStack, pipelineStack],

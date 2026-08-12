@@ -195,7 +195,7 @@
       "Value": "SingleInstance"
      }
     ],
-    "SolutionStackName": "64bit Amazon Linux 2023 v6.11.1 running Node.js 22"
+    "SolutionStackName": "64bit Amazon Linux 2023 v6.11.6 running Node.js 22"
    },
    "DependsOn": [
     "Application"

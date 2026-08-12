@@ -3,21 +3,60 @@
   "title": "Validation Report",
   "pluginReports": [
     {
-      "pluginName": "Construct Annotations",
+      "pluginName": "CloudFormation Validate",
+      "pluginVersion": "1.6.0",
       "conclusion": "success",
+      "metadata": {},
       "violations": [
         {
-          "ruleName": "@aws-cdk/aws-codepipeline:unspecifiedPipelineType",
-          "description": "V1 pipeline type is implicitly selected when `pipelineType` is not set. If you want to use V2 type, set `PipelineType.V2`. [ack: @aws-cdk/aws-codepipeline:unspecifiedPipelineType]",
+          "ruleName": "F0001",
+          "description": "Resources section must exist and be non-empty",
           "severity": "warning",
+          "ruleMetadata": {
+            "category": "Structure"
+          },
           "violatingConstructs": [
             {
-              "constructPath": "CdkPipelineInvestigationStack/Pipeline",
-              "constructFqn": "aws-cdk-lib.pipelines.CodePipeline",
+              "constructPath": "CdkPipelineInvestigationTest/DefaultTest/DeployAssert",
+              "constructFqn": "aws-cdk-lib.Stack",
+              "libraryVersion": "0.0.0"
+            }
+          ]
+        },
+        {
+          "ruleName": "E1156",
+          "description": "Stages.3.Actions.1.RoleArn: 'arn:aws:iam::12345678:role/cdk-hnb659fds-deploy-role-12345678-test-region' does not match format 'AWS::IAM::Role.Arn'",
+          "severity": "warning",
+          "ruleMetadata": {
+            "category": "Intrinsic Function"
+          },
+          "violatingConstructs": [
+            {
+              "constructPath": "CdkPipelineInvestigationStack/Pipeline/Pipeline/Resource",
+              "constructFqn": "aws-cdk-lib.aws_codepipeline.CfnPipeline",
               "libraryVersion": "0.0.0",
-              "stackTraces": [
-                "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/pipelines/test/integ.cross-account-pipeline-action.js:142:23)\nRun with '--debug' to include location info"
-              ]
+              "cloudFormationResource": {
+                "templatePath": "CdkPipelineInvestigationStack.template.json",
+                "logicalId": "Pipeline9850B417",
+                "propertyPaths": [
+                  "Properties.Stages.3.Actions.1.RoleArn"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "ruleName": "W9012",
+          "description": "Invalid pseudo-parameter override(s): AWS::AccountId override '12345678' is not a 12-digit AWS account ID",
+          "severity": "warning",
+          "ruleMetadata": {
+            "category": "Best Practice"
+          },
+          "violatingConstructs": [
+            {
+              "constructPath": "CdkPipelineInvestigationStack",
+              "constructFqn": "aws-cdk-lib.Stack",
+              "libraryVersion": "0.0.0"
             }
           ]
         }

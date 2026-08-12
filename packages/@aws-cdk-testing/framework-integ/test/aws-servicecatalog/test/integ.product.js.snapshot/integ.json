@@ -1,5 +1,4 @@
 {
-  "enableLookups": true,
   "version": "54.0.0",
   "testCases": {
     "integ-product/DefaultTest": {
@@ -12,5 +11,6 @@
       "assertionStackName": "integproductDefaultTestDeployAssertEB23E2A9"
     }
   },
-  "minimumCliVersion": "2.1126.0"
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
 }

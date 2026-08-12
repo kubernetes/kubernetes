@@ -132,7 +132,7 @@ const pipelineStack = new PipelineStack(app, 'CdkPipelineInvestigationStack',
   },
 );
 
-pipelineStack.addDependency(sourceStack);
+pipelineStack.addStackDependency(sourceStack);
 
 new integ.IntegTest(app, 'CdkPipelineInvestigationTest', {
   testCases: [sourceStack, pipelineStack],

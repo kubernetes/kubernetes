@@ -31,16 +31,16 @@
         }
       }
     },
-    "a72522445441e9b66c2f16956c54d4786af8c61c156b80c48a6e7c32fcc49023": {
+    "98f62bef9320f8c0a0a7be21d7c746f069131f196f51ffe3008a6bb730b368ec": {
       "displayName": "TestAssetBucket/ProductAssetsDeployment/AwsCliLayer/Code",
       "source": {
-        "path": "asset.a72522445441e9b66c2f16956c54d4786af8c61c156b80c48a6e7c32fcc49023.zip",
+        "path": "asset.98f62bef9320f8c0a0a7be21d7c746f069131f196f51ffe3008a6bb730b368ec.zip",
         "packaging": "file"
       },
       "destinations": {
-        "12345678-test-region-a7e71721": {
+        "12345678-test-region-3895253a": {
           "bucketName": "cdk-hnb659fds-assets-12345678-test-region",
-          "objectKey": "a72522445441e9b66c2f16956c54d4786af8c61c156b80c48a6e7c32fcc49023.zip",
+          "objectKey": "98f62bef9320f8c0a0a7be21d7c746f069131f196f51ffe3008a6bb730b368ec.zip",
           "region": "test-region",
           "assumeRoleArn": "arn:${AWS::Partition}:iam::12345678:role/cdk-hnb659fds-file-publishing-role-12345678-test-region"
         }
@@ -77,7 +77,7 @@
       }
     },
     "b59f768286e16b69628bb23b9c1a1f07300a24101b8979d8e2a94ff1ab03d09e": {
-      "displayName": "TestProduct/Template152d238fd871",
+      "displayName": "TestProduct/Templatef2be850540ce",
       "source": {
         "path": "asset.b59f768286e16b69628bb23b9c1a1f07300a24101b8979d8e2a94ff1ab03d09e.json",
         "packaging": "file"
@@ -92,7 +92,7 @@
       }
     },
     "6412a5f4524c6b41d26fbeee226c68c2dad735393940a51008d77e6f8b1038f5": {
-      "displayName": "TestProduct/Template2a18393e8a31",
+      "displayName": "TestProduct/Template389bdde2f86c",
       "source": {
         "path": "asset.6412a5f4524c6b41d26fbeee226c68c2dad735393940a51008d77e6f8b1038f5.json",
         "packaging": "file"
@@ -136,16 +136,16 @@
         }
       }
     },
-    "6b5fe62cdc856924c566a00d9e374f97e4fc982f410fad530d1d3c038a566ca1": {
+    "bd2a44c4e87e4687bae0888a61dd359f4266e954a2a5ac21d3d4c84b16e2cf22": {
       "displayName": "integ-servicecatalog-product Template",
       "source": {
         "path": "integ-servicecatalog-product.template.json",
         "packaging": "file"
       },
       "destinations": {
-        "12345678-test-region-af307a05": {
+        "12345678-test-region-e52e9751": {
           "bucketName": "cdk-hnb659fds-assets-12345678-test-region",
-          "objectKey": "6b5fe62cdc856924c566a00d9e374f97e4fc982f410fad530d1d3c038a566ca1.json",
+          "objectKey": "bd2a44c4e87e4687bae0888a61dd359f4266e954a2a5ac21d3d4c84b16e2cf22.json",
           "region": "test-region",
           "assumeRoleArn": "arn:${AWS::Partition}:iam::12345678:role/cdk-hnb659fds-file-publishing-role-12345678-test-region"
         }

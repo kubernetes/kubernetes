@@ -10,5 +10,6 @@
       "assertionStackName": "awscdkcodepipelinecommandstestDefaultTestDeployAssert6662C09B"
     }
   },
-  "minimumCliVersion": "2.1126.0"
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
 }
