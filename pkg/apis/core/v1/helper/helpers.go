@@ -18,8 +18,9 @@ package helper
 
 import (
 	"fmt"
-	"k8s.io/klog/v2"
 	"strings"
+
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -301,20 +302,20 @@ func GetMatchingTolerations(logger klog.Logger, taints []v1.Taint, tolerations [
 	result := []v1.Toleration{}
 	for i := range taints {
 		tolerated := false
-		var firstErr error
+		var firstWarning error
 		for j := range tolerations {
-			matched, err := tolerations[j].ToleratesTaint(&taints[i], enableComparisonOperators)
+			matched, warning := tolerations[j].ToleratesTaint(&taints[i], enableComparisonOperators)
 			if matched {
 				result = append(result, tolerations[j])
 				tolerated = true
 				break
 			}
-			if firstErr == nil && err != nil {
-				firstErr = err
+			if firstWarning == nil && warning != nil {
+				firstWarning = warning
 			}
 		}
 		if !tolerated {
-			return false, []v1.Toleration{}, firstErr
+			return false, []v1.Toleration{}, firstWarning
 		}
 	}
 	return true, result, nil
