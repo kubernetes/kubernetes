@@ -699,7 +699,7 @@
    },
    "aws-us-gov": {
     "applicationId": "arn:aws-us-gov:serverlessrepo:us-gov-west-1:023102451235:applications/SecretsManagerMongoDBRotationSingleUser",
-    "semanticVersion": "1.1.397"
+    "semanticVersion": "1.1.384"
    }
   }
  },

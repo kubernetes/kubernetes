@@ -37,7 +37,7 @@ export class SecretRotationApplication {
   public static readonly MARIADB_ROTATION_SINGLE_USER = new SecretRotationApplication('SecretsManagerRDSMariaDBRotationSingleUser', '1.1.670', {
     additionalSemanticVersions: {
       'aws-cn': '1.1.442',
-      'aws-us-gov': '1.1.399',
+      'aws-us-gov': '1.1.383',
     },
   });
 
@@ -47,7 +47,7 @@ export class SecretRotationApplication {
   public static readonly MARIADB_ROTATION_MULTI_USER = new SecretRotationApplication('SecretsManagerRDSMariaDBRotationMultiUser', '1.1.670', {
     additionalSemanticVersions: {
       'aws-cn': '1.1.441',
-      'aws-us-gov': '1.1.398',
+      'aws-us-gov': '1.1.383',
     },
   });
 
@@ -57,7 +57,7 @@ export class SecretRotationApplication {
   public static readonly MYSQL_ROTATION_SINGLE_USER = new SecretRotationApplication('SecretsManagerRDSMySQLRotationSingleUser', '1.1.671', {
     additionalSemanticVersions: {
       'aws-cn': '1.1.440',
-      'aws-us-gov': '1.1.397',
+      'aws-us-gov': '1.1.384',
     },
   });
 
@@ -67,7 +67,7 @@ export class SecretRotationApplication {
   public static readonly MYSQL_ROTATION_MULTI_USER = new SecretRotationApplication('SecretsManagerRDSMySQLRotationMultiUser', '1.1.671', {
     additionalSemanticVersions: {
       'aws-cn': '1.1.440',
-      'aws-us-gov': '1.1.397',
+      'aws-us-gov': '1.1.383',
     },
   });
 
@@ -77,7 +77,7 @@ export class SecretRotationApplication {
   public static readonly ORACLE_ROTATION_SINGLE_USER = new SecretRotationApplication('SecretsManagerRDSOracleRotationSingleUser', '1.1.671', {
     additionalSemanticVersions: {
       'aws-cn': '1.1.441',
-      'aws-us-gov': '1.1.398',
+      'aws-us-gov': '1.1.382',
     },
   });
 
@@ -87,7 +87,7 @@ export class SecretRotationApplication {
   public static readonly ORACLE_ROTATION_MULTI_USER = new SecretRotationApplication('SecretsManagerRDSOracleRotationMultiUser', '1.1.671', {
     additionalSemanticVersions: {
       'aws-cn': '1.1.441',
-      'aws-us-gov': '1.1.398',
+      'aws-us-gov': '1.1.383',
     },
   });
 
@@ -97,7 +97,7 @@ export class SecretRotationApplication {
   public static readonly POSTGRES_ROTATION_SINGLE_USER = new SecretRotationApplication('SecretsManagerRDSPostgreSQLRotationSingleUser', '1.1.671', {
     additionalSemanticVersions: {
       'aws-cn': '1.1.440',
-      'aws-us-gov': '1.1.397',
+      'aws-us-gov': '1.1.383',
     },
   });
 
@@ -107,7 +107,7 @@ export class SecretRotationApplication {
   public static readonly POSTGRES_ROTATION_MULTI_USER = new SecretRotationApplication('SecretsManagerRDSPostgreSQLRotationMultiUser', '1.1.671', {
     additionalSemanticVersions: {
       'aws-cn': '1.1.440',
-      'aws-us-gov': '1.1.397',
+      'aws-us-gov': '1.1.383',
     },
   });
 
@@ -117,7 +117,7 @@ export class SecretRotationApplication {
   public static readonly SQLSERVER_ROTATION_SINGLE_USER = new SecretRotationApplication('SecretsManagerRDSSQLServerRotationSingleUser', '1.1.670', {
     additionalSemanticVersions: {
       'aws-cn': '1.1.441',
-      'aws-us-gov': '1.1.398',
+      'aws-us-gov': '1.1.383',
     },
   });
 
@@ -127,7 +127,7 @@ export class SecretRotationApplication {
   public static readonly SQLSERVER_ROTATION_MULTI_USER = new SecretRotationApplication('SecretsManagerRDSSQLServerRotationMultiUser', '1.1.671', {
     additionalSemanticVersions: {
       'aws-cn': '1.1.441',
-      'aws-us-gov': '1.1.398',
+      'aws-us-gov': '1.1.384',
     },
   });
 
@@ -137,7 +137,7 @@ export class SecretRotationApplication {
   public static readonly REDSHIFT_ROTATION_SINGLE_USER = new SecretRotationApplication('SecretsManagerRedshiftRotationSingleUser', '1.1.671', {
     additionalSemanticVersions: {
       'aws-cn': '1.1.441',
-      'aws-us-gov': '1.1.398',
+      'aws-us-gov': '1.1.383',
     },
   });
 
@@ -147,7 +147,7 @@ export class SecretRotationApplication {
   public static readonly REDSHIFT_ROTATION_MULTI_USER = new SecretRotationApplication('SecretsManagerRedshiftRotationMultiUser', '1.1.671', {
     additionalSemanticVersions: {
       'aws-cn': '1.1.440',
-      'aws-us-gov': '1.1.397',
+      'aws-us-gov': '1.1.383',
     },
   });
 
@@ -157,7 +157,7 @@ export class SecretRotationApplication {
   public static readonly MONGODB_ROTATION_SINGLE_USER = new SecretRotationApplication('SecretsManagerMongoDBRotationSingleUser', '1.1.671', {
     additionalSemanticVersions: {
       'aws-cn': '1.1.440',
-      'aws-us-gov': '1.1.397',
+      'aws-us-gov': '1.1.384',
     },
   });
 
@@ -167,7 +167,7 @@ export class SecretRotationApplication {
   public static readonly MONGODB_ROTATION_MULTI_USER = new SecretRotationApplication('SecretsManagerMongoDBRotationMultiUser', '1.1.671', {
     additionalSemanticVersions: {
       'aws-cn': '1.1.441',
-      'aws-us-gov': '1.1.398',
+      'aws-us-gov': '1.1.384',
     },
   });
 
@@ -177,7 +177,7 @@ export class SecretRotationApplication {
   public static readonly DB2_ROTATION_SINGLE_USER = new SecretRotationApplication('SecretsManagerRDSDb2RotationSingleUser', '1.1.271', {
     additionalSemanticVersions: {
       'aws-cn': '1.1.242',
-      'aws-us-gov': '1.1.199',
+      'aws-us-gov': '1.1.222',
     },
   });
 
@@ -187,7 +187,7 @@ export class SecretRotationApplication {
   public static readonly DB2_ROTATION_MULTI_USER = new SecretRotationApplication('SecretsManagerRDSDb2RotationMultiUser', '1.1.272', {
     additionalSemanticVersions: {
       'aws-cn': '1.1.240',
-      'aws-us-gov': '1.1.197',
+      'aws-us-gov': '1.1.223',
     },
   });
 
