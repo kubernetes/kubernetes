@@ -1145,15 +1145,24 @@ Alternatively, existing security groups can be used by specifying the `securityG
 
 As IPv4 addresses are running out, many AWS services are adding support for IPv6 or Dualstack (IPv4 and IPv6 support) for their VPC Endpoints.
 
-IPv6 and Dualstack address types can be configured by using:
+IPv6 and Dualstack address types can be configured for both interface and gateway endpoints using `ipAddressType` and `dnsRecordIpType`:
 
 ```ts fixture=with-vpc
+// Interface endpoint with IPv6
 vpc.addInterfaceEndpoint('ExampleEndpoint', {
   service: ec2.InterfaceVpcEndpointAwsService.ECR,
   ipAddressType: ec2.VpcEndpointIpAddressType.IPV6,
   dnsRecordIpType: ec2.VpcEndpointDnsRecordIpType.IPV6,
 });
+
+// Gateway endpoint with dualstack
+vpc.addGatewayEndpoint('S3DualstackEndpoint', {
+  service: ec2.GatewayVpcEndpointAwsService.S3,
+  ipAddressType: ec2.VpcEndpointIpAddressType.DUALSTACK,
+  dnsRecordIpType: ec2.VpcEndpointDnsRecordIpType.DUALSTACK,
+});
 ```
+
 The possible values for `ipAddressType` are:
 * `IPV4` This option is supported only if all selected subnets have IPv4 address ranges and the endpoint service accepts IPv4 requests.
 * `IPV6` This option is supported only if all selected subnets are IPv6 only subnets and the endpoint service accepts IPv6 requests.
