@@ -2773,7 +2773,7 @@
     endpoint: /metrics
 - name: changes
   subsystem: endpoint_slice_controller
-  help: Number of EndpointSlice changes
+  help: Number of EndpointSlice changes. Deprecated in favor of endpoint_slice_controller_changes_total.
   type: Counter
   deprecatedVersion: 1.38.0
   stabilityLevel: ALPHA
