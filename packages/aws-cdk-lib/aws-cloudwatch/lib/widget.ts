@@ -54,8 +54,8 @@ export abstract class ConcreteWidget implements IWidget {
   protected x?: number;
   protected y?: number;
 
-  public readonly warnings: string[] | undefined = [];
-  public readonly warningsV2: { [id: string]: string } | undefined = {};
+  public readonly warnings?: string[] = [];
+  public readonly warningsV2?: { [id: string]: string } = {};
 
   constructor(width: number, height: number) {
     this.width = width;
