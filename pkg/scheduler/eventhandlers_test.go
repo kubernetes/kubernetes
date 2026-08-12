@@ -1054,6 +1054,15 @@ func TestUpdatePod(t *testing.T) {
 			expectInActiveQ: true,
 		},
 		{
+			name:            "recreated pod with a different UID while the previous one waits on permit",
+			oldPod:          pod,
+			assumedPod:      scheduledPod,
+			newPod:          recreatedPod,
+			waitingOnPermit: true,
+			expectInQueue:   recreatedPod,
+			expectInActiveQ: true,
+		},
+		{
 			name:                             "recreated unscheduled pod group member with a different UID",
 			oldPod:                           unscheduledPodGroupMember,
 			newPod:                           recreatedUnscheduledPodGroupMember,
@@ -1203,7 +1212,10 @@ func TestUpdatePod(t *testing.T) {
 				}
 			}
 
-			if tt.oldPod.UID != tt.newPod.UID {
+			// A Pod that was rejected on Permit is deliberately left in the cache by
+			// handleAssumedPodDeletion: its binding cycle unwinds through
+			// handleBindingCycleError on the binding goroutine, which this test does not run.
+			if tt.oldPod.UID != tt.newPod.UID && !tt.waitingOnPermit {
 				if oldCached, err := sched.Cache.GetPod(tt.oldPod); err == nil {
 					t.Errorf("Expected pod UID %v to be evicted from cache, but it is still there", oldCached.UID)
 				}

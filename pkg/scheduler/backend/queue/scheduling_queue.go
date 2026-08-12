@@ -28,6 +28,7 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -887,6 +888,23 @@ func (p *PriorityQueue) addPod(ctx context.Context, pod *v1.Pod) {
 	// Furthermore, this must be called before moveToActiveQ to prevent a potential data race,
 	// where an active scheduler loop could pop and process the pod before its nomination is recorded.
 	p.nominator.addNominatedPod(logger, pInfo.PodInfo, nil)
+	// An Add event means that this namespace/name slot now belongs to pInfo.Pod.UID, so any
+	// leftover of the previous occupant has to go. This matters for a Pod that was deleted
+	// while it was in flight: Delete could not see it, its failure handler requeued it anyway
+	// because podSuperseded deliberately ignores a NotFound, and no further event will ever
+	// carry its UID. moveToActiveQ evicts such a leftover from unschedulableEntities and the
+	// activeQ heap replaces it, but neither touches the backoffQ, even though moveToActiveQ
+	// documents that the entity has to be removed from there first. Without this, the leftover
+	// stays in the backoffQ next to the live Pod in the activeQ, and flushBackoffQCompleted
+	// later overwrites the live entry with the dead one through heap.AddOrUpdate.
+	//
+	// This runs before the pod group branch below, so that a name reused by a group member
+	// clears the leftover as well. Queue keys are prefixed with the entity type, so a delete by
+	// a Pod key can never remove a queued PodGroup.
+	if stale := p.backoffQ.delete(pInfo); stale != nil {
+		logger.V(3).Info("Evicted a stale entry from the backoffQ on add of the Pod that owns its key", "pod", klog.KObj(pod))
+		decreaseUnschedulableReasonMetric(stale)
+	}
 	if p.isPodGroupMember(pod) {
 		p.addPodGroupMember(logger, pInfo)
 		return
@@ -1083,6 +1101,21 @@ func (p *PriorityQueue) AddUnschedulablePodIfNotPresent(logger klog.Logger, pInf
 	}()
 
 	pod := pInfo.Pod
+
+	// pInfo is a snapshot taken when this Pod was popped. While the attempt was running, the
+	// Pod may have been deleted and recreated under the same name with a different UID; the
+	// informer collapses that into a single update event, which Scheduler.updatePod splits
+	// into deletePod(old) and addPod(new). Requeueing the stale instance would park a dead Pod
+	// in the live Pod's namespace/name slot, and the live Pod's own requeue would then fail
+	// with "already present" and be dropped from the queue by the deferred Done above.
+	//
+	// The three checks below cannot catch this. They are keyed by type/namespace/name and find
+	// nothing once the recreated Pod has been popped, and for pod group members they can never
+	// match a Pod at all, because the queued entity is keyed by the PodGroup.
+	if p.podSuperseded(logger, pod) {
+		return ErrPodSuperseded
+	}
+
 	if p.unschedulableEntities.get(pInfo) != nil {
 		return fmt.Errorf("Pod %v is already present in unschedulable queue", klog.KObj(pod))
 	}
@@ -1530,6 +1563,40 @@ func (p *PriorityQueue) deletePodGroupMember(logger klog.Logger, pod *v1.Pod) {
 	if queue == activeQ || (p.isPopFromBackoffQEnabled && queue == backoffQ) {
 		p.activeQ.broadcast()
 	}
+}
+
+// ErrPodSuperseded is returned by AddUnschedulablePodIfNotPresent when the Pod that finished
+// this scheduling attempt is no longer the Pod that owns its namespace/name.
+var ErrPodSuperseded = errors.New("pod was recreated during its scheduling attempt")
+
+// podSuperseded reports whether pod has been replaced by a Pod with the same namespace/name
+// and a different UID.
+//
+// Callers MUST hold p.lock; that is what makes the check race-free. client-go writes the
+// informer indexer before dispatching the notification that later drives Add and Delete on
+// this queue, and both of those take p.lock. So a read taken under p.lock is at least as
+// fresh as every queue mutation that has already been applied. Either the informer has
+// already run, and this read sees the new UID, or it has not, and Delete will remove
+// whatever we insert. The equivalent check in handleSchedulingFailure holds no lock and
+// works off a read taken earlier in the function, so it gives neither guarantee.
+//
+// A NotFound is deliberately not treated as superseded, which keeps today's behaviour for a
+// Pod that was plainly deleted. Its stale entry is either evicted by a later Add that reuses
+// the name, or picked up by the unschedulable leftover flush, attempted once more and then
+// dropped by the failure handler, which sees the NotFound itself. That costs one wasted
+// scheduling cycle; rejecting on NotFound here would be the complete fix.
+func (p *PriorityQueue) podSuperseded(logger klog.Logger, pod *v1.Pod) bool {
+	if p.podLister == nil {
+		// Only unit tests build the queue without a lister.
+		return false
+	}
+	livePod, err := p.podLister.Pods(pod.Namespace).Get(pod.Name)
+	if err != nil || livePod.UID == pod.UID {
+		return false
+	}
+	logger.V(2).Info("Pod was recreated with a different UID while it was being scheduled, not requeueing the previous instance",
+		"pod", klog.KObj(pod), "staleUID", pod.UID, "currentUID", livePod.UID)
+	return true
 }
 
 // deletePod removes an individual pod from the queue.

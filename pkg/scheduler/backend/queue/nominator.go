@@ -94,6 +94,23 @@ func (npm *nominator) addNominatedPodUnlocked(logger klog.Logger, pi fwk.PodInfo
 			logger.V(4).Info("Pod doesn't exist in podLister, aborted adding it to the nominator", "pod", klog.KObj(pi.GetPod()))
 			return
 		}
+		if updatedPod.UID != pi.GetPod().UID {
+			// The Pod was deleted and recreated under the same name while this instance was
+			// being scheduled. The caller that gets here is Scheduler.unreserveAndForget, which
+			// restores the nomination that Assume had removed, working off the Pod snapshot
+			// taken at Pop. It runs before the failure handler and outside the requeue path, so
+			// neither the UID check in handleSchedulingFailure nor the one in
+			// AddUnschedulablePodIfNotPresent can stop it, and this is the last place that can.
+			//
+			// Recording the nomination here would be permanent. The nominator is keyed by UID
+			// and every cleanup path is driven by an event, but every future event for this
+			// namespace/name carries the new UID. It would not stay harmless either, because
+			// nominatedPodToInfo resolves a nomination by namespace/name, so the entry would
+			// pull in the recreated Pod and keep the node accounted for against it in every
+			// Filter run for as long as the scheduler is up.
+			logger.V(4).Info("Pod was recreated with a different UID, aborted adding the previous instance to the nominator", "pod", klog.KObj(pi.GetPod()), "staleUID", pi.GetPod().UID, "currentUID", updatedPod.UID)
+			return
+		}
 		if updatedPod.Spec.NodeName != "" {
 			logger.V(4).Info("Pod is already scheduled to a node, aborted adding it to the nominator", "pod", klog.KObj(pi.GetPod()), "node", updatedPod.Spec.NodeName)
 			return
