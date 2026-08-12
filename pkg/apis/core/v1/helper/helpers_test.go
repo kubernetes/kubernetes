@@ -685,7 +685,7 @@ func TestGetMatchingTolerations(t *testing.T) {
 		tolerations                 []v1.Toleration
 		taints                      []v1.Taint
 		expectTolerated             bool
-		expectError                 bool
+		expectWarning               bool
 		enableComparisonOperatorsFG bool
 	}{
 		{
@@ -706,7 +706,7 @@ func TestGetMatchingTolerations(t *testing.T) {
 				},
 			},
 			expectTolerated:             false,
-			expectError:                 true,
+			expectWarning:               true,
 			enableComparisonOperatorsFG: true,
 		},
 	}
@@ -714,9 +714,9 @@ func TestGetMatchingTolerations(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintTolerationComparisonOperators, tc.enableComparisonOperatorsFG)
-			tolerated, matching, err := GetMatchingTolerations(logger, tc.taints, tc.tolerations)
-			if (err != nil) != tc.expectError {
-				t.Errorf("expect error %v, got %v", tc.expectError, err)
+			tolerated, matching, warning := GetMatchingTolerations(logger, tc.taints, tc.tolerations)
+			if (warning != nil) != tc.expectWarning {
+				t.Errorf("expect warning %v, got %v", tc.expectWarning, warning)
 			}
 			if tc.expectTolerated != tolerated {
 				t.Errorf("expect tolerated %v, got %v", tc.expectTolerated, tolerated)

@@ -62,17 +62,17 @@ func GetAvoidPodsFromNodeAnnotations(annotations map[string]string) (v1.AvoidPod
 
 // TolerationsTolerateTaint checks if taint is tolerated by any of the tolerations.
 func TolerationsTolerateTaint(logger klog.Logger, tolerations []v1.Toleration, taint *v1.Taint, enableComparisonOperators bool) (bool, error) {
-	var firstErr error
+	var firstWarning error
 	for i := range tolerations {
-		tolerated, err := tolerations[i].ToleratesTaint(taint, enableComparisonOperators)
+		tolerated, warning := tolerations[i].ToleratesTaint(taint, enableComparisonOperators)
 		if tolerated {
 			return true, nil
 		}
-		if firstErr == nil && err != nil {
-			firstErr = err
+		if firstWarning == nil && warning != nil {
+			firstWarning = warning
 		}
 	}
-	return false, firstErr
+	return false, firstWarning
 }
 
 type taintsFilterFunc func(*v1.Taint) bool
@@ -85,14 +85,14 @@ type taintsFilterFunc func(*v1.Taint) bool
 // Returns false if all taints are tolerated.
 func FindMatchingUntoleratedTaint(logger klog.Logger, taints []v1.Taint, tolerations []v1.Toleration, inclusionFilter taintsFilterFunc, enableComparisonOperators bool) (v1.Taint, bool, error) {
 	filteredTaints := getFilteredTaints(taints, inclusionFilter)
-	var firstErrTaint v1.Taint
-	var firstErr error
+	var firstWarningTaint v1.Taint
+	var firstWarning error
 	for _, taint := range filteredTaints {
-		tolerated, err := TolerationsTolerateTaint(logger, tolerations, &taint, enableComparisonOperators)
-		if err != nil {
-			if firstErr == nil {
-				firstErr = err
-				firstErrTaint = taint
+		tolerated, warning := TolerationsTolerateTaint(logger, tolerations, &taint, enableComparisonOperators)
+		if warning != nil {
+			if firstWarning == nil {
+				firstWarning = warning
+				firstWarningTaint = taint
 			}
 			continue
 		}
@@ -100,8 +100,8 @@ func FindMatchingUntoleratedTaint(logger klog.Logger, taints []v1.Taint, tolerat
 			return taint, true, nil
 		}
 	}
-	if firstErr != nil {
-		return firstErrTaint, true, firstErr
+	if firstWarning != nil {
+		return firstWarningTaint, true, firstWarning
 	}
 	return v1.Taint{}, false, nil
 }

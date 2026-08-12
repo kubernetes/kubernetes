@@ -61,7 +61,10 @@ func (pl *fooPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.P
 		return nil
 	}
 
-	tolerates, _ := corev1.TolerationsTolerateTaint(logger, pod.Spec.Tolerations, &nodeInfo.Node().Spec.Taints[0], utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators))
+	tolerates, err := corev1.TolerationsTolerateTaint(logger, pod.Spec.Tolerations, &nodeInfo.Node().Spec.Taints[0], utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators))
+	if err != nil {
+		return fwk.AsStatus(err)
+	}
 	if tolerates {
 		return nil
 	}
