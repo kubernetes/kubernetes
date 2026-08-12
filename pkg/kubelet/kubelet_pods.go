@@ -160,7 +160,7 @@ func (kl *Kubelet) getKubeletMappings(idsPerPod uint32) (uint32, uint32, error) 
 	execName := "getsubids"
 	cmd, err := exec.LookPath(execName)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if goerrors.Is(err, exec.ErrNotFound) {
 			klog.V(2).InfoS("user namespaces: executable not found, using default mappings", "executable", execName, "err", err)
 			return defaultFirstID, defaultLen, nil
 		}
