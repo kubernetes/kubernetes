@@ -47,6 +47,10 @@ func (t *Toleration) MatchToleration(tolerationToMatch *Toleration) bool {
 //     between toleration.value and taint.value.
 //  5. If enableComparisonOperators is false and the toleration uses 'Lt' or 'Gt'
 //     operators, the toleration does not match (returns false).
+//
+// The bool reports whether the toleration matches the taint.
+// The error is non-nil only when operator is Gt or Lt, comparison operators are
+// enabled, and the toleration or taint value is not a valid int64. In that case the bool is false.
 func (t *Toleration) ToleratesTaint(taint *Taint, enableComparisonOperators bool) (bool, error) {
 	if len(t.Effect) > 0 && t.Effect != taint.Effect {
 		return false, nil

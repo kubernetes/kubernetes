@@ -72,10 +72,14 @@ func (pl *NodeUnschedulable) isSchedulableAfterTargetPodTolerationChange(logger 
 	// - Taint can be added, but can't be modified nor removed.
 	// - If the Pod already has the toleration, it shouldn't have rejected by this plugin in the first place.
 	//   Meaning, here this Pod has been rejected by this plugin, and hence it shouldn't have the toleration yet.
-	toleratesUnschedulable, _ := v1helper.TolerationsTolerateTaint(logger, modifiedPod.Spec.Tolerations, &v1.Taint{
+	// A comparison warning means the toleration did not match, so the hint stays QueueSkip.
+	toleratesUnschedulable, err := v1helper.TolerationsTolerateTaint(modifiedPod.Spec.Tolerations, &v1.Taint{
 		Key:    v1.TaintNodeUnschedulable,
 		Effect: v1.TaintEffectNoSchedule,
 	}, pl.enableTaintTolerationComparisonOperators)
+	if err != nil {
+		logger.V(4).Info("Unschedulable taint value is not a valid integer for Gt/Lt comparison, treating taint as not tolerated", "warning", err)
+	}
 	if toleratesUnschedulable {
 		// This update makes the pod tolerate the unschedulable taint.
 		logger.V(5).Info("a new toleration is added for the unschedulable Pod, and it may make it schedulable", "pod", klog.KObj(modifiedPod))
@@ -130,10 +134,14 @@ func (pl *NodeUnschedulable) Filter(ctx context.Context, _ fwk.CycleState, pod *
 
 	logger := klog.FromContext(ctx)
 	// If pod tolerate unschedulable taint, it's also tolerate `node.Spec.Unschedulable`.
-	podToleratesUnschedulable, _ := v1helper.TolerationsTolerateTaint(logger, pod.Spec.Tolerations, &v1.Taint{
+	// A comparison warning means the pod does not tolerate the taint, so the status stays ErrReasonUnschedulable.
+	podToleratesUnschedulable, err := v1helper.TolerationsTolerateTaint(pod.Spec.Tolerations, &v1.Taint{
 		Key:    v1.TaintNodeUnschedulable,
 		Effect: v1.TaintEffectNoSchedule,
 	}, pl.enableTaintTolerationComparisonOperators)
+	if err != nil {
+		logger.V(4).Info("Unschedulable taint value is not a valid integer for Gt/Lt comparison, treating taint as not tolerated", "warning", err)
+	}
 	if !podToleratesUnschedulable {
 		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonUnschedulable)
 	}

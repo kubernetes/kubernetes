@@ -471,8 +471,8 @@ func TestTaintTolerationFilter(t *testing.T) {
 				t.Fatalf("creating plugin: %v", err)
 			}
 			gotStatus := p.(fwk.FilterPlugin).Filter(ctx, nil, test.pod, nodeInfo)
-			if test.wantStatus.Code() != gotStatus.Code() || test.wantStatus.Message() != gotStatus.Message() {
-				t.Errorf("Unexpected status (-want,+got):\n%s", cmp.Diff(test.wantStatus, gotStatus))
+			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+				t.Errorf("Unexpected status (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -557,8 +557,8 @@ func TestTaintTolerationFilterWithFeatureGate(t *testing.T) {
 				t.Fatalf("creating plugin: %v", err)
 			}
 			gotStatus := p.(fwk.FilterPlugin).Filter(ctx, nil, test.pod, nodeInfo)
-			if test.wantStatus.Code() != gotStatus.Code() || test.wantStatus.Message() != gotStatus.Message() {
-				t.Errorf("Unexpected status (-want,+got):\n%s", cmp.Diff(test.wantStatus, gotStatus))
+			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+				t.Errorf("Unexpected status (-want,+got):\n%s", diff)
 			}
 		})
 	}

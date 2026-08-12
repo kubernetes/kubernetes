@@ -23,7 +23,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2/ktesting"
 )
 
 // TestPodPriority tests PodPriority function.
@@ -645,14 +644,13 @@ func TestGetAvoidPodsFromNode(t *testing.T) {
 }
 
 func TestFindMatchingUntoleratedTaint(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
 		description                 string
 		tolerations                 []v1.Toleration
 		taints                      []v1.Taint
 		applyFilter                 taintsFilterFunc
 		expectTolerated             bool
-		expectError                 bool
+		expectErr                   bool
 		expectUntoleratedTaint      *v1.Taint
 		enableComparisonOperatorsFG bool
 	}{
@@ -834,7 +832,7 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 			},
 			applyFilter:                 func(t *v1.Taint) bool { return true },
 			expectTolerated:             false,
-			expectError:                 true,
+			expectErr:                   true,
 			enableComparisonOperatorsFG: true,
 		},
 		{
@@ -861,7 +859,7 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 			},
 			applyFilter:     func(t *v1.Taint) bool { return true },
 			expectTolerated: false,
-			expectError:     false,
+			expectErr:       false,
 			expectUntoleratedTaint: &v1.Taint{
 				Key:    "dedicated",
 				Value:  "gpu",
@@ -893,7 +891,7 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 			},
 			applyFilter:     func(t *v1.Taint) bool { return true },
 			expectTolerated: false,
-			expectError:     false,
+			expectErr:       false,
 			expectUntoleratedTaint: &v1.Taint{
 				Key:    "dedicated",
 				Value:  "gpu",
@@ -930,9 +928,9 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		untoleratedTaint, untolerated, err := FindMatchingUntoleratedTaint(logger, tc.taints, tc.tolerations, tc.applyFilter, tc.enableComparisonOperatorsFG)
-		if (err != nil) != tc.expectError {
-			t.Errorf("[%s] expect error %v, got %v", tc.description, tc.expectError, err)
+		untoleratedTaint, untolerated, err := FindMatchingUntoleratedTaint(tc.taints, tc.tolerations, tc.applyFilter, tc.enableComparisonOperatorsFG)
+		if (err != nil) != tc.expectErr {
+			t.Errorf("[%s] expect error %v, got %v", tc.description, tc.expectErr, err)
 		}
 		if tc.expectTolerated != !untolerated {
 			filteredTaints := []v1.Taint{}

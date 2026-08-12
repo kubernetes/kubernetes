@@ -308,7 +308,7 @@ func GetReadySchedulableNodes(ctx context.Context, c clientset.Interface) (nodes
 		return nil, fmt.Errorf("listing schedulable nodes error: %w", err)
 	}
 	Filter(nodes, func(node v1.Node) bool {
-		return IsNodeSchedulable(logger, &node) && isNodeUntainted(logger, &node)
+		return IsNodeSchedulable(logger, &node) && isNodeUntainted(&node)
 	})
 	if len(nodes.Items) == 0 {
 		return nil, fmt.Errorf("there are currently no ready, schedulable nodes in the cluster")
@@ -365,13 +365,13 @@ func GetReadyNodesIncludingTainted(ctx context.Context, c clientset.Interface) (
 
 // isNodeUntainted tests whether a fake pod can be scheduled on "node", given its current taints.
 // TODO: need to discuss wether to return bool and error type
-func isNodeUntainted(logger klog.Logger, node *v1.Node) bool {
-	return isNodeUntaintedWithNonblocking(logger, node, "")
+func isNodeUntainted(node *v1.Node) bool {
+	return isNodeUntaintedWithNonblocking(node, "")
 }
 
 // isNodeUntaintedWithNonblocking tests whether a fake pod can be scheduled on "node"
 // but allows for taints in the list of non-blocking taints.
-func isNodeUntaintedWithNonblocking(logger klog.Logger, node *v1.Node, nonblockingTaints string) bool {
+func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) bool {
 	// Simple lookup for nonblocking taints based on comma-delimited list.
 	nonblockingTaintsMap := map[string]struct{}{}
 	for _, t := range strings.Split(nonblockingTaints, ",") {
@@ -392,10 +392,10 @@ func isNodeUntaintedWithNonblocking(logger klog.Logger, node *v1.Node, nonblocki
 		n = nodeCopy
 	}
 
-	return toleratesTaintsWithNoScheduleNoExecuteEffects(logger, n.Spec.Taints, nil)
+	return toleratesTaintsWithNoScheduleNoExecuteEffects(n.Spec.Taints, nil)
 }
 
-func toleratesTaintsWithNoScheduleNoExecuteEffects(logger klog.Logger, taints []v1.Taint, tolerations []v1.Toleration) bool {
+func toleratesTaintsWithNoScheduleNoExecuteEffects(taints []v1.Taint, tolerations []v1.Toleration) bool {
 	filteredTaints := []v1.Taint{}
 	for _, taint := range taints {
 		if taint.Effect == v1.TaintEffectNoExecute || taint.Effect == v1.TaintEffectNoSchedule {
@@ -450,7 +450,7 @@ func IsNodeReady(logger klog.Logger, node *v1.Node) bool {
 // 2) it also returns true from IsNodeReady
 // 3) it also returns true from isNodeUntainted
 func isNodeSchedulableWithoutTaints(logger klog.Logger, node *v1.Node) bool {
-	return IsNodeSchedulable(logger, node) && isNodeUntainted(logger, node)
+	return IsNodeSchedulable(logger, node) && isNodeUntainted(node)
 }
 
 // hasNonblockingTaint returns true if the node contains at least

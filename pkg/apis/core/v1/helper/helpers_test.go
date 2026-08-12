@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -679,13 +678,12 @@ func TestNodeSelectorRequirementKeyExistsInNodeSelectorTerms(t *testing.T) {
 }
 
 func TestGetMatchingTolerations(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
 		description                 string
 		tolerations                 []v1.Toleration
 		taints                      []v1.Taint
 		expectTolerated             bool
-		expectError                 bool
+		expectErr                   bool
 		enableComparisonOperatorsFG bool
 	}{
 		{
@@ -706,7 +704,7 @@ func TestGetMatchingTolerations(t *testing.T) {
 				},
 			},
 			expectTolerated:             false,
-			expectError:                 true,
+			expectErr:                   true,
 			enableComparisonOperatorsFG: true,
 		},
 	}
@@ -714,9 +712,9 @@ func TestGetMatchingTolerations(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintTolerationComparisonOperators, tc.enableComparisonOperatorsFG)
-			tolerated, matching, err := GetMatchingTolerations(logger, tc.taints, tc.tolerations)
-			if (err != nil) != tc.expectError {
-				t.Errorf("expect error %v, got %v", tc.expectError, err)
+			tolerated, matching, err := GetMatchingTolerations(tc.taints, tc.tolerations)
+			if (err != nil) != tc.expectErr {
+				t.Errorf("expect error %v, got %v", tc.expectErr, err)
 			}
 			if tc.expectTolerated != tolerated {
 				t.Errorf("expect tolerated %v, got %v", tc.expectTolerated, tolerated)

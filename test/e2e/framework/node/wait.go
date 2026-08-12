@@ -305,11 +305,11 @@ func readyForTests(logger klog.Logger, node *v1.Node, nonblockingTaints string) 
 	if hasNonblockingTaint(node, nonblockingTaints) {
 		// If the node has one of the nonblockingTaints taints; just check that it is ready
 		// and don't require node.Spec.Unschedulable to be set either way.
-		if !IsNodeReady(logger, node) || !isNodeUntaintedWithNonblocking(logger, node, nonblockingTaints) {
+		if !IsNodeReady(logger, node) || !isNodeUntaintedWithNonblocking(node, nonblockingTaints) {
 			return false
 		}
 	} else {
-		if !IsNodeSchedulable(logger, node) || !isNodeUntainted(logger, node) {
+		if !IsNodeSchedulable(logger, node) || !isNodeUntainted(node) {
 			return false
 		}
 	}

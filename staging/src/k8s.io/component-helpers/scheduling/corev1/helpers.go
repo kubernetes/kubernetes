@@ -21,7 +21,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
-	"k8s.io/klog/v2"
 )
 
 // PodPriority returns priority of the given pod.
@@ -61,7 +60,7 @@ func GetAvoidPodsFromNodeAnnotations(annotations map[string]string) (v1.AvoidPod
 }
 
 // TolerationsTolerateTaint checks if taint is tolerated by any of the tolerations.
-func TolerationsTolerateTaint(logger klog.Logger, tolerations []v1.Toleration, taint *v1.Taint, enableComparisonOperators bool) (bool, error) {
+func TolerationsTolerateTaint(tolerations []v1.Toleration, taint *v1.Taint, enableComparisonOperators bool) (bool, error) {
 	var firstErr error
 	for i := range tolerations {
 		tolerated, err := tolerations[i].ToleratesTaint(taint, enableComparisonOperators)
@@ -83,12 +82,12 @@ type taintsFilterFunc func(*v1.Taint) bool
 // get a stable result regardless of taint order.
 // Returns true if there is an untolerated taint (or only comparison errors).
 // Returns false if all taints are tolerated.
-func FindMatchingUntoleratedTaint(logger klog.Logger, taints []v1.Taint, tolerations []v1.Toleration, inclusionFilter taintsFilterFunc, enableComparisonOperators bool) (v1.Taint, bool, error) {
+func FindMatchingUntoleratedTaint(taints []v1.Taint, tolerations []v1.Toleration, inclusionFilter taintsFilterFunc, enableComparisonOperators bool) (v1.Taint, bool, error) {
 	filteredTaints := getFilteredTaints(taints, inclusionFilter)
 	var firstErrTaint v1.Taint
 	var firstErr error
 	for _, taint := range filteredTaints {
-		tolerated, err := TolerationsTolerateTaint(logger, tolerations, &taint, enableComparisonOperators)
+		tolerated, err := TolerationsTolerateTaint(tolerations, &taint, enableComparisonOperators)
 		if err != nil {
 			if firstErr == nil {
 				firstErr = err
