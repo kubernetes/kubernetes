@@ -1455,6 +1455,26 @@ endpoint_slice_controller_endpoints_removed_per_sync_count 1
 	}
 }
 
+func TestReconcileEndpointSlicesMetrics_ChangesTotal_CollectAndCompare(t *testing.T) {
+	resetMetrics()
+	client := newClientset()
+	namespace := "test"
+	svc, _ := newServiceAndEndpointMeta("foo", namespace)
+
+	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+	reconcileHelper(t, r, &svc, []*corev1.Pod{}, []*discovery.EndpointSlice{}, time.Now())
+
+	want := `
+# HELP endpoint_slice_controller_changes_total [ALPHA] Number of EndpointSlice changes
+# TYPE endpoint_slice_controller_changes_total counter
+endpoint_slice_controller_changes_total{operation="create"} 1
+`
+
+	if err := testutil.CollectAndCompare(metrics.EndpointSliceChangesTotal, strings.NewReader(want), "endpoint_slice_controller_changes_total"); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestReconcileEndpointSlicesMetrics_GaugeUpdates(t *testing.T) {
 	resetMetrics()
 	client := newClientset()
@@ -2677,6 +2697,7 @@ func resetMetrics() {
 	metrics.EndpointsAddedPerSync.Reset()
 	metrics.EndpointsRemovedPerSync.Reset()
 	metrics.EndpointSliceChanges.Reset()
+	metrics.EndpointSliceChangesTotal.Reset()
 	metrics.EndpointSlicesChangedPerSync.Reset()
 	metrics.EndpointSliceSyncs.Reset()
 	metrics.ServicesCountByTrafficDistribution.Reset()
