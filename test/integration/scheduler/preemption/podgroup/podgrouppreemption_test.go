@@ -3389,35 +3389,51 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 
 // TestDisablePodGroupPreemption verifies that podgroup preemption does not happen if default preemption plugin is disabled.
 func TestDisablePodGroupPreemption(t *testing.T) {
-	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.GenericWorkload: true,
-	})
+	for _, asyncPreemptionEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("TestDisablePodGroupPreemption (Async preemption enabled: %v)", asyncPreemptionEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:          true,
+				features.SchedulerAsyncPreemption: asyncPreemptionEnabled,
+			})
 
-	// Initialize scheduler, and disable asyncframework.
-	testCtx := testutils.InitTestDisablePreemption(t, "disable-preemption")
-	cs := testCtx.ClientSet
+			// Initialize scheduler, and disable preemption.
+			testCtx := testutils.InitTestDisablePreemption(t, "disable-preemption")
+			cs := testCtx.ClientSet
 
-	tests := []struct {
-		name         string
-		existingPods []*v1.Pod
-		pod          *v1.Pod
-		podGroup     *schedulingv1beta1.PodGroup
-	}{
-		{
-			name: "pod group preemption will not happen",
-			existingPods: []*v1.Pod{
-				testutils.InitPausePod(&testutils.PausePodConfig{
-					Name:      "victim-pod",
-					Namespace: testCtx.NS.Name,
-					Priority:  &asyncframework.LowPriority,
-					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
-					},
-				}),
-			},
-			podGroup: st.MakePodGroup().Namespace(testCtx.NS.Name).Name("pg-preemptor").MinCount(1).Priority(asyncframework.HighPriority).Obj(),
-			pod: testutils.InitPausePod(&testutils.PausePodConfig{
+			// Create a node with some resources
+			nodeRes := map[v1.ResourceName]string{
+				v1.ResourcePods:   "32",
+				v1.ResourceCPU:    "500m",
+				v1.ResourceMemory: "500",
+			}
+			_, err := testutils.CreateNode(cs, st.MakeNode().Name("node1").Capacity(nodeRes).Obj())
+			if err != nil {
+				t.Fatalf("Error creating nodes: %v", err)
+			}
+
+			// Create and run existingPod.
+			existingPod := testutils.InitPausePod(&testutils.PausePodConfig{
+				Name:      "victim-pod",
+				Namespace: testCtx.NS.Name,
+				Priority:  &asyncframework.LowPriority,
+				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+				},
+			})
+			_, err = testutils.RunPausePod(cs, existingPod)
+			if err != nil {
+				t.Fatalf("TestDisablePodGroupPreemption (Async preemption enabled: %v): Error running pause pod: %v", asyncPreemptionEnabled, err)
+			}
+
+			// Create pod group.
+			podGroup := st.MakePodGroup().Namespace(testCtx.NS.Name).Name("pg-preemptor").MinCount(1).Priority(asyncframework.HighPriority).Obj()
+			if _, err := cs.SchedulingV1beta1().PodGroups(testCtx.NS.Name).Create(testCtx.Ctx, podGroup, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Error creating pod group: %v", err)
+			}
+
+			// Create the preemptor pod.
+			preemptor := testutils.InitPausePod(&testutils.PausePodConfig{
 				Name:         "preemptor-pod",
 				Namespace:    testCtx.NS.Name,
 				Priority:     &asyncframework.HighPriority,
@@ -3426,67 +3442,21 @@ func TestDisablePodGroupPreemption(t *testing.T) {
 					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
 					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
 				},
-			}),
-		},
-	}
-
-	// Create a node with some resources
-	nodeRes := map[v1.ResourceName]string{
-		v1.ResourcePods:   "32",
-		v1.ResourceCPU:    "500m",
-		v1.ResourceMemory: "500",
-	}
-	_, err := testutils.CreateNode(cs, st.MakeNode().Name("node1").Capacity(nodeRes).Obj())
-	if err != nil {
-		t.Fatalf("Error creating nodes: %v", err)
-	}
-
-	for _, asyncPreemptionEnabled := range []bool{true, false} {
-		for _, test := range tests {
-			t.Run(fmt.Sprintf("%s (Async preemption enabled: %v)", test.name, asyncPreemptionEnabled), func(t *testing.T) {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
-
-				pods := make([]*v1.Pod, len(test.existingPods))
-				// Create and run existingPods.
-				for i, p := range test.existingPods {
-					pods[i], err = testutils.RunPausePod(cs, p)
-					if err != nil {
-						t.Fatalf("Test [%v]: Error running pause pod: %v", test.name, err)
-					}
-				}
-
-				// Create pod group if provided.
-				if test.podGroup != nil {
-					if _, err := cs.SchedulingV1beta1().PodGroups(testCtx.NS.Name).Create(testCtx.Ctx, test.podGroup, metav1.CreateOptions{}); err != nil {
-						t.Fatalf("Error creating pod group: %v", err)
-					}
-				}
-
-				// Create the preemptor pod.
-				preemptor, err := testutils.CreatePausePod(cs, test.pod)
-				if err != nil {
-					t.Errorf("Error while creating high priority pod: %v", err)
-				}
-				// Ensure preemptor should keep unschedulable.
-				if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, cs, preemptor); err != nil {
-					t.Errorf("Preemptor %v should not become scheduled", preemptor.Name)
-				}
-
-				preemptor, err = cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, preemptor.Name, metav1.GetOptions{})
-				if err != nil {
-					t.Errorf("Error while getting preemptor: %v", err)
-				}
-				t.Logf("Preemptor: %v", preemptor.Status)
-				// Cleanup pods
-				pods = append(pods, preemptor)
-				testutils.CleanupPods(testCtx.Ctx, cs, t, pods)
-
-				// Cleanup pod group if provided.
-				if test.podGroup != nil {
-					testutils.CleanupPodGroups(testCtx.Ctx, cs, t, test.podGroup)
-				}
 			})
-		}
+			preemptor, err = testutils.CreatePausePod(cs, preemptor)
+			if err != nil {
+				t.Errorf("Error while creating high priority pod: %v", err)
+			}
+			// Ensure preemption did not happened.
+			// For preemption to happened, preemptor should be scheduled or unscheduled with nominated node name.
+			// So if the preemptor is unscheduled and does not have nominated node name, it means preemption did not happened.
+			if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, cs, preemptor); err != nil {
+				t.Errorf("Preemptor %v should not become scheduled", preemptor.Name)
+			}
+			if err := testutils.WaitForNominatedNodeNameWithTimeout(testCtx.Ctx, cs, preemptor, 5*time.Second); err == nil {
+				t.Errorf("Preemptor %v should not be nominated to any node", preemptor.Name)
+			}
+		})
 	}
 }
 
