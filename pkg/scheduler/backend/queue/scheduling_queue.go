@@ -28,6 +28,7 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -1047,6 +1048,10 @@ func (p *PriorityQueue) addPod(ctx context.Context, pod *v1.Pod) {
 	// Furthermore, this must be called before moveToActiveQ to prevent a potential data race,
 	// where an active scheduler loop could pop and process the pod before its nomination is recorded.
 	p.nominator.addNominatedPod(logger, pInfo.PodInfo, nil)
+	// Evict any leftover entry from a previous Pod with the same namespace/name that was
+	// deleted in flight and requeued (since podSuperseded ignores NotFound). moveToActiveQ
+	// does not clean up backoffQ, drop stale unschedulable metrics, or run for PodGroup members.
+	p.deletePod(pod)
 	if p.isPodGroupMember(pod) {
 		p.addPodGroupMember(logger, pInfo)
 		return
@@ -1066,6 +1071,9 @@ func (p *PriorityQueue) addPodGroupMember(logger klog.Logger, pInfo *framework.Q
 	if !hasRoot {
 		// If the PodGroup object cannot be fetched, the pod cannot be scheduled.
 		// It should be put into incompletePodGroupPods waiting for the pod group to be observed.
+		if oldPInfo := p.incompletePodGroupPods.delete(pInfo.Pod); oldPInfo != nil {
+			decreaseUnschedulableReasonMetric(oldPInfo)
+		}
 		p.incompletePodGroupPods.add(pInfo)
 		logger.V(5).Info("Pod with pod group added to incompletePodGroupPods, waiting for one or more parent pod group objects to be observed", "podGroup", pInfo.Pod.Spec.SchedulingGroup.PodGroupName, "pod", klog.KObj(pInfo))
 		return
@@ -1078,6 +1086,9 @@ func (p *PriorityQueue) addPodGroupMember(logger klog.Logger, pInfo *framework.Q
 	if p.activeQ.isLastPoppedEntity(rootInfoLookup) {
 		// If the last popped entity is the matching pod group, add the pod to the pending pod group pods,
 		// so it will be added to the pod group when it's requeued.
+		if oldPInfo := p.pendingPodGroupPods.delete(pInfo.Pod); oldPInfo != nil {
+			decreaseUnschedulableReasonMetric(oldPInfo)
+		}
 		p.pendingPodGroupPods.add(pInfo)
 		logger.V(5).Info("Pod added to pending pod group pods, waiting for its root group to be requeued", "rootType", rootInfoLookup.Type(), "root", klog.KObj(rootInfoLookup), "pod", klog.KObj(pInfo))
 		return
@@ -1118,6 +1129,14 @@ func (p *PriorityQueue) addToPodGroupIfExists(logger klog.Logger, pInfo *framewo
 		return false
 	}
 	rootInfo := entity.(*framework.QueuedPodGroupInfo)
+	if oldPInfo := rootInfo.RemovePod(pInfo.Pod); oldPInfo != nil {
+		decreaseUnschedulableReasonMetric(oldPInfo)
+		if !rootInfo.HasQueuedPodInfos() {
+			// Removing the stale Pod left the group empty; let addPodGroupMember create a
+			// fresh group in activeQ instead of inheriting the stale entry's queue state.
+			return false
+		}
+	}
 	rootInfo.AddPod(pInfo)
 	// Capture the root type and references before requeueing. Once the root is added to
 	// activeQ, it can be popped and processed before this goroutine logs the update.
@@ -1253,6 +1272,16 @@ func (p *PriorityQueue) AddUnschedulablePodIfNotPresent(ctx context.Context, pIn
 	}()
 
 	pod := pInfo.Pod
+
+	// Reject a Pod that was recreated under the same name while in flight. The presence
+	// checks below are keyed by type/namespace/name, so they miss a recreated Pod once it
+	// has been popped (letting the stale Pod take its slot) and never match PodGroup members.
+	if p.podSuperseded(logger, pod) {
+		p.nominator.deleteNominatedPodIfExists(pod, false /* assumed */)
+		p.processNominationChangesUnlocked(logger)
+		return ErrPodSuperseded
+	}
+
 	if p.unschedulableEntities.get(pInfo) != nil {
 		return fmt.Errorf("Pod %v is already present in unschedulable queue", klog.KObj(pod))
 	}
@@ -1541,6 +1570,12 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 
 func (p *PriorityQueue) updatePod(ctx context.Context, oldPod, newPod *v1.Pod) {
 	logger := klog.FromContext(ctx)
+	if p.podSuperseded(logger, newPod) {
+		if oldPod != nil {
+			p.nominator.deleteNominatedPodIfExists(oldPod, false /* assumed */)
+		}
+		return
+	}
 
 	// Because the pod itself is being updated here, events are associated with the resource TargetPod.
 	events := framework.PodSchedulingPropertiesChange(newPod, oldPod, true)
@@ -1740,6 +1775,30 @@ func (p *PriorityQueue) deletePodGroupMember(logger klog.Logger, pod *v1.Pod) {
 	if queue == activeQ || (p.isPopFromBackoffQEnabled && queue == backoffQ) {
 		p.activeQ.broadcast()
 	}
+}
+
+// ErrPodSuperseded is returned by AddUnschedulablePodIfNotPresent when the Pod that finished
+// this scheduling attempt is no longer the Pod that owns its namespace/name.
+var ErrPodSuperseded = errors.New("pod was recreated during its scheduling attempt")
+
+// podSuperseded reports whether podLister holds a different Pod UID for pod's
+// namespace/name. Missing pods (NotFound or nil podLister) return false.
+//
+// Callers must hold p.lock. Because the informer updates its indexer before
+// invoking queue Add/Delete handlers (which also acquire p.lock), either this
+// read observes the replacement UID or a subsequent Delete will evict the entry.
+func (p *PriorityQueue) podSuperseded(logger klog.Logger, pod *v1.Pod) bool {
+	if p.podLister == nil {
+		// Only unit tests build the queue without a lister.
+		return false
+	}
+	livePod, err := p.podLister.Pods(pod.Namespace).Get(pod.Name)
+	if err != nil || livePod.UID == pod.UID {
+		return false
+	}
+	logger.V(2).Info("Pod was recreated with a different UID while it was being scheduled, not requeueing the previous instance",
+		"pod", klog.KObj(pod), "staleUID", pod.UID, "currentUID", livePod.UID)
+	return true
 }
 
 // deletePod removes an individual pod from the queue.

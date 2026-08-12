@@ -51,10 +51,10 @@ func nominatedInMemory(q *PriorityQueue, uid types.UID) string {
 	return q.nominator.nominatedPodToNode[uid]
 }
 
-// TestNominationOfRecreatedPod checks that with the DRAPreemption feature
-// gate, a pod does not get nominated if the pod lister has a pod with the
-// same name and a different UID. Such a pod was deleted and created again,
-// and its deletion does not remove a nomination that gets added afterwards.
+// TestNominationOfRecreatedPod checks that a pod does not get nominated if the
+// pod lister has a pod with the same name and a different UID. Such a pod was
+// deleted and created again, and its deletion does not remove a nomination
+// that gets added afterwards.
 func TestNominationOfRecreatedPod(t *testing.T) {
 	oldPod := st.MakePod().Name("p").Namespace("ns").UID("old").Priority(highPriority).Obj()
 	newPod := st.MakePod().Name("p").Namespace("ns").UID("new").Priority(highPriority).Obj()
@@ -66,12 +66,8 @@ func TestNominationOfRecreatedPod(t *testing.T) {
 			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{newPod})
 
 			q.AddNominatedPod(logger, mustNewTestPodInfo(t, oldPod), overrideNomination("node1"))
-			want := "node1"
-			if draPreemption {
-				want = ""
-			}
-			if nodeName := nominatedInMemory(q, oldPod.UID); nodeName != want {
-				t.Errorf("Nominated node of the deleted pod %q, want %q", nodeName, want)
+			if nodeName := nominatedInMemory(q, oldPod.UID); nodeName != "" {
+				t.Errorf("Nominated node of the deleted pod %q, want \"\"", nodeName)
 			}
 		})
 	}
