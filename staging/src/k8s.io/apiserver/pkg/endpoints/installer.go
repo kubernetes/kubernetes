@@ -675,7 +675,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		// TODO: This seems wrong for cross-group subresources. It makes an assumption that a subresource and its parent are in the same group version. Revisit this.
 		Resource:    a.group.GroupVersion.WithResource(resource),
 		Subresource: subresource,
-		Kind:        fqKindToRegister,
+		Kind:              fqKindToRegister,
+		ResourceVersioner: handlers.ResourceGVK{Kind: fqKindToRegister},
 
 		AcceptsGroupVersionDelegate: gvAcceptor,
 
@@ -687,6 +688,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 	if a.group.MetaGroupVersion != nil {
 		reqScope.MetaGroupVersion = *a.group.MetaGroupVersion
+	}
+	if isLister {
+		if listKindProvider, ok := storage.(rest.GroupVersionListKindProvider); ok {
+			reqScope.ResourceVersioner.ListKind = listKindProvider.GroupVersionListKind(a.group.GroupVersion)
+		}
 	}
 
 	// Strategies may ignore changes to some fields by resetting the field values.

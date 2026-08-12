@@ -47,10 +47,10 @@ import (
 // StreamObject performs input stream negotiation from a ResourceStreamer and writes that to the response.
 // If the client requests a websocket upgrade, negotiate for a websocket reader protocol (because many
 // browser clients cannot easily handle binary streaming protocols).
-func StreamObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSerializer, stream rest.ResourceStreamer, w http.ResponseWriter, req *http.Request) {
-	out, flush, contentType, err := stream.InputStream(req.Context(), gv.String(), req.Header.Get("Accept"))
+func StreamObject(statusCode int, s runtime.NegotiatedSerializer, stream rest.ResourceStreamer, w http.ResponseWriter, req *http.Request) {
+	out, flush, contentType, err := stream.InputStream(req.Context(), req.Header.Get("Accept"))
 	if err != nil {
-		ErrorNegotiated(err, s, gv, w, req)
+		ErrorNegotiated(err, s, schema.GroupVersion{}, w, req)
 		return
 	}
 	if out == nil {
@@ -296,12 +296,12 @@ func (w *deferredResponseWriter) Close() (err error) {
 }
 
 // WriteObjectNegotiated renders an object in the content type negotiated by the client.
-func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiation.EndpointRestrictions, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object, listGVKInContentType bool) {
+func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiation.EndpointRestrictions, gv runtime.GroupVersioner, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object, listGVKInContentType bool) {
 	stream, ok := object.(rest.ResourceStreamer)
 	if ok {
 		requestInfo, _ := request.RequestInfoFrom(req.Context())
 		metrics.RecordLongRunning(req, requestInfo, metrics.APIServerComponent, func() {
-			StreamObject(statusCode, gv, s, stream, w, req)
+			StreamObject(statusCode, s, stream, w, req)
 		})
 		return
 	}
