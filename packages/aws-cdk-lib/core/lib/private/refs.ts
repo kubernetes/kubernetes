@@ -279,9 +279,6 @@ function resolveValue(consumer: Stack, reference: CfnReference, strengthOverride
     });
   }
 
-  // export the value through a cloudformation "export name" and use an
-  // Fn::ImportValue in the consumption site.
-
   // add a dependency between the producer and the consumer. dependency logic
   // will take care of applying the dependency at the right level (e.g. the
   // top-level stacks).
