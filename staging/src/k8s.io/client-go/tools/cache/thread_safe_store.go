@@ -321,8 +321,11 @@ func (c *threadSafeMap) Update(key string, obj interface{}) {
 }
 
 func (c *threadSafeMap) updateLocked(key string, obj interface{}) {
-	oldObject := c.items[key]
-	c.items[key] = obj
+	var oldObject interface{}
+	if stored, exists := c.items[key]; exists {
+		oldObject = cborDecodeObj(key, stored)
+	}
+	c.items[key] = cborEncodeObj(key, obj)
 	c.index.updateIndices(oldObject, obj, key)
 }
 
@@ -350,8 +353,8 @@ func (c *threadSafeMap) DeleteWithObject(key string, obj interface{}) {
 }
 
 func (c *threadSafeMap) deleteLocked(key string) {
-	if obj, exists := c.items[key]; exists {
-		c.index.updateIndices(obj, nil, key)
+	if stored, exists := c.items[key]; exists {
+		c.index.updateIndices(cborDecodeObj(key, stored), nil, key)
 		delete(c.items, key)
 	}
 }
@@ -359,16 +362,19 @@ func (c *threadSafeMap) deleteLocked(key string) {
 func (c *threadSafeMap) Get(key string) (item interface{}, exists bool) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	item, exists = c.items[key]
-	return item, exists
+	stored, exists := c.items[key]
+	if !exists {
+		return nil, false
+	}
+	return cborDecodeObj(key, stored), true
 }
 
 func (c *threadSafeMap) List() []interface{} {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	list := make([]interface{}, 0, len(c.items))
-	for _, item := range c.items {
-		list = append(list, item)
+	for key, stored := range c.items {
+		list = append(list, cborDecodeObj(key, stored))
 	}
 	return list
 }
@@ -393,14 +399,17 @@ func (c *threadSafeMap) Replace(items map[string]interface{}, resourceVersion st
 	}
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.items = items
+	newItems := make(map[string]interface{}, len(items))
+	for key, item := range items {
+		newItems[key] = cborEncodeObj(key, item)
+	}
+	c.items = newItems
 	c.rv = resourceVersion
 	if parseErr == nil {
 		c.metrics.storeResourceVersion.Set(float64(rvInt))
 	}
-	// rebuild any index
 	c.index.reset()
-	for key, item := range c.items {
+	for key, item := range items {
 		c.index.updateIndices(nil, item, key)
 	}
 }
@@ -427,7 +436,7 @@ func (c *threadSafeMap) Index(indexName string, obj interface{}) ([]interface{},
 
 	list := make([]interface{}, 0, storeKeySet.Len())
 	for storeKey := range storeKeySet {
-		list = append(list, c.items[storeKey])
+		list = append(list, cborDecodeObj(storeKey, c.items[storeKey]))
 	}
 	return list, nil
 }
@@ -469,7 +478,7 @@ func (c *threadSafeMap) ByIndex(indexName, indexedValue string) ([]interface{}, 
 	}
 	list := make([]interface{}, 0, set.Len())
 	for key := range set {
-		list = append(list, c.items[key])
+		list = append(list, cborDecodeObj(key, c.items[key]))
 	}
 
 	return list, nil
@@ -507,8 +516,8 @@ func (c *threadSafeMap) AddIndexers(newIndexers Indexers) error {
 		return err
 	}
 
-	// If there are already items, index them
-	for key, item := range c.items {
+	for key, stored := range c.items {
+		item := cborDecodeObj(key, stored)
 		for name := range newIndexers {
 			c.index.updateSingleIndex(name, nil, item, key)
 		}
