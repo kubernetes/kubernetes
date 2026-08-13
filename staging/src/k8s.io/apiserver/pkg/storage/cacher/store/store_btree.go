@@ -18,6 +18,7 @@ package store
 
 import (
 	"fmt"
+	"iter"
 	"strings"
 	"sync"
 
@@ -42,8 +43,6 @@ type threadedStoreIndexer struct {
 	store   btreeStore
 	indexer indexer
 }
-
-var _ Snapshot = (*threadedStoreIndexer)(nil)
 
 func (si *threadedStoreIndexer) Count(prefix, continueKey string) (count int) {
 	si.lock.RLock()
@@ -269,6 +268,20 @@ func (s *btreeStore) OrderedListPrefix(prefix, continueKey string) ([]interface{
 		return true
 	})
 	return result, nil
+}
+
+func (s *btreeStore) RangePrefix(prefix, continueKey string) iter.Seq2[*Element, error] {
+	if continueKey == "" {
+		continueKey = prefix
+	}
+	return func(yield func(*Element, error) bool) {
+		s.tree.AscendGreaterOrEqual(&Element{Key: continueKey}, func(item *Element) bool {
+			if !strings.HasPrefix(item.Key, prefix) {
+				return false
+			}
+			return yield(item, nil)
+		})
+	}
 }
 
 func (s *btreeStore) Count(prefix, continueKey string) (count int) {
