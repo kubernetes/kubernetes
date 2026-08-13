@@ -2741,8 +2741,8 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 		Steps []asyncframework.Step
 	}{
 		{
-			// Very basic test case: if it fails, the basic scenario is broken somewhere.
-			Name: "basic: async preemption happens expectedly",
+			// Very base test case: if it fails, the base scenario is broken somewhere.
+			Name: "base: async preemption happens expectedly",
 			Steps: []asyncframework.Step{
 				{
 					Name:       "create Node",
@@ -2796,7 +2796,7 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 			},
 		},
 		{
-			Name: "basic async preemption with 1 victim, preemptor gated until preemption API call finishes",
+			Name: "base async preemption with 1 victim, preemptor gated until preemption API call finishes",
 			Steps: []asyncframework.Step{
 				{
 					Name:       "create Node",
@@ -3688,144 +3688,182 @@ func TestPodGroupPreemptionRespectsWaitingPod(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.GenericWorkload: true,
 	})
-
-	victim1ToBlock := &asyncframework.BlockedPod{
-		Blocked: make(chan struct{}, 1),
-	}
-	victim2ToBlock := &asyncframework.BlockedPod{
-		Blocked: make(chan struct{}, 1),
-	}
-	podsToBlock := map[string]*asyncframework.BlockedPod{
-		"victim-1": victim1ToBlock,
-		"victim-2": victim2ToBlock,
-	}
-
-	registry := make(frameworkruntime.Registry)
-	err := registry.Register(PersistentBlockingPermitPluginName, func(ctx context.Context, obj runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
-		return &persistentBlockingPermitPlugin{podsToBlock: podsToBlock}, nil
-	})
-	if err != nil {
-		t.Fatalf("Error registering plugin: %v", err)
-	}
-
-	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
-		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: new(v1.DefaultSchedulerName),
-			Plugins: &configv1.Plugins{
-				Permit: configv1.PluginSet{
-					Enabled: []configv1.Plugin{
-						{Name: PersistentBlockingPermitPluginName},
-					},
-				},
+	tests := []struct {
+		name      string
+		podGroups []*schedulingv1beta1.PodGroup
+		victims   []*v1.Pod
+		preemptor *v1.Pod
+	}{
+		{
+			name: "preemptor without podGroup and victims in podGroup",
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Priority(10).MinCount(2).Obj(),
 			},
-		}},
-	})
-
-	testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-waiting-preemption",
-		scheduler.WithProfiles(cfg.Profiles...),
-		scheduler.WithFrameworkOutOfTreeRegistry(registry),
-		scheduler.WithPodMaxBackoffSeconds(0),
-		scheduler.WithPodInitialBackoffSeconds(0))
-	cs, ns := testCtx.ClientSet, testCtx.NS.Name
-
-	// 1. Create a node with resources for only one pod.
-	nodeRes := map[v1.ResourceName]string{
-		v1.ResourceCPU:    "2",
-		v1.ResourceMemory: "2Gi",
-	}
-	node := st.MakeNode().Name("big-node").Capacity(nodeRes).Obj()
-	if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("Error creating node: %v", err)
-	}
-
-	// 2. Create a PodGroup with minMember: 2 so GangScheduling quorum is met when both victims are scheduled.
-	pg := st.MakePodGroup().Name("pg1").Namespace(ns).Priority(10).MinCount(2).Obj()
-	if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("Failed to create PodGroup %s: %v", pg.Name, err)
-	}
-
-	// 3. Create TWO low-priority pods for that PodGroup.
-	// The custom Permit plugin will hold them in WaitOnPermit (waiting pods map).
-	victim1 := st.MakePod().Name("victim-1").Namespace(ns).Priority(10).PodGroupName("pg1").
-		Req(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "1Gi"}).
-		ZeroTerminationGracePeriod().Obj()
-	victim2 := st.MakePod().Name("victim-2").Namespace(ns).Priority(10).PodGroupName("pg1").
-		Req(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "1Gi"}).
-		ZeroTerminationGracePeriod().Obj()
-
-	t.Logf("Creating victim pods")
-	victim1, err = cs.CoreV1().Pods(ns).Create(testCtx.Ctx, victim1, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("Error creating victim-1: %v", err)
-	}
-	victim2, err = cs.CoreV1().Pods(ns).Create(testCtx.Ctx, victim2, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("Error creating victim-2: %v", err)
-	}
-
-	// 4. Wait for both victim-1 and victim-2 to reach WaitOnPermit via our custom permit plugin and be recorded as waiting pods.
-	t.Logf("Waiting for victim-1 and victim-2 to reach WaitOnPermit")
-	select {
-	case <-victim1ToBlock.Blocked:
-		t.Logf("Victim-1 reached WaitOnPermit")
-	case <-time.After(15 * time.Second):
-		t.Fatalf("Timed out waiting for victim-1 to reach WaitOnPermit")
-	}
-	select {
-	case <-victim2ToBlock.Blocked:
-		t.Logf("Victim-2 reached WaitOnPermit")
-	case <-time.After(15 * time.Second):
-		t.Fatalf("Timed out waiting for victim-2 to reach WaitOnPermit")
-	}
-	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 15*time.Second, false, func(ctx context.Context) (bool, error) {
-		wp1 := testCtx.Scheduler.Profiles[v1.DefaultSchedulerName].GetWaitingPod(victim1.UID)
-		wp2 := testCtx.Scheduler.Profiles[v1.DefaultSchedulerName].GetWaitingPod(victim2.UID)
-		return wp1 != nil && wp2 != nil, nil
-	}); err != nil {
-		t.Fatalf("Timed out waiting for victim pods to be recorded as waiting pods: %v", err)
+			victims: []*v1.Pod{
+				st.MakePod().Name("victim-1").Priority(10).PodGroupName("pg1").
+					Req(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "1Gi"}).
+					ZeroTerminationGracePeriod().Obj(),
+				st.MakePod().Name("victim-2").Priority(10).PodGroupName("pg1").
+					Req(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "1Gi"}).
+					ZeroTerminationGracePeriod().Obj(),
+			},
+			preemptor: st.MakePod().Name("preemptor").Priority(100).
+				Req(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "1.5Gi"}).
+				ZeroTerminationGracePeriod().Obj(),
+		},
+		{
+			name: "preemptor in podGroup and victim without podGroup",
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("preemptor-pg").Priority(100).MinCount(1).Obj(),
+			},
+			victims: []*v1.Pod{
+				st.MakePod().Name("victim-1").Priority(10).
+					Req(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "1Gi"}).
+					ZeroTerminationGracePeriod().Obj(),
+				st.MakePod().Name("victim-2").Priority(10).
+					Req(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "1Gi"}).
+					ZeroTerminationGracePeriod().Obj(),
+			},
+			preemptor: st.MakePod().Name("preemptor").Priority(100).PodGroupName("preemptor-pg").
+				Req(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "1.5Gi"}).
+				ZeroTerminationGracePeriod().Obj(),
+		},
+		{
+			name: "both preemptor and victims in podGroups",
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("victim-pg").Priority(10).MinCount(2).Obj(),
+				st.MakePodGroup().Name("preemptor-pg").Priority(100).MinCount(1).Obj(),
+			},
+			victims: []*v1.Pod{
+				st.MakePod().Name("victim-1").Priority(10).PodGroupName("victim-pg").
+					Req(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "1Gi"}).
+					ZeroTerminationGracePeriod().Obj(),
+				st.MakePod().Name("victim-2").Priority(10).PodGroupName("victim-pg").
+					Req(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "1Gi"}).
+					ZeroTerminationGracePeriod().Obj(),
+			},
+			preemptor: st.MakePod().Name("preemptor").Priority(100).PodGroupName("preemptor-pg").
+				Req(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "1.5Gi"}).
+				ZeroTerminationGracePeriod().Obj(),
+		},
 	}
 
-	// 5. Create a high-priority preemptor Pod that requires the resources.
-	preemptor := st.MakePod().Name("preemptor").Namespace(ns).Priority(100).
-		Req(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "1.5Gi"}).
-		ZeroTerminationGracePeriod().Obj()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			podsToBlock := make(map[string]*asyncframework.BlockedPod, len(tt.victims))
+			for _, v := range tt.victims {
+				podsToBlock[v.Name] = &asyncframework.BlockedPod{
+					Blocked: make(chan struct{}, 1),
+				}
+			}
 
-	t.Logf("Creating preemptor pod")
-	_, err = cs.CoreV1().Pods(ns).Create(testCtx.Ctx, preemptor, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("Error creating preemptor: %v", err)
-	}
+			registry := make(frameworkruntime.Registry)
+			err := registry.Register(PersistentBlockingPermitPluginName, func(ctx context.Context, obj runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+				return &persistentBlockingPermitPlugin{podsToBlock: podsToBlock}, nil
+			})
+			if err != nil {
+				t.Fatalf("Error registering plugin: %v", err)
+			}
 
-	t.Logf("Waiting for preemptor to be scheduled")
-	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 15*time.Second, false, testutils.PodScheduled(cs, ns, preemptor.Name))
-	if err != nil {
-		t.Fatalf("Failed waiting for preemptor to schedule: %v", err)
-	}
+			cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+				Profiles: []configv1.KubeSchedulerProfile{{
+					SchedulerName: new(v1.DefaultSchedulerName),
+					Plugins: &configv1.Plugins{
+						Permit: configv1.PluginSet{
+							Enabled: []configv1.Plugin{
+								{Name: PersistentBlockingPermitPluginName},
+							},
+						},
+					},
+				}},
+			})
 
-	// 6. Assert preemptor is scheduled on big-node
-	p, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, preemptor.Name, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Error getting preemptor: %v", err)
-	}
-	if p.Spec.NodeName != "big-node" {
-		t.Fatalf("Preemptor should be scheduled on big-node, but was scheduled on %s", p.Spec.NodeName)
-	}
+			testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-waiting-preemption",
+				scheduler.WithProfiles(cfg.Profiles...),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry),
+				scheduler.WithPodMaxBackoffSeconds(0),
+				scheduler.WithPodInitialBackoffSeconds(0))
+			cs, ns := testCtx.ClientSet, testCtx.NS.Name
 
-	// 7. Verify victim-1 and victim-2 do not have a NodeName because they were waiting in permit and got preempted.
-	v1, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, victim1.Name, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Error getting victim-1 at the end: %v", err)
-	}
-	if v1.Spec.NodeName != "" {
-		t.Fatalf("Victim-1's NodeName should be empty, but it is %s", v1.Spec.NodeName)
-	}
+			// Create a node with resources for only one set of pods (victims or preemptor).
+			nodeRes := map[v1.ResourceName]string{
+				v1.ResourceCPU:    "2",
+				v1.ResourceMemory: "2Gi",
+			}
+			node := st.MakeNode().Name("big-node").Capacity(nodeRes).Obj()
+			if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Error creating node: %v", err)
+			}
 
-	v2, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, victim2.Name, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Error getting victim-2 at the end: %v", err)
-	}
-	if v2.Spec.NodeName != "" {
-		t.Fatalf("Victim-2's NodeName should be empty, but it is %s", v2.Spec.NodeName)
+			for _, pg := range tt.podGroups {
+				pg := pg.DeepCopy()
+				pg.Namespace = ns
+				if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create PodGroup %s: %v", pg.Name, err)
+				}
+			}
+
+			createdVictims := make([]*v1.Pod, len(tt.victims))
+			for i, v := range tt.victims {
+				v := v.DeepCopy()
+				v.Namespace = ns
+				createdVictim, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, v, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("Error creating victim %s: %v", v.Name, err)
+				}
+				createdVictims[i] = createdVictim
+			}
+
+			for _, v := range tt.victims {
+				select {
+				case <-podsToBlock[v.Name].Blocked:
+					t.Logf("%s reached WaitOnPermit", v.Name)
+				case <-time.After(15 * time.Second):
+					t.Fatalf("Timed out waiting for %s to reach WaitOnPermit", v.Name)
+				}
+			}
+			if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 15*time.Second, false, func(ctx context.Context) (bool, error) {
+				for _, cv := range createdVictims {
+					if wp := testCtx.Scheduler.Profiles[v1.DefaultSchedulerName].GetWaitingPod(cv.UID); wp == nil {
+						return false, nil
+					}
+				}
+				return true, nil
+			}); err != nil {
+				t.Fatalf("Timed out waiting for victim pods to be recorded as waiting pods: %v", err)
+			}
+
+			preemptor := tt.preemptor.DeepCopy()
+			preemptor.Namespace = ns
+			t.Logf("Creating preemptor pod")
+			if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, preemptor, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Error creating preemptor: %v", err)
+			}
+
+			t.Logf("Waiting for preemptor to be scheduled")
+			err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 15*time.Second, false, testutils.PodScheduled(cs, ns, preemptor.Name))
+			if err != nil {
+				t.Fatalf("Failed waiting for preemptor to schedule: %v", err)
+			}
+
+			p, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, preemptor.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Error getting preemptor: %v", err)
+			}
+			if p.Spec.NodeName != "big-node" {
+				t.Fatalf("Preemptor should be scheduled on big-node, but was scheduled on %s", p.Spec.NodeName)
+			}
+
+			for _, v := range tt.victims {
+				gotVictim, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, v.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("Error getting %s at the end: %v", v.Name, err)
+				}
+				if gotVictim.Spec.NodeName != "" {
+					t.Fatalf("%s's NodeName should be empty, but it is %s", v.Name, gotVictim.Spec.NodeName)
+				}
+			}
+		})
 	}
 }
 

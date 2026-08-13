@@ -1125,8 +1125,8 @@ func TestAsyncPreemption(t *testing.T) {
 		Steps []asyncframework.Step
 	}{
 		{
-			// Very basic test case: if it fails, the basic scenario is broken somewhere.
-			Name: "basic: async preemption happens expectedly",
+			// Very base test case: if it fails, the base scenario is broken somewhere.
+			Name: "base: async preemption happens expectedly",
 			Steps: []asyncframework.Step{
 				{
 					Name:       "create Node",
@@ -1174,7 +1174,7 @@ func TestAsyncPreemption(t *testing.T) {
 			},
 		},
 		{
-			Name: "basic async preemption with 1 victim, preemptor gated until preemption API call finishes",
+			Name: "base async preemption with 1 victim, preemptor gated until preemption API call finishes",
 			Steps: []asyncframework.Step{
 				{
 					Name:       "create Node",
