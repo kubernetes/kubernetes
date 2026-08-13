@@ -1,0 +1,100 @@
+{
+  "/eks-v2-provisioned-control-plane-integ/DefaultTest/DeployAssert/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/eks-v2-provisioned-control-plane-integ/DefaultTest/DeployAssert/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/eks-v2-provisioned-control-plane-integ/DefaultTest/DeployAssert/AwsApiCalleksdescribeCluster3239d1925c9965155165422ddf04005d/Default": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": "*"
+    }
+  ],
+  "/eks-v2-provisioned-control-plane-integ/DefaultTest/DeployAssert/AwsApiCalleksdescribeCluster3239d1925c9965155165422ddf04005d/AssertionResults": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AssertionResultsAwsApiCalleksdescribeCluster3239d1925c9965155165422ddf04005d"
+    }
+  ],
+  "/eks-v2-provisioned-control-plane-integ/DefaultTest/DeployAssert/SingletonFunction1488541a7b23466481b69b4408076b81/Role": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction1488541a7b23466481b69b4408076b81Role37ABCE73"
+    }
+  ],
+  "/eks-v2-provisioned-control-plane-integ/DefaultTest/DeployAssert/SingletonFunction1488541a7b23466481b69b4408076b81/Handler": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction1488541a7b23466481b69b4408076b81HandlerCD40AE9F"
+    }
+  ],
+  "/eks-v2-provisioned-control-plane-integ/DefaultTest/DeployAssert/SingletonFunction76b3e830a873425f8453eddd85c86925/Role": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction76b3e830a873425f8453eddd85c86925Role918961BB"
+    }
+  ],
+  "/eks-v2-provisioned-control-plane-integ/DefaultTest/DeployAssert/SingletonFunction76b3e830a873425f8453eddd85c86925/Handler": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction76b3e830a873425f8453eddd85c86925Handler81461ECE"
+    }
+  ],
+  "/eks-v2-provisioned-control-plane-integ/DefaultTest/DeployAssert/SingletonFunction5c1898e096fb4e3e95d5f6c67f3ce41a/Role": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction5c1898e096fb4e3e95d5f6c67f3ce41aRoleB84BD8CE"
+    }
+  ],
+  "/eks-v2-provisioned-control-plane-integ/DefaultTest/DeployAssert/SingletonFunction5c1898e096fb4e3e95d5f6c67f3ce41a/Handler": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction5c1898e096fb4e3e95d5f6c67f3ce41aHandlerADF3E6EA"
+    }
+  ],
+  "/eks-v2-provisioned-control-plane-integ/DefaultTest/DeployAssert/AwsApiCalleksdescribeCluster3239d1925c9965155165422ddf04005d/Default/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AwsApiCalleksdescribeCluster3239d1925c9965155165422ddf04005d"
+    }
+  ],
+  "/eks-v2-provisioned-control-plane-integ/DefaultTest/DeployAssert/AwsApiCalleksdescribeCluster3239d1925c9965155165422ddf04005d/WaitFor/Role": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AwsApiCalleksdescribeCluster3239d1925c9965155165422ddf04005dWaitForRoleC93098EF"
+    }
+  ],
+  "/eks-v2-provisioned-control-plane-integ/DefaultTest/DeployAssert/AwsApiCalleksdescribeCluster3239d1925c9965155165422ddf04005d/WaitFor/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AwsApiCalleksdescribeCluster3239d1925c9965155165422ddf04005dWaitForD13BF375"
+    }
+  ],
+  "/eks-v2-provisioned-control-plane-integ/DefaultTest/DeployAssert/AwsApiCalleksdescribeCluster3239d1925c9965155165422ddf04005d/WaitFor/IsCompleteProvider/Invoke": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AwsApiCalleksdescribeCluster3239d1925c9965155165422ddf04005dWaitForIsCompleteProviderInvokeB4898416"
+    }
+  ],
+  "/eks-v2-provisioned-control-plane-integ/DefaultTest/DeployAssert/AwsApiCalleksdescribeCluster3239d1925c9965155165422ddf04005d/WaitFor/TimeoutProvider/Invoke": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AwsApiCalleksdescribeCluster3239d1925c9965155165422ddf04005dWaitForTimeoutProviderInvoke1AFD5C0E"
+    }
+  ]
+}
