@@ -205,42 +205,26 @@ func (l listSnapshot) OrderedListPrefix(prefix string, continueKey string) ([]in
 }
 
 func (l listSnapshot) RangePrefix(prefix, continueKey string) Range {
-	// TODO: filter and sort once here instead of on every All and Count.
-	return prefixRange{l, prefix, continueKey}
+	items, err := l.OrderedListPrefix(prefix, continueKey)
+	if err != nil {
+		return failedRange{err}
+	}
+	elems := make(elements, 0, len(items))
+	for _, item := range items {
+		// OrderedListPrefix has already checked every item is an *Element.
+		elems = append(elems, item.(*Element))
+	}
+	return elems
 }
 
-func (l listSnapshot) rangePrefix(prefix, continueKey string) iter.Seq2[*Element, error] {
-	return func(yield func(*Element, error) bool) {
-		items, err := l.OrderedListPrefix(prefix, continueKey)
-		if err != nil {
-			yield(nil, err)
-			return
-		}
-		for _, item := range items {
-			// OrderedListPrefix has already checked every item is an *Element.
-			if !yield(item.(*Element), nil) {
-				return
-			}
-		}
-	}
+type failedRange struct{ err error }
+
+func (r failedRange) All() iter.Seq2[*Element, error] {
+	return func(yield func(*Element, error) bool) { yield(nil, r.err) }
 }
 
-func (l listSnapshot) countPrefix(prefix, continueKey string) int {
-	count := 0
-	for _, item := range l.Items {
-		elem, ok := item.(*Element)
-		if !ok {
-			continue
-		}
-		if len(continueKey) > 0 && continueKey > elem.Key {
-			continue
-		}
-		if !key.HasPathPrefix(elem.Key, prefix) {
-			continue
-		}
-		count++
-	}
-	return count
+func (r failedRange) Count() int {
+	return 0
 }
 
 type sortableStoreElements []interface{}
