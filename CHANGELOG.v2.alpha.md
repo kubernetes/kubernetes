@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [2.265.0-alpha.0](https://github.com/aws/aws-cdk/compare/v2.264.0-alpha.0...v2.265.0-alpha.0) (2026-08-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* **glue-alpha:** PySparkFlexEtlJob and ScalaSparkFlexEtlJob now default to `GlueVersion.V5_0` instead of `V3_0`. Set `glueVersion` explicitly to keep the previous behavior.
+* **glue-alpha:** removal policy of existing `Database` resources will change to `RETAIN`.
+
+### Features
+
+* **glue-alpha:** default Flex jobs to Glue 5.0 ([#38543](https://github.com/aws/aws-cdk/issues/38543)) ([36d4976](https://github.com/aws/aws-cdk/commit/36d4976e9d6575debcf68b5e666a5920d53f69ab))
+* **glue-alpha:** removal policy is RETAIN for `Database` by default ([#38535](https://github.com/aws/aws-cdk/issues/38535)) ([9669928](https://github.com/aws/aws-cdk/commit/9669928f7837798e3e7169bea55c3907ce16f440))
+* **glue-alpha:** warn on plaintext secrets  ([#38538](https://github.com/aws/aws-cdk/issues/38538)) ([10bf0b5](https://github.com/aws/aws-cdk/commit/10bf0b596a06399271712987b0857df513b69ad5))
+
+
+### Bug Fixes
+
+* **glue-alpha:** warn when S3Table grants cover a shared bucket ([#38542](https://github.com/aws/aws-cdk/issues/38542)) ([d81d2d6](https://github.com/aws/aws-cdk/commit/d81d2d63613b5118ae3c7cc4c82b26aac2fd69f4))
+* **mediaconnect-alpha:** update validation to allow adding an underscore to name ([#38539](https://github.com/aws/aws-cdk/issues/38539)) ([7c85994](https://github.com/aws/aws-cdk/commit/7c85994cd1ee59204341ad7510124eafabe1eb6f))
+
 ## [2.264.0-alpha.0](https://github.com/aws/aws-cdk/compare/v2.263.0-alpha.0...v2.264.0-alpha.0) (2026-08-10)
 
 

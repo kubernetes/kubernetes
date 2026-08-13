@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [2.265.0](https://github.com/aws/aws-cdk/compare/v2.264.0...v2.265.0) (2026-08-13)
+
+
+### Features
+
+* **bedrock-agentcore:** add StreamDeliveryResources support to Memory L2 Construct ([#37527](https://github.com/aws/aws-cdk/issues/37527)) ([817c50b](https://github.com/aws/aws-cdk/commit/817c50bd4169d2fd5ed4ca49c2ae1c9d94e5b76e))
+* **cloudwatch:** support AT_LEAST expression for composite alarm rules ([#37693](https://github.com/aws/aws-cdk/issues/37693)) ([974e43b](https://github.com/aws/aws-cdk/commit/974e43b2db796da073cc2a16b97fe8e17804b78f)), closes [#37692](https://github.com/aws/aws-cdk/issues/37692) [#36100](https://github.com/aws/aws-cdk/issues/36100)
+* **docdb:** add managed password support  ([#35711](https://github.com/aws/aws-cdk/issues/35711)) ([fcf54bf](https://github.com/aws/aws-cdk/commit/fcf54bf2aa9b011e226e830b51870ad3bb44a1b8))
+* **ec2:** add ipAddressType and dnsRecordIpType to GatewayVpcEndpoint ([#37900](https://github.com/aws/aws-cdk/issues/37900)) ([000f532](https://github.com/aws/aws-cdk/commit/000f5328c275a43da13de5df594b1bdd878abfca)), closes [#37883](https://github.com/aws/aws-cdk/issues/37883)
+* **ec2:** add volume initialization rate to ebs props for launchtemplate ([#36451](https://github.com/aws/aws-cdk/issues/36451)) ([da4281e](https://github.com/aws/aws-cdk/commit/da4281edc0956ef474dc4fc05d843e32fb67b1b8)), closes [#36374](https://github.com/aws/aws-cdk/issues/36374)
+* **kinesisfirehose:** add HTTP Endpoint and Datadog destination ([#33657](https://github.com/aws/aws-cdk/issues/33657)) ([4c47171](https://github.com/aws/aws-cdk/commit/4c471712d2d5c74b923c7f5c2c1d69c9f329a1ae)), closes [#20354](https://github.com/aws/aws-cdk/issues/20354) [#15502](https://github.com/aws/aws-cdk/issues/15502)
+
+
+### Bug Fixes
+
+* **cloudwatch:** make concrete widgets assignable to widget interface ([#37695](https://github.com/aws/aws-cdk/issues/37695)) ([e322035](https://github.com/aws/aws-cdk/commit/e322035e259629275523b6f8b42ab66416b6a1e6)), closes [#37600](https://github.com/aws/aws-cdk/issues/37600)
+* **core:** `cdk validate` can hang indefinitely ([#38510](https://github.com/aws/aws-cdk/issues/38510)) ([0a238f3](https://github.com/aws/aws-cdk/commit/0a238f319359946e3c7dc2cec8d3a12b8e4b8773)), closes [#38498](https://github.com/aws/aws-cdk/issues/38498) [#38425](https://github.com/aws/aws-cdk/issues/38425)
+* **secretsmanager:** correct SAR rotation app versions for GovCloud ([#38462](https://github.com/aws/aws-cdk/issues/38462)) ([a29b5c0](https://github.com/aws/aws-cdk/commit/a29b5c034cf5e5af571a6355d8027419c2426b35))
+* bump brace-expansion to 5.0.9 to address CVE-2026-69152 ([#38520](https://github.com/aws/aws-cdk/issues/38520)) ([8764b7b](https://github.com/aws/aws-cdk/commit/8764b7b7d54384d9bbea54877aaf9cf63087b926)), closes [#38496](https://github.com/aws/aws-cdk/issues/38496) [#38410](https://github.com/aws/aws-cdk/issues/38410)
+
 ## [2.264.0](https://github.com/aws/aws-cdk/compare/v2.263.0...v2.264.0) (2026-08-10)
 
 
