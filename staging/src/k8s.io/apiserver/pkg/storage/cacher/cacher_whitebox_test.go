@@ -31,6 +31,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -2459,6 +2460,71 @@ func BenchmarkCacher_GetList_AllPods(b *testing.B) {
 	}
 }
 
+func BenchmarkCacher_WatchList_AllPods(b *testing.B) {
+	featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.WatchList, true)
+	forceRequestWatchProgressSupport(b)
+	totalObjectNum := 10_000
+	exemplar := loadExemplarPod(b)
+	pods := make([]corev1.Pod, totalObjectNum)
+	for i := range pods {
+		p := exemplar.DeepCopy()
+		p.Namespace = "default"
+		p.Name = fmt.Sprintf("pod-%d", i)
+		p.ResourceVersion = strconv.Itoa(i + 1)
+		pods[i] = *p
+	}
+	store := &cachertesting.MockStorage{
+		GetListFn: func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error {
+			podList := listObj.(*corev1.PodList)
+			podList.ListMeta = metav1.ListMeta{ResourceVersion: "12345"}
+			podList.Items = pods
+			return nil
+		},
+		GetRVFn: func(_ context.Context) (uint64, error) { return 12345, nil },
+	}
+	cacher, err := NewCacherFromConfig(benchmarkConfig(store))
+	if err != nil {
+		b.Fatalf("new cacher: %v", err)
+	}
+	b.Cleanup(cacher.Stop)
+	if err := cacher.Wait(context.Background()); err != nil {
+		b.Fatal(err)
+	}
+	delegator := NewCacheDelegator(cacher, store)
+	b.Cleanup(delegator.Stop)
+
+	pred := storage.Everything
+	pred.AllowWatchBookmarks = true
+	sendInitialEvents := true
+	opts := storage.ListOptions{
+		Predicate:            pred,
+		SendInitialEvents:    &sendInitialEvents,
+		ResourceVersion:      "12345",
+		ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+		Recursive:            true,
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		w, err := delegator.Watch(context.TODO(), "/pods/", opts)
+		if err != nil {
+			b.Fatalf("Watch cache: %v", err)
+		}
+		count := 0
+		for ev := range w.ResultChan() {
+			if ev.Type == watch.Bookmark {
+				break
+			}
+			count++
+		}
+		w.Stop()
+		if count != totalObjectNum {
+			b.Fatalf("expect %d but got %d", totalObjectNum, count)
+		}
+	}
+}
+
 // TestWatchListIsSynchronisedWhenNoEventsFromStoreReceived makes sure that
 // a bookmark event will be delivered even if the cacher has not received an event.
 func TestWatchListIsSynchronisedWhenNoEventsFromStoreReceived(t *testing.T) {
@@ -2963,7 +3029,7 @@ func TestComputeListLimit(t *testing.T) {
 //
 // In the future we could have a function that would allow for setting the feature
 // only for duration of a test.
-func forceRequestWatchProgressSupport(t *testing.T) {
+func forceRequestWatchProgressSupport(t testing.TB) {
 	if etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress) {
 		return
 	}
