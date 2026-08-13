@@ -9,16 +9,11 @@ package rpcconv
 
 import (
 	"context"
-	"sync"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/metric/noop"
-)
-
-var (
-	addOptPool = &sync.Pool{New: func() any { return &[]metric.AddOption{} }}
-	recOptPool = &sync.Pool{New: func() any { return &[]metric.RecordOption{} }}
+	"go.opentelemetry.io/otel/semconv/internal/metricpool"
 )
 
 // ErrorTypeAttr is an attribute conforming to the error.type semantic
@@ -26,9 +21,11 @@ var (
 // with.
 type ErrorTypeAttr string
 
-// ErrorTypeOther is a fallback error value to be used when the instrumentation
-// doesn't define a custom value.
-var ErrorTypeOther ErrorTypeAttr = "_OTHER"
+var (
+	// ErrorTypeOther is a fallback error value to be used when the instrumentation
+	// doesn't define a custom value.
+	ErrorTypeOther ErrorTypeAttr = "_OTHER"
+)
 
 // SystemNameAttr is an attribute conforming to the rpc.system.name semantic
 // conventions. It represents the Remote Procedure Call (RPC) system.
@@ -63,6 +60,7 @@ type ClientCallDuration struct {
 var newClientCallDurationOpts = []metric.Float64HistogramOption{
 	metric.WithDescription("Measures the duration of an outgoing Remote Procedure Call (RPC)."),
 	metric.WithUnit("s"),
+	metric.WithExplicitBucketBoundaries([]float64{0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10}...),
 }
 
 // NewClientCallDuration returns a new ClientCallDuration instrument.
@@ -135,11 +133,8 @@ func (m ClientCallDuration) Record(
 		return
 	}
 
-	o := recOptPool.Get().(*[]metric.RecordOption)
-	defer func() {
-		*o = (*o)[:0]
-		recOptPool.Put(o)
-	}()
+	o := metricpool.RecordOptions()
+	defer metricpool.PutRecordOptions(o)
 
 	*o = append(
 		*o,
@@ -167,11 +162,8 @@ func (m ClientCallDuration) RecordSet(ctx context.Context, val float64, set attr
 		return
 	}
 
-	o := recOptPool.Get().(*[]metric.RecordOption)
-	defer func() {
-		*o = (*o)[:0]
-		recOptPool.Put(o)
-	}()
+	o := metricpool.RecordOptions()
+	defer metricpool.PutRecordOptions(o)
 
 	*o = append(*o, metric.WithAttributeSet(set))
 	m.Float64Histogram.Record(ctx, val, *o...)
@@ -221,6 +213,7 @@ type ServerCallDuration struct {
 var newServerCallDurationOpts = []metric.Float64HistogramOption{
 	metric.WithDescription("Measures the duration of an incoming Remote Procedure Call (RPC)."),
 	metric.WithUnit("s"),
+	metric.WithExplicitBucketBoundaries([]float64{0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10}...),
 }
 
 // NewServerCallDuration returns a new ServerCallDuration instrument.
@@ -293,11 +286,8 @@ func (m ServerCallDuration) Record(
 		return
 	}
 
-	o := recOptPool.Get().(*[]metric.RecordOption)
-	defer func() {
-		*o = (*o)[:0]
-		recOptPool.Put(o)
-	}()
+	o := metricpool.RecordOptions()
+	defer metricpool.PutRecordOptions(o)
 
 	*o = append(
 		*o,
@@ -325,11 +315,8 @@ func (m ServerCallDuration) RecordSet(ctx context.Context, val float64, set attr
 		return
 	}
 
-	o := recOptPool.Get().(*[]metric.RecordOption)
-	defer func() {
-		*o = (*o)[:0]
-		recOptPool.Put(o)
-	}()
+	o := metricpool.RecordOptions()
+	defer metricpool.PutRecordOptions(o)
 
 	*o = append(*o, metric.WithAttributeSet(set))
 	m.Float64Histogram.Record(ctx, val, *o...)

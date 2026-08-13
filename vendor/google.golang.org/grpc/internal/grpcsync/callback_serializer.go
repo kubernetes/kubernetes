@@ -20,9 +20,14 @@ package grpcsync
 
 import (
 	"context"
+	"errors"
 
 	"google.golang.org/grpc/internal/buffer"
 )
+
+// ErrSerializerClosed is returned by ScheduleAndWait if the CallbackSerializer
+// was closed before the callback could be scheduled.
+var ErrSerializerClosed = errors.New("callback serializer is closed")
 
 // CallbackSerializer provides a mechanism to schedule callbacks in a
 // synchronized manner. It provides a FIFO guarantee on the order of execution
@@ -75,6 +80,27 @@ func (cs *CallbackSerializer) ScheduleOr(f func(ctx context.Context), onFailure 
 	if cs.callbacks.Put(f) != nil {
 		onFailure()
 	}
+}
+
+// ScheduleAndWait schedules the provided callback function f to be executed in
+// the order it was added and blocks until f has run. If the context passed to
+// NewCallbackSerializer was canceled before this method is called, f is not run
+// and ScheduleAndWait returns ErrSerializerClosed.
+//
+// Callbacks are expected to honor the context when performing any blocking
+// operations, and should return early when the context is canceled.
+func (cs *CallbackSerializer) ScheduleAndWait(f func(ctx context.Context)) error {
+	done := make(chan struct{})
+	var err error
+	cs.ScheduleOr(func(ctx context.Context) {
+		f(ctx)
+		close(done)
+	}, func() {
+		err = ErrSerializerClosed
+		close(done)
+	})
+	<-done
+	return err
 }
 
 func (cs *CallbackSerializer) run(ctx context.Context) {

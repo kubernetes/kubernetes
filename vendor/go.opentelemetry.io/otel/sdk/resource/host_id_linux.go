@@ -3,7 +3,7 @@
 
 //go:build linux
 
-package resource // import "go.opentelemetry.io/otel/sdk/resource"
+package resource
 
 var platformHostIDReader hostIDReader = &hostIDReaderLinux{
 	readFile: readFile,

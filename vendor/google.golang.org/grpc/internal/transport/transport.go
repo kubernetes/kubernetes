@@ -594,8 +594,6 @@ type CallHdr struct {
 
 	PreviousAttempts int // value of grpc-previous-rpc-attempts header to set
 
-	DoneFunc func() // called when the stream is finished
-
 	// Authority is used to explicitly override the `:authority` header.
 	//
 	// This value comes from one of two sources:

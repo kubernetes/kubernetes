@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package attribute // import "go.opentelemetry.io/otel/attribute"
+package attribute
 
 // Filter supports removing certain attributes from attribute sets. When
 // the filter returns true, the attribute will be kept in the filtered

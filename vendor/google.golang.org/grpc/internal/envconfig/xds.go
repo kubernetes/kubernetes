@@ -69,9 +69,8 @@ var (
 	// https://github.com/grpc/proposal/blob/master/A87-mtls-spiffe-support.md
 	XDSSPIFFEEnabled = boolFromEnv("GRPC_EXPERIMENTAL_XDS_MTLS_SPIFFE", false)
 
-	// XDSHTTPConnectEnabled is true if gRPC should parse custom Metadata
-	// configuring use of an HTTP CONNECT proxy via xDS from cluster resources.
-	// For more details, see:
+	// XDSHTTPConnectEnabled controls support for dynamic HTTP CONNECT proxying
+	// configured via the xDS control plane. For more details, see:
 	// https://github.com/grpc/proposal/blob/master/A86-xds-http-connect.md
 	XDSHTTPConnectEnabled = boolFromEnv("GRPC_EXPERIMENTAL_XDS_HTTP_CONNECT", false)
 
@@ -88,7 +87,7 @@ var (
 	// XDSORCAToLRSPropEnabled controls whether ORCA metrics are explicitly
 	// filtered and prefix-propagated to the LRS server. For more details, see:
 	// https://github.com/grpc/proposal/blob/master/A85-lrs-custom-metrics-changes.md
-	XDSORCAToLRSPropEnabled = boolFromEnv("GRPC_EXPERIMENTAL_XDS_ORCA_LRS_PROPAGATION", false)
+	XDSORCAToLRSPropEnabled = boolFromEnv("GRPC_EXPERIMENTAL_XDS_ORCA_LRS_PROPAGATION", true)
 
 	// XDSClientExtProcEnabled indicates whether ExtProc filter is enabled on
 	// the client side. For more details, see:
