@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package tracetransform // import "go.opentelemetry.io/otel/exporters/otlp/otlptrace/internal/tracetransform"
+package tracetransform
 
 import (
 	"math"
@@ -37,21 +37,22 @@ func Spans(sdl []tracesdk.ReadOnlySpan) []*tracepb.ResourceSpans {
 		}
 
 		rKey := sd.Resource().Equivalent()
+		scope := sd.InstrumentationScope()
 		k := key{
 			r:  rKey,
-			is: sd.InstrumentationScope(),
+			is: scope,
 		}
 		scopeSpan, iOk := ssm[k]
 		if !iOk {
 			// Either the resource or instrumentation scope were unknown.
 			scopeSpan = &tracepb.ScopeSpans{
-				Scope:     InstrumentationScope(sd.InstrumentationScope()),
+				Scope:     InstrumentationScope(scope),
 				Spans:     []*tracepb.Span{},
-				SchemaUrl: sd.InstrumentationScope().SchemaURL,
+				SchemaUrl: scope.SchemaURL,
 			}
+			ssm[k] = scopeSpan
 		}
 		scopeSpan.Spans = append(scopeSpan.Spans, span(sd))
-		ssm[k] = scopeSpan
 
 		rs, rOk := rsm[rKey]
 		if !rOk {
@@ -90,14 +91,16 @@ func span(sd tracesdk.ReadOnlySpan) *tracepb.Span {
 		return nil
 	}
 
-	tid := sd.SpanContext().TraceID()
-	sid := sd.SpanContext().SpanID()
+	spanContext := sd.SpanContext()
+	tid := spanContext.TraceID()
+	sid := spanContext.SpanID()
 
+	sdStatus := sd.Status()
 	s := &tracepb.Span{
 		TraceId:                tid[:],
 		SpanId:                 sid[:],
-		TraceState:             sd.SpanContext().TraceState().String(),
-		Status:                 status(sd.Status().Code, sd.Status().Description),
+		TraceState:             spanContext.TraceState().String(),
+		Status:                 status(sdStatus.Code, sdStatus.Description),
 		StartTimeUnixNano:      uint64(max(0, sd.StartTime().UnixNano())), // nolint:gosec // Overflow checked.
 		EndTimeUnixNano:        uint64(max(0, sd.EndTime().UnixNano())),   // nolint:gosec // Overflow checked.
 		Links:                  links(sd.Links()),
@@ -110,10 +113,11 @@ func span(sd tracesdk.ReadOnlySpan) *tracepb.Span {
 		DroppedLinksCount:      clampUint32(sd.DroppedLinks()),
 	}
 
-	if psid := sd.Parent().SpanID(); psid.IsValid() {
+	sdParent := sd.Parent()
+	if psid := sdParent.SpanID(); psid.IsValid() {
 		s.ParentSpanId = psid[:]
 	}
-	s.Flags = buildSpanFlagsWith(sd.SpanContext().TraceFlags(), sd.Parent())
+	s.Flags = buildSpanFlagsWith(spanContext.TraceFlags(), sdParent)
 
 	return s
 }
