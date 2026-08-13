@@ -23,12 +23,14 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	libcontainercgroups "github.com/opencontainers/cgroups"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/logs/logreduction"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -114,7 +116,8 @@ const (
 
 // MilliCPUToQuota converts milliCPU to CFS quota and period values.
 // Input parameters and resulting value is number of microseconds.
-func MilliCPUToQuota(milliCPU int64, period int64) (quota int64) {
+// A negative milliCPU, or one whose quota does not fit, converts to -1, no quota.
+func MilliCPUToQuota(milliCPU int64, period int64) int64 {
 	// CFS quota is measured in two values:
 	//  - cfs_period_us=100ms (the amount of time to measure usage across given by period)
 	//  - cfs_quota=20ms (the amount of cpu time allowed to be used across a period)
@@ -123,30 +126,68 @@ func MilliCPUToQuota(milliCPU int64, period int64) (quota int64) {
 	// see https://www.kernel.org/doc/Documentation/scheduler/sched-bwc.txt for details
 
 	if milliCPU == 0 {
-		return
+		return 0
+	}
+	if milliCPU < 0 {
+		// A negative cannot be a real limit. Treat it as unlimited; the multiply would wrap.
+		logCPUConversionAnomaly("negative milliCPU treated as unlimited", milliCPU, period)
+		return -1
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUCFSQuotaPeriod) {
 		period = QuotaPeriod
 	}
+	if period <= 0 {
+		// Validation keeps CPUCFSQuotaPeriod positive. Log an error and guard the divide anyway.
+		klog.Background().Error(nil, "MilliCPUToQuota got a non-positive CFS period", "period", period, "milliCPU", milliCPU)
+		return MinQuotaPeriod
+	}
+
+	// A limit whose quota overflows int64 is effectively unlimited. Use -1, the CFS
+	// "no quota" value the backends read back, since the kernel rejects MaxInt64.
+	if milliCPU > math.MaxInt64/period {
+		logCPUConversionAnomaly("milliCPU overflows int64, treated as unlimited", milliCPU, period)
+		return -1
+	}
 
 	// we then convert your milliCPU to a value normalized over a period
-	quota = (milliCPU * period) / MilliCPUToCPU
+	quota := (milliCPU * period) / MilliCPUToCPU
+
+	// Stay a period below MaxInt64/1e6: the systemd driver rescales the quota to one
+	// second and back, rounding up (opencontainers/cgroups#73), and that must not wrap.
+	if quota > math.MaxInt64/1000000-period {
+		logCPUConversionAnomaly("quota overflows the systemd rescale, treated as unlimited", milliCPU, period)
+		return -1
+	}
 
 	// quota needs to be a minimum of 1ms.
 	if quota < MinQuotaPeriod {
 		quota = MinQuotaPeriod
 	}
-	return
+	return quota
+}
+
+// cpuConversionLog keeps the anomaly warnings below to once a minute.
+var cpuConversionLog = logreduction.NewLogReduction(time.Minute)
+
+// logCPUConversionAnomaly logs at most once a minute; the conversions run in reconcile loops.
+func logCPUConversionAnomaly(reason string, milliCPU, period int64) {
+	// One key for every reason, so all of them share the once-a-minute window.
+	if cpuConversionLog.ShouldMessageBePrinted("overflow", "cpuConversion") {
+		klog.Background().Error(nil, "MilliCPUToQuota anomaly", "reason", reason, "milliCPU", milliCPU, "period", period)
+	}
 }
 
 // MilliCPUToShares converts the milliCPU to CFS shares.
 func MilliCPUToShares(milliCPU int64) uint64 {
-	if milliCPU == 0 {
-		// Docker converts zero milliCPU to unset, which maps to kernel default
-		// for unset: 1024. Return 2 here to really match kernel default for
-		// zero milliCPU.
+	if milliCPU <= 0 {
+		// Docker maps zero milliCPU to unset, which the kernel reads as 1024 shares; return 2
+		// to really match the default for zero. A negative floors here too, so nothing wraps.
 		return MinShares
+	}
+	// An oversized limit would wrap the multiply below into MinShares. It belongs at the ceiling.
+	if milliCPU > math.MaxInt64/SharesPerCPU {
+		return MaxShares
 	}
 	// Conceptually (milliCPU / milliCPUToCPU) * sharesPerCPU, but factored to improve rounding.
 	shares := (milliCPU * SharesPerCPU) / MilliCPUToCPU

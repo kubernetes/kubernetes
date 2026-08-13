@@ -19,6 +19,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -151,31 +152,51 @@ func TestCalculateCPUMaximum(t *testing.T) {
 			want:     10000,
 		},
 		{
-			// TODO(#141166): MilliValue() fits int64 but 10 * MilliValue() does not; must clamp to 10000.
 			name:     "smallest limit whose product overflows int64",
 			cpuLimit: resource.MustParse("922337203685477581m"),
 			cpuCount: 4,
-			want:     1,
+			want:     10000,
 		},
 		{
-			// TODO(#141166): A limit past int64 must clamp to 10000.
 			name:     "limit past int64",
 			cpuLimit: resource.MustParse("100E"),
 			cpuCount: 4,
-			want:     1,
+			want:     10000,
 		},
 		{
-			// TODO(#141166): A limit past int64 must clamp to 10000.
 			name:     "limit of MaxInt64 plus one milli",
 			cpuLimit: resource.MustParse("9223372036854775808m"),
 			cpuCount: 4,
-			want:     1,
+			want:     10000,
 		},
 		{
-			// TODO(#141166): A limit past int64 must clamp to 10000.
 			name:     "limit of 2^64 plus 4000 milli",
 			cpuLimit: resource.MustParse("18446744073709555616m"),
 			cpuCount: 4,
+			want:     10000,
+		},
+		{
+			name:     "just below the node capacity stays below the ceiling",
+			cpuLimit: resource.MustParse("95999m"),
+			cpuCount: 96,
+			want:     9999,
+		},
+		{
+			name:     "the node capacity maps to the ceiling",
+			cpuLimit: resource.MustParse("96"),
+			cpuCount: 96,
+			want:     10000,
+		},
+		{
+			name:     "a positive limit whose MilliValue overflows still saturates",
+			cpuLimit: resource.MustParse("9223372036854775808m"),
+			cpuCount: 1,
+			want:     10000,
+		},
+		{
+			name:     "an extreme negative milli value cannot wrap positive",
+			cpuLimit: *resource.NewMilliQuantity(math.MinInt64+100, resource.DecimalSI),
+			cpuCount: 1,
 			want:     1,
 		},
 	}
@@ -183,6 +204,31 @@ func TestCalculateCPUMaximum(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.want, calculateCPUMaximum(&tt.cpuLimit, tt.cpuCount))
 		})
+	}
+}
+
+func TestGenerateWindowsContainerResourcesOversizedCPULimit(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	// The limit overflows MilliValue. The Quantity comparison must send it to the
+	// ceiling, not the minimum.
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "12345678", Name: "foo", Namespace: "bar"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name: "c1",
+				Resources: v1.ResourceRequirements{
+					Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("9223372036854775808m")},
+				},
+			}},
+		},
+	}
+
+	got := m.generateWindowsContainerResources(tCtx, pod, &pod.Spec.Containers[0])
+	if got.CpuMaximum != 10000 {
+		t.Errorf("CpuMaximum = %d, want 10000 (an oversized limit is the ceiling, not the minimum)", got.CpuMaximum)
 	}
 }
 
