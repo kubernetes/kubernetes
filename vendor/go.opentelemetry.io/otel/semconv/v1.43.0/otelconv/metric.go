@@ -9,16 +9,11 @@ package otelconv
 
 import (
 	"context"
-	"sync"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/metric/noop"
-)
-
-var (
-	addOptPool = &sync.Pool{New: func() any { return &[]metric.AddOption{} }}
-	recOptPool = &sync.Pool{New: func() any { return &[]metric.RecordOption{} }}
+	"go.opentelemetry.io/otel/semconv/internal/metricpool"
 )
 
 // ErrorTypeAttr is an attribute conforming to the error.type semantic
@@ -192,6 +187,12 @@ func (SDKExporterLogExported) Description() string {
 // non-rejected log records count as success.
 // If no rejection reason is available, `rejected` SHOULD be used as value for
 // `error.type`.
+// If the exporter retries failed export attempts, the export operation is
+// considered finished only after the final attempt has concluded.
+// Each log record MUST be counted exactly once per export operation:
+// intermediate failed attempts that are followed by a retry MUST NOT increment
+// the counter,
+// and `error.type` reflects the cause of the final attempt.
 func (m SDKExporterLogExported) Add(
 	ctx context.Context,
 	incr int64,
@@ -205,12 +206,8 @@ func (m SDKExporterLogExported) Add(
 		return
 	}
 
-	o := addOptPool.Get().(*[]metric.AddOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		addOptPool.Put(o)
-	}()
+	o := metricpool.AddOptions()
+	defer metricpool.PutAddOptions(o)
 
 	*o = append(
 		*o,
@@ -231,6 +228,12 @@ func (m SDKExporterLogExported) Add(
 // non-rejected log records count as success.
 // If no rejection reason is available, `rejected` SHOULD be used as value for
 // `error.type`.
+// If the exporter retries failed export attempts, the export operation is
+// considered finished only after the final attempt has concluded.
+// Each log record MUST be counted exactly once per export operation:
+// intermediate failed attempts that are followed by a retry MUST NOT increment
+// the counter,
+// and `error.type` reflects the cause of the final attempt.
 func (m SDKExporterLogExported) AddSet(ctx context.Context, incr int64, set attribute.Set) {
 	if !m.Int64Counter.Enabled(ctx) {
 		return
@@ -240,12 +243,8 @@ func (m SDKExporterLogExported) AddSet(ctx context.Context, incr int64, set attr
 		return
 	}
 
-	o := addOptPool.Get().(*[]metric.AddOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		addOptPool.Put(o)
-	}()
+	o := metricpool.AddOptions()
+	defer metricpool.PutAddOptions(o)
 
 	*o = append(*o, metric.WithAttributeSet(set))
 	m.Int64Counter.Add(ctx, incr, *o...)
@@ -442,8 +441,10 @@ func (SDKExporterLogInflight) Description() string {
 //
 // All additional attrs passed are included in the recorded value.
 //
-// For successful exports, `error.type` MUST NOT be set. For failed exports,
-// `error.type` MUST contain the failure cause.
+// Log records are counted as inflight from when they are passed to the exporter
+// until the export operation has concluded.
+// If the exporter retries failed export attempts, log records remain inflight
+// across all retry attempts and any backoff between them.
 func (m SDKExporterLogInflight) Add(
 	ctx context.Context,
 	incr int64,
@@ -457,12 +458,8 @@ func (m SDKExporterLogInflight) Add(
 		return
 	}
 
-	o := addOptPool.Get().(*[]metric.AddOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		addOptPool.Put(o)
-	}()
+	o := metricpool.AddOptions()
+	defer metricpool.PutAddOptions(o)
 
 	*o = append(
 		*o,
@@ -476,8 +473,10 @@ func (m SDKExporterLogInflight) Add(
 
 // AddSet adds incr to the existing count for set.
 //
-// For successful exports, `error.type` MUST NOT be set. For failed exports,
-// `error.type` MUST contain the failure cause.
+// Log records are counted as inflight from when they are passed to the exporter
+// until the export operation has concluded.
+// If the exporter retries failed export attempts, log records remain inflight
+// across all retry attempts and any backoff between them.
 func (m SDKExporterLogInflight) AddSet(ctx context.Context, incr int64, set attribute.Set) {
 	if !m.Int64UpDownCounter.Enabled(ctx) {
 		return
@@ -487,12 +486,8 @@ func (m SDKExporterLogInflight) AddSet(ctx context.Context, incr int64, set attr
 		return
 	}
 
-	o := addOptPool.Get().(*[]metric.AddOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		addOptPool.Put(o)
-	}()
+	o := metricpool.AddOptions()
+	defer metricpool.PutAddOptions(o)
 
 	*o = append(*o, metric.WithAttributeSet(set))
 	m.Int64UpDownCounter.Add(ctx, incr, *o...)
@@ -683,6 +678,12 @@ func (SDKExporterMetricDataPointExported) Description() string {
 // non-rejected data points count as success.
 // If no rejection reason is available, `rejected` SHOULD be used as value for
 // `error.type`.
+// If the exporter retries failed export attempts, the export operation is
+// considered finished only after the final attempt has concluded.
+// Each metric data point MUST be counted exactly once per export operation:
+// intermediate failed attempts that are followed by a retry MUST NOT increment
+// the counter,
+// and `error.type` reflects the cause of the final attempt.
 func (m SDKExporterMetricDataPointExported) Add(
 	ctx context.Context,
 	incr int64,
@@ -696,12 +697,8 @@ func (m SDKExporterMetricDataPointExported) Add(
 		return
 	}
 
-	o := addOptPool.Get().(*[]metric.AddOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		addOptPool.Put(o)
-	}()
+	o := metricpool.AddOptions()
+	defer metricpool.PutAddOptions(o)
 
 	*o = append(
 		*o,
@@ -722,6 +719,12 @@ func (m SDKExporterMetricDataPointExported) Add(
 // non-rejected data points count as success.
 // If no rejection reason is available, `rejected` SHOULD be used as value for
 // `error.type`.
+// If the exporter retries failed export attempts, the export operation is
+// considered finished only after the final attempt has concluded.
+// Each metric data point MUST be counted exactly once per export operation:
+// intermediate failed attempts that are followed by a retry MUST NOT increment
+// the counter,
+// and `error.type` reflects the cause of the final attempt.
 func (m SDKExporterMetricDataPointExported) AddSet(ctx context.Context, incr int64, set attribute.Set) {
 	if !m.Int64Counter.Enabled(ctx) {
 		return
@@ -731,12 +734,8 @@ func (m SDKExporterMetricDataPointExported) AddSet(ctx context.Context, incr int
 		return
 	}
 
-	o := addOptPool.Get().(*[]metric.AddOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		addOptPool.Put(o)
-	}()
+	o := metricpool.AddOptions()
+	defer metricpool.PutAddOptions(o)
 
 	*o = append(*o, metric.WithAttributeSet(set))
 	m.Int64Counter.Add(ctx, incr, *o...)
@@ -935,8 +934,10 @@ func (SDKExporterMetricDataPointInflight) Description() string {
 //
 // All additional attrs passed are included in the recorded value.
 //
-// For successful exports, `error.type` MUST NOT be set. For failed exports,
-// `error.type` MUST contain the failure cause.
+// Metric data points are counted as inflight from when they are passed to the
+// exporter until the export operation has concluded.
+// If the exporter retries failed export attempts, metric data points remain
+// inflight across all retry attempts and any backoff between them.
 func (m SDKExporterMetricDataPointInflight) Add(
 	ctx context.Context,
 	incr int64,
@@ -950,12 +951,8 @@ func (m SDKExporterMetricDataPointInflight) Add(
 		return
 	}
 
-	o := addOptPool.Get().(*[]metric.AddOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		addOptPool.Put(o)
-	}()
+	o := metricpool.AddOptions()
+	defer metricpool.PutAddOptions(o)
 
 	*o = append(
 		*o,
@@ -969,8 +966,10 @@ func (m SDKExporterMetricDataPointInflight) Add(
 
 // AddSet adds incr to the existing count for set.
 //
-// For successful exports, `error.type` MUST NOT be set. For failed exports,
-// `error.type` MUST contain the failure cause.
+// Metric data points are counted as inflight from when they are passed to the
+// exporter until the export operation has concluded.
+// If the exporter retries failed export attempts, metric data points remain
+// inflight across all retry attempts and any backoff between them.
 func (m SDKExporterMetricDataPointInflight) AddSet(ctx context.Context, incr int64, set attribute.Set) {
 	if !m.Int64UpDownCounter.Enabled(ctx) {
 		return
@@ -980,12 +979,8 @@ func (m SDKExporterMetricDataPointInflight) AddSet(ctx context.Context, incr int
 		return
 	}
 
-	o := addOptPool.Get().(*[]metric.AddOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		addOptPool.Put(o)
-	}()
+	o := metricpool.AddOptions()
+	defer metricpool.PutAddOptions(o)
 
 	*o = append(*o, metric.WithAttributeSet(set))
 	m.Int64UpDownCounter.Add(ctx, incr, *o...)
@@ -1175,6 +1170,11 @@ func (SDKExporterOperationDuration) Description() string {
 // successful
 // operations, `error.type` MUST NOT be set. For unsuccessful export operations,
 // `error.type` MUST contain a relevant failure cause.
+// If the exporter retries failed export attempts, exactly one observation MUST
+// be recorded per export operation,
+// covering the wall-clock duration from the start of the first attempt through
+// the conclusion of the final attempt (including any backoff between attempts).
+// `error.type` reflects the cause of the final attempt.
 //
 // [http]: https://github.com/open-telemetry/opentelemetry-proto/blob/v1.5.0/docs/specification.md#full-success-1
 // [grpc]: https://github.com/open-telemetry/opentelemetry-proto/blob/v1.5.0/docs/specification.md#full-success
@@ -1191,12 +1191,8 @@ func (m SDKExporterOperationDuration) Record(
 		return
 	}
 
-	o := recOptPool.Get().(*[]metric.RecordOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		recOptPool.Put(o)
-	}()
+	o := metricpool.RecordOptions()
+	defer metricpool.PutRecordOptions(o)
 
 	*o = append(
 		*o,
@@ -1216,6 +1212,11 @@ func (m SDKExporterOperationDuration) Record(
 // successful
 // operations, `error.type` MUST NOT be set. For unsuccessful export operations,
 // `error.type` MUST contain a relevant failure cause.
+// If the exporter retries failed export attempts, exactly one observation MUST
+// be recorded per export operation,
+// covering the wall-clock duration from the start of the first attempt through
+// the conclusion of the final attempt (including any backoff between attempts).
+// `error.type` reflects the cause of the final attempt.
 //
 // [http]: https://github.com/open-telemetry/opentelemetry-proto/blob/v1.5.0/docs/specification.md#full-success-1
 // [grpc]: https://github.com/open-telemetry/opentelemetry-proto/blob/v1.5.0/docs/specification.md#full-success
@@ -1228,12 +1229,8 @@ func (m SDKExporterOperationDuration) RecordSet(ctx context.Context, val float64
 		return
 	}
 
-	o := recOptPool.Get().(*[]metric.RecordOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		recOptPool.Put(o)
-	}()
+	o := metricpool.RecordOptions()
+	defer metricpool.PutRecordOptions(o)
 
 	*o = append(*o, metric.WithAttributeSet(set))
 	m.Float64Histogram.Record(ctx, val, *o...)
@@ -1357,6 +1354,11 @@ func (SDKExporterSpanExported) Description() string {
 // success.
 // If no rejection reason is available, `rejected` SHOULD be used as value for
 // `error.type`.
+// If the exporter retries failed export attempts, the export operation is
+// considered finished only after the final attempt has concluded.
+// Each span MUST be counted exactly once per export operation: intermediate
+// failed attempts that are followed by a retry MUST NOT increment the counter,
+// and `error.type` reflects the cause of the final attempt.
 func (m SDKExporterSpanExported) Add(
 	ctx context.Context,
 	incr int64,
@@ -1370,12 +1372,8 @@ func (m SDKExporterSpanExported) Add(
 		return
 	}
 
-	o := addOptPool.Get().(*[]metric.AddOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		addOptPool.Put(o)
-	}()
+	o := metricpool.AddOptions()
+	defer metricpool.PutAddOptions(o)
 
 	*o = append(
 		*o,
@@ -1396,6 +1394,11 @@ func (m SDKExporterSpanExported) Add(
 // success.
 // If no rejection reason is available, `rejected` SHOULD be used as value for
 // `error.type`.
+// If the exporter retries failed export attempts, the export operation is
+// considered finished only after the final attempt has concluded.
+// Each span MUST be counted exactly once per export operation: intermediate
+// failed attempts that are followed by a retry MUST NOT increment the counter,
+// and `error.type` reflects the cause of the final attempt.
 func (m SDKExporterSpanExported) AddSet(ctx context.Context, incr int64, set attribute.Set) {
 	if !m.Int64Counter.Enabled(ctx) {
 		return
@@ -1405,12 +1408,8 @@ func (m SDKExporterSpanExported) AddSet(ctx context.Context, incr int64, set att
 		return
 	}
 
-	o := addOptPool.Get().(*[]metric.AddOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		addOptPool.Put(o)
-	}()
+	o := metricpool.AddOptions()
+	defer metricpool.PutAddOptions(o)
 
 	*o = append(*o, metric.WithAttributeSet(set))
 	m.Int64Counter.Add(ctx, incr, *o...)
@@ -1607,8 +1606,10 @@ func (SDKExporterSpanInflight) Description() string {
 //
 // All additional attrs passed are included in the recorded value.
 //
-// For successful exports, `error.type` MUST NOT be set. For failed exports,
-// `error.type` MUST contain the failure cause.
+// Spans are counted as inflight from when they are passed to the exporter until
+// the export operation has concluded.
+// If the exporter retries failed export attempts, spans remain inflight across
+// all retry attempts and any backoff between them.
 func (m SDKExporterSpanInflight) Add(
 	ctx context.Context,
 	incr int64,
@@ -1622,12 +1623,8 @@ func (m SDKExporterSpanInflight) Add(
 		return
 	}
 
-	o := addOptPool.Get().(*[]metric.AddOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		addOptPool.Put(o)
-	}()
+	o := metricpool.AddOptions()
+	defer metricpool.PutAddOptions(o)
 
 	*o = append(
 		*o,
@@ -1641,8 +1638,10 @@ func (m SDKExporterSpanInflight) Add(
 
 // AddSet adds incr to the existing count for set.
 //
-// For successful exports, `error.type` MUST NOT be set. For failed exports,
-// `error.type` MUST contain the failure cause.
+// Spans are counted as inflight from when they are passed to the exporter until
+// the export operation has concluded.
+// If the exporter retries failed export attempts, spans remain inflight across
+// all retry attempts and any backoff between them.
 func (m SDKExporterSpanInflight) AddSet(ctx context.Context, incr int64, set attribute.Set) {
 	if !m.Int64UpDownCounter.Enabled(ctx) {
 		return
@@ -1652,12 +1651,8 @@ func (m SDKExporterSpanInflight) AddSet(ctx context.Context, incr int64, set att
 		return
 	}
 
-	o := addOptPool.Get().(*[]metric.AddOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		addOptPool.Put(o)
-	}()
+	o := metricpool.AddOptions()
+	defer metricpool.PutAddOptions(o)
 
 	*o = append(*o, metric.WithAttributeSet(set))
 	m.Int64UpDownCounter.Add(ctx, incr, *o...)
@@ -1846,12 +1841,8 @@ func (m SDKLogCreated) Add(ctx context.Context, incr int64, attrs ...attribute.K
 		return
 	}
 
-	o := addOptPool.Get().(*[]metric.AddOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		addOptPool.Put(o)
-	}()
+	o := metricpool.AddOptions()
+	defer metricpool.PutAddOptions(o)
 
 	*o = append(*o, metric.WithAttributes(attrs...))
 	m.Int64Counter.Add(ctx, incr, *o...)
@@ -1867,12 +1858,8 @@ func (m SDKLogCreated) AddSet(ctx context.Context, incr int64, set attribute.Set
 		return
 	}
 
-	o := addOptPool.Get().(*[]metric.AddOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		addOptPool.Put(o)
-	}()
+	o := metricpool.AddOptions()
+	defer metricpool.PutAddOptions(o)
 
 	*o = append(*o, metric.WithAttributeSet(set))
 	m.Int64Counter.Add(ctx, incr, *o...)
@@ -2018,12 +2005,8 @@ func (m SDKMetricReaderCollectionDuration) Record(
 		return
 	}
 
-	o := recOptPool.Get().(*[]metric.RecordOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		recOptPool.Put(o)
-	}()
+	o := metricpool.RecordOptions()
+	defer metricpool.PutRecordOptions(o)
 
 	*o = append(
 		*o,
@@ -2051,12 +2034,8 @@ func (m SDKMetricReaderCollectionDuration) RecordSet(ctx context.Context, val fl
 		return
 	}
 
-	o := recOptPool.Get().(*[]metric.RecordOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		recOptPool.Put(o)
-	}()
+	o := metricpool.RecordOptions()
+	defer metricpool.PutRecordOptions(o)
 
 	*o = append(*o, metric.WithAttributeSet(set))
 	m.Float64Histogram.Record(ctx, val, *o...)
@@ -2148,6 +2127,11 @@ func (SDKProcessorLogProcessed) Description() string {
 //
 // For successful processing, `error.type` MUST NOT be set. For failed
 // processing, `error.type` MUST contain the failure cause.
+// SDK Batching Log Record Processors MUST use `queue_full` as the value of
+// `error.type` for log records dropped due to a full queue.
+// SDK Log Record Processors MUST use `already_shutdown` as the value of
+// `error.type` for log records dropped because the processor has already been
+// shut down.
 // For the SDK Simple and Batching Log Record Processor a log record is
 // considered to be processed already when it has been submitted to the exporter,
 // not when the corresponding export call has finished.
@@ -2164,12 +2148,8 @@ func (m SDKProcessorLogProcessed) Add(
 		return
 	}
 
-	o := addOptPool.Get().(*[]metric.AddOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		addOptPool.Put(o)
-	}()
+	o := metricpool.AddOptions()
+	defer metricpool.PutAddOptions(o)
 
 	*o = append(
 		*o,
@@ -2185,6 +2165,11 @@ func (m SDKProcessorLogProcessed) Add(
 //
 // For successful processing, `error.type` MUST NOT be set. For failed
 // processing, `error.type` MUST contain the failure cause.
+// SDK Batching Log Record Processors MUST use `queue_full` as the value of
+// `error.type` for log records dropped due to a full queue.
+// SDK Log Record Processors MUST use `already_shutdown` as the value of
+// `error.type` for log records dropped because the processor has already been
+// shut down.
 // For the SDK Simple and Batching Log Record Processor a log record is
 // considered to be processed already when it has been submitted to the exporter,
 // not when the corresponding export call has finished.
@@ -2197,12 +2182,8 @@ func (m SDKProcessorLogProcessed) AddSet(ctx context.Context, incr int64, set at
 		return
 	}
 
-	o := addOptPool.Get().(*[]metric.AddOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		addOptPool.Put(o)
-	}()
+	o := metricpool.AddOptions()
+	defer metricpool.PutAddOptions(o)
 
 	*o = append(*o, metric.WithAttributeSet(set))
 	m.Int64Counter.Add(ctx, incr, *o...)
@@ -2210,8 +2191,6 @@ func (m SDKProcessorLogProcessed) AddSet(ctx context.Context, incr int64, set at
 
 // AttrErrorType returns an optional attribute for the "error.type" semantic
 // convention. It represents a low-cardinality description of the failure reason.
-// SDK Batching Log Record Processors MUST use `queue_full` for log records
-// dropped due to a full queue.
 func (SDKProcessorLogProcessed) AttrErrorType(val ErrorTypeAttr) attribute.KeyValue {
 	return attribute.String("error.type", string(val))
 }
@@ -2292,8 +2271,6 @@ func (SDKProcessorLogProcessedObservable) Description() string {
 
 // AttrErrorType returns an optional attribute for the "error.type" semantic
 // convention. It represents a low-cardinality description of the failure reason.
-// SDK Batching Log Record Processors MUST use `queue_full` for log records
-// dropped due to a full queue.
 func (SDKProcessorLogProcessedObservable) AttrErrorType(val ErrorTypeAttr) attribute.KeyValue {
 	return attribute.String("error.type", string(val))
 }
@@ -2525,6 +2502,10 @@ func (SDKProcessorSpanProcessed) Description() string {
 //
 // For successful processing, `error.type` MUST NOT be set. For failed
 // processing, `error.type` MUST contain the failure cause.
+// SDK Batching Span Processors MUST use `queue_full` as the value of
+// `error.type` for spans dropped due to a full queue.
+// SDK Span Processors MUST use `already_shutdown` as the value of `error.type`
+// for spans dropped because the processor has already been shut down.
 // For the SDK Simple and Batching Span Processor a span is considered to be
 // processed already when it has been submitted to the exporter, not when the
 // corresponding export call has finished.
@@ -2541,12 +2522,8 @@ func (m SDKProcessorSpanProcessed) Add(
 		return
 	}
 
-	o := addOptPool.Get().(*[]metric.AddOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		addOptPool.Put(o)
-	}()
+	o := metricpool.AddOptions()
+	defer metricpool.PutAddOptions(o)
 
 	*o = append(
 		*o,
@@ -2562,6 +2539,10 @@ func (m SDKProcessorSpanProcessed) Add(
 //
 // For successful processing, `error.type` MUST NOT be set. For failed
 // processing, `error.type` MUST contain the failure cause.
+// SDK Batching Span Processors MUST use `queue_full` as the value of
+// `error.type` for spans dropped due to a full queue.
+// SDK Span Processors MUST use `already_shutdown` as the value of `error.type`
+// for spans dropped because the processor has already been shut down.
 // For the SDK Simple and Batching Span Processor a span is considered to be
 // processed already when it has been submitted to the exporter, not when the
 // corresponding export call has finished.
@@ -2574,12 +2555,8 @@ func (m SDKProcessorSpanProcessed) AddSet(ctx context.Context, incr int64, set a
 		return
 	}
 
-	o := addOptPool.Get().(*[]metric.AddOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		addOptPool.Put(o)
-	}()
+	o := metricpool.AddOptions()
+	defer metricpool.PutAddOptions(o)
 
 	*o = append(*o, metric.WithAttributeSet(set))
 	m.Int64Counter.Add(ctx, incr, *o...)
@@ -2587,8 +2564,6 @@ func (m SDKProcessorSpanProcessed) AddSet(ctx context.Context, incr int64, set a
 
 // AttrErrorType returns an optional attribute for the "error.type" semantic
 // convention. It represents a low-cardinality description of the failure reason.
-// SDK Batching Span Processors MUST use `queue_full` for spans dropped due to a
-// full queue.
 func (SDKProcessorSpanProcessed) AttrErrorType(val ErrorTypeAttr) attribute.KeyValue {
 	return attribute.String("error.type", string(val))
 }
@@ -2669,8 +2644,6 @@ func (SDKProcessorSpanProcessedObservable) Description() string {
 
 // AttrErrorType returns an optional attribute for the "error.type" semantic
 // convention. It represents a low-cardinality description of the failure reason.
-// SDK Batching Span Processors MUST use `queue_full` for spans dropped due to a
-// full queue.
 func (SDKProcessorSpanProcessedObservable) AttrErrorType(val ErrorTypeAttr) attribute.KeyValue {
 	return attribute.String("error.type", string(val))
 }
@@ -2899,6 +2872,9 @@ func (SDKSpanLive) Description() string {
 // Add adds incr to the existing count for attrs.
 //
 // All additional attrs passed are included in the recorded value.
+//
+// Non-recording spans are not counted, hence `otel.span.sampling_result` can
+// only take values `RECORD_ONLY` and `RECORD_AND_SAMPLE`, not `DROP`.
 func (m SDKSpanLive) Add(
 	ctx context.Context,
 	incr int64,
@@ -2912,12 +2888,8 @@ func (m SDKSpanLive) Add(
 		return
 	}
 
-	o := addOptPool.Get().(*[]metric.AddOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		addOptPool.Put(o)
-	}()
+	o := metricpool.AddOptions()
+	defer metricpool.PutAddOptions(o)
 
 	*o = append(
 		*o,
@@ -2930,6 +2902,9 @@ func (m SDKSpanLive) Add(
 }
 
 // AddSet adds incr to the existing count for set.
+//
+// Non-recording spans are not counted, hence `otel.span.sampling_result` can
+// only take values `RECORD_ONLY` and `RECORD_AND_SAMPLE`, not `DROP`.
 func (m SDKSpanLive) AddSet(ctx context.Context, incr int64, set attribute.Set) {
 	if !m.Int64UpDownCounter.Enabled(ctx) {
 		return
@@ -2939,12 +2914,8 @@ func (m SDKSpanLive) AddSet(ctx context.Context, incr int64, set attribute.Set) 
 		return
 	}
 
-	o := addOptPool.Get().(*[]metric.AddOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		addOptPool.Put(o)
-	}()
+	o := metricpool.AddOptions()
+	defer metricpool.PutAddOptions(o)
 
 	*o = append(*o, metric.WithAttributeSet(set))
 	m.Int64UpDownCounter.Add(ctx, incr, *o...)
@@ -3100,12 +3071,8 @@ func (m SDKSpanStarted) Add(
 		return
 	}
 
-	o := addOptPool.Get().(*[]metric.AddOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		addOptPool.Put(o)
-	}()
+	o := metricpool.AddOptions()
+	defer metricpool.PutAddOptions(o)
 
 	*o = append(
 		*o,
@@ -3130,12 +3097,8 @@ func (m SDKSpanStarted) AddSet(ctx context.Context, incr int64, set attribute.Se
 		return
 	}
 
-	o := addOptPool.Get().(*[]metric.AddOption)
-	defer func() {
-		clear(*o)
-		*o = (*o)[:0]
-		addOptPool.Put(o)
-	}()
+	o := metricpool.AddOptions()
+	defer metricpool.PutAddOptions(o)
 
 	*o = append(*o, metric.WithAttributeSet(set))
 	m.Int64Counter.Add(ctx, incr, *o...)
