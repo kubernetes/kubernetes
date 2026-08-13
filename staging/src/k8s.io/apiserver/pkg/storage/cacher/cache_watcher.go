@@ -19,6 +19,7 @@ package cacher
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -355,11 +356,19 @@ func (c *cacheWatcher) isDoneChannelClosedLocked() bool {
 }
 
 func getMutableObject(object runtime.Object) runtime.Object {
-	if _, ok := object.(*cachingObject); ok {
-		// It is safe to return without deep-copy, because the underlying
-		// object will lazily perform deep-copy on the first try to change
-		// any of its fields.
+	switch object.(type) {
+	case *cachingObject:
+		// It is safe to return cachingObject without deep-copying because
+		// nobody modifies the object itself and cache encoding is handled
+		// inside cachingObject cleanly.
 		return object
+	case runtime.Unstructured:
+		return object.DeepCopyObject()
+	}
+	if v := reflect.ValueOf(object); v.Kind() == reflect.Pointer && v.Elem().Kind() == reflect.Struct {
+		cp := reflect.New(v.Type().Elem())
+		cp.Elem().Set(v.Elem())
+		return cp.Interface().(runtime.Object)
 	}
 	return object.DeepCopyObject()
 }
