@@ -19,6 +19,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -143,11 +144,60 @@ func TestCalculateCPUMaximum(t *testing.T) {
 			cpuCount: 100,
 			want:     1,
 		},
+		{
+			name:     "just below the node capacity stays below the ceiling",
+			cpuLimit: resource.MustParse("95999m"),
+			cpuCount: 96,
+			want:     9999,
+		},
+		{
+			name:     "the node capacity maps to the ceiling",
+			cpuLimit: resource.MustParse("96"),
+			cpuCount: 96,
+			want:     10000,
+		},
+		{
+			name:     "a positive limit whose MilliValue overflows still saturates",
+			cpuLimit: resource.MustParse("9223372036854775808m"),
+			cpuCount: 1,
+			want:     10000,
+		},
+		{
+			name:     "an extreme negative milli value cannot wrap positive",
+			cpuLimit: *resource.NewMilliQuantity(math.MinInt64+100, resource.DecimalSI),
+			cpuCount: 1,
+			want:     1,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.want, calculateCPUMaximum(&tt.cpuLimit, tt.cpuCount))
 		})
+	}
+}
+
+func TestGenerateWindowsContainerResourcesOversizedCPULimit(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	// The limit overflows MilliValue(); the exact-Quantity path must map it to
+	// the ceiling rather than fall through to the minimum.
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "12345678", Name: "foo", Namespace: "bar"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name: "c1",
+				Resources: v1.ResourceRequirements{
+					Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("9223372036854775808m")},
+				},
+			}},
+		},
+	}
+
+	got := m.generateWindowsContainerResources(tCtx, pod, &pod.Spec.Containers[0])
+	if got.CpuMaximum != 10000 {
+		t.Errorf("CpuMaximum = %d, want 10000 (an oversized limit is the ceiling, not the minimum)", got.CpuMaximum)
 	}
 }
 
