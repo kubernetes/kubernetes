@@ -11,3 +11,17 @@ http://4.3.2.1:78/user/123
 file:///home/runner/work/opentelemetry-go/opentelemetry-go/exporters/otlp/otlptrace/otlptracegrpc/internal/observ/dns:/:4317
 # URL works, but it has blocked link checkers.
 https://dl.acm.org/doi/10.1145/198429.198435
+https://pkg.go.dev/google.golang.org/grpc.*internal/resolver
+https://golang.org/src/crypto/tls/generate_cert.go
+https://github.com/grpc/grpc/blob/.*/doc/naming.md
+https://github.com/open-telemetry/opentelemetry-specification/blob/.*
+# Fake domains used in otlp options_test.go tests
+https?://env\.endpoint.*
+https?://env\.metrics\.endpoint.*
+https?://env_metrics_endpoint.*
+https?://env\.traces\.endpoint.*
+https?://env_traces_endpoint.*
+https?://someendpoint.*
+https?://overrode\.by\.signal\.specific.*
+https?://overrode_by_signal_specific.*
+https?://proxy\.com.*

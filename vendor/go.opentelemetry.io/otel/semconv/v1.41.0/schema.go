@@ -3,7 +3,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package semconv // import "go.opentelemetry.io/otel/semconv/v1.41.0"
+package semconv
 
 // SchemaURL is the schema URL that matches the version of the semantic conventions
 // that this package defines. Semconv packages starting from v1.4.0 must declare

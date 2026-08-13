@@ -11,7 +11,7 @@
 // the API package).
 //
 // [OpenTelemetry trace API]: https://pkg.go.dev/go.opentelemetry.io/otel/trace
-package embedded // import "go.opentelemetry.io/otel/trace/embedded"
+package embedded
 
 // TracerProvider is embedded in
 // [go.opentelemetry.io/otel/trace.TracerProvider].

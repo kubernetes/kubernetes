@@ -229,14 +229,19 @@ func parseCert(in []byte, privAlgo string) (*Certificate, error) {
 		return nil, err
 	}
 	c.Reserved = g.Reserved
+	// Reject a certificate whose signature key is itself a certificate before
+	// parsing it. Certificates signed by certificates are not supported (see
+	// PROTOCOL.certkeys), and rejecting after ParsePublicKey returns would allow
+	// a chain of nested certificates to recurse once per level, exhausting the
+	// goroutine stack.
+	if sigAlgo, _, ok := parseString(g.SignatureKey); !ok {
+		return nil, errShortRead
+	} else if _, ok := certKeyAlgoNames[string(sigAlgo)]; ok {
+		return nil, fmt.Errorf("ssh: the signature key type %q is invalid for certificates", sigAlgo)
+	}
 	k, err := ParsePublicKey(g.SignatureKey)
 	if err != nil {
 		return nil, err
-	}
-	// The Type() function is intended to return only certificate key types, but
-	// we use certKeyAlgoNames anyway for safety, to match [Certificate.Type].
-	if _, ok := certKeyAlgoNames[k.Type()]; ok {
-		return nil, fmt.Errorf("ssh: the signature key type %q is invalid for certificates", k.Type())
 	}
 	c.SignatureKey = k
 	c.Signature, rest, ok = parseSignatureBody(g.Signature)

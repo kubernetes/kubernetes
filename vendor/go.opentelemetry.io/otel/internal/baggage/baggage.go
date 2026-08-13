@@ -10,7 +10,7 @@ this need this package would not need to exist and the
 `go.opentelemetry.io/otel/baggage` package would be the singular place where
 W3C baggage is handled.
 */
-package baggage // import "go.opentelemetry.io/otel/internal/baggage"
+package baggage
 
 // List is the collection of baggage members. The W3C allows for duplicates,
 // but OpenTelemetry does not, therefore, this is represented as a map.

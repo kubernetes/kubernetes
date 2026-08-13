@@ -8,4 +8,4 @@
 // OpenTelemetry semantic conventions are agreed standardized naming
 // patterns for OpenTelemetry things. This package represents the v1.41.0
 // version of the OpenTelemetry semantic conventions.
-package semconv // import "go.opentelemetry.io/otel/semconv/v1.41.0"
+package semconv
