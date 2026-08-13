@@ -17,6 +17,7 @@ limitations under the License.
 package store
 
 import (
+	"iter"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -74,6 +75,38 @@ func TestStoreListPrefix(t *testing.T) {
 	assert.Equal(t, []interface{}{
 		testStorageElement("bar", "baz", 4),
 	}, items)
+}
+
+func TestStoreCountAndRangePrefix(t *testing.T) {
+	store := newThreadedBtreeStoreIndexer(nil, btreeDegree)
+	require.NoError(t, store.Add(testStorageElement("foo3", "bar3", 1)))
+	require.NoError(t, store.Add(testStorageElement("foo1", "bar2", 2)))
+	require.NoError(t, store.Add(testStorageElement("foo2", "bar1", 3)))
+	require.NoError(t, store.Add(testStorageElement("bar", "baz", 4)))
+	snap := store.Clone()
+
+	for _, tc := range []struct {
+		name                string
+		prefix, continueKey string
+		expectKeys          []string
+	}{
+		{name: "whole tree", prefix: "", continueKey: "", expectKeys: []string{"bar", "foo1", "foo2", "foo3"}},
+		{name: "narrower prefix", prefix: "foo", continueKey: "", expectKeys: []string{"foo1", "foo2", "foo3"}},
+		{name: "continue mid prefix", prefix: "foo", continueKey: "foo1\x00", expectKeys: []string{"foo2", "foo3"}},
+		{name: "single item prefix", prefix: "bar", continueKey: "", expectKeys: []string{"bar"}},
+		{name: "no match", prefix: "zzz", continueKey: "", expectKeys: nil},
+		{name: "continue mid tree", prefix: "", continueKey: "foo2", expectKeys: []string{"foo2", "foo3"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var visited []string
+			for elem, err := range snap.RangePrefix(tc.prefix, tc.continueKey) {
+				require.NoError(t, err)
+				visited = append(visited, elem.Key)
+			}
+			assert.Equal(t, tc.expectKeys, visited)
+			assert.Equal(t, len(tc.expectKeys), snap.Count(tc.prefix, tc.continueKey))
+		})
+	}
 }
 
 func TestStoreSnapshotter(t *testing.T) {
@@ -166,6 +199,9 @@ func (f fakeIndexer) Replace([]interface{}, string) error {
 	return nil
 }
 func (f fakeIndexer) Count(prefixKey, continueKey string) int { return 0 }
+func (f fakeIndexer) RangePrefix(prefixKey, continueKey string) iter.Seq2[*Element, error] {
+	return func(yield func(*Element, error) bool) {}
+}
 
 type fakeSnapshotter struct {
 	getLessOrEqual func(rv uint64) (Snapshot, bool)

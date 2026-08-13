@@ -282,3 +282,34 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 	assert.Len(t, elements, 1)
 	assert.Equal(t, &mockObject{key: "foo", val: "600"}, elements[0].(*Element).Object)
 }
+
+// listSnapshot.Count filters the unordered bucket by hand rather than counting
+// the ordered range, so check it agrees with what RangePrefix visits.
+func TestListSnapshotCountAndRangePrefix(t *testing.T) {
+	snap := listSnapshot{Items: []interface{}{
+		testStorageElement("/pods/ns1/c", "3", 3),
+		testStorageElement("/pods/ns1/a", "1", 1),
+		testStorageElement("/pods/ns2/x", "4", 4),
+		testStorageElement("/pods/ns1/b", "2", 2),
+	}}
+	for _, tc := range []struct {
+		name                string
+		prefix, continueKey string
+		expectKeys          []string
+	}{
+		{name: "whole bucket", prefix: "/pods/", expectKeys: []string{"/pods/ns1/a", "/pods/ns1/b", "/pods/ns1/c", "/pods/ns2/x"}},
+		{name: "namespace prefix", prefix: "/pods/ns1/", expectKeys: []string{"/pods/ns1/a", "/pods/ns1/b", "/pods/ns1/c"}},
+		{name: "continue mid prefix", prefix: "/pods/ns1/", continueKey: "/pods/ns1/a\x00", expectKeys: []string{"/pods/ns1/b", "/pods/ns1/c"}},
+		{name: "no match", prefix: "/pods/ns3/", expectKeys: nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var visited []string
+			for elem, err := range snap.RangePrefix(tc.prefix, tc.continueKey) {
+				require.NoError(t, err)
+				visited = append(visited, elem.Key)
+			}
+			assert.Equal(t, tc.expectKeys, visited)
+			assert.Equal(t, len(tc.expectKeys), snap.Count(tc.prefix, tc.continueKey))
+		})
+	}
+}
