@@ -462,12 +462,14 @@ func runBenchmarkStoreList(ctx context.Context, b *testing.B, store storage.Inte
 				objectCount.Add(uint64(objects))
 				listCount.Add(uint64(lists))
 			case node:
+				opts.Predicate.Field = fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName})
 				if useIndex {
-					opts.Predicate.GetAttrs = podAttr
 					opts.Predicate.IndexFields = []string{"spec.nodeName"}
-					opts.Predicate.Field = fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName})
 				}
 				objects, lists := paginateList(ctx, store, "/pods/", opts)
+				if objects == 0 {
+					b.Errorf("Scope=Node list for node %q returned no objects", nodeName)
+				}
 				objectCount.Add(uint64(objects))
 				listCount.Add(uint64(lists))
 			case namespace:
