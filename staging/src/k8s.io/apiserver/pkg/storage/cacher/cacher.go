@@ -19,6 +19,7 @@ package cacher
 import (
 	"context"
 	"fmt"
+	"iter"
 	"net/http"
 	"reflect"
 	"strings"
@@ -745,8 +746,18 @@ func computeListLimit(opts storage.ListOptions) int64 {
 }
 
 type listResp struct {
-	Items           []interface{}
 	ResourceVersion uint64
+	snapshot        store.Snapshot
+	prefix          string
+	continueKey     string
+}
+
+func (r listResp) All() iter.Seq2[*store.Element, error] {
+	return r.snapshot.RangePrefix(r.prefix, r.continueKey)
+}
+
+func (r listResp) Count() int {
+	return r.snapshot.Count(r.prefix, r.continueKey)
 }
 
 // GetList implements storage.Interface
@@ -789,26 +800,35 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	if err != nil {
 		return err
 	}
-	span.AddEvent("Listed items from cache", attribute.Int("count", len(resp.Items)))
+	span.AddEvent("Got snapshot from cache")
 	var lastSelectedObjectKey string
 	var hasMoreListItems bool
+	// numFetched counts items read from the cache; totalCount is the range
+	// size, computed only for an empty predicate (remainingItemCount's case).
+	var numFetched int
+	var totalCount int64
 	limit := computeListLimit(opts)
 	if opts.Predicate.Empty() {
-		// Every item matches, so the result size is known upfront and items can be
-		// copied directly into the result list without an intermediate slice.
-		count := len(resp.Items)
+		// Every item matches, so the result size is known upfront: allocate the
+		// result exactly and fill it in a single walk that stops at the limit.
+		total := resp.Count()
+		totalCount = int64(total)
+		count := total
 		if limit > 0 && int64(count) > limit {
 			count = int(limit)
 			hasMoreListItems = true
 		}
 		listVal.Set(reflect.MakeSlice(listVal.Type(), count, count))
-		for i, obj := range resp.Items[:count] {
-			elem, ok := obj.(*store.Element)
-			if !ok {
-				return fmt.Errorf("non *store.Element returned from storage: %v", obj)
+		for elem, err := range resp.All() {
+			if err != nil {
+				return err
 			}
-			listVal.Index(i).Set(reflect.ValueOf(elem.Object).Elem())
+			listVal.Index(numFetched).Set(reflect.ValueOf(elem.Object).Elem())
 			lastSelectedObjectKey = elem.Key
+			numFetched++
+			if numFetched == count {
+				break
+			}
 		}
 	} else {
 		// store pointer of eligible objects,
@@ -816,14 +836,20 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		//   the elements in ListObject are Struct type, making slice will bring excessive memory consumption.
 		//   so we try to delay this action as much as possible
 		var selectedObjects []runtime.Object
-		for i, obj := range resp.Items {
-			elem, ok := obj.(*store.Element)
-			if !ok {
-				return fmt.Errorf("non *store.Element returned from storage: %v", obj)
+		isSharded := utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch)
+		for elem, err := range resp.All() {
+			if err != nil {
+				return err
+			}
+			numFetched++
+			if limit > 0 && int64(len(selectedObjects)) >= limit {
+				// The page is full and the range holds at least one more
+				// item, so a continuation must be issued.
+				hasMoreListItems = true
+				break
 			}
 			shardMatch := true
-			if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
-				var err error
+			if isSharded {
 				shardMatch, err = opts.Predicate.MatchesSharding(elem.Object)
 				if err != nil {
 					return fmt.Errorf("shard matching failed: %w", err)
@@ -832,10 +858,6 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 			if shardMatch && opts.Predicate.MatchesObjectAttributes(elem.Labels, elem.Fields) {
 				selectedObjects = append(selectedObjects, elem.Object)
 				lastSelectedObjectKey = elem.Key
-			}
-			if limit > 0 && int64(len(selectedObjects)) >= limit {
-				hasMoreListItems = i < len(resp.Items)-1
-				break
 			}
 		}
 		if len(selectedObjects) == 0 {
@@ -852,7 +874,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	}
 	span.AddEvent("Filtered items", attribute.Int("count", listVal.Len()))
 	if c.versioner != nil {
-		continueValue, remainingItemCount, err := storage.PrepareContinueToken(lastSelectedObjectKey, key, int64(resp.ResourceVersion), int64(len(resp.Items)), hasMoreListItems, opts)
+		continueValue, remainingItemCount, err := storage.PrepareContinueToken(lastSelectedObjectKey, key, int64(resp.ResourceVersion), totalCount, hasMoreListItems, opts)
 		if err != nil {
 			return err
 		}
@@ -864,7 +886,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
 		opts.Predicate.SetShardInfoOnList(listObj)
 	}
-	metrics.RecordListCacheMetrics(c.groupResource, indexUsed, len(resp.Items), listVal.Len())
+	metrics.RecordListCacheMetrics(c.groupResource, indexUsed, numFetched, listVal.Len())
 	return nil
 }
 

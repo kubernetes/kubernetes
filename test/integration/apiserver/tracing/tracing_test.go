@@ -870,7 +870,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"watchCache locked acquired",
 						"watchCache fresh enough",
 						"GetLatestSnapshotOrBuildLocked success",
-						"Listed items from cache",
+						"Got snapshot from cache",
 						"Filtered items",
 					},
 				},
