@@ -154,9 +154,11 @@ export class S3Table extends TableBase {
 
         parameters: {
           'classification': props.dataFormat.classificationString?.value,
-          'has_encrypted_data': true,
           'partition_filtering.enabled': props.enablePartitionFiltering,
           ...this.parameters,
+          // Managed keys are emitted last so free-form `parameters` cannot
+          // silently override them. Conflicts are rejected in `TableBase`.
+          'has_encrypted_data': this.hasEncryptedData,
         },
         storageDescriptor: {
           location: `s3://${this.bucket.bucketName}/${this.s3Prefix}`,

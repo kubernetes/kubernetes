@@ -1147,6 +1147,28 @@ new glue.S3Table(this, 'MyTable', {
 
 *Note: you cannot provide a `Bucket` when creating the `S3Table` if you wish to use server-side encryption (`KMS`, `KMS_MANAGED` or `S3_MANAGED`)*.
 
+### Marking table data as encrypted
+
+Both `S3Table` and `ExternalTable` set the `has_encrypted_data` table parameter, which
+Athena reads when querying client-side (`CSE-KMS`) encrypted datasets. It defaults to `true`.
+Set `hasEncryptedData` to `false` when the underlying data is not encrypted:
+
+```ts
+declare const myDatabase: glue.Database;
+new glue.S3Table(this, 'MyTable', {
+  hasEncryptedData: false,
+  database: myDatabase,
+  columns: [{
+    name: 'col1',
+    type: glue.Schema.STRING,
+  }],
+  dataFormat: glue.DataFormat.JSON,
+});
+```
+
+Do not set `has_encrypted_data` through the free-form `parameters` map as well - a value
+there that conflicts with `hasEncryptedData` is rejected at synthesis time.
+
 ## Types
 
 A table's schema is a collection of columns, each of which have a `name` and a `type`. Types are recursive structures, consisting of primitive and complex types:

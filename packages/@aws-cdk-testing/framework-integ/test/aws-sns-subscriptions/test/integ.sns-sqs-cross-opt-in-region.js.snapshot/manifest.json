@@ -1,0 +1,60 @@
+{
+  "version": "17.0.0",
+  "artifacts": {
+    "Tree": {
+      "type": "cdk:tree",
+      "properties": {
+        "file": "tree.json"
+      }
+    },
+    "TopicStack": {
+      "type": "aws:cloudformation:stack",
+      "environment": "aws://12345678/ap-southeast-4",
+      "properties": {
+        "templateFile": "TopicStack.template.json",
+        "validateOnSynth": false
+      },
+      "metadata": {
+        "/TopicStack/MyTopic/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "MyTopic86869434"
+          }
+        ]
+      },
+      "displayName": "TopicStack"
+    },
+    "QueueStack": {
+      "type": "aws:cloudformation:stack",
+      "environment": "aws://unknown-account/us-east-1",
+      "properties": {
+        "templateFile": "QueueStack.template.json",
+        "validateOnSynth": false
+      },
+      "dependencies": [
+        "TopicStack"
+      ],
+      "metadata": {
+        "/QueueStack/MyQueue/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "MyQueueE6CA6235"
+          }
+        ],
+        "/QueueStack/MyQueue/Policy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "MyQueuePolicy6BBEDDAC"
+          }
+        ],
+        "/QueueStack/MyQueue/TopicStackMyTopicC43E67AF/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "MyQueueTopicStackMyTopicC43E67AFC8DC8B4A"
+          }
+        ]
+      },
+      "displayName": "QueueStack"
+    }
+  }
+}

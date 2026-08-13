@@ -2136,3 +2136,151 @@ test('sms subscription with unresolved', () => {
     },
   });
 });
+
+test('queue subscription cross region with topic in opt-in region uses regionalized principal', () => {
+  const app = new App();
+  const queueStack = new Stack(app, 'QueueStack', {
+    env: { account: '11111111111', region: 'us-east-1' },
+  });
+
+  const queue = new sqs.Queue(queueStack, 'MyQueue');
+  const topic1 = sns.Topic.fromTopicArn(
+    queueStack,
+    'Topic',
+    'arn:aws:sns:ap-southeast-4:11111111111:my-topic',
+  );
+
+  topic1.addSubscription(new subs.SqsSubscription(queue));
+
+  Template.fromStack(queueStack).hasResourceProperties('AWS::SQS::QueuePolicy', {
+    PolicyDocument: {
+      Statement: [
+        {
+          Action: 'sqs:SendMessage',
+          Effect: 'Allow',
+          Principal: {
+            Service: 'sns.ap-southeast-4.amazonaws.com',
+          },
+          Resource: { 'Fn::GetAtt': ['MyQueueE6CA6235', 'Arn'] },
+          Condition: {
+            ArnEquals: { 'aws:SourceArn': 'arn:aws:sns:ap-southeast-4:11111111111:my-topic' },
+          },
+        },
+      ],
+    },
+  });
+});
+
+test('queue subscription cross region with queue in opt-in region uses regionalized principal', () => {
+  const app = new App();
+  const topicStack = new Stack(app, 'TopicStack', {
+    env: { account: '11111111111', region: 'us-east-1' },
+  });
+  const queueStack = new Stack(app, 'QueueStack', {
+    env: { account: '11111111111', region: 'ap-southeast-4' },
+  });
+
+  const topic1 = new sns.Topic(topicStack, 'Topic', {
+    topicName: 'topicName',
+  });
+
+  const queue = new sqs.Queue(queueStack, 'MyQueue');
+  topic1.addSubscription(new subs.SqsSubscription(queue));
+
+  Template.fromStack(queueStack).hasResourceProperties('AWS::SQS::QueuePolicy', {
+    PolicyDocument: {
+      Statement: [
+        {
+          Action: 'sqs:SendMessage',
+          Effect: 'Allow',
+          Principal: {
+            Service: 'sns.ap-southeast-4.amazonaws.com',
+          },
+          Resource: { 'Fn::GetAtt': ['MyQueueE6CA6235', 'Arn'] },
+        },
+      ],
+    },
+  });
+});
+
+test('queue subscription same region both opt-in uses global principal', () => {
+  const app = new App();
+  const myStack = new Stack(app, 'MyStack', {
+    env: { account: '11111111111', region: 'ap-southeast-4' },
+  });
+
+  const topic1 = new sns.Topic(myStack, 'Topic');
+  const queue = new sqs.Queue(myStack, 'MyQueue');
+  topic1.addSubscription(new subs.SqsSubscription(queue));
+
+  Template.fromStack(myStack).hasResourceProperties('AWS::SQS::QueuePolicy', {
+    PolicyDocument: {
+      Statement: [
+        {
+          Action: 'sqs:SendMessage',
+          Effect: 'Allow',
+          Principal: {
+            Service: 'sns.amazonaws.com',
+          },
+        },
+      ],
+    },
+  });
+});
+
+test('queue subscription cross region default-to-default uses global principal', () => {
+  const app = new App();
+  const queueStack = new Stack(app, 'QueueStack', {
+    env: { account: '11111111111', region: 'us-east-1' },
+  });
+
+  const queue = new sqs.Queue(queueStack, 'MyQueue');
+  const topic1 = sns.Topic.fromTopicArn(
+    queueStack,
+    'Topic',
+    'arn:aws:sns:eu-west-1:11111111111:my-topic',
+  );
+
+  topic1.addSubscription(new subs.SqsSubscription(queue));
+
+  Template.fromStack(queueStack).hasResourceProperties('AWS::SQS::QueuePolicy', {
+    PolicyDocument: {
+      Statement: [
+        {
+          Action: 'sqs:SendMessage',
+          Effect: 'Allow',
+          Principal: {
+            Service: 'sns.amazonaws.com',
+          },
+        },
+      ],
+    },
+  });
+});
+
+test('queue subscription cross region with unresolved topic ARN uses global principal', () => {
+  const app = new App();
+  const queueStack = new Stack(app, 'QueueStack', {
+    env: { account: '11111111111', region: 'us-east-1' },
+  });
+
+  const queue = new sqs.Queue(queueStack, 'MyQueue');
+  const topicArn = new CfnParameter(queueStack, 'TopicArn').valueAsString;
+  const topic1 = sns.Topic.fromTopicArn(queueStack, 'Topic', topicArn);
+
+  topic1.addSubscription(new subs.SqsSubscription(queue));
+
+  Template.fromStack(queueStack).hasResourceProperties('AWS::SQS::QueuePolicy', {
+    PolicyDocument: {
+      Statement: [
+        {
+          Action: 'sqs:SendMessage',
+          Effect: 'Allow',
+          Principal: {
+            Service: 'sns.amazonaws.com',
+          },
+        },
+      ],
+    },
+  });
+});

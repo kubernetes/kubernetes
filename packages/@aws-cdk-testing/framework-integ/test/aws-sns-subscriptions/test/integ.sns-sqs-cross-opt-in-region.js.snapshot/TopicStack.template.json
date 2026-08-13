@@ -1,0 +1,10 @@
+{
+ "Resources": {
+  "MyTopic86869434": {
+   "Type": "AWS::SNS::Topic",
+   "Properties": {
+    "TopicName": "topicstackopicstackmytopicc43e67afb24f28bb94f9"
+   }
+  }
+ }
+}
