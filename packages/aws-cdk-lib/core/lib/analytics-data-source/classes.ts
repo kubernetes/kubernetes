@@ -1786,7 +1786,8 @@ export const AWS_CDK_CONSTRUCTOR_PROPS: { [key: string]: any } = {
       'description': '*',
       'rulesetDqdl': '*',
       'tags': '*',
-      'targetTable': '*'
+      'targetTable': '*',
+      'removalPolicy': 'RemovalPolicy'
     },
     'Database': {
       'databaseName': '*',
@@ -1803,7 +1804,8 @@ export const AWS_CDK_CONSTRUCTOR_PROPS: { [key: string]: any } = {
           'account': '*',
           'region': '*'
         }
-      }
+      },
+      'removalPolicy': 'RemovalPolicy'
     },
     'ExternalTable': {
       'connection': {
@@ -2011,7 +2013,8 @@ export const AWS_CDK_CONSTRUCTOR_PROPS: { [key: string]: any } = {
       's3Encryption': {
         'mode': 'S3EncryptionMode',
         'kmsKey': '*'
-      }
+      },
+      'removalPolicy': 'RemovalPolicy'
     },
     'Table': {}
   },
@@ -12143,6 +12146,17 @@ export const AWS_CDK_CONSTRUCTOR_PROPS: { [key: string]: any } = {
       'securityGroupRemovalPolicy': 'RemovalPolicy',
       'copyTagsToSnapshot': 'boolean',
       'storageType': 'StorageType',
+      'manageMasterUserPassword': 'boolean',
+      'masterUserSecretKmsKey': {
+        'keyArn': '*',
+        'keyId': '*',
+        'stack': '*',
+        'node': '*',
+        'env': {
+          'account': '*',
+          'region': '*'
+        }
+      },
       'addRotationSingleUser': [
         '*'
       ],
@@ -13426,7 +13440,9 @@ export const AWS_CDK_CONSTRUCTOR_PROPS: { [key: string]: any } = {
             'region': '*'
           }
         }
-      }
+      },
+      'ipAddressType': 'VpcEndpointIpAddressType',
+      'dnsRecordIpType': 'VpcEndpointDnsRecordIpType'
     },
     'InterfaceVpcEndpoint': {
       'vpc': {
@@ -27264,12 +27280,16 @@ export const AWS_CDK_CONSTRUCTOR_PROPS: { [key: string]: any } = {
         }
       },
       'tags': '*',
+      'streamDeliveryResources': '*',
       'addMemoryStrategy': [
         {
           'strategyName': '*',
           'description': '*',
           'strategyType': 'MemoryStrategyType'
         }
+      ],
+      'addStreamDeliveryResource': [
+        '*'
       ]
     },
     'RuntimeEndpoint': {
