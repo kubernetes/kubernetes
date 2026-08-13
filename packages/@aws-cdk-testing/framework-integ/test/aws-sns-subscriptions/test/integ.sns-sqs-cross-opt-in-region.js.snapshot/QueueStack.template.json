@@ -1,0 +1,78 @@
+{
+ "Resources": {
+  "MyQueueE6CA6235": {
+   "Type": "AWS::SQS::Queue",
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "MyQueuePolicy6BBEDDAC": {
+   "Type": "AWS::SQS::QueuePolicy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sqs:SendMessage",
+       "Condition": {
+        "ArnEquals": {
+         "aws:SourceArn": {
+          "Fn::Join": [
+           "",
+           [
+            "arn:",
+            {
+             "Ref": "AWS::Partition"
+            },
+            ":sns:ap-southeast-4:12345678:topicstackopicstackmytopicc43e67afb24f28bb94f9"
+           ]
+          ]
+         }
+        }
+       },
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "sns.ap-southeast-4.amazonaws.com"
+       },
+       "Resource": {
+        "Fn::GetAtt": [
+         "MyQueueE6CA6235",
+         "Arn"
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Queues": [
+     {
+      "Ref": "MyQueueE6CA6235"
+     }
+    ]
+   }
+  },
+  "MyQueueTopicStackMyTopicC43E67AFC8DC8B4A": {
+   "Type": "AWS::SNS::Subscription",
+   "Properties": {
+    "Protocol": "sqs",
+    "TopicArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":sns:ap-southeast-4:12345678:topicstackopicstackmytopicc43e67afb24f28bb94f9"
+      ]
+     ]
+    },
+    "Endpoint": {
+     "Fn::GetAtt": [
+      "MyQueueE6CA6235",
+      "Arn"
+     ]
+    },
+    "Region": "ap-southeast-4"
+   }
+  }
+ }
+}

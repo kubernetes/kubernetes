@@ -1,0 +1,137 @@
+{
+  "version": "tree-0.1",
+  "tree": {
+    "id": "App",
+    "path": "",
+    "children": {
+      "TopicStack": {
+        "id": "TopicStack",
+        "path": "TopicStack",
+        "children": {
+          "MyTopic": {
+            "id": "MyTopic",
+            "path": "TopicStack/MyTopic",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TopicStack/MyTopic/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::SNS::Topic",
+                  "aws:cdk:cloudformation:props": {
+                    "topicName": "topicstackopicstackmytopicc43e67afb24f28bb94f9"
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_sns.CfnTopic",
+                  "version": "0.0.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_sns.Topic",
+              "version": "0.0.0"
+            }
+          }
+        },
+        "constructInfo": {
+          "fqn": "aws-cdk-lib.Stack",
+          "version": "0.0.0"
+        }
+      },
+      "QueueStack": {
+        "id": "QueueStack",
+        "path": "QueueStack",
+        "children": {
+          "MyQueue": {
+            "id": "MyQueue",
+            "path": "QueueStack/MyQueue",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "QueueStack/MyQueue/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::SQS::Queue",
+                  "aws:cdk:cloudformation:props": {}
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_sqs.CfnQueue",
+                  "version": "0.0.0"
+                }
+              },
+              "Policy": {
+                "id": "Policy",
+                "path": "QueueStack/MyQueue/Policy",
+                "children": {
+                  "Resource": {
+                    "id": "Resource",
+                    "path": "QueueStack/MyQueue/Policy/Resource",
+                    "attributes": {
+                      "aws:cdk:cloudformation:type": "AWS::SQS::QueuePolicy",
+                      "aws:cdk:cloudformation:props": {}
+                    },
+                    "constructInfo": {
+                      "fqn": "aws-cdk-lib.aws_sqs.CfnQueuePolicy",
+                      "version": "0.0.0"
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_sqs.QueuePolicy",
+                  "version": "0.0.0"
+                }
+              },
+              "TopicStackMyTopicC43E67AF": {
+                "id": "TopicStackMyTopicC43E67AF",
+                "path": "QueueStack/MyQueue/TopicStackMyTopicC43E67AF",
+                "children": {
+                  "Resource": {
+                    "id": "Resource",
+                    "path": "QueueStack/MyQueue/TopicStackMyTopicC43E67AF/Resource",
+                    "attributes": {
+                      "aws:cdk:cloudformation:type": "AWS::SNS::Subscription",
+                      "aws:cdk:cloudformation:props": {
+                        "protocol": "sqs",
+                        "topicArn": {
+                          "Fn::Join": [
+                            "",
+                            [
+                              "arn:",
+                              { "Ref": "AWS::Partition" },
+                              ":sns:ap-southeast-4:12345678:topicstackopicstackmytopicc43e67afb24f28bb94f9"
+                            ]
+                          ]
+                        },
+                        "endpoint": { "Fn::GetAtt": ["MyQueueE6CA6235", "Arn"] },
+                        "region": "ap-southeast-4"
+                      }
+                    },
+                    "constructInfo": {
+                      "fqn": "aws-cdk-lib.aws_sns.CfnSubscription",
+                      "version": "0.0.0"
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_sns.Subscription",
+                  "version": "0.0.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_sqs.Queue",
+              "version": "0.0.0"
+            }
+          }
+        },
+        "constructInfo": {
+          "fqn": "aws-cdk-lib.Stack",
+          "version": "0.0.0"
+        }
+      }
+    },
+    "constructInfo": {
+      "fqn": "aws-cdk-lib.App",
+      "version": "0.0.0"
+    }
+  }
+}

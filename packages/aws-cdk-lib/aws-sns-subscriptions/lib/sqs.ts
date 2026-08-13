@@ -5,7 +5,7 @@ import * as sns from '../../aws-sns';
 import * as sqs from '../../aws-sqs';
 import { FeatureFlags, Names, ValidationError } from '../../core';
 import * as cxapi from '../../cx-api';
-import { regionFromArn } from './private/util';
+import { regionFromArn, snsServicePrincipal } from './private/util';
 import { lit } from '../../core/lib/private/literal-string';
 
 /**
@@ -38,7 +38,7 @@ export class SqsSubscription implements sns.ITopicSubscription {
     if (!Construct.isConstruct(this.queue)) {
       throw new ValidationError(lit`SuppliedQueueObjectInstanceConstruct`, 'The supplied Queue object must be an instance of Construct', topic);
     }
-    const snsServicePrincipal = new iam.ServicePrincipal('sns.amazonaws.com');
+    const principal = snsServicePrincipal(topic, this.queue);
 
     // if the queue is encrypted by AWS managed KMS key (alias/aws/sqs),
     // throw error message
@@ -57,7 +57,7 @@ export class SqsSubscription implements sns.ITopicSubscription {
     const queuePolicyDependable = this.queue.addToResourcePolicy(new iam.PolicyStatement({
       resources: [this.queue.queueArn],
       actions: ['sqs:SendMessage'],
-      principals: [snsServicePrincipal],
+      principals: [principal],
       conditions: {
         ArnEquals: { 'aws:SourceArn': topic.topicArn },
       },
@@ -69,7 +69,7 @@ export class SqsSubscription implements sns.ITopicSubscription {
       this.queue.encryptionMasterKey.addToResourcePolicy(new iam.PolicyStatement({
         resources: ['*'],
         actions: ['kms:Decrypt', 'kms:GenerateDataKey'],
-        principals: [snsServicePrincipal],
+        principals: [principal],
         conditions: FeatureFlags.of(topic).isEnabled(cxapi.SNS_SUBSCRIPTIONS_SQS_DECRYPTION_POLICY)
           ? { ArnEquals: { 'aws:SourceArn': topic.topicArn } }
           : undefined,
