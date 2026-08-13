@@ -18,6 +18,7 @@ package noderesources
 
 import (
 	"context"
+	"math"
 	"strings"
 	"sync"
 
@@ -164,6 +165,16 @@ func (r *resourceAllocationScorer) score(
 	return score, nil
 }
 
+// saturatingAdd returns a + b for non-negative totals, capping at math.MaxInt64
+// instead of wrapping; the node totals it folds are already saturated there.
+func saturatingAdd(a, b int64) int64 {
+	sum := a + b
+	if a > 0 && b > 0 && sum < 0 {
+		return math.MaxInt64
+	}
+	return sum
+}
+
 func (r *resourceAllocationScorer) calculateNodeAllocatableRequest(
 	ctx context.Context,
 	nodeInfo fwk.NodeInfo,
@@ -187,7 +198,7 @@ func (r *resourceAllocationScorer) calculateNodeAllocatableRequest(
 		}
 		allocatable[i] = nodeAllocatable
 		allocated[i] = nodeAllocated
-		requested[i] = allocated[i] + podRequests[i]
+		requested[i] = saturatingAdd(allocated[i], podRequests[i])
 	}
 	return requested, allocated, allocatable
 }
