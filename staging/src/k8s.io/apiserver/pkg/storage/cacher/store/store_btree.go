@@ -256,17 +256,13 @@ func (s *btreeStore) getByKey(key string) (item interface{}, exists bool, err er
 }
 
 func (s *btreeStore) OrderedListPrefix(prefix, continueKey string) ([]interface{}, error) {
-	if continueKey == "" {
-		continueKey = prefix
-	}
 	var result []interface{}
-	s.tree.AscendGreaterOrEqual(&Element{Key: continueKey}, func(item *Element) bool {
-		if !strings.HasPrefix(item.Key, prefix) {
-			return false
+	for elem, err := range s.RangePrefix(prefix, continueKey) {
+		if err != nil {
+			return nil, err
 		}
-		result = append(result, item)
-		return true
-	})
+		result = append(result, elem)
+	}
 	return result, nil
 }
 

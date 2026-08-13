@@ -125,6 +125,12 @@ func orderedSnapshotResponseFromIndexer(indexer Indexer, key, continueKey string
 	return orderedListSnapshot{Items: items}, nil
 }
 
+// NewOrderedListSnapshot wraps an already ordered range as a Snapshot; it
+// answers with all of its items regardless of the prefix/continueKey asked.
+func NewOrderedListSnapshot(items []interface{}) Snapshot {
+	return orderedListSnapshot{Items: items}
+}
+
 type orderedListSnapshot struct {
 	Items []interface{}
 }
