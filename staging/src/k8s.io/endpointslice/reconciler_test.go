@@ -1138,6 +1138,100 @@ func TestReconcileEndpointSlicesReplaceDeprecated(t *testing.T) {
 	cmc.Check(t)
 }
 
+func TestReconcilerDeleteEndpointSlice(t *testing.T) {
+	deletePaths := []struct {
+		name   string
+		delete func(*testing.T, *Reconciler, *corev1.Service, *discovery.EndpointSlice) error
+	}{
+		{
+			name: "unsupported address type",
+			delete: func(t *testing.T, r *Reconciler, service *corev1.Service, slice *discovery.EndpointSlice) error {
+				logger, _ := ktesting.NewTestContext(t)
+				return r.Reconcile(logger, service, nil, []*discovery.EndpointSlice{slice}, time.Now())
+			},
+		},
+		{
+			name: "finalize",
+			delete: func(_ *testing.T, r *Reconciler, service *corev1.Service, slice *discovery.EndpointSlice) error {
+				return r.finalize(service, nil, nil, []*discovery.EndpointSlice{slice}, time.Now())
+			},
+		},
+	}
+
+	testCases := []struct {
+		name                 string
+		createStoredSlice    bool
+		wantDeletionExpected bool
+		wantDeleteMetric     float64
+	}{
+		{
+			name: "already deleted",
+		},
+		{
+			name:                 "existing slice",
+			createStoredSlice:    true,
+			wantDeletionExpected: true,
+			wantDeleteMetric:     1,
+		},
+	}
+
+	for _, deletePath := range deletePaths {
+		t.Run(deletePath.name, func(t *testing.T) {
+			for _, testCase := range testCases {
+				t.Run(testCase.name, func(t *testing.T) {
+					client := newClientset()
+					resetMetrics()
+					namespace := "test"
+					service, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
+					cachedSlice := newEmptyEndpointSlice(1, namespace, endpointMeta, service)
+					cachedSlice.Generation = 1
+					cachedSlice.AddressType = discovery.AddressTypeIPv6
+					cachedSlice.Labels = map[string]string{
+						discovery.LabelManagedBy:   controllerName,
+						discovery.LabelServiceName: service.Name,
+					}
+
+					if testCase.createStoredSlice {
+						createEndpointSlices(t, client, namespace, []*discovery.EndpointSlice{cachedSlice})
+					}
+					client.ClearActions()
+
+					r := newReconciler(client, nil, defaultMaxEndpointsPerSlice)
+					r.endpointSliceTracker.Update(cachedSlice)
+
+					if err := deletePath.delete(t, r, &service, cachedSlice); err != nil {
+						t.Fatalf("Expected EndpointSlice deletion to succeed, got %v", err)
+					}
+					expectActions(t, client.Actions(), 1, "delete", "endpointslices")
+
+					expectedGeneration := cachedSlice.Generation
+					if testCase.wantDeletionExpected {
+						expectedGeneration = -1
+					}
+					expectTrackedGeneration(t, r.endpointSliceTracker, cachedSlice, expectedGeneration)
+
+					deleted, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChanges.WithLabelValues("delete"))
+					if err != nil {
+						t.Fatalf("Failed to get EndpointSlice deletion metric: %v", err)
+					}
+					if deleted != testCase.wantDeleteMetric {
+						t.Errorf("Expected EndpointSlice deletion metric %v, got %v", testCase.wantDeleteMetric, deleted)
+					}
+					if deletePath.name == "finalize" {
+						changed, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("Disabled", ""))
+						if err != nil {
+							t.Fatalf("Failed to get EndpointSlice changes per sync metric: %v", err)
+						}
+						if changed != 1 {
+							t.Errorf("Expected EndpointSlice changes per sync metric 1, got %v", changed)
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
 // In this test, we want to verify that a Service recreation will result in new
 // EndpointSlices being created.
 func TestReconcileEndpointSlicesRecreation(t *testing.T) {
