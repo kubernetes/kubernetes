@@ -8546,7 +8546,10 @@ func ValidateResourceQuantityValue(resource core.ResourceName, value resource.Qu
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateNonnegativeQuantity(value, fldPath)...)
 	if helper.IsIntegerResourceName(resource) {
-		if value.MilliValue()%int64(1000) != int64(0) {
+		// MilliValue()%1000 wrapped for a value past the int64 range, so a whole
+		// number such as 10^16 was rejected as non-integer. AsScale reports
+		// integer-ness exactly.
+		if _, integer := value.AsScale(0); !integer {
 			allErrs = append(allErrs, field.Invalid(fldPath, value, isNotIntegerErrorMsg))
 		}
 	}
