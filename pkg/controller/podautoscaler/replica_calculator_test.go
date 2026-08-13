@@ -623,6 +623,39 @@ func TestReplicaCalcResourceScale(t *testing.T) {
 			expectedRawValue:    600,
 		},
 		{
+			name: "scale up: succeeded pods ignored",
+			fixture: calcScenario{
+				currentReplicas: 2,
+				podReadiness:    []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+				podPhase:        []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodSucceeded, v1.PodSucceeded},
+				resource: &cpuResource{
+					requests: cpuRequests(4, "1.0"),
+					levels:   makePodMetricLevels(500, 700),
+				},
+			},
+			targetUtilization:   30,
+			expectedReplicas:    4,
+			expectedUtilization: 60,
+			expectedRawValue:    numContainersPerPod * 600,
+		},
+		{
+			name: "scale up: container metric with succeeded pods ignored",
+			fixture: calcScenario{
+				currentReplicas: 2,
+				podReadiness:    []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+				podPhase:        []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodSucceeded, v1.PodSucceeded},
+				container:       "container2",
+				resource: &cpuResource{
+					requests: cpuRequests(4, "1.0"),
+					levels:   [][]int64{{1000, 500}, {9000, 700}},
+				},
+			},
+			targetUtilization:   30,
+			expectedReplicas:    4,
+			expectedUtilization: 60,
+			expectedRawValue:    600,
+		},
+		{
 			name: "scale up: pods being deleted are ignored",
 			fixture: calcScenario{
 				currentReplicas:      2,
@@ -815,6 +848,39 @@ func TestReplicaCalcResourceScale(t *testing.T) {
 			expectedRawValue:    280,
 		},
 		{
+			name: "scale down: succeeded pods ignored",
+			fixture: calcScenario{
+				currentReplicas: 5,
+				podReadiness:    []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+				podPhase:        []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodSucceeded, v1.PodSucceeded},
+				resource: &cpuResource{
+					requests: cpuRequests(7, "1.0"),
+					levels:   makePodMetricLevels(100, 300, 500, 250, 250),
+				},
+			},
+			targetUtilization:   50,
+			expectedReplicas:    3,
+			expectedUtilization: 28,
+			expectedRawValue:    numContainersPerPod * 280,
+		},
+		{
+			name: "scale down: container metric with succeeded pods ignored",
+			fixture: calcScenario{
+				currentReplicas: 5,
+				podReadiness:    []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+				podPhase:        []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodSucceeded, v1.PodSucceeded},
+				container:       "container2",
+				resource: &cpuResource{
+					requests: cpuRequests(7, "1.0"),
+					levels:   [][]int64{{1000, 100}, {1000, 300}, {1000, 500}, {1000, 250}, {1000, 250}},
+				},
+			},
+			targetUtilization:   50,
+			expectedReplicas:    3,
+			expectedUtilization: 28,
+			expectedRawValue:    280,
+		},
+		{
 			name: "scale down: pods being deleted are ignored",
 			fixture: calcScenario{
 				currentReplicas:      5,
@@ -864,54 +930,6 @@ func TestReplicaCalcResourceScale(t *testing.T) {
 			assertResourceReplicas(t,
 				tc.expectedReplicas, tc.expectedUtilization, tc.expectedRawValue, tc.fixture.timestamp, tc.expectedError,
 				replicas, util, raw, ts, err,
-			)
-		})
-	}
-}
-
-func TestReplicaCalcRawResourceIgnoresSucceededPods(t *testing.T) {
-	testCases := []struct {
-		name             string
-		levels           [][]int64
-		targetUsage      int64
-		expectedReplicas int32
-		expectedUsage    int64
-	}{
-		{
-			name:             "scale up",
-			levels:           makePodMetricLevels(2000, 2000),
-			targetUsage:      1000,
-			expectedReplicas: 4,
-			expectedUsage:    2000,
-		},
-		{
-			name:             "scale down",
-			levels:           makePodMetricLevels(400, 400),
-			targetUsage:      1000,
-			expectedReplicas: 1,
-			expectedUsage:    400,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			fixture := calcScenario{
-				currentReplicas: 2,
-				podPhase:        []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodSucceeded, v1.PodSucceeded},
-				container:       "container1",
-				resource: &cpuResource{
-					levels: tc.levels,
-				},
-			}
-			h := newReplicaCalcSetup(t, &fixture)
-
-			replicas, usage, ts, err := h.calc.GetRawResourceReplicas(
-				h.ctx, fixture.currentReplicas, tc.targetUsage,
-				v1.ResourceCPU, h.tolerances, h.namespace, h.selector, fixture.container,
-			)
-			assertMetricReplicas(t,
-				tc.expectedReplicas, tc.expectedUsage, fixture.timestamp, nil,
-				replicas, usage, ts, err,
 			)
 		})
 	}
