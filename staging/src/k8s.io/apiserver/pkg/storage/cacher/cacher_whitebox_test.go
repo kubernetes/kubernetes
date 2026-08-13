@@ -2322,27 +2322,6 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 	}
 }
 
-type fakeStorage struct {
-	pods []example.Pod
-	storage.Interface
-}
-
-func newObjectStorage(fakePods []example.Pod) *fakeStorage {
-	return &fakeStorage{
-		pods: fakePods,
-	}
-}
-
-func (m fakeStorage) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	podList := listObj.(*example.PodList)
-	podList.ListMeta = metav1.ListMeta{ResourceVersion: "12345"}
-	podList.Items = m.pods
-	return nil
-}
-func (m fakeStorage) Watch(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error) {
-	return cachertesting.NewMockWatch(), nil
-}
-
 func BenchmarkCacher_GetList(b *testing.B) {
 	testCases := []struct {
 		totalObjectNum  int
@@ -2390,14 +2369,7 @@ func BenchmarkCacher_GetList(b *testing.B) {
 				}
 
 				// build test cacher
-				store := newObjectStorage(fakePods)
-				cacher, _, err := newTestCacher(store)
-				if err != nil {
-					b.Fatalf("new cacher: %v", err)
-				}
-				defer cacher.Stop()
-				delegator := NewCacheDelegator(cacher, store)
-				defer delegator.Stop()
+				delegator := newDelegatorWithPods(b, fakePods)
 
 				// prepare result and pred
 				parsedField, err := fields.ParseSelector("spec.nodeName=node-0")
