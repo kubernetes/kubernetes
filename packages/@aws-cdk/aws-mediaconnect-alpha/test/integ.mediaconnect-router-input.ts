@@ -16,7 +16,7 @@ const networkInterface = new RouterNetworkInterface(stack, 'network', {
 });
 
 new RouterInput(stack, 'routerInput', {
-  routerInputName: 'test',
+  routerInputName: 'test_input',
   maximumBitrate: cdk.Bitrate.mbps(10),
   routingScope: RoutingScope.GLOBAL,
   tier: RouterInputTier.INPUT_100,

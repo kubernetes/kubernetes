@@ -11,6 +11,12 @@
       "data": "*"
     }
   ],
+  "/aws-cdk-glue-partition-projection/@aws-cdk.aws-glue-alpha.AccountCatalog": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
   "/aws-cdk-glue-partition-projection/TableDate": [
     {
       "type": "aws:cdk:analytics:construct",

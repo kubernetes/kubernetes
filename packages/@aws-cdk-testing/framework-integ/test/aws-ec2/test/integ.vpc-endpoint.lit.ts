@@ -26,6 +26,13 @@ class VpcEndpointStack extends cdk.Stack {
       service: ec2.GatewayVpcEndpointAwsService.DYNAMODB,
     });
 
+    // Gateway endpoint with IPv6/dualstack support
+    vpc.addGatewayEndpoint('S3DualstackEndpoint', {
+      service: ec2.GatewayVpcEndpointAwsService.S3,
+      ipAddressType: ec2.VpcEndpointIpAddressType.DUALSTACK,
+      dnsRecordIpType: ec2.VpcEndpointDnsRecordIpType.DUALSTACK,
+    });
+
     // This allows to customize the endpoint policy
     dynamoDbEndpoint.addToPolicy(
       new iam.PolicyStatement({ // Restrict to listing and describing tables

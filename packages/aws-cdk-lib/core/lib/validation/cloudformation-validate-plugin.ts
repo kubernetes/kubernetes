@@ -2,6 +2,10 @@ import { RegoEngine, TemplateFile, version } from '@aws/cloudformation-validate'
 import type { Engine, EngineConfig, RuleInfo, Severity } from '@aws/cloudformation-validate';
 import type { PolicyValidationPluginReport, PolicyViolatingResource } from './report';
 import type { IPolicyValidationPlugin, IPolicyValidationContext } from './validation';
+import { profileSpan, recordCounter } from '../private/perf';
+
+const VALIDATE_DETAILED_METRIC = 'CloudFormationValidate.validate';
+const DIAGNOSTICS_METRIC = 'CloudFormationValidate.diagnostics';
 
 interface MutableViolation {
   ruleName: string;
@@ -104,25 +108,40 @@ export class CloudFormationValidatePlugin implements IPolicyValidationPlugin {
 
     for (const { stackConstructPath, templatePath } of context.stackTemplates) {
       const templateFile = new TemplateFile(templatePath);
-      const report = this.engine.validateDetailed(templateFile, {
-        pseudoParameterOverrides: {
-          accountId: context.accountId,
-          region: context.region,
-        },
-        exclude: {
-          ids: [...IGNORE_RULES],
-          services: [{
-            // CDK still synthesizes AWS::AutoScaling::LaunchConfiguration for applications using
-            // the legacy launch-configuration behavior. Auto Scaling remains deployable despite
-            // its maintenance-mode classification, so suppress only its W3697 lifecycle warning
-            // rather than hiding lifecycle findings for every service.
-            // <https://github.com/aws-cloudformation/cloudformation-validate/issues/37>
-            ruleId: 'W3697',
-            service: 'AWS::AutoScaling',
-          }],
-        },
-        severityLevel: 'WARN',
-      });
+      const report = (() => {
+        using _span = profileSpan(VALIDATE_DETAILED_METRIC, { telemetry: true });
+
+        return this.engine.validateDetailed(templateFile, {
+          pseudoParameterOverrides: {
+            accountId: context.accountId,
+            region: context.region,
+          },
+          exclude: {
+            ids: [...IGNORE_RULES],
+            services: [{
+              // CDK still synthesizes AWS::AutoScaling::LaunchConfiguration for applications using
+              // the legacy launch-configuration behavior. Auto Scaling remains deployable despite
+              // its maintenance-mode classification, so suppress only its W3697 lifecycle warning
+              // rather than hiding lifecycle findings for every service.
+              // <https://github.com/aws-cloudformation/cloudformation-validate/issues/37>
+              ruleId: 'W3697',
+              service: 'AWS::AutoScaling',
+            }],
+          },
+          severityLevel: 'WARN',
+        });
+      })();
+
+      recordCounter(DIAGNOSTICS_METRIC, report.diagnostics.length, { telemetry: true });
+      const diagnosticsBySeverity = new Map<Severity, number>();
+
+      for (const diagnostic of report.diagnostics) {
+        diagnosticsBySeverity.set(diagnostic.severity, (diagnosticsBySeverity.get(diagnostic.severity) ?? 0) + 1);
+      }
+
+      for (const [severity, count] of diagnosticsBySeverity) {
+        recordCounter(`${DIAGNOSTICS_METRIC}.${severity}`, count, { telemetry: true });
+      }
 
       for (const diagnostic of report.diagnostics) {
         const severity = mapSeverity(diagnostic.severity);
@@ -215,7 +234,10 @@ const IGNORE_RULES = new Set([
   'W9013',
 
   // WHAT: value type tracking (parameter default should be a string)
-  // WHY: When the value is imported, it is considered not a string.
+  // WHY: This is a valid finding, but CDK can synthesize Fn::ImportValue as a parameter default when resolving
+  // a cross-stack reference. CloudFormation does not support intrinsic functions in the Parameters section.
+  // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/parameters-section-structure.html
+  // https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/intrinsic-function-reference.html
   // <https://github.com/aws-cloudformation/cloudformation-validate/issues/194>
   'E2001',
 ]);

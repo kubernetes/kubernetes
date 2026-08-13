@@ -15,7 +15,9 @@
      "Description": "my_database_description",
      "Name": "my_database"
     }
-   }
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain"
   },
   "AVROTable58646ABF": {
    "Type": "AWS::Glue::Table",

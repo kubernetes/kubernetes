@@ -80,8 +80,8 @@ export class BridgeOutput extends Resource implements IBridgeOutput {
       if (props.bridgeOutputName.length > 64) {
         throw new ValidationError(lit`BridgeOutputNameLength`, `Bridge output name must be between 1 and 64 characters, got ${props.bridgeOutputName.length}`, this);
       }
-      if (!/^[a-zA-Z0-9-]+$/.test(props.bridgeOutputName)) {
-        throw new ValidationError(lit`BridgeOutputNameFormat`, `Bridge output name must contain only alphanumeric characters and hyphens, got '${props.bridgeOutputName}'`, this);
+      if (!/^[a-zA-Z0-9_-]+$/.test(props.bridgeOutputName)) {
+        throw new ValidationError(lit`BridgeOutputNameFormat`, `Bridge output name must contain only alphanumeric characters, hyphens, and underscores, got '${props.bridgeOutputName}'`, this);
       }
     }
 

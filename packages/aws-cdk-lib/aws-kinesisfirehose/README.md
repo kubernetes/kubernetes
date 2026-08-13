@@ -19,8 +19,7 @@ project. It allows you to define Amazon Data Firehose delivery streams.
 
 ## Defining a Delivery Stream
 
-In order to define a Delivery Stream, you must specify a destination. An S3 bucket can be
-used as a destination. Currently the CDK supports only S3 as a destination which is covered [below](#destinations).
+In order to define a Delivery Stream, you must specify a destination. S3, HTTP endpoint, and Datadog can be used as destinations, as covered [below](#destinations).
 
 ```ts
 const bucket = new s3.Bucket(this, 'Bucket');
@@ -82,7 +81,32 @@ Data must be provided via "direct put", ie., by using a `PutRecord` or
 
 Amazon Data Firehose supports multiple AWS and third-party services as destinations, including Amazon S3, Amazon Redshift, and more. You can find the full list of supported destination [here](https://docs.aws.amazon.com/firehose/latest/dev/create-destination.html).
 
-Currently in the AWS CDK, only S3 is implemented as an L2 construct destination. Other destinations can still be configured using L1 constructs.
+Currently in the AWS CDK, S3, HTTP endpoint, and Datadog are implemented as L2 construct destinations. Other destinations can still be configured using L1 constructs.
+
+### HTTP
+
+Defining a delivery stream with an HTTP destination:
+
+```ts
+declare const endpointConfig: firehose.HttpEndpointConfig;
+const httpDestination = new firehose.HttpEndpoint({
+  endpointConfig,
+});
+```
+
+### Datadog
+
+Defining a delivery stream with a Datadog destination:
+
+```ts
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
+
+declare const apiKey: secretsmanager.Secret;
+const datadogDestination = new firehose.Datadog({
+  apiKey,
+  endpoint: firehose.DatadogEndpoint.LOGS_US1,
+});
+```
 
 ### S3
 

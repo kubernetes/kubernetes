@@ -1,6 +1,6 @@
 import { CfnDatabase } from 'aws-cdk-lib/aws-glue';
 import type { IResource } from 'aws-cdk-lib/core';
-import { ArnFormat, Lazy, Names, Resource, Stack, UnscopedValidationError } from 'aws-cdk-lib/core';
+import { ArnFormat, Lazy, Names, RemovalPolicy, Resource, Stack, UnscopedValidationError } from 'aws-cdk-lib/core';
 import { lit, memoizedGetter } from 'aws-cdk-lib/core/lib/helpers-internal';
 import { addConstructMetadata } from 'aws-cdk-lib/core/lib/metadata-resource';
 import { propertyInjectable } from 'aws-cdk-lib/core/lib/prop-injectable';
@@ -59,6 +59,16 @@ export interface DatabaseProps {
    * @default The default, account-wide catalog.
    */
   readonly catalog?: ICatalog;
+
+  /**
+   * Policy to apply when the database is removed from the stack.
+   *
+   * A database is a container for tables and their metadata, so it is retained
+   * by default to avoid accidental data loss when it is removed from a stack.
+   *
+   * @default RemovalPolicy.RETAIN
+   */
+  readonly removalPolicy?: RemovalPolicy;
 }
 
 /**
@@ -133,6 +143,10 @@ export class Database extends Resource implements IDatabase {
     this.resource = new CfnDatabase(this, 'Resource', {
       catalogId: this._catalog?.catalogId ?? Stack.of(this).account,
       databaseInput,
+    });
+
+    this.resource.applyRemovalPolicy(props.removalPolicy, {
+      default: RemovalPolicy.RETAIN,
     });
   }
 

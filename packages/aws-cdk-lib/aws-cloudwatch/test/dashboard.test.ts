@@ -1,5 +1,6 @@
 import { Annotations, Match, Template } from '../../assertions';
 import { App, Duration, Stack } from '../../core';
+import type { IWidget } from '../lib';
 import {
   Dashboard, DashboardVariable, DefaultValue,
   GraphWidget,
@@ -12,6 +13,19 @@ import {
 } from '../lib';
 
 describe('Dashboard', () => {
+  test('concrete widgets are assignable to the dashboard widget interface', () => {
+    // Regression coverage for exactOptionalPropertyTypes users.
+    const stack = new Stack();
+    const dashboard = new Dashboard(stack, 'Dash');
+    const widget = new GraphWidget({ width: 1, height: 1 });
+    const widgets: IWidget[] = [widget];
+
+    dashboard.addWidgets(...widgets);
+
+    expect(widget.warnings).toEqual([]);
+    expect(widget.warningsV2).toEqual({});
+  });
+
   test('widgets in different adds are laid out underneath each other', () => {
     // GIVEN
     const stack = new Stack();

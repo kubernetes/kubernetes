@@ -50,7 +50,7 @@ test('Gateway name validation - invalid characters', () => {
       egressCidrBlocks: ['10.0.0.0/16'],
       networks: [GatewayNetwork.define({ name: 'network1', cidrBlock: '10.0.0.0/24' })],
     });
-  }).toThrow('Gateway name must contain only alphanumeric characters and hyphens');
+  }).toThrow('Gateway name must contain only alphanumeric characters, hyphens, and underscores');
 });
 
 test('Gateway name validation - valid name', () => {

@@ -549,6 +549,12 @@
             "type": "aws:cdk:logicalId",
             "data": "CheckBootstrapVersion"
           }
+        ],
+        "/aws-cdk-ec2-vpc-endpoint/MyVpc/S3DualstackEndpoint/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "MyVpcS3DualstackEndpoint72DA66B2"
+          }
         ]
       },
       "displayName": "aws-cdk-ec2-vpc-endpoint"

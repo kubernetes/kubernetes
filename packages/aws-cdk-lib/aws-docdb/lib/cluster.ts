@@ -323,6 +323,34 @@ export interface DatabaseClusterProps {
    * @default StorageType.STANDARD
    */
   readonly storageType?: StorageType;
+
+  /**
+   * Specifies whether to manage the master user password with AWS Secrets Manager.
+   *
+   * When set to true, Amazon DocumentDB will automatically generate and manage the master user password in AWS Secrets Manager.
+   * This provides enhanced security and automatic password rotation capabilities.
+   *
+   * Constraint: You can't manage the master user password with AWS Secrets Manager if `masterUser.password` is specified.
+   *
+   * The `secret` property of the cluster is not set when using this option. See the
+   * module README for how to access the managed secret.
+   *
+   * @see https://docs.aws.amazon.com/documentdb/latest/developerguide/docdb-secrets-manager.html
+   * @default false
+   */
+  readonly manageMasterUserPassword?: boolean;
+
+  /**
+   * The AWS KMS key to encrypt a secret that is automatically generated and managed in AWS Secrets Manager.
+   *
+   * This setting is valid only if the master user password is managed by Amazon DocumentDB in AWS Secrets Manager
+   * for the DB cluster (i.e. when `manageMasterUserPassword` is true).
+   * If you don't specify this property, then the `aws/secretsmanager` KMS key is used to encrypt the secret.
+   *
+   * @see https://docs.aws.amazon.com/documentdb/latest/developerguide/docdb-secrets-manager.html
+   * @default - default AWS managed key `aws/secretsmanager`
+   */
+  readonly masterUserSecretKmsKey?: kms.IKey;
 }
 
 /**
@@ -528,6 +556,11 @@ export class DatabaseCluster extends DatabaseClusterBase {
   private readonly cluster: CfnDBCluster;
 
   /**
+   * Whether the master user password is managed by Amazon DocumentDB in AWS Secrets Manager.
+   */
+  private readonly manageMasterUserPassword?: boolean;
+
+  /**
    * The VPC where the DB subnet group is created.
    */
   private readonly vpc: ec2.IVpc;
@@ -607,9 +640,20 @@ export class DatabaseCluster extends DatabaseClusterBase {
       enableCloudwatchLogsExports.push('profiler');
     }
 
-    // Create the secret manager secret if no password is specified
+    // Validate manageMasterUserPassword constraints
+    if (props.manageMasterUserPassword && props.masterUser.password) {
+      throw new ValidationError(lit`ManageMasterUserPasswordConflictsWithPassword`, 'You can\'t manage the master user password with AWS Secrets Manager if masterUser.password is specified', this);
+    }
+
+    if (props.masterUserSecretKmsKey && !props.manageMasterUserPassword) {
+      throw new ValidationError(lit`MasterUserSecretKmsKeyRequiresManagedPassword`, 'masterUserSecretKmsKey is valid only if manageMasterUserPassword is true', this);
+    }
+
+    this.manageMasterUserPassword = props.manageMasterUserPassword;
+
+    // Create the secret manager secret if no password is specified and manageMasterUserPassword is false
     let secret: DatabaseSecret | undefined;
-    if (!props.masterUser.password) {
+    if (!props.manageMasterUserPassword && !props.masterUser.password) {
       secret = new DatabaseSecret(this, 'Secret', {
         username: props.masterUser.username,
         encryptionKey: props.masterUser.kmsKey,
@@ -654,10 +698,13 @@ export class DatabaseCluster extends DatabaseClusterBase {
       dbClusterParameterGroupName: props.parameterGroup?.dbClusterParameterGroupRef.dbClusterParameterGroupId,
       deletionProtection: props.deletionProtection,
       // Admin
-      masterUsername: secret ? secret.secretValueFromJson('username').unsafeUnwrap() : props.masterUser.username,
-      masterUserPassword: secret
-        ? secret.secretValueFromJson('password').unsafeUnwrap()
-        : props.masterUser.password!.unsafeUnwrap(), // Safe usage
+      masterUsername: props.manageMasterUserPassword ? props.masterUser.username :
+        (secret ? secret.secretValueFromJson('username').unsafeUnwrap() : props.masterUser.username),
+      masterUserPassword: props.manageMasterUserPassword ? undefined :
+        (secret ? secret.secretValueFromJson('password').unsafeUnwrap() : props.masterUser.password!.unsafeUnwrap()),
+      // ManageMasterUserPassword
+      manageMasterUserPassword: props.manageMasterUserPassword,
+      masterUserSecretKmsKeyId: props.masterUserSecretKmsKey?.keyArn,
       // Backup
       backupRetentionPeriod: props.backup?.retention?.toDays(),
       preferredBackupWindow: props.backup?.preferredWindow,
@@ -778,6 +825,9 @@ export class DatabaseCluster extends DatabaseClusterBase {
    */
   @MethodMetadata()
   public addRotationSingleUser(automaticallyAfter?: Duration): secretsmanager.SecretRotation {
+    if (this.manageMasterUserPassword) {
+      throw new ValidationError(lit`CannotAddRotationWithManageMasterUserPassword`, 'Cannot add rotation when `manageMasterUserPassword` is enabled. Amazon DocumentDB automatically rotates the master password when it manages the secret.', this);
+    }
     if (!this.secret) {
       throw new ValidationError(lit`CannotAddSingleUserRotationWithoutSecret`, 'Cannot add single user rotation for a cluster without secret.', this);
     }
@@ -804,6 +854,9 @@ export class DatabaseCluster extends DatabaseClusterBase {
    */
   @MethodMetadata()
   public addRotationMultiUser(id: string, options: RotationMultiUserOptions): secretsmanager.SecretRotation {
+    if (this.manageMasterUserPassword) {
+      throw new ValidationError(lit`CannotAddRotationWithManageMasterUserPassword`, 'Cannot add rotation when `manageMasterUserPassword` is enabled. Amazon DocumentDB automatically rotates the master password when it manages the secret.', this);
+    }
     if (!this.secret) {
       throw new ValidationError(lit`CannotAddMultiUserRotationWithoutSecret`, 'Cannot add multi user rotation for a cluster without secret.', this);
     }

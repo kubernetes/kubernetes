@@ -17,6 +17,12 @@
       "data": "*"
     }
   ],
+  "/aws-cdk-glue/@aws-cdk.aws-glue-alpha.AccountCatalog": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
   "/aws-cdk-glue/BootstrapVersion": [
     {
       "type": "aws:cdk:logicalId",

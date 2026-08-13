@@ -1374,6 +1374,71 @@ describe('auto scaling group', () => {
     Annotations.fromStack(stack).hasWarning('/Default/MyStack', 'iops will be ignored without volumeType: EbsDeviceVolumeType.IO1 [ack: @aws-cdk/aws-autoscaling:iopsIgnored]');
   });
 
+  test('warning if volumeInitilizationRate is set on LaunchConfiguration', () => {
+    // GIVEN
+    const stack = new cdk.Stack();
+    cdk.Validations.of(stack).acknowledge({
+      id: 'CloudFormation-Validate::W3671',
+      reason: 'We have our own warning',
+    });
+    const vpc = mockVpc(stack);
+
+    new autoscaling.AutoScalingGroup(stack, 'MyStack', {
+      instanceType: ec2.InstanceType.of(ec2.InstanceClass.M4, ec2.InstanceSize.MICRO),
+      machineImage: new ec2.AmazonLinuxImage(),
+      vpc,
+      blockDevices: [{
+        deviceName: 'ebs',
+        volume: autoscaling.BlockDeviceVolume.ebs(15, {
+          deleteOnTermination: true,
+          encrypted: true,
+          volumeType: autoscaling.EbsDeviceVolumeType.GP3,
+          volumeInitializationRate: cdk.Size.mebibytes(300),
+        }),
+      }],
+    });
+
+    // THEN
+    Annotations.fromStack(stack).hasWarning('/Default/MyStack', 'The volumeInitializationRate is not supported on Autoscaling Group LaunchConfigurations. Use a Launch Template instead. [ack: @aws-cdk/aws-autoscaling:volumeInitializationRateNotSupported]');
+  });
+
+  test('test if volumeInitilizationRate is set on LaunchTemplate', () => {
+    // GIVEN
+    const stack = new cdk.Stack();
+    stack.node.setContext(AUTOSCALING_GENERATE_LAUNCH_TEMPLATE, true);
+    const vpc = mockVpc(stack);
+    const blockDevices = [{
+      deviceName: 'ebs-snapshot',
+      volume: autoscaling.BlockDeviceVolume.ebsFromSnapshot('snapshot-id', {
+        volumeType: autoscaling.EbsDeviceVolumeType.GP3,
+        volumeInitializationRate: cdk.Size.mebibytes(300),
+      }),
+    }];
+
+    // WHEN
+    new autoscaling.AutoScalingGroup(stack, 'MyStack', {
+      machineImage: new ec2.AmazonLinuxImage(),
+      instanceType: ec2.InstanceType.of(ec2.InstanceClass.M4, ec2.InstanceSize.MICRO),
+      blockDevices,
+      vpc,
+    });
+    // THEN
+    Template.fromStack(stack).hasResourceProperties('AWS::EC2::LaunchTemplate', {
+      LaunchTemplateData: {
+        BlockDeviceMappings: [
+          {
+            DeviceName: 'ebs-snapshot',
+            Ebs: {
+              SnapshotId: 'snapshot-id',
+              VolumeType: 'gp3',
+              VolumeInitializationRate: 300,
+            },
+          },
+        ],
+      },
+    });
+  });
+
   test('step scaling on metric', () => {
     // GIVEN
     const stack = new cdk.Stack();

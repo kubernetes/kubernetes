@@ -1,0 +1,28 @@
+{
+  "version": "54.0.0",
+  "title": "Validation Report",
+  "pluginReports": [
+    {
+      "pluginName": "CloudFormation Validate",
+      "pluginVersion": "1.6.0",
+      "conclusion": "success",
+      "violations": [
+        {
+          "ruleName": "F0001",
+          "description": "Resources section must exist and be non-empty",
+          "severity": "warning",
+          "ruleMetadata": {
+            "category": "Structure"
+          },
+          "violatingConstructs": [
+            {
+              "constructPath": "cdk-integ-emx-router-network-interface/DefaultTest/DeployAssert",
+              "constructFqn": "constructs.Construct",
+              "libraryVersion": "10.6.0"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,361 @@
+{
+ "Resources": {
+  "DeliveryStreamHttpDestinationRole56341A2A": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Condition": {
+        "StringEquals": {
+         "aws:SourceAccount": {
+          "Ref": "AWS::AccountId"
+         }
+        },
+        "ArnLike": {
+         "aws:SourceArn": {
+          "Fn::Join": [
+           "",
+           [
+            "arn:",
+            {
+             "Ref": "AWS::Partition"
+            },
+            ":firehose:",
+            {
+             "Ref": "AWS::Region"
+            },
+            ":",
+            {
+             "Ref": "AWS::AccountId"
+            },
+            ":deliverystream/*"
+           ]
+          ]
+         }
+        }
+       },
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "firehose.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   }
+  },
+  "DeliveryStreamHttpDestinationRoleDefaultPolicy9B8736EB": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "DeliveryStreamLogGroupA92E8EA0",
+         "Arn"
+        ]
+       }
+      },
+      {
+       "Action": [
+        "s3:Abort*",
+        "s3:DeleteObject*",
+        "s3:GetBucket*",
+        "s3:GetObject*",
+        "s3:List*",
+        "s3:PutObject",
+        "s3:PutObjectLegalHold",
+        "s3:PutObjectRetention",
+        "s3:PutObjectTagging",
+        "s3:PutObjectVersionTagging"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "DeliveryStreamBackupBucket48C8465F",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "DeliveryStreamBackupBucket48C8465F",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "DeliveryStreamHttpDestinationRoleDefaultPolicy9B8736EB",
+    "Roles": [
+     {
+      "Ref": "DeliveryStreamHttpDestinationRole56341A2A"
+     }
+    ]
+   }
+  },
+  "DeliveryStreamLogGroupA92E8EA0": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "RetentionInDays": 731
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain"
+  },
+  "DeliveryStreamLogGroupHttpDestinationD1DCA6F4": {
+   "Type": "AWS::Logs::LogStream",
+   "Properties": {
+    "LogGroupName": {
+     "Ref": "DeliveryStreamLogGroupA92E8EA0"
+    }
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain"
+  },
+  "DeliveryStreamLogGroupS3BackupD848C05F": {
+   "Type": "AWS::Logs::LogStream",
+   "Properties": {
+    "LogGroupName": {
+     "Ref": "DeliveryStreamLogGroupA92E8EA0"
+    }
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain"
+  },
+  "DeliveryStreamBackupBucket48C8465F": {
+   "Type": "AWS::S3::Bucket",
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain"
+  },
+  "DeliveryStream58CF96DB": {
+   "Type": "AWS::KinesisFirehose::DeliveryStream",
+   "Properties": {
+    "DeliveryStreamType": "DirectPut",
+    "HttpEndpointDestinationConfiguration": {
+     "CloudWatchLoggingOptions": {
+      "Enabled": true,
+      "LogGroupName": {
+       "Ref": "DeliveryStreamLogGroupA92E8EA0"
+      },
+      "LogStreamName": {
+       "Ref": "DeliveryStreamLogGroupHttpDestinationD1DCA6F4"
+      }
+     },
+     "EndpointConfiguration": {
+      "Url": "https://postman-echo.com/post"
+     },
+     "RequestConfiguration": {
+      "ContentEncoding": "NONE"
+     },
+     "RoleARN": {
+      "Fn::GetAtt": [
+       "DeliveryStreamHttpDestinationRole56341A2A",
+       "Arn"
+      ]
+     },
+     "S3BackupMode": "FailedDataOnly",
+     "S3Configuration": {
+      "BucketARN": {
+       "Fn::GetAtt": [
+        "DeliveryStreamBackupBucket48C8465F",
+        "Arn"
+       ]
+      },
+      "CloudWatchLoggingOptions": {
+       "Enabled": true,
+       "LogGroupName": {
+        "Ref": "DeliveryStreamLogGroupA92E8EA0"
+       },
+       "LogStreamName": {
+        "Ref": "DeliveryStreamLogGroupS3BackupD848C05F"
+       }
+      },
+      "RoleARN": {
+       "Fn::GetAtt": [
+        "DeliveryStreamHttpDestinationRole56341A2A",
+        "Arn"
+       ]
+      }
+     }
+    }
+   },
+   "DependsOn": [
+    "DeliveryStreamHttpDestinationRoleDefaultPolicy9B8736EB"
+   ]
+  }
+ },
+ "Mappings": {
+  "awscdkawskinesisfirehoseCidrBlocks": {
+   "af-south-1": {
+    "FirehoseCidrBlock": "13.244.121.224/27"
+   },
+   "ap-east-1": {
+    "FirehoseCidrBlock": "18.162.221.32/27"
+   },
+   "ap-east-2": {
+    "FirehoseCidrBlock": "43.212.53.160/27"
+   },
+   "ap-northeast-1": {
+    "FirehoseCidrBlock": "13.113.196.224/27"
+   },
+   "ap-northeast-2": {
+    "FirehoseCidrBlock": "13.209.1.64/27"
+   },
+   "ap-northeast-3": {
+    "FirehoseCidrBlock": "13.208.177.192/27"
+   },
+   "ap-south-1": {
+    "FirehoseCidrBlock": "13.232.67.32/27"
+   },
+   "ap-south-2": {
+    "FirehoseCidrBlock": "18.60.192.128/27"
+   },
+   "ap-southeast-1": {
+    "FirehoseCidrBlock": "13.228.64.192/27"
+   },
+   "ap-southeast-2": {
+    "FirehoseCidrBlock": "13.210.67.224/27"
+   },
+   "ap-southeast-3": {
+    "FirehoseCidrBlock": "108.136.221.64/27"
+   },
+   "ap-southeast-4": {
+    "FirehoseCidrBlock": "16.50.161.128/27"
+   },
+   "ap-southeast-5": {
+    "FirehoseCidrBlock": "43.216.58.0/27"
+   },
+   "ap-southeast-7": {
+    "FirehoseCidrBlock": "43.208.112.96/27"
+   },
+   "ca-central-1": {
+    "FirehoseCidrBlock": "35.183.92.128/27"
+   },
+   "ca-west-1": {
+    "FirehoseCidrBlock": "40.176.98.192/27"
+   },
+   "cn-north-1": {
+    "FirehoseCidrBlock": "52.81.151.32/27"
+   },
+   "cn-northwest-1": {
+    "FirehoseCidrBlock": "161.189.23.64/27"
+   },
+   "eu-central-1": {
+    "FirehoseCidrBlock": "35.158.127.160/27"
+   },
+   "eu-central-2": {
+    "FirehoseCidrBlock": "16.62.183.32/27"
+   },
+   "eu-north-1": {
+    "FirehoseCidrBlock": "13.53.63.224/27"
+   },
+   "eu-south-1": {
+    "FirehoseCidrBlock": "15.161.135.128/27"
+   },
+   "eu-south-2": {
+    "FirehoseCidrBlock": "18.100.71.96/27"
+   },
+   "eu-west-1": {
+    "FirehoseCidrBlock": "52.19.239.192/27"
+   },
+   "eu-west-2": {
+    "FirehoseCidrBlock": "18.130.1.96/27"
+   },
+   "eu-west-3": {
+    "FirehoseCidrBlock": "35.180.1.96/27"
+   },
+   "il-central-1": {
+    "FirehoseCidrBlock": "51.16.102.0/27"
+   },
+   "me-central-1": {
+    "FirehoseCidrBlock": "3.28.159.32/27"
+   },
+   "me-south-1": {
+    "FirehoseCidrBlock": "15.185.91.0/27"
+   },
+   "sa-east-1": {
+    "FirehoseCidrBlock": "18.228.1.128/27"
+   },
+   "us-east-1": {
+    "FirehoseCidrBlock": "52.70.63.192/27"
+   },
+   "us-east-2": {
+    "FirehoseCidrBlock": "13.58.135.96/27"
+   },
+   "us-gov-east-1": {
+    "FirehoseCidrBlock": "18.253.138.96/27"
+   },
+   "us-gov-west-1": {
+    "FirehoseCidrBlock": "52.61.204.160/27"
+   },
+   "us-west-1": {
+    "FirehoseCidrBlock": "13.57.135.192/27"
+   },
+   "us-west-2": {
+    "FirehoseCidrBlock": "52.89.255.224/27"
+   }
+  }
+ },
+ "Outputs": {
+  "ExportsOutputRefDeliveryStream58CF96DB919FEA68": {
+   "Value": {
+    "Ref": "DeliveryStream58CF96DB"
+   },
+   "Export": {
+    "Name": "aws-cdk-firehose-delivery-stream-s3-all-properties:ExportsOutputRefDeliveryStream58CF96DB919FEA68"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

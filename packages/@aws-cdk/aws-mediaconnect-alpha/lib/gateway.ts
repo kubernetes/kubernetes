@@ -219,8 +219,8 @@ export class Gateway extends GatewayBase implements IGateway {
       if (props.gatewayName.length > 32) {
         throw new ValidationError(lit`GatewayNameLength`, `Gateway name must be between 1 and 32 characters, got ${props.gatewayName.length}`, this);
       }
-      if (!/^[a-zA-Z0-9-]+$/.test(props.gatewayName)) {
-        throw new ValidationError(lit`GatewayNameFormat`, `Gateway name must contain only alphanumeric characters and hyphens, got '${props.gatewayName}'`, this);
+      if (!/^[a-zA-Z0-9_-]+$/.test(props.gatewayName)) {
+        throw new ValidationError(lit`GatewayNameFormat`, `Gateway name must contain only alphanumeric characters, hyphens, and underscores, got '${props.gatewayName}'`, this);
       }
     }
 

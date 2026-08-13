@@ -541,8 +541,8 @@ export class FlowOutput extends FlowOutputBase {
       if (props.flowOutputName.length > 128) {
         throw new ValidationError(lit`FlowOutputNameLength`, `Flow output name must be between 1 and 128 characters, got ${props.flowOutputName.length}`, this);
       }
-      if (!/^[a-zA-Z0-9-]+$/.test(props.flowOutputName)) {
-        throw new ValidationError(lit`FlowOutputNameFormat`, `Flow output name must contain only alphanumeric characters and hyphens, got '${props.flowOutputName}'`, this);
+      if (!/^[a-zA-Z0-9_-]+$/.test(props.flowOutputName)) {
+        throw new ValidationError(lit`FlowOutputNameFormat`, `Flow output name must contain only alphanumeric characters, hyphens, and underscores, got '${props.flowOutputName}'`, this);
       }
     }
 

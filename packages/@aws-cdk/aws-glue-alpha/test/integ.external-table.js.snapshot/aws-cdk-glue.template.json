@@ -9,7 +9,9 @@
     "DatabaseInput": {
      "Name": "my_database"
     }
-   }
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain"
   },
   "MyConnection5621880D": {
    "Type": "AWS::Glue::Connection",

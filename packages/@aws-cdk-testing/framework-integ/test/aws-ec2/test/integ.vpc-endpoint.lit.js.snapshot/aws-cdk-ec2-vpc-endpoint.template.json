@@ -858,6 +858,51 @@
      "Ref": "MyVpcF9F0CA6F"
     }
    }
+  },
+  "MyVpcS3DualstackEndpoint72DA66B2": {
+   "Type": "AWS::EC2::VPCEndpoint",
+   "Properties": {
+    "RouteTableIds": [
+     {
+      "Ref": "MyVpcPrivateSubnet1RouteTable8819E6E2"
+     },
+     {
+      "Ref": "MyVpcPrivateSubnet2RouteTableCEDCEECE"
+     },
+     {
+      "Ref": "MyVpcPublicSubnet1RouteTableC46AB2F4"
+     },
+     {
+      "Ref": "MyVpcPublicSubnet2RouteTable1DF17386"
+     }
+    ],
+    "ServiceName": {
+     "Fn::Join": [
+      "",
+      [
+       "com.amazonaws.",
+       {
+        "Ref": "AWS::Region"
+       },
+       ".s3"
+      ]
+     ]
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "aws-cdk-ec2-vpc-endpoint/MyVpc"
+     }
+    ],
+    "VpcEndpointType": "Gateway",
+    "VpcId": {
+     "Ref": "MyVpcF9F0CA6F"
+    },
+    "IpAddressType": "dualstack",
+    "DnsOptions": {
+     "DnsRecordIpType": "dualstack"
+    }
+   }
   }
  },
  "Parameters": {

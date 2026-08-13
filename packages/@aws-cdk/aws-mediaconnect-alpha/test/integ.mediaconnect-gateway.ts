@@ -7,7 +7,7 @@ const app = new cdk.App();
 const stack = new cdk.Stack(app, 'aws-cdk-mediaconnect-gateway');
 
 new Gateway(stack, 'gateway', {
-  gatewayName: 'gateway',
+  gatewayName: 'my_gateway',
   egressCidrBlocks: ['10.0.0.0/23'],
   networks: [{
     cidrBlock: '10.0.1.0/24',

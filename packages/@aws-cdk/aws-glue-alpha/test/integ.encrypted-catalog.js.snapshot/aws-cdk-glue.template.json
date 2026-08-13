@@ -64,7 +64,9 @@
     "DatabaseInput": {
      "Name": "testdb"
     }
-   }
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain"
   },
   "MyTableBucketD51E7EDC": {
    "Type": "AWS::S3::Bucket",

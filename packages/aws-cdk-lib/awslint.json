@@ -1300,6 +1300,7 @@
     "prefer-ref-interface:aws-cdk-lib.aws_docdb.DatabaseClusterProps.cloudWatchLogsRetentionRole",
     "prefer-ref-interface:aws-cdk-lib.aws_docdb.DatabaseClusterProps.kmsKey",
     "prefer-ref-interface:aws-cdk-lib.aws_docdb.DatabaseClusterProps.securityGroup",
+    "prefer-ref-interface:aws-cdk-lib.aws_docdb.DatabaseClusterProps.masterUserSecretKmsKey",
     "prefer-ref-interface:aws-cdk-lib.aws_secretsmanager.SecretAttributes.encryptionKey",
     "prefer-ref-interface:aws-cdk-lib.aws_docdb.DatabaseSecretProps.encryptionKey",
     "prefer-ref-interface:aws-cdk-lib.aws_docdb.DatabaseSecretProps.masterSecret",

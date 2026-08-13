@@ -1,4 +1,4 @@
-import { App, Stack } from 'aws-cdk-lib';
+import { App, Stack, Validations } from 'aws-cdk-lib';
 import { Annotations, Match, Template } from 'aws-cdk-lib/assertions';
 import { Vpc, SecurityGroup } from 'aws-cdk-lib/aws-ec2';
 import { RouterNetworkConfiguration, RouterNetworkInterface } from '../lib/router-network-interface';
@@ -119,6 +119,13 @@ test('imported router network interface has undefined createdAt and updatedAt', 
 
 describe('open public CIDR warning', () => {
   test.each(['0.0.0.0/0', '::/0'])('warns when a public CIDR is fully open (%s)', (openCidr) => {
+    if (openCidr === '::/0') {
+      Validations.of(stack).acknowledge({
+        id: 'CloudFormation-Validate::F3018',
+        reason: 'This test intentionally uses an unsupported IPv6 CIDR to verify the public-access warning; see https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-properties-mediaconnect-routernetworkinterface-publicrouternetworkinterfacerule.html',
+      });
+    }
+
     new RouterNetworkInterface(stack, 'network', {
       routerNetworkInterfaceName: 'test-network',
       configuration: RouterNetworkConfiguration.publicNetwork({ cidr: [openCidr] }),

@@ -3,21 +3,22 @@
   "title": "Validation Report",
   "pluginReports": [
     {
-      "pluginName": "Construct Annotations",
+      "pluginName": "CloudFormation Validate",
+      "pluginVersion": "1.6.0",
       "conclusion": "success",
       "violations": [
         {
-          "ruleName": "@aws-cdk/aws-codepipeline:unspecifiedPipelineType",
-          "description": "V1 pipeline type is implicitly selected when `pipelineType` is not set. If you want to use V2 type, set `PipelineType.V2`. [ack: @aws-cdk/aws-codepipeline:unspecifiedPipelineType]",
+          "ruleName": "F0001",
+          "description": "Resources section must exist and be non-empty",
           "severity": "warning",
+          "ruleMetadata": {
+            "category": "Structure"
+          },
           "violatingConstructs": [
             {
-              "constructPath": "aws-cdk-codepipeline-elastic-beanstalk-deploy/Pipeline",
-              "constructFqn": "aws-cdk-lib.aws_codepipeline.Pipeline",
-              "libraryVersion": "0.0.0",
-              "stackTraces": [
-                "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-codepipeline-actions/test/integ.pipeline-elastic-beanstalk-deploy.js:64:15)\nRun with '--debug' to include location info"
-              ]
+              "constructPath": "codepipeline-elastic-beanstalk-deploy/DefaultTest/DeployAssert",
+              "constructFqn": "aws-cdk-lib.Stack",
+              "libraryVersion": "0.0.0"
             }
           ]
         }

@@ -675,8 +675,8 @@ export class Bridge extends BridgeBase implements IBridge {
       if (props.bridgeName.length > 64) {
         throw new ValidationError(lit`BridgeNameLength`, `Bridge name must be between 1 and 64 characters, got ${props.bridgeName.length}`, this);
       }
-      if (!/^[a-zA-Z0-9-]+$/.test(props.bridgeName)) {
-        throw new ValidationError(lit`BridgeNameFormat`, `Bridge name must contain only alphanumeric characters and hyphens, got '${props.bridgeName}'`, this);
+      if (!/^[a-zA-Z0-9_-]+$/.test(props.bridgeName)) {
+        throw new ValidationError(lit`BridgeNameFormat`, `Bridge name must contain only alphanumeric characters, hyphens, and underscores, got '${props.bridgeName}'`, this);
       }
     }
 

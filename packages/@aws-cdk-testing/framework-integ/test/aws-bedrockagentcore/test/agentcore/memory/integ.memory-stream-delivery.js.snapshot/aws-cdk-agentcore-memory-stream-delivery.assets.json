@@ -1,0 +1,20 @@
+{
+  "version": "54.0.0",
+  "files": {
+    "c88ec386e6d28491f8c3195242d5a504f32b1ea1ac9a4a9cd352d7ed8f491381": {
+      "displayName": "aws-cdk-agentcore-memory-stream-delivery Template",
+      "source": {
+        "path": "aws-cdk-agentcore-memory-stream-delivery.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-current_region-7ed5d5da": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "c88ec386e6d28491f8c3195242d5a504f32b1ea1ac9a4a9cd352d7ed8f491381.json",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

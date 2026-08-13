@@ -1,0 +1,125 @@
+{
+  "/CompositeAlarmIntegrationTest/Alarm1": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "metric": {
+          "warnings": "*",
+          "warningsV2": "*"
+        },
+        "threshold": "*",
+        "evaluationPeriods": "*"
+      }
+    }
+  ],
+  "/CompositeAlarmIntegrationTest/Alarm2": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "metric": {
+          "warnings": "*",
+          "warningsV2": "*"
+        },
+        "threshold": "*",
+        "evaluationPeriods": "*"
+      }
+    }
+  ],
+  "/CompositeAlarmIntegrationTest/Alarm3": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "metric": {
+          "warnings": "*",
+          "warningsV2": "*"
+        },
+        "threshold": "*",
+        "evaluationPeriods": "*"
+      }
+    }
+  ],
+  "/CompositeAlarmIntegrationTest/Alarm4": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "metric": {
+          "warnings": "*",
+          "warningsV2": "*"
+        },
+        "threshold": "*",
+        "evaluationPeriods": "*"
+      }
+    }
+  ],
+  "/CompositeAlarmIntegrationTest/Alarm5": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "alarmName": "*",
+        "metric": {
+          "warnings": "*",
+          "warningsV2": "*"
+        },
+        "threshold": "*",
+        "evaluationPeriods": "*"
+      }
+    }
+  ],
+  "/CompositeAlarmIntegrationTest/CompositeAlarm": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "alarmRule": "*",
+        "actionsSuppressor": "*"
+      }
+    }
+  ],
+  "/CompositeAlarmIntegrationTest/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/CompositeAlarmIntegrationTest/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/CompositeAlarmIntegrationTest/Alarm1/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Alarm1F9009D71"
+    }
+  ],
+  "/CompositeAlarmIntegrationTest/Alarm2/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Alarm2A7122E13"
+    }
+  ],
+  "/CompositeAlarmIntegrationTest/Alarm3/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Alarm32341D8D9"
+    }
+  ],
+  "/CompositeAlarmIntegrationTest/Alarm4/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Alarm4671832C8"
+    }
+  ],
+  "/CompositeAlarmIntegrationTest/Alarm5/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Alarm548383B2F"
+    }
+  ],
+  "/CompositeAlarmIntegrationTest/CompositeAlarm/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CompositeAlarmF4C3D082"
+    }
+  ]
+}

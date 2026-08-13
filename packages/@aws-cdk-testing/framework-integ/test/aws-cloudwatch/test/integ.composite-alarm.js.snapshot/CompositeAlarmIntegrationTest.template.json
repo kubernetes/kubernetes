@@ -51,9 +51,9 @@
   "Alarm548383B2F": {
    "Type": "AWS::CloudWatch::Alarm",
    "Properties": {
+    "AlarmName": "Alarm with space in name",
     "ComparisonOperator": "GreaterThanOrEqualToThreshold",
     "EvaluationPeriods": 3,
-    "AlarmName": "Alarm with space in name",
     "MetricName": "Metric",
     "Namespace": "CDK/Test",
     "Period": 300,
@@ -64,6 +64,15 @@
   "CompositeAlarmF4C3D082": {
    "Type": "AWS::CloudWatch::CompositeAlarm",
    "Properties": {
+    "ActionsSuppressor": {
+     "Fn::GetAtt": [
+      "Alarm548383B2F",
+      "Arn"
+     ]
+    },
+    "ActionsSuppressorExtensionPeriod": 60,
+    "ActionsSuppressorWaitPeriod": 60,
+    "AlarmName": "CompositeAlarmIntegrationTestCompositeAlarm742D2FBA",
     "AlarmRule": {
      "Fn::Join": [
       "",
@@ -103,19 +112,52 @@
          "Arn"
         ]
        },
-       "\")))) OR FALSE)"
+       "\"))) AND AT_LEAST(2, ALARM, (\"",
+       {
+        "Fn::GetAtt": [
+         "Alarm1F9009D71",
+         "Arn"
+        ]
+       },
+       "\", \"",
+       {
+        "Fn::GetAtt": [
+         "Alarm2A7122E13",
+         "Arn"
+        ]
+       },
+       "\", \"",
+       {
+        "Fn::GetAtt": [
+         "Alarm32341D8D9",
+         "Arn"
+        ]
+       },
+       "\")) AND AT_LEAST(60%, NOT OK, (\"",
+       {
+        "Fn::GetAtt": [
+         "Alarm1F9009D71",
+         "Arn"
+        ]
+       },
+       "\", \"",
+       {
+        "Fn::GetAtt": [
+         "Alarm2A7122E13",
+         "Arn"
+        ]
+       },
+       "\", \"",
+       {
+        "Fn::GetAtt": [
+         "Alarm32341D8D9",
+         "Arn"
+        ]
+       },
+       "\"))) OR FALSE)"
       ]
      ]
-    },
-    "ActionsSuppressor": {
-     "Fn::GetAtt": [
-      "Alarm548383B2F",
-      "Arn"
-     ]
-    },
-    "ActionsSuppressorExtensionPeriod": 60,
-    "ActionsSuppressorWaitPeriod": 60,
-    "AlarmName": "CompositeAlarmIntegrationTestCompositeAlarm742D2FBA"
+    }
    }
   }
  },

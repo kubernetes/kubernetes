@@ -25,9 +25,12 @@ import {
   Stats,
 } from '../../../aws-cloudwatch';
 import * as iam from '../../../aws-iam';
+import type * as kinesis from '../../../aws-kinesis';
 import * as kms from '../../../aws-kms';
 import { Arn, ArnFormat, Duration, Lazy, Resource, Stack, Token, Names } from '../../../core';
 import type { IResource, ResourceProps } from '../../../core';
+import { ValidationError } from '../../../core/lib/errors';
+import { lit } from '../../../core/lib/helpers-internal';
 import { addConstructMetadata, MethodMetadata } from '../../../core/lib/metadata-resource';
 import { propertyInjectable } from '../../../core/lib/prop-injectable';
 import { validateFieldPattern, validateStringFieldLength, throwIfInvalid } from '../common/validation-helpers';
@@ -70,6 +73,99 @@ const MEMORY_EXPIRATION_DAYS_MIN = 7;
  * @internal
  */
 const MEMORY_EXPIRATION_DAYS_MAX = 365;
+
+/******************************************************************************
+ *                         Stream Delivery Types
+ *****************************************************************************/
+/**
+ * Content type for stream delivery.
+ * Defines what kind of memory content is delivered to the Kinesis stream.
+ */
+export enum StreamDeliveryContentType {
+  /** Deliver memory record lifecycle events (created, updated, deleted) */
+  MEMORY_RECORDS = 'MEMORY_RECORDS',
+}
+
+/**
+ * Content detail level for stream delivery.
+ * Controls how much detail is included in each delivered record.
+ */
+export enum StreamDeliveryContentLevel {
+  /** Deliver only metadata (record ID, timestamps, event type) */
+  METADATA_ONLY = 'METADATA_ONLY',
+  /** Deliver full content including the memory record body */
+  FULL_CONTENT = 'FULL_CONTENT',
+}
+
+/**
+ * Content configuration for a stream delivery resource.
+ * Defines what content type and detail level to deliver.
+ */
+export interface StreamDeliveryContentConfiguration {
+  /**
+   * The type of content to deliver.
+   */
+  readonly type: StreamDeliveryContentType;
+  /**
+   * The level of content detail to deliver.
+   *
+   * There is no default: the level must be chosen explicitly because
+   * `FULL_CONTENT` delivers complete memory record bodies, which can contain
+   * personally identifiable information and other sensitive conversation
+   * content. Use `METADATA_ONLY` unless the record body is required downstream.
+   */
+  readonly level: StreamDeliveryContentLevel;
+}
+
+/**
+ * Options for delivering memory record events to a Kinesis Data Stream.
+ */
+export interface KinesisStreamDeliveryOptions {
+  /**
+   * Content configurations defining what to deliver to the stream.
+   *
+   * Currently exactly one configuration is supported.
+   */
+  readonly contentConfigurations: StreamDeliveryContentConfiguration[];
+}
+
+/**
+ * A delivery target for real-time streaming of memory record lifecycle events.
+ *
+ * Instances are created through the static factory methods, one per delivery
+ * target type, for example `StreamDeliveryResource.kinesis()`.
+ *
+ * @see https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/memory-record-streaming.html
+ */
+export class StreamDeliveryResource {
+  /**
+   * Deliver memory record lifecycle events to an Amazon Kinesis Data Stream.
+   *
+   * The memory execution role is automatically granted write permissions to
+   * the stream.
+   *
+   * @param stream The Kinesis Data Stream to deliver memory record events to
+   * @param options What content to deliver to the stream
+   */
+  public static kinesis(stream: kinesis.IStream, options: KinesisStreamDeliveryOptions): StreamDeliveryResource {
+    return new StreamDeliveryResource(stream, options.contentConfigurations);
+  }
+
+  /**
+   * The Kinesis Data Stream that memory record events are delivered to.
+   */
+  public readonly stream: kinesis.IStream;
+
+  /**
+   * Content configurations defining what is delivered to the stream.
+   */
+  public readonly contentConfigurations: StreamDeliveryContentConfiguration[];
+
+  private constructor(stream: kinesis.IStream, contentConfigurations: StreamDeliveryContentConfiguration[]) {
+    this.stream = stream;
+    this.contentConfigurations = contentConfigurations;
+  }
+}
 
 /******************************************************************************
  *                                Interface
@@ -514,6 +610,34 @@ export interface MemoryProps {
    * @default - no tags
    */
   readonly tags?: { [key: string]: string };
+
+  /**
+   * Stream delivery resources for real-time push-based streaming of memory
+   * record lifecycle events (created, updated, deleted) to Amazon Kinesis Data Streams.
+   *
+   * The memory execution role will automatically be granted write permissions to each stream.
+   *
+   * Only one stream delivery resource is currently supported (CloudFormation maximum);
+   * providing more than one fails at synth with `TooManyStreamDeliveryResources`:
+   *
+   * ```ts
+   * declare const stream: kinesis.IStream;
+   * new agentcore.Memory(this, 'Memory', {
+   *   streamDeliveryResources: [
+   *     agentcore.StreamDeliveryResource.kinesis(stream, {
+   *       contentConfigurations: [{
+   *         type: agentcore.StreamDeliveryContentType.MEMORY_RECORDS,
+   *         level: agentcore.StreamDeliveryContentLevel.METADATA_ONLY,
+   *       }],
+   *     }),
+   *   ],
+   * });
+   * ```
+   *
+   * @default - No stream delivery (events are not pushed to Kinesis)
+   * @see https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/memory-record-streaming.html
+   */
+  readonly streamDeliveryResources?: StreamDeliveryResource[];
 }
 
 /******************************************************************************
@@ -670,6 +794,10 @@ export class Memory extends MemoryBase {
    * @attribute
    */
   public readonly memoryStrategies: IMemoryStrategy[] = [];
+  /**
+   * The stream delivery resources configured for this memory.
+   */
+  public readonly streamDeliveryResources: StreamDeliveryResource[] = [];
   // ------------------------------------------------------
   // Internal Only
   // ------------------------------------------------------
@@ -739,6 +867,10 @@ export class Memory extends MemoryBase {
       encryptionKeyArn: this.kmsKey?.keyArn,
       memoryExecutionRoleArn: this.executionRole?.roleArn,
       memoryStrategies: Lazy.any({ produce: () => this._renderMemoryStrategies() }, { omitEmptyArray: true }),
+      streamDeliveryResources: Lazy.any(
+        { produce: () => this._renderStreamDeliveryResources() },
+        { omitEmptyArray: true },
+      ),
       tags: this.tags,
     };
 
@@ -756,6 +888,9 @@ export class Memory extends MemoryBase {
 
     // Add memory strategies to the memory
     for (const strategy of props?.memoryStrategies ?? []) {this.addMemoryStrategy(strategy);}
+
+    // Add stream delivery resources to the memory
+    for (const resource of props?.streamDeliveryResources ?? []) {this.addStreamDeliveryResource(resource);}
   }
 
   // ------------------------------------------------------
@@ -773,6 +908,46 @@ export class Memory extends MemoryBase {
     // Grant necessary permissions to the execution role
     const grant = memoryStrategy.grant(this.executionRole as iam.IRole);
     grant?.applyBefore(this.__resource);
+  }
+
+  /**
+   * Add a stream delivery resource to the memory.
+   * Grants Kinesis write permissions to the execution role automatically.
+   *
+   * @param resource - The stream delivery resource configuration
+   * @see https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/memory-record-streaming.html
+   */
+  @MethodMetadata()
+  public addStreamDeliveryResource(resource: StreamDeliveryResource): void {
+    // Validate current limit: at most 1 stream delivery resource
+    if (this.streamDeliveryResources.length >= 1) {
+      throw new ValidationError(
+        lit`TooManyStreamDeliveryResources`,
+        'Memory currently supports at most one stream delivery resource',
+        this,
+      );
+    }
+
+    // Validate content configurations
+    throwIfInvalid(this._validateStreamDeliveryResource, resource);
+
+    // Add to internal array
+    this.streamDeliveryResources.push(resource);
+
+    // Grant Kinesis write permissions to the execution role
+    // stream.grantWrite() grants: kinesis:ListShards, kinesis:PutRecord, kinesis:PutRecords
+    // stream.grantWrite() also grants KMS permissions when the stream's key is known
+    // (owned streams, or streams imported via fromStreamAttributes with an encryptionKey).
+    // Streams imported via fromStreamArn carry no key, so grant KMS manually in that case.
+    const grant = resource.stream.grantWrite(this.executionRole as iam.IRole);
+
+    // AgentCore also requires kinesis:DescribeStream which is not included in grantWrite().
+    // Route it through the stream's own grant so that, like the write grant, a
+    // cross-account stream also gets the matching resource policy statement.
+    const describeGrant = resource.stream.grant(this.executionRole as iam.IRole, 'kinesis:DescribeStream');
+
+    grant.applyBefore(this.__resource);
+    describeGrant.applyBefore(this.__resource);
   }
 
   /**
@@ -888,6 +1063,25 @@ export class Memory extends MemoryBase {
     return errors;
   };
 
+  /**
+   * Validates a stream delivery resource configuration.
+   * Currently CloudFormation limits contentConfigurations to exactly 1 entry
+   * and streamDeliveryResources to at most 1 entry.
+   */
+  private _validateStreamDeliveryResource = (resource: StreamDeliveryResource): string[] => {
+    const errors: string[] = [];
+
+    if (!resource.contentConfigurations || resource.contentConfigurations.length === 0) {
+      errors.push('contentConfigurations must be specified: choose METADATA_ONLY for event metadata or FULL_CONTENT to stream complete records (may contain sensitive data)');
+    }
+
+    if (resource.contentConfigurations && resource.contentConfigurations.length > 1) {
+      errors.push('Stream delivery resource currently supports at most one content configuration');
+    }
+
+    return errors;
+  };
+
   // ------------------------------------------------------
   // RENDERERS
   // ------------------------------------------------------
@@ -904,5 +1098,29 @@ export class Memory extends MemoryBase {
     }
 
     return this.memoryStrategies.map(ms => ms.render());
+  }
+
+  /**
+   * Render the stream delivery resources into CloudFormation format.
+   *
+   * @returns StreamDeliveryResourcesProperty or undefined if no resources configured
+   * @internal This is an internal core function and should not be called directly.
+   */
+  private _renderStreamDeliveryResources(): CfnMemory.StreamDeliveryResourcesProperty | undefined {
+    if (!this.streamDeliveryResources || this.streamDeliveryResources.length === 0) {
+      return undefined;
+    }
+
+    return {
+      resources: this.streamDeliveryResources.map(resource => ({
+        kinesis: {
+          dataStreamArn: resource.stream.streamArn,
+          contentConfigurations: resource.contentConfigurations.map(config => ({
+            type: config.type,
+            level: config.level,
+          })),
+        },
+      })),
+    };
   }
 }

@@ -1,0 +1,57 @@
+{
+  "/integ-tests/DefaultTest/DeployAssert": [
+    {
+      "type": "aws:cdk:warning",
+      "data": "No cross-stack-reference strength configured, defaulting to \"strong\". We recommend you set feature flag \"@aws-cdk/core:defaultCrossStackReferences\" to \"both\", then deploy everywhere, then set it to \"weak\". Alternatively, set it to \"strong\" explicitly to lock in the current producer-protecting behavior. (See: https://github.com/aws/aws-cdk/blob/main/packages/aws-cdk-lib/README.md#reference-strength) [ack: @aws-cdk/core:crossStackReferencesDefaultStrong]",
+      "trace": [
+        "Annotations.addMessage (/workplace/alvazjor/aws-cdk-repo/pr-33657-takeover/packages/aws-cdk-lib/core/lib/annotations.js:244:29)",
+        "Annotations.addWarningV2 (/workplace/alvazjor/aws-cdk-repo/pr-33657-takeover/packages/aws-cdk-lib/core/lib/annotations.js:113:18)",
+        "resolveValue (/workplace/alvazjor/aws-cdk-repo/pr-33657-takeover/packages/aws-cdk-lib/core/lib/private/refs.js:204:54)",
+        "resolveReferences (/workplace/alvazjor/aws-cdk-repo/pr-33657-takeover/packages/aws-cdk-lib/core/lib/private/refs.js:128:30)",
+        "prepareApp (/workplace/alvazjor/aws-cdk-repo/pr-33657-takeover/packages/aws-cdk-lib/core/lib/private/prepare-app.js:45:36)",
+        "synthesize (/workplace/alvazjor/aws-cdk-repo/pr-33657-takeover/packages/aws-cdk-lib/core/lib/private/synthesis.js:72:36)",
+        "App.synth (/workplace/alvazjor/aws-cdk-repo/pr-33657-takeover/packages/aws-cdk-lib/core/lib/stage.js:230:96)",
+        "App.synth (/workplace/alvazjor/aws-cdk-repo/pr-33657-takeover/packages/aws-cdk-lib/core/lib/app.js:217:27)",
+        "process.<anonymous> (/workplace/alvazjor/aws-cdk-repo/pr-33657-takeover/packages/aws-cdk-lib/core/lib/app.js:163:51)",
+        "Object.onceWrapper (node:events:634:26)",
+        "process.emit (node:events:519:28)"
+      ]
+    }
+  ],
+  "/integ-tests/DefaultTest/DeployAssert/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/integ-tests/DefaultTest/DeployAssert/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/integ-tests/DefaultTest/DeployAssert/AwsApiCallFirehoseputRecord44585e4a4193ab6938b5675835d76f5f/Default": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/integ-tests/DefaultTest/DeployAssert/SingletonFunction1488541a7b23466481b69b4408076b81/Role": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction1488541a7b23466481b69b4408076b81Role37ABCE73"
+    }
+  ],
+  "/integ-tests/DefaultTest/DeployAssert/SingletonFunction1488541a7b23466481b69b4408076b81/Handler": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction1488541a7b23466481b69b4408076b81HandlerCD40AE9F"
+    }
+  ],
+  "/integ-tests/DefaultTest/DeployAssert/AwsApiCallFirehoseputRecord44585e4a4193ab6938b5675835d76f5f/Default/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AwsApiCallFirehoseputRecord44585e4a4193ab6938b5675835d76f5f"
+    }
+  ]
+}

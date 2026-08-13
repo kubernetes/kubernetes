@@ -243,6 +243,63 @@ describe('vpc endpoint', () => {
 
       expect(() => vpc.addGatewayEndpoint('Gateway', { service: GatewayVpcEndpointAwsService.S3 })).toThrow(/route table/);
     });
+
+    test('gateway endpoint with ipAddressType', () => {
+      // GIVEN
+      const stack = new Stack();
+      const vpc = new Vpc(stack, 'VpcNetwork');
+
+      // WHEN
+      new GatewayVpcEndpoint(stack, 'Endpoint', {
+        vpc,
+        service: GatewayVpcEndpointAwsService.S3,
+        ipAddressType: VpcEndpointIpAddressType.DUALSTACK,
+      });
+
+      // THEN
+      Template.fromStack(stack).hasResourceProperties('AWS::EC2::VPCEndpoint', {
+        VpcEndpointType: 'Gateway',
+        IpAddressType: 'dualstack',
+      });
+    });
+
+    test('gateway endpoint with dnsRecordIpType', () => {
+      // GIVEN
+      const stack = new Stack();
+      const vpc = new Vpc(stack, 'VpcNetwork');
+
+      // WHEN
+      new GatewayVpcEndpoint(stack, 'Endpoint', {
+        vpc,
+        service: GatewayVpcEndpointAwsService.S3,
+        dnsRecordIpType: VpcEndpointDnsRecordIpType.IPV6,
+      });
+
+      // THEN
+      Template.fromStack(stack).hasResourceProperties('AWS::EC2::VPCEndpoint', {
+        VpcEndpointType: 'Gateway',
+        DnsOptions: { DnsRecordIpType: 'ipv6' },
+      });
+    });
+
+    test('gateway endpoint without ipAddressType or dnsRecordIpType omits those fields', () => {
+      // GIVEN
+      const stack = new Stack();
+      const vpc = new Vpc(stack, 'VpcNetwork');
+
+      // WHEN
+      new GatewayVpcEndpoint(stack, 'Endpoint', {
+        vpc,
+        service: GatewayVpcEndpointAwsService.S3,
+      });
+
+      // THEN
+      Template.fromStack(stack).hasResourceProperties('AWS::EC2::VPCEndpoint', {
+        VpcEndpointType: 'Gateway',
+        IpAddressType: Match.absent(),
+        DnsOptions: Match.absent(),
+      });
+    });
   });
 
   describe('interface endpoint', () => {

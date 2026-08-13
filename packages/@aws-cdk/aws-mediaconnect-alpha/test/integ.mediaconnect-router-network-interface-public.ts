@@ -7,7 +7,7 @@ const app = new cdk.App();
 const stack = new cdk.Stack(app, 'aws-cdk-mediaconnect-router-ni-public');
 
 new RouterNetworkInterface(stack, 'network', {
-  routerNetworkInterfaceName: 'test',
+  routerNetworkInterfaceName: 'test_interface',
   configuration: RouterNetworkConfiguration.publicNetwork({
     cidr: ['203.0.113.0/24'],
   }),

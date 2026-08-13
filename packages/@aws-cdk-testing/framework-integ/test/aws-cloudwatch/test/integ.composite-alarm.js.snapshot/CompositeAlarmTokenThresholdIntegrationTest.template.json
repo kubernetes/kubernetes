@@ -1,0 +1,118 @@
+{
+ "Resources": {
+  "Alarm1F9009D71": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+    "EvaluationPeriods": 3,
+    "MetricName": "Metric",
+    "Namespace": "CDK/Test",
+    "Period": 300,
+    "Statistic": "Average",
+    "Threshold": 100
+   }
+  },
+  "Alarm2A7122E13": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+    "EvaluationPeriods": 3,
+    "MetricName": "Metric",
+    "Namespace": "CDK/Test",
+    "Period": 300,
+    "Statistic": "Average",
+    "Threshold": 1000
+   }
+  },
+  "Alarm32341D8D9": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+    "EvaluationPeriods": 3,
+    "MetricName": "Metric",
+    "Namespace": "CDK/Test",
+    "Period": 300,
+    "Statistic": "Average",
+    "Threshold": 10000
+   }
+  },
+  "CompositeAlarmWithTokenThreshold8A62D58A": {
+   "Type": "AWS::CloudWatch::CompositeAlarm",
+   "Properties": {
+    "AlarmName": "CompositeAlarmTokenThresholdIntegrationTestCompositeAlarmWithTokenThreshold6E6F8F6C",
+    "AlarmRule": {
+     "Fn::Join": [
+      "",
+      [
+       "AT_LEAST(",
+       {
+        "Ref": "AtLeastCount"
+       },
+       ", ALARM, (\"",
+       {
+        "Fn::GetAtt": [
+         "Alarm1F9009D71",
+         "Arn"
+        ]
+       },
+       "\", \"",
+       {
+        "Fn::GetAtt": [
+         "Alarm2A7122E13",
+         "Arn"
+        ]
+       },
+       "\", \"",
+       {
+        "Fn::GetAtt": [
+         "Alarm32341D8D9",
+         "Arn"
+        ]
+       },
+       "\"))"
+      ]
+     ]
+    }
+   }
+  }
+ },
+ "Parameters": {
+  "AtLeastCount": {
+   "Type": "Number",
+   "Default": 2,
+   "Description": "Minimum number of alarms that must be in ALARM state"
+  },
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

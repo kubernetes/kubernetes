@@ -68,7 +68,7 @@ const ebsEnv = new elasticbeanstalk.CfnEnvironment(stack, 'Environment', {
     },
   ],
 });
-ebsEnv.addDependency(ebsApp);
+ebsEnv.addResourceDependency(ebsApp);
 
 const getEnvironmentUrl = new custom.AwsCustomResource(stack, 'GetEnvironmentUrl', {
   onCreate: {

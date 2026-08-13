@@ -56,7 +56,7 @@ new Bridge(stack, 'bridgeWithOutput', {
       source: { flow },
     }],
     networkOutputs: [{
-      name: 'bridge-network-output',
+      name: 'bridge_network_output',
       output: BridgeOutputConfiguration.network({
         ipAddress: '192.168.1.100',
         port: 5000,

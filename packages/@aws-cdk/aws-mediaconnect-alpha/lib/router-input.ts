@@ -1387,8 +1387,8 @@ export class RouterInput extends RouterInputBase implements IRouterInput {
       if (props.routerInputName.length > 128) {
         throw new ValidationError(lit`RouterInputNameLength`, `Router input name must be between 1 and 128 characters, got ${props.routerInputName.length}`, this);
       }
-      if (!/^[a-zA-Z0-9-]+$/.test(props.routerInputName)) {
-        throw new ValidationError(lit`RouterInputNameFormat`, `Router input name must contain only alphanumeric characters and hyphens, got '${props.routerInputName}'`, this);
+      if (!/^[a-zA-Z0-9_-]+$/.test(props.routerInputName)) {
+        throw new ValidationError(lit`RouterInputNameFormat`, `Router input name must contain only alphanumeric characters, hyphens, and underscores, got '${props.routerInputName}'`, this);
       }
     }
 

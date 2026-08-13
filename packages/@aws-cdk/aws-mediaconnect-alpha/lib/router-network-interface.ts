@@ -261,8 +261,8 @@ export class RouterNetworkInterface extends RouterNetworkInterfaceBase {
       if (props.routerNetworkInterfaceName.length > 128) {
         throw new ValidationError(lit`RouterNetworkInterfaceNameLength`, `Router network interface name must be between 1 and 128 characters, got ${props.routerNetworkInterfaceName.length}`, this);
       }
-      if (!/^[a-zA-Z0-9-]+$/.test(props.routerNetworkInterfaceName)) {
-        throw new ValidationError(lit`RouterNetworkInterfaceNameFormat`, `Router network interface name must contain only alphanumeric characters and hyphens, got '${props.routerNetworkInterfaceName}'`, this);
+      if (!/^[a-zA-Z0-9_-]+$/.test(props.routerNetworkInterfaceName)) {
+        throw new ValidationError(lit`RouterNetworkInterfaceNameFormat`, `Router network interface name must contain only alphanumeric characters, hyphens, and underscores, got '${props.routerNetworkInterfaceName}'`, this);
       }
     }
 

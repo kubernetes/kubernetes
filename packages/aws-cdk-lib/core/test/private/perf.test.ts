@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import { performance } from 'perf_hooks';
-import { profileClass, profileFn, profileObj, profileSpan, readPerfCounters } from '../../lib/private/perf';
+import { profileClass, profileFn, profileObj, profileSpan, readPerfCounters, recordCounter } from '../../lib/private/perf';
 
 beforeEach(() => {
   performance.clearMeasures();
@@ -67,6 +67,22 @@ test('spans can be recorded, and counts can be skipped', () => {
       count: 1,
     },
   });
+});
+
+test('arbitrary counters can be recorded, aggregated, and selected for telemetry', () => {
+  // WHEN
+  recordCounter('yes', 2, { telemetry: true });
+  recordCounter('yes', 3, { telemetry: true });
+  recordCounter('zero', 0, { telemetry: true });
+  recordCounter('no', 7);
+
+  // THEN
+  const ctrs = readPerfCounters({ telemetry: true });
+  expect(ctrs).toMatchObject({
+    yes: { count: 5, total: 0 },
+    zero: { count: 0, total: 0 },
+  });
+  expect(ctrs).not.toHaveProperty('no');
 });
 
 /**

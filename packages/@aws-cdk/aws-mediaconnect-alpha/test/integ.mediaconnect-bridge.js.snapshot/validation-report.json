@@ -4,7 +4,7 @@
   "pluginReports": [
     {
       "pluginName": "CloudFormation Validate",
-      "pluginVersion": "1.5.0",
+      "pluginVersion": "1.6.0",
       "conclusion": "success",
       "violations": [
         {
@@ -16,7 +16,9 @@
           },
           "violatingConstructs": [
             {
-              "constructPath": ""
+              "constructPath": "cdk-integ-emx-bridge/DefaultTest/DeployAssert",
+              "constructFqn": "constructs.Construct",
+              "libraryVersion": "10.6.0"
             }
           ]
         }

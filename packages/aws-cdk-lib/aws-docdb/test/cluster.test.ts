@@ -1547,6 +1547,136 @@ describe('DatabaseCluster', () => {
       });
     });
   });
+
+  describe('manageMasterUserPassword', () => {
+    test('can create cluster with manageMasterUserPassword enabled', () => {
+      // GIVEN
+      const stack = testStack();
+      const vpc = new ec2.Vpc(stack, 'VPC');
+
+      // WHEN
+      new DatabaseCluster(stack, 'Database', {
+        manageMasterUserPassword: true,
+        masterUser: {
+          username: 'admin',
+        },
+        instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE2, ec2.InstanceSize.SMALL),
+        vpc,
+      });
+
+      // THEN
+      Template.fromStack(stack).hasResourceProperties('AWS::DocDB::DBCluster', {
+        ManageMasterUserPassword: true,
+        MasterUsername: 'admin',
+        MasterUserPassword: Match.absent(),
+      });
+      // The construct must not create its own secret when the password is managed by the service
+      Template.fromStack(stack).resourceCountIs('AWS::SecretsManager::Secret', 0);
+    });
+
+    test('can specify KMS key for managed master user password', () => {
+      // GIVEN
+      const stack = testStack();
+      const vpc = new ec2.Vpc(stack, 'VPC');
+      const key = new kms.Key(stack, 'Key');
+
+      // WHEN
+      new DatabaseCluster(stack, 'Database', {
+        manageMasterUserPassword: true,
+        masterUser: {
+          username: 'admin',
+        },
+        masterUserSecretKmsKey: key,
+        instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE2, ec2.InstanceSize.SMALL),
+        vpc,
+      });
+
+      // THEN
+      Template.fromStack(stack).hasResourceProperties('AWS::DocDB::DBCluster', {
+        ManageMasterUserPassword: true,
+        MasterUserSecretKmsKeyId: {
+          'Fn::GetAtt': ['Key961B73FD', 'Arn'],
+        },
+      });
+    });
+
+    test('throws error when manageMasterUserPassword is true but masterUser.password is specified', () => {
+      // GIVEN
+      const stack = testStack();
+      const vpc = new ec2.Vpc(stack, 'VPC');
+
+      // WHEN/THEN
+      expect(() => {
+        new DatabaseCluster(stack, 'Database', {
+          manageMasterUserPassword: true,
+          masterUser: {
+            username: 'admin',
+            password: cdk.SecretValue.unsafePlainText('password'),
+          },
+          instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE2, ec2.InstanceSize.SMALL),
+          vpc,
+        });
+      }).toThrow('You can\'t manage the master user password with AWS Secrets Manager if masterUser.password is specified');
+    });
+
+    test('throws error when masterUserSecretKmsKey is specified but manageMasterUserPassword is false', () => {
+      // GIVEN
+      const stack = testStack();
+      const vpc = new ec2.Vpc(stack, 'VPC');
+      const key = new kms.Key(stack, 'Key');
+
+      // WHEN/THEN
+      expect(() => {
+        new DatabaseCluster(stack, 'Database', {
+          masterUser: {
+            username: 'admin',
+          },
+          masterUserSecretKmsKey: key,
+          instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE2, ec2.InstanceSize.SMALL),
+          vpc,
+        });
+      }).toThrow('masterUserSecretKmsKey is valid only if manageMasterUserPassword is true');
+    });
+
+    test('fails when addRotationSingleUser is called with manageMasterUserPassword enabled', () => {
+      // GIVEN
+      const stack = testStack();
+      const vpc = new ec2.Vpc(stack, 'VPC');
+      const cluster = new DatabaseCluster(stack, 'Database', {
+        manageMasterUserPassword: true,
+        masterUser: {
+          username: 'admin',
+        },
+        instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE2, ec2.InstanceSize.SMALL),
+        vpc,
+      });
+
+      // WHEN/THEN
+      expect(() => {
+        cluster.addRotationSingleUser();
+      }).toThrow('Cannot add rotation when `manageMasterUserPassword` is enabled. Amazon DocumentDB automatically rotates the master password when it manages the secret.');
+    });
+
+    test('fails when addRotationMultiUser is called with manageMasterUserPassword enabled', () => {
+      // GIVEN
+      const stack = testStack();
+      const vpc = new ec2.Vpc(stack, 'VPC');
+      const cluster = new DatabaseCluster(stack, 'Database', {
+        manageMasterUserPassword: true,
+        masterUser: {
+          username: 'admin',
+        },
+        instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE2, ec2.InstanceSize.SMALL),
+        vpc,
+      });
+      const userSecret = new DatabaseSecret(stack, 'UserSecret', { username: 'myuser' });
+
+      // WHEN/THEN
+      expect(() => {
+        cluster.addRotationMultiUser('MyUser', { secret: userSecret });
+      }).toThrow('Cannot add rotation when `manageMasterUserPassword` is enabled. Amazon DocumentDB automatically rotates the master password when it manages the secret.');
+    });
+  });
 });
 
 function testStack() {

@@ -1,0 +1,14 @@
+{
+  "version": "54.0.0",
+  "testCases": {
+    "launchtemplate-volume-initialization-rate-integ/DefaultTest": {
+      "stacks": [
+        "launchtemplate-volume-initialization-rate-stack"
+      ],
+      "assertionStack": "launchtemplate-volume-initialization-rate-integ/DefaultTest/DeployAssert",
+      "assertionStackName": "launchtemplatevolumeinitializationrateintegDefaultTestDeployAssertEAC51340"
+    }
+  },
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
+}

@@ -2628,6 +2628,26 @@
       "UNCOMPRESSED"
     ]
   },
+  "aws-cdk/packages/aws-cdk-lib/aws-kinesisfirehose/lib/datadog.ts": {
+    "DatadogEndpoint": [
+      "LOGS_US1",
+      "LOGS_US3",
+      "LOGS_US5",
+      "LOGS_AP1",
+      "LOGS_EU",
+      "LOGS_GOV",
+      "METRICS_US",
+      "METRICS_US5",
+      "METRICS_AP1",
+      "METRICS_EU",
+      "CONFIGURATION_US1",
+      "CONFIGURATION_US3",
+      "CONFIGURATION_US5",
+      "CONFIGURATION_AP1",
+      "CONFIGURATION_EU",
+      "CONFIGURATION_US_GOV"
+    ]
+  },
   "aws-cdk/packages/aws-cdk-lib/aws-kinesisfirehose/lib/record-format/input.ts": {
     "TimestampParser": [
       "EPOCH_MILLIS"

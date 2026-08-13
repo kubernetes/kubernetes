@@ -1853,6 +1853,10 @@ export const AWS_CDK_ENUMS: { [key: string]: any } = {
     "JWT",
     "REQUEST"
   ],
+  "HttpBackupMode": [
+    "FailedDataOnly",
+    "AllData"
+  ],
   "HttpCodeElb": [
     "HTTPCode_ELB_3XX_Count",
     "HTTPCode_ELB_4XX_Count",
@@ -1867,6 +1871,10 @@ export const AWS_CDK_ENUMS: { [key: string]: any } = {
     "HTTPCode_Target_3XX_Count",
     "HTTPCode_Target_4XX_Count",
     "HTTPCode_Target_5XX_Count"
+  ],
+  "HttpCompression": [
+    "GZIP",
+    "NONE"
   ],
   "HttpConnectionType": [
     "VPC_LINK",
@@ -4173,6 +4181,13 @@ export const AWS_CDK_ENUMS: { [key: string]: any } = {
     "gp3",
     "io1",
     "io2"
+  ],
+  "StreamDeliveryContentLevel": [
+    "METADATA_ONLY",
+    "FULL_CONTENT"
+  ],
+  "StreamDeliveryContentType": [
+    "MEMORY_RECORDS"
   ],
   "StreamEncryption": [
     "NONE",

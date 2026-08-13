@@ -330,7 +330,7 @@ test('Router input name validation - invalid characters', () => {
         protocol: RouterInputProtocol.rtp({ port: 5000 }),
       }),
     });
-  }).toThrow('Router input name must contain only alphanumeric characters and hyphens');
+  }).toThrow('Router input name must contain only alphanumeric characters, hyphens, and underscores');
 });
 
 describe('maximum bitrate validation', () => {

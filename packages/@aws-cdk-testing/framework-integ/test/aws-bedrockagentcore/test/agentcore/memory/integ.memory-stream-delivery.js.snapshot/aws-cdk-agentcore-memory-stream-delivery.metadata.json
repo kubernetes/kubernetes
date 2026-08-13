@@ -1,0 +1,272 @@
+{
+  "/aws-cdk-agentcore-memory-stream-delivery/MemoryEventStream": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "encryption": "MANAGED"
+      }
+    }
+  ],
+  "/aws-cdk-agentcore-memory-stream-delivery/MemoryWithStreamDelivery": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-agentcore-memory-stream-delivery/MetadataEventStream": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "encryption": "MANAGED"
+      }
+    }
+  ],
+  "/aws-cdk-agentcore-memory-stream-delivery/MemoryWithMetadataOnlyStreamDelivery": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-agentcore-memory-stream-delivery/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/aws-cdk-agentcore-memory-stream-delivery/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/aws-cdk-agentcore-memory-stream-delivery/MemoryEventStream/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MemoryEventStream982A05ED"
+    }
+  ],
+  "/aws-cdk-agentcore-memory-stream-delivery/MemoryWithStreamDelivery/ServiceRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        }
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-agentcore-memory-stream-delivery/MemoryWithStreamDelivery/Memory": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MemoryWithStreamDeliveryMemoryE85ED633"
+    }
+  ],
+  "/aws-cdk-agentcore-memory-stream-delivery/MetadataEventStream/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MetadataEventStream1F94DDBA"
+    }
+  ],
+  "/aws-cdk-agentcore-memory-stream-delivery/MemoryWithMetadataOnlyStreamDelivery/ServiceRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        }
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-agentcore-memory-stream-delivery/MemoryWithMetadataOnlyStreamDelivery/Memory": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MemoryWithMetadataOnlyStreamDeliveryMemory89060772"
+    }
+  ],
+  "/aws-cdk-agentcore-memory-stream-delivery/Exports/Output{\"Fn::GetAtt\":[\"MemoryWithStreamDeliveryMemoryE85ED633\",\"MemoryId\"]}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputFnGetAttMemoryWithStreamDeliveryMemoryE85ED633MemoryIdAD90132C"
+    }
+  ],
+  "/aws-cdk-agentcore-memory-stream-delivery/Exports/Output{\"Fn::GetAtt\":[\"MemoryWithMetadataOnlyStreamDeliveryMemory89060772\",\"MemoryId\"]}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputFnGetAttMemoryWithMetadataOnlyStreamDeliveryMemory89060772MemoryIdCF3BE663"
+    }
+  ],
+  "/aws-cdk-agentcore-memory-stream-delivery/MemoryWithStreamDelivery/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MemoryWithStreamDeliveryServiceRole890B7A55"
+    }
+  ],
+  "/aws-cdk-agentcore-memory-stream-delivery/MemoryWithStreamDelivery/ServiceRole/DefaultPolicy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-agentcore-memory-stream-delivery/MemoryWithMetadataOnlyStreamDelivery/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MemoryWithMetadataOnlyStreamDeliveryServiceRoleF96B730C"
+    }
+  ],
+  "/aws-cdk-agentcore-memory-stream-delivery/MemoryWithMetadataOnlyStreamDelivery/ServiceRole/DefaultPolicy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-agentcore-memory-stream-delivery/MemoryWithStreamDelivery/ServiceRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MemoryWithStreamDeliveryServiceRoleDefaultPolicy0FFA2F76"
+    }
+  ],
+  "/aws-cdk-agentcore-memory-stream-delivery/MemoryWithMetadataOnlyStreamDelivery/ServiceRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MemoryWithMetadataOnlyStreamDeliveryServiceRoleDefaultPolicyD1780D99"
+    }
+  ]
+}

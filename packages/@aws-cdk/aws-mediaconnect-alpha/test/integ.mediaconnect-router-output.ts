@@ -23,7 +23,7 @@ const networkInterface = new RouterNetworkInterface(stack, 'network', {
 
 // Test 1: Standard RTP Output
 new RouterOutput(stack, 'rtpOutput', {
-  routerOutputName: 'test-rtp-output',
+  routerOutputName: 'test_rtp_output',
   maximumBitrate: cdk.Bitrate.mbps(10),
   routingScope: RoutingScope.GLOBAL,
   tier: RouterOutputTier.OUTPUT_100,

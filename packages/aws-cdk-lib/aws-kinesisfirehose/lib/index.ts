@@ -12,6 +12,8 @@ export * from './processors/record-deaggregation-processor';
 export * from './common';
 export * from './s3-bucket';
 export * from './logging-config';
+export * from './datadog';
+export * from './http-endpoint';
 export * from './record-format';
 
 // AWS::KinesisFirehose CloudFormation Resources:

@@ -401,6 +401,16 @@ const alarmRule = cloudwatch.AlarmRule.anyOf(
       alarm3,
     ),
     cloudwatch.AlarmRule.not(cloudwatch.AlarmRule.fromAlarm(alarm4, cloudwatch.AlarmState.INSUFFICIENT_DATA)),
+    // AT_LEAST with count: at least 2 of these alarms must be in ALARM state
+    cloudwatch.AlarmRule.atLeast(cloudwatch.AlarmState.ALARM, {
+      operands: [alarm1, alarm2, alarm3],
+      threshold: cloudwatch.AtLeastThreshold.count(2),
+    }),
+    // AT_LEAST with percentage and NOT: at least 60% must NOT be in OK state
+    cloudwatch.AlarmRule.atLeastNot(cloudwatch.AlarmState.OK, {
+      operands: [alarm1, alarm2, alarm3],
+      threshold: cloudwatch.AtLeastThreshold.percentage(60),
+    }),
   ),
   cloudwatch.AlarmRule.fromBoolean(false),
 );

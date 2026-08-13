@@ -70,7 +70,7 @@ const ebsEnv = new elasticbeanstalk.CfnEnvironment(stack, 'Environment', {
   solutionStackName: SOLUTION_STACK_NAME.NODEJS_22,
   optionSettings,
 });
-ebsEnv.addDependency(ebsApp);
+ebsEnv.addResourceDependency(ebsApp);
 
 const getEnvironmentUrl = new custom.AwsCustomResource(stack, 'GetEnvironmentUrl', {
   onCreate: {

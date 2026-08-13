@@ -63,7 +63,7 @@ const vpcInterface = VpcInterface.define({
 });
 
 const flow = new Flow(stack, 'Flow', {
-  flowName: 'outputs-integ-flow',
+  flowName: 'outputs_integ_flow',
   vpcInterfaces: [vpcInterface],
   source: SourceConfiguration.rtp({
     flowSourceName: 'ingest',

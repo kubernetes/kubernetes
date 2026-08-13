@@ -133,3 +133,18 @@ test('can specify a physical name', () => {
     Name: 'MySecurityConfiguration',
   });
 });
+
+test('removalPolicy can be overridden to DESTROY', () => {
+  const stack = new cdk.Stack();
+  new glue.SecurityConfiguration(stack, 'SecurityConfiguration', {
+    cloudWatchEncryption: {
+      mode: glue.CloudWatchEncryptionMode.KMS,
+    },
+    removalPolicy: cdk.RemovalPolicy.DESTROY,
+  });
+
+  Template.fromStack(stack).hasResource('AWS::Glue::SecurityConfiguration', {
+    DeletionPolicy: 'Delete',
+    UpdateReplacePolicy: 'Delete',
+  });
+});
