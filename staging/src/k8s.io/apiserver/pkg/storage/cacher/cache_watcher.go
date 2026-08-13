@@ -19,6 +19,7 @@ package cacher
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -361,7 +362,31 @@ func getMutableObject(object runtime.Object) runtime.Object {
 		// any of its fields.
 		return object
 	}
+	if shallow, ok := shallowCopyObject(object); ok {
+		return shallow
+	}
 	return object.DeepCopyObject()
+}
+
+// shallowCopyObject copies the top-level struct of object, sharing everything
+// reachable from it through a pointer, slice or map, and reports whether such
+// a copy could be made.
+//
+// The caller only writes TypeMeta, which encoding sets on the object it is
+// given, and resourceVersion for DELETE events. Neither lives behind a
+// pointer, so sharing the rest is safe. runtime.Unstructured is refused
+// because its fields live behind a map the copy would share.
+func shallowCopyObject(object runtime.Object) (runtime.Object, bool) {
+	if _, ok := object.(runtime.Unstructured); ok {
+		return nil, false
+	}
+	value := reflect.ValueOf(object)
+	if value.Kind() != reflect.Pointer || value.Elem().Kind() != reflect.Struct {
+		return nil, false
+	}
+	copied := reflect.New(value.Type().Elem())
+	copied.Elem().Set(value.Elem())
+	return copied.Interface().(runtime.Object), true
 }
 
 func updateResourceVersion(object runtime.Object, versioner storage.Versioner, resourceVersion uint64) {
