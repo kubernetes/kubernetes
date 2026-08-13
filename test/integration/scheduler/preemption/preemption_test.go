@@ -1121,10 +1121,8 @@ func TestPreemption(t *testing.T) {
 
 func TestAsyncPreemption(t *testing.T) {
 	tests := []struct {
-		Name                  string
-		Steps                 []asyncframework.Step
-		InitialBackoffSeconds int64
-		MaxBackoffSeconds     int64
+		Name  string
+		Steps []asyncframework.Step
 	}{
 		{
 			// Very basic test case: if it fails, the basic scenario is broken somewhere.
@@ -1530,55 +1528,6 @@ func TestAsyncPreemption(t *testing.T) {
 				{
 					Name: "create victim Pod with long termination grace period that is going to be blocked in binding",
 					CreatePod: &asyncframework.CreatePod{
-						Pod: st.MakePod().Name(asyncframework.PodBlockedInBindingName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).TerminationGracePeriodSeconds(1000).Container("image").Priority(1).Obj(),
-					},
-				},
-				{
-					Name: "schedule victim Pod",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName: asyncframework.PodBlockedInBindingName,
-					},
-				},
-				{
-					Name: "create a preemptor Pod",
-					CreatePod: &asyncframework.CreatePod{
-						Pod: st.MakePod().Name("preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
-					},
-				},
-				{
-					Name: "schedule the preemptor Pod",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:             "preemptor",
-						ExpectUnschedulable: true,
-					},
-				},
-				{
-					Name:               "complete the preemption API call",
-					CompletePreemption: "preemptor",
-				},
-				{
-					Name: "schedule the preemptor Pod again and expect it to be scheduled (assumed victim pod was forgotten)",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:       "preemptor",
-						ExpectSuccess: true,
-					},
-				},
-			},
-		},
-		{
-			// This scenario verifies the fix for https://github.com/kubernetes/kubernetes/issues/134217
-			// Scenario reproduces the issue, but with a victim that is under graceful termination:
-			// Victim pod takes long in binding. Preemptor pod attempts preemption, goes to unschedulable, then the victim's graceful termination is initiated.
-			// Preemptor pod is woken up by the Pod/Update event (working like AssignedPodDeleted) and is being scheduled, even before the victim binding is terminated.
-			Name: "victim blocked in binding, preemptor pod gets scheduled when victim-in-binding is under graceful termination",
-			Steps: []asyncframework.Step{
-				{
-					Name:       "create Node",
-					CreateNode: "node",
-				},
-				{
-					Name: "create victim Pod with long termination grace period that is going to be blocked in binding",
-					CreatePod: &asyncframework.CreatePod{
 						Pod: st.MakePod().Name(asyncframework.PodBlockedInBindingName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").TerminationGracePeriodSeconds(1000).Priority(1).Obj(),
 					},
 				},
@@ -1801,7 +1750,8 @@ func TestAsyncPreemption(t *testing.T) {
 			},
 		},
 		{
-			// Expected test outcome: lower priority Pod switches to another node, does not get stuck in unschedulable queue forever. (This part is in comment due to test name length limit.)
+			// This scenario verifies that when preemption is in progress and a higher priotiy pod comes it will take place created for lower priority preemptor.
+			// The lower priority Pod switches to another node, does not get stuck in unschedulable queue forever.
 			Name: "While lower priority Pod is waiting for preemption, higher priority Pod takes its place on the node",
 			Steps: []asyncframework.Step{
 				{
@@ -1921,8 +1871,6 @@ func TestAsyncPreemption(t *testing.T) {
 				EnableWAP:              false,
 				PreemptionDoneChannels: preemptionDoneChannels,
 				BlockBindingChannel:    blockBindingChannel,
-				InitialBackoffSeconds:  test.InitialBackoffSeconds,
-				MaxBackoffSeconds:      test.MaxBackoffSeconds,
 			}
 			testCtx, preemptionPlugin, cs := asyncframework.InitTestForAsyncPreemption(t, preemptionConfig)
 

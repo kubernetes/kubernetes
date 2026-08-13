@@ -96,6 +96,7 @@ type SchedulePod struct {
 	PodName             string
 	ExpectSuccess       bool
 	ExpectUnschedulable bool
+	ExpectInQueue       bool
 }
 
 // Step represents an action in the async preemption test.
@@ -284,6 +285,7 @@ func initReservingPlugin(registry frameworkruntime.Registry) (string, error) {
 		return &reservingPlugin{
 			name:               reservingPluginName,
 			nameOfPodToReserve: ReservingPodName,
+			fh:                 fh,
 		}, nil
 	})
 	return reservingPluginName, err
@@ -452,6 +454,12 @@ func schedulePod(t *testing.T, testCtx *testutils.TestContext, schedulePodStep *
 		}); err != nil {
 			t.Fatalf("Expected the pod %s to be in the unschedulable queue after the scheduling attempt", schedulePodStep.PodName)
 		}
+	} else if schedulePodStep.ExpectInQueue {
+		if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+			return podInQueue(t, testCtx.Scheduler.SchedulingQueue, schedulePodStep.PodName), nil
+		}); err != nil {
+			t.Fatalf("Expected the pod %s to be in the queue after the scheduling attempt", schedulePodStep.PodName)
+		}
 	}
 }
 
@@ -510,6 +518,18 @@ func PodInUnschedulablePodPool(t *testing.T, queue queue.SchedulingQueue, podNam
 		}
 	}
 
+	pendingPods, _ := queue.PendingPods()
+	for _, pod := range pendingPods {
+		if pod.Name == podName {
+			return true
+		}
+	}
+
+	return false
+}
+
+func podInQueue(t *testing.T, queue queue.SchedulingQueue, podName string) bool {
+	t.Helper()
 	pendingPods, _ := queue.PendingPods()
 	for _, pod := range pendingPods {
 		if pod.Name == podName {
@@ -598,6 +618,7 @@ type reservingPlugin struct {
 	name               string
 	nameOfPodToReserve string
 	reserved           bool
+	fh                 fwk.Handle
 }
 
 func (rp *reservingPlugin) Name() string {
@@ -631,6 +652,26 @@ func (rp *reservingPlugin) PreFilter(ctx context.Context, state fwk.CycleState, 
 }
 
 func (rp *reservingPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	if state.IsPodGroupSchedulingCycle() {
+		// check if it is a preemption simulation
+		if err := rp.fh.MutableSnapshotSharedLister().StartMutations(); err != nil {
+			nodes, _ := rp.fh.MutableSnapshotSharedLister().NodeInfos().List()
+			for _, n := range nodes {
+				for _, p := range n.GetPods() {
+					// check if pod with reservation is not a victim, if it is not, return "resource are reserved"
+					if strings.Contains(p.GetPod().Name, rp.nameOfPodToReserve) {
+						return fwk.NewStatus(fwk.Unschedulable, "resources are reserved")
+					}
+				}
+			}
+			// this is simulation and pod with reservation is a victim, so resources are available
+			return nil
+		} else {
+			if err := rp.fh.MutableSnapshotSharedLister().EndMutations(); err != nil {
+				return fwk.AsStatus(err)
+			}
+		}
+	}
 	s, err := state.Read(reservingPluginStateKey)
 	if err != nil {
 		return fwk.AsStatus(err)

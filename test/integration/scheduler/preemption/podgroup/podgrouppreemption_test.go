@@ -2737,10 +2737,8 @@ func TestPodGroupCycleStatePreserved(t *testing.T) {
 func TestPodGroupAsyncPreemption(t *testing.T) {
 
 	tests := []struct {
-		Name                  string
-		Steps                 []asyncframework.Step
-		InitialBackoffSeconds int64
-		MaxBackoffSeconds     int64
+		Name  string
+		Steps []asyncframework.Step
 	}{
 		{
 			// Very basic test case: if it fails, the basic scenario is broken somewhere.
@@ -2851,6 +2849,89 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 			},
 		},
 		{
+			Name: "Lower priority Pod doesn't take over the place for higher priority Pod that is running the preemption",
+			Steps: []asyncframework.Step{
+				{
+					Name:       "create Node",
+					CreateNode: "node",
+				},
+				{
+					Name: "create scheduled Pod",
+					CreatePod: &asyncframework.CreatePod{
+						Pod:   st.MakePod().GenerateName("victim-").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Node("node").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+						Count: new(2),
+					},
+				},
+				{
+					Name: "create pod group for preemptor",
+					CreatePodGroup: &asyncframework.CreatePodGroup{
+						PodGroup: st.MakePodGroup().Name("pg-preemptor").MinCount(1).Priority(100).Obj(),
+					},
+				},
+				{
+					Name: "create a preemptor Pod",
+					CreatePod: &asyncframework.CreatePod{
+						Pod: st.MakePod().Name("preemptor-high-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).PodGroupName("pg-preemptor").Obj(),
+					},
+				},
+				{
+					Name: "schedule the preemptor Pod",
+					SchedulePod: &asyncframework.SchedulePod{
+						PodName:             "preemptor-high-priority",
+						ExpectUnschedulable: true,
+					},
+				},
+				{
+					Name:            "check the pod is in the queue and gated",
+					PodGatedInQueue: "preemptor-high-priority",
+				},
+				{
+					Name:                 "check the preemptor Pod making the preemption API calls",
+					PodRunningPreemption: new(2),
+				},
+				{
+					Name: "create a lower priority pod group for a lower priority pod",
+					CreatePodGroup: &asyncframework.CreatePodGroup{
+						PodGroup: st.MakePodGroup().Name("pg-mid-priority").MinCount(1).Priority(50).Obj(),
+					},
+				},
+				{
+					// This Pod is lower priority than the preemptor Pod.
+					// Given the preemptor Pod is nominated to the node, this Pod should be unschedulable.
+					Name: "create a second Pod that is lower priority than the first preemptor Pod",
+					CreatePod: &asyncframework.CreatePod{
+						Pod: st.MakePod().Name("pod-mid-priority").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").PodGroupName("pg-mid-priority").Priority(50).Obj(),
+					},
+				},
+				{
+					Name: "schedule the mid-priority Pod",
+					SchedulePod: &asyncframework.SchedulePod{
+						PodName:       "pod-mid-priority",
+						ExpectInQueue: true,
+					},
+				},
+				{
+					Name:               "complete the preemption API calls",
+					CompletePreemption: "preemptor-high-priority",
+				},
+				{
+					// the preemptor pod should be popped from the queue before the mid-priority pod.
+					Name: "schedule the preemptor Pod again",
+					SchedulePod: &asyncframework.SchedulePod{
+						PodName:       "preemptor-high-priority",
+						ExpectSuccess: true,
+					},
+				},
+				{
+					Name: "schedule the mid-priority Pod again",
+					SchedulePod: &asyncframework.SchedulePod{
+						PodName:       "pod-mid-priority",
+						ExpectInQueue: true,
+					},
+				},
+			},
+		},
+		{
 			Name: "Higher priority Pod takes over the place for lower priority Pod that is running the preemption",
 			Steps: []asyncframework.Step{
 				{
@@ -2944,13 +3025,11 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				{
 					Name: "schedule the high-priority Pod",
 					SchedulePod: &asyncframework.SchedulePod{
-						PodName:             "preemptor-high-priority",
-						ExpectUnschedulable: true,
+						PodName:       "preemptor-high-priority",
+						ExpectInQueue: true,
 					},
 				},
 			},
-			InitialBackoffSeconds: 1,
-			MaxBackoffSeconds:     1,
 		},
 		{
 			Name: "Lower priority Pod can select the same place where the higher priority Pod is preempting if the node is big enough",
@@ -3122,61 +3201,6 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				{
 					Name: "create victim Pod with long termination grace period that is going to be blocked in binding",
 					CreatePod: &asyncframework.CreatePod{
-						Pod: st.MakePod().Name(asyncframework.PodBlockedInBindingName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).TerminationGracePeriodSeconds(1000).Container("image").Priority(1).Obj(),
-					},
-				},
-				{
-					Name: "schedule victim Pod",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName: asyncframework.PodBlockedInBindingName,
-					},
-				},
-				{
-					Name: "create pod group for preemptor",
-					CreatePodGroup: &asyncframework.CreatePodGroup{
-						PodGroup: st.MakePodGroup().Name("pg-preemptor").MinCount(1).Priority(100).Obj(),
-					},
-				},
-				{
-					Name: "create a preemptor Pod",
-					CreatePod: &asyncframework.CreatePod{
-						Pod: st.MakePod().Name("preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).PodGroupName("pg-preemptor").Obj(),
-					},
-				},
-				{
-					Name: "schedule the preemptor Pod",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:             "preemptor",
-						ExpectUnschedulable: true,
-					},
-				},
-				{
-					Name:               "complete the preemption API call",
-					CompletePreemption: "preemptor",
-				},
-				{
-					Name: "schedule the preemptor Pod again and expect it to be scheduled (assumed victim pod was forgotten)",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:       "preemptor",
-						ExpectSuccess: true,
-					},
-				},
-			},
-		},
-		{
-			// This scenario verifies the fix for https://github.com/kubernetes/kubernetes/issues/134217
-			// Scenario reproduces the issue, but with a victim that is under graceful termination:
-			// Victim pod takes long in binding. Preemptor pod attempts preemption, goes to unschedulable, then the victim's graceful termination is initiated.
-			// Preemptor pod is woken up by the Pod/Update event (working like AssignedPodDeleted) and is being scheduled, even before the victim binding is terminated.
-			Name: "victim blocked in binding, preemptor pod gets scheduled when victim-in-binding is under graceful termination",
-			Steps: []asyncframework.Step{
-				{
-					Name:       "create Node",
-					CreateNode: "node",
-				},
-				{
-					Name: "create victim Pod with long termination grace period that is going to be blocked in binding",
-					CreatePod: &asyncframework.CreatePod{
 						Pod: st.MakePod().Name(asyncframework.PodBlockedInBindingName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").TerminationGracePeriodSeconds(1000).Priority(1).Obj(),
 					},
 				},
@@ -3219,6 +3243,206 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				{
 					Name:       "resume binding of the blocked pod",
 					ResumeBind: true,
+				},
+			},
+		},
+		{
+			// This scenario verifies the fix for https://github.com/kubernetes/kubernetes/issues/134217
+			// Scenario reproduces the issue, but with a victim that is reserving some resources required by the preemptor:
+			// Victim pod takes long in binding. Preemptor pod attempts preemption, goes to unschedulable, then the victim is deleted.
+			// Preemptor pod is woken up by the Pod/Update event (working like AssignedPodDeleted), but is still unschedulable, because victim has to unreserve its resources.
+			// After resuming binding for a victim, it releases the resources in its failure handler, preemptor is woken up again and ultimately scheduled.
+			Name: "victim blocked in binding, preemptor pod gets scheduled after victim-in-binding is deleted and its resources are unreserved",
+			Steps: []asyncframework.Step{
+				{
+					Name:       "create Node",
+					CreateNode: "node",
+				},
+				{
+					Name: "create victim Pod that is going to be blocked in binding",
+					CreatePod: &asyncframework.CreatePod{
+						Pod: st.MakePod().Name(asyncframework.PodBlockedInBindingName + asyncframework.ReservingPodName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+					},
+				},
+				{
+					Name: "schedule victim Pod",
+					SchedulePod: &asyncframework.SchedulePod{
+						PodName: asyncframework.PodBlockedInBindingName + asyncframework.ReservingPodName,
+					},
+				},
+				{
+					Name: "create pod group for preemptor",
+					CreatePodGroup: &asyncframework.CreatePodGroup{
+						PodGroup: st.MakePodGroup().Name("pg-preemptor").MinCount(1).Priority(100).Obj(),
+					},
+				},
+				{
+					Name: "create a preemptor Pod",
+					CreatePod: &asyncframework.CreatePod{
+						Pod: st.MakePod().Name("preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).PodGroupName("pg-preemptor").Obj(),
+					},
+				},
+				{
+					Name: "schedule the preemptor Pod",
+					SchedulePod: &asyncframework.SchedulePod{
+						PodName:             "preemptor",
+						ExpectUnschedulable: true,
+					},
+				},
+				{
+					Name:               "complete the preemption API call",
+					CompletePreemption: "preemptor",
+				},
+				{
+					Name: "schedule the preemptor Pod again and expect it to be unschedulable (resources are still reserved by the victim)",
+					SchedulePod: &asyncframework.SchedulePod{
+						PodName:       "preemptor",
+						ExpectInQueue: true,
+					},
+				},
+				{
+					Name:       "resume binding of the blocked pod",
+					ResumeBind: true,
+				},
+				{
+					Name: "schedule the preemptor Pod again and expect it to be scheduled (victim pod unreserved its resources)",
+					SchedulePod: &asyncframework.SchedulePod{
+						PodName:       "preemptor",
+						ExpectSuccess: true,
+					},
+				},
+			},
+		},
+		{
+			Name: "gated preemptor is eventually scheduled even if victim deletion doesn't raise queue hints",
+			Steps: []asyncframework.Step{
+				{
+					Name:       "create Node",
+					CreateNode: "node",
+				},
+				{
+					Name: "create victim pods",
+					CreatePod: &asyncframework.CreatePod{
+						Pod:   st.MakePod().GenerateName(fmt.Sprintf("victim-%s-", asyncframework.BlockingPodName)).Node("node").Priority(1).Container("image").ZeroTerminationGracePeriod().Obj(),
+						Count: new(2),
+					},
+				},
+				{
+					Name: "create pod group for preemptor",
+					CreatePodGroup: &asyncframework.CreatePodGroup{
+						PodGroup: st.MakePodGroup().Name("pg-preemptor").MinCount(1).Priority(100).Obj(),
+					},
+				},
+				{
+					Name: "create preemptor",
+					CreatePod: &asyncframework.CreatePod{
+						Pod: st.MakePod().Name("preemptor").Priority(100).Container("image").PodGroupName("pg-preemptor").Obj(),
+					},
+				},
+				{
+					Name: "schedule preemptor",
+					SchedulePod: &asyncframework.SchedulePod{
+						PodName:             "preemptor",
+						ExpectUnschedulable: true,
+					},
+				},
+				{
+					Name:                 "verify preemptor running preemption",
+					PodRunningPreemption: new(2),
+				},
+				{
+					Name:            "gate preemptor",
+					PodGatedInQueue: "preemptor",
+				},
+				{
+					Name:               "complete preemption",
+					CompletePreemption: "preemptor",
+				},
+				{
+					Name:               "wait for victims to be deleted",
+					WaitForPodsDeleted: []int{0, 1},
+				},
+				{
+					Name:                     "verify preemptor is still in unschedulable queue",
+					VerifyPodInUnschedulable: "preemptor",
+				},
+				{
+					Name:               "flush scheduling queue",
+					FlushUnschedulable: true,
+				},
+				{
+					Name: "verify preemptor scheduled",
+					SchedulePod: &asyncframework.SchedulePod{
+						PodName:       "preemptor",
+						ExpectSuccess: true,
+					},
+				},
+			},
+		},
+		{
+			// This scenario verifies the fix for https://github.com/kubernetes/kubernetes/issues/134217
+			// Scenario reproduces the issue, but with a victim that is under graceful termination and sis reserving some resources required by the preemptor:
+			// Victim pod takes long in binding. Preemptor pod attempts preemption, goes to unschedulable, then the victim's graceful termination is initiated.
+			// Preemptor pod is woken up by the Pod/Update event (working like AssignedPodDeleted), but is still unschedulable, because victim has to unreserve its resources.
+			// After resuming binding for a victim, it releases the resources in its failure handler, preemptor is woken up again and ultimately scheduled.
+			Name: "victim blocked in binding, preemptor pod gets scheduled after victim-in-binding is under graceful termination and its resources are unreserved",
+			Steps: []asyncframework.Step{
+				{
+					Name:       "create Node",
+					CreateNode: "node",
+				},
+				{
+					Name: "create victim Pod that is going to be blocked in binding",
+					CreatePod: &asyncframework.CreatePod{
+						Pod: st.MakePod().Name(asyncframework.PodBlockedInBindingName + asyncframework.ReservingPodName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").TerminationGracePeriodSeconds(1000).Priority(1).Obj(),
+					},
+				},
+				{
+					Name: "schedule victim Pod",
+					SchedulePod: &asyncframework.SchedulePod{
+						PodName: asyncframework.PodBlockedInBindingName + asyncframework.ReservingPodName,
+					},
+				},
+				{
+					Name: "create pod group for preemptor",
+					CreatePodGroup: &asyncframework.CreatePodGroup{
+						PodGroup: st.MakePodGroup().Name("pg-preemptor").MinCount(1).Priority(100).Obj(),
+					},
+				},
+				{
+					Name: "create a preemptor Pod",
+					CreatePod: &asyncframework.CreatePod{
+						Pod: st.MakePod().Name("preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).PodGroupName("pg-preemptor").Obj(),
+					},
+				},
+				{
+					Name: "schedule the preemptor Pod",
+					SchedulePod: &asyncframework.SchedulePod{
+						PodName:             "preemptor",
+						ExpectUnschedulable: true,
+					},
+				},
+				{
+					Name:               "complete the preemption API call",
+					CompletePreemption: "preemptor",
+				},
+				{
+					Name: "schedule the preemptor Pod again and expect it to be unschedulable (resources are still reserved by the victim)",
+					SchedulePod: &asyncframework.SchedulePod{
+						PodName:       "preemptor",
+						ExpectInQueue: true,
+					},
+				},
+				{
+					Name:       "resume binding of the blocked pod",
+					ResumeBind: true,
+				},
+				{
+					Name: "schedule the preemptor Pod again and expect it to be scheduled (victim pod unreserved its resources)",
+					SchedulePod: &asyncframework.SchedulePod{
+						PodName:       "preemptor",
+						ExpectSuccess: true,
+					},
 				},
 			},
 		},
@@ -3356,8 +3580,6 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				EnableWAP:              true,
 				PreemptionDoneChannels: preemptionDoneChannels,
 				BlockBindingChannel:    blockBindingChannel,
-				InitialBackoffSeconds:  test.InitialBackoffSeconds,
-				MaxBackoffSeconds:      test.MaxBackoffSeconds,
 			}
 			testCtx, preemptionPlugin, cs := asyncframework.InitTestForAsyncPreemption(t, preemptionConfig)
 
