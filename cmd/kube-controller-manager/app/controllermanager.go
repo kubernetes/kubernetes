@@ -48,6 +48,7 @@ import (
 	"k8s.io/apiserver/pkg/server/signals"
 	"k8s.io/apiserver/pkg/server/statusz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	clientgofeaturegate "k8s.io/client-go/features"
 	"k8s.io/client-go/informers"
@@ -92,7 +93,8 @@ import (
 	garbagecollector "k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
-	resourceclient "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
+	metricsv1client "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1"
+	metricsv1beta1client "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 	"k8s.io/metrics/pkg/client/custom_metrics"
 	"k8s.io/metrics/pkg/client/external_metrics"
 )
@@ -550,25 +552,35 @@ func NewApiextensionsClient(builder clientbuilder.TypedClientBuilder, name strin
 	return apiextensionsclientset.NewForConfig(config)
 }
 
-// NewMetricsClient creates a RESTMetricsClient for the named controller.
-func (c ControllerContext) NewMetricsClient(name string, apiVersionsGetter custom_metrics.AvailableAPIsGetter) (metrics.MetricsClient, error) {
+// NewMetricsClient creates a RESTMetricsClient and the resource metrics getter
+// used to renegotiate the preferred resource metrics API version.
+func (c ControllerContext) NewMetricsClient(name string, apiVersionsGetter custom_metrics.AvailableAPIsGetter, resourceDiscovery discovery.DiscoveryInterface) (metrics.MetricsClient, metrics.VersionedPodMetricsGetter, error) {
 	clientConfig, err := clientConfig(c.ClientBuilder, name)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	resourceClient, err := resourceclient.NewForConfig(clientConfig)
+	resourceClientV1, err := metricsv1client.NewForConfig(clientConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to init the resource client for %s: %w", name, err)
+		return nil, nil, fmt.Errorf("failed to init the v1 resource client for %s: %w", name, err)
 	}
+	resourceClientV1beta1, err := metricsv1beta1client.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to init the v1beta1 resource client for %s: %w", name, err)
+	}
+	// The pod metrics getter negotiates the resource metrics API version via
+	// discovery, preferring v1 and falling back to v1beta1 for metrics servers
+	// that don't serve v1 yet.
+	podMetricsGetter := metrics.NewVersionedPodMetricsGetter(resourceClientV1, resourceClientV1beta1, resourceDiscovery)
+
 	externalMetricsClient, err := external_metrics.NewForConfig(clientConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to init the external metrics client for %s: %w", name, err)
+		return nil, nil, fmt.Errorf("failed to init the external metrics client for %s: %w", name, err)
 	}
 	return metrics.NewRESTMetricsClient(
-		resourceClient,
+		podMetricsGetter,
 		custom_metrics.NewForConfig(clientConfig, c.RESTMapper, apiVersionsGetter),
 		externalMetricsClient,
-	), nil
+	), podMetricsGetter, nil
 }
 
 // CreateControllerContext creates a context struct containing references to resources needed by the

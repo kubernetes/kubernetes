@@ -165,7 +165,7 @@ func createHPA(tCtx ktesting.TContext, deployment *appsv1.Deployment, metricSpec
 func startHPAControllerAndWaitForCaches(tCtx ktesting.TContext, clients testClients) {
 	tCtx.Helper()
 
-	metricsClient := metricsclient.NewRESTMetricsClient(clients.metrics.MetricsV1beta1(), nil, clients.externalMetrics)
+	metricsClient := metricsclient.NewRESTMetricsClient(clients.metrics.MetricsV1(), nil, clients.externalMetrics)
 
 	informerSet := informers.NewSharedInformerFactory(tCtx.Client(), 0)
 	controller := podautoscaler.NewHorizontalController(
