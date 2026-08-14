@@ -670,8 +670,6 @@ func (td *typeDiscoverer) verifySupportedType(t *types.Type) error {
 		}
 		elem := util.NativeType(t.Elem)
 		switch elem.Kind {
-		case types.Pointer:
-			return fmt.Errorf("maps of pointers are not supported")
 		case types.Map:
 			return fmt.Errorf("maps of maps are not supported")
 		}
@@ -1289,23 +1287,30 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 			//      need to be executed, but if no fields changed they can be
 			//      skipped).
 			//
-			// For the same reasons, in the specific case of lists of pointers,
+			// For the same reasons, in the specific case of lists and maps of pointers,
 			// we do not emit nil-checks inside type-specific validation
 			// functions.  If we solve for the duplicative ratcheting, then we
 			// should also solve for nil-checks.
 
-			if nt := util.NativeType(fld.childType); nt.Kind == types.Slice && nt.Elem.Kind == types.Pointer {
-				hasFieldValidations := len(fld.fieldValidations.Functions) > 0
-				hasPropagation := fld.node != nil && g.hasValidations(fld.node)
-				hasKeyIterations := len(fld.fieldKeyIterations.Functions) > 0 && hasPropagation
-				hasValIterations := len(fld.fieldValIterations.Functions) > 0 && hasPropagation
-
-				if hasFieldValidations || hasPropagation || hasKeyIterations || hasValIterations {
-					// Prepend the nil-check so it runs before any other
-					// validations. This is important because the other
-					// validations may assume that the slice has no nil values.
-					nilCheck := validators.PtrSliceNoNils(nt.Elem.Elem.Name)
-					fld.fieldValidations.Functions = append([]validators.FunctionGen{nilCheck}, fld.fieldValidations.Functions...)
+			if nt := util.NativeType(fld.childType); nt.Kind == types.Slice || nt.Kind == types.Map {
+				if nt.Elem.Kind == types.Pointer {
+					hasFieldValidations := len(fld.fieldValidations.Functions) > 0
+					hasPropagation := fld.node != nil && g.hasValidations(fld.node)
+					hasKeyIterations := len(fld.fieldKeyIterations.Functions) > 0 && hasPropagation
+					hasValIterations := len(fld.fieldValIterations.Functions) > 0 && hasPropagation
+					if hasFieldValidations || hasPropagation || hasKeyIterations || hasValIterations {
+						// Prepend the nil-check so it runs before any other
+						// validations. This is important because the other
+						// validations may assume that the map or slice has no nil
+						// values.
+						var nilCheck validators.FunctionGen
+						if nt.Kind == types.Slice {
+							nilCheck = validators.PtrSliceNoNils(nt.Elem.Elem.Name)
+						} else {
+							nilCheck = validators.PtrMapNoNils(nt.Key.Name, nt.Elem.Elem.Name)
+						}
+						fld.fieldValidations.Functions = append([]validators.FunctionGen{nilCheck}, fld.fieldValidations.Functions...)
+					}
 				}
 			}
 

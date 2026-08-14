@@ -38,7 +38,17 @@ type Struct struct {
 	// +k8s:eachVal=+k8s:validateFalse="field Struct.MapTypedefField[*]"
 	MapTypedefField map[string]OtherTypedefStruct `json:"mapTypedefField"`
 
-	UnvalidatedMapField map[string]string `json:"UnvalidatedMapField"`
+	UnvalidatedMapField map[string]UnvalidatedStruct `json:"UnvalidatedMapField"`
+
+	// +k8s:validateFalse="field Struct.MapPtrField"
+	// +k8s:eachVal=+k8s:validateFalse="field Struct.MapPtrField[*]"
+	MapPtrField map[string]*OtherStruct `json:"mapPtrField"`
+
+	// +k8s:validateFalse="field Struct.MapPtrTypedefField"
+	// +k8s:eachVal=+k8s:validateFalse="field Struct.MapPtrTypedefField[*]"
+	MapPtrTypedefField map[string]*OtherTypedefStruct `json:"mapPtrTypedefField"`
+
+	UnvalidatedMapPtrField map[string]*UnvalidatedStruct `json:"UnvalidatedMapPtrField"`
 }
 
 // +k8s:validateFalse="type OtherStruct"
@@ -46,3 +56,5 @@ type OtherStruct struct{}
 
 // +k8s:validateFalse="type OtherTypedefStruct"
 type OtherTypedefStruct OtherStruct
+
+type UnvalidatedStruct struct{}
