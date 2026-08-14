@@ -49,8 +49,7 @@
     "@types/babel__traverse": "7.18.2",
     "@smithy/types": "3.5.0",
     "@types/minimatch": "^5.1.2",
-    "tar": "^7.5.7",
-    "@aws-cdk/service-spec-types": "0.0.260"
+    "tar": "^7.5.7"
   },
   "repository": {
     "type": "git",
@@ -181,7 +180,6 @@
     ]
   },
   "dependencies": {
-    "@aws-cdk/service-spec-types": "0.0.260",
     "string-width": "^4.2.3",
     "tar": "^7.5.20"
   },
