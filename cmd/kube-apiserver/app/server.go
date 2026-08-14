@@ -189,6 +189,13 @@ func CreateServerChain(config CompletedConfig) (*aggregatorapiserver.APIAggregat
 		return nil, err
 	}
 	crdAPIEnabled := config.ApiExtensions.GenericConfig.MergedResourceConfig.ResourceEnabled(apiextensionsv1.SchemeGroupVersion.WithResource("customresourcedefinitions"))
+	if crdAPIEnabled && config.kubeAdmissionPluginInitializer != nil {
+		if err := config.kubeAdmissionPluginInitializer.SetCustomResourceDefinitionInformer(
+			apiExtensionsServer.Informers.Apiextensions().V1().CustomResourceDefinitions(),
+		); err != nil {
+			return nil, fmt.Errorf("failed to configure admission paramKind resolver: %w", err)
+		}
+	}
 
 	kubeAPIServer, err := config.KubeAPIs.New(apiExtensionsServer.GenericAPIServer)
 	if err != nil {
@@ -217,6 +224,22 @@ func CreateKubeAPIServerConfig(
 	[]admission.PluginInitializer,
 	error,
 ) {
+	config, serviceResolver, initializers, _, err := createKubeAPIServerConfig(opts, genericConfig, versionedInformers, storageFactory)
+	return config, serviceResolver, initializers, err
+}
+
+func createKubeAPIServerConfig(
+	opts options.CompletedOptions,
+	genericConfig *genericapiserver.Config,
+	versionedInformers clientgoinformers.SharedInformerFactory,
+	storageFactory *serverstorage.DefaultStorageFactory,
+) (
+	*controlplane.Config,
+	aggregatorapiserver.ServiceResolver,
+	[]admission.PluginInitializer,
+	*kubeapiserveradmission.PluginInitializer,
+	error,
+) {
 	// global stuff
 	capabilities.Setup(opts.AllowPrivileged, opts.MaxConnectionBytesPerSec)
 
@@ -224,21 +247,31 @@ func CreateKubeAPIServerConfig(
 	kubeAdmissionConfig := &kubeapiserveradmission.Config{}
 	kubeInitializers, err := kubeAdmissionConfig.New()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create admission plugin initializer: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("failed to create admission plugin initializer: %w", err)
+	}
+	var kubeAdmissionPluginInitializer *kubeapiserveradmission.PluginInitializer
+	for _, initializer := range kubeInitializers {
+		if typedInitializer, ok := initializer.(*kubeapiserveradmission.PluginInitializer); ok {
+			kubeAdmissionPluginInitializer = typedInitializer
+			break
+		}
+	}
+	if kubeAdmissionPluginInitializer == nil {
+		return nil, nil, nil, nil, fmt.Errorf("kube-apiserver admission plugin initializer is missing")
 	}
 
 	endpointSliceGetter, err := proxy.NewEndpointSliceIndexerGetter(versionedInformers.Discovery().V1().EndpointSlices())
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create endpoint slice getter: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("failed to create endpoint slice getter: %w", err)
 	}
 
 	serviceResolver, err := buildServiceResolver(opts.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers, endpointSliceGetter)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error building service resolver: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("error building service resolver: %w", err)
 	}
 	controlplaneConfig, admissionInitializers, err := controlplaneapiserver.CreateConfig(opts.CompletedOptions, genericConfig, versionedInformers, endpointSliceGetter, storageFactory, serviceResolver, kubeInitializers)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	config := &controlplane.Config{
@@ -268,14 +301,14 @@ func CreateKubeAPIServerConfig(
 		networkContext := egressselector.Cluster.AsNetworkContext()
 		dialer, err := config.ControlPlane.Generic.EgressSelector.Lookup(networkContext)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 		c := config.ControlPlane.Extra.ProxyTransport.Clone()
 		c.DialContext = dialer
 		config.ControlPlane.ProxyTransport = c
 	}
 
-	return config, serviceResolver, admissionInitializers, nil
+	return config, serviceResolver, admissionInitializers, kubeAdmissionPluginInitializer, nil
 }
 
 var testServiceResolver webhook.ServiceResolver
