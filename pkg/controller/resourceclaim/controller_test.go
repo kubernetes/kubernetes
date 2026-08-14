@@ -191,6 +191,77 @@ var (
 )
 
 func TestSyncHandler(t *testing.T) { testSyncHandler(ktesting.Init(t)) }
+
+// TestCreateClaimDoesNotMutateTemplate verifies that creating a ResourceClaim
+// from a ResourceClaimTemplate with pre-existing annotations copies the map and
+// leaves the shared informer-cached template unmodified, on both claim paths.
+func TestCreateClaimDoesNotMutateTemplate(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		trigger  runtime.Object
+		key      string
+		features controllerFeatures
+	}{
+		{"pod", testPodWithResource.DeepCopy(), podKey(testPodWithResource), controllerFeatures{}},
+		{"podGroup", testPodGroupWithResource.DeepCopy(), testPodGroupKey, controllerFeatures{GenericWorkload: true, WorkloadResourceClaims: true}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+
+			template := makeTemplate(templateName, testNamespace, nil)
+			template.Spec.ObjectMeta.Annotations = map[string]string{"example.com/color": "blue"}
+
+			fakeKubeClient := createTestClient(tc.trigger, template)
+			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+			podInformer := informerFactory.Core().V1().Pods()
+			podGroupInformer := informerFactory.Scheduling().V1beta1().PodGroups()
+			claimInformer := informerFactory.Resource().V1().ResourceClaims()
+			templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
+			setupMetrics()
+
+			ec, err := newControllerWithFeatures(tCtx.Logger(), fakeKubeClient, podInformer, podGroupInformer, claimInformer, templateInformer, tc.features)
+			if err != nil {
+				tCtx.Fatalf("error creating controller: %v", err)
+			}
+
+			informerFactory.Start(tCtx.Done())
+			defer func() {
+				tCtx.Cancel("stopping informers")
+				informerFactory.Shutdown()
+			}()
+			informerFactory.WaitForCacheSync(tCtx.Done())
+
+			// cachedTemplate is the object the controller reads from the shared informer
+			// cache; snapshot it so any in-place mutation is detectable.
+			cachedTemplate, err := templateInformer.Lister().ResourceClaimTemplates(testNamespace).Get(templateName)
+			if err != nil {
+				tCtx.Fatalf("template not in informer cache: %v", err)
+			}
+			templateBefore := cachedTemplate.DeepCopy()
+
+			if err := ec.syncHandler(tCtx, tc.key); err != nil {
+				tCtx.Fatalf("syncHandler: %v", err)
+			}
+
+			assert.Equal(tCtx, templateBefore, cachedTemplate, "controller must not mutate the shared informer-cached ResourceClaimTemplate")
+			if _, leaked := cachedTemplate.Spec.ObjectMeta.Annotations[resourceapi.PodResourceClaimAnnotation]; leaked {
+				tCtx.Errorf("PodResourceClaimAnnotation leaked into the shared template's annotations")
+			}
+
+			// The generated claim must still carry both the template's annotation and
+			// the controller-added PodResourceClaimAnnotation.
+			claims, err := fakeKubeClient.ResourceV1().ResourceClaims(testNamespace).List(tCtx, metav1.ListOptions{})
+			if err != nil {
+				tCtx.Fatalf("listing claims: %v", err)
+			}
+			if assert.Len(tCtx, claims.Items, 1, "exactly one claim should be created") {
+				created := claims.Items[0]
+				assert.Equal(tCtx, "blue", created.Annotations["example.com/color"], "template annotation should be copied to the claim")
+				assert.Equal(tCtx, podResourceClaimName, created.Annotations[resourceapi.PodResourceClaimAnnotation], "claim should carry the PodResourceClaimAnnotation")
+			}
+		})
+	}
+}
 func testSyncHandler(tCtx ktesting.TContext) {
 	tests := []struct {
 		name                     string
