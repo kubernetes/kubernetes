@@ -63,8 +63,9 @@ export interface PySparkFlexEtlJobProps extends SparkJobProps {
  * Flexible job runs are supported for jobs using AWS Glue version 3.0 or later and G.1X or
  * G.2X worker types but will default to the latest version of Glue (currently Glue 3.0.)
  *
- * Similar to ETL, we’ll enable these features: —enable-metrics, —enable-spark-ui,
- * —enable-continuous-cloudwatch-log
+ * Similar to ETL, we’ll enable these features: --enable-metrics,
+ * --enable-continuous-cloudwatch-log. The Spark UI (--enable-spark-ui) is off by
+ * default; enable it by setting the `sparkUI` prop.
  */
 @propertyInjectable
 export class PySparkFlexEtlJob extends SparkJob {

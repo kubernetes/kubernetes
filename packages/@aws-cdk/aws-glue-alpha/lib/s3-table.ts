@@ -69,7 +69,8 @@ export interface S3TableProps extends TableBaseProps {
    * You can only provide this option if you are not explicitly passing in a bucket.
    *
    * If you choose `SSE-KMS`, you *can* provide an un-managed KMS key with `encryptionKey`.
-   * If you choose `CSE-KMS`, you *must* provide an un-managed KMS key with `encryptionKey`.
+   * If you choose `CSE-KMS`, you *may* provide an un-managed KMS key with `encryptionKey`;
+   * one is created automatically if omitted.
    *
    * @default BucketEncryption.S3_MANAGED
    */
