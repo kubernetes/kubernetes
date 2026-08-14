@@ -87,3 +87,47 @@ test('removalPolicy can be overridden to DESTROY', () => {
     UpdateReplacePolicy: 'Delete',
   });
 });
+
+describe('import', () => {
+  test('fromRulesetName derives the ARN from the name', () => {
+    const stack = new cdk.Stack();
+
+    const imported = glue.DataQualityRuleset.fromRulesetName(stack, 'Imported', 'my_ruleset');
+
+    expect(imported.rulesetName).toEqual('my_ruleset');
+    expect(imported.rulesetArn).toEqual(stack.formatArn({
+      service: 'glue',
+      resource: 'dataqualityruleset',
+      resourceName: 'my_ruleset',
+    }));
+  });
+
+  test('fromRulesetArn extracts the name from the ARN', () => {
+    const stack = new cdk.Stack();
+    const rulesetArn = 'arn:aws:glue:us-east-1:123456789012:dataqualityruleset/my_ruleset';
+
+    const imported = glue.DataQualityRuleset.fromRulesetArn(stack, 'Imported', rulesetArn);
+
+    expect(imported.rulesetArn).toEqual(rulesetArn);
+    expect(imported.rulesetName).toEqual('my_ruleset');
+  });
+});
+
+test('exposes the ruleset name and ARN of a created ruleset', () => {
+  const stack = new cdk.Stack();
+  const ruleset = new glue.DataQualityRuleset(stack, 'DataQualityRuleset', {
+    rulesetName: 'ruleset_name',
+    rulesetDqdl: 'ruleset_dqdl',
+    targetTable: new glue.DataQualityTargetTable('database_name', 'table_name'),
+  });
+
+  // The name getter returns an environment-sensitive token, so the ARN getter
+  // renders as an Fn::Join. Assert it is built under the glue dataqualityruleset
+  // resource and equals buildRulesetArn(this, rulesetName).
+  expect(ruleset.rulesetName).toBeDefined();
+  expect(stack.resolve(ruleset.rulesetArn)).toEqual(stack.resolve(stack.formatArn({
+    service: 'glue',
+    resource: 'dataqualityruleset',
+    resourceName: ruleset.rulesetName,
+  })));
+});
