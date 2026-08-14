@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/scale"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
+	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/metrics/pkg/client/custom_metrics"
 )
 
@@ -53,7 +54,7 @@ func newHorizontalPodAutoscalerController(ctx context.Context, controllerContext
 
 	apiVersionsGetter := custom_metrics.NewAvailableAPIsGetter(hpaClient.Discovery())
 
-	metricsClient, err := controllerContext.NewMetricsClient("horizontal-pod-autoscaler", apiVersionsGetter)
+	metricsClient, podMetricsGetter, err := controllerContext.NewMetricsClient("horizontal-pod-autoscaler", apiVersionsGetter, hpaClient.Discovery())
 	if err != nil {
 		return nil, err
 	}
@@ -79,6 +80,12 @@ func newHorizontalPodAutoscalerController(ctx context.Context, controllerContext
 				apiVersionsGetter,
 				controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerSyncPeriod.Duration,
 				ctx.Done())
+		},
+		func(ctx context.Context) {
+			metrics.PeriodicallyInvalidate(
+				ctx,
+				podMetricsGetter,
+				controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerSyncPeriod.Duration)
 		},
 		func(ctx context.Context) {
 			pas.Run(ctx, int(controllerContext.ComponentConfig.HPAController.ConcurrentHorizontalPodAutoscalerSyncs))
