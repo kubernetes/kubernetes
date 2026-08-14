@@ -157,6 +157,11 @@ var batchBufferPool = &sync.Pool{
 	},
 }
 
+// streamedWriteBatching is a test seam: it lets
+// BenchmarkStreamedResponseTransport measure the unbatched write path as its
+// baseline, and is always true in a running server.
+var streamedWriteBatching = true
+
 const (
 	// defaultGzipThresholdBytes is compared to the size of the first write from the stream
 	// (usually the entire object), and if the size is smaller no gzipping will be performed
@@ -224,7 +229,7 @@ type lazyBatchWriter struct {
 
 func (b *lazyBatchWriter) Write(p []byte) (int, error) {
 	if b.batch == nil {
-		if b.direct < streamingBatchEngageThresholdBytes {
+		if b.direct < streamingBatchEngageThresholdBytes || !streamedWriteBatching {
 			n, err := b.hw.Write(p)
 			if err == nil {
 				// a failed (possibly partial) write must not count: engaging

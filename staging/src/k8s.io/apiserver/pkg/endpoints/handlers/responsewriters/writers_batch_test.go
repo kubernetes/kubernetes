@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -329,5 +330,68 @@ func TestStreamedResponseFlushErrorSurfaces(t *testing.T) {
 				t.Error("flush failure not recorded in lastWriteErr")
 			}
 		})
+	}
+}
+
+// BenchmarkStreamedResponseTransport measures a streamed list response end to
+// end over a loopback TLS connection, per protocol, with and without
+// batching: one ~10MiB response of 10KiB item writes per iteration, served
+// through net/http's real HTTP/2 and HTTP/1.1 response writers.
+func BenchmarkStreamedResponseTransport(b *testing.B) {
+	item := []byte(strings.Repeat("x", 10*1024))
+	const items = 1000
+	handler := http.HandlerFunc(func(hw http.ResponseWriter, r *http.Request) {
+		drw := newDeferredWriter(hw, "application/json", "")
+		drw.ctx = r.Context()
+		if _, err := drw.Write([]byte("{")); err != nil {
+			b.Error(err)
+			return
+		}
+		for range items {
+			if _, err := drw.Write(item); err != nil {
+				b.Error(err)
+				return
+			}
+		}
+		if err := drw.Close(); err != nil {
+			b.Error(err)
+		}
+	})
+	for _, proto := range []string{"http2", "http1.1"} {
+		for _, batching := range []bool{true, false} {
+			name := fmt.Sprintf("%s/batched", proto)
+			if !batching {
+				name = fmt.Sprintf("%s/unbatched", proto)
+			}
+			b.Run(name, func(b *testing.B) {
+				prev := streamedWriteBatching
+				streamedWriteBatching = batching
+				defer func() { streamedWriteBatching = prev }()
+				srv := httptest.NewUnstartedServer(handler)
+				srv.EnableHTTP2 = proto == "http2"
+				if !srv.EnableHTTP2 {
+					srv.TLS = &tls.Config{NextProtos: []string{"http/1.1"}}
+				}
+				srv.StartTLS()
+				defer srv.Close()
+				client := srv.Client()
+				b.SetBytes(int64(1 + items*len(item)))
+				b.ReportAllocs()
+				b.ResetTimer()
+				for range b.N {
+					resp, err := client.Get(srv.URL)
+					if err != nil {
+						b.Fatal(err)
+					}
+					if resp.ProtoMajor == 2 != srv.EnableHTTP2 {
+						b.Fatalf("negotiated %s, want %s", resp.Proto, proto)
+					}
+					if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+						b.Fatal(err)
+					}
+					resp.Body.Close()
+				}
+			})
+		}
 	}
 }
