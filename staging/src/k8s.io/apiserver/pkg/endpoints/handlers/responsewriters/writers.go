@@ -17,6 +17,7 @@ limitations under the License.
 package responsewriters
 
 import (
+	"bufio"
 	"compress/gzip"
 	"context"
 	"encoding/json"
@@ -24,6 +25,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -148,6 +150,13 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 
 var gzipPool = NewGzipWriterPoolOrDie()
 
+// batchBufferPool recycles lazyBatchWriter's batch buffers across responses.
+var batchBufferPool = &sync.Pool{
+	New: func() interface{} {
+		return bufio.NewWriterSize(nil, streamingBatchBufferBytes)
+	},
+}
+
 const (
 	// defaultGzipThresholdBytes is compared to the size of the first write from the stream
 	// (usually the entire object), and if the size is smaller no gzipping will be performed
@@ -156,7 +165,93 @@ const (
 	// Use the length of the first write to recognize streaming implementations.
 	// When streaming JSON first write is "{", while Kubernetes protobuf starts unique 4 byte header.
 	firstWriteStreamingThresholdBytes = 4
+	// streamingBatchBufferBytes is the size of the buffer that batches a large
+	// streamed response's output. A ten-point sweep (4KiB-4MiB) on multi-GB
+	// list responses measured a flat performance plateau from 128KiB through
+	// 1MiB, degradation below 64KiB (item-sized writes pass through a small
+	// bufio unbatched), and regression at 2MiB and above (larger bursts make
+	// flow control choppier). 128KiB is the smallest size on the plateau,
+	// which keeps pooled memory minimal: at most one buffer per in-flight
+	// large streamed response.
+	streamingBatchBufferBytes = 128 * 1024
+	// streamingBatchEngageThresholdBytes is how many bytes lazyBatchWriter
+	// passes straight to the response writer (compressed bytes, under gzip)
+	// before it takes a pooled buffer and batches the rest. Responses that
+	// stay under it, the small-cluster steady state, never take a pooled
+	// buffer and reach the response writer exactly as on the unbatched path;
+	// larger responses forfeit batching only for this prefix (item-sized
+	// writes under identity, the compressor's small writes under gzip), a
+	// sliver of a multi-GB response. 64KiB is where the sweep put ~85% of the
+	// achievable benefit: below it, batching has little left to save.
+	streamingBatchEngageThresholdBytes = 64 * 1024
 )
+
+// firstWriteIsStreaming reports whether a response's first write looks like a
+// streaming collection encoder's opening bytes rather than a fully-marshaled
+// single object. Gzip negotiation and output batching must agree on this
+// classification, so both use this helper.
+func firstWriteIsStreaming(p []byte) bool {
+	return len(p) <= firstWriteStreamingThresholdBytes
+}
+
+// lazyBatchWriter is the last stage above the HTTP response writer for a
+// committed streamed response, under both encodings (encoder ->
+// lazyBatchWriter, or encoder -> gzip -> lazyBatchWriter).
+//
+// Streamed list responses arrive as one small write per item, and the
+// transports below make each such write expensive: HTTP/2 turns roughly every
+// one into a cross-goroutine DATA-frame handoff that parks the handler
+// goroutine (its 4KiB buffer only coalesces writes smaller than itself), so a
+// multi-GB list pays on the order of a million scheduler round-trips and
+// ships mostly sub-full frames; HTTP/1.1 turns each into its own
+// chunked-transfer frame, with TLS records fragmented to match. Batching
+// turns those into one handoff, or one chunk, per buffer.
+//
+// The writer passes bytes straight through until the response has proven
+// large (streamingBatchEngageThresholdBytes written directly), then takes a
+// pooled buffer and batches the remainder, so small responses never hold a
+// pooled buffer and reach the response writer exactly as before, whatever the
+// encoding. The accepted cost, once engaged: after a client reset or request
+// timeout, encoding continues until the next buffer flush fails (under gzip,
+// one buffer of compressed output can be over a MiB of plaintext) instead of
+// failing within one item or one deflate block. Bounded, and per canceled
+// request.
+type lazyBatchWriter struct {
+	hw     io.Writer     // the response writer
+	direct int           // bytes written straight to hw so far; decides engagement
+	batch  *bufio.Writer // from batchBufferPool once engaged; nil before, and after close
+}
+
+func (b *lazyBatchWriter) Write(p []byte) (int, error) {
+	if b.batch == nil {
+		if b.direct < streamingBatchEngageThresholdBytes {
+			n, err := b.hw.Write(p)
+			if err == nil {
+				// a failed (possibly partial) write must not count: engaging
+				// on the next write would accept it into a fresh buffer
+				// instead of failing it too
+				b.direct += n
+			}
+			return n, err
+		}
+		b.batch = batchBufferPool.Get().(*bufio.Writer)
+		b.batch.Reset(b.hw)
+	}
+	return b.batch.Write(p)
+}
+
+// close flushes any batched bytes to the response writer and returns the
+// buffer to the pool; a no-op for responses that never engaged batching.
+func (b *lazyBatchWriter) close() error {
+	if b.batch == nil {
+		return nil
+	}
+	err := b.batch.Flush()
+	b.batch.Reset(nil)
+	batchBufferPool.Put(b.batch)
+	b.batch = nil
+	return err
+}
 
 type deferredResponseWriter struct {
 	mediaType       string
@@ -168,9 +263,17 @@ type deferredResponseWriter struct {
 	hasWritten  bool
 	hw          http.ResponseWriter
 	w           io.Writer
-	// totalBytes is the number of bytes written to `w` and does not include buffered bytes
+	// batcher carries a committed streamed response's output to hw (below
+	// the gzip writer, when compressing); see lazyBatchWriter. Responses are
+	// wired through it by shape (a first write of a few bytes), which CBOR's
+	// per-object tag also matches: such single objects pass through it
+	// unengaged under identity, and batch like a list under gzip once large.
+	batcher lazyBatchWriter
+	// totalBytes is the number of bytes written to `w` (including bytes still
+	// batched below it) and does not include buffered bytes
 	totalBytes int
-	// lastWriteErr holds the error result (if any) of the last write attempt to `w`
+	// lastWriteErr holds the error result (if any) of the last write attempt
+	// to `w`, or of Close's final flush
 	lastWriteErr error
 
 	ctx context.Context
@@ -190,7 +293,7 @@ func (w *deferredResponseWriter) Write(p []byte) (n int, err error) {
 		// not yet buffered, first write is long enough to trigger gzip, no need to buffer
 		return w.unbufferedWrite(p)
 
-	case !w.hasBuffered && len(p) > firstWriteStreamingThresholdBytes:
+	case !w.hasBuffered && !firstWriteIsStreaming(p):
 		// not yet buffered, first write is longer than expected for streaming scenarios that would require buffering, no need to buffer
 		return w.unbufferedWrite(p)
 
@@ -221,6 +324,13 @@ func (w *deferredResponseWriter) discardBufferedResponse() {
 	w.buffer = nil
 }
 
+// unbufferedWrite commits the response on its first call (status code and
+// content-encoding headers, chosen from what Write accumulated) and writes p.
+// "Unbuffered" refers to that gzip-negotiation buffer, not to delivery: a
+// streamed response that proves large is batched by lazyBatchWriter below
+// this point. Everything SerializeObject writes comes through here; watch and
+// ResourceStreamer responses do not (they use their own writers, with
+// per-event flushes), so batching never applies to them.
 func (w *deferredResponseWriter) unbufferedWrite(p []byte) (n int, err error) {
 	defer func() {
 		w.totalBytes += n
@@ -234,17 +344,28 @@ func (w *deferredResponseWriter) unbufferedWrite(p []byte) (n int, err error) {
 
 	hw := w.hw
 	header := hw.Header()
+
+	// A response with a streaming encoder's shape (a tiny first write, or
+	// the accumulation of one) reaches hw through the lazy batcher; anything
+	// else is a fully-marshaled object and goes to hw directly. Misjudging a
+	// small response as streamed costs nothing: the batcher is pass-through
+	// below streamingBatchEngageThresholdBytes.
+	var sink io.Writer = hw
+	if w.hasBuffered || firstWriteIsStreaming(p) {
+		w.batcher = lazyBatchWriter{hw: hw}
+		sink = &w.batcher
+	}
 	switch {
 	case w.contentEncoding == "gzip" && len(p) > defaultGzipThresholdBytes:
 		header.Set("Content-Encoding", "gzip")
 		header.Add("Vary", "Accept-Encoding")
 
 		gw := gzipPool.Get().(*gzip.Writer)
-		gw.Reset(hw)
+		gw.Reset(sink)
 
 		w.w = gw
 	default:
-		w.w = hw
+		w.w = sink
 	}
 
 	span := tracing.SpanFromContext(w.ctx)
@@ -280,18 +401,31 @@ func (w *deferredResponseWriter) Close() (err error) {
 		if !w.hasBuffered {
 			return nil
 		}
-		// never reached defaultGzipThresholdBytes, no need to do the gzip writer cleanup
-		_, err := w.unbufferedWrite(w.buffer)
+		// never reached defaultGzipThresholdBytes: commit now, writing the
+		// accumulated body uncompressed
+		_, err = w.unbufferedWrite(w.buffer)
 		w.buffer = nil
-		return err
 	}
 
+	// Release whatever the response engaged; a body drained just above is one
+	// uncompressed write and engaged nothing.
 	switch t := w.w.(type) {
 	case *gzip.Writer:
 		err = t.Close()
 		t.Reset(nil)
 		gzipPool.Put(t)
 	}
+	if flushErr := w.batcher.close(); flushErr != nil && err == nil {
+		err = flushErr
+	}
+	// A cleanup failure is recorded like a write error so the span reports it.
+	if err != nil && w.lastWriteErr == nil {
+		w.lastWriteErr = err
+	}
+	// The pooled writers released above may already serve another response;
+	// drop w.w so that a Write after Close (which no caller does) panics on
+	// the nil writer instead of reaching them.
+	w.w = nil
 	return err
 }
 
