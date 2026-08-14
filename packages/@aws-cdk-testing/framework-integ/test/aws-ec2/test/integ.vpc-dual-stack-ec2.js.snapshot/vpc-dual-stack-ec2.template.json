@@ -141,7 +141,8 @@
     }
    },
    "DependsOn": [
-    "Ip6VpcDualStackipv6cidr40BE830A"
+    "Ip6VpcDualStackipv6cidr40BE830A",
+    "Ip6VpcDualStackVPCGW304156E6"
    ]
   },
   "Ip6VpcDualStackPublicSubnet2SubnetCBBC1B43": {
@@ -261,7 +262,8 @@
     }
    },
    "DependsOn": [
-    "Ip6VpcDualStackipv6cidr40BE830A"
+    "Ip6VpcDualStackipv6cidr40BE830A",
+    "Ip6VpcDualStackVPCGW304156E6"
    ]
   },
   "Ip6VpcDualStackPrivateSubnet1Subnet842B7F4C": {

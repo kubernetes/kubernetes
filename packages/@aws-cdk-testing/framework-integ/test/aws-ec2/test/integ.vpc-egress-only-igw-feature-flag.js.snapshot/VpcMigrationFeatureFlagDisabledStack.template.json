@@ -141,7 +141,8 @@
     }
    },
    "DependsOn": [
-    "VpcDisabledipv6cidrAE919F73"
+    "VpcDisabledipv6cidrAE919F73",
+    "VpcDisabledVPCGW116F96FA"
    ]
   },
   "VpcDisabledpublicSubnet2SubnetFD7D736A": {
@@ -261,7 +262,8 @@
     }
    },
    "DependsOn": [
-    "VpcDisabledipv6cidrAE919F73"
+    "VpcDisabledipv6cidrAE919F73",
+    "VpcDisabledVPCGW116F96FA"
    ]
   },
   "VpcDisabledIGWED9DDAA3": {

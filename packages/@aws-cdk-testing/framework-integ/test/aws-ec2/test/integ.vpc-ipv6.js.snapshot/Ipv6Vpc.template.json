@@ -141,7 +141,8 @@
     }
    },
    "DependsOn": [
-    "Ipv6ProtocolVpcipv6cidr80CB1C4B"
+    "Ipv6ProtocolVpcipv6cidr80CB1C4B",
+    "Ipv6ProtocolVpcVPCGW70BC7BE6"
    ]
   },
   "Ipv6ProtocolVpcPublicSubnet1EIP5773FDDD": {
@@ -302,7 +303,8 @@
     }
    },
    "DependsOn": [
-    "Ipv6ProtocolVpcipv6cidr80CB1C4B"
+    "Ipv6ProtocolVpcipv6cidr80CB1C4B",
+    "Ipv6ProtocolVpcVPCGW70BC7BE6"
    ]
   },
   "Ipv6ProtocolVpcPublicSubnet2EIPFA61104A": {

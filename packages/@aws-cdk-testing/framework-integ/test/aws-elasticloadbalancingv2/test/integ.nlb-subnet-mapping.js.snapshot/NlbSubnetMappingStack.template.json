@@ -141,7 +141,8 @@
     }
    },
    "DependsOn": [
-    "DualStackVpcipv6cidr0D52F270"
+    "DualStackVpcipv6cidr0D52F270",
+    "DualStackVpcVPCGW7803C9BB"
    ]
   },
   "DualStackVpcPublicSubnet2Subnet909A2064": {
@@ -261,7 +262,8 @@
     }
    },
    "DependsOn": [
-    "DualStackVpcipv6cidr0D52F270"
+    "DualStackVpcipv6cidr0D52F270",
+    "DualStackVpcVPCGW7803C9BB"
    ]
   },
   "DualStackVpcIsolatedSubnet1Subnet6E915754": {
