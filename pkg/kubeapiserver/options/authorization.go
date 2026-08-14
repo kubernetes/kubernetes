@@ -31,6 +31,7 @@ import (
 	authzconfig "k8s.io/apiserver/pkg/apis/apiserver"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	versionedinformers "k8s.io/client-go/informers"
+	clientgoclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 )
@@ -205,7 +206,7 @@ func (o *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ToAuthorizationConfig convert BuiltInAuthorizationOptions to authorizer.Config
-func (o *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFactory versionedinformers.SharedInformerFactory) (*authorizer.Config, error) {
+func (o *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFactory versionedinformers.SharedInformerFactory, client clientgoclientset.Interface) (*authorizer.Config, error) {
 	if o == nil {
 		return nil, nil
 	}
@@ -241,6 +242,7 @@ func (o *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFac
 	return &authorizer.Config{
 		PolicyFile:               o.PolicyFile,
 		VersionedInformerFactory: versionedInformerFactory,
+		Client:                   client,
 		WebhookRetryBackoff:      o.WebhookRetryBackoff,
 
 		ReloadFile:                            o.AuthorizationConfigurationFile,

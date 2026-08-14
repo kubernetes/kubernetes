@@ -36,6 +36,7 @@ import (
 	versionedinformers "k8s.io/client-go/informers"
 	certinformersv1 "k8s.io/client-go/informers/certificates/v1"
 	resourceinformers "k8s.io/client-go/informers/resource/v1"
+	clientgoclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/features"
@@ -60,6 +61,10 @@ type Config struct {
 	WebhookRetryBackoff *wait.Backoff
 
 	VersionedInformerFactory versionedinformers.SharedInformerFactory
+
+	// Client is used by authorizer modes that need their own dedicated
+	// watch instead of sharing VersionedInformerFactory's cache.
+	Client clientgoclientset.Interface
 
 	// Optional field, custom dial function used to connect to webhook
 	CustomDial utilnet.DialFunc
@@ -115,11 +120,12 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 			node.AddGraphEventHandlers(
 				graph,
 				config.VersionedInformerFactory.Core().V1().Nodes(),
-				config.VersionedInformerFactory.Core().V1().Pods(),
+				config.Client.CoreV1(),
 				config.VersionedInformerFactory.Core().V1().PersistentVolumes(),
 				config.VersionedInformerFactory.Storage().V1().VolumeAttachments(),
 				slices, // Nil check in AddGraphEventHandlers can be removed when always creating this.
 				podCertificateRequestInformer,
+				ctx.Done(),
 			)
 			r.nodeAuthorizer = node.NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), bootstrappolicy.NodeRules())
 

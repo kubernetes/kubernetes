@@ -233,6 +233,7 @@ func BuildGenericConfig(
 		genericConfig.EgressSelector,
 		genericConfig.APIServerID,
 		versionedInformers,
+		clientgoExternalClient,
 	)
 	if err != nil {
 		lastErr = fmt.Errorf("invalid authorization config: %w", err)
@@ -253,8 +254,8 @@ func BuildGenericConfig(
 }
 
 // BuildAuthorizer constructs the authorizer. If authorization is not set in s, it returns nil, nil, false, nil
-func BuildAuthorizer(ctx context.Context, s options.CompletedOptions, egressSelector *egressselector.EgressSelector, apiserverID string, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, bool, error) {
-	authorizationConfig, err := s.Authorization.ToAuthorizationConfig(versionedInformers)
+func BuildAuthorizer(ctx context.Context, s options.CompletedOptions, egressSelector *egressselector.EgressSelector, apiserverID string, versionedInformers clientgoinformers.SharedInformerFactory, client clientgoclientset.Interface) (authorizer.Authorizer, authorizer.RuleResolver, bool, error) {
+	authorizationConfig, err := s.Authorization.ToAuthorizationConfig(versionedInformers, client)
 	if err != nil {
 		return nil, nil, false, err
 	}

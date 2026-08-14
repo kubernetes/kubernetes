@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -25,11 +26,15 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	certsv1informers "k8s.io/client-go/informers/certificates/v1"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	resourceinformers "k8s.io/client-go/informers/resource/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/utils/ptr"
@@ -42,21 +47,37 @@ type graphPopulator struct {
 func AddGraphEventHandlers(
 	graph *Graph,
 	nodes corev1informers.NodeInformer,
-	pods corev1informers.PodInformer,
+	podsClient corev1client.PodsGetter,
 	pvs corev1informers.PersistentVolumeInformer,
 	attachments storageinformers.VolumeAttachmentInformer,
 	slices resourceinformers.ResourceSliceInformer,
 	pcrs certsv1informers.PodCertificateRequestInformer,
+	stopCh <-chan struct{},
 ) {
 	g := &graphPopulator{
 		graph: graph,
 	}
 
-	podHandler, _ := pods.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    g.addPod,
-		UpdateFunc: g.updatePod,
-		DeleteFunc: g.deletePod,
-	})
+	// Pods get their own Reflector instead of a shared informer, backed by
+	// podEventStore, so the node authorizer's need for full pod visibility
+	// doesn't force every other consumer of the shared Pod informer
+	// (admission plugins) to also keep full pod objects cached.
+	podStore := newPodEventStore(g)
+	podReflector := cache.NewReflector(
+		&cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return podsClient.Pods(metav1.NamespaceAll).List(context.Background(), options)
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				options.Watch = true
+				return podsClient.Pods(metav1.NamespaceAll).Watch(context.Background(), options)
+			},
+		},
+		&corev1.Pod{},
+		podStore,
+		0,
+	)
+	go podReflector.Run(stopCh)
 
 	pvsHandler, _ := pvs.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    g.addPV,
@@ -71,7 +92,7 @@ func AddGraphEventHandlers(
 	})
 
 	synced := []cache.InformerSynced{
-		podHandler.HasSynced, pvsHandler.HasSynced, attachHandler.HasSynced,
+		podStore.HasSynced, pvsHandler.HasSynced, attachHandler.HasSynced,
 	}
 
 	if slices != nil {
