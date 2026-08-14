@@ -319,11 +319,11 @@ func TestPolicySourcePreservesParamInformerWhenMappingIsUnchanged(t *testing.T) 
 	}
 	source.paramKindChanged(paramKind.GroupKind())
 
-	_, resolvedScope, err := source.ensureParamsForPolicyLocked(&paramKind)
+	_, resolvedMapping, err := source.ensureParamsForPolicyLocked(&paramKind)
 
 	require.NoError(t, err)
 	require.Same(t, existingInfo, source.paramsCRDControllers[paramKind])
-	require.Equal(t, mapping.Scope, resolvedScope)
+	require.Equal(t, &mapping, resolvedMapping)
 	require.False(t, canceled)
 	require.NotContains(t, source.paramKindsToReconcile, paramKind)
 }
@@ -353,11 +353,11 @@ func TestPolicySourcePreservesUnclaimedParamInformerOnCRDChange(t *testing.T) {
 	}
 	source.paramKindChanged(paramKind.GroupKind())
 
-	_, resolvedScope, err := source.ensureParamsForPolicyLocked(&paramKind)
+	_, resolvedMapping, err := source.ensureParamsForPolicyLocked(&paramKind)
 
 	require.NoError(t, err)
 	require.Same(t, existingInfo, source.paramsCRDControllers[paramKind])
-	require.Equal(t, mapping.Scope, resolvedScope)
+	require.Equal(t, &mapping, resolvedMapping)
 	require.False(t, canceled)
 	require.NotContains(t, source.paramKindsToReconcile, paramKind)
 }

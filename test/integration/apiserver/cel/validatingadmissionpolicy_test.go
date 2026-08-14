@@ -2650,7 +2650,7 @@ func TestCRDParamKindResolvesBeforeDiscoveryRefresh(t *testing.T) {
 
 	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 		_, err := client.CoreV1().Namespaces().Patch(ctx, "default", types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
-		if err == nil || strings.Contains(err.Error(), "failed to find resource referenced by paramKind") || strings.Contains(err.Error(), "not yet synced to use for admission") {
+		if err == nil || strings.Contains(err.Error(), "failed to find resource referenced by paramKind") {
 			return false, nil
 		}
 		if strings.Contains(err.Error(), "wrong prefix") {
@@ -2762,10 +2762,6 @@ func TestCRDsOnStartup(t *testing.T) {
 
 			_, err = client.CoreV1().Namespaces().Create(testContext, disallowedNamespace, metav1.CreateOptions{})
 			if err == nil {
-				return false, nil
-			}
-
-			if strings.Contains(err.Error(), "not yet synced to use for admission") {
 				return false, nil
 			}
 

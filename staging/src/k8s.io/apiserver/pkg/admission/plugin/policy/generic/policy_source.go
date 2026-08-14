@@ -109,6 +109,9 @@ type PolicyHook[P runtime.Object, B runtime.Object, E Evaluator] struct {
 	// there is no param or if there was a configuration error
 	ParamInformer informers.GenericInformer
 	ParamScope    meta.RESTScope
+	// ParamMapping is the mapping selected for ParamKind by the policy source.
+	// API-backed hooks use it for direct reads while ParamInformer is warming.
+	ParamMapping *meta.RESTMapping
 
 	// DynamicClient is used for direct API calls to handle cache misses
 	DynamicClient dynamic.Interface
@@ -410,13 +413,18 @@ func (s *policySource[P, B, E]) calculatePolicyData() ([]PolicyHook[P, B, E], er
 			usedParams[*parsedParamKind] = struct{}{}
 		}
 
-		paramInformer, paramScope, configurationError := s.ensureParamsForPolicyLocked(parsedParamKind)
+		paramInformer, paramMapping, configurationError := s.ensureParamsForPolicyLocked(parsedParamKind)
+		var paramScope meta.RESTScope
+		if paramMapping != nil {
+			paramScope = paramMapping.Scope
+		}
 		result = append(result, PolicyHook[P, B, E]{
 			Policy:             policySpec,
 			Bindings:           bindingSpecs,
 			Evaluator:          s.compilePolicyLocked(policySpec),
 			ParamInformer:      paramInformer,
 			ParamScope:         paramScope,
+			ParamMapping:       paramMapping,
 			DynamicClient:      s.dynamicClient,
 			RESTMapper:         s.restMapper,
 			ConfigurationError: configurationError,
@@ -454,10 +462,10 @@ func (s *policySource[P, B, E]) calculatePolicyData() ([]PolicyHook[P, B, E], er
 }
 
 // ensureParamsForPolicyLocked ensures that the informer for the paramKind is
-// started and returns the informer and the scope of the paramKind.
+// started and returns the informer and REST mapping of the paramKind.
 //
 // Must be called under write lock
-func (s *policySource[P, B, E]) ensureParamsForPolicyLocked(paramSource *schema.GroupVersionKind) (informers.GenericInformer, meta.RESTScope, error) {
+func (s *policySource[P, B, E]) ensureParamsForPolicyLocked(paramSource *schema.GroupVersionKind) (informers.GenericInformer, *meta.RESTMapping, error) {
 	if paramSource == nil {
 		return nil, nil, nil
 	}
@@ -465,7 +473,7 @@ func (s *policySource[P, B, E]) ensureParamsForPolicyLocked(paramSource *schema.
 	existingInfo, exists := s.paramsCRDControllers[*paramSource]
 	_, mustReconcile := s.paramKindsToReconcile[*paramSource]
 	if exists && !mustReconcile {
-		return existingInfo.informer, existingInfo.mapping.Scope, nil
+		return existingInfo.informer, &existingInfo.mapping, nil
 	}
 	delete(s.paramKindsToReconcile, *paramSource)
 
@@ -478,7 +486,7 @@ func (s *policySource[P, B, E]) ensureParamsForPolicyLocked(paramSource *schema.
 		return nil, nil, err
 	}
 	if exists && sameRESTMapping(&existingInfo.mapping, mapping) {
-		return existingInfo.informer, existingInfo.mapping.Scope, nil
+		return existingInfo.informer, &existingInfo.mapping, nil
 	}
 	if exists {
 		existingInfo.cancelFunc()
@@ -521,7 +529,7 @@ func (s *policySource[P, B, E]) ensureParamsForPolicyLocked(paramSource *schema.
 		informer:   informer,
 	}
 	s.paramsCRDControllers[*paramSource] = ret
-	return ret.informer, ret.mapping.Scope, nil
+	return ret.informer, &ret.mapping, nil
 }
 
 func (s *policySource[P, B, E]) resolveParamKindFromResolverLocked(paramSource schema.GroupVersionKind) (*meta.RESTMapping, error) {
