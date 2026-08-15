@@ -4120,7 +4120,7 @@ func TestApplyEventSeriesGranularToAtomic(t *testing.T) {
 	foundSeries := false
 	for _, entry := range managedFields {
 		if entry.Manager == "apply_test" {
-			fieldsV1 := string(entry.FieldsV1.Raw)
+			fieldsV1 := string(entry.FieldsV1.GetRawBytes())
 			if !strings.Contains(fieldsV1, `"f:series":{}`) {
 				t.Fatalf("expected atomic f:series:{}, but got %s", fieldsV1)
 			}
