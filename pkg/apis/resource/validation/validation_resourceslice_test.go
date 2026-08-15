@@ -1722,6 +1722,16 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 		},
 	}
 
+	// Not creatable today: single-allocatable forbids a requestPolicy, so this models legacy or skewed stored data.
+	singleAllocWithStoredInvalidPolicy := testResourceSliceWithConsumableCapacity(name, name, name, 1)
+	singleAllocWithStoredInvalidPolicy.Spec.Devices[0].AllowMultipleAllocations = ptr.To(false)
+	updateConsumableCapacity(singleAllocWithStoredInvalidPolicy, 0, func(cap *resourceapi.DeviceCapacity) {
+		cap.RequestPolicy = &resourceapi.CapacityRequestPolicy{
+			ValidValues: []resource.Quantity{resource.MustParse("10")},
+			ValidRange:  &resourceapi.CapacityRequestPolicyRange{Min: ptr.To(resource.MustParse("1"))},
+		}
+	})
+
 	scenarios := map[string]struct {
 		consumableCapacityFeatureGate      bool
 		fractionalCapacityRangeFeatureGate bool
@@ -1732,6 +1742,39 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 		"valid-no-op-update": {
 			oldResourceSlice: validResourceSlice,
 			update:           func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice { return slice },
+		},
+		"disable-allow-multiple-keeps-request-policy": {
+			consumableCapacityFeatureGate: true,
+			oldResourceSlice:              testResourceSliceWithConsumableCapacity(name, name, name, 1),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Devices[0].AllowMultipleAllocations = ptr.To(false)
+				return slice
+			},
+			wantFailures: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "devices").Index(0).Child("capacity").Key("a").Child("requestPolicy"), "allowMultipleAllocations must be true"),
+			},
+		},
+		"unset-allow-multiple-keeps-request-policy": {
+			consumableCapacityFeatureGate: true,
+			oldResourceSlice:              testResourceSliceWithConsumableCapacity(name, name, name, 1),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Devices[0].AllowMultipleAllocations = nil
+				return slice
+			},
+			wantFailures: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "devices").Index(0).Child("capacity").Key("a").Child("requestPolicy"), "allowMultipleAllocations must be true"),
+			},
+		},
+		"enable-allow-multiple-revalidates-stored-invalid-request-policy": {
+			consumableCapacityFeatureGate: true,
+			oldResourceSlice:              singleAllocWithStoredInvalidPolicy,
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Devices[0].AllowMultipleAllocations = ptr.To(true)
+				return slice
+			},
+			wantFailures: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "devices").Index(0).Child("capacity").Key("a").Child("requestPolicy"), `exactly one policy can be specified, cannot specify "validValues" and "validRange" at the same time`),
+			},
 		},
 		"invalid-name-update": {
 			oldResourceSlice: validResourceSlice,
