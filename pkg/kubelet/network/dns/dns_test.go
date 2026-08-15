@@ -33,6 +33,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 	netutils "k8s.io/utils/net"
 
 	"github.com/stretchr/testify/assert"
@@ -601,7 +602,6 @@ func TestGetPodDNS(t *testing.T) {
 }
 
 func TestGetPodDNSFiltersScopedLinkLocalNameservers(t *testing.T) {
-	ctx := ktesting.Init(t)
 	recorder := record.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
@@ -624,6 +624,8 @@ func TestGetPodDNSFiltersScopedLinkLocalNameservers(t *testing.T) {
 		hostNameservers   []string
 		dnsConfig         *v1.PodDNSConfig
 		expectedDNSConfig *runtimeapi.DNSConfig
+		expectedLog       string
+		unexpectedLog     string
 	}{
 		{
 			desc:            "DNSDefault without host network filters inherited scoped link-local IPv6 in podDNSHost path",
@@ -683,9 +685,10 @@ func TestGetPodDNSFiltersScopedLinkLocalNameservers(t *testing.T) {
 				Servers:  []string{},
 				Searches: []string{testHostDomain},
 			},
+			expectedLog: "All inherited nameservers were scoped IPv6 link-local addresses and were removed; no nameservers remain for pod DNS",
 		},
 		{
-			desc:            "explicit scoped link-local IPv6 nameserver is not filtered",
+			desc:            "explicit scoped link-local IPv6 nameserver replaces empty inherited nameservers",
 			dnsPolicy:       v1.DNSDefault,
 			hostNameservers: []string{"fe80::1%3"},
 			dnsConfig: &v1.PodDNSConfig{
@@ -695,11 +698,13 @@ func TestGetPodDNSFiltersScopedLinkLocalNameservers(t *testing.T) {
 				Servers:  []string{"fe80::2%eth0"},
 				Searches: []string{testHostDomain},
 			},
+			unexpectedLog: "All inherited nameservers were scoped IPv6 link-local addresses and were removed; no nameservers remain for pod DNS",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
+			ctx := ktesting.Init(t, initoption.BufferLogs(true))
 			configurer.getHostDNSConfig = func(klog.Logger, string) (*runtimeapi.DNSConfig, error) {
 				return &runtimeapi.DNSConfig{
 					Servers:  append([]string{}, tc.hostNameservers...),
@@ -724,6 +729,18 @@ func TestGetPodDNSFiltersScopedLinkLocalNameservers(t *testing.T) {
 			}
 			if !dnsConfigsAreEqual(resDNSConfig, tc.expectedDNSConfig) {
 				t.Errorf("%s: GetPodDNS(%v)=%v, want %v", tc.desc, testPod, resDNSConfig, tc.expectedDNSConfig)
+			}
+
+			underlier, ok := ctx.Logger().GetSink().(ktesting.Underlier)
+			if !ok {
+				t.Fatalf("expected ktesting LogSink, got %T", ctx.Logger().GetSink())
+			}
+			logs := underlier.GetBuffer().String()
+			if tc.expectedLog != "" && !strings.Contains(logs, tc.expectedLog) {
+				t.Errorf("%s: expected logs to contain %q, got %q", tc.desc, tc.expectedLog, logs)
+			}
+			if tc.unexpectedLog != "" && strings.Contains(logs, tc.unexpectedLog) {
+				t.Errorf("%s: expected logs not to contain %q, got %q", tc.desc, tc.unexpectedLog, logs)
 			}
 		})
 	}

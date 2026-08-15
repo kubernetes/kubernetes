@@ -387,6 +387,9 @@ func filterScopedLinkLocalNameservers(logger klog.Logger, nameservers []string) 
 	filteredNameservers := nameservers[:0]
 	for _, nameserver := range nameservers {
 		addr, err := netip.ParseAddr(nameserver)
+		// Remove only inherited scoped IPv6 link-local nameservers that can be
+		// positively identified; preserve unparsable values rather than dropping
+		// unexpected valid resolver syntax.
 		if err == nil && addr.Is6() && addr.IsLinkLocalUnicast() && addr.Zone() != "" {
 			logger.V(4).Info("Removed inherited scoped IPv6 link-local nameserver from pod DNS config", "nameserver", nameserver)
 			continue
@@ -403,6 +406,7 @@ func (c *Configurer) GetPodDNS(ctx context.Context, pod *v1.Pod) (*runtimeapi.DN
 	if err != nil {
 		return nil, err
 	}
+	allInheritedNameserversFiltered := false
 
 	dnsType, err := getPodDNSType(pod)
 	if err != nil {
@@ -459,14 +463,15 @@ func (c *Configurer) GetPodDNS(ctx context.Context, pod *v1.Pod) (*runtimeapi.DN
 		if !kubecontainer.IsHostNetworkPod(pod) {
 			originalServerCount := len(dnsConfig.Servers)
 			dnsConfig.Servers = filterScopedLinkLocalNameservers(logger, dnsConfig.Servers)
-			if originalServerCount > 0 && len(dnsConfig.Servers) == 0 {
-				logger.Info("No inherited nameservers remain after filtering scoped IPv6 link-local addresses", "pod", klog.KObj(pod))
-			}
+			allInheritedNameserversFiltered = originalServerCount > 0 && len(dnsConfig.Servers) == 0
 		}
 	}
 
 	if pod.Spec.DNSConfig != nil {
 		dnsConfig = appendDNSConfig(dnsConfig, pod.Spec.DNSConfig)
+	}
+	if allInheritedNameserversFiltered && len(dnsConfig.Servers) == 0 {
+		logger.Error(nil, "All inherited nameservers were scoped IPv6 link-local addresses and were removed; no nameservers remain for pod DNS", "pod", klog.KObj(pod), "resolverConfig", c.ResolverConfig)
 	}
 	return c.formDNSConfigFitsLimits(logger, dnsConfig, pod), nil
 }
