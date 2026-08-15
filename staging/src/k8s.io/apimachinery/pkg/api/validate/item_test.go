@@ -157,7 +157,7 @@ func TestValSliceItem(t *testing.T) {
 			op := operation.Operation{Type: operation.Update}
 			fp := field.NewPath("")
 
-			got := ValSliceItem(ctx, op, fp, tc.new, tc.old, tc.match, SemanticDeepEqual, tc.validator)
+			got := ValSliceItem(ctx, op, fp, tc.new, tc.old, tc.match, ReflectDeepEqual, tc.validator)
 
 			if !reflect.DeepEqual(got, tc.expected) {
 				t.Errorf("got %v want %v", got, tc.expected)
@@ -227,7 +227,7 @@ func TestPtrSliceItem(t *testing.T) {
 			op := operation.Operation{Type: operation.Update}
 			fp := field.NewPath("")
 
-			got := PtrSliceItem(ctx, op, fp, tc.new, tc.old, tc.match, SemanticDeepEqual, tc.validator)
+			got := PtrSliceItem(ctx, op, fp, tc.new, tc.old, tc.match, ReflectDeepEqual, tc.validator)
 
 			if !reflect.DeepEqual(got, tc.expected) {
 				t.Errorf("got %v want %v", got, tc.expected)

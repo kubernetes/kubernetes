@@ -137,7 +137,7 @@ func TestEachValSliceValRatcheting(t *testing.T) {
 		[]TestStruct{
 			{11, "a"}, {13, "c"}, {12, "b"},
 		},
-		SemanticDeepEqual,
+		ReflectDeepEqual,
 		nil,
 	)
 	testEachValSliceValRatcheting(t, "ComparableStruct less data in new, exist in old",
@@ -181,7 +181,7 @@ func TestEachValSliceValRatcheting(t *testing.T) {
 		[]NonComparableStruct{
 			{I: 11, S: []string{"a"}}, {I: 13, S: []string{"c"}}, {I: 12, S: []string{"b"}},
 		},
-		SemanticDeepEqual,
+		ReflectDeepEqual,
 		nil,
 	)
 	testEachValSliceValRatcheting(t, "NonComparableStructWithKey same data different order",
@@ -194,7 +194,7 @@ func TestEachValSliceValRatcheting(t *testing.T) {
 		MatchFunc[*NonComparableStructWithKey](func(a, b *NonComparableStructWithKey) bool {
 			return a.Key == b.Key
 		}),
-		SemanticDeepEqual,
+		ReflectDeepEqual,
 	)
 
 }
@@ -276,7 +276,7 @@ func TestEachMapValRatcheting(t *testing.T) {
 			"three": {I: 13, S: []string{"c"}},
 			"two":   {I: 12, S: []string{"b"}},
 		},
-		SemanticDeepEqual,
+		ReflectDeepEqual,
 		0,
 	)
 	testEachMapValRatcheting(t, "non comparable value, less data in new, exist in old",
@@ -289,7 +289,7 @@ func TestEachMapValRatcheting(t *testing.T) {
 			"one":   {I: 11, S: []string{"a"}},
 			"three": {I: 13, S: []string{"c"}},
 		},
-		SemanticDeepEqual,
+		ReflectDeepEqual,
 		0,
 	)
 	testEachMapValRatcheting(t, "non comparable value, new data, not exist in old",
@@ -304,7 +304,7 @@ func TestEachMapValRatcheting(t *testing.T) {
 			"two":   {I: 12, S: []string{"b"}},
 			"four":  {I: 14, S: []string{"d"}},
 		},
-		SemanticDeepEqual,
+		ReflectDeepEqual,
 		1,
 	)
 	testEachMapValRatcheting(t, "struct with pointer field, same value different pointer",
@@ -316,7 +316,7 @@ func TestEachMapValRatcheting(t *testing.T) {
 			"one": {I: 11, P: new(1)},
 			"two": {I: 12, P: new(2)},
 		},
-		SemanticDeepEqual,
+		ReflectDeepEqual,
 		0,
 	)
 	testEachMapValRatcheting(t, "nil map to empty map",
@@ -452,7 +452,7 @@ func TestEachPtrMapValRatcheting(t *testing.T) {
 			"three": {I: 13, S: []string{"c"}},
 			"two":   {I: 12, S: []string{"b"}},
 		},
-		SemanticDeepEqual,
+		ReflectDeepEqual,
 		0,
 	)
 	testEachPtrMapValRatcheting(t, "non comparable value, less data in new, exist in old",
@@ -465,7 +465,7 @@ func TestEachPtrMapValRatcheting(t *testing.T) {
 			"one":   {I: 11, S: []string{"a"}},
 			"three": {I: 13, S: []string{"c"}},
 		},
-		SemanticDeepEqual,
+		ReflectDeepEqual,
 		0,
 	)
 	testEachPtrMapValRatcheting(t, "non comparable value, new data, not exist in old",
@@ -480,7 +480,7 @@ func TestEachPtrMapValRatcheting(t *testing.T) {
 			"two":   {I: 12, S: []string{"b"}},
 			"four":  {I: 14, S: []string{"d"}},
 		},
-		SemanticDeepEqual,
+		ReflectDeepEqual,
 		1,
 	)
 	testEachPtrMapValRatcheting(t, "struct with pointer field, same value different pointer",
@@ -492,7 +492,7 @@ func TestEachPtrMapValRatcheting(t *testing.T) {
 			"one": {I: 11, P: new(1)},
 			"two": {I: 12, P: new(2)},
 		},
-		SemanticDeepEqual,
+		ReflectDeepEqual,
 		0,
 	)
 	testEachPtrMapValRatcheting(t, "nil map to empty map",
@@ -628,7 +628,7 @@ func testValSliceUnique[T comparable](t *testing.T, name string, input []T, want
 		}
 	})
 	t.Run(fmt.Sprintf("%s(reflect)", name), func(t *testing.T) {
-		errs := ValSliceUnique(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, SemanticDeepEqual)
+		errs := ValSliceUnique(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, ReflectDeepEqual)
 		if len(errs) != wantErrs {
 			t.Errorf("expected %d errors, got %d: %s", wantErrs, len(errs), fmtErrs(errs))
 		}
@@ -656,7 +656,7 @@ func testValSliceUniqueByReflect[T any](t *testing.T, name string, input []T, wa
 	t.Helper()
 	var zero T
 	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {
-		errs := ValSliceUnique(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, SemanticDeepEqual)
+		errs := ValSliceUnique(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, ReflectDeepEqual)
 		if len(errs) != wantErrs {
 			t.Errorf("expected %d errors, got %d: %s", wantErrs, len(errs), fmtErrs(errs))
 		}
@@ -746,7 +746,7 @@ func TestEachPtrSliceValRatcheting(t *testing.T) {
 	testEachPtrSliceValRatcheting(t, "ComparableStruct same data different order",
 		[]*TestStruct{{11, "a"}, {12, "b"}, {13, "c"}},
 		[]*TestStruct{{11, "a"}, {13, "c"}, {12, "b"}},
-		SemanticDeepEqual,
+		ReflectDeepEqual,
 		nil,
 	)
 }

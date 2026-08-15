@@ -20,6 +20,7 @@ import (
 	"context"
 
 	resourceapi "k8s.io/api/resource/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/validate"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -29,7 +30,7 @@ func ValidateCustom_Device_Attributes(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj map[resourceapi.QualifiedName]resourceapi.DeviceAttribute,
 ) field.ErrorList {
-	return validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, resourceapi.Validate_DeviceAttribute)
+	return validate.EachMapVal(ctx, op, fldPath, obj, oldObj, semanticDeepEqual, resourceapi.Validate_DeviceAttribute)
 }
 
 func ValidateCustom_Device_NetworkData(
@@ -37,4 +38,13 @@ func ValidateCustom_Device_NetworkData(
 	obj, oldObj *resourceapi.NetworkDeviceData,
 ) field.ErrorList {
 	return resourceapi.Validate_NetworkDeviceData(ctx, op, fldPath, obj, oldObj)
+}
+
+// semanticDeepEqual is a MatchFunc that uses equality.Semantic.DeepEqual to
+// compare two values.
+// This wrapper is needed because MatchFunc requires a function that takes two
+// arguments of specific type T, while equality.Semantic.DeepEqual takes
+// arguments of type interface{}/any.
+func semanticDeepEqual[T any](a, b T) bool {
+	return equality.Semantic.DeepEqual(a, b)
 }
