@@ -112,7 +112,7 @@ func Validate_Struct(
 			}()
 			func() { // cohort = "sliceField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "sliceField",
-					func(o *OtherStruct) []string { return o.SliceField }, validate.SemanticDeepEqual,
+					func(o *OtherStruct) []string { return o.SliceField }, deepEqualImpl_,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield Struct.StructField.SliceField")
 					}); len(e) != 0 {
@@ -121,7 +121,7 @@ func Validate_Struct(
 			}()
 			func() { // cohort = "mapField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "mapField",
-					func(o *OtherStruct) map[string]string { return o.MapField }, validate.SemanticDeepEqual,
+					func(o *OtherStruct) map[string]string { return o.MapField }, deepEqualImpl_,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj map[string]string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield Struct.StructField.MapField")
 					}); len(e) != 0 {
@@ -185,7 +185,7 @@ func Validate_Struct(
 			}()
 			func() { // cohort = "sliceField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "sliceField",
-					func(o *OtherStruct) []string { return o.SliceField }, validate.SemanticDeepEqual,
+					func(o *OtherStruct) []string { return o.SliceField }, deepEqualImpl_,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield Struct.StructPtrField.SliceField")
 					}); len(e) != 0 {
@@ -194,7 +194,7 @@ func Validate_Struct(
 			}()
 			func() { // cohort = "mapField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "mapField",
-					func(o *OtherStruct) map[string]string { return o.MapField }, validate.SemanticDeepEqual,
+					func(o *OtherStruct) map[string]string { return o.MapField }, deepEqualImpl_,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj map[string]string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield Struct.StructPtrField.MapField")
 					}); len(e) != 0 {
@@ -211,4 +211,9 @@ func Validate_Struct(
 	}
 
 	return errs
+}
+
+// deepEqualImpl_ is a validate.MatchFunc which allows the implementation of deep-equality to be defined at codegen time.
+func deepEqualImpl_[T any](a, b T) bool {
+	return equality.Semantic.DeepEqual(a, b)
 }

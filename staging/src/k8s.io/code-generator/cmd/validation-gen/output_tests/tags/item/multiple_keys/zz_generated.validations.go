@@ -168,7 +168,7 @@ func Validate_Struct(
 				if e := validate.ValSliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *PtrItem) bool {
 						return item.StringKey != nil && *item.StringKey == "target-ptr" && item.IntKey == 42 && item.BoolKey == true
-					}, validate.SemanticDeepEqual,
+					}, deepEqualImpl_,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *PtrItem) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item PtrItems[stringKey=target-ptr,intKey=42,boolKey=true]")
 					}); len(e) != 0 {
@@ -207,7 +207,7 @@ func Validate_Struct(
 				if e := validate.ValSliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *MixedPtrItem) bool {
 						return item.StringPtrKey != nil && *item.StringPtrKey == "target-ptr" && item.StringKey == "target"
-					}, validate.SemanticDeepEqual,
+					}, deepEqualImpl_,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MixedPtrItem) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item MixedPtrItems")
 					}); len(e) != 0 {
@@ -224,4 +224,9 @@ func Validate_Struct(
 	}
 
 	return errs
+}
+
+// deepEqualImpl_ is a validate.MatchFunc which allows the implementation of deep-equality to be defined at codegen time.
+func deepEqualImpl_[T any](a, b T) bool {
+	return equality.Semantic.DeepEqual(a, b)
 }

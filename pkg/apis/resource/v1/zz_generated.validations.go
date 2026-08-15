@@ -190,7 +190,7 @@ func Validate_AllocatedDeviceStatus(
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a *metav1.Condition, b *metav1.Condition) bool { return a.Type == b.Type }, validate.SemanticDeepEqual, validation.Validate_Condition); len(e) != 0 {
+				func(a *metav1.Condition, b *metav1.Condition) bool { return a.Type == b.Type }, deepEqualImpl_, validation.Validate_Condition); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -386,7 +386,7 @@ func Validate_Device(
 				return // do not proceed
 			}
 			// iterate the map and call the value type's validation function
-			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_DeviceAttribute); len(e) != 0 {
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, deepEqualImpl_, Validate_DeviceAttribute); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -434,7 +434,7 @@ func Validate_Device(
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a *resourcev1.DeviceCounterConsumption, b *resourcev1.DeviceCounterConsumption) bool {
 					return a.CounterSet == b.CounterSet
-				}, validate.SemanticDeepEqual, Validate_DeviceCounterConsumption); len(e) != 0 {
+				}, deepEqualImpl_, Validate_DeviceCounterConsumption); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -570,7 +570,7 @@ func Validate_Device(
 				return // do not proceed
 			}
 			// iterate the map and call the value type's validation function
-			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_NodeAllocatableResource); len(e) != 0 {
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, deepEqualImpl_, Validate_NodeAllocatableResource); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -1108,7 +1108,7 @@ func Validate_DeviceClaim(
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a *resourcev1.DeviceRequest, b *resourcev1.DeviceRequest) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_DeviceRequest); len(e) != 0 {
+				func(a *resourcev1.DeviceRequest, b *resourcev1.DeviceRequest) bool { return a.Name == b.Name }, deepEqualImpl_, Validate_DeviceRequest); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -1867,7 +1867,7 @@ func Validate_DeviceRequest(
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a *resourcev1.DeviceSubRequest, b *resourcev1.DeviceSubRequest) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_DeviceSubRequest); len(e) != 0 {
+				func(a *resourcev1.DeviceSubRequest, b *resourcev1.DeviceSubRequest) bool { return a.Name == b.Name }, deepEqualImpl_, Validate_DeviceSubRequest); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -2506,7 +2506,7 @@ func Validate_DeviceTaintRuleStatus(
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a *metav1.Condition, b *metav1.Condition) bool { return a.Type == b.Type }, validate.SemanticDeepEqual, validation.Validate_Condition); len(e) != 0 {
+				func(a *metav1.Condition, b *metav1.Condition) bool { return a.Type == b.Type }, deepEqualImpl_, validation.Validate_Condition); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -3440,7 +3440,7 @@ func Validate_ResourceClaimStatus(
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a *resourcev1.AllocatedDeviceStatus, b *resourcev1.AllocatedDeviceStatus) bool {
 					return a.Driver == b.Driver && a.Device == b.Device && a.Pool == b.Pool && ((a.ShareID == nil && b.ShareID == nil) || (a.ShareID != nil && b.ShareID != nil && *a.ShareID == *b.ShareID))
-				}, validate.SemanticDeepEqual, Validate_AllocatedDeviceStatus); len(e) != 0 {
+				}, deepEqualImpl_, Validate_AllocatedDeviceStatus); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -3674,7 +3674,7 @@ func Validate_ResourceSliceSpec(
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a *resourcev1.CounterSet, b *resourcev1.CounterSet) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_CounterSet); len(e) != 0 {
+				func(a *resourcev1.CounterSet, b *resourcev1.CounterSet) bool { return a.Name == b.Name }, deepEqualImpl_, Validate_CounterSet); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -3776,4 +3776,9 @@ func Validate_SkipNodeOperation(
 	}
 
 	return errs
+}
+
+// deepEqualImpl_ is a validate.MatchFunc which allows the implementation of deep-equality to be defined at codegen time.
+func deepEqualImpl_[T any](a, b T) bool {
+	return equality.Semantic.DeepEqual(a, b)
 }

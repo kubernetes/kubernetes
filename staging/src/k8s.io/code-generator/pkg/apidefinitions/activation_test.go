@@ -178,6 +178,7 @@ func TestIdentify(t *testing.T) {
 				"+k8s:defaulter-gen-input=k8s.io/api/foo/v1",
 				"+k8s:validation-gen=TypesWithField=TypeMeta",
 				"+k8s:validation-gen-input=k8s.io/api/foo/v1",
+				"+k8s:validation-gen-deep-equal-func=foo",
 				"+k8s:validation-gen-nolint",
 				"+k8s:validation-gen-scheme-registry=foo",
 				"+k8s:validation-gen-test-fixture=bar",

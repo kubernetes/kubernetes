@@ -54,6 +54,9 @@ const (
 	// (e.g. in tests), or set to "nil" to disable scheme registration for this
 	// package.
 	schemeRegistryTagName = "k8s:validation-gen-scheme-registry"
+	// Defines the deep-equal function used for equivalence and ratcheting checks.
+	// Defaults to "k8s.io/apimachinery/pkg/api/equality.Semantic.DeepEqual".
+	deepEqualFuncTagName = "k8s:validation-gen-deep-equal-func"
 	// If set, generate go test files for test fixtures.  Supported values: "validateFalse".
 	testFixtureTagName = "k8s:validation-gen-test-fixture"
 
@@ -69,10 +72,11 @@ const (
 )
 
 var (
-	runtimePkg   = "k8s.io/apimachinery/pkg/runtime"
-	schemeType   = types.Name{Package: runtimePkg, Name: "Scheme"}
-	metav1Pkg    = "k8s.io/apimachinery/pkg/apis/meta/v1"
-	listMetaType = types.Name{Package: metav1Pkg, Name: "ListMeta"}
+	runtimePkg           = "k8s.io/apimachinery/pkg/runtime"
+	schemeType           = types.Name{Package: runtimePkg, Name: "Scheme"}
+	defaultDeepEqualFunc = types.Name{Package: "k8s.io/apimachinery/pkg/api/equality", Name: "Semantic.DeepEqual"}
+	metav1Pkg            = "k8s.io/apimachinery/pkg/apis/meta/v1"
+	listMetaType         = types.Name{Package: metav1Pkg, Name: "ListMeta"}
 )
 
 // extractAndParseTag extracts all the values for a given tag, according to the
@@ -155,6 +159,48 @@ func schemeRegistryTag(pkg *types.Package) (types.Name, bool) {
 func registerScheme(pkg *types.Package) bool {
 	_, ok := schemeRegistryTag(pkg)
 	return ok
+}
+
+func deepEqualFuncTag(pkg *types.Package) types.Name {
+	// TODO: convert to extractAndParseTag() and update all callers to use quoted values
+	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{deepEqualFuncTagName}, pkg.Comments)
+	if err != nil {
+		klog.Fatalf("Failed to extract deep equal func tags: %v", err)
+	}
+	values, found := tags[deepEqualFuncTagName]
+	if !found || len(values) == 0 {
+		return defaultDeepEqualFunc
+	}
+	if len(values) > 1 {
+		panic(fmt.Sprintf("Package %q contains more than one usage of %q", pkg.Path, deepEqualFuncTagName))
+	}
+	val := values[0].Value
+	if val == "" {
+		return defaultDeepEqualFunc
+	}
+	return parseDeepEqualFunc(val)
+}
+
+func parseDeepEqualFunc(val string) types.Name {
+	lastSlash := strings.LastIndex(val, "/")
+	if lastSlash == -1 {
+		dot := strings.Index(val, ".")
+		if dot == -1 {
+			return types.Name{Name: val}
+		}
+		return types.Name{
+			Package: val[:dot],
+			Name:    val[dot+1:],
+		}
+	}
+	dot := lastSlash + strings.Index(val[lastSlash:], ".")
+	if dot == lastSlash {
+		return types.Name{Package: val}
+	}
+	return types.Name{
+		Package: val[:dot],
+		Name:    val[dot+1:],
+	}
 }
 
 func isSubresourceTag(t *types.Type) (string, bool) {
@@ -358,6 +404,7 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 		pkg := context.Universe[input]
 
 		schemeRegistry, registerThisPkg := schemeRegistryTag(pkg)
+		deepEqualFunc := deepEqualFuncTag(pkg)
 
 		criteria, found := validationTypeMatch(pkg, idOpts)
 		if !found {
@@ -485,7 +532,7 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 
 				GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 					generators = []generator.Generator{
-						NewGenValidations(args.OutputFile, pkg.Path, typesPkg.Path, rootTypes, td, inputToCanonicalPkg, schemeRegistry, registerThisPkg),
+						NewGenValidations(args.OutputFile, pkg.Path, typesPkg.Path, rootTypes, td, inputToCanonicalPkg, schemeRegistry, registerThisPkg, deepEqualFunc),
 					}
 					testFixtureTags := testFixtureTag(pkg)
 					if testFixtureTags.Len() > 0 {

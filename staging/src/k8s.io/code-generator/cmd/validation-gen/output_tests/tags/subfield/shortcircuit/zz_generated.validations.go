@@ -492,7 +492,7 @@ func Validate_ParentWithMaxItems(
 			func() { // cohort = "value"
 				earlyReturn := false
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithMaxItems) []string { return o.Value }, validate.SemanticDeepEqual,
+					func(o *TargetWithMaxItems) []string { return o.Value }, deepEqualImpl_,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []string) field.ErrorList {
 						return validate.MaxItems(ctx, op, fldPath, obj, oldObj, 2)
 					}).MarkShortCircuit(); len(e) != 0 {
@@ -502,7 +502,7 @@ func Validate_ParentWithMaxItems(
 					return // do not proceed
 				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithMaxItems) []string { return o.Value }, validate.SemanticDeepEqual,
+					func(o *TargetWithMaxItems) []string { return o.Value }, deepEqualImpl_,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield ParentWithMaxItems.Field.Value")
 					}); len(e) != 0 {
@@ -546,7 +546,7 @@ func Validate_ParentWithMaxProperties(
 			func() { // cohort = "value"
 				earlyReturn := false
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithMaxProperties) map[string]string { return o.Value }, validate.SemanticDeepEqual,
+					func(o *TargetWithMaxProperties) map[string]string { return o.Value }, deepEqualImpl_,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj map[string]string) field.ErrorList {
 						return validate.MaxProperties(ctx, op, fldPath, obj, oldObj, 2)
 					}).MarkShortCircuit(); len(e) != 0 {
@@ -556,7 +556,7 @@ func Validate_ParentWithMaxProperties(
 					return // do not proceed
 				}
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-					func(o *TargetWithMaxProperties) map[string]string { return o.Value }, validate.SemanticDeepEqual,
+					func(o *TargetWithMaxProperties) map[string]string { return o.Value }, deepEqualImpl_,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj map[string]string) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield ParentWithMaxProperties.Field.Value")
 					}); len(e) != 0 {
@@ -1325,4 +1325,9 @@ func Validate_TargetWithUpdate(
 	}
 
 	return errs
+}
+
+// deepEqualImpl_ is a validate.MatchFunc which allows the implementation of deep-equality to be defined at codegen time.
+func deepEqualImpl_[T any](a, b T) bool {
+	return equality.Semantic.DeepEqual(a, b)
 }
