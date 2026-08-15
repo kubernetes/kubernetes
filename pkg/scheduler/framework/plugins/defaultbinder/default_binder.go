@@ -51,6 +51,18 @@ func (b DefaultBinder) Name() string {
 // Bind binds pods to nodes using the k8s client.
 func (b DefaultBinder) Bind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
 	logger := klog.FromContext(ctx)
+	var err error
+	if snapshot := b.handle.SnapshotSharedLister(); snapshot != nil {
+		nodeInfo, err := snapshot.NodeInfos().Get(nodeName)
+		if err == nil && nodeInfo != nil && nodeInfo.Node() != nil {
+			p.Spec.NodeUID = nodeInfo.Node().UID
+		}
+	} else if informerFactory := b.handle.SharedInformerFactory(); informerFactory != nil {
+		node, err := informerFactory.Core().V1().Nodes().Lister().Get(nodeName)
+		if err == nil {
+			p.Spec.NodeUID = node.UID
+		}
+	}
 	binding := &v1.Binding{
 		ObjectMeta: metav1.ObjectMeta{Namespace: p.Namespace, Name: p.Name, UID: p.UID},
 		Target:     v1.ObjectReference{Kind: "Node", Name: nodeName},
@@ -68,7 +80,7 @@ func (b DefaultBinder) Bind(ctx context.Context, state fwk.CycleState, p *v1.Pod
 		return nil
 	}
 	logger.V(3).Info("Attempting to bind pod to node", "pod", klog.KObj(p), "node", klog.KRef("", nodeName))
-	err := util.BindPod(ctx, b.handle.ClientSet(), binding)
+	err = util.BindPod(ctx, b.handle.ClientSet(), binding)
 	if err != nil {
 		return fwk.AsStatus(err)
 	}

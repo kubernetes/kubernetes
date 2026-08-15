@@ -639,6 +639,9 @@ func TestSkipPodGroupPodSchedule(t *testing.T) {
 
 	logger, ctx := ktesting.NewTestContext(t)
 
+	client := clientsetfake.NewClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+
 	cache := internalcache.New(ctx, nil, true, true /* CompositePodGroup */)
 	registry := frameworkruntime.Registry{
 		queuesort.Name:     queuesort.New,
@@ -657,6 +660,7 @@ func TestSkipPodGroupPodSchedule(t *testing.T) {
 	}
 	schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
 		frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
+		frameworkruntime.WithInformerFactory(informerFactory),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create new framework: %v", err)
@@ -708,6 +712,8 @@ func TestScheduleOnePodGroup_FinishesAttemptWhenAllPoppedPodsAreAssumed(t *testi
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
+			client := clientsetfake.NewClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			podGroup := st.MakePodGroup().Name("pg").Namespace("default").Obj()
 			p1 := st.MakePod().Name("p1").Namespace("default").UID("p1").PodGroupName(podGroup.Name).SchedulerName("test-scheduler").Obj()
 			p2 := st.MakePod().Name("p2").Namespace("default").UID("p2").PodGroupName(podGroup.Name).SchedulerName("test-scheduler").Obj()
@@ -729,6 +735,7 @@ func TestScheduleOnePodGroup_FinishesAttemptWhenAllPoppedPodsAreAssumed(t *testi
 			}
 			schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
 				frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
+				frameworkruntime.WithInformerFactory(informerFactory),
 			)
 			if err != nil {
 				t.Fatalf("Failed to create new framework: %v", err)
@@ -827,8 +834,12 @@ func TestPodGroupCycle_UpdateSnapshotError(t *testing.T) {
 			},
 		},
 	}
+	client := clientsetfake.NewClientset(testPodGroup)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+
 	schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
 		frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
+		frameworkruntime.WithInformerFactory(informerFactory),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create new framework: %v", err)
@@ -843,8 +854,6 @@ func TestPodGroupCycle_UpdateSnapshotError(t *testing.T) {
 		},
 	}
 
-	client := clientsetfake.NewClientset(testPodGroup)
-	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	informerFactory.Start(ctx.Done())
 	informerFactory.WaitForCacheSync(ctx.Done())
 
@@ -920,6 +929,9 @@ func TestPodGroupCycle_FillsPodResultsOnFewerResults(t *testing.T) {
 
 	informerFactory.Start(ctx.Done())
 	informerFactory.WaitForCacheSync(ctx.Done())
+	if err := informerFactory.Core().V1().Nodes().Informer().GetIndexer().Add(testNode); err != nil {
+		t.Fatalf("Failed to add test node to informer: %v", err)
+	}
 	queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
 	snapshot := internalcache.NewEmptySnapshot()
 
@@ -1851,6 +1863,12 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 				pg = tt.existingPodGroup
 			}
 			client := clientsetfake.NewClientset(testNode, pg)
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
+			if err := informerFactory.Core().V1().Nodes().Informer().GetIndexer().Add(testNode); err != nil {
+				t.Fatalf("Failed to add test node to informer: %v", err)
+			}
 			client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
 				if action.GetSubresource() != "binding" {
 					return false, nil, nil
@@ -1882,6 +1900,7 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 			schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
+				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithWaitingPods(waitingPods),
 				frameworkruntime.WithPodsInPreBind(podInPreBind),
 			)
@@ -1893,10 +1912,6 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 			cache.AddNode(klog.FromContext(ctx), testNode)
 			apg := framework.NewGenericPodGroup(pg)
 			cache.AddGenericPodGroup(apg)
-
-			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
 
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			schedulingQueue := internalqueue.NewTestQueue(ctx, schedFwk.QueueSortFunc(), internalqueue.WithClock(fakeClock))
@@ -4548,6 +4563,11 @@ func TestScheduleOnePodGroup_SchedulerNameMismatchUpdatesStatus(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	client := clientsetfake.NewClientset(testPodGroup)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
+
 	registry := frameworkruntime.Registry{
 		queuesort.Name:     queuesort.New,
 		defaultbinder.Name: defaultbinder.New,
@@ -4565,6 +4585,7 @@ func TestScheduleOnePodGroup_SchedulerNameMismatchUpdatesStatus(t *testing.T) {
 	}
 	schedFwk1, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg1,
 		frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
+		frameworkruntime.WithInformerFactory(informerFactory),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create new framework 1: %v", err)
@@ -4574,6 +4595,7 @@ func TestScheduleOnePodGroup_SchedulerNameMismatchUpdatesStatus(t *testing.T) {
 	profileCfg2.SchedulerName = "sched2"
 	schedFwk2, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg2,
 		frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
+		frameworkruntime.WithInformerFactory(informerFactory),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create new framework 2: %v", err)
