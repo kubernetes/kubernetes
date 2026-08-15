@@ -985,6 +985,7 @@ func testFitScore(tCtx ktesting.TContext) {
 		nodeResourcesFitArgs config.NodeResourcesFitArgs
 		runPreScore          bool
 		draObjects           []apiruntime.Object
+		podLevelResources    bool
 	}{
 		{
 			name: "test case for ScoringStrategy RequestedToCapacityRatio case1",
@@ -1249,6 +1250,30 @@ func testFitScore(tCtx ktesting.TContext) {
 				},
 			},
 		},
+		{
+			// The container requests nothing, so a score of 50 is only reachable if
+			// the pod-level requests are the ones handed to the scorer. If they get
+			// skipped, the container falls back to the non-zero defaults (100m CPU,
+			// 200Mi memory) and the node looks nearly empty instead.
+			name:              "pod-level requests are used for scoring when PodLevelResources is enabled",
+			podLevelResources: true,
+			requestedPod: st.MakePod().Container("image").Resources(v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2000"),
+					v1.ResourceMemory: resource.MustParse("5000000000"),
+				},
+			}).Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{"cpu": "4000", "memory": "10000000000"}).Obj(),
+			},
+			expectedPriorities: []fwk.NodeScore{{Name: "node1", Score: 50}},
+			nodeResourcesFitArgs: config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type:      config.LeastAllocated,
+					Resources: defaultResources,
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -1267,6 +1292,7 @@ func testFitScore(tCtx ktesting.TContext) {
 			args := test.nodeResourcesFitArgs
 			p, err := NewFit(tCtx, &args, fh, plfeature.Features{
 				EnableDRAExtendedResource: test.draObjects != nil,
+				EnablePodLevelResources:   test.podLevelResources,
 			})
 			if err != nil {
 				tCtx.Fatalf("unexpected error: %v", err)
@@ -1457,7 +1483,10 @@ func TestEventsToRegister(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fp := &Fit{enableInPlacePodVerticalScaling: test.enableInPlacePodVerticalScaling, enableDRAExtendedResource: test.enableDRAExtendedResource}
+			fp := &Fit{resourceAllocationScorer: &resourceAllocationScorer{
+				enableInPlacePodVerticalScaling: test.enableInPlacePodVerticalScaling,
+				enableDRAExtendedResource:       test.enableDRAExtendedResource,
+			}}
 			_, ctx := ktesting.NewTestContext(t)
 			actualClusterEvents, err := fp.EventsToRegister(ctx)
 			if err != nil {
