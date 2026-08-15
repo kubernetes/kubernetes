@@ -1964,42 +1964,76 @@ func mergingMapFieldsHaveConflicts(
 
 func mapsHaveConflicts(typedLeft, typedRight map[string]interface{}, schema LookupPatchMeta) (bool, error) {
 	for key, leftValue := range typedLeft {
-		if key != directiveMarker && key != retainKeysDirective {
-			if rightValue, ok := typedRight[key]; ok {
-				var subschema LookupPatchMeta
-				var patchMeta PatchMeta
-				var patchStrategy string
-				var err error
-				switch leftValue.(type) {
-				case []interface{}:
-					subschema, patchMeta, err = schema.LookupPatchMetadataForSlice(key)
-					if err != nil {
-						return true, err
-					}
-					_, patchStrategy, err = extractRetainKeysPatchStrategy(patchMeta.patchStrategies)
-					if err != nil {
-						return true, err
-					}
-				case map[string]interface{}:
-					subschema, patchMeta, err = schema.LookupPatchMetadataForStruct(key)
-					if err != nil {
-						return true, err
-					}
-					_, patchStrategy, err = extractRetainKeysPatchStrategy(patchMeta.patchStrategies)
-					if err != nil {
-						return true, err
-					}
-				}
-
-				if hasConflicts, err := mergingMapFieldsHaveConflicts(leftValue, rightValue,
-					subschema, patchStrategy, patchMeta.GetPatchMergeKey()); hasConflicts {
+		if key == directiveMarker || key == retainKeysDirective {
+			continue
+		}
+		if strings.HasPrefix(key, deleteFromPrimitiveListDirectivePrefix+"/") ||
+			strings.HasPrefix(key, setElementOrderDirectivePrefix+"/") {
+			// Parallel-list directive keys are not real struct fields, so the
+			// schema lookup below would fail for them. Compare their values
+			// directly instead: identical directives are not a conflict, while
+			// differing directives are, matching how mergeMap treats them when
+			// merging two patches (differing $setElementOrder lists are
+			// rejected and a later $deleteFromPrimitiveList overwrites an
+			// earlier one).
+			if rightValue, ok := typedRight[key]; ok && parallelListDirectivesConflict(key, leftValue, rightValue) {
+				return true, nil
+			}
+			continue
+		}
+		if rightValue, ok := typedRight[key]; ok {
+			var subschema LookupPatchMeta
+			var patchMeta PatchMeta
+			var patchStrategy string
+			var err error
+			switch leftValue.(type) {
+			case []interface{}:
+				subschema, patchMeta, err = schema.LookupPatchMetadataForSlice(key)
+				if err != nil {
 					return true, err
 				}
+				_, patchStrategy, err = extractRetainKeysPatchStrategy(patchMeta.patchStrategies)
+				if err != nil {
+					return true, err
+				}
+			case map[string]interface{}:
+				subschema, patchMeta, err = schema.LookupPatchMetadataForStruct(key)
+				if err != nil {
+					return true, err
+				}
+				_, patchStrategy, err = extractRetainKeysPatchStrategy(patchMeta.patchStrategies)
+				if err != nil {
+					return true, err
+				}
+			}
+
+			if hasConflicts, err := mergingMapFieldsHaveConflicts(leftValue, rightValue,
+				subschema, patchStrategy, patchMeta.GetPatchMergeKey()); hasConflicts {
+				return true, err
 			}
 		}
 	}
 
 	return false, nil
+}
+
+// parallelListDirectivesConflict returns true if two occurrences of the same
+// parallel-list directive key disagree. $setElementOrder lists are compared
+// as-is, because their order is the meaning of the directive.
+// $deleteFromPrimitiveList lists are compared as sets, because deleteFromSlice
+// treats them as one: element order and duplicates do not affect the result.
+func parallelListDirectivesConflict(key string, leftValue, rightValue interface{}) bool {
+	if strings.HasPrefix(key, deleteFromPrimitiveListDirectivePrefix+"/") {
+		leftList, leftOk := leftValue.([]interface{})
+		rightList, rightOk := rightValue.([]interface{})
+		if leftOk && rightOk {
+			// deduplicateAndSortScalars mutates its argument, so pass copies.
+			leftSet := deduplicateAndSortScalars(append([]interface{}{}, leftList...))
+			rightSet := deduplicateAndSortScalars(append([]interface{}{}, rightList...))
+			return !reflect.DeepEqual(leftSet, rightSet)
+		}
+	}
+	return !reflect.DeepEqual(leftValue, rightValue)
 }
 
 func slicesHaveConflicts(

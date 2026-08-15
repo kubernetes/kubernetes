@@ -7059,3 +7059,201 @@ func TestUnknownField(t *testing.T) {
 		})
 	}
 }
+
+func TestMergingMapsHaveConflictsPrimitiveListDirectives(t *testing.T) {
+	testCases := []struct {
+		name             string
+		left             map[string]interface{}
+		right            map[string]interface{}
+		expectedConflict bool
+	}{
+		{
+			name: "identical deleteFromPrimitiveList directives are not a conflict",
+			left: map[string]interface{}{
+				"$deleteFromPrimitiveList/mergingIntList": []interface{}{int64(2)},
+			},
+			right: map[string]interface{}{
+				"$deleteFromPrimitiveList/mergingIntList": []interface{}{int64(2)},
+			},
+			expectedConflict: false,
+		},
+		{
+			name: "identical setElementOrder directives are not a conflict",
+			left: map[string]interface{}{
+				"$setElementOrder/mergingIntList": []interface{}{int64(1), int64(3)},
+			},
+			right: map[string]interface{}{
+				"$setElementOrder/mergingIntList": []interface{}{int64(1), int64(3)},
+			},
+			expectedConflict: false,
+		},
+		{
+			// Merging two patches with differing deletion lists silently drops
+			// the earlier one (preprocessDeletionListForMerging overwrites it),
+			// so the conflict check must report a conflict.
+			name: "differing deleteFromPrimitiveList directives are a conflict",
+			left: map[string]interface{}{
+				"$deleteFromPrimitiveList/mergingIntList": []interface{}{int64(2)},
+			},
+			right: map[string]interface{}{
+				"$deleteFromPrimitiveList/mergingIntList": []interface{}{int64(3)},
+			},
+			expectedConflict: true,
+		},
+		{
+			// Merging two patches with differing setElementOrder lists is
+			// rejected by mergePatchIntoOriginal, so the conflict check must
+			// report a conflict.
+			name: "differing setElementOrder directives are a conflict",
+			left: map[string]interface{}{
+				"$setElementOrder/mergingIntList": []interface{}{int64(1), int64(3)},
+			},
+			right: map[string]interface{}{
+				"$setElementOrder/mergingIntList": []interface{}{int64(3), int64(1)},
+			},
+			expectedConflict: true,
+		},
+		{
+			name: "directive present on one side only is not a conflict",
+			left: map[string]interface{}{
+				"$deleteFromPrimitiveList/mergingIntList": []interface{}{int64(2)},
+			},
+			right:            map[string]interface{}{},
+			expectedConflict: false,
+		},
+		{
+			// deleteFromSlice treats the deletion list as a set, so element
+			// order does not change the meaning of the directive.
+			name: "reordered deleteFromPrimitiveList directives are not a conflict",
+			left: map[string]interface{}{
+				"$deleteFromPrimitiveList/mergingIntList": []interface{}{int64(2), int64(3)},
+			},
+			right: map[string]interface{}{
+				"$deleteFromPrimitiveList/mergingIntList": []interface{}{int64(3), int64(2)},
+			},
+			expectedConflict: false,
+		},
+		{
+			// deleteFromSlice treats the deletion list as a set, so duplicate
+			// elements do not change the meaning of the directive.
+			name: "duplicated deleteFromPrimitiveList directives are not a conflict",
+			left: map[string]interface{}{
+				"$deleteFromPrimitiveList/mergingIntList": []interface{}{int64(2)},
+			},
+			right: map[string]interface{}{
+				"$deleteFromPrimitiveList/mergingIntList": []interface{}{int64(2), int64(2)},
+			},
+			expectedConflict: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			conflict, err := MergingMapsHaveConflicts(tc.left, tc.right, mergeItemStructSchema)
+			if err != nil {
+				t.Fatalf("MergingMapsHaveConflicts returned unexpected error: %v", err)
+			}
+			if conflict != tc.expectedConflict {
+				t.Fatalf("expected conflict=%v, got %v", tc.expectedConflict, conflict)
+			}
+		})
+	}
+}
+
+func TestMergingMapsHaveConflictsNestedPrimitiveListDirectives(t *testing.T) {
+	type nestedMergingList struct {
+		MergingIntList []int `json:"mergingIntList,omitempty" patchStrategy:"merge"`
+	}
+	type nestedHolder struct {
+		Inner nestedMergingList `json:"inner,omitempty"`
+	}
+	schema, err := NewPatchMetaFromStruct(nestedHolder{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	nested := func(deletions ...interface{}) map[string]interface{} {
+		return map[string]interface{}{
+			"inner": map[string]interface{}{
+				"$deleteFromPrimitiveList/mergingIntList": deletions,
+			},
+		}
+	}
+
+	conflict, err := MergingMapsHaveConflicts(nested(int64(2)), nested(int64(2)), schema)
+	if err != nil {
+		t.Fatalf("nested identical directives returned unexpected error: %v", err)
+	}
+	if conflict {
+		t.Fatalf("nested identical directives reported as conflict")
+	}
+
+	conflict, err = MergingMapsHaveConflicts(nested(int64(2)), nested(int64(3)), schema)
+	if err != nil {
+		t.Fatalf("nested differing directives returned unexpected error: %v", err)
+	}
+	if !conflict {
+		t.Fatalf("nested differing directives not reported as conflict")
+	}
+}
+
+func TestThreeWayMergePatchPrimitiveListDeletionIdempotent(t *testing.T) {
+	original := []byte(`{"mergingIntList":[1,2,3]}`)
+	modified := []byte(`{"mergingIntList":[1,3]}`)
+	current := []byte(`{"mergingIntList":[1,3]}`)
+
+	// Deleting an element of a primitive merge list whose deletion is already
+	// reflected in the live object (i.e. the live object has drifted from the
+	// last-applied state) must not error with overwrite=false.
+	patch, err := CreateThreeWayMergePatch(original, modified, current, mergeItemStructSchema, false)
+	if err != nil {
+		t.Fatalf("CreateThreeWayMergePatch returned unexpected error: %v", err)
+	}
+
+	// current already matches modified, so an (incorrect) empty patch would
+	// pass the applied-result check below; assert the patch content itself.
+	expectedPatch := []byte(`{"$deleteFromPrimitiveList/mergingIntList":[2],"$setElementOrder/mergingIntList":[1,3]}`)
+	var expectedPatchObj, patchObj map[string]interface{}
+	if err := json.Unmarshal(expectedPatch, &expectedPatchObj); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(patch, &patchObj); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(expectedPatchObj, patchObj) {
+		t.Fatalf("expected patch %s, got %s", expectedPatch, patch)
+	}
+
+	applied, err := StrategicMergePatch(current, patch, MergeItem{})
+	if err != nil {
+		t.Fatalf("StrategicMergePatch returned unexpected error: %v", err)
+	}
+
+	var modifiedObj, appliedObj map[string]interface{}
+	if err := json.Unmarshal(modified, &modifiedObj); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(applied, &appliedObj); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(modifiedObj, appliedObj) {
+		t.Fatalf("expected applied result %s, got %s", modified, applied)
+	}
+}
+
+func TestThreeWayMergePatchPrimitiveListDifferingDeletionsConflict(t *testing.T) {
+	original := []byte(`{"mergingIntList":[1,2,3]}`)
+	modified := []byte(`{"mergingIntList":[1,3]}`)
+	current := []byte(`{"mergingIntList":[1,2]}`)
+
+	// The user deletes 2 while the live object drifted by deleting 3: the
+	// deletion directives differ, so overwrite=false must report a proper
+	// conflict instead of an internal schema-lookup error.
+	_, err := CreateThreeWayMergePatch(original, modified, current, mergeItemStructSchema, false)
+	if err == nil {
+		t.Fatalf("expected a conflict error, got none")
+	}
+	if !mergepatch.IsConflict(err) {
+		t.Fatalf("expected a conflict error, got: %v", err)
+	}
+}
