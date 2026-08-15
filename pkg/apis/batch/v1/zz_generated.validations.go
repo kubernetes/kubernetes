@@ -403,7 +403,7 @@ func Validate_JobSchedulingConfiguration(
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a *schedulingv1alpha3.WorkloadPodGroupResourceClaim, b *schedulingv1alpha3.WorkloadPodGroupResourceClaim) bool {
 					return a.Name == b.Name
-				}, validate.SemanticDeepEqual, v1alpha3.Validate_WorkloadPodGroupResourceClaim); len(e) != 0 {
+				}, deepEqualImpl_, v1alpha3.Validate_WorkloadPodGroupResourceClaim); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -582,4 +582,9 @@ func Validate_JobTemplateSpec(
 	}
 
 	return errs
+}
+
+// deepEqualImpl_ is a validate.MatchFunc which allows the implementation of deep-equality to be defined at codegen time.
+func deepEqualImpl_[T any](a, b T) bool {
+	return equality.Semantic.DeepEqual(a, b)
 }

@@ -855,7 +855,7 @@ func Validate_NodeAllocatableResourceClaimStatus(
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a *corev1.NodeAllocatableMappedResources, b *corev1.NodeAllocatableMappedResources) bool {
 					return a.Name == b.Name
-				}, validate.SemanticDeepEqual, Validate_NodeAllocatableMappedResources); len(e) != 0 {
+				}, deepEqualImpl_, Validate_NodeAllocatableMappedResources); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -897,7 +897,7 @@ func Validate_NodeAllocatableResourceClaimStatus(
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a *corev1.NodeAllocatableOverheadResources, b *corev1.NodeAllocatableOverheadResources) bool {
 					return a.Name == b.Name
-				}, validate.SemanticDeepEqual, Validate_NodeAllocatableOverheadResources); len(e) != 0 {
+				}, deepEqualImpl_, Validate_NodeAllocatableOverheadResources); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -1390,7 +1390,7 @@ func Validate_PodSpec(
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a *corev1.EvictionResponder, b *corev1.EvictionResponder) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_EvictionResponder); len(e) != 0 {
+				func(a *corev1.EvictionResponder, b *corev1.EvictionResponder) bool { return a.Name == b.Name }, deepEqualImpl_, Validate_EvictionResponder); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -1462,7 +1462,7 @@ func Validate_PodStatus(
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a *corev1.NodeAllocatableResourceClaimStatus, b *corev1.NodeAllocatableResourceClaimStatus) bool {
 					return a.ResourceClaimName == b.ResourceClaimName
-				}, validate.SemanticDeepEqual, Validate_NodeAllocatableResourceClaimStatus); len(e) != 0 {
+				}, deepEqualImpl_, Validate_NodeAllocatableResourceClaimStatus); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -1500,7 +1500,7 @@ func Validate_PodStatus(
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a *corev1.PodVolumeHealth, b *corev1.PodVolumeHealth) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_PodVolumeHealth); len(e) != 0 {
+				func(a *corev1.PodVolumeHealth, b *corev1.PodVolumeHealth) bool { return a.Name == b.Name }, deepEqualImpl_, Validate_PodVolumeHealth); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -2249,4 +2249,9 @@ func Validate_VolumeHealthStatusType(
 	}
 
 	return errs
+}
+
+// deepEqualImpl_ is a validate.MatchFunc which allows the implementation of deep-equality to be defined at codegen time.
+func deepEqualImpl_[T any](a, b T) bool {
+	return equality.Semantic.DeepEqual(a, b)
 }

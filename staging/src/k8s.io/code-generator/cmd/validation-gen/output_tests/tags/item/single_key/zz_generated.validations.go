@@ -303,7 +303,7 @@ func Validate_Struct(
 			}
 			func() { // cohort = "{"key": "target-ptr"}"
 				if e := validate.ValSliceItem(ctx, op, fldPath, obj, oldObj,
-					func(item *PtrKeyItem) bool { return item.Key != nil && *item.Key == "target-ptr" }, validate.SemanticDeepEqual,
+					func(item *PtrKeyItem) bool { return item.Key != nil && *item.Key == "target-ptr" }, deepEqualImpl_,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *PtrKeyItem) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item PtrKeyItems[key=target-ptr]")
 					}); len(e) != 0 {
@@ -409,4 +409,9 @@ func Validate_StructWithNestedTypedef(
 	}
 
 	return errs
+}
+
+// deepEqualImpl_ is a validate.MatchFunc which allows the implementation of deep-equality to be defined at codegen time.
+func deepEqualImpl_[T any](a, b T) bool {
+	return equality.Semantic.DeepEqual(a, b)
 }

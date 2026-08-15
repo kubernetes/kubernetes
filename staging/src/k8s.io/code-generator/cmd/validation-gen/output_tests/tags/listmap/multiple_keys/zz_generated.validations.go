@@ -245,7 +245,7 @@ func Validate_Struct(
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a *NonComparableStruct, b *NonComparableStruct) bool {
 					return a.Key1Field == b.Key1Field && a.Key2Field == b.Key2Field
-				}, validate.SemanticDeepEqual,
+				}, deepEqualImpl_,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NonComparableStruct) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListNonComparableField[*]")
 				}); len(e) != 0 {
@@ -290,7 +290,7 @@ func Validate_Struct(
 				if e := validate.ValSliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *PtrKeyStruct) bool {
 						return item.Key1Field != nil && *item.Key1Field == "target-ptr" && item.Key2Field == 42
-					}, validate.SemanticDeepEqual,
+					}, deepEqualImpl_,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *PtrKeyStruct) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item ListPtrKeyField[key1Field=target-ptr,key2Field=42]")
 					}); len(e) != 0 {
@@ -329,7 +329,7 @@ func Validate_Struct(
 				if e := validate.ValSliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *MixedPtrKeyStruct) bool {
 						return item.StringPtrKey != nil && *item.StringPtrKey == "target-ptr" && item.StringKey == "target"
-					}, validate.SemanticDeepEqual,
+					}, deepEqualImpl_,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MixedPtrKeyStruct) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item ListMixedPtrKeyField")
 					}); len(e) != 0 {
@@ -346,4 +346,9 @@ func Validate_Struct(
 	}
 
 	return errs
+}
+
+// deepEqualImpl_ is a validate.MatchFunc which allows the implementation of deep-equality to be defined at codegen time.
+func deepEqualImpl_[T any](a, b T) bool {
+	return equality.Semantic.DeepEqual(a, b)
 }
