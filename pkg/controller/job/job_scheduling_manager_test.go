@@ -790,6 +790,46 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 			wantPodGroupName:         delegatedPodGroupName,
 			wantPodGroupGangMinCount: new(int32(4)),
 		},
+		// Regression coverage for https://github.com/kubernetes/kubernetes/issues/141380:
+		// the parent Workload can become discoverable on a sync after the
+		// delegated Job's own first sync already wrote StartTime or the
+		// Suspended condition. Unlike the root (manageBoth) path, the
+		// delegated path must still create the PodGroup once the dependency
+		// resolves, since it does not treat those fields as closing the
+		// creation window (see isNewJobForDelegation).
+		"delegated Job creates the PodGroup once the parent Workload appears, even after StartTime was set": {
+			job: func() *batch.Job {
+				j := delegatedJob.DeepCopy()
+				now := metav1.Now()
+				j.Status.StartTime = &now
+				return j
+			}(),
+			existingWorkloads:        []*schedulingv1beta1.Workload{makeParentWorkload(4)},
+			wantPodGroup:             true,
+			wantPodGroupName:         delegatedPodGroupName,
+			wantPodGroupGangMinCount: new(int32(4)),
+		},
+		"delegated Job creates the PodGroup once the parent Workload appears, even after the Suspended condition was set": {
+			job: func() *batch.Job {
+				j := delegatedJob.DeepCopy()
+				j.Status.Conditions = []batch.JobCondition{
+					{
+						Type:   batch.JobSuspended,
+						Status: v1.ConditionTrue,
+					},
+				}
+				return j
+			}(),
+			existingWorkloads:        []*schedulingv1beta1.Workload{makeParentWorkload(4)},
+			wantPodGroup:             true,
+			wantPodGroupName:         delegatedPodGroupName,
+			wantPodGroupGangMinCount: new(int32(4)),
+		},
+		"delegated Job with pods already running does not create a PodGroup even once the parent Workload appears": {
+			job:               delegatedJob,
+			pods:              []*v1.Pod{{ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Namespace: metav1.NamespaceDefault}}},
+			existingWorkloads: []*schedulingv1beta1.Workload{makeParentWorkload(4)},
+		},
 	}
 
 	for name, tc := range testCases {

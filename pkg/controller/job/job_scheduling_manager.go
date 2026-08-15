@@ -124,15 +124,18 @@ func (jm *Controller) ensureWorkloadAndPodGroup(ctx context.Context, job *batch.
 		return nil, nil, nil
 	}
 
-	// Objects are only created for a Job that has never started, so a
-	// Job that predates the feature gate being enabled is left untouched.
-	// An already-started Job discovers and reuses existing objects
-	// but never creates new ones.
-	newJob := isNewJob(job, pods)
-
-	// Case 1 - manage the PodGroup only.
+	// Case 1 - manage the PodGroup only (delegated, non-root Job).
+	//
+	// This deliberately does not use isNewJob: delegation is opt-in via an
+	// annotation, so there's no "predates the feature gate" concern to guard
+	// against, and isNewJob's StartTime/Suspended-condition checks would
+	// permanently foreclose creation the moment the Job's first sync writes
+	// either of those fields -- which happens in that very same sync, before
+	// the parent-owned Workload this path depends on is necessarily visible
+	// yet. Gating on "no pods yet" instead keeps the retry genuinely open
+	// across syncs until the dependency resolves or the Job starts running.
 	if mode == managePodGroupOnly {
-		pg, err := jm.getOrCreateDelegatedPodGroup(ctx, job, newJob)
+		pg, err := jm.getOrCreateDelegatedPodGroup(ctx, job, isNewJobForDelegation(pods))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -140,6 +143,12 @@ func (jm *Controller) ensureWorkloadAndPodGroup(ctx context.Context, job *batch.
 	}
 
 	// Case 2 - manage both Workload and PodGroup (root Job).
+	//
+	// Objects are only created for a Job that has never started, so a
+	// Job that predates the feature gate being enabled is left untouched.
+	// An already-started Job discovers and reuses existing objects
+	// but never creates new ones.
+	newJob := isNewJob(job, pods)
 	wl, err := jm.getOrCreateWorkload(ctx, job, newJob)
 	if err != nil || wl == nil {
 		return nil, nil, err
@@ -379,6 +388,18 @@ func isNewJob(job *batch.Job, pods []*v1.Pod) bool {
 		return false
 	}
 	return findConditionByType(job.Status.Conditions, batch.JobSuspended) == nil
+}
+
+// isNewJobForDelegation returns true if the Job has no pods yet. Unlike
+// isNewJob, it does not consult StartTime or the Suspended condition: both
+// get written during the Job's first sync (the same sync that evaluates
+// this), so using them here would close the delegated-PodGroup creation
+// window after a single sync regardless of whether the parent-owned
+// Workload this path depends on has become discoverable yet. There's no
+// "predates the feature gate" concern to guard against for this path since
+// delegation is opt-in via an annotation on the Job's pod template.
+func isNewJobForDelegation(pods []*v1.Pod) bool {
+	return len(pods) == 0
 }
 
 // getOrCreateWorkload returns the Workload for this Job, creating one if needed.
