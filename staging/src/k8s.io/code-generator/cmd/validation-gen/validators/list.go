@@ -408,7 +408,7 @@ func (cutv customUniqueTagValidator) Docs() TagDoc {
 var (
 	validateValSliceUnique    = types.Name{Package: libValidationPkg, Name: "ValSliceUnique"}
 	validatePtrSliceUnique    = types.Name{Package: libValidationPkg, Name: "PtrSliceUnique"}
-	validateSemanticDeepEqual = types.Name{Package: libValidationPkg, Name: "SemanticDeepEqual"}
+	validateSemanticDeepEqual = DeepEqualImpl
 	validateDirectEqual       = types.Name{Package: libValidationPkg, Name: "DirectEqual"}
 )
 

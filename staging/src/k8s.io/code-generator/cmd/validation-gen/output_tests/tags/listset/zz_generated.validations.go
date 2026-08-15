@@ -183,7 +183,7 @@ func Validate_ImmutableStruct(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, deepEqualImpl_, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -191,7 +191,7 @@ func Validate_ImmutableStruct(
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
-			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, deepEqualImpl_); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -278,7 +278,7 @@ func Validate_ImmutableStruct(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, deepEqualImpl_, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -286,7 +286,7 @@ func Validate_ImmutableStruct(
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
-			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, deepEqualImpl_); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -397,7 +397,7 @@ func Validate_Struct(
 			}
 			// call field-attached validations
 			// lists with set semantics require unique values
-			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, deepEqualImpl_); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -422,7 +422,7 @@ func Validate_Struct(
 			}
 			// call field-attached validations
 			// lists with set semantics require unique values
-			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, deepEqualImpl_); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -435,4 +435,9 @@ func Validate_Struct(
 	}
 
 	return errs
+}
+
+// deepEqualImpl_ is a validate.MatchFunc which allows the implementation of deep-equality to be defined at codegen time.
+func deepEqualImpl_[T any](a, b T) bool {
+	return equality.Semantic.DeepEqual(a, b)
 }
