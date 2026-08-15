@@ -199,13 +199,12 @@ func (utc updateTagCollector) Docs() TagDoc {
 }
 
 var (
-	updateValueValidator          = types.Name{Package: libValidationPkg, Name: "UpdateValueByCompare"}
-	updatePointerValidator        = types.Name{Package: libValidationPkg, Name: "UpdatePointer"}
-	updateValueByReflectValidator = types.Name{Package: libValidationPkg, Name: "UpdateValueByReflect"}
-	updateStructValidator         = types.Name{Package: libValidationPkg, Name: "UpdateStruct"}
-	valSliceUpdateValidator       = types.Name{Package: libValidationPkg, Name: "ValSliceUpdate"}
-	ptrSliceUpdateValidator       = types.Name{Package: libValidationPkg, Name: "PtrSliceUpdate"}
-	updateMapValidator            = types.Name{Package: libValidationPkg, Name: "UpdateMap"}
+	updateValueValidator    = types.Name{Package: libValidationPkg, Name: "UpdateValue"}
+	updatePointerValidator  = types.Name{Package: libValidationPkg, Name: "UpdatePointer"}
+	updateStructValidator   = types.Name{Package: libValidationPkg, Name: "UpdateStruct"}
+	valSliceUpdateValidator = types.Name{Package: libValidationPkg, Name: "ValSliceUpdate"}
+	ptrSliceUpdateValidator = types.Name{Package: libValidationPkg, Name: "PtrSliceUpdate"}
+	updateMapValidator      = types.Name{Package: libValidationPkg, Name: "UpdateMap"}
 
 	// Constraint constants that will be used as arguments
 	noSetConstraint        = types.Name{Package: libValidationPkg, Name: "NoSet"}
@@ -314,9 +313,8 @@ func generateMapValidation(constraints []validate.UpdateConstraint) Validations 
 	return Validations{Functions: []FunctionGen{fn}}
 }
 
-// emitScalarUpdate emits a call to
-// UpdateValueByCompare/UpdatePointer/UpdateStruct/UpdateValueByReflect based
-// on the Go kind of context.Type.
+// emitScalarUpdate emits a call to UpdateValue/UpdatePointer/UpdateStruct
+// based on the Go kind of context.Type.
 // Used for both field scope (scalar/pointer/struct) and list/map element
 // scope via +k8s:eachVal.
 func emitScalarUpdate(context Context, constraints []validate.UpdateConstraint) Validations {
@@ -327,21 +325,33 @@ func emitScalarUpdate(context Context, constraints []validate.UpdateConstraint) 
 	isComparable := util.IsDirectComparable(t)
 
 	var validatorFunc types.Name
+	var args []any
 	if isPointer {
 		validatorFunc = updatePointerValidator
+		args = constraintIdentifierArgs(constraints)
 	} else if isStruct {
 		validatorFunc = updateStructValidator
-	} else if isComparable {
-		validatorFunc = updateValueValidator
+		args = constraintIdentifierArgs(constraints)
 	} else {
-		validatorFunc = updateValueByReflectValidator
+		validatorFunc = updateValueValidator
+		var matchArg any
+		if isComparable {
+			matchArg = FunctionLiteral{
+				Parameters: []ParamResult{{"a", context.Type}, {"b", context.Type}},
+				Results:    []ParamResult{{"", types.Bool}},
+				Body:       "return a == b",
+			}
+		} else {
+			matchArg = Identifier(validateSemanticDeepEqual)
+		}
+		args = append([]any{matchArg}, constraintIdentifierArgs(constraints)...)
 	}
 
 	// Use ShortCircuit flag so these run in the same group as +k8s:optional.
 	// Scalar/pointer/struct fields only accept NoSet/NoUnset/NoModify
 	// (validateConstraintsForType rejects the rest), all of which emit
 	// field.Invalid at the field path.
-	fn := Function(updateTagName, ShortCircuit, validatorFunc, constraintIdentifierArgs(constraints)...).
+	fn := Function(updateTagName, ShortCircuit, validatorFunc, args...).
 		WithEmits(Emission{field.ErrorTypeInvalid, "update", ""})
 	return Validations{Functions: []FunctionGen{fn}}
 }
