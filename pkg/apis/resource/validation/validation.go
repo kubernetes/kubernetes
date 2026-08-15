@@ -728,7 +728,7 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 	allErrs = append(allErrs, validateSet(spec.Devices, maxDevices,
 		func(device resource.Device, fldPath *field.Path) field.ErrorList {
 			oldDevice := lookupDevice(oldSpec, device.Name)
-			return validateDevice(device, oldDevice, fldPath, spec.PerDeviceNodeSelection)
+			return validateDevice(device, deviceRevalidationFor(oldDevice, device), fldPath, spec.PerDeviceNodeSelection)
 		},
 		func(device resource.Device) string {
 			return device.Name
@@ -830,9 +830,66 @@ func validateResourcePool(pool resource.ResourcePool, fldPath *field.Path) field
 	return allErrs
 }
 
-func validateDevice(device resource.Device, oldDevice *resource.Device, fldPath *field.Path, perDeviceNodeSelection *bool) field.ErrorList {
+// capacityRevalidation selects how much of a device's capacity map an update must
+// re-validate. Its zero value re-validates everything, so a newly created device
+// (which has no stored device to correlate with) is always fully validated.
+type capacityRevalidation int
+
+const (
+	// capacityValidateAll re-validates capacity keys and values. Used for a new
+	// device or a changed capacity map.
+	capacityValidateAll capacityRevalidation = iota
+	// capacityValidateValues re-validates capacity values only, leaving unchanged
+	// keys ratcheted. Used when the capacity map is unchanged but the effective
+	// allowMultipleAllocations value changed: that flips the value validator
+	// (single- vs multi-allocatable) without affecting key syntax, so re-checking
+	// unchanged keys would risk rejecting stored data that a later, stricter key
+	// check has not grandfathered (see #141644).
+	capacityValidateValues
+	// capacitySkip skips capacity validation. Used when neither the capacity map nor
+	// the effective allocation mode changed.
+	capacitySkip
+)
+
+// deviceRevalidation records what an update must re-validate for one device.
+// validateResourceSliceSpec owns this decision by correlating the stored and
+// updated device; validateDevice consumes it. The zero value re-validates
+// everything.
+type deviceRevalidation struct {
+	capacity     capacityRevalidation
+	taintsStored bool
+}
+
+// effectiveAllowMultipleAllocations reports a device's effective
+// AllowMultipleAllocations, treating a nil pointer (and a nil device) as false.
+func effectiveAllowMultipleAllocations(device *resource.Device) bool {
+	return device != nil && device.AllowMultipleAllocations != nil && *device.AllowMultipleAllocations
+}
+
+// deviceRevalidationFor decides what an update must re-validate for a device by
+// correlating it with the stored device. A new device (oldDevice == nil) gets the
+// zero value, which re-validates everything. New per-device ratcheting rules
+// should be added here rather than inside validateDevice.
+func deviceRevalidationFor(oldDevice *resource.Device, device resource.Device) deviceRevalidation {
+	if oldDevice == nil {
+		return deviceRevalidation{}
+	}
+	revalidation := deviceRevalidation{
+		taintsStored: apiequality.Semantic.DeepEqual(oldDevice.Taints, device.Taints),
+	}
+	switch {
+	case !apiequality.Semantic.DeepEqual(oldDevice.Capacity, device.Capacity):
+		revalidation.capacity = capacityValidateAll
+	case effectiveAllowMultipleAllocations(oldDevice) != effectiveAllowMultipleAllocations(&device):
+		revalidation.capacity = capacityValidateValues
+	default:
+		revalidation.capacity = capacitySkip
+	}
+	return revalidation
+}
+
+func validateDevice(device resource.Device, revalidation deviceRevalidation, fldPath *field.Path, perDeviceNodeSelection *bool) field.ErrorList {
 	var allErrs field.ErrorList
-	allowMultipleAllocations := device.AllowMultipleAllocations != nil && *device.AllowMultipleAllocations
 	allErrs = append(allErrs, validateDeviceName(device.Name, fldPath.Child("name"))...)
 
 	// Warn about exceeding the maximum length only once. If any individual
@@ -848,18 +905,25 @@ func validateDevice(device resource.Device, oldDevice *resource.Device, fldPath 
 	}
 
 	allErrs = append(allErrs, validateMap(device.Attributes, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateDeviceAttribute, fldPath.Child("attributes"))...)
-	// If the entire capacity is the same as before then validation can be skipped.
-	// We could also do the DeepEqual on the entire spec, but here it is a bit cheaper.
-	if oldDevice == nil || !apiequality.Semantic.DeepEqual(oldDevice.Capacity, device.Capacity) {
-		if allowMultipleAllocations {
-			allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateMultiAllocatableDeviceCapacity, fldPath.Child("capacity"))...)
-		} else {
-			allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateSingleAllocatableDeviceCapacity, fldPath.Child("capacity"))...)
+	// The value validator for capacity depends on the effective allowMultipleAllocations
+	// value: it selects the single- vs multi-allocatable check. The key validator does not.
+	// validateResourceSliceSpec decides, per device, whether to validate the whole capacity
+	// map, only its values (map unchanged but the mode flipped), or nothing (both unchanged).
+	if revalidation.capacity != capacitySkip {
+		validateCapacityKey := validateQualifiedName
+		if revalidation.capacity == capacityValidateValues {
+			// The capacity map is unchanged, so its keys keep whatever validation they
+			// already passed; only the values need re-checking under the new mode.
+			validateCapacityKey = func(resource.QualifiedName, *field.Path) field.ErrorList { return nil }
 		}
+		validateCapacityValue := validateSingleAllocatableDeviceCapacity
+		if effectiveAllowMultipleAllocations(&device) {
+			validateCapacityValue = validateMultiAllocatableDeviceCapacity
+		}
+		allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateCapacityKey, validateCapacityValue, fldPath.Child("capacity"))...)
 	}
-	// If the entire set is the same as before then validation can be skipped.
-	// We could also do the DeepEqual on the entire spec, but here it is a bit cheaper.
-	if oldDevice == nil || !apiequality.Semantic.DeepEqual(oldDevice.Taints, device.Taints) {
+	// Unchanged taints keep the validation they already passed.
+	if !revalidation.taintsStored {
 		allErrs = append(allErrs, validateSlice(device.Taints, resource.DeviceTaintsMaxLength,
 			func(taint resource.DeviceTaint, fldPath *field.Path) field.ErrorList {
 				return validateDeviceTaint(taint, nil, fldPath)
@@ -1076,7 +1140,7 @@ func validateDeviceAttributeVersionValue(value *string, fldPath *field.Path) fie
 }
 
 // validateMultiAllocatableDeviceCapacity must check requestPolicy in consumable capacity.
-// It only gets called for new or modified capacity.
+// It gets called for new or modified capacity, or when allowMultipleAllocations changes.
 func validateMultiAllocatableDeviceCapacity(capacity resource.DeviceCapacity, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if capacity.RequestPolicy != nil {
@@ -1098,7 +1162,7 @@ func validateSingleAllocatableDeviceCapacity(capacity resource.DeviceCapacity, f
 
 // validateRequestPolicy validates at most one of ValidRequestValues can be defined.
 // If any ValidRequestValues are defined, Default must also be defined and valid.
-// Only gets called for new or modified policy.
+// Gets called for new or modified policy, or when allowMultipleAllocations changes.
 func validateRequestPolicy(maxCapacity apiresource.Quantity, policy *resource.CapacityRequestPolicy, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(policy.ValidValues) > 0 && policy.ValidRange != nil {
@@ -1168,7 +1232,7 @@ func validateRequestPolicyValidValues(defaultValue apiresource.Quantity, maxCapa
 }
 
 // validateRequestPolicyRange validates a CapacityRequestPolicyRange.
-// Only gets called for a new or modified range.
+// Gets called for a new or modified range, or when allowMultipleAllocations changes.
 func validateRequestPolicyRange(defaultValue apiresource.Quantity, maxCapacity apiresource.Quantity, valueRange resource.CapacityRequestPolicyRange, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if valueRange.Min == nil {

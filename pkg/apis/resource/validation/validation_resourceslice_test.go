@@ -1722,6 +1722,40 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 		},
 	}
 
+	// Not creatable today: single-allocatable forbids a requestPolicy, so this models legacy or skewed stored data.
+	singleAllocWithStoredInvalidPolicy := testResourceSliceWithConsumableCapacity(name, name, name, 1)
+	singleAllocWithStoredInvalidPolicy.Spec.Devices[0].AllowMultipleAllocations = ptr.To(false)
+	updateConsumableCapacity(singleAllocWithStoredInvalidPolicy, 0, func(cap *resourceapi.DeviceCapacity) {
+		cap.RequestPolicy = &resourceapi.CapacityRequestPolicy{
+			ValidValues: []resource.Quantity{resource.MustParse("10")},
+			ValidRange:  &resourceapi.CapacityRequestPolicyRange{Min: ptr.To(resource.MustParse("1"))},
+		}
+	})
+
+	// Not creatable today: the capacity key "a-b" fails the current validateQualifiedName (a
+	// hyphen is not a valid C identifier), so this models legacy or skewed stored data. The
+	// value carries no requestPolicy, so it stays valid in both allocation modes and only the
+	// key would be re-checked. This is the ratcheting that #141644's stricter key syntax needs.
+	sliceWithStoredInvalidCapacityKey := testResourceSliceWithConsumableCapacity(name, name, name, 1)
+	sliceWithStoredInvalidCapacityKey.Spec.Devices[0].AllowMultipleAllocations = ptr.To(false)
+	updateConsumableCapacity(sliceWithStoredInvalidCapacityKey, 0, func(cap *resourceapi.DeviceCapacity) {
+		cap.RequestPolicy = nil
+	})
+	sliceWithStoredInvalidCapacityKey.Spec.Devices[0].Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+		"a-b": sliceWithStoredInvalidCapacityKey.Spec.Devices[0].Capacity["a"],
+	}
+
+	// Same modeling as singleAllocWithStoredInvalidPolicy but with the mode left unset, to
+	// cover the unset<->false direction (both are the same effective mode).
+	unsetAllocWithStoredInvalidPolicy := testResourceSliceWithConsumableCapacity(name, name, name, 1)
+	unsetAllocWithStoredInvalidPolicy.Spec.Devices[0].AllowMultipleAllocations = nil
+	updateConsumableCapacity(unsetAllocWithStoredInvalidPolicy, 0, func(cap *resourceapi.DeviceCapacity) {
+		cap.RequestPolicy = &resourceapi.CapacityRequestPolicy{
+			ValidValues: []resource.Quantity{resource.MustParse("10")},
+			ValidRange:  &resourceapi.CapacityRequestPolicyRange{Min: ptr.To(resource.MustParse("1"))},
+		}
+	})
+
 	scenarios := map[string]struct {
 		consumableCapacityFeatureGate      bool
 		fractionalCapacityRangeFeatureGate bool
@@ -1732,6 +1766,96 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 		"valid-no-op-update": {
 			oldResourceSlice: validResourceSlice,
 			update:           func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice { return slice },
+		},
+		"disable-allow-multiple-keeps-request-policy": {
+			consumableCapacityFeatureGate: true,
+			oldResourceSlice:              testResourceSliceWithConsumableCapacity(name, name, name, 1),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Devices[0].AllowMultipleAllocations = ptr.To(false)
+				return slice
+			},
+			wantFailures: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "devices").Index(0).Child("capacity").Key("a").Child("requestPolicy"), "allowMultipleAllocations must be true"),
+			},
+		},
+		"unset-allow-multiple-keeps-request-policy": {
+			consumableCapacityFeatureGate: true,
+			oldResourceSlice:              testResourceSliceWithConsumableCapacity(name, name, name, 1),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Devices[0].AllowMultipleAllocations = nil
+				return slice
+			},
+			wantFailures: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "devices").Index(0).Child("capacity").Key("a").Child("requestPolicy"), "allowMultipleAllocations must be true"),
+			},
+		},
+		"enable-allow-multiple-revalidates-stored-invalid-request-policy": {
+			consumableCapacityFeatureGate: true,
+			oldResourceSlice:              singleAllocWithStoredInvalidPolicy,
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Devices[0].AllowMultipleAllocations = ptr.To(true)
+				return slice
+			},
+			wantFailures: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "devices").Index(0).Child("capacity").Key("a").Child("requestPolicy"), `exactly one policy can be specified, cannot specify "validValues" and "validRange" at the same time`),
+			},
+		},
+		"attribute-update-does-not-revalidate-unchanged-capacity": {
+			consumableCapacityFeatureGate: true,
+			oldResourceSlice:              singleAllocWithStoredInvalidPolicy,
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				if slice.Spec.Devices[0].Attributes == nil {
+					slice.Spec.Devices[0].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{}
+				}
+				slice.Spec.Devices[0].Attributes["foo"] = resourceapi.DeviceAttribute{StringValue: ptr.To("bar")}
+				return slice
+			},
+			// No failures: changing an unrelated field must not re-validate the unchanged,
+			// stored-invalid capacity. Guards against whole-device revalidation.
+		},
+		"disable-to-unset-does-not-revalidate-capacity": {
+			consumableCapacityFeatureGate: true,
+			oldResourceSlice:              singleAllocWithStoredInvalidPolicy,
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Devices[0].AllowMultipleAllocations = nil
+				return slice
+			},
+			// No failures: false and unset are the same effective mode, so the unchanged
+			// capacity stays ratcheted. Guards against comparing the raw pointers.
+		},
+		"unset-to-disable-does-not-revalidate-capacity": {
+			consumableCapacityFeatureGate: true,
+			oldResourceSlice:              unsetAllocWithStoredInvalidPolicy,
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Devices[0].AllowMultipleAllocations = ptr.To(false)
+				return slice
+			},
+			// No failures: the reverse direction of the same effective-mode no-op.
+		},
+		"disable-allow-multiple-and-remove-request-policy": {
+			consumableCapacityFeatureGate: true,
+			oldResourceSlice:              testResourceSliceWithConsumableCapacity(name, name, name, 1),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Devices[0].AllowMultipleAllocations = ptr.To(false)
+				updateConsumableCapacity(slice, 0, func(cap *resourceapi.DeviceCapacity) {
+					cap.RequestPolicy = nil
+				})
+				return slice
+			},
+			// No failures: disabling allowMultipleAllocations while removing the now-invalid
+			// requestPolicy is a valid repair, not an immutable-field or blanket rejection.
+		},
+		"allocation-mode-change-does-not-revalidate-stored-capacity-key": {
+			consumableCapacityFeatureGate: true,
+			oldResourceSlice:              sliceWithStoredInvalidCapacityKey,
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Devices[0].AllowMultipleAllocations = ptr.To(true)
+				return slice
+			},
+			// No failures: the capacity map is unchanged, so its keys stay ratcheted even
+			// though the mode change re-runs the value validator. The stored key is invalid
+			// under the current validateQualifiedName, so a full re-validation would wrongly
+			// reject it; this is the ratcheting #141644's stricter key syntax relies on.
 		},
 		"invalid-name-update": {
 			oldResourceSlice: validResourceSlice,
