@@ -1029,7 +1029,8 @@ func Validate_ParentWithUpdate(
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
 					func(o *TargetWithUpdate) *string { return &o.Value }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-						return validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify)
+						return validate.UpdateValue(ctx, op, fldPath, obj, oldObj,
+							func(a string, b string) bool { return a == b }, validate.NoModify)
 					}).MarkShortCircuit(); len(e) != 0 {
 					earlyReturn = true
 				}
@@ -1308,7 +1309,8 @@ func Validate_TargetWithUpdate(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.UpdateValue(ctx, op, fldPath, obj, oldObj,
+				func(a string, b string) bool { return a == b }, validate.NoModify).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
