@@ -29111,6 +29111,13 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 							Format:      "",
 						},
 					},
+					"nodeUID": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NodeUID indicates the UID of the Node object where this pod is scheduled.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"hostNetwork": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Host networking requested for this pod. Use the host's network namespace. When using HostNetwork you should specify ports so the scheduler is aware. When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`, and unspecified `hostPort` fields in port definitions are defaulted to match `containerPort`. Default to false.",
