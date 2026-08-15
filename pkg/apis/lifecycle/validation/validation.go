@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/validate"
@@ -487,7 +488,7 @@ func ValidateEvictionStatusResponder(status, oldStatus *lifecycle.ResponderStatu
 		oldDefaultedStatus = *oldStatus // +k8s:verify-mutation:reason=clone
 	}
 
-	if oldStatus != nil && !validate.SemanticDeepEqual(status, oldStatus) && opts.responderState != lifecycle.ResponderStateActive {
+	if oldStatus != nil && !equality.Semantic.DeepEqual(status, oldStatus) && opts.responderState != lifecycle.ResponderStateActive {
 		// immutable; changes to the ResponderStatus are only allowed by the active responder or during initialization
 		return append(allErrs, field.Invalid(fldPath, status, validation.FieldImmutableErrorMsg).WithOrigin("immutable"))
 	}

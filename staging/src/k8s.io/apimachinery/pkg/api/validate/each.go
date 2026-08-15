@@ -18,6 +18,7 @@ package validate
 
 import (
 	"context"
+	"reflect"
 	"slices"
 	"sort"
 
@@ -291,8 +292,20 @@ func PtrSliceUnique[T any](_ context.Context, _ operation.Operation, fldPath *fi
 // arguments of type interface{}/any. The wrapper satisfies the type
 // constraints of MatchFunc while leveraging the underlying semantic equality
 // logic. It can be used by any other function that needs to call DeepEqual.
+//
+// Deprecated: Callers should use equality.Semantic.DeepEqual directly.
 func SemanticDeepEqual[T any](a, b T) bool {
 	return equality.Semantic.DeepEqual(a, b)
+}
+
+// ReflectDeepEqual is a MatchFunc that uses reflect.DeepEqual to compare two
+// values.
+// This wrapper is needed because MatchFunc requires a function that takes two
+// arguments of specific type T, while reflect.DeepEqual takes arguments of
+// type interface{}/any. It can be used by any other function that needs to
+// call DeepEqual.
+func ReflectDeepEqual[T any](a, b T) bool {
+	return reflect.DeepEqual(a, b)
 }
 
 // DirectEqual is a MatchFunc that dereferences two pointers and uses the ==
