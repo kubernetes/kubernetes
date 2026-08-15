@@ -913,6 +913,99 @@ func TestApplyOverride(t *testing.T) {
 	}
 }
 
+// TestApplyOverrideDoesNotMatchUnrelatedLeafCommand verifies that a default
+// configured for one command is not applied to an unrelated command that only
+// shares the same leaf name (e.g. "config view" vs "kuberc view").
+// See https://github.com/kubernetes/kubectl/issues/1862.
+func TestApplyOverrideDoesNotMatchUnrelatedLeafCommand(t *testing.T) {
+	// newRootCmd builds a command tree with two distinct subtrees that share the
+	// same "view" leaf name: "config view" and "kuberc view".
+	newRootCmd := func() *cobra.Command {
+		rootCmd := &cobra.Command{Use: "root"}
+
+		configCmd := &cobra.Command{Use: "config"}
+		configView := &cobra.Command{Use: "view"}
+		configView.Flags().String("output", "yaml", "")
+		configCmd.AddCommand(configView)
+
+		kubercCmd := &cobra.Command{Use: "kuberc"}
+		kubercView := &cobra.Command{Use: "view"}
+		kubercView.Flags().String("output", "yaml", "")
+		kubercCmd.AddCommand(kubercView)
+
+		rootCmd.AddCommand(configCmd, kubercCmd)
+		return rootCmd
+	}
+
+	// The default targets "config view" only.
+	getPreferencesFunc := func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+		return &config.Preference{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Preference",
+				APIVersion: "kubectl.config.k8s.io/v1alpha1",
+			},
+			Defaults: []config.CommandDefaults{
+				{
+					Command: "config view",
+					Options: []config.CommandOptionDefault{
+						{Name: "output", Default: "json"},
+					},
+				},
+			},
+		}, nil
+	}
+
+	tests := []struct {
+		name           string
+		args           []string
+		findArgs       []string
+		expectedOutput string
+	}{
+		{
+			name:           "unrelated leaf command is not overridden",
+			args:           []string{"root", "kuberc", "view"},
+			findArgs:       []string{"kuberc", "view"},
+			expectedOutput: "yaml",
+		},
+		{
+			name:           "targeted command is still overridden",
+			args:           []string{"root", "config", "view"},
+			findArgs:       []string{"config", "view"},
+			expectedOutput: "json",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rootCmd := newRootCmd()
+			opts := genericclioptions.NewConfigFlags(false)
+			prefHandler := NewPreferences()
+			prefHandler.AddFlags(rootCmd.PersistentFlags())
+			pref, ok := prefHandler.(*Preferences)
+			if !ok {
+				t.Fatal("unexpected type. Expected *Preferences")
+			}
+			pref.getPreferencesFunc = getPreferencesFunc
+			errWriter := &bytes.Buffer{}
+
+			if _, err := pref.Apply(rootCmd, opts, test.args, errWriter); err != nil {
+				t.Fatalf("unexpected error %v\n", err)
+			}
+			if errWriter.String() != "" {
+				t.Fatalf("unexpected error message %s\n", errWriter.String())
+			}
+
+			actualCmd, _, err := rootCmd.Find(test.findArgs)
+			if err != nil {
+				t.Fatalf("unable to find the command %v\n", err)
+			}
+			if got := actualCmd.Flag("output").Value.String(); got != test.expectedOutput {
+				t.Fatalf("unexpected flag value for %q: expected %s actual %s\n", actualCmd.CommandPath(), test.expectedOutput, got)
+			}
+		})
+	}
+}
+
 func TestApplyOverrideBool(t *testing.T) {
 	tests := []testApplyOverride[bool]{
 		{
