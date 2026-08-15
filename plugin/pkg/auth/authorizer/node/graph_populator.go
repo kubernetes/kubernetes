@@ -28,7 +28,6 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	certsv1informers "k8s.io/client-go/informers/certificates/v1"
 	corev1informers "k8s.io/client-go/informers/core/v1"
@@ -113,7 +112,7 @@ func AddGraphEventHandlers(
 		synced = append(synced, pcrHandler.HasSynced)
 	}
 
-	go cache.WaitForNamedCacheSync("node_authorizer", wait.NeverStop, synced...)
+	go cache.WaitForNamedCacheSync("node_authorizer", stopCh, synced...)
 }
 
 func (g *graphPopulator) addPod(obj interface{}) {
