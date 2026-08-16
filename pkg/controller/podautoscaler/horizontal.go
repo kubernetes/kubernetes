@@ -1452,7 +1452,7 @@ func calculateScaleUpLimitWithScalingRules(currentReplicas int32, scaleUpEvents,
 			proposed = periodStartReplicas + policy.Value
 		} else if policy.Type == autoscalingv2.PercentScalingPolicy {
 			// the proposal has to be rounded up because the proposed change might not increase the replica count causing the target to never scale up
-			proposed = int32(math.Ceil(float64(periodStartReplicas) * (1 + float64(policy.Value)/100)))
+			proposed = ceilToInt32(float64(periodStartReplicas) * (1 + float64(policy.Value)/100))
 		}
 		result = selectPolicyFn(result, proposed)
 	}
