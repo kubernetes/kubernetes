@@ -788,9 +788,15 @@ func TestClearQuotaReclaimsProjectID(t *testing.T) {
 	if _, err := tmpProjectsFile.WriteString(projectsHeader); err != nil {
 		t.Fatalf("Unable to write fake projects file: %v", err)
 	}
-	tmpProjectsFile.Close()
+	if err := tmpProjectsFile.Close(); err != nil {
+		t.Fatalf("Unable to close fake projects file: %v", err)
+	}
 	projectsFile = tmpProjectsFile.Name()
-	defer os.Remove(projectsFile)
+	t.Cleanup(func() {
+		if err := os.Remove(projectsFile); err != nil {
+			t.Errorf("Unable to remove fake projects file: %v", err)
+		}
+	})
 
 	tmpProjidFile, err := os.CreateTemp("", "projid")
 	if err != nil {
@@ -799,9 +805,15 @@ func TestClearQuotaReclaimsProjectID(t *testing.T) {
 	if _, err := tmpProjidFile.WriteString(projidHeader); err != nil {
 		t.Fatalf("Unable to write fake projid file: %v", err)
 	}
-	tmpProjidFile.Close()
+	if err := tmpProjidFile.Close(); err != nil {
+		t.Fatalf("Unable to close fake projid file: %v", err)
+	}
 	projidFile = tmpProjidFile.Name()
-	defer os.Remove(projidFile)
+	t.Cleanup(func() {
+		if err := os.Remove(projidFile); err != nil {
+			t.Errorf("Unable to remove fake projid file: %v", err)
+		}
+	})
 
 	providers = []common.LinuxVolumeQuotaProvider{
 		&VolumeProvider1{},
