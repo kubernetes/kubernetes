@@ -39,11 +39,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -3272,7 +3274,7 @@ func TestSchedulerBinding(t *testing.T) {
 		},
 		{
 			name:                           "extender binder is skipped for deferred resize pod",
-			pod:                            st.MakePod().Name("pod0").Node("node").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+			pod:                            st.MakePod().Name("pod0").UID("pod0").Node("node").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
 			enableDeferredResizePreemption: true,
 			extenders: []fwk.Extender{
 				&fakeExtender{isBinder: true, interestedPodName: "pod0"},
@@ -3370,6 +3372,7 @@ func TestUpdatePodStatus(t *testing.T) {
 		newPodCondition          *v1.PodCondition
 		currentNominatedNodeName string
 		newNominatingInfo        *fwk.NominatingInfo
+		patchErr                 error
 		expectPatchRequest       bool
 		expectedPatchDataPattern string
 	}{
@@ -3385,7 +3388,7 @@ func TestUpdatePodStatus(t *testing.T) {
 				Message:            "newMessage",
 			},
 			expectPatchRequest:       true,
-			expectedPatchDataPattern: `{"status":{"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"newType"}]}}`,
+			expectedPatchDataPattern: `{"metadata":{"uid":"foo-uid"},"status":{"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"newType"}]}}`,
 		},
 		{
 			name: "Should make patch request to add a new pod condition when there is already one with another type",
@@ -3408,7 +3411,7 @@ func TestUpdatePodStatus(t *testing.T) {
 				Message:            "newMessage",
 			},
 			expectPatchRequest:       true,
-			expectedPatchDataPattern: `{"status":{"\$setElementOrder/conditions":\[{"type":"someOtherType"},{"type":"newType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"newType"}]}}`,
+			expectedPatchDataPattern: `{"metadata":{"uid":"foo-uid"},"status":{"\$setElementOrder/conditions":\[{"type":"someOtherType"},{"type":"newType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"newType"}]}}`,
 		},
 		{
 			name: "Should make patch request to update an existing pod condition",
@@ -3431,7 +3434,7 @@ func TestUpdatePodStatus(t *testing.T) {
 				Message:            "newMessage",
 			},
 			expectPatchRequest:       true,
-			expectedPatchDataPattern: `{"status":{"\$setElementOrder/conditions":\[{"type":"currentType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"currentType"}]}}`,
+			expectedPatchDataPattern: `{"metadata":{"uid":"foo-uid"},"status":{"\$setElementOrder/conditions":\[{"type":"currentType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"currentType"}]}}`,
 		},
 		{
 			name: "Should make patch request to update an existing pod condition, but the transition time should remain unchanged because the status is the same",
@@ -3454,7 +3457,7 @@ func TestUpdatePodStatus(t *testing.T) {
 				Message:            "newMessage",
 			},
 			expectPatchRequest:       true,
-			expectedPatchDataPattern: `{"status":{"\$setElementOrder/conditions":\[{"type":"currentType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","message":"newMessage","reason":"newReason","type":"currentType"}]}}`,
+			expectedPatchDataPattern: `{"metadata":{"uid":"foo-uid"},"status":{"\$setElementOrder/conditions":\[{"type":"currentType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","message":"newMessage","reason":"newReason","type":"currentType"}]}}`,
 		},
 		{
 			name: "Should not make patch request if pod condition already exists and is identical and nominated node name is not set",
@@ -3501,7 +3504,7 @@ func TestUpdatePodStatus(t *testing.T) {
 			},
 			newNominatingInfo:        &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"},
 			expectPatchRequest:       true,
-			expectedPatchDataPattern: `{"status":{"nominatedNodeName":"node1"}}`,
+			expectedPatchDataPattern: `{"metadata":{"uid":"foo-uid"},"status":{"nominatedNodeName":"node1"}}`,
 		},
 		{
 			name: "Should not update nominated node name when nominatingInfo is nil",
@@ -3526,7 +3529,7 @@ func TestUpdatePodStatus(t *testing.T) {
 			currentNominatedNodeName: "existing-node",
 			newNominatingInfo:        nil,
 			expectPatchRequest:       true,
-			expectedPatchDataPattern: `{"status":{"\$setElementOrder/conditions":\[{"type":"currentType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"currentType"}]}}`,
+			expectedPatchDataPattern: `{"metadata":{"uid":"foo-uid"},"status":{"\$setElementOrder/conditions":\[{"type":"currentType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"currentType"}]}}`,
 		},
 		{
 			name: "Should not make patch request when nominatingInfo is nil and pod condition is unchanged",
@@ -3552,6 +3555,21 @@ func TestUpdatePodStatus(t *testing.T) {
 			newNominatingInfo:        nil,
 			expectPatchRequest:       false,
 		},
+		{
+			name:                     "Should ignore NotFound error when pod is already deleted",
+			newNominatingInfo:        &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"},
+			patchErr:                 apierrors.NewNotFound(v1.Resource("pods"), "foo"),
+			expectPatchRequest:       true,
+			expectedPatchDataPattern: `{"metadata":{"uid":"foo-uid"},"status":{"nominatedNodeName":"node1"}}`,
+		},
+		{
+			name:              "Should ignore Invalid error on metadata.uid when pod was recreated",
+			newNominatingInfo: &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"},
+			patchErr: apierrors.NewInvalid(v1.SchemeGroupVersion.WithKind("Pod").GroupKind(), "foo",
+				field.ErrorList{field.Invalid(field.NewPath("metadata").Child("uid"), "foo-uid", "field is immutable")}),
+			expectPatchRequest:       true,
+			expectedPatchDataPattern: `{"metadata":{"uid":"foo-uid"},"status":{"nominatedNodeName":"node1"}}`,
+		},
 	}
 	for _, asyncAPICallsEnabled := range []bool{true, false} {
 		for _, test := range tests {
@@ -3565,12 +3583,15 @@ func TestUpdatePodStatus(t *testing.T) {
 					patch := action.(clienttesting.PatchAction)
 					actualPatchData = string(patch.GetPatch())
 					patchCalled <- struct{}{}
+					if test.patchErr != nil {
+						return true, nil, test.patchErr
+					}
 					// For this test, we don't care about the result of the patched pod, just that we got the expected
 					// patch request, so just returning &v1.Pod{} here is OK because scheduler doesn't use the response.
 					return true, &v1.Pod{}, nil
 				})
 
-				pod := st.MakePod().Name("foo").NominatedNodeName(test.currentNominatedNodeName).Conditions(test.currentPodConditions).Obj()
+				pod := st.MakePod().Name("foo").UID("foo-uid").NominatedNodeName(test.currentNominatedNodeName).Conditions(test.currentPodConditions).Obj()
 
 				logger, ctx := ktesting.NewTestContext(t)
 				ctx, cancel := context.WithCancel(ctx)

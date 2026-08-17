@@ -32,7 +32,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/retry"
@@ -250,6 +252,7 @@ func TestPatchPodStatus(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns",
 					Name:      "pod1",
+					UID:       "pod1-uid",
 				},
 				Spec: v1.PodSpec{
 					ImagePullSecrets: []v1.LocalObjectReference{{Name: "foo"}},
@@ -274,6 +277,7 @@ func TestPatchPodStatus(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns",
 					Name:      "pod1",
+					UID:       "pod1-uid",
 				},
 				Spec: v1.PodSpec{
 					// this will serialize to imagePullSecrets:[{}]
@@ -316,6 +320,7 @@ func TestPatchPodStatus(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns",
 					Name:      "pod1",
+					UID:       "pod1-uid",
 				},
 				Spec: v1.PodSpec{
 					ImagePullSecrets: []v1.LocalObjectReference{{Name: "foo"}},
@@ -353,6 +358,7 @@ func TestPatchPodStatus(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns",
 					Name:      "pod1",
+					UID:       "pod1-uid",
 				},
 				Spec: v1.PodSpec{
 					ImagePullSecrets: []v1.LocalObjectReference{{Name: "foo"}},
@@ -375,6 +381,7 @@ func TestPatchPodStatus(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "ns",
 					Name:      "pod1",
+					UID:       "pod1-uid",
 				},
 			},
 			statusToUpdate: v1.PodStatus{
@@ -405,7 +412,7 @@ func TestPatchPodStatus(t *testing.T) {
 			if tc.nilOldStatus {
 				oldStatus = nil
 			}
-			err = PatchPodStatus(ctx, client, tc.pod.Name, tc.pod.Namespace, oldStatus, &tc.statusToUpdate)
+			err = PatchPodStatus(ctx, client, tc.pod.Name, tc.pod.Namespace, tc.pod.UID, oldStatus, &tc.statusToUpdate)
 			if err != nil && tc.validateErr == nil {
 				// shouldn't be error
 				t.Fatal(err)
@@ -424,6 +431,171 @@ func TestPatchPodStatus(t *testing.T) {
 
 			if diff := cmp.Diff(tc.statusToUpdate, retrievedPod.Status); diff != "" {
 				t.Errorf("unexpected pod status (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestPatchPodStatusUIDPrecondition covers the uid precondition itself: that it reaches
+// the API server in the patch, that it is mandatory, and that it does not turn an
+// unchanged status into a write.
+func TestPatchPodStatusUIDPrecondition(t *testing.T) {
+	pod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod1", UID: "pod1-uid"},
+		Status: v1.PodStatus{
+			Conditions: []v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionFalse}},
+		},
+	}
+	updatedStatus := v1.PodStatus{
+		Conditions: []v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionTrue}},
+	}
+
+	tests := []struct {
+		name           string
+		uid            types.UID
+		statusToUpdate v1.PodStatus
+		wantErr        bool
+		// wantPatch is the exact patch expected to reach the API server. Empty means
+		// no patch request must be issued at all.
+		wantPatch string
+	}{
+		{
+			name:           "uid is sent as a precondition",
+			uid:            pod.UID,
+			statusToUpdate: updatedStatus,
+			wantPatch:      `{"metadata":{"uid":"pod1-uid"},"status":{"$setElementOrder/conditions":[{"type":"PodScheduled"}],"conditions":[{"status":"True","type":"PodScheduled"}]}}`,
+		},
+		{
+			name:           "unchanged status does not issue a patch",
+			uid:            pod.UID,
+			statusToUpdate: pod.Status,
+		},
+		{
+			name:           "empty uid is rejected",
+			uid:            "",
+			statusToUpdate: updatedStatus,
+			wantErr:        true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			client := clientsetfake.NewClientset()
+			if _, err := client.CoreV1().Pods(pod.Namespace).Create(ctx, &pod, metav1.CreateOptions{}); err != nil {
+				t.Fatal(err)
+			}
+
+			var gotPatches []string
+			client.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				gotPatches = append(gotPatches, string(action.(clienttesting.PatchAction).GetPatch()))
+				// Let the tracker apply the patch as usual.
+				return false, nil, nil
+			})
+
+			err := PatchPodStatus(ctx, client, pod.Name, pod.Namespace, tc.uid, &pod.Status, &tc.statusToUpdate)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected an error, got none")
+				}
+			} else if err != nil {
+				t.Fatal(err)
+			}
+
+			var wantPatches []string
+			if tc.wantPatch != "" {
+				wantPatches = []string{tc.wantPatch}
+			}
+			if diff := cmp.Diff(wantPatches, gotPatches); diff != "" {
+				t.Errorf("unexpected patch requests (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestDeletePodUIDPrecondition(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	pod := st.MakePod().Namespace("ns").Name("pod1").UID("pod1-uid").Obj()
+	client := clientsetfake.NewClientset()
+	var gotOptions *metav1.DeleteOptions
+	client.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		opts := action.(clienttesting.DeleteAction).GetDeleteOptions()
+		gotOptions = &opts
+		return true, nil, nil
+	})
+
+	if err := DeletePod(ctx, client, pod); err != nil {
+		t.Fatalf("DeletePod() unexpected error: %v", err)
+	}
+	wantOptions := &metav1.DeleteOptions{
+		Preconditions: metav1.NewUIDPreconditions("pod1-uid"),
+	}
+	if diff := cmp.Diff(wantOptions, gotOptions); diff != "" {
+		t.Errorf("unexpected DeleteOptions (-want,+got):\n%s", diff)
+	}
+}
+
+func TestDeletePodRequiresUID(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	pod := st.MakePod().Namespace("ns").Name("pod1").Obj()
+	client := clientsetfake.NewClientset()
+	client.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		t.Errorf("unexpected delete call when pod UID is empty")
+		return true, nil, nil
+	})
+
+	if err := DeletePod(ctx, client, pod); err == nil {
+		t.Fatal("DeletePod() with empty UID: expected an error, got nil")
+	}
+}
+
+func TestIsPodUIDPreconditionError(t *testing.T) {
+	podGK := v1.SchemeGroupVersion.WithKind("Pod").GroupKind()
+	uidInvalidErr := apierrors.NewInvalid(podGK, "pod1", field.ErrorList{
+		field.Invalid(field.NewPath("metadata").Child("uid"), "pod1-uid", "field is immutable"),
+	})
+
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "nil error",
+			err:  nil,
+			want: false,
+		},
+		{
+			name: "not-found error",
+			err:  apierrors.NewNotFound(v1.Resource("pods"), "pod1"),
+			want: false,
+		},
+		{
+			name: "invalid error on metadata.uid",
+			err:  uidInvalidErr,
+			want: true,
+		},
+		{
+			name: "wrapped invalid error on metadata.uid",
+			err:  fmt.Errorf("patching pod: %w", uidInvalidErr),
+			want: true,
+		},
+		{
+			name: "invalid error on another field",
+			err: apierrors.NewInvalid(podGK, "pod1", field.ErrorList{
+				field.Invalid(field.NewPath("status").Child("conditions"), "", "invalid condition"),
+			}),
+			want: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := IsPodUIDPreconditionError(tc.err); got != tc.want {
+				t.Errorf("IsPodUIDPreconditionError(%v) = %v, want %v", tc.err, got, tc.want)
 			}
 		})
 	}

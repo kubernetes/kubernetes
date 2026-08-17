@@ -26,6 +26,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -1042,5 +1043,8 @@ func updatePod(ctx context.Context, client clientset.Interface, apiCacher fwk.AP
 	if nnnNeedsUpdate {
 		podStatusCopy.NominatedNodeName = nominatingInfo.NominatedNodeName
 	}
-	return util.PatchPodStatus(ctx, client, pod.Name, pod.Namespace, &pod.Status, podStatusCopy)
+	if err := util.PatchPodStatus(ctx, client, pod.Name, pod.Namespace, pod.UID, &pod.Status, podStatusCopy); err != nil && !apierrors.IsNotFound(err) && !util.IsPodUIDPreconditionError(err) {
+		return err
+	}
+	return nil
 }
