@@ -18,12 +18,15 @@ package cacher
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"k8s.io/utils/clock"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -89,6 +92,54 @@ type cacheWatcher struct {
 
 	// state holds a numeric value indicating the current state of the watcher
 	state int
+
+	// The fields below exist for the WatchCacheStallResume feature gate.
+	// Unless noted otherwise they are written only by the dispatcher
+	// goroutine, so they need no lock.
+
+	// stallMetrics is non-nil exactly when the gate is on; it is the only
+	// gate signal the watcher goroutine has for its in-stream 410 paths.
+	stallMetrics *metrics.StallResumeObservers
+	// position is the highest resourceVersion accounted for: every event
+	// this watcher must see at or below it is in input (or was filtered
+	// out), and every one above it is still to be offered.
+	position uint64
+	// unsynced marks a watcher the live path skips because it missed an
+	// event; sync passes serve it from the history until it catches up.
+	unsynced bool
+	// catchupEvents counts the events sync passes pushed since the watcher
+	// went unsynced, for the catch-up histogram.
+	catchupEvents int
+	// servedPass is the number of the sync pass that last served this
+	// watcher since it went unsynced, 0 for none. fastDrainer is judged
+	// once after each service (judged records that), at the first pass
+	// the watcher has room again: true if its input was empty by then.
+	// The lead choice prefers an unserved or fast draining watcher;
+	// a pass that leaves the watcher out never changes the judgement.
+	servedPass  uint64
+	judged      bool
+	fastDrainer bool
+	// scope, triggerValue and triggerSupported are the registration keys;
+	// forget deletes the watcher by them and a sync pass selects events
+	// for it like startDispatching does.
+	scope            namespacedName
+	triggerValue     string
+	triggerSupported bool
+	// live is set by the watcher goroutine once it serves the live stream;
+	// the dispatcher reads it to pick the 410 reason label.
+	live atomic.Bool
+	// expired is set (under the Cacher lock, before the input channel is
+	// closed) when the position aged out of the history; the watcher
+	// goroutine then ends the stream with a 410 once input is drained.
+	expired       bool
+	expiredReason string
+	// hardStop records a non-draining stop (set by stopWatcherLocked) so
+	// that a later draining stop cannot reopen the drain window and leave
+	// done unclosed.
+	hardStop bool
+	// forgotten is set by forgetWatcher (under the Cacher lock) so a sync
+	// pass can drop a watcher its client already stopped.
+	forgotten bool
 }
 
 func newCacheWatcher(
@@ -187,7 +238,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 		// This means that we couldn't send event to that watcher.
 		// Since we don't want to block on it infinitely,
 		// we simply terminate it.
-		metrics.TerminatedWatchersCounter.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Inc()
+		metrics.TerminatedWatchersCounter.WithLabelValues(c.groupResource.Group, c.groupResource.Resource, metrics.TerminationReasonUnresponsive).Inc()
 		// This means that we couldn't send event to that watcher.
 		// Since we don't want to block on it infinitely, we simply terminate it.
 
@@ -211,7 +262,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 			defer c.stateMutex.Unlock()
 			return c.state == cacheWatcherBookmarkReceived
 		}()
-		klog.V(1).Infof("Forcing %v watcher close due to unresponsiveness: %v. len(c.input) = %v, len(c.result) = %v, graceful = %v", c.groupResource.String(), c.identifier, len(c.input), len(c.result), graceful)
+		klog.V(1).Infof("Forcing %v watcher close due to unresponsiveness (reason = %v): %v. len(c.input) = %v, len(c.result) = %v, graceful = %v", c.groupResource.String(), metrics.TerminationReasonUnresponsive, c.identifier, len(c.input), len(c.result), graceful)
 		c.forget(graceful)
 	}
 
@@ -341,7 +392,7 @@ func (c *cacheWatcher) setBookmarkAfterResourceVersion(bookmarkAfterResourceVers
 // setDrainInputBufferLocked if set to true indicates that we should delay closing this watcher
 // until we send all events residing in the input buffer.
 func (c *cacheWatcher) setDrainInputBufferLocked(drain bool) {
-	c.drainInputBuffer = drain
+	c.drainInputBuffer = drain && !c.hardStop
 }
 
 // isDoneChannelClosed checks if c.done channel is closed
@@ -514,6 +565,13 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 		// An error indicates that the cache interval
 		// has been invalidated and can no longer serve
 		// events.
+		if c.stallMetrics != nil && errors.Is(err, errCacheIntervalInvalidated) {
+			// The history moved past the interval while the client was
+			// still consuming it: the client fell more than the history
+			// window behind, so tell it to re-list instead of just closing.
+			c.terminate(err, resourceVersion, metrics.TerminationReasonResourceExpiredInitial)
+			return
+		}
 		//
 		// Initially we considered sending an "out-of-history"
 		// Error event in this case, but because historically
@@ -525,7 +583,7 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 		// now, in order to be on the safe side and not break
 		// custom clients, the cost of it is something that we
 		// are fully accepting.
-		klog.Warningf("couldn't retrieve watch event to serve: %#v", err)
+		klog.Warningf("couldn't retrieve watch event to serve: %v", err)
 		return
 	}
 
@@ -553,10 +611,16 @@ func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
 	//   process, but we're leaving this to the tuning phase.
 	utilflowcontrol.WatchInitialized(ctx)
 
+	if c.stallMetrics != nil {
+		c.live.Store(true)
+	}
 	for {
 		select {
 		case event, ok := <-c.input:
 			if !ok {
+				if c.expired {
+					c.terminate(nil, c.position, c.expiredReason)
+				}
 				return
 			}
 			dequeuedAt := c.clock.Now()
@@ -584,4 +648,38 @@ func (c *cacheWatcher) observeDispatchMetrics(event *watchCacheEvent, dequeuedAt
 	tl.MarkAt(metrics.PointEventBuilt, builtAt)
 	tl.MarkAt(metrics.PointSentToClient, sentAt)
 	c.watcherMetrics.ObserveTimeline(&tl)
+}
+
+// terminate ends this watch because its position is no longer covered by the
+// watch cache history: the client gets one in-stream 410 (Expired) ERROR
+// event, exactly like a compaction on a direct etcd watch, and the deferred
+// close of the result channel in processInterval ends the stream. The
+// termination is counted here, under the given reason, when the 410 is
+// sent: a watcher expired by a pass whose initial interval is then
+// invalidated reaches this once, from processInterval, and a watcher the
+// client stopped first is not counted at all.
+func (c *cacheWatcher) terminate(err error, position uint64, reason string) {
+	select {
+	case <-c.done:
+		// Stopped by the client (Stop, deadline, shutdown): nobody reads
+		// the ERROR event.
+		return
+	default:
+	}
+	klog.V(2).InfoS("Terminating watcher: position no longer in the watch cache history",
+		"groupResource", c.groupResource, "identifier", c.identifier, "position", position, "reason", reason, "err", err)
+
+	var statusErr *apierrors.StatusError
+	if !errors.As(err, &statusErr) {
+		statusErr = apierrors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", position))
+	}
+	select {
+	case c.result <- watch.Event{Type: watch.Error, Object: &statusErr.ErrStatus}:
+		if reason == metrics.TerminationReasonResourceExpiredInitial {
+			c.stallMetrics.TerminatedExpiredInitial.Inc()
+		} else {
+			c.stallMetrics.TerminatedExpired.Inc()
+		}
+	case <-c.done:
+	}
 }

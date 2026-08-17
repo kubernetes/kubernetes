@@ -666,6 +666,33 @@ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, key string,
 	return w.history.GetIntervalLocked(resourceVersion, w.storage.ListResourceVersion(), w.RWMutex.RLocker())
 }
 
+// historyCatchUp is the sync passes' source of catch-up intervals. It reads
+// only the watch cache event history, never the store: an unsynced watcher is
+// served the recent events it missed, and a position that has aged out of the
+// history is reported as ResourceExpired instead of being turned into a
+// re-list of the whole state.
+type historyCatchUp struct {
+	cache *watchCache
+}
+
+// intervalSince returns an interval over the events newer than the given
+// resourceVersion, or a ResourceExpired error if that position is no longer
+// covered by the history.
+func (r *historyCatchUp) intervalSince(resourceVersion uint64) (*watchCacheInterval, error) {
+	r.cache.RLock()
+	defer r.cache.RUnlock()
+	return r.cache.history.GetIntervalLocked(resourceVersion, r.cache.storage.ListResourceVersion(), r.cache.RWMutex.RLocker())
+}
+
+// oldest returns the oldest resourceVersion intervalSince can serve from, the
+// same quantity GetIntervalLocked derives, or false while the history is not
+// initialized.
+func (r *historyCatchUp) oldest() (uint64, bool) {
+	r.cache.RLock()
+	defer r.cache.RUnlock()
+	return r.cache.history.oldestServableLocked(r.cache.storage.ListResourceVersion())
+}
+
 // getIntervalFromStoreLocked returns a watchCacheInterval
 // that covers the entire storage state.
 // This function assumes to be called under the watchCache lock.

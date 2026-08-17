@@ -17,10 +17,12 @@ limitations under the License.
 package cacher
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"net/http"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -343,6 +345,158 @@ type Cacher struct {
 	expiredBookmarkWatchers []*cacheWatcher
 	compactor               *compactor
 	watcherMetrics          *metrics.WatcherMetricsObservers
+
+	// stall is non-nil exactly when the WatchCacheStallResume feature gate
+	// is enabled (read once at construction): a watcher whose input channel
+	// fills up becomes unsynced and is served from the watch cache history
+	// by the dispatcher's sync passes instead of being terminated. When
+	// nil, dispatch behaves exactly as before the gate existed.
+	stall *cacherStall
+}
+
+const (
+	// syncScanBudget bounds the history events one sync pass reads, so
+	// catch-up work delays live dispatch by a bounded amount; 2000 was
+	// chosen so that one pass with 512 members costs about 1 ms.
+	syncScanBudget = 2000
+	// syncPushBudget bounds the events one pass pushes, for the same
+	// reason: 512 draining members in one cohort would otherwise take up
+	// to 512 times cap(input) pushes in one pass. It equals the scan
+	// budget, so a pass pushes at most about what it can scan; the busy
+	// period follows the pass duration, so the bound sets the slice, not
+	// the throughput. The bound is soft by one cohort's width, because a
+	// scanned event is offered to every cohort member or to none, plus
+	// the lead's room, because the lead is served past the budget (see
+	// serveSyncCohort).
+	syncPushBudget = syncScanBudget
+	// maxWatchersPerSync bounds the unsynced watchers one pass serves; it
+	// is etcd's maxWatchersPerSync (server/storage/mvcc/watchable_store.go).
+	maxWatchersPerSync = 512
+	// syncIntervalOpenCost is what a cohort's interval open costs in scan
+	// budget units: an open takes the watch cache read lock and allocates
+	// a 100 event buffer, so it is priced like a short scan. It bounds the
+	// intervals one pass opens, so many members with tiny windows cannot
+	// multiply the per interval cost; the cursor carries fairness across
+	// passes.
+	syncIntervalOpenCost = 64
+	// syncPushRetryRounds is how many rounds the end of a pass re-offers
+	// the owed events to a blocked eager member whose input drained during
+	// the pass, so a client that drains fast absorbs more than cap(input)
+	// events per pass; it also sizes the owed events a blocked member
+	// records, syncPushRetryRounds times cap(input).
+	syncPushRetryRounds = 2
+	// syncPassPeriod is the pass cadence while any watcher is unsynced;
+	// syncPassIdlePeriod takes over after a pass that served nothing.
+	// syncPassBusyPeriod is the floor of the period after a pass that left
+	// a member owed events with a full input: that client is draining, and
+	// a fixed period would cap its catch-up at cap(input) events per
+	// period (10 per 10 ms for a trigger-indexed watcher), the same yield
+	// after progress etcd's syncWatchersLoop makes. The busy period grows
+	// with the measured pass duration, syncPassBusyDutyFactor times it, so
+	// passes take at most about a tenth of the dispatcher's time, and is
+	// capped at syncPassPeriod so that a pass descheduled by the host
+	// cannot amplify into a long silence.
+	syncPassPeriod         = 10 * time.Millisecond
+	syncPassIdlePeriod     = 100 * time.Millisecond
+	syncPassBusyPeriod     = time.Millisecond
+	syncPassBusyDutyFactor = 9
+)
+
+// cacherStall is the per-Cacher stall-and-resume state; a Cacher holds one
+// exactly when the WatchCacheStallResume gate is on, making the nil check
+// the single mode representation. Everything but metrics and src is owned
+// by the dispatcher goroutine.
+type cacherStall struct {
+	// metrics holds the pre-resolved metric children shared by all
+	// watchers of this Cacher.
+	metrics *metrics.StallResumeObservers
+	// src serves catch-up intervals from the watch cache event history.
+	src *historyCatchUp
+
+	// unsynced holds the watchers the live path skips; sync passes serve
+	// them until they catch up, expire or stop.
+	unsynced map[*cacheWatcher]struct{}
+	// syncCursor is where the last pass stopped scanning; the next pass
+	// prefers a lead at or above it so one lead keeps tracking the history.
+	syncCursor uint64
+	// passCount numbers the passes, from 1, so a watcher's servedPass
+	// tells whether the previous pass served it.
+	passCount uint64
+
+	// stalled is set by dispatchEvent when a watcher goes unsynced so the
+	// scheduler returns to the short pass period.
+	stalled    bool
+	passPeriod time.Duration
+	passTimer  clock.Timer
+	passArmed  bool
+	lastPass   time.Time
+	// dispatcherHook runs a test function on the dispatcher goroutine, handing
+	// it a func that runs one sync pass; tests drive passes and read the
+	// dispatcher-owned state through it. Tests only.
+	dispatcherHook chan func(runPass syncPassFunc)
+
+	// Scratch space reused across passes.
+	members    []syncMember
+	scanned    []scannedEvent
+	expiredBuf []*cacheWatcher
+	// byScope, byTrigger and triggerFanout are the pass's lookup maps
+	// over the candidates, built once per pass in sorted order; each
+	// entry is a member index. lead is the cohort being served.
+	byScope       map[namespacedName][]int
+	byTrigger     map[string][]int
+	triggerFanout []int
+	lead          int
+	// blockedCount counts the members of the cohort being served whose
+	// input filled; pendingOpen counts the eager ones among them that can
+	// still record owed events for the retry rounds. The scan stops once
+	// every active member is blocked and none can record more.
+	blockedCount int
+	pendingOpen  int
+	pushBudget   int
+	// cut is set once the push budget ran out during the cohort being
+	// served: the scan then goes on for the lead alone.
+	cut    bool
+	pushed int
+}
+
+// syncPassFunc runs one sync pass and reports how many members it served
+// and how many it expired.
+type syncPassFunc func() (served, expired int)
+
+// syncMember is a candidate of one sync pass: an unsynced watcher with room
+// in its input, sorted by position.
+type syncMember struct {
+	w *cacheWatcher
+	// startPosition is the position at the start of the pass; a scanned
+	// event is offered only if it is above it. room and eager are the
+	// lead choice's keys, taken at the start of the pass: the free share
+	// of the input in permille (a share, so watchers with different
+	// input capacities compare by how far they drained, not by slots),
+	// and whether the member is not served since it went unsynced or was
+	// judged a fast drainer after its last service.
+	startPosition uint64
+	room          int
+	eager         bool
+	served        bool
+	// blocked is set once a push failed in the member's cohort; pending
+	// then collects the scanned events still owed, up to what the retry
+	// rounds can push; pendingTruncated records that more were owed.
+	blocked          bool
+	pending          []int
+	pendingTruncated bool
+	// resync is set when the member accepted everything it was offered and
+	// its cohort read the history to its end.
+	resync bool
+}
+
+// scannedEvent is one history event read by a sync pass with its selection
+// keys computed once; wrapped is the shared dispatch copy, made lazily.
+type scannedEvent struct {
+	raw              *watchCacheEvent
+	wrapped          *watchCacheEvent
+	namespace, name  string
+	triggerValues    []string
+	triggerSupported bool
 }
 
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
@@ -455,6 +609,17 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 
 	cacher.watchCache = watchCache
 	cacher.reflector = reflector
+	if utilfeature.DefaultFeatureGate.Enabled(features.WatchCacheStallResume) {
+		cacher.stall = &cacherStall{
+			metrics:        metrics.NewStallResumeObservers(config.GroupResource),
+			src:            &historyCatchUp{cache: watchCache},
+			unsynced:       map[*cacheWatcher]struct{}{},
+			passPeriod:     syncPassPeriod,
+			dispatcherHook: make(chan func(syncPassFunc)),
+			byScope:        map[namespacedName][]int{},
+			byTrigger:      map[string][]int{},
+		}
+	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
 		err := config.Storage.EnableResourceSizeEstimation(cacher.getKeys)
@@ -569,6 +734,8 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	// - having it large enough to ensure that watchers that need to process
 	//   a bunch of changes have enough buffer to avoid from blocking other
 	//   watchers on our watcher having a processing hiccup
+	// (with WatchCacheStallResume the size no longer decides whether a slow
+	// watcher survives; see suggestedWatchChannelSize)
 	chanSize := c.watchCache.suggestedWatchChannelSize(c.indexedTrigger != nil, triggerSupported)
 
 	// client-go is going to fall back to a standard LIST on any error
@@ -610,6 +777,9 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		c.clock,
 		identifier,
 	)
+	if c.stall != nil {
+		watcher.stallMetrics = c.stall.metrics
+	}
 
 	// note that c.waitUntilWatchCacheFreshAndForceAllEvents must be called without
 	// the c.watchCache.RLock held otherwise we are at risk of a deadlock
@@ -654,8 +824,10 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 			return
 		}
 
+		// The registration keys, read by forget and by the sync passes.
+		watcher.scope, watcher.triggerValue, watcher.triggerSupported = scope, triggerValue, triggerSupported
 		// Update watcher.forget function once we can compute it.
-		watcher.forget = forgetWatcher(c, watcher, c.watcherIdx, scope, triggerValue, triggerSupported)
+		watcher.forget = forgetWatcher(c, watcher, c.watcherIdx)
 		// Update the bookMarkAfterResourceVersion
 		watcher.setBookmarkAfterResourceVersion(bookmarkAfterResourceVersionFn())
 		c.watchers.addWatcher(watcher, c.watcherIdx, scope, triggerValue, triggerSupported)
@@ -929,6 +1101,14 @@ func (c *Cacher) dispatchEvents() {
 		// the non-empty error means that the stopCh was closed
 		return
 	}
+	var passC <-chan time.Time
+	var dispatcherHook chan func(syncPassFunc)
+	if c.stall != nil {
+		c.stall.passTimer = c.clock.NewTimer(syncPassPeriod)
+		c.stall.passTimer.Stop()
+		defer c.stall.passTimer.Stop()
+		dispatcherHook = c.stall.dispatcherHook
+	}
 	for {
 		select {
 		case event, ok := <-c.incoming:
@@ -951,6 +1131,9 @@ func (c *Cacher) dispatchEvents() {
 				metrics.EventsCounter.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Inc()
 			}
 			lastProcessedResourceVersion = event.ResourceVersion
+			if c.stall != nil {
+				passC = c.syncAfterDispatch()
+			}
 		case <-bookmarkTimer.C():
 			bookmarkTimer.Reset(wait.Jitter(time.Second, 0.25))
 			bookmarkEvent := &watchCacheEvent{
@@ -963,10 +1146,557 @@ func (c *Cacher) dispatchEvents() {
 				continue
 			}
 			c.dispatchEvent(bookmarkEvent)
+			if c.stall != nil {
+				passC = c.syncAfterDispatch()
+			}
+		case <-passC:
+			c.stall.passArmed = false
+			c.syncPass(c.clock.Now())
+			passC = c.armSyncTimer()
+		case fn := <-dispatcherHook:
+			// Re-arm only after a pass: re-arming after a hook that ran
+			// none would drain a tick the test's clock step just produced.
+			ran := false
+			fn(func() (int, int) {
+				ran = true
+				return c.syncPass(c.clock.Now())
+			})
+			if ran {
+				passC = c.armSyncTimer()
+			}
 		case <-c.stopCh:
 			return
 		}
 	}
+}
+
+// syncAfterDispatch runs a sync pass when one is due after a dispatched
+// event and keeps the pass timer armed while any watcher is unsynced. It
+// returns the timer channel to select on, nil while nothing is unsynced.
+func (c *Cacher) syncAfterDispatch() <-chan time.Time {
+	s := c.stall
+	rearm := false
+	stalled := s.stalled
+	if stalled {
+		s.stalled = false
+		if s.passPeriod != syncPassPeriod {
+			s.passPeriod = syncPassPeriod
+			rearm = true
+		}
+	}
+	if len(s.unsynced) == 0 {
+		return c.armSyncTimer()
+	}
+	now := c.clock.Now()
+	if now.Sub(s.lastPass) >= s.passPeriod {
+		c.syncPass(now)
+		if stalled && s.passPeriod == syncPassIdlePeriod {
+			// The pass that follows a stall finds the new member with a
+			// full input and serves nothing; keep the short period so its
+			// first catch-up is not delayed by the idle backoff.
+			s.passPeriod = syncPassPeriod
+		}
+		return c.armSyncTimer()
+	}
+	if s.passArmed && !rearm {
+		return s.passTimer.C()
+	}
+	return c.armSyncTimer()
+}
+
+// armSyncTimer re-arms the pass timer for the current period while any
+// watcher is unsynced and stops it otherwise, returning the channel to
+// select on (nil when stopped). A stale tick is drained so that a fake
+// clock, whose timer channel holds one tick, never blocks on the next fire.
+func (c *Cacher) armSyncTimer() <-chan time.Time {
+	s := c.stall
+	if s.passArmed {
+		s.passTimer.Stop()
+		select {
+		case <-s.passTimer.C():
+		default:
+		}
+		s.passArmed = false
+	}
+	if len(s.unsynced) == 0 {
+		return nil
+	}
+	s.passTimer.Reset(s.passPeriod)
+	s.passArmed = true
+	return s.passTimer.C()
+}
+
+// syncPass serves the unsynced watchers from the watch cache history, the
+// way etcd's syncWatchers serves its unsynced group: candidates are the
+// unsynced watchers with room in their input (the ones the lead choice
+// prefers when there are more than maxWatchersPerSync), sorted by
+// position; they are served in cohorts, led by the candidate the lead
+// choice prefers, that share one history read and one wrapped copy of
+// every event, under a scan budget, a push budget and a cohort budget for
+// the whole pass.
+// A member that accepted everything it was offered and whose cohort read
+// the history to its end is synced again; one whose position aged out of
+// the history is expired with an in-stream 410. Runs on the dispatcher
+// goroutine between dispatches; it never holds the Cacher lock while taking
+// the watch cache lock, because Watch holds the latter across the former.
+func (c *Cacher) syncPass(now time.Time) (served, expired int) {
+	s := c.stall
+	s.lastPass = now
+	s.passCount++
+	oldest, ok := s.src.oldest()
+	if !ok {
+		return 0, 0
+	}
+
+	c.Lock()
+	c.dispatching = true
+	s.expiredBuf = s.expiredBuf[:0]
+	s.members = s.members[:0]
+	for w := range s.unsynced {
+		// A stop deferred by an earlier dispatch has run by now, so a
+		// stopped member has a closed input that must never be pushed to.
+		if w.forgotten || w.stopped {
+			delete(s.unsynced, w)
+			continue
+		}
+		// The same boundary GetIntervalLocked rejects, so an unexpired
+		// lead is always servable. The reason is the watcher's state now;
+		// the termination is counted when the 410 is sent.
+		if w.position+1 < oldest {
+			w.expired = true
+			if w.live.Load() {
+				w.expiredReason = metrics.TerminationReasonResourceExpired
+			} else {
+				w.expiredReason = metrics.TerminationReasonResourceExpiredInitial
+			}
+			delete(s.unsynced, w)
+			s.expiredBuf = append(s.expiredBuf, w)
+			continue
+		}
+		if len(w.input) < cap(w.input) {
+			s.members = append(s.members, syncMember{w: w})
+		}
+	}
+	c.Unlock()
+
+	// forget takes the Cacher lock itself; with dispatching set the stop
+	// is deferred to finishDispatching, and in drain mode the watcher
+	// goroutine delivers the backlog and then the 410.
+	for _, w := range s.expiredBuf {
+		w.forget(true)
+	}
+	expired = len(s.expiredBuf)
+	clear(s.expiredBuf)
+
+	for i := range s.members {
+		m := &s.members[i]
+		m.room = (cap(m.w.input) - len(m.w.input)) * 1000 / cap(m.w.input)
+		// The first pass a served member has room again judges it: a
+		// fast drainer emptied its input, a slow one freed a slot or a
+		// few. The judgement holds until the next service, so a pass
+		// that leaves the member out does not change it.
+		if m.w.servedPass != 0 && !m.w.judged {
+			m.w.judged, m.w.fastDrainer = true, m.room == 1000
+		}
+		m.eager = m.w.servedPass == 0 || m.w.fastDrainer
+	}
+	if len(s.members) > maxWatchersPerSync {
+		// Keep the members the lead choice would pick first (the same
+		// keys), so that a client that can catch up is never left out
+		// behind maxWatchersPerSync laggards; among equals the order
+		// rotates with the cursor (at or above it first), so every member
+		// gets its turn across passes.
+		slices.SortFunc(s.members, func(a, b syncMember) int {
+			if c := cmp.Compare(b.room, a.room); c != 0 {
+				return c
+			}
+			if a.eager != b.eager {
+				if a.eager {
+					return -1
+				}
+				return 1
+			}
+			return cmp.Compare(a.w.position-s.syncCursor, b.w.position-s.syncCursor)
+		})
+		clear(s.members[maxWatchersPerSync:])
+		s.members = s.members[:maxWatchersPerSync]
+	}
+	slices.SortFunc(s.members, func(a, b syncMember) int {
+		return cmp.Compare(a.w.position, b.w.position)
+	})
+	c.buildSyncIndexes()
+
+	budget := syncScanBudget
+	s.pushBudget = syncPushBudget
+	s.pushed = 0
+	s.scanned = s.scanned[:0]
+	for budget >= syncIntervalOpenCost && s.pushBudget > 0 {
+		lead := c.pickSyncLead()
+		if lead < 0 {
+			break
+		}
+		c.serveSyncCohort(lead, &budget, now)
+	}
+	// A spent push budget means a member is still owed events it has
+	// room for; read before the retry rounds get their own allowance.
+	pushBudgetSpent := s.pushBudget <= 0
+	// Retry rounds over the whole pass, with their own push allowance: a
+	// fast client drained what its cohort pushed while the later cohorts
+	// ran (microseconds against the rest of the pass), so it takes the
+	// events its cohort recorded as owed now, up to two rounds of its
+	// room. This is what lets a client with a small input catch up with
+	// a churn faster than cap(input) per pass period.
+	s.pushBudget = syncPushBudget
+	for round := 0; round < syncPushRetryRounds && s.pushBudget > 0; round++ {
+		for i := range s.members {
+			m := &s.members[i]
+			if !m.blocked || !m.eager || len(m.w.input) == cap(m.w.input) {
+				continue
+			}
+			if c.reofferPending(m, now) {
+				m.blocked = false
+			}
+		}
+	}
+	clear(s.scanned)
+	s.scanned = s.scanned[:0]
+	if s.pushed > 0 {
+		s.metrics.DeferredEvents.Add(float64(s.pushed))
+	}
+
+	blocked := false
+	c.Lock()
+	for i := range s.members {
+		m := &s.members[i]
+		if m.served {
+			served++
+		}
+		blocked = blocked || m.blocked
+		if !m.resync || m.w.forgotten || m.w.stopped {
+			continue
+		}
+		m.w.unsynced = false
+		m.w.servedPass, m.w.judged, m.w.fastDrainer = 0, false, false
+		delete(s.unsynced, m.w)
+		s.metrics.CatchupRounds.Inc()
+		s.metrics.CatchupEvents.Observe(float64(m.w.catchupEvents))
+		m.w.catchupEvents = 0
+	}
+	c.Unlock()
+	c.finishDispatching()
+
+	clear(s.members)
+	s.members = s.members[:0]
+	// Busy: a member is still owed events it has room for, because its
+	// input was full when offered (and is draining) or the push budget
+	// ran out.
+	s.passPeriod = nextPassPeriod(served, expired, blocked || pushBudgetSpent, c.clock.Since(now))
+	return served, expired
+}
+
+// nextPassPeriod picks the period until the next pass from what this one
+// did: busy while a member is still owed events it has room for, scaled to
+// the pass duration so that passes take at most about a tenth of the
+// dispatcher's time, but never above the normal period, so a pass that
+// the host descheduled cannot amplify into a long silence; idle after a
+// pass that served and expired nothing; the normal period otherwise.
+func nextPassPeriod(served, expired int, busy bool, passDuration time.Duration) time.Duration {
+	switch {
+	case busy:
+		return min(syncPassPeriod, max(syncPassBusyPeriod, syncPassBusyDutyFactor*passDuration))
+	case served == 0 && expired == 0:
+		return syncPassIdlePeriod
+	default:
+		return syncPassPeriod
+	}
+}
+
+// buildSyncIndexes builds the pass's lookup maps over the candidates in
+// sorted order, mirroring the indexes startDispatching consults: scope key
+// to members, trigger value to members, and the fan-out list of every
+// trigger indexed member for an event without a supported trigger value.
+// Every list is in position order, so offerToAll can stop at the first
+// member above the scanned event.
+func (c *Cacher) buildSyncIndexes() {
+	s := c.stall
+	clear(s.byScope)
+	clear(s.byTrigger)
+	s.triggerFanout = s.triggerFanout[:0]
+	for i := range s.members {
+		m := &s.members[i]
+		m.startPosition = m.w.position
+		if m.w.triggerSupported {
+			s.byTrigger[m.w.triggerValue] = append(s.byTrigger[m.w.triggerValue], i)
+			s.triggerFanout = append(s.triggerFanout, i)
+			continue
+		}
+		s.byScope[m.w.scope] = append(s.byScope[m.w.scope], i)
+	}
+}
+
+// pickSyncLead returns the index of the next cohort's lead, or -1 when
+// every member was served. Among the unserved members it prefers, in this
+// order: the largest free share of the input (the member that drained
+// the most of what it holds, whatever its capacity); then an eager
+// member (not served since it went unsynced, or judged a fast drainer:
+// its input was empty at the first pass it had room after its last
+// service) over one judged slow (it had freed a slot or a few by then);
+// then the first member at or above the cursor, else the first. The
+// middle key depends only on the member's own behaviour, so being left
+// out by the candidate cap or the push budget for a pass does not demote
+// it. Without these keys a client draining at full speed would wait its
+// turn behind every slow client that had time to free a few slots, and
+// could never catch up with the churn; a burst of clients stalling
+// together ties on all three and still forms one cohort. "At or above"
+// lets a lead that accepted its whole window be picked again and keep
+// tracking the history.
+func (c *Cacher) pickSyncLead() int {
+	s := c.stall
+	lead := -1
+	for i := range s.members {
+		m := &s.members[i]
+		if m.served {
+			continue
+		}
+		if lead < 0 {
+			lead = i
+			continue
+		}
+		l := &s.members[lead]
+		switch {
+		case m.room > l.room || (m.room == l.room && m.eager && !l.eager):
+			lead = i
+		case m.room == l.room && m.eager == l.eager && l.w.position < s.syncCursor && m.w.position >= s.syncCursor:
+			lead = i
+		}
+	}
+	return lead
+}
+
+// serveSyncCohort opens one history interval at the lead's position, scans
+// it up to the remaining budget and pushes every scanned event to the
+// unserved members above the lead that it is selected for. The cohort is
+// the lead plus the unserved members whose position is below the last
+// scanned resourceVersion; every one of them counts as served, and the
+// cursor moves to that resourceVersion. A member that rejected a push
+// keeps its last accepted resourceVersion and records the events still
+// owed; the end of the pass re-offers them.
+func (c *Cacher) serveSyncCohort(lead int, budget *int, now time.Time) {
+	s := c.stall
+	members := s.members
+	leadW := members[lead].w
+	// The open is priced as a short scan (see syncIntervalOpenCost); the
+	// caller made sure the budget covers it.
+	*budget -= syncIntervalOpenCost
+	interval, err := s.src.intervalSince(leadW.position)
+	if err != nil {
+		// The history advanced past the lead since it was checked: it is
+		// served with nothing offered, the cursor stays, and step 1 of the
+		// next pass expires it.
+		members[lead].served = true
+		leadW.servedPass, leadW.judged = s.passCount, false
+		return
+	}
+
+	s.lead = lead
+	s.cut = false
+	s.blockedCount, s.pendingOpen = 0, 0
+	lastScannedRV := leadW.position
+	historyEnd := false
+	// The cohort is members[lead:end) less the ones an earlier cohort
+	// served; end advances with the scan over the members whose start
+	// position is below the scanned event, and active counts the cohort
+	// members so far, i.e. the members the scan has offered something to.
+	// Once the push budget is spent (checked between events, so every
+	// event scanned before the cut was offered to every active member)
+	// the scan goes on for the lead alone, up to its room: the lead is the
+	// member the pass chose to serve, and the followers it picked up on
+	// the way must not take the whole budget before it got its share.
+	// Followers are offered nothing past cutRV.
+	end, active := lead, 0
+	budgetSpent := false
+	cutRV := uint64(0)
+	for {
+		if *budget == 0 {
+			budgetSpent = true
+			break
+		}
+		if s.cut && members[lead].blocked {
+			break
+		}
+		if !s.cut && s.pushBudget <= 0 {
+			s.cut, cutRV = true, lastScannedRV
+		}
+		ev, err := interval.Next()
+		if err != nil {
+			// Invalidated mid scan: what was scanned stands, the rest is
+			// retried by the next pass from the members' positions.
+			break
+		}
+		if ev == nil {
+			historyEnd = true
+			break
+		}
+		*budget--
+		rv := ev.ResourceVersion
+		for !s.cut && end < len(members) && members[end].startPosition < rv {
+			if !members[end].served {
+				active++
+			}
+			end++
+		}
+		s.scanned = append(s.scanned, scannedEvent{
+			raw:       ev,
+			namespace: ev.ObjFields["metadata.namespace"],
+			name:      ev.ObjFields["metadata.name"],
+		})
+		idx := len(s.scanned) - 1
+		s.scanned[idx].triggerValues, s.scanned[idx].triggerSupported = c.triggerValuesThreadUnsafe(ev)
+		lastScannedRV = rv
+		c.offerScanned(idx, now)
+		if !s.cut && s.blockedCount == active && s.pendingOpen == 0 {
+			// Every member offered something has a full input, and every
+			// eager one among them holds all the owed events the retry
+			// rounds can push; a member above this point gets its own
+			// cohort.
+			break
+		}
+	}
+	if budgetSpent {
+		// A budget ran out exactly at the last event scanned: one more
+		// read tells whether the history end was reached, so the cohort
+		// can resync this pass. An event returned here is not consumed;
+		// the next pass reads it again.
+		if ev, err := interval.Next(); err == nil && ev == nil {
+			historyEnd = true
+		}
+	}
+
+	// The lead is a cohort member even when the interval was empty.
+	if end == lead {
+		end = lead + 1
+	}
+	for i := lead; i < end; i++ {
+		m := &members[i]
+		if m.served {
+			continue
+		}
+		m.served = true
+		m.w.servedPass, m.w.judged = s.passCount, false
+		if m.blocked {
+			continue
+		}
+		// Position follows the scan: everything in (position, limit] was
+		// scanned and either accepted or not selected; for a follower
+		// the scan ends at the cut, and it reached the history end only
+		// if nothing was scanned past the cut.
+		limit, atEnd := lastScannedRV, historyEnd
+		if s.cut && i != lead {
+			limit, atEnd = cutRV, historyEnd && cutRV == lastScannedRV
+		}
+		if limit > m.w.position {
+			m.w.position = limit
+		}
+		m.resync = atEnd
+	}
+	s.syncCursor = lastScannedRV
+}
+
+// offerScanned pushes the scanned event at idx to every cohort member it is
+// selected for, by the rules of startDispatching.
+func (c *Cacher) offerScanned(idx int, now time.Time) {
+	s := c.stall
+	se := &s.scanned[idx]
+	forEachSelectionKey(se.namespace, se.name, se.triggerValues, se.triggerSupported,
+		func(key namespacedName) { c.offerToAll(s.byScope[key], idx, now) },
+		func(value string) { c.offerToAll(s.byTrigger[value], idx, now) },
+		func() { c.offerToAll(s.triggerFanout, idx, now) })
+}
+
+// offerToAll offers the scanned event at idx to the cohort members among
+// hits: the entries at or above the lead that no earlier cohort served,
+// or the lead alone once the push budget is spent. hits is in position
+// order, so the walk stops at the first member whose start position is at
+// or above the event.
+func (c *Cacher) offerToAll(hits []int, idx int, now time.Time) {
+	s := c.stall
+	rv := s.scanned[idx].raw.ResourceVersion
+	for _, i := range hits {
+		m := &s.members[i]
+		if m.startPosition >= rv {
+			return
+		}
+		if i < s.lead || m.served || (s.cut && i != s.lead) {
+			continue
+		}
+		c.offerTo(m, idx, now)
+	}
+}
+
+// offerTo pushes the scanned event at idx to the member; a blocked member
+// only records it as owed, up to what the retry rounds can push.
+func (c *Cacher) offerTo(m *syncMember, idx int, now time.Time) {
+	s := c.stall
+	pendingCap := syncPushRetryRounds * cap(m.w.input)
+	if m.blocked {
+		if len(m.pending) < pendingCap {
+			m.pending = append(m.pending, idx)
+			if m.eager && len(m.pending) == pendingCap {
+				s.pendingOpen--
+			}
+		} else {
+			m.pendingTruncated = true
+		}
+		return
+	}
+	if !c.pushScanned(m, idx, now) {
+		m.blocked = true
+		m.pending = append(m.pending, idx)
+		s.blockedCount++
+		if m.eager {
+			// pendingCap is at least two, so the first owed event never
+			// fills it.
+			s.pendingOpen++
+		}
+	}
+}
+
+// reofferPending pushes the events owed to a blocked member in order and
+// reports whether all of them were accepted; a member owed more than
+// pending holds, or cut off by the push budget, stays blocked at its last
+// accepted resourceVersion.
+func (c *Cacher) reofferPending(m *syncMember, now time.Time) bool {
+	for len(m.pending) > 0 {
+		if c.stall.pushBudget <= 0 || !c.pushScanned(m, m.pending[0], now) {
+			return false
+		}
+		m.pending = m.pending[1:]
+	}
+	return !m.pendingTruncated
+}
+
+// pushScanned wraps the scanned event at idx once, exactly like the live
+// path does per dispatch, and offers the shared copy to the member; the
+// scanned events live for the whole pass, so the retry rounds at its end
+// reuse the copies.
+func (c *Cacher) pushScanned(m *syncMember, idx int, now time.Time) bool {
+	s := c.stall
+	se := &s.scanned[idx]
+	if se.wrapped == nil {
+		wcEvent := *se.raw
+		setCachingObjects(&wcEvent, c.versioner)
+		wcEvent.timeline.MarkAt(metrics.PointDispatchStarted, now)
+		wcEvent.timeline.MarkAt(metrics.PointWatcherEnqueued, now)
+		se.wrapped = &wcEvent
+	}
+	if !m.w.nonblockingAdd(se.wrapped) {
+		return false
+	}
+	m.w.position = se.raw.ResourceVersion
+	m.w.catchupEvents++
+	s.pushed++
+	s.pushBudget--
+	return true
 }
 
 func setCachingObjects(event *watchCacheEvent, versioner storage.Versioner) {
@@ -1009,6 +1739,20 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 	// Dispatching event in nonblocking way first, which make faster watchers
 	// not be blocked by slower ones.
 	if event.Type == watch.Bookmark {
+		if c.stall != nil {
+			// A bookmark below the position would move the client's last
+			// seen resourceVersion backwards after a resync that scanned
+			// past the events still queued in c.incoming.
+			for _, watcher := range c.watchersBuffer {
+				if watcher.unsynced || event.ResourceVersion < watcher.position {
+					continue
+				}
+				if watcher.nonblockingAdd(event) {
+					watcher.position = event.ResourceVersion
+				}
+			}
+			return
+		}
 		for _, watcher := range c.watchersBuffer {
 			watcher.nonblockingAdd(event)
 		}
@@ -1030,6 +1774,31 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 		setCachingObjects(&wcEvent, c.versioner)
 		wcEvent.timeline.MarkAt(metrics.PointWatcherEnqueued, c.clock.Now())
 		event = &wcEvent
+
+		if c.stall != nil {
+			// Never wait for a slow watcher and never terminate it here: a
+			// watcher whose input is full becomes unsynced and the sync
+			// passes serve it from the history. Events at or below the
+			// position were already pushed by a pass.
+			for _, watcher := range c.watchersBuffer {
+				if watcher.unsynced || event.ResourceVersion <= watcher.position {
+					continue
+				}
+				if watcher.nonblockingAdd(event) {
+					watcher.position = event.ResourceVersion
+					continue
+				}
+				// Everything below this event was accepted, so the pass
+				// resumes from just below it.
+				watcher.position = max(watcher.position, event.ResourceVersion-1)
+				watcher.unsynced = true
+				watcher.servedPass, watcher.judged, watcher.fastDrainer = 0, false, false
+				c.stall.unsynced[watcher] = struct{}{}
+				c.stall.stalled = true
+				c.stall.metrics.Stalls.Inc()
+			}
+			return
+		}
 
 		c.blockedWatchers = c.blockedWatchers[:0]
 		for _, watcher := range c.watchersBuffer {
@@ -1111,53 +1880,60 @@ func (c *Cacher) startDispatching(event *watchCacheEvent) {
 		return
 	}
 
-	// iterate over watchers for each applicable namespace/name tuple
 	namespace := event.ObjFields["metadata.namespace"]
 	name := event.ObjFields["metadata.name"]
-	if len(namespace) > 0 {
-		if len(name) > 0 {
-			// namespaced watchers scoped by name
-			for _, watcher := range c.watchers.allWatchers[namespacedName{namespace: namespace, name: name}] {
+	forEachSelectionKey(namespace, name, triggerValues, supported,
+		func(key namespacedName) {
+			for _, watcher := range c.watchers.allWatchers[key] {
 				c.watchersBuffer = append(c.watchersBuffer, watcher)
 			}
-		}
-		// namespaced watchers not scoped by name
-		for _, watcher := range c.watchers.allWatchers[namespacedName{namespace: namespace}] {
-			c.watchersBuffer = append(c.watchersBuffer, watcher)
-		}
-	}
-	if len(name) > 0 {
-		// cluster-wide watchers scoped by name
-		for _, watcher := range c.watchers.allWatchers[namespacedName{name: name}] {
-			c.watchersBuffer = append(c.watchersBuffer, watcher)
-		}
-	}
-	// cluster-wide watchers unscoped by name
-	for _, watcher := range c.watchers.allWatchers[namespacedName{}] {
-		c.watchersBuffer = append(c.watchersBuffer, watcher)
-	}
-
-	if supported {
-		// Iterate over watchers interested in the given values of the trigger.
-		for _, triggerValue := range triggerValues {
+		},
+		func(triggerValue string) {
 			for _, watcher := range c.watchers.valueWatchers[triggerValue] {
 				c.watchersBuffer = append(c.watchersBuffer, watcher)
 			}
-		}
-	} else {
-		// supported equal to false generally means that trigger function
-		// is not defined (or not aware of any indexes). In this case,
-		// watchers filters should generally also don't generate any
-		// trigger values, but can cause problems in case of some
-		// misconfiguration. Thus we paranoidly leave this branch.
-
-		// Iterate over watchers interested in exact values for all values.
-		for _, watchers := range c.watchers.valueWatchers {
-			for _, watcher := range watchers {
-				c.watchersBuffer = append(c.watchersBuffer, watcher)
+		},
+		func() {
+			for _, watchers := range c.watchers.valueWatchers {
+				for _, watcher := range watchers {
+					c.watchersBuffer = append(c.watchersBuffer, watcher)
+				}
 			}
+		})
+}
+
+// forEachSelectionKey encodes how an event selects watchers, for the live
+// dispatch and the sync passes alike: scoped is called with every
+// namespace/name key the event's watchers are indexed under (namespaced
+// watchers scoped by name, namespaced watchers not scoped by name,
+// cluster-wide watchers scoped by name, cluster-wide watchers unscoped by
+// name), then trigger with each of the event's trigger values, or, when the
+// trigger is not supported, allTriggers once for the fan-out to every
+// watcher interested in an exact trigger value.
+func forEachSelectionKey(namespace, name string, triggerValues []string, triggerSupported bool, scoped func(namespacedName), trigger func(string), allTriggers func()) {
+	if len(namespace) > 0 {
+		if len(name) > 0 {
+			scoped(namespacedName{namespace: namespace, name: name})
 		}
+		scoped(namespacedName{namespace: namespace})
 	}
+	if len(name) > 0 {
+		scoped(namespacedName{name: name})
+	}
+	scoped(namespacedName{})
+
+	if triggerSupported {
+		for _, triggerValue := range triggerValues {
+			trigger(triggerValue)
+		}
+		return
+	}
+	// supported equal to false generally means that trigger function
+	// is not defined (or not aware of any indexes). In this case,
+	// watchers filters should generally also don't generate any
+	// trigger values, but can cause problems in case of some
+	// misconfiguration. Thus we paranoidly leave this branch.
+	allTriggers()
 }
 
 // finishDispatching stops all the watchers that were supposed to be
@@ -1190,6 +1966,14 @@ func (c *Cacher) terminateAllWatchers() {
 }
 
 func (c *Cacher) stopWatcherLocked(watcher *cacheWatcher) {
+	// A non-draining stop is final: a later draining stop (a sync pass
+	// expiring the watcher) must not reopen the drain window, or done
+	// would never be closed and the goroutine could leak on a full result
+	// channel. Latched here so that terminateAllWatchers, which stops
+	// without forgetting, is covered too.
+	if !watcher.drainInputBuffer {
+		watcher.hardStop = true
+	}
 	if c.dispatching {
 		c.watchersToStop = append(c.watchersToStop, watcher)
 	} else {
@@ -1235,17 +2019,18 @@ func (c *Cacher) prepareKey(key string, recursive bool) (string, error) {
 	return storage.PrepareKey(c.resourcePrefix, key, recursive)
 }
 
-func forgetWatcher(c *Cacher, w *cacheWatcher, index int, scope namespacedName, triggerValue string, triggerSupported bool) func(bool) {
+func forgetWatcher(c *Cacher, w *cacheWatcher, index int) func(bool) {
 	return func(drainWatcher bool) {
 		c.Lock()
 		defer c.Unlock()
 
 		w.setDrainInputBufferLocked(drainWatcher)
+		w.forgotten = true
 
 		// It's possible that the watcher is already not in the structure (e.g. in case of
 		// simultaneous Stop() and terminateAllWatchers(), but it is safe to call stopLocked()
 		// on a watcher multiple times.
-		c.watchers.deleteWatcher(index, scope, triggerValue, triggerSupported)
+		c.watchers.deleteWatcher(index, w.scope, w.triggerValue, w.triggerSupported)
 		c.stopWatcherLocked(w)
 	}
 }
