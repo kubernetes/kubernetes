@@ -1906,6 +1906,10 @@ func validateDeviceTaintSelector(filter, oldFilter *resource.DeviceTaintSelector
 	if filter == nil {
 		return allErrs
 	}
+	if filter.Driver == nil && filter.Pool == nil && filter.Device == nil {
+		allErrs = append(allErrs, field.Required(fldPath, "at least one of driver, pool, or device must be specified"))
+		return allErrs
+	}
 	if filter.Driver != nil {
 		allErrs = append(allErrs, validateDriverName(*filter.Driver, fldPath.Child("driver"))...)
 	}
