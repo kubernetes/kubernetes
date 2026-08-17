@@ -81,13 +81,24 @@ import (
 //
 //	go test ./staging/src/k8s.io/apiserver/pkg/storage/cacher/ -run xxx -bench BenchmarkSlowWatcherTax -benchtime 1x -v
 //
-// The benchmark has no feature gate dimension.
+// Every cell runs once per WatchCacheStallResume gate state (gate=off and
+// gate=on). With the gate on the dispatcher never blocks on a full
+// watcher channel: the watcher catches up from the watch cache history
+// ring on its own goroutine, and it is terminated only when the event it
+// missed has already aged out of that history (an in-stream 410). The
+// gate=on cells additionally report the stall instruments (stalls,
+// deferred-events, catchup-rounds). To run one state only:
+//
+//	-bench 'BenchmarkSlowWatcherTax/gate=on'
 func BenchmarkSlowWatcherTax(b *testing.B) {
 	registry := compbasemetrics.NewKubeRegistry()
 	// Registering creates the vectors; an unregistered vector discards
 	// observations. The delta is computed per cell, so earlier tests that
 	// touched the same global vectors do not matter.
-	for _, m := range []compbasemetrics.Registerable{metrics.DispatchStageDuration, metrics.TerminatedWatchersCounter} {
+	for _, m := range []compbasemetrics.Registerable{
+		metrics.DispatchStageDuration, metrics.TerminatedWatchersCounter,
+		metrics.WatcherStalls, metrics.WatcherDeferredEvents, metrics.WatcherCatchupRounds,
+	} {
 		if err := registry.Register(m); err != nil {
 			b.Fatal(err)
 		}
@@ -101,21 +112,38 @@ func BenchmarkSlowWatcherTax(b *testing.B) {
 		{name: "baseline-1000", eventsPerSecond: 1000},
 		{name: "stalled-reconnecting-1000", eventsPerSecond: 1000, companion: true, reconnects: true},
 	}
-	for _, cell := range cells {
-		b.Run(cell.name, func(b *testing.B) {
-			var r slowWatcherResult
-			for i := 0; i < b.N; i++ {
-				r = runSlowWatcherCell(b, registry, cell)
+	for _, gateOn := range []bool{false, true} {
+		gateName := "gate=off"
+		if gateOn {
+			gateName = "gate=on"
+		}
+		b.Run(gateName, func(b *testing.B) {
+			for _, cell := range cells {
+				b.Run(cell.name, func(b *testing.B) {
+					// The cacher reads the gate at construction, so it is set
+					// before the cell builds its cacher and restored by the
+					// sub-benchmark's cleanup.
+					setStallResumeGate(b, gateOn)
+					var r slowWatcherResult
+					for i := 0; i < b.N; i++ {
+						r = runSlowWatcherCell(b, registry, cell)
+					}
+					b.ReportMetric(float64(r.percentile(0.5).Microseconds()), "p50-us")
+					b.ReportMetric(float64(r.percentile(0.9).Microseconds()), "p90-us")
+					b.ReportMetric(float64(r.percentile(0.99).Microseconds()), "p99-us")
+					b.ReportMetric(float64(r.percentile(1.0).Microseconds()), "max-us")
+					b.ReportMetric(float64(r.slowDispatches), "slow-dispatches")
+					b.ReportMetric(float64(r.terminated), "force-closed")
+					b.ReportMetric(float64(r.incomingHWM), "incoming-hwm")
+					if gateOn {
+						b.ReportMetric(r.stalls, "stalls")
+						b.ReportMetric(r.deferredEvents, "deferred-events")
+						b.ReportMetric(r.catchupRounds, "catchup-rounds")
+					}
+					b.Logf("%s: %d of %d dispatches above %v, %d watcher(s) force closed, incoming high water mark %d",
+						cell.name, r.slowDispatches, r.allDispatches, slowDispatchGate, r.terminated, r.incomingHWM)
+				})
 			}
-			b.ReportMetric(float64(r.percentile(0.5).Microseconds()), "p50-us")
-			b.ReportMetric(float64(r.percentile(0.9).Microseconds()), "p90-us")
-			b.ReportMetric(float64(r.percentile(0.99).Microseconds()), "p99-us")
-			b.ReportMetric(float64(r.percentile(1.0).Microseconds()), "max-us")
-			b.ReportMetric(float64(r.slowDispatches), "slow-dispatches")
-			b.ReportMetric(float64(r.terminated), "force-closed")
-			b.ReportMetric(float64(r.incomingHWM), "incoming-hwm")
-			b.Logf("%s: %d of %d dispatches above %v, %d watcher(s) force closed, incoming high water mark %d",
-				cell.name, r.slowDispatches, r.allDispatches, slowDispatchGate, r.terminated, r.incomingHWM)
 		})
 	}
 }
@@ -154,6 +182,8 @@ type slowWatcherResult struct {
 	allDispatches   uint64
 	terminated      int
 	incomingHWM     int64
+	// Stall instruments, always zero with the gate off.
+	stalls, deferredEvents, catchupRounds float64
 }
 
 func (r slowWatcherResult) percentile(p float64) time.Duration {
@@ -272,6 +302,9 @@ func runSlowWatcherCell(b *testing.B, registry compbasemetrics.KubeRegistry, cel
 		allDispatches:   after.allDispatches - before.allDispatches,
 		terminated:      after.terminated - before.terminated,
 		incomingHWM:     atomic.LoadInt64((*int64)(&cacher.incomingHWM)),
+		stalls:          after.stalls - before.stalls,
+		deferredEvents:  after.deferredEvents - before.deferredEvents,
+		catchupRounds:   after.catchupRounds - before.catchupRounds,
 	}
 }
 
@@ -340,6 +373,8 @@ type slowWatcherMetrics struct {
 	slowDispatches uint64 // stage="total" observations above slowDispatchGate
 	allDispatches  uint64 // one per delivered event per watcher
 	terminated     int
+	// WatchCacheStallResume instruments.
+	stalls, deferredEvents, catchupRounds float64
 }
 
 func snapshotSlowWatcherMetrics(b *testing.B, registry compbasemetrics.KubeRegistry) slowWatcherMetrics {
@@ -369,9 +404,23 @@ func snapshotSlowWatcherMetrics(b *testing.B, registry compbasemetrics.KubeRegis
 			for _, m := range mf.GetMetric() {
 				s.terminated += int(m.GetCounter().GetValue())
 			}
+		case "apiserver_watch_cache_watcher_stalls_total":
+			s.stalls += sumCounters(mf)
+		case "apiserver_watch_cache_watcher_deferred_events_total":
+			s.deferredEvents += sumCounters(mf)
+		case "apiserver_watch_cache_watcher_catchup_rounds_total":
+			s.catchupRounds += sumCounters(mf)
 		}
 	}
 	return s
+}
+
+func sumCounters(mf *dto.MetricFamily) float64 {
+	var total float64
+	for _, m := range mf.GetMetric() {
+		total += m.GetCounter().GetValue()
+	}
+	return total
 }
 
 func hasMetricLabel(m *dto.Metric, name, value string) bool {

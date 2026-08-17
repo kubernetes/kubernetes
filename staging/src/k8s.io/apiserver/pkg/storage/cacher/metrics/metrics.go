@@ -38,6 +38,14 @@ const (
 	// TerminationReasonUnresponsive: the watcher's input buffer was full
 	// and it did not drain within the dispatch time budget.
 	TerminationReasonUnresponsive = "unresponsive"
+	// TerminationReasonResourceExpired: with WatchCacheStallResume enabled,
+	// a watcher that had reached the live stream fell more than the watch
+	// cache history window behind and was ended with an in-stream 410.
+	TerminationReasonResourceExpired = "resource_expired"
+	// TerminationReasonResourceExpiredInitial: as above, but the watcher
+	// never got past its initial catch-up (the initial-list / boot-storm
+	// signal).
+	TerminationReasonResourceExpiredInitial = "resource_expired_initial"
 )
 
 // DispatchStage identifies a single stage of an event's lifecycle as it moves
@@ -283,6 +291,52 @@ var (
 			StabilityLevel: compbasemetrics.ALPHA,
 			Buckets:        []float64{0.0001, 0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5},
 		}, []string{"group", "resource", "stage"})
+
+	// The following metrics are exported only when the WatchCacheStallResume
+	// feature gate is enabled.
+
+	WatcherStalls = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "watcher_stalls_total",
+			Help:           "Counter of watcher stall episodes (a watcher's input buffer filled up and its missed events were deferred to a catch-up from the watch cache history), broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+
+	WatcherDeferredEvents = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "watcher_deferred_events_total",
+			Help:           "Counter of events that could not be added to a watcher's input buffer and were deferred to a catch-up from the watch cache history instead, broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+
+	WatcherCatchupRounds = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "watcher_catchup_rounds_total",
+			Help:           "Counter of watcher catch-up rounds served from the watch cache history, broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+
+	WatcherCatchupEvents = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "watcher_catchup_events",
+			Help:           "Histogram of the number of events streamed from the watch cache history per watcher catch-up round, broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:        []float64{1, 10, 50, 100, 500, 1000, 5000, 10000, 50000, 100000},
+		}, []string{"group", "resource"})
 )
 
 var registerMetrics sync.Once
@@ -313,6 +367,12 @@ func Register() {
 			legacyregistry.MustRegister(WatchFilteredEventsTotal)
 		}
 		legacyregistry.MustRegister(DispatchStageDuration)
+		if utilfeature.DefaultFeatureGate.Enabled(features.WatchCacheStallResume) {
+			legacyregistry.MustRegister(WatcherStalls)
+			legacyregistry.MustRegister(WatcherDeferredEvents)
+			legacyregistry.MustRegister(WatcherCatchupRounds)
+			legacyregistry.MustRegister(WatcherCatchupEvents)
+		}
 	})
 }
 
@@ -399,4 +459,36 @@ func NewNoopWatcherMetricsObservers() *WatcherMetricsObservers {
 		o.stageDurations[s] = noopObs
 	}
 	return o
+}
+
+// StallResumeObservers holds the pre-resolved (group, resource) children of
+// the WatchCacheStallResume metrics, so the dispatcher's per-event path and
+// the watchers never touch a label map. One per Cacher.
+type StallResumeObservers struct {
+	// Stalls counts stall episodes (a poke that found no pending token).
+	Stalls compbasemetrics.CounterMetric
+	// DeferredEvents counts events that failed the non-blocking add and are
+	// left to a catch-up round.
+	DeferredEvents compbasemetrics.CounterMetric
+	// CatchupRounds counts catch-up rounds, including empty ones.
+	CatchupRounds compbasemetrics.CounterMetric
+	// CatchupEvents records the number of events each round streamed.
+	CatchupEvents compbasemetrics.ObserverMetric
+	// Terminated children of TerminatedWatchersCounter by reason.
+	TerminatedExpired        compbasemetrics.CounterMetric
+	TerminatedExpiredInitial compbasemetrics.CounterMetric
+}
+
+// NewStallResumeObservers pre-resolves every WatchCacheStallResume metric child
+// for the given resource type.
+func NewStallResumeObservers(groupResource schema.GroupResource) *StallResumeObservers {
+	group, resource := groupResource.Group, groupResource.Resource
+	return &StallResumeObservers{
+		Stalls:                   WatcherStalls.WithLabelValues(group, resource),
+		DeferredEvents:           WatcherDeferredEvents.WithLabelValues(group, resource),
+		CatchupRounds:            WatcherCatchupRounds.WithLabelValues(group, resource),
+		CatchupEvents:            WatcherCatchupEvents.WithLabelValues(group, resource),
+		TerminatedExpired:        TerminatedWatchersCounter.WithLabelValues(group, resource, TerminationReasonResourceExpired),
+		TerminatedExpiredInitial: TerminatedWatchersCounter.WithLabelValues(group, resource, TerminationReasonResourceExpiredInitial),
+	}
 }
