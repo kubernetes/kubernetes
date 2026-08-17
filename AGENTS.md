@@ -134,7 +134,7 @@ public static isFoo(x: any): x is Foo {
 ## Props Design
 
 - Name: `FooProps` — always a struct (readonly properties only)
-- Flat — no artificial nesting, use shared prefixes for related props
+- Flat — no artificial nesting, use shared prefixes for related props. Exception: group **co-dependent** props (only valid together) into a required-together value object when it makes incomplete combinations unrepresentable — e.g. `workerConfiguration: { workerType, numberOfWorkers }`. Litmus: if flattening would need a synth-time throw for partial input, nest; mutually *exclusive* props use factory methods instead
 - Every optional prop needs `@default` tag:
   - Simple: `@default true`
   - Context-dependent: `@default - uses the account default encryption`
