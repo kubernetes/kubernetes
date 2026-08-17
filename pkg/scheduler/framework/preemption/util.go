@@ -20,7 +20,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -105,14 +104,14 @@ func TraverseHierarchyUp(
 	startKey fwk.EntityKey,
 	pgLister fwk.PodGroupLister,
 	cpgLister fwk.CompositePodGroupLister,
-	visitFn func(key fwk.EntityKey, pg *schedulingv1beta1.PodGroup, cpg *schedulingv1alpha3.CompositePodGroup) (stop bool),
+	visitFn func(key fwk.EntityKey, pg *schedulingv1alpha3.PodGroup, cpg *schedulingv1alpha3.CompositePodGroup) (stop bool),
 ) {
 	if pgLister == nil || cpgLister == nil {
 		return
 	}
 	currentKey := startKey
 	visited := sets.New[fwk.EntityKey]()
-	for range schedulingv1beta1.WorkloadMaxTreeDepth {
+	for range schedulingv1alpha3.WorkloadMaxTreeDepth {
 		if visited.Has(currentKey) {
 			break
 		}
@@ -167,10 +166,10 @@ func GetPodPriority(p *v1.Pod, podGroupLister fwk.PodGroupLister, compositePodGr
 	}
 
 	startKey := fwk.PodGroupKey(p.Namespace, *p.Spec.SchedulingGroup.PodGroupName)
-	var lastPG *schedulingv1beta1.PodGroup
+	var lastPG *schedulingv1alpha3.PodGroup
 	var lastCPG *schedulingv1alpha3.CompositePodGroup
 
-	TraverseHierarchyUp(p.Namespace, startKey, podGroupLister, compositePodGroupLister, func(key fwk.EntityKey, pg *schedulingv1beta1.PodGroup, cpg *schedulingv1alpha3.CompositePodGroup) bool {
+	TraverseHierarchyUp(p.Namespace, startKey, podGroupLister, compositePodGroupLister, func(key fwk.EntityKey, pg *schedulingv1alpha3.PodGroup, cpg *schedulingv1alpha3.CompositePodGroup) bool {
 		if pg != nil {
 			lastPG = pg
 			lastCPG = nil

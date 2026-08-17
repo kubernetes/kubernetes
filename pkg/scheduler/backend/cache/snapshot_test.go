@@ -27,7 +27,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -1574,7 +1574,7 @@ func TestSnapshot_AddRemovePod(t *testing.T) {
 		name                            string
 		initialPods                     []*v1.Pod
 		initialNodes                    []*v1.Node
-		initialPodGroups                []*schedulingv1beta1.PodGroup
+		initialPodGroups                []*schedulingv1alpha3.PodGroup
 		operations                      []operation
 		expectedAffinityNodeNames       sets.Set[string]
 		expectedAntiAffNodeNames        sets.Set[string]
@@ -1779,7 +1779,7 @@ func TestSnapshot_AddRemovePod(t *testing.T) {
 			name:             "PodGroup state updates",
 			initialNodes:     []*v1.Node{st.MakeNode().Name("node-1").Obj(), st.MakeNode().Name("node-2").Obj()},
 			initialPods:      []*v1.Pod{},
-			initialPodGroups: []*schedulingv1beta1.PodGroup{st.MakePodGroup().Name("pg1").Namespace("ns").Obj()},
+			initialPodGroups: []*schedulingv1alpha3.PodGroup{st.MakePodGroup().Name("pg1").Namespace("ns").Obj()},
 			operations: []operation{
 				{opType: "add", pod: st.MakePod().Name("p1").UID("uid-1").Namespace("ns").PodGroupName("pg1").Node("node-1").Obj()},
 				{opType: "add", pod: st.MakePod().Name("p2").UID("uid-2").Namespace("ns").PodGroupName("pg1").Node("node-2").Obj()},

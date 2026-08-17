@@ -22,7 +22,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
@@ -36,9 +35,9 @@ import (
 type podGroupPreemptor struct {
 	priority          int32
 	pods              []*v1.Pod
-	podGroup          *schedulingv1beta1.PodGroup
+	podGroup          *schedulingv1alpha3.PodGroup
 	compositePodGroup *schedulingv1alpha3.CompositePodGroup
-	preemptionPolicy  schedulingv1beta1.PreemptionPolicy
+	preemptionPolicy  schedulingv1alpha3.PreemptionPolicy
 }
 
 func newPodGroupPreemptor(pgInfo fwk.PodGroupInfo, enablePodGroupPreemptionPolicy bool) *podGroupPreemptor {
@@ -73,7 +72,7 @@ func (p *podGroupPreemptor) getObj() klog.KMetadata {
 	return p.podGroup
 }
 
-func resolvePreemptionPolicy(pg *schedulingv1beta1.PodGroup, pods []*v1.Pod, enablePodGroupPreemptionPolicy bool) schedulingv1beta1.PreemptionPolicy {
+func resolvePreemptionPolicy(pg *schedulingv1alpha3.PodGroup, pods []*v1.Pod, enablePodGroupPreemptionPolicy bool) schedulingv1alpha3.PreemptionPolicy {
 	if enablePodGroupPreemptionPolicy {
 		// If the PodGroup was created with PodGroupPreemptionPolicy feature disabled, the PreemptionPolicy field will be nil.
 		// In this case the default policy value should be returned.
@@ -83,29 +82,29 @@ func resolvePreemptionPolicy(pg *schedulingv1beta1.PodGroup, pods []*v1.Pod, ena
 	} else {
 		for _, pod := range pods {
 			if p := pod.Spec.PreemptionPolicy; p != nil && *p == v1.PreemptNever {
-				return schedulingv1beta1.PreemptNever
+				return schedulingv1alpha3.PreemptNever
 			}
 		}
 	}
-	return schedulingv1beta1.PreemptLowerPriority
+	return schedulingv1alpha3.PreemptLowerPriority
 }
 
-func resolveCompositePreemptionPolicy(cpg *schedulingv1alpha3.CompositePodGroup, pods []*v1.Pod, enablePodGroupPreemptionPolicy bool) schedulingv1beta1.PreemptionPolicy {
+func resolveCompositePreemptionPolicy(cpg *schedulingv1alpha3.CompositePodGroup, pods []*v1.Pod, enablePodGroupPreemptionPolicy bool) schedulingv1alpha3.PreemptionPolicy {
 	if enablePodGroupPreemptionPolicy {
 		if cpg.Spec.PreemptionPolicy != nil {
 			if *cpg.Spec.PreemptionPolicy == schedulingv1alpha3.PreemptLowerPriority {
-				return schedulingv1beta1.PreemptLowerPriority
+				return schedulingv1alpha3.PreemptLowerPriority
 			}
-			return schedulingv1beta1.PreemptNever
+			return schedulingv1alpha3.PreemptNever
 		}
 	} else {
 		for _, pod := range pods {
 			if p := pod.Spec.PreemptionPolicy; p != nil && *p == v1.PreemptNever {
-				return schedulingv1beta1.PreemptNever
+				return schedulingv1alpha3.PreemptNever
 			}
 		}
 	}
-	return schedulingv1beta1.PreemptLowerPriority
+	return schedulingv1alpha3.PreemptLowerPriority
 }
 
 // Priority returns the scheduling priority of the preemptor.
@@ -120,7 +119,7 @@ func (p *podGroupPreemptor) Members() []*v1.Pod {
 }
 
 // PodGroup returns a pod group connected with this preemptor.
-func (p *podGroupPreemptor) PodGroup() *schedulingv1beta1.PodGroup {
+func (p *podGroupPreemptor) PodGroup() *schedulingv1alpha3.PodGroup {
 	return p.podGroup
 }
 
@@ -130,7 +129,7 @@ func (p *podGroupPreemptor) CompositePodGroup() *schedulingv1alpha3.CompositePod
 }
 
 // PreemptionPolicy returns a preemption policy of this preemptor.
-func (p *podGroupPreemptor) PreemptionPolicy() schedulingv1beta1.PreemptionPolicy {
+func (p *podGroupPreemptor) PreemptionPolicy() schedulingv1alpha3.PreemptionPolicy {
 	return p.preemptionPolicy
 }
 
@@ -183,7 +182,7 @@ func getHighestAllAncestor(pod *v1.Pod, pgLister fwk.PodGroupLister, cpgLister f
 	var highestAllKey fwk.EntityKey
 	var hasAll bool
 
-	TraverseHierarchyUp(pod.Namespace, startKey, pgLister, cpgLister, func(key fwk.EntityKey, pg *schedulingv1beta1.PodGroup, cpg *schedulingv1alpha3.CompositePodGroup) bool {
+	TraverseHierarchyUp(pod.Namespace, startKey, pgLister, cpgLister, func(key fwk.EntityKey, pg *schedulingv1alpha3.PodGroup, cpg *schedulingv1alpha3.CompositePodGroup) bool {
 		if pg != nil {
 			if pg.Spec.DisruptionMode != nil && pg.Spec.DisruptionMode.All != nil {
 				highestAllKey = key

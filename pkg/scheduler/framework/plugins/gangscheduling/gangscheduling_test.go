@@ -24,7 +24,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -54,7 +53,7 @@ func Test_isSchedulableAfterPodAdded(t *testing.T) {
 		name                       string
 		pod                        *v1.Pod
 		newPod                     *v1.Pod
-		pgs                        []*schedulingv1beta1.PodGroup
+		pgs                        []*schedulingv1alpha3.PodGroup
 		cpgs                       []*schedulingv1alpha3.CompositePodGroup
 		expectedHint               fwk.QueueingHint
 		isCompositePodGroupEnabled bool
@@ -91,7 +90,7 @@ func Test_isSchedulableAfterPodAdded(t *testing.T) {
 			name:   "add a newPod which doesn't match the pod's namespace",
 			pod:    st.MakePod().Name("p").PodGroupName("pg").Obj(),
 			newPod: st.MakePod().Namespace("foo").PodGroupName("pg").Obj(),
-			pgs: []*schedulingv1beta1.PodGroup{
+			pgs: []*schedulingv1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg").Obj(),
 				st.MakePodGroup().Namespace("foo").Name("pg").Obj(),
 			},
@@ -102,7 +101,7 @@ func Test_isSchedulableAfterPodAdded(t *testing.T) {
 			name:   "add a newPod which doesn't match the pod's namespace (CPG=false)",
 			pod:    st.MakePod().Name("p").PodGroupName("pg").Obj(),
 			newPod: st.MakePod().Namespace("foo").PodGroupName("pg").Obj(),
-			pgs: []*schedulingv1beta1.PodGroup{
+			pgs: []*schedulingv1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg").Obj(),
 				st.MakePodGroup().Namespace("foo").Name("pg").Obj(),
 			},
@@ -113,7 +112,7 @@ func Test_isSchedulableAfterPodAdded(t *testing.T) {
 			name:   "add a newPod which doesn't match the pod's pod group name",
 			pod:    st.MakePod().Name("p").PodGroupName("pg1").Obj(),
 			newPod: st.MakePod().PodGroupName("pg2").Obj(),
-			pgs: []*schedulingv1beta1.PodGroup{
+			pgs: []*schedulingv1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").Obj(),
 				st.MakePodGroup().Name("pg2").Obj(),
 			},
@@ -124,7 +123,7 @@ func Test_isSchedulableAfterPodAdded(t *testing.T) {
 			name:   "add a newPod which doesn't match the pod's pod group name (CPG=false)",
 			pod:    st.MakePod().Name("p").PodGroupName("pg1").Obj(),
 			newPod: st.MakePod().PodGroupName("pg2").Obj(),
-			pgs: []*schedulingv1beta1.PodGroup{
+			pgs: []*schedulingv1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").Obj(),
 				st.MakePodGroup().Name("pg2").Obj(),
 			},
@@ -135,7 +134,7 @@ func Test_isSchedulableAfterPodAdded(t *testing.T) {
 			name:   "add a newPod which belongs to a different scheduling group but matches the root CPG",
 			pod:    st.MakePod().Name("p1").PodGroupName("pg1").Obj(),
 			newPod: st.MakePod().Name("p2").PodGroupName("pg2").Obj(),
-			pgs: []*schedulingv1beta1.PodGroup{
+			pgs: []*schedulingv1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root").Obj(),
 				st.MakePodGroup().Name("pg2").ParentCompositePodGroup("cpg-root").Obj(),
 			},
@@ -149,7 +148,7 @@ func Test_isSchedulableAfterPodAdded(t *testing.T) {
 			name:   "add a newPod which belongs to a different scheduling group but matches the root CPG (CPG=false)",
 			pod:    st.MakePod().Name("p1").PodGroupName("pg1").Obj(),
 			newPod: st.MakePod().Name("p2").PodGroupName("pg2").Obj(),
-			pgs: []*schedulingv1beta1.PodGroup{
+			pgs: []*schedulingv1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root").Obj(),
 				st.MakePodGroup().Name("pg2").ParentCompositePodGroup("cpg-root").Obj(),
 			},
@@ -163,7 +162,7 @@ func Test_isSchedulableAfterPodAdded(t *testing.T) {
 			name:   "add a newPod which belongs to a different scheduling group and does not match the root CPG",
 			pod:    st.MakePod().Name("p1").PodGroupName("pg1").Obj(),
 			newPod: st.MakePod().Name("p2").PodGroupName("pg2").Obj(),
-			pgs: []*schedulingv1beta1.PodGroup{
+			pgs: []*schedulingv1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root1").Obj(),
 				st.MakePodGroup().Name("pg2").ParentCompositePodGroup("cpg-root2").Obj(),
 			},
@@ -178,7 +177,7 @@ func Test_isSchedulableAfterPodAdded(t *testing.T) {
 			name:   "add a newPod which belongs to a different scheduling group and does not match the root CPG (CPG=false)",
 			pod:    st.MakePod().Name("p1").PodGroupName("pg1").Obj(),
 			newPod: st.MakePod().Name("p2").PodGroupName("pg2").Obj(),
-			pgs: []*schedulingv1beta1.PodGroup{
+			pgs: []*schedulingv1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root1").Obj(),
 				st.MakePodGroup().Name("pg2").ParentCompositePodGroup("cpg-root2").Obj(),
 			},
@@ -207,7 +206,7 @@ func Test_isSchedulableAfterPodAdded(t *testing.T) {
 			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(objs...), 0)
 
 			for _, pg := range tc.pgs {
-				if err := informerFactory.Scheduling().V1beta1().PodGroups().Informer().GetStore().Add(pg); err != nil {
+				if err := informerFactory.Scheduling().V1alpha3().PodGroups().Informer().GetStore().Add(pg); err != nil {
 					t.Fatalf("Failed to add podGroup %s to store: %v", pg.Name, err)
 				}
 			}
@@ -226,7 +225,7 @@ func Test_isSchedulableAfterPodAdded(t *testing.T) {
 
 			p, err := New(ctx, nil, fh, feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate))
 			if err == nil {
-				pgMap := make(map[string]*schedulingv1beta1.PodGroup)
+				pgMap := make(map[string]*schedulingv1alpha3.PodGroup)
 				for _, pg := range tc.pgs {
 					pgMap[pg.Name] = pg
 				}
@@ -254,8 +253,8 @@ func Test_isSchedulableAfterPodGroupAdded(t *testing.T) {
 	tests := []struct {
 		name                       string
 		pod                        *v1.Pod
-		newPodGroup                *schedulingv1beta1.PodGroup
-		pgs                        []*schedulingv1beta1.PodGroup
+		newPodGroup                *schedulingv1alpha3.PodGroup
+		pgs                        []*schedulingv1alpha3.PodGroup
 		cpgs                       []*schedulingv1alpha3.CompositePodGroup
 		expectedHint               fwk.QueueingHint
 		isCompositePodGroupEnabled bool
@@ -278,7 +277,7 @@ func Test_isSchedulableAfterPodGroupAdded(t *testing.T) {
 			name:        "add a pod group which doesn't match the pod's scheduling group name",
 			pod:         st.MakePod().Name("p").PodGroupName("pg1").Obj(),
 			newPodGroup: st.MakePodGroup().Name("pg2").MinCount(1).WorkloadRef("t", "w").Obj(),
-			pgs: []*schedulingv1beta1.PodGroup{
+			pgs: []*schedulingv1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").Obj(),
 			},
 			expectedHint:               fwk.QueueSkip,
@@ -288,7 +287,7 @@ func Test_isSchedulableAfterPodGroupAdded(t *testing.T) {
 			name:        "add a pod group which doesn't match the pod's scheduling group name (CPG=false)",
 			pod:         st.MakePod().Name("p").PodGroupName("pg1").Obj(),
 			newPodGroup: st.MakePodGroup().Name("pg2").MinCount(1).WorkloadRef("t", "w").Obj(),
-			pgs: []*schedulingv1beta1.PodGroup{
+			pgs: []*schedulingv1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").Obj(),
 			},
 			expectedHint:               fwk.QueueSkip,
@@ -298,7 +297,7 @@ func Test_isSchedulableAfterPodGroupAdded(t *testing.T) {
 			name:        "add a pod group which doesn't match the pod's scheduling group namespace",
 			pod:         st.MakePod().Namespace("ns1").Name("p").PodGroupName("pg").Obj(),
 			newPodGroup: st.MakePodGroup().Namespace("ns2").Name("pg").MinCount(1).WorkloadRef("t", "w").Obj(),
-			pgs: []*schedulingv1beta1.PodGroup{
+			pgs: []*schedulingv1alpha3.PodGroup{
 				st.MakePodGroup().Namespace("ns1").Name("pg").Obj(),
 			},
 			expectedHint:               fwk.QueueSkip,
@@ -308,7 +307,7 @@ func Test_isSchedulableAfterPodGroupAdded(t *testing.T) {
 			name:        "add a pod group which doesn't match the pod's scheduling group namespace (CPG=false)",
 			pod:         st.MakePod().Namespace("ns1").Name("p").PodGroupName("pg").Obj(),
 			newPodGroup: st.MakePodGroup().Namespace("ns2").Name("pg").MinCount(1).WorkloadRef("t", "w").Obj(),
-			pgs: []*schedulingv1beta1.PodGroup{
+			pgs: []*schedulingv1alpha3.PodGroup{
 				st.MakePodGroup().Namespace("ns1").Name("pg").Obj(),
 			},
 			expectedHint:               fwk.QueueSkip,
@@ -318,7 +317,7 @@ func Test_isSchedulableAfterPodGroupAdded(t *testing.T) {
 			name:        "add a pod group which doesn't match the pod's scheduling group but matches the root CPG",
 			pod:         st.MakePod().Name("p").PodGroupName("pg1").Obj(),
 			newPodGroup: st.MakePodGroup().Name("pg2").ParentCompositePodGroup("cpg-root").MinCount(1).Obj(),
-			pgs: []*schedulingv1beta1.PodGroup{
+			pgs: []*schedulingv1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root").Obj(),
 			},
 			cpgs: []*schedulingv1alpha3.CompositePodGroup{
@@ -331,7 +330,7 @@ func Test_isSchedulableAfterPodGroupAdded(t *testing.T) {
 			name:        "add a pod group which doesn't match the pod's scheduling group but matches the root CPG (CPG=false)",
 			pod:         st.MakePod().Name("p").PodGroupName("pg1").Obj(),
 			newPodGroup: st.MakePodGroup().Name("pg2").ParentCompositePodGroup("cpg-root").MinCount(1).Obj(),
-			pgs: []*schedulingv1beta1.PodGroup{
+			pgs: []*schedulingv1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root").Obj(),
 			},
 			cpgs: []*schedulingv1alpha3.CompositePodGroup{
@@ -344,7 +343,7 @@ func Test_isSchedulableAfterPodGroupAdded(t *testing.T) {
 			name:        "add a pod group which doesn't match the pod's scheduling group and doesn't match the root CPG",
 			pod:         st.MakePod().Name("p").PodGroupName("pg1").Obj(),
 			newPodGroup: st.MakePodGroup().Name("pg2").ParentCompositePodGroup("cpg-root2").MinCount(1).Obj(),
-			pgs: []*schedulingv1beta1.PodGroup{
+			pgs: []*schedulingv1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root1").Obj(),
 			},
 			cpgs: []*schedulingv1alpha3.CompositePodGroup{
@@ -358,7 +357,7 @@ func Test_isSchedulableAfterPodGroupAdded(t *testing.T) {
 			name:        "add a pod group which doesn't match the pod's scheduling group and doesn't match the root CPG (CPG=false)",
 			pod:         st.MakePod().Name("p").PodGroupName("pg1").Obj(),
 			newPodGroup: st.MakePodGroup().Name("pg2").ParentCompositePodGroup("cpg-root2").MinCount(1).Obj(),
-			pgs: []*schedulingv1beta1.PodGroup{
+			pgs: []*schedulingv1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg-root1").Obj(),
 			},
 			cpgs: []*schedulingv1alpha3.CompositePodGroup{
@@ -386,7 +385,7 @@ func Test_isSchedulableAfterPodGroupAdded(t *testing.T) {
 			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(objs...), 0)
 
 			for _, pg := range tc.pgs {
-				if err := informerFactory.Scheduling().V1beta1().PodGroups().Informer().GetStore().Add(pg); err != nil {
+				if err := informerFactory.Scheduling().V1alpha3().PodGroups().Informer().GetStore().Add(pg); err != nil {
 					t.Fatalf("Failed to add podGroup %s to store: %v", pg.Name, err)
 				}
 			}
@@ -405,7 +404,7 @@ func Test_isSchedulableAfterPodGroupAdded(t *testing.T) {
 
 			p, err := New(ctx, nil, fh, feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate))
 			if err == nil {
-				pgMap := make(map[string]*schedulingv1beta1.PodGroup)
+				pgMap := make(map[string]*schedulingv1alpha3.PodGroup)
 				for _, pg := range tc.pgs {
 					pgMap[pg.Name] = pg
 				}
@@ -436,8 +435,8 @@ func Test_isSchedulableAfterPodGroupUpdated(t *testing.T) {
 	tests := []struct {
 		name                       string
 		pod                        *v1.Pod
-		oldPodGroup                *schedulingv1beta1.PodGroup
-		newPodGroup                *schedulingv1beta1.PodGroup
+		oldPodGroup                *schedulingv1alpha3.PodGroup
+		newPodGroup                *schedulingv1alpha3.PodGroup
 		expectedHint               fwk.QueueingHint
 		expectErr                  bool
 		isCompositePodGroupEnabled bool
@@ -572,7 +571,7 @@ func Test_isSchedulableAfterPodGroupUpdated(t *testing.T) {
 
 			p, err := New(ctx, nil, fh, feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate))
 			if err == nil {
-				pgMap := make(map[string]*schedulingv1beta1.PodGroup)
+				pgMap := make(map[string]*schedulingv1alpha3.PodGroup)
 				if tc.oldPodGroup != nil {
 					pgMap[tc.oldPodGroup.Name] = tc.oldPodGroup
 				}
@@ -618,14 +617,14 @@ func Test_isSchedulableAfterCompositePodGroupAdded(t *testing.T) {
 		pod                        *v1.Pod
 		newCPG                     *schedulingv1alpha3.CompositePodGroup
 		cpgs                       []*schedulingv1alpha3.CompositePodGroup
-		pgs                        []*schedulingv1beta1.PodGroup
+		pgs                        []*schedulingv1alpha3.PodGroup
 		expectedHint               fwk.QueueingHint
 		isCompositePodGroupEnabled bool
 	}{
 		{
 			name: "add a CPG which matches the pod's root CPG",
 			pod:  st.MakePod().Namespace("default").Name("p").PodGroupName("pg").Obj(),
-			pgs: []*schedulingv1beta1.PodGroup{
+			pgs: []*schedulingv1alpha3.PodGroup{
 				st.MakePodGroup().Namespace("default").Name("pg").ParentCompositePodGroup("cpg-root").Obj(),
 			},
 			newCPG:                     st.MakeCompositePodGroup().Namespace("default").Name("cpg-root").Obj(),
@@ -635,7 +634,7 @@ func Test_isSchedulableAfterCompositePodGroupAdded(t *testing.T) {
 		{
 			name: "add a CPG which matches the pod's root CPG (CPG=false)",
 			pod:  st.MakePod().Namespace("default").Name("p").PodGroupName("pg").Obj(),
-			pgs: []*schedulingv1beta1.PodGroup{
+			pgs: []*schedulingv1alpha3.PodGroup{
 				st.MakePodGroup().Namespace("default").Name("pg").ParentCompositePodGroup("cpg-root").Obj(),
 			},
 			newCPG:                     st.MakeCompositePodGroup().Namespace("default").Name("cpg-root").Obj(),
@@ -645,7 +644,7 @@ func Test_isSchedulableAfterCompositePodGroupAdded(t *testing.T) {
 		{
 			name: "add a CPG which matches the pod's root CPG",
 			pod:  st.MakePod().Namespace("default").Name("p").PodGroupName("pg").Obj(),
-			pgs: []*schedulingv1beta1.PodGroup{
+			pgs: []*schedulingv1alpha3.PodGroup{
 				st.MakePodGroup().Namespace("default").Name("pg").ParentCompositePodGroup("cpg-root").Obj(),
 			},
 			newCPG:                     st.MakeCompositePodGroup().Namespace("default").Name("cpg-root").Obj(),
@@ -655,7 +654,7 @@ func Test_isSchedulableAfterCompositePodGroupAdded(t *testing.T) {
 		{
 			name: "add a CPG which matches the pod's intermediate CPG but implies the same root",
 			pod:  st.MakePod().Namespace("default").Name("p").PodGroupName("pg").Obj(),
-			pgs: []*schedulingv1beta1.PodGroup{
+			pgs: []*schedulingv1alpha3.PodGroup{
 				st.MakePodGroup().Namespace("default").Name("pg").ParentCompositePodGroup("cpg-sub").Obj(),
 			},
 			cpgs: []*schedulingv1alpha3.CompositePodGroup{
@@ -668,7 +667,7 @@ func Test_isSchedulableAfterCompositePodGroupAdded(t *testing.T) {
 		{
 			name: "add a CPG which matches the pod's intermediate CPG but implies the same root (CPG=false)",
 			pod:  st.MakePod().Namespace("default").Name("p").PodGroupName("pg").Obj(),
-			pgs: []*schedulingv1beta1.PodGroup{
+			pgs: []*schedulingv1alpha3.PodGroup{
 				st.MakePodGroup().Namespace("default").Name("pg").ParentCompositePodGroup("cpg-sub").Obj(),
 			},
 			cpgs: []*schedulingv1alpha3.CompositePodGroup{
@@ -681,7 +680,7 @@ func Test_isSchedulableAfterCompositePodGroupAdded(t *testing.T) {
 		{
 			name: "add a CPG which matches the pod's intermediate CPG but implies the same root",
 			pod:  st.MakePod().Namespace("default").Name("p").PodGroupName("pg").Obj(),
-			pgs: []*schedulingv1beta1.PodGroup{
+			pgs: []*schedulingv1alpha3.PodGroup{
 				st.MakePodGroup().Namespace("default").Name("pg").ParentCompositePodGroup("cpg-sub").Obj(),
 			},
 			cpgs: []*schedulingv1alpha3.CompositePodGroup{
@@ -694,7 +693,7 @@ func Test_isSchedulableAfterCompositePodGroupAdded(t *testing.T) {
 		{
 			name: "add a CPG which does not match the pod's CPG hierarchy",
 			pod:  st.MakePod().Namespace("default").Name("p").PodGroupName("pg").Obj(),
-			pgs: []*schedulingv1beta1.PodGroup{
+			pgs: []*schedulingv1alpha3.PodGroup{
 				st.MakePodGroup().Namespace("default").Name("pg").ParentCompositePodGroup("cpg-1").Obj(),
 			},
 			cpgs: []*schedulingv1alpha3.CompositePodGroup{
@@ -708,7 +707,7 @@ func Test_isSchedulableAfterCompositePodGroupAdded(t *testing.T) {
 		{
 			name: "add a CPG which does not match the pod's CPG hierarchy (CPG=false)",
 			pod:  st.MakePod().Namespace("default").Name("p").PodGroupName("pg").Obj(),
-			pgs: []*schedulingv1beta1.PodGroup{
+			pgs: []*schedulingv1alpha3.PodGroup{
 				st.MakePodGroup().Namespace("default").Name("pg").ParentCompositePodGroup("cpg-1").Obj(),
 			},
 			cpgs: []*schedulingv1alpha3.CompositePodGroup{
@@ -722,7 +721,7 @@ func Test_isSchedulableAfterCompositePodGroupAdded(t *testing.T) {
 		{
 			name: "add a CPG which does not match the pod's CPG hierarchy",
 			pod:  st.MakePod().Namespace("default").Name("p").PodGroupName("pg").Obj(),
-			pgs: []*schedulingv1beta1.PodGroup{
+			pgs: []*schedulingv1alpha3.PodGroup{
 				st.MakePodGroup().Namespace("default").Name("pg").ParentCompositePodGroup("cpg-1").Obj(),
 			},
 			cpgs: []*schedulingv1alpha3.CompositePodGroup{
@@ -754,7 +753,7 @@ func Test_isSchedulableAfterCompositePodGroupAdded(t *testing.T) {
 
 			// We need to wait for informers to sync
 			for _, pg := range tc.pgs {
-				if err := informerFactory.Scheduling().V1beta1().PodGroups().Informer().GetStore().Add(pg); err != nil {
+				if err := informerFactory.Scheduling().V1alpha3().PodGroups().Informer().GetStore().Add(pg); err != nil {
 					t.Fatalf("Failed to add podGroup %s to store: %v", pg.Name, err)
 				}
 			}
@@ -773,7 +772,7 @@ func Test_isSchedulableAfterCompositePodGroupAdded(t *testing.T) {
 
 			p, err := New(ctx, nil, fh, feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate))
 			if err == nil {
-				pgMap := make(map[string]*schedulingv1beta1.PodGroup)
+				pgMap := make(map[string]*schedulingv1alpha3.PodGroup)
 				for _, pg := range tc.pgs {
 					pgMap[pg.Name] = pg
 				}
@@ -900,7 +899,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 		name                            string
 		pod                             *v1.Pod
 		initialPods                     []*v1.Pod
-		initialPodGroups                []*schedulingv1beta1.PodGroup
+		initialPodGroups                []*schedulingv1alpha3.PodGroup
 		initialCompositePodGroups       []*schedulingv1alpha3.CompositePodGroup
 		podsWaitingOnPermit             []*v1.Pod
 		isDuringPodGroupSchedulingCycle bool
@@ -915,7 +914,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			name:                       "non-gang pod succeeds immediately (CPG=false)",
 			pod:                        nonGangPod,
 			isCompositePodGroupEnabled: false,
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{gangPodGroup1, gangPodGroup2, basicPodGroup},
+			initialPodGroups:           []*schedulingv1alpha3.PodGroup{gangPodGroup1, gangPodGroup2, basicPodGroup},
 			wantPreEnqueueStatus:       nil,
 			wantPermitStatus:           nil,
 		},
@@ -923,7 +922,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			name:                       "non-gang pod succeeds immediately (CPG=true)",
 			pod:                        nonGangPod,
 			isCompositePodGroupEnabled: true,
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{gangPodGroup1, gangPodGroup2, basicPodGroup},
+			initialPodGroups:           []*schedulingv1alpha3.PodGroup{gangPodGroup1, gangPodGroup2, basicPodGroup},
 			wantPreEnqueueStatus:       nil,
 			wantPermitStatus:           nil,
 		},
@@ -931,7 +930,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			name:                       "basic policy pod succeeds immediately (CPG=false)",
 			pod:                        basicPolicyPod,
 			isCompositePodGroupEnabled: false,
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{gangPodGroup1, gangPodGroup2, basicPodGroup},
+			initialPodGroups:           []*schedulingv1alpha3.PodGroup{gangPodGroup1, gangPodGroup2, basicPodGroup},
 			wantPreEnqueueStatus:       nil,
 			wantPermitStatus:           nil,
 		},
@@ -939,7 +938,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			name:                       "basic policy pod succeeds immediately (CPG=true)",
 			pod:                        basicPolicyPod,
 			isCompositePodGroupEnabled: true,
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{gangPodGroup1, gangPodGroup2, basicPodGroup},
+			initialPodGroups:           []*schedulingv1alpha3.PodGroup{gangPodGroup1, gangPodGroup2, basicPodGroup},
 			wantPreEnqueueStatus:       nil,
 			wantPermitStatus:           nil,
 		},
@@ -948,7 +947,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			pod:                        p1,
 			isCompositePodGroupEnabled: false,
 			initialPods:                []*v1.Pod{p2, p3, p4, p5},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{},
+			initialPodGroups:           []*schedulingv1alpha3.PodGroup{},
 			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `waiting for pods's pod group "pg1" to appear in scheduling queue`),
 		},
 		{
@@ -956,7 +955,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			pod:                        p1,
 			isCompositePodGroupEnabled: true,
 			initialPods:                []*v1.Pod{p2, p3, p4, p5},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{},
+			initialPodGroups:           []*schedulingv1alpha3.PodGroup{},
 			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "failed to build hierarchy snapshot: pod group object not found in state for podgroup/ns1/pg1"),
 		},
 		{
@@ -964,7 +963,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			pod:                        p1,
 			isCompositePodGroupEnabled: false,
 			initialPods:                []*v1.Pod{p2, p4, p5},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{gangPodGroup1, gangPodGroup2},
+			initialPodGroups:           []*schedulingv1alpha3.PodGroup{gangPodGroup1, gangPodGroup2},
 			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for minCount pods from a gang to appear in scheduling queue"),
 		},
 		{
@@ -972,7 +971,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			pod:                        p1,
 			isCompositePodGroupEnabled: true,
 			initialPods:                []*v1.Pod{p2, p4, p5},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{gangPodGroup1, gangPodGroup2},
+			initialPodGroups:           []*schedulingv1alpha3.PodGroup{gangPodGroup1, gangPodGroup2},
 			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for minCount pods from a gang to appear in scheduling queue"),
 		},
 		{
@@ -980,7 +979,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			pod:                        p1,
 			isCompositePodGroupEnabled: false,
 			initialPods:                []*v1.Pod{p2, p3, p4, p5},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{gangPodGroup1, gangPodGroup2},
+			initialPodGroups:           []*schedulingv1alpha3.PodGroup{gangPodGroup1, gangPodGroup2},
 			podsWaitingOnPermit:        []*v1.Pod{p2, p4, p5},
 			wantPreEnqueueStatus:       nil,
 			wantActivatedPods:          []*v1.Pod{p3},
@@ -991,7 +990,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			pod:                        p1,
 			isCompositePodGroupEnabled: true,
 			initialPods:                []*v1.Pod{p2, p3, p4, p5},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{gangPodGroup1, gangPodGroup2},
+			initialPodGroups:           []*schedulingv1alpha3.PodGroup{gangPodGroup1, gangPodGroup2},
 			podsWaitingOnPermit:        []*v1.Pod{p2, p4, p5},
 			wantPreEnqueueStatus:       nil,
 			wantActivatedPods:          []*v1.Pod{p3},
@@ -1002,7 +1001,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			pod:                        p1,
 			isCompositePodGroupEnabled: false,
 			initialPods:                []*v1.Pod{p2, p3, p4, p5},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{gangPodGroup1, gangPodGroup2},
+			initialPodGroups:           []*schedulingv1alpha3.PodGroup{gangPodGroup1, gangPodGroup2},
 			podsWaitingOnPermit:        []*v1.Pod{p2, p3, p4, p5},
 			wantPreEnqueueStatus:       nil,
 			wantPermitStatus:           nil,
@@ -1013,7 +1012,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			pod:                        p1,
 			isCompositePodGroupEnabled: true,
 			initialPods:                []*v1.Pod{p2, p3, p4, p5},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{gangPodGroup1, gangPodGroup2},
+			initialPodGroups:           []*schedulingv1alpha3.PodGroup{gangPodGroup1, gangPodGroup2},
 			podsWaitingOnPermit:        []*v1.Pod{p2, p3, p4, p5},
 			wantPreEnqueueStatus:       nil,
 			wantPermitStatus:           nil,
@@ -1024,7 +1023,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			pod:                        p1CPG,
 			isCompositePodGroupEnabled: true,
 			initialPods:                []*v1.Pod{},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1, pg2, pg3, pg4, pg5, pg6, pg7},
+			initialPodGroups:           []*schedulingv1alpha3.PodGroup{pg1, pg2, pg3, pg4, pg5, pg6, pg7},
 			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
 			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for composite pod group \"cpg-root\" tree to meet quorum"),
 		},
@@ -1033,7 +1032,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			pod:                        p1CPG,
 			isCompositePodGroupEnabled: false,
 			initialPods:                []*v1.Pod{},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1, pg2, pg3, pg4, pg5, pg6, pg7},
+			initialPodGroups:           []*schedulingv1alpha3.PodGroup{pg1, pg2, pg3, pg4, pg5, pg6, pg7},
 			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
 			wantPreEnqueueStatus:       nil,
 			wantPermitStatus:           nil,
@@ -1043,7 +1042,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			pod:                        p6CPG,
 			isCompositePodGroupEnabled: true,
 			initialPods:                []*v1.Pod{p1CPG, p2CPG},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1, pg2, pg3, pg4, pg5, pg6, pg7},
+			initialPodGroups:           []*schedulingv1alpha3.PodGroup{pg1, pg2, pg3, pg4, pg5, pg6, pg7},
 			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
 			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for composite pod group \"cpg-root\" tree to meet quorum"),
 		},
@@ -1052,7 +1051,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			pod:                        p6CPG,
 			isCompositePodGroupEnabled: false,
 			initialPods:                []*v1.Pod{p1CPG, p2CPG},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1, pg2, pg3, pg4, pg5, pg6, pg7},
+			initialPodGroups:           []*schedulingv1alpha3.PodGroup{pg1, pg2, pg3, pg4, pg5, pg6, pg7},
 			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
 			wantPreEnqueueStatus:       nil,
 			wantPermitStatus:           nil,
@@ -1063,7 +1062,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			isCompositePodGroupEnabled: true,
 			initialPods:                []*v1.Pod{p1CPG, p2CPG, p6CPG},
 			podsWaitingOnPermit:        []*v1.Pod{p1CPG, p2CPG, p6CPG},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1, pg2, pg3, pg4, pg5, pg6, pg7},
+			initialPodGroups:           []*schedulingv1alpha3.PodGroup{pg1, pg2, pg3, pg4, pg5, pg6, pg7},
 			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
 			wantPreEnqueueStatus:       nil,
 			wantPermitStatus:           nil,
@@ -1073,7 +1072,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			pod:                        p4CPG,
 			isCompositePodGroupEnabled: false,
 			initialPods:                []*v1.Pod{p1CPG, p2CPG, p6CPG},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1, pg2, pg3, pg4, pg5, pg6, pg7},
+			initialPodGroups:           []*schedulingv1alpha3.PodGroup{pg1, pg2, pg3, pg4, pg5, pg6, pg7},
 			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
 			wantPreEnqueueStatus:       nil,
 		},
@@ -1082,7 +1081,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			pod:                        p2_1,
 			isCompositePodGroupEnabled: true,
 			initialPods:                []*v1.Pod{p1_1, p1_2},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{pgBasic1, pgBasic2},
+			initialPodGroups:           []*schedulingv1alpha3.PodGroup{pgBasic1, pgBasic2},
 			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgBasicRoot},
 			wantPreEnqueueStatus:       nil,
 			wantPermitStatus:           fwk.NewStatus(fwk.Wait, "waiting for composite pod group \"cpg-basic-root\" tree to meet quorum"),
@@ -1092,7 +1091,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			pod:                        p2_1,
 			isCompositePodGroupEnabled: false,
 			initialPods:                []*v1.Pod{p1_1, p1_2},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{pgBasic1, pgBasic2},
+			initialPodGroups:           []*schedulingv1alpha3.PodGroup{pgBasic1, pgBasic2},
 			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgBasicRoot},
 			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for minCount pods from a gang to appear in scheduling queue"),
 		},
@@ -1101,7 +1100,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			pod:                        p4CPG,
 			isCompositePodGroupEnabled: true,
 			initialPods:                []*v1.Pod{p1CPG, p2CPG, p6CPG},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1, pg2, pg3, pg4, pg5, pg6, pg7},
+			initialPodGroups:           []*schedulingv1alpha3.PodGroup{pg1, pg2, pg3, pg4, pg5, pg6, pg7},
 			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
 			wantPreEnqueueStatus:       nil,
 			wantPermitStatus:           fwk.NewStatus(fwk.Wait, "waiting for composite pod group \"cpg-root\" tree to meet quorum"),
@@ -1111,7 +1110,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			pod:                        p4CPG,
 			isCompositePodGroupEnabled: false,
 			initialPods:                []*v1.Pod{p1CPG, p2CPG, p6CPG},
-			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1, pg2, pg3, pg4, pg5, pg6, pg7},
+			initialPodGroups:           []*schedulingv1alpha3.PodGroup{pg1, pg2, pg3, pg4, pg5, pg6, pg7},
 			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgRoot, cpgSub1, cpgSub2, cpgSub3},
 			wantPreEnqueueStatus:       nil,
 			wantPermitStatus:           nil,
@@ -1129,7 +1128,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 			cache := internalcache.New(ctx, nil, true, tt.isCompositePodGroupEnabled)
 
 			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(), 0)
-			podGroupInformer := informerFactory.Scheduling().V1beta1().PodGroups()
+			podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
 			if tt.isCompositePodGroupEnabled {
 				informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer()
 			}
@@ -1778,9 +1777,9 @@ func TestPlacementFeasible(t *testing.T) {
 			} else {
 				pg := st.MakePodGroup().Namespace(namespace).Name(pgName).ParentCompositePodGroup("cpg-root").Obj()
 				if tc.minCount > 0 {
-					pg.Spec.SchedulingPolicy.Gang = &schedulingv1beta1.GangSchedulingPolicy{MinCount: tc.minCount}
+					pg.Spec.SchedulingPolicy.Gang = &schedulingv1alpha3.GangSchedulingPolicy{MinCount: tc.minCount}
 				} else {
-					pg.Spec.SchedulingPolicy.Basic = &schedulingv1beta1.BasicSchedulingPolicy{}
+					pg.Spec.SchedulingPolicy.Basic = &schedulingv1alpha3.BasicSchedulingPolicy{}
 				}
 				pgInfo.groupType = fwk.PodGroupKeyType
 				pgInfo.podGroup = pg
@@ -1788,7 +1787,7 @@ func TestPlacementFeasible(t *testing.T) {
 			}
 
 			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(objs...), 0)
-			informerFactory.Scheduling().V1beta1().PodGroups().Informer()
+			informerFactory.Scheduling().V1alpha3().PodGroups().Informer()
 			if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
 				informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer()
 			}
@@ -1844,13 +1843,13 @@ type testPodGroupInfo struct {
 	groupType       fwk.EntityKeyType
 	unscheduledPods []*v1.Pod
 	cpg             *schedulingv1alpha3.CompositePodGroup
-	podGroup        *schedulingv1beta1.PodGroup
+	podGroup        *schedulingv1alpha3.PodGroup
 }
 
 func (t *testPodGroupInfo) GetNamespace() string                     { return t.namespace }
 func (t *testPodGroupInfo) GetName() string                          { return t.name }
 func (t *testPodGroupInfo) GetUnscheduledPods() []*v1.Pod            { return t.unscheduledPods }
-func (t *testPodGroupInfo) GetPodGroup() *schedulingv1beta1.PodGroup { return t.podGroup }
+func (t *testPodGroupInfo) GetPodGroup() *schedulingv1alpha3.PodGroup { return t.podGroup }
 func (t *testPodGroupInfo) GetType() fwk.EntityKeyType               { return t.groupType }
 func (t *testPodGroupInfo) GetKey() string {
 	return fmt.Sprintf("%s/%s/%s", t.groupType, t.namespace, t.name)
@@ -1864,7 +1863,7 @@ func (t *testPodGroupInfo) GetChildren() []fwk.PodGroupInfo {
 
 type mockPodGroupManager struct {
 	fwk.PodGroupManager
-	pgs  map[string]*schedulingv1beta1.PodGroup
+	pgs  map[string]*schedulingv1alpha3.PodGroup
 	cpgs map[string]*schedulingv1alpha3.CompositePodGroup
 }
 

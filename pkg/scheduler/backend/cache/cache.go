@@ -25,7 +25,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -1012,7 +1011,7 @@ type podGroupListerImpl struct {
 }
 
 // Get returns the cached pod group object.
-func (l *podGroupListerImpl) Get(namespace, name string) (*schedulingv1beta1.PodGroup, error) {
+func (l *podGroupListerImpl) Get(namespace, name string) (*schedulingv1alpha3.PodGroup, error) {
 	if !l.cache.genericWorkloadEnabled {
 		return nil, fmt.Errorf("generic workload feature gate is disabled")
 	}
@@ -1126,7 +1125,7 @@ func (cache *cacheImpl) applyPVCRefCountDelta(snapshot *Snapshot) error {
 }
 
 // AddPodGroup adds a pod group object to the cache.
-func (cache *cacheImpl) AddPodGroup(podGroup *schedulingv1beta1.PodGroup) {
+func (cache *cacheImpl) AddPodGroup(podGroup *schedulingv1alpha3.PodGroup) {
 	if !cache.genericWorkloadEnabled {
 		return
 	}
@@ -1158,7 +1157,7 @@ func (cache *cacheImpl) AddPodGroup(podGroup *schedulingv1beta1.PodGroup) {
 }
 
 // UpdatePodGroup updates a pod group object in the cache.
-func (cache *cacheImpl) UpdatePodGroup(logger klog.Logger, oldPodGroup, newPodGroup *schedulingv1beta1.PodGroup) {
+func (cache *cacheImpl) UpdatePodGroup(logger klog.Logger, oldPodGroup, newPodGroup *schedulingv1alpha3.PodGroup) {
 	if !cache.genericWorkloadEnabled {
 		return
 	}
@@ -1176,7 +1175,7 @@ func (cache *cacheImpl) UpdatePodGroup(logger klog.Logger, oldPodGroup, newPodGr
 }
 
 // RemovePodGroup removes a pod group object from the cache.
-func (cache *cacheImpl) RemovePodGroup(logger klog.Logger, podGroup *schedulingv1beta1.PodGroup) {
+func (cache *cacheImpl) RemovePodGroup(logger klog.Logger, podGroup *schedulingv1alpha3.PodGroup) {
 	if !cache.genericWorkloadEnabled {
 		return
 	}

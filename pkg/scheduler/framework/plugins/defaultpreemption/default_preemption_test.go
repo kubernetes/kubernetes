@@ -35,7 +35,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	"k8s.io/api/scheduling/v1alpha3"
-	"k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -212,7 +211,7 @@ func TestPostFilter(t *testing.T) {
 		pods                  []*v1.Pod
 		pdbs                  []*policy.PodDisruptionBudget
 		nodes                 []*v1.Node
-		podGroups             []*v1beta1.PodGroup
+		podGroups             []*v1alpha3.PodGroup
 		filteredNodesStatuses *framework.NodeToStatus
 		features              feature.Features
 		extender              fwk.Extender
@@ -1794,7 +1793,7 @@ func TestCustomSelection(t *testing.T) {
 		nodeNames          []string
 		pod                *v1.Pod
 		pods               []*v1.Pod
-		podGroups          []*v1beta1.PodGroup
+		podGroups          []*v1alpha3.PodGroup
 		compositePodGroups []*v1alpha3.CompositePodGroup
 		features           feature.Features
 		expected           map[string][]string
@@ -1928,7 +1927,7 @@ func TestCustomSelection(t *testing.T) {
 				st.MakePod().Name("v1").UID("v1").Namespace(v1.NamespaceDefault).Node("node1").Label("preemptible", "yes").PodGroupName("pg1").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
 				st.MakePod().Name("v2").UID("v2").Namespace(v1.NamespaceDefault).Node("node2").Label("preemptible", "yes").PodGroupName("pg1").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
 			},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").UID("pg1").Namespace(v1.NamespaceDefault).DisruptionModeAll().Obj(),
 			},
 			features: feature.Features{EnableGenericWorkload: true},
@@ -1944,7 +1943,7 @@ func TestCustomSelection(t *testing.T) {
 				st.MakePod().Name("v2").UID("v2").Namespace(v1.NamespaceDefault).Node("node2").PodGroupName("pg1").Priority(lowPriority).Req(smallRes).StartTime(epochTime).Obj(),
 				st.MakePod().Name("v3").UID("v3").Namespace(v1.NamespaceDefault).Node("node1").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
 			},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").UID("pg1").Namespace(v1.NamespaceDefault).DisruptionModeAll().Obj(),
 			},
 			features: feature.Features{EnableGenericWorkload: true},
@@ -1959,7 +1958,7 @@ func TestCustomSelection(t *testing.T) {
 				st.MakePod().Name("v1").UID("v1").Namespace(v1.NamespaceDefault).Node("node1").Label("preemptible", "yes").PodGroupName("pg1").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
 				st.MakePod().Name("v2").UID("v2").Namespace(v1.NamespaceDefault).Node("node2").Label("preemptible", "yes").PodGroupName("pg2").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
 			},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").UID("pg1").Namespace(v1.NamespaceDefault).ParentCompositePodGroup("cpg1").Priority(lowPriority).Obj(),
 				st.MakePodGroup().Name("pg2").UID("pg2").Namespace(v1.NamespaceDefault).ParentCompositePodGroup("cpg1").Priority(lowPriority).Obj(),
 			},
@@ -1979,7 +1978,7 @@ func TestCustomSelection(t *testing.T) {
 				st.MakePod().Name("v2").UID("v2").Namespace(v1.NamespaceDefault).Node("node2").PodGroupName("pg2").Priority(lowPriority).Req(smallRes).StartTime(epochTime).Obj(),
 				st.MakePod().Name("v3").UID("v3").Namespace(v1.NamespaceDefault).Node("node1").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
 			},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").UID("pg1").Namespace(v1.NamespaceDefault).ParentCompositePodGroup("cpg1").Priority(lowPriority).Obj(),
 				st.MakePodGroup().Name("pg2").UID("pg2").Namespace(v1.NamespaceDefault).ParentCompositePodGroup("cpg1").Priority(lowPriority).Obj(),
 			},
@@ -2184,7 +2183,7 @@ func TestCustomOrdering(t *testing.T) {
 		nodeNames          []string
 		preemptor          *v1.Pod
 		pods               []*v1.Pod
-		podGroups          []*v1beta1.PodGroup
+		podGroups          []*v1alpha3.PodGroup
 		compositePodGroups []*v1alpha3.CompositePodGroup
 		features           feature.Features
 		expectedPods       []string
@@ -2229,7 +2228,7 @@ func TestCustomOrdering(t *testing.T) {
 				st.MakePod().Name("v2").UID("v2").Namespace(v1.NamespaceDefault).Node("node1").PodGroupName("pg1").Priority(lowPriority).Req(smallRes).StartTime(epochTime).Obj(),
 				st.MakePod().Name("v3").UID("v3").Namespace(v1.NamespaceDefault).Node("node1").PodGroupName("pg1").Priority(lowPriority).Req(smallRes).StartTime(epochTime).Obj(),
 			},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").UID("pg1").Namespace(v1.NamespaceDefault).DisruptionModeAll().Obj(),
 			},
 			features: feature.Features{EnableGenericWorkload: true},
@@ -2246,7 +2245,7 @@ func TestCustomOrdering(t *testing.T) {
 				st.MakePod().Name("v2").UID("v2").Namespace(v1.NamespaceDefault).Node("node1").PodGroupName("pg-large").Priority(lowPriority).Req(smallRes).StartTime(epochTime).Obj(),
 				st.MakePod().Name("v3").UID("v3").Namespace(v1.NamespaceDefault).Node("node1").PodGroupName("pg-large").Priority(lowPriority).Req(smallRes).StartTime(epochTime).Obj(),
 			},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg-small").UID("pg-small").Namespace(v1.NamespaceDefault).DisruptionModeAll().Obj(),
 				st.MakePodGroup().Name("pg-large").UID("pg-large").Namespace(v1.NamespaceDefault).DisruptionModeAll().Obj(),
 			},
@@ -2263,7 +2262,7 @@ func TestCustomOrdering(t *testing.T) {
 				st.MakePod().Name("v1").UID("v1").Namespace(v1.NamespaceDefault).Node("node1").PodGroupName("pg-a").Priority(lowPriority).Req(mediumRes).StartTime(epochTime1).Obj(),
 				st.MakePod().Name("v2").UID("v2").Namespace(v1.NamespaceDefault).Node("node1").PodGroupName("pg-z").Priority(lowPriority).Req(mediumRes).StartTime(epochTime).Obj(),
 			},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg-a").UID("pg-a").Namespace(v1.NamespaceDefault).DisruptionModeAll().Obj(),
 				st.MakePodGroup().Name("pg-z").UID("pg-z").Namespace(v1.NamespaceDefault).DisruptionModeAll().Obj(),
 			},
@@ -2281,7 +2280,7 @@ func TestCustomOrdering(t *testing.T) {
 				st.MakePod().Name("v2").UID("v2").Namespace(v1.NamespaceDefault).Node("node1").PodGroupName("pg1").Priority(lowPriority).Req(smallRes).StartTime(epochTime).Obj(),
 				st.MakePod().Name("v3").UID("v3").Namespace(v1.NamespaceDefault).Node("node1").PodGroupName("pg2").Priority(lowPriority).Req(smallRes).StartTime(epochTime).Obj(),
 			},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").UID("pg1").Namespace(v1.NamespaceDefault).ParentCompositePodGroup("cpg1").Priority(lowPriority).Obj(),
 				st.MakePodGroup().Name("pg2").UID("pg2").Namespace(v1.NamespaceDefault).ParentCompositePodGroup("cpg1").Priority(lowPriority).Obj(),
 			},
@@ -2301,7 +2300,7 @@ func TestCustomOrdering(t *testing.T) {
 				st.MakePod().Name("v2").UID("v2").Namespace(v1.NamespaceDefault).Node("node1").PodGroupName("pg-large1").Priority(lowPriority).Req(smallRes).StartTime(epochTime).Obj(),
 				st.MakePod().Name("v3").UID("v3").Namespace(v1.NamespaceDefault).Node("node1").PodGroupName("pg-large2").Priority(lowPriority).Req(smallRes).StartTime(epochTime).Obj(),
 			},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg-small").UID("pg-small").Namespace(v1.NamespaceDefault).ParentCompositePodGroup("cpg-small").Priority(lowPriority).Obj(),
 				st.MakePodGroup().Name("pg-large1").UID("pg-large1").Namespace(v1.NamespaceDefault).ParentCompositePodGroup("cpg-large").Priority(lowPriority).Obj(),
 				st.MakePodGroup().Name("pg-large2").UID("pg-large2").Namespace(v1.NamespaceDefault).ParentCompositePodGroup("cpg-large").Priority(lowPriority).Obj(),
@@ -2421,7 +2420,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 		name                string
 		pod                 *v1.Pod
 		pods                []*v1.Pod
-		podGroups           []*v1beta1.PodGroup
+		podGroups           []*v1alpha3.PodGroup
 		compositePodGroups  []*v1alpha3.CompositePodGroup
 		nodes               []string
 		features            feature.Features
@@ -2474,7 +2473,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 				st.MakePod().Name("v1").UID("v1").Namespace("ns2").Node("node1").Priority(veryHighPriority).PodGroupName("pg1").Terminating().
 					Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj(),
 			},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").UID("pg1").Namespace("ns2").Priority(lowPriority).Obj(),
 			},
 			nodes:    []string{"node1"},
@@ -2488,7 +2487,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 				st.MakePod().Name("v1").UID("v1").Namespace("ns2").Node("node1").Priority(veryHighPriority).PodGroupName("pg1").Terminating().
 					Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj(),
 			},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").UID("pg1").Namespace("ns2").ParentCompositePodGroup("cpg1").Priority(lowPriority).Obj(),
 			},
 			compositePodGroups: []*v1alpha3.CompositePodGroup{
@@ -2505,7 +2504,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 				st.MakePod().Name("v1").UID("v1").Namespace("ns2").Node("node1").Priority(veryHighPriority).PodGroupName("pg1").Terminating().
 					Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj(),
 			},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").UID("pg1").Namespace("ns2").ParentCompositePodGroup("cpg1").Priority(lowPriority).Obj(),
 			},
 			nodes:    []string{"node1"},
@@ -2530,7 +2529,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 				st.MakePod().Name("v1").UID("v1").Namespace("ns2").Node("node1").Priority(veryHighPriority).PodGroupName("leaf-pg").Terminating().
 					Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj(),
 			},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("leaf-pg").UID("leaf-pg").Namespace("ns2").ParentCompositePodGroup("child-cpg").Priority(veryHighPriority).Obj(),
 			},
 			compositePodGroups: []*v1alpha3.CompositePodGroup{
@@ -3052,7 +3051,7 @@ func TestSelectVictimsOnNode(t *testing.T) {
 		initPods                   []*v1.Pod
 		preemptor                  *v1.Pod
 		pdbs                       []*policy.PodDisruptionBudget
-		podGroups                  []*v1beta1.PodGroup
+		podGroups                  []*v1alpha3.PodGroup
 		registerPlugins            []tf.RegisterPluginFunc
 		features                   feature.Features
 		expectedPods               sets.Set[string]
@@ -3124,7 +3123,7 @@ func TestSelectVictimsOnNode(t *testing.T) {
 			nodeNames: []string{"node1"},
 			mainNode:  "node1",
 			features:  feature.Features{EnableGenericWorkload: true},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace(v1.NamespaceDefault).UID("pg1").Priority(lowPriority).DisruptionModeAll().Obj(),
 			},
 			initPods: []*v1.Pod{
@@ -3140,7 +3139,7 @@ func TestSelectVictimsOnNode(t *testing.T) {
 			nodeNames: []string{"node1"},
 			mainNode:  "node1",
 			features:  feature.Features{EnableGenericWorkload: true},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace(v1.NamespaceDefault).UID("pg1").Priority(lowPriority).DisruptionModeAll().Obj(),
 			},
 			initPods: []*v1.Pod{
@@ -3157,7 +3156,7 @@ func TestSelectVictimsOnNode(t *testing.T) {
 			nodeNames: []string{"node1"},
 			mainNode:  "node1",
 			features:  feature.Features{EnableGenericWorkload: true},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace(v1.NamespaceDefault).UID("pg1").Priority(lowPriority).DisruptionModeAll().Obj(),
 			},
 			initPods: []*v1.Pod{
@@ -3173,7 +3172,7 @@ func TestSelectVictimsOnNode(t *testing.T) {
 			nodeNames: []string{"node1"},
 			mainNode:  "node1",
 			features:  feature.Features{EnableGenericWorkload: true},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace(v1.NamespaceDefault).UID("pg1").Priority(highPriority).DisruptionModeAll().Obj(),
 			},
 			initPods: []*v1.Pod{
@@ -3189,7 +3188,7 @@ func TestSelectVictimsOnNode(t *testing.T) {
 			nodeNames: []string{"node1"},
 			mainNode:  "node1",
 			features:  feature.Features{EnableGenericWorkload: true},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace(v1.NamespaceDefault).UID("pg1").Priority(lowPriority).DisruptionModeAll().Obj(),
 			},
 			initPods: []*v1.Pod{
@@ -3212,7 +3211,7 @@ func TestSelectVictimsOnNode(t *testing.T) {
 			nodeNames: []string{"node1"},
 			mainNode:  "node1",
 			features:  feature.Features{EnableGenericWorkload: true},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg-violating").Namespace(v1.NamespaceDefault).UID("pg-violating").Priority(lowPriority).DisruptionModeAll().Obj(),
 				st.MakePodGroup().Name("pg-non-violating").Namespace(v1.NamespaceDefault).UID("pg-non-violating").Priority(midPriority).DisruptionModeAll().Obj(),
 			},
@@ -3236,7 +3235,7 @@ func TestSelectVictimsOnNode(t *testing.T) {
 			nodeNames: []string{"node1"},
 			mainNode:  "node1",
 			features:  feature.Features{EnableGenericWorkload: true},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg-violating").Namespace(v1.NamespaceDefault).UID("pg-violating").Priority(lowPriority).DisruptionModeSingle().Obj(),
 				st.MakePodGroup().Name("pg-non-violating").Namespace(v1.NamespaceDefault).UID("pg-non-violating").Priority(midPriority).DisruptionModeSingle().Obj(),
 			},
@@ -3285,7 +3284,7 @@ func TestSelectVictimsOnNode(t *testing.T) {
 			registerPlugins: []tf.RegisterPluginFunc{
 				tf.RegisterPluginAsExtensions(interpodaffinity.Name, frameworkruntime.FactoryAdapter(feature.Features{}, interpodaffinity.New), "Filter", "PreFilter"),
 			},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace(v1.NamespaceDefault).UID("pg1").Priority(lowPriority).DisruptionModeAll().Obj(),
 			},
 			initPods: []*v1.Pod{
@@ -3305,7 +3304,7 @@ func TestSelectVictimsOnNode(t *testing.T) {
 			registerPlugins: []tf.RegisterPluginFunc{
 				tf.RegisterPluginAsExtensions(interpodaffinity.Name, frameworkruntime.FactoryAdapter(feature.Features{}, interpodaffinity.New), "Filter", "PreFilter"),
 			},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace(v1.NamespaceDefault).UID("pg1").Priority(lowPriority).DisruptionModeAll().Obj(),
 			},
 			initPods: []*v1.Pod{
@@ -3325,7 +3324,7 @@ func TestSelectVictimsOnNode(t *testing.T) {
 			registerPlugins: []tf.RegisterPluginFunc{
 				tf.RegisterPluginAsExtensions(interpodaffinity.Name, frameworkruntime.FactoryAdapter(feature.Features{}, interpodaffinity.New), "Filter", "PreFilter"),
 			},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace(v1.NamespaceDefault).UID("pg1").Priority(lowPriority).DisruptionModeAll().Obj(),
 			},
 			initPods: []*v1.Pod{
@@ -3345,7 +3344,7 @@ func TestSelectVictimsOnNode(t *testing.T) {
 			registerPlugins: []tf.RegisterPluginFunc{
 				tf.RegisterPluginAsExtensions(podtopologyspread.Name, podTopologySpreadFunc, "PreFilter", "Filter"),
 			},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace(v1.NamespaceDefault).UID("pg1").Priority(lowPriority).DisruptionModeAll().Obj(),
 			},
 			initPods: []*v1.Pod{
@@ -3366,7 +3365,7 @@ func TestSelectVictimsOnNode(t *testing.T) {
 			registerPlugins: []tf.RegisterPluginFunc{
 				tf.RegisterPluginAsExtensions(podtopologyspread.Name, podTopologySpreadFunc, "PreFilter", "Filter"),
 			},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace(v1.NamespaceDefault).UID("pg1").Priority(lowPriority).DisruptionModeAll().Obj(),
 			},
 			initPods: []*v1.Pod{
@@ -3385,7 +3384,7 @@ func TestSelectVictimsOnNode(t *testing.T) {
 			nodeNames: []string{"node-a", "node-b"},
 			mainNode:  "node-a",
 			features:  feature.Features{EnableGenericWorkload: true},
-			podGroups: []*v1beta1.PodGroup{
+			podGroups: []*v1alpha3.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace(v1.NamespaceDefault).UID("pg1").Priority(lowPriority).DisruptionModeAll().Obj(),
 			},
 			initPods: []*v1.Pod{
@@ -3715,7 +3714,7 @@ func TestPreEnqueue(t *testing.T) {
 				}
 			}
 
-			var allPgs []*v1beta1.PodGroup
+			var allPgs []*v1alpha3.PodGroup
 			var allCpgs []*v1alpha3.CompositePodGroup
 
 			if tt.pgInfo != nil {
@@ -3997,7 +3996,7 @@ func TestDefaultPreemption_PodGroupPostFilter_InvalidSnapshot(t *testing.T) {
 			testPods := []*v1.Pod{pod}
 			nodes := []*v1.Node{node}
 
-			var pg *v1beta1.PodGroup
+			var pg *v1alpha3.PodGroup
 			var cpg *v1alpha3.CompositePodGroup
 			var client *clientsetfake.Clientset
 			var cache internalcache.Cache
@@ -4008,7 +4007,7 @@ func TestDefaultPreemption_PodGroupPostFilter_InvalidSnapshot(t *testing.T) {
 				client = clientsetfake.NewClientset(pod, pg)
 				cache = internalcache.New(ctx, nil, true, false)
 				cache.AddPodGroup(pg)
-				snapshot = internalcache.NewTestSnapshotWithPodGroups(testPods, nodes, []*v1beta1.PodGroup{pg})
+				snapshot = internalcache.NewTestSnapshotWithPodGroups(testPods, nodes, []*v1alpha3.PodGroup{pg})
 			} else {
 				priorityVal := highPriority
 				cpg = &v1alpha3.CompositePodGroup{
@@ -4260,7 +4259,7 @@ func getCounterFromGatherer(g componentmetrics.Gatherer, name string, resultLabe
 }
 
 // newPGInfo creates a PodGroupInfo representing a standalone PodGroup.
-func newPGInfo(pg *v1beta1.PodGroup, pods ...*v1.Pod) *framework.PodGroupInfo {
+func newPGInfo(pg *v1alpha3.PodGroup, pods ...*v1.Pod) *framework.PodGroupInfo {
 	return &framework.PodGroupInfo{
 		Name:            pg.Name,
 		Namespace:       pg.Namespace,
@@ -4284,8 +4283,8 @@ func newCPGInfo(cpg *v1alpha3.CompositePodGroup, children []*framework.PodGroupI
 
 // extractGroups is an auxiliary method to extract all PodGroups and CompositePodGroups
 // API objects from a PodGroupInfo, useful for setting up tests.
-func extractGroups(pgInfo *framework.PodGroupInfo) ([]*v1beta1.PodGroup, []*v1alpha3.CompositePodGroup) {
-	var pgs []*v1beta1.PodGroup
+func extractGroups(pgInfo *framework.PodGroupInfo) ([]*v1alpha3.PodGroup, []*v1alpha3.CompositePodGroup) {
+	var pgs []*v1alpha3.PodGroup
 	var cpgs []*v1alpha3.CompositePodGroup
 
 	var traverse func(info *framework.PodGroupInfo)

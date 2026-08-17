@@ -35,7 +35,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -134,12 +133,12 @@ type SchedulingQueue interface {
 	MoveAllToActiveOrBackoffQueue(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck)
 	// AddPodGroup adds a new PodGroup object to the queue,
 	// requeuing all pods associated with the pod group.
-	AddPodGroup(logger klog.Logger, podGroup *schedulingv1beta1.PodGroup)
+	AddPodGroup(logger klog.Logger, podGroup *schedulingv1alpha3.PodGroup)
 	// UpdatePodGroup updates an existing PodGroup object in the queue.
-	UpdatePodGroup(logger klog.Logger, podGroup *schedulingv1beta1.PodGroup)
+	UpdatePodGroup(logger klog.Logger, podGroup *schedulingv1alpha3.PodGroup)
 	// DeletePodGroup removes a PodGroup object from the queue,
 	// moving all pods associated with the pod group to the incompletePodGroupPods.
-	DeletePodGroup(logger klog.Logger, podGroup *schedulingv1beta1.PodGroup)
+	DeletePodGroup(logger klog.Logger, podGroup *schedulingv1alpha3.PodGroup)
 
 	// Close closes the SchedulingQueue so that the goroutine which is
 	// waiting to pop items can exit gracefully.
@@ -1560,7 +1559,7 @@ func (p *PriorityQueue) deletePod(pod *v1.Pod) {
 
 // AddPodGroup adds a new PodGroup object to the queue,
 // requeuing all pods associated with the pod group.
-func (p *PriorityQueue) AddPodGroup(logger klog.Logger, podGroup *schedulingv1beta1.PodGroup) {
+func (p *PriorityQueue) AddPodGroup(logger klog.Logger, podGroup *schedulingv1alpha3.PodGroup) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -1598,7 +1597,7 @@ func (p *PriorityQueue) AddPodGroup(logger klog.Logger, podGroup *schedulingv1be
 }
 
 // UpdatePodGroup updates an existing PodGroup object in the queue.
-func (p *PriorityQueue) UpdatePodGroup(logger klog.Logger, podGroup *schedulingv1beta1.PodGroup) {
+func (p *PriorityQueue) UpdatePodGroup(logger klog.Logger, podGroup *schedulingv1alpha3.PodGroup) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -1621,7 +1620,7 @@ func (p *PriorityQueue) UpdatePodGroup(logger klog.Logger, podGroup *schedulingv
 
 // DeletePodGroup removes a PodGroup object from the queue,
 // moving all pods associated with the pod group to the incompletePodGroupPods.
-func (p *PriorityQueue) DeletePodGroup(logger klog.Logger, podGroup *schedulingv1beta1.PodGroup) {
+func (p *PriorityQueue) DeletePodGroup(logger klog.Logger, podGroup *schedulingv1alpha3.PodGroup) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -2258,7 +2257,7 @@ func podGroupKeyForPod(pod *v1.Pod) fwk.EntityKey {
 	return fwk.PodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
 }
 
-func podGroupKey(podGroup *schedulingv1beta1.PodGroup) fwk.EntityKey {
+func podGroupKey(podGroup *schedulingv1alpha3.PodGroup) fwk.EntityKey {
 	return fwk.PodGroupKey(podGroup.Namespace, podGroup.Name)
 }
 

@@ -24,7 +24,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
@@ -102,7 +101,7 @@ func (c *shareListerContract) CompositePodGroups() fwk.CompositePodGroupLister {
 
 type podGroupListerContract struct{}
 
-func (c *podGroupListerContract) Get(_ string, _ string) (*schedulingapi.PodGroup, error) {
+func (c *podGroupListerContract) Get(_ string, _ string) (*schedulingv1alpha3.PodGroup, error) {
 	return nil, nil
 }
 

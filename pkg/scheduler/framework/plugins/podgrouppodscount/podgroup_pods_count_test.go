@@ -25,7 +25,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -221,7 +220,7 @@ func TestScorePlacement(t *testing.T) {
 				})
 				_, tCtx := ktesting.NewTestContext(t)
 
-				pgs := []schedulingapi.PodGroup{}
+				pgs := []schedulingv1alpha3.PodGroup{}
 				cpgs := []schedulingv1alpha3.CompositePodGroup{}
 				pods := []*v1.Pod{}
 				alreadyAdded := sets.New[string]()
@@ -268,16 +267,16 @@ func TestScorePlacement(t *testing.T) {
 				}
 
 				cs := clientsetfake.NewClientset(
-					&schedulingapi.PodGroupList{Items: pgs},
+					&schedulingv1alpha3.PodGroupList{Items: pgs},
 					&schedulingv1alpha3.CompositePodGroupList{Items: cpgs},
 				)
 				informerFactory := informers.NewSharedInformerFactory(cs, 0)
-				_ = informerFactory.Scheduling().V1beta1().PodGroups().Informer()
+				_ = informerFactory.Scheduling().V1alpha3().PodGroups().Informer()
 				_ = informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer()
 				informerFactory.StartWithContext(tCtx)
 				informerFactory.WaitForCacheSyncWithContext(tCtx)
 
-				pgPtrs := make([]*schedulingapi.PodGroup, len(pgs))
+				pgPtrs := make([]*schedulingv1alpha3.PodGroup, len(pgs))
 				cpgPtrs := make([]*schedulingv1alpha3.CompositePodGroup, len(cpgs))
 				for i := range pgs {
 					pgPtrs[i] = &pgs[i]
@@ -404,7 +403,7 @@ func TestNormalizePlacementScore(t *testing.T) {
 	}
 }
 
-func makePodGroupInfoFromPG(pg *schedulingapi.PodGroup) fwk.PodGroupInfo {
+func makePodGroupInfoFromPG(pg *schedulingv1alpha3.PodGroup) fwk.PodGroupInfo {
 	return &framework.PodGroupInfo{
 		Name:      pg.Name,
 		Namespace: pg.Namespace,
@@ -423,7 +422,7 @@ func makePodGroupInfoFromCPG(cpg *schedulingv1alpha3.CompositePodGroup) fwk.PodG
 }
 
 func makePodGroup() fwk.PodGroupInfo {
-	return makePodGroupInfoFromPG(&schedulingapi.PodGroup{
+	return makePodGroupInfoFromPG(&schedulingv1alpha3.PodGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "root",
 			Namespace: "default",

@@ -26,7 +26,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -3538,7 +3537,7 @@ func TestPodGroupInfoGetChildrenSorting(t *testing.T) {
 		return &PodGroupInfo{
 			Name:      name,
 			Namespace: namespace,
-			PodGroup: &schedulingv1beta1.PodGroup{
+			PodGroup: &schedulingv1alpha3.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              name,
 					Namespace:         namespace,
@@ -3902,7 +3901,7 @@ func TestQueuedPodGroupInfo_AddPodGroup(t *testing.T) {
 	tests := []struct {
 		name       string
 		initialCPG *schedulingv1alpha3.CompositePodGroup
-		pgToAdd    *schedulingv1beta1.PodGroup
+		pgToAdd    *schedulingv1alpha3.PodGroup
 		verify     func(*testing.T, *QueuedPodGroupInfo)
 	}{
 		{
@@ -3973,7 +3972,7 @@ func TestQueuedPodGroupInfo_UpdatePodGroup(t *testing.T) {
 	tests := []struct {
 		name     string
 		setup    func() *QueuedPodGroupInfo
-		updatePG *schedulingv1beta1.PodGroup
+		updatePG *schedulingv1alpha3.PodGroup
 		verify   func(*testing.T, *QueuedPodGroupInfo)
 	}{
 		{
@@ -4055,7 +4054,7 @@ func TestQueuedPodGroupInfo_RemovePodGroup(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		removePG *schedulingv1beta1.PodGroup
+		removePG *schedulingv1alpha3.PodGroup
 		setup    func(*QueuedPodGroupInfo)
 		verify   func(*testing.T, *QueuedPodGroupInfo, []*QueuedPodInfo)
 	}{

@@ -23,7 +23,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
@@ -112,7 +111,7 @@ func (pl *GangScheduling) isSchedulableAfterPodAdded(logger klog.Logger, pod *v1
 
 // isSchedulableAfterPodGroupUpdated triggers re-enqueueing of the group's pods if the minCount requirement has decreased.
 func (pl *GangScheduling) isSchedulableAfterPodGroupUpdated(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-	oldPodGroup, newPodGroup, err := util.As[*schedulingapi.PodGroup](oldObj, newObj)
+	oldPodGroup, newPodGroup, err := util.As[*schedulingv1alpha3.PodGroup](oldObj, newObj)
 	if err != nil {
 		return fwk.Queue, err
 	}
@@ -144,7 +143,7 @@ func (pl *GangScheduling) isSchedulableAfterPodGroupUpdated(logger klog.Logger, 
 }
 
 func (pl *GangScheduling) isSchedulableAfterPodGroupAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-	_, addedPodGroup, err := util.As[*schedulingapi.PodGroup](oldObj, newObj)
+	_, addedPodGroup, err := util.As[*schedulingv1alpha3.PodGroup](oldObj, newObj)
 	if err != nil {
 		return fwk.Queue, err
 	}
@@ -362,7 +361,7 @@ func (pl *GangScheduling) Permit(ctx context.Context, state fwk.CycleState, pod 
 	namespace := pod.Namespace
 	schedulingGroup := pod.Spec.SchedulingGroup
 
-	var podGroup *schedulingapi.PodGroup
+	var podGroup *schedulingv1alpha3.PodGroup
 	var err error
 	var snapshot fwk.PodGroupManager
 
@@ -393,7 +392,7 @@ func (pl *GangScheduling) Permit(ctx context.Context, state fwk.CycleState, pod 
 	return pl.permitPodGroup(logger, pod, podGroup, podGroupState)
 }
 
-func (pl *GangScheduling) permitPodGroup(logger klog.Logger, pod *v1.Pod, podGroup *schedulingapi.PodGroup, podGroupState fwk.PodGroupState) (*fwk.Status, time.Duration) {
+func (pl *GangScheduling) permitPodGroup(logger klog.Logger, pod *v1.Pod, podGroup *schedulingv1alpha3.PodGroup, podGroupState fwk.PodGroupState) (*fwk.Status, time.Duration) {
 	if podGroup.Spec.SchedulingPolicy.Gang == nil {
 		return nil, 0
 	}

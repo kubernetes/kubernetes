@@ -24,7 +24,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -502,7 +501,7 @@ func (p *podExecutorPreemptor) Type() string {
 
 // podGroupExecutorPreemptor is a wrapper around pod group used by preemption execution.
 type podGroupExecutorPreemptor struct {
-	pg   *schedulingv1beta1.PodGroup
+	pg   *schedulingv1alpha3.PodGroup
 	pods []*v1.Pod
 }
 

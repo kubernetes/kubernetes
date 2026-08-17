@@ -28,7 +28,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -303,7 +302,7 @@ func TestPrepareCandidate(t *testing.T) {
 				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
 				Obj()
 
-		podGroupPreemptor = &schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default", UID: "pg1"}}
+		podGroupPreemptor = &schedulingv1alpha3.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default", UID: "pg1"}}
 
 		errDeletePodFailed   = errors.New("delete pod failed")
 		errPatchStatusFailed = errors.New("patch pod status failed")
@@ -320,7 +319,7 @@ func TestPrepareCandidate(t *testing.T) {
 		nodeNames                  []string
 		candidate                  Candidate
 		preemptor                  *v1.Pod
-		preemptorPodGroup          *schedulingv1beta1.PodGroup
+		preemptorPodGroup          *schedulingv1alpha3.PodGroup
 		preemptorCompositePodGroup *schedulingv1alpha3.CompositePodGroup
 		testPods                   []*v1.Pod
 		// expectedDeletedPod is the pod name that is expected to be deleted.
@@ -898,7 +897,7 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 				SchedulerName(defaultSchedulerName).Priority(highPriority).
 				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
 				Obj()
-		preemptorPodGroup          = &schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default", UID: "pg1"}}
+		preemptorPodGroup          = &schedulingv1alpha3.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default", UID: "pg1"}}
 		preemptorCompositePodGroup = &schedulingv1alpha3.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg1", Namespace: "default", UID: "cpg1"}}
 		testPods                   = []*v1.Pod{
 			victim1,
@@ -1121,7 +1120,7 @@ func TestAsyncPreemptionFailure(t *testing.T) {
 	tests := []struct {
 		name                                 string
 		victims                              []*v1.Pod
-		preemptorPodGroup                    *schedulingv1beta1.PodGroup
+		preemptorPodGroup                    *schedulingv1alpha3.PodGroup
 		preemptorCompositePodGroup           *schedulingv1alpha3.CompositePodGroup
 		preemptorPods                        []*v1.Pod
 		expectSuccessfulPreemption           bool
@@ -1198,7 +1197,7 @@ func TestAsyncPreemptionFailure(t *testing.T) {
 			victims: []*v1.Pod{
 				makeVictim(failVictimNamePrefix),
 			},
-			preemptorPodGroup:                    &schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default"}},
+			preemptorPodGroup:                    &schedulingv1alpha3.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default"}},
 			preemptorPods:                        []*v1.Pod{makePod("pod1", highPriority), makePod("pod2", highPriority)},
 			expectSuccessfulPreemption:           false,
 			expectPreemptionAttemptForLastVictim: true,
@@ -1432,7 +1431,7 @@ func TestRemoveNominatedNodeName(t *testing.T) {
 
 func TestPreemptPod(t *testing.T) {
 	preemptorPod := st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()
-	preemptorPodGroup := &schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"}}
+	preemptorPodGroup := &schedulingv1alpha3.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"}}
 	preemptorCompositePodGroup := &schedulingv1alpha3.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg", Namespace: "default"}}
 	preemptorPods := []*v1.Pod{st.MakePod().Name("p1").UID("p1").Priority(highPriority).Obj(), st.MakePod().Name("p2").UID("p2").Priority(highPriority).Obj()}
 
@@ -1561,7 +1560,7 @@ func TestPreemptPod(t *testing.T) {
 func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemption(t *testing.T) {
 	preemptorPod := st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()
 	secondPreemptorPod := st.MakePod().Name("p2").UID("p2").Priority(highPriority).Obj()
-	preemptorPodGroup := &schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg", UID: "pg"}}
+	preemptorPodGroup := &schedulingv1alpha3.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg", UID: "pg"}}
 	preemptorCompositePodGroup := &schedulingv1alpha3.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg", UID: "cpg"}}
 	waitingVictim := st.MakePod().Name("waiting-v").UID("waiting-v").Priority(midPriority).Node("node1").Obj()
 	preBindVictim := st.MakePod().Name("prebind-v").UID("prebind-v").Priority(midPriority).Node("node1").Obj()
@@ -1574,7 +1573,7 @@ func TestPrepareCandidateAsyncActivatesPreemptorAfterLastVictimInMemoryPreemptio
 		addVictimToPrebind          bool
 		addVictimToPrebindOnPreempt bool
 		addVictimToWaiting          bool
-		preemptorPodGroup           *schedulingv1beta1.PodGroup
+		preemptorPodGroup           *schedulingv1alpha3.PodGroup
 		preemptorCompositePodGroup  *schedulingv1alpha3.CompositePodGroup
 		preemptorPods               []*v1.Pod
 		wantPreemptorActivate       bool

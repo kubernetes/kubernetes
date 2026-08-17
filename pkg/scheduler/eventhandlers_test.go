@@ -30,7 +30,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -414,7 +413,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeFor[*resourceapi.ResourceSlice]():   true,
 				reflect.TypeFor[*resourceapi.DeviceTaintRule](): true,
 				reflect.TypeFor[*resourceapi.DeviceClass]():     true,
-				reflect.TypeFor[*schedulingapi.PodGroup]():      true,
+				reflect.TypeFor[*schedulingv1alpha3.PodGroup]():      true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
@@ -543,7 +542,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 			expectedStaticInformers := make(map[reflect.Type]bool)
 			maps.Copy(expectedStaticInformers, tt.expectStaticInformers)
 			if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-				expectedStaticInformers[reflect.TypeFor[*schedulingapi.PodGroup]()] = true
+				expectedStaticInformers[reflect.TypeFor[*schedulingv1alpha3.PodGroup]()] = true
 				if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
 					expectedStaticInformers[reflect.TypeFor[*schedulingv1alpha3.CompositePodGroup]()] = true
 				}
@@ -1409,7 +1408,7 @@ func TestAddPodGroup(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		podGroup *schedulingapi.PodGroup
+		podGroup *schedulingv1alpha3.PodGroup
 	}{
 		{
 			name:     "add valid pod group",
@@ -1450,9 +1449,9 @@ func TestUpdatePodGroup(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		oldPodGroup    *schedulingapi.PodGroup
-		newPodGroup    *schedulingapi.PodGroup
-		expectPodGroup *schedulingapi.PodGroup
+		oldPodGroup    *schedulingv1alpha3.PodGroup
+		newPodGroup    *schedulingv1alpha3.PodGroup
+		expectPodGroup *schedulingv1alpha3.PodGroup
 	}{
 		{
 			name:           "update valid pod group",
@@ -1500,7 +1499,7 @@ func TestDeletePodGroup(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		initPodGroup     *schedulingapi.PodGroup
+		initPodGroup     *schedulingv1alpha3.PodGroup
 		podGroupToDelete any
 	}{
 		{
