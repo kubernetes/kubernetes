@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
@@ -110,9 +111,15 @@ func (psuc *PodStatusPatchCall) Execute(ctx context.Context, client clientset.In
 		return nil
 	}
 
-	// It's safe to run PatchPodStatus even on outdated pod object.
-	err := util.PatchPodStatus(ctx, client, psuc.podRef.Name, psuc.podRef.Namespace, psuc.podStatus, podStatusCopy)
+	// It's safe to run PatchPodStatus even on outdated pod object: the uid is sent as a
+	// precondition, so the patch cannot land on a pod that took over this pod's name
+	// between the call being queued and executed.
+	err := util.PatchPodStatus(ctx, client, psuc.podRef.Name, psuc.podRef.Namespace, psuc.podUID, psuc.podStatus, podStatusCopy)
 	if err != nil {
+		if apierrors.IsNotFound(err) || util.IsPodUIDPreconditionError(err) {
+			logger.V(3).Info("Pod is already deleted or was recreated, skipping status patch", "pod", psuc.podRef)
+			return nil
+		}
 		logger.Error(err, "Failed to patch pod status", "pod", psuc.podRef)
 		return err
 	}

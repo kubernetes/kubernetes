@@ -25,9 +25,11 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
@@ -457,6 +459,33 @@ func TestDeferredPodScheduling_Bind(t *testing.T) {
 			gateOn:    true,
 			wantCode:  fwk.Unschedulable,
 			wantErr:   framework.ErrStalePodGeneration,
+		},
+		{
+			name:      "feature gate on, pod deleted before patch -> ignores not-found and returns nil",
+			pod:       deferredPod,
+			cachedPod: deferredPod,
+			gateOn:    true,
+			patchErr:  apierrors.NewNotFound(v1.Resource("pods"), deferredPod.Name),
+			wantPatch: true,
+		},
+		{
+			name:      "feature gate on, pod recreated before patch -> ignores invalid and returns nil",
+			pod:       deferredPod,
+			cachedPod: deferredPod,
+			gateOn:    true,
+			patchErr: apierrors.NewInvalid(v1.SchemeGroupVersion.WithKind("Pod").GroupKind(), deferredPod.Name,
+				field.ErrorList{field.Invalid(field.NewPath("metadata").Child("uid"), deferredPod.UID, "field is immutable")}),
+			wantPatch: true,
+		},
+		{
+			name:      "feature gate on, unrelated invalid error on patch -> error, so the binding cycle requeues the pod",
+			pod:       deferredPod,
+			cachedPod: deferredPod,
+			gateOn:    true,
+			patchErr: apierrors.NewInvalid(v1.SchemeGroupVersion.WithKind("Pod").GroupKind(), deferredPod.Name,
+				field.ErrorList{field.Invalid(field.NewPath("status").Child("conditions"), "", "invalid condition")}),
+			wantCode:  fwk.Error,
+			wantPatch: true,
 		},
 		{
 			name:      "feature gate on, patch fails -> error, so the binding cycle requeues the pod",

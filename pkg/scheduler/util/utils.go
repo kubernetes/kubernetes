@@ -19,6 +19,7 @@ package util
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -115,9 +116,18 @@ func BindPod(ctx context.Context, cs kubernetes.Interface, binding *v1.Binding) 
 
 // PatchPodStatus calculates the delta bytes change from <old.Status> to <newStatus>,
 // and then submit a request to API server to patch the pod changes.
-func PatchPodStatus(ctx context.Context, cs kubernetes.Interface, name string, namespace string, oldStatus *v1.PodStatus, newStatus *v1.PodStatus) error {
+//
+// The pod uid is required and is sent as a precondition, so that a patch built for one
+// pod cannot be applied to a different pod that took over its name. A pod recreated
+// under the same name makes the API server reject the patch as Invalid, because
+// metadata.uid is immutable; a deleted pod keeps returning NotFound as before.
+func PatchPodStatus(ctx context.Context, cs kubernetes.Interface, name string, namespace string, uid types.UID, oldStatus *v1.PodStatus, newStatus *v1.PodStatus) error {
 	if newStatus == nil {
 		return nil
+	}
+
+	if uid == "" {
+		return fmt.Errorf("pod uid is required to patch the status of pod %q/%q", namespace, name)
 	}
 
 	if oldStatus == nil {
@@ -129,7 +139,9 @@ func PatchPodStatus(ctx context.Context, cs kubernetes.Interface, name string, n
 		return err
 	}
 
-	newData, err := json.Marshal(v1.Pod{Status: *newStatus})
+	// Only the new object carries the uid, so that it shows up in the patch as a
+	// precondition. Setting it on both sides would cancel it out of the delta.
+	newData, err := json.Marshal(v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: uid}, Status: *newStatus})
 	if err != nil {
 		return err
 	}
@@ -138,7 +150,9 @@ func PatchPodStatus(ctx context.Context, cs kubernetes.Interface, name string, n
 		return fmt.Errorf("failed to create merge patch for pod %q/%q: %w", namespace, name, err)
 	}
 
-	if "{}" == string(patchBytes) {
+	// The uid is always part of the patch, so an unchanged status reduces to the
+	// precondition alone rather than to an empty patch.
+	if fmt.Sprintf(`{"metadata":{"uid":%q}}`, uid) == string(patchBytes) {
 		return nil
 	}
 
@@ -148,6 +162,25 @@ func PatchPodStatus(ctx context.Context, cs kubernetes.Interface, name string, n
 	}
 
 	return retry.OnError(retry.DefaultBackoff, RetriableWithConflict, patchFn)
+}
+
+// IsPodUIDPreconditionError returns true if err is an Invalid API status error
+// caused by a metadata.uid precondition mismatch (for example, when a status
+// patch built for one pod lands on a pod that was recreated with the same name).
+func IsPodUIDPreconditionError(err error) bool {
+	if !apierrors.IsInvalid(err) {
+		return false
+	}
+	var status apierrors.APIStatus
+	if !errors.As(err, &status) || status.Status().Details == nil {
+		return false
+	}
+	for _, cause := range status.Status().Details.Causes {
+		if cause.Field == "metadata.uid" {
+			return true
+		}
+	}
+	return false
 }
 
 // PatchPodGroupStatus calculates the delta bytes change from <old.Status> to <newStatus>,
@@ -230,7 +263,12 @@ func PatchCompositePodGroupStatus(ctx context.Context, cs kubernetes.Interface, 
 
 // DeletePod deletes the given <pod> from API server
 func DeletePod(ctx context.Context, cs kubernetes.Interface, pod *v1.Pod) error {
-	return cs.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+	if pod.UID == "" {
+		return fmt.Errorf("pod uid is required to delete pod %q/%q", pod.Namespace, pod.Name)
+	}
+	return cs.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{
+		Preconditions: metav1.NewUIDPreconditions(string(pod.UID)),
+	})
 }
 
 // IsScalarResourceName validates the resource for Extended, Hugepages, Native and AttachableVolume resources

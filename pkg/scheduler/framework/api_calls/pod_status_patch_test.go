@@ -17,13 +17,17 @@ limitations under the License.
 package apicalls
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/klog/v2/ktesting"
@@ -419,8 +423,10 @@ func TestPodStatusPatchCall_Execute(t *testing.T) {
 	t.Run("Successful patch", func(t *testing.T) {
 		client := fake.NewClientset()
 		patched := false
+		var patchData string
 		client.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
 			patched = true
+			patchData = string(action.(clienttesting.PatchAction).GetPatch())
 			return true, nil, nil
 		})
 
@@ -431,6 +437,11 @@ func TestPodStatusPatchCall_Execute(t *testing.T) {
 		}
 		if !patched {
 			t.Error("Expected patch API to be called")
+		}
+		// The call is executed long after it was queued, so the pod uid has to travel
+		// with it as a precondition.
+		if wantPrefix := `{"metadata":{"uid":"uid"},`; !strings.HasPrefix(patchData, wantPrefix) {
+			t.Errorf("Expected patch to start with %v, got %v", wantPrefix, patchData)
 		}
 		if !call.executed {
 			t.Error("Expected 'executed' flag to be set during execution")
@@ -452,6 +463,48 @@ func TestPodStatusPatchCall_Execute(t *testing.T) {
 		}
 		if patched {
 			t.Error("Expected patch API not to be called if the call is no-op")
+		}
+	})
+
+	t.Run("Ignore NotFound error when pod is already deleted", func(t *testing.T) {
+		client := fake.NewClientset()
+		client.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+			return true, nil, apierrors.NewNotFound(v1.Resource("pods"), pod.Name)
+		})
+
+		call := NewPodStatusPatchCall(pod, []*v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionFalse}},
+			&fwk.NominatingInfo{NominatingMode: fwk.ModeNoop})
+		if err := call.Execute(ctx, client); err != nil {
+			t.Fatalf("Expected NotFound error to be ignored, got: %v", err)
+		}
+	})
+
+	t.Run("Ignore Invalid error on metadata.uid when pod was recreated", func(t *testing.T) {
+		client := fake.NewClientset()
+		client.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+			return true, nil, apierrors.NewInvalid(v1.SchemeGroupVersion.WithKind("Pod").GroupKind(), pod.Name,
+				field.ErrorList{field.Invalid(field.NewPath("metadata").Child("uid"), pod.UID, "field is immutable")})
+		})
+
+		call := NewPodStatusPatchCall(pod, []*v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionFalse}},
+			&fwk.NominatingInfo{NominatingMode: fwk.ModeNoop})
+		if err := call.Execute(ctx, client); err != nil {
+			t.Fatalf("Expected metadata.uid Invalid error to be ignored, got: %v", err)
+		}
+	})
+
+	t.Run("Return error on unrelated Invalid error", func(t *testing.T) {
+		client := fake.NewClientset()
+		patchErr := apierrors.NewInvalid(v1.SchemeGroupVersion.WithKind("Pod").GroupKind(), pod.Name,
+			field.ErrorList{field.Invalid(field.NewPath("status").Child("conditions"), "", "invalid condition")})
+		client.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+			return true, nil, patchErr
+		})
+
+		call := NewPodStatusPatchCall(pod, []*v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionFalse}},
+			&fwk.NominatingInfo{NominatingMode: fwk.ModeNoop})
+		if err := call.Execute(ctx, client); !errors.Is(err, patchErr) {
+			t.Fatalf("Expected error %v, got: %v", patchErr, err)
 		}
 	})
 }
