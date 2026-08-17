@@ -17,6 +17,7 @@ limitations under the License.
 package apicalls
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -400,8 +401,10 @@ func TestPodStatusPatchCall_Execute(t *testing.T) {
 	t.Run("Successful patch", func(t *testing.T) {
 		client := fake.NewClientset()
 		patched := false
+		var patchData string
 		client.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
 			patched = true
+			patchData = string(action.(clienttesting.PatchAction).GetPatch())
 			return true, nil, nil
 		})
 
@@ -412,6 +415,11 @@ func TestPodStatusPatchCall_Execute(t *testing.T) {
 		}
 		if !patched {
 			t.Error("Expected patch API to be called")
+		}
+		// The call is executed long after it was queued, so the pod uid has to travel
+		// with it as a precondition.
+		if wantPrefix := `{"metadata":{"uid":"uid"},`; !strings.HasPrefix(patchData, wantPrefix) {
+			t.Errorf("Expected patch to start with %v, got %v", wantPrefix, patchData)
 		}
 		if !call.executed {
 			t.Error("Expected 'executed' flag to be set during execution")
