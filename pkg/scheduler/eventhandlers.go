@@ -165,6 +165,7 @@ func (sched *Scheduler) updatePod(oldObj, newObj interface{}) {
 	// happened, so that the recreated Pod is routed to the cache or to the
 	// scheduling queue depending on whether it is already assigned to a node.
 	if oldPod.UID != newPod.UID {
+		logger.V(4).Info("Pod was recreated with a different UID, splitting into delete and add events", "pod", klog.KObj(newPod), "oldUID", oldPod.UID, "newUID", newPod.UID)
 		sched.deletePod(oldPod)
 		sched.addPod(newPod)
 		return

@@ -133,12 +133,15 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 			newStatus := victim.Status.DeepCopy()
 			updated := apipod.UpdatePodCondition(newStatus, condition)
 			if updated {
-				if err := util.PatchPodStatus(ctx, fh.ClientSet(), victim.Name, victim.Namespace, &victim.Status, newStatus); err != nil {
-					if !apierrors.IsNotFound(err) {
+				if err := util.PatchPodStatus(ctx, fh.ClientSet(), victim.Name, victim.Namespace, victim.UID, &victim.Status, newStatus); err != nil {
+					// The patch carries the victim's uid as a precondition, so a victim that
+					// was recreated under the same name is rejected as invalid. Like a
+					// deleted victim, it means the pod we picked is no longer there.
+					if !apierrors.IsNotFound(err) && !apierrors.IsInvalid(err) {
 						logger.Error(err, "Could not add DisruptionTarget condition due to preemption", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim))
 						return false, err
 					}
-					logger.V(2).Info("Victim Pod is already deleted", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim), "node", c.Name())
+					logger.V(2).Info("Victim Pod is already deleted or was recreated", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim), "node", c.Name())
 					return false, nil
 				}
 			}
@@ -432,7 +435,7 @@ func clearNominatedNodeName(ctx context.Context, cs clientset.Interface, apiCach
 			}
 			podStatusCopy := p.Status.DeepCopy()
 			podStatusCopy.NominatedNodeName = ""
-			if err := util.PatchPodStatus(ctx, cs, p.Name, p.Namespace, &p.Status, podStatusCopy); err != nil {
+			if err := util.PatchPodStatus(ctx, cs, p.Name, p.Namespace, p.UID, &p.Status, podStatusCopy); err != nil {
 				errs = append(errs, err)
 			}
 		}

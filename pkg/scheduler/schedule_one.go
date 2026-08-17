@@ -1315,5 +1315,5 @@ func updatePod(ctx context.Context, client clientset.Interface, apiCacher fwk.AP
 	if nnnNeedsUpdate {
 		podStatusCopy.NominatedNodeName = nominatingInfo.NominatedNodeName
 	}
-	return util.PatchPodStatus(ctx, client, pod.Name, pod.Namespace, &pod.Status, podStatusCopy)
+	return util.PatchPodStatus(ctx, client, pod.Name, pod.Namespace, pod.UID, &pod.Status, podStatusCopy)
 }

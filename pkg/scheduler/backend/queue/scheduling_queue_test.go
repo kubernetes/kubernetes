@@ -3187,7 +3187,10 @@ func TestPriorityQueue_NominatedPodDeleted(t *testing.T) {
 				// Simulate that the test pod gets deleted and recreated under the same name.
 				recreated := tt.podInfo.Pod.DeepCopy()
 				recreated.UID = tt.podInfo.Pod.UID + "-recreated"
-				informerFactory.Core().V1().Pods().Informer().GetStore().Update(recreated)
+				err := informerFactory.Core().V1().Pods().Informer().GetStore().Update(recreated)
+				if err != nil {
+					t.Fatalf("unexpected error from update api call: %v", err)
+				}
 			}
 
 			q.AddNominatedPod(logger, tt.podInfo, nil)

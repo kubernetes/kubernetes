@@ -628,7 +628,7 @@ func (pl *DynamicResources) patchNodeAllocatableResourceClaimStatus(ctx context.
 	targetStatus := pod.Status.DeepCopy()
 
 	targetStatus.NodeAllocatableResourceClaimStatuses = nodeAllocatableClaimStatus
-	if err := schedutil.PatchPodStatus(ctx, pl.clientset, pod.Name, pod.Namespace, baseStatus, targetStatus); err != nil {
+	if err := schedutil.PatchPodStatus(ctx, pl.clientset, pod.Name, pod.Namespace, pod.UID, baseStatus, targetStatus); err != nil {
 		return statusError(logger, fmt.Errorf("updating pod %s/%s NodeAllocatableResourceClaimStatuses: %w", pod.Namespace, pod.Name, err))
 	}
 	logger.V(5).Info("Patched pod status with NodeAllocatableResourceClaimStatuses", "pod", klog.KObj(pod), "status", targetStatus.NodeAllocatableResourceClaimStatuses)

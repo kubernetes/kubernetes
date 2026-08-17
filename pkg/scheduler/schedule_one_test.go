@@ -2634,7 +2634,7 @@ func TestUpdatePodStatus(t *testing.T) {
 				Message:            "newMessage",
 			},
 			expectPatchRequest:       true,
-			expectedPatchDataPattern: `{"status":{"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"newType"}]}}`,
+			expectedPatchDataPattern: `{"metadata":{"uid":"foo-uid"},"status":{"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"newType"}]}}`,
 		},
 		{
 			name: "Should make patch request to add a new pod condition when there is already one with another type",
@@ -2657,7 +2657,7 @@ func TestUpdatePodStatus(t *testing.T) {
 				Message:            "newMessage",
 			},
 			expectPatchRequest:       true,
-			expectedPatchDataPattern: `{"status":{"\$setElementOrder/conditions":\[{"type":"someOtherType"},{"type":"newType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"newType"}]}}`,
+			expectedPatchDataPattern: `{"metadata":{"uid":"foo-uid"},"status":{"\$setElementOrder/conditions":\[{"type":"someOtherType"},{"type":"newType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"newType"}]}}`,
 		},
 		{
 			name: "Should make patch request to update an existing pod condition",
@@ -2680,7 +2680,7 @@ func TestUpdatePodStatus(t *testing.T) {
 				Message:            "newMessage",
 			},
 			expectPatchRequest:       true,
-			expectedPatchDataPattern: `{"status":{"\$setElementOrder/conditions":\[{"type":"currentType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"currentType"}]}}`,
+			expectedPatchDataPattern: `{"metadata":{"uid":"foo-uid"},"status":{"\$setElementOrder/conditions":\[{"type":"currentType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"currentType"}]}}`,
 		},
 		{
 			name: "Should make patch request to update an existing pod condition, but the transition time should remain unchanged because the status is the same",
@@ -2703,7 +2703,7 @@ func TestUpdatePodStatus(t *testing.T) {
 				Message:            "newMessage",
 			},
 			expectPatchRequest:       true,
-			expectedPatchDataPattern: `{"status":{"\$setElementOrder/conditions":\[{"type":"currentType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","message":"newMessage","reason":"newReason","type":"currentType"}]}}`,
+			expectedPatchDataPattern: `{"metadata":{"uid":"foo-uid"},"status":{"\$setElementOrder/conditions":\[{"type":"currentType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","message":"newMessage","reason":"newReason","type":"currentType"}]}}`,
 		},
 		{
 			name: "Should not make patch request if pod condition already exists and is identical and nominated node name is not set",
@@ -2750,7 +2750,7 @@ func TestUpdatePodStatus(t *testing.T) {
 			},
 			newNominatingInfo:        &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"},
 			expectPatchRequest:       true,
-			expectedPatchDataPattern: `{"status":{"nominatedNodeName":"node1"}}`,
+			expectedPatchDataPattern: `{"metadata":{"uid":"foo-uid"},"status":{"nominatedNodeName":"node1"}}`,
 		},
 		{
 			name: "Should not update nominated node name when nominatingInfo is nil",
@@ -2775,7 +2775,7 @@ func TestUpdatePodStatus(t *testing.T) {
 			currentNominatedNodeName: "existing-node",
 			newNominatingInfo:        nil,
 			expectPatchRequest:       true,
-			expectedPatchDataPattern: `{"status":{"\$setElementOrder/conditions":\[{"type":"currentType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"currentType"}]}}`,
+			expectedPatchDataPattern: `{"metadata":{"uid":"foo-uid"},"status":{"\$setElementOrder/conditions":\[{"type":"currentType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"currentType"}]}}`,
 		},
 		{
 			name: "Should not make patch request when nominatingInfo is nil and pod condition is unchanged",
@@ -2819,7 +2819,7 @@ func TestUpdatePodStatus(t *testing.T) {
 					return true, &v1.Pod{}, nil
 				})
 
-				pod := st.MakePod().Name("foo").NominatedNodeName(test.currentNominatedNodeName).Conditions(test.currentPodConditions).Obj()
+				pod := st.MakePod().Name("foo").UID("foo-uid").NominatedNodeName(test.currentNominatedNodeName).Conditions(test.currentPodConditions).Obj()
 
 				logger, ctx := ktesting.NewTestContext(t)
 				ctx, cancel := context.WithCancel(ctx)
