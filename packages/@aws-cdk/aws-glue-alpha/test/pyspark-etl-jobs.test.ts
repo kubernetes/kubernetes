@@ -1,5 +1,5 @@
 import * as cdk from 'aws-cdk-lib';
-import { Template, Match } from 'aws-cdk-lib/assertions';
+import { Template, Match, Annotations } from 'aws-cdk-lib/assertions';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import { LogGroup } from 'aws-cdk-lib/aws-logs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
@@ -760,6 +760,68 @@ describe('Job', () => {
           '--enable-observability-metrics': 'true',
         }),
       });
+    });
+  });
+
+  describe('maxRetries warning with job run queuing enabled', () => {
+    const WARNING = Match.stringLikeRegexp('.*Overriding it to 0 with since job run queuing is enabled.*');
+
+    test('warns when job run queuing is enabled and maxRetries is greater than 0', () => {
+      new glue.PySparkEtlJob(stack, 'PySparkETLJob', {
+        role,
+        script,
+        jobName: 'PySparkETLJob',
+        jobRunQueuingEnabled: true,
+        maxRetries: 2,
+      });
+
+      Annotations.fromStack(stack).hasWarning('/Default/PySparkETLJob', WARNING);
+    });
+
+    test('does not warn when job run queuing is enabled and maxRetries is 0', () => {
+      new glue.PySparkEtlJob(stack, 'PySparkETLJob', {
+        role,
+        script,
+        jobName: 'PySparkETLJob',
+        jobRunQueuingEnabled: true,
+        maxRetries: 0,
+      });
+
+      Annotations.fromStack(stack).hasNoWarning('/Default/PySparkETLJob', WARNING);
+    });
+
+    test('does not warn when job run queuing is enabled and maxRetries is not set', () => {
+      new glue.PySparkEtlJob(stack, 'PySparkETLJob', {
+        role,
+        script,
+        jobName: 'PySparkETLJob',
+        jobRunQueuingEnabled: true,
+      });
+
+      Annotations.fromStack(stack).hasNoWarning('/Default/PySparkETLJob', WARNING);
+    });
+
+    test('does not warn when maxRetries is greater than 0 but job run queuing is disabled', () => {
+      new glue.PySparkEtlJob(stack, 'PySparkETLJob', {
+        role,
+        script,
+        jobName: 'PySparkETLJob',
+        jobRunQueuingEnabled: false,
+        maxRetries: 2,
+      });
+
+      Annotations.fromStack(stack).hasNoWarning('/Default/PySparkETLJob', WARNING);
+    });
+
+    test('does not warn when maxRetries is greater than 0 but job run queuing is not set', () => {
+      new glue.PySparkEtlJob(stack, 'PySparkETLJob', {
+        role,
+        script,
+        jobName: 'PySparkETLJob',
+        maxRetries: 2,
+      });
+
+      Annotations.fromStack(stack).hasNoWarning('/Default/PySparkETLJob', WARNING);
     });
   });
 

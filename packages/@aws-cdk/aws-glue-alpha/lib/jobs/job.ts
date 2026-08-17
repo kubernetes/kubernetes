@@ -439,15 +439,6 @@ export interface JobProps {
   readonly glueVersion?: GlueVersion;
 
   /**
-   * Enables the collection of metrics for job profiling.
-   *
-   * @default - no profiling metrics emitted.
-   *
-   * @see https://docs.aws.amazon.com/glue/latest/dg/aws-glue-programming-etl-glue-arguments.html
-   */
-  readonly enableProfilingMetrics? :boolean;
-
-  /**
    * Enables continuous logging with the specified props.
    *
    * @default - continuous logging is enabled.

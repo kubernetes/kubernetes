@@ -1,6 +1,7 @@
 import { CfnJob } from 'aws-cdk-lib/aws-glue';
 import type * as cdk from 'aws-cdk-lib/core';
-import { memoizedGetter } from 'aws-cdk-lib/core/lib/helpers-internal';
+import { Annotations } from 'aws-cdk-lib/core';
+import { lit, memoizedGetter } from 'aws-cdk-lib/core/lib/helpers-internal';
 import { addConstructMetadata } from 'aws-cdk-lib/core/lib/metadata-resource';
 import { propertyInjectable } from 'aws-cdk-lib/core/lib/prop-injectable';
 import type { Construct } from 'constructs';
@@ -98,6 +99,11 @@ export class PySparkEtlJob extends SparkJob {
       ...this.executableArguments(props),
       ...this.nonExecutableCommonArguments(props),
     };
+
+    if (props.jobRunQueuingEnabled === true && props.maxRetries !== undefined && props.maxRetries > 0) {
+      Annotations.of(this).addWarningV2(lit`GlueMaxRetriesQueuingEnabled`,
+        `maxRetries was set to ${props.maxRetries}. Overriding it to 0 with since job run queuing is enabled (service constraint)`);
+    }
 
     this.resource = new CfnJob(this, 'Resource', {
       name: props.jobName,
