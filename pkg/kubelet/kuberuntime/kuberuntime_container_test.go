@@ -875,7 +875,7 @@ func TestRestartCountByLogDir(t *testing.T) {
 		},
 		// mix of log files
 		{
-			filenames:    []string{"9223372036854775808.log.rotated", "23.log", "23a.log", "1aaa.log.rotated", "2.log", "3.log.rotated"},
+			filenames:    []string{"9223372036854775808.log.rotated", "23.log", "23a.log", "99.log-invalid", "1aaa.log.rotated", "2.log", "3.log.rotated"},
 			restartCount: 24,
 		},
 		// prefixed
@@ -908,6 +908,12 @@ func TestRestartCountByLogDir(t *testing.T) {
 		if assert.NoError(t, err) {
 			assert.Equal(t, count, tc.restartCount, "count %v should equal restartCount %v", count, tc.restartCount)
 		}
+	}
+}
+
+func TestRestartCountByLogDirReturnsReadError(t *testing.T) {
+	if _, err := calcRestartCountByLogDir("\x00"); err == nil {
+		t.Fatal("expected invalid path to return an error")
 	}
 }
 

@@ -139,11 +139,10 @@ func (s *startSpec) getTargetID(podStatus *kubecontainer.PodStatus) (*kubecontai
 }
 
 func calcRestartCountByLogDir(path string) (int, error) {
-	// if the path doesn't exist then it's not an error
-	if _, err := os.Stat(path); err != nil {
+	files, err := os.ReadDir(path)
+	if os.IsNotExist(err) {
 		return 0, nil
 	}
-	files, err := os.ReadDir(path)
 	if err != nil {
 		return 0, err
 	}
@@ -151,7 +150,7 @@ func calcRestartCountByLogDir(path string) (int, error) {
 		return 0, nil
 	}
 	restartCount := 0
-	restartCountLogFileRegex := regexp.MustCompile(`^(\d+)\.log(\..*)?`)
+	restartCountLogFileRegex := regexp.MustCompile(`^(\d+)\.log(\..*)?$`)
 	for _, file := range files {
 		if file.IsDir() {
 			continue
