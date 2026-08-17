@@ -387,7 +387,7 @@ func TestRelistWithCache(t *testing.T) {
 	}
 	for i, c := range cases {
 		testStr := fmt.Sprintf("test[%d]", i)
-		actualStatus, actualErr := pleg.cache.Get(c.pod.ID)
+		actualStatus, actualErr := pleg.cache.Get(tCtx, c.pod.ID)
 		assert.Equal(t, c.status, actualStatus, testStr)
 		assert.Equal(t, c.error, actualErr, testStr)
 	}
@@ -408,7 +408,7 @@ func TestRelistWithCache(t *testing.T) {
 	}
 	for i, c := range cases {
 		testStr := fmt.Sprintf("test[%d]", i)
-		actualStatus, actualErr := pleg.cache.Get(c.pod.ID)
+		actualStatus, actualErr := pleg.cache.Get(tCtx, c.pod.ID)
 		assert.Equal(t, c.status, actualStatus, testStr)
 		assert.Equal(t, c.error, actualErr, testStr)
 	}
@@ -430,7 +430,7 @@ func TestRemoveCacheEntry(t *testing.T) {
 	// removed after relisting.
 	runtimeMock.EXPECT().GetPods(mock.Anything, true).Return([]*kubecontainer.Pod{}, nil).Times(1)
 	pleg.Relist(tCtx)
-	actualStatus, actualErr := pleg.cache.Get(pods[0].ID)
+	actualStatus, actualErr := pleg.cache.Get(tCtx, pods[0].ID)
 	assert.Equal(t, &kubecontainer.PodStatus{ID: pods[0].ID}, actualStatus)
 	assert.NoError(t, actualErr)
 }
@@ -615,11 +615,11 @@ func TestReinspect(t *testing.T) {
 			}
 
 			if tc.expectStatus {
-				actualStatus, actualErr := pleg.cache.Get(podID)
+				actualStatus, actualErr := pleg.cache.Get(tCtx, podID)
 				assert.Equal(t, expectedStatus, actualStatus)
 				assert.Equal(t, tc.updateCacheError, actualErr)
 			} else if tc.podDeleted {
-				actualStatus, _ := pleg.cache.Get(podID)
+				actualStatus, _ := pleg.cache.Get(tCtx, podID)
 				// If deleted, Get returns an empty status with the ID
 				assert.Equal(t, &kubecontainer.PodStatus{ID: podID}, actualStatus)
 			}
@@ -656,7 +656,7 @@ func TestUpdateCacheUsesPodTimestampWhenEventedPLEGIsEnabled(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, expectedStatus, status)
 
-	cachedStatus, cachedErr := cache.Get(podID)
+	cachedStatus, cachedErr := cache.Get(ctx, podID)
 	require.NoError(t, cachedErr)
 	assert.Equal(t, expectedStatus, cachedStatus)
 }
@@ -772,7 +772,7 @@ func TestRelistIPChange(t *testing.T) {
 
 		pleg.Relist(tCtx)
 		actualEvents := getEventsFromChannel(ch)
-		actualStatus, actualErr := pleg.cache.Get(pod.ID)
+		actualStatus, actualErr := pleg.cache.Get(tCtx, pod.ID)
 		assert.Equal(t, status, actualStatus, tc.name)
 		assert.NoError(t, actualErr, tc.name)
 		assert.Exactly(t, []*PodLifecycleEvent{event}, actualEvents)
@@ -793,7 +793,7 @@ func TestRelistIPChange(t *testing.T) {
 
 		pleg.Relist(tCtx)
 		actualEvents = getEventsFromChannel(ch)
-		actualStatus, actualErr = pleg.cache.Get(pod.ID)
+		actualStatus, actualErr = pleg.cache.Get(tCtx, pod.ID)
 		// Must copy status to compare since its pointer gets passed through all
 		// the way to the event
 		statusCopy := *status
@@ -983,9 +983,10 @@ func TestWorkerLoop(t *testing.T) {
 }
 
 func getNewerThanAsync(t *testing.T, cache kubecontainer.ROCache, podID types.UID, minTime time.Time) <-chan *kubecontainer.PodStatus {
+	tCtx := ktesting.Init(t)
 	resCh := make(chan *kubecontainer.PodStatus, 1)
 	go func() {
-		s, err := cache.GetNewerThan(podID, minTime)
+		s, err := cache.GetNewerThan(tCtx, podID, minTime)
 		assert.NoError(t, err)
 		resCh <- s
 	}()

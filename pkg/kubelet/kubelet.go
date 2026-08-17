@@ -3251,7 +3251,7 @@ func (kl *Kubelet) HandlePodReconcile(ctx context.Context, pods []*v1.Pod) {
 		// been evicted, so if this is about minimizing the time to react to an eviction we
 		// can do better. If it's about preserving pod status info we can also do better.
 		if eviction.PodIsEvicted(pod.Status) {
-			if podStatus, err := kl.podCache.Get(pod.UID); err == nil {
+			if podStatus, err := kl.podCache.Get(ctx, pod.UID); err == nil {
 				kl.containerDeletor.deleteContainersInPod(logger, "", podStatus, true)
 			}
 		}
@@ -3449,7 +3449,7 @@ func (kl *Kubelet) ListenAndServePods(ctx context.Context) {
 
 // Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.
 func (kl *Kubelet) cleanUpContainersInPod(ctx context.Context, podID types.UID, exitedContainerID string) {
-	if podStatus, err := kl.podCache.Get(podID); err == nil {
+	if podStatus, err := kl.podCache.Get(ctx, podID); err == nil {
 		// When an evicted or deleted pod has already synced, all containers can be removed.
 		removeAll := kl.podWorkers.ShouldPodContentBeRemoved(podID)
 		kl.containerDeletor.deleteContainersInPod(klog.FromContext(ctx), exitedContainerID, podStatus, removeAll)
