@@ -130,7 +130,7 @@ func (w *predicateAdmitHandler) Admit(ctx context.Context, attrs *PodAdmitAttrib
 	admitPod := attrs.Pod
 
 	// perform the checks that preemption will not help first to avoid meaningless pod eviction
-	if rejectPodAdmissionBasedOnOSSelector(admitPod, node) {
+	if rejectPodAdmissionBasedOnOSSelector(admitPod) {
 		return PodAdmitResult{
 			Admit:   false,
 			Reason:  PodOSSelectorNodeLabelDoesNotMatch,
@@ -273,24 +273,16 @@ func (w *predicateAdmitHandler) generalFilter(ctx context.Context, pod *v1.Pod, 
 }
 
 // rejectPodAdmissionBasedOnOSSelector rejects pod if it's nodeSelector doesn't match
-// We expect the kubelet status reconcile which happens every 10sec to update the node labels if there is a mismatch.
-func rejectPodAdmissionBasedOnOSSelector(pod *v1.Pod, node *v1.Node) bool {
-	labels := node.Labels
-	osName, osLabelExists := labels[v1.LabelOSStable]
-	if !osLabelExists || osName != runtime.GOOS {
-		if len(labels) == 0 {
-			labels = make(map[string]string)
-		}
-		labels[v1.LabelOSStable] = runtime.GOOS
-	}
+// the OS this kubelet runs on. The node's kubernetes.io/os label is not consulted: it
+// can be missing or stale, and the kubelet status reconcile which happens every 10sec
+// updates it if there is a mismatch. runtime.GOOS is authoritative in the meantime.
+func rejectPodAdmissionBasedOnOSSelector(pod *v1.Pod) bool {
 	podLabelSelector, podOSLabelExists := pod.Labels[v1.LabelOSStable]
 	if !podOSLabelExists {
 		// If the labelselector didn't exist, let's keep the current behavior as is
 		return false
-	} else if podOSLabelExists && podLabelSelector != labels[v1.LabelOSStable] {
-		return true
 	}
-	return false
+	return podLabelSelector != runtime.GOOS
 }
 
 // rejectPodAdmissionBasedOnOSField rejects pods if their OS field doesn't match runtime.GOOS.
