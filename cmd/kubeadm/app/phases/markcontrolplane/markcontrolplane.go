@@ -52,6 +52,9 @@ func MarkControlPlane(client clientset.Interface, controlPlaneName string, taint
 }
 
 func markControlPlaneNode(n *v1.Node, taints []v1.Taint) {
+	if n.Labels == nil {
+		n.Labels = map[string]string{}
+	}
 	for _, label := range labelsToAdd {
 		n.ObjectMeta.Labels[label] = ""
 	}

@@ -170,3 +170,14 @@ func TestMarkControlPlane(t *testing.T) {
 		})
 	}
 }
+
+func TestMarkControlPlaneNodeWithNilLabels(t *testing.T) {
+	node := &v1.Node{}
+	markControlPlaneNode(node, nil)
+
+	for _, label := range labelsToAdd {
+		if _, ok := node.Labels[label]; !ok {
+			t.Errorf("expected label %q", label)
+		}
+	}
+}
