@@ -194,15 +194,52 @@ func TestSetDifference(t *testing.T) {
 }
 
 func TestSetSymmetricDifference(t *testing.T) {
-	a := sets.New("1", "2", "3")
-	b := sets.New("1", "2", "4", "5")
-	c := a.SymmetricDifference(b)
-	d := b.SymmetricDifference(a)
-	if !c.Equal(sets.New("3", "4", "5")) {
-		t.Errorf("Unexpected contents: %#v", sets.List(c))
+	tests := []struct {
+		s1       sets.Set[string]
+		s2       sets.Set[string]
+		expected sets.Set[string]
+	}{
+		{
+			s1:       sets.New("1", "2", "3"),
+			s2:       sets.New("1", "2", "4", "5"),
+			expected: sets.New("3", "4", "5"),
+		},
+		{
+			s1:       sets.New("1", "2", "3"),
+			s2:       sets.New("1", "2", "3"),
+			expected: sets.New[string](),
+		},
+		{
+			s1:       sets.New("1", "2"),
+			s2:       sets.New("3", "4"),
+			expected: sets.New("1", "2", "3", "4"),
+		},
+		{
+			s1:       sets.New("1", "2"),
+			s2:       sets.New[string](),
+			expected: sets.New("1", "2"),
+		},
+		{
+			s1:       sets.New[string](),
+			s2:       sets.New("1", "2"),
+			expected: sets.New("1", "2"),
+		},
+		{
+			s1:       sets.New[string](),
+			s2:       sets.New[string](),
+			expected: sets.New[string](),
+		},
 	}
-	if !d.Equal(sets.New("3", "4", "5")) {
-		t.Errorf("Unexpected contents: %#v", sets.List(d))
+
+	for i, tc := range tests {
+		c := tc.s1.SymmetricDifference(tc.s2)
+		d := tc.s2.SymmetricDifference(tc.s1)
+		if !c.Equal(tc.expected) {
+			t.Errorf("[%d] Unexpected contents for s1.SymmetricDifference(s2): expected %#v, got %#v", i, sets.List(tc.expected), sets.List(c))
+		}
+		if !d.Equal(tc.expected) {
+			t.Errorf("[%d] Unexpected contents for s2.SymmetricDifference(s1): expected %#v, got %#v", i, sets.List(tc.expected), sets.List(d))
+		}
 	}
 }
 
