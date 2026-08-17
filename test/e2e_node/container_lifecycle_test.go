@@ -7218,7 +7218,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Not Change Container Status", frame
 				})
 			framework.ExpectNoError(err)
 
-			ginkgo.By("Removing the readiness marker file from the restartable init container to make the pod NotReady")
+			ginkgo.By("Removing the readiness marker file from the restartable init container to make the pod NotReady ")
 			_, _, err = e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, pod.Spec.InitContainers[0].Name, "rm", "/tmp/ready")
 			framework.ExpectNoError(err, "failed to remove /tmp/ready from restartable init container")
 
