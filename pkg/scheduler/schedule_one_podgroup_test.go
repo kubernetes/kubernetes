@@ -771,7 +771,7 @@ func TestScheduleOnePodGroup_FinishesAttemptWhenAllPoppedPodsAreAssumed(t *testi
 			if pendingPods := queue.PendingPodGroupPods(); len(pendingPods) != 0 {
 				t.Errorf("Expected no pending PodGroup members, got %v", pendingPods)
 			}
-			requeuedPodGroup, ok := queue.GetPodGroup(podGroup.Name, podGroup.Namespace, fwk.PodGroupKeyType)
+			requeuedPodGroup, ok := queue.GetPodGroup(podGroup.Name, podGroup.Namespace)
 			if !ok {
 				t.Fatalf("Expected PodGroup to be queued")
 			}
@@ -1940,7 +1940,7 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 
 			// If there were any remaining pods of the podgroup requeued into the active queue, they must preserve their timestamp.
 			if tt.expectPodsInActiveQueue.Len() > 0 {
-				queuedPGInfo, ok := sched.SchedulingQueue.GetPodGroup("pg", "default", fwk.PodGroupKeyType)
+				queuedPGInfo, ok := sched.SchedulingQueue.GetPodGroup("pg", "default")
 				if !ok {
 					t.Errorf("Expected pod group pg to be requeued, but it was not found in the scheduling queue")
 				} else if !queuedPGInfo.Timestamp.Equal(oldTimestamp) {

@@ -3961,7 +3961,7 @@ func TestAddAttemptedPodGroupIfNeeded(t *testing.T) {
 				tCtx.Fatalf("Unexpected error from AddAttemptedPodGroupIfNeeded: %v", err)
 			}
 			if !test.skipAddPodGroup {
-				if queuedInfo, ok := q.GetPodGroup(podGroup.Name, podGroup.Namespace, fwk.PodGroupKeyType); ok {
+				if queuedInfo, ok := q.GetPodGroup(podGroup.Name, podGroup.Namespace); ok {
 					pgInfo = queuedInfo
 				}
 			}

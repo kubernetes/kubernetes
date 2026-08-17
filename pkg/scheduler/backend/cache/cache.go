@@ -344,13 +344,13 @@ func (cache *cacheImpl) updatePodGroupStateSnapshot(snapshot *Snapshot) {
 // It removes entries that no longer exist in the live cache
 // and clones entries whose generation has advanced since the last snapshot.
 func (cache *cacheImpl) updateCompositePodGroupStateSnapshot(snapshot *Snapshot) {
-	// Remove pod group states from snapshot that no longer exist in cache.
+	// Remove composite pod group states from snapshot that no longer exist in cache.
 	for key := range snapshot.compositePodGroupStates {
 		if _, exists := cache.compositePodGroupStates[key]; !exists {
 			delete(snapshot.compositePodGroupStates, key)
 		}
 	}
-	// Clone only pod group states that changed since the last snapshot.
+	// Clone only composite pod group states that changed since the last snapshot.
 	for key, cpgs := range cache.compositePodGroupStates {
 		if existing, ok := snapshot.compositePodGroupStates[key]; ok && existing.generation == cpgs.generation {
 			continue
@@ -1125,7 +1125,7 @@ func (cache *cacheImpl) applyPVCRefCountDelta(snapshot *Snapshot) error {
 	return nil
 }
 
-// AddGenericPodGroup adds an generic pod group object to the cache,
+// AddGenericPodGroup adds a generic pod group object to the cache,
 // and links it to its parent composite pod group if one is specified.
 func (cache *cacheImpl) AddGenericPodGroup(gpg *framework.GenericPodGroup) {
 	cache.mu.Lock()
@@ -1196,7 +1196,7 @@ func (cache *cacheImpl) UpdateGenericPodGroup(logger klog.Logger, gpg *framework
 	}
 }
 
-// RemoveGenericPodGroup removes an generic pod group object from the cache.
+// RemoveGenericPodGroup removes a generic pod group object from the cache.
 func (cache *cacheImpl) RemoveGenericPodGroup(logger klog.Logger, gpg *framework.GenericPodGroup) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
@@ -1220,6 +1220,7 @@ func (cache *cacheImpl) RemoveGenericPodGroup(logger klog.Logger, gpg *framework
 	case fwk.PodGroupKeyType:
 		pgs, exists := cache.podGroupStates[key]
 		if !exists {
+			// This should not happen: the pod group state should always be present when removal event comes.
 			utilruntime.HandleErrorWithLogger(logger, nil, "Pod group state not found for removal", "podGroup", klog.KObj(gpg))
 			return
 		}
@@ -1230,6 +1231,7 @@ func (cache *cacheImpl) RemoveGenericPodGroup(logger klog.Logger, gpg *framework
 	case fwk.CompositePodGroupKeyType:
 		cpgs, exists := cache.compositePodGroupStates[key]
 		if !exists {
+			// This should not happen: the composite pod group state should always be present when removal event comes.
 			utilruntime.HandleErrorWithLogger(logger, nil, "Composite pod group state not found for removal", "compositePodGroup", klog.KObj(gpg))
 			return
 		}

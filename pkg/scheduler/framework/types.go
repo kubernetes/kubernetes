@@ -1017,7 +1017,7 @@ func (pgqi *QueuedPodGroupInfo) AddSubtree(subtree *PodGroupInfo) {
 	}
 }
 
-// UpdateGenericPodGroup updates an generic pod group in the queued pod group info hierarchy.
+// UpdateGenericPodGroup updates a generic pod group in the queued pod group info hierarchy.
 func (pgqi *QueuedPodGroupInfo) UpdateGenericPodGroup(gpg *GenericPodGroup) {
 	node, _ := findNodeAndParent(pgqi.PodGroupInfo, nil, gpg.GetName())
 	if node != nil {
@@ -1025,7 +1025,7 @@ func (pgqi *QueuedPodGroupInfo) UpdateGenericPodGroup(gpg *GenericPodGroup) {
 	}
 }
 
-// RemoveGenericPodGroup removes an generic pod group from the queued pod group info hierarchy.
+// RemoveGenericPodGroup removes a generic pod group from the queued pod group info hierarchy.
 // It returns a slice of all pods within the hierarchy of the removed pod group / composite pod group.
 func (pgqi *QueuedPodGroupInfo) RemoveGenericPodGroup(gpg *GenericPodGroup) []*QueuedPodInfo {
 	node, parent := findNodeAndParent(pgqi.PodGroupInfo, nil, gpg.GetName())
@@ -1088,12 +1088,12 @@ type GenericPodGroup struct {
 	CompositePodGroup *schedulingv1alpha3.CompositePodGroup
 }
 
-// NewGenericPodGroup returns an GenericPodGroup for a PodGroup.
+// NewGenericPodGroup returns a GenericPodGroup for a PodGroup.
 func NewGenericPodGroup(pg *schedulingv1beta1.PodGroup) *GenericPodGroup {
 	return &GenericPodGroup{PodGroup: pg}
 }
 
-// NewGenericCompositePodGroup returns an GenericPodGroup for a CompositePodGroup.
+// NewGenericCompositePodGroup returns a GenericPodGroup for a CompositePodGroup.
 func NewGenericCompositePodGroup(cpg *schedulingv1alpha3.CompositePodGroup) *GenericPodGroup {
 	return &GenericPodGroup{CompositePodGroup: cpg}
 }
@@ -1134,6 +1134,8 @@ func (gpg *GenericPodGroup) GetKey() fwk.EntityKey {
 	return fwk.CompositePodGroupKey(gpg.CompositePodGroup.Namespace, gpg.CompositePodGroup.Name)
 }
 
+// GetParentCompositePodGroupName returns the parent composite pod group name of the GenericPodGroup.
+// This should be used only when the feature feature gate CompositePodGroup is enabled.
 func (gpg *GenericPodGroup) GetParentCompositePodGroupName() *string {
 	if gpg.PodGroup != nil {
 		return gpg.PodGroup.Spec.ParentCompositePodGroupName
@@ -1141,10 +1143,14 @@ func (gpg *GenericPodGroup) GetParentCompositePodGroupName() *string {
 	return gpg.CompositePodGroup.Spec.ParentCompositePodGroupName
 }
 
+// HasParent returns true if the GenericPodGroup has a parent.
+// This should be used only when the feature feature gate CompositePodGroup is enabled.
 func (gpg *GenericPodGroup) HasParent() bool {
 	return gpg.GetParentCompositePodGroupName() != nil
 }
 
+// GetParentKey returns the parent key of the GenericPodGroup.
+// This should be used only when the feature CompositePodGroup feature gate is enabled.
 func (gpg *GenericPodGroup) GetParentKey() (fwk.EntityKey, bool) {
 	parentName := gpg.GetParentCompositePodGroupName()
 	if parentName == nil {

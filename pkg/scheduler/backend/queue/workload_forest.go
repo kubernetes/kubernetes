@@ -51,7 +51,7 @@ func newWorkloadForest(isCompositePodGroupEnabled bool) *workloadForest {
 	}
 }
 
-// addGenericPodGroup adds an GenericPodGroup to the forest.
+// addGenericPodGroup adds a GenericPodGroup to the forest.
 func (wf *workloadForest) addGenericPodGroup(gpg *framework.GenericPodGroup) {
 	key := gpg.GetKey()
 	wf.podGroups[key] = gpg
@@ -71,12 +71,12 @@ func (wf *workloadForest) addGenericPodGroup(gpg *framework.GenericPodGroup) {
 	wf.children[parentKey].Insert(key)
 }
 
-// updateGenericPodGroup updates an GenericPodGroup in the forest.
+// updateGenericPodGroup updates a GenericPodGroup in the forest.
 func (wf *workloadForest) updateGenericPodGroup(gpg *framework.GenericPodGroup) {
 	wf.podGroups[gpg.GetKey()] = gpg
 }
 
-// deleteGenericPodGroup removes an GenericPodGroup from the forest.
+// deleteGenericPodGroup removes a GenericPodGroup from the forest.
 func (wf *workloadForest) deleteGenericPodGroup(gpg *framework.GenericPodGroup) {
 	key := gpg.GetKey()
 	delete(wf.podGroups, key)
@@ -151,7 +151,7 @@ func (wf *workloadForest) getRootLookupInfoForParentCPG(parentName, namespace st
 	}
 }
 
-// getLeafPodGroups returns all PodGroups that are leaf nodes in the subtree rooted at the given CompositePodGroup.
+// getLeafPodGroups returns all PodGroups that are leaf nodes in the subtree rooted at the given rootLookupInfo.
 func (wf *workloadForest) getLeafPodGroups(logger klog.Logger, rootLookupInfo *framework.QueuedPodGroupInfo) []*schedulingv1beta1.PodGroup {
 	var key fwk.EntityKey
 	if rootLookupInfo.GetType() == fwk.PodGroupKeyType {

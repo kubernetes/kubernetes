@@ -151,7 +151,7 @@ type SchedulingQueue interface {
 	PatchPodStatus(pod *v1.Pod, conditions []*v1.PodCondition, nominatingInfo *fwk.NominatingInfo) (<-chan error, error)
 
 	// The following functions are supposed to be used only for testing or debugging.
-	GetPodGroup(name, namespace string, entityKeyType fwk.EntityKeyType) (*framework.QueuedPodGroupInfo, bool)
+	GetPodGroup(name, namespace string) (*framework.QueuedPodGroupInfo, bool)
 	GetPod(name, namespace string, schedulingGroup *v1.PodSchedulingGroup) (*framework.QueuedPodInfo, bool)
 	PendingPods() ([]*v1.Pod, string)
 	InFlightPods() []*v1.Pod
@@ -1893,7 +1893,7 @@ func (p *PriorityQueue) GetPod(name, namespace string, schedulingGroup *v1.PodSc
 
 // GetPodGroup searches for a pod group in the activeQ, backoffQ, and unschedulableEntities.
 // This function is only used for testing.
-func (p *PriorityQueue) GetPodGroup(name, namespace string, entityKeyType fwk.EntityKeyType) (*framework.QueuedPodGroupInfo, bool) {
+func (p *PriorityQueue) GetPodGroup(name, namespace string) (*framework.QueuedPodGroupInfo, bool) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
