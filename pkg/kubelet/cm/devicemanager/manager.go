@@ -984,6 +984,12 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(ctx context.Context, pod *v1.
 	needsReAllocate := false
 	for k, v := range container.Resources.Limits {
 		resource := string(k)
+		// A DRA-backed extended resource won't have device plugin state.
+		// We need to detect that and skip, because an earlier
+		// device-plugin resource with the same name may still be cached.
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) && isDRAExtendedResource(pod, container.Name, resource) {
+			continue
+		}
 		if !m.isDevicePluginResource(resource) || v.Value() == 0 {
 			continue
 		}
