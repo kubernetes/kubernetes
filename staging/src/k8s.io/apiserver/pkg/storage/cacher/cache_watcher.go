@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"k8s.io/utils/clock"
@@ -123,6 +124,10 @@ type watcherStall struct {
 	// watchers of one Cacher.
 	metrics *metrics.StallResumeObservers
 
+	// lastProgress is the c.clock UnixNano time of the last successful send
+	// to the result channel; read by the stalled-watchers sampler.
+	lastProgress atomic.Int64
+
 	// start is the position the live loop was entered with (the resume
 	// position before any live delivery); only the watcher goroutine uses it.
 	start uint64
@@ -170,6 +175,9 @@ func (c *cacheWatcher) enableStallResume(src *ringCatchUp, observers *metrics.St
 		src:     src,
 		metrics: observers,
 	}
+	// Same clock as the send timestamps sendWatchCacheEvent produces and
+	// the sampler compares against.
+	c.stall.lastProgress.Store(c.clock.Now().UnixNano())
 }
 
 // poke records that the event at resourceVersion did not fit into this
@@ -201,6 +209,15 @@ func (c *cacheWatcher) consumeLatch() (uint64, bool) {
 	default:
 		return 0, false
 	}
+}
+
+// clientBlocked reports whether this watcher's client has stopped draining:
+// the result channel, which only the client reads, is full. Neither a
+// pending stall (served by the watcher's own goroutine, possibly just not
+// scheduled yet) nor a part-filled result channel (normal on a quiet
+// resource) is evidence about the client, so neither is counted.
+func (c *cacheWatcher) clientBlocked() bool {
+	return len(c.result) == cap(c.result)
 }
 
 // Implements watch.Interface.
@@ -558,8 +575,13 @@ func (c *cacheWatcher) streamInterval(cacheInterval *watchCacheInterval, resourc
 			return eventCount, nil
 		}
 		builtAt, sentAt := c.sendWatchCacheEvent(event)
-		if catchUpRound && !sentAt.IsZero() {
-			c.observeDispatchMetrics(event, builtAt, sentAt)
+		if !sentAt.IsZero() {
+			if c.stall != nil {
+				c.stall.lastProgress.Store(sentAt.UnixNano())
+			}
+			if catchUpRound {
+				c.observeDispatchMetrics(event, builtAt, sentAt)
+			}
 		}
 
 		// With some events already sent, update resourceVersion so that
@@ -841,12 +863,13 @@ func (c *cacheWatcher) resume(missed uint64, inHand *watchCacheEvent, resourceVe
 }
 
 // deliverEvent sends a live event to the client and records its delivery
-// latency.
+// latency and the delivery progress timestamp.
 func (c *cacheWatcher) deliverEvent(event *watchCacheEvent) {
 	builtAt, sentAt := c.sendWatchCacheEvent(event)
 	if sentAt.IsZero() {
 		return
 	}
+	c.stall.lastProgress.Store(sentAt.UnixNano())
 	c.observeDispatchMetrics(event, builtAt, sentAt)
 }
 

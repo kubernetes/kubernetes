@@ -52,6 +52,7 @@ import (
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/utils/clock"
+	testingclock "k8s.io/utils/clock/testing"
 
 	cachertesting "k8s.io/apiserver/pkg/storage/cacher/testing"
 )
@@ -65,7 +66,7 @@ func ensureStallResumeMetrics() {
 		registry := compbasemetrics.NewKubeRegistry()
 		for _, m := range []compbasemetrics.Registerable{
 			metrics.WatcherStalls, metrics.WatcherDeferredEvents, metrics.WatcherCatchupRounds,
-			metrics.WatcherCatchupEvents, metrics.TerminatedWatchersCounter,
+			metrics.WatcherCatchupEvents, metrics.StalledWatchers, metrics.TerminatedWatchersCounter,
 		} {
 			_ = registry.Register(m)
 		}
@@ -74,10 +75,10 @@ func ensureStallResumeMetrics() {
 
 // stallResumeCounters is a snapshot of the stall/resume counters for pods.
 type stallResumeCounters struct {
-	stalls, deferred, rounds float64
-	roundSamples             uint64
-	expired, expiredInitial  float64
-	unresponsive             float64
+	stalls, deferred, rounds      float64
+	roundSamples                  uint64
+	expired, expiredInitial, cull float64
+	unresponsive                  float64
 }
 
 func readStallResumeCounters(t testing.TB) stallResumeCounters {
@@ -101,6 +102,7 @@ func readStallResumeCounters(t testing.TB) stallResumeCounters {
 		rounds:         read(metrics.WatcherCatchupRounds.WithLabelValues("", "pods")),
 		expired:        read(metrics.TerminatedWatchersCounter.WithLabelValues("", "pods", metrics.TerminationReasonResourceExpired)),
 		expiredInitial: read(metrics.TerminatedWatchersCounter.WithLabelValues("", "pods", metrics.TerminationReasonResourceExpiredInitial)),
+		cull:           read(metrics.TerminatedWatchersCounter.WithLabelValues("", "pods", metrics.TerminationReasonStalledClient)),
 		unresponsive:   read(metrics.TerminatedWatchersCounter.WithLabelValues("", "pods", metrics.TerminationReasonUnresponsive)),
 	}
 }
@@ -1108,12 +1110,6 @@ func TestStallResumeSingleKeyWatch(t *testing.T) {
 	}
 }
 
-// clientBlocked is true when the result channel is full, i.e. the client is
-// not reading.
-func (c *cacheWatcher) clientBlocked() bool {
-	return len(c.result) == cap(c.result)
-}
-
 // waitWedged blocks until the Cacher's incoming queue is drained (at most the
 // one event the dispatcher is currently delivering is unaccounted for) and
 // the watcher's result channel is full: the state a silent client's watcher
@@ -1352,6 +1348,114 @@ drain:
 // The dispatch fork placement (live deliveries still carry the shared
 // cachingObject, i.e. the fork happens after setCachingObjects) is pinned by
 // TestCachingObjects, which runs in both gate states.
+
+// TestStalledWatchersGaugeAndCull verifies the stalled-watchers gauge counts a
+// watcher whose result channel is full and that has made no delivery
+// progress within the window, that the cull is off by default, and that
+// enabling it stops the watcher and counts it as
+// terminated{reason=stalled_client}.
+func TestStalledWatchersGaugeAndCull(t *testing.T) {
+	cacher := newStallResumeCacher(t)
+	stallResumeAddPods(t, cacher, 100, 100)
+	w := stallResumeWatch(t, cacher, 100)
+	defer w.Stop()
+	cw := w.(*cacheWatcher)
+
+	// Read the count directly rather than through the exported gauge: the
+	// Cacher's own 1s sampler goroutine refreshes the gauge concurrently and
+	// would race a synthetic "future now" set from here.
+	count := func(now time.Time) (int, int) {
+		stalled, toCull := cacher.stalledWatchers(now)
+		return stalled, len(toCull)
+	}
+
+	// Deliver one event so the watcher is live, then leave two events unread
+	// in its result channel: a part-filled result on a quiet resource is a
+	// client between reads, not a stalled one, however long ago the last
+	// delivery was.
+	stallResumeAddPods(t, cacher, 101, 101)
+	stallResumeCollect(t, w, 101, 5*time.Second)
+	stallResumeAddPods(t, cacher, 102, 103)
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond, 5*time.Second, true, func(context.Context) (bool, error) {
+		return len(cacher.incoming) == 0 && len(cw.input) == 0 && len(cw.result) == 2, nil
+	}); err != nil {
+		t.Fatalf("watcher never settled with two unread events: %v", err)
+	}
+	if stalled, cull := count(cacher.clock.Now().Add(stalledWatcherProgressWindow + time.Second)); stalled != 0 || cull != 0 {
+		t.Errorf("part-filled result channel: expected 0 stalled / 0 to cull, got %d / %d", stalled, cull)
+	}
+
+	// Now wedge the client for real: overflow its buffers so events pile up
+	// for it (queued in its channels and/or deferred to a catch-up round).
+	stallResumeAddPods(t, cacher, 104, 200)
+	// Wait for the asynchronous dispatch to finish and for the watcher to
+	// settle blocked in a send to its full result buffer (the wedged state),
+	// so the counts below are not racing a transient.
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond, 5*time.Second, true, func(context.Context) (bool, error) {
+		return len(cacher.incoming) == 0 && cw.clientBlocked(), nil
+	}); err != nil {
+		t.Fatalf("watcher never settled into the wedged state: %v", err)
+	}
+
+	now := cacher.clock.Now()
+	// Within the progress window it is not yet counted as stalled.
+	if stalled, cull := count(now); stalled != 0 || cull != 0 {
+		t.Errorf("within the progress window: expected 0 stalled / 0 to cull, got %d / %d", stalled, cull)
+	}
+	// Past the window it is stalled, but not culled: the cull is disabled
+	// by default.
+	if stalled, cull := count(now.Add(stalledWatcherProgressWindow + time.Second)); stalled != 1 || cull != 0 {
+		t.Errorf("past the progress window: expected 1 stalled / 0 to cull, got %d / %d (len(result)=%d len(input)=%d)",
+			stalled, cull, len(cw.result), len(cw.input))
+	}
+	// The gauge is exported by the sampler goroutine; a direct sample from
+	// here is only a smoke check that setting it works.
+	cacher.sampleStalledWatchers(now.Add(stalledWatcherProgressWindow + time.Second))
+	if _, err := testutil.GetGaugeMetricValue(metrics.StalledWatchers.WithLabelValues("", "pods")); err != nil {
+		t.Errorf("reading the stalled-watchers gauge: %v", err)
+	}
+	cacher.Lock()
+	stoppedBeforeCull := cw.stopped
+	cacher.Unlock()
+	if stoppedBeforeCull {
+		t.Fatalf("watcher must not be culled while the cull is disabled")
+	}
+
+	// Enable the cull with a duration the wedged watcher exceeds.
+	before := readStallResumeCounters(t)
+	// The Cacher's own sampler goroutine reads this field under c.RLock();
+	// write it under the same lock.
+	cacher.Lock()
+	cacher.stall.cullAfter = stalledWatcherProgressWindow
+	cacher.Unlock()
+	cacher.sampleStalledWatchers(now.Add(stalledWatcherProgressWindow + time.Second))
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond, 5*time.Second, true, func(context.Context) (bool, error) {
+		cacher.Lock()
+		defer cacher.Unlock()
+		return cw.stopped, nil
+	}); err != nil {
+		t.Fatalf("expected the culled watcher to be stopped: %v", err)
+	}
+	after := readStallResumeCounters(t)
+	if after.cull-before.cull != 1 {
+		t.Errorf("expected terminated{reason=stalled_client} +1, got %v", after.cull-before.cull)
+	}
+	// The client sees a clean close, not an error event.
+	deadline := time.After(5 * time.Second)
+	for {
+		select {
+		case ev, ok := <-w.ResultChan():
+			if !ok {
+				return
+			}
+			if ev.Type == watch.Error {
+				t.Errorf("no error event expected for a culled watcher, got %#v", ev.Object)
+			}
+		case <-deadline:
+			t.Fatalf("timed out waiting for the culled watch to close")
+		}
+	}
+}
 
 // TestStallResumeScopedWatcherBookmarkAdvancesPosition covers a
 // scope-filtered watcher that requests bookmarks: it receives no object
@@ -1624,6 +1728,26 @@ func TestStallResumeWedgedScopedWatcherResumesFromMiss(t *testing.T) {
 	}
 }
 
+// TestStalledClientCullAfterConfigWiring pins the Config plumbing for the
+// cull knob: a Cacher built with StalledClientCullAfter carries it into its
+// stall state. (The cull behavior itself is covered by the cull test above,
+// which flips the live field mid-test to arm the cull after the wedge is
+// established.)
+func TestStalledClientCullAfterConfigWiring(t *testing.T) {
+	setStallResumeGate(t, true)
+	ensureStallResumeMetrics()
+	cacher, _, err := newTestCacherWithoutSyncing(&cachertesting.MockStorage{}, clock.RealClock{}, func(cfg *Config) {
+		cfg.StalledClientCullAfter = 42 * time.Second
+	})
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+	if got := cacher.stall.cullAfter; got != 42*time.Second {
+		t.Fatalf("Config.StalledClientCullAfter not plumbed: got %v", got)
+	}
+}
+
 // TestStallResumeMidRoundInvalidationYields410 covers the other honest ending:
 // a client that resumes reading but is still slower than the writer has the
 // history move past the catch-up round it is being served from. The round's
@@ -1677,8 +1801,9 @@ func TestStallResumeMidRoundInvalidationYields410(t *testing.T) {
 // TestStallResumeTriggerIndexedWatcher covers the dominant production shape:
 // a watcher registered under a trigger index value (as kubelets watch pods by
 // spec.nodeName), which is dispatched through the value-watchers buckets with
-// the small channel size, must stall, resume, and deliver exactly its node's
-// events in order, including the DELETED for a pod that moved to another node.
+// the small channel size, must stall, be counted by the sampler, resume, and
+// deliver exactly its node's events in order, including the DELETED for a pod
+// that moved to another node.
 func TestStallResumeTriggerIndexedWatcher(t *testing.T) {
 	setStallResumeGate(t, true)
 	ensureStallResumeMetrics()
@@ -1749,6 +1874,9 @@ func TestStallResumeTriggerIndexedWatcher(t *testing.T) {
 	}
 	want = append(want, rv)
 	waitWedged(t, cacher, w)
+	if stalled, _ := cacher.stalledWatchers(cacher.clock.Now().Add(stalledWatcherProgressWindow + time.Second)); stalled != 1 {
+		t.Errorf("expected the sampler to count the trigger-indexed watcher as stalled, got %d", stalled)
+	}
 
 	var got []uint64
 	deadline := time.After(10 * time.Second)
@@ -1789,6 +1917,181 @@ func TestStallResumeTriggerIndexedWatcher(t *testing.T) {
 	}
 	if after := readStallResumeCounters(t); after.stalls-before.stalls < 1 {
 		t.Errorf("the schedule did not stall the watcher; the test would not exercise catch-up")
+	}
+}
+
+// TestStalledWatchersSamplerWithFakeClock drives the real sampler goroutine
+// with a fake clock: a wedged watcher is exported as stalled once the
+// progress window has passed, is culled only once StalledClientCullAfter has
+// passed (a clean close, counted as terminated{reason=stalled_client}), and
+// the gauge returns to zero when the Cacher stops.
+func TestStalledWatchersSamplerWithFakeClock(t *testing.T) {
+	setStallResumeGate(t, true)
+	ensureStallResumeMetrics()
+	fc := testingclock.NewFakeClock(time.Now())
+	const cullAfter = stalledWatcherProgressWindow + time.Minute
+	cacher, _, err := newTestCacherWithoutSyncing(&cachertesting.MockStorage{}, fc, func(cfg *Config) {
+		cfg.StalledClientCullAfter = cullAfter
+	})
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	stopped := false
+	defer func() {
+		if !stopped {
+			cacher.Stop()
+		}
+	}()
+	if err := cacher.Wait(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	stallResumeAddPods(t, cacher, 100, 100)
+	w := stallResumeWatch(t, cacher, 100)
+	defer w.Stop()
+	cw := w.(*cacheWatcher)
+	stallResumeAddPods(t, cacher, 101, 101)
+	stallResumeCollect(t, w, 101, 5*time.Second)
+	stallResumeAddPods(t, cacher, 102, 200)
+	waitWedged(t, cacher, w)
+
+	gauge := func() float64 {
+		v, err := testutil.GetGaugeMetricValue(metrics.StalledWatchers.WithLabelValues("", "pods"))
+		if err != nil {
+			t.Fatalf("reading the stalled-watchers gauge: %v", err)
+		}
+		return v
+	}
+	isStopped := func() bool {
+		cacher.Lock()
+		defer cacher.Unlock()
+		return cw.stopped
+	}
+	// stepUntil advances the fake clock a second at a time (the sampler's
+	// period) until cond holds, giving the sampler goroutine time to run
+	// between steps.
+	stepUntil := func(what string, limit time.Duration, cond func() bool) {
+		t.Helper()
+		for elapsed := time.Duration(0); !cond(); elapsed += time.Second {
+			if elapsed > limit {
+				t.Fatalf("%s: not reached after stepping the clock by %v", what, elapsed)
+			}
+			fc.Step(time.Second)
+			time.Sleep(time.Millisecond)
+		}
+	}
+	before := readStallResumeCounters(t)
+	stepUntil("gauge reports the wedged watcher", stalledWatcherProgressWindow+10*time.Second, func() bool { return gauge() == 1 })
+	if isStopped() {
+		t.Fatalf("watcher culled before StalledClientCullAfter elapsed")
+	}
+	stepUntil("watcher culled", time.Minute+10*time.Second, isStopped)
+	if after := readStallResumeCounters(t); after.cull-before.cull != 1 {
+		t.Errorf("expected terminated{reason=stalled_client} +1, got %v", after.cull-before.cull)
+	}
+	deadline := time.After(5 * time.Second)
+drain:
+	for {
+		select {
+		case ev, ok := <-w.ResultChan():
+			if !ok {
+				break drain
+			}
+			if ev.Type == watch.Error {
+				t.Errorf("a culled client gets a clean close, got %#v", ev.Object)
+			}
+		case <-deadline:
+			t.Fatalf("timed out waiting for the culled watch to close")
+		}
+	}
+	cacher.Stop()
+	stopped = true
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond, 5*time.Second, true, func(context.Context) (bool, error) {
+		return gauge() == 0, nil
+	}); err != nil {
+		t.Errorf("gauge not reset when the Cacher stopped: %v (value %v)", err, gauge())
+	}
+}
+
+// TestStalledWatchersGaugeSharedAcrossCachers runs two Cachers for the same
+// group/resource (as a CRD with several served versions does) against one
+// gauge child: the child must read the sum of both samplers' counts, and
+// stopping one Cacher must withdraw only its own contribution.
+func TestStalledWatchersGaugeSharedAcrossCachers(t *testing.T) {
+	setStallResumeGate(t, true)
+	ensureStallResumeMetrics()
+	fc := testingclock.NewFakeClock(time.Now())
+	newCacher := func() *Cacher {
+		t.Helper()
+		cacher, _, err := newTestCacherWithoutSyncing(&cachertesting.MockStorage{}, fc)
+		if err != nil {
+			t.Fatalf("Couldn't create cacher: %v", err)
+		}
+		t.Cleanup(cacher.Stop)
+		if err := cacher.Wait(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		return cacher
+	}
+	// wedge opens n watchers on the Cacher and overflows all of them.
+	wedge := func(cacher *Cacher, n int) {
+		t.Helper()
+		stallResumeAddPods(t, cacher, 100, 100)
+		watches := make([]watch.Interface, 0, n)
+		for i := 0; i < n; i++ {
+			w := stallResumeWatch(t, cacher, 100)
+			t.Cleanup(w.Stop)
+			watches = append(watches, w)
+		}
+		stallResumeAddPods(t, cacher, 101, 101)
+		for _, w := range watches {
+			stallResumeCollect(t, w, 101, 5*time.Second)
+		}
+		stallResumeAddPods(t, cacher, 102, 200)
+		for _, w := range watches {
+			waitWedged(t, cacher, w)
+		}
+	}
+	a, b := newCacher(), newCacher()
+	wedge(a, 2)
+	wedge(b, 3)
+
+	gauge := func() float64 {
+		v, err := testutil.GetGaugeMetricValue(metrics.StalledWatchers.WithLabelValues("", "pods"))
+		if err != nil {
+			t.Fatalf("reading the stalled-watchers gauge: %v", err)
+		}
+		return v
+	}
+	// stepUntil advances the shared fake clock a second at a time (the
+	// sampler period) until the gauge reads want, giving both sampler
+	// goroutines time to run between steps.
+	stepUntil := func(what string, want float64) {
+		t.Helper()
+		for elapsed := time.Duration(0); gauge() != want; elapsed += time.Second {
+			if elapsed > stalledWatcherProgressWindow+10*time.Second {
+				t.Fatalf("%s: gauge %v, want %v after stepping the clock by %v", what, gauge(), want, elapsed)
+			}
+			fc.Step(time.Second)
+			time.Sleep(time.Millisecond)
+		}
+	}
+	stepUntil("gauge reads the sum over both Cachers", 5)
+
+	// Stop waits for the sampler to withdraw the Cacher's contribution, so
+	// the survivor's count is visible as soon as Stop returns.
+	b.Stop()
+	if got := gauge(); got != 2 {
+		t.Fatalf("after stopping one Cacher: gauge %v, want the survivor's 2", got)
+	}
+	// The survivor keeps reporting its own count unchanged.
+	fc.Step(time.Second)
+	time.Sleep(10 * time.Millisecond)
+	if got := gauge(); got != 2 {
+		t.Fatalf("survivor's next sample: gauge %v, want 2", got)
+	}
+	a.Stop()
+	if got := gauge(); got != 0 {
+		t.Fatalf("after stopping both Cachers: gauge %v, want 0", got)
 	}
 }
 

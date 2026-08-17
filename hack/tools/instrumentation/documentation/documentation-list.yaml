@@ -2242,6 +2242,19 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
+- name: stalled_watchers
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Number of watchers whose result buffer is full and that have made no delivery
+    progress within the last bookmark period, broken by resource type.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
 - name: watcher_catchup_events
   subsystem: watch_cache
   namespace: apiserver

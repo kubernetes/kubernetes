@@ -46,6 +46,9 @@ const (
 	// never got past its initial catch-up (the initial-list / boot-storm
 	// signal).
 	TerminationReasonResourceExpiredInitial = "resource_expired_initial"
+	// TerminationReasonStalledClient: the watcher was ended by the
+	// stalled-client cull because its client stopped reading.
+	TerminationReasonStalledClient = "stalled_client"
 )
 
 // DispatchStage identifies a single stage of an event's lifecycle as it moves
@@ -295,6 +298,17 @@ var (
 	// The following metrics are exported only when the WatchCacheStallResume
 	// feature gate is enabled.
 
+	StalledWatchers = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "stalled_watchers",
+			Help:           "Number of watchers whose result buffer is full and that have made no delivery progress within the last bookmark period, broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+
 	WatcherStalls = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Namespace:      namespace,
@@ -368,6 +382,7 @@ func Register() {
 		}
 		legacyregistry.MustRegister(DispatchStageDuration)
 		if utilfeature.DefaultFeatureGate.Enabled(features.WatchCacheStallResume) {
+			legacyregistry.MustRegister(StalledWatchers)
 			legacyregistry.MustRegister(WatcherStalls)
 			legacyregistry.MustRegister(WatcherDeferredEvents)
 			legacyregistry.MustRegister(WatcherCatchupRounds)
@@ -474,9 +489,12 @@ type StallResumeObservers struct {
 	CatchupRounds compbasemetrics.CounterMetric
 	// CatchupEvents records the number of events each round streamed.
 	CatchupEvents compbasemetrics.ObserverMetric
+	// StalledWatchers is the sampled gauge of stalled watchers.
+	StalledWatchers compbasemetrics.GaugeMetric
 	// Terminated children of TerminatedWatchersCounter by reason.
 	TerminatedExpired        compbasemetrics.CounterMetric
 	TerminatedExpiredInitial compbasemetrics.CounterMetric
+	TerminatedStalledClient  compbasemetrics.CounterMetric
 }
 
 // NewStallResumeObservers pre-resolves every WatchCacheStallResume metric child
@@ -488,7 +506,9 @@ func NewStallResumeObservers(groupResource schema.GroupResource) *StallResumeObs
 		DeferredEvents:           WatcherDeferredEvents.WithLabelValues(group, resource),
 		CatchupRounds:            WatcherCatchupRounds.WithLabelValues(group, resource),
 		CatchupEvents:            WatcherCatchupEvents.WithLabelValues(group, resource),
+		StalledWatchers:          StalledWatchers.WithLabelValues(group, resource),
 		TerminatedExpired:        TerminatedWatchersCounter.WithLabelValues(group, resource, TerminationReasonResourceExpired),
 		TerminatedExpiredInitial: TerminatedWatchersCounter.WithLabelValues(group, resource, TerminationReasonResourceExpiredInitial),
+		TerminatedStalledClient:  TerminatedWatchersCounter.WithLabelValues(group, resource, TerminationReasonStalledClient),
 	}
 }
