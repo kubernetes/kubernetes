@@ -6973,9 +6973,18 @@ var _ = SIGDescribe(framework.WithSerial(), "Not Change Container Status", frame
 				framework.ExpectNoError(err, "failed to remove /tmp/ready from container %s", c.Name)
 			}
 
-			ginkgo.By("Waiting for the pod to become NotReady")
-			err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "PodNotReady", f.Timeouts.PodStart,
+			ginkgo.By("Waiting for the pod and all containers to become NotReady")
+			err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "PodNotReady with all containers not ready", f.Timeouts.PodStart,
 				func(p *v1.Pod) (bool, error) {
+					// PodReady becomes false after the first readiness failure, so wait for every container status update.
+					if len(p.Status.ContainerStatuses) != len(pod.Spec.Containers) {
+						return false, nil
+					}
+					for _, status := range p.Status.ContainerStatuses {
+						if status.Ready {
+							return false, nil
+						}
+					}
 					for _, cond := range p.Status.Conditions {
 						if cond.Type == v1.PodReady && cond.Status == v1.ConditionFalse {
 							return true, nil
