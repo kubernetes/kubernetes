@@ -99,5 +99,8 @@ func AddFromEnvFile(filePath string, addTo func(key, value string) error) error 
 			return err
 		}
 	}
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("error reading env file %q: %w", filePath, err)
+	}
 	return nil
 }

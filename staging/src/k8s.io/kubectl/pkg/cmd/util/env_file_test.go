@@ -17,6 +17,8 @@ limitations under the License.
 package util
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -95,5 +97,16 @@ func Test_processEnvFileLine_readEnvironment(t *testing.T) {
 	}
 	if value != realValue {
 		t.Errorf(`expected value %q, received %q`, realValue, value)
+	}
+}
+
+func TestAddFromEnvFileReturnsScanError(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "env")
+	if err := os.WriteFile(path, []byte("KEY="+strings.Repeat("a", 64*1024)), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := AddFromEnvFile(path, func(_, _ string) error { return nil }); err == nil {
+		t.Fatal("expected oversized line to return a scan error")
 	}
 }
