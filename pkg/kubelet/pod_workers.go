@@ -1076,23 +1076,30 @@ func (p *podWorkers) allowStaticPodStart(fullname string, uid types.UID) bool {
 	waitingPods := p.waitingToStartStaticPodsByFullname[fullname]
 	// TODO: This is O(N) with respect to the number of updates to static pods
 	// with overlapping full names, and ideally would be O(1).
+	firstValidIndex := -1
 	for i, waitingUID := range waitingPods {
 		// has pod already terminated or been deleted?
 		status, ok := p.podSyncStatuses[waitingUID]
 		if !ok || status.IsTerminationRequested() || status.IsTerminated() {
 			continue
 		}
-		// another pod is next in line
-		if waitingUID != uid {
-			p.waitingToStartStaticPodsByFullname[fullname] = waitingPods[i:]
-			return false
-		}
-		// we are up next, remove ourselves
-		waitingPods = waitingPods[i+1:]
+		firstValidIndex = i
 		break
 	}
-	if len(waitingPods) != 0 {
-		p.waitingToStartStaticPodsByFullname[fullname] = waitingPods
+
+	if firstValidIndex == -1 {
+		delete(p.waitingToStartStaticPodsByFullname, fullname)
+		p.startedStaticPodsByFullname[fullname] = uid
+		return true
+	}
+
+	if waitingPods[firstValidIndex] != uid {
+		p.waitingToStartStaticPodsByFullname[fullname] = waitingPods[firstValidIndex:]
+		return false
+	}
+
+	if remaining := waitingPods[firstValidIndex+1:]; len(remaining) != 0 {
+		p.waitingToStartStaticPodsByFullname[fullname] = remaining
 	} else {
 		delete(p.waitingToStartStaticPodsByFullname, fullname)
 	}

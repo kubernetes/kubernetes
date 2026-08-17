@@ -2498,6 +2498,35 @@ func Test_allowPodStart(t *testing.T) {
 			allowedEver: true,
 		},
 		{
+			desc: "static pod when all waiting pods are terminated and a new valid static pod arrives",
+			pod:  newStaticPod("uid-0", "foo"),
+			podSyncStatuses: map[types.UID]*podSyncStatus{
+				"uid-0": {
+					fullname: "foo_",
+				},
+				"uid-2": {
+					fullname:      "foo_",
+					terminatingAt: time.Now(),
+				},
+				"uid-3": {
+					fullname:     "foo_",
+					terminatedAt: time.Now(),
+				},
+			},
+			waitingToStartStaticPodsByFullname: map[string][]types.UID{
+				"foo_": {
+					types.UID("uid-2"),
+					types.UID("uid-3"),
+				},
+			},
+			expectedStartedStaticPodsByFullname: map[string]types.UID{
+				"foo_": types.UID("uid-0"),
+			},
+			expectedWaitingToStartStaticPodsByFullname: make(map[string][]types.UID),
+			allowed:     true,
+			allowedEver: true,
+		},
+		{
 			desc: "static pod if there is no sync status for the pod should be denied",
 			pod:  newStaticPod("uid-0", "foo"),
 			podSyncStatuses: map[types.UID]*podSyncStatus{
