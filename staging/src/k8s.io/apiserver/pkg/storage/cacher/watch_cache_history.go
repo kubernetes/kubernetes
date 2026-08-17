@@ -188,6 +188,18 @@ const (
 	maxWatchChanSizeWithoutIndex = 100
 )
 
+// suggestedWatchChannelSize returns the size of a watcher's input and result
+// channels.
+//
+// Without the WatchCacheStallResume feature gate this size is a survival
+// criterion: a watcher whose input channel stays full for longer than the
+// dispatch time budget is terminated, so the channels bound how long a slow
+// or hiccuping client is tolerated (roughly 2*chanSize events of write
+// traffic). With the gate enabled the channels are only burst absorption: a
+// watcher whose input channel fills up is deferred to a catch-up round from
+// the event history instead of being terminated, so the size trades memory
+// for the frequency of catch-up rounds and no longer decides survival; a
+// watcher is terminated only once it falls out of the whole history window.
 func (w *watchCacheHistory) suggestedWatchChannelSize(indexExists, triggerUsed bool) int {
 	// To estimate the channel size we use a heuristic that a channel
 	// should roughly be able to keep one second of history.
