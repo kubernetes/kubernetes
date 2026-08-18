@@ -44,7 +44,7 @@ var AllocatorPool = sync.Pool{
 // large responses leaves every pooled allocator holding a multi-megabyte
 // buffer for the lifetime of the process. Encodes larger than this bound still
 // work; their buffers are simply released to the GC instead of being pooled.
-const maxPooledBufferCapacity = 256 * 1024
+const maxPooledBufferCapacity = 128 * 1024
 
 // PutAllocator returns a MemoryAllocator previously obtained from
 // AllocatorPool. Buffers that grew beyond maxPooledBufferCapacity are dropped
