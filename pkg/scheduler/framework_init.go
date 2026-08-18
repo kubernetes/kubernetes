@@ -201,6 +201,7 @@ func NewFrameworkMap(ctx context.Context, c *FrameworkComponents, recorderFactor
 		frameworkruntime.WithAPIDispatcher(c.apiDispatcher),
 		frameworkruntime.WithSharedCSIManager(csiManager),
 		frameworkruntime.WithPodGroupManager(c.cache),
+		frameworkruntime.WithMaxBatchAge(c.options.maxBatchAge),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing profiles: %w", err)
