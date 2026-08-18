@@ -345,7 +345,7 @@ function createBucket(table: S3Table, props: S3TableProps) {
   };
 }
 
-function renderColumns(columns?: Array<Column | Column>) {
+function renderColumns(columns?: Column[]) {
   if (columns === undefined) {
     return undefined;
   }

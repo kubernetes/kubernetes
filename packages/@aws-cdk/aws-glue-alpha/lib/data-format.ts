@@ -59,14 +59,14 @@ export class OutputFormat {
    *
    * @see https://svn.apache.org/repos/infra/websites/production/hive/content/javadocs/r3.1.3/api/org/apache/hadoop/hive/ql/io/avro/AvroContainerOutputFormat.html
    */
-  public static readonly AVRO = new InputFormat('org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat');
+  public static readonly AVRO = new OutputFormat('org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat');
 
   /**
    * OutputFormat for Orc files.
    *
    * @see https://svn.apache.org/repos/infra/websites/production/hive/content/javadocs/r3.1.3/api/org/apache/hadoop/hive/ql/io/orc/OrcOutputFormat.html
    */
-  public static readonly ORC = new InputFormat('org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat');
+  public static readonly ORC = new OutputFormat('org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat');
 
   /**
    * OutputFormat for Parquet files.
