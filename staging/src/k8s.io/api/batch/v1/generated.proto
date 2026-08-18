@@ -126,6 +126,15 @@ message CronJobStatus {
   // Information when was the last time the job successfully completed.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastSuccessfulTime = 5;
+
+  // nextScheduleTime is the next time the CronJob is scheduled to create a Job,
+  // computed from the schedule and, if set, the time zone. It is not set when the
+  // CronJob is suspended or does not have a valid future schedule.
+  // This field is alpha-level and is only populated when the
+  // CronJobsNextScheduleTime feature gate is enabled on the kube-controller-manager.
+  // +optional
+  // +featureGate=CronJobsNextScheduleTime
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time nextScheduleTime = 6;
 }
 
 // Job represents the configuration of a single job.

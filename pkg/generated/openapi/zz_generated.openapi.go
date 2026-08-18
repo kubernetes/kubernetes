@@ -16677,6 +16677,12 @@ func schema_k8sio_api_batch_v1_CronJobStatus(ref common.ReferenceCallback) commo
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
+					"nextScheduleTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "nextScheduleTime is the next time the CronJob is scheduled to create a Job, computed from the schedule and, if set, the time zone. It is not set when the CronJob is suspended or does not have a valid future schedule. This field is alpha-level and is only populated when the CronJobsNextScheduleTime feature gate is enabled on the kube-controller-manager.",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
