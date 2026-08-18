@@ -109,6 +109,7 @@
     "interface-extends-ref:@aws-cdk/aws-glue-alpha.ISecurityConfiguration",
     "interface-extends-ref:@aws-cdk/aws-glue-alpha.ITable",
     "interface-extends-ref:@aws-cdk/aws-glue-alpha.IWorkflow",
-    "prefer-ref-interface:@aws-cdk/aws-glue-alpha.DatabaseProps.catalog"
+    "prefer-ref-interface:@aws-cdk/aws-glue-alpha.DatabaseProps.catalog",
+    "no-unused-type:@aws-cdk/aws-glue-alpha.S3EncryptionMode"
   ]
 }

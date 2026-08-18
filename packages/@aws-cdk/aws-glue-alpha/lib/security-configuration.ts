@@ -38,78 +38,94 @@ export enum S3EncryptionMode {
   KMS = 'SSE-KMS',
 }
 
+// CloudWatch Logs support only SSE-KMS; Job Bookmarks support only CSE-KMS.
+const CLOUD_WATCH_ENCRYPTION_MODE = 'SSE-KMS';
+const JOB_BOOKMARKS_ENCRYPTION_MODE = 'CSE-KMS';
+
 /**
- * Encryption mode for CloudWatch Logs.
- * @see https://docs.aws.amazon.com/glue/latest/webapi/API_CloudWatchEncryption.html#Glue-Type-CloudWatchEncryption-CloudWatchEncryptionMode
+ * S3 encryption configuration for a `SecurityConfiguration`.
+ *
+ * Use {@link S3Encryption.s3Managed} for SSE-S3 or {@link S3Encryption.kms} for
+ * SSE-KMS. Because these are separate factories, a KMS key can never be paired
+ * with S3-managed encryption.
  */
-export enum CloudWatchEncryptionMode {
+export class S3Encryption {
+  /**
+   * Server-side encryption (SSE) with an Amazon S3-managed key.
+   *
+   * @see https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingServerSideEncryption.html
+   */
+  public static s3Managed(): S3Encryption {
+    return new S3Encryption(S3EncryptionMode.S3_MANAGED, undefined);
+  }
+
   /**
    * Server-side encryption (SSE) with an AWS KMS key managed by the account owner.
    *
+   * @param kmsKey the KMS key used to encrypt the data. A key is created if one is not provided.
    * @see https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingKMSEncryption.html
    */
-  KMS = 'SSE-KMS',
+  public static kms(kmsKey?: kms.IKeyRef): S3Encryption {
+    return new S3Encryption(S3EncryptionMode.KMS, kmsKey);
+  }
+
+  /** @internal */
+  public readonly _mode: S3EncryptionMode;
+
+  /** @internal */
+  public readonly _kmsKey?: kms.IKeyRef;
+
+  private constructor(mode: S3EncryptionMode, kmsKey?: kms.IKeyRef) {
+    this._mode = mode;
+    this._kmsKey = kmsKey;
+  }
 }
 
 /**
- * Encryption mode for Job Bookmarks.
- * @see https://docs.aws.amazon.com/glue/latest/webapi/API_JobBookmarksEncryption.html#Glue-Type-JobBookmarksEncryption-JobBookmarksEncryptionMode
+ * CloudWatch Logs encryption configuration for a `SecurityConfiguration`.
+ *
+ * CloudWatch Logs support only server-side encryption with a KMS key.
  */
-export enum JobBookmarksEncryptionMode {
+export class CloudWatchEncryption {
+  /**
+   * Server-side encryption (SSE) with an AWS KMS key managed by the account owner.
+   *
+   * @param kmsKey the KMS key used to encrypt the data. A key is created if one is not provided.
+   */
+  public static kms(kmsKey?: kms.IKeyRef): CloudWatchEncryption {
+    return new CloudWatchEncryption(kmsKey);
+  }
+
+  /** @internal */
+  public readonly _kmsKey?: kms.IKeyRef;
+
+  private constructor(kmsKey?: kms.IKeyRef) {
+    this._kmsKey = kmsKey;
+  }
+}
+
+/**
+ * Job bookmarks encryption configuration for a `SecurityConfiguration`.
+ *
+ * Job bookmarks support only client-side encryption with a KMS key.
+ */
+export class JobBookmarksEncryption {
   /**
    * Client-side encryption (CSE) with an AWS KMS key managed by the account owner.
    *
+   * @param kmsKey the KMS key used to encrypt the data. A key is created if one is not provided.
    * @see https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingClientSideEncryption.html
    */
-  CLIENT_SIDE_KMS = 'CSE-KMS',
-}
+  public static clientSideKms(kmsKey?: kms.IKeyRef): JobBookmarksEncryption {
+    return new JobBookmarksEncryption(kmsKey);
+  }
 
-/**
- * S3 encryption configuration.
- */
-export interface S3Encryption {
-  /**
-   * Encryption mode.
-   */
-  readonly mode: S3EncryptionMode;
+  /** @internal */
+  public readonly _kmsKey?: kms.IKeyRef;
 
-  /**
-   * The KMS key to be used to encrypt the data.
-   * @default no kms key if mode = S3_MANAGED. A key will be created if one is not provided and mode = KMS.
-   */
-  readonly kmsKey?: kms.IKeyRef;
-}
-
-/**
- * CloudWatch Logs encryption configuration.
- */
-export interface CloudWatchEncryption {
-  /**
-   * Encryption mode
-   */
-  readonly mode: CloudWatchEncryptionMode;
-
-  /**
-   * The KMS key to be used to encrypt the data.
-   * @default A key will be created if one is not provided.
-   */
-  readonly kmsKey?: kms.IKeyRef;
-}
-
-/**
- * Job bookmarks encryption configuration.
- */
-export interface JobBookmarksEncryption {
-  /**
-   * Encryption mode.
-   */
-  readonly mode: JobBookmarksEncryptionMode;
-
-  /**
-   * The KMS key to be used to encrypt the data.
-   * @default A key will be created if one is not provided.
-   */
-  readonly kmsKey?: kms.IKeyRef;
+  private constructor(kmsKey?: kms.IKeyRef) {
+    this._kmsKey = kmsKey;
+  }
 }
 
 /**
@@ -210,37 +226,37 @@ export class SecurityConfiguration extends cdk.Resource implements ISecurityConf
     }
 
     const kmsKeyCreationRequired =
-      (props.s3Encryption && props.s3Encryption.mode === S3EncryptionMode.KMS && !props.s3Encryption.kmsKey) ||
-      (props.cloudWatchEncryption && !props.cloudWatchEncryption.kmsKey) ||
-      (props.jobBookmarksEncryption && !props.jobBookmarksEncryption.kmsKey);
+      (props.s3Encryption && props.s3Encryption._mode === S3EncryptionMode.KMS && !props.s3Encryption._kmsKey) ||
+      (props.cloudWatchEncryption && !props.cloudWatchEncryption._kmsKey) ||
+      (props.jobBookmarksEncryption && !props.jobBookmarksEncryption._kmsKey);
     const autoCreatedKmsKey = kmsKeyCreationRequired ? new kms.Key(this, 'Key', { enableKeyRotation: true }) : undefined;
 
     let cloudWatchEncryption;
     if (props.cloudWatchEncryption) {
-      this.cloudWatchEncryptionKey = props.cloudWatchEncryption.kmsKey || autoCreatedKmsKey;
+      this.cloudWatchEncryptionKey = props.cloudWatchEncryption._kmsKey || autoCreatedKmsKey;
       cloudWatchEncryption = {
-        cloudWatchEncryptionMode: props.cloudWatchEncryption.mode,
+        cloudWatchEncryptionMode: CLOUD_WATCH_ENCRYPTION_MODE,
         kmsKeyArn: this.cloudWatchEncryptionKey?.keyRef.keyArn,
       };
     }
 
     let jobBookmarksEncryption;
     if (props.jobBookmarksEncryption) {
-      this.jobBookmarksEncryptionKey = props.jobBookmarksEncryption.kmsKey || autoCreatedKmsKey;
+      this.jobBookmarksEncryptionKey = props.jobBookmarksEncryption._kmsKey || autoCreatedKmsKey;
       jobBookmarksEncryption = {
-        jobBookmarksEncryptionMode: props.jobBookmarksEncryption.mode,
+        jobBookmarksEncryptionMode: JOB_BOOKMARKS_ENCRYPTION_MODE,
         kmsKeyArn: this.jobBookmarksEncryptionKey?.keyRef.keyArn,
       };
     }
 
     let s3Encryptions;
     if (props.s3Encryption) {
-      if (props.s3Encryption.mode === S3EncryptionMode.KMS) {
-        this.s3EncryptionKey = props.s3Encryption.kmsKey || autoCreatedKmsKey;
+      if (props.s3Encryption._mode === S3EncryptionMode.KMS) {
+        this.s3EncryptionKey = props.s3Encryption._kmsKey || autoCreatedKmsKey;
       }
       // NOTE: CloudFormations errors out if array is of length > 1. That's why the props don't expose an array
       s3Encryptions = [{
-        s3EncryptionMode: props.s3Encryption.mode,
+        s3EncryptionMode: props.s3Encryption._mode,
         kmsKeyArn: this.s3EncryptionKey?.keyRef.keyArn,
       }];
     }
