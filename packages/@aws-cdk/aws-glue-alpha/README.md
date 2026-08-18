@@ -1074,6 +1074,25 @@ new glue.ExternalTable(this, 'MyTable', {
 });
 ```
 
+## Data Quality Ruleset
+
+A `DataQualityRuleset` defines a set of data quality rules — authored in Glue's
+Data Quality Definition Language (DQDL) — that are evaluated against a table in
+the Data Catalog.
+
+```ts
+new glue.DataQualityRuleset(this, 'MyRuleset', {
+  rulesetName: 'my_ruleset',
+  dqdl: glue.Dqdl.fromString('Rules = [ RowCount > 100, IsComplete "order_id" ]'),
+  targetTable: new glue.DataQualityTargetTable('my_database', 'my_table'),
+});
+```
+
+Build the DQDL document with `Dqdl.fromString(...)`. Glue parses and validates the
+DQDL when the ruleset is deployed; see the
+[DQDL reference](https://docs.aws.amazon.com/glue/latest/dg/dqdl.html) for the
+full rule syntax.
+
 ## [Encryption](https://docs.aws.amazon.com/athena/latest/ug/encryption.html)
 
 When the table creates its own S3 bucket (i.e. you do not pass an explicit `bucket`), that bucket enforces SSL: a bucket policy denies any request made over plain HTTP. If you provide your own bucket, enabling `enforceSSL` on it is your responsibility.

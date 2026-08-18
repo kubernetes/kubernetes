@@ -7,7 +7,7 @@ test('a data quality ruleset', () => {
   new glue.DataQualityRuleset(stack, 'DataQualityRuleset', {
     description: 'description',
     rulesetName: 'ruleset_name',
-    rulesetDqdl: 'ruleset_dqdl',
+    dqdl: glue.Dqdl.fromString('ruleset_dqdl'),
     targetTable: new glue.DataQualityTargetTable('database_name', 'table_name'),
   });
 
@@ -28,7 +28,7 @@ test('a data quality ruleset with a client token', () => {
     clientToken: 'client_token',
     description: 'description',
     rulesetName: 'ruleset_name',
-    rulesetDqdl: 'ruleset_dqdl',
+    dqdl: glue.Dqdl.fromString('ruleset_dqdl'),
     targetTable: new glue.DataQualityTargetTable('database_name', 'table_name'),
   });
 
@@ -50,7 +50,7 @@ test('a data quality ruleset with tags', () => {
     clientToken: 'client_token',
     description: 'description',
     rulesetName: 'ruleset_name',
-    rulesetDqdl: 'ruleset_dqdl',
+    dqdl: glue.Dqdl.fromString('ruleset_dqdl'),
     tags: {
       key1: 'value1',
       key2: 'value2',
@@ -77,7 +77,7 @@ test('a data quality ruleset with tags', () => {
 test('removalPolicy can be overridden to DESTROY', () => {
   const stack = new cdk.Stack();
   new glue.DataQualityRuleset(stack, 'DataQualityRuleset', {
-    rulesetDqdl: 'ruleset_dqdl',
+    dqdl: glue.Dqdl.fromString('ruleset_dqdl'),
     targetTable: new glue.DataQualityTargetTable('database_name', 'table_name'),
     removalPolicy: cdk.RemovalPolicy.DESTROY,
   });
@@ -117,7 +117,7 @@ test('exposes the ruleset name and ARN of a created ruleset', () => {
   const stack = new cdk.Stack();
   const ruleset = new glue.DataQualityRuleset(stack, 'DataQualityRuleset', {
     rulesetName: 'ruleset_name',
-    rulesetDqdl: 'ruleset_dqdl',
+    dqdl: glue.Dqdl.fromString('ruleset_dqdl'),
     targetTable: new glue.DataQualityTargetTable('database_name', 'table_name'),
   });
 
