@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
+	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/hermeticpodcertificatesigner"
 	imageutils "k8s.io/kubernetes/test/utils/image" // Import imageutils
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -104,6 +105,12 @@ var _ = SIGDescribe("Projected PodCertificate",
 			if err != nil {
 				framework.Failf("failed to create client deployment: %v", err)
 			}
+
+			ginkgo.By("Waiting for server deployment to complete...")
+			framework.ExpectNoError(testutils.WaitForDeploymentComplete(f.ClientSet, serverDeployment, framework.Logf, time.Second, time.Minute))
+
+			ginkgo.By("Waiting for client deployment to complete...")
+			framework.ExpectNoError(testutils.WaitForDeploymentComplete(f.ClientSet, clientDeployment, framework.Logf, time.Second, time.Minute))
 
 			ginkgo.By("Waiting for mTLS connection to be built...")
 
