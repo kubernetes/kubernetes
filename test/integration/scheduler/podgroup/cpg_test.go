@@ -25,6 +25,7 @@ import (
 	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
@@ -37,11 +38,11 @@ import (
 // _ to avoid unused import
 var _ = time.Second
 
-func makeTestPods(pgName string, reqCPUs ...string) []*v1.Pod {
+func makeTestPodsWithPriority(pgName string, priority int32, reqCPUs ...string) []*v1.Pod {
 	var pods []*v1.Pod
 	for i, cpu := range reqCPUs {
 		pod := st.MakePod().Name(fmt.Sprintf("%s-pod-%d", pgName, i)).
-			PodGroupName(pgName).Priority(100).Obj()
+			PodGroupName(pgName).Priority(priority).Obj()
 
 		pod.Spec.Containers = []v1.Container{{
 			Name:  "container",
@@ -56,6 +57,10 @@ func makeTestPods(pgName string, reqCPUs ...string) []*v1.Pod {
 		pods = append(pods, pod)
 	}
 	return pods
+}
+
+func makeTestPods(pgName string, reqCPUs ...string) []*v1.Pod {
+	return makeTestPodsWithPriority(pgName, 100, reqCPUs...)
 }
 
 func concatPods(podSlices ...[]*v1.Pod) []*v1.Pod {
@@ -634,6 +639,234 @@ func TestCPGScheduling(t *testing.T) {
 						makeTestPods("sub-pg1", "1", "1"),
 						makeTestPods("sub-pg2", "1", "1"),
 					)),
+				},
+			},
+		},
+		{
+			name: "TestCPGAtomicCacheRollbackOnGangQuorumFailure",
+			// TestCPGAtomicCacheRollbackOnGangQuorumFailure verifies that when a Gang CompositePodGroup
+			// fails to satisfy its minGroupCount quorum across multiple subtrees, all tentative
+			// in-memory assumptions made in the scheduler cache are cleanly rolled back, allowing
+			// subsequent workloads to claim the resources on those nodes immediately.
+			//
+			// Setup:
+			//   node1: 2 CPU
+			//   node2: 1 CPU
+			//
+			// CPG Tree:
+			//   cpg-root (Gang, MinGroup: 2)
+			//    /        \
+			//   pg1       pg2
+			// (needs 2) (needs 2)
+			//
+			// pg1 fits on node1, but pg2 fails on node2. Quorum of 2 groups is unmet.
+			// Tentative assumption of pg1 on node1 must be rolled back.
+			// A standalone pod requiring 2 CPU should then successfully schedule on node1.
+			steps: []stepsframework.Step{
+				{
+					Name: "Create Nodes",
+					CreateNodes: []*v1.Node{
+						st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
+						st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+					},
+				},
+				{
+					Name: "Create Workload",
+					CreateWorkloads: []*schedulingapi.Workload{
+						st.MakeWorkload().Name("workload-cpg-rollback").
+							Children(
+								st.MakeCompositePodGroupTemplate().Name("root-t").MinGroupCount(2).Priority(100).Children(
+									st.MakePodGroupTemplate().Name("gang-t").MinCount(2).Priority(100),
+								),
+							).Obj(),
+					},
+				},
+				{
+					Name:                    "Create root CPG",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("workload-cpg-rollback", "root-t").MinGroupCount(2).Priority(100).Obj(),
+				},
+				{
+					Name:           "Create pg1",
+					CreatePodGroup: st.MakePodGroup().Name("pg1").WorkloadRef("workload-cpg-rollback", "gang-t").ParentCompositePodGroup("cpg-root").Priority(100).MinCount(2).Obj(),
+				},
+				{
+					Name:           "Create pg2",
+					CreatePodGroup: st.MakePodGroup().Name("pg2").WorkloadRef("workload-cpg-rollback", "gang-t").ParentCompositePodGroup("cpg-root").Priority(100).MinCount(2).Obj(),
+				},
+				{
+					Name: "Create pods for both groups",
+					CreatePods: concatPods(
+						makeTestPods("pg1", "1", "1"),
+						makeTestPods("pg2", "1", "1"),
+					),
+				},
+				{
+					Name: "Verify all CPG pods remain unschedulable due to unmet root gang quorum",
+					WaitForPodsUnschedulable: podNames(concatPods(
+						makeTestPods("pg1", "1", "1"),
+						makeTestPods("pg2", "1", "1"),
+					)),
+				},
+				{
+					Name: "Create standalone pod requiring all 2 CPU on node1",
+					CreatePods: []*v1.Pod{
+						st.MakePod().Name("standalone-pod").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Obj(),
+					},
+				},
+				{
+					Name:                 "Verify standalone pod schedules on node1, confirming cache rollback",
+					WaitForPodsScheduled: []string{"standalone-pod"},
+				},
+				{
+					Name: "Verify standalone pod is assigned to node1",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"standalone-pod"},
+						Nodes: sets.New("node1"),
+					},
+				},
+			},
+		},
+		{
+			name: "TestCPGHierarchyValidationMismatchedPriority",
+			// TestCPGHierarchyValidationMismatchedPriority verifies that when a pod in a child
+			// PodGroup has a priority that does not match the root CompositePodGroup, the
+			// scheduler validation detects the mismatch and rejects the scheduling attempt.
+			steps: []stepsframework.Step{
+				{
+					Name:        "Create Node",
+					CreateNodes: []*v1.Node{st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "20"}).Obj()},
+				},
+				{
+					Name: "Create Workload",
+					CreateWorkloads: []*schedulingapi.Workload{
+						st.MakeWorkload().Name("workload-cpg-mismatched-prio").
+							Children(
+								st.MakeCompositePodGroupTemplate().Name("root-t").BasicPolicy().Priority(100).Children(
+									st.MakePodGroupTemplate().Name("basic-t1").BasicPolicy().Priority(100),
+									st.MakePodGroupTemplate().Name("basic-t2").BasicPolicy().Priority(100),
+								),
+							).Obj(),
+					},
+				},
+				{
+					Name:                    "Create root CPG with Priority 100",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("workload-cpg-mismatched-prio", "root-t").BasicPolicy().Priority(100).Obj(),
+				},
+				{
+					Name:           "Create pg1 with Priority 100",
+					CreatePodGroup: st.MakePodGroup().Name("pg1").WorkloadRef("workload-cpg-mismatched-prio", "basic-t1").ParentCompositePodGroup("cpg-root").Priority(100).BasicPolicy().Obj(),
+				},
+				{
+					Name:           "Create pg2 with Priority 100",
+					CreatePodGroup: st.MakePodGroup().Name("pg2").WorkloadRef("workload-cpg-mismatched-prio", "basic-t2").ParentCompositePodGroup("cpg-root").Priority(100).BasicPolicy().Obj(),
+				},
+				{
+					Name: "Create pods with priority 50 (mismatched with root CPG priority 100)",
+					CreatePods: concatPods(
+						makeTestPodsWithPriority("pg1", 50, "1", "1"),
+						makeTestPodsWithPriority("pg2", 50, "1", "1"),
+					),
+				},
+				{
+					Name:                       "Verify pods get scheduling error due to priority validation rejection",
+					WaitForPodsSchedulingError: []string{"pg1-pod-0", "pg1-pod-1", "pg2-pod-0", "pg2-pod-1"},
+				},
+			},
+		},
+		{
+			name: "TestCPG3LevelMixedGangAndBasicSubtrees",
+			// TestCPG3LevelMixedGangAndBasicSubtrees tests a 3-level hierarchy with a Basic root CPG,
+			// one Gang intermediate CPG (minGroupCount=2 with 2 Gang child PGs), and one Basic
+			// intermediate CPG (with 2 Basic child PGs).
+			//
+			// Tree structure:
+			//
+			//	                    cpg-root (Basic)
+			//	            /                              \
+			//	   cpg-gang-mid (Gang, Min: 2)       cpg-basic-mid (Basic)
+			//	   /                       \          /                 \
+			//	 pg-g1                   pg-g2      pg-b1             pg-b2
+			//	  (F)                     (F)        (S)               (S)
+			//
+			// [Gang, Min: 2]       [Gang, Min: 2]     [Basic]           [Basic]
+			// (needs 2 CPU)        (needs 2 CPU)      (needs 1 CPU)     (needs 1 CPU)
+			//
+			// (S) = Success (scheduled on node1)
+			// (F) = Fail (unschedulable due to gang quorum failure)
+			//
+			// Cluster capacity fits the Basic branch (2 CPU) but cannot satisfy the Gang branch quorum (4 CPU).
+			// The scheduler rolls back tentative placements for the Gang branch and successfully schedules
+			// the Basic branch.
+			steps: []stepsframework.Step{
+				{
+					Name: "Create nodes with total capacity 3 CPU",
+					CreateNodes: []*v1.Node{
+						st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
+						st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+					},
+				},
+				{
+					Name: "Create Workload with mixed Gang and Basic subtrees",
+					CreateWorkloads: []*schedulingapi.Workload{
+						st.MakeWorkload().Name("workload-mixed-subtrees").
+							Children(
+								st.MakeCompositePodGroupTemplate().Name("root-t").BasicPolicy().Priority(100).Children(
+									st.MakeCompositePodGroupTemplate().Name("gang-mid-t").MinGroupCount(2).Priority(100).Children(
+										st.MakePodGroupTemplate().Name("gang-t1").MinCount(2).Priority(100),
+										st.MakePodGroupTemplate().Name("gang-t2").MinCount(2).Priority(100),
+									),
+									st.MakeCompositePodGroupTemplate().Name("basic-mid-t").BasicPolicy().Priority(100).Children(
+										st.MakePodGroupTemplate().Name("basic-t1").BasicPolicy().Priority(100),
+										st.MakePodGroupTemplate().Name("basic-t2").BasicPolicy().Priority(100),
+									),
+								),
+							).Obj(),
+					},
+				},
+				{
+					Name:                    "Create root CPG (Basic)",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("workload-mixed-subtrees", "root-t").BasicPolicy().Priority(100).Obj(),
+				},
+				{
+					Name:                    "Create gang intermediate CPG",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-gang-mid").WorkloadRef("workload-mixed-subtrees", "gang-mid-t").ParentCompositePodGroup("cpg-root").MinGroupCount(2).Priority(100).Obj(),
+				},
+				{
+					Name:                    "Create basic intermediate CPG",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-basic-mid").WorkloadRef("workload-mixed-subtrees", "basic-mid-t").ParentCompositePodGroup("cpg-root").BasicPolicy().Priority(100).Obj(),
+				},
+				{
+					Name:           "Create gang leaf pg-g1",
+					CreatePodGroup: st.MakePodGroup().Name("pg-g1").WorkloadRef("workload-mixed-subtrees", "gang-t1").ParentCompositePodGroup("cpg-gang-mid").MinCount(2).Priority(100).Obj(),
+				},
+				{
+					Name:           "Create gang leaf pg-g2",
+					CreatePodGroup: st.MakePodGroup().Name("pg-g2").WorkloadRef("workload-mixed-subtrees", "gang-t2").ParentCompositePodGroup("cpg-gang-mid").MinCount(2).Priority(100).Obj(),
+				},
+				{
+					Name:           "Create basic leaf pg-b1",
+					CreatePodGroup: st.MakePodGroup().Name("pg-b1").WorkloadRef("workload-mixed-subtrees", "basic-t1").ParentCompositePodGroup("cpg-basic-mid").BasicPolicy().Priority(100).Obj(),
+				},
+				{
+					Name:           "Create basic leaf pg-b2",
+					CreatePodGroup: st.MakePodGroup().Name("pg-b2").WorkloadRef("workload-mixed-subtrees", "basic-t2").ParentCompositePodGroup("cpg-basic-mid").BasicPolicy().Priority(100).Obj(),
+				},
+				{
+					Name: "Create pods: gang pods need 4 CPU total (exceeds cluster capacity 3 CPU), basic pods need 2 CPU total (fits on node1)",
+					CreatePods: concatPods(
+						makeTestPods("pg-g1", "1", "1"),
+						makeTestPods("pg-g2", "1", "1"),
+						makeTestPods("pg-b1", "1"),
+						makeTestPods("pg-b2", "1"),
+					),
+				},
+				{
+					Name:                 "Verify Basic subtree pods are scheduled successfully",
+					WaitForPodsScheduled: []string{"pg-b1-pod-0", "pg-b2-pod-0"},
+				},
+				{
+					Name:                     "Verify Gang subtree pods remain unschedulable due to quorum failure",
+					WaitForPodsUnschedulable: []string{"pg-g1-pod-0", "pg-g1-pod-1", "pg-g2-pod-0", "pg-g2-pod-1"},
 				},
 			},
 		},

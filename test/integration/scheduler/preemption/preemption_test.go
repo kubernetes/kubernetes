@@ -978,6 +978,128 @@ func TestPreemption(t *testing.T) {
 			// Only index 0 on node1 is evicted; index 1 on node2 is NOT evicted.
 			preemptedPodIndexes: map[int]struct{}{0: {}},
 		},
+		{
+			// When a standalone pod and a CPG member pod have equal priority on the same candidate node,
+			// preemption chooses the standalone pod (Victim Rank 1) over the CPG member pod (Victim Rank 3)
+			// to minimize workload disruption.
+			name:                     "CPG victim tie-breaking with standalone pod",
+			initTokens:               maxTokens,
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-victim").Priority(lowPriority).MinGroupCount(1).
+					DisruptionModeAll().WorkloadRef("wl1", "t1").Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg-victim").Priority(lowPriority).MinCount(1).
+					DisruptionModeAll().ParentCompositePodGroup("cpg-victim").WorkloadRef("t1", "wl1").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				initPausePod(&testutils.PausePodConfig{
+					Name:         "standalone-victim",
+					Priority:     &lowPriority,
+					NodeSelector: map[string]string{"node": "node1"},
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI),
+					}},
+				}),
+				initPausePod(&testutils.PausePodConfig{
+					Name:         "cpg-victim-1",
+					Priority:     &lowPriority,
+					NodeSelector: map[string]string{"node": "node1"},
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI),
+					}},
+					PodGroupName: "pg-victim",
+				}),
+			},
+			pod: initPausePod(&testutils.PausePodConfig{
+				Name:         "preemptor-pod",
+				Priority:     &highPriority,
+				NodeSelector: map[string]string{"node": "node1"},
+				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI),
+				}},
+			}),
+			// Standalone pod is chosen for preemption; CPG member remains untouched.
+			preemptedPodIndexes: map[int]struct{}{0: {}},
+		},
+		{
+			// In a multi-branch CPG hierarchy with mixed disruption modes, evicting a member of a branch
+			// with DisruptionModeAll triggers eviction of all pods in that branch across nodes, while
+			// sibling branches under a DisruptionModeSingle root remain intact.
+			name:                     "multi-branch CPG hierarchy victim with mixed disruption modes",
+			initTokens:               maxTokens,
+			genericWorkloadEnabled:   true,
+			compositePodGroupEnabled: true,
+			extraNodes: []*v1.Node{
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{
+					v1.ResourcePods:   "32",
+					v1.ResourceCPU:    "500m",
+					v1.ResourceMemory: "500",
+				}).Label("node", "node2").Obj(),
+			},
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg-root").Priority(lowPriority).BasicPolicy().
+					DisruptionModeSingle().WorkloadRef("wl1", "t1").Obj(),
+				st.MakeCompositePodGroup().Name("cpg-branch-a").Priority(lowPriority).MinGroupCount(1).
+					DisruptionModeAll().ParentCompositePodGroup("cpg-root").WorkloadRef("wl1", "t1").Obj(),
+				st.MakeCompositePodGroup().Name("cpg-branch-b").Priority(lowPriority).BasicPolicy().
+					DisruptionModeSingle().ParentCompositePodGroup("cpg-root").WorkloadRef("wl1", "t1").Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg-branch-a").Priority(lowPriority).MinCount(2).
+					DisruptionModeAll().ParentCompositePodGroup("cpg-branch-a").WorkloadRef("t1", "wl1").Obj(),
+				st.MakePodGroup().Name("pg-branch-b").Priority(lowPriority).BasicPolicy().
+					DisruptionModeSingle().ParentCompositePodGroup("cpg-branch-b").WorkloadRef("t1", "wl1").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				initPausePod(&testutils.PausePodConfig{
+					Name:         "branch-a-node1",
+					Priority:     &lowPriority,
+					NodeSelector: map[string]string{"node": "node1"},
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(250, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI),
+					}},
+					PodGroupName: "pg-branch-a",
+				}),
+				initPausePod(&testutils.PausePodConfig{
+					Name:         "branch-a-node2",
+					Priority:     &lowPriority,
+					NodeSelector: map[string]string{"node": "node2"},
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(250, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI),
+					}},
+					PodGroupName: "pg-branch-a",
+				}),
+				initPausePod(&testutils.PausePodConfig{
+					Name:         "branch-b-node2",
+					Priority:     &lowPriority,
+					NodeSelector: map[string]string{"node": "node2"},
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(250, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI),
+					}},
+					PodGroupName: "pg-branch-b",
+				}),
+			},
+			pod: initPausePod(&testutils.PausePodConfig{
+				Name:         "preemptor-pod",
+				Priority:     &highPriority,
+				NodeSelector: map[string]string{"node": "node1"},
+				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI),
+				}},
+			}),
+			// Branch A members on node1 and node2 are evicted together; Branch B on node2 is NOT evicted.
+			preemptedPodIndexes: map[int]struct{}{0: {}, 1: {}},
+		},
 	}
 
 	// Create a node with some resources and a label.
