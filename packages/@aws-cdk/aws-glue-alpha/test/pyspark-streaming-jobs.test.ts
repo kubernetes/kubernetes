@@ -155,8 +155,7 @@ describe('Job', () => {
         role,
         script,
         jobName: 'PySparkStreamingJob',
-        workerType: glue.WorkerType.G_2X,
-        numberOfWorkers: 2,
+        workerConfiguration: { workerType: glue.WorkerType.G_2X, numberOfWorkers: 2 },
       });
     });
 
@@ -215,8 +214,7 @@ describe('Job', () => {
         role,
         script,
         jobName: 'PySparkStreamingJob',
-        workerType: glue.WorkerType.G_4X,
-        numberOfWorkers: 4,
+        workerConfiguration: { workerType: glue.WorkerType.G_4X, numberOfWorkers: 4 },
       });
     });
 
@@ -265,8 +263,7 @@ describe('Job', () => {
         role,
         script,
         jobName: 'PySparkStreamingJob',
-        workerType: glue.WorkerType.G_8X,
-        numberOfWorkers: 8,
+        workerConfiguration: { workerType: glue.WorkerType.G_8X, numberOfWorkers: 8 },
       });
     });
 
@@ -373,8 +370,7 @@ describe('Job', () => {
             bucket: sparkUIBucket,
             prefix: 'prefix',
           },
-          numberOfWorkers: 8,
-          workerType: glue.WorkerType.G_8X,
+          workerConfiguration: { workerType: glue.WorkerType.G_8X, numberOfWorkers: 8 },
           continuousLogging: { enabled: false },
         });
       }).toThrow('Invalid prefix format (value: prefix)');
@@ -458,7 +454,7 @@ describe('Job', () => {
         script,
         glueVersion: glue.GlueVersion.V3_0,
         continuousLogging: { enabled: false },
-        workerType: glue.WorkerType.G_2X,
+        workerConfiguration: { workerType: glue.WorkerType.G_2X, numberOfWorkers: 2 },
         maxConcurrentRuns: 100,
         timeout: cdk.Duration.hours(2),
         connections: [glue.Connection.fromConnectionName(stack, 'Connection', 'connectionName')],
@@ -468,7 +464,6 @@ describe('Job', () => {
           SecondTagName: 'SecondTagValue',
           XTagName: 'XTagValue',
         },
-        numberOfWorkers: 2,
         maxRetries: 2,
       });
     });
@@ -581,7 +576,7 @@ describe('Job', () => {
         script,
         glueVersion: glue.GlueVersion.V3_0,
         continuousLogging: { enabled: false },
-        workerType: glue.WorkerType.G_2X,
+        workerConfiguration: { workerType: glue.WorkerType.G_2X, numberOfWorkers: 2 },
         maxConcurrentRuns: 100,
         timeout: cdk.Duration.hours(2),
         connections: [glue.Connection.fromConnectionName(stack, 'Connection', 'connectionName')],
@@ -591,7 +586,6 @@ describe('Job', () => {
           SecondTagName: 'SecondTagValue',
           XTagName: 'XTagValue',
         },
-        numberOfWorkers: 2,
         maxRetries: 2,
         jobRunQueuingEnabled: true,
       });

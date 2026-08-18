@@ -117,7 +117,10 @@ new glue.PySparkEtlJob(stack, 'PySparkETLJob', {
   script,
   glueVersion: glue.GlueVersion.V5_1,
   continuousLogging: { enabled: false },
-  workerType: glue.WorkerType.G_2X,
+  workerConfiguration: {
+    workerType: glue.WorkerType.G_2X,
+    numberOfWorkers: 2,
+  },
   maxConcurrentRuns: 100,
   timeout: cdk.Duration.hours(2),
   connections: [glue.Connection.fromConnectionName(stack, 'Connection', 'connectionName')],
@@ -127,7 +130,6 @@ new glue.PySparkEtlJob(stack, 'PySparkETLJob', {
     SecondTagName: 'SecondTagValue',
     XTagName: 'XTagValue',
   },
-  numberOfWorkers: 2,
   maxRetries: 2,
 });
 ```
@@ -174,7 +176,10 @@ new glue.PySparkStreamingJob(stack, 'PySparkStreamingJob', {
   script,
   glueVersion: glue.GlueVersion.V5_1,
   continuousLogging: { enabled: false },
-  workerType: glue.WorkerType.G_2X,
+  workerConfiguration: {
+    workerType: glue.WorkerType.G_2X,
+    numberOfWorkers: 2,
+  },
   maxConcurrentRuns: 100,
   timeout: cdk.Duration.hours(2),
   connections: [glue.Connection.fromConnectionName(stack, 'Connection', 'connectionName')],
@@ -184,7 +189,6 @@ new glue.PySparkStreamingJob(stack, 'PySparkStreamingJob', {
     SecondTagName: 'SecondTagValue',
     XTagName: 'XTagValue',
   },
-  numberOfWorkers: 2,
   maxRetries: 2,
 });
 ```
@@ -229,7 +233,10 @@ new glue.PySparkFlexEtlJob(stack, 'pySparkFlexEtlJob', {
   script,
   glueVersion: glue.GlueVersion.V5_1,
   continuousLogging: { enabled: false },
-  workerType: glue.WorkerType.G_2X,
+  workerConfiguration: {
+    workerType: glue.WorkerType.G_2X,
+    numberOfWorkers: 2,
+  },
   maxConcurrentRuns: 100,
   timeout: cdk.Duration.hours(2),
   connections: [glue.Connection.fromConnectionName(stack, 'Connection', 'connectionName')],
@@ -239,7 +246,6 @@ new glue.PySparkFlexEtlJob(stack, 'pySparkFlexEtlJob', {
     SecondTagName: 'SecondTagValue',
     XTagName: 'XTagValue',
   },
-  numberOfWorkers: 2,
   maxRetries: 2,
 });
 ```

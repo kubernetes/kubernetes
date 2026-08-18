@@ -40,8 +40,7 @@ new glue.PySparkStreamingJob(stack, 'OverridePySparkStreamingJob', {
   role: iam_role,
   description: 'Optional Override PySpark Streaming Job',
   glueVersion: glue.GlueVersion.V3_0,
-  numberOfWorkers: 20,
-  workerType: glue.WorkerType.G_1X,
+  workerConfiguration: { workerType: glue.WorkerType.G_1X, numberOfWorkers: 20 },
   timeout: cdk.Duration.minutes(15),
   jobName: 'Optional Override PySpark Streaming Job',
   defaultArguments: {
