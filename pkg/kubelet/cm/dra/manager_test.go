@@ -907,6 +907,7 @@ dra_operations_duration_seconds_count{is_error="true",operation_name="PrepareRes
 		},
 		{
 			description:    "unknown driver",
+			driverName:     driverName,
 			pod:            genTestPod(),
 			claim:          genTestClaim(claimName, "unknown driver", deviceName, podUID),
 			expectedErrMsg: "prepare dynamic resources: DRA driver unknown driver is not registered",

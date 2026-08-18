@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
+	"path/filepath"
 	"slices"
 	"sync"
 	"time"
@@ -35,15 +37,20 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	timedworkers "k8s.io/kubernetes/pkg/controller/tainteviction" // TODO (?): move this common helper somewhere else?
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/utils/ptr"
 )
+
+// unixPathMax is the maximum length of an AF_UNIX socket path on Linux.
+const unixPathMax = 108
 
 // DRAPluginManager keeps track of how to reach plugins registered for DRA drivers.
 // Each plugin has a gRPC endpoint. There may be more than one plugin per driver.
@@ -324,6 +331,14 @@ func (pm *DRAPluginManager) get(driverName string) *DRAPlugin {
 // in advance which version to use resp. which optional services the plugin
 // supports.
 func (pm *DRAPluginManager) RegisterPlugin(_ context.Context, driverName string, endpoint string, supportedServices []string, pluginClientTimeout *time.Duration) error {
+	if err := validateDriverName(driverName); err != nil {
+		return err
+	}
+
+	if err := validateEndpoint(endpoint); err != nil {
+		return err
+	}
+
 	chosenService, err := pm.validateSupportedServices(driverName, supportedServices)
 	if err != nil {
 		return fmt.Errorf("invalid supported gRPC versions of DRA driver plugin %s at endpoint %s: %w", driverName, endpoint, err)
@@ -553,6 +568,13 @@ func (pm *DRAPluginManager) usable(driverName string) bool {
 // The plugin manager calls it upon detection of a new registration socket
 // opened by DRA plugin.
 func (pm *DRAPluginManager) ValidatePlugin(_ context.Context, driverName string, endpoint string, supportedServices []string) error {
+	if err := validateDriverName(driverName); err != nil {
+		return err
+	}
+
+	if err := validateEndpoint(endpoint); err != nil {
+		return err
+	}
 	_, err := pm.validateSupportedServices(driverName, supportedServices)
 	if err != nil {
 		return fmt.Errorf("invalid supported gRPC versions of DRA driver plugin %s at endpoint %s: %w", driverName, endpoint, err)
@@ -586,4 +608,58 @@ func (pm *DRAPluginManager) validateSupportedServices(driverName string, support
 	}
 
 	return chosenService, nil
+}
+
+// validateEndpoint returns an error if driver endpoint
+// advertised by a plugin during registration is not acceptable.
+func validateEndpoint(endpoint string) error {
+	if endpoint == "" {
+		return errors.New("empty DRA plugin endpoint")
+	}
+	// Relative endpoints are rejected outright. gRPC would resolve them
+	// against kubelet's current working directory (via "unix:" + endpoint),
+	// which is unspecified — it depends on how kubelet was started and can
+	// be changed at runtime — so accepting one would mean validating a
+	// different path than gRPC ultimately dials.
+	if !filepath.IsAbs(endpoint) {
+		return fmt.Errorf("DRA plugin endpoint %q must be an absolute path", endpoint)
+	}
+	if len(endpoint) >= unixPathMax {
+		return fmt.Errorf("DRA plugin endpoint %q must not be longer than %d bytes", endpoint, unixPathMax)
+	}
+
+	// gRPC dials "unix:"+endpoint via url.Parse, so we validate against
+	// the same parser to keep what we check in sync with what gRPC
+	// resolves. This closes a percent-encoding bypass: url.Parse decodes
+	// "%2e%2e" to ".." in u.Path, so an endpoint like
+	// "/plugins/%2e%2e/run/evil.sock" would decode past the intended
+	// directory at dial time.
+	//
+	// Mirror the resolver's Path||Opaque fallback (see
+	// google.golang.org/grpc/internal/resolver/unix/unix.go), so
+	// Windows-native paths ("C:\\...") — which url.Parse puts in Opaque
+	// rather than Path — still validate against the exact string gRPC
+	// would dial.
+	u, err := url.Parse("unix:" + endpoint)
+	if err != nil || u.Host != "" || u.RawQuery != "" || u.Fragment != "" {
+		return fmt.Errorf("DRA plugin endpoint %q must be a plain path", endpoint)
+	}
+	resolved := u.Path
+	if resolved == "" {
+		resolved = u.Opaque
+	}
+	if resolved != endpoint {
+		return fmt.Errorf("DRA plugin endpoint %q must be a plain path", endpoint)
+	}
+	return nil
+}
+
+// validateDriverName returns an error if a driver name advertised by a
+// plugin during registration is unacceptable.
+// Reuses CSI driver name validation to be consistent with pkg/apis/resource/validation.
+func validateDriverName(driverName string) error {
+	if errs := corevalidation.ValidateCSIDriverName(driverName, field.NewPath("driverName")); len(errs) > 0 {
+		return fmt.Errorf("invalid DRA driver name: %w", errs.ToAggregate())
+	}
+	return nil
 }
