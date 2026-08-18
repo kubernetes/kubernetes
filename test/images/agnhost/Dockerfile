@@ -12,10 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG BASEIMAGE
-ARG GOLANG_VERSION
+# If we ever move agnhost away from alpine, we may need changes to
+# test/e2e/network/dns.go, which assumes that agnhost's `dig` binary
+# is linked against musl libc.
+ARG BASEIMAGE=alpine
 
-FROM golang:$GOLANG_VERSION AS preparer
+# latest as of 2026-05-08
+FROM golang@sha256:efaccb5b497e90df3ebe5216cc25cd9f98e73874e2d638b56e38d4a3f098c41c AS preparer
+
+ARG GOLANG_VERSION
+ARG GOTOOLCHAIN=go${GOLANG_VERSION}
 
 RUN go install github.com/google/go-containerregistry/cmd/crane@latest && \
     apt-get update && apt-get install -y jq
