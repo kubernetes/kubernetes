@@ -21,7 +21,9 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubernetes/pkg/features"
 	runtimeutil "k8s.io/kubernetes/pkg/kubelet/kuberuntime/util"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -91,6 +93,16 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(ctx contex
 
 	synthesized.MaskedPaths = securitycontext.ConvertToRuntimeMaskedPaths(effectiveSc.ProcMount)
 	synthesized.ReadonlyPaths = securitycontext.ConvertToRuntimeReadonlyPaths(effectiveSc.ProcMount)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.CgroupOptions) &&
+		effectiveSc.CgroupOptions != nil && effectiveSc.CgroupOptions.MountMode != nil {
+		switch *effectiveSc.CgroupOptions.MountMode {
+		case v1.CgroupMountModeWritable:
+			synthesized.CgroupMountMode = runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_WRITABLE
+		case v1.CgroupMountModeReadOnly:
+			synthesized.CgroupMountMode = runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_READ_ONLY
+		}
+	}
 
 	return synthesized, nil
 }

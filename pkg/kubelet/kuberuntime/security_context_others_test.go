@@ -23,9 +23,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -175,5 +180,108 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 		} else {
 			assert.NoError(t, err, test.desc)
 		}
+	}
+}
+
+func TestDetermineEffectiveSecurityContextCgroupOptions(t *testing.T) {
+	writable := v1.CgroupMountModeWritable
+	readOnly := v1.CgroupMountModeReadOnly
+
+	testCases := []struct {
+		desc                    string
+		cgroupOptionsGate       bool
+		podSc                   *v1.PodSecurityContext
+		sc                      *v1.SecurityContext
+		expectedCgroupMountMode runtimeapi.CgroupMountMode
+	}{
+		{
+			desc:                    "nil SecurityContext",
+			cgroupOptionsGate:       true,
+			sc:                      nil,
+			expectedCgroupMountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_UNSPECIFIED,
+		},
+		{
+			desc:                    "no CgroupOptions",
+			cgroupOptionsGate:       true,
+			sc:                      &v1.SecurityContext{},
+			expectedCgroupMountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_UNSPECIFIED,
+		},
+		{
+			desc:              "CgroupOptions with nil MountMode",
+			cgroupOptionsGate: true,
+			sc: &v1.SecurityContext{
+				CgroupOptions: &v1.CgroupOptions{},
+			},
+			expectedCgroupMountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_UNSPECIFIED,
+		},
+		{
+			desc:              "CgroupOptions Writable",
+			cgroupOptionsGate: true,
+			sc: &v1.SecurityContext{
+				CgroupOptions: &v1.CgroupOptions{MountMode: &writable},
+			},
+			expectedCgroupMountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_WRITABLE,
+		},
+		{
+			desc:              "CgroupOptions ReadOnly",
+			cgroupOptionsGate: true,
+			sc: &v1.SecurityContext{
+				CgroupOptions: &v1.CgroupOptions{MountMode: &readOnly},
+			},
+			expectedCgroupMountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_READ_ONLY,
+		},
+		{
+			// With a pod-level securityContext, the merge copies container fields one
+			// by one and has to include cgroupOptions.
+			desc:              "CgroupOptions Writable with a pod-level security context",
+			cgroupOptionsGate: true,
+			podSc:             &v1.PodSecurityContext{RunAsNonRoot: new(true)},
+			sc: &v1.SecurityContext{
+				CgroupOptions: &v1.CgroupOptions{MountMode: &writable},
+			},
+			expectedCgroupMountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_WRITABLE,
+		},
+		{
+			// With the gate off the kubelet does not set the descendant and depth
+			// limits. It must not request a writable mount.
+			desc:              "CgroupOptions Writable with the feature gate disabled",
+			cgroupOptionsGate: false,
+			sc: &v1.SecurityContext{
+				CgroupOptions: &v1.CgroupOptions{MountMode: &writable},
+			},
+			expectedCgroupMountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_UNSPECIFIED,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CgroupOptions, tc.cgroupOptionsGate)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "12345678",
+					Name:      "bar",
+					Namespace: "new",
+				},
+				Spec: v1.PodSpec{
+					SecurityContext: tc.podSc,
+					Containers: []v1.Container{
+						{
+							Name:            "foo",
+							Image:           "busybox",
+							SecurityContext: tc.sc,
+						},
+					},
+				},
+			}
+
+			tCtx := ktesting.Init(t)
+			_, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+
+			result, err := m.determineEffectiveSecurityContext(tCtx, pod, &pod.Spec.Containers[0], nil, "")
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedCgroupMountMode, result.CgroupMountMode)
+		})
 	}
 }
