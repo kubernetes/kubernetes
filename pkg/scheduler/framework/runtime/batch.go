@@ -19,6 +19,7 @@ package runtime
 import (
 	"bytes"
 	"context"
+	"errors"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -169,10 +170,13 @@ func (b *OpportunisticBatch) StoreScheduleResults(ctx context.Context, signature
 
 // logUnusableState our batch state because we can't keep it up to date.
 // Record the reason for our invalidation in the stats.
-func (b *OpportunisticBatch) logUnusableState(logger klog.Logger, cycleCount int64, reason string) {
+func (b *OpportunisticBatch) logUnusableState(logger klog.Logger, cycleCount int64, reason string, err ...error) {
 	metrics.BatchCacheFlushed.WithLabelValues(b.handle.ProfileName(), reason).Inc()
-	logger.V(4).Info("OpportunisticBatch found unusable state",
-		"profile", b.handle.ProfileName(), "cycleCount", cycleCount, "reason", reason)
+	keysAndValues := []any{"profile", b.handle.ProfileName(), "cycleCount", cycleCount, "reason", reason}
+	if joinedErr := errors.Join(err...); joinedErr != nil {
+		keysAndValues = append(keysAndValues, "err", joinedErr)
+	}
+	logger.V(4).Info("OpportunisticBatch found unusable state", keysAndValues...)
 }
 
 // batchStateCompatible checks whether the cached batch state is still valid for the new pod.
@@ -232,7 +236,7 @@ func (b *OpportunisticBatch) refreshHintCandidates(ctx context.Context, pod *v1.
 	logger := klog.FromContext(ctx)
 	lastChosenNode, err := b.handle.SnapshotSharedLister().NodeInfos().Get(b.lastCycle.chosenNode)
 	if lastChosenNode == nil || err != nil {
-		b.logUnusableState(logger, cycleCount, metrics.BatchFlushNodeMissing)
+		b.logUnusableState(logger, cycleCount, metrics.BatchFlushNodeMissing, err)
 		return false
 	}
 
@@ -243,7 +247,7 @@ func (b *OpportunisticBatch) refreshHintCandidates(ctx context.Context, pod *v1.
 		return b.rescoreHintedNode(ctx, pod, state, cycleCount, lastChosenNode)
 	}
 	if !status.IsRejected() {
-		b.logUnusableState(logger, cycleCount, metrics.BatchFlushFilterError)
+		b.logUnusableState(logger, cycleCount, metrics.BatchFlushFilterError, status.AsError())
 		return false
 	}
 	return true
@@ -268,13 +272,13 @@ func (b *OpportunisticBatch) rescoreHintedNode(ctx context.Context, pod *v1.Pod,
 	rescoreState := state.Clone()
 	status := b.handle.RunPreScorePlugins(ctx, rescoreState, pod, nodeInfos)
 	if !status.IsSuccess() {
-		b.logUnusableState(logger, cycleCount, metrics.BatchFlushPreScoreError)
+		b.logUnusableState(logger, cycleCount, metrics.BatchFlushPreScoreError, status.AsError())
 		return false
 	}
 
 	freshScores, status := b.handle.RunRawScorePlugins(ctx, rescoreState, pod, lastChosenNodeInfo)
 	if !status.IsSuccess() {
-		b.logUnusableState(logger, cycleCount, metrics.BatchFlushRescoreError)
+		b.logUnusableState(logger, cycleCount, metrics.BatchFlushRescoreError, status.AsError())
 		return false
 	}
 
@@ -288,7 +292,7 @@ func (b *OpportunisticBatch) rescoreHintedNode(ctx context.Context, pod *v1.Pod,
 	)
 
 	if status := b.handle.NormalizeScores(ctx, rescoreState, pod, filteredScores); !status.IsSuccess() {
-		b.logUnusableState(logger, cycleCount, metrics.BatchFlushNormalizeError)
+		b.logUnusableState(logger, cycleCount, metrics.BatchFlushNormalizeError, status.AsError())
 		return false
 	}
 
