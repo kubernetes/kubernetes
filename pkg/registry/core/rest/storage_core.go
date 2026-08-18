@@ -125,6 +125,11 @@ func New(c Config, authorizer authorizer.UnconditionalAuthorizer) (*legacyProvid
 		authorizer:                       authorizer,
 	}
 
+	// When an issuer is configured, NewRESTStorage below builds a pod-aware
+	// serviceaccount storage. Tell the embedded generic config not to build its
+	// own, so the resource ends up with a single storage instance.
+	p.skipServiceAccount = c.ServiceAccountIssuer != nil
+
 	// create service node port repair controller
 	client, err := kubernetes.NewForConfig(c.LoopbackClientConfig)
 	if err != nil {
@@ -230,9 +235,10 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		return genericapiserver.APIGroupInfo{}, err
 	}
 
-	// potentially override the generic serviceaccount storage with one that supports pods
+	// The generic config skipped serviceaccounts (see New), so this provider owns
+	// the resource and builds the storage that supports pods.
 	var serviceAccountStorage *serviceaccountstore.REST
-	if p.ServiceAccountIssuer != nil {
+	if p.skipServiceAccount {
 		var nodeGetter rest.Getter
 		if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenNodeBinding) ||
 			utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenPodNodeInfo) {
@@ -283,14 +289,8 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		}
 	}
 
-	// potentially override generic storage for service account (with pod support)
+	// serviceaccount storage with pod support, built above rather than by the generic config
 	if resource := "serviceaccounts"; serviceAccountStorage != nil && apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
-		// don't leak go routines
-		storage[resource].Destroy()
-		if storage[resource+"/token"] != nil {
-			storage[resource+"/token"].Destroy()
-		}
-
 		storage[resource] = serviceAccountStorage
 		if serviceAccountStorage.Token != nil {
 			storage[resource+"/token"] = serviceAccountStorage.Token
