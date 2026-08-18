@@ -2770,3 +2770,54 @@ func TestPodCgroupOptions(t *testing.T) {
 		}
 	})
 }
+
+func TestPodCgroupOptionsFeatureDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.CgroupOptions: true,
+	})
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	ns := framework.CreateNamespaceOrDie(client, "pod-cgroup-options-disabled", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	// Create the pod before disabling the gate to test preservation of a stored field.
+	existing, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(),
+		cgroupOptionsPod("preexisting", v1.CgroupMountModeWritable), metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to create pod: %v", err)
+	}
+	defer integration.DeletePodOrErrorf(t, client, ns.Name, existing.Name)
+
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.CgroupOptions: false,
+	})
+
+	t.Run("field is dropped on create", func(t *testing.T) {
+		pod := cgroupOptionsPod("dropped", v1.CgroupMountModeWritable)
+		created, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("failed to create pod: %v", err)
+		}
+		defer integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+
+		if got := created.Spec.Containers[0].SecurityContext.CgroupOptions; got != nil {
+			t.Errorf("expected cgroupOptions to be dropped, got %v", got)
+		}
+	})
+
+	t.Run("field is kept on a pod that already had it", func(t *testing.T) {
+		update := existing.DeepCopy()
+		update.Spec.Containers[0].Image = "fakeimage2"
+		updated, err := client.CoreV1().Pods(ns.Name).Update(context.TODO(), update, metav1.UpdateOptions{})
+		if err != nil {
+			t.Fatalf("failed to update pod: %v", err)
+		}
+
+		got := updated.Spec.Containers[0].SecurityContext.CgroupOptions
+		if got == nil || got.MountMode == nil || *got.MountMode != v1.CgroupMountModeWritable {
+			t.Errorf("expected cgroupOptions.mountMode=Writable to be preserved, got %v", got)
+		}
+	})
+}
