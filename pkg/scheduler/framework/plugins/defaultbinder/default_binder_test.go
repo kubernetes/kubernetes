@@ -27,7 +27,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
@@ -57,7 +56,11 @@ func TestDefaultBinder(t *testing.T) {
 			name: "successful",
 			wantBinding: &v1.Binding{
 				ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "foo"},
-				Target:     v1.ObjectReference{Kind: "Node", Name: testNode},
+				Target: v1.ObjectReference{
+					Kind: "Node",
+					Name: testNode,
+					UID:  "test-node-uid",
+				},
 			},
 		}, {
 			name:      "binding error",
@@ -123,9 +126,7 @@ func TestDefaultBinder(t *testing.T) {
 
 				binder := &DefaultBinder{handle: fh}
 				status := binder.Bind(ctx, nil, testPod, testNode)
-				if got := testPod.Spec.NodeUID; got != types.UID("test-node-uid") {
-					t.Errorf("got NodeUID %q, want %q", got, types.UID("test-node-uid"))
-				}
+
 				if got := status.AsError(); (tt.injectErr != nil) != (got != nil) {
 					t.Errorf("got error %q, want %q", got, tt.injectErr)
 				}

@@ -1039,7 +1039,11 @@ func TestEtcdCreateBinding(t *testing.T) {
 		"kindNode": {
 			binding: api.Binding{
 				ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "foo"},
-				Target:     api.ObjectReference{Name: "machine3", Kind: "Node"},
+				Target: api.ObjectReference{
+					Name: "machine3",
+					Kind: "Node",
+					UID:  "node-uid-3",
+				},
 			},
 			errOK: func(err error) bool { return err == nil },
 		},
@@ -1068,6 +1072,8 @@ func TestEtcdCreateBinding(t *testing.T) {
 				t.Errorf("%s: unexpected error: %v", k, err)
 			} else if pod.(*api.Pod).Spec.NodeName != test.binding.Target.Name {
 				t.Errorf("%s: expected: %v, got: %v", k, pod.(*api.Pod).Spec.NodeName, test.binding.Target.Name)
+			} else if pod.(*api.Pod).Spec.NodeUID != test.binding.Target.UID {
+				t.Errorf("%s: expected NodeUID: %v, got: %v", k, test.binding.Target.UID, pod.(*api.Pod).Spec.NodeUID)
 			}
 		}
 	}
