@@ -98,6 +98,16 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(ctx contex
 		effectiveSc.CgroupOptions != nil && effectiveSc.CgroupOptions.MountMode != nil {
 		switch *effectiveSc.CgroupOptions.MountMode {
 		case v1.CgroupMountModeWritable:
+			nodeConfig := m.containerManager.GetNodeConfig()
+			if nodeConfig.CgroupVersion != 2 {
+				return nil, fmt.Errorf("writable cgroups require cgroup v2")
+			}
+			if !nodeConfig.CgroupNsdelegate {
+				return nil, fmt.Errorf("writable cgroups require the cgroup filesystem to be mounted with nsdelegate")
+			}
+			if !nodeConfig.CgroupsPerQOS {
+				return nil, fmt.Errorf("writable cgroups require the kubelet to manage a cgroup per pod (--cgroups-per-qos)")
+			}
 			synthesized.CgroupMountMode = runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_WRITABLE
 		case v1.CgroupMountModeReadOnly:
 			synthesized.CgroupMountMode = runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_READ_ONLY
