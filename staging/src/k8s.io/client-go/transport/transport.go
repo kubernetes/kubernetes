@@ -146,7 +146,9 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 
 	var dynamicCertLoader func() (*tls.Certificate, error)
 	if c.TLS.ReloadTLSFiles {
-		dynamicCertLoader = cachingCertificateLoader(c.TLS.CertFile, c.TLS.KeyFile)
+		// loadTLSFiles above has already read the cert and the key, so seed the loader
+		// with what it read rather than making it open both files a second time.
+		dynamicCertLoader = cachingCertificateLoader(c.TLS.CertFile, c.TLS.KeyFile, c.TLS.CertData, c.TLS.KeyData)
 	}
 
 	if c.HasCertAuth() || c.HasCertCallback() {
@@ -436,10 +438,26 @@ func newCertificateCacheEntry(certFile, keyFile string) certificateCacheEntry {
 	return certificateCacheEntry{cert: &cert, err: err, birth: time.Now()}
 }
 
+// newCertificateCacheEntryFromData builds an entry from cert and key contents that have
+// already been read off disk, so that seeding the cache costs no further opens.
+func newCertificateCacheEntryFromData(certData, keyData []byte) certificateCacheEntry {
+	cert, err := tls.X509KeyPair(certData, keyData)
+	return certificateCacheEntry{cert: &cert, err: err, birth: time.Now()}
+}
+
 // cachingCertificateLoader ensures that we don't hammer the filesystem when opening many connections
-// the underlying cert files are read at most once every second
-func cachingCertificateLoader(certFile, keyFile string) func() (*tls.Certificate, error) {
-	current := newCertificateCacheEntry(certFile, keyFile)
+// the underlying cert files are read at most once every second.
+//
+// certData and keyData are the contents of certFile and keyFile as the caller has already
+// read them; they seed the cache so that the first entry costs no additional reads. Pass
+// nil for either to have the initial entry read from disk like every later one.
+func cachingCertificateLoader(certFile, keyFile string, certData, keyData []byte) func() (*tls.Certificate, error) {
+	var current certificateCacheEntry
+	if len(certData) > 0 && len(keyData) > 0 {
+		current = newCertificateCacheEntryFromData(certData, keyData)
+	} else {
+		current = newCertificateCacheEntry(certFile, keyFile)
+	}
 	var currentMtx sync.RWMutex
 
 	return func() (*tls.Certificate, error) {
