@@ -1,0 +1,86 @@
+{
+  "/ReplicationInteg/DefaultTest/DeployAssert/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/ReplicationInteg/DefaultTest/DeployAssert/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/ReplicationInteg/DefaultTest/DeployAssert/AwsApiCallS3putObjecta6e8279b7eddaacd6f4263f64667e14d/Default": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/ReplicationInteg/DefaultTest/DeployAssert/SingletonFunction1488541a7b23466481b69b4408076b81/Role": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction1488541a7b23466481b69b4408076b81Role37ABCE73"
+    }
+  ],
+  "/ReplicationInteg/DefaultTest/DeployAssert/SingletonFunction1488541a7b23466481b69b4408076b81/Handler": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction1488541a7b23466481b69b4408076b81HandlerCD40AE9F"
+    }
+  ],
+  "/ReplicationInteg/DefaultTest/DeployAssert/SingletonFunction76b3e830a873425f8453eddd85c86925/Role": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction76b3e830a873425f8453eddd85c86925Role918961BB"
+    }
+  ],
+  "/ReplicationInteg/DefaultTest/DeployAssert/SingletonFunction76b3e830a873425f8453eddd85c86925/Handler": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction76b3e830a873425f8453eddd85c86925Handler81461ECE"
+    }
+  ],
+  "/ReplicationInteg/DefaultTest/DeployAssert/SingletonFunction5c1898e096fb4e3e95d5f6c67f3ce41a/Role": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction5c1898e096fb4e3e95d5f6c67f3ce41aRoleB84BD8CE"
+    }
+  ],
+  "/ReplicationInteg/DefaultTest/DeployAssert/SingletonFunction5c1898e096fb4e3e95d5f6c67f3ce41a/Handler": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction5c1898e096fb4e3e95d5f6c67f3ce41aHandlerADF3E6EA"
+    }
+  ],
+  "/ReplicationInteg/DefaultTest/DeployAssert/AwsApiCallS3putObjecta6e8279b7eddaacd6f4263f64667e14d/Default/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AwsApiCallS3putObjecta6e8279b7eddaacd6f4263f64667e14d"
+    }
+  ],
+  "/ReplicationInteg/DefaultTest/DeployAssert/AwsApiCallS3putObjecta6e8279b7eddaacd6f4263f64667e14d/WaitFor/Role": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AwsApiCallS3putObjecta6e8279b7eddaacd6f4263f64667e14dWaitForRoleED5560C7"
+    }
+  ],
+  "/ReplicationInteg/DefaultTest/DeployAssert/AwsApiCallS3putObjecta6e8279b7eddaacd6f4263f64667e14d/WaitFor/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AwsApiCallS3putObjecta6e8279b7eddaacd6f4263f64667e14dWaitFor7FD72988"
+    }
+  ],
+  "/ReplicationInteg/DefaultTest/DeployAssert/AwsApiCallS3putObjecta6e8279b7eddaacd6f4263f64667e14d/WaitFor/IsCompleteProvider/Invoke": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AwsApiCallS3putObjecta6e8279b7eddaacd6f4263f64667e14dWaitForIsCompleteProviderInvoke6FBA213B"
+    }
+  ],
+  "/ReplicationInteg/DefaultTest/DeployAssert/AwsApiCallS3putObjecta6e8279b7eddaacd6f4263f64667e14d/WaitFor/TimeoutProvider/Invoke": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AwsApiCallS3putObjecta6e8279b7eddaacd6f4263f64667e14dWaitForTimeoutProviderInvoke1F2D77D3"
+    }
+  ]
+}

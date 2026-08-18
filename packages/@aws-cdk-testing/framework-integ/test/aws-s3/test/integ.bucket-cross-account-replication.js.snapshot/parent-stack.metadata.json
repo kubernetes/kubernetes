@@ -1,0 +1,45 @@
+{
+  "/parent-stack/DestinationBucketnew": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "versioned": true,
+        "removalPolicy": "destroy",
+        "bucketName": "*",
+        "objectOwnership": "ObjectWriter"
+      }
+    }
+  ],
+  "/parent-stack/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/parent-stack/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/parent-stack/DestinationBucketnew/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DestinationBucketnew4DB863C3"
+    }
+  ],
+  "/parent-stack/DestinationBucketnew/Policy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "bucket": "*"
+      }
+    }
+  ],
+  "/parent-stack/DestinationBucketnew/Policy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DestinationBucketnewPolicy8D43FB0B"
+    }
+  ]
+}

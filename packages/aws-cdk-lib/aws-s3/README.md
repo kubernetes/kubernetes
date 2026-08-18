@@ -1133,42 +1133,58 @@ sourceBucket.grantReplicationPermission(replicationRole, {
 
 You can also set a destination bucket from a different account as the replication destination.
 
-In this case, the bucket policy for the destination bucket is required, to configure it through CDK use  `addReplicationPolicy()` method to add bucket policy on destination bucket.
-In a cross-account scenario, where the source and destination buckets are owned by different AWS accounts, you can use a KMS key to encrypt object replicas. However, the KMS key owner must grant the source bucket owner permission to use the KMS key.
-For more information, please refer to https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication-walkthrough-2.html .
-> **NOTE:** AWS managed keys don't allow cross-account use, and therefore can't be used to perform cross-account replication.
-
-If you need to override the bucket ownership to destination account pass the account value to the method to provide permissions to override bucket owner.
-`addReplicationPolicy(bucket.replicationRoleArn, true, '11111111111')`;
-
-
-However, if the destination bucket is a referenced bucket, CDK cannot set the bucket policy,
-so you will need to [configure the necessary bucket policy](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication-walkthrough-2.html) separately.
+Cross-account replication requires a bucket policy on the destination bucket. If the destination
+bucket is managed by CDK, use `addReplicationPolicy()` to add the required permissions.
 
 ```ts
-// The destination bucket in a different account.
-declare const destinationBucket: s3.IBucket;
-declare const replicationRole: iam.IRole;
+// A bucket defined in a CDK stack in the destination account.
+declare const destinationBucket: s3.Bucket;
+// The account ID that owns the source bucket.
+declare const sourceAccountId: string;
+
 const sourceBucket = new s3.Bucket(this, 'SourceBucket', {
   versioned: true,
-  // Optional. If not specified, a new role will be created.
-  replicationRole,
   replicationRules: [
     {
       destination: destinationBucket,
       priority: 1,
-      // Whether to want to change replica ownership to the AWS account that owns the destination bucket.
-      // The replicas are owned by same AWS account that owns the source object by default.
+      // Change replica ownership to the account that owns the destination bucket.
       accessControlTransition: true,
     },
   ],
 });
 
-//Add permissions to the destination after replication role is created
+// Add the required permissions to the destination bucket policy.
 if (sourceBucket.replicationRoleArn) {
-  destinationBucket.addReplicationPolicy(sourceBucket.replicationRoleArn, true, '111111111111');
-  }
+  destinationBucket.addReplicationPolicy(
+    sourceBucket.replicationRoleArn,
+    true,
+    sourceAccountId,
+  );
+}
 ```
+
+The account ID passed to `addReplicationPolicy()` is the **source** bucket owner's account ID. CDK
+uses the destination bucket construct's account for the replication configuration.
+
+If the destination bucket uses `ObjectOwnership.BUCKET_OWNER_ENFORCED`, the destination bucket owner
+already owns all replicated objects and `accessControlTransition` is not required. The ownership
+override shown above is useful for ACL-enabled destination buckets.
+
+When importing an existing cross-account destination into the source stack, use
+`Bucket.fromBucketAttributes()` and set its `account` attribute to the destination bucket owner's
+account ID. `Bucket.fromBucketArn()` and `Bucket.fromBucketName()` assume that the bucket belongs to
+the same account as the scope where it is imported. Referenced buckets cannot have their bucket
+policy modified by CDK, so configure the
+[required bucket policy](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication-walkthrough-2.html)
+separately in the destination account.
+
+In a cross-account scenario, you can use a KMS key to encrypt object replicas. The KMS key owner
+must grant the source bucket owner permission to use the key. AWS managed keys do not allow
+cross-account use and therefore cannot be used for cross-account replication.
+
+For more information, see
+[Changing the replica owner](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication-change-owner.html).
 
 ## Mixins
 

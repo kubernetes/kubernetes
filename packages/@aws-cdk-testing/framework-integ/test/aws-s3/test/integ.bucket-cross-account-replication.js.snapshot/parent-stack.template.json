@@ -4,6 +4,13 @@
    "Type": "AWS::S3::Bucket",
    "Properties": {
     "BucketName": "parent-stackinationbucketnew6dff25a9220c96586f79",
+    "OwnershipControls": {
+     "Rules": [
+      {
+       "ObjectOwnership": "ObjectWriter"
+      }
+     ]
+    },
     "VersioningConfiguration": {
      "Status": "Enabled"
     }
@@ -43,6 +50,27 @@
        "Effect": "Allow",
        "Principal": {
         "AWS": "arn:aws:iam::234567890123:role/CDKReplicationRole"
+       },
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          {
+           "Fn::GetAtt": [
+            "DestinationBucketnew4DB863C3",
+            "Arn"
+           ]
+          },
+          "/*"
+         ]
+        ]
+       }
+      },
+      {
+       "Action": "s3:ObjectOwnerOverrideToBucketOwner",
+       "Effect": "Allow",
+       "Principal": {
+        "AWS": "arn:aws:iam::234567890123:root"
        },
        "Resource": {
         "Fn::Join": [

@@ -1,0 +1,175 @@
+{
+  "/child-stack/SourceBucket": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "versioned": true,
+        "removalPolicy": "destroy",
+        "bucketName": "*",
+        "encryption": "S3_MANAGED",
+        "replicationRules": [
+          {
+            "destination": "*",
+            "priority": "*",
+            "accessControlTransition": true,
+            "replicationTimeControl": "*",
+            "storageClass": "*",
+            "replicaModifications": true,
+            "deleteMarkerReplication": true,
+            "id": "*"
+          }
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:info",
+      "data": "For Cross-account S3 replication, ensure to set up permissions on destination bucket using method addReplicationPolicy() ",
+      "trace": [
+        "Annotations.addMessage (/home/fukunaga/aws-cdk/packages/aws-cdk-lib/core/lib/annotations.js:244:29)",
+        "Annotations.addInfo (/home/fukunaga/aws-cdk/packages/aws-cdk-lib/core/lib/annotations.js:180:14)",
+        "/home/fukunaga/aws-cdk/packages/aws-cdk-lib/aws-s3/lib/bucket.js:2100:55",
+        "Array.map (<anonymous>)",
+        "WrappedClass.renderReplicationConfiguration (/home/fukunaga/aws-cdk/packages/aws-cdk-lib/aws-s3/lib/bucket.js:2074:47)",
+        "new Bucket (/home/fukunaga/aws-cdk/packages/aws-cdk-lib/aws-s3/lib/bucket.js:1449:51)",
+        "new Bucket (/home/fukunaga/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
+        "new Bucket (/home/fukunaga/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "new SourceBucketStack (/home/fukunaga/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-s3/test/integ.bucket-cross-account-replication.js:87:23)",
+        "Object.<anonymous> (/home/fukunaga/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-s3/test/integ.bucket-cross-account-replication.js:114:27)",
+        "Module._compile (node:internal/modules/cjs/loader:1521:14)",
+        "Module._extensions..js (node:internal/modules/cjs/loader:1623:10)",
+        "Module.load (node:internal/modules/cjs/loader:1266:32)",
+        "Module._load (node:internal/modules/cjs/loader:1091:12)",
+        "Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)",
+        "node:internal/main/run_main_module:28:49"
+      ]
+    }
+  ],
+  "/child-stack/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/child-stack/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/child-stack/SourceBucket/ReplicationRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        },
+        "roleName": "*"
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/child-stack/SourceBucket/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SourceBucketDDD2130A"
+    }
+  ],
+  "/child-stack/SourceBucket/ReplicationRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SourceBucketReplicationRole9043C65F"
+    }
+  ],
+  "/child-stack/SourceBucket/ReplicationRole/DefaultPolicy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/child-stack/SourceBucket/ReplicationRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SourceBucketReplicationRoleDefaultPolicyF98AD664"
+    }
+  ]
+}
