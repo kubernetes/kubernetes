@@ -42,9 +42,13 @@ var (
 	ClusterDefaults = clientcmdapi.Cluster{Server: getDefaultServer()}
 	// DefaultClientConfig represents the legacy behavior of this package for defaulting
 	// DEPRECATED will be replace
-	DefaultClientConfig = DirectClientConfig{*clientcmdapi.NewConfig(), "", &ConfigOverrides{
-		ClusterDefaults: ClusterDefaults,
-	}, nil, NewDefaultClientConfigLoadingRules(), promptedCredentials{}}
+	DefaultClientConfig = DirectClientConfig{
+		config: *clientcmdapi.NewConfig(),
+		overrides: &ConfigOverrides{
+			ClusterDefaults: ClusterDefaults,
+		},
+		configAccess: NewDefaultClientConfigLoadingRules(),
+	}
 )
 
 // getDefaultServer returns a default setting for DefaultClientConfig
@@ -93,21 +97,42 @@ type DirectClientConfig struct {
 	configAccess   ConfigAccess
 	// promptedCredentials store the credentials input by the user
 	promptedCredentials promptedCredentials
+	// confirmedUsable and confirmUsableErr memoize ConfirmUsable. Like the rest of
+	// this struct they are not guarded by a lock; DirectClientConfig has never been
+	// safe for concurrent use.
+	confirmedUsable  bool
+	confirmUsableErr error
 }
 
 // NewDefaultClientConfig creates a DirectClientConfig using the config.CurrentContext as the context name
 func NewDefaultClientConfig(config clientcmdapi.Config, overrides *ConfigOverrides) OverridingClientConfig {
-	return &DirectClientConfig{config, config.CurrentContext, overrides, nil, NewDefaultClientConfigLoadingRules(), promptedCredentials{}}
+	return &DirectClientConfig{
+		config:       config,
+		contextName:  config.CurrentContext,
+		overrides:    overrides,
+		configAccess: NewDefaultClientConfigLoadingRules(),
+	}
 }
 
 // NewNonInteractiveClientConfig creates a DirectClientConfig using the passed context name and does not have a fallback reader for auth information
 func NewNonInteractiveClientConfig(config clientcmdapi.Config, contextName string, overrides *ConfigOverrides, configAccess ConfigAccess) OverridingClientConfig {
-	return &DirectClientConfig{config, contextName, overrides, nil, configAccess, promptedCredentials{}}
+	return &DirectClientConfig{
+		config:       config,
+		contextName:  contextName,
+		overrides:    overrides,
+		configAccess: configAccess,
+	}
 }
 
 // NewInteractiveClientConfig creates a DirectClientConfig using the passed context name and a reader in case auth information is not provided via files or flags
 func NewInteractiveClientConfig(config clientcmdapi.Config, contextName string, overrides *ConfigOverrides, fallbackReader io.Reader, configAccess ConfigAccess) OverridingClientConfig {
-	return &DirectClientConfig{config, contextName, overrides, fallbackReader, configAccess, promptedCredentials{}}
+	return &DirectClientConfig{
+		config:         config,
+		contextName:    contextName,
+		overrides:      overrides,
+		fallbackReader: fallbackReader,
+		configAccess:   configAccess,
+	}
 }
 
 // NewClientConfigFromBytes takes your kubeconfig and gives you back a ClientConfig
@@ -117,7 +142,7 @@ func NewClientConfigFromBytes(configBytes []byte) (OverridingClientConfig, error
 		return nil, err
 	}
 
-	return &DirectClientConfig{*config, "", &ConfigOverrides{}, nil, nil, promptedCredentials{}}, nil
+	return &DirectClientConfig{config: *config, overrides: &ConfigOverrides{}}, nil
 }
 
 // RESTConfigFromKubeConfig is a convenience method to give back a restconfig from your kubeconfig bytes.
@@ -428,7 +453,21 @@ func (config *DirectClientConfig) ConfigAccess() ConfigAccess {
 
 // ConfirmUsable looks a particular context and determines if that particular part of the config is useable.  There might still be errors in the config,
 // but no errors in the sections requested or referenced.  It does not return early so that it can find as many errors as possible.
+//
+// The result is memoized. Validation is a pure function of the config and the overrides,
+// which are both fixed when the DirectClientConfig is built; the only thing it observes
+// beyond them is whether the referenced certificate, key and token files can be opened.
+// Both ClientConfig and Namespace call this, so re-validating means probing those files
+// once per call for no new information.
 func (config *DirectClientConfig) ConfirmUsable() error {
+	if !config.confirmedUsable {
+		config.confirmUsableErr = config.confirmUsable()
+		config.confirmedUsable = true
+	}
+	return config.confirmUsableErr
+}
+
+func (config *DirectClientConfig) confirmUsable() error {
 	validationErrors := make([]error, 0)
 
 	var contextName string
