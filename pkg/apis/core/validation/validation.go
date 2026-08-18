@@ -3890,6 +3890,10 @@ func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, 
 		// of allowed fields so that new fields will be given consideration prior to inclusion in ephemeral containers.
 		allErrs = append(allErrs, validateFieldAllowList(ec.EphemeralContainerCommon, allowedEphemeralContainerFields, "cannot be set for an Ephemeral Container", idxPath)...)
 
+		if ec.SecurityContext != nil && ec.SecurityContext.CgroupOptions != nil {
+			allErrs = append(allErrs, field.Forbidden(idxPath.Child("securityContext", "cgroupOptions"), "cannot be set for an Ephemeral Container"))
+		}
+
 		// VolumeMount subpaths have the potential to leak resources since they're implemented with bind mounts
 		// that aren't cleaned up until the pod exits. Since they also imply that the container is being used
 		// as part of the workload, they're disallowed entirely.
@@ -5119,6 +5123,9 @@ func validateWindows(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 			}
 			if sc.RunAsGroup != nil {
 				allErrs = append(allErrs, field.Forbidden(fldPath.Child("runAsGroup"), "cannot be set for a windows pod"))
+			}
+			if sc.CgroupOptions != nil {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("cgroupOptions"), "cannot be set for a windows pod"))
 			}
 		}
 		return true
@@ -8890,7 +8897,26 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path, host
 
 	allErrs = append(allErrs, validateWindowsSecurityContextOptions(sc.WindowsOptions, fldPath.Child("windowsOptions"))...)
 	allErrs = append(allErrs, ValidateAppArmorProfileField(sc.AppArmorProfile, fldPath.Child("appArmorProfile"))...)
+	allErrs = append(allErrs, validateCgroupOptions(sc.CgroupOptions, fldPath.Child("cgroupOptions"))...)
+	if sc.Privileged != nil && *sc.Privileged && sc.CgroupOptions != nil {
+		if mountMode := sc.CgroupOptions.MountMode; mountMode != nil && *mountMode == core.CgroupMountModeReadOnly {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("cgroupOptions", "mountMode"), *mountMode, "cannot be set to ReadOnly when privileged is true"))
+		}
+	}
 
+	return allErrs
+}
+
+var validCgroupMountModes = sets.New(core.CgroupMountModeReadOnly, core.CgroupMountModeWritable)
+
+func validateCgroupOptions(cgroupOptions *core.CgroupOptions, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if cgroupOptions == nil {
+		return allErrs
+	}
+	if mountMode := cgroupOptions.MountMode; mountMode != nil && !validCgroupMountModes.Has(*mountMode) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("mountMode"), *mountMode, sets.List(validCgroupMountModes)))
+	}
 	return allErrs
 }
 

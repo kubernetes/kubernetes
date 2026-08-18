@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/ptr"
 )
 
 func TestPodTopologyLabels(t *testing.T) {
@@ -2670,4 +2671,102 @@ func TestDRAStatusPreservedOnStatusUpdate(t *testing.T) {
 	if len(cleared.Status.ResourceClaimStatuses) != 0 {
 		t.Errorf("ResourceClaimStatuses not cleared: %v", cleared.Status.ResourceClaimStatuses)
 	}
+}
+
+func cgroupOptionsPod(name string, mountMode v1.CgroupMountMode) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name:            "fake-name",
+				Image:           "fakeimage",
+				SecurityContext: &v1.SecurityContext{CgroupOptions: &v1.CgroupOptions{MountMode: &mountMode}},
+			}},
+		},
+	}
+}
+
+func TestPodCgroupOptions(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.CgroupOptions: true,
+	})
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	ns := framework.CreateNamespaceOrDie(client, "pod-cgroup-options", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	t.Run("writable mount mode is accepted and persisted", func(t *testing.T) {
+		pod := cgroupOptionsPod("writable", v1.CgroupMountModeWritable)
+		created, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("failed to create pod: %v", err)
+		}
+		defer integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+
+		got := created.Spec.Containers[0].SecurityContext.CgroupOptions
+		if got == nil || got.MountMode == nil || *got.MountMode != v1.CgroupMountModeWritable {
+			t.Errorf("expected cgroupOptions.mountMode=Writable, got %v", got)
+		}
+	})
+
+	t.Run("unsupported mount mode is rejected", func(t *testing.T) {
+		pod := cgroupOptionsPod("invalid", "Invalid")
+		_, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+		if !apierrors.IsInvalid(err) {
+			t.Fatalf("expected an invalid error, got %v", err)
+		}
+		if !strings.Contains(err.Error(), "cgroupOptions.mountMode") {
+			t.Errorf("expected the error to name cgroupOptions.mountMode, got %v", err)
+		}
+	})
+
+	t.Run("rejected on a windows pod", func(t *testing.T) {
+		pod := cgroupOptionsPod("windows", v1.CgroupMountModeWritable)
+		pod.Spec.OS = &v1.PodOS{Name: v1.Windows}
+		_, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+		if !apierrors.IsInvalid(err) {
+			t.Fatalf("expected an invalid error, got %v", err)
+		}
+		if !strings.Contains(err.Error(), "cgroupOptions") {
+			t.Errorf("expected the error to name cgroupOptions, got %v", err)
+		}
+	})
+
+	t.Run("rejected on ephemeral containers", func(t *testing.T) {
+		pod := cgroupOptionsPod("ephemeral", v1.CgroupMountModeWritable)
+		created, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("failed to create pod: %v", err)
+		}
+		defer integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+
+		for _, tc := range []struct {
+			name          string
+			cgroupOptions *v1.CgroupOptions
+		}{
+			{name: "empty", cgroupOptions: &v1.CgroupOptions{}},
+			{name: "read-only", cgroupOptions: &v1.CgroupOptions{MountMode: ptr.To(v1.CgroupMountModeReadOnly)}},
+			{name: "writable", cgroupOptions: &v1.CgroupOptions{MountMode: ptr.To(v1.CgroupMountModeWritable)}},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				update := created.DeepCopy()
+				update.Spec.EphemeralContainers = []v1.EphemeralContainer{{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:            "debug",
+						Image:           "fakeimage",
+						SecurityContext: &v1.SecurityContext{CgroupOptions: tc.cgroupOptions},
+					},
+				}}
+				_, err := client.CoreV1().Pods(ns.Name).UpdateEphemeralContainers(context.TODO(), pod.Name, update, metav1.UpdateOptions{})
+				if !apierrors.IsInvalid(err) {
+					t.Fatalf("expected an invalid error, got %v", err)
+				}
+				if !strings.Contains(err.Error(), "spec.ephemeralContainers[0].securityContext.cgroupOptions") {
+					t.Errorf("expected the error to name the ephemeral container's cgroupOptions, got %v", err)
+				}
+			})
+		}
+	})
 }
