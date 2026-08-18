@@ -20,7 +20,6 @@ import (
 	"cmp"
 	"fmt"
 	"slices"
-	"sort"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -56,10 +55,6 @@ func (*enumExcludeTagValidator) ValidScopes() sets.Set[Scope] {
 	return enumExcludeValidScope
 }
 
-func (*enumExcludeTagValidator) GetValidations(_ Context, _ codetags.Tag) (Validations, error) {
-	return Validations{}, nil
-}
-
 func (eetv *enumExcludeTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            eetv.TagName(),
@@ -72,11 +67,11 @@ If multiple +k8s:ifEnabled/+k8s:ifDisabled tags are used, the value is excluded 
 }
 
 type enumTagValidator struct {
-	validator TagValidationExtractor
+	extractor Extractor
 }
 
 func (etv *enumTagValidator) Init(cfg Config) {
-	etv.validator = cfg.TagValidator
+	etv.extractor = cfg.Extractor
 }
 
 func (enumTagValidator) TagName() string {
@@ -95,7 +90,7 @@ var (
 	setsNew           = types.Name{Package: "k8s.io/apimachinery/pkg/util/sets", Name: "New"}
 )
 
-func (etv *enumTagValidator) GetValidations(context Context, _ codetags.Tag) (Validations, error) {
+func (etv *enumTagValidator) GetValidations(context Context, _ SchemaMetadata, _ codetags.Tag) (Validations, error) {
 	// NOTE: typedefs to pointers are not supported, so we should never see a pointer here.
 	if t := util.NativeType(context.Type); t != types.String {
 		return Validations{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
@@ -202,14 +197,6 @@ func (etv *enumTagValidator) Docs() TagDoc {
 	}
 }
 
-func (et *enumType) ValueArgs() []any {
-	var values []any
-	for _, value := range et.SymbolConstants() {
-		values = append(values, value)
-	}
-	return values
-}
-
 func (et *enumType) SymbolConstants() []Identifier {
 	var values []Identifier
 	for _, value := range et.Values {
@@ -242,18 +229,6 @@ type enumExclude struct {
 	excludeWhen bool
 	// option is the name of the feature option that controls the exclusion.
 	option string
-}
-
-// ValueStrings returns all possible values of the enum type as strings
-// the results are sorted and quoted as Go literals.
-func (et *enumType) ValueStrings() []string {
-	var values []string
-	for _, value := range et.Values {
-		// use "%q" format to generate a Go literal of the string const value
-		values = append(values, fmt.Sprintf("%q", value.Value))
-	}
-	sort.Strings(values)
-	return values
 }
 
 func (et *enumType) addIfNotPresent(value *enumValue) {

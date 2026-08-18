@@ -67,7 +67,7 @@ func (requirednessTagValidator) ValidScopes() sets.Set[Scope] {
 	return requirednessTagValidScopes
 }
 
-func (rtv requirednessTagValidator) GetValidations(context Context, _ codetags.Tag) (Validations, error) {
+func (rtv requirednessTagValidator) GetValidations(context Context, _ SchemaMetadata, _ codetags.Tag) (Validations, error) {
 	switch rtv.mode {
 	case requirednessRequired:
 		return rtv.doRequired(context)

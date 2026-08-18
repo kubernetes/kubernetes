@@ -49,7 +49,7 @@ func (v *monotonicTagValidator) ValidScopes() sets.Set[Scope] {
 	return sets.New(ScopeType, ScopeField)
 }
 
-func (v *monotonicTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (v *monotonicTagValidator) GetValidations(context Context, _ SchemaMetadata, tag codetags.Tag) (Validations, error) {
 	t := util.NonPointer(util.NativeType(context.Type))
 	if !types.IsInteger(t) {
 		return Validations{}, fmt.Errorf("must be an integer type (got %s)", rootTypeString(context.Type, t))

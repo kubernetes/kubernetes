@@ -31,8 +31,7 @@ const (
 )
 
 func init() {
-	// Processing item tags requires the list metadata.
-	RegisterTagValidator(&itemTagValidator{listByPath: globalListMeta})
+	RegisterTagValidator(&itemTagValidator{})
 }
 
 type keyValuePair struct {
@@ -42,12 +41,11 @@ type keyValuePair struct {
 }
 
 type itemTagValidator struct {
-	validator  TagValidationExtractor
-	listByPath map[string]*listMetadata
+	extractor Extractor
 }
 
 func (itv *itemTagValidator) Init(cfg Config) {
-	itv.validator = cfg.TagValidator
+	itv.extractor = cfg.Extractor
 }
 
 func (itemTagValidator) TagName() string {
@@ -60,41 +58,35 @@ func (itemTagValidator) ValidScopes() sets.Set[Scope] {
 	return itemTagValidScopes
 }
 
-var (
-	validateValSliceItem = types.Name{Package: libValidationPkg, Name: "ValSliceItem"}
-	validatePtrSliceItem = types.Name{Package: libValidationPkg, Name: "PtrSliceItem"}
-)
+type itemSubContext struct {
+	context  Context
+	elemT    *types.Type
+	criteria []keyValuePair
+	itemKey  string
+}
 
-func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
-	// TODO: Support regular maps with syntax like:
-	// +k8s:item("map-key")=+k8s:immutable
-
+func (itv *itemTagValidator) makeSubContext(context Context, tag codetags.Tag) (itemSubContext, error) {
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
 	nt := util.NonPointer(util.NativeType(context.Type))
 	if nt.Kind != types.Slice {
-		return Validations{}, fmt.Errorf("can only be used on list types")
+		return itemSubContext{}, fmt.Errorf("can only be used on list types")
 	}
 	elemT := util.NonPointer(util.NativeType(nt.Elem))
-
-	validateFunc := validateValSliceItem
-	if nt.Elem.Kind == types.Pointer {
-		validateFunc = validatePtrSliceItem
-	}
 	if elemT.Kind != types.Struct {
-		return Validations{}, fmt.Errorf("can only be used on lists of structs")
+		return itemSubContext{}, fmt.Errorf("can only be used on lists of structs")
 	}
 	if tag.ValueType != codetags.ValueTypeTag || tag.ValueTag == nil {
-		return Validations{}, fmt.Errorf("requires a validation tag as its value payload")
+		return itemSubContext{}, fmt.Errorf("requires a validation tag as its value payload")
 	}
 
 	// Parse key-value pairs from named args.
 	criteria, err := criteriaFromArgs(tag.Args)
 	if err != nil {
-		return Validations{}, err
+		return itemSubContext{}, err
 	}
 	if len(criteria) == 0 {
-		return Validations{}, fmt.Errorf("no selection criteria was specified")
+		return itemSubContext{}, fmt.Errorf("no selection criteria was specified")
 	}
 
 	// Extract validations from the stored tag
@@ -109,86 +101,141 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 		ParentPath:     context.Path,
 		ParentType:     context.Type,
 		StabilityLevel: context.StabilityLevel,
+		Conditions:     context.Conditions,
 	}
+	return itemSubContext{
+		context:  subContext,
+		elemT:    elemT,
+		criteria: criteria,
+		itemKey:  itemKey,
+	}, nil
+}
 
-	validations, err := itv.validator.ExtractTagValidations(subContext, *tag.ValueTag)
+type itemMetadata struct {
+	tag        codetags.Tag
+	criteria   []keyValuePair
+	itemKey    string
+	elemT      *types.Type
+	subContext Context
+	conditions Conditions
+	level      ValidationStabilityLevel
+}
+
+
+func (itv *itemTagValidator) CollectMetadata(context Context, tag codetags.Tag) (SchemaMetadata, error) {
+	sc, err := itv.makeSubContext(context, tag)
 	if err != nil {
-		return Validations{}, err
+		return SchemaMetadata{}, err
+	}
+	meta, err := globalRegistry.ExtractMetadata(sc.context, *tag.ValueTag)
+	if err != nil {
+		return SchemaMetadata{}, err
 	}
 
-	result := validations.Clone()
-	result.Functions = nil
-	result.Deferred = nil
-
-	// 1. Handle immediate functions. We need to defer them because listMetadata is not ready yet.
-	if len(validations.Functions) > 0 {
-		result.AddDeferred(Deferred(ThisContext, func() (Validations, error) {
-			matchArg, equivArg, err := itv.prepareArgs(context, criteria, elemT)
-			if err != nil {
-				return Validations{}, err
-			}
-			deferredResult := Validations{}
-			for _, vfn := range validations.Functions {
-				f := Function(itemTagName, vfn.Flags, validateFunc, matchArg, equivArg, WrapperFunction{Function: vfn, ObjType: elemT})
-				f.Cohort = itemKey
-				vfn = f
-				deferredResult.AddFunction(vfn)
-			}
-			return deferredResult, nil
-		}))
+	im := &itemMetadata{
+		tag:        tag,
+		criteria:   sc.criteria,
+		itemKey:    sc.itemKey,
+		elemT:      sc.elemT,
+		subContext: sc.context,
+		conditions: context.Conditions,
+		level:      context.StabilityLevel,
 	}
 
-	// 2. Handle deferred validations from child tag.
-	for _, d := range validations.Deferred {
-		scope := d.Scope
-		if scope == ParentContext {
-			// A child tag (e.g. +k8s:union) returning a ParentContext validation intends
-			// to evaluate the entire collection (the list) after its items are processed.
-			// Because item tags are evaluated in the context of the list field, the "parent"
-			// of a list element is conceptually the list itself, which maps to ThisContext
-			// (the field phase).
-			// If we left this as ParentContext, the framework would mistakenly defer it to
-			// the struct containing the list. By mapping to ThisContext, we ensure the
-			// deferred validation correctly runs at the end of the list field's phase, naturally
-			// accumulating and running after all immediate item validations for this criteria.
-			scope = ThisContext
+	node := meta.GetOrCreateNode(nodeKeyFor(context.Path))
+	node.Items = append(node.Items, Conditional[*itemMetadata]{
+		Conditions:     context.Conditions,
+		StabilityLevel: context.StabilityLevel,
+		Payload:        im,
+	})
+	return meta, nil
+}
+
+var (
+	validateValSliceItem = types.Name{Package: libValidationPkg, Name: "ValSliceItem"}
+	validatePtrSliceItem = types.Name{Package: libValidationPkg, Name: "PtrSliceItem"}
+)
+
+func (itv *itemTagValidator) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (Validations, error) {
+	if context.Scope != ScopeField && context.Scope != ScopeType {
+		return Validations{}, nil
+	}
+	nt := util.NonPointer(util.NativeType(context.Type))
+	if nt == nil || (nt.Kind != types.Slice && nt.Kind != types.Array) {
+		return Validations{}, nil
+	}
+
+	var items []Conditional[*itemMetadata]
+	if node, ok := metadata.Nodes[nodeKeyFor(context.Path)]; ok {
+		items = node.Items
+	}
+	if len(items) == 0 {
+		return Validations{}, nil
+	}
+
+	hasUnemitted := false
+	for _, itemCond := range items {
+		if itemCond.Payload != nil {
+			emittedKey := fmt.Sprintf("item:%s:%s:%s", context.Path.String(), itemCond.Payload.itemKey, itemCond.Conditions.Key())
+			if !metadata.MarkEmitted(emittedKey) {
+				hasUnemitted = true
+			}
 		}
-		result.AddDeferred(Deferred(scope, func() (Validations, error) {
-			inner, err := d.Callback()
-			if err != nil {
-				return Validations{}, err
-			}
+	}
+	if !hasUnemitted {
+		return Validations{}, nil
+	}
 
-			matchArg, equivArg, err := itv.prepareArgs(context, criteria, elemT)
-			if err != nil {
-				return Validations{}, err
-			}
+	listMeta := GetListMetadataFromSchema(context, metadata)
+	result := Validations{}
+	validateFunc := validateValSliceItem
+	if nt.Elem.Kind == types.Pointer {
+		validateFunc = validatePtrSliceItem
+	}
 
-			return wrapFunctionsWithScope(inner, func(fn FunctionGen, s DeferredScope) FunctionGen {
-				if s == ParentContext {
-					// We reach here if the original deferred scope was ParentContext.
-					// Because the parent of a list element is the list itself, the generated
-					// function `fn` (e.g. a union validation) already expects the full list
-					// as its argument. If we didn't skip wrapping, validateValSliceItem would
-					// mistakenly attempt to pass individual list elements to it.
-					return fn
-				}
-				f := Function(itemTagName, fn.Flags, validateFunc, matchArg, equivArg, WrapperFunction{Function: fn, ObjType: elemT})
-				f.Cohort = itemKey
-				return f
-			}, d.Scope), nil
-		}))
+	for _, itemCond := range items {
+		im := itemCond.Payload
+		if im == nil {
+			continue
+		}
+		validations, err := itv.extractor.ExtractTagValidations(im.subContext, metadata, *im.tag.ValueTag)
+		if err != nil {
+			return Validations{}, err
+		}
+
+		if len(validations.Functions) == 0 {
+			continue
+		}
+
+		matchArg, equivArg, err := itv.prepareArgsWithMeta(context, im.criteria, im.elemT, listMeta)
+		if err != nil {
+			return Validations{}, err
+		}
+
+		// Because item tags are evaluated in the context of the list field, the "parent"
+		// of a list element is conceptually the list itself, which maps to the field phase.
+		itemValidations := Validations{}
+		for _, vfn := range validations.Functions {
+			f := Function(itemTagName, vfn.Flags, validateFunc, matchArg, equivArg, WrapperFunction{Function: vfn, ObjType: im.elemT})
+			f.Cohort = im.itemKey
+			itemValidations.AddFunction(f)
+		}
+		finalized, err := FinalizeGroup(context, EmittedGroup{
+			Validations:    itemValidations,
+			Conditions:     itemCond.Conditions,
+			StabilityLevel: itemCond.StabilityLevel,
+		})
+		if err != nil {
+			return Validations{}, err
+		}
+		result.Add(finalized)
 	}
 
 	return result, nil
 }
 
-func (itv *itemTagValidator) prepareArgs(context Context, criteria []keyValuePair, elemT *types.Type) (matchArg any, equivArg any, err error) {
-	listMeta, ok := itv.listByPath[context.Path.String()]
-	if !ok && context.Scope == ScopeField {
-		listMeta, ok = itv.listByPath[context.Type.String()]
-	}
-	if !ok || listMeta.semantic != semanticMap || len(listMeta.keyMembers) == 0 {
+func (itv *itemTagValidator) prepareArgsWithMeta(context Context, criteria []keyValuePair, elemT *types.Type, listMeta *listMetadata) (matchArg any, equivArg any, err error) {
+	if listMeta == nil || listMeta.semantic != semanticMap || len(listMeta.keyMembers) == 0 {
 		return nil, nil, fmt.Errorf("found items with no list metadata - item tags require listType=map or unique=map with listMapKey")
 	}
 

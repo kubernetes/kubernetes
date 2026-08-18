@@ -66,7 +66,7 @@ func (maxLengthTagValidator) ValidScopes() sets.Set[Scope] {
 
 var maxLengthValidator = types.Name{Package: libValidationPkg, Name: "MaxLength"}
 
-func (maxLengthTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (maxLengthTagValidator) GetValidations(context Context, _ SchemaMetadata, tag codetags.Tag) (Validations, error) {
 	var result Validations
 
 	// This tag can apply to value and pointer fields, as well as typedefs
@@ -120,7 +120,7 @@ func (maxBytesTagValidator) ValidScopes() sets.Set[Scope] {
 
 var maxBytesValidator = types.Name{Package: libValidationPkg, Name: "MaxBytes"}
 
-func (maxBytesTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (maxBytesTagValidator) GetValidations(context Context, _ SchemaMetadata, tag codetags.Tag) (Validations, error) {
 	var result Validations
 
 	// This tag can apply to value and pointer fields, as well as typedefs
@@ -179,7 +179,7 @@ func (minItemsTagValidator) ValidScopes() sets.Set[Scope] {
 
 var minItemsValidator = types.Name{Package: libValidationPkg, Name: "MinItems"}
 
-func (minItemsTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (minItemsTagValidator) GetValidations(context Context, _ SchemaMetadata, tag codetags.Tag) (Validations, error) {
 	var result Validations
 
 	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
@@ -233,7 +233,7 @@ func (minPropertiesTagValidator) ValidScopes() sets.Set[Scope] {
 
 var minPropertiesValidator = types.Name{Package: libValidationPkg, Name: "MinProperties"}
 
-func (minPropertiesTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (minPropertiesTagValidator) GetValidations(context Context, _ SchemaMetadata, tag codetags.Tag) (Validations, error) {
 	var result Validations
 
 	// NOTE: pointers to maps are not supported, so we should never see a pointer here.
@@ -297,7 +297,7 @@ func (maxItemsTagValidator) ValidScopes() sets.Set[Scope] {
 
 var maxItemsValidator = types.Name{Package: libValidationPkg, Name: "MaxItems"}
 
-func (maxItemsTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (maxItemsTagValidator) GetValidations(context Context, _ SchemaMetadata, tag codetags.Tag) (Validations, error) {
 	var result Validations
 
 	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
@@ -352,7 +352,7 @@ func (maxPropertiesTagValidator) ValidScopes() sets.Set[Scope] {
 
 var maxPropertiesValidator = types.Name{Package: libValidationPkg, Name: "MaxProperties"}
 
-func (maxPropertiesTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (maxPropertiesTagValidator) GetValidations(context Context, _ SchemaMetadata, tag codetags.Tag) (Validations, error) {
 	var result Validations
 
 	// NOTE: pointers to maps are not supported, so we should never see a pointer here.
@@ -412,7 +412,7 @@ func (minimumTagValidator) ValidScopes() sets.Set[Scope] {
 
 var minimumValidator = types.Name{Package: libValidationPkg, Name: "Minimum"}
 
-func (minimumTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (minimumTagValidator) GetValidations(context Context, _ SchemaMetadata, tag codetags.Tag) (Validations, error) {
 	var result Validations
 
 	// This tag can apply to value and pointer fields, as well as typedefs
@@ -475,7 +475,7 @@ func (maximumTagValidator) ValidScopes() sets.Set[Scope] {
 
 var maximumValidator = types.Name{Package: libValidationPkg, Name: "Maximum"}
 
-func (maximumTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (maximumTagValidator) GetValidations(context Context, _ SchemaMetadata, tag codetags.Tag) (Validations, error) {
 	var result Validations
 
 	// This tag can apply to value and pointer fields, as well as typedefs
@@ -538,7 +538,7 @@ func (minLengthTagValidator) ValidScopes() sets.Set[Scope] {
 
 var minLengthValidator = types.Name{Package: libValidationPkg, Name: "MinLength"}
 
-func (minLengthTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (minLengthTagValidator) GetValidations(context Context, _ SchemaMetadata, tag codetags.Tag) (Validations, error) {
 	var result Validations
 
 	// This tag can apply to value and pointer fields, as well as typedefs

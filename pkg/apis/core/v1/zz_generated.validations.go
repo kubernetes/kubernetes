@@ -1664,14 +1664,14 @@ func Validate_PodVolumeHealth(
 			// lists with map semantics require unique keys
 			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *corev1.VolumeHealthCondition, b *corev1.VolumeHealthCondition) bool {
-					return a.Status == b.Status && a.Reason == b.Reason
+					return a.Reason == b.Reason && a.Status == b.Status
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a *corev1.VolumeHealthCondition, b *corev1.VolumeHealthCondition) bool {
-					return a.Status == b.Status && a.Reason == b.Reason
+					return a.Reason == b.Reason && a.Status == b.Status
 				}, validate.DirectEqual, Validate_VolumeHealthCondition); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -2212,14 +2212,14 @@ func Validate_VolumeHealthStatus(
 			// lists with map semantics require unique keys
 			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *corev1.VolumeHealthCondition, b *corev1.VolumeHealthCondition) bool {
-					return a.Status == b.Status && a.Reason == b.Reason
+					return a.Reason == b.Reason && a.Status == b.Status
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a *corev1.VolumeHealthCondition, b *corev1.VolumeHealthCondition) bool {
-					return a.Status == b.Status && a.Reason == b.Reason
+					return a.Reason == b.Reason && a.Status == b.Status
 				}, validate.DirectEqual, Validate_VolumeHealthCondition); len(e) != 0 {
 				errs = append(errs, e...)
 			}

@@ -20,22 +20,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
-	"k8s.io/gengo/v2/types"
 )
 
 const (
 	opaqueTypeTagName = "k8s:opaqueType"
-)
-
-// globalOpaqueTypes and globalOpaqueMembers record the set of types and struct
-// members tagged with +k8s:opaqueType, populated as opaqueTypeTagValidator
-// processes those tags. Other validators (currently subfield) consult these to
-// decide whether to inherit short-circuit validations from the field. Lookups
-// must therefore happen in a deferred callback so that all opaque tags have
-// been registered first.
-var (
-	globalOpaqueTypes   = map[*types.Type]bool{}
-	globalOpaqueMembers = map[*types.Member]bool{}
 )
 
 type opaqueTypeTagValidator struct{}
@@ -54,30 +42,45 @@ func (opaqueTypeTagValidator) ValidScopes() sets.Set[Scope] {
 	return sets.New(ScopeType, ScopeField, ScopeListVal, ScopeMapKey, ScopeMapVal)
 }
 
-func (opaqueTypeTagValidator) GetValidations(context Context, _ codetags.Tag) (Validations, error) {
-	// Store information about opaque types and fields, so that other validators
-	// don't have to extract it again.
-	switch context.Scope {
-	case ScopeType:
-		globalOpaqueTypes[util.NonPointer(util.NativeType(context.Type))] = true
-	case ScopeField:
-		if context.Member != nil {
-			globalOpaqueMembers[context.Member] = true
-		}
-	}
+func (opaqueTypeTagValidator) GetValidations(context Context, _ SchemaMetadata, _ codetags.Tag) (Validations, error) {
 	return Validations{OpaqueType: true}, nil
 }
 
-// isFieldOpaque reports whether the field or its type was tagged
-// +k8s:opaqueType. It reads from the package-level registries above, so
-// callers must invoke it from a deferred callback (or any other context
-// where opaque-tag processing has finished).
+// Other validators (currently subfield) consult opaque tags to
+// decide whether to inherit short-circuit validations from the field.
+// isFieldOpaque reports whether the field or its type was tagged +k8s:opaqueType.
 func isFieldOpaque(context Context) bool {
-	if context.Member != nil && globalOpaqueMembers[context.Member] {
-		return true
+	if context.Member != nil && len(context.Member.CommentLines) > 0 {
+		if hasOpaqueTag(context.Member.CommentLines) {
+			return true
+		}
 	}
-	if context.Type != nil && globalOpaqueTypes[util.NonPointer(util.NativeType(context.Type))] {
-		return true
+	if context.Type != nil {
+		if len(context.Type.CommentLines) > 0 && hasOpaqueTag(context.Type.CommentLines) {
+			return true
+		}
+		t := util.NonPointer(util.NativeType(context.Type))
+		if t != nil && len(t.CommentLines) > 0 && hasOpaqueTag(t.CommentLines) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasOpaqueTag(commentLines []string) bool {
+	extracted := codetags.Extract("+", commentLines)
+	for _, lines := range extracted {
+		parsedTags, err := codetags.ParseAll(lines)
+		if err != nil {
+			continue
+		}
+		for _, tagItem := range parsedTags {
+			for t := &tagItem; t != nil; t = t.ValueTag {
+				if t.Name == opaqueTypeTagName {
+					return true
+				}
+			}
+		}
 	}
 	return false
 }

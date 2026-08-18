@@ -2684,21 +2684,6 @@ func Validate_NodeAllocatableMapping(
 		}).MarkAlpha(); len(e) != 0 {
 		errs = append(errs, e...)
 	}
-	if e := validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_api_resource_v1_NodeAllocatableMapping_,
-		func(obj *NodeAllocatableMapping) bool {
-			if obj == nil {
-				return false
-			}
-			return obj.CapacityKey != nil
-		},
-		func(obj *NodeAllocatableMapping) bool {
-			if obj == nil {
-				return false
-			}
-			return obj.DeviceMultiplier != nil
-		}); len(e) != 0 {
-		errs = append(errs, e...)
-	}
 	if e := validate.DependentRequired(ctx, op, fldPath, obj, oldObj, "capacityMultiplier",
 		func(obj *NodeAllocatableMapping) bool {
 			if obj == nil {
@@ -2712,6 +2697,21 @@ func Validate_NodeAllocatableMapping(
 			}
 			return obj.CapacityKey != nil
 		}).MarkAlpha(); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+	if e := validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_api_resource_v1_NodeAllocatableMapping_,
+		func(obj *NodeAllocatableMapping) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.CapacityKey != nil
+		},
+		func(obj *NodeAllocatableMapping) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.DeviceMultiplier != nil
+		}); len(e) != 0 {
 		errs = append(errs, e...)
 	}
 
@@ -3111,14 +3111,14 @@ func Validate_ResourceClaimStatus(
 			// lists with map semantics require unique keys
 			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *AllocatedDeviceStatus, b *AllocatedDeviceStatus) bool {
-					return a.Driver == b.Driver && a.Device == b.Device && a.Pool == b.Pool && ((a.ShareID == nil && b.ShareID == nil) || (a.ShareID != nil && b.ShareID != nil && *a.ShareID == *b.ShareID))
+					return a.Device == b.Device && a.Driver == b.Driver && a.Pool == b.Pool && ((a.ShareID == nil && b.ShareID == nil) || (a.ShareID != nil && b.ShareID != nil && *a.ShareID == *b.ShareID))
 				}).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a *AllocatedDeviceStatus, b *AllocatedDeviceStatus) bool {
-					return a.Driver == b.Driver && a.Device == b.Device && a.Pool == b.Pool && ((a.ShareID == nil && b.ShareID == nil) || (a.ShareID != nil && b.ShareID != nil && *a.ShareID == *b.ShareID))
+					return a.Device == b.Device && a.Driver == b.Driver && a.Pool == b.Pool && ((a.ShareID == nil && b.ShareID == nil) || (a.ShareID != nil && b.ShareID != nil && *a.ShareID == *b.ShareID))
 				}, validate.SemanticDeepEqual, Validate_AllocatedDeviceStatus); len(e) != 0 {
 				errs = append(errs, e...)
 			}

@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
@@ -52,7 +53,7 @@ var (
 	neqValidator = types.Name{Package: libValidationPkg, Name: "NEQ"}
 )
 
-func (v neqTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (v neqTagValidator) GetValidations(context Context, _ SchemaMetadata, tag codetags.Tag) (Validations, error) {
 	t := util.NonPointer(util.NativeType(context.Type))
 	if !util.IsDirectComparable(t) {
 		return Validations{}, fmt.Errorf("can only be used on comparable types (e.g. string, int, bool), but got %s", rootTypeString(context.Type, t))

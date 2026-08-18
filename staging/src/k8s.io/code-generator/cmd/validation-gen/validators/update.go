@@ -33,8 +33,7 @@ const (
 )
 
 func init() {
-	shared := map[string]*updateMetadata{}
-	RegisterTagValidator(updateTagCollector{byFieldPath: shared, listByPath: globalListMeta})
+	RegisterTagValidator(updateTagCollector{})
 }
 
 // updateMetadata collects constraints for a field, supporting both normal and shadow validation.
@@ -43,11 +42,22 @@ type updateMetadata struct {
 	stabilityLevel ValidationStabilityLevel
 }
 
-// updateTagCollector collects +k8s:update tags
-type updateTagCollector struct {
-	byFieldPath map[string]*updateMetadata
-	listByPath  map[string]*listMetadata
+
+func (um *updateMetadata) merge(other *updateMetadata) {
+	if other == nil {
+		return
+	}
+	if um.constraints == nil {
+		um.constraints = sets.New[validate.UpdateConstraint]()
+	}
+	um.constraints.Insert(other.constraints.UnsortedList()...)
+	if um.stabilityLevel == "" && other.stabilityLevel != "" {
+		um.stabilityLevel = other.stabilityLevel
+	}
 }
+
+// updateTagCollector collects +k8s:update tags
+type updateTagCollector struct{}
 
 func (updateTagCollector) Init(_ Config) {}
 
@@ -61,8 +71,11 @@ func (updateTagCollector) ValidScopes() sets.Set[Scope] {
 	return updateTagValidScopes
 }
 
-func (utc updateTagCollector) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
-	// Parse constraint from this tag
+func (utc updateTagCollector) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (Validations, error) {
+	if context.Scope == ScopeField {
+		return GenerateUpdateValidations(context, metadata)
+	}
+
 	var constraint validate.UpdateConstraint
 	switch tag.Value {
 	case "NoSet":
@@ -98,38 +111,60 @@ func (utc updateTagCollector) GetValidations(context Context, tag codetags.Tag) 
 		// listType=set or listType=atomic, a content change becomes a new
 		// unmatched item that ratchets through as a no-op. Reject upfront.
 		if context.Scope == ScopeListVal && context.ParentPath != nil {
-			if lm := utc.listByPath[context.ParentPath.String()]; lm != nil && lm.semantic != semanticMap {
+			if lm := GetListMetadataFromSchema(context, metadata); lm != nil && lm.semantic != semanticMap {
 				return Validations{}, fmt.Errorf("+k8s:eachVal=+k8s:update=NoModify requires the enclosing list to use listType=map or unique=map (got %s)", lm.semantic)
 			}
 		}
 		v := emitScalarUpdate(context, []validate.UpdateConstraint{constraint})
-		applyStabilityLevel(&v, context.StabilityLevel)
-		return v, nil
+		return FinalizeGroup(context, EmittedGroup{
+			Validations:    v,
+			StabilityLevel: context.StabilityLevel,
+		})
 	}
 
-	// Initialize metadata if doesn't exist
-	fieldPath := context.Path.String()
-	if utc.byFieldPath[fieldPath] == nil {
-		utc.byFieldPath[fieldPath] = &updateMetadata{constraints: sets.New[validate.UpdateConstraint]()}
-	}
-	um := utc.byFieldPath[fieldPath]
+	return Validations{}, nil
+}
 
-	um.stabilityLevel = context.StabilityLevel
-
-	// Add this constraint to the set for this field
-	um.constraints.Insert(constraint)
-
-	if err := utc.validateConstraintsForType(context, um.constraints.UnsortedList()); err != nil {
-		return Validations{}, err
+func (utc updateTagCollector) CollectMetadata(context Context, tag codetags.Tag) (SchemaMetadata, error) {
+	if context.Scope == ScopeListVal || context.Scope == ScopeMapVal {
+		return SchemaMetadata{}, nil
 	}
 
-	return Validations{
-		Deferred: []DeferredGen{
-			Deferred(ThisContext, func() (Validations, error) {
-				return getUpdateValidations(utc.byFieldPath, utc.listByPath, context)
-			}),
+	var constraint validate.UpdateConstraint
+	switch tag.Value {
+	case "NoSet":
+		constraint = validate.NoSet
+	case "NoUnset":
+		constraint = validate.NoUnset
+	case "NoModify":
+		constraint = validate.NoModify
+	case "NoAddItem":
+		constraint = validate.NoAddItem
+	case "NoRemoveItem":
+		constraint = validate.NoRemoveItem
+	default:
+		return SchemaMetadata{}, fmt.Errorf("unknown +k8s:update constraint: %s", tag.Value)
+	}
+
+	if err := utc.validateConstraintsForType(context, []validate.UpdateConstraint{constraint}); err != nil {
+		return SchemaMetadata{}, err
+	}
+
+	um := &updateMetadata{
+		constraints:    sets.New(constraint),
+		stabilityLevel: context.StabilityLevel,
+	}
+
+	res := SchemaMetadata{}
+	node := res.GetOrCreateNode(nodeKeyFor(context.Path))
+	node.UpdateConstraints = []Conditional[*updateMetadata]{
+		{
+			Conditions:     context.Conditions,
+			StabilityLevel: context.StabilityLevel,
+			Payload:        um,
 		},
-	}, nil
+	}
+	return res, nil
 }
 
 func (utc updateTagCollector) validateConstraintsForType(context Context, constraints []validate.UpdateConstraint) error {
@@ -215,39 +250,66 @@ var (
 	noRemoveItemConstraint = types.Name{Package: libValidationPkg, Name: "NoRemoveItem"}
 )
 
-func getUpdateValidations(byFieldPath map[string]*updateMetadata, listByPath map[string]*listMetadata, context Context) (Validations, error) {
-	um := byFieldPath[context.Path.String()]
+func GenerateUpdateValidations(context Context, metadata SchemaMetadata) (Validations, error) {
+	var ucs []Conditional[*updateMetadata]
+	if node := metadata.Nodes[nodeKeyFor(context.Path)]; node != nil {
+		ucs = node.UpdateConstraints
+	}
 
-	if um == nil || um.constraints.Len() == 0 {
+	if len(ucs) == 0 {
 		return Validations{}, nil
 	}
-	// Delete the entry from the map after processing to avoid reprocessing.
-	delete(byFieldPath, context.Path.String())
 
-	constraints := um.constraints.UnsortedList()
-
-	v, err := generateUpdateValidation(listByPath, context, constraints)
-	if err != nil {
-		return Validations{}, err
+	hasUnemitted := false
+	for _, uc := range ucs {
+		if uc.Payload != nil {
+			emittedKey := fmt.Sprintf("update:%v:%s:%s", uc.Payload.constraints, uc.Conditions.Key(), context.Path.String())
+			if !metadata.MarkEmitted(emittedKey) {
+				hasUnemitted = true
+			}
+		}
+	}
+	if !hasUnemitted {
+		return Validations{}, nil
 	}
 
-	level := um.stabilityLevel
-	if context.StabilityLevel != "" {
-		level = context.StabilityLevel
+	res := Validations{}
+	for _, uc := range ucs {
+		cond := uc.Conditions
+		um := uc.Payload
+		if um == nil || um.constraints.Len() == 0 {
+			continue
+		}
+		constraints := um.constraints.UnsortedList()
+		v, err := generateUpdateValidation(context, metadata, constraints)
+		if err != nil {
+			return Validations{}, err
+		}
+		level := um.stabilityLevel
+		if context.StabilityLevel != "" {
+			level = context.StabilityLevel
+		}
+		finalized, err := FinalizeGroup(context, EmittedGroup{
+			Validations:    v,
+			Conditions:     cond,
+			StabilityLevel: level,
+		})
+		if err != nil {
+			return Validations{}, err
+		}
+		res.Add(finalized)
 	}
-
-	applyStabilityLevel(&v, level)
-	return v, nil
+	return res, nil
 }
 
-func generateUpdateValidation(listByPath map[string]*listMetadata, context Context, constraints []validate.UpdateConstraint) (Validations, error) {
+func generateUpdateValidation(context Context, metadata SchemaMetadata, constraints []validate.UpdateConstraint) (Validations, error) {
 	// Sort constraints to ensure deterministic order
 	slices.Sort(constraints)
 
 	t := util.NonPointer(util.NativeType(context.Type))
 	switch t.Kind {
 	case types.Slice:
-		return generateSliceValidation(listByPath, context, constraints)
+		return generateSliceValidation(context, metadata, constraints)
 	case types.Map:
 		return generateMapValidation(constraints), nil
 	}
@@ -262,14 +324,11 @@ func generateUpdateValidation(listByPath map[string]*listMetadata, context Conte
 // Metadata lookup falls back from the field path to the type path so that
 // typedef-level list annotations apply, mirroring the pattern used by
 // listValidator.
-func generateSliceValidation(listByPath map[string]*listMetadata, context Context, constraints []validate.UpdateConstraint) (Validations, error) {
+func generateSliceValidation(context Context, metadata SchemaMetadata, constraints []validate.UpdateConstraint) (Validations, error) {
 	var matchArg any = Literal("nil")
 	// NoAddItem/NoRemoveItem need a match function to pair items between old and new, NoSet/NoUnset only check len == 0.
 	if slices.Contains(constraints, validate.NoAddItem) || slices.Contains(constraints, validate.NoRemoveItem) {
-		lm := listByPath[context.Path.String()]
-		if lm == nil {
-			lm = listByPath[context.Type.String()]
-		}
+		lm := GetListMetadataFromSchema(context, metadata)
 		if lm == nil {
 			return Validations{}, fmt.Errorf("+k8s:update=NoAddItem/+k8s:update=NoRemoveItem require list metadata (+k8s:listType with listMapKey, or +k8s:unique) to determine item identity")
 		}
@@ -398,13 +457,4 @@ func constraintIdentifierArgs(constraints []validate.UpdateConstraint) []any {
 		}
 	}
 	return args
-}
-
-func applyStabilityLevel(v *Validations, level ValidationStabilityLevel) {
-	if level == "" {
-		return
-	}
-	for i := range v.Functions {
-		v.Functions[i] = v.Functions[i].WithStabilityLevel(level)
-	}
 }

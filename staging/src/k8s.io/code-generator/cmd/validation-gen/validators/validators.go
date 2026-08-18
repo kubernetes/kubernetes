@@ -18,6 +18,8 @@ package validators
 
 import (
 	"fmt"
+	"slices"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -34,8 +36,11 @@ import (
 // already because users might specify tags in the any order.
 //
 // No other guarantees are made about the order of execution of TagValidators.
-// Instead of relying on tag ordering, TagValidators can
-// accumulate information internally and use a DeferredGen to finish the work.
+// Instead of relying on tag ordering, TagValidators can implement
+// MetadataCollector to accumulate metadata during the scanning phase and emit
+// validations deterministically during the emission phase.
+// TagValidators that directly emit validations when their tag is encountered
+// should also implement the optional ValidationEmitter interface.
 type TagValidator interface {
 	// Init initializes the implementation.  This will be called exactly once.
 	Init(cfg Config)
@@ -47,11 +52,31 @@ type TagValidator interface {
 	// ValidScopes returns the set of scopes where this tag may be used.
 	ValidScopes() sets.Set[Scope]
 
-	// GetValidations returns any validations described by this tag.
-	GetValidations(context Context, tag codetags.Tag) (Validations, error)
-
 	// Docs returns user-facing documentation for this tag.
 	Docs() TagDoc
+}
+
+// ValidationEmitter is an optional interface implemented by TagValidators
+// that directly emit validations when their tag is encountered.
+// Metadata-only tag validators do not need to implement this interface.
+type ValidationEmitter interface {
+	// GetValidations returns any validations described by this tag.
+	GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (Validations, error)
+}
+
+// Extractor represents an aggregation of tag validators and metadata extractors.
+type Extractor interface {
+	// ExtractTags extracts Tags from comment lines.
+	ExtractTags(context Context, comments []string) ([]codetags.Tag, error)
+
+	// ExtractValidations evaluates registered validators for the given context and tags.
+	ExtractValidations(context Context, metadata SchemaMetadata, tags ...codetags.Tag) (Validations, error)
+
+	// ExtractTagValidations extracts validations associated with the given tags.
+	ExtractTagValidations(context Context, metadata SchemaMetadata, tags ...codetags.Tag) (Validations, error)
+
+	// ExtractMetadata extracts path-indexed schema and validation metadata associated with the given tags.
+	ExtractMetadata(context Context, tags ...codetags.Tag) (SchemaMetadata, error)
 }
 
 // Config carries optional configuration information for use by validators.
@@ -60,7 +85,7 @@ type Config struct {
 	// to look up all sorts of other information.
 	GengoContext *generator.Context
 
-	// TagValidator provides a way to compose validations.
+	// Extractor provides a way to compose tags, validations, and metadata.
 	//
 	// For example, it is possible to define a validation such as
 	// "+myValidator=+format=IP" by using the registry to extract the
@@ -69,7 +94,7 @@ type Config struct {
 	//
 	// This field MUST NOT be used during init, since other validators may not
 	// be initialized yet.
-	TagValidator TagValidationExtractor
+	Extractor Extractor
 
 	// InputToCanonicalPkg maps each input (API types) package to its canonical
 	// generated validation package (the one cross-package references resolve to).
@@ -166,12 +191,18 @@ type Context struct {
 	// When the scope is ScopeType, this is nil.
 	ParentType *types.Type
 
+	// ParentMember provides the member of the parent struct when applicable.
+	ParentMember *types.Member
+
 	// Constants provides access to all constants of the type being
 	// validated.  Only set when Scope is ScopeType.
 	Constants []*Constant
 
 	// StabilityLevel indicates the stability on the corresponding validation.
 	StabilityLevel ValidationStabilityLevel
+
+	// Conditions indicates conditional options (e.g. ifEnabled / ifDisabled) for the context.
+	Conditions Conditions
 }
 
 // Constant represents a constant value.
@@ -323,7 +354,8 @@ type Validations struct {
 	//        Args[N] <Args[N]Type>)
 	//
 	// The standard arguments are not included in the FunctionGen.Args list.
-	Functions []FunctionGen
+	Functions     []FunctionGen
+	TypeFunctions []FunctionGen
 
 	// Variables hold any variables which must be generated to perform
 	// validation.  Variables are not permitted in every context.
@@ -344,13 +376,6 @@ type Validations struct {
 	// validated is opaque, and that any validations defined on it should not
 	// be emitted.
 	OpaqueValType bool
-
-	// Deferred holds a list of callbacks which will be executed after all other
-	// validation generation is complete. This allows validators to defer
-	// decision making until they have more information (e.g. about other
-	// validators). Deferred callbacks may return further deferred validations,
-	// which will be processed iteratively until exhaustion.
-	Deferred []DeferredGen
 }
 
 func (v *Validations) Empty() bool {
@@ -361,7 +386,7 @@ func (v *Validations) Empty() bool {
 }
 
 func (v *Validations) HasEmitable() bool {
-	return len(v.Functions) > 0 || len(v.Variables) > 0 || len(v.Comments) > 0 || len(v.Deferred) > 0
+	return len(v.Functions) > 0 || len(v.TypeFunctions) > 0 || len(v.Variables) > 0 || len(v.Comments) > 0
 }
 
 func (v *Validations) AddFunction(fn FunctionGen) {
@@ -372,19 +397,15 @@ func (v *Validations) AddVariable(vr VariableGen) {
 	v.Variables = append(v.Variables, vr)
 }
 
-func (v *Validations) AddDeferred(d DeferredGen) {
-	v.Deferred = append(v.Deferred, d)
-}
-
 func (v *Validations) AddComment(comment string) {
 	v.Comments = append(v.Comments, comment)
 }
 
 func (v *Validations) Add(o Validations) {
 	v.Functions = append(v.Functions, o.Functions...)
+	v.TypeFunctions = append(v.TypeFunctions, o.TypeFunctions...)
 	v.Variables = append(v.Variables, o.Variables...)
 	v.Comments = append(v.Comments, o.Comments...)
-	v.Deferred = append(v.Deferred, o.Deferred...)
 	v.OpaqueType = v.OpaqueType || o.OpaqueType
 	v.OpaqueKeyType = v.OpaqueKeyType || o.OpaqueKeyType
 	v.OpaqueValType = v.OpaqueValType || o.OpaqueValType
@@ -405,41 +426,7 @@ func (v Validations) Clone() Validations {
 		res.Comments = make([]string, len(v.Comments))
 		copy(res.Comments, v.Comments)
 	}
-	if v.Deferred != nil {
-		res.Deferred = make([]DeferredGen, len(v.Deferred))
-		copy(res.Deferred, v.Deferred)
-	}
 	return res
-}
-
-// WrapFunctions applies the given wrap function to all functions in this Validations object
-// and recursively to all Deferred validations, passing the appropriate scope.
-// Useful for applying common transformations (e.g., conditionals, stability levels)
-// to all validations, including deferred ones.
-func WrapFunctions(v Validations, wrapFn func(FunctionGen, DeferredScope) FunctionGen) Validations {
-	return wrapFunctionsWithScope(v, wrapFn, ThisContext)
-}
-
-func wrapFunctionsWithScope(v Validations, wrapFn func(FunctionGen, DeferredScope) FunctionGen, scope DeferredScope) Validations {
-	result := v.Clone()
-	result.Functions = nil
-	result.Deferred = nil
-
-	for _, fn := range v.Functions {
-		result.AddFunction(wrapFn(fn, scope))
-	}
-
-	for _, d := range v.Deferred {
-		result.AddDeferred(Deferred(d.Scope, func() (Validations, error) {
-			inner, err := d.Callback()
-			if err != nil {
-				return Validations{}, err
-			}
-			return wrapFunctionsWithScope(inner, wrapFn, d.Scope), nil
-		}))
-	}
-
-	return result
 }
 
 // FunctionFlags define optional properties of a validator.  Most validators
@@ -467,18 +454,179 @@ const (
 	NonError
 )
 
-// Conditions defines what conditions must be true for a resource to be validated.
-// If any of the conditions are not true, the resource is not validated.
-type Conditions struct {
-	// OptionEnabled specifies an option name that must be set to true for the condition to be true.
-	OptionEnabled string
-
-	// OptionDisabled specifies an option name that must be set to false for the condition to be true.
-	OptionDisabled string
+// Condition represents a single conditional predicate for validation.
+type Condition interface {
+	// Kind returns a unique identifier for the type of condition (e.g. "OptionEnabled").
+	Kind() string
+	// Key returns a deterministic string representation of the condition for map indexing and sorting.
+	Key() string
+	// Order returns an integer priority for sorting conditions deterministically.
+	Order() int
+	// Compare compares this condition to another condition of the same Kind.
+	Compare(other Condition) int
+	// Wrap wraps the given validations with this condition check.
+	Wrap(validations Validations, context Context) Validations
 }
 
+// OptionCondition requires a feature option to be set to enabled or disabled.
+type OptionCondition struct {
+	Option  string
+	Enabled bool
+}
+
+func (c OptionCondition) Kind() string {
+	return "Option:" + c.Option
+}
+
+func (c OptionCondition) Key() string {
+	if c.Enabled {
+		return "OptionEnabled:" + c.Option
+	}
+	return "OptionDisabled:" + c.Option
+}
+
+func (c OptionCondition) Order() int {
+	return 1
+}
+
+func (c OptionCondition) Compare(other Condition) int {
+	o, ok := other.(OptionCondition)
+	if !ok {
+		return strings.Compare(c.Kind(), other.Kind())
+	}
+	if cmp := strings.Compare(c.Option, o.Option); cmp != 0 {
+		return cmp
+	}
+	if c.Enabled != o.Enabled {
+		if !c.Enabled {
+			return -1
+		}
+		return 1
+	}
+	return 0
+}
+
+func (c OptionCondition) Wrap(validations Validations, context Context) Validations {
+	tag := ifDisabledTag
+	if c.Enabled {
+		tag = ifEnabledTag
+	}
+	for i, fn := range validations.Functions {
+		validations.Functions[i] = Function(tag, fn.Flags, ifOption, c.Option, c.Enabled, WrapperFunction{Function: fn, ObjType: context.Type})
+	}
+	for i, fn := range validations.TypeFunctions {
+		validations.TypeFunctions[i] = Function(tag, fn.Flags, ifOption, c.Option, c.Enabled, WrapperFunction{Function: fn, ObjType: context.Type})
+	}
+	return validations
+}
+
+// ModeCondition requires a mode discriminator to match a value.
+type ModeCondition struct {
+	Modality string
+	Mode     string
+}
+
+func (c ModeCondition) Kind() string                 { return "Mode:" + c.Modality }
+func (c ModeCondition) Key() string                  { return fmt.Sprintf("Mode:%s=%s", c.Modality, c.Mode) }
+func (c ModeCondition) Order() int                   { return 2 }
+func (c ModeCondition) Compare(other Condition) int {
+	o, ok := other.(ModeCondition)
+	if !ok {
+		return strings.Compare(c.Kind(), other.Kind())
+	}
+	if cmp := strings.Compare(c.Modality, o.Modality); cmp != 0 {
+		return cmp
+	}
+	return strings.Compare(c.Mode, o.Mode)
+}
+func (c ModeCondition) Wrap(validations Validations, _ Context) Validations {
+	return validations
+}
+
+// Conditions defines what conditions must be true for a resource to be validated.
+// If any of the conditions are not true, the resource is not validated.
+type Conditions []Condition
+
 func (c Conditions) Empty() bool {
-	return len(c.OptionEnabled) == 0 && len(c.OptionDisabled) == 0
+	return len(c) == 0
+}
+
+func (c Conditions) Key() string {
+	if len(c) == 0 {
+		return ""
+	}
+	if len(c) == 1 {
+		return c[0].Key()
+	}
+	keys := make([]string, len(c))
+	for i, cond := range c {
+		keys[i] = cond.Key()
+	}
+	return strings.Join(keys, ";")
+}
+
+func (c Conditions) Merge(other Conditions) Conditions {
+	if len(other) == 0 {
+		return c
+	}
+	if len(c) == 0 {
+		return slices.Clone(other)
+	}
+	res := make(Conditions, len(c), len(c)+len(other))
+	copy(res, c)
+	for _, o := range other {
+		replaced := false
+		for i, existing := range res {
+			if existing.Kind() == o.Kind() {
+				res[i] = o
+				replaced = true
+				break
+			}
+		}
+		if !replaced {
+			res = append(res, o)
+		}
+	}
+	slices.SortFunc(res, func(a, b Condition) int {
+		if cmp := a.Order() - b.Order(); cmp != 0 {
+			return cmp
+		}
+		if cmp := strings.Compare(a.Kind(), b.Kind()); cmp != 0 {
+			return cmp
+		}
+		return a.Compare(b)
+	})
+	return res
+}
+
+func (c Conditions) Compare(other Conditions) int {
+	minLen := len(c)
+	if len(other) < minLen {
+		minLen = len(other)
+	}
+	for i := 0; i < minLen; i++ {
+		if cmp := c[i].Compare(other[i]); cmp != 0 {
+			return cmp
+		}
+	}
+	return len(c) - len(other)
+}
+
+func (c Conditions) WithOptionEnabled(opt string) Conditions {
+	return c.Merge(Conditions{OptionCondition{Option: opt, Enabled: true}})
+}
+
+func (c Conditions) WithOptionDisabled(opt string) Conditions {
+	return c.Merge(Conditions{OptionCondition{Option: opt, Enabled: false}})
+}
+
+func (c Conditions) Mode() (string, string) {
+	for _, cond := range c {
+		if m, ok := cond.(ModeCondition); ok {
+			return m.Modality, m.Mode
+		}
+	}
+	return "", ""
 }
 
 // Identifier is a name that the generator will output as an identifier.
@@ -497,31 +645,6 @@ func Function(tagName string, flags FunctionFlags, function types.Name, extraArg
 		Function: function,
 		Args:     extraArgs,
 	}
-}
-
-// DeferredScope indicates how long a validation should be deferred.
-type DeferredScope string
-
-const (
-	// ThisContext defers validation until the end of the current context (e.g. field or type).
-	ThisContext DeferredScope = "ThisContext"
-	// ParentContext defers validation until the end of the parent context (e.g. to accumulate data across fields in a struct).
-	ParentContext DeferredScope = "ParentContext"
-)
-
-// Deferred creates a DeferredGen for a given callback.
-func Deferred(scope DeferredScope, callback func() (Validations, error)) DeferredGen {
-	return DeferredGen{
-		Scope:    scope,
-		Callback: callback,
-	}
-}
-
-// DeferredGen describes a validation generation task that is deferred until
-// later.
-type DeferredGen struct {
-	Scope    DeferredScope
-	Callback func() (Validations, error)
 }
 
 // Emission describes the field.Error a runtime validator produces on failure.
@@ -569,10 +692,6 @@ type FunctionGen struct {
 	// generic function calls which require explicit type arguments.
 	TypeArgs []types.Name
 
-	// Conditions holds any conditions that must true for a field to be
-	// validated by this function.
-	Conditions Conditions
-
 	// Comments holds optional comments that should be added to the generated
 	// code (without the leading "//").
 	Comments []string
@@ -595,12 +714,6 @@ type FunctionGen struct {
 // WithTypeArgs returns a derived FunctionGen with type arguments.
 func (fg FunctionGen) WithTypeArgs(typeArgs ...types.Name) FunctionGen {
 	fg.TypeArgs = typeArgs
-	return fg
-}
-
-// WithConditions returns a derived FunctionGen with conditions.
-func (fg FunctionGen) WithConditions(conditions Conditions) FunctionGen {
-	fg.Conditions = conditions
 	return fg
 }
 
@@ -663,8 +776,9 @@ type WrapperFunction struct {
 // of a regular validation function (op, fldPath, obj, oldObj) and calls
 // multiple other validation functions with the same signature.
 type MultiWrapperFunction struct {
-	Functions []FunctionGen
-	ObjType   *types.Type
+	Functions     []FunctionGen
+	TypeFunctions []FunctionGen
+	ObjType       *types.Type
 	// PathFragment, when non-empty, is the static field-path component the
 	// wrapping FunctionGen adds to fldPath before invoking the inner Functions
 	// (e.g. ".<jsonName>" for the discriminated-mode validator). Used by tools

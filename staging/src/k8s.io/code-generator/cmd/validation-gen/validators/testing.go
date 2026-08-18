@@ -77,7 +77,7 @@ func (fixedResultTagValidator) ValidScopes() sets.Set[Scope] {
 	return fixedResultTagValidScopes
 }
 
-func (frtv fixedResultTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (frtv fixedResultTagValidator) GetValidations(context Context, _ SchemaMetadata, tag codetags.Tag) (Validations, error) {
 	var result Validations
 
 	if frtv.error {

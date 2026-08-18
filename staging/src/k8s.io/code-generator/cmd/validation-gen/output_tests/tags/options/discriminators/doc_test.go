@@ -56,4 +56,15 @@ func Test(t *testing.T) {
 		field.ErrorMatcher{}.ByType().ByField().ByOrigin(),
 		field.ErrorList{field.Forbidden(field.NewPath("discriminatorField", "fieldB"), "").WithOrigin("")},
 	)
+
+	// Test independent mode feature options: disabling FeatureB for Mode B must NOT suppress Mode A validation when FeatureA is enabled.
+	st.Value(&Struct{
+		IndependentDiscriminator: IndependentFeatureDiscriminator{
+			Discriminator: "A",
+			// SharedField is nil/missing
+		},
+	}).Opts(map[string]bool{"FeatureA": true, "FeatureB": false, "FeatureZ": true}).ExpectMatches(
+		field.ErrorMatcher{}.ByType().ByField().ByOrigin(),
+		field.ErrorList{field.Required(field.NewPath("independentDiscriminator", "sharedField"), "").WithOrigin("")},
+	)
 }

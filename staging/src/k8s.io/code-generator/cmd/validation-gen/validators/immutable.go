@@ -49,7 +49,7 @@ var (
 	immutableValidator = types.Name{Package: libValidationPkg, Name: "Immutable"}
 )
 
-func (immutableTagValidator) GetValidations(context Context, _ codetags.Tag) (Validations, error) {
+func (immutableTagValidator) GetValidations(context Context, _ SchemaMetadata, _ codetags.Tag) (Validations, error) {
 	var result Validations
 
 	// Use ShortCircuit flag so immutable runs in the same group as +k8s:optional.

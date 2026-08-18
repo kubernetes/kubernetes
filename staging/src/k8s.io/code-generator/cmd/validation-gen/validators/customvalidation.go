@@ -76,7 +76,7 @@ func (customValidationTagValidator) ValidScopes() sets.Set[Scope] {
 	return customValidationTagValidScopes
 }
 
-func (v *customValidationTagValidator) GetValidations(context Context, _ codetags.Tag) (Validations, error) {
+func (v *customValidationTagValidator) GetValidations(context Context, _ SchemaMetadata, _ codetags.Tag) (Validations, error) {
 	// Resolve the output package for the type that owns the call site (the type
 	// itself, or the containing struct for a field), as done for Validate_<Type>.
 	definingType := context.Type

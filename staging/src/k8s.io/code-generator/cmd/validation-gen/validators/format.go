@@ -66,7 +66,7 @@ var (
 	uuidValidator                       = types.Name{Package: libValidationPkg, Name: "UUID"}
 )
 
-func (formatTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (formatTagValidator) GetValidations(context Context, _ SchemaMetadata, tag codetags.Tag) (Validations, error) {
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
 	if t := util.NonPointer(util.NativeType(context.Type)); t != types.String {

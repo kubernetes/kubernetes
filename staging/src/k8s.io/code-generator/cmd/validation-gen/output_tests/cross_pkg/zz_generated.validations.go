@@ -585,13 +585,13 @@ func Validate_T1(
 				}
 			}
 			// call field-attached validations
-			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, true, "field T1.SliceOfOtherStruct"); len(e) != 0 {
-				errs = append(errs, e...)
-			}
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *other.StructType) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, true, "field T1.SliceOfOtherStruct values")
 				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, true, "field T1.SliceOfOtherStruct"); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -615,9 +615,6 @@ func Validate_T1(
 				}
 			}
 			// call field-attached validations
-			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, true, "field T1.ListMapOfOtherStruct"); len(e) != 0 {
-				errs = append(errs, e...)
-			}
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a *other.StructType, b *other.StructType) bool { return a.StringField == b.StringField }, validate.DirectEqual,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *other.StructType) field.ErrorList {
@@ -628,6 +625,9 @@ func Validate_T1(
 			// lists with map semantics require unique keys
 			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *other.StructType, b *other.StructType) bool { return a.StringField == b.StringField }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, true, "field T1.ListMapOfOtherStruct"); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -657,13 +657,13 @@ func Validate_T1(
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, true, "field T1.MapOfOtherStringToOtherStruct"); len(e) != 0 {
-				errs = append(errs, e...)
-			}
 			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *other.StructType) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, true, "field T1.MapOfOtherStringToOtherStruct values")
 				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, true, "field T1.MapOfOtherStringToOtherStruct"); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return

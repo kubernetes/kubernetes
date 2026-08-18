@@ -29,10 +29,14 @@ import (
 // name. It returns nil if no such member exists.
 func GetMemberByJSON(t *types.Type, jsonName string) *types.Member {
 	for i := range t.Members {
-		if jsonTag, ok := tags.LookupJSON(t.Members[i]); ok {
+		m := &t.Members[i]
+		if jsonTag, ok := tags.LookupJSON(*m); ok && jsonTag.Name != "" {
 			if jsonTag.Name == jsonName {
-				return &t.Members[i]
+				return m
 			}
+		}
+		if m.Name == jsonName {
+			return m
 		}
 	}
 	return nil

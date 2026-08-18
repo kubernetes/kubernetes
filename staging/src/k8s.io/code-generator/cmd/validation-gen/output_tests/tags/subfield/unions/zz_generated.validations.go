@@ -25,7 +25,6 @@ import (
 	context "context"
 	fmt "fmt"
 
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -64,49 +63,35 @@ func Validate_Struct(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *Struct) (errs field.ErrorList) {
 
-	// field Struct.TypeMeta has no validation
-
-	{ // field Struct.Subfield
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *SubStruct,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call field-attached validations
-			if e := validate.DiscriminatedUnion(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_subfield_unions_Struct_subfield_,
-				func(obj *SubStruct) string {
-					if obj == nil {
-						return ""
-					}
-					return string(obj.D)
-				},
-				func(obj *SubStruct) bool {
-					if obj == nil {
-						return false
-					}
-					return obj.M1 != nil
-				},
-				func(obj *SubStruct) bool {
-					if obj == nil {
-						return false
-					}
-					return obj.M2 != nil
-				}); len(e) != 0 {
-				errs = append(errs, e...)
-			}
-			return
+	func() { // cohort = "subfield"
+		if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "subfield",
+			func(o *Struct) *SubStruct { return &o.Subfield }, validate.SemanticDeepEqual,
+			func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SubStruct) field.ErrorList {
+				return validate.DiscriminatedUnion(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_subfield_unions_Struct_subfield_,
+					func(obj *SubStruct) string {
+						if obj == nil {
+							return ""
+						}
+						return string(obj.D)
+					},
+					func(obj *SubStruct) bool {
+						if obj == nil {
+							return false
+						}
+						return obj.M1 != nil
+					},
+					func(obj *SubStruct) bool {
+						if obj == nil {
+							return false
+						}
+						return obj.M2 != nil
+					})
+			}); len(e) != 0 {
+			errs = append(errs, e...)
 		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *Struct) *SubStruct {
-				return &oldObj.Subfield
-			})
-		errs = append(errs, fn(fldPath.Child("subfield"), &obj.Subfield, oldVal, oldObj != nil)...)
-	}
+	}()
 
+	// field Struct.TypeMeta has no validation
+	// field Struct.Subfield has no validation
 	return errs
 }
