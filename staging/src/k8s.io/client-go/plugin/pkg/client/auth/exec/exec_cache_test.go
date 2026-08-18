@@ -18,6 +18,7 @@ package exec_test // separate package to prevent circular import
 
 import (
 	"context"
+	"crypto/tls"
 	"testing"
 	"time"
 
@@ -102,6 +103,58 @@ func TestExecTLSCache(t *testing.T) {
 
 	if tlsConfig1 == tlsConfig3 {
 		t.Fatal("expected different TLS config for non-matching exec config via rest config")
+	}
+}
+
+// TestExecTLSCacheWithMapConfig verifies that equivalent exec configs containing
+// maps produce stable cache keys and share a cached authenticator.
+func TestExecTLSCacheWithMapConfig(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	t.Cleanup(cancel)
+
+	newConfig := func() *rest.Config {
+		execConfig := &clientcmdapi.ExecConfig{
+			Command:         "./testdata/test-plugin.sh",
+			APIVersion:      "client.authentication.k8s.io/v1",
+			InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
+			Config: &clientcmdapi.Config{
+				Clusters: map[string]*clientcmdapi.Cluster{
+					"a": {Server: "https://a.example.com"},
+					"b": {Server: "https://b.example.com"},
+					"c": {Server: "https://c.example.com"},
+				},
+			},
+		}
+
+		return &rest.Config{
+			Host:         "https://localhost",
+			ExecProvider: execConfig,
+		}
+	}
+
+	var expected *tls.Config
+
+	for range 100 {
+		client := clientset.NewForConfigOrDie(newConfig())
+
+		_, _ = client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+
+		rt := client.RESTClient().(*rest.RESTClient).Client.Transport
+		tlsConfig, err := utilnet.TLSClientConfig(rt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tlsConfig == nil {
+			t.Fatal("expected non-nil TLS config")
+		}
+
+		if expected == nil {
+			expected = tlsConfig
+			continue
+		}
+		if expected != tlsConfig {
+			t.Fatal("expected the same TLS config for equivalent exec configs containing maps")
+		}
 	}
 }
 
