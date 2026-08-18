@@ -169,6 +169,7 @@ type frameworkOptions struct {
 	podsInPreBind          *podsInPreBindMap
 	apiDispatcher          *apidispatcher.APIDispatcher
 	podGroupManager        fwk.PodGroupManager
+	maxBatchAge            time.Duration
 	logger                 *klog.Logger
 }
 
@@ -320,11 +321,19 @@ func WithLogger(logger klog.Logger) Option {
 	}
 }
 
+// WithMaxBatchAge sets maxBatchAge for OpportunisticBatch.
+func WithMaxBatchAge(maxBatchAge time.Duration) Option {
+	return func(o *frameworkOptions) {
+		o.maxBatchAge = maxBatchAge
+	}
+}
+
 // defaultFrameworkOptions are applied when no option corresponding to those fields exist.
 func defaultFrameworkOptions(stopCh <-chan struct{}) frameworkOptions {
 	return frameworkOptions{
 		metricsRecorder: metrics.NewMetricsAsyncRecorder(1000, time.Second, stopCh),
 		parallelizer:    parallelize.NewParallelizer(parallelize.DefaultParallelism),
+		maxBatchAge:     DefaultMaxBatchAge,
 	}
 }
 
@@ -368,7 +377,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
-		f.batch = newOpportunisticBatch(f, utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload))
+		f.batch = newOpportunisticBatch(f, utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload), options.maxBatchAge)
 	}
 
 	if len(f.extenders) > 0 {

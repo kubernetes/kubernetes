@@ -139,6 +139,7 @@ type schedulerOptions struct {
 	podInitialBackoffSeconds          int64
 	podMaxBackoffSeconds              int64
 	podMaxInUnschedulablePodsDuration time.Duration
+	maxBatchAge                       time.Duration
 	// Contains out-of-tree plugins to be merged with the in-tree registry.
 	frameworkOutOfTreeRegistry frameworkruntime.Registry
 	profiles                   []schedulerapi.KubeSchedulerProfile
@@ -237,6 +238,13 @@ func WithPodMaxInUnschedulablePodsDuration(duration time.Duration) Option {
 	}
 }
 
+// WithMaxBatchAge sets maxBatchAge for OpportunisticBatching, the default value is 500ms.
+func WithMaxBatchAge(maxBatchAge time.Duration) Option {
+	return func(o *schedulerOptions) {
+		o.maxBatchAge = maxBatchAge
+	}
+}
+
 // WithExtenders sets extenders for the Scheduler
 func WithExtenders(e ...schedulerapi.Extender) Option {
 	return func(o *schedulerOptions) {
@@ -274,6 +282,7 @@ var defaultSchedulerOptions = schedulerOptions{
 	podInitialBackoffSeconds:          int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
 	podMaxBackoffSeconds:              int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
 	podMaxInUnschedulablePodsDuration: internalqueue.DefaultPodMaxInUnschedulablePodsDuration,
+	maxBatchAge:                       frameworkruntime.DefaultMaxBatchAge,
 	parallelism:                       int32(parallelize.DefaultParallelism),
 	// Ideally we would statically set the default profile here, but we can't because
 	// creating the default profile may require testing feature gates, which may get
@@ -383,6 +392,7 @@ func New(ctx context.Context,
 		frameworkruntime.WithAPIDispatcher(apiDispatcher),
 		frameworkruntime.WithSharedCSIManager(sharedCSIManager),
 		frameworkruntime.WithPodGroupManager(schedulerCache),
+		frameworkruntime.WithMaxBatchAge(options.maxBatchAge),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing profiles: %v", err)

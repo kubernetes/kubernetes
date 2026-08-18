@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
@@ -368,7 +369,7 @@ func TestBatchBasic(t *testing.T) {
 			}
 
 			signature := fwk.PodSignature(tt.firstSig)
-			batch := newOpportunisticBatch(testFwk, tt.genericWorkloadEnabled)
+			batch := newOpportunisticBatch(testFwk, tt.genericWorkloadEnabled, time.Minute)
 			state := framework.NewCycleState()
 
 			// Run the first "pod" through
@@ -599,7 +600,7 @@ func TestBatchRescore(t *testing.T) {
 			// First pod: non-blocking, chosen node is n2, n1 left as other candidate.
 			pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID(nonBlockingPodID("1"))}}
 			sig := fwk.PodSignature("sig")
-			batch := newOpportunisticBatch(testFwk, false)
+			batch := newOpportunisticBatch(testFwk, false, time.Minute)
 
 			cachedNodes := framework.NewSortedScoredNodes([]fwk.NodePluginScores{
 				{Name: "n1", RawScores: []fwk.PluginScore{{Name: "configurableScore", Score: n1CachedScore}}},
@@ -662,7 +663,7 @@ func TestBatchRescoreChain(t *testing.T) {
 	}
 
 	sig := fwk.PodSignature("sig")
-	batch := newOpportunisticBatch(testFwk, false)
+	batch := newOpportunisticBatch(testFwk, false, time.Minute)
 
 	// Pod1: n2 chosen, n1 is stored as the only other candidate.
 	pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID(nonBlockingPodID("1"))}}
