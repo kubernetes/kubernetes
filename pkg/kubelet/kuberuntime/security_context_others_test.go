@@ -31,6 +31,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -190,25 +191,32 @@ func TestDetermineEffectiveSecurityContextCgroupOptions(t *testing.T) {
 	testCases := []struct {
 		desc                    string
 		cgroupOptionsGate       bool
+		cgroupVersion           int
+		noNsdelegate            bool
+		noCgroupsPerQOS         bool
 		podSc                   *v1.PodSecurityContext
 		sc                      *v1.SecurityContext
 		expectedCgroupMountMode runtimeapi.CgroupMountMode
+		expectedErr             string
 	}{
 		{
 			desc:                    "nil SecurityContext",
 			cgroupOptionsGate:       true,
+			cgroupVersion:           2,
 			sc:                      nil,
 			expectedCgroupMountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_UNSPECIFIED,
 		},
 		{
 			desc:                    "no CgroupOptions",
 			cgroupOptionsGate:       true,
+			cgroupVersion:           2,
 			sc:                      &v1.SecurityContext{},
 			expectedCgroupMountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_UNSPECIFIED,
 		},
 		{
 			desc:              "CgroupOptions with nil MountMode",
 			cgroupOptionsGate: true,
+			cgroupVersion:     2,
 			sc: &v1.SecurityContext{
 				CgroupOptions: &v1.CgroupOptions{},
 			},
@@ -217,6 +225,7 @@ func TestDetermineEffectiveSecurityContextCgroupOptions(t *testing.T) {
 		{
 			desc:              "CgroupOptions ReadWrite",
 			cgroupOptionsGate: true,
+			cgroupVersion:     2,
 			sc: &v1.SecurityContext{
 				CgroupOptions: &v1.CgroupOptions{MountMode: &readWrite},
 			},
@@ -225,6 +234,7 @@ func TestDetermineEffectiveSecurityContextCgroupOptions(t *testing.T) {
 		{
 			desc:              "CgroupOptions ReadOnly",
 			cgroupOptionsGate: true,
+			cgroupVersion:     2,
 			sc: &v1.SecurityContext{
 				CgroupOptions: &v1.CgroupOptions{MountMode: &readOnly},
 			},
@@ -235,6 +245,7 @@ func TestDetermineEffectiveSecurityContextCgroupOptions(t *testing.T) {
 			// by one and has to include cgroupOptions.
 			desc:              "CgroupOptions ReadWrite with a pod-level security context",
 			cgroupOptionsGate: true,
+			cgroupVersion:     2,
 			podSc:             &v1.PodSecurityContext{RunAsNonRoot: new(true)},
 			sc: &v1.SecurityContext{
 				CgroupOptions: &v1.CgroupOptions{MountMode: &readWrite},
@@ -246,10 +257,41 @@ func TestDetermineEffectiveSecurityContextCgroupOptions(t *testing.T) {
 			// limits. It must not request a writable mount.
 			desc:              "CgroupOptions ReadWrite with the feature gate disabled",
 			cgroupOptionsGate: false,
+			cgroupVersion:     2,
 			sc: &v1.SecurityContext{
 				CgroupOptions: &v1.CgroupOptions{MountMode: &readWrite},
 			},
 			expectedCgroupMountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_UNSPECIFIED,
+		},
+		{
+			desc:              "CgroupOptions ReadWrite on cgroup v1",
+			cgroupOptionsGate: true,
+			cgroupVersion:     1,
+			sc: &v1.SecurityContext{
+				CgroupOptions: &v1.CgroupOptions{MountMode: &readWrite},
+			},
+			expectedErr: "require cgroup v2",
+		},
+		{
+			desc:              "CgroupOptions ReadWrite without nsdelegate",
+			cgroupOptionsGate: true,
+			cgroupVersion:     2,
+			noNsdelegate:      true,
+			sc: &v1.SecurityContext{
+				CgroupOptions: &v1.CgroupOptions{MountMode: &readWrite},
+			},
+			expectedErr: "nsdelegate",
+		},
+		{
+			// Without a pod cgroup there is nowhere to write the descendant limits.
+			desc:              "CgroupOptions ReadWrite without a pod cgroup",
+			cgroupOptionsGate: true,
+			cgroupVersion:     2,
+			noCgroupsPerQOS:   true,
+			sc: &v1.SecurityContext{
+				CgroupOptions: &v1.CgroupOptions{MountMode: &readWrite},
+			},
+			expectedErr: "cgroup per pod",
 		},
 	}
 
@@ -278,8 +320,17 @@ func TestDetermineEffectiveSecurityContextCgroupOptions(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			_, _, m, err := createTestRuntimeManager(tCtx)
 			require.NoError(t, err)
+			m.containerManager = cm.NewFakeContainerManagerWithNodeConfig(cm.NodeConfig{
+				CgroupVersion:    tc.cgroupVersion,
+				CgroupsPerQOS:    !tc.noCgroupsPerQOS,
+				CgroupNsdelegate: !tc.noNsdelegate,
+			})
 
 			result, err := m.determineEffectiveSecurityContext(tCtx, pod, &pod.Spec.Containers[0], nil, "")
+			if tc.expectedErr != "" {
+				require.ErrorContains(t, err, tc.expectedErr)
+				return
+			}
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectedCgroupMountMode, result.CgroupMountMode)
 		})
