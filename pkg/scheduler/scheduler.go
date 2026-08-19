@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic/dynamicinformer"
@@ -156,6 +157,8 @@ type Option func(*schedulerOptions)
 type ScheduleResult struct {
 	// Name of the selected node.
 	SuggestedHost string
+	// UID of the selected node.
+	SuggestedHostUID types.UID
 	// The number of nodes the scheduler evaluated the pod against in the filtering
 	// phase and beyond.
 	EvaluatedNodes int
