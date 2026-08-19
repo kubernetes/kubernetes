@@ -67,6 +67,7 @@ func TestBeforeSynced(t *testing.T) {
 
 type testClient[T clusterTrustBundle] interface {
 	Create(context.Context, *T, metav1.CreateOptions) (*T, error)
+	Update(context.Context, *T, metav1.UpdateOptions) (*T, error)
 	Delete(context.Context, string, metav1.DeleteOptions) error
 }
 
@@ -263,6 +264,144 @@ func testGetTrustAnchorsByNameCaching[T clusterTrustBundle](tCtx ktesting.TConte
 			t.Fatalf("Bad bundle; diff (-got +want)\n%s", diff)
 		}
 	}()
+}
+
+func TestGetTrustAnchorsByNameCachingSignedBundle(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	tCtx.SyncTest("v1alpha1", func(tCtx ktesting.TContext) {
+		testGetTrustAnchorsByNameCachingSignedBundle(tCtx, alphaFunctionsBundle)
+	})
+	tCtx.SyncTest("v1beta1", func(tCtx ktesting.TContext) {
+		testGetTrustAnchorsByNameCachingSignedBundle(tCtx, betaFunctionsBundle)
+	})
+	tCtx.SyncTest("v1", func(tCtx ktesting.TContext) {
+		testGetTrustAnchorsByNameCachingSignedBundle(tCtx, gaFunctionsBundle)
+	})
+}
+
+// testGetTrustAnchorsByNameCachingSignedBundle covers a ClusterTrustBundle that
+// carries a signer name but is read by name, which is what a pod does when it
+// projects a signer-linked bundle through clusterTrustBundle.name. Such an
+// object lands in the cache under a name key, and the update below has to
+// invalidate that entry just as it would for a bundle with no signer.
+func testGetTrustAnchorsByNameCachingSignedBundle[T clusterTrustBundle](tCtx ktesting.TContext, b testingFunctionBundle[T]) {
+	defer tCtx.Cancel("test completed")
+	t := tCtx.TB()
+
+	ctb1 := b.ctbConstructor("foo", "foo.bar/a", nil, mustMakeRoot(t, "root1"))
+	ctb2 := b.ctbConstructor("foo", "foo.bar/a", nil, mustMakeRoot(t, "root2"))
+
+	kc := fake.NewSimpleClientset(b.ctbToObj(ctb1))
+
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(kc, 0)
+
+	ctbManager, _ := b.informerManagerConstructor(tCtx, informerFactory, 256, 5*time.Minute)
+
+	informerFactory.Start(tCtx.Done())
+	ctbInformer := b.informerGetter(informerFactory)
+	if !cache.WaitForCacheSync(tCtx.Done(), ctbInformer.HasSynced) {
+		t.Fatalf("Timed out waiting for informer to sync")
+	}
+
+	func() {
+		t.Log("foo should yield the first certificate, and leave it in the cache under a name key")
+		gotBundle, err := ctbManager.GetTrustAnchorsByName(tCtx, "foo", false)
+		if err != nil {
+			t.Fatalf("Got error while calling GetTrustAnchorsByName: %v", err)
+		}
+
+		wantBundle := b.ctbTrustBundle(ctb1)
+
+		if diff := diffBundles(gotBundle, []byte(wantBundle)); diff != "" {
+			t.Fatalf("Bad bundle; diff (-got +want)\n%s", diff)
+		}
+	}()
+
+	client := b.clientGetter(kc)
+	if _, err := client.Update(tCtx, ctb2, metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("Error while updating the CTB: %v", err)
+	}
+
+	// As above, long enough for the informer to notice the update and much less
+	// than the 5 minute cache TTL, so that passing here means the event dropped
+	// the entry rather than the entry expiring on its own.
+	time.Sleep(5 * time.Second)
+
+	func() {
+		t.Log("foo should yield the new certificate")
+		gotBundle, err := ctbManager.GetTrustAnchorsByName(tCtx, "foo", false)
+		if err != nil {
+			t.Fatalf("Got error while calling GetTrustAnchorsByName: %v", err)
+		}
+
+		wantBundle := b.ctbTrustBundle(ctb2)
+		if diff := diffBundles(gotBundle, []byte(wantBundle)); diff != "" {
+			t.Fatalf("Bad bundle; diff (-got +want)\n%s", diff)
+		}
+	}()
+}
+
+func TestDropCacheForKeepsUnrelatedEntries(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	tCtx.SyncTest("v1alpha1", func(tCtx ktesting.TContext) {
+		testDropCacheForKeepsUnrelatedEntries(tCtx, alphaFunctionsBundle)
+	})
+	tCtx.SyncTest("v1beta1", func(tCtx ktesting.TContext) {
+		testDropCacheForKeepsUnrelatedEntries(tCtx, betaFunctionsBundle)
+	})
+	tCtx.SyncTest("v1", func(tCtx ktesting.TContext) {
+		testDropCacheForKeepsUnrelatedEntries(tCtx, gaFunctionsBundle)
+	})
+}
+
+// testDropCacheForKeepsUnrelatedEntries is why the signer sweep in dropCacheFor
+// stays conditional. GetSignerName returns "" for a bundle with no signer, and
+// name-keyed entries are stored with an empty signerName, so sweeping on signer
+// name unconditionally would match every name-keyed entry in the cache,
+// including entries belonging to unrelated ClusterTrustBundles.
+func testDropCacheForKeepsUnrelatedEntries[T clusterTrustBundle](tCtx ktesting.TContext, b testingFunctionBundle[T]) {
+	defer tCtx.Cancel("test completed")
+	t := tCtx.TB()
+
+	ctb1 := b.ctbConstructor("ctb1", "", nil, mustMakeRoot(t, "root1"))
+	ctb2 := b.ctbConstructor("ctb2", "", nil, mustMakeRoot(t, "root2"))
+
+	kc := fake.NewSimpleClientset(b.ctbToObj(ctb1), b.ctbToObj(ctb2))
+
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(kc, 0)
+
+	ctbManager, _ := b.informerManagerConstructor(tCtx, informerFactory, 256, 5*time.Minute)
+
+	informerFactory.Start(tCtx.Done())
+	ctbInformer := b.informerGetter(informerFactory)
+	if !cache.WaitForCacheSync(tCtx.Done(), ctbInformer.HasSynced) {
+		t.Fatalf("Timed out waiting for informer to sync")
+	}
+
+	m, ok := ctbManager.(*InformerManager[T])
+	if !ok {
+		t.Fatalf("Got a %T, wanted an *InformerManager", ctbManager)
+	}
+
+	// The informer hands its initial adds to the event handler asynchronously,
+	// and each one calls dropCacheFor. Let those drain first, so that what the
+	// assertions below see is the effect of the explicit call and nothing else.
+	time.Sleep(1 * time.Second)
+
+	for _, name := range []string{"ctb1", "ctb2"} {
+		if _, err := m.GetTrustAnchorsByName(tCtx, name, false); err != nil {
+			t.Fatalf("Error while calling GetTrustAnchorsByName(%q): %v", name, err)
+		}
+	}
+
+	m.dropCacheFor(ctb1)
+
+	if _, ok := m.normalizationCache.Get(cacheKeyType{ctbName: "ctb1"}); ok {
+		t.Errorf("Cache entry for ctb1 survived dropCacheFor(ctb1), wanted it dropped")
+	}
+	if _, ok := m.normalizationCache.Get(cacheKeyType{ctbName: "ctb2"}); !ok {
+		t.Errorf("Cache entry for the unrelated ctb2 was dropped by dropCacheFor(ctb1), wanted it kept")
+	}
 }
 
 func TestGetTrustAnchorsBySignerName(t *testing.T) {
