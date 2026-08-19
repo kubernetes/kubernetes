@@ -8,6 +8,7 @@
  */
 import { type IConstruct } from 'constructs';
 import type { App } from '../app';
+import type { CfnResource } from '../cfn-resource';
 import { ValidationError } from '../errors';
 import type { NestedStack } from '../nested-stack';
 import type { Stack } from '../stack';
@@ -73,4 +74,11 @@ export function stageOf(construct: IConstruct): Stage | undefined {
 export function appOf(construct: IConstruct): App | undefined {
   const root = construct.node.root;
   return APP_TYPE.isMarked(root) ? root : undefined;
+}
+
+/**
+ * Check whether the given object is a CfnResource
+ */
+export function isCfnResource(x: any): x is CfnResource {
+  return x !== null && typeof (x) === 'object' && x.cfnResourceType !== undefined;
 }
