@@ -970,6 +970,7 @@ func TestPodResourceLimits(t *testing.T) {
 		description           string
 		options               PodResourcesOptions
 		overhead              v1.ResourceList
+		podLevelResources     *v1.ResourceRequirements
 		initContainers        []v1.Container
 		initContainerStatuses []v1.ContainerStatus
 		containers            []v1.Container
@@ -1115,11 +1116,8 @@ func TestPodResourceLimits(t *testing.T) {
 			},
 		},
 		{
-			description: "one limited and one unlimited container should result in the limited container's limits for the pod",
-			expectedLimits: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("2"),
-				v1.ResourceMemory: resource.MustParse("2Gi"),
-			},
+			description:    "aggregate does not contain cpu and memory limits when they are omitted in one container",
+			expectedLimits: v1.ResourceList{},
 			initContainers: []v1.Container{},
 			containers: []v1.Container{
 				{
@@ -1136,11 +1134,8 @@ func TestPodResourceLimits(t *testing.T) {
 			},
 		},
 		{
-			description: "one limited and one unlimited init container should result in the limited init container's limits for the pod",
-			expectedLimits: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("2"),
-				v1.ResourceMemory: resource.MustParse("2Gi"),
-			},
+			description:    "aggregate does not contain cpu and memory limits when they are omitted in one init container",
+			expectedLimits: v1.ResourceList{},
 			initContainers: []v1.Container{
 				{
 					Resources: v1.ResourceRequirements{
@@ -1546,6 +1541,69 @@ func TestPodResourceLimits(t *testing.T) {
 				},
 			},
 		},
+		{
+			description: "aggregate contains ephemeral-storage limit when limit is omitted in one container",
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{}}},
+			},
+			expectedLimits: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+		},
+		{
+			description: "aggregate contains hugepages limit when limit is omitted in one container, which contributes zero",
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{"hugepages-2Mi": resource.MustParse("2Mi")}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{}}},
+			},
+			expectedLimits: v1.ResourceList{"hugepages-2Mi": resource.MustParse("2Mi")},
+		},
+		{
+			description: "aggregate contains extended resource limit when limit is omitted in one container, which contributes zero",
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{"example.com/gpu": resource.MustParse("1")}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{}}},
+			},
+			expectedLimits: v1.ResourceList{"example.com/gpu": resource.MustParse("1")},
+		},
+		{
+			description:       "aggregate contains pod-level cpu limit when limit is omitted in one container",
+			podLevelResources: &v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4")}},
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{}}},
+			},
+			expectedLimits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4")},
+		},
+		{
+			description: "aggregate does not contain cpu limit or its overhead when limit is omitted in one container",
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("64Mi"),
+			},
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+				}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+				}}},
+			},
+			expectedLimits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2112Mi")},
+		},
+		{
+			description: "aggregate does not contain cpu limit when limit is omitted in a restartable init container",
+			initContainers: []v1.Container{
+				{
+					RestartPolicy: &restartAlways,
+					Resources:     v1.ResourceRequirements{Limits: v1.ResourceList{}},
+				},
+			},
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}}},
+			},
+			expectedLimits: v1.ResourceList{},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
@@ -1554,6 +1612,7 @@ func TestPodResourceLimits(t *testing.T) {
 					Containers:     tc.containers,
 					InitContainers: tc.initContainers,
 					Overhead:       tc.overhead,
+					Resources:      tc.podLevelResources,
 				},
 				Status: v1.PodStatus{
 					ContainerStatuses:     tc.containerStatuses,
@@ -3540,6 +3599,37 @@ func TestAggregateContainerRequestsAndLimits(t *testing.T) {
 			expectedLimits: v1.ResourceList{
 				v1.ResourceName(v1.ResourceCPU): resource.MustParse("9"),
 			},
+		},
+		{
+			name: "aggregate contains memory limit but not cpu limit when cpu limit is omitted in one container",
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+				}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+				}}},
+			},
+			expectedRequests: v1.ResourceList{},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+		},
+		{
+			name: "aggregate does not contain both cpu and memory limits when they are zero in one container",
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+				}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("0"),
+					v1.ResourceMemory: resource.MustParse("0"),
+				}}},
+			},
+			expectedRequests: v1.ResourceList{},
+			expectedLimits:   v1.ResourceList{},
 		},
 		{
 			name: "two containers with limits",
