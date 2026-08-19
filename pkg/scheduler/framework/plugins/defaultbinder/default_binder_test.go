@@ -46,6 +46,7 @@ func init() {
 
 func TestDefaultBinder(t *testing.T) {
 	testPod := st.MakePod().Name("foo").Namespace("ns").Obj()
+	testPod.Spec.NodeUID = "test-node-uid"
 	testNode := "foohost.kubernetes.mydomain.com"
 	tests := []struct {
 		name        string
@@ -83,7 +84,7 @@ func TestDefaultBinder(t *testing.T) {
 				testNodeObj := &v1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: string(testNode),
-						UID:  "test-node-uid",
+						UID:  "different-node-uid",
 					},
 				}
 
