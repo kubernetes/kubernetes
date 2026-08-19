@@ -256,18 +256,11 @@ func BuildGenericConfig(
 	return
 }
 
-// trimPodSpec clears Pod spec fields on objects in the self-requested
-// informers that are not read by any of the in-process consumers of this
-// shared cache (NodeRestriction and ResourceQuota admission, the node
-// authorizer, and PodSecurity admission), to reduce the informer's memory
-// footprint. See https://github.com/kubernetes/kubernetes/issues/125469.
+// trimPodSpec clears Pod spec fields unused by admission/authorization code
+// reading off this shared cache, to shrink its memory footprint. See
+// https://github.com/kubernetes/kubernetes/issues/125469.
 //
-// Only fields verified unread by all of those consumers are cleared here;
-// fields any of them touch (e.g. ServiceAccountName, Volumes, container
-// resources) are left alone.
-//
-// If you add a Pod field read to one of those four consumers, check whether
-// it's cleared here first — nothing else will catch the conflict.
+// Before reading a new Pod field from this cache, check it isn't cleared here.
 func trimPodSpec(pod *corev1.Pod) {
 	pod.Spec.RestartPolicy = ""
 	pod.Spec.TerminationGracePeriodSeconds = nil

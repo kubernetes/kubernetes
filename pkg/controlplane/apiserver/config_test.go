@@ -83,10 +83,8 @@ func TestBuildGenericConfig(t *testing.T) {
 	}
 }
 
-// fullPodSpecForTrimTest returns a Pod with every field trimPodSpec targets,
-// and every field NodeRestriction/ResourceQuota/the node authorizer/PodSecurity
-// actually read (see pkg/controlplane/apiserver/config.go), populated with a
-// non-zero value.
+// fullPodSpecForTrimTest returns a Pod with every field relevant to
+// trimPodSpec set to a non-zero value.
 func fullPodSpecForTrimTest() *corev1.Pod {
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
