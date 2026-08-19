@@ -409,10 +409,38 @@ func PodLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	return limits
 }
 
+// omitPartiallySetCPUMemLimits deletes the cpu and memory limits from limits unless every
+// init and regular container sets them to a non-zero value.
+func omitPartiallySetCPUMemLimits(pod *v1.Pod, limits v1.ResourceList) {
+	_, cpuPresent := limits[v1.ResourceCPU]
+	_, memoryPresent := limits[v1.ResourceMemory]
+	for _, containers := range [][]v1.Container{pod.Spec.InitContainers, pod.Spec.Containers} {
+		for i := range containers {
+			if !cpuPresent && !memoryPresent {
+				return
+			}
+			ctrLimits := containers[i].Resources.Limits
+			if limit, found := ctrLimits[v1.ResourceCPU]; cpuPresent && (!found || limit.IsZero()) {
+				cpuPresent = false
+				delete(limits, v1.ResourceCPU)
+			}
+			if limit, found := ctrLimits[v1.ResourceMemory]; memoryPresent && (!found || limit.IsZero()) {
+				memoryPresent = false
+				delete(limits, v1.ResourceMemory)
+			}
+		}
+	}
+}
+
 // AggregateContainerLimits computes the aggregated resource limits of all the containers
 // in a pod. This computation follows the formula defined in the KEP for sidecar
 // containers. See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#resources-calculation-for-scheduling-and-pod-admission
 // for more details.
+//
+// If any container does not set a cpu or memory limit, or sets it to zero, that limit is
+// omitted in the aggregate instead of returned as a partial sum, because the kubelet treats
+// such a container as unlimited. Other resources,  hugepages, are always summed and an unset limit
+// for them means zero.
 func AggregateContainerLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	opts.NonMissingContainerRequests = nil
 	// attempt to reuse the maps if passed, or allocate otherwise
@@ -443,6 +471,8 @@ func AggregateContainerLimits(pod *v1.Pod, opts PodResourcesOptions) v1.Resource
 			addResourceList(limits, max(specLimits, actuatedLimits))
 		}
 	}
+
+	omitPartiallySetCPUMemLimits(pod, limits)
 	return limits
 }
 
