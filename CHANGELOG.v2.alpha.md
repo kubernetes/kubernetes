@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [2.266.0-alpha.0](https://github.com/aws/aws-cdk/compare/v2.265.0-alpha.0...v2.266.0-alpha.0) (2026-08-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **glue-alpha:** `DataQualityRulesetProps.rulesetDqdl: string` is replaced by
+`dqdl: Dqdl`. Build it with `Dqdl.fromString('Rules = [ ... ]')`.
+* **glue-alpha:** `s3Encryption`, `cloudWatchEncryption`, and `jobBookmarksEncryption` are no longer object literals. Use `S3Encryption.s3Managed()` / `S3Encryption.kms(key?)`, `CloudWatchEncryption.kms(key?)`, and `JobBookmarksEncryption.clientSideKms(key?)`. The `CloudWatchEncryptionMode` and `JobBookmarksEncryptionMode` enums are removed (their mode is now implicit); `S3EncryptionMode` is retained.
+* **glue-alpha:** this is a corrective breaking change. Apps that leaned on the bug, and did things like `InputFormat x = OutputFormat.AVRO;` will get a compilation error in other jsii languages. The intended usage, on the other hand, was broken before and works now.
+* **glue-alpha:** `workerType` and `numberOfWorkers` are no longer top-level job props. For Spark jobs, pass them together via `workerConfiguration: { workerType, numberOfWorkers }`. `PythonShellJob` no longer accepts them (it is sized by `maxCapacity`). `RayJob` no longer accepts `workerType` (it is fixed to `Z.2X`).
+* **glue-alpha:** `SparkJobProps.enableMetrics` removed, which will cause a compilation error for any app using it. But there is no behavior change, since this is a dead prop.
+* **glue-alpha:** a differing/tokenized `has_encrypted_data` supplied via `parameters` now throws.
+
+### Features
+
+* **glue-alpha:** add warning for maxRetries when job run queuing is enabled ([#38575](https://github.com/aws/aws-cdk/issues/38575)) ([09ae11e](https://github.com/aws/aws-cdk/commit/09ae11e81d44bd58059ac337d3c418254a6955a7))
+* **glue-alpha:** model SecurityConfiguration encryption as factory subtypes ([#38586](https://github.com/aws/aws-cdk/issues/38586)) ([e37e7a6](https://github.com/aws/aws-cdk/commit/e37e7a6ea3d525ca0b4048093416eac059272cdf))
+* **glue-alpha:** new `hasEncryptedData` property ([#38511](https://github.com/aws/aws-cdk/issues/38511)) ([c977e36](https://github.com/aws/aws-cdk/commit/c977e36c3aa43c0be3d043aef80775d9748477a6))
+* **glue-alpha:** pair workerType and numberOfWorkers into a required workerConfiguration ([#38576](https://github.com/aws/aws-cdk/issues/38576)) ([5f3b1b6](https://github.com/aws/aws-cdk/commit/5f3b1b6f3aa700d73fbc10c956ae53809af99047))
+* **glue-alpha:** wrap DataQualityRuleset DQDL in a typed value object ([#38587](https://github.com/aws/aws-cdk/issues/38587)) ([fd01268](https://github.com/aws/aws-cdk/commit/fd012680b1cff1905ad114082fc612ad7fb8992e))
+
+
+### Bug Fixes
+
+* **glue-alpha:** correct OutputFormat.AVRO/ORC type and tidy GA-hygiene items ([#38593](https://github.com/aws/aws-cdk/issues/38593)) ([35aefaf](https://github.com/aws/aws-cdk/commit/35aefaf5a72b89eda630de8cae38a1ed9c4c95ce))
+* **glue-alpha:** omit comments from struct type strings ([#38008](https://github.com/aws/aws-cdk/issues/38008)) ([5f16a86](https://github.com/aws/aws-cdk/commit/5f16a86dc8edefdb223260f8202acd272d43e643)), closes [#26935](https://github.com/aws/aws-cdk/issues/26935)
+* **mediapackagev2-alpha:** add GetChannel grant on MediaPackageV2 ([#38582](https://github.com/aws/aws-cdk/issues/38582)) ([74d922c](https://github.com/aws/aws-cdk/commit/74d922c4bf22fde05465f61c5dd19291b9db608f)), closes [#38581](https://github.com/aws/aws-cdk/issues/38581)
+
 ## [2.265.0-alpha.0](https://github.com/aws/aws-cdk/compare/v2.264.0-alpha.0...v2.265.0-alpha.0) (2026-08-13)
 
 

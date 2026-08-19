@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [2.266.0](https://github.com/aws/aws-cdk/compare/v2.265.0...v2.266.0) (2026-08-19)
+
+
+### Features
+
+* adding controlPlaneScalingConfig to Cluster  ([#36863](https://github.com/aws/aws-cdk/issues/36863)) ([94e5c1a](https://github.com/aws/aws-cdk/commit/94e5c1a64427374423e88c0b727fd19aa41a192c))
+* update L1 CloudFormation resource definitions ([#38578](https://github.com/aws/aws-cdk/issues/38578)) ([ccd2633](https://github.com/aws/aws-cdk/commit/ccd263359fd9a4f8725d2e3285d8a9641711cabb))
+
+
+### Bug Fixes
+
+* **ec2:** add DependsOn VPCGatewayAttachment to IPv6 default route ([#37893](https://github.com/aws/aws-cdk/issues/37893)) ([ab272bc](https://github.com/aws/aws-cdk/commit/ab272bc8b12614a37caa9c0679bc0c6b4163d352)), closes [#37853](https://github.com/aws/aws-cdk/issues/37853)
+* **sns-subscriptions:** use regionalized service principal for opt-in region SQS subscriptions ([#38339](https://github.com/aws/aws-cdk/issues/38339)) ([67a7eb1](https://github.com/aws/aws-cdk/commit/67a7eb1f104eea969a6539f074c7e0d282b92f59)), closes [#32526](https://github.com/aws/aws-cdk/issues/32526)
+
 ## [2.265.0](https://github.com/aws/aws-cdk/compare/v2.264.0...v2.265.0) (2026-08-13)
 
 
