@@ -53,7 +53,12 @@ func (m *kubeGenericRuntimeManager) calculateSandboxResources(ctx context.Contex
 		UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
 	}
 	req := resourcehelper.PodRequests(pod, opts)
+
+	// PodLimits() omits a cpu or memory limit that any container leaves unset when no
+	// pod-level limit is declared, so the sandbox is unlimited in that case, the same way
+	// ResourceConfigForPod() leaves the pod cgroup unlimited.
 	lim := resourcehelper.PodLimits(pod, opts)
+
 	var cpuRequest *resource.Quantity
 	if _, cpuRequestExists := req[v1.ResourceCPU]; cpuRequestExists {
 		cpuRequest = req.Cpu()
