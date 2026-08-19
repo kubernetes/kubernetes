@@ -32932,7 +32932,7 @@ func schema_k8sio_api_core_v1_Taint(ref common.ReferenceCallback) common.OpenAPI
 					},
 					"timeAdded": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TimeAdded represents the time at which the taint was added.",
+							Description: "TimeAdded represents the time at which the taint was added. It is populated at admission time by the NodeTaintTimeAddedDefaulting admission controller when it is not set: taints which have no counterpart with the same key and effect in the existing node get the current time, all other taints keep the time they already had.",
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},

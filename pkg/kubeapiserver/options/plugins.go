@@ -46,7 +46,8 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/network/denyserviceexternalips"
 	"k8s.io/kubernetes/plugin/pkg/admission/nodedeclaredfeatures"
 	"k8s.io/kubernetes/plugin/pkg/admission/noderestriction"
-	"k8s.io/kubernetes/plugin/pkg/admission/nodetaint"
+	"k8s.io/kubernetes/plugin/pkg/admission/nodetaintcondition"
+	"k8s.io/kubernetes/plugin/pkg/admission/nodetainttimeadded"
 	"k8s.io/kubernetes/plugin/pkg/admission/podnodeselector"
 	"k8s.io/kubernetes/plugin/pkg/admission/podresize"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
@@ -78,7 +79,8 @@ var AllOrderedPlugins = []string{
 	limitranger.PluginName,                  // LimitRanger
 	serviceaccount.PluginName,               // ServiceAccount
 	noderestriction.PluginName,              // NodeRestriction
-	nodetaint.PluginName,                    // TaintNodesByCondition
+	nodetaintcondition.PluginName,           // TaintNodesByCondition
+	nodetainttimeadded.PluginName,           // NodeTaintTimeAddedDefaulting
 	alwayspullimages.PluginName,             // AlwaysPullImages
 	imagepolicy.PluginName,                  // ImagePolicyWebhook
 	podsecurity.PluginName,                  // PodSecurity
@@ -139,7 +141,8 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	autoprovision.Register(plugins)
 	exists.Register(plugins)
 	noderestriction.Register(plugins)
-	nodetaint.Register(plugins)
+	nodetaintcondition.Register(plugins)
+	nodetainttimeadded.Register(plugins)
 	podnodeselector.Register(plugins)
 	podtolerationrestriction.Register(plugins)
 	runtimeclass.Register(plugins)
@@ -175,7 +178,8 @@ func DefaultOffAdmissionPlugins() sets.Set[string] {
 		storageobjectinuseprotection.PluginName, // StorageObjectInUseProtection
 		podgroupprotection.PluginName,           // PodGroupProtection
 		podpriority.PluginName,                  // Priority
-		nodetaint.PluginName,                    // TaintNodesByCondition
+		nodetaintcondition.PluginName,           // TaintNodesByCondition
+		nodetainttimeadded.PluginName,           // NodeTaintTimeAddedDefaulting
 		runtimeclass.PluginName,                 // RuntimeClass
 		certapproval.PluginName,                 // CertificateApproval
 		certsigning.PluginName,                  // CertificateSigning
