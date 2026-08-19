@@ -682,6 +682,41 @@ func TestCollisionEqualTimestampTieBreak(t *testing.T) {
 	}
 }
 
+func TestBetterDeviceClass(t *testing.T) {
+	older := newDeviceClass("class-older", "example.com/gpu", time.Unix(100, 0))
+	newer := newDeviceClass("class-newer", "example.com/gpu", time.Unix(200, 0))
+	other := newDeviceClass("class-a", "example.com/gpu", time.Unix(100, 0))
+
+	// Newer classes win over older ones.
+	if betterDeviceClass(older, newer) {
+		t.Error("expected the older class to lose")
+	}
+	if !betterDeviceClass(newer, older) {
+		t.Error("expected the newer class to win")
+	}
+	// Equal creation timestamps: the lexicographically first name wins.
+	if !betterDeviceClass(other, older) {
+		t.Error("expected the lexicographically first name to win the tie")
+	}
+	if betterDeviceClass(older, other) {
+		t.Error("expected the lexicographically later name to lose the tie")
+	}
+	// A class is never better than itself.
+	if betterDeviceClass(older, older) {
+		t.Error("expected a class to not be better than itself")
+	}
+	// A nil class never wins, and never blocks a non-nil one.
+	if betterDeviceClass(nil, older) {
+		t.Error("expected a nil class to lose")
+	}
+	if betterDeviceClass(nil, nil) {
+		t.Error("expected a nil class to lose against another nil class")
+	}
+	if !betterDeviceClass(older, nil) {
+		t.Error("expected a class to win against a nil incumbent")
+	}
+}
+
 func setup(t *testing.T) (context.Context, *fake.Clientset, *ExtendedResourceCache) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)

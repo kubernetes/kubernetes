@@ -35,11 +35,12 @@ type ExtendedResourceCache struct {
 	handlers []cache.ResourceEventHandler
 
 	mutex sync.RWMutex
-	// explicitResourceName2classes maps an explicit extended resource name to
-	// the set of device classes which declare it. Several classes may declare
-	// the same name, for example while migrating from one class to another;
-	// the winner is the "best" class according to betterDeviceClass.
-	explicitResourceName2classes map[string]map[string]*resourceapi.DeviceClass
+	// explicitResourceName2classes maps an explicit extended resource name
+	// (the first map key) to the classes which declare it, keyed by class
+	// name (the second map key) with the class as value. Several classes may
+	// declare the same name, for example while migrating from one class to
+	// another; the winner is the "best" class according to betterDeviceClass.
+	explicitResourceName2classes map[v1.ResourceName]map[string]*resourceapi.DeviceClass
 	// resourceName2class maps extended resource name to device class. For
 	// explicit names it holds the current winner of
 	// explicitResourceName2classes, for implicit
@@ -67,7 +68,7 @@ func NewExtendedResourceCache(logger klog.Logger, handlers ...cache.ResourceEven
 	cache := &ExtendedResourceCache{
 		logger:                       logger,
 		handlers:                     handlers,
-		explicitResourceName2classes: make(map[string]map[string]*resourceapi.DeviceClass),
+		explicitResourceName2classes: make(map[v1.ResourceName]map[string]*resourceapi.DeviceClass),
 		resourceName2class:           make(map[v1.ResourceName]*resourceapi.DeviceClass),
 		class2ResourceName:           make(map[string]string),
 	}
@@ -149,23 +150,17 @@ func (c *ExtendedResourceCache) OnUpdate(oldObj, newObj interface{}) {
 
 // OnDelete handles deletion of a device class.
 func (c *ExtendedResourceCache) OnDelete(obj interface{}) {
-	className := ""
-	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-		if deviceClass, ok := tombstone.Obj.(*resourceapi.DeviceClass); ok {
-			className = deviceClass.Name
-		} else {
-			// DeltaFIFO.Replace can emit a key-only tombstone with a nil
-			// Obj when the key is no longer available from knownObjects.
-			// DeviceClass is cluster-scoped and all mappings are keyed by
-			// class name, so the key alone is enough to remove them all.
-			className = tombstone.Key
-		}
-	} else if deviceClass, ok := obj.(*resourceapi.DeviceClass); ok {
-		className = deviceClass.Name
-	} else {
+	// DeltaFIFO.Replace can emit a key-only tombstone with a nil Obj when
+	// the key is no longer available from knownObjects.
+	// DeletionHandlingObjectToName falls back to the tombstone key in that
+	// case, which is enough because DeviceClass is cluster-scoped and all
+	// mappings are keyed by class name.
+	objName, err := cache.DeletionHandlingObjectToName(obj)
+	if err != nil {
 		utilruntime.HandleErrorWithLogger(c.logger, nil, "Expected DeviceClass", "actual", fmt.Sprintf("%T", obj))
 		return
 	}
+	className := objName.Name
 	c.logger.V(5).Info("DeviceClass deleted", "deviceClass", className)
 	c.removeMappings(className)
 
@@ -176,9 +171,13 @@ func (c *ExtendedResourceCache) OnDelete(obj interface{}) {
 
 // betterDeviceClass returns true if class a should win the explicit extended
 // resource name over class b: the newer class wins, with the alphabetically
-// lower name as tie-breaker. This matches the arbitration documented in
-// DeviceClassSpec.ExtendedResourceName.
+// lower name as tie-breaker. A nil class never wins, so a nil b (no current
+// winner) always loses against a non-nil a. This matches the arbitration
+// documented in DeviceClassSpec.ExtendedResourceName.
 func betterDeviceClass(a, b *resourceapi.DeviceClass) bool {
+	if a == nil {
+		return false
+	}
 	if b == nil {
 		return true
 	}
@@ -243,13 +242,16 @@ func (c *ExtendedResourceCache) updateResourceName2class(newDeviceClass, oldDevi
 				delete(c.explicitResourceName2classes, explicitName)
 			}
 			c.recomputeWinner(explicitName)
+			// A class declares at most one explicit name, so it can be a
+			// candidate of a single resource name only.
+			break
 		}
 	}
 
 	// Add this class to the candidates of its new explicit name, if any. The
 	// freshly updated object replaces a stale cached one.
 	if newDeviceClass.Spec.ExtendedResourceName != nil {
-		explicitName := *newDeviceClass.Spec.ExtendedResourceName
+		explicitName := v1.ResourceName(*newDeviceClass.Spec.ExtendedResourceName)
 		classes := c.explicitResourceName2classes[explicitName]
 		if classes == nil {
 			classes = make(map[string]*resourceapi.DeviceClass)
@@ -259,8 +261,9 @@ func (c *ExtendedResourceCache) updateResourceName2class(newDeviceClass, oldDevi
 		c.recomputeWinner(explicitName)
 	}
 
-	// Always add the default mapping; it is unique to this class and
-	// independent of any explicit name arbitration.
+	// Always add the implicit extended resource name
+	// deviceclass.resource.kubernetes.io/<class name>; it is unique to this
+	// class and independent of any explicit name arbitration.
 	defaultResourceName := v1.ResourceName(resourceapi.ResourceDeviceClassPrefix + newDeviceClass.Name)
 	c.resourceName2class[defaultResourceName] = newDeviceClass
 	c.logger.V(5).Info("Updated extended resource cache for default mapping",
@@ -270,7 +273,7 @@ func (c *ExtendedResourceCache) updateResourceName2class(newDeviceClass, oldDevi
 
 // recomputeWinner makes explicitName map to the best candidate device class,
 // removing the mapping if no candidate remains.
-func (c *ExtendedResourceCache) recomputeWinner(explicitName string) {
+func (c *ExtendedResourceCache) recomputeWinner(explicitName v1.ResourceName) {
 	classes := c.explicitResourceName2classes[explicitName]
 	var winner *resourceapi.DeviceClass
 	for _, class := range classes {
@@ -279,10 +282,10 @@ func (c *ExtendedResourceCache) recomputeWinner(explicitName string) {
 		}
 	}
 	if winner == nil {
-		delete(c.resourceName2class, v1.ResourceName(explicitName))
+		delete(c.resourceName2class, explicitName)
 		return
 	}
-	c.resourceName2class[v1.ResourceName(explicitName)] = winner
+	c.resourceName2class[explicitName] = winner
 	c.logger.V(5).Info("Updated extended resource cache for explicit mapping",
 		"extendedResource", explicitName,
 		"deviceClass", winner.Name)
@@ -323,6 +326,9 @@ func (c *ExtendedResourceCache) removeResourceName2class(className string) {
 			delete(c.explicitResourceName2classes, explicitName)
 		}
 		c.recomputeWinner(explicitName)
+		// A class declares at most one explicit name, so it can be a
+		// candidate of a single resource name only.
+		break
 	}
 	c.logger.V(5).Info("Removed extended resource from cache",
 		"deviceClass", className)
