@@ -156,13 +156,13 @@ var (
 	validatePtrSliceItem = types.Name{Package: libValidationPkg, Name: "PtrSliceItem"}
 )
 
-func (itv *itemTagValidator) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (Validations, error) {
+func (itv *itemTagValidator) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (EmittedGroup, error) {
 	if context.Scope != ScopeField && context.Scope != ScopeType {
-		return Validations{}, nil
+		return EmittedGroup{}, nil
 	}
 	nt := util.NonPointer(util.NativeType(context.Type))
 	if nt == nil || (nt.Kind != types.Slice && nt.Kind != types.Array) {
-		return Validations{}, nil
+		return EmittedGroup{}, nil
 	}
 
 	var items []Conditional[*itemMetadata]
@@ -170,7 +170,7 @@ func (itv *itemTagValidator) GetValidations(context Context, metadata SchemaMeta
 		items = node.Items
 	}
 	if len(items) == 0 {
-		return Validations{}, nil
+		return EmittedGroup{}, nil
 	}
 
 	hasUnemitted := false
@@ -183,7 +183,7 @@ func (itv *itemTagValidator) GetValidations(context Context, metadata SchemaMeta
 		}
 	}
 	if !hasUnemitted {
-		return Validations{}, nil
+		return EmittedGroup{}, nil
 	}
 
 	listMeta := GetListMetadataFromSchema(context, metadata)
@@ -200,7 +200,7 @@ func (itv *itemTagValidator) GetValidations(context Context, metadata SchemaMeta
 		}
 		validations, err := itv.extractor.ExtractTagValidations(im.subContext, metadata, *im.tag.ValueTag)
 		if err != nil {
-			return Validations{}, err
+			return EmittedGroup{}, err
 		}
 
 		if len(validations.Functions) == 0 {
@@ -209,7 +209,7 @@ func (itv *itemTagValidator) GetValidations(context Context, metadata SchemaMeta
 
 		matchArg, equivArg, err := itv.prepareArgsWithMeta(context, im.criteria, im.elemT, listMeta)
 		if err != nil {
-			return Validations{}, err
+			return EmittedGroup{}, err
 		}
 
 		// Because item tags are evaluated in the context of the list field, the "parent"
@@ -226,12 +226,12 @@ func (itv *itemTagValidator) GetValidations(context Context, metadata SchemaMeta
 			StabilityLevel: itemCond.StabilityLevel,
 		})
 		if err != nil {
-			return Validations{}, err
+			return EmittedGroup{}, err
 		}
 		result.Add(finalized)
 	}
 
-	return result, nil
+	return EmittedGroup{Validations: result}, nil
 }
 
 func (itv *itemTagValidator) prepareArgsWithMeta(context Context, criteria []keyValuePair, elemT *types.Type, listMeta *listMetadata) (matchArg any, equivArg any, err error) {

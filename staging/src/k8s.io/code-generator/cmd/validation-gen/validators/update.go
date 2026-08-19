@@ -71,9 +71,10 @@ func (updateTagCollector) ValidScopes() sets.Set[Scope] {
 	return updateTagValidScopes
 }
 
-func (utc updateTagCollector) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (Validations, error) {
+func (utc updateTagCollector) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (EmittedGroup, error) {
 	if context.Scope == ScopeField {
-		return GenerateUpdateValidations(context, metadata)
+		vals, err := GenerateUpdateValidations(context, metadata)
+		return EmittedGroup{Validations: vals}, err
 	}
 
 	var constraint validate.UpdateConstraint
@@ -89,7 +90,7 @@ func (utc updateTagCollector) GetValidations(context Context, metadata SchemaMet
 	case "NoRemoveItem":
 		constraint = validate.NoRemoveItem
 	default:
-		return Validations{}, fmt.Errorf("unknown +k8s:update constraint: %s", tag.Value)
+		return EmittedGroup{}, fmt.Errorf("unknown +k8s:update constraint: %s", tag.Value)
 	}
 
 	// Element scope (reached via +k8s:eachVal): only NoModify is valid,
@@ -100,11 +101,11 @@ func (utc updateTagCollector) GetValidations(context Context, metadata SchemaMet
 	// updateFieldValidator.
 	if context.Scope == ScopeListVal || context.Scope == ScopeMapVal {
 		if constraint != validate.NoModify {
-			return Validations{}, fmt.Errorf("+k8s:update=%s does not apply to %s, attach it to the enclosing field", constraintName(constraint), context.Scope)
+			return EmittedGroup{}, fmt.Errorf("+k8s:update=%s does not apply to %s, attach it to the enclosing field", constraintName(constraint), context.Scope)
 		}
 		nt := util.NonPointer(util.NativeType(context.Type))
 		if nt.Kind == types.Slice || nt.Kind == types.Map {
-			return Validations{}, fmt.Errorf("+k8s:update=NoModify cannot be applied to list/map elements that are themselves lists or maps")
+			return EmittedGroup{}, fmt.Errorf("+k8s:update=NoModify cannot be applied to list/map elements that are themselves lists or maps")
 		}
 		// For ScopeListVal, NoModify is only meaningful when the enclosing
 		// list matches items by key (listType=map or unique=map). For
@@ -112,17 +113,17 @@ func (utc updateTagCollector) GetValidations(context Context, metadata SchemaMet
 		// unmatched item that ratchets through as a no-op. Reject upfront.
 		if context.Scope == ScopeListVal && context.ParentPath != nil {
 			if lm := GetListMetadataFromSchema(context, metadata); lm != nil && lm.semantic != semanticMap {
-				return Validations{}, fmt.Errorf("+k8s:eachVal=+k8s:update=NoModify requires the enclosing list to use listType=map or unique=map (got %s)", lm.semantic)
+				return EmittedGroup{}, fmt.Errorf("+k8s:eachVal=+k8s:update=NoModify requires the enclosing list to use listType=map or unique=map (got %s)", lm.semantic)
 			}
 		}
 		v := emitScalarUpdate(context, []validate.UpdateConstraint{constraint})
-		return FinalizeGroup(context, EmittedGroup{
+		return EmittedGroup{
 			Validations:    v,
 			StabilityLevel: context.StabilityLevel,
-		})
+		}, nil
 	}
 
-	return Validations{}, nil
+	return EmittedGroup{}, nil
 }
 
 func (utc updateTagCollector) CollectMetadata(context Context, tag codetags.Tag) (SchemaMetadata, error) {

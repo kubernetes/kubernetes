@@ -42,8 +42,8 @@ func (opaqueTypeTagValidator) ValidScopes() sets.Set[Scope] {
 	return sets.New(ScopeType, ScopeField, ScopeListVal, ScopeMapKey, ScopeMapVal)
 }
 
-func (opaqueTypeTagValidator) GetValidations(context Context, _ SchemaMetadata, _ codetags.Tag) (Validations, error) {
-	return Validations{OpaqueType: true}, nil
+func (opaqueTypeTagValidator) GetValidations(context Context, _ SchemaMetadata, _ codetags.Tag) (EmittedGroup, error) {
+	return EmittedGroup{Validations: Validations{OpaqueType: true}}, nil
 }
 
 // Other validators (currently subfield) consult opaque tags to

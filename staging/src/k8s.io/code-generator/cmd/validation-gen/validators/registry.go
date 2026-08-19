@@ -171,11 +171,15 @@ func (reg *registry) ExtractTagValidations(context Context, metadata SchemaMetad
 			return Validations{}, fmt.Errorf("tag %q: %w", tv.TagName(), err)
 		}
 		if emitter, ok := tv.(ValidationEmitter); ok {
-			if theseValidations, err := emitter.GetValidations(context, metadata, tag); err != nil {
+			group, err := emitter.GetValidations(context, metadata, tag)
+			if err != nil {
 				return Validations{}, fmt.Errorf("tag %q: %w", tv.TagName(), err)
-			} else {
-				accumulatedValidations.Add(theseValidations)
 			}
+			theseValidations, err := FinalizeGroup(context, group)
+			if err != nil {
+				return Validations{}, fmt.Errorf("tag %q finalizer: %w", tv.TagName(), err)
+			}
+			accumulatedValidations.Add(theseValidations)
 		}
 	}
 	return accumulatedValidations, nil

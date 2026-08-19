@@ -71,14 +71,14 @@ var (
 	validateEachMapVal      = types.Name{Package: libValidationPkg, Name: "EachMapVal"}
 )
 
-func (evtv eachValTagValidator) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (Validations, error) {
+func (evtv eachValTagValidator) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (EmittedGroup, error) {
 	// NOTE: pointers to lists and maps are not supported, so we should never see a pointer here.
 	t := context.Type
 	nt := util.NativeType(t)
 	switch nt.Kind {
 	case types.Slice, types.Array, types.Map:
 	default:
-		return Validations{}, fmt.Errorf("can only be used on list or map types (%s)", nt.Kind)
+		return EmittedGroup{}, fmt.Errorf("can only be used on list or map types (%s)", nt.Kind)
 	}
 
 	elemContext := Context{
@@ -99,16 +99,16 @@ func (evtv eachValTagValidator) GetValidations(context Context, metadata SchemaM
 		// TODO: We may need map selectors at some point.
 	}
 	if tag.ValueTag == nil {
-		return Validations{}, fmt.Errorf("missing validation tag")
+		return EmittedGroup{}, fmt.Errorf("missing validation tag")
 	}
 
 	validations, err := evtv.extractor.ExtractTagValidations(elemContext, metadata, *tag.ValueTag)
 	if err != nil {
-		return Validations{}, err
+		return EmittedGroup{}, err
 	}
 
 	if len(validations.Variables) > 0 {
-		return Validations{}, fmt.Errorf("variable generation is not supported")
+		return EmittedGroup{}, fmt.Errorf("variable generation is not supported")
 	}
 
 	result := Validations{
@@ -119,16 +119,16 @@ func (evtv eachValTagValidator) GetValidations(context Context, metadata SchemaM
 	if len(validations.Functions) > 0 {
 		innerVals, err := evtv.getValidations(context, metadata, context.Path, t, Validations{Functions: validations.Functions})
 		if err != nil {
-			return Validations{}, err
+			return EmittedGroup{}, err
 		}
 		result.Add(innerVals)
 	}
 
 	if result.Empty() {
-		return Validations{}, fmt.Errorf("no validation functions found")
+		return EmittedGroup{}, fmt.Errorf("no validation functions found")
 	}
 
-	return result, nil
+	return EmittedGroup{Validations: result}, nil
 }
 
 // t is expected to be the top-most type of the list or map. For example, if
@@ -271,12 +271,12 @@ var (
 	validateEachMapKey = types.Name{Package: libValidationPkg, Name: "EachMapKey"}
 )
 
-func (ektv eachKeyTagValidator) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (Validations, error) {
+func (ektv eachKeyTagValidator) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (EmittedGroup, error) {
 	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
 	t := context.Type
 	nt := util.NativeType(t)
 	if nt.Kind != types.Map {
-		return Validations{}, fmt.Errorf("can only be used on map types (%s)", nt.Kind)
+		return EmittedGroup{}, fmt.Errorf("can only be used on map types (%s)", nt.Kind)
 	}
 
 	elemContext := Context{
@@ -291,11 +291,11 @@ func (ektv eachKeyTagValidator) GetValidations(context Context, metadata SchemaM
 
 	validations, err := ektv.extractor.ExtractTagValidations(elemContext, metadata, *tag.ValueTag)
 	if err != nil {
-		return Validations{}, err
+		return EmittedGroup{}, err
 	}
 
 	if len(validations.Variables) > 0 {
-		return Validations{}, fmt.Errorf("variable generation is not supported")
+		return EmittedGroup{}, fmt.Errorf("variable generation is not supported")
 	}
 
 	result := Validations{
@@ -306,16 +306,16 @@ func (ektv eachKeyTagValidator) GetValidations(context Context, metadata SchemaM
 	if len(validations.Functions) > 0 {
 		innerVals, err := ektv.getValidations(t, Validations{Functions: validations.Functions})
 		if err != nil {
-			return Validations{}, err
+			return EmittedGroup{}, err
 		}
 		result.Add(innerVals)
 	}
 
 	if result.Empty() {
-		return Validations{}, fmt.Errorf("no validation functions found")
+		return EmittedGroup{}, fmt.Errorf("no validation functions found")
 	}
 
-	return result, nil
+	return EmittedGroup{Validations: result}, nil
 }
 
 func (ektv eachKeyTagValidator) getValidations(t *types.Type, validations Validations) (Validations, error) {

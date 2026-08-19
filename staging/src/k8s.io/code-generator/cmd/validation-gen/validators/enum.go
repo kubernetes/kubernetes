@@ -90,10 +90,10 @@ var (
 	setsNew           = types.Name{Package: "k8s.io/apimachinery/pkg/util/sets", Name: "New"}
 )
 
-func (etv *enumTagValidator) GetValidations(context Context, _ SchemaMetadata, _ codetags.Tag) (Validations, error) {
+func (etv *enumTagValidator) GetValidations(context Context, _ SchemaMetadata, _ codetags.Tag) (EmittedGroup, error) {
 	// NOTE: typedefs to pointers are not supported, so we should never see a pointer here.
 	if t := util.NativeType(context.Type); t != types.String {
-		return Validations{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
+		return EmittedGroup{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
 	}
 
 	enum := &enumType{Name: context.Type.Name}
@@ -185,7 +185,7 @@ func (etv *enumTagValidator) GetValidations(context Context, _ SchemaMetadata, _
 		WithEmits(Emission{field.ErrorTypeNotSupported, "", ""})
 	result.AddFunction(fn)
 
-	return result, nil
+	return EmittedGroup{Validations: result}, nil
 }
 
 func (etv *enumTagValidator) Docs() TagDoc {

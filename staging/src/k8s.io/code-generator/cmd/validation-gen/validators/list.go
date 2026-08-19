@@ -208,10 +208,10 @@ func (listTypeTagValidator) ValidScopes() sets.Set[Scope] {
 	return listTagsValidScopes
 }
 
-func (lttv listTypeTagValidator) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (Validations, error) {
+func (lttv listTypeTagValidator) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (EmittedGroup, error) {
 	lm := GetListMetadataFromSchema(context, metadata)
 	if lm == nil {
-		return Validations{}, nil
+		return EmittedGroup{}, nil
 	}
 	return generateListValidations(lm, context.Type)
 }
@@ -266,9 +266,9 @@ func (lttv listTypeTagValidator) CollectMetadata(context Context, tag codetags.T
 	return res, nil
 }
 
-func generateListValidations(lm *listMetadata, contextType *types.Type) (Validations, error) {
+func generateListValidations(lm *listMetadata, contextType *types.Type) (EmittedGroup, error) {
 	if err := lm.check(); err != nil {
-		return Validations{}, err
+		return EmittedGroup{}, err
 	}
 
 	result := Validations{}
@@ -276,7 +276,7 @@ func generateListValidations(lm *listMetadata, contextType *types.Type) (Validat
 		// Uniqueness validation is disabled in generated validation for this list.
 		// It would defer to handwritten validation to check the uniqueness.
 		result.AddComment("Uniqueness validation is implemented via custom, handwritten validation")
-		return result, nil
+		return EmittedGroup{Validations: result}, nil
 	}
 
 	nt := util.NativeType(lm.listType)
@@ -332,7 +332,10 @@ func generateListValidations(lm *listMetadata, contextType *types.Type) (Validat
 		}
 	}
 
-	return result, nil
+	return EmittedGroup{
+		Validations:    result,
+		StabilityLevel: lm.stabilityLevel,
+	}, nil
 }
 
 func (lttv listTypeTagValidator) Docs() TagDoc {
@@ -395,10 +398,10 @@ func (uniqueTagValidator) ValidScopes() sets.Set[Scope] {
 	return listTagsValidScopes
 }
 
-func (utv uniqueTagValidator) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (Validations, error) {
+func (utv uniqueTagValidator) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (EmittedGroup, error) {
 	lm := GetListMetadataFromSchema(context, metadata)
 	if lm == nil || lm.ownership != "" {
-		return Validations{}, nil
+		return EmittedGroup{}, nil
 	}
 	return generateListValidations(lm, context.Type)
 }

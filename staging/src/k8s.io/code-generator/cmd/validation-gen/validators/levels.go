@@ -72,13 +72,13 @@ func (levelTagValidator) ValidScopes() sets.Set[Scope] {
 	return levelTagsValidScopes
 }
 
-func (ltv *levelTagValidator) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (Validations, error) {
+func (ltv *levelTagValidator) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (EmittedGroup, error) {
 	if tag.ValueType != codetags.ValueTypeTag || tag.ValueTag == nil {
-		return Validations{}, fmt.Errorf("requires a validation tag as its value payload")
+		return EmittedGroup{}, fmt.Errorf("requires a validation tag as its value payload")
 	}
 
 	if len(tag.Args) > 1 {
-		return Validations{}, fmt.Errorf("at most one optional kubernetes version argument is supported")
+		return EmittedGroup{}, fmt.Errorf("at most one optional kubernetes version argument is supported")
 	}
 
 	var version string
@@ -86,17 +86,20 @@ func (ltv *levelTagValidator) GetValidations(context Context, metadata SchemaMet
 		arg := tag.Args[0]
 		version = arg.Value
 		if !kubeVersionRegex.MatchString(version) {
-			return Validations{}, fmt.Errorf("invalid kubernetes version format, expected <major>.<minor>, got %s", version)
+			return EmittedGroup{}, fmt.Errorf("invalid kubernetes version format, expected <major>.<minor>, got %s", version)
 		}
 	}
 
 	context.StabilityLevel = ltv.level
 	validations, err := ltv.extractor.ExtractTagValidations(context, metadata, *tag.ValueTag)
 	if err != nil {
-		return Validations{}, err
+		return EmittedGroup{}, err
 	}
 
-	return wrapWithStabilityLevel(validations, ltv.level), nil
+	return EmittedGroup{
+		Validations:    validations,
+		StabilityLevel: ltv.level,
+	}, nil
 }
 
 // wrapWithStabilityLevel applies a stability level to all functions in validations

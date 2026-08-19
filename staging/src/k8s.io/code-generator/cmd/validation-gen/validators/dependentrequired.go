@@ -160,13 +160,13 @@ func (dtv dependencyTagValidator) CollectMetadata(context Context, tag codetags.
 	return res, nil
 }
 
-func (dtv dependencyTagValidator) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (Validations, error) {
+func (dtv dependencyTagValidator) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (EmittedGroup, error) {
 	if context.Scope != ScopeField {
-		return Validations{}, nil
+		return EmittedGroup{}, nil
 	}
 	deps := metadata.SortedDependencies()
 	if len(deps) == 0 {
-		return Validations{}, nil
+		return EmittedGroup{}, nil
 	}
 
 	hasUnemitted := false
@@ -177,15 +177,15 @@ func (dtv dependencyTagValidator) GetValidations(context Context, metadata Schem
 		}
 	}
 	if !hasUnemitted {
-		return Validations{}, nil
+		return EmittedGroup{}, nil
 	}
 
 	structType := context.ParentType
 	if structType == nil {
-		return Validations{}, fmt.Errorf("missing ParentType for field scope")
+		return EmittedGroup{}, fmt.Errorf("missing ParentType for field scope")
 	}
 	if k := util.NonPointer(util.NativeType(structType)).Kind; k != types.Struct {
-		return Validations{}, nil
+		return EmittedGroup{}, nil
 	}
 
 	var result Validations
@@ -202,7 +202,7 @@ func (dtv dependencyTagValidator) GetValidations(context Context, metadata Schem
 		case dependencyForbidden:
 			validator, emitType, origin = dependentForbiddenValidator, field.ErrorTypeForbidden, "dependentForbidden"
 		default:
-			return Validations{}, fmt.Errorf("unknown dependency mode: %q", dm.mode)
+			return EmittedGroup{}, fmt.Errorf("unknown dependency mode: %q", dm.mode)
 		}
 
 		// Emit at the parent — the check needs both sibling fields.
@@ -226,12 +226,12 @@ func (dtv dependencyTagValidator) GetValidations(context Context, metadata Schem
 			Hoist:          true,
 		})
 		if err != nil {
-			return Validations{}, err
+			return EmittedGroup{}, err
 		}
 		result.Add(finalized)
 	}
 
-	return result, nil
+	return EmittedGroup{Validations: result}, nil
 }
 
 func (dtv dependencyTagValidator) Docs() TagDoc {

@@ -170,10 +170,10 @@ func (tcv *testCollectorValidator) CollectMetadata(context Context, tag codetags
 	return SchemaMetadata{}, nil
 }
 
-func (tcv *testCollectorValidator) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (Validations, error) {
+func (tcv *testCollectorValidator) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (EmittedGroup, error) {
 	tcv.validated = true
 	tcv.callOrder = append(tcv.callOrder, "GetValidations")
-	return Validations{}, nil
+	return EmittedGroup{}, nil
 }
 
 func (tcv *testCollectorValidator) Docs() TagDoc {
@@ -285,8 +285,10 @@ func TestCollectMetadata_Dependencies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error from GetValidations: %v", err)
 	}
-	if len(val.TypeFunctions) != 1 {
-		t.Errorf("expected 1 generated validation function, got %d", len(val.TypeFunctions))
+	if len(val.Validations.Functions)+len(val.Validations.TypeFunctions) != 1 {
+		t.Errorf("expected 1 generated validation function, got %d (Functions: %d, TypeFunctions: %d)",
+			len(val.Validations.Functions)+len(val.Validations.TypeFunctions),
+			len(val.Validations.Functions), len(val.Validations.TypeFunctions))
 	}
 }
 

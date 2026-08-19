@@ -80,10 +80,10 @@ var (
 	ifOption = types.Name{Package: libValidationPkg, Name: "IfOption"}
 )
 
-func (itv ifTagValidator) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (Validations, error) {
+func (itv ifTagValidator) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (EmittedGroup, error) {
 	optionArg, ok := tag.PositionalArg()
 	if !ok {
-		return Validations{}, fmt.Errorf("missing required option name positional argument")
+		return EmittedGroup{}, fmt.Errorf("missing required option name positional argument")
 	}
 
 	if itv.enabled {
@@ -94,10 +94,13 @@ func (itv ifTagValidator) GetValidations(context Context, metadata SchemaMetadat
 
 	validations, err := itv.extractor.ExtractTagValidations(context, metadata, *tag.ValueTag)
 	if err != nil {
-		return Validations{}, err
+		return EmittedGroup{}, err
 	}
 
-	return wrapWithConditions(validations, context.Conditions, context), nil
+	return EmittedGroup{
+		Validations: validations,
+		Conditions:  context.Conditions,
+	}, nil
 }
 
 // wrapWithConditions wraps validations with condition checks,

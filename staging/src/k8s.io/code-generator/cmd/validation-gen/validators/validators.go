@@ -57,11 +57,11 @@ type TagValidator interface {
 }
 
 // ValidationEmitter is an optional interface implemented by TagValidators
-// that directly emit validations when their tag is encountered.
+// that emit validations when their tag is encountered.
 // Metadata-only tag validators do not need to implement this interface.
 type ValidationEmitter interface {
 	// GetValidations returns any validations described by this tag.
-	GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (Validations, error)
+	GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (EmittedGroup, error)
 }
 
 // Extractor represents an aggregation of tag validators and metadata extractors.

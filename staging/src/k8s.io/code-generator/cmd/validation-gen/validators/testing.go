@@ -77,16 +77,16 @@ func (fixedResultTagValidator) ValidScopes() sets.Set[Scope] {
 	return fixedResultTagValidScopes
 }
 
-func (frtv fixedResultTagValidator) GetValidations(context Context, _ SchemaMetadata, tag codetags.Tag) (Validations, error) {
+func (frtv fixedResultTagValidator) GetValidations(context Context, _ SchemaMetadata, tag codetags.Tag) (EmittedGroup, error) {
 	var result Validations
 
 	if frtv.error {
-		return result, fmt.Errorf("forced error: %q", tag.Value)
+		return EmittedGroup{}, fmt.Errorf("forced error: %q", tag.Value)
 	}
 
 	args, err := frtv.toFixedResultArgs(tag)
 	if err != nil {
-		return result, fmt.Errorf("can't decode tag payload: %w", err)
+		return EmittedGroup{}, fmt.Errorf("can't decode tag payload: %w", err)
 	}
 	fn := Function(frtv.TagName(), args.flags, fixedResultValidator, frtv.result, args.msg).
 		WithTypeArgs(args.typeArgs...)
@@ -96,7 +96,10 @@ func (frtv fixedResultTagValidator) GetValidations(context Context, _ SchemaMeta
 	fn.Cohort = args.cohort
 	result.AddFunction(fn)
 
-	return result, nil
+	return EmittedGroup{
+		Validations:    result,
+		StabilityLevel: ValidationStabilityLevel(frtv.stability),
+	}, nil
 }
 
 var (

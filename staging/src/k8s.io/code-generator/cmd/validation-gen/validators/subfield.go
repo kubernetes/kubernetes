@@ -80,13 +80,13 @@ var (
 	validateSubfield = types.Name{Package: libValidationPkg, Name: "Subfield"}
 )
 
-func (stv *subfieldTagValidator) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (Validations, error) {
+func (stv *subfieldTagValidator) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (EmittedGroup, error) {
 	// TODO: Support nested subfields once the generated validation code can
 	// prevent nil pointer dereferences by checking optionality or requiredness
 	// for intermediate fields.
 	for t := tag.ValueTag; t != nil; t = t.ValueTag {
 		if t.Name == subfieldTagName {
-			return Validations{}, fmt.Errorf("nested +%s tags are unsupported; apply validations directly to the nested type instead", subfieldTagName)
+			return EmittedGroup{}, fmt.Errorf("nested +%s tags are unsupported; apply validations directly to the nested type instead", subfieldTagName)
 		}
 	}
 
@@ -96,12 +96,12 @@ func (stv *subfieldTagValidator) GetValidations(context Context, metadata Schema
 	t := context.Type
 	nt := util.NonPointer(util.NativeType(t))
 	if nt.Kind != types.Struct {
-		return Validations{}, fmt.Errorf("can only be used on struct types: %v", nt.Kind)
+		return EmittedGroup{}, fmt.Errorf("can only be used on struct types: %v", nt.Kind)
 	}
 	subname := args[0].Value
 	submemb := util.GetMemberByJSON(nt, subname)
 	if submemb == nil {
-		return Validations{}, fmt.Errorf("no field for json name %q", subname)
+		return EmittedGroup{}, fmt.Errorf("no field for json name %q", subname)
 	}
 
 	subContext := Context{
@@ -117,7 +117,7 @@ func (stv *subfieldTagValidator) GetValidations(context Context, metadata Schema
 
 	tagValidations, err := stv.extractor.ExtractTagValidations(subContext, metadata, *tag.ValueTag)
 	if err != nil {
-		return Validations{}, err
+		return EmittedGroup{}, err
 	}
 
 	// Subfield's own validations (which contain its short-circuits) are added first,
@@ -130,13 +130,16 @@ func (stv *subfieldTagValidator) GetValidations(context Context, metadata Schema
 	if !isFieldOpaque(context) {
 		fieldValidations, err := stv.extractMemberShortCircuits(subContext)
 		if err != nil {
-			return Validations{}, err
+			return EmittedGroup{}, err
 		}
 		combined.Add(fieldValidations)
 	}
 
-	mapped := wrapWithSubfield(combined, subname, context.Type, submemb)
-	return mapped, nil
+	return EmittedGroup{
+		Validations: combined,
+		TargetPath:  context.Path.Child(subname),
+		TargetType:  submemb.Type,
+	}, nil
 }
 
 // wrapWithSubfield wraps validations in a subfield validation step for a single member,
