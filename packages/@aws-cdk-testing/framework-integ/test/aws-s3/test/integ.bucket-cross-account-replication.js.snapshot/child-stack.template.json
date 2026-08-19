@@ -105,6 +105,9 @@
         "Status": "Enabled"
        },
        "Destination": {
+        "AccessControlTranslation": {
+         "Owner": "Destination"
+        },
         "Account": "12345678",
         "Bucket": "arn:aws:s3:::parent-stackinationbucketnew6dff25a9220c96586f79",
         "Metrics": {

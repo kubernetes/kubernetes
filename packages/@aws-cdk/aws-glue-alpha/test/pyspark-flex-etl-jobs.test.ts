@@ -147,7 +147,7 @@ describe('Job', () => {
         script,
         glueVersion: glue.GlueVersion.V3_0,
         continuousLogging: { enabled: false },
-        workerType: glue.WorkerType.G_2X,
+        workerConfiguration: { workerType: glue.WorkerType.G_2X, numberOfWorkers: 2 },
         maxConcurrentRuns: 100,
         timeout: cdk.Duration.hours(2),
         connections: [glue.Connection.fromConnectionName(stack, 'Connection', 'connectionName')],
@@ -157,7 +157,6 @@ describe('Job', () => {
           SecondTagName: 'SecondTagValue',
           XTagName: 'XTagValue',
         },
-        numberOfWorkers: 2,
         maxRetries: 2,
       });
     });

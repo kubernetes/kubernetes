@@ -340,7 +340,7 @@
     "@aws-cdk/integ-runner": "^2.202.3",
     "@aws-cdk/integ-tests-alpha": "0.0.0",
     "@aws-cdk/pkglint": "0.0.0",
-    "@aws-cdk/service-spec-types": "0.0.267",
+    "@aws-cdk/service-spec-types": "0.0.269",
     "@aws-cdk/spec2cdk": "0.0.0",
     "@cdklabs/tskb": "^0.0.4",
     "@cdklabs/typewriter": "^0.0.16",

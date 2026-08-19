@@ -1,6 +1,7 @@
 import { CfnJob } from 'aws-cdk-lib/aws-glue';
 import type * as cdk from 'aws-cdk-lib/core';
-import { memoizedGetter } from 'aws-cdk-lib/core/lib/helpers-internal';
+import { Annotations } from 'aws-cdk-lib/core';
+import { lit, memoizedGetter } from 'aws-cdk-lib/core/lib/helpers-internal';
 import { addConstructMetadata } from 'aws-cdk-lib/core/lib/metadata-resource';
 import { propertyInjectable } from 'aws-cdk-lib/core/lib/prop-injectable';
 import type { Construct } from 'constructs';
@@ -74,7 +75,8 @@ export interface PySparkEtlJobProps extends SparkJobProps {
  * can override this default with other supported worker type values
  * (G1, G2, G4 and G8). ETL jobs defaults to Glue version 4.0, which you can
  * override to 3.0. The following ETL features are enabled by default:
- * —enable-metrics, —enable-spark-ui, —enable-continuous-cloudwatch-log.
+ * --enable-metrics, --enable-continuous-cloudwatch-log. The Spark UI
+ * (--enable-spark-ui) is off by default; enable it by setting the `sparkUI` prop.
  * You can find more details about version, worker type and other features
  * in Glue's public documentation.
  */
@@ -98,6 +100,11 @@ export class PySparkEtlJob extends SparkJob {
       ...this.nonExecutableCommonArguments(props),
     };
 
+    if (props.jobRunQueuingEnabled === true && props.maxRetries !== undefined && props.maxRetries > 0) {
+      Annotations.of(this).addWarningV2(lit`GlueMaxRetriesQueuingEnabled`,
+        `maxRetries was set to ${props.maxRetries}. Overriding it to 0 with since job run queuing is enabled (service constraint)`);
+    }
+
     this.resource = new CfnJob(this, 'Resource', {
       name: props.jobName,
       description: props.description,
@@ -108,8 +115,8 @@ export class PySparkEtlJob extends SparkJob {
         pythonVersion: PythonVersion.THREE,
       },
       glueVersion: props.glueVersion ?? GlueVersion.V4_0,
-      workerType: props.workerType ?? WorkerType.G_1X,
-      numberOfWorkers: props.numberOfWorkers ? props.numberOfWorkers : 10,
+      workerType: props.workerConfiguration?.workerType ?? WorkerType.G_1X,
+      numberOfWorkers: props.workerConfiguration?.numberOfWorkers ?? 10,
       maxRetries: props.jobRunQueuingEnabled ? 0 : props.maxRetries,
       jobRunQueuingEnabled: props.jobRunQueuingEnabled ? props.jobRunQueuingEnabled : false,
       notificationProperty: props.notifyDelayAfter ? { notifyDelayAfter: props.notifyDelayAfter.toMinutes() } : undefined,

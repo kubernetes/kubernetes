@@ -141,7 +141,8 @@
     }
    },
    "DependsOn": [
-    "DualStackProtocolVpcipv6cidr449C49CD"
+    "DualStackProtocolVpcipv6cidr449C49CD",
+    "DualStackProtocolVpcVPCGWADE48B7D"
    ]
   },
   "DualStackProtocolVpcPub1Subnet1EIP12EDF1FD": {
@@ -302,7 +303,8 @@
     }
    },
    "DependsOn": [
-    "DualStackProtocolVpcipv6cidr449C49CD"
+    "DualStackProtocolVpcipv6cidr449C49CD",
+    "DualStackProtocolVpcVPCGWADE48B7D"
    ]
   },
   "DualStackProtocolVpcPub1Subnet2EIP149FAFF5": {
@@ -463,7 +465,8 @@
     }
    },
    "DependsOn": [
-    "DualStackProtocolVpcipv6cidr449C49CD"
+    "DualStackProtocolVpcipv6cidr449C49CD",
+    "DualStackProtocolVpcVPCGWADE48B7D"
    ]
   },
   "DualStackProtocolVpcPub2Subnet2SubnetCA5962A0": {
@@ -583,7 +586,8 @@
     }
    },
    "DependsOn": [
-    "DualStackProtocolVpcipv6cidr449C49CD"
+    "DualStackProtocolVpcipv6cidr449C49CD",
+    "DualStackProtocolVpcVPCGWADE48B7D"
    ]
   },
   "DualStackProtocolVpcPriv1Subnet1Subnet6E77EDE7": {

@@ -1,0 +1,439 @@
+{
+  "/EksV2ProvisionedControlPlaneStack/Cluster": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "version": "*",
+        "clusterName": "*"
+      }
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Custom::VpcRestrictDefaultSGCustomResourceProvider": [
+    {
+      "type": "aws:cdk:is-custom-resource-handler-customResourceProvider",
+      "data": true
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/Role": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        },
+        "managedPolicies": [
+          {
+            "managedPolicyArn": "*"
+          }
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addManagedPolicy": [
+          {
+            "managedPolicyArn": "*"
+          }
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addManagedPolicy": [
+          {
+            "managedPolicyArn": "*"
+          }
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addManagedPolicy": [
+          {
+            "managedPolicyArn": "*"
+          }
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addManagedPolicy": [
+          {
+            "managedPolicyArn": "*"
+          }
+        ]
+      }
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/ControlPlaneSecurityGroup": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "vpc": "*",
+        "description": "*"
+      }
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/ClusternodePoolRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        },
+        "managedPolicies": [
+          {
+            "managedPolicyArn": "*"
+          },
+          {
+            "managedPolicyArn": "*"
+          }
+        ]
+      }
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterEB0386A7"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/KubectlReadyBarrier": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterKubectlReadyBarrier200052AF"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Custom::VpcRestrictDefaultSGCustomResourceProvider/Role": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Custom::VpcRestrictDefaultSGCustomResourceProvider/Handler": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CustomVpcRestrictDefaultSGCustomResourceProviderHandlerDC833E5E"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterDefaultVpcFA9F2722"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/PublicSubnet1": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "availabilityZone": "*",
+        "vpcId": "*",
+        "cidrBlock": "*",
+        "mapPublicIpOnLaunch": true,
+        "ipv6CidrBlock": "*",
+        "assignIpv6AddressOnCreation": "*"
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "availabilityZone": "*",
+        "vpcId": "*",
+        "cidrBlock": "*",
+        "mapPublicIpOnLaunch": true,
+        "ipv6CidrBlock": "*",
+        "assignIpv6AddressOnCreation": "*"
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {}
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addNatGateway": [
+          "*"
+        ]
+      }
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/PublicSubnet2": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "availabilityZone": "*",
+        "vpcId": "*",
+        "cidrBlock": "*",
+        "mapPublicIpOnLaunch": true,
+        "ipv6CidrBlock": "*",
+        "assignIpv6AddressOnCreation": "*"
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "availabilityZone": "*",
+        "vpcId": "*",
+        "cidrBlock": "*",
+        "mapPublicIpOnLaunch": true,
+        "ipv6CidrBlock": "*",
+        "assignIpv6AddressOnCreation": "*"
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {}
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addNatGateway": [
+          "*"
+        ]
+      }
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/PrivateSubnet1": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "availabilityZone": "*",
+        "vpcId": "*",
+        "cidrBlock": "*",
+        "mapPublicIpOnLaunch": false,
+        "ipv6CidrBlock": "*",
+        "assignIpv6AddressOnCreation": "*"
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "availabilityZone": "*",
+        "vpcId": "*",
+        "cidrBlock": "*",
+        "mapPublicIpOnLaunch": false,
+        "ipv6CidrBlock": "*",
+        "assignIpv6AddressOnCreation": "*"
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {}
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/PrivateSubnet2": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "availabilityZone": "*",
+        "vpcId": "*",
+        "cidrBlock": "*",
+        "mapPublicIpOnLaunch": false,
+        "ipv6CidrBlock": "*",
+        "assignIpv6AddressOnCreation": "*"
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "availabilityZone": "*",
+        "vpcId": "*",
+        "cidrBlock": "*",
+        "mapPublicIpOnLaunch": false,
+        "ipv6CidrBlock": "*",
+        "assignIpv6AddressOnCreation": "*"
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {}
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/IGW": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterDefaultVpcIGW756BE43E"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/VPCGW": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterDefaultVpcVPCGWC1D00388"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/RestrictDefaultSecurityGroupCustomResource": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/Role/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterRoleFA261979"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/ControlPlaneSecurityGroup/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterControlPlaneSecurityGroupD274242C"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/ClusternodePoolRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterClusternodePoolRole69276141"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/PublicSubnet1/Subnet": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterDefaultVpcPublicSubnet1Subnet3BFE1BDA"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/PublicSubnet1/RouteTable": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterDefaultVpcPublicSubnet1RouteTable1DCCDD98"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/PublicSubnet1/RouteTableAssociation": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterDefaultVpcPublicSubnet1RouteTableAssociationAFBE6789"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/PublicSubnet1/DefaultRoute": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterDefaultVpcPublicSubnet1DefaultRouteCF22EF6E"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/PublicSubnet1/EIP": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterDefaultVpcPublicSubnet1EIP498E2BD2"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/PublicSubnet1/NATGateway": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterDefaultVpcPublicSubnet1NATGateway6E21013E"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/PublicSubnet2/Subnet": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterDefaultVpcPublicSubnet2SubnetC4E9A966"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/PublicSubnet2/RouteTable": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterDefaultVpcPublicSubnet2RouteTable6F1F5F47"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/PublicSubnet2/RouteTableAssociation": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterDefaultVpcPublicSubnet2RouteTableAssociationA8539C50"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/PublicSubnet2/DefaultRoute": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterDefaultVpcPublicSubnet2DefaultRoute1FA8621E"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/PublicSubnet2/EIP": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterDefaultVpcPublicSubnet2EIP265F4810"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/PublicSubnet2/NATGateway": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterDefaultVpcPublicSubnet2NATGateway4AF4B728"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/PrivateSubnet1/Subnet": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterDefaultVpcPrivateSubnet1Subnet03F39409"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/PrivateSubnet1/RouteTable": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterDefaultVpcPrivateSubnet1RouteTable7844020C"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/PrivateSubnet1/RouteTableAssociation": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterDefaultVpcPrivateSubnet1RouteTableAssociationF8A67D95"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/PrivateSubnet1/DefaultRoute": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterDefaultVpcPrivateSubnet1DefaultRouteD624C8BD"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/PrivateSubnet2/Subnet": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterDefaultVpcPrivateSubnet2SubnetA526AEA7"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/PrivateSubnet2/RouteTable": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterDefaultVpcPrivateSubnet2RouteTable1F9A5298"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/PrivateSubnet2/RouteTableAssociation": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterDefaultVpcPrivateSubnet2RouteTableAssociationE1240DF2"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/PrivateSubnet2/DefaultRoute": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterDefaultVpcPrivateSubnet2DefaultRouteAB55737C"
+    }
+  ],
+  "/EksV2ProvisionedControlPlaneStack/Cluster/DefaultVpc/RestrictDefaultSecurityGroupCustomResource/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterDefaultVpcRestrictDefaultSecurityGroupCustomResource59F333B7"
+    }
+  ]
+}

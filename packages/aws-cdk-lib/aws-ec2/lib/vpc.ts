@@ -1709,7 +1709,7 @@ export class Vpc extends VpcBase {
         }
         // configure IPv6 route if VPC is dual stack
         if (this.useIpv6) {
-          publicSubnet.addIpv6DefaultInternetRoute(igw.ref);
+          publicSubnet.addIpv6DefaultInternetRoute(igw.ref, att);
         }
       });
 
@@ -2243,18 +2243,26 @@ export class Subnet extends Resource implements ISubnet {
   }
 
   /**
-   * Create a default IPv6 route that points to a passed IGW.
+   * Create a default IPv6 route that points to a passed IGW, with a dependency
+   * on the IGW's attachment to the VPC.
    *
    * @param gatewayId the logical ID (ref) of the gateway attached to your VPC
+   * @param gatewayAttachment the gateway attachment construct to be added as a dependency
    */
   @MethodMetadata()
-  public addIpv6DefaultInternetRoute(gatewayId: string) {
-    this.addRoute('DefaultRoute6', {
-      routerType: RouterType.GATEWAY,
-      routerId: gatewayId,
+  public addIpv6DefaultInternetRoute(gatewayId: string, gatewayAttachment?: IDependable) {
+    const route = new CfnRoute(this, 'DefaultRoute6', {
+      routeTableId: this.routeTable.routeTableId,
       destinationIpv6CidrBlock: '::/0',
-      enablesInternetConnectivity: true,
+      gatewayId,
     });
+    if (gatewayAttachment) {
+      route.node.addDependency(gatewayAttachment);
+    }
+
+    // Since the 'route' depends on the gateway attachment, just
+    // depending on the route is enough.
+    this._internetConnectivityEstablished.add(route);
   }
 
   /**

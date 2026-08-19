@@ -69,7 +69,8 @@ export interface S3TableProps extends TableBaseProps {
    * You can only provide this option if you are not explicitly passing in a bucket.
    *
    * If you choose `SSE-KMS`, you *can* provide an un-managed KMS key with `encryptionKey`.
-   * If you choose `CSE-KMS`, you *must* provide an un-managed KMS key with `encryptionKey`.
+   * If you choose `CSE-KMS`, you *may* provide an un-managed KMS key with `encryptionKey`;
+   * one is created automatically if omitted.
    *
    * @default BucketEncryption.S3_MANAGED
    */
@@ -154,9 +155,11 @@ export class S3Table extends TableBase {
 
         parameters: {
           'classification': props.dataFormat.classificationString?.value,
-          'has_encrypted_data': true,
           'partition_filtering.enabled': props.enablePartitionFiltering,
           ...this.parameters,
+          // Managed keys are emitted last so free-form `parameters` cannot
+          // silently override them. Conflicts are rejected in `TableBase`.
+          'has_encrypted_data': this.hasEncryptedData,
         },
         storageDescriptor: {
           location: `s3://${this.bucket.bucketName}/${this.s3Prefix}`,
@@ -342,7 +345,7 @@ function createBucket(table: S3Table, props: S3TableProps) {
   };
 }
 
-function renderColumns(columns?: Array<Column | Column>) {
+function renderColumns(columns?: Column[]) {
   if (columns === undefined) {
     return undefined;
   }

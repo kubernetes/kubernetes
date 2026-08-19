@@ -141,7 +141,8 @@
     }
    },
    "DependsOn": [
-    "DualStackVpcipv6cidr0D52F270"
+    "DualStackVpcipv6cidr0D52F270",
+    "DualStackVpcVPCGW7803C9BB"
    ]
   },
   "DualStackVpcIpv6Public1Subnet1EIP4E17F847": {
@@ -302,7 +303,8 @@
     }
    },
    "DependsOn": [
-    "DualStackVpcipv6cidr0D52F270"
+    "DualStackVpcipv6cidr0D52F270",
+    "DualStackVpcVPCGW7803C9BB"
    ]
   },
   "DualStackVpcIpv6Public1Subnet2EIP45B7D0DE": {
@@ -463,7 +465,8 @@
     }
    },
    "DependsOn": [
-    "DualStackVpcipv6cidr0D52F270"
+    "DualStackVpcipv6cidr0D52F270",
+    "DualStackVpcVPCGW7803C9BB"
    ]
   },
   "DualStackVpcIpv6Public2Subnet2Subnet509DD3CC": {
@@ -583,7 +586,8 @@
     }
    },
    "DependsOn": [
-    "DualStackVpcipv6cidr0D52F270"
+    "DualStackVpcipv6cidr0D52F270",
+    "DualStackVpcVPCGW7803C9BB"
    ]
   },
   "DualStackVpcIpv6Private1Subnet1Subnet2C527D85": {

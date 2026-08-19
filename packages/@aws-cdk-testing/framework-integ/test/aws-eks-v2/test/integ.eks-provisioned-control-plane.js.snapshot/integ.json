@@ -1,0 +1,15 @@
+{
+  "version": "54.0.0",
+  "testCases": {
+    "eks-v2-provisioned-control-plane-integ/DefaultTest": {
+      "stacks": [
+        "EksV2ProvisionedControlPlaneStack"
+      ],
+      "diffAssets": false,
+      "assertionStack": "eks-v2-provisioned-control-plane-integ/DefaultTest/DeployAssert",
+      "assertionStackName": "eksv2provisionedcontrolplaneintegDefaultTestDeployAssert0B4FE83A"
+    }
+  },
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
+}

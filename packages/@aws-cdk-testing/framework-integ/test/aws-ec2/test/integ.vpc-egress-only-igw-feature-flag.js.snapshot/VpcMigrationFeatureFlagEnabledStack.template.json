@@ -141,7 +141,8 @@
     }
    },
    "DependsOn": [
-    "VpcEnabledipv6cidrDF3828C8"
+    "VpcEnabledipv6cidrDF3828C8",
+    "VpcEnabledVPCGW8D682D3E"
    ]
   },
   "VpcEnabledpublicSubnet2Subnet112835F8": {
@@ -261,7 +262,8 @@
     }
    },
    "DependsOn": [
-    "VpcEnabledipv6cidrDF3828C8"
+    "VpcEnabledipv6cidrDF3828C8",
+    "VpcEnabledVPCGW8D682D3E"
    ]
   },
   "VpcEnabledIGWADCF2C30": {

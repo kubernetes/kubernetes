@@ -538,12 +538,6 @@
     "S3EncryptionMode": [
       "SSE-S3",
       "SSE-KMS"
-    ],
-    "CloudWatchEncryptionMode": [
-      "SSE-KMS"
-    ],
-    "JobBookmarksEncryptionMode": [
-      "CSE-KMS"
     ]
   },
   "aws-cdk/packages/@aws-cdk/aws-glue-alpha/lib/storage-parameter.ts": {

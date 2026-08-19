@@ -1,0 +1,16 @@
+{
+  "version": "54.0.0",
+  "testCases": {
+    "ReplicationImportedDestinationInteg/DefaultTest": {
+      "stacks": [
+        "destination-bucket-stack",
+        "source-bucket-stack",
+        "destination-policy-stack"
+      ],
+      "assertionStack": "ReplicationImportedDestinationInteg/DefaultTest/DeployAssert",
+      "assertionStackName": "ReplicationImportedDestinationIntegDefaultTestDeployAssertAA2257A7"
+    }
+  },
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
+}

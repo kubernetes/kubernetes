@@ -864,6 +864,7 @@ const targetGroup = new elbv2.ApplicationTargetGroup(this, 'LambdaTargetGroup', 
   targets: [new targets.LambdaTarget(lambdaFunction)],
 
   // Enable multi-value headers
+  targetType: elbv2.TargetType.LAMBDA,
   multiValueHeadersEnabled: true,
 });
 ```

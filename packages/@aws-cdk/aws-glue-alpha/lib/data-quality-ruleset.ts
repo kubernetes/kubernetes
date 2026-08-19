@@ -27,6 +27,36 @@ export class DataQualityTargetTable {
   }
 }
 
+/**
+ * The Data Quality Definition Language (DQDL) document for a `DataQualityRuleset`.
+ *
+ * DQDL is an authored string that Glue parses and validates at deploy time. Build
+ * one from a raw DQDL string with {@link Dqdl.fromString}.
+ *
+ * @see https://docs.aws.amazon.com/glue/latest/dg/dqdl.html
+ */
+export class Dqdl {
+  /**
+   * Create a `Dqdl` from a raw DQDL string.
+   *
+   * @param dqdl the DQDL document, e.g. `Rules = [ RowCount > 100 ]`.
+   */
+  public static fromString(dqdl: string): Dqdl {
+    return new Dqdl(dqdl);
+  }
+
+  private constructor(private readonly dqdl: string) {}
+
+  /**
+   * Render this DQDL to the string expected by the Glue ruleset resource.
+   *
+   * @internal
+   */
+  public _render(): string {
+    return this.dqdl;
+  }
+}
+
 export interface IDataQualityRuleset extends IResource {
   /**
    * The ARN of the ruleset
@@ -64,10 +94,11 @@ export interface DataQualityRulesetProps {
   readonly description?: string;
 
   /**
-   * The dqdl of the ruleset
-   * @attribute
+   * The DQDL document defining the ruleset's data quality rules.
+   *
+   * Build it with `Dqdl.fromString(...)`.
    */
-  readonly rulesetDqdl: string;
+  readonly dqdl: Dqdl;
 
   /**
    *  Key-Value pairs that define tags for the ruleset.
@@ -136,7 +167,7 @@ export class DataQualityRuleset extends Resource implements IDataQualityRuleset 
       clientToken: props.clientToken,
       description: props.description,
       name: props.rulesetName,
-      ruleset: props.rulesetDqdl,
+      ruleset: props.dqdl._render(),
       tags: props.tags,
       targetTable: props.targetTable,
     });

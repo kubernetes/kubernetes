@@ -954,6 +954,46 @@ new Bucket(this, 'MyBucket', {
 });
 ```
 
+The rule above targets nesting that only *groups* related properties. If grouping
+is your goal, you can achieve it with the shared prefix, and avoid making life 
+harder for other language users.
+
+But the situation is different when you are dealing with co-dependent properties.
+If you have a case in which two or more properties are only valid together —
+none of them makes sense on its own — then nesting lets the type system reject 
+the incomplete combinations. Here the ergonomic loss is outweighed by making an
+illegal state unrepresentable rather than caught by a runtime check.
+
+The rule of thumb is: if flattening the properties would force you to add
+construction-time validation that throws when some — but not all — of them are
+set, group them into a required-together object instead. If each property is
+independently valid, keep them flat. (Properties that are mutually exclusive
+rather than required-together are usually better modeled with factory methods or
+subtypes than with a nested object — see [Prefer Additions](#prefer-additions)
+and the enum-like class pattern.)
+
+For example, a Glue Spark job's `workerType` and `numberOfWorkers` must be set
+together. Flattened, the pair is severable, so the construct has to reject the
+partial input at synthesis:
+
+```ts
+new PySparkEtlJob(this, 'Job', {
+  workerType: WorkerType.G_2X, // throws at synth: numberOfWorkers is required with workerType
+});
+```
+
+Grouping them into a value object whose fields are both required makes "one
+without the other" impossible to express in the first place:
+
+```ts
+new PySparkEtlJob(this, 'Job', {
+  workerConfiguration: {
+    workerType: WorkerType.G_2X,
+    numberOfWorkers: 2,
+  },
+});
+```
+
 #### Concise
 
 Property names should be short and concise as possible and take into

@@ -234,6 +234,6 @@ test('struct type', () => {
   expect(type.isPrimitive).toEqual(false);
   expect(type.inputString).toEqual(
 
-    'struct<primitive:string,with_comment:string COMMENT \'this has a comment\',array:array<string>,map:map<string,string>,nested_struct:struct<nested:string COMMENT \'nested comment\'>>',
+    'struct<primitive:string,with_comment:string,array:array<string>,map:map<string,string>,nested_struct:struct<nested:string>>',
   );
 });

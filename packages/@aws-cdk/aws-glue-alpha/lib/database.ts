@@ -100,7 +100,7 @@ export class Database extends Resource implements IDatabase {
   /**
    * Location URI of this database.
    */
-  public locationUri?: string;
+  public readonly locationUri?: string;
 
   private readonly _catalog?: ICatalog;
 

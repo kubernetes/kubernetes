@@ -1,7 +1,6 @@
 import { CfnJob } from 'aws-cdk-lib/aws-glue';
-import { ValidationError } from 'aws-cdk-lib/core';
 import type * as cdk from 'aws-cdk-lib/core';
-import { memoizedGetter, lit } from 'aws-cdk-lib/core/lib/helpers-internal';
+import { memoizedGetter } from 'aws-cdk-lib/core/lib/helpers-internal';
 import { addConstructMetadata } from 'aws-cdk-lib/core/lib/metadata-resource';
 import { propertyInjectable } from 'aws-cdk-lib/core/lib/prop-injectable';
 import type { Construct } from 'constructs';
@@ -98,10 +97,6 @@ export class ScalaSparkEtlJob extends SparkJob {
       ...this.nonExecutableCommonArguments(props),
     };
 
-    if ((!props.workerType && props.numberOfWorkers !== undefined) || (props.workerType && props.numberOfWorkers === undefined)) {
-      throw new ValidationError(lit`WorkerTypeAndNumberOfWorkersMustBothBeSet`, 'Both workerType and numberOfWorkers must be set', this);
-    }
-
     this.resource = new CfnJob(this, 'Resource', {
       name: props.jobName,
       description: props.description,
@@ -111,8 +106,8 @@ export class ScalaSparkEtlJob extends SparkJob {
         scriptLocation: this.codeS3ObjectUrl(props.script),
       },
       glueVersion: props.glueVersion ? props.glueVersion : GlueVersion.V4_0,
-      workerType: props.workerType ? props.workerType : WorkerType.G_1X,
-      numberOfWorkers: props.numberOfWorkers ? props.numberOfWorkers : 10,
+      workerType: props.workerConfiguration?.workerType ?? WorkerType.G_1X,
+      numberOfWorkers: props.workerConfiguration?.numberOfWorkers ?? 10,
       maxRetries: props.jobRunQueuingEnabled ? 0 : props.maxRetries,
       jobRunQueuingEnabled: props.jobRunQueuingEnabled ? props.jobRunQueuingEnabled : false,
       notificationProperty: props.notifyDelayAfter ? { notifyDelayAfter: props.notifyDelayAfter.toMinutes() } : undefined,

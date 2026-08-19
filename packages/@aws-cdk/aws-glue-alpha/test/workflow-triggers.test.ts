@@ -1,5 +1,6 @@
 import * as cdk from 'aws-cdk-lib';
 import { Template, Capture } from 'aws-cdk-lib/assertions';
+import { CfnCrawler } from 'aws-cdk-lib/aws-glue';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as glue from '../lib';
 import { TriggerSchedule } from '../lib/triggers/trigger-options';
@@ -24,8 +25,7 @@ describe('Workflow and Triggers', () => {
       script: glue.Code.fromAsset('test/job-script/hello_world.py'),
       role,
       glueVersion: glue.GlueVersion.V4_0,
-      workerType: glue.WorkerType.G_1X,
-      numberOfWorkers: 10,
+      workerConfiguration: { workerType: glue.WorkerType.G_1X, numberOfWorkers: 10 },
     });
   });
 
@@ -284,5 +284,104 @@ describe('.fromWorkflowAttributes()', () => {
       resource: 'workflow',
       resourceName: workflowName,
     }));
+  });
+});
+
+describe('import factories', () => {
+  let stack: cdk.Stack;
+
+  beforeEach(() => {
+    stack = new cdk.Stack();
+  });
+
+  test('fromWorkflowName derives the ARN from the name', () => {
+    const imported = glue.Workflow.fromWorkflowName(stack, 'Imported', 'my-workflow');
+
+    expect(imported.workflowName).toEqual('my-workflow');
+    expect(imported.workflowArn).toEqual(stack.formatArn({
+      service: 'glue',
+      resource: 'workflow',
+      resourceName: 'my-workflow',
+    }));
+  });
+
+  test('fromWorkflowArn extracts the name from the ARN', () => {
+    const workflowArn = 'arn:aws:glue:us-east-1:123456789012:workflow/my-workflow';
+
+    const imported = glue.Workflow.fromWorkflowArn(stack, 'Imported', workflowArn);
+
+    // The name is parsed out of the ARN, and the ARN is rebuilt from it in the
+    // importing stack's environment.
+    expect(imported.workflowName).toEqual('my-workflow');
+    expect(imported.workflowArn).toEqual(stack.formatArn({
+      service: 'glue',
+      resource: 'workflow',
+      resourceName: 'my-workflow',
+    }));
+  });
+});
+
+describe('trigger validation', () => {
+  let stack: cdk.Stack;
+  let workflow: glue.Workflow;
+  let job: glue.PySparkEtlJob;
+
+  beforeEach(() => {
+    stack = new cdk.Stack();
+    workflow = new glue.Workflow(stack, 'Workflow');
+    job = new glue.PySparkEtlJob(stack, 'Job', {
+      script: glue.Code.fromAsset('test/job-script/hello_world.py'),
+      role: new iam.Role(stack, 'JobRole', { assumedBy: new iam.ServicePrincipal('glue.amazonaws.com') }),
+    });
+  });
+
+  describe('action', () => {
+    test('fails when neither job nor crawler is provided', () => {
+      expect(() => workflow.addOnDemandTrigger('Trigger', {
+        actions: [{}],
+      })).toThrow('You must provide either a job or a crawler for the action.');
+    });
+
+    test('fails when both job and crawler are provided', () => {
+      const crawler = new CfnCrawler(stack, 'Crawler', {
+        role: 'arn:aws:iam::123456789012:role/CrawlerRole',
+        targets: {},
+      });
+
+      expect(() => workflow.addOnDemandTrigger('Trigger', {
+        actions: [{ job, crawler }],
+      })).toThrow('You cannot provide both a job and a crawler for the action.');
+    });
+  });
+
+  describe('condition', () => {
+    const predicateWith = (condition: glue.Condition) => ({
+      actions: [{ job }],
+      predicate: { conditions: [condition] },
+    });
+
+    test('fails when neither job nor crawler is provided', () => {
+      expect(() => workflow.addConditionalTrigger('Trigger', predicateWith({})))
+        .toThrow('You must provide either a job or a crawler for the condition.');
+    });
+
+    test('fails when both job and crawler are provided', () => {
+      expect(() => workflow.addConditionalTrigger('Trigger', predicateWith({
+        job,
+        state: glue.JobState.SUCCEEDED,
+        crawlerName: 'my-crawler',
+        crawlState: glue.CrawlerState.SUCCEEDED,
+      }))).toThrow('You cannot provide both a job and a crawler for the condition.');
+    });
+
+    test('fails when a job is provided without a job state', () => {
+      expect(() => workflow.addConditionalTrigger('Trigger', predicateWith({ job })))
+        .toThrow('If you provide a job for the condition, you must also provide a job state.');
+    });
+
+    test('fails when a crawler is provided without a crawler state', () => {
+      expect(() => workflow.addConditionalTrigger('Trigger', predicateWith({ crawlerName: 'my-crawler' })))
+        .toThrow('If you provide a crawler for the condition, you must also provide a crawler state.');
+    });
   });
 });

@@ -2473,6 +2473,13 @@
     ]
   },
   "aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.ts": {
+    "ControlPlaneScalingTier": [
+      "STANDARD",
+      "TIER_XL",
+      "TIER_2XL",
+      "TIER_4XL",
+      "TIER_8XL"
+    ],
     "EndpointAccess": [
       "PUBLIC",
       "PRIVATE",

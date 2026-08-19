@@ -114,6 +114,14 @@ Common facade types — see [AGENTS_CONSTRUCT_IMPLEMENTATION.md](./AGENTS_CONSTR
 - Keep names concise by removing redundant context (resource type, property type, "configuration") without inventing new semantics
 - Include units of measurement in names when not using a strong type: `milli`, `sec`, `min`, `hr`, `Bytes`, `KiB`, `MiB`, `GiB`
 
+### Property Structure (flat vs. nested)
+
+- You MUST keep props flat by default — do not introduce nesting that only *groups* related props. Use a shared name prefix instead (`websiteErrorDocument`/`websiteIndexDocument`, not `websiteConfiguration: { ... }`)
+- EXCEPTION: You SHOULD group two or more **co-dependent** props (only valid together, none meaningful alone) into a required-together nested value object when doing so makes the incomplete combinations unrepresentable at compile time. Making an illegal state unrepresentable outranks flatness here
+- Litmus test: if flattening would force construction-time validation that throws when *some but not all* of the props are set, nest them; if each prop is independently valid, keep it flat
+- Mutually *exclusive* props are NOT this case — model those with factory methods or enum-like classes (a nested object cannot enforce exclusivity)
+- Example: a Glue Spark job's `workerType` + `numberOfWorkers` are required-together → `workerConfiguration: { workerType, numberOfWorkers }` instead of two severable top-level props guarded by a synth-time throw
+
 ### Default Behavior
 
 - You MUST define the default behavior for every optional prop — what happens when the user omits it is a design decision, not just a documentation task. The `@default` JSDoc tag documents it, but the behavior itself must be intentionally designed.

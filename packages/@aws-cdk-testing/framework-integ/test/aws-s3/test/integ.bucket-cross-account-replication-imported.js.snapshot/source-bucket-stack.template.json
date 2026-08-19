@@ -1,0 +1,165 @@
+{
+ "Resources": {
+  "SourceBucketReplicationRole9043C65F": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "s3.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "RoleName": "source-bucket-stacktreplicationroleeed9db3516683f9245a0"
+   }
+  },
+  "SourceBucketReplicationRoleDefaultPolicyF98AD664": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "s3:GetReplicationConfiguration",
+        "s3:ListBucket"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "SourceBucketDDD2130A",
+         "Arn"
+        ]
+       }
+      },
+      {
+       "Action": [
+        "s3:GetObjectVersionAcl",
+        "s3:GetObjectVersionForReplication",
+        "s3:GetObjectVersionTagging"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          {
+           "Fn::GetAtt": [
+            "SourceBucketDDD2130A",
+            "Arn"
+           ]
+          },
+          "/*"
+         ]
+        ]
+       }
+      },
+      {
+       "Action": [
+        "s3:ObjectOwnerOverrideToBucketOwner",
+        "s3:ReplicateDelete",
+        "s3:ReplicateObject",
+        "s3:ReplicateTags"
+       ],
+       "Effect": "Allow",
+       "Resource": "arn:aws:s3:::destination-bucket-stackestinationbucket35310271b2b92b02d131/*"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "SourceBucketReplicationRoleDefaultPolicyF98AD664",
+    "Roles": [
+     {
+      "Ref": "SourceBucketReplicationRole9043C65F"
+     }
+    ]
+   }
+  },
+  "SourceBucketDDD2130A": {
+   "Type": "AWS::S3::Bucket",
+   "Properties": {
+    "BucketEncryption": {
+     "ServerSideEncryptionConfiguration": [
+      {
+       "ServerSideEncryptionByDefault": {
+        "SSEAlgorithm": "AES256"
+       }
+      }
+     ]
+    },
+    "BucketName": "source-bucket-stacktacksourcebucket60bbca048ff9a26bffef",
+    "ReplicationConfiguration": {
+     "Role": {
+      "Fn::GetAtt": [
+       "SourceBucketReplicationRole9043C65F",
+       "Arn"
+      ]
+     },
+     "Rules": [
+      {
+       "DeleteMarkerReplication": {
+        "Status": "Enabled"
+       },
+       "Destination": {
+        "AccessControlTranslation": {
+         "Owner": "Destination"
+        },
+        "Account": "12345678",
+        "Bucket": "arn:aws:s3:::destination-bucket-stackestinationbucket35310271b2b92b02d131"
+       },
+       "Filter": {
+        "Prefix": ""
+       },
+       "Id": "imported-destination-rule",
+       "Priority": 1,
+       "Status": "Enabled"
+      }
+     ]
+    },
+    "VersioningConfiguration": {
+     "Status": "Enabled"
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

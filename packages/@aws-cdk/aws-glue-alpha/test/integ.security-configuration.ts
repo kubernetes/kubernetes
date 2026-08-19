@@ -11,40 +11,23 @@ const key = new kms.Key(stack, 'Key');
 // SecurityConfiguration for all 3 (s3, cloudwatch and job bookmarks) in modes requiring kms keys
 new glue.SecurityConfiguration(stack, 'KeyedSC', {
   securityConfigurationName: 'KeyedSC',
-  jobBookmarksEncryption: {
-    mode: glue.JobBookmarksEncryptionMode.CLIENT_SIDE_KMS,
-    kmsKey: key,
-  },
-  cloudWatchEncryption: {
-    mode: glue.CloudWatchEncryptionMode.KMS,
-    kmsKey: key,
-  },
-  s3Encryption: {
-    mode: glue.S3EncryptionMode.KMS,
-    kmsKey: key,
-  },
+  jobBookmarksEncryption: glue.JobBookmarksEncryption.clientSideKms(key),
+  cloudWatchEncryption: glue.CloudWatchEncryption.kms(key),
+  s3Encryption: glue.S3Encryption.kms(key),
 });
 
 // SecurityConfiguration for all 3 (s3, cloudwatch and job bookmarks) in modes requiring kms keys without one provided
 new glue.SecurityConfiguration(stack, 'KeylessSC', {
   securityConfigurationName: 'KeylessSC',
-  jobBookmarksEncryption: {
-    mode: glue.JobBookmarksEncryptionMode.CLIENT_SIDE_KMS,
-  },
-  cloudWatchEncryption: {
-    mode: glue.CloudWatchEncryptionMode.KMS,
-  },
-  s3Encryption: {
-    mode: glue.S3EncryptionMode.KMS,
-  },
+  jobBookmarksEncryption: glue.JobBookmarksEncryption.clientSideKms(),
+  cloudWatchEncryption: glue.CloudWatchEncryption.kms(),
+  s3Encryption: glue.S3Encryption.kms(),
 });
 
 // SecurityConfiguration for s3 not requiring kms key
 new glue.SecurityConfiguration(stack, 'S3SC', {
   securityConfigurationName: 'S3SC',
-  s3Encryption: {
-    mode: glue.S3EncryptionMode.S3_MANAGED,
-  },
+  s3Encryption: glue.S3Encryption.s3Managed(),
 });
 
 app.synth();

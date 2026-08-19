@@ -157,7 +157,10 @@ test('Grant write to MediaLive Role created seperately', () => {
   Template.fromStack(stack).hasResourceProperties('AWS::IAM::Policy', {
     PolicyDocument: {
       Statement: [{
-        Action: 'mediapackagev2:PutObject',
+        Action: [
+          'mediapackagev2:GetChannel',
+          'mediapackagev2:PutObject',
+        ],
         Effect: 'Allow',
         Resource: {
           'Fn::GetAtt': ['mychannel130AE695', 'Arn'],
@@ -373,7 +376,10 @@ test('grants.ingest() adds correct IAM policy', () => {
   Template.fromStack(stack).hasResourceProperties('AWS::IAM::Policy', {
     PolicyDocument: {
       Statement: [{
-        Action: 'mediapackagev2:PutObject',
+        Action: [
+          'mediapackagev2:GetChannel',
+          'mediapackagev2:PutObject',
+        ],
         Effect: 'Allow',
         Resource: {
           'Fn::GetAtt': ['mychannel130AE695', 'Arn'],

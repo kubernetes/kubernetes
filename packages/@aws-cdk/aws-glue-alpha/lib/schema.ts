@@ -206,11 +206,7 @@ export class Schema {
     return {
       isPrimitive: false,
       inputString: `struct<${columns.map(column => {
-        if (column.comment === undefined) {
-          return `${column.name}:${column.type.inputString}`;
-        } else {
-          return `${column.name}:${column.type.inputString} COMMENT '${column.comment}'`;
-        }
+        return `${column.name}:${column.type.inputString}`;
       }).join(',')}>`,
     };
   }
