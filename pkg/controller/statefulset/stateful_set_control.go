@@ -731,8 +731,9 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 	// Parallel Pod management does not require ordered processing. Process
 	// condemned Pods first so scale down can release resources before the
 	// controller attempts to create missing Pods in the desired ordinal range.
-	if !monotonic {
-		if shouldExit, err := ssc.processCondemnedPods(
+
+	processCondemnedPodsFn := func() (bool, error) {
+		return ssc.processCondemnedPods(
 			ctx,
 			set,
 			updateSet,
@@ -740,7 +741,11 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 			monotonic,
 			condemned,
 			now,
-		); shouldExit || err != nil {
+		)
+	}
+
+	if !monotonic {
+		if shouldExit, err := processCondemnedPodsFn(); shouldExit || err != nil {
 			updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, now, replicas, condemned)
 			return &status, err
 		}
@@ -758,15 +763,11 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 
 	// Preserve the existing processing order for OrderedReady StatefulSets.
 	if monotonic {
-		if shouldExit, err := ssc.processCondemnedPods(
-			ctx,
-			set,
-			updateSet,
-			firstUnavailablePod,
-			monotonic,
-			condemned,
-			now,
-		); shouldExit || err != nil {
+		// We will wait for all predecessors to be Running and Available prior to attempting a deletion.
+		// We will terminate Pods in a monotonically decreasing order.
+		// Note that we do not resurrect Pods in this interval. Also note that scaling will take precedence over
+		// updates.
+		if shouldExit, err := processCondemnedPodsFn(); shouldExit || err != nil {
 			updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, now, replicas, condemned)
 			return &status, err
 		}
