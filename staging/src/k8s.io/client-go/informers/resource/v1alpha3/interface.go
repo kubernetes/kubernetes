@@ -24,9 +24,9 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// DeviceTaintRules returns a DeviceTaintRuleInformer.
+	// DeviceTaintRules returns a TypedDeviceTaintRuleInformer.
 	DeviceTaintRules() TypedDeviceTaintRuleInformer
-	// ResourcePoolStatusRequests returns a ResourcePoolStatusRequestInformer.
+	// ResourcePoolStatusRequests returns a TypedResourcePoolStatusRequestInformer.
 	ResourcePoolStatusRequests() TypedResourcePoolStatusRequestInformer
 }
 

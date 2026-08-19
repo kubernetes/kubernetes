@@ -24,7 +24,7 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// PodDisruptionBudgets returns a PodDisruptionBudgetInformer.
+	// PodDisruptionBudgets returns a TypedPodDisruptionBudgetInformer.
 	PodDisruptionBudgets() TypedPodDisruptionBudgetInformer
 }
 

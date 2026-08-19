@@ -24,15 +24,15 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// DeviceClasses returns a DeviceClassInformer.
+	// DeviceClasses returns a TypedDeviceClassInformer.
 	DeviceClasses() TypedDeviceClassInformer
-	// DeviceTaintRules returns a DeviceTaintRuleInformer.
+	// DeviceTaintRules returns a TypedDeviceTaintRuleInformer.
 	DeviceTaintRules() TypedDeviceTaintRuleInformer
-	// ResourceClaims returns a ResourceClaimInformer.
+	// ResourceClaims returns a TypedResourceClaimInformer.
 	ResourceClaims() TypedResourceClaimInformer
-	// ResourceClaimTemplates returns a ResourceClaimTemplateInformer.
+	// ResourceClaimTemplates returns a TypedResourceClaimTemplateInformer.
 	ResourceClaimTemplates() TypedResourceClaimTemplateInformer
-	// ResourceSlices returns a ResourceSliceInformer.
+	// ResourceSlices returns a TypedResourceSliceInformer.
 	ResourceSlices() TypedResourceSliceInformer
 }
 

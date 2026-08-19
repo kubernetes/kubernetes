@@ -24,11 +24,11 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// ControllerRevisions returns a ControllerRevisionInformer.
+	// ControllerRevisions returns a TypedControllerRevisionInformer.
 	ControllerRevisions() TypedControllerRevisionInformer
-	// Deployments returns a DeploymentInformer.
+	// Deployments returns a TypedDeploymentInformer.
 	Deployments() TypedDeploymentInformer
-	// StatefulSets returns a StatefulSetInformer.
+	// StatefulSets returns a TypedStatefulSetInformer.
 	StatefulSets() TypedStatefulSetInformer
 }
 

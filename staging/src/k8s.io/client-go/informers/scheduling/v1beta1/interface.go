@@ -24,11 +24,11 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// PodGroups returns a PodGroupInformer.
+	// PodGroups returns a TypedPodGroupInformer.
 	PodGroups() TypedPodGroupInformer
-	// PriorityClasses returns a PriorityClassInformer.
+	// PriorityClasses returns a TypedPriorityClassInformer.
 	PriorityClasses() TypedPriorityClassInformer
-	// Workloads returns a WorkloadInformer.
+	// Workloads returns a TypedWorkloadInformer.
 	Workloads() TypedWorkloadInformer
 }
 

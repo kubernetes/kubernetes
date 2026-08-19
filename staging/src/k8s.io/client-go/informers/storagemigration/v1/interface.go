@@ -24,7 +24,7 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// StorageVersionMigrations returns a StorageVersionMigrationInformer.
+	// StorageVersionMigrations returns a TypedStorageVersionMigrationInformer.
 	StorageVersionMigrations() TypedStorageVersionMigrationInformer
 }
 

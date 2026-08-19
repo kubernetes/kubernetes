@@ -24,7 +24,7 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// PriorityClasses returns a PriorityClassInformer.
+	// PriorityClasses returns a TypedPriorityClassInformer.
 	PriorityClasses() TypedPriorityClassInformer
 }
 

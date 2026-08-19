@@ -24,37 +24,37 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// ComponentStatuses returns a ComponentStatusInformer.
+	// ComponentStatuses returns a TypedComponentStatusInformer.
 	ComponentStatuses() TypedComponentStatusInformer
-	// ConfigMaps returns a ConfigMapInformer.
+	// ConfigMaps returns a TypedConfigMapInformer.
 	ConfigMaps() TypedConfigMapInformer
-	// Endpoints returns a EndpointsInformer.
+	// Endpoints returns a TypedEndpointsInformer.
 	Endpoints() TypedEndpointsInformer
-	// Events returns a EventInformer.
+	// Events returns a TypedEventInformer.
 	Events() TypedEventInformer
-	// LimitRanges returns a LimitRangeInformer.
+	// LimitRanges returns a TypedLimitRangeInformer.
 	LimitRanges() TypedLimitRangeInformer
-	// Namespaces returns a NamespaceInformer.
+	// Namespaces returns a TypedNamespaceInformer.
 	Namespaces() TypedNamespaceInformer
-	// Nodes returns a NodeInformer.
+	// Nodes returns a TypedNodeInformer.
 	Nodes() TypedNodeInformer
-	// PersistentVolumes returns a PersistentVolumeInformer.
+	// PersistentVolumes returns a TypedPersistentVolumeInformer.
 	PersistentVolumes() TypedPersistentVolumeInformer
-	// PersistentVolumeClaims returns a PersistentVolumeClaimInformer.
+	// PersistentVolumeClaims returns a TypedPersistentVolumeClaimInformer.
 	PersistentVolumeClaims() TypedPersistentVolumeClaimInformer
-	// Pods returns a PodInformer.
+	// Pods returns a TypedPodInformer.
 	Pods() TypedPodInformer
-	// PodTemplates returns a PodTemplateInformer.
+	// PodTemplates returns a TypedPodTemplateInformer.
 	PodTemplates() TypedPodTemplateInformer
-	// ReplicationControllers returns a ReplicationControllerInformer.
+	// ReplicationControllers returns a TypedReplicationControllerInformer.
 	ReplicationControllers() TypedReplicationControllerInformer
-	// ResourceQuotas returns a ResourceQuotaInformer.
+	// ResourceQuotas returns a TypedResourceQuotaInformer.
 	ResourceQuotas() TypedResourceQuotaInformer
-	// Secrets returns a SecretInformer.
+	// Secrets returns a TypedSecretInformer.
 	Secrets() TypedSecretInformer
-	// Services returns a ServiceInformer.
+	// Services returns a TypedServiceInformer.
 	Services() TypedServiceInformer
-	// ServiceAccounts returns a ServiceAccountInformer.
+	// ServiceAccounts returns a TypedServiceAccountInformer.
 	ServiceAccounts() TypedServiceAccountInformer
 }
 
