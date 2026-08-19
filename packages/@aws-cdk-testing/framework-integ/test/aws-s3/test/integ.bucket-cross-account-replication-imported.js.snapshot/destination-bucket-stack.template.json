@@ -1,0 +1,77 @@
+{
+ "Resources": {
+  "DestinationBucket4BECDB47": {
+   "Type": "AWS::S3::Bucket",
+   "Properties": {
+    "BucketName": "destination-bucket-stackestinationbucket35310271b2b92b02d131",
+    "OwnershipControls": {
+     "Rules": [
+      {
+       "ObjectOwnership": "ObjectWriter"
+      }
+     ]
+    },
+    "VersioningConfiguration": {
+     "Status": "Enabled"
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  }
+ },
+ "Outputs": {
+  "ExportsOutputRefDestinationBucket4BECDB47A299B8F3": {
+   "Value": {
+    "Ref": "DestinationBucket4BECDB47"
+   },
+   "Export": {
+    "Name": "destination-bucket-stack:ExportsOutputRefDestinationBucket4BECDB47A299B8F3"
+   }
+  },
+  "ExportsOutputFnGetAttDestinationBucket4BECDB47Arn6B889445": {
+   "Value": {
+    "Fn::GetAtt": [
+     "DestinationBucket4BECDB47",
+     "Arn"
+    ]
+   },
+   "Export": {
+    "Name": "destination-bucket-stack:ExportsOutputFnGetAttDestinationBucket4BECDB47Arn6B889445"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

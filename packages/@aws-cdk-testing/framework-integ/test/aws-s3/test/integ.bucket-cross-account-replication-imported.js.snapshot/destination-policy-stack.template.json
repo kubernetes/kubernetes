@@ -1,0 +1,103 @@
+{
+ "Resources": {
+  "DestinationBucketPolicyD9991181": {
+   "Type": "AWS::S3::BucketPolicy",
+   "Properties": {
+    "Bucket": {
+     "Fn::ImportValue": "destination-bucket-stack:ExportsOutputRefDestinationBucket4BECDB47A299B8F3"
+    },
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "s3:GetBucketVersioning",
+        "s3:PutBucketVersioning"
+       ],
+       "Effect": "Allow",
+       "Principal": {
+        "AWS": "arn:aws:iam::234567890123:role/source-bucket-stacktreplicationroleeed9db3516683f9245a0"
+       },
+       "Resource": {
+        "Fn::ImportValue": "destination-bucket-stack:ExportsOutputFnGetAttDestinationBucket4BECDB47Arn6B889445"
+       }
+      },
+      {
+       "Action": [
+        "s3:ReplicateDelete",
+        "s3:ReplicateObject"
+       ],
+       "Effect": "Allow",
+       "Principal": {
+        "AWS": "arn:aws:iam::234567890123:role/source-bucket-stacktreplicationroleeed9db3516683f9245a0"
+       },
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          {
+           "Fn::ImportValue": "destination-bucket-stack:ExportsOutputFnGetAttDestinationBucket4BECDB47Arn6B889445"
+          },
+          "/*"
+         ]
+        ]
+       }
+      },
+      {
+       "Action": "s3:ObjectOwnerOverrideToBucketOwner",
+       "Effect": "Allow",
+       "Principal": {
+        "AWS": "arn:aws:iam::234567890123:root"
+       },
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          {
+           "Fn::ImportValue": "destination-bucket-stack:ExportsOutputFnGetAttDestinationBucket4BECDB47Arn6B889445"
+          },
+          "/*"
+         ]
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

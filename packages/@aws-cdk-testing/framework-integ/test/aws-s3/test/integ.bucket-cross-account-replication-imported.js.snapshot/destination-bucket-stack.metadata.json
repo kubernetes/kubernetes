@@ -1,0 +1,43 @@
+{
+  "/destination-bucket-stack/DestinationBucket": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "versioned": true,
+        "removalPolicy": "destroy",
+        "bucketName": "*",
+        "objectOwnership": "ObjectWriter"
+      }
+    }
+  ],
+  "/destination-bucket-stack/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/destination-bucket-stack/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/destination-bucket-stack/DestinationBucket/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DestinationBucket4BECDB47"
+    }
+  ],
+  "/destination-bucket-stack/Exports/Output{\"Ref\":\"DestinationBucket4BECDB47\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefDestinationBucket4BECDB47A299B8F3"
+    }
+  ],
+  "/destination-bucket-stack/Exports/Output{\"Fn::GetAtt\":[\"DestinationBucket4BECDB47\",\"Arn\"]}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputFnGetAttDestinationBucket4BECDB47Arn6B889445"
+    }
+  ]
+}
