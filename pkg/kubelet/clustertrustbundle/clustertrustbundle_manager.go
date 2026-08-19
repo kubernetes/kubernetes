@@ -206,13 +206,24 @@ func newInformerManager[T clusterTrustBundle](ctx context.Context, handlers clus
 }
 
 func (m *InformerManager[T]) dropCacheFor(ctb *T) {
+	// A ClusterTrustBundle that has a signer name is still reachable by name, so
+	// a change to it has to invalidate both kinds of cache entry. The name sweep
+	// is therefore unconditional. It cannot over-match a signer-keyed entry,
+	// because those are stored with an empty ctbName and an object's name is
+	// never empty.
+	ctbName := m.ctbHandlers.GetName(ctb)
+	m.normalizationCache.RemoveAll(func(key any) bool {
+		return key.(cacheKeyType).ctbName == ctbName
+	})
+
+	// The signer sweep stays guarded. GetSignerName returns "" for a bundle with
+	// no signer, and every name-keyed entry is stored with an empty signerName,
+	// so an unguarded sweep would match all of them. That would still project
+	// correct content, since entries are refilled from the lister, but it would
+	// needlessly evict unrelated entries.
 	if ctbSignerName := m.ctbHandlers.GetSignerName(ctb); ctbSignerName != "" {
 		m.normalizationCache.RemoveAll(func(key any) bool {
 			return key.(cacheKeyType).signerName == ctbSignerName
-		})
-	} else {
-		m.normalizationCache.RemoveAll(func(key any) bool {
-			return key.(cacheKeyType).ctbName == m.ctbHandlers.GetName(ctb)
 		})
 	}
 }
