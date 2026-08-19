@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -166,6 +167,9 @@ func BuildGenericConfig(
 		if accessor, err := meta.Accessor(obj); err == nil && accessor.GetManagedFields() != nil {
 			accessor.SetManagedFields(nil)
 		}
+		if pod, ok := obj.(*corev1.Pod); ok {
+			trimPodSpec(pod)
+		}
 		return obj, nil
 	}
 	versionedInformers = clientgoinformers.NewSharedInformerFactoryWithOptions(
@@ -250,6 +254,41 @@ func BuildGenericConfig(
 	genericConfig.AggregatedDiscoveryGroupManager = aggregated.NewResourceManager("apis")
 
 	return
+}
+
+// trimPodSpec clears Pod spec fields on objects in the self-requested
+// informers that are not read by any of the in-process consumers of this
+// shared cache (NodeRestriction and ResourceQuota admission, the node
+// authorizer, and PodSecurity admission), to reduce the informer's memory
+// footprint. See https://github.com/kubernetes/kubernetes/issues/125469.
+//
+// Only fields verified unread by all of those consumers are cleared here;
+// fields any of them touch (e.g. ServiceAccountName, Volumes, container
+// resources) are left alone.
+//
+// If you add a Pod field read to one of those four consumers, check whether
+// it's cleared here first — nothing else will catch the conflict.
+func trimPodSpec(pod *corev1.Pod) {
+	pod.Spec.RestartPolicy = ""
+	pod.Spec.TerminationGracePeriodSeconds = nil
+	pod.Spec.DNSPolicy = ""
+	pod.Spec.NodeSelector = nil
+	pod.Spec.DeprecatedServiceAccount = ""
+	pod.Spec.AutomountServiceAccountToken = nil
+	pod.Spec.ShareProcessNamespace = nil
+	pod.Spec.Hostname = ""
+	pod.Spec.Subdomain = ""
+	pod.Spec.SchedulerName = ""
+	pod.Spec.Tolerations = nil
+	pod.Spec.HostAliases = nil
+	pod.Spec.Priority = nil
+	pod.Spec.DNSConfig = nil
+	pod.Spec.ReadinessGates = nil
+	pod.Spec.EnableServiceLinks = nil
+	pod.Spec.PreemptionPolicy = nil
+	pod.Spec.TopologySpreadConstraints = nil
+	pod.Spec.SetHostnameAsFQDN = nil
+	pod.Spec.SchedulingGates = nil
 }
 
 // BuildAuthorizer constructs the authorizer. If authorization is not set in s, it returns nil, nil, false, nil
