@@ -4,8 +4,6 @@ rules:
     allowedPrefixes: [ "" ]
   - selectorRegexp: ^k8s[.]io/kubernetes/pkg/apis/core/v1/helper$
     allowedPrefixes: [ "" ]
-  - selectorRegexp: ^k8s[.]io/kubernetes/pkg/apis/core/validation$
-    allowedPrefixes: [ "" ]
   - selectorRegexp: ^k8s[.]io/kubernetes/pkg/apis/scheduling$
     allowedPrefixes: [ "" ]
   - selectorRegexp: ^k8s[.]io/kubernetes/pkg/controller$
