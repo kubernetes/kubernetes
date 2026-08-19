@@ -37,7 +37,6 @@ import (
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
@@ -60,6 +59,10 @@ const (
 	// to ensure that a certain minimum of nodes are checked for feasibility.
 	// This in turn helps ensure a minimum level of spreading.
 	minFeasibleNodesPercentageToFind = 5
+	// noteLengthLimit is a local copy of NoteLengthLimit in k8s.io/kubernetes/pkg/apis/core/validation, which the API
+	// server enforces on notes the scheduler records. A local copy is safe because API validation limits will never
+	// become lower than an already released version.
+	noteLengthLimit = 1024
 )
 
 // ScheduleOne does the entire scheduling workflow for a single scheduling entity (either a pod or a pod group).
@@ -1262,14 +1265,13 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 	}
 }
 
-// truncateMessage truncates a message if it hits the NoteLengthLimit.
+// truncateMessage truncates a message if it hits the noteLengthLimit.
 func truncateMessage(message string) string {
-	max := validation.NoteLengthLimit
-	if len(message) <= max {
+	if len(message) <= noteLengthLimit {
 		return message
 	}
 	suffix := " ..."
-	return message[:max-len(suffix)] + suffix
+	return message[:noteLengthLimit-len(suffix)] + suffix
 }
 
 func updatePod(ctx context.Context, client clientset.Interface, apiCacher fwk.APICacher, pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) error {
