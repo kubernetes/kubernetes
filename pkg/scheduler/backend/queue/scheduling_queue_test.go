@@ -4806,7 +4806,8 @@ scheduler_pending_pods{queue="unschedulable"} 0
 				},
 			}
 			preenq := map[string]map[string]fwk.PreEnqueuePlugin{"": {(&preEnqueuePlugin{}).Name(): &preEnqueuePlugin{allowlists: []string{queueable}}}}
-			recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, tCtx.Done())
+			recorderCtx, stopRecorder := context.WithCancel(tCtx)
+			recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, recorderCtx.Done())
 			queue := NewTestQueue(tCtx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)), WithPreEnqueuePluginMap(preenq), WithPluginMetricsSamplePercent(test.pluginMetricsSamplePercent), WithMetricsRecorder(recorder), WithQueueingHintMapPerProfile(m))
 			queue.isPopFromBackoffQEnabled = !test.disablePopFromBackoffQ
 			for i, op := range test.operations {
@@ -4815,6 +4816,8 @@ scheduler_pending_pods{queue="unschedulable"} 0
 				}
 			}
 
+			stopRecorder()
+			<-recorder.IsStoppedCh
 			recorder.FlushMetrics()
 
 			if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(test.wants), test.metricsName); err != nil {
@@ -9884,7 +9887,9 @@ func TestPreQueueingHint_Metrics(t *testing.T) {
 		},
 	}
 
-	q := NewTestQueue(ctx, newDefaultQueueSort(), WithQueueingHintMapPerProfile(m))
+	recorderCtx, stopRecorder := context.WithCancel(ctx)
+	recorder := metrics.NewMetricsAsyncRecorder(10, 20*time.Microsecond, recorderCtx.Done())
+	q := NewTestQueue(ctx, newDefaultQueueSort(), WithQueueingHintMapPerProfile(m), WithMetricsRecorder(recorder))
 
 	pod := st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj()
 	q.Add(ctx, pod)
@@ -9896,7 +9901,12 @@ func TestPreQueueingHint_Metrics(t *testing.T) {
 	}
 
 	q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, st.MakeNode().Name("node1").Obj(), nil)
-	q.metricsRecorder.FlushMetrics()
+
+	// Stop the background flush goroutine and wait for it to exit before
+	// calling FlushMetrics, so there is no concurrent drain of the channels.
+	stopRecorder()
+	<-recorder.IsStoppedCh
+	recorder.FlushMetrics()
 
 	// Verify metric was incremented with "narrowed" label
 	narrowedCount, err := testutil.GetCounterMetricValue(metrics.PreQueueingHintEvaluations.WithLabelValues("testPlugin", "narrowed"))
