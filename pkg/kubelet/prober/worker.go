@@ -380,7 +380,7 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	}
 
 	// Note, exec probe does NOT have access to pod environment variables or downward API
-	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
+	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status.PodIP, w.container, w.containerID)
 	if err != nil {
 		// Prober error, throw away the result.
 		return true

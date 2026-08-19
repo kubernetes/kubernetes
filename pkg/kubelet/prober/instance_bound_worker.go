@@ -90,11 +90,6 @@ type instanceBoundWorker struct {
 	// resultsManager is the cache for this worker's probe type.
 	resultsManager results.Manager
 
-	// podStatus carries the pod IP to the probe handlers. Snapshotted rather
-	// than read from the status manager, so the worker has no dependency on
-	// anyone else's view of the pod.
-	podStatus v1.PodStatus
-
 	adopted            bool
 	onExit             func(*instanceBoundWorker)
 	onStartupSucceeded func(*instanceBoundWorker)
@@ -135,7 +130,6 @@ func newInstanceBoundWorker(ctx context.Context, opts instanceBoundWorkerOptions
 		adopted:            opts.adopted,
 		onExit:             opts.onExit,
 		onStartupSucceeded: opts.onStartupSucceeded,
-		podStatus:          v1.PodStatus{PodIP: opts.target.podIP()},
 	}
 	w.ctx, w.cancel = context.WithCancel(ctx)
 
@@ -251,7 +245,7 @@ func (w *instanceBoundWorker) doProbe() (keepGoing bool) {
 	defer runtime.HandleCrashWithContext(ctx, func(ctx context.Context, _ interface{}) { keepGoing = true })
 
 	startTime := time.Now()
-	result, err := w.prober.probe(ctx, w.probeType, w.pod, w.podStatus, w.container, w.containerID)
+	result, err := w.prober.probe(ctx, w.probeType, w.pod, w.podIP(), w.container, w.containerID)
 	if err != nil {
 		// Prober error, or a probe cancelled by stop(): throw away the result.
 		return true

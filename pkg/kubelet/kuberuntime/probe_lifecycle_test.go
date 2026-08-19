@@ -51,16 +51,10 @@ func (r *recordingProbeLifecycle) StartProbes(_ context.Context, _ *v1.Pod, cont
 	r.startedAt = startedAt
 }
 
-func (r *recordingProbeLifecycle) StopLivenessAndStartupProbes(containerID kubecontainer.ContainerID) {
+func (r *recordingProbeLifecycle) StopProbes(containerID kubecontainer.ContainerID, probeTypes kubecontainer.ProbeType) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.calls = append(r.calls, fmt.Sprintf("StopLivenessAndStartupProbes(%s)", containerID.ID))
-}
-
-func (r *recordingProbeLifecycle) StopProbes(containerID kubecontainer.ContainerID) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.calls = append(r.calls, fmt.Sprintf("StopProbes(%s)", containerID.ID))
+	r.calls = append(r.calls, fmt.Sprintf("StopProbes(%s, %s)", containerID.ID, probeTypes))
 }
 
 func (r *recordingProbeLifecycle) recorded() []string {
@@ -151,7 +145,7 @@ func TestStartContainerStopsProbesOnPostStartFailure(t *testing.T) {
 
 	got := probes.recorded()
 	if len(got) != 3 || got[0] != "StartProbes(foo)" ||
-		!strings.HasPrefix(got[1], "StopLivenessAndStartupProbes(") ||
+		!strings.HasPrefix(got[1], "StopProbes(") ||
 		!strings.HasPrefix(got[2], "StopProbes(") {
 		t.Errorf("probe lifecycle calls = %v, want StartProbes then the kill hooks", got)
 	}
@@ -169,13 +163,13 @@ func TestKillContainerStopsProbes(t *testing.T) {
 		want []string
 	}{{
 		name: "container stops",
-		want: []string{"StopLivenessAndStartupProbes(%s)", "PreStop", "StopProbes(%s)"},
+		want: []string{"StopProbes(%s, Liveness|Startup)", "PreStop", "StopProbes(%s, All)"},
 	}, {
 		name:      "container fails to stop",
 		stopFails: true,
 		// Readiness keeps running and the results stay cached; the next sync
 		// reconciles.
-		want: []string{"StopLivenessAndStartupProbes(%s)", "PreStop"},
+		want: []string{"StopProbes(%s, Liveness|Startup)", "PreStop"},
 	}} {
 		t.Run(tc.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)

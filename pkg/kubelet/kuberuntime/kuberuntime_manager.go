@@ -411,19 +411,10 @@ func (m *kubeGenericRuntimeManager) SetContainerProbeLifecycle(probeLifecycle ku
 // manager is wired in -- and in tests that never wire one -- that is nowhere.
 func (m *kubeGenericRuntimeManager) probes() kubecontainer.ContainerProbeLifecycle {
 	if m.probeLifecycle == nil {
-		return noopProbeLifecycle{}
+		return kubecontainer.NoopContainerProbeLifecycle{}
 	}
 	return m.probeLifecycle
 }
-
-type noopProbeLifecycle struct{}
-
-func (noopProbeLifecycle) StartProbes(context.Context, *v1.Pod, *v1.Container, kubecontainer.ContainerID, []string, time.Time) {
-}
-
-func (noopProbeLifecycle) StopLivenessAndStartupProbes(kubecontainer.ContainerID) {}
-
-func (noopProbeLifecycle) StopProbes(kubecontainer.ContainerID) {}
 
 // Type returns the type of the container runtime.
 func (m *kubeGenericRuntimeManager) Type() string {

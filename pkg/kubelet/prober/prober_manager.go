@@ -74,12 +74,13 @@ var ProberDuration = metrics.NewHistogramVec(
 // requested (UpdatePodStatus). Updating probe parameters is not currently supported.
 type Manager interface {
 	// Every probe manager can be handed to the container runtime, so that the
-	// runtime never has to know which one is installed. The legacy manager
-	// implements these as no-ops.
+	// runtime never has to know which one is installed. ContainerProbeLifecycle
+	// methods are no-op if ContainerScopedProbes is disabled.
 	kubecontainer.ContainerProbeLifecycle
 
-	// EnsureProbes makes sure the pod's containers are being probed, given the
-	// runtime's current view of them. It should be called on every pod sync.
+	// EnsureProbes makes sure the pod's running containers are being probed,
+	// given the runtime's current view of them. It should be called on every
+	// pod sync.
 	EnsureProbes(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus)
 
 	// StopLivenessAndStartup handles stopping liveness and startup probes during termination.
@@ -104,6 +105,8 @@ var (
 )
 
 type manager struct {
+	kubecontainer.NoopContainerProbeLifecycle
+
 	// Map of active workers for probes
 	workers map[probeKey]*worker
 	// Lock for accessing & mutating workers
@@ -156,31 +159,19 @@ type probeKey struct {
 }
 
 // Type of probe (liveness, readiness or startup)
-type probeType int
+type probeType = kubecontainer.ProbeType
 
 const (
-	liveness probeType = iota
-	readiness
-	startup
+	liveness  = kubecontainer.LivenessProbe
+	readiness = kubecontainer.ReadinessProbe
+	startup   = kubecontainer.StartupProbe
+
+	allProbes = kubecontainer.AllProbes
 
 	probeResultSuccessful string = "successful"
 	probeResultFailed     string = "failed"
 	probeResultUnknown    string = "unknown"
 )
-
-// For debugging.
-func (t probeType) String() string {
-	switch t {
-	case readiness:
-		return "Readiness"
-	case liveness:
-		return "Liveness"
-	case startup:
-		return "Startup"
-	default:
-		return "UNKNOWN"
-	}
-}
 
 func getRestartableInitContainers(pod *v1.Pod) []v1.Container {
 	var restartableInitContainers []v1.Container
@@ -194,9 +185,6 @@ func getRestartableInitContainers(pod *v1.Pod) []v1.Container {
 
 // EnsureProbes creates a probe worker for every container probe that does not
 // have one yet.
-//
-// This manager's workers find their containers by polling the status manager,
-// so the runtime's view of the pod is of no use to it and is ignored.
 func (m *manager) EnsureProbes(ctx context.Context, pod *v1.Pod, _ *kubecontainer.PodStatus) {
 	m.workerLock.Lock()
 	defer m.workerLock.Unlock()
@@ -252,18 +240,6 @@ func (m *manager) EnsureProbes(ctx context.Context, pod *v1.Pod, _ *kubecontaine
 		}
 	}
 }
-
-// StartProbes, StopLivenessAndStartupProbes and StopProbes are no-ops for this
-// manager: its workers discover containers by polling the status manager, so
-// there is nothing for the container runtime to tell it. They exist so that the
-// runtime can call the hooks unconditionally, without knowing which probe
-// manager is installed.
-func (m *manager) StartProbes(_ context.Context, _ *v1.Pod, _ *v1.Container, _ kubecontainer.ContainerID, _ []string, _ time.Time) {
-}
-
-func (m *manager) StopLivenessAndStartupProbes(_ kubecontainer.ContainerID) {}
-
-func (m *manager) StopProbes(_ kubecontainer.ContainerID) {}
 
 func (m *manager) StopLivenessAndStartup(pod *v1.Pod) {
 	m.workerLock.RLock()

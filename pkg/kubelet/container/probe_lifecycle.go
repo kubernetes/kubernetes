@@ -23,6 +23,34 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
+// ProbeType identifies a probe kind (liveness, readiness, startup).
+type ProbeType int
+
+const (
+	LivenessProbe ProbeType = 1 << iota
+	ReadinessProbe
+	StartupProbe
+
+	AllProbes = LivenessProbe | ReadinessProbe | StartupProbe
+)
+
+func (t ProbeType) String() string {
+	switch t {
+	case ReadinessProbe:
+		return "Readiness"
+	case LivenessProbe:
+		return "Liveness"
+	case StartupProbe:
+		return "Startup"
+	case AllProbes:
+		return "All"
+	case LivenessProbe | StartupProbe:
+		return "Liveness|Startup"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 // ContainerProbeLifecycle lets the container runtime tell the probe manager
 // when the containers it probes start and stop, so that probing a container is
 // tied to that container existing rather than being inferred after the fact.
@@ -35,18 +63,17 @@ type ContainerProbeLifecycle interface {
 	// container ID.
 	StartProbes(ctx context.Context, pod *v1.Pod, container *v1.Container, containerID ContainerID, podIPs []string, startedAt time.Time)
 
-	// StopLivenessAndStartupProbes stops the liveness and startup probes of a
-	// container that is about to be killed, aborting any probe currently
-	// executing. It is called before the PreStop hook, so that a container on
-	// its way out is not killed again for failing a probe and no exec probe is
-	// left running inside it as it is torn down.
-	//
-	// Readiness deliberately keeps running: a container that is shutting down
-	// should be taken out of service, which is what its readiness probe failing
-	// does.
-	StopLivenessAndStartupProbes(containerID ContainerID)
-
-	// StopProbes stops all remaining probes for a container instance and drops
-	// its cached results. It is called once the container has stopped.
-	StopProbes(containerID ContainerID)
+	// StopProbes stops the specified probes for a container instance.
+	// When AllProbes is specified, cached probe results for the container are also dropped.
+	StopProbes(containerID ContainerID, probeTypes ProbeType)
 }
+
+// NoopContainerProbeLifecycle is a no-op implementation of ContainerProbeLifecycle.
+type NoopContainerProbeLifecycle struct{}
+
+var _ ContainerProbeLifecycle = NoopContainerProbeLifecycle{}
+
+func (NoopContainerProbeLifecycle) StartProbes(context.Context, *v1.Pod, *v1.Container, ContainerID, []string, time.Time) {
+}
+
+func (NoopContainerProbeLifecycle) StopProbes(ContainerID, ProbeType) {}

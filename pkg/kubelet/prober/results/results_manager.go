@@ -32,12 +32,7 @@ type Manager interface {
 	// The pod is only included to be sent with the update.
 	Set(kubecontainer.ContainerID, Result, *v1.Pod)
 	// Seed sets the cached result for the container with the given ID without
-	// sending anything on Updates().
-	//
-	// It is for reconstructing state that consumers of Updates() already know
-	// about -- adopting containers that were already running when the kubelet
-	// started -- where an update would be spurious. Every other write must go
-	// through Set, or the sync loop will not learn about the result.
+	// sending anything on Updates(), for populating cache after Kubelet restart.
 	Seed(kubecontainer.ContainerID, Result)
 	// Remove clears the cached result for the container with the given ID.
 	Remove(kubecontainer.ContainerID)

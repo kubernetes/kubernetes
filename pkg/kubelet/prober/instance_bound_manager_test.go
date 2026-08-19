@@ -37,14 +37,14 @@ import (
 var testProbeSpec = v1.Probe{FailureThreshold: 1000}
 
 func newTestInstanceBoundManager(tCtx ktesting.TContext) *instanceBoundManager {
-	m := newInstanceBoundManager(
+	m := NewInstanceBoundManager(
 		tCtx,
 		results.NewManager(),
 		results.NewManager(),
 		results.NewManager(),
 		nil, // runner
 		&record.FakeRecorder{},
-	)
+	).(*instanceBoundManager)
 	// Don't actually execute probes. Failure keeps workers alive without
 	// publishing anything, given testProbeSpec's threshold.
 	m.prober.exec = &syncExecProber{fakeExecProber: fakeExecProber{result: probe.Failure}}
@@ -157,11 +157,15 @@ func TestInstanceBoundManagerLateStopIsIgnored(t *testing.T) {
 		name string
 		stop func(*instanceBoundManager, kubecontainer.ContainerID)
 	}{{
-		name: "StopProbes",
-		stop: (*instanceBoundManager).StopProbes,
+		name: "StopProbes(allProbes)",
+		stop: func(m *instanceBoundManager, id kubecontainer.ContainerID) {
+			m.StopProbes(id, allProbes)
+		},
 	}, {
-		name: "StopLivenessAndStartupProbes",
-		stop: (*instanceBoundManager).StopLivenessAndStartupProbes,
+		name: "StopProbes(liveness|startup)",
+		stop: func(m *instanceBoundManager, id kubecontainer.ContainerID) {
+			m.StopProbes(id, liveness|startup)
+		},
 	}} {
 		t.Run(tc.name, func(t *testing.T) {
 			ktesting.Init(t).SyncTest("", func(tCtx ktesting.TContext) {
@@ -196,7 +200,7 @@ func TestInstanceBoundManagerStopLivenessAndStartupProbes(t *testing.T) {
 		pod := probedTestPod(readiness, liveness)
 
 		startTestProbes(tCtx, m, pod, testID("a"))
-		m.StopLivenessAndStartupProbes(testID("a"))
+		m.StopProbes(testID("a"), liveness|startup)
 
 		want := map[string]string{"Readiness": "a"}
 		if got := boundIDs(m, pod, testContainerName); fmt.Sprint(got) != fmt.Sprint(want) {
@@ -219,7 +223,7 @@ func TestInstanceBoundManagerStopProbes(t *testing.T) {
 		pod := probedTestPod(readiness, liveness)
 
 		startTestProbes(tCtx, m, pod, testID("a"))
-		m.StopProbes(testID("a"))
+		m.StopProbes(testID("a"), allProbes)
 
 		if got := m.workerCount(); got != 0 {
 			tCtx.Errorf("worker count = %d after StopProbes, want 0", got)
@@ -246,7 +250,7 @@ func TestInstanceBoundManagerStopCancelsInFlightProbe(t *testing.T) {
 		w, _ := getInstanceBoundWorker(m, pod.UID, testContainerName, liveness)
 
 		<-runner.entered
-		m.StopLivenessAndStartupProbes(testID("a"))
+		m.StopProbes(testID("a"), liveness|startup)
 
 		if w.ctx.Err() == nil {
 			tCtx.Error("in-flight probe was not cancelled")
@@ -389,7 +393,7 @@ func TestInstanceBoundManagerStartupCallbackAfterKill(t *testing.T) {
 	}{{
 		name: "container killed",
 		after: func(m *instanceBoundManager, pod *v1.Pod, tCtx ktesting.TContext) {
-			m.StopProbes(testID("a"))
+			m.StopProbes(testID("a"), allProbes)
 		},
 	}, {
 		name: "container replaced",

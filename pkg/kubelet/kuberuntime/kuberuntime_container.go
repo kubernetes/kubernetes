@@ -874,7 +874,7 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 	// running exec or network probes inside a container being torn down wastes
 	// resources and produces spurious errors. Readiness keeps going, so that a
 	// container draining through its PreStop hook and grace period is taken out of service.
-	m.probes().StopLivenessAndStartupProbes(containerID)
+	m.probes().StopProbes(containerID, kubecontainer.LivenessProbe|kubecontainer.StartupProbe)
 
 	var containerSpec *v1.Container
 	if pod != nil {
@@ -936,7 +936,7 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 
 	// The container is gone, so its readiness probe and its cached results are
 	// too. This is skipped when the stop failed above; the next sync reconciles.
-	m.probes().StopProbes(containerID)
+	m.probes().StopProbes(containerID, kubecontainer.AllProbes)
 
 	if ordering != nil {
 		ordering.containerTerminated(containerName)

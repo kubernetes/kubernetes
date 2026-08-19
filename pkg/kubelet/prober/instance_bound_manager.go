@@ -87,17 +87,6 @@ func NewInstanceBoundManager(
 	runner kubecontainer.CommandRunner,
 	recorder record.EventRecorderLogger) Manager {
 
-	return newInstanceBoundManager(ctx, livenessManager, readinessManager, startupManager, runner, recorder)
-}
-
-func newInstanceBoundManager(
-	ctx context.Context,
-	livenessManager results.Manager,
-	readinessManager results.Manager,
-	startupManager results.Manager,
-	runner kubecontainer.CommandRunner,
-	recorder record.EventRecorderLogger) *instanceBoundManager {
-
 	return &instanceBoundManager{
 		ctx:              ctx,
 		prober:           newProber(runner, recorder),
@@ -389,40 +378,28 @@ func (m *instanceBoundManager) onStartupSucceeded(w *instanceBoundWorker) {
 	m.ensureWorkerLocked(m.ctx, liveness, w.probeTarget, w.adopted)
 }
 
-// StopLivenessAndStartupProbes stops the liveness and startup workers bound to
-// this container instance, aborting any probe they are executing. It is called
-// before the PreStop hook, so that a container which is on its way out is not
-// killed again for failing a probe, and so that no exec probe is running inside
-// it while it is torn down.
-//
-// Readiness keeps running: a container that is shutting down should be taken
-// out of service, which is exactly what its readiness probe failing does.
-func (m *instanceBoundManager) StopLivenessAndStartupProbes(containerID kubecontainer.ContainerID) {
-	m.stopWorkersForContainer(containerID, liveness, startup)
-}
-
-// StopProbes stops every worker bound to this container instance and forgets
-// its results. It is called once the container has actually stopped.
-func (m *instanceBoundManager) StopProbes(containerID kubecontainer.ContainerID) {
-	m.stopWorkersForContainer(containerID, allProbeTypes[:]...)
-	m.removeResults(containerID)
+// StopProbes stops the specified probe types bound to this container instance.
+// When all probes are stopped, its cached results are also removed.
+func (m *instanceBoundManager) StopProbes(containerID kubecontainer.ContainerID, probeTypes kubecontainer.ProbeType) {
+	m.stopWorkersForContainer(containerID, probeTypes)
+	if probeTypes&allProbes == allProbes {
+		m.removeResults(containerID)
+	}
 }
 
 // stopWorkersForContainer stops the given probe types for one container
 // instance. A worker bound to any other instance is left alone, so a stop that
 // arrives late -- after the container has already been replaced -- cannot take
 // down its successor's workers.
-func (m *instanceBoundManager) stopWorkersForContainer(containerID kubecontainer.ContainerID, probeTypes ...probeType) {
+func (m *instanceBoundManager) stopWorkersForContainer(containerID kubecontainer.ContainerID, probeTypes probeType) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	for _, probeType := range probeTypes {
-		for key, w := range m.workers {
-			if key.probeType != probeType || w.containerID != containerID {
-				continue
-			}
-			m.stopWorkerLocked(key, w)
+	for key, w := range m.workers {
+		if key.probeType&probeTypes == 0 || w.containerID != containerID {
+			continue
 		}
+		m.stopWorkerLocked(key, w)
 	}
 }
 
@@ -647,15 +624,11 @@ func runningContainerStatus(podStatus *kubecontainer.PodStatus, containerName st
 // apiContainerStatus returns the container's status as last reported to the API
 // server, which is where adoption reconstructs probe state from.
 func apiContainerStatus(pod *v1.Pod, containerName string) *v1.ContainerStatus {
-	for i, status := range pod.Status.ContainerStatuses {
-		if status.Name == containerName {
-			return &pod.Status.ContainerStatuses[i]
-		}
+	if status, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, containerName); ok {
+		return &status
 	}
-	for i, status := range pod.Status.InitContainerStatuses {
-		if status.Name == containerName {
-			return &pod.Status.InitContainerStatuses[i]
-		}
+	if status, ok := podutil.GetContainerStatus(pod.Status.InitContainerStatuses, containerName); ok {
+		return &status
 	}
 	return nil
 }
