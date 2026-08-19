@@ -31,7 +31,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -48,19 +47,9 @@ func ApplyPodLevelMemoryHigh(pod *v1.Pod, rc *ResourceConfig, throttlingFactor f
 		return
 	}
 	reqs := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{})
+	// PodLimits() omits the memory limit unless every container declares it or a pod-level
+	// limit is set, so memoryLimit stays 0 (and memory.high stays unset) otherwise.
 	limits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{})
-	memoryLimitsDeclared := true
-	for c := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
-		if c.Resources.Limits.Memory().IsZero() {
-			memoryLimitsDeclared = false
-		}
-	}
-	if !pod.Spec.Resources.Limits.Memory().IsZero() {
-		memoryLimitsDeclared = true
-	}
-	if !memoryLimitsDeclared {
-		return
-	}
 	memoryRequest := int64(0)
 	memoryLimit := int64(0)
 	if req, found := reqs[v1.ResourceMemory]; found {
@@ -187,34 +176,15 @@ func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod
 		UseStatusResources:                       false,
 		UseDRANodeAllocatableResourceClaimStatus: draNodeAllocatableEnabled,
 	})
-	// track if limits were applied for each resource.
-	memoryLimitsDeclared := true
-	cpuLimitsDeclared := true
-
+	// PodLimits() omits a cpu or memory limit that is not declared by every container (or
+	// at the pod level), so presence in the map below doubles as the "limits declared"
+	// signal.
 	limits := resourcehelper.PodLimits(allocatedPod, resourcehelper.PodResourcesOptions{
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
 		SkipPodLevelResources:                    !podLevelResourcesEnabled,
 		UseDRANodeAllocatableResourceClaimStatus: draNodeAllocatableEnabled,
 	})
 
-	for c := range podutil.ContainerIter(&allocatedPod.Spec, podutil.InitContainers|podutil.Containers) {
-		if c.Resources.Limits.Cpu().IsZero() {
-			cpuLimitsDeclared = false
-		}
-		if c.Resources.Limits.Memory().IsZero() {
-			memoryLimitsDeclared = false
-		}
-	}
-
-	if podLevelResourcesEnabled && resourcehelper.IsPodLevelResourcesSet(allocatedPod) {
-		if !allocatedPod.Spec.Resources.Limits.Cpu().IsZero() {
-			cpuLimitsDeclared = true
-		}
-
-		if !allocatedPod.Spec.Resources.Limits.Memory().IsZero() {
-			memoryLimitsDeclared = true
-		}
-	}
 	// map hugepage pagesize (bytes) to limits (bytes)
 	hugePageLimits := HugePageLimits(reqs)
 
@@ -252,11 +222,11 @@ func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod
 		result.Memory = &memoryLimits
 	} else if qosClass == v1.PodQOSBurstable {
 		result.CPUShares = &cpuShares
-		if cpuLimitsDeclared {
+		if cpuLimits != 0 {
 			result.CPUQuota = &cpuQuota
 			result.CPUPeriod = &cpuPeriod
 		}
-		if memoryLimitsDeclared {
+		if memoryLimits != 0 {
 			result.Memory = &memoryLimits
 		}
 	} else {
