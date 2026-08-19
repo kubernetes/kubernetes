@@ -256,3 +256,44 @@ export function createDynamicPartitioningConfiguration(
     }),
   };
 }
+
+/**
+ * Validates and returns the timezone name for use in S3 destination custom time zone configuration.
+ *
+ * Custom time zones are limited to 'UTC' and non-3-letter IANA time zone identifiers
+ * (e.g., 'America/New_York', 'Asia/Tokyo').
+ * Throws a ValidationError if the timezone name is invalid.
+ *
+ * @see https://docs.aws.amazon.com/firehose/latest/dev/s3-object-name.html
+ */
+export function createTimezoneName(scope: Construct, timezone?: cdk.TimeZone): string | undefined {
+  if (!timezone) return undefined;
+
+  const timezoneName = timezone.timezoneName;
+
+  if (cdk.Token.isUnresolved(timezoneName)) return timezoneName;
+  if (timezoneName === 'UTC') return timezoneName;
+
+  // This list may not be exhaustive - AWS maintains a service-side allowlist that can change.
+  // See https://docs.aws.amazon.com/firehose/latest/dev/s3-object-name.html
+  const invalidTimezoneNames = [
+    cdk.TimeZone.ETC_UTC,
+    cdk.TimeZone.ETC_GMT,
+    cdk.TimeZone.FACTORY,
+  ].map((_timezone) => _timezone.timezoneName);
+
+  const isThreeLetterTimezone = /^[A-Za-z]{3}$/.test(timezoneName);
+  const isInvalidTimezone = invalidTimezoneNames.includes(timezoneName);
+  const hasInvalidCharacters = !/^[a-zA-Z/_]+$/.test(timezoneName);
+
+  if (isThreeLetterTimezone || isInvalidTimezone || hasInvalidCharacters) {
+    throw new cdk.ValidationError(lit`InvalidTimezone`,
+      `Invalid timezone format '${timezoneName}'. Use standard IANA timezone identifiers ` +
+      '(e.g., \'America/New_York\', \'Europe/London\'). ' +
+      'See https://docs.aws.amazon.com/firehose/latest/dev/s3-object-name.html for more details',
+      scope,
+    );
+  }
+
+  return timezoneName;
+}

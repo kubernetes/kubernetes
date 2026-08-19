@@ -39,7 +39,6 @@ export * from './duration';
 export * from './bitrate';
 export * from './expiration';
 export * from './size';
-export type { Element } from './deps';
 export * from './errors';
 
 export * from './app';

@@ -1,0 +1,236 @@
+{
+  "/aws-cdk-firehose-delivery-stream-s3-custom-time-zone/Bucket": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "removalPolicy": "destroy",
+        "autoDeleteObjects": true
+      }
+    }
+  ],
+  "/aws-cdk-firehose-delivery-stream-s3-custom-time-zone/Custom::S3AutoDeleteObjectsCustomResourceProvider": [
+    {
+      "type": "aws:cdk:is-custom-resource-handler-customResourceProvider",
+      "data": true
+    }
+  ],
+  "/aws-cdk-firehose-delivery-stream-s3-custom-time-zone/DeliveryStream": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "destination": "*"
+      }
+    }
+  ],
+  "/aws-cdk-firehose-delivery-stream-s3-custom-time-zone/@aws-cdk--aws-kinesisfirehose.CidrBlocks": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "awscdkawskinesisfirehoseCidrBlocks"
+    }
+  ],
+  "/aws-cdk-firehose-delivery-stream-s3-custom-time-zone/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/aws-cdk-firehose-delivery-stream-s3-custom-time-zone/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/aws-cdk-firehose-delivery-stream-s3-custom-time-zone/Bucket/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Bucket83908E77"
+    },
+    {
+      "type": "aws:cdk:analytics:mixin",
+      "data": {
+        "mixin": "aws-cdk-lib.aws_s3.mixins.BucketAutoDeleteObjects"
+      }
+    }
+  ],
+  "/aws-cdk-firehose-delivery-stream-s3-custom-time-zone/Bucket/Policy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "bucket": "*"
+      }
+    }
+  ],
+  "/aws-cdk-firehose-delivery-stream-s3-custom-time-zone/Bucket/AutoDeleteObjectsCustomResource": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-firehose-delivery-stream-s3-custom-time-zone/Custom::S3AutoDeleteObjectsCustomResourceProvider/Role": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092"
+    }
+  ],
+  "/aws-cdk-firehose-delivery-stream-s3-custom-time-zone/Custom::S3AutoDeleteObjectsCustomResourceProvider/Handler": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F"
+    }
+  ],
+  "/aws-cdk-firehose-delivery-stream-s3-custom-time-zone/DeliveryStream/S3 Destination Role": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        }
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-firehose-delivery-stream-s3-custom-time-zone/DeliveryStream/LogGroup": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-firehose-delivery-stream-s3-custom-time-zone/DeliveryStream/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DeliveryStream58CF96DB"
+    }
+  ],
+  "/aws-cdk-firehose-delivery-stream-s3-custom-time-zone/Exports/Output{\"Ref\":\"DeliveryStream58CF96DB\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefDeliveryStream58CF96DB919FEA68"
+    }
+  ],
+  "/aws-cdk-firehose-delivery-stream-s3-custom-time-zone/Exports/Output{\"Ref\":\"Bucket83908E77\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefBucket83908E7781C90AC0"
+    }
+  ],
+  "/aws-cdk-firehose-delivery-stream-s3-custom-time-zone/Bucket/Policy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BucketPolicyE9A3008A"
+    },
+    {
+      "type": "aws:cdk:analytics:mixin",
+      "data": {
+        "mixin": "aws-cdk-lib.aws_s3.mixins.BucketPolicyStatements"
+      }
+    }
+  ],
+  "/aws-cdk-firehose-delivery-stream-s3-custom-time-zone/Bucket/AutoDeleteObjectsCustomResource/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BucketAutoDeleteObjectsCustomResourceBAFD23C2"
+    }
+  ],
+  "/aws-cdk-firehose-delivery-stream-s3-custom-time-zone/DeliveryStream/S3 Destination Role/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DeliveryStreamS3DestinationRoleD96B8345"
+    }
+  ],
+  "/aws-cdk-firehose-delivery-stream-s3-custom-time-zone/DeliveryStream/S3 Destination Role/DefaultPolicy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-firehose-delivery-stream-s3-custom-time-zone/DeliveryStream/LogGroup/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DeliveryStreamLogGroupA92E8EA0"
+    }
+  ],
+  "/aws-cdk-firehose-delivery-stream-s3-custom-time-zone/DeliveryStream/LogGroup/S3Destination": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "logGroup": "*"
+      }
+    }
+  ],
+  "/aws-cdk-firehose-delivery-stream-s3-custom-time-zone/DeliveryStream/S3 Destination Role/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DeliveryStreamS3DestinationRoleDefaultPolicyF652AD65"
+    }
+  ],
+  "/aws-cdk-firehose-delivery-stream-s3-custom-time-zone/DeliveryStream/LogGroup/S3Destination/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DeliveryStreamLogGroupS3DestinationF045EA13"
+    }
+  ]
+}
