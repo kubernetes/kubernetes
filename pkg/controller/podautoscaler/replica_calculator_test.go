@@ -199,6 +199,11 @@ type perPodMetricCase struct {
 	name    string
 	fixture calcScenario
 
+	// statusReplicas is the observed scale.Status.Replicas used for the
+	// utilization ratio. Zero means use fixture.currentReplicas (stable case).
+	// fixture.currentReplicas is treated as scale.Spec.Replicas.
+	statusReplicas int32
+
 	perPodTargetUsage int64
 	expectedReplicas  int32
 	expectedUsage     int64
@@ -939,6 +944,30 @@ func TestReplicaCalcExternalPerPodMetric(t *testing.T) {
 			expectedReplicas:  4,
 			expectedUsage:     2867,
 		},
+		// Regression for https://github.com/kubernetes/kubernetes/issues/138505:
+		// within-tolerance must preserve spec.replicas when status drifts (surge/lag).
+		{
+			name: "within tolerance with status surge keeps spec replicas",
+			fixture: calcScenario{
+				currentReplicas: 22,
+				metric:          externalPerPodMetric(22),
+			},
+			statusReplicas:    23,
+			perPodTargetUsage: 1,
+			expectedReplicas:  22,
+			expectedUsage:     1,
+		},
+		{
+			name: "within tolerance with status lag keeps spec replicas",
+			fixture: calcScenario{
+				currentReplicas: 22,
+				metric:          externalPerPodMetric(22),
+			},
+			statusReplicas:    21,
+			perPodTargetUsage: 1,
+			expectedReplicas:  22,
+			expectedUsage:     2, // ceil(22/21)
+		},
 	}
 
 	for _, tc := range cases {
@@ -947,8 +976,12 @@ func TestReplicaCalcExternalPerPodMetric(t *testing.T) {
 			if tc.tolerances != nil {
 				h.tolerances = *tc.tolerances
 			}
+			statusReplicas := tc.fixture.currentReplicas
+			if tc.statusReplicas != 0 {
+				statusReplicas = tc.statusReplicas
+			}
 			replicas, usage, ts, err := h.calc.GetExternalPerPodMetricReplicas(
-				tc.fixture.currentReplicas, tc.perPodTargetUsage, tc.fixture.metric.name,
+				tc.fixture.currentReplicas, statusReplicas, tc.perPodTargetUsage, tc.fixture.metric.name,
 				h.tolerances, h.namespace, tc.fixture.metric.selector,
 			)
 			assertMetricReplicas(t,
@@ -1208,6 +1241,29 @@ func TestReplicaCalcObjectPerPodMetric(t *testing.T) {
 			expectedReplicas:  5,
 			expectedUsage:     5052,
 		},
+		// Regression for https://github.com/kubernetes/kubernetes/issues/138505.
+		{
+			name: "within tolerance with status surge keeps spec replicas",
+			fixture: calcScenario{
+				currentReplicas: 22,
+				metric:          perPodMetric(22),
+			},
+			statusReplicas:    23,
+			perPodTargetUsage: 1,
+			expectedReplicas:  22,
+			expectedUsage:     1,
+		},
+		{
+			name: "within tolerance with status lag keeps spec replicas",
+			fixture: calcScenario{
+				currentReplicas: 22,
+				metric:          perPodMetric(22),
+			},
+			statusReplicas:    21,
+			perPodTargetUsage: 1,
+			expectedReplicas:  22,
+			expectedUsage:     2, // ceil(22/21)
+		},
 	}
 
 	for _, tc := range cases {
@@ -1216,8 +1272,12 @@ func TestReplicaCalcObjectPerPodMetric(t *testing.T) {
 			if tc.tolerances != nil {
 				h.tolerances = *tc.tolerances
 			}
+			statusReplicas := tc.fixture.currentReplicas
+			if tc.statusReplicas != 0 {
+				statusReplicas = tc.statusReplicas
+			}
 			replicas, usage, ts, err := h.calc.GetObjectPerPodMetricReplicas(
-				tc.fixture.currentReplicas, tc.perPodTargetUsage, tc.fixture.metric.name,
+				tc.fixture.currentReplicas, statusReplicas, tc.perPodTargetUsage, tc.fixture.metric.name,
 				h.tolerances, h.namespace, tc.fixture.metric.singleObject, nil,
 			)
 			assertMetricReplicas(t,

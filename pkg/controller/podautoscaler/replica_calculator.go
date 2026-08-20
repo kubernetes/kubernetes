@@ -307,16 +307,22 @@ func (c *ReplicaCalculator) getUsageRatioReplicaCount(currentReplicas int32, usa
 }
 
 // GetObjectPerPodMetricReplicas calculates the desired replica count based on a target metric usage (as a milli-value)
-// for the given object in the given namespace, and the current replica count.
-func (c *ReplicaCalculator) GetObjectPerPodMetricReplicas(statusReplicas int32, targetAverageUsage int64, metricName string, tolerances Tolerances, namespace string, objectRef *autoscaling.CrossVersionObjectReference, metricSelector labels.Selector) (replicaCount int32, usage int64, timestamp time.Time, err error) {
+// for the given object in the given namespace.
+//
+// statusReplicas is used only to evaluate utilization (how load is currently
+// distributed). When the ratio is within tolerance, specReplicas is returned so
+// transient status drift (e.g. rolling-update surge or lag) does not rewrite the
+// desired scale. See https://github.com/kubernetes/kubernetes/issues/138505.
+func (c *ReplicaCalculator) GetObjectPerPodMetricReplicas(specReplicas, statusReplicas int32, targetAverageUsage int64, metricName string, tolerances Tolerances, namespace string, objectRef *autoscaling.CrossVersionObjectReference, metricSelector labels.Selector) (replicaCount int32, usage int64, timestamp time.Time, err error) {
 	usage, timestamp, err = c.metricsClient.GetObjectMetric(metricName, namespace, objectRef, metricSelector)
 	if err != nil {
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get metric %s on %s %s/%s: %w", metricName, objectRef.Kind, namespace, objectRef.Name, err)
 	}
 
-	replicaCount = statusReplicas
-	usageRatio := float64(usage) / (float64(targetAverageUsage) * float64(replicaCount))
-	if !tolerances.isWithin(usageRatio) {
+	usageRatio := float64(usage) / (float64(targetAverageUsage) * float64(statusReplicas))
+	if tolerances.isWithin(usageRatio) {
+		replicaCount = specReplicas
+	} else {
 		// update number of replicas if change is large enough
 		replicaCount = int32(math.Ceil(float64(usage) / float64(targetAverageUsage)))
 	}
@@ -378,8 +384,13 @@ func (c *ReplicaCalculator) GetExternalMetricReplicas(currentReplicas int32, tar
 
 // GetExternalPerPodMetricReplicas calculates the desired replica count based on a
 // target metric value per pod (as a milli-value) for the external metric in the
-// given namespace, and the current replica count.
-func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(statusReplicas int32, targetUsagePerPod int64, metricName string, tolerances Tolerances, namespace string, metricSelector *metav1.LabelSelector) (replicaCount int32, usage int64, timestamp time.Time, err error) {
+// given namespace.
+//
+// statusReplicas is used only to evaluate utilization (how load is currently
+// distributed). When the ratio is within tolerance, specReplicas is returned so
+// transient status drift (e.g. rolling-update surge or lag) does not rewrite the
+// desired scale. See https://github.com/kubernetes/kubernetes/issues/138505.
+func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(specReplicas, statusReplicas int32, targetUsagePerPod int64, metricName string, tolerances Tolerances, namespace string, metricSelector *metav1.LabelSelector) (replicaCount int32, usage int64, timestamp time.Time, err error) {
 	metricLabelSelector, err := metav1.LabelSelectorAsSelector(metricSelector)
 	if err != nil {
 		return 0, 0, time.Time{}, err
@@ -398,9 +409,10 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(statusReplicas int32
 		}
 	}
 
-	replicaCount = statusReplicas
-	usageRatio := float64(usage) / (float64(targetUsagePerPod) * float64(replicaCount))
-	if !tolerances.isWithin(usageRatio) {
+	usageRatio := float64(usage) / (float64(targetUsagePerPod) * float64(statusReplicas))
+	if tolerances.isWithin(usageRatio) {
+		replicaCount = specReplicas
+	} else {
 		// update number of replicas if the change is large enough
 		replicaCountResult := math.Ceil(float64(usage) / float64(targetUsagePerPod))
 		// Ensure that the result exceeds the bounds of an int32
