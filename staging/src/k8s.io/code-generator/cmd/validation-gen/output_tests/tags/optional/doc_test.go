@@ -18,8 +18,6 @@ package optional
 
 import (
 	"testing"
-
-	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -31,13 +29,13 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		StringField:           "abc",
-		StringPtrField:        ptr.To("xyz"),
+		StringPtrField:        new("xyz"),
 		StringTypedefField:    StringType("abc"),
-		StringTypedefPtrField: ptr.To(StringType("xyz")),
+		StringTypedefPtrField: new(StringType("xyz")),
 		IntField:              123,
-		IntPtrField:           ptr.To(456),
+		IntPtrField:           new(456),
 		IntTypedefField:       IntType(123),
-		IntTypedefPtrField:    ptr.To(IntType(456)),
+		IntTypedefPtrField:    new(IntType(456)),
 		OtherStructPtrField:   &OtherStruct{},
 		SliceField:            []string{"a", "b"},
 		SliceTypedefField:     SliceType([]string{"a", "b"}),

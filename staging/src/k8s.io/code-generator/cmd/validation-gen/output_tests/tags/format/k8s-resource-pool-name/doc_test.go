@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -29,19 +28,19 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		ResourcePoolNameField:        "foo.bar",
-		ResourcePoolNamePtrField:     ptr.To("foo.bar"),
+		ResourcePoolNamePtrField:     new("foo.bar"),
 		ResourcePoolNameTypedefField: "foo.bar",
 	}).ExpectValid()
 
 	st.Value(&Struct{
 		ResourcePoolNameField:        "1.2.3.4",
-		ResourcePoolNamePtrField:     ptr.To("1.2.3.4"),
+		ResourcePoolNamePtrField:     new("1.2.3.4"),
 		ResourcePoolNameTypedefField: "1.2.3.4",
 	}).ExpectValid()
 
 	invalidStruct := &Struct{
 		ResourcePoolNameField:        "",
-		ResourcePoolNamePtrField:     ptr.To(""),
+		ResourcePoolNamePtrField:     new(""),
 		ResourcePoolNameTypedefField: "",
 	}
 	st.Value(invalidStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
@@ -54,7 +53,7 @@ func Test(t *testing.T) {
 
 	invalidStruct = &Struct{
 		ResourcePoolNameField:        "Not a ResourcePoolName",
-		ResourcePoolNamePtrField:     ptr.To("Not a ResourcePoolName"),
+		ResourcePoolNamePtrField:     new("Not a ResourcePoolName"),
 		ResourcePoolNameTypedefField: "Not a ResourcePoolName",
 	}
 	st.Value(invalidStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
@@ -67,7 +66,7 @@ func Test(t *testing.T) {
 
 	invalidStruct = &Struct{
 		ResourcePoolNameField:        "a..b",
-		ResourcePoolNamePtrField:     ptr.To("a..b"),
+		ResourcePoolNamePtrField:     new("a..b"),
 		ResourcePoolNameTypedefField: "a..b",
 	}
 	st.Value(invalidStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{

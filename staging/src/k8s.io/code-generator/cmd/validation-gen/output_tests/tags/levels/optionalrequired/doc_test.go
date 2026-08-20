@@ -20,24 +20,23 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func TestAlpha(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
 	st.Value(&Struct{
-		RequiredField:     ptr.To("val"),
-		RequiredFieldBeta: ptr.To("val"),
+		RequiredField:     new("val"),
+		RequiredFieldBeta: new("val"),
 	}).ExpectValid()
 
 	// Test failures marked as alpha
 	st.Value(&Struct{
 		RequiredField:     nil,
-		RequiredFieldBeta: ptr.To("val"),
+		RequiredFieldBeta: new("val"),
 	}).OldValue(&Struct{
-		RequiredField:     ptr.To("old"),
-		RequiredFieldBeta: ptr.To("old"),
+		RequiredField:     new("old"),
+		RequiredFieldBeta: new("old"),
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByValidationStabilityLevel(), field.ErrorList{
 		field.Required(field.NewPath("requiredField"), "").MarkAlpha(),
 	})
@@ -47,17 +46,17 @@ func TestBeta(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
 	st.Value(&Struct{
-		RequiredField:     ptr.To("val"),
-		RequiredFieldBeta: ptr.To("val"),
+		RequiredField:     new("val"),
+		RequiredFieldBeta: new("val"),
 	}).ExpectValid()
 
 	// Test failures marked as beta
 	st.Value(&Struct{
-		RequiredField:     ptr.To("val"),
+		RequiredField:     new("val"),
 		RequiredFieldBeta: nil,
 	}).OldValue(&Struct{
-		RequiredField:     ptr.To("old"),
-		RequiredFieldBeta: ptr.To("old"),
+		RequiredField:     new("old"),
+		RequiredFieldBeta: new("old"),
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByValidationStabilityLevel(), field.ErrorList{
 		field.Required(field.NewPath("requiredFieldBeta"), "").MarkBeta(),
 	})
