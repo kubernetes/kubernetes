@@ -3849,6 +3849,44 @@ func TestValidateVolumes(t *testing.T) {
 				detail: "may not specify more than 1 volume",
 			}},
 		},
+		// more than 1 volume type: the Forbidden error must be reported at the
+		// second volume source's JSON field path
+		{
+			name: "multiple volume types with cephfs",
+			vol: core.Volume{
+				Name: "multi",
+				VolumeSource: core.VolumeSource{
+					EmptyDir: &core.EmptyDirVolumeSource{},
+					CephFS: &core.CephFSVolumeSource{
+						Monitors: []string{"foo"},
+					},
+				},
+			},
+			errs: []verr{{
+				etype:  field.ErrorTypeForbidden,
+				field:  "cephfs",
+				detail: "may not specify more than 1 volume type",
+			}},
+		},
+		{
+			name: "multiple volume types with downwardAPI",
+			vol: core.Volume{
+				Name: "multi",
+				VolumeSource: core.VolumeSource{
+					EmptyDir: &core.EmptyDirVolumeSource{},
+					DownwardAPI: &core.DownwardAPIVolumeSource{
+						Items: []core.DownwardAPIVolumeFile{
+							{Path: "/etc/hostname", FieldRef: &core.ObjectFieldSelector{FieldPath: "metadata.name"}},
+						},
+					},
+				},
+			},
+			errs: []verr{{
+				etype:  field.ErrorTypeForbidden,
+				field:  "downwardAPI",
+				detail: "may not specify more than 1 volume type",
+			}},
+		},
 		// HostPath Default
 		{
 			name: "default HostPath",
@@ -4186,7 +4224,7 @@ func TestValidateVolumes(t *testing.T) {
 			},
 			errs: []verr{{
 				etype: field.ErrorTypeInvalid,
-				field: "iscsi.initiatorname",
+				field: "iscsi.initiatorName",
 			}},
 		}, {
 			name: "empty secret",
@@ -17099,7 +17137,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		),
 		test:              "should not be allowed to set an empty imageRef",
 		validationOptions: PodValidationOptions{AllowImageVolumeWithDigest: true},
-		err:               `status.containerStatuses[0].volumeMounts[0].volumeStatus.imageVolumeStatus.imageRef: Required value: imageRef must not be empty`,
+		err:               `status.containerStatuses[0].volumeMounts[0].volumeStatus.image.imageRef: Required value: imageRef must not be empty`,
 	}, {
 		old: *podtest.MakePod("foo",
 			podtest.SetStatus(
@@ -17137,7 +17175,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		),
 		test:              "should not be allowed to set an imageRef of len larger than 256",
 		validationOptions: PodValidationOptions{AllowImageVolumeWithDigest: true},
-		err:               `status.containerStatuses[0].volumeMounts[0].volumeStatus.imageVolumeStatus.imageRef: Too long: may not be more than 256`,
+		err:               `status.containerStatuses[0].volumeMounts[0].volumeStatus.image.imageRef: Too long: may not be more than 256`,
 	},
 	}
 
