@@ -25,7 +25,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -843,33 +842,23 @@ func TestGangSchedulingFlow(t *testing.T) {
 
 	nonGangPod := st.MakePod().Namespace("ns1").Name("non-gang").UID("non-gang").Obj()
 
-	cpgRoot := &schedulingv1alpha3.CompositePodGroup{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "cpg-root"},
-		Spec: schedulingv1alpha3.CompositePodGroupSpec{
-			SchedulingPolicy: schedulingv1alpha3.CompositePodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.CompositeGangSchedulingPolicy{MinGroupCount: 2}},
-		},
-	}
-	cpgSub1 := &schedulingv1alpha3.CompositePodGroup{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "cpg-sub1"},
-		Spec: schedulingv1alpha3.CompositePodGroupSpec{
-			ParentCompositePodGroupName: new("cpg-root"),
-			SchedulingPolicy:            schedulingv1alpha3.CompositePodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.CompositeGangSchedulingPolicy{MinGroupCount: 2}},
-		},
-	}
-	cpgSub2 := &schedulingv1alpha3.CompositePodGroup{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "cpg-sub2"},
-		Spec: schedulingv1alpha3.CompositePodGroupSpec{
-			ParentCompositePodGroupName: new("cpg-root"),
-			SchedulingPolicy:            schedulingv1alpha3.CompositePodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.CompositeBasicSchedulingPolicy{}},
-		},
-	}
-	cpgSub3 := &schedulingv1alpha3.CompositePodGroup{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "cpg-sub3"},
-		Spec: schedulingv1alpha3.CompositePodGroupSpec{
-			ParentCompositePodGroupName: new("cpg-root"),
-			SchedulingPolicy:            schedulingv1alpha3.CompositePodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.CompositeGangSchedulingPolicy{MinGroupCount: 2}},
-		},
-	}
+	cpgRoot := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-root").MinGroupCount(2).Obj()
+	cpgSub1 := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-sub1").ParentCompositePodGroup("cpg-root").MinGroupCount(2).Obj()
+	cpgSub2 := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-sub2").ParentCompositePodGroup("cpg-root").BasicPolicy().Obj()
+	cpgDeep1 := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-deep-1").MinGroupCount(1).Obj()
+	cpgDeep2 := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-deep-2").ParentCompositePodGroup("cpg-deep-1").MinGroupCount(1).Obj()
+	cpgDeep3 := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-deep-3").ParentCompositePodGroup("cpg-deep-2").MinGroupCount(1).Obj()
+	cpgDeep4 := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-deep-4").ParentCompositePodGroup("cpg-deep-3").MinGroupCount(1).Obj()
+	cpgDeep5 := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-deep-5").ParentCompositePodGroup("cpg-deep-4").MinGroupCount(1).Obj()
+	pgDeep := st.MakePodGroup().Namespace("ns1").Name("pg-deep").ParentCompositePodGroup("cpg-deep-5").MinCount(1).Obj()
+	podDeep := st.MakePod().Namespace("ns1").Name("pod-deep").UID("pod-deep").PodGroupName("pg-deep").Obj()
+
+	cpgCycle1 := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-cycle-1").ParentCompositePodGroup("cpg-cycle-2").MinGroupCount(1).Obj()
+	cpgCycle2 := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-cycle-2").ParentCompositePodGroup("cpg-cycle-1").MinGroupCount(1).Obj()
+	pgCycle := st.MakePodGroup().Namespace("ns1").Name("pg-cycle").ParentCompositePodGroup("cpg-cycle-1").MinCount(1).Obj()
+	podCycle := st.MakePod().Namespace("ns1").Name("pod-cycle").UID("pod-cycle").PodGroupName("pg-cycle").Obj()
+
+	cpgSub3 := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-sub3").ParentCompositePodGroup("cpg-root").MinGroupCount(2).Obj()
 
 	pg1 := st.MakePodGroup().Namespace("ns1").Name("pg1-cpg").ParentCompositePodGroup("cpg-sub1").MinCount(1).Obj()
 	pg2 := st.MakePodGroup().Namespace("ns1").Name("pg2-cpg").ParentCompositePodGroup("cpg-sub1").MinCount(1).Obj()
@@ -884,12 +873,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 	p4CPG := st.MakePod().Namespace("ns1").Name("p4-cpg").UID("p4-cpg").PodGroupName("pg4-cpg").Obj()
 	p6CPG := st.MakePod().Namespace("ns1").Name("p6-cpg").UID("p6-cpg").PodGroupName("pg6-cpg").Obj()
 
-	cpgBasicRoot := &schedulingv1alpha3.CompositePodGroup{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "cpg-basic-root"},
-		Spec: schedulingv1alpha3.CompositePodGroupSpec{
-			SchedulingPolicy: schedulingv1alpha3.CompositePodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.CompositeBasicSchedulingPolicy{}},
-		},
-	}
+	cpgBasicRoot := st.MakeCompositePodGroup().Namespace("ns1").Name("cpg-basic-root").BasicPolicy().Obj()
 	pgBasic1 := st.MakePodGroup().Namespace("ns1").Name("pg-basic-1").ParentCompositePodGroup("cpg-basic-root").MinCount(2).Obj()
 	pgBasic2 := st.MakePodGroup().Namespace("ns1").Name("pg-basic-2").ParentCompositePodGroup("cpg-basic-root").MinCount(2).Obj()
 	p1_1 := st.MakePod().Namespace("ns1").Name("p1_1").UID("p1_1").PodGroupName("pg-basic-1").Obj()
@@ -910,7 +894,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 		wantActivatedPods               []*v1.Pod
 		wantAllowedPods                 []types.UID
 	}
-	baseTests := []testCase{
+	tests := []testCase{
 		{
 			name:                       "non-gang pod succeeds immediately (CPG=false)",
 			pod:                        nonGangPod,
@@ -1116,9 +1100,45 @@ func TestGangSchedulingFlow(t *testing.T) {
 			wantPreEnqueueStatus:       nil,
 			wantPermitStatus:           nil,
 		},
+		{
+			name:                       "CPG_Max_Depth_Exceeded_(CPG=false)",
+			pod:                        podDeep,
+			isCompositePodGroupEnabled: false,
+			initialPods:                []*v1.Pod{},
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pgDeep},
+			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgDeep1, cpgDeep2, cpgDeep3, cpgDeep4, cpgDeep5},
+			wantPreEnqueueStatus:       nil,
+		},
+		{
+			name:                       "CPG_Max_Depth_Exceeded_(CPG=true)",
+			pod:                        podDeep,
+			isCompositePodGroupEnabled: true,
+			initialPods:                []*v1.Pod{},
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pgDeep},
+			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgDeep1, cpgDeep2, cpgDeep3, cpgDeep4, cpgDeep5},
+			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "failed to build hierarchy snapshot: workload tree depth exceeds max depth 4"),
+		},
+		{
+			name:                       "CPG_Cycle_Detection_(CPG=false)",
+			pod:                        podCycle,
+			isCompositePodGroupEnabled: false,
+			initialPods:                []*v1.Pod{},
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pgCycle},
+			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgCycle1, cpgCycle2},
+			wantPreEnqueueStatus:       nil,
+		},
+		{
+			name:                       "CPG_Cycle_Detection_(CPG=true)",
+			pod:                        podCycle,
+			isCompositePodGroupEnabled: true,
+			initialPods:                []*v1.Pod{},
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pgCycle},
+			initialCompositePodGroups:  []*schedulingv1alpha3.CompositePodGroup{cpgCycle1, cpgCycle2},
+			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "failed to build hierarchy snapshot: cycle detected in composite pod group hierarchy: compositepodgroup/ns1/cpg-cycle-1"),
+		},
 	}
 
-	for _, tt := range baseTests {
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
 			if tt.isCompositePodGroupEnabled {
@@ -1763,15 +1783,13 @@ func TestPlacementFeasible(t *testing.T) {
 			var objs []runtime.Object
 
 			if tc.isCPG {
-				cpg := &schedulingv1alpha3.CompositePodGroup{
-					ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: pgName},
-					Spec:       schedulingv1alpha3.CompositePodGroupSpec{},
-				}
+				cpgBuilder := st.MakeCompositePodGroup().Namespace(namespace).Name(pgName)
 				if tc.minCount > 0 {
-					cpg.Spec.SchedulingPolicy.Gang = &schedulingv1alpha3.CompositeGangSchedulingPolicy{MinGroupCount: tc.minCount}
+					cpgBuilder.MinGroupCount(tc.minCount)
 				} else {
-					cpg.Spec.SchedulingPolicy.Basic = &schedulingv1alpha3.CompositeBasicSchedulingPolicy{}
+					cpgBuilder.BasicPolicy()
 				}
+				cpg := cpgBuilder.Obj()
 				pgInfo.groupType = fwk.CompositePodGroupKeyType
 				pgInfo.cpg = cpg
 				objs = append(objs, cpg)

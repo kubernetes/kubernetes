@@ -590,6 +590,13 @@ func TestWorkloadForest_DeleteCompositePodGroup(t *testing.T) {
 		wantChildren map[fwk.EntityKey]sets.Set[fwk.EntityKey]
 	}{
 		{
+			name:         "delete non-existent composite pod group",
+			initialCPGs:  []*schedulingv1alpha3.CompositePodGroup{},
+			cpgToDelete:  cpg1,
+			wantCPGs:     map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{},
+			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
+		},
+		{
 			name:         "delete existing composite pod group without parent",
 			initialCPGs:  []*schedulingv1alpha3.CompositePodGroup{cpg1},
 			cpgToDelete:  cpg1,
@@ -1002,6 +1009,26 @@ func TestWorkloadForest_GetLeafPodGroups(t *testing.T) {
 		isCompositePodGroupEnabled bool
 	}{
 		{
+			name: "cpg not found",
+			rootLookupInfo: &framework.QueuedPodGroupInfo{
+				PodGroupInfo: &framework.PodGroupInfo{Namespace: "ns1", Name: "cpg-missing", Type: fwk.CompositePodGroupKeyType},
+			},
+			wantLeaves:                 nil,
+			isCompositePodGroupEnabled: true,
+		},
+		{
+			name: "cpg with cycle",
+			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+				st.MakeCompositePodGroup().Name("cpg1").Namespace("ns1").ParentCompositePodGroup("cpg2").Obj(),
+				st.MakeCompositePodGroup().Name("cpg2").Namespace("ns1").ParentCompositePodGroup("cpg1").Obj(),
+			},
+			rootLookupInfo: &framework.QueuedPodGroupInfo{
+				PodGroupInfo: &framework.PodGroupInfo{Namespace: "ns1", Name: "cpg1", Type: fwk.CompositePodGroupKeyType},
+			},
+			wantLeaves:                 nil,
+			isCompositePodGroupEnabled: true,
+		},
+		{
 			name:             "single pod group lookup",
 			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1},
 			rootLookupInfo: &framework.QueuedPodGroupInfo{
@@ -1106,6 +1133,7 @@ func TestWorkloadForest_BuildPodGroupInfoForPG(t *testing.T) {
 		initialPodGroups           []*schedulingv1beta1.PodGroup
 		pg                         *schedulingv1beta1.PodGroup
 		wantInfo                   *framework.PodGroupInfo
+		visited                    sets.Set[fwk.EntityKey]
 		isCompositePodGroupEnabled bool
 	}{
 		{
@@ -1134,6 +1162,14 @@ func TestWorkloadForest_BuildPodGroupInfoForPG(t *testing.T) {
 			},
 			isCompositePodGroupEnabled: false,
 		},
+		{
+			name:                       "build info with cycle detected",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1},
+			pg:                         pg1,
+			wantInfo:                   nil,
+			visited:                    sets.New(fwk.PodGroupKey(pg1.Namespace, pg1.Name)),
+			isCompositePodGroupEnabled: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1144,7 +1180,10 @@ func TestWorkloadForest_BuildPodGroupInfoForPG(t *testing.T) {
 			}
 
 			logger, _ := ktesting.NewTestContext(t)
-			visited := sets.New[fwk.EntityKey]()
+			visited := tt.visited
+			if visited == nil {
+				visited = sets.New[fwk.EntityKey]()
+			}
 			gotInfo := wf.buildPodGroupInfoForPG(logger, tt.pg, visited)
 
 			if diff := cmp.Diff(tt.wantInfo, gotInfo); diff != "" {
@@ -1164,6 +1203,7 @@ func TestWorkloadForest_BuildPodGroupInfoForCPG(t *testing.T) {
 		initialCPGs                []*schedulingv1alpha3.CompositePodGroup
 		cpg                        *schedulingv1alpha3.CompositePodGroup
 		wantInfo                   *framework.PodGroupInfo
+		visited                    sets.Set[fwk.EntityKey]
 		isCompositePodGroupEnabled bool
 	}{
 		{
@@ -1202,6 +1242,15 @@ func TestWorkloadForest_BuildPodGroupInfoForCPG(t *testing.T) {
 			},
 			isCompositePodGroupEnabled: false,
 		},
+		{
+			name:                       "build info with cycle detected",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1WithParent},
+			initialCPGs:                []*schedulingv1alpha3.CompositePodGroup{cpg1},
+			cpg:                        cpg1,
+			wantInfo:                   nil,
+			visited:                    sets.New(fwk.CompositePodGroupKey(cpg1.Namespace, cpg1.Name)),
+			isCompositePodGroupEnabled: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1215,7 +1264,10 @@ func TestWorkloadForest_BuildPodGroupInfoForCPG(t *testing.T) {
 			}
 
 			logger, _ := ktesting.NewTestContext(t)
-			visited := sets.New[fwk.EntityKey]()
+			visited := tt.visited
+			if visited == nil {
+				visited = sets.New[fwk.EntityKey]()
+			}
 			gotInfo := wf.buildPodGroupInfoForCPG(logger, tt.cpg, visited)
 
 			// Note: Children are sorted by name in buildPodGroupInfoForCPG, so it is deterministic.

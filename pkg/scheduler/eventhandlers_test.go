@@ -1865,6 +1865,13 @@ func TestDeleteCompositePodGroup(t *testing.T) {
 			expectStillExists: false,
 		},
 		{
+			name:              "delete DeletedFinalStateUnknown tombstone with invalid type",
+			initCPG:           cpg,
+			cpgToDelete:       cache.DeletedFinalStateUnknown{Obj: "invalid-type"},
+			cpgEnabled:        true,
+			expectStillExists: true,
+		},
+		{
 			name:              "delete composite pod group with invalid type",
 			initCPG:           cpg,
 			cpgToDelete:       "invalid-type",
