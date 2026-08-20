@@ -42,6 +42,7 @@ import (
 
 	apitest "k8s.io/cri-api/pkg/apis/testing"
 	kubelettypes "k8s.io/kubelet/pkg/types"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -491,7 +492,7 @@ func TestToKubeContainerStatusWithResources(t *testing.T) {
 			}
 
 			if test.actuatedResources != nil {
-				require.NoError(t, m.actuatedState.SetContainerResources(logger, podUID, meta.Name, *test.actuatedResources))
+				require.NoError(t, m.actuatedState.SetContainerResources(logger, podUID, meta.Name, podutil.Containers, *test.actuatedResources))
 				t.Cleanup(func() { _ = m.actuatedState.RemovePod(logger, podUID) })
 			}
 
@@ -1191,7 +1192,7 @@ func TestUpdateContainerResources(t *testing.T) {
 			// Perform resource update
 			container := pod.Spec.Containers[0].DeepCopy()
 			container.Resources = tc.newResources
-			err = m.updateContainerResources(tCtx, pod, container, containerID)
+			err = m.updateContainerResources(tCtx, pod, container, containerID, podutil.Containers)
 			require.NoError(t, err)
 
 			// Verify container config resources inside the fake runtime
