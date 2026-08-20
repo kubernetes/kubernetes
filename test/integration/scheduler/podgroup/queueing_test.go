@@ -48,6 +48,13 @@ func TestCPGQueueing(t *testing.T) {
 	p2_3 := st.MakePod().Name("p2-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg2-2").Obj()
 	p2_4 := st.MakePod().Name("p2-4").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg2-2").Obj()
 
+	cpgRoot3 := st.MakeCompositePodGroup().Name("cpg-root3").WorkloadRef("w3", "cpg-t3").MinGroupCount(1).Obj()
+	cpgMid3 := st.MakeCompositePodGroup().Name("cpg-mid3").WorkloadRef("w3", "cpg-mid3-t").MinGroupCount(2).ParentCompositePodGroup("cpg-root3").Obj()
+	pg3_1 := st.MakePodGroup().Name("pg3-1").WorkloadRef("w3", "pg-t3-1").MinCount(2).ParentCompositePodGroup("cpg-mid3").Obj()
+
+	p3_1 := st.MakePod().Name("p3-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg3-1").Obj()
+	p3_2 := st.MakePod().Name("p3-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg3-1").Obj()
+
 	tests := []struct {
 		name  string
 		steps []stepsframework.Step
@@ -226,6 +233,76 @@ func TestCPGQueueing(t *testing.T) {
 				{
 					Name:                 "Verify pod gets scheduled after PodGroup MinCount is reduced",
 					WaitForPodsScheduled: []string{"p1"},
+				},
+			},
+		},
+		{
+			name: "CPG update (reduce minGroupCount) triggers queueing hint for unschedulable CPG tree",
+			steps: []stepsframework.Step{
+				{
+					Name:        "Create initial node",
+					CreateNodes: []*v1.Node{node},
+				},
+				{
+					Name:                    "Create root CPG requiring 2 groups",
+					CreateCompositePodGroup: cpgRoot2,
+				},
+				{
+					Name:           "Create first PodGroup",
+					CreatePodGroup: pg2_1,
+				},
+				{
+					Name:       "Create all pods of first PodGroup",
+					CreatePods: []*v1.Pod{p2_1, p2_2},
+				},
+				{
+					Name:                               "Verify first group pods are in unschedulableEntities due to root needing 2 groups",
+					WaitForPodsInUnschedulableEntities: []string{"p2-1", "p2-2"},
+				},
+				{
+					Name:                    "Update root CPG to MinGroupCount=1",
+					UpdateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-root2").WorkloadRef("w2", "cpg-t2").MinGroupCount(1).Obj(),
+				},
+				{
+					Name:                 "Verify pods get scheduled after root CPG MinGroupCount is reduced",
+					WaitForPodsScheduled: []string{"p2-1", "p2-2"},
+				},
+			},
+		},
+		{
+			name: "Intermediate CPG update (reduce minGroupCount) triggers queueing hint for unschedulable CPG tree",
+			steps: []stepsframework.Step{
+				{
+					Name:        "Create initial node",
+					CreateNodes: []*v1.Node{node},
+				},
+				{
+					Name:                    "Create root CPG requiring 1 group",
+					CreateCompositePodGroup: cpgRoot3,
+				},
+				{
+					Name:                    "Create intermediate CPG requiring 2 groups",
+					CreateCompositePodGroup: cpgMid3,
+				},
+				{
+					Name:           "Create first PodGroup under intermediate CPG",
+					CreatePodGroup: pg3_1,
+				},
+				{
+					Name:       "Create all pods of first PodGroup",
+					CreatePods: []*v1.Pod{p3_1, p3_2},
+				},
+				{
+					Name:                               "Verify pods are in unschedulableEntities due to intermediate CPG needing 2 groups",
+					WaitForPodsInUnschedulableEntities: []string{"p3-1", "p3-2"},
+				},
+				{
+					Name:                    "Update intermediate CPG to MinGroupCount=1",
+					UpdateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-mid3").WorkloadRef("w3", "cpg-mid3-t").MinGroupCount(1).ParentCompositePodGroup("cpg-root3").Obj(),
+				},
+				{
+					Name:                 "Verify pods get scheduled after intermediate CPG MinGroupCount is reduced",
+					WaitForPodsScheduled: []string{"p3-1", "p3-2"},
 				},
 			},
 		},

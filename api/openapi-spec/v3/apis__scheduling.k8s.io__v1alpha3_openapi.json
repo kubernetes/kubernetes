@@ -52,7 +52,7 @@
         "properties": {
           "minGroupCount": {
             "default": 0,
-            "description": "minGroupCount is the minimum number of child groups that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer.",
+            "description": "minGroupCount is the minimum number of child groups that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer. This field is mutable to support workload scaling.\n\nNote that the scheduler operates on an eventually consistent model. Updates to minGroupCount may not be immediately reflected in scheduling decisions due to propagation delays. If minGroupCount is updated while a scheduling cycle is in progress for that group, the new value may not take effect until the next cycle. Moreover, minGroupCount is only enforced during scheduling, meaning that modifications to this field do not affect already-scheduled pods, applying only to those evaluated in future cycles.",
             "format": "int32",
             "type": "integer"
           }
@@ -168,7 +168,7 @@
         "type": "object"
       },
       "io.k8s.api.scheduling.v1alpha3.CompositePodGroupSchedulingPolicy": {
-        "description": "CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup. Exactly one policy must be set.",
+        "description": "CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup. Exactly one policy must be set. The policy is chosen at creation time by setting either the Basic or Gang field. The CompositePodGroup may not change policy after creation. Fields within chosen policy may be updated after creation when their individual fields allow it.",
         "properties": {
           "basic": {
             "allOf": [
@@ -176,7 +176,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.CompositeBasicSchedulingPolicy"
               }
             ],
-            "description": "basic specifies that the groups of this composite group should be scheduled independently. This field is immutable."
+            "description": "basic specifies that the groups of this composite group should be scheduled independently. Setting this field at group creation time opts this group to basic scheduling; this field cannot be changed afterward."
           },
           "gang": {
             "allOf": [
@@ -184,7 +184,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha3.CompositeGangSchedulingPolicy"
               }
             ],
-            "description": "gang specifies that the groups of this composite group should be scheduled using all-or-nothing semantics."
+            "description": "gang specifies that the groups of this composite group should be scheduled using all-or-nothing semantics. Setting this field at group creation time opts this group to gang scheduling; this field cannot be set or unset afterward. The minGroupCount field within Gang scheduling policy remains mutable after group creation."
           }
         },
         "type": "object",
@@ -243,7 +243,7 @@
               }
             ],
             "default": {},
-            "description": "schedulingPolicy defines the scheduling policy for this instance of the CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. This field is immutable."
+            "description": "schedulingPolicy defines the scheduling policy for this instance of the CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate."
           },
           "workloadRef": {
             "allOf": [
