@@ -1760,12 +1760,8 @@
   labels:
   - code
   - component
-  - group
-  - resource
   - scope
-  - subresource
   - verb
-  - version
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
