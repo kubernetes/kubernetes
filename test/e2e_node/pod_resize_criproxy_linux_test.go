@@ -197,7 +197,7 @@ var _ = SIGDescribe("Pod InPlace Resize Memory-Backed Volume with CRI Proxy", fr
 
 			ginkgo.By("Waiting for the entire actuation to complete after CRI unblocks")
 			expected := podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, resizedContainers)
-			gotPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, patchedPod, expected)
+			gotPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, patchedPod)
 			podresize.ExpectPodResized(ctx, f, gotPod, expected)
 
 			ginkgo.By("Verifying both volume resizes are eventually complete")
