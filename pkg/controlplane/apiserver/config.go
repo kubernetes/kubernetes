@@ -58,6 +58,7 @@ import (
 	controlplaneadmission "k8s.io/kubernetes/pkg/controlplane/apiserver/admission"
 	"k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
@@ -179,6 +180,13 @@ func BuildGenericConfig(
 		return
 	}
 	if lastErr = s.APIEnablement.ApplyTo(genericConfig, resourceConfig, legacyscheme.Scheme); lastErr != nil {
+		return
+	}
+	// Fail fast if an enabled feature gate requires an API that the effective config
+	// does not serve. This must run after APIEnablement.ApplyTo so MergedResourceConfig
+	// reflects --runtime-config plus the emulation and forward-compatibility resolution,
+	// and the feature gate is already finalized.
+	if lastErr = validateFeatureGateAPIDependencies(genericConfig.FeatureGate, genericConfig.MergedResourceConfig, kubefeatures.FeatureGateAPIDependencies()); lastErr != nil {
 		return
 	}
 	if lastErr = s.EgressSelector.ApplyTo(genericConfig); lastErr != nil {
