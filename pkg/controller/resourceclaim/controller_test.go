@@ -958,6 +958,30 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			expectedMetrics: claimCreateMetrics{},
 		},
 		{
+			name: "do not reserve static claim for terminal pre-scheduled pod",
+			pods: func() []*v1.Pod {
+				pod := makePod(testPodName, testNamespace, testPodUID, v1.PodResourceClaim{
+					Name:              podResourceClaimName,
+					ResourceClaimName: &testClaim.Name,
+				})
+				pod.Spec.NodeName = nodeName
+				pod.Status.Phase = v1.PodSucceeded
+				return []*v1.Pod{pod}
+			}(),
+			key: podKey(testPodWithNodeName),
+			claims: func() []*resourceapi.ResourceClaim {
+				claim := reserveClaim(testClaimAllocated, otherTestPod)
+				claim.OwnerReferences = nil
+				return []*resourceapi.ResourceClaim{claim}
+			}(),
+			expectedClaims: []resourceapi.ResourceClaim{func() resourceapi.ResourceClaim {
+				claim := reserveClaim(testClaimAllocated, otherTestPod)
+				claim.OwnerReferences = nil
+				return *claim
+			}()},
+			expectedMetrics: claimCreateMetrics{},
+		},
+		{
 			name: "delete-claim-when-done",
 			pods: func() []*v1.Pod {
 				pods := []*v1.Pod{testPodWithResource.DeepCopy()}
@@ -1612,7 +1636,7 @@ func testEventHandlers(tCtx ktesting.TContext) {
 		},
 		"completed-pod-with-regular-and-extended-resource-claim": {
 			createObjects: []object{completedPodWithRegularAndExtendedResourceClaim},
-			expectedKeys:  []string{extendedResourceClaimKey, testPodKey},
+			expectedKeys:  []string{extendedResourceClaimKey},
 		},
 		"new-podgroup-feature-disabled": {
 			featureCombinations: workloadResourceClaimsDisabled,

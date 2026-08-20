@@ -533,6 +533,9 @@ func (ec *Controller) podNeedsWork(pod *v1.Pod) (bool, string) {
 		// Nothing else to do for the pod.
 		return false, "pod is deleted"
 	}
+	if podutil.IsPodTerminal(pod) {
+		return false, "pod has terminated"
+	}
 
 	var doNothingReasons []string
 
@@ -903,9 +906,15 @@ func (ec *Controller) syncPod(ctx context.Context, namespace, name string) error
 		return err
 	}
 
-	// Ignore pods which are already getting deleted.
+	// Ignore pods which are already getting deleted or have terminated. A
+	// terminal Pod must not reserve an allocated claim again after syncClaim
+	// removed its stale reservation.
 	if pod.DeletionTimestamp != nil {
 		logger.V(5).Info("Nothing to do for pod, it is marked for deletion")
+		return nil
+	}
+	if podutil.IsPodTerminal(pod) {
+		logger.V(5).Info("Nothing to do for pod, it has terminated")
 		return nil
 	}
 
