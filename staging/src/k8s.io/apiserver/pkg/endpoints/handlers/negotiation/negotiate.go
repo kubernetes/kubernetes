@@ -62,6 +62,27 @@ func NegotiateOutputMediaType(req *http.Request, ns runtime.NegotiatedSerializer
 	return mediaType, info, nil
 }
 
+// NegotiateOutputMediaTypes returns all acceptable media type matches from the Accept
+// header in quality order, or NewNotAcceptableError if none match. Callers that want to
+// fall through to the next candidate when an encoder cannot represent the object should
+// use this instead of NegotiateOutputMediaType. The pretty serializer override is folded
+// into each result's Accepted serializer.
+func NegotiateOutputMediaTypes(req *http.Request, ns runtime.NegotiatedSerializer, restrictions EndpointRestrictions) ([]MediaTypeOptions, error) {
+	mediaTypes := negotiateAllMediaTypeOptions(req.Header.Get("Accept"), ns.SupportedMediaTypes(), restrictions)
+	if len(mediaTypes) == 0 {
+		supported, _ := MediaTypesForSerializer(ns)
+		return nil, NewNotAcceptableError(supported)
+	}
+	pretty := isPrettyPrint(req)
+	for i := range mediaTypes {
+		accepted := &mediaTypes[i].Accepted
+		if (mediaTypes[i].Pretty || pretty) && accepted.PrettySerializer != nil {
+			accepted.Serializer = accepted.PrettySerializer
+		}
+	}
+	return mediaTypes, nil
+}
+
 // NegotiateOutputMediaTypeStream returns a stream serializer for the given request.
 func NegotiateOutputMediaTypeStream(req *http.Request, ns runtime.NegotiatedSerializer, restrictions EndpointRestrictions) (runtime.SerializerInfo, error) {
 	mediaType, ok := NegotiateMediaTypeOptions(req.Header.Get("Accept"), ns.SupportedMediaTypes(), restrictions)
@@ -247,6 +268,22 @@ func acceptMediaTypeOptions(params map[string]string, accepts *runtime.Serialize
 	return options, true
 }
 
+// matchedMediaTypeOptions reports whether the serializer satisfies the Accept clause and,
+// if so, returns the negotiated options. Shared by the singular and plural negotiators.
+func matchedMediaTypeOptions(clause *goautoneg.Accept, accepts *runtime.SerializerInfo, endpoint EndpointRestrictions) (MediaTypeOptions, bool) {
+	// q=0 means "not acceptable" per RFC 9110 §12.5.1, so the client is rejecting this media type.
+	if clause.Q <= 0 {
+		return MediaTypeOptions{}, false
+	}
+	switch {
+	case clause.Type == accepts.MediaTypeType && clause.SubType == accepts.MediaTypeSubType,
+		clause.Type == accepts.MediaTypeType && clause.SubType == "*",
+		clause.Type == "*" && clause.SubType == "*":
+		return acceptMediaTypeOptions(clause.Params, accepts, endpoint)
+	}
+	return MediaTypeOptions{}, false
+}
+
 // NegotiateMediaTypeOptions returns the most appropriate content type given the accept header and
 // a list of alternatives along with the accepted media type parameters.
 func NegotiateMediaTypeOptions(header string, accepted []runtime.SerializerInfo, endpoint EndpointRestrictions) (MediaTypeOptions, bool) {
@@ -257,20 +294,87 @@ func NegotiateMediaTypeOptions(header string, accepted []runtime.SerializerInfo,
 	}
 
 	clauses := goautoneg.ParseAccept(header)
+	rejected := rejectedMediaTypes(clauses, accepted)
 	for i := range clauses {
-		clause := &clauses[i]
-		for i := range accepted {
-			accepts := &accepted[i]
-			switch {
-			case clause.Type == accepts.MediaTypeType && clause.SubType == accepts.MediaTypeSubType,
-				clause.Type == accepts.MediaTypeType && clause.SubType == "*",
-				clause.Type == "*" && clause.SubType == "*":
-				if retVal, ret := acceptMediaTypeOptions(clause.Params, accepts, endpoint); ret {
-					return retVal, true
-				}
+		for j := range accepted {
+			if rejected[j] {
+				continue
+			}
+			if retVal, ok := matchedMediaTypeOptions(&clauses[i], &accepted[j], endpoint); ok {
+				return retVal, true
 			}
 		}
 	}
 
 	return MediaTypeOptions{}, false
+}
+
+// negotiateAllMediaTypeOptions is the plural counterpart to NegotiateMediaTypeOptions:
+// it returns every accepted serializer in quality order, deduplicated so a wildcard clause
+// does not re-emit a serializer an earlier clause already matched.
+func negotiateAllMediaTypeOptions(header string, accepted []runtime.SerializerInfo, endpoint EndpointRestrictions) []MediaTypeOptions {
+	if len(header) == 0 && len(accepted) > 0 {
+		return []MediaTypeOptions{{Accepted: accepted[0]}}
+	}
+
+	clauses := goautoneg.ParseAccept(header)
+	rejected := rejectedMediaTypes(clauses, accepted)
+
+	var results []MediaTypeOptions
+	seen := make(map[string]struct{})
+	for i := range clauses {
+		for j := range accepted {
+			if rejected[j] {
+				continue
+			}
+			retVal, ok := matchedMediaTypeOptions(&clauses[i], &accepted[j], endpoint)
+			if !ok {
+				continue
+			}
+			// An earlier, higher-priority clause may have already emitted this serializer.
+			key := accepted[j].MediaType
+			if _, dup := seen[key]; dup {
+				continue
+			}
+			seen[key] = struct{}{}
+			results = append(results, retVal)
+		}
+	}
+
+	return results
+}
+
+// rejectedMediaTypes reports, per serializer, whether the Accept clauses reject it: a
+// serializer is rejected when its most specific matching clause has q<=0 ("not acceptable",
+// RFC 9110 §12.5.1). Clauses are quality-sorted, so a specificity tie keeps the highest q.
+// This lets application/json;q=0 override a */* that would accept it, while */* still serves
+// as a fallback for types that are not rejected. Both negotiators use it so they agree on
+// acceptability.
+func rejectedMediaTypes(clauses []goautoneg.Accept, accepted []runtime.SerializerInfo) []bool {
+	rejected := make([]bool, len(accepted))
+	for j := range accepted {
+		best := -1
+		for i := range clauses {
+			if spec := clauseSpecificity(&clauses[i], &accepted[j]); spec > best {
+				best = spec
+				rejected[j] = clauses[i].Q <= 0
+			}
+		}
+	}
+	return rejected
+}
+
+// clauseSpecificity ranks how specifically a clause matches a serializer: 2 for an exact
+// match, 1 for type/*, 0 for */*, -1 for no match. Quality is ignored so a specific q=0
+// rejection still outranks a wildcard.
+func clauseSpecificity(clause *goautoneg.Accept, accepts *runtime.SerializerInfo) int {
+	switch {
+	case clause.Type == accepts.MediaTypeType && clause.SubType == accepts.MediaTypeSubType:
+		return 2
+	case clause.Type == accepts.MediaTypeType && clause.SubType == "*":
+		return 1
+	case clause.Type == "*" && clause.SubType == "*":
+		return 0
+	}
+	return -1
 }
