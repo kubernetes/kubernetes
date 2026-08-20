@@ -2073,11 +2073,13 @@
     endpoint: /metrics
 - name: terminated_watchers_total
   namespace: apiserver
-  help: Counter of watchers closed due to unresponsiveness broken by resource type.
+  help: Counter of watchers closed by the watch cache broken by resource type and
+    reason.
   type: Counter
   stabilityLevel: ALPHA
   labels:
   - group
+  - reason
   - resource
   componentEndpoints:
   - component: kube-apiserver
@@ -2233,6 +2235,71 @@
   help: Current resource version of watch cache broken by resource type. This is truncated
     to the 15 least significant digits.
   type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: watcher_catchup_events
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Histogram of the number of events streamed from the watch cache history per
+    watcher catch-up round, broken by resource type.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  buckets:
+  - 1
+  - 10
+  - 50
+  - 100
+  - 500
+  - 1000
+  - 5000
+  - 10000
+  - 50000
+  - 100000
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: watcher_catchup_rounds_total
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Counter of watcher catch-up rounds served from the watch cache history, broken
+    by resource type.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: watcher_deferred_events_total
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Counter of events that could not be added to a watcher's input buffer and
+    were deferred to a catch-up from the watch cache history instead, broken by resource
+    type.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: watcher_stalls_total
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Counter of watcher stall episodes (a watcher's input buffer filled up and
+    its missed events were deferred to a catch-up from the watch cache history), broken
+    by resource type.
+  type: Counter
   stabilityLevel: ALPHA
   labels:
   - group
