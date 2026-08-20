@@ -70,6 +70,10 @@ const (
 	// 500 pods. Just creation is limited to 20qps, and watching happens with ~10-30s
 	// latency/pod at the scale of 3000 pods over 100 nodes.
 	ExpectationsTimeout = 5 * time.Minute
+	// ExpectationsCreate indicates that the controller is waiting for creations.
+	ExpectationsCreate = "creates"
+	// ExpectationsDelete indicates that the controller is waiting for deletions.
+	ExpectationsDelete = "deletes"
 	// When batching pod creates, SlowStartInitialBatchSize is the size of the
 	// initial batch.  The size of each successive batch is twice the size of
 	// the previous batch.  For example, for a value of 1, batch sizes would be
@@ -165,9 +169,15 @@ type ControllerExpectationsInterface interface {
 	LowerExpectations(logger klog.Logger, controllerKey string, add, del int)
 }
 
+// ExpectationsMetrics is an interface for recording controller expectations metrics.
+type ExpectationsMetrics interface {
+	ObserveExpectationsWaiting(expType string)
+}
+
 // ControllerExpectations is a cache mapping controllers to what they expect to see before being woken up for a sync.
 type ControllerExpectations struct {
 	cache.Store
+	metrics ExpectationsMetrics
 }
 
 // GetExpectations returns the ControlleeExpectations of the given controller.
@@ -202,6 +212,15 @@ func (r *ControllerExpectations) SatisfiedExpectations(logger klog.Logger, contr
 			return true
 		} else {
 			logger.V(4).Info("Controller still waiting on expectations", "expectations", exp)
+			if r.metrics != nil {
+				adds, dels := exp.GetExpectations()
+				if adds > 0 {
+					r.metrics.ObserveExpectationsWaiting(ExpectationsCreate)
+				}
+				if dels > 0 {
+					r.metrics.ObserveExpectationsWaiting(ExpectationsDelete)
+				}
+			}
 			return false
 		}
 	} else if err != nil {
@@ -311,8 +330,11 @@ func (e *ControlleeExpectations) MarshalLog() interface{} {
 }
 
 // NewControllerExpectations returns a store for ControllerExpectations.
-func NewControllerExpectations() *ControllerExpectations {
-	return &ControllerExpectations{cache.NewStore(ExpKeyFunc)}
+func NewControllerExpectations(metrics ExpectationsMetrics) *ControllerExpectations {
+	return &ControllerExpectations{
+		Store:   cache.NewStore(ExpKeyFunc),
+		metrics: metrics,
+	}
 }
 
 // UIDSetKeyFunc to parse out the key from a UIDSet.
