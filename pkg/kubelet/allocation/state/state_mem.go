@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 type stateMemory struct {
@@ -106,7 +107,7 @@ func (s *stateMemory) GetPodResourceInfo(podUID types.UID) (PodResourceInfo, boo
 	return resourceInfo, ok
 }
 
-func (s *stateMemory) SetContainerResources(logger klog.Logger, podUID types.UID, containerName string, resources v1.ResourceRequirements) error {
+func (s *stateMemory) SetContainerResources(logger klog.Logger, podUID types.UID, containerName string, _ podutil.ContainerType, resources v1.ResourceRequirements) error {
 	s.Lock()
 	defer s.Unlock()
 
