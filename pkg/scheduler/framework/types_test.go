@@ -19,6 +19,8 @@ package framework
 import (
 	"fmt"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"math"
+	"math/rand"
 	"strings"
 	"testing"
 	"time"
@@ -86,6 +88,377 @@ func TestNewResource(t *testing.T) {
 				t.Errorf("Unexpected resource (-want, +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestSubChecked(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		a, b         int64
+		want         int64
+		wantOverflow bool
+	}{
+		{"no overflow", 5, 3, 2, false},
+		// Subtracting math.MinInt64 must not negate it: -math.MinInt64 overflows
+		// back to math.MinInt64, so a - (-x) done as a + (-x) would be wrong.
+		{"subtracting min int does not negate-overflow", math.MinInt64, math.MinInt64, 0, false},
+		{"underflow saturates", math.MinInt64, 1, math.MinInt64, true},
+		{"subtracting a negative can overflow high", 0, math.MinInt64, math.MaxInt64, true},
+		{"subtracting minus one saturates", math.MaxInt64, -1, math.MaxInt64, true},
+		{"large values within range", math.MaxInt64, math.MaxInt64, 0, false},
+	} {
+		got, gotOverflow := subChecked(tc.a, tc.b)
+		if got != tc.want || gotOverflow != tc.wantOverflow {
+			t.Errorf("%s: subChecked(%d, %d) = (%d, %t), want (%d, %t)", tc.name, tc.a, tc.b, got, gotOverflow, tc.want, tc.wantOverflow)
+		}
+	}
+}
+
+func TestAddChecked(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		a, b         int64
+		want         int64
+		wantOverflow bool
+	}{
+		{"no overflow", 2, 3, 5, false},
+		{"positive saturates", math.MaxInt64, 1, math.MaxInt64, true},
+		{"both positive saturate", math.MaxInt64, math.MaxInt64, math.MaxInt64, true},
+		{"negative saturates", math.MinInt64, -1, math.MinInt64, true},
+		{"both negative saturate", math.MinInt64, math.MinInt64, math.MinInt64, true},
+		{"opposite signs cannot overflow", math.MaxInt64, math.MinInt64, -1, false},
+	} {
+		got, gotOverflow := addChecked(tc.a, tc.b)
+		if got != tc.want || gotOverflow != tc.wantOverflow {
+			t.Errorf("%s: addChecked(%d, %d) = (%d, %t), want (%d, %t)", tc.name, tc.a, tc.b, got, gotOverflow, tc.want, tc.wantOverflow)
+		}
+	}
+}
+
+func TestAddProjectedRequestChecked(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		a, b         int64
+		want         int64
+		wantOverflow bool
+	}{
+		{"non-negative operand adds normally", 5, 3, 8, false},
+		{"positive saturates", math.MaxInt64, 1, math.MaxInt64, true},
+		// A negative operand means the projection overflowed; fail closed.
+		{"negative operand is treated as overflow", 100, math.MinInt64, math.MaxInt64, true},
+		{"negative operand on a zero total", 0, -1, math.MaxInt64, true},
+	} {
+		got, gotOverflow := addProjectedRequestChecked(tc.a, tc.b)
+		if got != tc.want || gotOverflow != tc.wantOverflow {
+			t.Errorf("%s: addProjectedRequestChecked(%d, %d) = (%d, %t), want (%d, %t)", tc.name, tc.a, tc.b, got, gotOverflow, tc.want, tc.wantOverflow)
+		}
+	}
+}
+
+func TestNodeInfoAddPodSaturatesRequested(t *testing.T) {
+	// Two pods each project a field to math.MaxInt64; that field's total must
+	// saturate, not wrap negative. Every accumulated field is covered, built
+	// directly so the table does not depend on the projection that #141305 flips.
+	const max = int64(math.MaxInt64)
+	dev := v1.ResourceName("example.com/dev")
+	cases := []struct {
+		name             string
+		res              Resource
+		non0CPU, non0Mem int64
+		got              func(*NodeInfo) int64
+	}{
+		{"MilliCPU", Resource{MilliCPU: max}, 0, 0, func(n *NodeInfo) int64 { return n.Requested.MilliCPU }},
+		{"Memory", Resource{Memory: max}, 0, 0, func(n *NodeInfo) int64 { return n.Requested.Memory }},
+		{"EphemeralStorage", Resource{EphemeralStorage: max}, 0, 0, func(n *NodeInfo) int64 { return n.Requested.EphemeralStorage }},
+		{"ScalarResources", Resource{ScalarResources: map[v1.ResourceName]int64{dev: max}}, 0, 0, func(n *NodeInfo) int64 { return n.Requested.ScalarResources[dev] }},
+		{"NonZeroCPU", Resource{}, max, 0, func(n *NodeInfo) int64 { return n.NonZeroRequested.MilliCPU }},
+		{"NonZeroMemory", Resource{}, 0, max, func(n *NodeInfo) int64 { return n.NonZeroRequested.Memory }},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ni := NewNodeInfo()
+			r1, r2 := c.res, c.res
+			addCachedResource(ni, "p1", &r1, c.non0CPU, c.non0Mem)
+			addCachedResource(ni, "p2", &r2, c.non0CPU, c.non0Mem)
+			if got := c.got(ni); got != max {
+				t.Errorf("%s = %d after two MaxInt64 adds, want MaxInt64 (wrapped instead of saturating)", c.name, got)
+			}
+			if !ni.requestedOverflow {
+				t.Errorf("%s: requestedOverflow not set after saturation", c.name)
+			}
+		})
+	}
+}
+
+func TestNodeInfoRemovePodRecomputesAfterSaturation(t *testing.T) {
+	// Saturation is not reversible: once two huge pods drive the node total to
+	// math.MaxInt64, subtracting one of them would wrap the total down and lose
+	// the other. Removal instead recomputes from the pods that remain.
+	logger := klog.Background()
+	huge := map[v1.ResourceName]string{v1.ResourceCPU: "9223372036854775807m"} // MilliValue is math.MaxInt64
+	small := map[v1.ResourceName]string{v1.ResourceCPU: "100m"}
+
+	ni := NewNodeInfo()
+	base := st.MakePod().Name("base").UID("base").Req(small).Obj()
+	a := st.MakePod().Name("a").UID("a").Req(huge).Obj()
+	b := st.MakePod().Name("b").UID("b").Req(huge).Obj()
+	ni.AddPod(base)
+	ni.AddPod(a)
+	ni.AddPod(b)
+	if got := ni.Requested.MilliCPU; got != math.MaxInt64 {
+		t.Fatalf("after adds, Requested.MilliCPU = %d, want %d", got, int64(math.MaxInt64))
+	}
+
+	// b still needs MaxInt64, so the node stays saturated rather than dropping to 0.
+	if err := ni.RemovePod(logger, a); err != nil {
+		t.Fatal(err)
+	}
+	if got := ni.Requested.MilliCPU; got != math.MaxInt64 {
+		t.Errorf("after removing a, Requested.MilliCPU = %d, want %d (b still present)", got, int64(math.MaxInt64))
+	}
+
+	// With both huge pods gone, only the 100m base remains.
+	if err := ni.RemovePod(logger, b); err != nil {
+		t.Fatal(err)
+	}
+	if got := ni.Requested.MilliCPU; got != 100 {
+		t.Errorf("after removing b, Requested.MilliCPU = %d, want 100 (base restored)", got)
+	}
+	if got := ni.NonZeroRequested.MilliCPU; got != 100 {
+		t.Errorf("after removing b, NonZeroRequested.MilliCPU = %d, want 100", got)
+	}
+}
+
+// addCachedResource adds a pod to ni with a directly-constructed PodResource, so
+// the arithmetic tests do not depend on the Quantity int64 projection that
+// #141305 changes. It returns the pod, for a later RemovePod.
+func addCachedResource(ni *NodeInfo, name string, res *Resource, non0CPU, non0Mem int64) *v1.Pod {
+	pod := st.MakePod().Name(name).UID(name).Obj()
+	ni.AddPodInfo(&PodInfo{Pod: pod, cachedResource: &fwk.PodResource{Resource: res, Non0CPU: non0CPU, Non0Mem: non0Mem}})
+	return pod
+}
+
+func TestNodeInfoRemovePodWithNegativeProjection(t *testing.T) {
+	// Until #141305 a positive request past int64 projects to a negative int64.
+	// Each field must be guarded to the saturation rail rather than added as a
+	// negative, so the node stays fail-closed, and removing the pod returns the
+	// totals to zero.
+	logger := klog.Background()
+	ni := NewNodeInfo()
+	res := &Resource{
+		Memory:           math.MinInt64,
+		EphemeralStorage: math.MinInt64,
+		ScalarResources:  map[v1.ResourceName]int64{"example.com/dev": math.MinInt64},
+	}
+	pod := addCachedResource(ni, "p", res, 0, math.MinInt64)
+	if ni.Requested.Memory != math.MaxInt64 || ni.Requested.EphemeralStorage != math.MaxInt64 ||
+		ni.Requested.ScalarResources["example.com/dev"] != math.MaxInt64 || ni.NonZeroRequested.Memory != math.MaxInt64 {
+		t.Errorf("negative projection not guarded to the rail: mem=%d eph=%d scalar=%d non0mem=%d",
+			ni.Requested.Memory, ni.Requested.EphemeralStorage, ni.Requested.ScalarResources["example.com/dev"], ni.NonZeroRequested.Memory)
+	}
+	if err := ni.RemovePod(logger, pod); err != nil {
+		t.Fatal(err)
+	}
+	if ni.Requested.Memory != 0 || ni.Requested.EphemeralStorage != 0 ||
+		ni.Requested.ScalarResources["example.com/dev"] != 0 || ni.NonZeroRequested.Memory != 0 || ni.requestedOverflow {
+		t.Errorf("empty node not zeroed: mem=%d eph=%d scalar=%d non0mem=%d flag=%v",
+			ni.Requested.Memory, ni.Requested.EphemeralStorage, ni.Requested.ScalarResources["example.com/dev"], ni.NonZeroRequested.Memory, ni.requestedOverflow)
+	}
+}
+
+func TestNodeInfoSaturationCannotBeCancelledByNegativeProjection(t *testing.T) {
+	// Two MaxInt64 pods saturate the node; a third pod whose positive request
+	// projects to MinInt64 must not cancel the rail back to a negative total that
+	// the fit check would read as spare capacity.
+	logger := klog.Background()
+	ni := NewNodeInfo()
+	a := addCachedResource(ni, "a", &Resource{Memory: math.MaxInt64}, 0, math.MaxInt64)
+	b := addCachedResource(ni, "b", &Resource{Memory: math.MaxInt64}, 0, math.MaxInt64)
+	c := addCachedResource(ni, "c", &Resource{Memory: math.MinInt64}, 0, math.MinInt64)
+
+	if ni.Requested.Memory != math.MaxInt64 || !ni.requestedOverflow {
+		t.Fatalf("after Max/Max/Min adds, Requested.Memory=%d flag=%v, want MaxInt64/true", ni.Requested.Memory, ni.requestedOverflow)
+	}
+	// Removing a MaxInt64 pod leaves MaxInt64 and MinInt64; recompute re-adds the
+	// MinInt64 pod through the same guard, so the total stays on the rail instead
+	// of the -1/false state an unguarded recompute would leave.
+	if err := ni.RemovePod(logger, a); err != nil {
+		t.Fatal(err)
+	}
+	if ni.Requested.Memory != math.MaxInt64 || !ni.requestedOverflow {
+		t.Errorf("after removing a, Requested.Memory=%d flag=%v, want MaxInt64/true", ni.Requested.Memory, ni.requestedOverflow)
+	}
+	// Removing everything returns to zero.
+	if err := ni.RemovePod(logger, b); err != nil {
+		t.Fatal(err)
+	}
+	if err := ni.RemovePod(logger, c); err != nil {
+		t.Fatal(err)
+	}
+	if ni.Requested.Memory != 0 || ni.requestedOverflow {
+		t.Errorf("empty node Requested.Memory=%d flag=%v, want 0/false", ni.Requested.Memory, ni.requestedOverflow)
+	}
+}
+
+func TestNodeInfoRecomputeIsOrderIndependent(t *testing.T) {
+	// recomputeRequested folds the pods in slice order, and a saturating add is
+	// not associative: unguarded, MaxInt64 + MaxInt64 + MinInt64 rebuilds to -1 or
+	// to MaxInt64-1 depending on order. The negative-projection guard clamps a
+	// negative operand to the absorbing MaxInt64, so every order rebuilds alike.
+	build := func(order []int) *NodeInfo {
+		res := map[int]*Resource{
+			0: {Memory: math.MaxInt64},
+			1: {Memory: math.MaxInt64},
+			2: {Memory: math.MinInt64}, // a positive request whose projection wrapped
+		}
+		ni := NewNodeInfo()
+		for _, i := range order {
+			addCachedResource(ni, fmt.Sprintf("p%d", i), res[i], 0, res[i].Memory)
+		}
+		ni.recomputeRequested()
+		return ni
+	}
+	for _, order := range [][]int{{0, 1, 2}, {2, 1, 0}, {1, 2, 0}, {2, 0, 1}} {
+		if got := build(order).Requested.Memory; got != math.MaxInt64 {
+			t.Errorf("rebuild in order %v = %d, want MaxInt64 (order-independent rail)", order, got)
+		}
+	}
+}
+
+func TestNodeInfoSnapshotPreservesOverflowFlag(t *testing.T) {
+	// A snapshot of a saturated node must carry the overflow flag, or a removal
+	// on the snapshot (as preemption simulation does) would subtract from a
+	// saturated total and undercount what remains.
+	logger := klog.Background()
+	huge := map[v1.ResourceName]string{v1.ResourceCPU: "9223372036854775807m"}
+
+	ni := NewNodeInfo()
+	ni.AddPod(st.MakePod().Name("a").UID("a").Req(huge).Obj())
+	ni.AddPod(st.MakePod().Name("b").UID("b").Req(huge).Obj())
+
+	clone := ni.SnapshotConcrete()
+	if err := clone.RemovePod(logger, st.MakePod().Name("a").UID("a").Req(huge).Obj()); err != nil {
+		t.Fatal(err)
+	}
+	if got := clone.Requested.MilliCPU; got != math.MaxInt64 {
+		t.Errorf("after removing a from the snapshot, Requested.MilliCPU = %d, want %d (overflow flag lost in the copy)", got, int64(math.MaxInt64))
+	}
+	// The clone rebuilt from b alone, which does not overflow, so its own flag
+	// clears while the source keeps the flag it was cloned with.
+	if clone.requestedOverflow {
+		t.Errorf("clone flag still set after its total was rebuilt from one pod, want cleared")
+	}
+	if !ni.requestedOverflow {
+		t.Errorf("source flag cleared by a removal on its snapshot, want still set")
+	}
+	// The removal on the snapshot must not touch the source node.
+	if got := ni.Requested.MilliCPU; got != math.MaxInt64 {
+		t.Errorf("source Requested.MilliCPU = %d after a removal on its snapshot, want %d", got, int64(math.MaxInt64))
+	}
+	if len(ni.Pods) != 2 {
+		t.Errorf("source has %d pods after a removal on its snapshot, want 2", len(ni.Pods))
+	}
+}
+
+func TestNodeInfoStaysFailClosedUnderRandomOps(t *testing.T) {
+	// Random add/remove sequences whose pod memory includes math.MaxInt64 and
+	// math.MinInt64 (a positive request whose projection wrapped) must never drive
+	// a total negative, and the running total must match a fold of the live pods.
+	logger := klog.Background()
+	r := rand.New(rand.NewSource(1)) // deterministic
+	pickMem := func() int64 {
+		switch r.Intn(4) {
+		case 0:
+			return int64(r.Intn(1000))
+		case 1:
+			return math.MaxInt64
+		case 2:
+			return math.MinInt64
+		default:
+			return r.Int63()
+		}
+	}
+	ni := NewNodeInfo()
+	var live []*v1.Pod
+	for i := 0; i < 10000; i++ {
+		if len(live) == 0 || (len(live) < 500 && r.Intn(2) == 0) {
+			name := fmt.Sprintf("p%d", i)
+			mem := pickMem()
+			pod := st.MakePod().Name(name).UID(name).Obj()
+			ni.AddPodInfo(&PodInfo{Pod: pod, cachedResource: &fwk.PodResource{Resource: &Resource{Memory: mem}, Non0Mem: mem}})
+			live = append(live, pod)
+		} else {
+			j := r.Intn(len(live))
+			if err := ni.RemovePod(logger, live[j]); err != nil {
+				t.Fatal(err)
+			}
+			live[j] = live[len(live)-1]
+			live = live[:len(live)-1]
+		}
+		if ni.Requested.Memory < 0 || ni.NonZeroRequested.Memory < 0 {
+			t.Fatalf("op %d (%d pods): Requested.Memory=%d NonZeroRequested.Memory=%d, want >= 0",
+				i, len(live), ni.Requested.Memory, ni.NonZeroRequested.Memory)
+		}
+		var fold int64
+		for _, p := range ni.Pods {
+			fold, _ = addOrSub(fold, p.CalculateResource().Resource.GetMemory(), 1)
+		}
+		if fold != ni.Requested.Memory {
+			t.Fatalf("op %d: running Requested.Memory=%d != fold of pods=%d", i, ni.Requested.Memory, fold)
+		}
+	}
+	for _, p := range live {
+		if err := ni.RemovePod(logger, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if ni.Requested.Memory != 0 || ni.NonZeroRequested.Memory != 0 || ni.requestedOverflow {
+		t.Fatalf("drained node: Requested.Memory=%d NonZeroRequested.Memory=%d flag=%v, want 0/0/false",
+			ni.Requested.Memory, ni.NonZeroRequested.Memory, ni.requestedOverflow)
+	}
+}
+
+func BenchmarkNodeInfoRemovePods(b *testing.B) {
+	// Compare removals on a saturated node (each removal rebuilds from the
+	// remaining pods) against an unsaturated node (a plain decrement), so the
+	// rebuild's incremental cost is isolated rather than folded in with the
+	// linear pod-slice scan RemovePod already does. The scalar variant exercises
+	// the map that recomputeRequested reallocates.
+	logger := klog.Background()
+	variants := []struct {
+		name       string
+		saturated  bool
+		small, big map[v1.ResourceName]string
+	}{
+		{"cpu/unsaturated", false, map[v1.ResourceName]string{v1.ResourceCPU: "1m"}, nil},
+		{"cpu/saturated", true, map[v1.ResourceName]string{v1.ResourceCPU: "1m"}, map[v1.ResourceName]string{v1.ResourceCPU: "9223372036854775807m"}},
+		{"scalar/saturated", true, map[v1.ResourceName]string{"example.com/dev": "1"}, map[v1.ResourceName]string{"example.com/dev": "9223372036854775807"}},
+	}
+	for _, v := range variants {
+		for _, n := range []int{100, 1000, 10000} {
+			b.Run(fmt.Sprintf("%s/pods=%d", v.name, n), func(b *testing.B) {
+				b.ReportAllocs()
+				for i := 0; i < b.N; i++ {
+					b.StopTimer()
+					ni := NewNodeInfo()
+					if v.saturated {
+						ni.AddPod(st.MakePod().Name("h1").UID("h1").Req(v.big).Obj())
+						ni.AddPod(st.MakePod().Name("h2").UID("h2").Req(v.big).Obj())
+					}
+					pods := make([]*v1.Pod, n)
+					for j := range pods {
+						pods[j] = st.MakePod().Name(fmt.Sprintf("p%d", j)).UID(fmt.Sprintf("p%d", j)).Req(v.small).Obj()
+						ni.AddPod(pods[j])
+					}
+					b.StartTimer()
+					for _, p := range pods {
+						if err := ni.RemovePod(logger, p); err != nil {
+							b.Fatal(err)
+						}
+					}
+				}
+			})
+		}
 	}
 }
 
