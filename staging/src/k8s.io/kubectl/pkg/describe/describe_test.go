@@ -1920,54 +1920,6 @@ func TestDescribers(t *testing.T) {
 	}
 }
 
-func TestDefaultDescribers(t *testing.T) {
-	out, err := DefaultObjectDescriber.DescribeObject(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(out, "foo") {
-		t.Errorf("missing Pod `foo` in output: %s", out)
-	}
-
-	out, err = DefaultObjectDescriber.DescribeObject(&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(out, "foo") {
-		t.Errorf("missing Service `foo` in output: %s", out)
-	}
-
-	out, err = DefaultObjectDescriber.DescribeObject(&corev1.ReplicationController{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-		Spec:       corev1.ReplicationControllerSpec{Replicas: ptr.To[int32](1)},
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(out, "foo") {
-		t.Errorf("missing Replication Controller `foo` in output: %s", out)
-	}
-
-	out, err = DefaultObjectDescriber.DescribeObject(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(out, "foo") {
-		t.Errorf("missing Node `foo` output: %s", out)
-	}
-
-	out, err = DefaultObjectDescriber.DescribeObject(&appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-		Spec:       appsv1.StatefulSetSpec{Replicas: ptr.To[int32](1)},
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(out, "foo") {
-		t.Errorf("missing StatefulSet `foo` in output: %s", out)
-	}
-}
-
 func TestGetPodsTotalRequests(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -5199,8 +5151,109 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 	}
 }
 
-func TestDescribeEvents(t *testing.T) {
+var objectMeta = metav1.ObjectMeta{
+	Name:      "bar",
+	Namespace: "foo",
+}
+var objectMetaName = metav1.ObjectMeta{
+	Name: "bar",
+}
+var objectTypeToInstance = map[string]runtime.Object{
+	"ClusterRole":        &rbacv1.ClusterRole{ObjectMeta: objectMeta},
+	"ClusterRoleBinding": &rbacv1.ClusterRoleBinding{ObjectMeta: objectMeta},
+	"ConfigMap":          &corev1.ConfigMap{ObjectMeta: objectMeta},
+	"DaemonSet":          &appsv1.DaemonSet{ObjectMeta: objectMeta},
+	"Deployment": &appsv1.Deployment{
+		ObjectMeta: objectMeta,
+		Spec: appsv1.DeploymentSpec{
+			Replicas: ptr.To[int32](1),
+			Selector: &metav1.LabelSelector{},
+		},
+	},
+	"Endpoints":               &corev1.Endpoints{ObjectMeta: objectMeta},
+	"EndpointSlice":           &discoveryv1.EndpointSlice{ObjectMeta: objectMeta},
+	"HorizontalPodAutoscaler": &autoscalingv2.HorizontalPodAutoscaler{ObjectMeta: objectMeta},
+	"Job":                     &batchv1.Job{ObjectMeta: objectMeta},
+	"Ingress":                 &networkingv1.Ingress{ObjectMeta: objectMeta},
+	"Node": &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "bar",
+		},
+	},
+	"PersistentVolume": &corev1.PersistentVolume{ObjectMeta: objectMetaName},
+	"Pod":              &corev1.Pod{ObjectMeta: objectMeta},
+	"ReplicaSet": &appsv1.ReplicaSet{
+		ObjectMeta: objectMeta,
+		Spec: appsv1.ReplicaSetSpec{
+			Replicas: ptr.To[int32](1),
+		},
+	},
+	"ReplicationController": &corev1.ReplicationController{
+		ObjectMeta: objectMeta,
+		Spec: corev1.ReplicationControllerSpec{
+			Replicas: ptr.To[int32](1),
+		},
+	},
+	"ResourceQuota": &corev1.ResourceQuota{ObjectMeta: objectMeta},
+	"Role":          &rbacv1.Role{ObjectMeta: objectMeta},
+	"RoleBinding":   &rbacv1.RoleBinding{ObjectMeta: objectMeta},
+	"Service":       &corev1.Service{ObjectMeta: objectMeta},
+	"StorageClass":  &storagev1.StorageClass{ObjectMeta: objectMetaName},
+}
 
+func TestDefaultDescribers(t *testing.T) {
+	// source: https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/kubectl/pkg/describe/describe.go#L405
+	defaultObjectDescriberTypes := map[string]struct{}{
+		"CertificateSigningRequest": {},
+		"ClusterRole":               {},
+		"ClusterRoleBinding":        {},
+		"ConfigMap":                 {},
+		"CronJob":                   {},
+		"CSINode":                   {},
+		"DaemonSet":                 {},
+		"Deployment":                {},
+		"Endpoints":                 {},
+		"EndpointSlice":             {},
+		"HorizontalPodAutoscaler":   {},
+		"Job":                       {},
+		"LimitRange":                {},
+		"Namespace":                 {},
+		"NetworkPolicy":             {},
+		"Node":                      {},
+		"PersistentVolume":          {},
+		"PersistentVolumeClaim":     {},
+		"Pod":                       {},
+		"PodDisruptionBudget":       {},
+		"PriorityClass":             {},
+		"ResourceQuota":             {},
+		"ReplicaSet":                {},
+		"ReplicationController":     {},
+		"Role":                      {},
+		"RoleBinding":               {},
+		"Secret":                    {},
+		"Service":                   {},
+		"ServiceAccount":            {},
+		"StatefulSet":               {},
+		"StorageClass":              {},
+		"VolumeAttributesClass":     {},
+	}
+
+	for objType, obj := range objectTypeToInstance {
+		if _, ok := defaultObjectDescriberTypes[objType]; ok {
+			t.Run(objType, func(t *testing.T) {
+				out, err := DefaultObjectDescriber.DescribeObject(obj)
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if !strings.Contains(out, "bar") {
+					t.Errorf("missing `bar` in output: %s", out)
+				}
+			})
+		}
+	}
+}
+
+func TestDescribeEvents(t *testing.T) {
 	events := &corev1.EventList{
 		Items: []corev1.Event{
 			{
@@ -5232,152 +5285,53 @@ func TestDescribeEvents(t *testing.T) {
 		},
 	}
 
-	describerFor := func(name string, clientset *fake.Clientset) ResourceDescriber {
-		m := map[string]ResourceDescriber{
-			"DaemonSetDescriber":             &DaemonSetDescriber{clientset},
-			"DeploymentDescriber":            &DeploymentDescriber{clientset},
-			"EndpointsDescriber":             &EndpointsDescriber{clientset},
-			"EndpointSliceDescriber":         &EndpointSliceDescriber{clientset},
-			"JobDescriber":                   &JobDescriber{clientset},
-			"IngressDescriber":               &IngressDescriber{clientset},
-			"NodeDescriber":                  &NodeDescriber{clientset},
-			"PersistentVolumeDescriber":      &PersistentVolumeDescriber{clientset},
-			"PodDescriber":                   &PodDescriber{clientset},
-			"ReplicaSetDescriber":            &ReplicaSetDescriber{clientset},
-			"ReplicationControllerDescriber": &ReplicationControllerDescriber{clientset},
-			"Service":                        &ServiceDescriber{clientset},
-			"StorageClass":                   &StorageClassDescriber{clientset},
-			"HorizontalPodAutoscaler":        &HorizontalPodAutoscalerDescriber{clientset},
-			"ConfigMap":                      &ConfigMapDescriber{clientset},
+	describerFor := func(name string, clientset *fake.Clientset) (ResourceDescriber, bool) {
+		objectTypeToDescriber := map[string]ResourceDescriber{
+			"ConfigMap":               &ConfigMapDescriber{clientset},
+			"DaemonSet":               &DaemonSetDescriber{clientset},
+			"Deployment":              &DeploymentDescriber{clientset},
+			"Endpoints":               &EndpointsDescriber{clientset},
+			"EndpointSlice":           &EndpointSliceDescriber{clientset},
+			"HorizontalPodAutoscaler": &HorizontalPodAutoscalerDescriber{clientset},
+			"Job":                     &JobDescriber{clientset},
+			"Ingress":                 &IngressDescriber{clientset},
+			"Node":                    &NodeDescriber{clientset},
+			"PersistentVolume":        &PersistentVolumeDescriber{clientset},
+			"Pod":                     &PodDescriber{clientset},
+			"ReplicaSet":              &ReplicaSetDescriber{clientset},
+			"ReplicationController":   &ReplicationControllerDescriber{clientset},
+			"Service":                 &ServiceDescriber{clientset},
+			"StorageClass":            &StorageClassDescriber{clientset},
 		}
-		return m[name]
+		describer, ok := objectTypeToDescriber[name]
+		return describer, ok
 	}
 
-	m := map[string]runtime.Object{
-		"DaemonSetDescriber": &appsv1.DaemonSet{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "bar",
-				Namespace: "foo",
-			},
-		},
-		"DeploymentDescriber": &appsv1.Deployment{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "bar",
-				Namespace: "foo",
-			},
-			Spec: appsv1.DeploymentSpec{
-				Replicas: ptr.To[int32](1),
-				Selector: &metav1.LabelSelector{},
-			},
-		},
-		"EndpointsDescriber": &corev1.Endpoints{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "bar",
-				Namespace: "foo",
-			},
-		},
-		"EndpointSliceDescriber": &discoveryv1.EndpointSlice{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "bar",
-				Namespace: "foo",
-			},
-		},
-		"JobDescriber": &batchv1.Job{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "bar",
-				Namespace: "foo",
-			},
-		},
-		"IngressDescriber": &networkingv1.Ingress{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "bar",
-				Namespace: "foo",
-			},
-		},
-		"NodeDescriber": &corev1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "bar",
-			},
-		},
-		"PersistentVolumeDescriber": &corev1.PersistentVolume{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "bar",
-			},
-		},
-		"PodDescriber": &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "bar",
-				Namespace: "foo",
-			},
-		},
-		"ReplicaSetDescriber": &appsv1.ReplicaSet{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "bar",
-				Namespace: "foo",
-			},
-			Spec: appsv1.ReplicaSetSpec{
-				Replicas: ptr.To[int32](1),
-			},
-		},
-		"ReplicationControllerDescriber": &corev1.ReplicationController{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "bar",
-				Namespace: "foo",
-			},
-			Spec: corev1.ReplicationControllerSpec{
-				Replicas: ptr.To[int32](1),
-			},
-		},
-		"Service": &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "bar",
-				Namespace: "foo",
-			},
-		},
-		"StorageClass": &storagev1.StorageClass{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "bar",
-			},
-		},
-		"HorizontalPodAutoscaler": &autoscalingv2.HorizontalPodAutoscaler{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "bar",
-				Namespace: "foo",
-			},
-		},
-		"ConfigMap": &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "bar",
-				Namespace: "foo",
-			},
-		},
-	}
-
-	for name, obj := range m {
+	for name, obj := range objectTypeToInstance {
 		t.Run(name, func(t *testing.T) {
 			clientset := fake.NewClientset(obj, events)
-			d := describerFor(name, clientset)
+			if d, ok := describerFor(name, clientset); ok {
+				out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+				if err != nil {
+					t.Errorf("unexpected error for %q: %v", name, err)
+				}
+				if !strings.Contains(out, "bar") {
+					t.Errorf("unexpected out for %q: %s", name, out)
+				}
+				if !strings.Contains(out, "Events:") {
+					t.Errorf("events not found for %q when ShowEvents=true: %s", name, out)
+				}
 
-			out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
-			if err != nil {
-				t.Errorf("unexpected error for %q: %v", name, err)
-			}
-			if !strings.Contains(out, "bar") {
-				t.Errorf("unexpected out for %q: %s", name, out)
-			}
-			if !strings.Contains(out, "Events:") {
-				t.Errorf("events not found for %q when ShowEvents=true: %s", name, out)
-			}
-
-			out, err = d.Describe("foo", "bar", DescriberSettings{ShowEvents: false})
-			if err != nil {
-				t.Errorf("unexpected error for %q: %s", name, err)
-			}
-			if !strings.Contains(out, "bar") {
-				t.Errorf("unexpected out for %q: %s", name, out)
-			}
-			if strings.Contains(out, "Events:") {
-				t.Errorf("events found for %q when ShowEvents=false: %s", name, out)
+				out, err = d.Describe("foo", "bar", DescriberSettings{ShowEvents: false})
+				if err != nil {
+					t.Errorf("unexpected error for %q: %s", name, err)
+				}
+				if !strings.Contains(out, "bar") {
+					t.Errorf("unexpected out for %q: %s", name, out)
+				}
+				if strings.Contains(out, "Events:") {
+					t.Errorf("events found for %q when ShowEvents=false: %s", name, out)
+				}
 			}
 		})
 	}

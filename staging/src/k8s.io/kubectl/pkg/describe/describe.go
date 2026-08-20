@@ -403,6 +403,9 @@ func init() {
 	d := &Describers{}
 	err := d.Add(
 		describeCertificateSigningRequest,
+		describeClusterRole,
+		describeClusterRoleBinding,
+		describeConfigMap,
 		describeCronJob,
 		describeCSINode,
 		describeDaemonSet,
@@ -424,6 +427,8 @@ func init() {
 		describeQuota,
 		describeReplicaSet,
 		describeReplicationController,
+		describeRole,
+		describeRoleBinding,
 		describeSecret,
 		describeService,
 		describeServiceAccount,
@@ -3279,6 +3284,10 @@ func (d *RoleDescriber) Describe(namespace, name string, describerSettings Descr
 		return "", err
 	}
 
+	return describeRole(role)
+}
+
+func describeRole(role *rbacv1.Role) (string, error) {
 	breakdownRules := []rbacv1.PolicyRule{}
 	for _, rule := range role.Rules {
 		breakdownRules = append(breakdownRules, rbac.BreakdownRule(rule)...)
@@ -3313,13 +3322,17 @@ type ClusterRoleDescriber struct {
 }
 
 func (d *ClusterRoleDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	role, err := d.RbacV1().ClusterRoles().Get(context.TODO(), name, metav1.GetOptions{})
+	clusterRole, err := d.RbacV1().ClusterRoles().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
 
+	return describeClusterRole(clusterRole)
+}
+
+func describeClusterRole(clusterRole *rbacv1.ClusterRole) (string, error) {
 	breakdownRules := []rbacv1.PolicyRule{}
-	for _, rule := range role.Rules {
+	for _, rule := range clusterRole.Rules {
 		breakdownRules = append(breakdownRules, rbac.BreakdownRule(rule)...)
 	}
 
@@ -3331,9 +3344,9 @@ func (d *ClusterRoleDescriber) Describe(namespace, name string, describerSetting
 
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
-		w.Write(LEVEL_0, "Name:\t%s\n", role.Name)
-		printLabelsMultiline(w, "Labels", role.Labels)
-		printAnnotationsMultiline(w, "Annotations", role.Annotations)
+		w.Write(LEVEL_0, "Name:\t%s\n", clusterRole.Name)
+		printLabelsMultiline(w, "Labels", clusterRole.Labels)
+		printAnnotationsMultiline(w, "Annotations", clusterRole.Annotations)
 
 		w.Write(LEVEL_0, "PolicyRule:\n")
 		w.Write(LEVEL_1, "Resources\tNon-Resource URLs\tResource Names\tVerbs\n")
@@ -3369,25 +3382,29 @@ type RoleBindingDescriber struct {
 }
 
 func (d *RoleBindingDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	binding, err := d.RbacV1().RoleBindings(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	roleBinding, err := d.RbacV1().RoleBindings(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
 
+	return describeRoleBinding(roleBinding)
+}
+
+func describeRoleBinding(roleBinding *rbacv1.RoleBinding) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
-		w.Write(LEVEL_0, "Name:\t%s\n", binding.Name)
-		printLabelsMultiline(w, "Labels", binding.Labels)
-		printAnnotationsMultiline(w, "Annotations", binding.Annotations)
+		w.Write(LEVEL_0, "Name:\t%s\n", roleBinding.Name)
+		printLabelsMultiline(w, "Labels", roleBinding.Labels)
+		printAnnotationsMultiline(w, "Annotations", roleBinding.Annotations)
 
 		w.Write(LEVEL_0, "Role:\n")
-		w.Write(LEVEL_1, "Kind:\t%s\n", binding.RoleRef.Kind)
-		w.Write(LEVEL_1, "Name:\t%s\n", binding.RoleRef.Name)
+		w.Write(LEVEL_1, "Kind:\t%s\n", roleBinding.RoleRef.Kind)
+		w.Write(LEVEL_1, "Name:\t%s\n", roleBinding.RoleRef.Name)
 
 		w.Write(LEVEL_0, "Subjects:\n")
 		w.Write(LEVEL_1, "Kind\tName\tNamespace\n")
 		w.Write(LEVEL_1, "----\t----\t---------\n")
-		for _, s := range binding.Subjects {
+		for _, s := range roleBinding.Subjects {
 			w.Write(LEVEL_1, "%s\t%s\t%s\n", s.Kind, s.Name, s.Namespace)
 		}
 
@@ -3401,25 +3418,29 @@ type ClusterRoleBindingDescriber struct {
 }
 
 func (d *ClusterRoleBindingDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	binding, err := d.RbacV1().ClusterRoleBindings().Get(context.TODO(), name, metav1.GetOptions{})
+	clusterRoleBinding, err := d.RbacV1().ClusterRoleBindings().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
 
+	return describeClusterRoleBinding(clusterRoleBinding)
+}
+
+func describeClusterRoleBinding(clusterRoleBinding *rbacv1.ClusterRoleBinding) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
-		w.Write(LEVEL_0, "Name:\t%s\n", binding.Name)
-		printLabelsMultiline(w, "Labels", binding.Labels)
-		printAnnotationsMultiline(w, "Annotations", binding.Annotations)
+		w.Write(LEVEL_0, "Name:\t%s\n", clusterRoleBinding.Name)
+		printLabelsMultiline(w, "Labels", clusterRoleBinding.Labels)
+		printAnnotationsMultiline(w, "Annotations", clusterRoleBinding.Annotations)
 
 		w.Write(LEVEL_0, "Role:\n")
-		w.Write(LEVEL_1, "Kind:\t%s\n", binding.RoleRef.Kind)
-		w.Write(LEVEL_1, "Name:\t%s\n", binding.RoleRef.Name)
+		w.Write(LEVEL_1, "Kind:\t%s\n", clusterRoleBinding.RoleRef.Kind)
+		w.Write(LEVEL_1, "Name:\t%s\n", clusterRoleBinding.RoleRef.Name)
 
 		w.Write(LEVEL_0, "Subjects:\n")
 		w.Write(LEVEL_1, "Kind\tName\tNamespace\n")
 		w.Write(LEVEL_1, "----\t----\t---------\n")
-		for _, s := range binding.Subjects {
+		for _, s := range clusterRoleBinding.Subjects {
 			w.Write(LEVEL_1, "%s\t%s\t%s\n", s.Kind, s.Name, s.Namespace)
 		}
 
@@ -4337,35 +4358,38 @@ func (d *ConfigMapDescriber) Describe(namespace, name string, describerSettings 
 		return "", err
 	}
 
+	var events *corev1.EventList
+	if describerSettings.ShowEvents {
+		events, _ = searchEvents(d.CoreV1(), configMap, describerSettings.ChunkSize)
+	}
+
+	return describeConfigMap(configMap, events)
+}
+
+func describeConfigMap(cm *corev1.ConfigMap, events *corev1.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
-		w.Write(LEVEL_0, "Name:\t%s\n", configMap.Name)
-		w.Write(LEVEL_0, "Namespace:\t%s\n", configMap.Namespace)
-		printLabelsMultiline(w, "Labels", configMap.Labels)
-		printAnnotationsMultiline(w, "Annotations", configMap.Annotations)
+		w.Write(LEVEL_0, "Name:\t%s\n", cm.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", cm.Namespace)
+		printLabelsMultiline(w, "Labels", cm.Labels)
+		printAnnotationsMultiline(w, "Annotations", cm.Annotations)
 
 		w.Write(LEVEL_0, "\nData\n====\n")
-		for _, k := range slices.Sorted(maps.Keys(configMap.Data)) {
-			v := configMap.Data[k]
+		for _, k := range slices.Sorted(maps.Keys(cm.Data)) {
+			v := cm.Data[k]
 			w.Write(LEVEL_0, "%s:\n----\n", k)
 			w.Write(LEVEL_0, "%s\n", string(v))
 			w.Write(LEVEL_0, "\n")
 		}
 		w.Write(LEVEL_0, "\nBinaryData\n====\n")
-		for _, k := range slices.Sorted(maps.Keys(configMap.BinaryData)) {
-			v := configMap.BinaryData[k]
+		for _, k := range slices.Sorted(maps.Keys(cm.BinaryData)) {
+			v := cm.BinaryData[k]
 			w.Write(LEVEL_0, "%s: %s bytes\n", k, strconv.Itoa(len(v)))
 		}
 		w.Write(LEVEL_0, "\n")
 
-		if describerSettings.ShowEvents {
-			events, err := searchEvents(d.CoreV1(), configMap, describerSettings.ChunkSize)
-			if err != nil {
-				return err
-			}
-			if events != nil {
-				DescribeEvents(events, w)
-			}
+		if events != nil {
+			DescribeEvents(events, w)
 		}
 		return nil
 	})
