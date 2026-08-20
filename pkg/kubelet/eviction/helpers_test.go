@@ -3721,3 +3721,50 @@ func TestEvictionMessage(t *testing.T) {
 		})
 	}
 }
+
+func TestEvictionMessageIncludesLocalVolumeUsageForEphemeralStorage(t *testing.T) {
+	const (
+		podName       = "pod-ephemeral-eviction-message"
+		containerName = "regular1"
+	)
+
+	container := newContainer(containerName, newResourceList("", "", "100Mi"), newResourceList("", "", ""))
+	container.VolumeMounts = []v1.VolumeMount{{Name: "local-volume"}}
+	pod := newPod(podName, defaultPriority, []v1.Container{container}, []v1.Volume{
+		newVolume("local-volume", v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		}),
+	})
+
+	podStats := newPodDiskStats(
+		pod,
+		resource.MustParse("20Mi"),
+		resource.MustParse("10Mi"),
+		resource.MustParse("150Mi"),
+	)
+	statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
+		return podStats, true
+	}
+
+	msg, annotations := evictionMessage(v1.ResourceEphemeralStorage, pod, statsFn, nil, signalObservations{})
+
+	expectedUsage := resource.MustParse("180Mi")
+	expectedMessage := fmt.Sprintf(nodeLowMessageFmt, v1.ResourceEphemeralStorage) +
+		fmt.Sprintf(containerMessageFmt, containerName, expectedUsage.String(), "100Mi", v1.ResourceEphemeralStorage)
+
+	if msg != expectedMessage {
+		t.Fatalf("unexpected ephemeral storage eviction message, got: %s, want: %s", msg, expectedMessage)
+	}
+	if got := annotations[OffendingContainersKey]; got != containerName {
+		t.Fatalf("unexpected %s annotation, got: %s, want: %s", OffendingContainersKey, got, containerName)
+	}
+	if got := annotations[OffendingContainersUsageKey]; got != expectedUsage.String() {
+		t.Fatalf("unexpected %s annotation, got: %s, want: %s", OffendingContainersUsageKey, got, expectedUsage.String())
+	}
+	if _, found := annotations[OffendingPodKey]; found {
+		t.Fatalf("unexpected %s annotation found: %s", OffendingPodKey, annotations[OffendingPodKey])
+	}
+	if _, found := annotations[OffendingPodUsageKey]; found {
+		t.Fatalf("unexpected %s annotation found: %s", OffendingPodUsageKey, annotations[OffendingPodUsageKey])
+	}
+}
