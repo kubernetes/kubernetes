@@ -32945,3 +32945,56 @@ func TestValidatePodBinding(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateBasicResource(t *testing.T) {
+	// Value() is not a reliable way to ask for the sign of a quantity: it overflows
+	// to a positive number for some negative values and falls back to zero for
+	// others. Every negative case below passes a "Value() < 0" check.
+	cases := []struct {
+		name     string
+		quantity string
+		wantErr  bool
+	}{
+		{name: "zero", quantity: "0"},
+		{name: "positive", quantity: "1Gi"},
+		{name: "positive, above MaxInt64", quantity: "1000E"},
+		{name: "positive, far above MaxInt64", quantity: "1e30"},
+		{name: "positive, Value() wraps negative", quantity: "9223372036854775808"},
+
+		{name: "negative", quantity: "-1Gi", wantErr: true},
+		{name: "negative, Value() overflows positive", quantity: "-9.5Gi", wantErr: true},
+		{name: "negative, Value() overflows positive with more digits", quantity: "-9.5000000001Gi", wantErr: true},
+		{name: "negative, Value() falls back to zero", quantity: "-1e30", wantErr: true},
+		{name: "negative, suffixed, Value() falls back to zero", quantity: "-100E", wantErr: true},
+		{name: "negative, at the int64 boundary", quantity: "-9223372036854775808", wantErr: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			q := resource.MustParse(tc.quantity)
+			errs := validateBasicResource(q, field.NewPath("resources").Key("storage"))
+
+			if tc.wantErr && len(errs) == 0 {
+				t.Errorf("%s: expected an error, got none (Value() reports %d)", tc.quantity, q.Value())
+			}
+			if !tc.wantErr && len(errs) != 0 {
+				t.Errorf("%s: expected no error, got %v", tc.quantity, errs)
+			}
+			// The quantity belongs in the error, not the overflowed integer. String()
+			// canonicalizes, so compare by value rather than by spelling.
+			if tc.wantErr && len(errs) == 1 {
+				reported, ok := errs[0].BadValue.(string)
+				if !ok {
+					t.Fatalf("%s: error reports %T, want the quantity as a string", tc.quantity, errs[0].BadValue)
+				}
+				got, err := resource.ParseQuantity(reported)
+				if err != nil {
+					t.Fatalf("%s: error reports %q, which is not a quantity: %v", tc.quantity, reported, err)
+				}
+				if got.Cmp(q) != 0 {
+					t.Errorf("%s: error reports %q, want a quantity equal to the one submitted", tc.quantity, reported)
+				}
+			}
+		})
+	}
+}
