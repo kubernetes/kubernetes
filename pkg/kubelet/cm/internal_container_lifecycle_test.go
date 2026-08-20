@@ -47,12 +47,26 @@ func (memoryManager *mockMemoryManager) AddContainer(klog.Logger, *v1.Pod, *v1.C
 }
 
 type mockTopologyManager struct {
-	called bool
+	called       bool
+	removeCalled bool
 	topologymanager.Manager
 }
 
-func (topologyManager *mockTopologyManager) AddContainer(klog.Logger, *v1.Pod, *v1.Container, string) {
+func (topologyManager *mockTopologyManager) AddContainer(
+	klog.Logger,
+	*v1.Pod,
+	*v1.Container,
+	string,
+) {
 	topologyManager.called = true
+}
+
+func (topologyManager *mockTopologyManager) RemoveContainer(
+	klog.Logger,
+	string,
+) error {
+	topologyManager.removeCalled = true
+	return nil
 }
 
 func TestPreStartContainer(t *testing.T) {
@@ -105,5 +119,25 @@ func TestPreStartContainer(t *testing.T) {
 		if !tManager.(*mockTopologyManager).called {
 			t.Errorf("TopologyManager's AddContainer method must be called during container startup")
 		}
+	}
+}
+
+func TestPostStopContainer(t *testing.T) {
+	topologyManager := &mockTopologyManager{}
+
+	lifecycle := internalContainerLifecycleImpl{
+		topologyManager: topologyManager,
+	}
+
+	logger, _ := ktesting.NewTestContext(t)
+
+	err := lifecycle.PostStopContainer(logger, "42")
+
+	if err != nil {
+		t.Errorf("PostStopContainer returned unexpected error: %v", err)
+	}
+
+	if !topologyManager.removeCalled {
+		t.Errorf("TopologyManager's RemoveContainer method must be called")
 	}
 }
