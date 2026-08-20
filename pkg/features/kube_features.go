@@ -17,7 +17,16 @@ limitations under the License.
 package features
 
 import (
+	certificatesv1 "k8s.io/api/certificates/v1"
+	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	lifecyclev1alpha1 "k8s.io/api/lifecycle/v1alpha1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	svmv1 "k8s.io/api/storagemigration/v1"
+	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	genericfeatures "k8s.io/apiserver/pkg/features"
@@ -3007,6 +3016,56 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	zpagesfeatures.ComponentFlagz: {},
 
 	zpagesfeatures.ComponentStatusz: {},
+}
+
+// defaultFeatureGateAPIDependencies enumerates the API group/version/resources that
+// kube-apiserver must serve for an enabled feature gate to function.
+//
+// The listed GroupVersionResources are grouped by GroupResource during validation. An
+// enabled feature is satisfied when each required GroupResource is served in at least
+// one of its listed versions. Listing every version a resource can be served in (across
+// GA/beta/alpha) keeps the check correct as APIs graduate and older versions are dropped.
+//
+// Entries are alphabetized.
+var defaultFeatureGateAPIDependencies = map[featuregate.Feature][]schema.GroupVersionResource{
+	ClusterTrustBundle: {
+		certificatesv1.SchemeGroupVersion.WithResource("clustertrustbundles"),
+		certificatesv1beta1.SchemeGroupVersion.WithResource("clustertrustbundles"),
+		certificatesv1alpha1.SchemeGroupVersion.WithResource("clustertrustbundles"),
+	},
+
+	CompositePodGroup: {
+		schedulingv1alpha3.SchemeGroupVersion.WithResource("compositepodgroups"),
+	},
+
+	EvictionRequestAPI: {
+		lifecyclev1alpha1.SchemeGroupVersion.WithResource("evictions"),
+		lifecyclev1alpha1.SchemeGroupVersion.WithResource("evictionrequests"),
+	},
+
+	GenericWorkload: {
+		schedulingv1beta1.SchemeGroupVersion.WithResource("workloads"),
+		schedulingv1alpha3.SchemeGroupVersion.WithResource("workloads"),
+		schedulingv1beta1.SchemeGroupVersion.WithResource("podgroups"),
+		schedulingv1alpha3.SchemeGroupVersion.WithResource("podgroups"),
+	},
+
+	PodCertificateRequest: {
+		certificatesv1.SchemeGroupVersion.WithResource("podcertificaterequests"),
+		certificatesv1beta1.SchemeGroupVersion.WithResource("podcertificaterequests"),
+	},
+
+	StorageVersionMigrator: {
+		svmv1.SchemeGroupVersion.WithResource("storageversionmigrations"),
+		svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
+	},
+}
+
+// FeatureGateAPIDependencies returns the mapping of feature gates to the API
+// group/version/resources kube-apiserver must serve for them to function. It is
+// consumed by kube-apiserver startup validation and by generated documentation.
+func FeatureGateAPIDependencies() map[featuregate.Feature][]schema.GroupVersionResource {
+	return defaultFeatureGateAPIDependencies
 }
 
 func init() {

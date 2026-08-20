@@ -31,7 +31,7 @@ import (
 	_ "k8s.io/apiextensions-apiserver/pkg/features"
 	_ "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	_ "k8s.io/kubernetes/pkg/features"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 var (
@@ -44,9 +44,10 @@ var (
 
 // FeatureGateJSON represents a feature gate in JSON output format
 type FeatureGateJSON struct {
-	Name         string      `json:"name"`
-	Stages       []StageJSON `json:"stages"`
-	Dependencies []string    `json:"dependencies,omitempty"`
+	Name            string      `json:"name"`
+	Stages          []StageJSON `json:"stages"`
+	Dependencies    []string    `json:"dependencies,omitempty"`
+	APIDependencies []string    `json:"apiDependencies,omitempty"`
 }
 
 // StageJSON represents a stage in the feature gate lifecycle
@@ -80,8 +81,23 @@ type featureInfo struct {
 	depStages          []stageInfo
 	depVersion         *version.Version
 	deps               string
+	apiDeps            string
 	linkCode           string
 	linkKEPs           string
+}
+
+// apiDependencyStrings returns the API group/version/resources that a feature
+// gate requires kube-apiserver to serve.
+func apiDependencyStrings(feature string) []string {
+	gvrs := kubefeatures.FeatureGateAPIDependencies()[featuregate.Feature(feature)]
+	if len(gvrs) == 0 {
+		return nil
+	}
+	out := make([]string, len(gvrs))
+	for i, gvr := range gvrs {
+		out[i] = gvr.String()
+	}
+	return out
 }
 
 func main() {
@@ -232,6 +248,8 @@ func generateJSON(filterStage string) string {
 				fg.Dependencies[i] = string(d)
 			}
 		}
+
+		fg.APIDependencies = apiDependencyStrings(feature)
 
 		features = append(features, fg)
 	}
@@ -453,6 +471,8 @@ func generateMarkdown(sortBy string, reverseSort bool, filterStage string) strin
 			info.deps = strings.Join(depItems, "<br>")
 		}
 
+		info.apiDeps = strings.Join(apiDependencyStrings(feature), "<br>")
+
 		info.linkCode = fmt.Sprintf("[code](https://cs.k8s.io/?q=%%5Cb%s%%5Cb&i=nope&files=&excludeFiles=CHANGELOG&repos=kubernetes/kubernetes)", feature)
 		info.linkKEPs = fmt.Sprintf("[KEPs](https://cs.k8s.io/?q=%%5Cb%s%%5Cb&i=nope&files=&excludeFiles=CHANGELOG&repos=kubernetes/enhancements)", feature)
 
@@ -472,11 +492,11 @@ func generateMarkdown(sortBy string, reverseSort bool, filterStage string) strin
 		sb.WriteString(fmt.Sprintf("*Showing only %s features (%d)*\n\n", strings.ToUpper(filterStage), len(features)))
 	}
 
-	sb.WriteString("| Feature | Enabled | Locked | Alpha | Beta | GA | Deprecated | Dependencies | Links |\n")
-	sb.WriteString("|---------|---------|--------|-------|------|----|------------|--------------|-------|\n")
+	sb.WriteString("| Feature | Enabled | Locked | Alpha | Beta | GA | Deprecated | Dependencies | API Dependencies | Links |\n")
+	sb.WriteString("|---------|---------|--------|-------|------|----|------------|--------------|------------------|-------|\n")
 
 	for _, info := range features {
-		sb.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s | %s | %s | %s | %s %s |\n",
+		fmt.Fprintf(&sb, "| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s %s |\n",
 			info.name,
 			formatEnabledColumn(info.enabledFromVersion),
 			formatLockedColumn(info.lockedFromVersion),
@@ -484,7 +504,7 @@ func generateMarkdown(sortBy string, reverseSort bool, filterStage string) strin
 			formatStageRanges(info.betaStages),
 			formatStageRanges(info.gaStages),
 			formatStageRanges(info.depStages),
-			info.deps, info.linkCode, info.linkKEPs))
+			info.deps, info.apiDeps, info.linkCode, info.linkKEPs)
 	}
 
 	sb.WriteString("\n## Legend\n\n")
