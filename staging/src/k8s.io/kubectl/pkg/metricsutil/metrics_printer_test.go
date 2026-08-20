@@ -367,6 +367,158 @@ test-1   400m         5120Mi
          800m         7168Mi          
 `,
 		},
+		{
+			name: "Multiple Pods - Sum with No Header",
+			podMetric: []metricsapi.PodMetrics{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test",
+						Namespace: "default",
+					},
+					Timestamp: metav1.Time{Time: time.Now()},
+					Window:    metav1.Duration{Duration: time.Minute},
+					Containers: []metricsapi.ContainerMetrics{
+						{
+							Name: "container1",
+							Usage: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("0.2"),
+								v1.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-1",
+						Namespace: "default",
+					},
+					Timestamp: metav1.Time{Time: time.Now()},
+					Window:    metav1.Duration{Duration: time.Minute},
+					Containers: []metricsapi.ContainerMetrics{
+						{
+							Name: "container1",
+							Usage: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("0.2"),
+								v1.ResourceMemory: resource.MustParse("2Gi"),
+							},
+						},
+					},
+				},
+			},
+			noHeader: true,
+			sum:      true,
+			expectedOutput: `test     200m       1024Mi     
+test-1   200m       2048Mi     
+         ________   ________   
+         400m       3072Mi     
+`,
+		},
+		{
+			name: "Multiple Pods - Sum with Namespace and No Header",
+			podMetric: []metricsapi.PodMetrics{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test",
+						Namespace: "ns-1",
+					},
+					Timestamp: metav1.Time{Time: time.Now()},
+					Window:    metav1.Duration{Duration: time.Minute},
+					Containers: []metricsapi.ContainerMetrics{
+						{
+							Name: "container1",
+							Usage: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("0.2"),
+								v1.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-1",
+						Namespace: "ns-2",
+					},
+					Timestamp: metav1.Time{Time: time.Now()},
+					Window:    metav1.Duration{Duration: time.Minute},
+					Containers: []metricsapi.ContainerMetrics{
+						{
+							Name: "container1",
+							Usage: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("0.2"),
+								v1.ResourceMemory: resource.MustParse("2Gi"),
+							},
+						},
+					},
+				},
+			},
+			withNamespace: true,
+			noHeader:      true,
+			sum:           true,
+			expectedOutput: `ns-1   test     200m       1024Mi     
+ns-2   test-1   200m       2048Mi     
+                ________   ________   
+                400m       3072Mi     
+`,
+		},
+		{
+			name: "Multiple Pods - Sum with Containers and No Header",
+			podMetric: []metricsapi.PodMetrics{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test",
+						Namespace: "default",
+					},
+					Timestamp: metav1.Time{Time: time.Now()},
+					Window:    metav1.Duration{Duration: time.Minute},
+					Containers: []metricsapi.ContainerMetrics{
+						{
+							Name: "container1",
+							Usage: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("0.2"),
+								v1.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+			printContainers: true,
+			noHeader:        true,
+			sum:             true,
+			expectedOutput: `test   container1   200m       1024Mi     
+                    ________   ________   
+                    200m       1024Mi     
+`,
+		},
+		{
+			name: "Multiple Pods - Sum with Namespace, Containers and No Header",
+			podMetric: []metricsapi.PodMetrics{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test",
+						Namespace: "ns-1",
+					},
+					Timestamp: metav1.Time{Time: time.Now()},
+					Window:    metav1.Duration{Duration: time.Minute},
+					Containers: []metricsapi.ContainerMetrics{
+						{
+							Name: "container1",
+							Usage: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("0.2"),
+								v1.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+			withNamespace:   true,
+			printContainers: true,
+			noHeader:        true,
+			sum:             true,
+			expectedOutput: `ns-1   test   container1   200m       1024Mi     
+                           ________   ________   
+                           200m       1024Mi     
+`,
+		},
 	}
 
 	for _, test := range tests {
