@@ -22,21 +22,21 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-helpers/storage/volume"
+	"k8s.io/component-helpers/storage/volume/assumecache"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
-// persistentVolumeOrderedIndex is a cache.Store that keeps persistent volumes
-// indexed by AccessModes and ordered by storage capacity.
-type persistentVolumeOrderedIndex struct {
-	store cache.Indexer
-}
+const accessModesIndex = "accessmodes"
 
-func newPersistentVolumeOrderedIndex() persistentVolumeOrderedIndex {
-	return persistentVolumeOrderedIndex{cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"accessmodes": accessModesIndexFunc})}
+// persistentVolumeOrderedIndex keeps persistent volumes indexed by AccessModes
+// and ordered by storage capacity. It is backed by an assume cache layered on
+// top of the PV shared informer, so lookups observe the controller's own writes
+// before the informer delivers them.
+type persistentVolumeOrderedIndex struct {
+	*assumecache.AssumeCache[*v1.PersistentVolume]
 }
 
 // accessModesIndexFunc is an indexing function that returns a persistent
@@ -52,23 +52,7 @@ func accessModesIndexFunc(obj interface{}) ([]string, error) {
 // listByAccessModes returns all volumes with the given set of
 // AccessModeTypes. The list is unsorted!
 func (pvIndex *persistentVolumeOrderedIndex) listByAccessModes(modes []v1.PersistentVolumeAccessMode) ([]*v1.PersistentVolume, error) {
-	pv := &v1.PersistentVolume{
-		Spec: v1.PersistentVolumeSpec{
-			AccessModes: modes,
-		},
-	}
-
-	objs, err := pvIndex.store.Index("accessmodes", pv)
-	if err != nil {
-		return nil, err
-	}
-
-	volumes := make([]*v1.PersistentVolume, len(objs))
-	for i, obj := range objs {
-		volumes[i] = obj.(*v1.PersistentVolume)
-	}
-
-	return volumes, nil
+	return pvIndex.ByIndex(accessModesIndex, v1helper.GetAccessModesAsString(modes))
 }
 
 // find returns the nearest PV from the ordered list or nil if a match is not found
@@ -151,7 +135,7 @@ func (pvIndex *persistentVolumeOrderedIndex) findBestMatchForClaim(claim *v1.Per
 // what is closest to what they actually asked for.
 func (pvIndex *persistentVolumeOrderedIndex) allPossibleMatchingAccessModes(requestedModes []v1.PersistentVolumeAccessMode) [][]v1.PersistentVolumeAccessMode {
 	matchedModes := [][]v1.PersistentVolumeAccessMode{}
-	keys := pvIndex.store.ListIndexFuncValues("accessmodes")
+	keys := pvIndex.ListIndexFuncValues(accessModesIndex)
 	for _, key := range keys {
 		indexedModes := v1helper.GetAccessModesFromString(key)
 		if util.ContainsAllAccessModes(indexedModes, requestedModes) {
