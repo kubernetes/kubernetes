@@ -1457,6 +1457,18 @@ func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, 
 		// Devices with binding conditions are not supported, feature is off.
 		return false, nil
 	}
+	if !alloc.features.PartitionableDevices && len(device.ConsumesCounters) > 0 {
+		// Devices that consume counters are not supported, feature is off.
+		return false, nil
+	}
+	if len(slice.Spec.SkipNodeOperations) > 0 {
+		if !alloc.features.OptionalNodeOperations {
+			return false, nil
+		}
+		if !slices.Contains(alloc.node.Status.DeclaredFeatures, draoptionalnodeoperations.DRAOptionalNodeOperationsFeatureGate) {
+			return false, nil
+		}
+	}
 
 	deviceID := DeviceID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name, Device: slice.Spec.Devices[deviceIndex].Name}
 	matchKey := matchKey{DeviceID: deviceID, requestIndices: r}
