@@ -27,93 +27,121 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func TestPodResourceInfoMap_Clone(t *testing.T) {
+func TestPodMap_Clone(t *testing.T) {
 	tests := []struct {
 		name     string
-		original PodResourceInfoMap
-		expected PodResourceInfoMap
+		original PodMap
+		expected PodMap
 	}{
 		{
 			name:     "nil map clone returns empty non-nil map",
 			original: nil,
-			expected: make(PodResourceInfoMap),
+			expected: make(PodMap),
 		},
 		{
 			name:     "empty map clone returns empty non-nil map",
-			original: make(PodResourceInfoMap),
-			expected: make(PodResourceInfoMap),
+			original: make(PodMap),
+			expected: make(PodMap),
 		},
 		{
 			name: "basic cloning with all fields populated",
-			original: PodResourceInfoMap{
+			original: PodMap{
 				types.UID("pod"): {
-					ContainerResources: map[string]v1.ResourceRequirements{
-						"container-a": {
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name: "container-a",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    resource.MustParse("100m"),
+										v1.ResourceMemory: resource.MustParse("256Mi"),
+									},
+									Limits: v1.ResourceList{
+										v1.ResourceCPU:    resource.MustParse("200m"),
+										v1.ResourceMemory: resource.MustParse("512Mi"),
+									},
+								},
+							},
+						},
+						Resources: &v1.ResourceRequirements{
 							Requests: v1.ResourceList{
 								v1.ResourceCPU:    resource.MustParse("100m"),
 								v1.ResourceMemory: resource.MustParse("256Mi"),
 							},
-							Limits: v1.ResourceList{
-								v1.ResourceCPU:    resource.MustParse("200m"),
-								v1.ResourceMemory: resource.MustParse("512Mi"),
+						},
+						Volumes: []v1.Volume{
+							{
+								Name: "vol-x",
+								VolumeSource: v1.VolumeSource{
+									EmptyDir: &v1.EmptyDirVolumeSource{
+										SizeLimit: resource.NewQuantity(2, resource.BinarySI),
+									},
+								},
 							},
 						},
-					},
-					PodLevelResources: &v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceCPU:    resource.MustParse("100m"),
-							v1.ResourceMemory: resource.MustParse("256Mi"),
-						},
-					},
-					EmptyDirVolumeLimits: map[string]*resource.Quantity{
-						"vol-x": resource.NewQuantity(2, resource.BinarySI),
 					},
 				},
 			},
-			expected: PodResourceInfoMap{
+			expected: PodMap{
 				types.UID("pod"): {
-					ContainerResources: map[string]v1.ResourceRequirements{
-						"container-a": {
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name: "container-a",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    resource.MustParse("100m"),
+										v1.ResourceMemory: resource.MustParse("256Mi"),
+									},
+									Limits: v1.ResourceList{
+										v1.ResourceCPU:    resource.MustParse("200m"),
+										v1.ResourceMemory: resource.MustParse("512Mi"),
+									},
+								},
+							},
+						},
+						Resources: &v1.ResourceRequirements{
 							Requests: v1.ResourceList{
 								v1.ResourceCPU:    resource.MustParse("100m"),
 								v1.ResourceMemory: resource.MustParse("256Mi"),
 							},
-							Limits: v1.ResourceList{
-								v1.ResourceCPU:    resource.MustParse("200m"),
-								v1.ResourceMemory: resource.MustParse("512Mi"),
+						},
+						Volumes: []v1.Volume{
+							{
+								Name: "vol-x",
+								VolumeSource: v1.VolumeSource{
+									EmptyDir: &v1.EmptyDirVolumeSource{
+										SizeLimit: resource.NewQuantity(2, resource.BinarySI),
+									},
+								},
 							},
 						},
-					},
-					PodLevelResources: &v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceCPU:    resource.MustParse("100m"),
-							v1.ResourceMemory: resource.MustParse("256Mi"),
-						},
-					},
-					EmptyDirVolumeLimits: map[string]*resource.Quantity{
-						"vol-x": resource.NewQuantity(2, resource.BinarySI),
 					},
 				},
 			},
 		},
 		{
 			name: "cloning with missing or partially nil fields",
-			original: PodResourceInfoMap{
+			original: PodMap{
 				types.UID("pod"): {
-					ContainerResources: map[string]v1.ResourceRequirements{
-						"container-c": {},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name: "container-c",
+							},
+						},
 					},
-					PodLevelResources:    nil,
-					EmptyDirVolumeLimits: nil,
 				},
 			},
-			expected: PodResourceInfoMap{
+			expected: PodMap{
 				types.UID("pod"): {
-					ContainerResources: map[string]v1.ResourceRequirements{
-						"container-c": {},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name: "container-c",
+							},
+						},
 					},
-					PodLevelResources:    nil,
-					EmptyDirVolumeLimits: nil,
 				},
 			},
 		},
@@ -121,7 +149,7 @@ func TestPodResourceInfoMap_Clone(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var cloned PodResourceInfoMap
+			var cloned PodMap
 			require.NotPanics(t, func() {
 				cloned = test.original.Clone()
 			})
@@ -131,31 +159,43 @@ func TestPodResourceInfoMap_Clone(t *testing.T) {
 				return x.Equal(y)
 			}))
 			if diff != "" {
-				t.Errorf("PodResourceInfoMap mismatch (-want +got):\n%s", diff)
+				t.Errorf("PodMap mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
 
 }
 
-func TestPodResourceInfoMap_Clone_DeepCopyIsolation(t *testing.T) {
-	newBaseMap := func() PodResourceInfoMap {
-		return PodResourceInfoMap{
+func TestPodMap_Clone_DeepCopyIsolation(t *testing.T) {
+	newBaseMap := func() PodMap {
+		return PodMap{
 			types.UID("pod"): {
-				ContainerResources: map[string]v1.ResourceRequirements{
-					"container-a": {
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container-a",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					Resources: &v1.ResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceMemory: resource.MustParse("256Mi"),
 						},
 					},
-				},
-				PodLevelResources: &v1.ResourceRequirements{
-					Requests: v1.ResourceList{
-						v1.ResourceMemory: resource.MustParse("256Mi"),
+					Volumes: []v1.Volume{
+						{
+							Name: "vol-y",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									SizeLimit: resource.NewQuantity(1024*1024*100, resource.BinarySI),
+								},
+							},
+						},
 					},
-				},
-				EmptyDirVolumeLimits: map[string]*resource.Quantity{
-					"vol-y": resource.NewQuantity(1024*1024*100, resource.BinarySI),
 				},
 			},
 		}
@@ -163,43 +203,53 @@ func TestPodResourceInfoMap_Clone_DeepCopyIsolation(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		mutate func(cloned PodResourceInfoMap)
+		mutate func(cloned PodMap)
 	}{
 		{
 			name: "modifying a resource quantity in cloned ContainerResources",
-			mutate: func(cloned PodResourceInfoMap) {
+			mutate: func(cloned PodMap) {
 				pod := cloned[types.UID("pod")]
-				pod.ContainerResources["container-a"].Requests[v1.ResourceMemory] = resource.MustParse("512Mi")
+				pod.Spec.Containers[0].Resources.Requests[v1.ResourceMemory] = resource.MustParse("512Mi")
 			},
 		},
 		{
-			name: "adding a new container to cloned ContainerResources",
-			mutate: func(cloned PodResourceInfoMap) {
+			name: "adding a new container to cloned Containers",
+			mutate: func(cloned PodMap) {
 				pod := cloned[types.UID("pod")]
-				pod.ContainerResources["container-new"] = v1.ResourceRequirements{
-					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
-				}
+				pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
+					Name: "container-new",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+					},
+				})
 			},
 		},
 		{
-			name: "modifying a resource quantity in cloned PodLevelResources",
-			mutate: func(cloned PodResourceInfoMap) {
+			name: "modifying a resource quantity in cloned Pod Resources",
+			mutate: func(cloned PodMap) {
 				pod := cloned[types.UID("pod")]
-				pod.PodLevelResources.Requests[v1.ResourceMemory] = resource.MustParse("512Mi")
+				pod.Spec.Resources.Requests[v1.ResourceMemory] = resource.MustParse("512Mi")
 			},
 		},
 		{
 			name: "modifying a dynamic limit in cloned EmptyDirVolumeLimits",
-			mutate: func(cloned PodResourceInfoMap) {
+			mutate: func(cloned PodMap) {
 				pod := cloned[types.UID("pod")]
-				pod.EmptyDirVolumeLimits["vol-y"].Set(1024 * 1024 * 500)
+				pod.Spec.Volumes[0].EmptyDir.SizeLimit.Set(1024 * 1024 * 500)
 			},
 		},
 		{
-			name: "adding a new volume key to cloned EmptyDirVolumeLimits",
-			mutate: func(cloned PodResourceInfoMap) {
+			name: "adding a new volume key to cloned Volumes",
+			mutate: func(cloned PodMap) {
 				pod := cloned[types.UID("pod")]
-				pod.EmptyDirVolumeLimits["vol-new"] = resource.NewQuantity(1024, resource.DecimalSI)
+				pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
+					Name: "vol-new",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							SizeLimit: resource.NewQuantity(1024, resource.DecimalSI),
+						},
+					},
+				})
 			},
 		},
 	}
@@ -216,7 +266,7 @@ func TestPodResourceInfoMap_Clone_DeepCopyIsolation(t *testing.T) {
 				return x.Equal(y)
 			}))
 			if diff != "" {
-				t.Errorf("original PodResourceInfoMap changed (-want +got):\n%s", diff)
+				t.Errorf("original PodMap changed (-want +got):\n%s", diff)
 			}
 		})
 	}
