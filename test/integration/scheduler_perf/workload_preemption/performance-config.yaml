@@ -162,6 +162,15 @@
       podsPerGroup: 10
       lowPriorityCpuRequest: 600m
       highPriorityCpuRequest: 3500m
+  - name: 1000Nodes_10PreemptorGangs_100Pods_Evicting_50LowPriorityGangs
+    labels: [performance]
+    params:
+      initNodes: 1000
+      lowPriorityGroups: 50
+      highPriorityGroups: 10
+      podsPerGroup: 100
+      lowPriorityCpuRequest: 600m
+      highPriorityCpuRequest: 3500m
 
 # GangPreemptionAffinity benchmarks the performance of gang preemption (WorkloadAwarePreemption)
 # in the presence of pod affinity constraints.
