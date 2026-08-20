@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	gw "github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/soheilhy/cmux"
@@ -173,8 +174,9 @@ func (sctx *serveCtx) serve(
 		if httpEnabled {
 			httpmux := sctx.createMux(gwmux, handler)
 			srv = &http.Server{
-				Handler:  createAccessController(sctx.lg, s, httpmux),
-				ErrorLog: logger, // do not log user error
+				Handler:           createAccessController(sctx.lg, s, httpmux),
+				ReadHeaderTimeout: 5 * time.Minute,
+				ErrorLog:          logger, // do not log user error
 			}
 			if err = configureHTTPServer(srv, s.Cfg); err != nil {
 				sctx.lg.Error("Configure http server failed", zap.Error(err))
@@ -263,9 +265,10 @@ func (sctx *serveCtx) serve(
 			httpmux := sctx.createMux(gwmux, handler)
 
 			srv = &http.Server{
-				Handler:   createAccessController(sctx.lg, s, httpmux),
-				TLSConfig: tlscfg,
-				ErrorLog:  logger, // do not log user error
+				Handler:           createAccessController(sctx.lg, s, httpmux),
+				TLSConfig:         tlscfg,
+				ReadHeaderTimeout: 5 * time.Minute,
+				ErrorLog:          logger, // do not log user error
 			}
 			if err = configureHTTPServer(srv, s.Cfg); err != nil {
 				sctx.lg.Error("Configure https server failed", zap.Error(err))
