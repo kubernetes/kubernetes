@@ -120,17 +120,20 @@ func (v *ObjectVal) ConvertToNative(typeDesc reflect.Type) (any, error) {
 		}
 		result[k] = converted
 	}
-	if typeDesc == reflect.TypeOf(result) {
+	switch typeDesc {
+	case reflect.TypeFor[map[string]any]():
 		return result, nil
-	}
 	// CEL's builtin data literal values all support conversion to structpb.Value, which
 	// can then be serialized to JSON. This is convenient for CEL expressions that return
 	// an arbitrary JSON value, such as our MutatingAdmissionPolicy JSON Patch valueExpression
 	// field, so we support the conversion here, for Object data literals, as well.
-	if typeDesc == reflect.TypeOf(&structpb.Value{}) {
+	case reflect.TypeFor[*structpb.Struct]():
 		return structpb.NewStruct(result)
+	case reflect.TypeFor[*structpb.Value]():
+		return structpb.NewValue(result)
+	default:
+		return nil, fmt.Errorf("unable to convert to %v", typeDesc)
 	}
-	return nil, fmt.Errorf("unable to convert to %v", typeDesc)
 }
 
 // ConvertToType supports type conversions between CEL value types supported by the expression language.
