@@ -43,7 +43,7 @@ type cachingAuthorizer struct {
 }
 
 // NewCachingAuthorizer returns an authorizer that caches decisions for the duration
-// of the authorizers use.  Intended to be used for short-lived operations such as
+// of the authorizers use. Intended to be used for short-lived operations such as
 // the handling of a request in the admission chain, and then discarded.
 func NewCachingAuthorizer(in authorizer.UnconditionalAuthorizer) authorizer.UnconditionalAuthorizer {
 	return &cachingAuthorizer{
@@ -126,6 +126,8 @@ func (ca *cachingAuthorizer) Authorize(ctx context.Context, a authorizer.Attribu
 		if extra := u.GetExtra(); len(extra) > 0 {
 			di.Extra = make(map[string][]string, len(extra))
 			for k, vs := range extra {
+				// Normalize values per key so otherwise-equivalent checks hit the same
+				// cache entry regardless of user.Info.Extra value ordering.
 				vdupe := make([]string, len(vs))
 				copy(vdupe, vs)
 				sort.Strings(vdupe)
