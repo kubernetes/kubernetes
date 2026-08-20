@@ -740,13 +740,13 @@ new glue.S3Table(this, 'MyTable', {
 });
 ```
 
-By default, a S3 bucket will be created to store the table's data but you can manually pass the `bucket` and `s3Prefix`:
+By default, a S3 bucket will be created to store the table's data but you can bring your own with `S3TableStorage.fromBucket` and set an `s3Prefix`:
 
 ```ts
 declare const myBucket: s3.Bucket;
 declare const myDatabase: glue.Database;
 new glue.S3Table(this, 'MyTable', {
-  bucket: myBucket,
+  storage: glue.S3TableStorage.fromBucket(myBucket),
   s3Prefix: 'my-table/',
   // ...
   database: myDatabase,
@@ -1111,16 +1111,17 @@ full rule syntax.
 
 ## [Encryption](https://docs.aws.amazon.com/athena/latest/ug/encryption.html)
 
-When the table creates its own S3 bucket (i.e. you do not pass an explicit `bucket`), that bucket enforces SSL: a bucket policy denies any request made over plain HTTP. If you provide your own bucket, enabling `enforceSSL` on it is your responsibility.
+When the table creates its own S3 bucket (`S3TableStorage.managedBucket`, the default), that bucket enforces SSL: a bucket policy denies any request made over plain HTTP. If you bring your own bucket with `S3TableStorage.fromBucket`, enabling `enforceSSL` on it is your responsibility.
 
-You can enable encryption on a Table's data:
+Server-side encryption applies only to a bucket the table manages. Choose it with
+`storage: glue.S3TableStorage.managedBucket(...)`:
 
 * [S3Managed](https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingServerSideEncryption.html) - (default) Server side encryption (`SSE-S3`) with an Amazon S3-managed key.
 
 ```ts
 declare const myDatabase: glue.Database;
 new glue.S3Table(this, 'MyTable', {
-  encryption: glue.TableEncryption.S3_MANAGED,
+  storage: glue.S3TableStorage.managedBucket(glue.S3TableEncryption.s3Managed()),
   // ...
   database: myDatabase,
   columns: [{
@@ -1137,7 +1138,7 @@ new glue.S3Table(this, 'MyTable', {
 declare const myDatabase: glue.Database;
 // KMS key is created automatically
 new glue.S3Table(this, 'MyTable', {
-  encryption: glue.TableEncryption.KMS,
+  storage: glue.S3TableStorage.managedBucket(glue.S3TableEncryption.kms()),
   // ...
   database: myDatabase,
   columns: [{
@@ -1149,8 +1150,7 @@ new glue.S3Table(this, 'MyTable', {
 
 // with an explicit KMS key
 new glue.S3Table(this, 'MyTable', {
-  encryption: glue.TableEncryption.KMS,
-  encryptionKey: new kms.Key(this, 'MyKey'),
+  storage: glue.S3TableStorage.managedBucket(glue.S3TableEncryption.kms(new kms.Key(this, 'MyKey'))),
   // ...
   database: myDatabase,
   columns: [{
@@ -1166,7 +1166,7 @@ new glue.S3Table(this, 'MyTable', {
 ```ts
 declare const myDatabase: glue.Database;
 new glue.S3Table(this, 'MyTable', {
-  encryption: glue.TableEncryption.KMS_MANAGED,
+  storage: glue.S3TableStorage.managedBucket(glue.S3TableEncryption.kmsManaged()),
   // ...
   database: myDatabase,
   columns: [{
@@ -1177,13 +1177,13 @@ new glue.S3Table(this, 'MyTable', {
 });
 ```
 
-* [ClientSideKms](https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingClientSideEncryption.html#client-side-encryption-kms-managed-master-key-intro) - Client-side encryption (`CSE-KMS`) with an AWS KMS Key managed by the account owner.
+Client-side encryption ([CSE-KMS](https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingClientSideEncryption.html#client-side-encryption-kms-managed-master-key-intro)) is independent of the bucket's server-side encryption and works with either a managed or an existing bucket. Configure it with `clientSideEncryption`:
 
 ```ts
 declare const myDatabase: glue.Database;
 // KMS key is created automatically
 new glue.S3Table(this, 'MyTable', {
-  encryption: glue.TableEncryption.CLIENT_SIDE_KMS, 
+  clientSideEncryption: glue.TableClientSideEncryption.kms(),
   // ...
   database: myDatabase,
   columns: [{
@@ -1195,8 +1195,7 @@ new glue.S3Table(this, 'MyTable', {
 
 // with an explicit KMS key
 new glue.S3Table(this, 'MyTable', {
-  encryption: glue.TableEncryption.CLIENT_SIDE_KMS,
-  encryptionKey: new kms.Key(this, 'MyKey'),
+  clientSideEncryption: glue.TableClientSideEncryption.kms(new kms.Key(this, 'MyKey')),
   // ...
   database: myDatabase,
   columns: [{
@@ -1207,7 +1206,7 @@ new glue.S3Table(this, 'MyTable', {
 });
 ```
 
-*Note: you cannot provide a `Bucket` when creating the `S3Table` if you wish to use server-side encryption (`KMS`, `KMS_MANAGED` or `S3_MANAGED`)*.
+To store the table's data in an existing bucket, use `glue.S3TableStorage.fromBucket(bucket)`. CDK does not manage that bucket's server-side encryption, so an encryption choice can never be paired with a provided bucket — but client-side encryption still applies.
 
 ### Marking table data as encrypted
 

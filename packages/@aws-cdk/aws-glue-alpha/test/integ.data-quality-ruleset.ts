@@ -31,9 +31,9 @@ const partitionKeys = [{
   type: glue.Schema.BIG_INT,
 }];
 
-const csvTable = new glue.Table(stack, 'CSVTable', {
+const csvTable = new glue.S3Table(stack, 'CSVTable', {
   database,
-  bucket,
+  storage: glue.S3TableStorage.fromBucket(bucket),
   tableName: 'csv_table',
   columns,
   partitionKeys,
