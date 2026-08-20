@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kuberuntime
+package cri
 
 import (
 	"context"
@@ -31,8 +31,8 @@ type instrumentedRuntimeService struct {
 	service internalapi.RuntimeService
 }
 
-// Creates an instrumented RuntimeInterface from an existing RuntimeService.
-func newInstrumentedRuntimeService(service internalapi.RuntimeService) internalapi.RuntimeService {
+// NewInstrumentedRuntimeService creates an instrumented RuntimeService from an existing RuntimeService.
+func NewInstrumentedRuntimeService(service internalapi.RuntimeService) internalapi.RuntimeService {
 	return &instrumentedRuntimeService{service: service}
 }
 
@@ -42,8 +42,8 @@ type instrumentedImageManagerService struct {
 	service internalapi.ImageManagerService
 }
 
-// Creates an instrumented ImageManagerService from an existing ImageManagerService.
-func newInstrumentedImageManagerService(service internalapi.ImageManagerService) internalapi.ImageManagerService {
+// NewInstrumentedImageManagerService creates an instrumented ImageManagerService from an existing ImageManagerService.
+func NewInstrumentedImageManagerService(service internalapi.ImageManagerService) internalapi.ImageManagerService {
 	return &instrumentedImageManagerService{service: service}
 }
 
@@ -332,7 +332,7 @@ func (in instrumentedImageManagerService) ImageFsInfo(ctx context.Context) (*run
 
 	fsInfo, err := in.service.ImageFsInfo(ctx)
 	recordError(operation, err)
-	return fsInfo, nil
+	return fsInfo, err
 }
 
 func (in instrumentedImageManagerService) Close(ctx context.Context) error {
