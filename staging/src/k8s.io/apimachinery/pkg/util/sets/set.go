@@ -131,7 +131,18 @@ func (s1 Set[T]) Difference(s2 Set[T]) Set[T] {
 // s1.SymmetricDifference(s2) = {a3, a4, a5}
 // s2.SymmetricDifference(s1) = {a3, a4, a5}
 func (s1 Set[T]) SymmetricDifference(s2 Set[T]) Set[T] {
-	return s1.Difference(s2).Union(s2.Difference(s1))
+	result := New[T]()
+	for key := range s1 {
+		if !s2.Has(key) {
+			result.Insert(key)
+		}
+	}
+	for key := range s2 {
+		if !s1.Has(key) {
+			result.Insert(key)
+		}
+	}
+	return result
 }
 
 // Union returns a new set which includes items in either s1 or s2.
