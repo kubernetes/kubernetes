@@ -22,6 +22,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
+	gruntime "runtime"
 	"strings"
 	"unicode"
 
@@ -34,7 +36,16 @@ import (
 const (
 	// clusterExtensionKey is reserved in the cluster extensions list for exec plugin config.
 	clusterExtensionKey = "client.authentication.k8s.io/exec"
+	serviceAccountRoot  = "/var/run/secrets/kubernetes.io/serviceaccount"
 )
+
+func serviceAccountFilePath(goos, filename string) string {
+	path := path.Join(serviceAccountRoot, filename)
+	if goos == "windows" {
+		return "c:" + path
+	}
+	return path
+}
 
 var (
 	// ClusterDefaults has the same behavior as the old EnvVar and DefaultCluster fields
@@ -651,7 +662,7 @@ func (config *inClusterClientConfig) Namespace() (string, bool, error) {
 	}
 
 	// Fall back to the namespace associated with the service account token, if available
-	if data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
+	if data, err := os.ReadFile(serviceAccountFilePath(gruntime.GOOS, "namespace")); err == nil {
 		if ns := strings.TrimSpace(string(data)); len(ns) > 0 {
 			return ns, false, nil
 		}
@@ -666,7 +677,7 @@ func (config *inClusterClientConfig) ConfigAccess() ConfigAccess {
 
 // Possible returns true if loading an inside-kubernetes-cluster is possible.
 func (config *inClusterClientConfig) Possible() bool {
-	fi, err := os.Stat("/var/run/secrets/kubernetes.io/serviceaccount/token")
+	fi, err := os.Stat(serviceAccountFilePath(gruntime.GOOS, "token"))
 	return os.Getenv("KUBERNETES_SERVICE_HOST") != "" &&
 		os.Getenv("KUBERNETES_SERVICE_PORT") != "" &&
 		err == nil && !fi.IsDir()
