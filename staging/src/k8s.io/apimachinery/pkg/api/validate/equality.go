@@ -36,3 +36,35 @@ func NEQ[T comparable](_ context.Context, _ operation.Operation, fldPath *field.
 	}
 	return nil
 }
+
+// EqualTo verifies that two sibling fields have equal values. The tagged field
+// (fieldName/fieldExtractor) must have the same value as the referenced sibling
+// (siblingName/siblingExtractor). The error is reported at
+// fldPath.Child(fieldName). On Update, the check is skipped if neither field's
+// value changed from oldObj, so unrelated updates can proceed past a
+// pre-existing violation.
+func EqualTo[T any, V comparable](_ context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *T,
+	fieldName string, fieldExtractor ExtractorFn[*T, V],
+	siblingName string, siblingExtractor ExtractorFn[*T, V],
+) field.ErrorList {
+	if obj == nil {
+		return nil
+	}
+	fieldVal := fieldExtractor(obj)
+	siblingVal := siblingExtractor(obj)
+	if op.Type == operation.Update && oldObj != nil {
+		oldFieldVal := fieldExtractor(oldObj)
+		oldSiblingVal := siblingExtractor(oldObj)
+		// Skip if neither side changed - ratcheting.
+		if fieldVal == oldFieldVal && siblingVal == oldSiblingVal {
+			return nil
+		}
+	}
+	if fieldVal != siblingVal {
+		return field.ErrorList{
+			field.Invalid(fldPath.Child(fieldName), fieldVal,
+				content.EqualToError(siblingName)).WithOrigin("equalTo"),
+		}
+	}
+	return nil
+}
