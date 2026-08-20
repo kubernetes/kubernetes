@@ -4557,6 +4557,169 @@ func Test_prioritizeNodes(t *testing.T) {
 	}
 }
 
+type fakeMapScorePlugin struct {
+	name   string
+	scores map[string]int
+}
+
+func (pl *fakeMapScorePlugin) Name() string {
+	return pl.name
+}
+
+func (pl *fakeMapScorePlugin) Score(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
+	score := pl.scores[nodeInfo.Node().Name]
+	return int64(score), nil
+}
+
+func (pl *fakeMapScorePlugin) ScoreExtensions() fwk.ScoreExtensions {
+	return nil
+}
+
+// Verify that scores with identical TotalScore receive unique Randomizer tiebreaker
+// values across successive scheduling cycles so that node selection is non-deterministic.
+func Test_prioritizeNodes_TieBreaker(t *testing.T) {
+	nodes := []*v1.Node{
+		makeNode("node1", 1000, schedutil.DefaultMemoryRequest*10),
+		makeNode("node2", 1000, schedutil.DefaultMemoryRequest*10),
+		makeNode("node3", 1000, schedutil.DefaultMemoryRequest*10),
+		makeNode("node4", 1000, schedutil.DefaultMemoryRequest*10),
+		makeNode("node5", 1000, schedutil.DefaultMemoryRequest*10),
+	}
+
+	tests := []struct {
+		name           string
+		pluginScores   []map[string]int
+		extenderScores []map[string]int
+	}{
+		{
+			name:           "no score plugins or extenders",
+			pluginScores:   nil,
+			extenderScores: nil,
+		},
+		{
+			name: "score plugins only",
+			pluginScores: []map[string]int{
+				{"node1": 10, "node2": 10, "node3": 10, "node4": 10, "node5": 10},
+			},
+		},
+		{
+			name: "extenders only",
+			extenderScores: []map[string]int{
+				{"node1": 10, "node2": 10, "node3": 10, "node4": 10, "node5": 10},
+			},
+		},
+		{
+			name: "tiebreaker between plugin and extender with complementary scores",
+			pluginScores: []map[string]int{
+				{
+					"node1": int(fwk.MaxScore),
+					"node2": int(fwk.MaxScore) * 4 / 5,
+					"node3": int(fwk.MaxScore) * 3 / 5,
+					"node4": int(fwk.MaxScore) * 1 / 5,
+					"node5": 0,
+				},
+			},
+			extenderScores: []map[string]int{
+				{
+					"node1": 0,
+					"node2": int(extenderv1.MaxExtenderPriority) * 1 / 5,
+					"node3": int(extenderv1.MaxExtenderPriority) * 2 / 5,
+					"node4": int(extenderv1.MaxExtenderPriority) * 4 / 5,
+					"node5": int(extenderv1.MaxExtenderPriority),
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			client := clientsetfake.NewClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			cache := internalcache.New(ctx, nil, false, false)
+			for _, node := range nodes {
+				cache.AddNode(klog.FromContext(ctx), node)
+			}
+			snapshot := internalcache.NewEmptySnapshot()
+			if err := cache.UpdateSnapshot(klog.FromContext(ctx), snapshot); err != nil {
+				t.Fatal(err)
+			}
+
+			pluginRegistrations := []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}
+			for i, scores := range test.pluginScores {
+				pluginName := fmt.Sprintf("FakeScorePlugin%d", i)
+				pluginRegistrations = append(pluginRegistrations, tf.RegisterScorePlugin(
+					pluginName,
+					func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+						return &fakeMapScorePlugin{name: pluginName, scores: scores}, nil
+					},
+					1,
+				))
+			}
+			var extenders []fwk.Extender
+			for i, scores := range test.extenderScores {
+				extName := fmt.Sprintf("FakeExtender%d", i)
+				extender := &tf.FakeExtender{
+					ExtenderName: extName,
+					Weight:       1,
+					Prioritizers: []tf.PriorityConfig{
+						{
+							Weight: 1,
+							Function: func(_ *v1.Pod, nodes []fwk.NodeInfo) (*fwk.NodeScoreList, error) {
+								result := fwk.NodeScoreList{}
+								for _, node := range nodes {
+									result = append(result, fwk.NodeScore{Name: node.Node().Name, Score: int64(scores[node.Node().Name])})
+								}
+								return &result, nil
+							},
+						},
+					},
+				}
+				extenders = append(extenders, extender)
+			}
+
+			schedFramework, err := tf.NewFramework(
+				ctx,
+				pluginRegistrations, "",
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithClientSet(client),
+				frameworkruntime.WithExtenders(extenders),
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+			)
+			if err != nil {
+				t.Fatalf("error creating framework: %+v", err)
+			}
+
+			nodeInfos, err := snapshot.NodeInfos().List()
+			if err != nil {
+				t.Fatalf("failed to list node from snapshot: %v", err)
+			}
+			selectedNodes := sets.New[string]()
+			// Up to 100 iterations reduces the chance of coincidental tiebreaker repetition across 5 nodes to under (1/5)^99.
+			for range 100 {
+				scores, err := prioritizeNodes(ctx, extenders, schedFramework, framework.NewCycleState(), &v1.Pod{}, nodeInfos)
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				h := framework.NewSortedScoredNodes(scores)
+				selectedNodes.Insert(h.Pop().Name)
+				if selectedNodes.Len() > 1 {
+					break
+				}
+			}
+			if selectedNodes.Len() <= 1 {
+				t.Errorf("expected randomizer to select different nodes across iterations due to tiebreaking, but only selected: %v", selectedNodes)
+			}
+		})
+	}
+}
+
 var lowPriority, midPriority, highPriority = int32(0), int32(100), int32(1000)
 
 func TestNumFeasibleNodesToFind(t *testing.T) {
