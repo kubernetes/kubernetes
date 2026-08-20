@@ -126,6 +126,12 @@ func (hcnObj HcnMock) PopulateQueriedLoadbalancers(lbID, vip string, protocol ui
 	loadbalancerMap[lbID] = lb
 }
 
+// PopulateRawQueriedLoadbalancer injects a load balancer into the mocked HNS state verbatim,
+// bypassing the validation CreateLoadBalancer performs.
+func (hcnObj HcnMock) PopulateRawQueriedLoadbalancer(lb *hcn.HostComputeLoadBalancer) {
+	loadbalancerMap[lb.Id] = lb
+}
+
 func (hcnObj HcnMock) GetNetworkByName(networkName string) (*hcn.HostComputeNetwork, error) {
 	return hcnObj.network, nil
 }
