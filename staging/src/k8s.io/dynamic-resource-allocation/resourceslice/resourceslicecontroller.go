@@ -421,18 +421,19 @@ func (c *Controller) Stop() {
 // the instance once Update returns. Nil is valid and the same
 // as an empty resources struct.
 func (c *Controller) Update(resources *DriverResources) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
-	// Sync all old pools..
-	if c.resources != nil {
-		for poolName := range c.resources.Pools {
-			c.queue.Add(poolName)
-		}
-	}
-
+	// Validate the caller's input and build the new desired state *before*
+	// taking c.mutex. errorHandler is caller-provided code and, per its
+	// contract, may react to a rejected update by replacing the slices; the
+	// only public API for doing so is Update itself. Because Go mutexes are not
+	// reentrant, calling the handler while holding c.mutex would deadlock such a
+	// caller. More generally, caller callbacks must not run under this lock.
+	//
+	// reconcilePoolWithName and errorHandler are set once in newController and
+	// are never mutated afterwards, so reading them here without the lock is
+	// safe.
+	var newResources *DriverResources
 	if resources == nil {
-		c.resources = &DriverResources{}
+		newResources = &DriverResources{}
 	} else {
 		// If reconcilePoolWithName is set, we expect to reconcile only a single pool.
 		// Having additional pools is considered an error. However, an empty pool list
@@ -448,9 +449,21 @@ func (c *Controller) Update(resources *DriverResources) {
 			}
 		}
 
-		c.resources = resources.DeepCopy()
-		roundTaintTimeAdded(c.resources)
+		newResources = resources.DeepCopy()
+		roundTaintTimeAdded(newResources)
 	}
+
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	// Sync all old pools..
+	if c.resources != nil {
+		for poolName := range c.resources.Pools {
+			c.queue.Add(poolName)
+		}
+	}
+
+	c.resources = newResources
 
 	// ... and the new ones (might be the same).
 	for poolName := range c.resources.Pools {
