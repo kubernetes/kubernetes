@@ -237,6 +237,81 @@ func TestControllerSyncPool(t *testing.T) {
 					Obj(),
 			},
 		},
+		// Two taints whose TimeAdded has to survive an update triggered by
+		// something else. With one taint the previous case passes either way.
+		"keep-time-added-of-every-taint": {
+			nodeUID: nodeUID,
+			initialObjects: []runtime.Object{
+				MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).
+					Devices([]resourceapi.Device{
+						newDevice(
+							deviceName,
+							resourceapi.DeviceTaint{
+								Key:       "taint-a",
+								Effect:    resourceapi.DeviceTaintEffectNoExecute,
+								TimeAdded: &timeAdded,
+							},
+							resourceapi.DeviceTaint{
+								Key:       "taint-b",
+								Effect:    resourceapi.DeviceTaintEffectNoExecute,
+								TimeAdded: &timeAddedLater,
+							},
+						)}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Obj(),
+			},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{{Devices: []resourceapi.Device{
+							newDevice(
+								deviceName,
+								// The attribute is what makes the controller update the
+								// slice. A change in TimeAdded alone would not.
+								attrs,
+								resourceapi.DeviceTaint{
+									Key:    "taint-a",
+									Effect: resourceapi.DeviceTaintEffectNoExecute,
+								},
+								resourceapi.DeviceTaint{
+									Key:    "taint-b",
+									Effect: resourceapi.DeviceTaintEffectNoExecute,
+								},
+							),
+						}}},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumUpdates: 1,
+			},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
+					ResourceVersion("1").
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).
+					Devices([]resourceapi.Device{
+						newDevice(
+							deviceName,
+							attrs,
+							resourceapi.DeviceTaint{
+								Key:       "taint-a",
+								Effect:    resourceapi.DeviceTaintEffectNoExecute,
+								TimeAdded: &timeAdded,
+							},
+							resourceapi.DeviceTaint{
+								Key:       "taint-b",
+								Effect:    resourceapi.DeviceTaintEffectNoExecute,
+								TimeAdded: &timeAddedLater,
+							},
+						)}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Obj(),
+			},
+		},
 		"add-taints": {
 			nodeUID: nodeUID,
 			initialObjects: []runtime.Object{
@@ -2328,4 +2403,91 @@ func getExpectedForLargeInt(val int64) int {
 		return -1
 	}
 	return int(val)
+}
+
+func deepCopyDevices(devices []resourceapi.Device) []resourceapi.Device {
+	out := make([]resourceapi.Device, len(devices))
+	for i := range devices {
+		out[i] = *devices[i].DeepCopy()
+	}
+	return out
+}
+
+func TestCopyTaintTimeAdded(t *testing.T) {
+	t1 := metav1.Time{Time: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)}
+	t2 := metav1.Time{Time: time.Date(2026, 2, 2, 0, 0, 0, 0, time.UTC)}
+	t3 := metav1.Time{Time: time.Date(2026, 3, 3, 0, 0, 0, 0, time.UTC)}
+	taint := func(key, value string, timeAdded *metav1.Time) resourceapi.DeviceTaint {
+		return resourceapi.DeviceTaint{
+			Key:       key,
+			Value:     value,
+			Effect:    resourceapi.DeviceTaintEffectNoExecute,
+			TimeAdded: timeAdded,
+		}
+	}
+	device := func(taints ...resourceapi.DeviceTaint) []resourceapi.Device {
+		return []resourceapi.Device{newDevice("device-0", taints)}
+	}
+
+	for name, tc := range map[string]struct {
+		from, to, want []resourceapi.Device
+	}{
+		"every-matching-taint": {
+			from: device(taint("a", "value-a", &t1), taint("b", "value-b", &t2)),
+			to:   device(taint("a", "value-a", nil), taint("b", "value-b", nil)),
+			want: device(taint("a", "value-a", &t1), taint("b", "value-b", &t2)),
+		},
+		"matched-by-content-not-position": {
+			from: device(taint("b", "value-b", &t2), taint("a", "value-a", &t1)),
+			to:   device(taint("a", "value-a", nil), taint("b", "value-b", nil)),
+			want: device(taint("a", "value-a", &t1), taint("b", "value-b", &t2)),
+		},
+		"explicit-time-wins": {
+			from: device(taint("a", "value-a", &t1), taint("b", "value-b", &t2)),
+			to:   device(taint("a", "value-a", &t3), taint("b", "value-b", nil)),
+			want: device(taint("a", "value-a", &t3), taint("b", "value-b", &t2)),
+		},
+		"no-matching-device": {
+			from: []resourceapi.Device{newDevice("other", taint("a", "value-a", &t1))},
+			to:   device(taint("a", "value-a", nil)),
+			want: device(taint("a", "value-a", nil)),
+		},
+		// A taint is the whole of key, value and effect, so an edit to any of
+		// them is a different taint and starts its own clock.
+		"changed-taint-does-not-inherit-the-old-time": {
+			from: device(taint("a", "value-a", &t1), taint("b", "old", &t2)),
+			to:   device(taint("a", "value-a", nil), taint("b", "new", nil), taint("c", "value-c", nil)),
+			want: device(taint("a", "value-a", &t1), taint("b", "new", nil), taint("c", "value-c", nil)),
+		},
+		// from is in the other order, so a device read by position rather than
+		// by name would take the wrong one's times.
+		"devices-are-matched-by-name": {
+			from: []resourceapi.Device{
+				newDevice("device-1", taint("b", "value-b", &t2)),
+				newDevice("device-0", taint("a", "value-a", &t1)),
+			},
+			to: []resourceapi.Device{
+				newDevice("device-0", taint("a", "value-a", nil)),
+				newDevice("device-1", taint("b", "value-b", nil)),
+			},
+			want: []resourceapi.Device{
+				newDevice("device-0", taint("a", "value-a", &t1)),
+				newDevice("device-1", taint("b", "value-b", &t2)),
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			// Deep copies: a shallow one keeps pointing at the same taints,
+			// so a write into them would show up in the baseline as well.
+			fromBefore := deepCopyDevices(tc.from)
+			toBefore := deepCopyDevices(tc.to)
+
+			got := copyTaintTimeAdded(tc.from, tc.to)
+
+			assert.Equal(t, tc.want, got)
+			// Both inputs are documented as read-only.
+			assert.Equal(t, fromBefore, tc.from, "from was modified")
+			assert.Equal(t, toBefore, tc.to, "to was modified")
+		})
+	}
 }
