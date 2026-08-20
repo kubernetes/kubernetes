@@ -298,14 +298,14 @@ func optionsForTransform(mediaType negotiation.MediaTypeOptions, req *http.Reque
 }
 
 // targetEncodingForTransform returns the appropriate serializer for the input media type
-func targetEncodingForTransform(scope *RequestScope, mediaType negotiation.MediaTypeOptions, req *http.Request) (schema.GroupVersionKind, runtime.NegotiatedSerializer, bool) {
+func targetEncodingForTransform(scope *RequestScope, mediaType negotiation.MediaTypeOptions, req *http.Request) (runtime.GroupVersioner, runtime.NegotiatedSerializer, bool) {
 	switch target := mediaType.Convert; {
 	case target == nil:
 	case (target.Kind == "PartialObjectMetadata" || target.Kind == "PartialObjectMetadataList" || target.Kind == "Table") &&
 		(target.GroupVersion() == metav1beta1.SchemeGroupVersion || target.GroupVersion() == metav1.SchemeGroupVersion):
-		return *target, apihelpers.GetMetaInternalVersionCodecs(), true
+		return target.GroupVersion(), apihelpers.GetMetaInternalVersionCodecs(), true
 	}
-	return scope.Kind, scope.Serializer, false
+	return scope.ResourceVersioner, scope.Serializer, false
 }
 
 // transformResponseObject takes an object loaded from storage and performs any necessary transformations.
@@ -339,7 +339,7 @@ func transformResponseObject(ctx context.Context, scope *RequestScope, req *http
 		return
 	}
 	kind, serializer, _ := targetEncodingForTransform(scope, mediaType, req)
-	responsewriters.WriteObjectNegotiated(serializer, scope, kind.GroupVersion(), w, req, statusCode, obj, false)
+	responsewriters.WriteObjectNegotiated(serializer, scope, kind, w, req, statusCode, obj, false)
 }
 
 // errNotAcceptable indicates Accept negotiation has failed

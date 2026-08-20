@@ -85,9 +85,9 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 	framer := serializer.StreamSerializer.Framer
 	var encoder runtime.Encoder
 	if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
-		encoder = scope.Serializer.EncoderForVersion(runtime.UseNondeterministicEncoding(serializer.StreamSerializer.Serializer), scope.Kind.GroupVersion())
+		encoder = scope.Serializer.EncoderForVersion(runtime.UseNondeterministicEncoding(serializer.StreamSerializer.Serializer), scope.ResourceVersioner)
 	} else {
-		encoder = scope.Serializer.EncoderForVersion(serializer.StreamSerializer.Serializer, scope.Kind.GroupVersion())
+		encoder = scope.Serializer.EncoderForVersion(serializer.StreamSerializer.Serializer, scope.ResourceVersioner)
 	}
 	useTextFraming := serializer.EncodesAsText
 	if framer == nil {
@@ -120,15 +120,15 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 			return nil, fmt.Errorf("no encoder for %q exists in the requested target %#v", serializer.MediaType, contentSerializer)
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
-			negotiatedEncoder = contentSerializer.EncoderForVersion(runtime.UseNondeterministicEncoding(info.Serializer), contentKind.GroupVersion())
+			negotiatedEncoder = contentSerializer.EncoderForVersion(runtime.UseNondeterministicEncoding(info.Serializer), contentKind)
 		} else {
-			negotiatedEncoder = contentSerializer.EncoderForVersion(info.Serializer, contentKind.GroupVersion())
+			negotiatedEncoder = contentSerializer.EncoderForVersion(info.Serializer, contentKind)
 		}
 	} else {
 		if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
-			negotiatedEncoder = scope.Serializer.EncoderForVersion(runtime.UseNondeterministicEncoding(serializer.Serializer), contentKind.GroupVersion())
+			negotiatedEncoder = scope.Serializer.EncoderForVersion(runtime.UseNondeterministicEncoding(serializer.Serializer), contentKind)
 		} else {
-			negotiatedEncoder = scope.Serializer.EncoderForVersion(serializer.Serializer, contentKind.GroupVersion())
+			negotiatedEncoder = scope.Serializer.EncoderForVersion(serializer.Serializer, contentKind)
 		}
 	}
 

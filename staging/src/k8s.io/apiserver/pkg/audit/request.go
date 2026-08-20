@@ -169,7 +169,7 @@ func LogRequestPatch(ctx context.Context, patch []byte) {
 
 // LogResponseObject fills in the response object into an audit event. The passed runtime.Object
 // will be converted to the given gv.
-func LogResponseObject(ctx context.Context, obj runtime.Object, gv schema.GroupVersion, s runtime.NegotiatedSerializer) {
+func LogResponseObject(ctx context.Context, obj runtime.Object, gv runtime.GroupVersioner, s runtime.NegotiatedSerializer) {
 	ac := AuditContextFrom(WithAuditContext(ctx))
 	status, _ := obj.(*metav1.Status)
 	if ac.GetEventLevel().Less(auditinternal.LevelMetadata) {
@@ -198,7 +198,7 @@ func LogResponseObject(ctx context.Context, obj runtime.Object, gv schema.GroupV
 	ac.LogResponseObject(status, responseObject)
 }
 
-func encodeObject(obj runtime.Object, gv schema.GroupVersion, serializer runtime.NegotiatedSerializer) (*runtime.Unknown, error) {
+func encodeObject(obj runtime.Object, gv runtime.GroupVersioner, serializer runtime.NegotiatedSerializer) (*runtime.Unknown, error) {
 	const mediaType = runtime.ContentTypeJSON
 	info, ok := runtime.SerializerInfoForMediaType(serializer.SupportedMediaTypes(), mediaType)
 	if !ok {
