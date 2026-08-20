@@ -857,23 +857,36 @@ func (m *kubeGenericRuntimeManager) computeVolumeResizeAction(ctx context.Contex
 			if !allocation.VolHasMemoryBackedEmptyDirSizeLimit(&vol) {
 				continue
 			}
+			// vol is only a shallow copy, so vol.EmptyDir still points at the
+			// pod spec's EmptyDirVolumeSource and vol.EmptyDir.SizeLimit at a
+			// resource.Quantity that every other reader of the pod shares (the
+			// volume manager's populator, for one). Several of the methods that
+			// look like reads write to the quantity: String() fills in the
+			// cached string, and Cmp() calls AsDec() on its receiver if either
+			// side is in inf.Dec form. Both happen to this SizeLimit - it is
+			// compared below, logged as part of podActions in SyncPod, logged
+			// by the emptyDir plugin during the resize, and stored in and
+			// logged by the actuated state. Work off a copy throughout so none
+			// of that can reach the pod spec.
+			volCopy := *vol.DeepCopy()
+
 			actuatedSize := m.getActuatedEmptyDirVolumeLimit(logger, pod, vol.Name)
-			desiredSize := vol.EmptyDir.SizeLimit
+			desiredSize := volCopy.EmptyDir.SizeLimit
 
 			if actuatedSize == nil {
 				// If the actuation checkpoint is missing, force a sync to apply
 				// the limit and write the checkpoint. We treat it as an upsize
 				// (safer order) to ensure cgroup limits are expanded first.
-				changes.VolumesToUpsize = append(changes.VolumesToUpsize, vol)
+				changes.VolumesToUpsize = append(changes.VolumesToUpsize, volCopy)
 				continue
 			}
 
 			// Compare current (actuated) size with new size
 			cmp := desiredSize.Cmp(*actuatedSize)
 			if cmp > 0 {
-				changes.VolumesToUpsize = append(changes.VolumesToUpsize, vol)
+				changes.VolumesToUpsize = append(changes.VolumesToUpsize, volCopy)
 			} else if cmp < 0 {
-				changes.VolumesToDownsize = append(changes.VolumesToDownsize, vol)
+				changes.VolumesToDownsize = append(changes.VolumesToDownsize, volCopy)
 			}
 		}
 	}
