@@ -101,11 +101,13 @@ type watcher struct {
 
 // watchChan implements watch.Interface.
 type watchChan struct {
-	watcher                  *watcher
-	key                      string
-	initialRev               int64
-	recursive                bool
-	progressNotify           bool
+	watcher        *watcher
+	key            string
+	initialRev     int64
+	recursive      bool
+	progressNotify bool
+	// recordTimestamps enables wrapping watch events with decode timestamps and
+	// etcd client-side watch response buffer logging.
 	recordTimestamps         bool
 	internalPred             storage.SelectionPredicate
 	ctx                      context.Context
@@ -474,6 +476,11 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}, initialEventsEnd
 	if wc.progressNotify {
 		opts = append(opts, clientv3.WithProgressNotify())
 	}
+
+	if wc.recordTimestamps && klog.V(3).Enabled() {
+		opts = append(opts, clientv3.WithWatchBufLog())
+	}
+
 	wch := wc.watcher.client.Watch(wc.ctx, wc.key, opts...)
 	estimator := wc.getResourceSizeEstimator()
 	for wres := range wch {
