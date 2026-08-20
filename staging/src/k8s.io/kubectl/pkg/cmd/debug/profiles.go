@@ -300,14 +300,23 @@ func (p *sysadminProfile) Apply(pod *corev1.Pod, containerName string, target ru
 		return fmt.Errorf("sysadmin profile: %w", err)
 	}
 
-	setPrivileged(pod, containerName)
-
 	switch style {
 	case node:
-		useHostNamespaces(pod)
-		mountRootPartition(pod, containerName)
+		n := target.(*corev1.Node)
+		if isWindowsNode(n) {
+			pod.Spec.OS = &corev1.PodOS{Name: corev1.Windows}
+			clearSecurityContext(pod, containerName)
+			setWindowsHostProcess(pod)
+			setWindowsRunAsUserName(pod, containerName)
+			pod.Spec.HostNetwork = true
+		} else {
+			setPrivileged(pod, containerName)
+			useHostNamespaces(pod)
+			mountRootPartition(pod, containerName)
+		}
 
 	case podCopy:
+		setPrivileged(pod, containerName)
 		// to mimic general, default and baseline
 		p.RemoveLabels(pod)
 		p.RemoveAnnotations(pod)
@@ -316,7 +325,7 @@ func (p *sysadminProfile) Apply(pod *corev1.Pod, containerName string, target ru
 		shareProcessNamespace(pod)
 
 	case ephemeral:
-		// no additional modifications needed
+		setPrivileged(pod, containerName)
 	}
 
 	return nil
@@ -473,6 +482,42 @@ func setSeccompProfile(p *corev1.Pod, containerName string) {
 			c.SecurityContext = &corev1.SecurityContext{}
 		}
 		c.SecurityContext.SeccompProfile = &corev1.SeccompProfile{Type: "RuntimeDefault"}
+		return false
+	})
+}
+
+// isWindowsNode returns true if the node has the well-known OS label set to "windows".
+func isWindowsNode(n *corev1.Node) bool {
+	return n.Labels[corev1.LabelOSStable] == string(corev1.Windows)
+}
+
+// setWindowsHostProcess configures the pod for Windows Host Process Container (HPC) execution.
+// HostProcess is set at the pod level because all containers in an HPC pod must agree.
+func setWindowsHostProcess(p *corev1.Pod) {
+	if p.Spec.SecurityContext == nil {
+		p.Spec.SecurityContext = &corev1.PodSecurityContext{}
+	}
+	if p.Spec.SecurityContext.WindowsOptions == nil {
+		p.Spec.SecurityContext.WindowsOptions = &corev1.WindowsSecurityContextOptions{}
+	}
+	p.Spec.SecurityContext.WindowsOptions.HostProcess = ptr.To(true)
+}
+
+// setWindowsRunAsUserName sets the RunAsUserName at the container level.
+// This is set at container level rather than pod level so that it can be
+// overridden via the --custom flag.
+func setWindowsRunAsUserName(p *corev1.Pod, containerName string) {
+	podutils.VisitContainers(&p.Spec, podutils.AllContainers, func(c *corev1.Container, _ podutils.ContainerType) bool {
+		if c.Name != containerName {
+			return true
+		}
+		if c.SecurityContext == nil {
+			c.SecurityContext = &corev1.SecurityContext{}
+		}
+		if c.SecurityContext.WindowsOptions == nil {
+			c.SecurityContext.WindowsOptions = &corev1.WindowsSecurityContextOptions{}
+		}
+		c.SecurityContext.WindowsOptions.RunAsUserName = ptr.To("NT AUTHORITY\\SYSTEM")
 		return false
 	})
 }
