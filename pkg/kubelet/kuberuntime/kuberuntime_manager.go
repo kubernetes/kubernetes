@@ -26,6 +26,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
@@ -126,6 +127,10 @@ type kubeGenericRuntimeManager struct {
 	// Runner of lifecycle events.
 	runner kubecontainer.HandlerRunner
 
+	// Cancels sleep lifecycle hooks when their containers exit.
+	containerExitCancelsLock sync.Mutex
+	containerExitCancels     map[string]context.CancelFunc
+
 	// RuntimeHelper that wraps kubelet to generate runtime container options.
 	runtimeHelper kubecontainer.RuntimeHelper
 
@@ -213,6 +218,7 @@ type kubeGenericRuntimeManager struct {
 type KubeGenericRuntime interface {
 	kubecontainer.Runtime
 	kubecontainer.StreamingRuntime
+	NotifyContainerDied(containerID string)
 }
 
 // NewKubeGenericRuntimeManager creates a new kubeGenericRuntimeManager
@@ -290,6 +296,7 @@ func NewKubeGenericRuntimeManager(
 		memoryReservationPolicy:      memoryReservationPolicy,
 		podLogsDirectory:             podLogsDirectory,
 		podInitContainerTimeRecorder: podInitContainerTimeRecorder,
+		containerExitCancels:         make(map[string]context.CancelFunc),
 	}
 
 	// Initialize swap controller availability check with lazy evaluation
