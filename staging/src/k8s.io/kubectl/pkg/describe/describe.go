@@ -562,22 +562,22 @@ func describeLimitRangeSpec(spec corev1.LimitRangeSpec, prefix string, w PrefixW
 
 			maxQuantity, maxQuantityFound := maxResources[k]
 			if maxQuantityFound {
-				maxValue = maxQuantity.String()
+				maxValue = formatResourceQuantity(k, maxQuantity)
 			}
 
 			minQuantity, minQuantityFound := minResources[k]
 			if minQuantityFound {
-				minValue = minQuantity.String()
+				minValue = formatResourceQuantity(k, minQuantity)
 			}
 
 			defaultLimitQuantity, defaultLimitQuantityFound := defaultLimitResources[k]
 			if defaultLimitQuantityFound {
-				defaultLimitValue = defaultLimitQuantity.String()
+				defaultLimitValue = formatResourceQuantity(k, defaultLimitQuantity)
 			}
 
 			defaultRequestQuantity, defaultRequestQuantityFound := defaultRequestResources[k]
 			if defaultRequestQuantityFound {
-				defaultRequestValue = defaultRequestQuantity.String()
+				defaultRequestValue = formatResourceQuantity(k, defaultRequestQuantity)
 			}
 
 			ratioQuantity, ratioQuantityFound := ratio[k]
@@ -642,7 +642,8 @@ func DescribeResourceQuotas(quotas *corev1.ResourceQuotaList, w PrefixWriter) {
 		for _, resource := range resources {
 			hardQuantity := q.Status.Hard[resource]
 			usedQuantity := q.Status.Used[resource]
-			w.Write(LEVEL_1, "%s\t%s\t%s\n", string(resource), usedQuantity.String(), hardQuantity.String())
+			w.Write(LEVEL_1, "%s\t%s\t%s\n", string(resource),
+				formatResourceQuantity(resource, usedQuantity), formatResourceQuantity(resource, hardQuantity))
 		}
 	}
 }
@@ -736,7 +737,8 @@ func describeQuota(resourceQuota *corev1.ResourceQuota) (string, error) {
 			if hardQuantity.Format != usedQuantity.Format {
 				usedQuantity = *resource.NewQuantity(usedQuantity.Value(), hardQuantity.Format)
 			}
-			w.Write(LEVEL_0, msg, resourceName, usedQuantity.String(), hardQuantity.String())
+			w.Write(LEVEL_0, msg, resourceName,
+				formatResourceQuantity(resourceName, usedQuantity), formatResourceQuantity(resourceName, hardQuantity))
 		}
 		return nil
 	})
@@ -1892,6 +1894,26 @@ func describeContainerCommand(container corev1.Container, w PrefixWriter) {
 	}
 }
 
+// isByteSizedResource returns true for resources that are measured in bytes.
+func isByteSizedResource(name corev1.ResourceName) bool {
+	return name == corev1.ResourceMemory ||
+		name == corev1.ResourceStorage ||
+		name == corev1.ResourceEphemeralStorage ||
+		kubectlresourcehelper.IsHugePageResourceName(name)
+}
+
+// formatResourceQuantity renders a quantity, rounding byte-sized resources up to
+// whole bytes. A request of "0.1Gi" is stored as "107374182400m" because it is not
+// a whole number of bytes, and a fractional byte is not meaningful to display.
+// Quantities that are already whole bytes and resources not measured in bytes are
+// rendered unchanged.
+func formatResourceQuantity(name corev1.ResourceName, quantity resource.Quantity) string {
+	if _, exact := quantity.AsScale(0); exact || !isByteSizedResource(name) {
+		return quantity.String()
+	}
+	return resource.NewQuantity(quantity.Value(), quantity.Format).String()
+}
+
 func describeResources(resources *corev1.ResourceRequirements, w PrefixWriter, level int) {
 	if resources == nil {
 		return
@@ -1902,7 +1924,7 @@ func describeResources(resources *corev1.ResourceRequirements, w PrefixWriter, l
 	}
 	for _, name := range SortedResourceNames(resources.Limits) {
 		quantity := resources.Limits[name]
-		w.Write(level+1, "%s:\t%s\n", name, quantity.String())
+		w.Write(level+1, "%s:\t%s\n", name, formatResourceQuantity(name, quantity))
 	}
 
 	if len(resources.Requests) > 0 {
@@ -1910,7 +1932,7 @@ func describeResources(resources *corev1.ResourceRequirements, w PrefixWriter, l
 	}
 	for _, name := range SortedResourceNames(resources.Requests) {
 		quantity := resources.Requests[name]
-		w.Write(level+1, "%s:\t%s\n", name, quantity.String())
+		w.Write(level+1, "%s:\t%s\n", name, formatResourceQuantity(name, quantity))
 	}
 }
 
@@ -3544,7 +3566,7 @@ func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, 
 			sort.Sort(SortableResourceNames(resources))
 			for _, resource := range resources {
 				value := resourceList[resource]
-				w.Write(LEVEL_0, "  %s:\t%s\n", resource, value.String())
+				w.Write(LEVEL_0, "  %s:\t%s\n", resource, formatResourceQuantity(resource, value))
 			}
 		}
 
@@ -4073,7 +4095,9 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 		fractionMemoryLimit := float64(memoryLimit.Value()) / float64(allocatable.Memory().Value()) * 100
 		w.Write(LEVEL_1, "%s\t%s\t\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s\n", pod.Namespace, pod.Name,
 			cpuReq.String(), int64(fractionCpuReq), cpuLimit.String(), int64(fractionCpuLimit),
-			memoryReq.String(), int64(fractionMemoryReq), memoryLimit.String(), int64(fractionMemoryLimit), translateTimestampSince(pod.CreationTimestamp))
+			formatResourceQuantity(corev1.ResourceMemory, memoryReq), int64(fractionMemoryReq),
+			formatResourceQuantity(corev1.ResourceMemory, memoryLimit), int64(fractionMemoryLimit),
+			translateTimestampSince(pod.CreationTimestamp))
 	}
 
 	w.Write(LEVEL_0, "Allocated resources:\n  (Total limits may be over 100 percent, i.e., overcommitted.)\n")
@@ -4103,9 +4127,13 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
 		corev1.ResourceCPU, cpuReqs.String(), int64(fractionCpuReqs), cpuLimits.String(), int64(fractionCpuLimits))
 	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
-		corev1.ResourceMemory, memoryReqs.String(), int64(fractionMemoryReqs), memoryLimits.String(), int64(fractionMemoryLimits))
+		corev1.ResourceMemory,
+		formatResourceQuantity(corev1.ResourceMemory, memoryReqs), int64(fractionMemoryReqs),
+		formatResourceQuantity(corev1.ResourceMemory, memoryLimits), int64(fractionMemoryLimits))
 	w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
-		corev1.ResourceEphemeralStorage, ephemeralstorageReqs.String(), int64(fractionEphemeralStorageReqs), ephemeralstorageLimits.String(), int64(fractionEphemeralStorageLimits))
+		corev1.ResourceEphemeralStorage,
+		formatResourceQuantity(corev1.ResourceEphemeralStorage, ephemeralstorageReqs), int64(fractionEphemeralStorageReqs),
+		formatResourceQuantity(corev1.ResourceEphemeralStorage, ephemeralstorageLimits), int64(fractionEphemeralStorageLimits))
 
 	extResources := make([]string, 0, len(allocatable))
 	hugePageResources := make([]string, 0, len(allocatable))
@@ -4121,7 +4149,8 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 	sort.Strings(hugePageResources)
 
 	for _, resource := range hugePageResources {
-		hugePageSizeRequests, hugePageSizeLimits, hugePageSizeAllocable := reqs[corev1.ResourceName(resource)], limits[corev1.ResourceName(resource)], allocatable[corev1.ResourceName(resource)]
+		hugePageName := corev1.ResourceName(resource)
+		hugePageSizeRequests, hugePageSizeLimits, hugePageSizeAllocable := reqs[hugePageName], limits[hugePageName], allocatable[hugePageName]
 		fractionHugePageSizeRequests := float64(0)
 		fractionHugePageSizeLimits := float64(0)
 		if hugePageSizeAllocable.Value() != 0 {
@@ -4129,7 +4158,9 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 			fractionHugePageSizeLimits = float64(hugePageSizeLimits.Value()) / float64(hugePageSizeAllocable.Value()) * 100
 		}
 		w.Write(LEVEL_1, "%s\t%s (%d%%)\t%s (%d%%)\n",
-			resource, hugePageSizeRequests.String(), int64(fractionHugePageSizeRequests), hugePageSizeLimits.String(), int64(fractionHugePageSizeLimits))
+			resource,
+			formatResourceQuantity(hugePageName, hugePageSizeRequests), int64(fractionHugePageSizeRequests),
+			formatResourceQuantity(hugePageName, hugePageSizeLimits), int64(fractionHugePageSizeLimits))
 	}
 
 	for _, ext := range extResources {

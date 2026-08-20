@@ -1487,6 +1487,15 @@ func TestDescribeResources(t *testing.T) {
 			},
 			expectedElements: map[string]int{"cpu": 1, "memory": 1, "Requests": 1, "1k": 1, "100Mi": 1},
 		},
+		{
+			resources: &corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("1m"),
+					corev1.ResourceMemory: resource.MustParse("0.1Gi"),
+				},
+			},
+			expectedElements: map[string]int{"cpu": 1, "memory": 1, "Requests": 1, "1m": 1, "107374183": 1},
+		},
 	}
 
 	for i, testCase := range testCases {
@@ -1507,6 +1516,97 @@ func TestDescribeResources(t *testing.T) {
 
 			if !reflect.DeepEqual(gotElements, testCase.expectedElements) {
 				t.Errorf("Expected %v, got %v in output string: %q", testCase.expectedElements, gotElements, output)
+			}
+		})
+	}
+}
+
+func TestFormatResourceQuantity(t *testing.T) {
+	testCases := []struct {
+		name     string
+		resource corev1.ResourceName
+		quantity string
+		expected string
+	}{
+		{
+			name:     "fractional memory is rounded up to whole bytes",
+			resource: corev1.ResourceMemory,
+			quantity: "0.1Gi",
+			expected: "107374183",
+		},
+		{
+			name:     "memory already stored in millibytes is rounded up to whole bytes",
+			resource: corev1.ResourceMemory,
+			quantity: "107374182400m",
+			expected: "107374183",
+		},
+		{
+			name:     "sub-byte memory is rounded up to one byte",
+			resource: corev1.ResourceMemory,
+			quantity: "1m",
+			expected: "1",
+		},
+		{
+			name:     "whole memory is unchanged",
+			resource: corev1.ResourceMemory,
+			quantity: "10Gi",
+			expected: "10Gi",
+		},
+		{
+			name:     "decimal memory suffix is preserved",
+			resource: corev1.ResourceMemory,
+			quantity: "500M",
+			expected: "500M",
+		},
+		{
+			name:     "zero memory is unchanged",
+			resource: corev1.ResourceMemory,
+			quantity: "0",
+			expected: "0",
+		},
+		{
+			name:     "fractional ephemeral storage is rounded up to whole bytes",
+			resource: corev1.ResourceEphemeralStorage,
+			quantity: "0.1Gi",
+			expected: "107374183",
+		},
+		{
+			name:     "fractional storage is rounded up to whole bytes",
+			resource: corev1.ResourceStorage,
+			quantity: "0.1Gi",
+			expected: "107374183",
+		},
+		{
+			name:     "fractional hugepages are rounded up to whole bytes",
+			resource: corev1.ResourceName("hugepages-2Mi"),
+			quantity: "0.1Gi",
+			expected: "107374183",
+		},
+		{
+			name:     "cpu milli-units are preserved",
+			resource: corev1.ResourceCPU,
+			quantity: "100m",
+			expected: "100m",
+		},
+		{
+			name:     "fractional cpu is preserved",
+			resource: corev1.ResourceCPU,
+			quantity: "0.1",
+			expected: "100m",
+		},
+		{
+			name:     "non-byte resources are unchanged",
+			resource: corev1.ResourcePods,
+			quantity: "110",
+			expected: "110",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := formatResourceQuantity(testCase.resource, resource.MustParse(testCase.quantity))
+			if got != testCase.expected {
+				t.Errorf("expected %q, got %q", testCase.expected, got)
 			}
 		})
 	}
@@ -6444,6 +6544,64 @@ func TestDescribeNode(t *testing.T) {
 		if !strings.Contains(out, expected) {
 			t.Errorf("expected to find %q in output: %q", expected, out)
 		}
+	}
+}
+
+// TestDescribeNodeWithFractionalMemory verifies that a memory request that is not
+// a whole number of bytes is never rendered in millibytes, neither in the per-pod
+// table nor in the Allocated resources summary.
+func TestDescribeNodeWithFractionalMemory(t *testing.T) {
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "bar",
+			UID:  "uid",
+		},
+		Status: corev1.NodeStatus{
+			Capacity:    getResourceList("8", "24Gi"),
+			Allocatable: getResourceList("4", "12Gi"),
+		},
+	}
+	fake := fake.NewClientset(
+		node,
+		&corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-with-fractional-memory",
+				Namespace: "foo",
+			},
+			TypeMeta: metav1.TypeMeta{
+				Kind: "Pod",
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  "cpu-mem",
+						Image: "image:latest",
+						Resources: corev1.ResourceRequirements{
+							Requests: getResourceList("1m", "0.1Gi"),
+							Limits:   getResourceList("2", "0.1Gi"),
+						},
+					},
+				},
+			},
+			Status: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+			},
+		},
+	)
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := NodeDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: false})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if strings.Contains(out, "107374182400m") {
+		t.Errorf("expected no millibyte memory value in output: %q", out)
+	}
+	// Once each for the pod's requests and limits in the per-pod table, and
+	// once each for the requests and limits rows of Allocated resources.
+	if got := strings.Count(out, "107374183"); got != 4 {
+		t.Errorf("expected 4 occurrences of %q, got %d in output: %q", "107374183", got, out)
 	}
 }
 
