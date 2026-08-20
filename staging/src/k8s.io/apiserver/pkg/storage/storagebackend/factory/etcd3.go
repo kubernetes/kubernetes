@@ -39,7 +39,9 @@ import (
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
+	grpcstatus "google.golang.org/grpc/status"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -55,6 +57,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics/legacyregistry"
 	tracing "k8s.io/component-base/tracing"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -276,11 +279,26 @@ func (t *etcd3ProberMonitor) Monitor(ctx context.Context) (metrics.StorageMetric
 	}
 	status, err := t.client.Status(ctx, t.endpoints[rand.Int()%len(t.endpoints)])
 	if err != nil {
+		// etcd >= 3.6 requires admin permission on Maintenance.Status
+		// (etcd-io/etcd#21466). An apiserver using a non-root etcd user cannot
+		// read DbSize; treat that as "size unknown" rather than a probe error so
+		// we don't repeatedly report the storage backend as unhealthy.
+		if isEtcdMaintenancePermissionDenied(err) {
+			klog.V(4).Infof("Cannot read etcd db size: Maintenance.Status requires admin permission (etcd-io/etcd#21466)")
+			return metrics.StorageMetrics{}, nil
+		}
 		return metrics.StorageMetrics{}, err
 	}
 	return metrics.StorageMetrics{
 		Size: status.DbSize,
 	}, nil
+}
+
+// isEtcdMaintenancePermissionDenied reports whether err is the PermissionDenied
+// returned by etcd >= 3.6 for Maintenance RPCs (e.g. Status) when the client is
+// not an admin/root user. See etcd-io/etcd#21466.
+func isEtcdMaintenancePermissionDenied(err error) bool {
+	return grpcstatus.Code(err) == codes.PermissionDenied
 }
 
 var newETCD3Client = func(c storagebackend.TransportConfig) (*kubernetes.Client, error) {
