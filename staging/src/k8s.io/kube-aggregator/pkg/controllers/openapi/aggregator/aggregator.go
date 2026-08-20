@@ -26,6 +26,7 @@ import (
 
 	restful "github.com/emicklei/go-restful/v3"
 
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/klog/v2"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -100,8 +101,30 @@ func buildAndRegisterSpecAggregatorForLocalServices(downloader *Downloader, aggr
 	}
 
 	s.openAPIVersionedService = handler.NewOpenAPIServiceLazy(s.buildMergeSpecLocked())
-	s.openAPIVersionedService.RegisterOpenAPIVersionedService("/openapi/v2", pathHandler)
+	// RegisterOpenAPIVersionedService builds the handler internally, so capture it
+	// instead of registering it directly and install the instrumented handler here.
+	var openAPIHandler http.Handler
+	s.openAPIVersionedService.RegisterOpenAPIVersionedService("/openapi/v2", pathHandlerFunc(func(_ string, h http.Handler) {
+		openAPIHandler = h
+	}))
+	pathHandler.Handle("/openapi/v2", metrics.InstrumentHandlerFunc("GET",
+		/* group = */ "",
+		/* version = */ "",
+		/* resource = */ "",
+		/* subresource = */ "openapi/v2",
+		/* scope = */ "",
+		/* component = */ "",
+		/* deprecated */ false,
+		/* removedRelease */ "",
+		openAPIHandler.ServeHTTP))
 	return s
+}
+
+// pathHandlerFunc adapts a function to the common.PathHandler interface.
+type pathHandlerFunc func(path string, handler http.Handler)
+
+func (f pathHandlerFunc) Handle(path string, handler http.Handler) {
+	f(path, handler)
 }
 
 // BuildAndRegisterAggregator registered OpenAPI aggregator handler. This function is not thread safe as it only being called on startup.
