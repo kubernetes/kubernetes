@@ -970,6 +970,7 @@ type AllocatorTestCase struct {
 
 	expectResults []any
 	expectError   types.GomegaMatcher // can be used to check for no error or match specific error
+	expectErrorIs error               // can be used to check error classification with errors.Is
 
 	// Test case setting expectNumAllocateOneInvocations do not run against the "stable" variant of the allocator,
 	// which doesn't provide the stats and also falls over with excessive runtime for them.
@@ -9095,6 +9096,67 @@ func TestAllocator(t *testing.T,
 			node:          node(node1, region1),
 			expectResults: nil,
 		},
+		"malformed-per-device-node-selector-before-node-name": {
+			features:         Features{PartitionableDevices: true},
+			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 2))),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, nodeSelectionPerDevice, pool1, driverA,
+				device(device1, nil, nil).withNodeSelection(&v1.NodeSelector{NodeSelectorTerms: []v1.NodeSelectorTerm{
+					{MatchExpressions: []v1.NodeSelectorRequirement{{Key: regionKey, Operator: v1.NodeSelectorOpIn, Values: []string{region1}}}},
+					{MatchExpressions: []v1.NodeSelectorRequirement{{Key: regionKey, Operator: v1.NodeSelectorOpIn, Values: []string{region1}}}},
+				}}),
+				device(device2, nil, nil).withNodeSelection(node1),
+			)),
+			node:          node(node1, region1),
+			expectError:   gomega.MatchError(gomega.ContainSubstring("unsupported ResourceSlice.NodeSelector with 2 terms")),
+			expectErrorIs: internal.ErrFailedAllocationOnNode,
+		},
+		"malformed-per-device-node-selector-after-node-name": {
+			features:         Features{PartitionableDevices: true},
+			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 2))),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, nodeSelectionPerDevice, pool1, driverA,
+				device(device1, nil, nil).withNodeSelection(node1),
+				device(device2, nil, nil).withNodeSelection(&v1.NodeSelector{NodeSelectorTerms: []v1.NodeSelectorTerm{
+					{MatchExpressions: []v1.NodeSelectorRequirement{{Key: regionKey, Operator: v1.NodeSelectorOpIn, Values: []string{region1}}}},
+					{MatchExpressions: []v1.NodeSelectorRequirement{{Key: regionKey, Operator: v1.NodeSelectorOpIn, Values: []string{region1}}}},
+				}}),
+			)),
+			node:          node(node1, region1),
+			expectError:   gomega.MatchError(gomega.ContainSubstring("unsupported ResourceSlice.NodeSelector with 2 terms")),
+			expectErrorIs: internal.ErrFailedAllocationOnNode,
+		},
+		"malformed-per-device-node-selector-after-binds-to-node": {
+			features: Features{
+				PartitionableDevices:   true,
+				DeviceBindingAndStatus: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 2))),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, nodeSelectionPerDevice, pool1, driverA,
+				device(device1, nil, nil).withNodeSelection(nodeSelectionAll).withBindsToNode(true),
+				device(device2, nil, nil).withNodeSelection(&v1.NodeSelector{NodeSelectorTerms: []v1.NodeSelectorTerm{
+					{MatchExpressions: []v1.NodeSelectorRequirement{{Key: regionKey, Operator: v1.NodeSelectorOpIn, Values: []string{region1}}}},
+					{MatchExpressions: []v1.NodeSelectorRequirement{{Key: regionKey, Operator: v1.NodeSelectorOpIn, Values: []string{region1}}}},
+				}}),
+			)),
+			node:          node(node1, region1),
+			expectError:   gomega.MatchError(gomega.ContainSubstring("unsupported ResourceSlice.NodeSelector with 2 terms")),
+			expectErrorIs: internal.ErrFailedAllocationOnNode,
+		},
+		"single-term-per-device-node-selector": {
+			features:         Features{PartitionableDevices: true},
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(sliceWithDevices(slice1, nodeSelectionPerDevice, pool1, driverA,
+				device(device1, nil, nil).withNodeSelection(nodeLabelSelector(regionKey, region1)),
+			)),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				nodeLabelSelector(regionKey, region1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
 	}
 
 	RunTestAllocator(t, supportedFeatures, newAllocator, testcases)
@@ -9223,6 +9285,9 @@ func RunTestAllocator(t *testing.T,
 				matchError = gomega.Not(gomega.HaveOccurred())
 			}
 			g.Expect(err).To(matchError)
+			if tc.expectErrorIs != nil {
+				g.Expect(errors.Is(err, tc.expectErrorIs)).To(gomega.BeTrue())
+			}
 
 			t.Logf("name: %s", name)
 			// replace any share id with fixed value for testing
