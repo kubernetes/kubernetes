@@ -28,6 +28,7 @@ import (
 	yaml "go.yaml.in/yaml/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/component-base/logs/datapol"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
@@ -580,10 +581,35 @@ func TestMarshalKubeletConfigForLog(t *testing.T) {
 	require.Contains(t, out, "failSwapOn: false")
 	require.Contains(t, out, "memory.available: 200Mi")
 
-	// (3) Sensitive StaticPodURLHeader values are masked, never leaked.
-	require.Contains(t, out, "<masked>")
+	// (3) Sensitive StaticPodURLHeader values are redacted via datapolicy tags, never leaked.
+	require.Contains(t, out, "CLASSIFIED")
 	require.NotContains(t, out, "super-secret-token")
 
-	// The helper must not mutate the caller's config when masking.
+	// The helper must not mutate the caller's config when redacting.
 	require.Equal(t, []string{"Bearer super-secret-token"}, kc.StaticPodURLHeader["Authorization"])
+}
+
+// TestConfigzVersionedConfigIsRedactable guards the /configz path: setConfigz
+// stores the *versioned* (v1beta1) KubeletConfiguration, and configz.MarshalJSON
+// redacts that stored object via datapol.Redact. The datapolicy tag therefore
+// must live on the v1beta1 type as well as the internal type, otherwise the
+// StaticPodURLHeader credentials leak over /configz (kubernetes#140101).
+func TestConfigzVersionedConfigIsRedactable(t *testing.T) {
+	kc := &kubeletconfiginternal.KubeletConfiguration{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "KubeletConfiguration",
+			APIVersion: "kubelet.config.k8s.io/v1beta1",
+		},
+		StaticPodURLHeader: map[string][]string{
+			"Authorization": {"Bearer super-secret-token"},
+		},
+	}
+
+	// Mirror what setConfigz stores and what configz.MarshalJSON serializes.
+	versioned, err := convertToVersionedKubeletConfig(kc)
+	require.NoError(t, err)
+	require.NoError(t, datapol.Redact(versioned))
+
+	require.Equal(t, []string{"CLASSIFIED"}, versioned.StaticPodURLHeader["Authorization"],
+		"versioned StaticPodURLHeader must be redacted; the datapolicy tag must exist on the v1beta1 type")
 }
