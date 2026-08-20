@@ -1481,7 +1481,6 @@ func getTestPod(claimName string) *v1.Pod {
 }
 
 func Test_UncertainDeviceGlobalMounts(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
 	var tests = []struct {
 		name                   string
 		deviceState            operationexecutor.DeviceMountState
@@ -1533,8 +1532,9 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 			testName := fmt.Sprintf("%s [%s]", tc.name, mode)
 			uniqueTestString := fmt.Sprintf("global-mount-%s", testName)
 			uniquePodDir := fmt.Sprintf("%s-%x", kubeletPodsDir, hasher.Sum([]byte(uniqueTestString)))
-			t.Run(testName+"[", func(t *testing.T) {
-				t.Parallel()
+		t.Run(testName+"[", func(t *testing.T) {
+			t.Parallel()
+			logger, ctx := ktesting.NewTestContext(t)
 				pv := &v1.PersistentVolume{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: tc.volumeName,
@@ -1631,11 +1631,12 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 				dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{volumeName})
 
 				// Start the reconciler to fill ASW.
-				stopChan, stoppedChan := make(chan struct{}), make(chan struct{})
-				go func() {
-					reconciler.Run(ctx, stopChan)
-					close(stoppedChan)
-				}()
+			stopChan, stoppedChan := make(chan struct{}), make(chan struct{})
+			defer close(stopChan)
+			go func() {
+				reconciler.Run(ctx, stopChan)
+				close(stoppedChan)
+			}()
 				waitForVolumeToExistInASW(t, volumeName, asw)
 				if tc.volumeName == volumetesting.TimeoutAndFailOnMountDeviceVolumeName {
 					// Wait upto 10s for reconciler to catch up
@@ -1678,7 +1679,6 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 }
 
 func Test_UncertainVolumeMountState(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
 	var tests = []struct {
 		name                   string
 		volumeState            operationexecutor.VolumeMountState
@@ -1747,8 +1747,9 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 			testName := fmt.Sprintf("%s [%s]", tc.name, mode)
 			uniqueTestString := fmt.Sprintf("local-mount-%s", testName)
 			uniquePodDir := fmt.Sprintf("%s-%x", kubeletPodsDir, hasher.Sum([]byte(uniqueTestString)))
-			t.Run(testName, func(t *testing.T) {
-				t.Parallel()
+		t.Run(testName, func(t *testing.T) {
+			t.Parallel()
+			logger, ctx := ktesting.NewTestContext(t)
 				pv := &v1.PersistentVolume{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: tc.volumeName,
@@ -1856,11 +1857,12 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 				dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{volumeName})
 
 				// Start the reconciler to fill ASW.
-				stopChan, stoppedChan := make(chan struct{}), make(chan struct{})
-				go func() {
-					reconciler.Run(ctx, stopChan)
-					close(stoppedChan)
-				}()
+			stopChan, stoppedChan := make(chan struct{}), make(chan struct{})
+			defer close(stopChan)
+			go func() {
+				reconciler.Run(ctx, stopChan)
+				close(stoppedChan)
+			}()
 				waitForVolumeToExistInASW(t, volumeName, asw)
 				// all of these tests rely on device to be globally mounted and hence waiting for global
 				// mount ensures that unmountDevice is called as expected.
