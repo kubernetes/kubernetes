@@ -1188,11 +1188,16 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 
 	if err == ErrNoNodesAvailable {
 		logger.V(2).Info("Unable to schedule pod; no nodes are registered to the cluster; waiting", "pod", klog.KObj(pod))
-	} else if fitError, ok := err.(*framework.FitError); ok { // Inject UnschedulablePlugins to PodInfo, which will be used later for moving Pods between queues efficiently.
+	} else if fitError, ok := errors.AsType[*framework.FitError](err); ok { // Inject UnschedulablePlugins to PodInfo, which will be used later for moving Pods between queues efficiently.
 		podInfo.UnschedulablePlugins = fitError.Diagnosis.UnschedulablePlugins
 		podInfo.PendingPlugins = fitError.Diagnosis.PendingPlugins
 		logger.V(2).Info("Unable to schedule pod; no fit; waiting", "pod", klog.KObj(pod), "err", errMsg)
-	} else if errors.Is(err, errPodGroupUnschedulable) {
+	} else if fitError, ok := errors.AsType[*podGroupFitError](err); ok {
+		// Clone the plugin sets to ensure other readers of the same podGroupFitError
+		// won't modify them afterwards.
+		podInfo.UnschedulablePlugins = fitError.unschedulablePlugins.Clone()
+		podInfo.PendingPlugins = fitError.pendingPlugins.Clone()
+		errMsg = fmt.Sprintf("parent pod group is unschedulable: %s", errMsg)
 		logger.V(2).Info("Unable to schedule pod belonging to a pod group; waiting", "pod", klog.KObj(pod), "err", errMsg)
 	} else {
 		utilruntime.HandleErrorWithContext(ctx, err, "Error scheduling pod; retrying", "pod", klog.KObj(pod))

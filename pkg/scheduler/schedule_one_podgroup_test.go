@@ -49,6 +49,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	schedulingapi "k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -191,7 +192,7 @@ func (mp *fakePlacementFeasiblePlugin) PlacementFeasible(ctx context.Context, pl
 }
 
 func (mp *fakePlacementFeasiblePlugin) Permit(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (*fwk.Status, time.Duration) {
-	return fwk.NewStatus(fwk.Error, "unexpected call to permit"), 0
+	return nil, 0
 }
 
 func TestValidatePodGroup(t *testing.T) {
@@ -1624,6 +1625,38 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 			},
 		},
 		{
+			name:   "All pods feasible, but podGroup unschedulable with podGroupFitError",
+			status: fwk.NewStatus(fwk.Unschedulable).WithError(newPodGroupFitError(fwk.NewStatus(fwk.Unschedulable, "not enough capacity for the gang"))),
+			podResultsByPodName: map[string]algorithmResult{
+				"p1": {scheduleResult: ScheduleResult{SuggestedHost: "node1"}, status: nil},
+				"p2": {scheduleResult: ScheduleResult{SuggestedHost: "node1"}, status: nil},
+				"p3": {scheduleResult: ScheduleResult{SuggestedHost: "node1"}, status: nil},
+			},
+			expectFailed: sets.New("p1", "p2", "p3"),
+			expectCondition: &metav1.Condition{
+				Type:    schedulingapi.PodGroupInitiallyScheduled,
+				Status:  metav1.ConditionFalse,
+				Reason:  schedulingapi.PodGroupReasonUnschedulable,
+				Message: "not enough capacity for the gang",
+			},
+		},
+		{
+			name:   "All pods feasible, but podGroup unschedulable with placement podGroupFitError",
+			status: fwk.NewStatus(fwk.Unschedulable).WithError(newPodGroupPlacementFitError(fwk.NewStatus(fwk.Unschedulable, "not enough capacity for the gang"), 2)),
+			podResultsByPodName: map[string]algorithmResult{
+				"p1": {scheduleResult: ScheduleResult{SuggestedHost: "node1"}, status: nil},
+				"p2": {scheduleResult: ScheduleResult{SuggestedHost: "node1"}, status: nil},
+				"p3": {scheduleResult: ScheduleResult{SuggestedHost: "node1"}, status: nil},
+			},
+			expectFailed: sets.New("p1", "p2", "p3"),
+			expectCondition: &metav1.Condition{
+				Type:    schedulingapi.PodGroupInitiallyScheduled,
+				Status:  metav1.ConditionFalse,
+				Reason:  schedulingapi.PodGroupReasonUnschedulable,
+				Message: "0/2 placements are available, first placement status: not enough capacity for the gang",
+			},
+		},
+		{
 			name: "One unschedulable",
 			podResultsByPodName: map[string]algorithmResult{
 				"p1": {scheduleResult: ScheduleResult{SuggestedHost: "node1"}, status: nil},
@@ -2611,7 +2644,7 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 						status: fwk.NewStatus(fwk.Unschedulable, "0/1 nodes are available:"),
 					},
 				},
-				status: fwk.NewStatus(fwk.Unschedulable, "0/2 placements are available, first placement status: injected placementFeasible status").WithError(errPodGroupUnschedulable),
+				status: fwk.NewStatus(fwk.Unschedulable, "0/2 placements are available, first placement status: injected placementFeasible status"),
 			},
 		},
 		"when all placements are infeasible, but pods are feasible, returns unschedulable": {
@@ -2651,7 +2684,7 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 						status: nil,
 					},
 				},
-				status: fwk.NewStatus(fwk.Unschedulable, "0/2 placements are available, first placement status: injected placementFeasible status").WithError(errPodGroupUnschedulable),
+				status: fwk.NewStatus(fwk.Unschedulable, "0/2 placements are available, first placement status: injected placementFeasible status"),
 			},
 		},
 		"filters out infeasible placements": {
@@ -3786,7 +3819,7 @@ func TestCPGSchedulingPlacementAlgorithm(t *testing.T) {
 			},
 			expectedResults: map[string]podGroupAlgorithmResult{
 				rootPGInfo.GetKey(): {
-					status: fwk.NewStatus(fwk.Unschedulable, "pod group is unschedulable"),
+					status: fwk.NewStatus(fwk.Unschedulable, "no pods were schedulable"),
 				},
 				childPGInfo1.GetKey(): {
 					podResults: []algorithmResult{
@@ -3803,6 +3836,80 @@ func TestCPGSchedulingPlacementAlgorithm(t *testing.T) {
 							status:  fwk.NewStatus(fwk.Unschedulable, "0/1 nodes are available: 1 node1 rejected."),
 						},
 					},
+				},
+			},
+		},
+		"returns unschedulable if no pods got scheduled and placement feasible rejected pods": {
+			placementPlugin: fakePlacementPlugin{
+				generatePlacementsResult: defaultPlacementResults,
+				scorePlacementsResult: map[string]map[string]int64{
+					rootPGInfo.GetKey(): {
+						"placement1": 2,
+						"placement2": 1,
+					},
+					childPGInfo1.GetKey(): {
+						"placement1": 5,
+						"placement2": 1,
+						"placement3": 1,
+						"placement4": 1,
+					},
+					childPGInfo2.GetKey(): {
+						"placement1": 5,
+						"placement2": 1,
+						"placement3": 1,
+						"placement4": 1,
+					},
+				},
+				filterStatus: map[string]*fwk.Status{
+					nodes[0].Name: fwk.NewStatus(fwk.Unschedulable, "node1 rejected"),
+					nodes[1].Name: fwk.NewStatus(fwk.Unschedulable, "node2 rejected"),
+					nodes[2].Name: fwk.NewStatus(fwk.Unschedulable, "node3 rejected"),
+					nodes[3].Name: fwk.NewStatus(fwk.Unschedulable, "node4 rejected"),
+				},
+			},
+			placementFeasibleStatuses: [][]fwk.Code{
+				// cpg, p1
+				{fwk.Wait, fwk.Wait, fwk.Unschedulable},
+				// pg1, p1
+				{fwk.Wait, fwk.Unschedulable},
+				// pg1, p2
+				{fwk.Wait, fwk.Unschedulable},
+				// pg2, p1
+				{fwk.Wait, fwk.Unschedulable},
+				// pg2, p2
+				{fwk.Wait, fwk.Unschedulable},
+				// cpg, p2
+				{fwk.Wait, fwk.Wait, fwk.Unschedulable},
+				// pg1, p3
+				{fwk.Wait, fwk.Unschedulable},
+				// pg1, p4
+				{fwk.Wait, fwk.Unschedulable},
+				// pg2, p3
+				{fwk.Wait, fwk.Unschedulable},
+				// pg2, p4
+				{fwk.Wait, fwk.Unschedulable},
+			},
+			expectedResults: map[string]podGroupAlgorithmResult{
+				rootPGInfo.GetKey(): {
+					status: fwk.NewStatus(fwk.Unschedulable, "0/2 placements are available, first placement status: injected placementFeasible status"),
+				},
+				childPGInfo1.GetKey(): {
+					podResults: []algorithmResult{
+						{
+							podInfo: queuedPodInfo1,
+							status:  fwk.NewStatus(fwk.Unschedulable, "0/1 nodes are available: 1 node1 rejected."),
+						},
+					},
+					status: fwk.NewStatus(fwk.Unschedulable, "0/2 placements are available, first placement status: injected placementFeasible status"),
+				},
+				childPGInfo2.GetKey(): {
+					podResults: []algorithmResult{
+						{
+							podInfo: queuedPodInfo2,
+							status:  fwk.NewStatus(fwk.Unschedulable, "0/1 nodes are available: 1 node1 rejected."),
+						},
+					},
+					status: fwk.NewStatus(fwk.Unschedulable, "0/2 placements are available, first placement status: injected placementFeasible status"),
 				},
 			},
 		},
@@ -3870,10 +3977,38 @@ func TestCPGSchedulingPlacementAlgorithm(t *testing.T) {
 				generatePlacementsStatus: map[string]*fwk.Status{
 					childPGInfo2.GetKey(): fwk.AsStatus(fmt.Errorf("injected error")),
 				},
+				scorePlacementsResult: map[string]map[string]int64{
+					rootPGInfo.GetKey(): {
+						"placement1": 1,
+					},
+					childPGInfo1.GetKey(): {
+						"placement1": 2,
+						"placement2": 1,
+					},
+					childPGInfo2.GetKey(): {
+						"placement1": 2,
+						"placement2": 1,
+					},
+				},
 			},
 			expectedResults: map[string]podGroupAlgorithmResult{
 				rootPGInfo.GetKey(): {
 					status: fwk.NewStatus(fwk.Error, "composite pod group evaluation failed due to child error: injected error"),
+				},
+				childPGInfo1.GetKey(): {
+					podResults: []algorithmResult{
+						{
+							podInfo: queuedPodInfo1,
+							scheduleResult: ScheduleResult{
+								SuggestedHost:  nodes[0].Name,
+								EvaluatedNodes: 1,
+								FeasibleNodes:  1,
+							},
+						},
+					},
+				},
+				childPGInfo2.GetKey(): {
+					status: fwk.AsStatus(fmt.Errorf("injected error")),
 				},
 			},
 		},
@@ -3972,16 +4107,7 @@ func TestCPGSchedulingPlacementAlgorithm(t *testing.T) {
 					ScheduleResult{},
 					fwk.Status{},
 					framework.PodInfo{}),
-				cmp.FilterPath(func(p cmp.Path) bool {
-					if len(p) < 2 {
-						return false
-					}
-					step, ok := p[len(p)-1].(cmp.StructField)
-					if !ok {
-						return false
-					}
-					return (strings.HasSuffix(p[len(p)-2].Type().String(), "podGroupAlgorithmResult") && (step.Name() == "podGroupInfo" || step.Name() == "placementCycleState" || step.Name() == "revertFn" || step.Name() == "anyScheduled"))
-				}, cmp.Ignore()),
+				cmpopts.IgnoreFields(podGroupAlgorithmResult{}, "podGroupInfo", "placementCycleState", "anyScheduled"),
 				cmpopts.IgnoreFields(algorithmResult{}, "podCtx", "schedulingDuration"),
 				statusCmpOpt,
 			}
@@ -5981,5 +6107,1223 @@ func buildHierarchicalQueuedPodGroupInfo(
 	return &framework.QueuedPodGroupInfo{
 		PodGroupInfo:   rootInfo,
 		QueuedPodInfos: queuedPodInfos,
+	}
+}
+
+func TestPodGroupPotentiallyFeasible(t *testing.T) {
+	tests := []struct {
+		name               string
+		injectedStatus     fwk.Code
+		expectedProceed    bool
+		expectedStatusCode fwk.Code
+	}{
+		{
+			name:               "PlacementFeasible returns Success",
+			injectedStatus:     fwk.Success,
+			expectedProceed:    true,
+			expectedStatusCode: fwk.Success,
+		},
+		{
+			name:               "PlacementFeasible returns Wait",
+			injectedStatus:     fwk.Wait,
+			expectedProceed:    true,
+			expectedStatusCode: fwk.Unschedulable,
+		},
+		{
+			name:               "PlacementFeasible returns Unschedulable",
+			injectedStatus:     fwk.Unschedulable,
+			expectedProceed:    false,
+			expectedStatusCode: fwk.Unschedulable,
+		},
+		{
+			name:               "PlacementFeasible returns Error",
+			injectedStatus:     fwk.Error,
+			expectedProceed:    false,
+			expectedStatusCode: fwk.Error,
+		},
+		{
+			name:               "PlacementFeasible returns UnschedulableAndUnresolvable (unsupported code)",
+			injectedStatus:     fwk.UnschedulableAndUnresolvable,
+			expectedProceed:    false,
+			expectedStatusCode: fwk.Error,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+
+			_, ctx := ktesting.NewTestContext(t)
+			placementFeasiblePlugin := &fakePlacementFeasiblePlugin{
+				placementFeasibleStatuses: [][]fwk.Code{{tt.injectedStatus}},
+			}
+			registry := []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				tf.RegisterPermitPlugin(placementFeasiblePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return placementFeasiblePlugin, nil
+				}),
+			}
+			schedFwk, err := tf.NewFramework(ctx, registry, "test-scheduler")
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+
+			placementCycleState := framework.NewCycleState()
+			podGroupInfo := &framework.PodGroupInfo{
+				UnscheduledPods: []*v1.Pod{
+					st.MakePod().Name("pod").UID("pod").PodGroupName("pg").Obj(),
+				},
+				PodGroup: st.MakePodGroup().Name("pg").Obj(),
+			}
+			placementProgress := framework.PlacementProgress{
+				Remaining: 1,
+				Scheduled: 0,
+			}
+
+			proceed, status := podGroupPotentiallyFeasible(ctx, schedFwk, placementCycleState, podGroupInfo, placementProgress)
+			if proceed != tt.expectedProceed {
+				t.Errorf("Expected proceed: %v, got: %v", tt.expectedProceed, proceed)
+			}
+			if status.Code() != tt.expectedStatusCode {
+				t.Errorf("Expected status code: %v, got: %v", tt.expectedStatusCode, status.Code())
+			}
+		})
+	}
+}
+
+func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
+	testNode := st.MakeNode().Name("node1").UID("node1").Obj()
+
+	p1 := st.MakePod().Name("p1").Namespace("default").UID("p1").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
+	p2 := st.MakePod().Name("p2").Namespace("default").UID("p2").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
+	p3 := st.MakePod().Name("p3").Namespace("default").UID("p3").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
+	p4 := st.MakePod().Name("p4").Namespace("default").UID("p4").PodGroupName("pg2").SchedulerName("test-scheduler").Obj()
+	p5 := st.MakePod().Name("p5").Namespace("default").UID("p5").PodGroupName("pg3").SchedulerName("test-scheduler").Obj()
+	pg1Pods := []*v1.Pod{p1, p2, p3}
+	pg2Pods := []*v1.Pod{p4}
+	pg3Pods := []*v1.Pod{p5}
+
+	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}}
+	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}}
+	qInfo3 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p3}}
+	qInfo4 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p4}}
+	qInfo5 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p5}}
+
+	pg1 := st.MakePodGroup().Name("pg").Namespace("default").Obj()
+	pg2 := st.MakePodGroup().Name("pg2").Namespace("default").ParentCompositePodGroup("cpg").Obj()
+	pg3 := st.MakePodGroup().Name("pg3").Namespace("default").ParentCompositePodGroup("cpg").Obj()
+	cpg := st.MakeCompositePodGroup().Name("cpg").Namespace("default").Obj()
+
+	podGroupInfo := &framework.QueuedPodGroupInfo{
+		QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{
+			fwk.PodGroupKey("default", "pg"): {qInfo1, qInfo2, qInfo3},
+		},
+		PodGroupInfo: &framework.PodGroupInfo{
+			Name:            "pg",
+			Namespace:       "default",
+			Type:            fwk.PodGroupKeyType,
+			UnscheduledPods: pg1Pods,
+			PodGroup:        pg1,
+		},
+	}
+
+	compositePodGroupInfo := &framework.QueuedPodGroupInfo{
+		QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{
+			fwk.PodGroupKey("default", "pg2"): {qInfo4},
+			fwk.PodGroupKey("default", "pg3"): {qInfo5},
+		},
+		PodGroupInfo: &framework.PodGroupInfo{
+			Name:              "cpg",
+			Namespace:         "default",
+			Type:              fwk.CompositePodGroupKeyType,
+			CompositePodGroup: cpg,
+			Children: []*framework.PodGroupInfo{
+				{
+					Name:            "pg2",
+					Namespace:       "default",
+					Type:            fwk.PodGroupKeyType,
+					UnscheduledPods: pg2Pods,
+					PodGroup:        pg2,
+				},
+				{
+					Name:            "pg3",
+					Namespace:       "default",
+					Type:            fwk.PodGroupKeyType,
+					UnscheduledPods: pg3Pods,
+					PodGroup:        pg3,
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name                         string
+		tasEnabled                   []bool
+		cpgEnabled                   []bool
+		compositePodGroups           []*schedulingv1alpha3.CompositePodGroup
+		podGroups                    []*schedulingv1beta1.PodGroup
+		pods                         []*v1.Pod
+		podGroupInfo                 *framework.QueuedPodGroupInfo
+		plugin                       *fakePodGroupPlugin
+		podGroupFeasibleStatuses     [][]fwk.Code
+		expectedFailedPodConditions  map[string]*v1.PodCondition
+		expectedUnschedulablePlugins map[*v1.Pod]sets.Set[string]
+		expectedBindings             sets.Set[string]
+	}{
+		{
+			name:         "All pods feasible",
+			tasEnabled:   []bool{true, false},
+			cpgEnabled:   []bool{true, false},
+			podGroups:    []*schedulingv1beta1.PodGroup{pg1},
+			pods:         pg1Pods,
+			podGroupInfo: podGroupInfo,
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p1": nil,
+					"p2": nil,
+					"p3": nil,
+				},
+			},
+			podGroupFeasibleStatuses: [][]fwk.Code{{
+				fwk.Wait,
+				fwk.Wait,
+				fwk.Wait,
+				fwk.Success,
+			}},
+			expectedBindings: sets.New("p1", "p2", "p3"),
+		},
+		{
+			name:         "No pods schedulable",
+			tasEnabled:   []bool{true, false},
+			cpgEnabled:   []bool{true, false},
+			podGroups:    []*schedulingv1beta1.PodGroup{pg1},
+			pods:         pg1Pods,
+			podGroupInfo: podGroupInfo,
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p1": fwk.NewStatus(fwk.Unschedulable, "node1 capacity exceeded"),
+					"p2": fwk.NewStatus(fwk.Unschedulable, "node2 capacity exceeded"),
+					"p3": fwk.NewStatus(fwk.Unschedulable, "node3 capacity exceeded"),
+				},
+			},
+			podGroupFeasibleStatuses: [][]fwk.Code{{
+				fwk.Success,
+				fwk.Success,
+				fwk.Success,
+				fwk.Success,
+			}},
+			expectedFailedPodConditions: map[string]*v1.PodCondition{
+				"p1": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "0/1 nodes are available: 1 node1 capacity exceeded.",
+				},
+				"p2": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "0/1 nodes are available: 1 node2 capacity exceeded.",
+				},
+				"p3": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "0/1 nodes are available: 1 node3 capacity exceeded.",
+				},
+			},
+			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
+				p1: sets.New("FakePodGroupPlugin"),
+				p2: sets.New("FakePodGroupPlugin"),
+				p3: sets.New("FakePodGroupPlugin"),
+			},
+		},
+		{
+			name:         "One pod unschedulable, with placement context",
+			tasEnabled:   []bool{true},
+			cpgEnabled:   []bool{true},
+			podGroups:    []*schedulingv1beta1.PodGroup{pg1},
+			pods:         pg1Pods,
+			podGroupInfo: podGroupInfo,
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p1": nil,
+					"p2": fwk.NewStatus(fwk.Unschedulable, "node capacity exceeded"),
+					"p3": nil,
+				},
+			},
+			podGroupFeasibleStatuses: [][]fwk.Code{{
+				fwk.Wait,
+				fwk.Wait,
+				fwk.Wait,
+				fwk.Unschedulable,
+			}},
+			expectedFailedPodConditions: map[string]*v1.PodCondition{
+				"p1": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "parent pod group is unschedulable: 0/1 placements are available, first placement status: injected placementFeasible status",
+				},
+				"p2": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "0/1 nodes are available: 1 node capacity exceeded.",
+				},
+				"p3": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "parent pod group is unschedulable: 0/1 placements are available, first placement status: injected placementFeasible status",
+				},
+			},
+			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
+				p1: sets.New("GangScheduling"),
+				p2: sets.New("FakePodGroupPlugin"),
+				p3: sets.New("GangScheduling"),
+			},
+		},
+		{
+			name:         "One pod unschedulable, without placement context",
+			tasEnabled:   []bool{false},
+			cpgEnabled:   []bool{false},
+			podGroups:    []*schedulingv1beta1.PodGroup{pg1},
+			pods:         pg1Pods,
+			podGroupInfo: podGroupInfo,
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p1": nil,
+					"p2": fwk.NewStatus(fwk.Unschedulable, "node capacity exceeded"),
+					"p3": nil,
+				},
+			},
+			podGroupFeasibleStatuses: [][]fwk.Code{{
+				fwk.Wait,
+				fwk.Wait,
+				fwk.Wait,
+				fwk.Unschedulable,
+			}},
+			expectedFailedPodConditions: map[string]*v1.PodCondition{
+				"p1": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "parent pod group is unschedulable: injected placementFeasible status",
+				},
+				"p2": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "0/1 nodes are available: 1 node capacity exceeded.",
+				},
+				"p3": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "parent pod group is unschedulable: injected placementFeasible status",
+				},
+			},
+			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
+				p1: sets.New("GangScheduling"),
+				p2: sets.New("FakePodGroupPlugin"),
+				p3: sets.New("GangScheduling"),
+			},
+		},
+		{
+			name:         "One pod unschedulable, causing loop to break earlier, with placement context",
+			tasEnabled:   []bool{true},
+			cpgEnabled:   []bool{true},
+			podGroups:    []*schedulingv1beta1.PodGroup{pg1},
+			pods:         pg1Pods,
+			podGroupInfo: podGroupInfo,
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p1": nil,
+					"p2": fwk.NewStatus(fwk.Unschedulable, "node capacity exceeded"),
+					"p3": nil,
+				},
+			},
+			podGroupFeasibleStatuses: [][]fwk.Code{{
+				fwk.Wait,
+				fwk.Wait,
+				fwk.Unschedulable,
+				fwk.Unschedulable,
+			}},
+			expectedFailedPodConditions: map[string]*v1.PodCondition{
+				"p1": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "parent pod group is unschedulable: 0/1 placements are available, first placement status: injected placementFeasible status",
+				},
+				"p2": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "0/1 nodes are available: 1 node capacity exceeded.",
+				},
+				"p3": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "parent pod group is unschedulable: 0/1 placements are available, first placement status: injected placementFeasible status",
+				},
+			},
+			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
+				p1: sets.New("GangScheduling"),
+				p2: sets.New("FakePodGroupPlugin"),
+				p3: sets.New("GangScheduling"),
+			},
+		},
+		{
+			name:         "One pod unschedulable, causing loop to break earlier, without placement context",
+			tasEnabled:   []bool{false},
+			cpgEnabled:   []bool{false},
+			podGroups:    []*schedulingv1beta1.PodGroup{pg1},
+			pods:         pg1Pods,
+			podGroupInfo: podGroupInfo,
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p1": nil,
+					"p2": fwk.NewStatus(fwk.Unschedulable, "node capacity exceeded"),
+					"p3": nil,
+				},
+			},
+			podGroupFeasibleStatuses: [][]fwk.Code{{
+				fwk.Wait,
+				fwk.Wait,
+				fwk.Unschedulable,
+				fwk.Unschedulable,
+			}},
+			expectedFailedPodConditions: map[string]*v1.PodCondition{
+				"p1": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "parent pod group is unschedulable: injected placementFeasible status",
+				},
+				"p2": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "0/1 nodes are available: 1 node capacity exceeded.",
+				},
+				"p3": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "parent pod group is unschedulable: injected placementFeasible status",
+				},
+			},
+			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
+				p1: sets.New("GangScheduling"),
+				p2: sets.New("FakePodGroupPlugin"),
+				p3: sets.New("GangScheduling"),
+			},
+		},
+		{
+			name:         "One pod unschedulable, but others feasible",
+			tasEnabled:   []bool{true, false},
+			cpgEnabled:   []bool{true, false},
+			podGroups:    []*schedulingv1beta1.PodGroup{pg1},
+			pods:         pg1Pods,
+			podGroupInfo: podGroupInfo,
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p1": nil,
+					"p2": fwk.NewStatus(fwk.Unschedulable, "node capacity exceeded"),
+					"p3": nil,
+				},
+			},
+			podGroupFeasibleStatuses: [][]fwk.Code{{
+				fwk.Wait,
+				fwk.Wait,
+				fwk.Wait,
+				fwk.Success,
+			}},
+			expectedFailedPodConditions: map[string]*v1.PodCondition{
+				"p2": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "0/1 nodes are available: 1 node capacity exceeded.",
+				},
+			},
+			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
+				p2: sets.New("FakePodGroupPlugin"),
+			},
+			expectedBindings: sets.New("p1", "p3"),
+		},
+		{
+			name:         "One pod returns error, with success pods",
+			tasEnabled:   []bool{true, false},
+			cpgEnabled:   []bool{true, false},
+			podGroups:    []*schedulingv1beta1.PodGroup{pg1},
+			pods:         pg1Pods,
+			podGroupInfo: podGroupInfo,
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p1": nil,
+					"p2": fwk.NewStatus(fwk.Error, "filter internal error"),
+					"p3": nil,
+				},
+			},
+			podGroupFeasibleStatuses: [][]fwk.Code{{
+				fwk.Wait,
+				fwk.Success,
+				fwk.Success,
+				fwk.Success,
+			}},
+			expectedFailedPodConditions: map[string]*v1.PodCondition{
+				"p1": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonSchedulerError,
+					Message: "failed to schedule other pod from a pod group: running \"FakePodGroupPlugin\" filter plugin: filter internal error",
+				},
+				"p2": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonSchedulerError,
+					Message: "running \"FakePodGroupPlugin\" filter plugin: filter internal error",
+				},
+				"p3": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonSchedulerError,
+					Message: "failed to schedule other pod from a pod group: running \"FakePodGroupPlugin\" filter plugin: filter internal error",
+				},
+			},
+			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
+				p1: sets.New[string](),
+				p2: sets.New[string](),
+				p3: sets.New[string](),
+			},
+		},
+		{
+			name:         "One pod returns error, with unschedulable pods",
+			tasEnabled:   []bool{true, false},
+			cpgEnabled:   []bool{true, false},
+			podGroups:    []*schedulingv1beta1.PodGroup{pg1},
+			pods:         pg1Pods,
+			podGroupInfo: podGroupInfo,
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p1": fwk.NewStatus(fwk.Unschedulable, "node1 capacity exceeded"),
+					"p2": fwk.NewStatus(fwk.Error, "filter internal error"),
+					"p3": fwk.NewStatus(fwk.Unschedulable, "node3 capacity exceeded"),
+				},
+			},
+			podGroupFeasibleStatuses: [][]fwk.Code{{
+				fwk.Wait,
+				fwk.Wait,
+				fwk.Wait,
+				fwk.Unschedulable,
+			}},
+			expectedFailedPodConditions: map[string]*v1.PodCondition{
+				"p1": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonSchedulerError,
+					Message: "failed to schedule other pod from a pod group: running \"FakePodGroupPlugin\" filter plugin: filter internal error",
+				},
+				"p2": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonSchedulerError,
+					Message: "running \"FakePodGroupPlugin\" filter plugin: filter internal error",
+				},
+				"p3": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonSchedulerError,
+					Message: "failed to schedule other pod from a pod group: running \"FakePodGroupPlugin\" filter plugin: filter internal error",
+				},
+			},
+			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
+				p1: sets.New[string](),
+				p2: sets.New[string](),
+				p3: sets.New[string](),
+			},
+		},
+		{
+			name:         "Pods feasible, but PlacementFeasible errors",
+			tasEnabled:   []bool{true, false},
+			cpgEnabled:   []bool{true, false},
+			podGroups:    []*schedulingv1beta1.PodGroup{pg1},
+			pods:         pg1Pods,
+			podGroupInfo: podGroupInfo,
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p1": nil,
+					"p2": fwk.NewStatus(fwk.Unschedulable, "node1 capacity exceeded"),
+					"p3": nil,
+				},
+			},
+			podGroupFeasibleStatuses: [][]fwk.Code{{
+				fwk.Wait,
+				fwk.Success,
+				fwk.Success,
+				fwk.Error,
+			}},
+			expectedFailedPodConditions: map[string]*v1.PodCondition{
+				"p1": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonSchedulerError,
+					Message: "failed to evaluate placement feasibility: running PlacementFeasible plugin: injected placementFeasible status",
+				},
+				"p2": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonSchedulerError,
+					Message: "failed to evaluate placement feasibility: running PlacementFeasible plugin: injected placementFeasible status",
+				},
+				"p3": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonSchedulerError,
+					Message: "failed to evaluate placement feasibility: running PlacementFeasible plugin: injected placementFeasible status",
+				},
+			},
+			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
+				p1: sets.New[string](),
+				p2: sets.New[string](),
+				p3: sets.New[string](),
+			},
+		},
+		{
+			name:         "Unschedulable pods, but PlacementFeasible errors",
+			tasEnabled:   []bool{true, false},
+			cpgEnabled:   []bool{true, false},
+			podGroups:    []*schedulingv1beta1.PodGroup{pg1},
+			pods:         pg1Pods,
+			podGroupInfo: podGroupInfo,
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p1": fwk.NewStatus(fwk.Unschedulable, "node1 capacity exceeded"),
+					"p2": fwk.NewStatus(fwk.Unschedulable, "node2 capacity exceeded"),
+					"p3": fwk.NewStatus(fwk.Unschedulable, "node3 capacity exceeded"),
+				},
+			},
+			podGroupFeasibleStatuses: [][]fwk.Code{{
+				fwk.Wait,
+				fwk.Wait,
+				fwk.Wait,
+				fwk.Error,
+			}},
+			expectedFailedPodConditions: map[string]*v1.PodCondition{
+				"p1": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonSchedulerError,
+					Message: "failed to evaluate placement feasibility: running PlacementFeasible plugin: injected placementFeasible status",
+				},
+				"p2": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonSchedulerError,
+					Message: "failed to evaluate placement feasibility: running PlacementFeasible plugin: injected placementFeasible status",
+				},
+				"p3": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonSchedulerError,
+					Message: "failed to evaluate placement feasibility: running PlacementFeasible plugin: injected placementFeasible status",
+				},
+			},
+			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
+				p1: sets.New[string](),
+				p2: sets.New[string](),
+				p3: sets.New[string](),
+			},
+		},
+		{
+			name:         "PlacementFeasible returns Unschedulable on first step, with placement context",
+			tasEnabled:   []bool{true},
+			cpgEnabled:   []bool{true},
+			podGroups:    []*schedulingv1beta1.PodGroup{pg1},
+			pods:         pg1Pods,
+			podGroupInfo: podGroupInfo,
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p1": nil,
+					"p2": nil,
+					"p3": nil,
+				},
+			},
+			podGroupFeasibleStatuses: [][]fwk.Code{{
+				fwk.Unschedulable,
+			}},
+			expectedFailedPodConditions: map[string]*v1.PodCondition{
+				"p1": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "parent pod group is unschedulable: 0/1 placements are available, first placement status: injected placementFeasible status",
+				},
+				"p2": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "parent pod group is unschedulable: 0/1 placements are available, first placement status: injected placementFeasible status",
+				},
+				"p3": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "parent pod group is unschedulable: 0/1 placements are available, first placement status: injected placementFeasible status",
+				},
+			},
+			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
+				p1: sets.New("GangScheduling"),
+				p2: sets.New("GangScheduling"),
+				p3: sets.New("GangScheduling"),
+			},
+		},
+		{
+			name:         "PlacementFeasible returns Unschedulable on first step, without placement context",
+			tasEnabled:   []bool{false},
+			cpgEnabled:   []bool{false},
+			podGroups:    []*schedulingv1beta1.PodGroup{pg1},
+			pods:         pg1Pods,
+			podGroupInfo: podGroupInfo,
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p1": nil,
+					"p2": nil,
+					"p3": nil,
+				},
+			},
+			podGroupFeasibleStatuses: [][]fwk.Code{{
+				fwk.Unschedulable,
+			}},
+			expectedFailedPodConditions: map[string]*v1.PodCondition{
+				"p1": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "parent pod group is unschedulable: injected placementFeasible status",
+				},
+				"p2": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "parent pod group is unschedulable: injected placementFeasible status",
+				},
+				"p3": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "parent pod group is unschedulable: injected placementFeasible status",
+				},
+			},
+			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
+				p1: sets.New("GangScheduling"),
+				p2: sets.New("GangScheduling"),
+				p3: sets.New("GangScheduling"),
+			},
+		},
+		{
+			name:               "CPG: All pods feasible",
+			tasEnabled:         []bool{true},
+			cpgEnabled:         []bool{true},
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{cpg},
+			podGroups:          []*schedulingv1beta1.PodGroup{pg2, pg3},
+			pods:               []*v1.Pod{p4, p5},
+			podGroupInfo:       compositePodGroupInfo,
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p4": nil,
+					"p5": nil,
+				},
+			},
+			podGroupFeasibleStatuses: [][]fwk.Code{
+				{fwk.Wait, fwk.Success, fwk.Success},
+				{fwk.Wait, fwk.Success},
+				{fwk.Wait, fwk.Success},
+			},
+			expectedBindings: sets.New("p4", "p5"),
+		},
+		{
+			name:               "CPG: No pods schedulable",
+			tasEnabled:         []bool{true},
+			cpgEnabled:         []bool{true},
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{cpg},
+			podGroups:          []*schedulingv1beta1.PodGroup{pg2, pg3},
+			pods:               []*v1.Pod{p4, p5},
+			podGroupInfo:       compositePodGroupInfo,
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p4": fwk.NewStatus(fwk.Unschedulable, "node1 capacity exceeded"),
+					"p5": fwk.NewStatus(fwk.Unschedulable, "node2 capacity exceeded"),
+				},
+			},
+			podGroupFeasibleStatuses: [][]fwk.Code{
+				{fwk.Success, fwk.Success, fwk.Success},
+				{fwk.Success, fwk.Success},
+				{fwk.Success, fwk.Success},
+			},
+			expectedFailedPodConditions: map[string]*v1.PodCondition{
+				"p4": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "0/1 nodes are available: 1 node1 capacity exceeded.",
+				},
+				"p5": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "0/1 nodes are available: 1 node2 capacity exceeded.",
+				},
+			},
+			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
+				p4: sets.New("FakePodGroupPlugin"),
+				p5: sets.New("FakePodGroupPlugin"),
+			},
+		},
+		{
+			name:               "CPG: One pod unschedulable",
+			tasEnabled:         []bool{true},
+			cpgEnabled:         []bool{true},
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{cpg},
+			podGroups:          []*schedulingv1beta1.PodGroup{pg2, pg3},
+			pods:               []*v1.Pod{p4, p5},
+			podGroupInfo:       compositePodGroupInfo,
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p4": fwk.NewStatus(fwk.Unschedulable, "node capacity exceeded"),
+					"p5": nil,
+				},
+			},
+			podGroupFeasibleStatuses: [][]fwk.Code{
+				{fwk.Wait, fwk.Wait, fwk.Unschedulable},
+				{fwk.Wait, fwk.Unschedulable},
+				{fwk.Wait, fwk.Success},
+			},
+			expectedFailedPodConditions: map[string]*v1.PodCondition{
+				"p4": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "0/1 nodes are available: 1 node capacity exceeded.",
+				},
+				"p5": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "parent pod group is unschedulable: 0/1 placements are available, first placement status: injected placementFeasible status",
+				},
+			},
+			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
+				p4: sets.New("FakePodGroupPlugin"),
+				p5: sets.New("GangScheduling"),
+			},
+		},
+		{
+			name:               "CPG: One pod unschedulable, causing loop to break earlier",
+			tasEnabled:         []bool{true},
+			cpgEnabled:         []bool{true},
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{cpg},
+			podGroups:          []*schedulingv1beta1.PodGroup{pg2, pg3},
+			pods:               []*v1.Pod{p4, p5},
+			podGroupInfo:       compositePodGroupInfo,
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p4": fwk.NewStatus(fwk.Unschedulable, "node capacity exceeded"),
+					"p5": nil,
+				},
+			},
+			podGroupFeasibleStatuses: [][]fwk.Code{
+				{fwk.Wait, fwk.Unschedulable, fwk.Unschedulable},
+				{fwk.Wait, fwk.Unschedulable},
+				{fwk.Wait, fwk.Success},
+			},
+			expectedFailedPodConditions: map[string]*v1.PodCondition{
+				"p4": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "0/1 nodes are available: 1 node capacity exceeded.",
+				},
+				"p5": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "parent pod group is unschedulable: 0/1 placements are available, first placement status: injected placementFeasible status",
+				},
+			},
+			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
+				p4: sets.New("FakePodGroupPlugin"),
+				p5: sets.New("GangScheduling"),
+			},
+		},
+		{
+			name:               "CPG: One pod unschedulable, but others feasible",
+			tasEnabled:         []bool{true},
+			cpgEnabled:         []bool{true},
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{cpg},
+			podGroups:          []*schedulingv1beta1.PodGroup{pg2, pg3},
+			pods:               []*v1.Pod{p4, p5},
+			podGroupInfo:       compositePodGroupInfo,
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p4": fwk.NewStatus(fwk.Unschedulable, "node capacity exceeded"),
+					"p5": nil,
+				},
+			},
+			podGroupFeasibleStatuses: [][]fwk.Code{
+				{fwk.Wait, fwk.Wait, fwk.Success},
+				{fwk.Wait, fwk.Unschedulable},
+				{fwk.Wait, fwk.Success},
+			},
+			expectedFailedPodConditions: map[string]*v1.PodCondition{
+				"p4": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "0/1 nodes are available: 1 node capacity exceeded.",
+				},
+			},
+			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
+				p4: sets.New("FakePodGroupPlugin"),
+			},
+			expectedBindings: sets.New("p5"),
+		},
+		{
+			name:               "CPG: One pod returns error, with success pods",
+			tasEnabled:         []bool{true},
+			cpgEnabled:         []bool{true},
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{cpg},
+			podGroups:          []*schedulingv1beta1.PodGroup{pg2, pg3},
+			pods:               []*v1.Pod{p4, p5},
+			podGroupInfo:       compositePodGroupInfo,
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p4": nil,
+					"p5": fwk.NewStatus(fwk.Error, "filter internal error"),
+				},
+			},
+			podGroupFeasibleStatuses: [][]fwk.Code{
+				{fwk.Wait, fwk.Success, fwk.Success},
+				{fwk.Wait, fwk.Success},
+				{fwk.Wait, fwk.Success},
+			},
+			expectedFailedPodConditions: map[string]*v1.PodCondition{
+				"p4": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonSchedulerError,
+					Message: "composite pod group evaluation failed due to child error: failed to schedule other pod from a pod group: running \"FakePodGroupPlugin\" filter plugin: filter internal error",
+				},
+				"p5": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonSchedulerError,
+					Message: "running \"FakePodGroupPlugin\" filter plugin: filter internal error",
+				},
+			},
+			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
+				p4: sets.New[string](),
+				p5: sets.New[string](),
+			},
+		},
+		{
+			name:               "CPG: One pod returns error, with unschedulable pods",
+			tasEnabled:         []bool{true},
+			cpgEnabled:         []bool{true},
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{cpg},
+			podGroups:          []*schedulingv1beta1.PodGroup{pg2, pg3},
+			pods:               []*v1.Pod{p4, p5},
+			podGroupInfo:       compositePodGroupInfo,
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p4": fwk.NewStatus(fwk.Unschedulable, "node capacity exceeded"),
+					"p5": fwk.NewStatus(fwk.Error, "filter internal error"),
+				},
+			},
+			podGroupFeasibleStatuses: [][]fwk.Code{
+				{fwk.Wait, fwk.Wait, fwk.Unschedulable},
+				{fwk.Wait, fwk.Unschedulable},
+				{fwk.Wait, fwk.Success},
+			},
+			expectedFailedPodConditions: map[string]*v1.PodCondition{
+				"p4": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonSchedulerError,
+					Message: "composite pod group evaluation failed due to child error: failed to schedule other pod from a pod group: running \"FakePodGroupPlugin\" filter plugin: filter internal error",
+				},
+				"p5": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonSchedulerError,
+					Message: "running \"FakePodGroupPlugin\" filter plugin: filter internal error",
+				},
+			},
+			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
+				p4: sets.New[string](),
+				p5: sets.New[string](),
+			},
+		},
+		{
+			name:               "CPG: Pods feasible, but PlacementFeasible errors",
+			tasEnabled:         []bool{true},
+			cpgEnabled:         []bool{true},
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{cpg},
+			podGroups:          []*schedulingv1beta1.PodGroup{pg2, pg3},
+			pods:               []*v1.Pod{p4, p5},
+			podGroupInfo:       compositePodGroupInfo,
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p4": nil,
+					"p5": fwk.NewStatus(fwk.Unschedulable, "node capacity exceeded"),
+				},
+			},
+			podGroupFeasibleStatuses: [][]fwk.Code{
+				{fwk.Wait, fwk.Success, fwk.Error},
+				{fwk.Wait, fwk.Success},
+				{fwk.Wait, fwk.Unschedulable},
+			},
+			expectedFailedPodConditions: map[string]*v1.PodCondition{
+				"p4": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonSchedulerError,
+					Message: "failed to evaluate placement feasibility: running PlacementFeasible plugin: injected placementFeasible status",
+				},
+				"p5": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonSchedulerError,
+					Message: "failed to evaluate placement feasibility: running PlacementFeasible plugin: injected placementFeasible status",
+				},
+			},
+			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
+				p4: sets.New[string](),
+				p5: sets.New[string](),
+			},
+		},
+		{
+			name:               "CPG: Unschedulable pods, but PlacementFeasible errors",
+			tasEnabled:         []bool{true},
+			cpgEnabled:         []bool{true},
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{cpg},
+			podGroups:          []*schedulingv1beta1.PodGroup{pg2, pg3},
+			pods:               []*v1.Pod{p4, p5},
+			podGroupInfo:       compositePodGroupInfo,
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p4": fwk.NewStatus(fwk.Unschedulable, "node1 capacity exceeded"),
+					"p5": fwk.NewStatus(fwk.Unschedulable, "node2 capacity exceeded"),
+				},
+			},
+			podGroupFeasibleStatuses: [][]fwk.Code{
+				{fwk.Wait, fwk.Wait, fwk.Error},
+				{fwk.Wait, fwk.Unschedulable},
+				{fwk.Wait, fwk.Unschedulable},
+			},
+			expectedFailedPodConditions: map[string]*v1.PodCondition{
+				"p4": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonSchedulerError,
+					Message: "failed to evaluate placement feasibility: running PlacementFeasible plugin: injected placementFeasible status",
+				},
+				"p5": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonSchedulerError,
+					Message: "failed to evaluate placement feasibility: running PlacementFeasible plugin: injected placementFeasible status",
+				},
+			},
+			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
+				p4: sets.New[string](),
+				p5: sets.New[string](),
+			},
+		},
+		{
+			name:               "CPG: PlacementFeasible returns Unschedulable on first step, with placement context",
+			tasEnabled:         []bool{true},
+			cpgEnabled:         []bool{true},
+			compositePodGroups: []*schedulingv1alpha3.CompositePodGroup{cpg},
+			podGroups:          []*schedulingv1beta1.PodGroup{pg2, pg3},
+			pods:               []*v1.Pod{p4, p5},
+			podGroupInfo:       compositePodGroupInfo,
+			plugin: &fakePodGroupPlugin{
+				filterStatus: map[string]*fwk.Status{
+					"p4": nil,
+					"p5": nil,
+				},
+			},
+			podGroupFeasibleStatuses: [][]fwk.Code{
+				{fwk.Unschedulable},
+			},
+			expectedFailedPodConditions: map[string]*v1.PodCondition{
+				"p4": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "parent pod group is unschedulable: 0/1 placements are available, first placement status: injected placementFeasible status",
+				},
+				"p5": {
+					Type:    v1.PodScheduled,
+					Status:  v1.ConditionFalse,
+					Reason:  v1.PodReasonUnschedulable,
+					Message: "parent pod group is unschedulable: 0/1 placements are available, first placement status: injected placementFeasible status",
+				},
+			},
+			expectedUnschedulablePlugins: map[*v1.Pod]sets.Set[string]{
+				p4: sets.New("GangScheduling"),
+				p5: sets.New("GangScheduling"),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		for _, tasEnabled := range tt.tasEnabled {
+			for _, cpgEnabled := range tt.cpgEnabled {
+				if !tasEnabled && cpgEnabled {
+					// Cannot happen, skip.
+					continue
+				}
+				t.Run(fmt.Sprintf("%s (TAS enabled: %v, CPG enabled: %v)", tt.name, tasEnabled, cpgEnabled), func(t *testing.T) {
+					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+						features.GenericWorkload:                 true,
+						features.TopologyAwareWorkloadScheduling: tasEnabled,
+						features.CompositePodGroup:               cpgEnabled,
+					})
+
+					logger, ctx := ktesting.NewTestContext(t)
+					ctx, cancel := context.WithCancel(ctx)
+					defer cancel()
+
+					objs := []runtime.Object{testNode}
+					for _, cpg := range tt.compositePodGroups {
+						objs = append(objs, cpg)
+					}
+					for _, pg := range tt.podGroups {
+						objs = append(objs, pg)
+					}
+					for _, p := range tt.pods {
+						objs = append(objs, p)
+					}
+					client := clientsetfake.NewClientset(objs...)
+
+					informerFactory := informers.NewSharedInformerFactory(client, 0)
+					queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
+					snapshot := internalcache.NewEmptySnapshot()
+
+					placementFeasiblePlugin := &fakePlacementFeasiblePlugin{
+						placementFeasibleStatuses: tt.podGroupFeasibleStatuses,
+					}
+
+					registry := []tf.RegisterPluginFunc{
+						tf.RegisterFilterPlugin(tt.plugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+							return tt.plugin, nil
+						}),
+						tf.RegisterPostFilterPlugin(tt.plugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+							return tt.plugin, nil
+						}),
+						tf.RegisterPermitPlugin(placementFeasiblePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+							return placementFeasiblePlugin, nil
+						}),
+						tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+						tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+					}
+
+					schedFwk, err := tf.NewFramework(ctx, registry, "test-scheduler",
+						frameworkruntime.WithInformerFactory(informerFactory),
+						frameworkruntime.WithSnapshotSharedLister(snapshot),
+						frameworkruntime.WithPodNominator(queue),
+						frameworkruntime.WithClientSet(client),
+						frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
+						frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+						frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
+					)
+					if err != nil {
+						t.Fatalf("Failed to create new framework: %v", err)
+					}
+
+					cache := internalcache.New(ctx, nil, true, cpgEnabled)
+					cache.AddNode(logger, testNode)
+					for _, cpg := range tt.compositePodGroups {
+						cache.AddCompositePodGroup(logger, cpg)
+					}
+					for _, pg := range tt.podGroups {
+						cache.AddPodGroup(pg)
+					}
+					for _, p := range tt.pods {
+						cache.AddPodGroupMember(p)
+					}
+
+					sched := &Scheduler{
+						Profiles:         profile.Map{"test-scheduler": schedFwk},
+						SchedulingQueue:  queue,
+						Cache:            cache,
+						client:           client,
+						nodeInfoSnapshot: snapshot,
+					}
+					sched.SchedulePod = sched.schedulePod
+					sched.FailureHandler = sched.handleSchedulingFailure
+
+					bindChan := make(chan string, len(tt.pods))
+					client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+						if action.GetSubresource() != "binding" {
+							return false, nil, nil
+						}
+						binding := action.(clienttesting.CreateAction).GetObject().(*v1.Binding)
+						bindChan <- binding.Name
+						return true, binding, nil
+					})
+
+					informerFactory.Start(ctx.Done())
+					informerFactory.WaitForCacheSync(ctx.Done())
+
+					if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
+						t.Fatalf("Failed to update snapshot: %v", err)
+					}
+
+					sched.podGroupCycle(ctx, schedFwk, framework.NewCycleState(), tt.podGroupInfo, time.Now())
+
+					boundPods := sets.New[string]()
+					for i := 0; i < len(tt.expectedBindings); i++ {
+						select {
+						case podName := <-bindChan:
+							boundPods.Insert(podName)
+						case <-time.After(5 * time.Second):
+							t.Fatalf("Timed out waiting for expected bindings")
+						}
+					}
+					if diff := cmp.Diff(tt.expectedBindings, boundPods); diff != "" {
+						t.Errorf("Unexpected bound pods (-want, +got):\n%s", diff)
+					}
+
+					for podName, expectedCond := range tt.expectedFailedPodConditions {
+						updatedPod, err := client.CoreV1().Pods("default").Get(ctx, podName, metav1.GetOptions{})
+						if err != nil {
+							t.Fatalf("Failed to get pod %s: %v", podName, err)
+						}
+						_, gotCond := podutil.GetPodCondition(&updatedPod.Status, expectedCond.Type)
+						if diff := cmp.Diff(expectedCond, gotCond, cmpopts.IgnoreFields(v1.PodCondition{}, "LastTransitionTime", "LastProbeTime")); diff != "" {
+							t.Errorf("Unexpected pod %s condition (-want, +got):\n%s", podName, diff)
+						}
+					}
+
+					for pod, expectedPlugins := range tt.expectedUnschedulablePlugins {
+						pInfo, ok := queue.GetPod(pod.Name, pod.Namespace, pod.Spec.SchedulingGroup)
+						if !ok {
+							t.Fatalf("Failed to get pod %s from queue", pod.Name)
+						}
+						if diff := cmp.Diff(expectedPlugins, pInfo.UnschedulablePlugins); diff != "" {
+							t.Errorf("Unexpected pod %s unschedulablePlugins (-want, +got):\n%s", pod.Name, diff)
+						}
+					}
+				})
+			}
+		}
 	}
 }

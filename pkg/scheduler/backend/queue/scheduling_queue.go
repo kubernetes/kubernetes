@@ -778,6 +778,9 @@ func (p *PriorityQueue) runPreEnqueuePlugin(ctx context.Context, pl fwk.PreEnque
 	if !pInfo.UnschedulablePlugins.Has(pl.Name()) && !pInfo.PendingPlugins.Has(pl.Name()) {
 		metrics.UnschedulableReason(pl.Name(), pod.Spec.SchedulerName).Inc()
 	}
+	if pInfo.UnschedulablePlugins == nil {
+		pInfo.UnschedulablePlugins = sets.New[string]()
+	}
 	pInfo.UnschedulablePlugins.Insert(pl.Name())
 	pInfo.GatingPlugin = pl.Name()
 	pInfo.GatingPluginEvents = p.pluginToEventsMap[pInfo.GatingPlugin]
