@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onsi/gomega"
 	"math/rand"
 	"net/http/httptest"
 	"net/url"
@@ -31,9 +30,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onsi/gomega"
+
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -1363,6 +1365,67 @@ func shuffle(controllers []*apps.ReplicaSet) []*apps.ReplicaSet {
 		shuffled[i] = controllers[randIndexes[i]]
 	}
 	return shuffled
+}
+
+type preconditionPodControl struct {
+	*controller.FakePodControl
+	opts metav1.DeleteOptions
+}
+
+func (p *preconditionPodControl) DeletePod(ctx context.Context, namespace string, podID string, object runtime.Object, opts metav1.DeleteOptions) error {
+	p.opts = opts
+	return p.FakePodControl.DeletePod(ctx, namespace, podID, object, opts)
+}
+
+func TestSyncReplicaSetDeletePreconditions(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	labelMap := map[string]string{"foo": "bar"}
+	rs := newReplicaSet(1, labelMap)
+
+	client := fake.NewSimpleClientset(rs)
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	manager, informers := testNewReplicaSetControllerFromClient(t, client, stopCh, BurstReplicas)
+
+	// Add a running pod that belongs to the ReplicaSet
+	podList := newPodList(informers.Core().V1().Pods().Informer().GetIndexer(), 1, v1.PodRunning, labelMap, rs, "pod")
+	pod := &podList.Items[0]
+
+	// Set up scale-down to 0 so the next sync attempts deletion
+	*(rs.Spec.Replicas) = 0
+	if err := informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Add(rs); err != nil {
+		t.Fatal(err)
+	}
+
+	// Set pod's initial RV to "1" for the test setup
+	pod.ResourceVersion = "1"
+	if err := informers.Core().V1().Pods().Informer().GetIndexer().Update(pod); err != nil {
+		t.Fatal(err)
+	}
+
+	fakePodControl := &controller.FakePodControl{}
+	fakePodControl.Err = apierrors.NewConflict(schema.GroupResource{Resource: "pods"}, pod.Name, fmt.Errorf("Precondition failed: ResourceVersion does not match"))
+	podControl := &preconditionPodControl{FakePodControl: fakePodControl}
+	manager.podControl = podControl
+
+	// Run sync.
+	_ = manager.syncReplicaSet(ctx, GetKey(rs, t))
+
+	// Verify that deletion was attempted
+	if len(podControl.DeletePodName) != 1 || podControl.DeletePodName[0] != pod.Name {
+		t.Errorf("Deletion was not attempted correctly, expected %s, got %v", pod.Name, podControl.DeletePodName)
+	}
+	if podControl.opts.Preconditions == nil || podControl.opts.Preconditions.ResourceVersion == nil || *podControl.opts.Preconditions.ResourceVersion != "1" {
+		t.Errorf("Precondition ResourceVersion not set correctly, expected '1', got %v", podControl.opts.Preconditions)
+	}
+
+	// Verify that expectations are satisfied after failure (they are decremented on error)
+	rsKey, _ := controller.KeyFunc(rs)
+	satisfied := manager.expectations.SatisfiedExpectations(klog.FromContext(ctx), rsKey)
+	if !satisfied {
+		t.Errorf("Expectations should be satisfied after failure")
+	}
 }
 
 func TestOverlappingRSs(t *testing.T) {
