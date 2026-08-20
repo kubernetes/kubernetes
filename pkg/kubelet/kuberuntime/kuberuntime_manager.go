@@ -1978,7 +1978,15 @@ func incrementImageVolumeMetrics(err error, msg string, container *v1.Container,
 		if _, exists := imageVolumes[m.Name]; exists {
 			if errors.Is(err, ErrCreateContainer) && strings.HasPrefix(msg, crierror.ErrImageVolumeMountFailed.Error()) {
 				metrics.ImageVolumeMountedErrorsTotal.Inc()
-			} else {
+			} else if err == nil ||
+				errors.Is(err, ErrCreateContainer) ||
+				errors.Is(err, ErrPreStartHook) ||
+				errors.Is(err, kubecontainer.ErrRunContainer) ||
+				errors.Is(err, ErrPostStartHook) {
+				// Only count success when CreateContainer was called and the
+				// image volume mount itself did not fail. For errors before
+				// CreateContainer (image pull failures, ErrCreateContainerConfig,
+				// ErrPreCreateHook), the mount was never attempted.
 				metrics.ImageVolumeMountedSucceedTotal.Inc()
 			}
 		}
