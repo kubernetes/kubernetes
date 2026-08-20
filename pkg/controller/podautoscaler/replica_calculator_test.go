@@ -2367,3 +2367,26 @@ func TestCalculatePodRequestsFromContainers_NonExistentContainer(t *testing.T) {
 	assert.Equal(t, expectedErr, err.Error(), "error message should match expected format")
 	assert.Equal(t, int64(0), request, "request should be 0 when container does not exist")
 }
+
+func TestCeilToInt32(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    float64
+		expected int32
+	}{
+		{name: "rounds up", input: 1.1, expected: 2},
+		{name: "rounds up for negatives", input: -1.9, expected: -1},
+		{name: "ceiling crosses max int32", input: float64(math.MaxInt32) + 0.5, expected: math.MaxInt32},
+		{name: "positive overflow", input: 5e9, expected: math.MaxInt32},
+		{name: "positive infinity", input: math.Inf(1), expected: math.MaxInt32},
+		{name: "negative overflow", input: -5e9, expected: math.MinInt32},
+		{name: "negative infinity", input: math.Inf(-1), expected: math.MinInt32},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ceilToInt32(tc.input); got != tc.expected {
+				t.Errorf("ceilToInt32(%v) = %d, want %d", tc.input, got, tc.expected)
+			}
+		})
+	}
+}
