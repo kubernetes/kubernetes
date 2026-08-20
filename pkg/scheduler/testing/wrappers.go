@@ -32,11 +32,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/ptr"
 )
 
 var zero int64
+
+// pauseImage is a placeholder image name for pod fixtures.
+// It is suitable for tests that need a valid non-empty image name, but never actually pull that image.
+const pauseImage = "pause"
 
 // NodeSelectorWrapper wraps a NodeSelector inside.
 type NodeSelectorWrapper struct{ v1.NodeSelector }
@@ -514,14 +517,14 @@ func (p *PodWrapper) Toleration(key string) *PodWrapper {
 // HostPort creates a container with a hostPort valued `hostPort`,
 // and injects into the inner pod.
 func (p *PodWrapper) HostPort(port int32) *PodWrapper {
-	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name("container").Image("pause").HostPort(port).Obj())
+	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name("container").Image(pauseImage).HostPort(port).Obj())
 	return p
 }
 
 // ContainerPort creates a container with ports valued `ports`,
 // and injects into the inner pod.
 func (p *PodWrapper) ContainerPort(ports []v1.ContainerPort) *PodWrapper {
-	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name("container").Image("pause").ContainerPort(ports).Obj())
+	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name("container").Image(pauseImage).ContainerPort(ports).Obj())
 	return p
 }
 
@@ -530,7 +533,7 @@ func (p *PodWrapper) ContainerPort(ports []v1.ContainerPort) *PodWrapper {
 func (p *PodWrapper) InitContainerPort(sidecar bool, ports []v1.ContainerPort) *PodWrapper {
 	c := MakeContainer().
 		Name("init-container").
-		Image("pause").
+		Image(pauseImage).
 		ContainerPort(ports)
 	if sidecar {
 		c.RestartPolicy(v1.ContainerRestartPolicyAlways)
@@ -791,7 +794,7 @@ func (p *PodWrapper) Res(resMap map[v1.ResourceName]string) *PodWrapper {
 	}
 
 	name := fmt.Sprintf("con%d", len(p.Spec.Containers))
-	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name(name).Image(imageutils.GetPauseImageName()).Resources(resMap).Obj())
+	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name(name).Image(pauseImage).Resources(resMap).Obj())
 	return p
 }
 
@@ -818,7 +821,7 @@ func (p *PodWrapper) Req(reqMap map[v1.ResourceName]string) *PodWrapper {
 	}
 
 	name := fmt.Sprintf("con%d", len(p.Spec.Containers))
-	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name(name).Image(imageutils.GetPauseImageName()).ResourceRequests(reqMap).Obj())
+	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name(name).Image(pauseImage).ResourceRequests(reqMap).Obj())
 	return p
 }
 
@@ -829,7 +832,7 @@ func (p *PodWrapper) Lim(limMap map[v1.ResourceName]string) *PodWrapper {
 	}
 
 	name := fmt.Sprintf("con%d", len(p.Spec.Containers))
-	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name(name).Image(imageutils.GetPauseImageName()).ResourceLimits(limMap).Obj())
+	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name(name).Image(pauseImage).ResourceLimits(limMap).Obj())
 	return p
 }
 
@@ -840,7 +843,7 @@ func (p *PodWrapper) InitReq(resMap map[v1.ResourceName]string) *PodWrapper {
 	}
 
 	name := fmt.Sprintf("init-con%d", len(p.Spec.InitContainers))
-	p.Spec.InitContainers = append(p.Spec.InitContainers, MakeContainer().Name(name).Image(imageutils.GetPauseImageName()).Resources(resMap).Obj())
+	p.Spec.InitContainers = append(p.Spec.InitContainers, MakeContainer().Name(name).Image(pauseImage).Resources(resMap).Obj())
 	return p
 }
 
@@ -851,7 +854,7 @@ func (p *PodWrapper) SidecarReq(resMap map[v1.ResourceName]string) *PodWrapper {
 	}
 
 	name := fmt.Sprintf("sidecar-con%d", len(p.Spec.InitContainers))
-	p.Spec.InitContainers = append(p.Spec.InitContainers, MakeContainer().Name(name).Image(imageutils.GetPauseImageName()).RestartPolicy(v1.ContainerRestartPolicyAlways).Resources(resMap).Obj())
+	p.Spec.InitContainers = append(p.Spec.InitContainers, MakeContainer().Name(name).Image(pauseImage).RestartPolicy(v1.ContainerRestartPolicyAlways).Resources(resMap).Obj())
 	return p
 }
 
