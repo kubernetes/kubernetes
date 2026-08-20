@@ -68,6 +68,16 @@ type KubeSchedulerConfiguration struct {
 	// nodes will be scored. It is overridden by profile level PercentageOfNodesToScore.
 	PercentageOfNodesToScore *int32 `json:"percentageOfNodesToScore,omitempty"`
 
+	// PercentageOfPlacementsToScore is the percentage of generated placements that once found
+	// feasible for running a PodGroup, the scheduler stops its search for more feasible placements.
+	// This field is used only when the TopologyAwareWorkloadScheduling feature is enabled.
+	// Scheduler always tries to find at least "minFeasiblePlacementsToFind" feasible placements.
+	// Example: if 500 placements are generated and the value is 30, the scheduler stops after
+	// finding 150 feasible placements. When the value is 0, the default percentage decreases
+	// from 100% to 10% as the summed node count across generated placements grows from 0 to 5000,
+	// with a 5% floor. It is overridden by profile level PercentageOfPlacementsToScore.
+	PercentageOfPlacementsToScore *int32 `json:"percentageOfPlacementsToScore,omitempty"`
+
 	// PodInitialBackoffSeconds is the initial backoff for unschedulable pods.
 	// If specified, it must be greater than 0. If this value is null, the default value (1s)
 	// will be used.
@@ -152,6 +162,17 @@ type KubeSchedulerProfile struct {
 	// nodes will be scored. It will override global PercentageOfNodesToScore. If it is empty,
 	// global PercentageOfNodesToScore will be used.
 	PercentageOfNodesToScore *int32 `json:"percentageOfNodesToScore,omitempty"`
+
+	// PercentageOfPlacementsToScore is the percentage of generated placements that once found
+	// feasible for running a PodGroup, the scheduler stops its search for more feasible placements.
+	// This field is used only when the TopologyAwareWorkloadScheduling feature is enabled.
+	// Scheduler always tries to find at least "minFeasiblePlacementsToFind" feasible placements.
+	// Example: if 500 placements are generated and the value is 30, the scheduler stops after
+	// finding 150 feasible placements. When the value is 0, the default percentage decreases
+	// from 100% to 10% as the summed node count across generated placements grows from 0 to 5000,
+	// with a 5% floor. It overrides global PercentageOfPlacementsToScore. If empty, the global
+	// PercentageOfPlacementsToScore is used.
+	PercentageOfPlacementsToScore *int32 `json:"percentageOfPlacementsToScore,omitempty"`
 
 	// Plugins specify the set of plugins that should be enabled or disabled.
 	// Enabled plugins are the ones that should be enabled in addition to the

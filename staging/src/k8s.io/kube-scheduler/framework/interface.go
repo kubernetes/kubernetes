@@ -803,6 +803,8 @@ type PlacementGeneratePlugin interface {
 
 	// GeneratePlacements generates a list of potential Placements for the given PodGroup within the parent placement.
 	// Each Placement represents a candidate set of resources, e.g., nodes matching a selector.
+	// The scheduler may shuffle and evaluate only a subset of the returned Placements, so plugins
+	// must not rely on their order.
 	GeneratePlacements(ctx context.Context, state PodGroupCycleState, podGroup PodGroupInfo, parentPlacement *Placement) (*GeneratePlacementsResult, *Status)
 }
 
