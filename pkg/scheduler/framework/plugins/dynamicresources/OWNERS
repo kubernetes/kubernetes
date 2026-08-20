@@ -6,6 +6,7 @@ reviewers:
   - klueska
   - pohly
   - bart0sh
+  - nojnhuh
 labels:
   - sig/node
   - wg/device-management
