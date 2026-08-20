@@ -375,25 +375,28 @@ func TestTimeTravelHealthcheck(t *testing.T) {
 
 	ready := make(chan struct{})
 	signal := make(chan struct{})
+	// firstProbeStarted is closed once the first probe has entered the mocked
+	// client, which happens only after it has consumed the rate limiter token.
+	firstProbeStarted := make(chan struct{})
+	// releaseFirstProbe keeps the first probe in flight until the test releases
+	// it, so the second probe is guaranteed to run before the first one returns.
+	releaseFirstProbe := make(chan struct{})
 
 	var counter uint64
 	newETCD3Client = func(c storagebackend.TransportConfig) (*kubernetes.Client, error) {
 		defer close(ready)
 		dummyKV := mockKV{
 			get: func(ctx context.Context) (*clientv3.GetResponse, error) {
-				atomic.AddUint64(&counter, 1)
-				val := atomic.LoadUint64(&counter)
-				// the first request wait for a custom timeout to trigger an error.
-				// We don't use the context timeout because we want to check that
-				// the cached answer is not overridden, and since the rate limit is
-				// based on cfg.HealthcheckTimeout / 2, the timeout will race with
-				// the race limiter to server the new request from the cache or allow
-				// it to go through
+				val := atomic.AddUint64(&counter, 1)
+				// The first probe blocks until the test releases it and then
+				// returns an error. Its timestamp is captured before it blocks,
+				// so this late error must not overwrite a newer cached success.
 				if val == 1 {
+					close(firstProbeStarted)
 					select {
 					case <-ctx.Done():
 						return nil, ctx.Err()
-					case <-time.After((2 * cfg.HealthcheckTimeout) / 3):
+					case <-releaseFirstProbe:
 						return nil, fmt.Errorf("etcd down")
 					}
 				}
@@ -413,16 +416,20 @@ func TestTimeTravelHealthcheck(t *testing.T) {
 	}
 	// Wait for healthcheck to establish connection
 	<-ready
-	// run a first request that fails after 2 seconds
+	// run a first request that stays in flight until released
 	go func() {
 		err := healthcheck()
-		if !strings.Contains(err.Error(), "etcd down") {
+		if err == nil || !strings.Contains(err.Error(), "etcd down") {
 			t.Errorf("healthcheck() mismatch want %v got %v", fmt.Errorf("etcd down"), err)
 		}
 		close(signal)
 	}()
 
-	// wait until the rate limit allows new connections
+	// Only start timing the rate limiter once the first probe has consumed its
+	// token. Because time.Sleep never wakes early, sleeping the limiter interval
+	// (HealthcheckTimeout/2) then guarantees the next probe is admitted, without
+	// racing the limiter refill as the previous timer-based version did.
+	<-firstProbeStarted
 	time.Sleep(cfg.HealthcheckTimeout / 2)
 
 	select {
@@ -440,6 +447,10 @@ func TestTimeTravelHealthcheck(t *testing.T) {
 	if c != 2 {
 		t.Errorf("healthcheck() called etcd %d times, expected only two calls", c)
 	}
+
+	// Release the first probe; its error is stamped with an older timestamp and
+	// must not override the cached success from the second probe.
+	close(releaseFirstProbe)
 
 	// cached request should be success and not be overridden by the late error
 	<-signal
