@@ -804,10 +804,13 @@ func Test_isSchedulableAfterCompositePodGroupAdded(t *testing.T) {
 
 type mockPodGroupState struct {
 	fwk.PodGroupState
-	scheduledPodsCount int
+	scheduledPodsCount      int
+	assumedInThisCycleCount int
 }
 
 func (m *mockPodGroupState) ScheduledPodsCount() int { return m.scheduledPodsCount }
+
+func (m *mockPodGroupState) AssumedInThisCycleCount() int { return m.assumedInThisCycleCount }
 
 type mockPodGroupStateLister struct {
 	state *mockPodGroupState
