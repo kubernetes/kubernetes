@@ -58,6 +58,12 @@ func (d *decoratedWatcher) run(ctx context.Context) {
 			}
 			switch recv.Type {
 			case watch.Added, watch.Modified, watch.Deleted, watch.Bookmark:
+				// The watch cache may wrap objects in a CacheableObject for
+				// serialization efficiency. Unwrap to the underlying object
+				// so the decorator's type assertions work correctly.
+				if co, ok := recv.Object.(runtime.CacheableObject); ok {
+					recv.Object = co.GetObject()
+				}
 				d.decorator(recv.Object)
 				send = recv
 			case watch.Error:

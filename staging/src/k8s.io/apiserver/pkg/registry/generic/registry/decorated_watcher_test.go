@@ -18,11 +18,13 @@ package registry
 
 import (
 	"context"
+	"io"
 	"testing"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
@@ -104,5 +106,52 @@ func expectErrorEvent(t *testing.T, dw *decoratedWatcher) {
 		}
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("timeout after %v", wait.ForeverTestTimeout)
+	}
+}
+
+// wrappedObject simulates the cachingObject wrapper used by the watch cache.
+// It implements runtime.CacheableObject so the decoratedWatcher can extract
+// the underlying object for decoration.
+type wrappedObject struct {
+	inner runtime.Object
+}
+
+func (w *wrappedObject) GetObjectKind() schema.ObjectKind { return w.inner.GetObjectKind() }
+func (w *wrappedObject) DeepCopyObject() runtime.Object   { return &wrappedObject{inner: w.inner.DeepCopyObject()} }
+func (w *wrappedObject) GetObject() runtime.Object        { return w.inner.DeepCopyObject() }
+func (w *wrappedObject) CacheEncode(_ runtime.Identifier, _ func(runtime.Object, io.Writer) error, _ io.Writer) error {
+	return nil
+}
+
+func TestDecoratedWatcherUnwrapsCachingObject(t *testing.T) {
+	w := watch.NewFake()
+	decorator := func(obj runtime.Object) {
+		if pod, ok := obj.(*example.Pod); ok {
+			pod.Annotations = map[string]string{"decorated": "true"}
+		}
+	}
+	ctx := context.Background()
+	dw := newDecoratedWatcher(ctx, w, decorator)
+	defer dw.Stop()
+
+	// Send a wrapped object (simulating cachingObject from the watch cache).
+	go w.Action(watch.Modified, &wrappedObject{
+		inner: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "wrapped-pod"}},
+	})
+
+	select {
+	case e := <-dw.ResultChan():
+		pod, ok := e.Object.(*example.Pod)
+		if !ok {
+			t.Fatalf("expected *example.Pod after unwrapping, got %T", e.Object)
+		}
+		if pod.Annotations["decorated"] != "true" {
+			t.Fatalf("decorator did not run on unwrapped object: annotations=%v", pod.Annotations)
+		}
+		if pod.Name != "wrapped-pod" {
+			t.Fatalf("expected name wrapped-pod, got %s", pod.Name)
+		}
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("timeout waiting for event")
 	}
 }
