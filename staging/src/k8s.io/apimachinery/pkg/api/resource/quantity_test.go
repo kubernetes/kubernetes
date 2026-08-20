@@ -718,6 +718,21 @@ func TestQuantityString(t *testing.T) {
 		{decQuantity(10800, -4, DecimalSI), "1080m", ""},
 		{decQuantity(300, 6, DecimalSI), "300M", ""},
 		{decQuantity(1, 12, DecimalSI), "1T", ""},
+		// DecimalSI has no suffix beyond "E" (10^18). Larger exponents must fall
+		// back to exponent notation instead of dropping the magnitude, otherwise
+		// e.g. "1000E" would serialize to "1" (a 10^21 corruption).
+		{decQuantity(1, 18, DecimalSI), "1E", ""},
+		{decQuantity(1, 21, DecimalSI), "1e21", "1000E"},
+		{decQuantity(5, 21, DecimalSI), "5e21", "5000E"},
+		{decQuantity(1, 24, DecimalSI), "1e24", "1000000E"},
+		// BinarySI has no suffix beyond "Ei" (2^60). A value whose canonical
+		// base-1024 exponent exceeds that (a multiple of 2^70 or larger) has no
+		// binary suffix, so it must fall back to decimal exponent notation
+		// instead of dropping the suffix, otherwise e.g. 2^70 would serialize
+		// to "1". These values round-trip through parse.
+		{decQuantity(1, 70, BinarySI), "10e69", ""},
+		{decQuantity(2, 70, BinarySI), "20e69", ""},
+		{decQuantity(1, 72, BinarySI), "1e72", ""},
 		{decQuantity(1234567, 6, DecimalSI), "1234567M", ""},
 		{decQuantity(1234567, -3, BinarySI), "1234567m", ""},
 		{decQuantity(3, 3, DecimalSI), "3k", ""},
@@ -782,6 +797,26 @@ func TestQuantityString(t *testing.T) {
 		q := item.in
 		q.d = infDecAmount{desired.Neg(q.AsDec())}
 		if e, a := "-"+item.expect, q.String(); e != a {
+			t.Errorf("%#v: expected %v, got %v", item.in, e, a)
+		}
+	}
+}
+
+func TestQuantityStringBelowNano(t *testing.T) {
+	// DecimalSI has no suffix below "n" (10^-9), so these values take the same
+	// exponent-notation fallback as the >"E" cases above. They are not reachable
+	// from a parse (parsing rounds up to nano), only from Go callers such as
+	// NewScaledQuantity, which is why they are not in the TestQuantityString
+	// table: its round-trip checks require parse-stable strings.
+	table := []struct {
+		in     Quantity
+		expect string
+	}{
+		{decQuantity(1, -12, DecimalSI), "1e-12"},
+		{decQuantity(1, -10, DecimalSI), "100e-12"},
+	}
+	for _, item := range table {
+		if e, a := item.expect, item.in.String(); e != a {
 			t.Errorf("%#v: expected %v, got %v", item.in, e, a)
 		}
 	}
