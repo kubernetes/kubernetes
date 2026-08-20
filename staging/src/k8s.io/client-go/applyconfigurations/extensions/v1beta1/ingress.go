@@ -37,13 +37,13 @@ import (
 // DEPRECATED - This group version of Ingress is deprecated by networking.k8s.io/v1beta1 Ingress. See the release notes for more information.
 type IngressApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Spec is the desired state of the Ingress.
+	// spec is the desired state of the Ingress.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Spec *IngressSpecApplyConfiguration `json:"spec,omitempty"`
-	// Status is the current state of the Ingress.
+	// status is the current state of the Ingress.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Status *IngressStatusApplyConfiguration `json:"status,omitempty"`
 }
