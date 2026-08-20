@@ -7366,6 +7366,26 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
+- name: delayed_items
+  subsystem: workqueue
+  help: Current number of delayed items in workqueue
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - name
+  componentEndpoints:
+  - component: cloud-controller-manager
+    endpoint: /metrics
+  - component: kube-apiserver
+    endpoint: /metrics
+  - component: kube-controller-manager
+    endpoint: /metrics
+  - component: kube-proxy
+    endpoint: /metrics
+  - component: kube-scheduler
+    endpoint: /metrics
+  - component: kubelet
+    endpoint: /metrics
 - name: automatic_reload_last_timestamp_seconds
   subsystem: authentication_config_controller
   namespace: apiserver
