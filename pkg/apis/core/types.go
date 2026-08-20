@@ -3825,6 +3825,10 @@ type Taint struct {
 	// Valid effects are NoSchedule, PreferNoSchedule and NoExecute.
 	Effect TaintEffect
 	// TimeAdded represents the time at which the taint was added.
+	// It is populated at admission time by the NodeTaintTimeAddedDefaulting
+	// admission controller when it is not set: taints which have no counterpart with the
+	// same key and effect in the existing node get the current time, all other
+	// taints keep the time they already had.
 	// +optional
 	TimeAdded *metav1.Time
 }
