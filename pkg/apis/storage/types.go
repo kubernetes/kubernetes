@@ -46,6 +46,7 @@ type StorageClass struct {
 	// to the provisioner.  The only validation done on keys is that they are
 	// not empty.  The maximum number of parameters is
 	// 512, with a cumulative max size of 256K
+	// +k8s:maxProperties=512
 	// +optional
 	Parameters map[string]string
 

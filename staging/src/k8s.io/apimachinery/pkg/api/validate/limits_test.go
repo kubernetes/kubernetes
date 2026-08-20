@@ -677,3 +677,53 @@ func TestMinLength(t *testing.T) {
 		})
 	}
 }
+
+func TestMaxProperties(t *testing.T) {
+	cases := []struct {
+		name     string
+		items    int
+		max      int
+		wantErrs field.ErrorList
+	}{{
+		name:  "0 items, max 0",
+		items: 0,
+		max:   0,
+	}, {
+		name:  "1 item, max 0",
+		items: 1,
+		max:   0,
+		wantErrs: field.ErrorList{
+			field.TooMany(field.NewPath("fldpath"), 1, 0).WithOrigin("maxProperties"),
+		},
+	}, {
+		name:  "1 item, max 1",
+		items: 1,
+		max:   1,
+	}, {
+		name:  "2 items, max 1",
+		items: 2,
+		max:   1,
+		wantErrs: field.ErrorList{
+			field.TooMany(field.NewPath("fldpath"), 2, 1).WithOrigin("maxProperties"),
+		},
+	}, {
+		name:  "0 items, max -1",
+		items: 0,
+		max:   -1,
+		wantErrs: field.ErrorList{
+			field.TooMany(field.NewPath("fldpath"), 0, -1).WithOrigin("maxProperties"),
+		},
+	}}
+
+	matcher := field.ErrorMatcher{}.ByOrigin().ByDetailSubstring().ByField().ByType()
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			value := make(map[string]bool, tc.items)
+			for i := range tc.items {
+				value[fmt.Sprintf("key%d", i)] = true
+			}
+			gotErrs := MaxProperties(context.Background(), operation.Operation{}, field.NewPath("fldpath"), value, nil, tc.max)
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}
