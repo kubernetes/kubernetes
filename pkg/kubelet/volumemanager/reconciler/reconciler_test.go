@@ -713,7 +713,7 @@ func Test_Run_Positive_VolumeAttachAndMap(t *testing.T) {
 	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	kubeClient := createtestClientWithPVPVC(gcepv, gcepvc)
+	kubeClient := createTestClientWithPVPVC(gcepv, gcepvc)
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -827,7 +827,7 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	kubeClient := createtestClientWithPVPVC(gcepv, gcepvc, v1.AttachedVolume{
+	kubeClient := createTestClientWithPVPVC(gcepv, gcepvc, v1.AttachedVolume{
 		Name:       "fake-plugin/fake-device1",
 		DevicePath: "/fake/path",
 	})
@@ -929,7 +929,7 @@ func Test_Run_Positive_BlockVolumeAttachMapUnmapDetach(t *testing.T) {
 	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	kubeClient := createtestClientWithPVPVC(gcepv, gcepvc)
+	kubeClient := createTestClientWithPVPVC(gcepv, gcepvc)
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -1052,7 +1052,7 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	kubeClient := createtestClientWithPVPVC(gcepv, gcepvc, v1.AttachedVolume{
+	kubeClient := createTestClientWithPVPVC(gcepv, gcepvc, v1.AttachedVolume{
 		Name:       "fake-plugin/fake-device1",
 		DevicePath: "/fake/path",
 	})
@@ -1333,7 +1333,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 			seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
 			dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 			asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-			kubeClient := createtestClientWithPVPVC(pv, pvc, v1.AttachedVolume{
+			kubeClient := createTestClientWithPVPVC(pv, pvc, v1.AttachedVolume{
 				Name:       v1.UniqueVolumeName(fmt.Sprintf("fake-plugin/%s", tc.pvName)),
 				DevicePath: "fake/path",
 			})
@@ -1594,7 +1594,7 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 
 				dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 				asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-				kubeClient := createtestClientWithPVPVC(pv, pvc, v1.AttachedVolume{
+				kubeClient := createTestClientWithPVPVC(pv, pvc, v1.AttachedVolume{
 					Name:       v1.UniqueVolumeName(fmt.Sprintf("fake-plugin/%s", tc.volumeName)),
 					DevicePath: "fake/path",
 				})
@@ -1819,7 +1819,7 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 				seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
 				dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 				asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-				kubeClient := createtestClientWithPVPVC(pv, pvc, v1.AttachedVolume{
+				kubeClient := createTestClientWithPVPVC(pv, pvc, v1.AttachedVolume{
 					Name:       v1.UniqueVolumeName(fmt.Sprintf("fake-plugin/%s", tc.volumeName)),
 					DevicePath: "fake/path",
 				})
@@ -2109,7 +2109,7 @@ func runReconciler(ctx context.Context, reconciler Reconciler) {
 	go reconciler.Run(ctx, wait.NeverStop)
 }
 
-func createtestClientWithPVPVC(pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim, attachedVolumes ...v1.AttachedVolume) *fake.Clientset {
+func createTestClientWithPVPVC(pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim, attachedVolumes ...v1.AttachedVolume) *fake.Clientset {
 	fakeClient := &fake.Clientset{}
 	if len(attachedVolumes) == 0 {
 		attachedVolumes = append(attachedVolumes, v1.AttachedVolume{
