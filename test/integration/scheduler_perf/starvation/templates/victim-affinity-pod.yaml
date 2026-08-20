@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: pod-victim-
+  labels:
+    app: victim-app
+spec:
+  priority: 0
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+            - key: app
+              operator: In
+              values:
+              - victim-app
+          topologyKey: kubernetes.io/hostname
+  containers:
+  - image: registry.k8s.io/pause:3.10.1
+    name: pause
+    resources:
+      requests:
+        cpu: 10m
+        memory: 10Mi
