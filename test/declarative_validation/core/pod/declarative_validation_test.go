@@ -17,6 +17,7 @@ limitations under the License.
 package pod
 
 import (
+	"math"
 	"strings"
 	"testing"
 
@@ -74,6 +75,24 @@ func TestDeclarativeValidate(t *testing.T) {
 				)),
 				expectedErrs: field.ErrorList{
 					field.Invalid(field.NewPath("spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+				},
+			},
+			"invalid zero activeDeadlineSeconds": {
+				input: podtest.MakePod("foo", podtest.SetActiveDeadlineSeconds(0)),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("spec", "activeDeadlineSeconds"), nil, "").WithOrigin("minimum").MarkAlpha(),
+				},
+			},
+			"invalid negative activeDeadlineSeconds": {
+				input: podtest.MakePod("foo", podtest.SetActiveDeadlineSeconds(-1)),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("spec", "activeDeadlineSeconds"), nil, "").WithOrigin("minimum").MarkAlpha(),
+				},
+			},
+			"invalid activeDeadlineSeconds over maximum": {
+				input: podtest.MakePod("foo", podtest.SetActiveDeadlineSeconds(math.MaxInt32+1)),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("spec", "activeDeadlineSeconds"), nil, "").WithOrigin("maximum").MarkAlpha(),
 				},
 			},
 		}
