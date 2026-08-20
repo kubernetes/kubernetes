@@ -24,6 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -311,5 +312,143 @@ func BenchmarkIndexer(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		store.Update(objects[i%objectCount], objects[i%objectCount])
+	}
+}
+
+// makeCBORTestPod returns a *unstructured.Unstructured Pod-like object for use
+// in codec tests.
+func makeCBORTestPod(name, namespace string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Pod",
+		"metadata": map[string]interface{}{
+			"name":            name,
+			"namespace":       namespace,
+			"resourceVersion": "1",
+		},
+	}}
+}
+
+func podName(obj interface{}) ([]string, error) {
+	u, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return nil, fmt.Errorf("expected *unstructured.Unstructured, got %T", obj)
+	}
+	return []string{u.GetName()}, nil
+}
+
+// TestThreadSafeStoreCodecRoundTrip verifies that CBORUnstructuredCodec
+// transparently encodes objects at rest and decodes them on every read path:
+func TestThreadSafeStoreCodecRoundTrip(t *testing.T) {
+	indexers := Indexers{"byName": podName}
+	store := NewThreadSafeStore(indexers, Indices{}).(*threadSafeMap)
+
+	pod1 := makeCBORTestPod("foo", "default")
+	pod2 := makeCBORTestPod("bar", "default")
+	store.Add("key1", pod1)
+	store.Add("key2", pod2)
+
+	if _, ok := store.items["key1"].(cborEncoded); !ok {
+		t.Fatalf("expected key1 stored as []byte, got %T", store.items["key1"])
+	}
+
+	got, exists := store.Get("key1")
+	if !exists {
+		t.Fatal("Get(key1): not found")
+	}
+	u, ok := got.(*unstructured.Unstructured)
+	if !ok {
+		t.Fatalf("Get(key1) returned %T, want *unstructured.Unstructured", got)
+	}
+	if u.GetName() != "foo" {
+		t.Errorf("Get(key1).name = %q, want foo", u.GetName())
+	}
+
+	list := store.List()
+	if len(list) != 2 {
+		t.Fatalf("List() len = %d, want 2", len(list))
+	}
+	for _, item := range list {
+		if _, ok := item.(*unstructured.Unstructured); !ok {
+			t.Errorf("List() item type = %T, want *unstructured.Unstructured", item)
+		}
+	}
+
+	res, err := store.ByIndex("byName", "foo")
+	if err != nil {
+		t.Fatalf("ByIndex error: %v", err)
+	}
+	if len(res) != 1 || res[0].(*unstructured.Unstructured).GetName() != "foo" {
+		t.Errorf("ByIndex(byName, foo) = %v, want [foo]", res)
+	}
+
+	keys, err := store.IndexKeys("byName", "bar")
+	if err != nil {
+		t.Fatalf("IndexKeys error: %v", err)
+	}
+	if len(keys) != 1 || keys[0] != "key2" {
+		t.Errorf("IndexKeys(byName, bar) = %v, want [key2]", keys)
+	}
+
+	store.Update("key1", makeCBORTestPod("baz", "default"))
+	if res, _ := store.ByIndex("byName", "foo"); len(res) != 0 {
+		t.Errorf("ByIndex(foo) after update = %v, want empty", res)
+	}
+	if res, _ := store.ByIndex("byName", "baz"); len(res) != 1 {
+		t.Errorf("ByIndex(baz) after update = %v, want 1 result", res)
+	}
+
+	store.Delete("key2")
+	if _, exists := store.Get("key2"); exists {
+		t.Error("Get(key2) after delete: still exists")
+	}
+	if res, _ := store.ByIndex("byName", "bar"); len(res) != 0 {
+		t.Errorf("ByIndex(bar) after delete = %v, want empty", res)
+	}
+}
+
+// TestThreadSafeStoreCodecReplace verifies that Replace encodes the incoming
+// objects and that the rebuilt index works correctly.
+func TestThreadSafeStoreCodecReplace(t *testing.T) {
+	indexers := Indexers{"byName": podName}
+	store := NewThreadSafeStore(indexers, Indices{}).(*threadSafeMap)
+
+	store.Replace(map[string]interface{}{
+		"key1": makeCBORTestPod("foo", "default"),
+		"key2": makeCBORTestPod("bar", "default"),
+	}, "10")
+
+	if _, ok := store.items["key1"].(cborEncoded); !ok {
+		t.Fatalf("expected key1 stored as []byte after Replace, got %T", store.items["key1"])
+	}
+	got, exists := store.Get("key1")
+	if !exists {
+		t.Fatal("Get(key1) after Replace: not found")
+	}
+	if got.(*unstructured.Unstructured).GetName() != "foo" {
+		t.Errorf("Get(key1).name = %q, want foo", got.(*unstructured.Unstructured).GetName())
+	}
+	if res, _ := store.ByIndex("byName", "bar"); len(res) != 1 {
+		t.Errorf("ByIndex(bar) after Replace = %v, want 1 result", res)
+	}
+}
+
+// TestThreadSafeStoreCodecEncodeFallback verifies that non-Unstructured objects
+// (e.g. typed structs) pass through the store unchanged and are not CBOR-encoded.
+func TestThreadSafeStoreCodecEncodeFallback(t *testing.T) {
+	store := NewThreadSafeStore(Indexers{}, Indices{}).(*threadSafeMap)
+
+	typed := &metav1.ObjectMeta{Name: "foo"}
+	store.Add("key1", typed)
+
+	if store.items["key1"] != typed {
+		t.Errorf("expected typed object stored as original pointer, got %T", store.items["key1"])
+	}
+	got, exists := store.Get("key1")
+	if !exists {
+		t.Fatal("Get(key1): not found")
+	}
+	if got.(*metav1.ObjectMeta).Name != "foo" {
+		t.Errorf("Get(key1).Name = %q, want foo", got.(*metav1.ObjectMeta).Name)
 	}
 }
