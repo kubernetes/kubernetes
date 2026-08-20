@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package otlptrace // import "go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+package otlptrace
 
 import (
 	"context"
@@ -97,9 +97,9 @@ func NewUnstarted(client Client) *Exporter {
 func (e *Exporter) MarshalLog() any {
 	return struct {
 		Type   string
-		Client Client
+		Client string
 	}{
 		Type:   "otlptrace",
-		Client: e.client,
+		Client: fmt.Sprintf("%T", e.client),
 	}
 }

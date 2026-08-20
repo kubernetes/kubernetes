@@ -10,4 +10,4 @@ See https://opentelemetry.io.
 See [go.opentelemetry.io/otel/sdk/internal/x] for information about
 the experimental features.
 */
-package trace // import "go.opentelemetry.io/otel/sdk/trace"
+package trace

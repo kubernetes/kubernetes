@@ -10,6 +10,7 @@ ALL_COVERAGE_MOD_DIRS := $(shell find . -type f -name 'go.mod' -exec dirname {} 
 
 GO = go
 TIMEOUT = 60
+GO_VERSION := $(shell awk '/^go [0-9]/ {print $$2; exit}' go.mod)
 
 # User to run as in docker images.
 DOCKER_USER=$(shell id -u):$(shell id -g)
@@ -19,7 +20,7 @@ DEPENDENCIES_DOCKERFILE=./dependencies.Dockerfile
 
 .PHONY: precommit ci
 precommit: generate toolchain-check license-check misspell go-mod-tidy golangci-lint-fix verify-readmes verify-mods test-default
-ci: generate toolchain-check license-check lint vanity-import-check verify-readmes verify-mods build test-default check-clean-work-tree test-coverage
+ci: generate toolchain-check license-check lint verify-readmes verify-mods build test-default check-clean-work-tree test-coverage
 
 # Tools
 
@@ -59,9 +60,6 @@ $(TOOLS)/gocovmerge: PACKAGE=github.com/wadey/gocovmerge
 STRINGER = $(TOOLS)/stringer
 $(TOOLS)/stringer: PACKAGE=golang.org/x/tools/cmd/stringer
 
-PORTO = $(TOOLS)/porto
-$(TOOLS)/porto: PACKAGE=github.com/jcchavezs/porto/cmd/porto
-
 GOTMPL = $(TOOLS)/gotmpl
 $(GOTMPL): PACKAGE=go.opentelemetry.io/build-tools/gotmpl
 
@@ -72,7 +70,7 @@ GOVULNCHECK = $(TOOLS)/govulncheck
 $(TOOLS)/govulncheck: PACKAGE=golang.org/x/vuln/cmd/govulncheck
 
 .PHONY: tools
-tools: $(CROSSLINK) $(GOLANGCI_LINT) $(MISSPELL) $(GOCOVMERGE) $(STRINGER) $(PORTO) $(VERIFYREADMES) $(MULTIMOD) $(SEMCONVKIT) $(GOTMPL) $(GORELEASE)
+tools: $(CROSSLINK) $(GOLANGCI_LINT) $(MISSPELL) $(GOCOVMERGE) $(STRINGER) $(VERIFYREADMES) $(MULTIMOD) $(SEMCONVKIT) $(GOTMPL) $(GORELEASE)
 
 # Virtualized python tools via docker
 
@@ -110,7 +108,7 @@ $(CODESPELL): PACKAGE=codespell
 # Generate
 
 .PHONY: generate
-generate: go-generate vanity-import-fix
+generate: go-generate
 
 .PHONY: go-generate
 go-generate: $(OTEL_GO_MOD_DIRS:%=go-generate/%)
@@ -120,14 +118,10 @@ go-generate/%: $(STRINGER) $(GOTMPL)
 		&& cd $(DIR) \
 		&& PATH="$(TOOLS):$${PATH}" $(GO) generate ./...
 
-.PHONY: vanity-import-fix
-vanity-import-fix: $(PORTO)
-	@$(PORTO) --include-internal -w .
-
 # Generate go.work file for local development.
 .PHONY: go-work
 go-work: $(CROSSLINK)
-	$(CROSSLINK) work --root=$(shell pwd) --go=1.22.7
+	$(CROSSLINK) work --root=$(shell pwd) --go=$(GO_VERSION)
 
 # Build
 
@@ -227,10 +221,6 @@ go-mod-tidy/%: crosslink
 
 .PHONY: lint
 lint: misspell go-mod-tidy golangci-lint
-
-.PHONY: vanity-import-check
-vanity-import-check: $(PORTO)
-	@$(PORTO) --include-internal -l . || ( echo "(run: make vanity-import-fix)"; exit 1 )
 
 .PHONY: misspell
 misspell: $(MISSPELL)

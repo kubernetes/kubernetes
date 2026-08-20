@@ -113,3 +113,10 @@ All officially supported exporters for the OpenTelemetry project are contained i
 ## Contributing
 
 See the [contributing documentation](CONTRIBUTING.md).
+
+### Emeritus
+
+- [Alex Kats](https://github.com/akats7), Triager
+
+For more information about the emeritus role, see the
+[community repository](https://github.com/open-telemetry/community/blob/main/guides/contributor/membership.md#emeritus-maintainerapprovertriager).
