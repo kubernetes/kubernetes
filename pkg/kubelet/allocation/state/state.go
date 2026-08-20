@@ -25,49 +25,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
-// PodResourceInfo stores resource requirements for containers within a pod.
-type PodResourceInfo struct {
-	// ContainerResources maps container names to their respective ResourceRequirements.
-	ContainerResources map[string]v1.ResourceRequirements
-
-	// PodLevelResources represents resource requirements that apply to the entire pod, if any.
-	PodLevelResources *v1.ResourceRequirements
-
-	// EmptyDirVolumeLimits maps emptyDir volume names to their respective resource limits, if any.
-	EmptyDirVolumeLimits map[string]*resource.Quantity
-}
-
-// PodResourceInfoMap maps pod UIDs to their corresponding PodResourceInfo,
-// tracking resource requirements for all containers within each pod.
-type PodResourceInfoMap map[types.UID]PodResourceInfo
-
-// Clone returns a copy of PodResourceInfoMap
-func (pr PodResourceInfoMap) Clone() PodResourceInfoMap {
-	prCopy := make(PodResourceInfoMap)
-	for podUID, podInfo := range pr {
-		newPodInfo := PodResourceInfo{
-			ContainerResources: make(map[string]v1.ResourceRequirements),
-			PodLevelResources:  podInfo.PodLevelResources.DeepCopy(),
-		}
-		for containerName, containerInfo := range podInfo.ContainerResources {
-			newPodInfo.ContainerResources[containerName] = *containerInfo.DeepCopy()
-		}
-		if podInfo.EmptyDirVolumeLimits != nil {
-			newPodInfo.EmptyDirVolumeLimits = make(map[string]*resource.Quantity)
-			for volumeName, volumeLimit := range podInfo.EmptyDirVolumeLimits {
-				if volumeLimit == nil {
-					newPodInfo.EmptyDirVolumeLimits[volumeName] = nil
-				} else {
-					vl := volumeLimit.DeepCopy()
-					newPodInfo.EmptyDirVolumeLimits[volumeName] = &vl
-				}
-			}
-		}
-		prCopy[podUID] = newPodInfo
-	}
-	return prCopy
-}
-
 // Reader interface used to read current pod resource state
 type Reader interface {
 	GetContainerResources(podUID types.UID, containerName string) (v1.ResourceRequirements, bool)
