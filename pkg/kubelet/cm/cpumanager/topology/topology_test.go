@@ -864,6 +864,26 @@ func TestCPUDetailsKeepOnly(t *testing.T) {
 		name: "cpus is not in CPUDetails.",
 		cpus: cpuset.New(3),
 		want: CPUDetails{},
+	}, {
+		name: "empty cpus set.",
+		cpus: cpuset.New(),
+		want: CPUDetails{},
+	}, {
+		name: "cpus equals all CPUDetails.",
+		cpus: cpuset.New(0, 1, 2),
+		want: map[int]CPUInfo{
+			0: {},
+			1: {},
+			2: {},
+		},
+	}, {
+		name: "cpus is superset of CPUDetails.",
+		cpus: cpuset.New(0, 1, 2, 3, 4, 5),
+		want: map[int]CPUInfo{
+			0: {},
+			1: {},
+			2: {},
+		},
 	}}
 
 	for _, tt := range tests {
