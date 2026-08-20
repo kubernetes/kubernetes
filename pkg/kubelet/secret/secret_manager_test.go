@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/api/core/v1"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -154,4 +155,194 @@ func TestCacheBasedSecretManager(t *testing.T) {
 			checkObject(t, store, ns, secret, shouldExist)
 		}
 	}
+}
+
+// stubObjectManager returns a fixed object and error, so the type assertion in
+// secretManager.GetSecret can be exercised without building a real store.
+type stubObjectManager struct {
+	object runtime.Object
+	err    error
+}
+
+func (s *stubObjectManager) GetObject(namespace, name string) (runtime.Object, error) {
+	return s.object, s.err
+}
+
+func (s *stubObjectManager) RegisterPod(pod *v1.Pod) {}
+
+func (s *stubObjectManager) UnregisterPod(pod *v1.Pod) {}
+
+func TestSimpleSecretManager(t *testing.T) {
+	secret := &v1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "s1"}}
+	secretManager := NewSimpleSecretManager(fake.NewSimpleClientset(secret))
+
+	actual, err := secretManager.GetSecret("ns1", "s1")
+	if err != nil {
+		t.Fatalf("unexpected error getting ns1/s1: %v", err)
+	}
+	if actual.Namespace != "ns1" || actual.Name != "s1" {
+		t.Errorf("expected ns1/s1, got %v/%v", actual.Namespace, actual.Name)
+	}
+
+	// Every call reads through to the apiserver, so a secret of the same name in
+	// another namespace must not be visible.
+	if _, err := secretManager.GetSecret("ns2", "s1"); !apierrors.IsNotFound(err) {
+		t.Errorf("expected NotFound for ns2/s1, got %v", err)
+	}
+
+	// Register/UnregisterPod are no-ops for this implementation. Call them to
+	// pin down that they do not panic and do not affect later reads.
+	pod := podWithSecrets("ns1", "name1", secretsToAttach{imagePullSecretNames: []string{"s1"}})
+	secretManager.RegisterPod(pod)
+	secretManager.UnregisterPod(pod)
+	if _, err := secretManager.GetSecret("ns1", "s1"); err != nil {
+		t.Errorf("unexpected error after register/unregister: %v", err)
+	}
+}
+
+func TestSecretManagerGetSecret(t *testing.T) {
+	secret := &v1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "s1"}}
+	testCases := []struct {
+		name         string
+		object       runtime.Object
+		err          error
+		expectSecret *v1.Secret
+		expectErr    string
+	}{
+		{
+			name:         "secret is returned unchanged",
+			object:       secret,
+			expectSecret: secret,
+		},
+		{
+			name:      "error from the store is propagated",
+			err:       fmt.Errorf("object %q/%q not registered", "ns1", "s1"),
+			expectErr: "not registered",
+		},
+		{
+			name:      "object of another type is rejected",
+			object:    &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "s1"}},
+			expectErr: "unexpected object type",
+		},
+		{
+			// A store returning no object and no error is not something callers
+			// should silently treat as a missing secret.
+			name:      "nil object without error is rejected",
+			expectErr: "unexpected object type",
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			secretManager := &secretManager{
+				manager: &stubObjectManager{object: testCase.object, err: testCase.err},
+			}
+
+			actual, err := secretManager.GetSecret("ns1", "s1")
+			if testCase.expectErr != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got secret %v", testCase.expectErr, actual)
+				}
+				if !strings.Contains(err.Error(), testCase.expectErr) {
+					t.Errorf("expected error containing %q, got %v", testCase.expectErr, err)
+				}
+				if actual != nil {
+					t.Errorf("expected no secret alongside the error, got %v", actual)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if actual != testCase.expectSecret {
+				t.Errorf("expected secret %v, got %v", testCase.expectSecret, actual)
+			}
+		})
+	}
+}
+
+func TestSecretManagerRegisterPodDelegates(t *testing.T) {
+	stub := &stubObjectManager{object: &v1.Secret{}}
+	secretManager := &secretManager{manager: stub}
+
+	// Delegation only, so the assertion is simply that these reach the
+	// underlying manager without panicking.
+	pod := podWithSecrets("ns1", "name1", secretsToAttach{imagePullSecretNames: []string{"s1"}})
+	secretManager.RegisterPod(pod)
+	secretManager.UnregisterPod(pod)
+}
+
+func TestCachingAndWatchingSecretManagers(t *testing.T) {
+	testCases := []struct {
+		name          string
+		secretManager Manager
+	}{
+		{
+			name:          "caching",
+			secretManager: NewCachingSecretManager(fake.NewSimpleClientset(), noObjectTTL),
+		},
+		{
+			name:          "watching",
+			secretManager: NewWatchingSecretManager(fake.NewSimpleClientset(), time.Minute),
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			if testCase.secretManager == nil {
+				t.Fatal("expected a secret manager")
+			}
+
+			// Nothing has been registered, so a lookup must fail locally rather
+			// than fall back to the apiserver.
+			if _, err := testCase.secretManager.GetSecret("ns1", "s1"); err == nil {
+				t.Error("expected an error for a secret that was never registered")
+			}
+		})
+	}
+}
+
+func TestFakeSecretManager(t *testing.T) {
+	pod := podWithSecrets("ns1", "name1", secretsToAttach{imagePullSecretNames: []string{"s1"}})
+
+	t.Run("without secrets", func(t *testing.T) {
+		fakeManager := NewFakeManager()
+
+		// Callers rely on the nil secret and nil error to skip secret handling
+		// altogether, so both halves matter.
+		actual, err := fakeManager.GetSecret("ns1", "s1")
+		if err != nil {
+			t.Errorf("expected no error, got %v", err)
+		}
+		if actual != nil {
+			t.Errorf("expected no secret, got %v", actual)
+		}
+
+		fakeManager.RegisterPod(pod)
+		fakeManager.UnregisterPod(pod)
+	})
+
+	t.Run("with secrets", func(t *testing.T) {
+		secret := &v1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "s1"}}
+		fakeManager := NewFakeManagerWithSecrets([]*v1.Secret{secret})
+
+		actual, err := fakeManager.GetSecret("ns1", "s1")
+		if err != nil {
+			t.Fatalf("unexpected error getting ns1/s1: %v", err)
+		}
+		if actual != secret {
+			t.Errorf("expected secret %v, got %v", secret, actual)
+		}
+
+		// Lookup matches on name only, so the namespace argument is ignored.
+		actual, err = fakeManager.GetSecret("other", "s1")
+		if err != nil {
+			t.Fatalf("unexpected error getting other/s1: %v", err)
+		}
+		if actual != secret {
+			t.Errorf("expected secret %v, got %v", secret, actual)
+		}
+
+		if _, err := fakeManager.GetSecret("ns1", "missing"); err == nil {
+			t.Error("expected an error for a secret that was not provided")
+		}
+	})
 }

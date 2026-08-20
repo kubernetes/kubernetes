@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/api/core/v1"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -170,4 +171,165 @@ func TestCacheBasedConfigMapManager(t *testing.T) {
 			checkObject(t, store, ns, configMap, shouldExist(ns, configMap))
 		}
 	}
+}
+
+// stubObjectManager returns a fixed object and error, so the type assertion in
+// configMapManager.GetConfigMap can be exercised without building a real store.
+type stubObjectManager struct {
+	object runtime.Object
+	err    error
+}
+
+func (s *stubObjectManager) GetObject(namespace, name string) (runtime.Object, error) {
+	return s.object, s.err
+}
+
+func (s *stubObjectManager) RegisterPod(pod *v1.Pod) {}
+
+func (s *stubObjectManager) UnregisterPod(pod *v1.Pod) {}
+
+func TestSimpleConfigMapManager(t *testing.T) {
+	configMap := &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "cm1"}}
+	configMapManager := NewSimpleConfigMapManager(fake.NewSimpleClientset(configMap))
+
+	actual, err := configMapManager.GetConfigMap("ns1", "cm1")
+	if err != nil {
+		t.Fatalf("unexpected error getting ns1/cm1: %v", err)
+	}
+	if actual.Namespace != "ns1" || actual.Name != "cm1" {
+		t.Errorf("expected ns1/cm1, got %v/%v", actual.Namespace, actual.Name)
+	}
+
+	// Every call reads through to the apiserver, so a configmap of the same name
+	// in another namespace must not be visible.
+	if _, err := configMapManager.GetConfigMap("ns2", "cm1"); !apierrors.IsNotFound(err) {
+		t.Errorf("expected NotFound for ns2/cm1, got %v", err)
+	}
+
+	// Register/UnregisterPod are no-ops for this implementation. Call them to
+	// pin down that they do not panic and do not affect later reads.
+	pod := podWithConfigMaps("ns1", "name1", configMapsToAttach{volumes: []string{"cm1"}})
+	configMapManager.RegisterPod(pod)
+	configMapManager.UnregisterPod(pod)
+	if _, err := configMapManager.GetConfigMap("ns1", "cm1"); err != nil {
+		t.Errorf("unexpected error after register/unregister: %v", err)
+	}
+}
+
+func TestConfigMapManagerGetConfigMap(t *testing.T) {
+	configMap := &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "cm1"}}
+	testCases := []struct {
+		name            string
+		object          runtime.Object
+		err             error
+		expectConfigMap *v1.ConfigMap
+		expectErr       string
+	}{
+		{
+			name:            "configmap is returned unchanged",
+			object:          configMap,
+			expectConfigMap: configMap,
+		},
+		{
+			name:      "error from the store is propagated",
+			err:       fmt.Errorf("object %q/%q not registered", "ns1", "cm1"),
+			expectErr: "not registered",
+		},
+		{
+			name:      "object of another type is rejected",
+			object:    &v1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "cm1"}},
+			expectErr: "unexpected object type",
+		},
+		{
+			// A store returning no object and no error is not something callers
+			// should silently treat as a missing configmap.
+			name:      "nil object without error is rejected",
+			expectErr: "unexpected object type",
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			configMapManager := &configMapManager{
+				manager: &stubObjectManager{object: testCase.object, err: testCase.err},
+			}
+
+			actual, err := configMapManager.GetConfigMap("ns1", "cm1")
+			if testCase.expectErr != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got configmap %v", testCase.expectErr, actual)
+				}
+				if !strings.Contains(err.Error(), testCase.expectErr) {
+					t.Errorf("expected error containing %q, got %v", testCase.expectErr, err)
+				}
+				if actual != nil {
+					t.Errorf("expected no configmap alongside the error, got %v", actual)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if actual != testCase.expectConfigMap {
+				t.Errorf("expected configmap %v, got %v", testCase.expectConfigMap, actual)
+			}
+		})
+	}
+}
+
+func TestConfigMapManagerRegisterPodDelegates(t *testing.T) {
+	stub := &stubObjectManager{object: &v1.ConfigMap{}}
+	configMapManager := &configMapManager{manager: stub}
+
+	// Delegation only, so the assertion is simply that these reach the
+	// underlying manager without panicking.
+	pod := podWithConfigMaps("ns1", "name1", configMapsToAttach{volumes: []string{"cm1"}})
+	configMapManager.RegisterPod(pod)
+	configMapManager.UnregisterPod(pod)
+}
+
+func TestCachingAndWatchingConfigMapManagers(t *testing.T) {
+	testCases := []struct {
+		name             string
+		configMapManager Manager
+	}{
+		{
+			name:             "caching",
+			configMapManager: NewCachingConfigMapManager(fake.NewSimpleClientset(), noObjectTTL),
+		},
+		{
+			name:             "watching",
+			configMapManager: NewWatchingConfigMapManager(fake.NewSimpleClientset(), time.Minute),
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			if testCase.configMapManager == nil {
+				t.Fatal("expected a configmap manager")
+			}
+
+			// Nothing has been registered, so a lookup must fail locally rather
+			// than fall back to the apiserver.
+			if _, err := testCase.configMapManager.GetConfigMap("ns1", "cm1"); err == nil {
+				t.Error("expected an error for a configmap that was never registered")
+			}
+		})
+	}
+}
+
+func TestFakeConfigMapManager(t *testing.T) {
+	fakeManager := NewFakeManager()
+
+	// Callers rely on the nil configmap and nil error to skip configmap handling
+	// altogether, so both halves matter.
+	actual, err := fakeManager.GetConfigMap("ns1", "cm1")
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if actual != nil {
+		t.Errorf("expected no configmap, got %v", actual)
+	}
+
+	pod := podWithConfigMaps("ns1", "name1", configMapsToAttach{volumes: []string{"cm1"}})
+	fakeManager.RegisterPod(pod)
+	fakeManager.UnregisterPod(pod)
 }
