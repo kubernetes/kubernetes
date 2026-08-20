@@ -1410,6 +1410,22 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		// If container does not exist, or is not running, check whether we
 		// need to restart it.
 		if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
+			// Check for a running duplicate before scheduling a new start.
+                	// FindContainerStatusByName returns only the first match and may return
+                	// an Exited status while a Running duplicate exists (e.g. when a CRI
+                	// StartContainer call timed out in kubelet but succeeded in the runtime).
+                	// See https://github.com/kubernetes/kubernetes/issues/139670
+                	hasRunningDuplicate := false
+                	for _, s := range podStatus.ContainerStatuses {
+                        	if s.Name == container.Name && s.State == kubecontainer.ContainerStateRunning {
+                                	hasRunningDuplicate = true
+                                	break
+                        	}
+                	}
+                	if hasRunningDuplicate {
+                        	keepCount++
+                        	continue
+                	}
 			if kubecontainer.ShouldContainerBeRestarted(logger, &container, pod, podStatus) {
 				logger.V(3).Info("Container of pod is not in the desired state and shall be started", "containerName", container.Name, "pod", klog.KObj(pod))
 				changes.ContainersToStart = append(changes.ContainersToStart, idx)
