@@ -71,8 +71,6 @@ type Scheduler struct {
 	// by NodeLister and Algorithm.
 	Cache internalcache.Cache
 
-	Extenders []fwk.Extender
-
 	// NextEntity should be a function that blocks until the next entity (pod or pod group)
 	// is available. We don't use a channel for this, because scheduling
 	// a pod may take some amount of time and we don't want pods to get
@@ -108,10 +106,6 @@ type Scheduler struct {
 
 	nodeInfoSnapshot *internalcache.Snapshot
 
-	percentageOfNodesToScore int32
-
-	nextStartNodeIndex int
-
 	// logger *must* be initialized when creating a Scheduler,
 	// otherwise logging functions will access a nil sink and
 	// panic.
@@ -123,10 +117,14 @@ type Scheduler struct {
 	nominatedNodeNameForExpectationEnabled              bool
 	genericWorkloadEnabled                              bool
 	inPlacePodVerticalScalingSchedulerPreemptionEnabled bool
+
+	algorithm *SchedulingAlgorithm
 }
 
+// applyDefaultHandlers installs the default handlers. It must run after
+// initAlgorithm, whose result SchedulePod points at.
 func (sched *Scheduler) applyDefaultHandlers() {
-	sched.SchedulePod = sched.schedulePod
+	sched.SchedulePod = sched.algorithm.schedulePod
 	sched.FailureHandler = sched.handleSchedulingFailure
 }
 
@@ -458,8 +456,6 @@ func New(ctx context.Context,
 		Cache:                                  schedulerCache,
 		client:                                 client,
 		nodeInfoSnapshot:                       snapshot,
-		percentageOfNodesToScore:               options.percentageOfNodesToScore,
-		Extenders:                              extenders,
 		StopEverything:                         stopEverything,
 		SchedulingQueue:                        podQueue,
 		Profiles:                               profiles,
@@ -470,6 +466,7 @@ func New(ctx context.Context,
 		genericWorkloadEnabled:                 feature.DefaultFeatureGate.Enabled(features.GenericWorkload),
 		inPlacePodVerticalScalingSchedulerPreemptionEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption),
 	}
+	sched.initAlgorithm(withPercentageOfNodesToScore(options.percentageOfNodesToScore))
 	sched.NextEntity = podQueue.Pop
 	sched.applyDefaultHandlers()
 
@@ -681,4 +678,15 @@ func (sched *Scheduler) CurrentCycle() int64 {
 		return sched.SchedulingQueue.SchedulingCycle()
 	}
 	return 0
+}
+
+// initAlgorithm builds the scheduling algorithm from the Scheduler's fields. It
+// has to run before any scheduling method, and before applyDefaultHandlers, which
+// hands SchedulePod the algorithm's method value. New calls it, and so must a
+// Scheduler assembled field by field.
+//
+// CurrentCycle is passed as a bound method value, so a SchedulingQueue installed
+// after this call is still picked up.
+func (sched *Scheduler) initAlgorithm(opts ...AlgorithmOption) {
+	sched.algorithm = NewSchedulingAlgorithm(sched.nodeInfoSnapshot, sched.Cache, sched.CurrentCycle, opts...)
 }
