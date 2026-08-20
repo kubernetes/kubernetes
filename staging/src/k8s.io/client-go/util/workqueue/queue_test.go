@@ -462,6 +462,157 @@ func mustGarbageCollect(t *testing.T, i interface{}) {
 	})
 }
 
+// TestShutDownWithDrainWaitsForQueuedItems checks that ShutDownWithDrain does not
+// return while items remain in the queue (not only while items are in processing).
+func TestShutDownWithDrainWaitsForQueuedItems(t *testing.T) {
+	q := workqueue.New()
+	q.Add("a")
+	q.Add("b")
+
+	first, _ := q.Get() // processing={a}, queue=[b]
+
+	// Worker takes remaining items but holds "b" in processing until released so
+	// we can assert drain stays blocked without relying on timing.
+	holdB := make(chan struct{})
+	sawB := make(chan struct{})
+	workerDone := make(chan struct{})
+	go func() {
+		defer close(workerDone)
+		for {
+			item, quit := q.Get()
+			if quit {
+				return
+			}
+			if item == "b" {
+				close(sawB)
+				<-holdB
+			}
+			q.Done(item)
+		}
+	}()
+
+	drained := make(chan struct{})
+	go func() {
+		q.ShutDownWithDrain()
+		close(drained)
+	}()
+
+	// Finish "a". Worker should receive queued "b" and block before Done.
+	q.Done(first)
+
+	select {
+	case <-sawB:
+	case <-drained:
+		t.Fatalf("ShutDownWithDrain returned before remaining item was processed (len=%d)", q.Len())
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("timed out waiting for worker to get queued item b")
+	}
+
+	// "b" is in-flight; drain must still be waiting.
+	select {
+	case <-drained:
+		t.Fatal("ShutDownWithDrain returned while item b still processing")
+	default:
+	}
+
+	close(holdB)
+
+	select {
+	case <-drained:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("ShutDownWithDrain did not return after queue drained")
+	}
+
+	select {
+	case <-workerDone:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("worker did not exit after drain")
+	}
+
+	if q.Len() != 0 {
+		t.Fatalf("expected empty queue after drain, len=%d", q.Len())
+	}
+}
+
+// TestShutDownWithDrainManyWorkers stresses ShutDownWithDrain with multiple workers
+// so a single Signal cannot leave drain or workers stuck.
+func TestShutDownWithDrainManyWorkers(t *testing.T) {
+	q := workqueue.New()
+	for i := 0; i < 50; i++ {
+		q.Add(i)
+	}
+
+	const workers = 8
+	var started, wg sync.WaitGroup
+	started.Add(workers)
+	wg.Add(workers)
+	for i := 0; i < workers; i++ {
+		go func() {
+			defer wg.Done()
+			started.Done()
+			for {
+				item, quit := q.Get()
+				if quit {
+					return
+				}
+				q.Done(item)
+			}
+		}()
+	}
+	started.Wait()
+
+	drained := make(chan struct{})
+	go func() {
+		q.ShutDownWithDrain()
+		close(drained)
+	}()
+
+	select {
+	case <-drained:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("deadlock: ShutDownWithDrain did not return")
+	}
+
+	workersDone := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(workersDone)
+	}()
+	select {
+	case <-workersDone:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("deadlock: workers did not exit after drain")
+	}
+}
+
+// TestDoneIdempotent ensures a spurious extra Done does not duplicate queue entries.
+func TestDoneIdempotent(t *testing.T) {
+	q := workqueue.New()
+	q.Add("x")
+	item, _ := q.Get()
+	q.Add(item) // dirty while processing
+	q.Done(item)
+	q.Done(item) // spurious second Done
+
+	if got := q.Len(); got != 1 {
+		t.Fatalf("queue len=%d after requeue + spurious Done, want 1", got)
+	}
+
+	got, quit := q.Get()
+	if quit || got != "x" {
+		t.Fatalf("Get()=(%v, quit=%v), want (x, false)", got, quit)
+	}
+	if q.Len() != 0 {
+		t.Fatalf("queue len=%d after one Get, want 0 (duplicate entries)", q.Len())
+	}
+	q.Done(got)
+
+	q.ShutDown()
+	if _, quit = q.Get(); !quit {
+		t.Fatal("expected shutdown signal with empty queue")
+	}
+}
+
 func BenchmarkQueue(b *testing.B) {
 	keys := make([]string, 100)
 	for idx := range keys {
