@@ -248,6 +248,14 @@ func TestValidateDeviceTaint(t *testing.T) {
 				return claim
 			}(),
 		},
+		"empty-device-selector": {
+			wantFailures: field.ErrorList{field.Required(field.NewPath("spec", "deviceSelector"), "at least one of driver, pool, or device must be specified")},
+			taintRule: func() *resourceapi.DeviceTaintRule {
+				claim := testDeviceTaintRule(goodName, validDeviceTaintRuleSpec)
+				claim.Spec.DeviceSelector = &resourceapi.DeviceTaintSelector{}
+				return claim
+			}(),
+		},
 	}
 
 	for name, scenario := range scenarios {
