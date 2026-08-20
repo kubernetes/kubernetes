@@ -233,6 +233,11 @@ func Run(g *Generator) {
 		localOutputPackages = append(localOutputPackages, p)
 	}
 
+	// Flatten the fields to prevent inline fields from losing
+	// their inline properties during proto serialization.
+	flattener := NewFlattener(protobufNames.packages)
+	flattener.flattenEmbeddedMembersInPackages(c)
+
 	if err := protobufNames.AssignTypesToPackages(c); err != nil {
 		log.Fatalf("Failed to identify Common types: %v", err)
 	}
