@@ -601,6 +601,63 @@ func TestResourceConfigForPod(t *testing.T) {
 			},
 		},
 		{
+			description: "burstable-with-dra-init-only-percontainer-overhead-claim",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name: "ic1",
+							Resources: getResourceRequirements(
+								getResourceList("500m", "100Mi"), // requests
+								getResourceList("1", "200Mi"),    // limits
+							),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: getResourceRequirements(
+								getResourceList("1", "200Mi"), // requests
+								getResourceList("3", "500Mi"), // limits
+							),
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "overhead-claim",
+							Containers:        []string{"ic1"},
+							Overhead: []v1.NodeAllocatableOverheadResources{
+								{
+									Name:         v1.ResourceCPU,
+									PerContainer: new(resource.MustParse("2")),
+								},
+								{
+									Name:         v1.ResourceMemory,
+									PerContainer: new(resource.MustParse("300Mi")),
+								},
+							},
+						},
+					},
+				},
+			},
+			draNodeAllocatableResourcesEnabled: true,
+			enforceCPULimits:                   true,
+			quotaPeriod:                        defaultQuotaPeriod,
+			// The init container is the claim's only reference, so its PerContainer overhead counts
+			// only toward the init phase peak:
+			// CPUShares: max(c1 request (1), ic1 request (0.5) + PerContainer (2)) = 2.5 CPUs
+			// CPUQuota: max(c1 limit (3), ic1 limit (1) + PerContainer (2)) = 3 CPUs
+			// Memory: max(c1 limit (500), ic1 limit (200) + PerContainer (300)) = 500 Mi
+			expected: &ResourceConfig{
+				CPUShares: new(MilliCPUToShares(2500)),
+				CPUQuota:  new(MilliCPUToQuota(3000, int64(defaultQuotaPeriod))),
+				CPUPeriod: &defaultQuotaPeriod,
+				Memory:    new(500 * Mi),
+			},
+		},
+		{
 			description: "burstable-with-dra-feature-gate-disabled",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
