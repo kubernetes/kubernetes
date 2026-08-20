@@ -2816,6 +2816,14 @@ func (kl *Kubelet) findContainer(ctx context.Context, podFullName string, podUID
 	if err != nil {
 		return nil, err
 	}
+	// When a non-empty pod UID is supplied it must match the current pod with
+	// this full name. FindPod below resolves by full name whenever it is set,
+	// so without this check a request carrying a stale or mismatched UID could
+	// resolve to a recreated pod that merely shares the namespace/name. This
+	// mirrors the UID enforcement already performed by GetAttach.
+	if apiPod, found := kl.GetPodByFullName(podFullName); found && podUID != "" && apiPod.UID != podUID {
+		return nil, fmt.Errorf("pod %s not found", podFullName)
+	}
 	// Resolve and type convert back again.
 	// We need the static pod UID but the kubecontainer API works with types.UID.
 	podUID = types.UID(kl.podManager.TranslatePodUID(podUID))
