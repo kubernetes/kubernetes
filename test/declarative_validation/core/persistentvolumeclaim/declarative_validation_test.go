@@ -73,6 +73,35 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 
 	updateObj := mkValidPersistentVolumeClaim()
 	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
+
+	tests := map[string]struct {
+		newVolumeName string
+		expectedErr   field.ErrorList
+	}{
+		"volumeName cannot be modified once set": {
+			newVolumeName: "other-volume",
+			expectedErr: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "volumeName"), nil, "field cannot be modified once set").WithOrigin("update").MarkAlpha(),
+			},
+		},
+		"volumeName cannot be cleared once set": {
+			newVolumeName: "",
+			expectedErr: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "volumeName"), nil, "field cannot be cleared once set").WithOrigin("update").MarkAlpha(),
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			oldObj := mkValidPersistentVolumeClaim()
+			oldObj.ResourceVersion = "1"
+			oldObj.Spec.VolumeName = "volume"
+			updateObj := oldObj.DeepCopy()
+			updateObj.Spec.VolumeName = tc.newVolumeName
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, updateObj, &oldObj, registry.Strategy, tc.expectedErr)
+		})
+	}
 }
 
 func TestDeclarativeValidateStatusUpdate(t *testing.T) {
