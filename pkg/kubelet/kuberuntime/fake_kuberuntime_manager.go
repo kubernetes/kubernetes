@@ -117,6 +117,7 @@ func newFakeKubeRuntimeManager(ctx context.Context, runtimeService internalapi.R
 		podLogsDirectory:   fakePodLogsDirectory,
 		actuatedState:      state.NewStateMemory(logger, nil),
 	}
+	kubeRuntimeManager.containerExitCancels = make(map[string]context.CancelFunc)
 
 	// Initialize swap controller availability check (always false for tests)
 	kubeRuntimeManager.getSwapControllerAvailable = func() bool { return false }

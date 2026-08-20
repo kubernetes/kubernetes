@@ -73,6 +73,7 @@ func newTestGenericPLEGWithChannelSize(eventChannelCap int) *TestGenericPLEG {
 		&RelistDuration{RelistPeriod: time.Hour, RelistThreshold: 3 * time.Minute},
 		fakeCache,
 		clock,
+		nil,
 	).(*GenericPLEG)
 	return &TestGenericPLEG{pleg: pleg, runtime: fakeRuntime, clock: clock}
 }
@@ -332,6 +333,7 @@ func newTestGenericPLEGWithRuntimeMock(runtimeMock kubecontainer.Runtime) *Gener
 		&RelistDuration{RelistPeriod: time.Hour, RelistThreshold: 2 * time.Hour},
 		kubecontainer.NewCache(),
 		clock.RealClock{},
+		nil,
 	).(*GenericPLEG)
 	return pleg
 }
@@ -644,6 +646,7 @@ func TestUpdateCacheUsesPodTimestampWhenEventedPLEGIsEnabled(t *testing.T) {
 		&RelistDuration{RelistPeriod: time.Hour, RelistThreshold: 3 * time.Minute},
 		cache,
 		testingclock.NewFakeClock(time.Time{}),
+		nil,
 	).(*GenericPLEG)
 
 	cache.Set(podID, &kubecontainer.PodStatus{ID: podID}, nil, cachedTimestamp)
@@ -886,6 +889,7 @@ func TestWorkerLoop(t *testing.T) {
 			&RelistDuration{RelistPeriod: 2 * time.Second},
 			cache,
 			clock.RealClock{},
+			nil,
 		).(*GenericPLEG)
 
 		pod1 := &kubecontainer.Pod{ID: "pod1", Name: "pod1", Containers: []*kubecontainer.Container{{ID: kubecontainer.ContainerID{Type: "test", ID: "c1"}, State: kubecontainer.ContainerStateRunning}}}
