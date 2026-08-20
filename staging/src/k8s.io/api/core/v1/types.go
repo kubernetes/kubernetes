@@ -4456,6 +4456,9 @@ type PodSpec struct {
 	// https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodename
 	// +optional
 	NodeName string `json:"nodeName,omitempty" protobuf:"bytes,10,opt,name=nodeName"`
+	// NodeUID indicates the UID of the Node object where this pod is scheduled.
+	// +optional
+	NodeUID types.UID `json:"nodeUID,omitempty" protobuf:"bytes,45,opt,name=nodeUID,casttype=k8s.io/apimachinery/pkg/types.UID"`
 	// Host networking requested for this pod. Use the host's network namespace.
 	// When using HostNetwork you should specify ports so the scheduler is aware.
 	// When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`,

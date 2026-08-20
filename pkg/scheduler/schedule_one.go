@@ -28,6 +28,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -324,6 +325,7 @@ func (sched *Scheduler) assumeAndReserve(
 	// This allows us to keep scheduling without waiting on binding to occur.
 	assumedPodInfo := podInfo.DeepCopy()
 	assumedPod := assumedPodInfo.Pod
+	assumedPod.Spec.NodeUID = scheduleResult.SuggestedHostUID
 	// assume modifies `assumedPod` by setting NodeName=scheduleResult.SuggestedHost
 	err := sched.assume(logger, state, assumedPodInfo, scheduleResult.SuggestedHost)
 	if err != nil {
@@ -594,14 +596,16 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 
 	// When only one node after predicate, just use it.
 	if len(feasibleNodes) == 1 {
-		node := feasibleNodes[0].Node().Name
+		selectedNode := feasibleNodes[0].Node()
+		node := selectedNode.Name
 		if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
 			fwk.StoreScheduleResults(ctx, podInfo.PodSignature, nodeHint, node, nil, sched.CurrentCycle())
 		}
 		return ScheduleResult{
-			SuggestedHost:  node,
-			EvaluatedNodes: 1 + diagnosis.NodeToStatus.Len(),
-			FeasibleNodes:  1,
+			SuggestedHost:    node,
+			SuggestedHostUID: selectedNode.UID,
+			EvaluatedNodes:   1 + diagnosis.NodeToStatus.Len(),
+			FeasibleNodes:    1,
 		}, nil
 	}
 
@@ -612,6 +616,14 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 
 	sortedPrioritizedNodes := framework.NewSortedScoredNodes(priorityList)
 	node := sortedPrioritizedNodes.Pop().Name
+
+	var nodeUID types.UID
+	for i := range feasibleNodes {
+		if feasibleNodes[i].Node().Name == node {
+			nodeUID = feasibleNodes[i].Node().UID
+			break
+		}
+	}
 	trace.Step("Prioritizing done")
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
@@ -619,9 +631,10 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 	}
 
 	return ScheduleResult{
-		SuggestedHost:  node,
-		EvaluatedNodes: len(feasibleNodes) + diagnosis.NodeToStatus.Len(),
-		FeasibleNodes:  len(feasibleNodes),
+		SuggestedHost:    node,
+		SuggestedHostUID: nodeUID,
+		EvaluatedNodes:   len(feasibleNodes) + diagnosis.NodeToStatus.Len(),
+		FeasibleNodes:    len(feasibleNodes),
 	}, err
 }
 
