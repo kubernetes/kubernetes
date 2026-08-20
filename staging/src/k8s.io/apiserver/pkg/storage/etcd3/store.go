@@ -144,7 +144,7 @@ func (a *abortOnFirstError) Append(key string, err error) bool {
 func (a *abortOnFirstError) Aggregate() error { return a.err }
 
 // New returns an etcd3 implementation of storage.Interface.
-func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner) (*store, error) {
+func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, reverseKeyFunc storage.ReverseKeyFunc, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner) (*store, error) {
 	// for compatibility with etcd2 impl.
 	// no-op for default prefix of '/registry'.
 	// keeps compatibility with etcd2 impl for custom prefixes that don't start with '/'
@@ -169,12 +169,13 @@ func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc
 	}
 
 	w := &watcher{
-		client:        c.Client,
-		codec:         codec,
-		newFunc:       newFunc,
-		groupResource: groupResource,
-		versioner:     versioner,
-		transformer:   transformer,
+		client:         c.Client,
+		codec:          codec,
+		newFunc:        newFunc,
+		reverseKeyFunc: newStorageKeyReverseFunc(pathPrefix, reverseKeyFunc),
+		groupResource:  groupResource,
+		versioner:      versioner,
+		transformer:    transformer,
 	}
 	if newFunc == nil {
 		w.objectType = "<unknown>"
@@ -204,6 +205,19 @@ func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc
 	}
 	etcdfeature.DefaultFeatureSupportChecker.CheckClient(c.Ctx(), c, storage.RequestWatchProgress)
 	return s, nil
+}
+
+func newStorageKeyReverseFunc(pathPrefix string, reverseKeyFunc storage.ReverseKeyFunc) storageKeyReverseFunc {
+	if reverseKeyFunc == nil {
+		return nil
+	}
+	return func(key storageKey) (name string, namespace string, err error) {
+		resourceKey, found := strings.CutPrefix(string(key), pathPrefix)
+		if !found {
+			return "", "", fmt.Errorf("storage key %q does not have backend prefix %q", key, pathPrefix)
+		}
+		return reverseKeyFunc("/" + resourceKey)
+	}
 }
 
 func (s *store) CompactRevision() int64 {
