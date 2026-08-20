@@ -23,6 +23,7 @@ import (
 	"math"
 	"reflect"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -826,8 +827,13 @@ func (s *Validator) validateMap(ctx context.Context, fldPath *field.Path, obj, o
 
 	correlatable := MapIsCorrelatable(s.Schema.XMapType)
 
+	if s.AdditionalProperties == nil && s.Properties == nil {
+		return errs, remainingBudget
+	}
+	keys := sortedMapKeys(obj)
 	if s.AdditionalProperties != nil {
-		for k, v := range obj {
+		for _, k := range keys {
+			v := obj[k]
 			var oldV interface{}
 			if correlatable {
 				oldV = oldObj[k] // +k8s:verify-mutation:reason=clone
@@ -842,7 +848,8 @@ func (s *Validator) validateMap(ctx context.Context, fldPath *field.Path, obj, o
 		}
 	}
 	if s.Properties != nil {
-		for k, v := range obj {
+		for _, k := range keys {
+			v := obj[k]
 			sub, ok := s.Properties[k]
 			if ok {
 				var oldV interface{}
@@ -861,6 +868,15 @@ func (s *Validator) validateMap(ctx context.Context, fldPath *field.Path, obj, o
 	}
 
 	return errs, remainingBudget
+}
+
+func sortedMapKeys(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func (s *Validator) validateArray(ctx context.Context, fldPath *field.Path, obj, oldObj []interface{}, correlation ratchetingOptions, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
