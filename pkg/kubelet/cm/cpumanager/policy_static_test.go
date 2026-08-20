@@ -637,7 +637,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 	}
 	alignBySocketOptionTestCases := []staticPolicyTest{
 		{
-			description: "Align by socket: true, cpu's within same socket of numa in hint are part of allocation",
+			description: "Align by socket: true, CPUs from NUMA nodes in the hint are allocated first",
 			topo:        topoDualSocketMultiNumaPerSocketHT,
 			options: map[string]string{
 				AlignBySocketOption: "true",
@@ -649,10 +649,10 @@ func TestStaticPolicyAdd(t *testing.T) {
 			topologyHint:    &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0, 2), Preferred: true},
 			expErr:          nil,
 			expCPUAlloc:     true,
-			expCSet:         cpuset.New(2, 11),
+			expCSet:         cpuset.New(2, 21),
 		},
 		{
-			description: "Align by socket: false, cpu's are taken strictly from NUMA nodes in hint",
+			description: "Align by socket: false, CPUs are taken strictly from NUMA nodes in the hint",
 			topo:        topoDualSocketMultiNumaPerSocketHT,
 			options: map[string]string{
 				AlignBySocketOption: "false",
@@ -665,6 +665,52 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          nil,
 			expCPUAlloc:     true,
 			expCSet:         cpuset.New(2, 21),
+		},
+		{
+			description: "Align by socket: true, insufficient hinted NUMA CPUs expand allocation within the same socket",
+			topo:        topoDualSocketMultiNumaPerSocketHT,
+			options: map[string]string{
+				AlignBySocketOption: "true",
+			},
+			numReservedCPUs: 1,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(1, 2, 10, 11, 12, 21, 22),
+			pod:             makePod("fakePod", "fakeContainer5", "3000m", "3000m"),
+			topologyHint:    &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         cpuset.New(1, 2, 10),
+		},
+		{
+			description: "Align by socket: true, insufficient same-socket CPUs fall back to other sockets",
+			topo:        topoDualSocketMultiNumaPerSocketHT,
+			options: map[string]string{
+				AlignBySocketOption: "true",
+			},
+			numReservedCPUs: 1,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(1, 2, 11, 21, 22, 31, 32),
+			pod:             makePod("fakePod", "fakeContainer6", "4000m", "4000m"),
+			topologyHint:    &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         cpuset.New(1, 2, 11, 21),
+		},
+		{
+			description: "Distribute CPUs across NUMA takes precedence over align by socket",
+			topo:        topoDualSocketMultiNumaPerSocketHT,
+			options: map[string]string{
+				AlignBySocketOption:            "true",
+				DistributeCPUsAcrossNUMAOption: "true",
+			},
+			numReservedCPUs: 1,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(1, 10, 11, 12, 20, 21, 22, 23, 24, 30, 31, 32, 33, 34),
+			pod:             makePod("fakePod", "fakeContainer7", "4000m", "4000m"),
+			topologyHint:    &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         cpuset.New(1, 20, 21, 22),
 		},
 	}
 
