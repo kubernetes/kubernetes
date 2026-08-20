@@ -76,6 +76,15 @@ const (
 	// defaultBookmarkFrequency defines how frequently watch bookmarks should be send
 	// in addition to sending a bookmark right before watch deadline.
 	defaultBookmarkFrequency = time.Minute
+
+	// stalledWatchersSamplePeriod is how often the stalled-watchers gauge is
+	// refreshed (WatchCacheStallResume only).
+	stalledWatchersSamplePeriod = time.Second
+
+	// stalledWatcherProgressWindow is how long a watcher whose result
+	// channel is full may go without delivering an event before it is
+	// counted as stalled.
+	stalledWatcherProgressWindow = defaultBookmarkFrequency
 )
 
 // Config contains the configuration for a given Cache.
@@ -93,6 +102,14 @@ type Config struct {
 	// EventsHistoryWindow specifies minimum history duration that storage is keeping.
 	// If lower than DefaultEventFreshDuration, the cache creation will fail.
 	EventsHistoryWindow time.Duration
+
+	// StalledClientCullAfter, if positive, makes the WatchCacheStallResume
+	// sampler stop any watcher whose result channel is full and that has
+	// delivered nothing to its client for that long. Zero (the default) disables the
+	// cull: only the stalled-watchers gauge is maintained, and a stalled
+	// watcher lives until its client acts or its request deadline fires.
+	// Ignored when the WatchCacheStallResume feature gate is off.
+	StalledClientCullAfter time.Duration
 
 	// The Cache will be caching objects of a given Type and assumes that they
 	// are all stored under ResourcePrefix directory in the underlying database.
@@ -134,13 +151,6 @@ func (wm watchersMap) deleteWatcher(number int) {
 	delete(wm, number)
 }
 
-func (wm watchersMap) terminateAll(done func(*cacheWatcher)) {
-	for key, watcher := range wm {
-		delete(wm, key)
-		done(watcher)
-	}
-}
-
 type indexedWatchers struct {
 	allWatchers   map[namespacedName]watchersMap
 	valueWatchers map[string]watchersMap
@@ -176,6 +186,21 @@ func (i *indexedWatchers) deleteWatcher(number int, scope namespacedName, value 
 	}
 }
 
+// forEach visits every registered watcher across both indexes. Callers
+// hold the Cacher lock (read or write per their needs).
+func (i *indexedWatchers) forEach(f func(*cacheWatcher)) {
+	for _, watchers := range i.allWatchers {
+		for _, w := range watchers {
+			f(w)
+		}
+	}
+	for _, watchers := range i.valueWatchers {
+		for _, w := range watchers {
+			f(w)
+		}
+	}
+}
+
 func (i *indexedWatchers) terminateAll(groupResource schema.GroupResource, done func(*cacheWatcher)) {
 	// note that we don't have to call setDrainInputBufferLocked method on the watchers
 	// because we take advantage of the default value - stop immediately
@@ -184,12 +209,7 @@ func (i *indexedWatchers) terminateAll(groupResource schema.GroupResource, done 
 	if len(i.allWatchers) > 0 || len(i.valueWatchers) > 0 {
 		klog.Warningf("Terminating all watchers from cacher %v", groupResource)
 	}
-	for _, watchers := range i.allWatchers {
-		watchers.terminateAll(done)
-	}
-	for _, watchers := range i.valueWatchers {
-		watchers.terminateAll(done)
-	}
+	i.forEach(done)
 	i.allWatchers = map[namespacedName]watchersMap{}
 	i.valueWatchers = map[string]watchersMap{}
 }
@@ -320,7 +340,7 @@ type Cacher struct {
 	stopCh   chan struct{}
 	stopWg   sync.WaitGroup
 
-	clock clock.Clock
+	clock clock.WithTicker
 	// timer is used to avoid unnecessary allocations in underlying watchers.
 	timer *time.Timer
 
@@ -343,6 +363,35 @@ type Cacher struct {
 	expiredBookmarkWatchers []*cacheWatcher
 	compactor               *compactor
 	watcherMetrics          *metrics.WatcherMetricsObservers
+
+	// stall is non-nil exactly when the WatchCacheStallResume feature gate
+	// is enabled (read once at construction): watchers whose input channel
+	// fills up are poked and catch up from the watch cache history instead
+	// of being terminated. When nil, dispatch behaves exactly as before the
+	// gate existed.
+	stall *cacherStall
+}
+
+// cacherStall is the per-Cacher stall-and-resume state; a Cacher holds one
+// exactly when the WatchCacheStallResume gate is on, making the nil check
+// the single mode representation.
+type cacherStall struct {
+	// metrics holds the pre-resolved metric children shared by all
+	// watchers of this Cacher.
+	metrics *metrics.StallResumeObservers
+	// src serves catch-up intervals from the watch cache event history.
+	src *ringCatchUp
+	// cullAfter, if positive, makes the stalled-watchers sampler stop any
+	// watcher whose result channel is full and that has delivered nothing
+	// for that long. Zero (the default) disables the cull; only the gauge
+	// is maintained.
+	cullAfter time.Duration
+	// reportedMu serializes the stalled-watchers gauge updates with the
+	// shutdown withdrawal.
+	reportedMu sync.Mutex
+	// reported is this Cacher's current contribution to the stalled-watchers
+	// gauge child, which siblings serving the same group/resource share.
+	reported int
 }
 
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
@@ -455,6 +504,13 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 
 	cacher.watchCache = watchCache
 	cacher.reflector = reflector
+	if utilfeature.DefaultFeatureGate.Enabled(features.WatchCacheStallResume) {
+		cacher.stall = &cacherStall{
+			metrics:   metrics.NewStallResumeObservers(config.GroupResource),
+			src:       &ringCatchUp{cache: watchCache},
+			cullAfter: config.StalledClientCullAfter,
+		}
+	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
 		err := config.Storage.EnableResourceSizeEstimation(cacher.getKeys)
@@ -470,6 +526,15 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 
 	go cacher.dispatchEvents()
 	go progressRequester.Run(stopCh)
+	if cacher.stall != nil {
+		// Under stopWg so Stop returns only after this Cacher's gauge
+		// contribution is withdrawn.
+		cacher.stopWg.Add(1)
+		go func() {
+			defer cacher.stopWg.Done()
+			cacher.runStalledWatchersSampler(stopCh)
+		}()
+	}
 
 	cacher.stopWg.Add(1)
 	go func() {
@@ -569,6 +634,8 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	// - having it large enough to ensure that watchers that need to process
 	//   a bunch of changes have enough buffer to avoid from blocking other
 	//   watchers on our watcher having a processing hiccup
+	// (with WatchCacheStallResume the size no longer decides whether a slow
+	// watcher survives; see suggestedWatchChannelSize)
 	chanSize := c.watchCache.suggestedWatchChannelSize(c.indexedTrigger != nil, triggerSupported)
 
 	// client-go is going to fall back to a standard LIST on any error
@@ -610,6 +677,11 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		c.clock,
 		identifier,
 	)
+	if c.stall != nil {
+		// Must happen before the watcher is registered, so the dispatcher never
+		// sees a stall-mode watcher without its latch.
+		watcher.enableStallResume(c.stall.src, c.stall.metrics)
+	}
 
 	// note that c.waitUntilWatchCacheFreshAndForceAllEvents must be called without
 	// the c.watchCache.RLock held otherwise we are at risk of a deadlock
@@ -1023,6 +1095,18 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 		setCachingObjects(&wcEvent, c.versioner)
 		event = &wcEvent
 
+		if c.stall != nil {
+			// Stall/resume mode: never wait for a slow watcher and never
+			// terminate it here. A watcher whose input channel is full is
+			// poked and later catches up from the watch cache history.
+			for _, watcher := range c.watchersBuffer {
+				if !watcher.nonblockingAdd(event) {
+					watcher.poke(event.ResourceVersion)
+				}
+			}
+			return
+		}
+
 		c.blockedWatchers = c.blockedWatchers[:0]
 		for _, watcher := range c.watchersBuffer {
 			if !watcher.nonblockingAdd(event) {
@@ -1187,6 +1271,86 @@ func (c *Cacher) stopWatcherLocked(watcher *cacheWatcher) {
 	} else {
 		watcher.stopLocked()
 	}
+}
+
+// runStalledWatchersSampler periodically counts the watchers whose client
+// has stopped draining (full result channel) and that have made no delivery
+// progress within the last bookmark period, exports that as a gauge, and
+// optionally culls them (WatchCacheStallResume only).
+func (c *Cacher) runStalledWatchersSampler(stopCh <-chan struct{}) {
+	ticker := c.clock.NewTicker(stalledWatchersSamplePeriod)
+	defer ticker.Stop()
+	// A stopped Cacher (deleted CRD storage) must not leave its last nonzero
+	// sample in the gauge until process restart; withdrawing only its own
+	// contribution leaves any sibling's intact.
+	defer c.reportStalledWatchers(0)
+	for {
+		select {
+		case <-ticker.C():
+			// lastProgress is stamped with c.clock by the watchers.
+			c.sampleStalledWatchers(c.clock.Now())
+		case <-stopCh:
+			return
+		}
+	}
+}
+
+// reportStalledWatchers moves this Cacher's contribution to the
+// stalled-watchers gauge to n. The gauge child is keyed by group/resource,
+// which several live Cachers can share (one per served CRD version, one per
+// served resource.k8s.io version), so each Cacher adds only its own delta:
+// the child is then the exact sum over the siblings, and a stopping Cacher
+// removes only what it added instead of zeroing the child under them.
+func (c *Cacher) reportStalledWatchers(n int) {
+	s := c.stall
+	s.reportedMu.Lock()
+	defer s.reportedMu.Unlock()
+	if n == s.reported {
+		return
+	}
+	s.metrics.StalledWatchers.Add(float64(n - s.reported))
+	s.reported = n
+}
+
+// sampleStalledWatchers refreshes the stalled-watchers gauge and, if the cull
+// is enabled, stops watchers whose client has stopped reading.
+func (c *Cacher) sampleStalledWatchers(now time.Time) {
+	stalled, toCull := c.stalledWatchers(now)
+	c.reportStalledWatchers(stalled)
+	for _, w := range toCull {
+		c.stall.metrics.TerminatedStalledClient.Inc()
+		klog.V(2).InfoS("Culling stalled watcher", "groupResource", c.groupResource, "identifier", w.identifier)
+		// A clean stop: the client is not reading, so there is nobody to
+		// send an ERROR event to.
+		w.forget(false)
+	}
+}
+
+// stalledWatchers counts the watchers that are stalled as of now and, if
+// the cull is enabled, lists the ones idle for longer than the cull
+// threshold.
+func (c *Cacher) stalledWatchers(now time.Time) (stalled int, toCull []*cacheWatcher) {
+	visit := func(w *cacheWatcher) {
+		// A watcher is stalled if its client has stopped draining (its
+		// result channel is full) and nothing has been delivered to that
+		// client for a whole progress window. A full result channel implies
+		// at least one earlier successful send, so lastProgress is a real
+		// delivery time here, never just the creation-time seed.
+		if !w.clientBlocked() {
+			return
+		}
+		idle := now.Sub(time.Unix(0, w.stall.lastProgress.Load()))
+		if idle > stalledWatcherProgressWindow {
+			stalled++
+		}
+		if c.stall.cullAfter > 0 && idle > c.stall.cullAfter {
+			toCull = append(toCull, w)
+		}
+	}
+	c.RLock()
+	defer c.RUnlock()
+	c.watchers.forEach(visit)
+	return stalled, toCull
 }
 
 func (c *Cacher) isStopped() bool {
