@@ -891,7 +891,7 @@ func NewMainKubelet(ctx context.Context,
 		RelistPeriod:    genericPlegRelistPeriod,
 		RelistThreshold: genericPlegRelistThreshold,
 	}
-	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, eventChannel, genericRelistDuration, podCache, clock.RealClock{})
+	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, eventChannel, genericRelistDuration, podCache, clock.RealClock{}, runtime.NotifyContainerDied)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
 		// EventedPLEG only watches the CRI event stream and requests relists.
