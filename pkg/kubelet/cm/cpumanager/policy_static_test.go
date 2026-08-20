@@ -2627,6 +2627,64 @@ func TestStaticPolicyAllocatePod(t *testing.T) {
 				expPodSharedPoolAssignments: 0,
 			},
 		},
+		{
+			description: "scope: pod, DistributeCPUsAcrossNUMA with multi-NUMA hint should distribute container CPUs across all hinted NUMA nodes",
+			topo:        topoDualSocketHT,
+			options: map[string]string{
+				DistributeCPUsAcrossNUMAOption: "true",
+			},
+			numReservedCPUs: 2,
+			reservedCPUs:    cpuset.New(0, 1),
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			pod:             makePodWithPodLevelResources("pod-single-container-distributed", "4", "4", "workload", "4", "4"),
+			topologyHint:    topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0, 1), Preferred: true},
+			expErr:          nil,
+			expPodAssignments: state.ContainerCPUAssignments{
+				"pod-single-container-distributed": map[string]cpuset.CPUSet{
+					"workload": cpuset.New(2, 3, 8, 9),
+				},
+			},
+			expDefaultCPUSet:                cpuset.New(4, 5, 6, 7, 10, 11),
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalAllocs:              1,
+				expExclusiveAssignments:     1,
+				expPodSharedPoolAssignments: 0,
+			},
+		},
+		{
+			description: "scope: pod, DistributeCPUsAcrossNUMA with multi-NUMA hint should distribute multiple containers across all hinted NUMA nodes",
+			topo:        topoDualSocketHT,
+			options: map[string]string{
+				DistributeCPUsAcrossNUMAOption: "true",
+			},
+			numReservedCPUs: 2,
+			reservedCPUs:    cpuset.New(0, 1),
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			pod: makePodWithContainersAndPodLevelResources("pod-multi-container-distributed", "6", "6", []containerSpec{}, []containerSpec{
+				{name: "workload", request: "4", limit: "4"},
+				{name: "sidecar", request: "2", limit: "2"},
+			}),
+			topologyHint: topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0, 1), Preferred: true},
+			expErr:       nil,
+			expPodAssignments: state.ContainerCPUAssignments{
+				"pod-multi-container-distributed": map[string]cpuset.CPUSet{
+					"workload": cpuset.New(2, 3, 8, 9),
+					"sidecar":  cpuset.New(6, 7),
+				},
+			},
+			expDefaultCPUSet:                cpuset.New(4, 5, 10, 11),
+			podLevelResourcesEnabled:        true,
+			podLevelResourceManagersEnabled: true,
+			requiredMetrics: requiredMetrics{
+				expTotalAllocs:              2,
+				expExclusiveAssignments:     2,
+				expPodSharedPoolAssignments: 0,
+			},
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -2639,7 +2697,7 @@ func TestStaticPolicyAllocatePod(t *testing.T) {
 			metrics.ResourceManagerAllocationErrorsTotal.Reset()
 			metrics.ResourceManagerContainerAssignments.Reset()
 
-			policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reservedCPUs, topologymanager.NewFakeManager(logger), testCase.options)
+			policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, testCase.reservedCPUs, topologymanager.NewFakeManagerWithHint(logger, &testCase.topologyHint), testCase.options)
 			if err != nil {
 				t.Fatalf("NewStaticPolicy() failed: %v", err)
 			}
