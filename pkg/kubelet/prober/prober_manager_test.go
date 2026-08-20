@@ -29,8 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/probe"
@@ -627,6 +630,192 @@ func TestUpdatePodStatusWithInitContainers(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestUpdatePodStatusOnKubeletRestart(t *testing.T) {
+	const (
+		containerName  = "test_container"
+		oldContainerID = "test://old-container-id"
+		newContainerID = "test://new_container_id"
+	)
+
+	tests := []struct {
+		name string
+		// featureEnabled toggles ChangeContainerStatusOnKubeletRestart feature gate.
+		// When enabled, readiness is never preserved across a kubelet restart.
+		featureEnabled bool
+		// apiContainerID is the container ID in the pod status the kubelet last
+		// observed from the API server, which may be outdated.
+		apiContainerID string
+		expectedReady  bool
+	}{
+		{
+			name:           "feature is disabled, the container survived the kubelet restart",
+			featureEnabled: false,
+			apiContainerID: newContainerID,
+			expectedReady:  true,
+		},
+		{
+			name:           "feature is disabled, the container was replaced while the API server was unreachable",
+			featureEnabled: false,
+			apiContainerID: oldContainerID,
+			expectedReady:  false,
+		},
+		{
+			name:           "feature is enabled, the container survived the kubelet restart",
+			featureEnabled: true,
+			apiContainerID: newContainerID,
+			expectedReady:  false,
+		},
+		{
+			name:           "feature is enabled, the container was replaced while the API server was unreachable",
+			featureEnabled: true,
+			apiContainerID: oldContainerID,
+			expectedReady:  false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ChangeContainerStatusOnKubeletRestart, tc.featureEnabled)
+
+			ctx := ktesting.Init(t)
+			m := newTestManager()
+			// no cleanup: using fake workers.
+
+			// The readiness probe is registered but has not produced a result yet,
+			// because initialDelaySeconds has not elapsed.
+			m.workers = map[probeKey]*worker{
+				{testPodUID, containerName, readiness}: {
+					probeType:       readiness,
+					manualTriggerCh: make(chan struct{}, 1),
+				},
+			}
+
+			// The runtime reports a container that started before the kubelet
+			// restart grace period, so its start time alone makes it look like a
+			// container that survived the restart.
+			startedBeforeKubeletRestart := metav1.Time{Time: kubeletRestartGracePeriod(m.start).Add(-time.Minute)}
+			podStatus := v1.PodStatus{
+				Phase: v1.PodRunning,
+				ContainerStatuses: []v1.ContainerStatus{{
+					Name:        containerName,
+					ContainerID: newContainerID,
+					State: v1.ContainerState{
+						Running: &v1.ContainerStateRunning{StartedAt: startedBeforeKubeletRestart},
+					},
+				}},
+			}
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: testPodUID},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: containerName, ReadinessProbe: defaultProbe}},
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}},
+					ContainerStatuses: []v1.ContainerStatus{{
+						Name:        containerName,
+						ContainerID: tc.apiContainerID,
+						Ready:       true,
+					}},
+				},
+			}
+
+			m.UpdatePodStatus(ctx, pod, &podStatus)
+
+			if got := podStatus.ContainerStatuses[0].Ready; got != tc.expectedReady {
+				t.Errorf("Unexpected readiness for container %v: expected %v but got %v", containerName, tc.expectedReady, got)
+			}
+		})
+	}
+}
+
+func TestUpdatePodStatusOnKubeletRestartWithMultipleContainers(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ChangeContainerStatusOnKubeletRestart, false)
+
+	const (
+		survivedContainer      = "survived_container"
+		survivedContainerID    = "test://survived_container_id"
+		replacedContainer      = "replaced_container"
+		replacedOldContainerID = "test://replaced_container_old_id"
+		replacedNewContainerID = "test://replaced_container_new_id"
+	)
+
+	ctx := ktesting.Init(t)
+	m := newTestManager()
+	// no cleanup: using fake workers.
+
+	// Neither readiness probe has produced a result yet.
+	m.workers = map[probeKey]*worker{
+		{testPodUID, survivedContainer, readiness}: {
+			probeType:       readiness,
+			manualTriggerCh: make(chan struct{}, 1),
+		},
+		{testPodUID, replacedContainer, readiness}: {
+			probeType:       readiness,
+			manualTriggerCh: make(chan struct{}, 1),
+		},
+	}
+
+	startedBeforeKubeletRestart := metav1.Time{Time: kubeletRestartGracePeriod(m.start).Add(-time.Minute)}
+	runningStatus := func(name, id string) v1.ContainerStatus {
+		return v1.ContainerStatus{
+			Name:        name,
+			ContainerID: id,
+			State: v1.ContainerState{
+				Running: &v1.ContainerStateRunning{StartedAt: startedBeforeKubeletRestart},
+			},
+		}
+	}
+
+	podStatus := v1.PodStatus{
+		Phase: v1.PodRunning,
+		ContainerStatuses: []v1.ContainerStatus{
+			runningStatus(survivedContainer, survivedContainerID),
+			runningStatus(replacedContainer, replacedNewContainerID),
+		},
+	}
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: testPodUID},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Name: survivedContainer, ReadinessProbe: defaultProbe},
+				{Name: replacedContainer, ReadinessProbe: defaultProbe},
+			},
+		},
+		Status: v1.PodStatus{
+			Conditions: []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}},
+			ContainerStatuses: []v1.ContainerStatus{
+				{Name: survivedContainer, ContainerID: survivedContainerID, Ready: true},
+				{Name: replacedContainer, ContainerID: replacedOldContainerID, Ready: true},
+			},
+		},
+	}
+
+	m.UpdatePodStatus(ctx, pod, &podStatus)
+
+	if !podStatus.ContainerStatuses[0].Ready {
+		t.Errorf("Expected container %v to keep its readiness across the kubelet restart", survivedContainer)
+	}
+	if podStatus.ContainerStatuses[1].Ready {
+		t.Errorf("Expected container %v not to inherit the replaced container's readiness", replacedContainer)
+	}
+
+	// Marking the new container NotReady flips the pod's Ready condition to False.
+	// setReadyStateOnKubeletRestart backs off whenever PodReady is not True, so on
+	// the next sync it also drops the container that did survive the restart,
+	// because its own readiness probe still has not produced a result.
+	pod.Status.Conditions[0].Status = v1.ConditionFalse
+
+	m.UpdatePodStatus(ctx, pod, &podStatus)
+
+	for _, c := range podStatus.ContainerStatuses {
+		if c.Ready {
+			t.Errorf("Expected container %v to be NotReady once the pod is no longer Ready", c.Name)
+		}
 	}
 }
 
