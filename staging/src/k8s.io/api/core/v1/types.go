@@ -17,6 +17,9 @@ limitations under the License.
 package v1
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -7370,6 +7373,33 @@ const (
 
 // ResourceList is a set of (resource name, quantity) pairs.
 type ResourceList map[ResourceName]resource.Quantity
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+// Null values for individual resources are skipped instead of being
+// deserialized as zero-value Quantity, ensuring consistent behavior
+// between kubectl create and kubectl apply.
+func (rl *ResourceList) UnmarshalJSON(data []byte) error {
+	var raw map[ResourceName]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	if raw == nil {
+		return nil
+	}
+	result := make(ResourceList, len(raw))
+	for name, val := range raw {
+		if string(val) == "null" {
+			continue
+		}
+		var q resource.Quantity
+		if err := json.Unmarshal(val, &q); err != nil {
+			return fmt.Errorf("failed to unmarshal resource %q: %w", name, err)
+		}
+		result[name] = q
+	}
+	*rl = result
+	return nil
+}
 
 // +genclient
 // +genclient:nonNamespaced
