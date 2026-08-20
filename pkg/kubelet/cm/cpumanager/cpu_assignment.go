@@ -512,13 +512,28 @@ func (a *cpuAccumulator) sortAvailableCPUsPacked() []int {
 
 // Sort all available CPUs:
 // - First by core using sortAvailableSockets().
-// - Then within each socket, sort cpus directly using the sort() algorithm defined above.
+// - Then within each socket, sort cores directly using the sort() algorithm defined above.
 func (a *cpuAccumulator) sortAvailableCPUsSpread() []int {
 	var result []int
 	for _, socket := range a.sortAvailableSockets() {
-		cpus := a.details.CPUsInSockets(socket).UnsortedList()
-		sort.Ints(cpus)
-		result = append(result, cpus...)
+		cores := a.details.CoresInSockets(socket).UnsortedList()
+		a.sort(cores, a.details.CPUsInCores)
+		cpusPerCore := make([][]int, 0, len(cores))
+		maxCPUsPerCore := 0
+		for _, core := range cores {
+			cpus := a.details.CPUsInCores(core).List()
+			cpusPerCore = append(cpusPerCore, cpus)
+			if len(cpus) > maxCPUsPerCore {
+				maxCPUsPerCore = len(cpus)
+			}
+		}
+		for cpuIndex := 0; cpuIndex < maxCPUsPerCore; cpuIndex++ {
+			for _, cpus := range cpusPerCore {
+				if cpuIndex < len(cpus) {
+					result = append(result, cpus[cpuIndex])
+				}
+			}
+		}
 	}
 	return result
 }
