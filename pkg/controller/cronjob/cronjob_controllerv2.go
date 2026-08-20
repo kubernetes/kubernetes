@@ -770,6 +770,10 @@ func (jm *ControllerV2) removeOldestJobs(ctx context.Context, cj *batchv1.CronJo
 func deleteJob(logger klog.Logger, cj *batchv1.CronJob, job *batchv1.Job, jc jobControlInterface, recorder record.EventRecorder) bool {
 	// delete the job itself...
 	if err := jc.DeleteJob(job.Namespace, job.Name); err != nil {
+		if errors.IsNotFound(err) {
+			logger.V(4).Info("Job has already been deleted", "job", klog.KObj(job), "cronjob", klog.KObj(cj))
+			return false
+		}
 		recorder.Eventf(cj, corev1.EventTypeWarning, "FailedDelete", "Deleted job: %v", err)
 		logger.Error(err, "Error deleting job from cronjob", "job", klog.KObj(job), "cronjob", klog.KObj(cj))
 		return false
