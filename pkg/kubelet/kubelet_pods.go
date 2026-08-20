@@ -1253,8 +1253,9 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	// These two conditions could be alleviated by checkpointing kubelet.
 
 	// Stop the workers for terminated pods not in the config source
+	// Filter out terminated pods to ensure runtime pods associated with them get cleaned up
 	logger.V(3).Info("Clean up pod workers for terminated pods")
-	workingPods := kl.podWorkers.SyncKnownPods(logger, allPods)
+	workingPods := kl.podWorkers.SyncKnownPods(logger, kl.filterOutInactivePods(allPods))
 
 	// Reconcile: At this point the pod workers have been pruned to the set of
 	// desired pods. Pods that must be restarted due to UID reuse, or leftover
