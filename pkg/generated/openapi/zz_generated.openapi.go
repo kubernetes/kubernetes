@@ -493,6 +493,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.Capabilities{}.OpenAPIModelName():                                                                        schema_k8sio_api_core_v1_Capabilities(ref),
 		corev1.CephFSPersistentVolumeSource{}.OpenAPIModelName():                                                        schema_k8sio_api_core_v1_CephFSPersistentVolumeSource(ref),
 		corev1.CephFSVolumeSource{}.OpenAPIModelName():                                                                  schema_k8sio_api_core_v1_CephFSVolumeSource(ref),
+		corev1.CgroupOptions{}.OpenAPIModelName():                                                                       schema_k8sio_api_core_v1_CgroupOptions(ref),
 		corev1.CinderPersistentVolumeSource{}.OpenAPIModelName():                                                        schema_k8sio_api_core_v1_CinderPersistentVolumeSource(ref),
 		corev1.CinderVolumeSource{}.OpenAPIModelName():                                                                  schema_k8sio_api_core_v1_CinderVolumeSource(ref),
 		corev1.ClientIPConfig{}.OpenAPIModelName():                                                                      schema_k8sio_api_core_v1_ClientIPConfig(ref),
@@ -20535,6 +20536,27 @@ func schema_k8sio_api_core_v1_CephFSVolumeSource(ref common.ReferenceCallback) c
 	}
 }
 
+func schema_k8sio_api_core_v1_CgroupOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CgroupOptions defines options for cgroup filesystem access.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"mountMode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "mountMode controls whether the cgroup filesystem is mounted as writable. Defaults to \"ReadOnly\" if not specified.\n\nPossible enum values:\n - `\"ReadOnly\"` mounts cgroup filesystem as read-only (default)\n - `\"Writable\"` mounts cgroup filesystem as writable, allowing containers to manage their own cgroup subtree",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"ReadOnly", "Writable"},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_core_v1_CinderPersistentVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -32001,11 +32023,17 @@ func schema_k8sio_api_core_v1_SecurityContext(ref common.ReferenceCallback) comm
 							Ref:         ref(corev1.AppArmorProfile{}.OpenAPIModelName()),
 						},
 					},
+					"cgroupOptions": {
+						SchemaProps: spec.SchemaProps{
+							Description: "cgroupOptions controls cgroup filesystem access and configuration. This allows unprivileged containers to manage their own cgroup hierarchies on cgroup v2 systems. Only effective on Linux containers with cgroup v2. Note that this field cannot be set when spec.os.name is windows.",
+							Ref:         ref(corev1.CgroupOptions{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			corev1.AppArmorProfile{}.OpenAPIModelName(), corev1.Capabilities{}.OpenAPIModelName(), corev1.SELinuxOptions{}.OpenAPIModelName(), corev1.SeccompProfile{}.OpenAPIModelName(), corev1.WindowsSecurityContextOptions{}.OpenAPIModelName()},
+			corev1.AppArmorProfile{}.OpenAPIModelName(), corev1.Capabilities{}.OpenAPIModelName(), corev1.CgroupOptions{}.OpenAPIModelName(), corev1.SELinuxOptions{}.OpenAPIModelName(), corev1.SeccompProfile{}.OpenAPIModelName(), corev1.WindowsSecurityContextOptions{}.OpenAPIModelName()},
 	}
 }
 

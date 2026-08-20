@@ -8839,6 +8839,21 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path, host
 	allErrs = append(allErrs, validateWindowsSecurityContextOptions(sc.WindowsOptions, fldPath.Child("windowsOptions"))...)
 	allErrs = append(allErrs, ValidateAppArmorProfileField(sc.AppArmorProfile, fldPath.Child("appArmorProfile"))...)
 
+	if sc.CgroupOptions != nil {
+		// CgroupOptions is Linux-only, cannot be used with WindowsOptions
+		if sc.WindowsOptions != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("cgroupOptions"),
+				sc.CgroupOptions, "cannot be set when windowsOptions is specified"))
+		}
+		if sc.CgroupOptions.MountMode != nil {
+			validModes := []core.CgroupMountMode{core.CgroupMountModeReadOnly, core.CgroupMountModeWritable}
+			if !slices.Contains(validModes, *sc.CgroupOptions.MountMode) {
+				allErrs = append(allErrs, field.NotSupported(fldPath.Child("cgroupOptions", "mountMode"),
+					*sc.CgroupOptions.MountMode, []string{string(core.CgroupMountModeReadOnly), string(core.CgroupMountModeWritable)}))
+			}
+		}
+	}
+
 	return allErrs
 }
 

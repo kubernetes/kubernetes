@@ -130,6 +130,12 @@ const (
 	// Enables kubelet to detect CSI volume condition and send the event of the abnormal volume to the corresponding pod that is using it.
 	CSIVolumeHealth featuregate.Feature = "CSIVolumeHealth"
 
+	// owner: @Divya063 @chrishenzie
+	// kep: https://kep.k8s.io/5474
+	//
+	// Allows unprivileged containers to have writable cgroup access on cgroup v2 systems.
+	CgroupOptions featuregate.Feature = "CgroupOptions"
+
 	// owner: @HirazawaUi
 	//
 	// Enabling this feature gate will cause the pod's status to change due to a kubelet restart.
@@ -1404,6 +1410,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.21"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	CgroupOptions: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	ChangeContainerStatusOnKubeletRestart: {
 		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.GA},
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Deprecated},
@@ -2559,6 +2569,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	CSIServiceAccountTokenSecrets: {},
 
 	CSIVolumeHealth: {},
+
+	CgroupOptions: {},
 
 	ChangeContainerStatusOnKubeletRestart: {},
 

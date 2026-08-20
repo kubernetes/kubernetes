@@ -751,6 +751,7 @@ func dropDisabledFields(
 
 	dropDisabledPodLevelResources(podSpec, oldPodSpec)
 	dropDisabledProcMountField(podSpec, oldPodSpec)
+	dropDisabledCgroupOptionsField(podSpec, oldPodSpec)
 
 	dropDisabledNodeInclusionPolicyFields(podSpec, oldPodSpec)
 	dropDisabledMatchLabelKeysFieldInTopologySpread(podSpec, oldPodSpec)
@@ -1513,6 +1514,37 @@ func procMountInUse(podSpec *api.PodSpec) bool {
 			return true
 		}
 		if *c.SecurityContext.ProcMount != api.DefaultProcMount {
+			inUse = true
+			return false
+		}
+		return true
+	})
+
+	return inUse
+}
+
+// dropDisabledCgroupOptionsField removes the CgroupOptions field from container
+// security contexts if the CgroupOptions feature is disabled and it is not
+// already in use by the existing pod.
+func dropDisabledCgroupOptionsField(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CgroupOptions) && !cgroupOptionsInUse(oldPodSpec) {
+		VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
+			if c.SecurityContext != nil {
+				c.SecurityContext.CgroupOptions = nil
+			}
+			return true
+		})
+	}
+}
+
+func cgroupOptionsInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	var inUse bool
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
+		if c.SecurityContext != nil && c.SecurityContext.CgroupOptions != nil {
 			inUse = true
 			return false
 		}
