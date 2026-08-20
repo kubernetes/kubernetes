@@ -228,6 +228,19 @@ var _ = SIGDescribe("WorkloadAwarePreemption", framework.WithFeatureGate(feature
 		addExtendedResource(ctx, nodeName)
 		defer removeExtendedResource(ctx, nodeName)
 
+		ginkgo.By("Waiting for the extended resource to be allocatable on the node")
+		gomega.Eventually(ctx, func(ctx context.Context) error {
+			node, err := cs.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			alloc := node.Status.Allocatable[v1.ResourceName(extendedResourceName)]
+			if alloc.Cmp(resource.MustParse("2")) < 0 {
+				return fmt.Errorf("resource not ready yet")
+			}
+			return nil
+		}).WithTimeout(1 * time.Minute).Should(gomega.Succeed())
+
 		ginkgo.By(fmt.Sprintf("Creating low-priority pod group PG-victim with disruptionMode %v", args.victimDisruptionMode))
 		pgVictimName := "pg-victim-" + ns
 		pgVictim := makePodGroup(pgVictimName, lowPriorityName, gangPolicy, args.victimDisruptionMode)
