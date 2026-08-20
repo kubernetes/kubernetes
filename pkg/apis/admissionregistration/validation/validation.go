@@ -403,7 +403,7 @@ func validateValidatingWebhook(hook *admissionregistration.ValidatingWebhook, op
 	case cc.URL != nil:
 		allErrors = append(allErrors, webhook.ValidateWebhookURL(fldPath.Child("clientConfig").Child("url"), *cc.URL, true)...)
 	case cc.Service != nil:
-		allErrors = append(allErrors, webhook.ValidateWebhookService(fldPath.Child("clientConfig").Child("service"), cc.Service.Name, cc.Service.Namespace, cc.Service.Path, cc.Service.Port)...)
+		allErrors = append(allErrors, webhook.ValidateWebhookService(fldPath.Child("clientConfig").Child("service"), cc.Service.Namespace, cc.Service.Name, cc.Service.Path, cc.Service.Port)...)
 	}
 
 	if !opts.ignoreMatchConditions {
@@ -461,7 +461,7 @@ func validateMutatingWebhook(hook *admissionregistration.MutatingWebhook, opts v
 	case cc.URL != nil:
 		allErrors = append(allErrors, webhook.ValidateWebhookURL(fldPath.Child("clientConfig").Child("url"), *cc.URL, true)...)
 	case cc.Service != nil:
-		allErrors = append(allErrors, webhook.ValidateWebhookService(fldPath.Child("clientConfig").Child("service"), cc.Service.Name, cc.Service.Namespace, cc.Service.Path, cc.Service.Port)...)
+		allErrors = append(allErrors, webhook.ValidateWebhookService(fldPath.Child("clientConfig").Child("service"), cc.Service.Namespace, cc.Service.Name, cc.Service.Path, cc.Service.Port)...)
 	}
 
 	if !opts.ignoreMatchConditions {

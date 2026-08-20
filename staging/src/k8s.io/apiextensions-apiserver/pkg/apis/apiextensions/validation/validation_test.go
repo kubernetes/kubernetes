@@ -257,6 +257,55 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			},
 		},
 		{
+			name: "webhookconfig: missing service namespace",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group: "group.com",
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+						},
+					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("Webhook"),
+						WebhookClientConfig: &apiextensions.WebhookClientConfig{
+							Service: &apiextensions.ServiceReference{
+								Name: "n",
+								Port: 443,
+							},
+						},
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+						},
+					},
+					PreserveUnknownFields: ptr.To(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				required("spec", "conversion", "webhookClientConfig", "service", "namespace"),
+			},
+		},
+		{
 			name: "webhookconfig: invalid CABundle should be allowed on Create",
 			resource: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},

@@ -811,6 +811,20 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		}, true),
 		expectedError: `webhooks[0].matchConditions: Too many: 65: must have at most 64 items`,
+	}, {
+		name: "missing service namespace",
+		config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{{
+			Name: "webhook.k8s.io",
+			ClientConfig: admissionregistration.WebhookClientConfig{
+				Service: &admissionregistration.ServiceReference{
+					Name: "n",
+					Port: 443,
+				},
+			},
+			SideEffects: &noSideEffect,
+		},
+		}, true),
+		expectedError: `webhooks[0].clientConfig.service.namespace: Required value`,
 	}}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -1788,6 +1802,20 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 		},
 		}, true),
 		expectedError: `webhooks[0].matchConditions: Too many: 65: must have at most 64 items`,
+	}, {
+		name: "missing service namespace",
+		config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{{
+			Name: "webhook.k8s.io",
+			ClientConfig: admissionregistration.WebhookClientConfig{
+				Service: &admissionregistration.ServiceReference{
+					Name: "n",
+					Port: 443,
+				},
+			},
+			SideEffects: &noSideEffect,
+		},
+		}, true),
+		expectedError: `webhooks[0].clientConfig.service.namespace: Required value`,
 	}}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
