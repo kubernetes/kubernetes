@@ -677,7 +677,7 @@ func Test_Run_UpdateNodeStatusFailBeforeOneVolumeDetachNodeWithReadWriteOnce(t *
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	rc := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
-	reconciliationLoopFunc := rc.(*reconciler).reconciliationLoopFunc(ctx)
+	reconciliationLoopFunc := rc.(*reconciler).reconciliationLoopFunc()
 	podName1 := "pod-uid1"
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
