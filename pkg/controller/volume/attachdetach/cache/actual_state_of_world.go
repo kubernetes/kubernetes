@@ -368,12 +368,6 @@ func (asw *actualStateOfWorld) AddVolumeNode(
 			attachedConfirmed:   isAttached,
 			detachRequestedTime: time.Time{},
 		}
-		// Assume mounted, until proven otherwise
-		if asw.inUseVolumes[nodeName] == nil {
-			asw.inUseVolumes[nodeName] = sets.New(volumeName)
-		} else {
-			asw.inUseVolumes[nodeName].Insert(volumeName)
-		}
 	} else {
 		node.attachedConfirmed = isAttached
 		logger.V(5).Info("Volume is already added to attachedVolume list to the node",
