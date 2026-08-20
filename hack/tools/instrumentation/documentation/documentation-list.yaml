@@ -2071,6 +2071,22 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
+- name: terminated_watchers_detailed_total
+  namespace: apiserver
+  help: Counter of watchers closed due to unresponsiveness, broken by which buffer
+    was full, the scope of the watch, and the size its input channel was fixed at
+    when it was created.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - chan_size
+  - group
+  - reason
+  - resource
+  - scope
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
 - name: terminated_watchers_total
   namespace: apiserver
   help: Counter of watchers closed due to unresponsiveness broken by resource type.
@@ -2124,6 +2140,31 @@
   - group
   - resource
   - success
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: event_conversion_duration_seconds
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Sampled time spent converting a watch cache event into a watch event, including
+    filtering and deep copy.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  buckets:
+  - 1e-05
+  - 5e-05
+  - 0.0001
+  - 0.00025
+  - 0.0005
+  - 0.001
+  - 0.005
+  - 0.01
+  - 0.05
+  - 0.1
+  - 1
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
@@ -2201,6 +2242,31 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
+- name: input_backlog_events
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Sampled depth of a watcher's input channel at the moment an event is handed
+    to the serve loop.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  buckets:
+  - 0
+  - 1
+  - 2
+  - 5
+  - 10
+  - 25
+  - 50
+  - 100
+  - 250
+  - 500
+  - 1000
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
 - name: read_wait_seconds
   subsystem: watch_cache
   namespace: apiserver
@@ -2240,6 +2306,138 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
+- name: result_backlog_events
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Sampled depth of a watcher's result channel at the moment an event is handed
+    to the serve loop.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  buckets:
+  - 0
+  - 1
+  - 2
+  - 5
+  - 10
+  - 25
+  - 50
+  - 100
+  - 250
+  - 500
+  - 1000
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: serialization_cache_total
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Counter of watch event serialization attempts against the per-event serialization
+    cache, broken by whether the serialization was reused.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  - result
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: watchers_blocked_on_result
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Number of watchers currently blocked handing an event to the watch serve loop,
+    i.e. whose serve loop is not consuming right now.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: watch_event_encode_duration_seconds
+  subsystem: apiserver
+  help: Time the watch serve loop spent encoding a single watch event, including the
+    writes it issues to the response writer.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  - version
+  buckets:
+  - 0.0001
+  - 0.0005
+  - 0.001
+  - 0.005
+  - 0.01
+  - 0.05
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 10
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: watch_event_flush_duration_seconds
+  subsystem: apiserver
+  help: Time the watch serve loop spent flushing buffered watch events to the client.
+    For HTTP/2 this is where a stream or connection flow control stall becomes visible.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  - version
+  buckets:
+  - 0.0001
+  - 0.0005
+  - 0.001
+  - 0.005
+  - 0.01
+  - 0.05
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 10
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: watch_event_write_duration_seconds
+  subsystem: apiserver
+  help: Time the watch serve loop spent inside the response writer chain (framer,
+    optional gzip, HTTP transport) for a single watch event, broken by serialized
+    event size.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  - size_bucket
+  - version
+  buckets:
+  - 0.0001
+  - 0.0005
+  - 0.001
+  - 0.005
+  - 0.01
+  - 0.05
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 10
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
 - name: dispatch_duration_seconds
   subsystem: watch_events
   namespace: apiserver
@@ -2268,6 +2466,81 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
+- name: dispatch_grace_budget_seconds
+  subsystem: watch_events
+  namespace: apiserver
+  help: Histogram of the timeout granted by the dispatch time budget for a single
+    dispatch that had blocked watchers.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  buckets:
+  - 0
+  - 0.0001
+  - 0.001
+  - 0.005
+  - 0.01
+  - 0.025
+  - 0.05
+  - 0.075
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: terminated_watchers_per_dispatch
+  subsystem: watch_events
+  namespace: apiserver
+  help: Histogram of how many watchers a single dispatch terminated, observed only
+    for dispatches that terminated at least one.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  buckets:
+  - 1
+  - 2
+  - 5
+  - 10
+  - 25
+  - 50
+  - 100
+  - 250
+  - 500
+  - 1000
+  - 2500
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: terminated_watchers_without_grace_total
+  subsystem: watch_events
+  namespace: apiserver
+  help: Counter of watchers terminated after the shared dispatch timer had already
+    fired, so they were given no grace period of their own.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: watch_experiment_variant
+  namespace: apiserver
+  help: Always 1, labelled with the watch-chain experiment arm this apiserver is running.
+    Join on this to attribute a difference to an arm rather than to the instance.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - variant
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
 - name: watch_filtered_events_total
   namespace: apiserver
   help: Counter of events filtered out by shard selector during watch dispatch, broken
@@ -2277,6 +2550,19 @@
   labels:
   - group
   - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: watch_serve_idle_seconds_total
+  subsystem: apiserver
+  help: Cumulative time watch serve loops spent blocked waiting for their next event,
+    i.e. with no work to do.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  - version
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics

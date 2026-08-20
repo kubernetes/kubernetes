@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	"k8s.io/klog/v2"
 )
 
@@ -81,6 +82,10 @@ type cachingObject struct {
 	// The value stored in atomic.Value is of type serializationsCache.
 	// The atomic.Value type is used to allow fast-path.
 	serializations atomic.Value
+
+	// cacheObservers records whether each delivery reused a serialization.
+	// May be nil, in which case nothing is recorded.
+	cacheObservers *metrics.SerializationCacheObservers
 }
 
 // newCachingObject performs a deep copy of the given object and wraps it
@@ -135,7 +140,9 @@ func (o *cachingObject) getSerializationResult(id runtime.Identifier) *serializa
 // each input object into the same output format.
 func (o *cachingObject) CacheEncode(id runtime.Identifier, encode func(runtime.Object, io.Writer) error, w io.Writer) error {
 	result := o.getSerializationResult(id)
+	serialized := false
 	result.once.Do(func() {
+		serialized = true
 		buffer := bytes.NewBuffer(nil)
 		// TODO(wojtek-t): This is currently making a copy to avoid races
 		//   in cases where encoding is making subtle object modifications,
@@ -144,6 +151,14 @@ func (o *cachingObject) CacheEncode(id runtime.Identifier, encode func(runtime.O
 		result.err = encode(o.GetObject(), buffer)
 		result.raw = buffer.Bytes()
 	})
+	// A miss is the caller that performed the serialization; every other
+	// caller for the same event is a hit, including ones that waited on the
+	// Once while the first was encoding.
+	if serialized {
+		o.cacheObservers.RecordMiss()
+	} else {
+		o.cacheObservers.RecordHit()
+	}
 	// Once invoked, fields of serialization will not change.
 	if result.err != nil {
 		return result.err

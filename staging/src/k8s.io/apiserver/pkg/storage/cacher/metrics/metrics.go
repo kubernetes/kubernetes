@@ -230,6 +230,137 @@ var (
 			Buckets:        []float64{0.005, 0.025, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3},
 		}, []string{"group", "resource"})
 
+	// TerminatedWatchersDetailed carries the labels that the V(1) "Forcing ...
+	// watcher close due to unresponsiveness" log line already prints. Every
+	// conclusion about which watchers die and why has so far come from grepping
+	// gigabytes of apiserver logs. This is deliberately a second metric rather
+	// than labels on TerminatedWatchersCounter, so the existing series keeps its
+	// meaning.
+	TerminatedWatchersDetailed = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Namespace:      namespace,
+			Name:           "terminated_watchers_detailed_total",
+			Help:           "Counter of watchers closed due to unresponsiveness, broken by which buffer was full, the scope of the watch, and the size its input channel was fixed at when it was created.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource", "reason", "scope", "chan_size"},
+	)
+
+	// DispatchGraceBudget records what the shared time budget actually granted.
+	// A dispatch that finds blocked watchers gets one timer for all of them, so
+	// this is the total grace the whole group had to share.
+	DispatchGraceBudget = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      "watch_events",
+			Name:           "dispatch_grace_budget_seconds",
+			Help:           "Histogram of the timeout granted by the dispatch time budget for a single dispatch that had blocked watchers.",
+			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:        []float64{0, 0.0001, 0.001, 0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 1},
+		},
+		[]string{"group", "resource"},
+	)
+
+	// TerminatedWatchersPerDispatch and WatchersTerminatedWithoutGrace together
+	// separate "one slow watcher took the rest down with it" from "many slow
+	// watchers". A single dispatch shares one timer across every blocked
+	// watcher, and once it fires each remaining watcher is closed with no grace
+	// at all, so a single dispatch can produce hundreds of kills.
+	TerminatedWatchersPerDispatch = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      "watch_events",
+			Name:           "terminated_watchers_per_dispatch",
+			Help:           "Histogram of how many watchers a single dispatch terminated, observed only for dispatches that terminated at least one.",
+			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:        []float64{1, 2, 5, 10, 25, 50, 100, 250, 500, 1000, 2500},
+		},
+		[]string{"group", "resource"},
+	)
+
+	WatchersTerminatedWithoutGrace = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      "watch_events",
+			Name:           "terminated_watchers_without_grace_total",
+			Help:           "Counter of watchers terminated after the shared dispatch timer had already fired, so they were given no grace period of their own.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+
+	// The three sampled signals below are observed on one in every
+	// watchBacklogSampleRate handoffs. At hundreds of millions of deliveries per
+	// run an unsampled histogram would cost more than it is worth, and the
+	// question these answer is distributional.
+	WatchInputBacklog = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "input_backlog_events",
+			Help:           "Sampled depth of a watcher's input channel at the moment an event is handed to the serve loop.",
+			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:        []float64{0, 1, 2, 5, 10, 25, 50, 100, 250, 500, 1000},
+		},
+		[]string{"group", "resource"},
+	)
+
+	WatchResultBacklog = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "result_backlog_events",
+			Help:           "Sampled depth of a watcher's result channel at the moment an event is handed to the serve loop.",
+			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:        []float64{0, 1, 2, 5, 10, 25, 50, 100, 250, 500, 1000},
+		},
+		[]string{"group", "resource"},
+	)
+
+	// WatchEventConversionDuration covers convertToWatchEvent, which filters and
+	// deep-copies. It is the one place processInterval can be parked while its
+	// result channel sits empty.
+	WatchEventConversionDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "event_conversion_duration_seconds",
+			Help:           "Sampled time spent converting a watch cache event into a watch event, including filtering and deep copy.",
+			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:        []float64{0.00001, 0.00005, 0.0001, 0.00025, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 1},
+		},
+		[]string{"group", "resource"},
+	)
+
+	// SerializationCacheTotal validates the fanout-amortization model directly:
+	// a cachingObject serializes once and every further watcher receiving the
+	// same event reuses it, so the per-delivery serialization cost is inversely
+	// proportional to the hit rate.
+	SerializationCacheTotal = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "serialization_cache_total",
+			Help:           "Counter of watch event serialization attempts against the per-event serialization cache, broken by whether the serialization was reused.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource", "result"},
+	)
+
+	// WatchersBlockedOnResult complements the StageCacheToWatcher histogram,
+	// which can only report a wait once it has ended. A watcher wedged
+	// indefinitely is visible here and in no histogram.
+	WatchersBlockedOnResult = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "watchers_blocked_on_result",
+			Help:           "Number of watchers currently blocked handing an event to the watch serve loop, i.e. whose serve loop is not consuming right now.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+
 	ConsistentReadTotal = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Namespace:      namespace,
@@ -299,6 +430,15 @@ func Register() {
 		legacyregistry.MustRegister(WatchCacheInitializationErrors)
 		legacyregistry.MustRegister(WatchCacheInitializationDuration)
 		legacyregistry.MustRegister(WatchCacheReadWait)
+		legacyregistry.MustRegister(WatchersBlockedOnResult)
+		legacyregistry.MustRegister(TerminatedWatchersDetailed)
+		legacyregistry.MustRegister(DispatchGraceBudget)
+		legacyregistry.MustRegister(TerminatedWatchersPerDispatch)
+		legacyregistry.MustRegister(WatchersTerminatedWithoutGrace)
+		legacyregistry.MustRegister(WatchInputBacklog)
+		legacyregistry.MustRegister(WatchResultBacklog)
+		legacyregistry.MustRegister(WatchEventConversionDuration)
+		legacyregistry.MustRegister(SerializationCacheTotal)
 		legacyregistry.MustRegister(ConsistentReadTotal)
 		legacyregistry.MustRegister(StorageConsistencyCheckTotal)
 		if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
@@ -307,6 +447,68 @@ func Register() {
 		}
 		legacyregistry.MustRegister(DispatchStageDuration)
 	})
+}
+
+// SerializationCacheObservers holds the pre-resolved hit and miss counters for
+// one resource. CacheEncode runs once per delivery, hundreds of millions of
+// times per scale run, so the label lookup is done once per cacher instead.
+type SerializationCacheObservers struct {
+	hit  compbasemetrics.CounterMetric
+	miss compbasemetrics.CounterMetric
+}
+
+// NewSerializationCacheObservers pre-resolves the counters for a resource.
+func NewSerializationCacheObservers(groupResource schema.GroupResource) *SerializationCacheObservers {
+	return &SerializationCacheObservers{
+		hit:  SerializationCacheTotal.WithLabelValues(groupResource.Group, groupResource.Resource, "hit"),
+		miss: SerializationCacheTotal.WithLabelValues(groupResource.Group, groupResource.Resource, "miss"),
+	}
+}
+
+// RecordHit notes a delivery that reused an existing serialization. It is
+// nil-safe so that callers constructing a cachingObject outside a cacher do not
+// have to supply observers.
+func (o *SerializationCacheObservers) RecordHit() {
+	if o != nil {
+		o.hit.Inc()
+	}
+}
+
+// RecordMiss notes a delivery that had to perform the serialization itself.
+func (o *SerializationCacheObservers) RecordMiss() {
+	if o != nil {
+		o.miss.Inc()
+	}
+}
+
+// TerminationReason classifies which buffer was backed up when a watcher was
+// closed. result_full means the serve loop was not consuming; result_empty
+// means it was, and the watcher fell behind before the events reached it.
+func TerminationReason(inputLen, resultLen, resultCap int) string {
+	switch {
+	case resultCap > 0 && resultLen >= resultCap:
+		return "result_full"
+	case resultLen == 0:
+		return "result_empty"
+	default:
+		return "result_partial"
+	}
+}
+
+// ChanSizeBucket buckets the watcher channel size, which is fixed when the
+// watcher is created from the then-current watch cache capacity and never grows
+// afterwards.
+func ChanSizeBucket(chanSize int) string {
+	switch {
+	case chanSize <= 10:
+		return "10"
+	case chanSize <= 50:
+		return "11-50"
+	case chanSize <= 200:
+		return "51-200"
+	default:
+		return "201-1000"
+	}
 }
 
 // RecordListCacheMetrics notes various metrics of the cost to serve a LIST request

@@ -343,6 +343,9 @@ type Cacher struct {
 	expiredBookmarkWatchers []*cacheWatcher
 	compactor               *compactor
 	watcherMetrics          *metrics.WatcherMetricsObservers
+	// serializationCacheObservers is pre-resolved once per cacher because
+	// CacheEncode runs on every delivery.
+	serializationCacheObservers *metrics.SerializationCacheObservers
 }
 
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
@@ -411,11 +414,12 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		// - reflector.ListAndWatch
 		// and there are no guarantees on the order that they will stop.
 		// So we will be simply closing the channel, and synchronizing on the WaitGroup.
-		stopCh:           stopCh,
-		clock:            config.Clock,
-		timer:            time.NewTimer(time.Duration(0)),
-		bookmarkWatchers: newTimeBucketWatchers(config.Clock, defaultBookmarkFrequency),
-		watcherMetrics:   metrics.NewWatcherMetricsObservers(config.GroupResource),
+		stopCh:                      stopCh,
+		clock:                       config.Clock,
+		timer:                       time.NewTimer(time.Duration(0)),
+		bookmarkWatchers:            newTimeBucketWatchers(config.Clock, defaultBookmarkFrequency),
+		watcherMetrics:              metrics.NewWatcherMetricsObservers(config.GroupResource),
+		serializationCacheObservers: metrics.NewSerializationCacheObservers(config.GroupResource),
 	}
 
 	// Ensure that timer is stopped.
@@ -610,6 +614,9 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		c.clock,
 		identifier,
 	)
+	// Set before the watcher is registered or started, so no other goroutine
+	// can observe it yet.
+	watcher.scope = watchScopeFor(scope)
 
 	// note that c.waitUntilWatchCacheFreshAndForceAllEvents must be called without
 	// the c.watchCache.RLock held otherwise we are at risk of a deadlock
@@ -962,10 +969,11 @@ func (c *Cacher) dispatchEvents() {
 	}
 }
 
-func setCachingObjects(event *watchCacheEvent, versioner storage.Versioner) {
+func setCachingObjects(event *watchCacheEvent, versioner storage.Versioner, cacheObservers *metrics.SerializationCacheObservers) {
 	switch event.Type {
 	case watch.Added, watch.Modified:
 		if object, err := newCachingObject(event.Object); err == nil {
+			object.cacheObservers = cacheObservers
 			event.Object = object
 		} else {
 			klog.Errorf("couldn't create cachingObject from: %#v", event.Object)
@@ -981,6 +989,7 @@ func setCachingObjects(event *watchCacheEvent, versioner storage.Versioner) {
 		// Don't wrap Object for delete events - these are not to deliver any
 		// events. Only wrap PrevObject.
 		if object, err := newCachingObject(event.PrevObject); err == nil {
+			object.cacheObservers = cacheObservers
 			// Update resource version of the object.
 			// event.PrevObject is used to deliver DELETE watch events and
 			// for them, we set resourceVersion to <current> instead of
@@ -1020,7 +1029,7 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 		//
 		// Make a shallow copy to allow overwriting Object and PrevObject.
 		wcEvent := *event
-		setCachingObjects(&wcEvent, c.versioner)
+		setCachingObjects(&wcEvent, c.versioner, c.serializationCacheObservers)
 		event = &wcEvent
 
 		c.blockedWatchers = c.blockedWatchers[:0]
@@ -1035,6 +1044,7 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 			// to reuse timers instead of constantly allocating.
 			startTime := time.Now()
 			timeout := c.dispatchTimeoutBudget.takeAvailable()
+			metrics.DispatchGraceBudget.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Observe(timeout.Seconds())
 			c.timer.Reset(timeout)
 
 			// Send event to all blocked watchers. As long as timer is running,
@@ -1043,10 +1053,26 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 			// Hence, every watcher gets the chance to unblock itself while timer
 			// is running, not only the first ones in the list.
 			timer := c.timer
+			// A single dispatch shares one timer across every blocked watcher,
+			// so once it fires the remaining watchers are closed with no grace
+			// of their own. Counting both totals separates one slow watcher
+			// amplified N times from N genuinely slow watchers.
+			terminated, terminatedWithoutGrace := 0, 0
 			for _, watcher := range c.blockedWatchers {
+				hadGrace := timer != nil
 				if !watcher.add(event, timer) {
+					terminated++
+					if !hadGrace {
+						terminatedWithoutGrace++
+					}
 					// fired, clean the timer by set it to nil.
 					timer = nil
+				}
+			}
+			if terminated > 0 {
+				metrics.TerminatedWatchersPerDispatch.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Observe(float64(terminated))
+				if terminatedWithoutGrace > 0 {
+					metrics.WatchersTerminatedWithoutGrace.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Add(float64(terminatedWithoutGrace))
 				}
 			}
 
@@ -1059,6 +1085,20 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 
 			c.dispatchTimeoutBudget.returnUnused(timeout - time.Since(startTime))
 		}
+	}
+}
+
+// watchScopeFor classifies how broad a watch is, for attributing terminations.
+// A watch pinned to a single object name is the narrowest even when it is not
+// namespaced.
+func watchScopeFor(scope namespacedName) string {
+	switch {
+	case scope.name != "":
+		return watchScopeResource
+	case scope.namespace != "":
+		return watchScopeNamespace
+	default:
+		return watchScopeCluster
 	}
 }
 
