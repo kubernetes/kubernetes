@@ -2033,3 +2033,81 @@ func TestQuantityPtrEqual(t *testing.T) {
 		})
 	}
 }
+
+// TestQuantityStringBeyondSuffixRange covers magnitudes for which no SI suffix
+// exists: the decimal suffixes stop at E (10^18) and the binary ones at Ei (2^60).
+// Emitting the canonical mantissa without a suffix in those cases dropped the scale
+// entirely, so 10^21 serialized as "1".
+func TestQuantityStringBeyondSuffixRange(t *testing.T) {
+	table := []struct {
+		in     string
+		format Format
+		expect string
+	}{
+		// Within the suffix range, the output must not change.
+		{"1000000000000000000", DecimalSI, "1E"},
+		{"100000000000000000000", DecimalSI, "100E"},
+		{"1152921504606846976", BinarySI, "1Ei"},
+
+		// Beyond the suffix range, fall back to the exponent form.
+		{"1000000000000000000000", DecimalSI, "1e21"},
+		{"10000000000000000000000", DecimalSI, "10e21"},
+		{"1000000000000000000000000", DecimalSI, "1e24"},
+		{"-1000000000000000000000", DecimalSI, "-1e21"},
+
+		// Already-exponent input keeps its format.
+		{"1e21", DecimalExponent, "1e21"},
+
+		// Beyond Ei the binary form falls back to the decimal representation.
+		{"1180591620717411303424", BinarySI, "1180591620717411303424"},
+	}
+
+	for _, item := range table {
+		q, err := ParseQuantity(item.in)
+		if err != nil {
+			t.Errorf("%v: unexpected parse error: %v", item.in, err)
+			continue
+		}
+		q.Format = item.format
+
+		got := q.String()
+		if got != item.expect {
+			t.Errorf("%v (%v): expected %v, got %v", item.in, item.format, item.expect, got)
+		}
+
+		// The serialized form must parse back to the same value. This is the
+		// property that the missing suffix violated.
+		parsed, err := ParseQuantity(got)
+		if err != nil {
+			t.Errorf("%v: serialized form %q does not parse: %v", item.in, got, err)
+			continue
+		}
+		if q.Cmp(parsed) != 0 {
+			t.Errorf("%v: serialized as %q which is %v, not %v", item.in, got, parsed.AsDec(), q.AsDec())
+		}
+	}
+}
+
+// TestQuantityMarshalJSONBeyondSuffixRange guards the API serialization path, which
+// is where the dropped scale actually reached stored objects.
+func TestQuantityMarshalJSONBeyondSuffixRange(t *testing.T) {
+	const in = "1000000000000000000000"
+
+	q, err := ParseQuantity(in)
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+
+	data, err := q.MarshalJSON()
+	if err != nil {
+		t.Fatalf("unexpected marshal error: %v", err)
+	}
+
+	var out Quantity
+	if err := out.UnmarshalJSON(data); err != nil {
+		t.Fatalf("unexpected unmarshal error for %s: %v", data, err)
+	}
+	if q.Cmp(out) != 0 {
+		t.Errorf("JSON round trip changed the value: %v became %s which is %v", q.AsDec(), data, out.AsDec())
+	}
+}
