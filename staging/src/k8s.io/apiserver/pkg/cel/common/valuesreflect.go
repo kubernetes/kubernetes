@@ -530,6 +530,9 @@ func addToMapList(elements []ref.Val, other traits.Lister, escapedKeyProps []str
 		if overwritePosition, ok := keyToIdx[k]; ok {
 			elements[overwritePosition] = v
 		} else {
+			// Index newly appended keys so later elements with the same key
+			// overwrite in place instead of duplicating the entry.
+			keyToIdx[k] = len(elements)
 			elements = append(elements, v)
 		}
 	}
