@@ -20,12 +20,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/grpclog"
 
 	"k8s.io/apimachinery/pkg/api/apitesting"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -561,9 +563,14 @@ type setupOptions struct {
 	clock          clock.WithTicker
 	codec          runtime.Codec
 	transformer    value.Transformer
+	useExternalEtcd bool
 }
 
 type setupOption func(*setupOptions)
+
+func withExternalEtcd(options *setupOptions) {
+	options.useExternalEtcd = true
+}
 
 func withDefaults(options *setupOptions) {
 	prefix := "/pods/"
@@ -628,10 +635,10 @@ func testSetupWithEtcdServer(t testing.TB, opts ...setupOption) (context.Context
 		opt(&setupOpts)
 	}
 
-	server, etcdStorage := newEtcdTestStorageWithOptions(t, etcd3testing.PathPrefix(), setupOpts.codec, setupOpts.transformer)
+	server, etcdStorage := newEtcdTestStorageWithOptions(t, etcd3testing.PathPrefix(), setupOpts.codec, setupOpts.transformer, setupOpts.useExternalEtcd)
 	// Inject one list error to make sure we test the relist case.
 	listErrors := 1
-	if clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClient) {
+	if clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClient) || setupOpts.useExternalEtcd {
 		// The WatchListClient feature changes the reflector to use WATCH
 		// instead of LIST, therefore we don't expect any errors
 		listErrors = 0
@@ -664,8 +671,10 @@ func testSetupWithEtcdServer(t testing.TB, opts ...setupOption) (context.Context
 
 	// Since some tests depend on the fact that GetList shouldn't fail,
 	// we wait until the error from the underlying storage is consumed.
-	if err := wait.PollInfinite(100*time.Millisecond, wrappedStorage.ErrorsConsumed); err != nil {
-		t.Fatalf("Failed to inject list errors: %v", err)
+	if listErrors > 0 {
+		if err := wait.PollInfinite(100*time.Millisecond, wrappedStorage.ErrorsConsumed); err != nil {
+			t.Fatalf("Failed to inject list errors: %v", err)
+		}
 	}
 
 	// The tests assume that Get/GetList/Watch calls shouldn't fail.
@@ -715,11 +724,17 @@ func (c *createWrapper) Create(ctx context.Context, key string, obj, out runtime
 }
 func BenchmarkStoreWriteThroughput(b *testing.B) {
 	klog.SetLogger(logr.Discard())
+	grpclog.SetLoggerV2(grpclog.NewLoggerV2(io.Discard, io.Discard, io.Discard))
 	dimensions := []struct {
 		namespaceCount       int
 		podPerNamespaceCount int
 		nodeCount            int
 	}{
+		{
+			namespaceCount:       50,
+			podPerNamespaceCount: 300,
+			nodeCount:            500,
+		},
 		{
 			namespaceCount:       50,
 			podPerNamespaceCount: 3_000,
@@ -728,7 +743,7 @@ func BenchmarkStoreWriteThroughput(b *testing.B) {
 	}
 	for _, dims := range dimensions {
 		b.Run(fmt.Sprintf("Namespaces=%d/Pods=%d/Nodes=%d", dims.namespaceCount, dims.namespaceCount*dims.podPerNamespaceCount, dims.nodeCount), func(b *testing.B) {
-			opts := []setupOption{withNodeNameAndNamespaceIndex}
+			opts := []setupOption{withNodeNameAndNamespaceIndex, withExternalEtcd}
 			ctx, cacher, _, terminate := testSetupWithEtcdServer(b, opts...)
 			b.Cleanup(terminate)
 			data := storagetesting.PrepareBenchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
@@ -775,7 +790,7 @@ func BenchmarkStoreList(b *testing.B) {
 	for _, dims := range dimensions {
 		b.Run(fmt.Sprintf("Namespaces=%d/Pods=%d/Nodes=%d", dims.namespaceCount, dims.namespaceCount*dims.podPerNamespaceCount, dims.nodeCount), func(b *testing.B) {
 			data := storagetesting.PrepareBenchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
-			ctx, cacher, _, terminate := testSetupWithEtcdServer(b, withNodeNameAndNamespaceIndex)
+			ctx, cacher, _, terminate := testSetupWithEtcdServer(b, withNodeNameAndNamespaceIndex, withExternalEtcd)
 			b.Cleanup(terminate)
 			require.NoError(b, storagetesting.PrecreateBenchmarkPods(ctx, cacher, data))
 			for _, useIndex := range []bool{true, false} {
@@ -790,7 +805,7 @@ func BenchmarkStoreList(b *testing.B) {
 func BenchmarkStoreStats(b *testing.B) {
 	klog.SetLogger(logr.Discard())
 	data := storagetesting.PrepareBenchmarkData(50, 3_000, 5_000)
-	ctx, cacher, _, terminate := testSetupWithEtcdServer(b)
+	ctx, cacher, _, terminate := testSetupWithEtcdServer(b, withExternalEtcd)
 	b.Cleanup(terminate)
 	var out example.Pod
 	for _, pod := range data.Pods {
