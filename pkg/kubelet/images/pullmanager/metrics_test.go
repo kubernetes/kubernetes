@@ -46,8 +46,8 @@ func TestFSPullRecordsMetrics(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	const pullIntentsCacheSize, pulledRecordsCacheSize, stripedSetLocksSize int32 = 5, 10, 1
-	inMemoryAccessor := NewCachedPullRecordsAccessor(logger, fsAccessor, pullIntentsCacheSize, pulledRecordsCacheSize, stripedSetLocksSize)
+	const pullIntentsCacheSize, preloadedRecordsCacheSize, pulledRecordsCacheSize, stripedSetLocksSize int32 = 5, 10, 10, 1
+	inMemoryAccessor := NewCachedPullRecordsAccessor(logger, fsAccessor, pullIntentsCacheSize, preloadedRecordsCacheSize, pulledRecordsCacheSize, stripedSetLocksSize)
 
 	cmpFSIntents(t, 0)
 	cmpMemIntents(t, 0)
@@ -104,6 +104,61 @@ func TestFSPullRecordsMetrics(t *testing.T) {
 	cmpFSPulledRecords(t, 4)
 	cmpMemPulledRecords(t, 40)
 
+	cmpFSPreloadedRecords(t, 0)
+	cmpMemPreloadedRecords(t, 0)
+	require.NoError(t, inMemoryAccessor.WriteImagePreloadedRecord(logger, &kubeletconfig.ImagePreloadedRecord{
+		ImageRef:        "test-image-latest-ref",
+		LastUpdatedTime: metav1.NewTime(time.Now()),
+		ObservedImages: map[string]kubeletconfig.PreloadedImage{
+			"test-image": {},
+		},
+	}))
+	cmpFSPreloadedRecords(t, 1)
+	cmpMemPreloadedRecords(t, 10)
+
+	// Test that writing the same record does not increase the count
+	require.NoError(t, inMemoryAccessor.WriteImagePreloadedRecord(logger, &kubeletconfig.ImagePreloadedRecord{
+		ImageRef:        "test-image-latest-ref",
+		LastUpdatedTime: metav1.NewTime(time.Now()),
+		ObservedImages: map[string]kubeletconfig.PreloadedImage{
+			"test-image": {},
+		},
+	}))
+	require.NoError(t, inMemoryAccessor.WriteImagePreloadedRecord(logger, &kubeletconfig.ImagePreloadedRecord{
+		ImageRef:        "test-image-latest-ref",
+		LastUpdatedTime: metav1.NewTime(time.Now()),
+		ObservedImages: map[string]kubeletconfig.PreloadedImage{
+			"test-image": {},
+		},
+	}))
+	cmpFSPreloadedRecords(t, 1)
+	cmpMemPreloadedRecords(t, 10)
+
+	// Test adding more records
+	require.NoError(t, inMemoryAccessor.WriteImagePreloadedRecord(logger, &kubeletconfig.ImagePreloadedRecord{
+		ImageRef:        "test-image-v1-ref",
+		LastUpdatedTime: metav1.NewTime(time.Now()),
+		ObservedImages: map[string]kubeletconfig.PreloadedImage{
+			"test-image": {},
+		},
+	}))
+	require.NoError(t, inMemoryAccessor.WriteImagePreloadedRecord(logger, &kubeletconfig.ImagePreloadedRecord{
+		ImageRef:        "test-image-v1.1-ref",
+		LastUpdatedTime: metav1.NewTime(time.Now()),
+		ObservedImages: map[string]kubeletconfig.PreloadedImage{
+			"test-image": {},
+		},
+	}))
+	require.NoError(t, inMemoryAccessor.WriteImagePreloadedRecord(logger, &kubeletconfig.ImagePreloadedRecord{
+		ImageRef:        "test-image-v1.2-ref",
+		LastUpdatedTime: metav1.NewTime(time.Now()),
+		ObservedImages: map[string]kubeletconfig.PreloadedImage{
+			"test-image": {},
+		},
+	}))
+	cmpFSPreloadedRecords(t, 4)
+	cmpMemPreloadedRecords(t, 40)
+
 	// double-check that intents count is not affected
 	cmpFSIntents(t, 3)
 	cmpMemIntents(t, 60)
@@ -148,23 +203,70 @@ func TestFSPullRecordsMetrics(t *testing.T) {
 	cmpFSPulledRecords(t, 0)
 	cmpMemPulledRecords(t, 0)
 
+	// double-check that preloaded records count is not affected
+	cmpFSPreloadedRecords(t, 4)
+	cmpMemPreloadedRecords(t, 40)
+
+	// Test image preloaded record deletions
+	require.NoError(t, inMemoryAccessor.DeleteImagePreloadedRecord(logger, "test-image-v1.1-ref"))
+	cmpFSPreloadedRecords(t, 3)
+	cmpMemPreloadedRecords(t, 30)
+
+	require.NoError(t, inMemoryAccessor.DeleteImagePreloadedRecord(logger, "test-image-v1.1-ref"))
+	require.NoError(t, inMemoryAccessor.DeleteImagePreloadedRecord(logger, "test-image-v1.1-ref"))
+	cmpFSPreloadedRecords(t, 3)
+	cmpMemPreloadedRecords(t, 30)
+
+	// Removing the only observed image of a record removes the whole record
+	require.NoError(t, inMemoryAccessor.DeleteImagePreloadedRecordObservedImage(logger, "test-image:v1.2", "test-image-v1.2-ref"))
+	cmpFSPreloadedRecords(t, 2)
+	cmpMemPreloadedRecords(t, 20)
+
+	// Removing an unobserved image is a no-op that keeps the count unchanged
+	require.NoError(t, inMemoryAccessor.DeleteImagePreloadedRecordObservedImage(logger, "test-image:v1.2", "test-image-v1.2-ref"))
+	cmpFSPreloadedRecords(t, 2)
+	cmpMemPreloadedRecords(t, 20)
+
+	require.NoError(t, inMemoryAccessor.DeleteImagePreloadedRecord(logger, "test-image-v1-ref"))
+	require.NoError(t, inMemoryAccessor.DeleteImagePreloadedRecord(logger, "test-image-latest-ref"))
+	cmpFSPreloadedRecords(t, 0)
+	cmpMemPreloadedRecords(t, 0)
+
+	require.NoError(t, inMemoryAccessor.DeleteImagePreloadedRecord(logger, "test-image-v1-ref"))
+	require.NoError(t, inMemoryAccessor.DeleteImagePreloadedRecord(logger, "test-image-latest-ref"))
+	cmpFSPreloadedRecords(t, 0)
+	cmpMemPreloadedRecords(t, 0)
+
 	// test exceeding memory cache sizes
 	for i := range 20 {
 		require.NoError(t, inMemoryAccessor.WriteImagePullIntent(logger, fmt.Sprintf("test-image-%d:latest", i)))
+		require.NoError(t, inMemoryAccessor.WriteImagePreloadedRecord(logger, &kubeletconfig.ImagePreloadedRecord{
+			ImageRef:        fmt.Sprintf("test-image-preloaded-v%d-ref", i),
+			LastUpdatedTime: metav1.NewTime(time.Now()),
+			ObservedImages: map[string]kubeletconfig.PreloadedImage{
+				fmt.Sprintf("test-image-%d:latest", i): {},
+			},
+		}))
 		require.NoError(t, inMemoryAccessor.WriteImagePulledRecord(logger, &kubeletconfig.ImagePulledRecord{
 			ImageRef:        fmt.Sprintf("test-image-v%d-ref", i),
 			LastUpdatedTime: metav1.NewTime(time.Now()),
 		}))
 	}
 	cmpFSIntents(t, 20)
+	cmpFSPreloadedRecords(t, 20)
 	cmpFSPulledRecords(t, 20)
 	cmpMemIntents(t, 100)
+	cmpMemPreloadedRecords(t, 100)
 	cmpMemPulledRecords(t, 100)
 
 	// test removing some of the latest records from the cache
 	require.NoError(t, inMemoryAccessor.DeleteImagePullIntent(logger, "test-image-19:latest"))
 	cmpFSIntents(t, 19)
 	cmpMemIntents(t, 80)
+
+	require.NoError(t, inMemoryAccessor.DeleteImagePreloadedRecord(logger, "test-image-preloaded-v19-ref"))
+	cmpFSPreloadedRecords(t, 19)
+	cmpMemPreloadedRecords(t, 90)
 
 	require.NoError(t, inMemoryAccessor.DeleteImagePulledRecord(logger, "test-image-v19-ref"))
 	cmpFSPulledRecords(t, 19)
@@ -278,6 +380,21 @@ kubelet_imagemanager_ondisk_pulledrecords %d
 		t.Errorf("failed to gather metrics: %v", err)
 	}
 }
+func cmpFSPreloadedRecords(t *testing.T, expected uint) {
+	t.Helper()
+	const metricFormat = `
+# HELP kubelet_imagemanager_ondisk_preloadedrecords [ALPHA] Number of ImagePreloadedRecords stored on disk.
+# TYPE kubelet_imagemanager_ondisk_preloadedrecords gauge
+kubelet_imagemanager_ondisk_preloadedrecords %d
+`
+
+	err := metricstestutil.GatherAndCompare(
+		legacyregistry.DefaultGatherer, strings.NewReader(fmt.Sprintf(metricFormat, expected)), "kubelet_imagemanager_ondisk_preloadedrecords",
+	)
+	if err != nil {
+		t.Errorf("failed to gather metrics: %v", err)
+	}
+}
 
 func cmpMemIntents(t *testing.T, expected uint) {
 	t.Helper()
@@ -304,6 +421,21 @@ kubelet_imagemanager_inmemory_pulledrecords_usage_percent %d
 
 	err := metricstestutil.GatherAndCompare(
 		legacyregistry.DefaultGatherer, strings.NewReader(fmt.Sprintf(metricFormat, expected)), "kubelet_imagemanager_inmemory_pulledrecords_usage_percent",
+	)
+	if err != nil {
+		t.Errorf("failed to gather metrics: %v", err)
+	}
+}
+func cmpMemPreloadedRecords(t *testing.T, expected uint) {
+	t.Helper()
+	const metricFormat = `
+# HELP kubelet_imagemanager_inmemory_preloadedrecords_usage_percent [ALPHA] The ImagePreloadedRecords in-memory cache usage in percent.
+# TYPE kubelet_imagemanager_inmemory_preloadedrecords_usage_percent gauge
+kubelet_imagemanager_inmemory_preloadedrecords_usage_percent %d
+`
+
+	err := metricstestutil.GatherAndCompare(
+		legacyregistry.DefaultGatherer, strings.NewReader(fmt.Sprintf(metricFormat, expected)), "kubelet_imagemanager_inmemory_preloadedrecords_usage_percent",
 	)
 	if err != nil {
 		t.Errorf("failed to gather metrics: %v", err)
