@@ -25,7 +25,7 @@ spec:
   validations:
   - expression: variables.userNodeName != ""
     message: >-
-      no node association found for user, this user must run in a pod on a node and ServiceAccountTokenPodNodeInfo must be enabled
+      no node association found for user, this user must run in a pod on a node
   - expression: variables.userNodeName == variables.objectNodeName
     messageExpression: >-
       "this user running on node '"+variables.userNodeName+"' may not modify ConfigMap '" + variables.objectNodeName +
