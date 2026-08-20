@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -37,7 +38,9 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	v1 "k8s.io/api/core/v1"
+	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	apitest "k8s.io/cri-api/pkg/apis/testing"
 	"k8s.io/kubernetes/test/utils/ktesting"
 
 	kubelettypes "k8s.io/kubelet/pkg/types"
@@ -1074,6 +1077,82 @@ func TestKillContainerGracePeriod(t *testing.T) {
 			require.Equal(t, test.expectedGracePeriod, actualGracePeriod)
 		})
 	}
+}
+
+func TestKillContainerReturnsImmediatelyWhenRuntimeStopsQuickly(t *testing.T) {
+
+	tCtx := ktesting.Init(t)
+
+	gp := int64(60)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "p", Namespace: "ns", UID: "uid"},
+		Spec: v1.PodSpec{
+			Containers:                    []v1.Container{{Name: "foo"}},
+			TerminationGracePeriodSeconds: &gp,
+		},
+	}
+
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+
+	require.NoError(t, err)
+
+	fakeRuntime.SetFakeContainers([]*apitest.FakeContainer{
+		{
+			ContainerStatus: runtimeapi.ContainerStatus{
+				Id: "container-id",
+				Metadata: &runtimeapi.ContainerMetadata{
+					Name:    "foo",
+					Attempt: 0,
+				},
+				State: runtimeapi.ContainerState_CONTAINER_RUNNING,
+			},
+			SandboxID: "sandbox-id",
+		},
+	})
+
+	hook := &stopContainerHook{
+		RuntimeService: m.runtimeService,
+		StopFunc: func(ctx context.Context, id string, timeout int64) error {
+			time.Sleep(5 * time.Second)
+			return nil
+		},
+	}
+	m.runtimeService = hook
+
+	start := time.Now()
+	err = m.killContainer(
+		tCtx,
+		pod,
+		kubecontainer.ContainerID{Type: apitest.FakeRuntimeName, ID: "container-id"},
+		"foo",
+		"test kill",
+		reasonUnknown,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+
+	elapsed := time.Since(start)
+
+	require.Equal(t, gp, hook.GotTimeout)
+
+	require.Less(t, elapsed, 6*time.Second)
+}
+
+type stopContainerHook struct {
+	internalapi.RuntimeService
+
+	StopFunc   func(ctx context.Context, id string, timeout int64) error
+	GotTimeout int64
+}
+
+func (h *stopContainerHook) StopContainer(ctx context.Context, id string, timeout int64) error {
+	h.GotTimeout = timeout
+	if h.StopFunc != nil {
+		return h.StopFunc(ctx, id, timeout)
+	}
+	return h.RuntimeService.StopContainer(ctx, id, timeout)
 }
 
 // TestUpdateContainerResources tests updating a container in a Pod.
