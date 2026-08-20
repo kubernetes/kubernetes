@@ -266,7 +266,7 @@ func (s *snapshotMetadataTestSuite) DefineTests(driver storageframework.TestDriv
 		targetDeviceName string
 	)
 
-	f := framework.NewDefaultFramework("snapshotmetadata")
+	f := framework.NewFrameworkWithCustomTimeouts("snapshotmetadata", storageframework.GetDriverTimeouts(driver))
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	createBackupClientPod := func(ctx context.Context, source, target *v1.PersistentVolumeClaim) *v1.Pod {
