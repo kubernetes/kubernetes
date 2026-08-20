@@ -426,6 +426,110 @@ service/baz   <unknown>
 	}
 }
 
+func TestGetCategorySuppressesForbiddenFromDeniedExpandedResource(t *testing.T) {
+	pods, _, _ := cmdtesting.TestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+	forbiddenBody := `{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"services is forbidden: User \"test\" cannot list resource \"services\" in API group \"\" in the namespace \"test\"","reason":"Forbidden","details":{"kind":"services"},"code":403}`
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/pods" && m == "GET":
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)}, nil
+			case p == "/namespaces/test/replicationcontrollers" && m == "GET":
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.ReplicationControllerList{})}, nil
+			case p == "/namespaces/test/services" && m == "GET":
+				return &http.Response{StatusCode: http.StatusForbidden, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(strings.NewReader(forbiddenBody))}, nil
+			case p == "/namespaces/test/statefulsets" && m == "GET":
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &appsv1.StatefulSetList{})}, nil
+			case p == "/namespaces/test/horizontalpodautoscalers" && m == "GET":
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &autoscalingv1.HorizontalPodAutoscalerList{})}, nil
+			case p == "/namespaces/test/jobs" && m == "GET":
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &batchv1.JobList{})}, nil
+			case p == "/namespaces/test/cronjobs" && m == "GET":
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &batchv1beta1.CronJobList{})}, nil
+			case p == "/namespaces/test/daemonsets" && m == "GET":
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &appsv1.DaemonSetList{})}, nil
+			case p == "/namespaces/test/deployments" && m == "GET":
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &extensionsv1beta1.DeploymentList{})}, nil
+			case p == "/namespaces/test/replicasets" && m == "GET":
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &extensionsv1beta1.ReplicaSetList{})}, nil
+			default:
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	var gotFatal string
+	cmdutil.BehaviorOnFatal(func(str string, code int) {
+		gotFatal = str
+	})
+	defer cmdutil.DefaultBehaviorOnFatal()
+
+	streams, _, buf, bufErr := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.Run(cmd, []string{"all"})
+
+	if gotFatal != "" {
+		t.Fatalf("expected no error from category-expanded forbidden resource, got %q", gotFatal)
+	}
+	if !strings.Contains(buf.String(), "foo") {
+		t.Fatalf("expected allowed resource output, got %q", buf.String())
+	}
+	if e, a := "", bufErr.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+	if strings.Contains(strings.ToLower(buf.String()), "forbidden") || strings.Contains(strings.ToLower(bufErr.String()), "forbidden") {
+		t.Fatalf("expected forbidden error to be suppressed, got stdout %q stderr %q", buf.String(), bufErr.String())
+	}
+
+	gotFatal = ""
+	streams, _, buf, bufErr = genericiooptions.NewTestIOStreams()
+	cmd = NewCmdGet("kubectl", tf, streams)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.Run(cmd, []string{"services"})
+
+	if !strings.Contains(gotFatal, "services is forbidden") {
+		t.Fatalf("expected forbidden error from direct resource, got %q", gotFatal)
+	}
+
+	gotFatal = ""
+	streams, _, buf, bufErr = genericiooptions.NewTestIOStreams()
+	cmd = NewCmdGet("kubectl", tf, streams)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.Run(cmd, []string{"pods,services"})
+
+	if !strings.Contains(gotFatal, "services is forbidden") {
+		t.Fatalf("expected forbidden error from explicit resource, got %q", gotFatal)
+	}
+	if !strings.Contains(buf.String(), "foo") {
+		t.Fatalf("expected allowed resource output, got %q", buf.String())
+	}
+
+	gotFatal = ""
+	streams, _, buf, bufErr = genericiooptions.NewTestIOStreams()
+	cmd = NewCmdGet("kubectl", tf, streams)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.Run(cmd, []string{"all,services"})
+
+	if !strings.Contains(gotFatal, "services is forbidden") {
+		t.Fatalf("expected forbidden error from resource that was also explicitly requested, got %q", gotFatal)
+	}
+	if !strings.Contains(buf.String(), "foo") {
+		t.Fatalf("expected allowed resource output, got %q", buf.String())
+	}
+}
+
 func TestGetMultipleTableResourceTypesShowKinds(t *testing.T) {
 	pods, svcs, _ := cmdtesting.TestData()
 
