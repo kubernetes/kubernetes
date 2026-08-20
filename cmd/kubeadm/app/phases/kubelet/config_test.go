@@ -36,6 +36,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
 
@@ -179,6 +180,36 @@ func TestApplyKubeletConfigPatchFromFile(t *testing.T) {
 	}
 }
 
+func TestWriteConfigToDiskDoesNotMutateClusterConfiguration(t *testing.T) {
+	kubeletDir := t.TempDir()
+	if err := WriteInstanceConfigToDisk(&kubeletconfig.KubeletConfiguration{}, kubeletDir); err != nil {
+		t.Fatalf("could not write kubelet instance configuration: %v", err)
+	}
+
+	kubeletCfg := &mutatingComponentConfig{value: "cluster-wide"}
+	cfg := &kubeadmapi.ClusterConfiguration{
+		ComponentConfigs: kubeadmapi.ComponentConfigMap{
+			componentconfigs.KubeletGroup: kubeletCfg,
+		},
+	}
+
+	if err := WriteConfigToDisk(cfg, kubeletDir, "", io.Discard); err != nil {
+		t.Fatalf("could not write kubelet configuration: %v", err)
+	}
+
+	if kubeletCfg.value != "cluster-wide" {
+		t.Fatalf("expected cluster-wide configuration to remain unchanged, got %q", kubeletCfg.value)
+	}
+
+	written, err := os.ReadFile(filepath.Join(kubeletDir, kubeadmconstants.KubeletConfigurationFileName))
+	if err != nil {
+		t.Fatalf("could not read kubelet configuration: %v", err)
+	}
+	if !bytes.Contains(written, []byte("healthzBindAddress: node-specific")) {
+		t.Fatalf("expected node-specific mutation in written configuration, got:\n%s", written)
+	}
+}
+
 func TestApplyPatchesToConfig(t *testing.T) {
 	const (
 		expectedAddress = "barfoo"
@@ -223,4 +254,42 @@ func TestApplyPatchesToConfig(t *testing.T) {
 	if *newTyped.HealthzPort != expectedPort {
 		t.Fatalf("expected port: %d, got: %d", expectedPort, *newTyped.HealthzPort)
 	}
+}
+
+type mutatingComponentConfig struct {
+	value string
+}
+
+func (c *mutatingComponentConfig) DeepCopy() kubeadmapi.ComponentConfig {
+	return &mutatingComponentConfig{value: c.value}
+}
+
+func (c *mutatingComponentConfig) Marshal() ([]byte, error) {
+	return fmt.Appendf(nil, "apiVersion: kubelet.config.k8s.io/v1beta1\nkind: KubeletConfiguration\nhealthzBindAddress: %s\n", c.value), nil
+}
+
+func (c *mutatingComponentConfig) Unmarshal(kubeadmapi.DocumentMap) error {
+	return nil
+}
+
+func (c *mutatingComponentConfig) Default(*kubeadmapi.ClusterConfiguration, *kubeadmapi.APIEndpoint, *kubeadmapi.NodeRegistrationOptions) {
+}
+
+func (c *mutatingComponentConfig) IsUserSupplied() bool {
+	return false
+}
+
+func (c *mutatingComponentConfig) SetUserSupplied(bool) {
+}
+
+func (c *mutatingComponentConfig) Mutate() error {
+	c.value = "node-specific"
+	return nil
+}
+
+func (c *mutatingComponentConfig) Set(interface{}) {
+}
+
+func (c *mutatingComponentConfig) Get() interface{} {
+	return c
 }
