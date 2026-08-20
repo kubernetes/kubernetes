@@ -25,18 +25,35 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
+// PodMap maps pod UIDs to their corresponding *v1.Pod,
+// tracking resource requirements for all containers within each pod.
+type PodMap map[types.UID]*v1.Pod
+
+// Clone returns a copy of PodMap
+func (pm PodMap) Clone() PodMap {
+	pmCopy := make(PodMap, len(pm))
+	for podUID, pod := range pm {
+		if pod != nil {
+			pmCopy[podUID] = pod.DeepCopy()
+		}
+	}
+	return pmCopy
+}
+
 // Reader interface used to read current pod resource state
 type Reader interface {
 	GetContainerResources(podUID types.UID, containerName string) (v1.ResourceRequirements, bool)
-	GetPodResourceInfoMap() PodResourceInfoMap
-	GetPodResourceInfo(podUID types.UID) (PodResourceInfo, bool)
+	GetPodMap() PodMap
+	GetPodUIDs() []types.UID
+	GetPod(podUID types.UID) (*v1.Pod, bool)
+	HasPod(podUID types.UID) bool
 	GetPodLevelResources(podUID types.UID) (*v1.ResourceRequirements, bool)
 	GetEmptyDirVolumeLimit(podUID types.UID, volumeName string) (*resource.Quantity, bool)
 }
 
 type writer interface {
 	SetContainerResources(logger klog.Logger, podUID types.UID, containerName string, containerType podutil.ContainerType, resources v1.ResourceRequirements) error
-	SetPodResourceInfo(logger klog.Logger, podUID types.UID, resourceInfo PodResourceInfo) error
+	SetPod(logger klog.Logger, pod *v1.Pod) error
 	SetPodLevelResources(logger klog.Logger, podUID types.UID, alloc *v1.ResourceRequirements) error
 	SetEmptyDirVolumeLimit(podUID types.UID, volumeName string, limit *resource.Quantity) error
 	RemovePod(logger klog.Logger, podUID types.UID) error

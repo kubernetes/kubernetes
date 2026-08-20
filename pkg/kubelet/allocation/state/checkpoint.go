@@ -17,59 +17,72 @@ limitations under the License.
 package state
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
 )
 
+const (
+	// checkpointVersionV2 is the current checkpoint format version storing base64-encoded protobuf PodList.
+	checkpointVersionV2 = "v2"
+)
+
 var _ checkpointmanager.Checkpoint = &Checkpoint{}
 
-// Checkpoint represents a structure to store pod resource allocation checkpoint data
+// Checkpoint represents a structure to store pod resource allocation checkpoint data.
 type Checkpoint struct {
-	// Data is a serialized PodResourceAllocationInfo
+	// Version is the checkpoint format version (e.g. "v2")
+	Version string `json:"version,omitempty"`
+	// Data is a serialized and base64-encoded PodList
 	Data string `json:"data"`
 	// Checksum is a checksum of Data
 	Checksum checksum.Checksum `json:"checksum"`
 }
 
-// NewCheckpoint creates a new checkpoint from a list of claim info states
-func NewCheckpoint(allocations *PodResourceCheckpointInfo) (*Checkpoint, error) {
-
-	serializedAllocations, err := json.Marshal(allocations)
+// NewCheckpoint creates a new checkpoint containing the serialized PodList.
+func NewCheckpoint(podList *v1.PodList) (*Checkpoint, error) {
+	if podList == nil {
+		podList = &v1.PodList{}
+	}
+	protoBytes, err := podList.Marshal()
 	if err != nil {
-		return nil, fmt.Errorf("failed to serialize allocations for checkpointing: %w", err)
+		return nil, fmt.Errorf("failed to marshal PodList to protobuf for checkpointing: %w", err)
 	}
-
+	data := base64.StdEncoding.EncodeToString(protoBytes)
 	cp := &Checkpoint{
-		Data: string(serializedAllocations),
+		Version:  checkpointVersionV2,
+		Data:     data,
+		Checksum: checksum.New(data),
 	}
-	cp.Checksum = checksum.New(cp.Data)
 	return cp, nil
+}
+
+// GetPodList deserializes the base64-encoded protobuf PodList from checkpoint data.
+func (cp *Checkpoint) getPodList() (*v1.PodList, error) {
+	protoBytes, err := base64.StdEncoding.DecodeString(cp.Data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode base64 protobuf data: %w", err)
+	}
+	var podList v1.PodList
+	if err := podList.Unmarshal(protoBytes); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal protobuf PodList: %w", err)
+	}
+	return &podList, nil
 }
 
 func (cp *Checkpoint) MarshalCheckpoint() ([]byte, error) {
 	return json.Marshal(cp)
 }
 
-// UnmarshalCheckpoint unmarshals checkpoint from JSON
+// UnmarshalCheckpoint unmarshals checkpoint from  JSON
 func (cp *Checkpoint) UnmarshalCheckpoint(blob []byte) error {
 	return json.Unmarshal(blob, cp)
 }
 
-// VerifyChecksum verifies that current checksum
-// of checkpointed Data is valid
 func (cp *Checkpoint) VerifyChecksum() error {
 	return cp.Checksum.Verify(cp.Data)
-}
-
-// GetPodResourceCheckpointInfo returns Pod Resource Allocation info states from checkpoint
-func (cp *Checkpoint) GetPodResourceCheckpointInfo() (*PodResourceCheckpointInfo, error) {
-	var data PodResourceCheckpointInfo
-	if err := json.Unmarshal([]byte(cp.Data), &data); err != nil {
-		return nil, err
-	}
-
-	return &data, nil
 }
