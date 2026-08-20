@@ -275,11 +275,14 @@ func (m topologyToMatchedTermCount) clone() topologyToMatchedTermCount {
 }
 
 func (m topologyToMatchedTermCount) update(node *v1.Node, tk string, value int64) {
+	if node == nil {
+		return
+	}
 	if tv, ok := node.Labels[tk]; ok {
 		pair := topologyPair{key: tk, value: tv}
 		m[pair] += value
 		// value could be negative, hence we delete the entry if it is down to zero.
-		if m[pair] == 0 {
+		if m[pair] <= 0 {
 			delete(m, pair)
 		}
 	}
@@ -318,6 +321,9 @@ type topologyPairCount struct {
 }
 
 func (m *topologyToMatchedTermCountList) recordMatch(node *v1.Node, tk string, value int64) {
+	if node == nil {
+		return
+	}
 	if tv, ok := node.Labels[tk]; ok {
 		pair := topologyPair{key: tk, value: tv}
 		*m = append(*m, topologyPairCount{
