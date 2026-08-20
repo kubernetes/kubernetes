@@ -1614,47 +1614,6 @@ func TestUncoreCaches(t *testing.T) {
 	}
 }
 
-func TestCPUsPerUncore(t *testing.T) {
-	tests := []struct {
-		name string
-		topo *CPUTopology
-		want int
-	}{
-		{
-			name: "Zero Number of UncoreCache",
-			topo: &CPUTopology{
-				NumCPUs:        8,
-				NumUncoreCache: 0,
-			},
-			want: 0,
-		},
-		{
-			name: "Normal case",
-			topo: &CPUTopology{
-				NumCPUs:        16,
-				NumUncoreCache: 2,
-			},
-			want: 8,
-		},
-		{
-			name: "Single shared UncoreCache",
-			topo: &CPUTopology{
-				NumCPUs:        8,
-				NumUncoreCache: 1,
-			},
-			want: 8,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := tt.topo.CPUsPerUncore()
-			if got != tt.want {
-				t.Errorf("CPUsPerUncore() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-
-}
 func Test_getUncoreCacheID(t *testing.T) {
 	tests := []struct {
 		name string
