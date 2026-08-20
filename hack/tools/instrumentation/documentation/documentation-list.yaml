@@ -2073,11 +2073,13 @@
     endpoint: /metrics
 - name: terminated_watchers_total
   namespace: apiserver
-  help: Counter of watchers closed due to unresponsiveness broken by resource type.
+  help: Counter of watchers closed by the watch cache broken by resource type and
+    reason.
   type: Counter
   stabilityLevel: ALPHA
   labels:
   - group
+  - reason
   - resource
   componentEndpoints:
   - component: kube-apiserver
