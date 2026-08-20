@@ -167,7 +167,7 @@ func (l listSnapshot) OrderedListPrefix(prefix string, continueKey string) ([]in
 		if !ok {
 			return nil, fmt.Errorf("non *Element returned from storage: %v", item)
 		}
-		if len(continueKey) > 0 && continueKey >= elem.Key {
+		if len(continueKey) > 0 && continueKey > elem.Key {
 			continue
 		}
 		if !key.HasPathPrefix(elem.Key, prefix) {
