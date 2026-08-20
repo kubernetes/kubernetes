@@ -17,13 +17,11 @@ limitations under the License.
 package v1
 
 import (
-	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/validate/content"
-
-	"k8s.io/klog/v2"
 )
 
 // MatchToleration checks if the toleration matches tolerationToMatch. Tolerations are unique by <key,effect,operator,value>,
@@ -49,64 +47,59 @@ func (t *Toleration) MatchToleration(tolerationToMatch *Toleration) bool {
 //     between toleration.value and taint.value.
 //  5. If enableComparisonOperators is false and the toleration uses 'Lt' or 'Gt'
 //     operators, the toleration does not match (returns false).
-func (t *Toleration) ToleratesTaint(logger klog.Logger, taint *Taint, enableComparisonOperators bool) bool {
+func (t *Toleration) ToleratesTaint(taint *Taint, enableComparisonOperators bool) (bool, error) {
 	if len(t.Effect) > 0 && t.Effect != taint.Effect {
-		return false
+		return false, nil
 	}
 
 	if len(t.Key) > 0 && t.Key != taint.Key {
-		return false
+		return false, nil
 	}
 
 	// TODO: Use proper defaulting when Toleration becomes a field of PodSpec
 	switch t.Operator {
 	// empty operator means Equal
 	case "", TolerationOpEqual:
-		return t.Value == taint.Value
+		return t.Value == taint.Value, nil
 	case TolerationOpExists:
-		return true
+		return true, nil
 	case TolerationOpLt, TolerationOpGt:
 		// If comparison operators are disabled, this toleration doesn't match
 		if !enableComparisonOperators {
-			return false
+			return false, nil
 		}
-		return compareNumericValues(logger, t.Value, taint.Value, t.Operator)
+		return compareNumericValues(t.Value, taint.Value, t.Operator)
 	default:
-		return false
+		return false, nil
 	}
 }
 
 // compareNumericValues performs numeric comparison between toleration and taint values
-func compareNumericValues(logger klog.Logger, tolerationVal, taintVal string, op TolerationOperator) bool {
-
+func compareNumericValues(tolerationVal, taintVal string, op TolerationOperator) (bool, error) {
 	errorMsgs := content.IsDecimalInteger(tolerationVal)
 	if len(errorMsgs) > 0 {
-		logger.Error(errors.New(strings.Join(errorMsgs, ",")), "failed to parse toleration value as int64", "toleration", tolerationVal)
-		return false
+		return false, fmt.Errorf("failed to parse toleration value %q as int64: %s", tolerationVal, strings.Join(errorMsgs, ","))
 	}
 	tVal, err := strconv.ParseInt(tolerationVal, 10, 64)
 	if err != nil {
-		logger.Error(err, "failed to parse toleration value as int64", "toleration", tolerationVal)
-		return false
+		return false, fmt.Errorf("failed to parse toleration value %q as int64: %w", tolerationVal, err)
 	}
 
 	errorMsgs = content.IsDecimalInteger(taintVal)
 	if len(errorMsgs) > 0 {
-		logger.Error(errors.New(strings.Join(errorMsgs, ",")), "failed to parse taint value as int64", "taint", taintVal)
-		return false
+		return false, fmt.Errorf("failed to parse taint value %q as int64: %s", taintVal, strings.Join(errorMsgs, ","))
 	}
 	tntVal, err := strconv.ParseInt(taintVal, 10, 64)
 	if err != nil {
-		logger.Error(err, "failed to parse taint value as int64", "taint", taintVal)
-		return false
+		return false, fmt.Errorf("failed to parse taint value %q as int64: %w", taintVal, err)
 	}
 
 	switch op {
 	case TolerationOpLt:
-		return tntVal < tVal
+		return tntVal < tVal, nil
 	case TolerationOpGt:
-		return tntVal > tVal
+		return tntVal > tVal, nil
 	default:
-		return false
+		return false, nil
 	}
 }

@@ -168,10 +168,14 @@ func (m *managerImpl) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttrib
 
 		// When node has memory pressure, check BestEffort Pod's toleration:
 		// admit it if tolerates memory pressure taint, fail for other tolerations, e.g. DiskPressure.
-		if corev1helpers.TolerationsTolerateTaint(logger, attrs.Pod.Spec.Tolerations, &v1.Taint{
+		toleratesMemoryPressure, warning := corev1helpers.TolerationsTolerateTaint(logger, attrs.Pod.Spec.Tolerations, &v1.Taint{
 			Key:    v1.TaintNodeMemoryPressure,
 			Effect: v1.TaintEffectNoSchedule,
-		}, utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators)) {
+		}, utilfeature.DefaultFeatureGate.Enabled(features.TaintTolerationComparisonOperators))
+		if warning != nil {
+			logger.V(4).Info("Failed to match tolerations against memory pressure taint", "warning", warning)
+		}
+		if toleratesMemoryPressure {
 			return lifecycle.PodAdmitResult{Admit: true}
 		}
 	}
