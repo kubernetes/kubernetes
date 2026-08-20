@@ -19,6 +19,7 @@ package podgrouppreemption
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -58,11 +59,6 @@ import (
 
 // TestPodGroupPreemption tests preemption scenarios involving pod groups.
 func TestPodGroupPreemption(t *testing.T) {
-	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.GenericWorkload:                 true,
-		features.PodLevelResources:               true,
-		features.TopologyAwareWorkloadScheduling: true,
-	})
 	tests := []struct {
 		name          string
 		nodes         []*v1.Node
@@ -1018,540 +1014,537 @@ func TestPodGroupPreemption(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		for _, cpgEnabled := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s (CPG enabled: %v)", tt.name, cpgEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.PodLevelResources:               true,
+					features.GenericWorkload:                 true,
+					features.PodGroupPreemptionPolicy:        tt.enablePodGroupPreemptionPolicy,
+					features.TopologyAwareWorkloadScheduling: true,
+					features.CompositePodGroup:               cpgEnabled,
+				})
+				recorder := eventRecorder{}
+				registry := make(frameworkruntime.Registry)
+
+				// Register mock bind plugin that will register NNN information during binding.
+				mockBindPluginName := "mockBindPlugin"
+				var bindPlugin = mockBindPlugin{
+					name:       mockBindPluginName,
+					realPlugin: nil,
+					nnnInfo:    sync.Map{},
+					recorder:   &recorder,
+				}
+				err := registry.Register(mockBindPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+					db, err := defaultbinder.New(ctx, o, fh)
+					if err != nil {
+						t.Fatalf("Error creating a default binder plugin: %v", err)
+					}
+					bindPlugin.realPlugin = db.(fwk.BindPlugin)
+					return &bindPlugin, nil
+				})
+				if err != nil {
+					t.Fatalf("Error registering a bind plugin: %v", err)
+				}
+
+				mockPGPostFilterPluginName := "mockPGPostFilterPlugin"
+				var pgPostFilterPlugin = mockPodGroupPostFilterPlugin{
+					name:     mockPGPostFilterPluginName,
+					recorder: &recorder,
+				}
+				err = registry.Register(mockPGPostFilterPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+					return &pgPostFilterPlugin, nil
+				})
+				if err != nil {
+					t.Fatalf("Error registering a pg post filter plugin: %v", err)
+				}
+
+				cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+					Profiles: []configv1.KubeSchedulerProfile{{
+						SchedulerName: ptr.To(v1.DefaultSchedulerName),
+						Plugins: &configv1.Plugins{
+							MultiPoint: configv1.PluginSet{
+								Enabled: []configv1.Plugin{
+									{Name: mockBindPluginName},
+									{Name: mockPGPostFilterPluginName},
+									{Name: names.DefaultPreemption},
+								},
+								Disabled: []configv1.Plugin{
+									{Name: names.DefaultBinder},
+									// Disable DefaultPreemption from its default position to allow explicit ordering.
+									// If not disabled, it runs as an override first and terminates the post-filter chain,
+									// preventing our mock plugins from recording events.
+									{Name: names.DefaultPreemption},
+								},
+							},
+						},
+					}},
+				})
+
+				if tt.customPluginName != "" {
+					err := registry.Register(tt.customPluginName, tt.customPluginFunc)
+					if err != nil {
+						t.Fatalf("Error registering custom plugin: %v", err)
+					}
+					cfg.Profiles[0].Plugins.MultiPoint.Enabled = append(cfg.Profiles[0].Plugins.MultiPoint.Enabled, config.Plugin{Name: tt.customPluginName})
+				}
+
+				// Set PodMaxBackoff to 1 second to turn on backoff and allow apiCacher to get information about
+				// pod NNN. Without this we might have a race between starting binding and update of apiCacher.
+				testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-preemption",
+					scheduler.WithProfiles(cfg.Profiles...),
+					scheduler.WithFrameworkOutOfTreeRegistry(registry),
+					scheduler.WithPodMaxBackoffSeconds(1),
+					scheduler.WithPodInitialBackoffSeconds(0))
+				cs, ns := testCtx.ClientSet, testCtx.NS.Name
+
+				// Create nodes
+				for _, n := range tt.nodes {
+					if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, n, metav1.CreateOptions{}); err != nil {
+						t.Fatalf("Failed to create node %s: %v", n.Name, err)
+					}
+				}
+
+				// Create PDB if specified
+				if tt.pdb != nil {
+					tt.pdb.Namespace = ns
+					if _, err := cs.PolicyV1().PodDisruptionBudgets(ns).Create(testCtx.Ctx, tt.pdb, metav1.CreateOptions{}); err != nil {
+						t.Fatalf("Failed to create PDB: %v", err)
+					}
+				}
+
+				// 1. Create PodGroups
+				for _, pg := range tt.podGroups {
+					pg.Namespace = ns
+					if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+						t.Fatalf("Failed to create PodGroup %s: %v", pg.Name, err)
+					}
+				}
+
+				// 2. Create initial pods
+				for _, p := range tt.initialPods {
+					p.Namespace = ns
+					if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+						t.Fatalf("Failed to create pod %s: %v", p.Name, err)
+					}
+				}
+
+				// 3. Wait for initial pods to be scheduled
+				for _, p := range tt.initialPods {
+					if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
+						testutils.PodScheduled(cs, ns, p.Name)); err != nil {
+						t.Errorf("Failed to wait for pod %s to be scheduled: %v", p.Name, err)
+					}
+				}
+
+				recorder.Clear()
+
+				// 4. Create preemptor pods
+				if tt.tempRemovePG {
+					// Temporarily remove PodGroups. This is a trick to ensure that all preemptor pods
+					// are created and queued as unschedulable first, and then become schedulable at once
+					// when the PodGroup is recreated.
+					pgNames := make([]string, len(tt.podGroups))
+					for i, pg := range tt.podGroups {
+						pgNames[i] = pg.Name
+					}
+					if err := deletePodGroups(testCtx.Ctx, cs, ns, pgNames); err != nil {
+						t.Fatalf("Failed to delete PodGroups: %v", err)
+					}
+				}
+
+				for _, p := range tt.preemptorPods {
+					p.Namespace = ns
+					if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+						t.Fatalf("Failed to create pod %s: %v", p.Name, err)
+					}
+					if !tt.tempRemovePG && tt.preemptorPodsQueuedInCreationOrder {
+						podScheduledFn := testutils.PodScheduled(cs, ns, p.Name)
+						err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+							_, ok := testCtx.Scheduler.SchedulingQueue.GetPod(p.Name, p.Namespace, p.Spec.SchedulingGroup)
+							if ok {
+								return true, nil
+							}
+							// pod may have gotten queued and scheduled between the polls
+							return podScheduledFn(ctx)
+						})
+						if err != nil {
+							t.Fatalf("Failed to ensure order of pod %s: %v", p.Name, err)
+						}
+					}
+				}
+
+				if tt.tempRemovePG {
+					// Wait for preemptor pods to be unschedulable
+					for _, p := range tt.preemptorPods {
+						if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
+							func(ctx context.Context) (bool, error) {
+								return isPodInUnschedulableQueue(testCtx.Scheduler, p.Name, ns), nil
+							}); err != nil {
+							t.Fatalf("Failed to wait for pod %s to be unschedulable: %v", p.Name, err)
+						}
+					}
+
+					// Recreate PodGroups
+					for _, pg := range tt.podGroups {
+						pgCopy := pg.DeepCopy()
+						pgCopy.ResourceVersion = ""
+						if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pgCopy, metav1.CreateOptions{}); err != nil {
+							t.Fatalf("Failed to recreate PodGroup %s: %v", pg.Name, err)
+						}
+					}
+				}
+
+				// 5. Wait for preemption to complete if WAP calls are expected
+				if tt.expectedPodsPreemptedByWAP > 0 {
+					wapCalls := 0
+					err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+						wapCalls = 0
+						for _, podName := range tt.expectedPreempted {
+							events, err := cs.CoreV1().Events(ns).List(ctx, metav1.ListOptions{
+								FieldSelector: "involvedObject.name=" + podName,
+							})
+							if err != nil {
+								return false, err
+							}
+							for _, event := range events.Items {
+								if event.Reason == "Preempted" && strings.HasPrefix(event.Message, "Preempted by podgroup") {
+									wapCalls++
+									break
+								}
+							}
+						}
+						return wapCalls == tt.expectedPodsPreemptedByWAP, nil
+					})
+					if err != nil {
+						t.Errorf("WorkloadAwarePreemption was not called expected times within timeout: want=%d, got=%d", wapCalls, tt.expectedPodsPreemptedByWAP)
+					}
+				}
+
+				// 6. Verify unschedulable pods
+				for _, podName := range tt.expectedUnschedulable {
+					if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
+						testutils.PodUnschedulable(cs, ns, podName)); err != nil {
+						t.Errorf("Pod %s was expected to be unschedulable but wasn't: %v", podName, err)
+					}
+				}
+
+				// 7. Verify scheduled pods
+				for _, podName := range tt.expectedScheduled {
+					if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
+						testutils.PodScheduled(cs, ns, podName)); err != nil {
+						t.Errorf("Pod %s was expected to be scheduled but wasn't: %v", podName, err)
+					}
+				}
+
+				// 8. Verify preempted pods
+				for _, podName := range tt.expectedPreempted {
+					if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, 5*time.Second, false,
+						func(ctx context.Context) (bool, error) {
+							pod, err := cs.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
+							if err != nil {
+								return apierrors.IsNotFound(err), nil
+							}
+							if pod.DeletionTimestamp != nil {
+								return true, nil
+							}
+							_, cond := podutil.GetPodCondition(&pod.Status, v1.DisruptionTarget)
+							return cond != nil, nil
+						}); err != nil {
+						t.Errorf("Pod %s was expected to be preempted but wasn't", podName)
+					}
+				}
+
+				// 9. Verify preemptor pods have nominated node name
+				for _, podName := range tt.expectedToHaveNNNInfo {
+					if node, ok := bindPlugin.nnnInfo.Load(podName); !ok || node.(string) == "" {
+						t.Errorf("Pod %s was expected to have nominated node name but didn't", podName)
+					}
+				}
+
+				// Verify event order
+				if len(tt.expectedEventOrder) > 0 {
+					actualEvents := recorder.GetEvents()
+					if diff := cmp.Diff(tt.expectedEventOrder, actualEvents); diff != "" {
+						t.Errorf("Unexpected event order (-want,+got):\n%s", diff)
+					}
+				}
+
+				// 10. Dump the state of pods to ease debugging failed runs.
+				if t.Failed() {
+					t.Log("Dumping states of initial and preemptor pods:")
+					var allPods []string
+					for _, p := range tt.initialPods {
+						allPods = append(allPods, p.Name)
+					}
+					for _, p := range tt.preemptorPods {
+						allPods = append(allPods, p.Name)
+					}
+					for _, podName := range allPods {
+						pod, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, podName, metav1.GetOptions{})
+						if err != nil {
+							if apierrors.IsNotFound(err) {
+								t.Logf("Pod %q: not present in cluster", podName)
+							} else {
+								t.Logf("Pod %q: failed to get: %v", podName, err)
+							}
+							continue
+						}
+
+						var statusStr string
+						if pod.Spec.NodeName != "" {
+							statusStr = "scheduled on node " + pod.Spec.NodeName
+						} else {
+							_, cond := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
+							if cond != nil && cond.Status == v1.ConditionFalse && cond.Reason == v1.PodReasonUnschedulable {
+								statusStr = "unschedulable"
+							} else {
+								statusStr = "pending"
+							}
+						}
+						t.Logf("Pod %q: status=%s, phase=%s", podName, statusStr, pod.Status.Phase)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestPodGroupPreemptionStatus(t *testing.T) {
+	for _, cpgEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("CPG enabled: %v)", cpgEnabled), func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:                 true,
-				features.PodGroupPreemptionPolicy:        tt.enablePodGroupPreemptionPolicy,
-				features.TopologyAwareWorkloadScheduling: true,
+				features.TopologyAwareWorkloadScheduling: cpgEnabled,
+				features.CompositePodGroup:               cpgEnabled,
 			})
-			recorder := eventRecorder{}
-			registry := make(frameworkruntime.Registry)
+			testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-preemption-status")
 
-			// Register mock bind plugin that will register NNN information during binding.
-			mockBindPluginName := "mockBindPlugin"
-			var bindPlugin = mockBindPlugin{
-				name:       mockBindPluginName,
-				realPlugin: nil,
-				nnnInfo:    sync.Map{},
-				recorder:   &recorder,
+			cs := testCtx.ClientSet
+			ns := testCtx.NS.Name
+
+			// Create a node.
+			node := st.MakeNode().Name("node-1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+			if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create node: %v", err)
 			}
-			err := registry.Register(mockBindPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
-				db, err := defaultbinder.New(ctx, o, fh)
+			// Create a low-priority pod low-1 taking whole node
+			lowPod := st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).TerminationGracePeriodSeconds(30).Obj()
+			if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, lowPod, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create low-priority pod: %v", err)
+			}
+			// Wait for low-priority pod to be scheduled
+			if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
+				testutils.PodScheduled(cs, ns, lowPod.Name)); err != nil {
+				t.Fatalf("Failed to wait for low-priority pod to be scheduled: %v", err)
+			}
+			// Create a high-priority pod high-1 belonging to pg1 (priority=100)
+			pg := st.MakePodGroup().Name("pg1").Namespace(ns).MinCount(1).Priority(100).Obj()
+			if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create PodGroup: %v", err)
+			}
+			highPod := st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(100).Obj()
+			if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, highPod, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create high-priority pod: %v", err)
+			}
+			// Poll until the low-priority pod gets DeletionTimestamp set (which indicates preemption is triggered)
+			err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+				pod, err := cs.CoreV1().Pods(ns).Get(ctx, lowPod.Name, metav1.GetOptions{})
 				if err != nil {
-					t.Fatalf("Error creating a default binder plugin: %v", err)
+					return false, err
 				}
-				bindPlugin.realPlugin = db.(fwk.BindPlugin)
-				return &bindPlugin, nil
+				return pod.DeletionTimestamp != nil, nil
 			})
 			if err != nil {
-				t.Fatalf("Error registering a bind plugin: %v", err)
+				t.Fatalf("Failed to wait for low-priority pod to get DeletionTimestamp set: %v", err)
 			}
+			// Verify the PodGroup condition.
+			// We want PodGroupInitiallyScheduled status to be False, Reason to be Unschedulable, and Message to contain
+			// both "minCount (1) cannot be satisfied" and "pod group preemption found a placement for podgroup"
+			var cond *metav1.Condition
+			err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
+				currentPG, err := cs.SchedulingV1beta1().PodGroups(ns).Get(ctx, pg.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				cond = apimeta.FindStatusCondition(currentPG.Status.Conditions, schedulingv1beta1.PodGroupInitiallyScheduled)
+				if cond != nil &&
+					cond.Status == metav1.ConditionFalse &&
+					cond.Reason == schedulingv1beta1.PodGroupReasonUnschedulable &&
+					strings.Contains(cond.Message, "minCount (1) cannot be satisfied") &&
+					strings.Contains(cond.Message, "pod group preemption: found a placement for podgroup, preempting 1 victims") {
+					return true, nil
+				}
+				return false, nil
+			})
+			if err != nil {
+				t.Logf("Failed to verify PodGroup condition: %v", err)
+				t.Fatalf("Last observed podGroup condition: Status=%s, Reason=%s, Message=%q", cond.Status, cond.Reason, cond.Message)
+			}
+		})
+	}
+}
 
-			mockPGPostFilterPluginName := "mockPGPostFilterPlugin"
-			var pgPostFilterPlugin = mockPodGroupPostFilterPlugin{
-				name:     mockPGPostFilterPluginName,
-				recorder: &recorder,
-			}
-			err = registry.Register(mockPGPostFilterPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
-				return &pgPostFilterPlugin, nil
+func TestPodGroupPreemption_NominatedNodeNameRespected(t *testing.T) {
+	for _, cpgEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("CPG enabled: %v", cpgEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: cpgEnabled,
+				features.CompositePodGroup:               cpgEnabled,
 			})
+
+			mockScorePlugin := "mockScorePlugin"
+			registry := make(frameworkruntime.Registry)
+			err := registry.Register(mockScorePlugin, newPresetScorePlugin(map[string]int64{"node1": 100, "node2": 0}))
 			if err != nil {
-				t.Fatalf("Error registering a pg post filter plugin: %v", err)
+				t.Fatalf("Failed to register custom score plugin: %v", err)
 			}
 
 			cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 				Profiles: []configv1.KubeSchedulerProfile{{
 					SchedulerName: ptr.To(v1.DefaultSchedulerName),
 					Plugins: &configv1.Plugins{
-						MultiPoint: configv1.PluginSet{
+						Score: configv1.PluginSet{
 							Enabled: []configv1.Plugin{
-								{Name: mockBindPluginName},
-								{Name: mockPGPostFilterPluginName},
-								{Name: names.DefaultPreemption},
-							},
-							Disabled: []configv1.Plugin{
-								{Name: names.DefaultBinder},
-								// Disable DefaultPreemption from its default position to allow explicit ordering.
-								// If not disabled, it runs as an override first and terminates the post-filter chain,
-								// preventing our mock plugins from recording events.
-								{Name: names.DefaultPreemption},
+								{Name: mockScorePlugin},
 							},
 						},
 					},
 				}},
 			})
 
-			if tt.customPluginName != "" {
-				err := registry.Register(tt.customPluginName, tt.customPluginFunc)
-				if err != nil {
-					t.Fatalf("Error registering custom plugin: %v", err)
-				}
-				cfg.Profiles[0].Plugins.MultiPoint.Enabled = append(cfg.Profiles[0].Plugins.MultiPoint.Enabled, config.Plugin{Name: tt.customPluginName})
-			}
-
-			// Set PodMaxBackoff to 1 second to turn on backoff and allow apiCacher to get information about
-			// pod NNN. Without this we might have a race between starting binding and update of apiCacher.
-			testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-preemption",
+			testCtx := testutils.InitTestSchedulerWithNS(t, "pg-preemption-nnn",
 				scheduler.WithProfiles(cfg.Profiles...),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry),
 				scheduler.WithPodMaxBackoffSeconds(1),
-				scheduler.WithPodInitialBackoffSeconds(0))
+				scheduler.WithPodInitialBackoffSeconds(0),
+			)
 			cs, ns := testCtx.ClientSet, testCtx.NS.Name
 
-			// Create nodes
-			for _, n := range tt.nodes {
-				if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, n, metav1.CreateOptions{}); err != nil {
-					t.Fatalf("Failed to create node %s: %v", n.Name, err)
+			// 1. Create 3 nodes
+			nodes := []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node3").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			}
+			for _, node := range nodes {
+				if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create node %s: %v", node.Name, err)
 				}
 			}
 
-			// Create PDB if specified
-			if tt.pdb != nil {
-				tt.pdb.Namespace = ns
-				if _, err := cs.PolicyV1().PodDisruptionBudgets(ns).Create(testCtx.Ctx, tt.pdb, metav1.CreateOptions{}); err != nil {
-					t.Fatalf("Failed to create PDB: %v", err)
+			// 2. Create PodGroup with minCount=2
+			pg := st.MakePodGroup().Name("pg1").Namespace(ns).Priority(50).MinCount(2).Obj()
+			if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create pod group pg1: %v", err)
+			}
+
+			// 3. Create initial pods: pod1 on node1 (high priority), pod2 on node2 & pod3 on node3 (low priority with default grace period)
+			initialPods := []*v1.Pod{
+				st.MakePod().Name("pod1").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(100).ZeroTerminationGracePeriod().Node("node1").Obj(),
+				st.MakePod().Name("pod2").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).Node("node2").Obj(),
+				st.MakePod().Name("pod3").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).Node("node3").Obj(),
+			}
+			for _, pod := range initialPods {
+				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create pod %s: %v", pod.Name, err)
 				}
 			}
 
-			// 1. Create PodGroups
-			for _, pg := range tt.podGroups {
-				pg.Namespace = ns
-				if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
-					t.Fatalf("Failed to create PodGroup %s: %v", pg.Name, err)
+			// Wait for initial pods to be scheduled
+			for _, pod := range initialPods {
+				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, testutils.PodScheduled(cs, ns, pod.Name)); err != nil {
+					t.Fatalf("Failed to wait for initial pod %s to schedule: %v", pod.Name, err)
 				}
 			}
 
-			// 2. Create initial pods
-			for _, p := range tt.initialPods {
-				p.Namespace = ns
-				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
-					t.Fatalf("Failed to create pod %s: %v", p.Name, err)
+			// 4. Create preemptor pods belonging to pg1
+			preemptorPods := []*v1.Pod{
+				st.MakePod().Name("preemptor1").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(50).ZeroTerminationGracePeriod().Obj(),
+				st.MakePod().Name("preemptor2").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(50).ZeroTerminationGracePeriod().Obj(),
+			}
+			for _, pod := range preemptorPods {
+				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create preemptor pod %s: %v", pod.Name, err)
 				}
 			}
 
-			// 3. Wait for initial pods to be scheduled
-			for _, p := range tt.initialPods {
-				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
-					testutils.PodScheduled(cs, ns, p.Name)); err != nil {
-					t.Errorf("Failed to wait for pod %s to be scheduled: %v", p.Name, err)
-				}
-			}
-
-			recorder.Clear()
-
-			// 4. Create preemptor pods
-			if tt.tempRemovePG {
-				// Temporarily remove PodGroups. This is a trick to ensure that all preemptor pods
-				// are created and queued as unschedulable first, and then become schedulable at once
-				// when the PodGroup is recreated.
-				pgNames := make([]string, len(tt.podGroups))
-				for i, pg := range tt.podGroups {
-					pgNames[i] = pg.Name
-				}
-				if err := deletePodGroups(testCtx.Ctx, cs, ns, pgNames); err != nil {
-					t.Fatalf("Failed to delete PodGroups: %v", err)
-				}
-			}
-
-			for _, p := range tt.preemptorPods {
-				p.Namespace = ns
-				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
-					t.Fatalf("Failed to create pod %s: %v", p.Name, err)
-				}
-				if !tt.tempRemovePG && tt.preemptorPodsQueuedInCreationOrder {
-					podScheduledFn := testutils.PodScheduled(cs, ns, p.Name)
-					err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
-						_, ok := testCtx.Scheduler.SchedulingQueue.GetPod(p.Name, p.Namespace, p.Spec.SchedulingGroup)
-						if ok {
-							return true, nil
-						}
-						// pod may have gotten queued and scheduled between the polls
-						return podScheduledFn(ctx)
-					})
+			// 5. Verify that initial nominated node names are set for preemptor pods (node2 and node3)
+			initialNNNs := make(map[string]string)
+			for _, pod := range preemptorPods {
+				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+					p, err := cs.CoreV1().Pods(ns).Get(ctx, pod.Name, metav1.GetOptions{})
 					if err != nil {
-						t.Fatalf("Failed to ensure order of pod %s: %v", p.Name, err)
+						return false, err
 					}
-				}
-			}
-
-			if tt.tempRemovePG {
-				// Wait for preemptor pods to be unschedulable
-				for _, p := range tt.preemptorPods {
-					if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
-						func(ctx context.Context) (bool, error) {
-							return isPodInUnschedulableQueue(testCtx.Scheduler, p.Name, ns), nil
-						}); err != nil {
-						t.Fatalf("Failed to wait for pod %s to be unschedulable: %v", p.Name, err)
+					if p.Status.NominatedNodeName != "" {
+						initialNNNs[pod.Name] = p.Status.NominatedNodeName
+						return true, nil
 					}
-				}
-
-				// Recreate PodGroups
-				for _, pg := range tt.podGroups {
-					pgCopy := pg.DeepCopy()
-					pgCopy.ResourceVersion = ""
-					if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pgCopy, metav1.CreateOptions{}); err != nil {
-						t.Fatalf("Failed to recreate PodGroup %s: %v", pg.Name, err)
-					}
+					return false, nil
+				}); err != nil {
+					t.Fatalf("Failed to wait for pod %s to have NominatedNodeName set: %v", pod.Name, err)
 				}
 			}
 
-			// 5. Wait for preemption to complete if WAP calls are expected
-			if tt.expectedPodsPreemptedByWAP > 0 {
-				wapCalls := 0
-				err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
-					wapCalls = 0
-					for _, podName := range tt.expectedPreempted {
-						events, err := cs.CoreV1().Events(ns).List(ctx, metav1.ListOptions{
-							FieldSelector: "involvedObject.name=" + podName,
-						})
-						if err != nil {
-							return false, err
-						}
-						for _, event := range events.Items {
-							if event.Reason == "Preempted" && strings.HasPrefix(event.Message, "Preempted by podgroup") {
-								wapCalls++
-								break
-							}
-						}
-					}
-					return wapCalls == tt.expectedPodsPreemptedByWAP, nil
-				})
-				if err != nil {
-					t.Errorf("WorkloadAwarePreemption was not called expected times within timeout: want=%d, got=%d", wapCalls, tt.expectedPodsPreemptedByWAP)
-				}
+			// 6. Delete pod1 from node1 to create free capacity on a higher-scored node
+			if err := cs.CoreV1().Pods(ns).Delete(testCtx.Ctx, "pod1", metav1.DeleteOptions{}); err != nil {
+				t.Fatalf("Failed to delete pod1: %v", err)
 			}
-
-			// 6. Verify unschedulable pods
-			for _, podName := range tt.expectedUnschedulable {
-				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
-					testutils.PodUnschedulable(cs, ns, podName)); err != nil {
-					t.Errorf("Pod %s was expected to be unschedulable but wasn't: %v", podName, err)
-				}
-			}
-
-			// 7. Verify scheduled pods
-			for _, podName := range tt.expectedScheduled {
-				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
-					testutils.PodScheduled(cs, ns, podName)); err != nil {
-					t.Errorf("Pod %s was expected to be scheduled but wasn't: %v", podName, err)
-				}
-			}
-
-			// 8. Verify preempted pods
-			for _, podName := range tt.expectedPreempted {
-				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, 5*time.Second, false,
-					func(ctx context.Context) (bool, error) {
-						pod, err := cs.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
-						if err != nil {
-							return apierrors.IsNotFound(err), nil
-						}
-						if pod.DeletionTimestamp != nil {
-							return true, nil
-						}
-						_, cond := podutil.GetPodCondition(&pod.Status, v1.DisruptionTarget)
-						return cond != nil, nil
-					}); err != nil {
-					t.Errorf("Pod %s was expected to be preempted but wasn't", podName)
-				}
-			}
-
-			// 9. Verify preemptor pods have nominated node name
-			for _, podName := range tt.expectedToHaveNNNInfo {
-				if node, ok := bindPlugin.nnnInfo.Load(podName); !ok || node.(string) == "" {
-					t.Errorf("Pod %s was expected to have nominated node name but didn't", podName)
-				}
-			}
-
-			// Verify event order
-			if len(tt.expectedEventOrder) > 0 {
-				actualEvents := recorder.GetEvents()
-				if diff := cmp.Diff(tt.expectedEventOrder, actualEvents); diff != "" {
-					t.Errorf("Unexpected event order (-want,+got):\n%s", diff)
-				}
-			}
-
-			// 10. Dump the state of pods to ease debugging failed runs.
-			if t.Failed() {
-				t.Log("Dumping states of initial and preemptor pods:")
-				var allPods []string
-				for _, p := range tt.initialPods {
-					allPods = append(allPods, p.Name)
-				}
-				for _, p := range tt.preemptorPods {
-					allPods = append(allPods, p.Name)
-				}
-				for _, podName := range allPods {
-					pod, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, podName, metav1.GetOptions{})
-					if err != nil {
-						if apierrors.IsNotFound(err) {
-							t.Logf("Pod %q: not present in cluster", podName)
-						} else {
-							t.Logf("Pod %q: failed to get: %v", podName, err)
-						}
-						continue
-					}
-
-					var statusStr string
-					if pod.Spec.NodeName != "" {
-						statusStr = "scheduled on node " + pod.Spec.NodeName
-					} else {
-						_, cond := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-						if cond != nil && cond.Status == v1.ConditionFalse && cond.Reason == v1.PodReasonUnschedulable {
-							statusStr = "unschedulable"
-						} else {
-							statusStr = "pending"
-						}
-					}
-					t.Logf("Pod %q: status=%s, phase=%s", podName, statusStr, pod.Status.Phase)
-				}
-			}
-		})
-	}
-}
-
-func TestPodGroupPreemptionStatus(t *testing.T) {
-	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.GenericWorkload: true,
-	})
-	testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-preemption-status")
-
-	cs := testCtx.ClientSet
-	ns := testCtx.NS.Name
-
-	// Create a node.
-	node := st.MakeNode().Name("node-1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
-	if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("Failed to create node: %v", err)
-	}
-	// Create a low-priority pod low-1 taking whole node
-	lowPod := st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).TerminationGracePeriodSeconds(30).Obj()
-	if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, lowPod, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("Failed to create low-priority pod: %v", err)
-	}
-	// Wait for low-priority pod to be scheduled
-	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false,
-		testutils.PodScheduled(cs, ns, lowPod.Name)); err != nil {
-		t.Fatalf("Failed to wait for low-priority pod to be scheduled: %v", err)
-	}
-	// Create a high-priority pod high-1 belonging to pg1 (priority=100)
-	pg := st.MakePodGroup().Name("pg1").Namespace(ns).MinCount(1).Priority(100).Obj()
-	if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("Failed to create PodGroup: %v", err)
-	}
-	highPod := st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(100).Obj()
-	if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, highPod, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("Failed to create high-priority pod: %v", err)
-	}
-	// Poll until the low-priority pod gets DeletionTimestamp set (which indicates preemption is triggered)
-	err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
-		pod, err := cs.CoreV1().Pods(ns).Get(ctx, lowPod.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		return pod.DeletionTimestamp != nil, nil
-	})
-	if err != nil {
-		t.Fatalf("Failed to wait for low-priority pod to get DeletionTimestamp set: %v", err)
-	}
-	// Verify the PodGroup condition.
-	// We want PodGroupInitiallyScheduled status to be False, Reason to be Unschedulable, and Message to contain
-	// both "minCount (1) cannot be satisfied" and "pod group preemption found a placement for podgroup"
-	var cond *metav1.Condition
-	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
-		currentPG, err := cs.SchedulingV1beta1().PodGroups(ns).Get(ctx, pg.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		cond = apimeta.FindStatusCondition(currentPG.Status.Conditions, schedulingv1beta1.PodGroupInitiallyScheduled)
-		if cond != nil &&
-			cond.Status == metav1.ConditionFalse &&
-			cond.Reason == schedulingv1beta1.PodGroupReasonUnschedulable &&
-			strings.Contains(cond.Message, "minCount (1) cannot be satisfied") &&
-			strings.Contains(cond.Message, "pod group preemption: found a placement for podgroup, preempting 1 victims") {
-			return true, nil
-		}
-		return false, nil
-	})
-	if err != nil {
-		t.Logf("Failed to verify PodGroup condition: %v", err)
-		t.Fatalf("Last observed podGroup condition: Status=%s, Reason=%s, Message=%q", cond.Status, cond.Reason, cond.Message)
-	}
-}
-
-func TestPodGroupPreemption_NominatedNodeNameRespected(t *testing.T) {
-	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.GenericWorkload: true,
-	})
-
-	mockScorePlugin := "mockScorePlugin"
-	registry := make(frameworkruntime.Registry)
-	err := registry.Register(mockScorePlugin, newPresetScorePlugin(map[string]int64{"node1": 100, "node2": 0}))
-	if err != nil {
-		t.Fatalf("Failed to register custom score plugin: %v", err)
-	}
-
-	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
-		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: ptr.To(v1.DefaultSchedulerName),
-			Plugins: &configv1.Plugins{
-				Score: configv1.PluginSet{
-					Enabled: []configv1.Plugin{
-						{Name: mockScorePlugin},
-					},
-				},
-			},
-		}},
-	})
-
-	testCtx := testutils.InitTestSchedulerWithNS(t, "pg-preemption-nnn",
-		scheduler.WithProfiles(cfg.Profiles...),
-		scheduler.WithFrameworkOutOfTreeRegistry(registry),
-		scheduler.WithPodMaxBackoffSeconds(1),
-		scheduler.WithPodInitialBackoffSeconds(0),
-	)
-	cs, ns := testCtx.ClientSet, testCtx.NS.Name
-
-	// 1. Create 3 nodes
-	nodes := []*v1.Node{
-		st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
-		st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
-		st.MakeNode().Name("node3").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
-	}
-	for _, node := range nodes {
-		if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
-			t.Fatalf("Failed to create node %s: %v", node.Name, err)
-		}
-	}
-
-	// 2. Create PodGroup with minCount=2
-	pg := st.MakePodGroup().Name("pg1").Namespace(ns).Priority(50).MinCount(2).Obj()
-	if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("Failed to create pod group pg1: %v", err)
-	}
-
-	// 3. Create initial pods: pod1 on node1 (high priority), pod2 on node2 & pod3 on node3 (low priority with default grace period)
-	initialPods := []*v1.Pod{
-		st.MakePod().Name("pod1").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(100).ZeroTerminationGracePeriod().Node("node1").Obj(),
-		st.MakePod().Name("pod2").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).Node("node2").Obj(),
-		st.MakePod().Name("pod3").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).Node("node3").Obj(),
-	}
-	for _, pod := range initialPods {
-		if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
-			t.Fatalf("Failed to create pod %s: %v", pod.Name, err)
-		}
-	}
-
-	// Wait for initial pods to be scheduled
-	for _, pod := range initialPods {
-		if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, testutils.PodScheduled(cs, ns, pod.Name)); err != nil {
-			t.Fatalf("Failed to wait for initial pod %s to schedule: %v", pod.Name, err)
-		}
-	}
-
-	// 4. Create preemptor pods belonging to pg1
-	preemptorPods := []*v1.Pod{
-		st.MakePod().Name("preemptor-1").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(50).Obj(),
-		st.MakePod().Name("preemptor-2").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(50).Obj(),
-	}
-	for _, pod := range preemptorPods {
-		if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
-			t.Fatalf("Failed to create preemptor pod %s: %v", pod.Name, err)
-		}
-	}
-
-	// 5. Wait for preemption to occur and verify that NominatedNodeName is set on both preemptor pods
-	initialNNNs := make(map[string]string)
-	for _, pod := range preemptorPods {
-		podName := pod.Name
-		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
-			p, err := cs.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
-			if err != nil {
-				return false, err
-			}
-			if p.Status.NominatedNodeName != "" {
-				initialNNNs[podName] = p.Status.NominatedNodeName
-				return true, nil
-			}
-			return false, nil
-		})
-		if err != nil {
-			t.Fatalf("Timed out waiting for NominatedNodeName on %s: %v", podName, err)
-		}
-	}
-
-	for podName, nodeName := range initialNNNs {
-		if nodeName == "node1" {
-			t.Errorf("Expected preemptor pod %s NNN to be node2 or node3, got %s", podName, nodeName)
-		}
-	}
-
-	// 6. Remove pod1 from node1
-	if err := cs.CoreV1().Pods(ns).Delete(testCtx.Ctx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64(0))}); err != nil {
-		t.Fatalf("Failed to delete pod1: %v", err)
-	}
-
-	// Wait for pod1 to be completely removed from API server
-	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
-		_, err := cs.CoreV1().Pods(ns).Get(ctx, "pod1", metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			return true, nil
-		}
-		return false, nil
-	})
-	if err != nil {
-		t.Fatalf("Timed out waiting for pod1 to be deleted: %v", err)
-	}
-
-	// 7. Verify that nominated node names did not change to node1 despite node1 having free space and higher score from preferNode1ScorePlugin
-	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 3*time.Second, false, func(ctx context.Context) (bool, error) {
-		_, err := cs.CoreV1().Pods(ns).Get(ctx, "pod2", metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			t.Fatalf("pod2 got removed")
-		}
-		_, err = cs.CoreV1().Pods(ns).Get(ctx, "pod3", metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			t.Fatalf("pod3 got removed")
-		}
-
-		for _, pod := range preemptorPods {
-			events, err := cs.CoreV1().Events(ns).List(ctx, metav1.ListOptions{
-				FieldSelector: "involvedObject.name=" + pod.Name,
+			err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+				_, err := cs.CoreV1().Pods(ns).Get(ctx, "pod1", metav1.GetOptions{})
+				return apierrors.IsNotFound(err), nil
 			})
 			if err != nil {
-				return false, err
-			}
-			for _, event := range events.Items {
-				t.Logf("Event: %v", event.Message)
+				t.Fatalf("Timed out waiting for pod1 to be deleted: %v", err)
 			}
 
-			p, err := cs.CoreV1().Pods(ns).Get(ctx, pod.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, err
-			}
-			if p.Spec.NodeName == "node1" {
-				t.Errorf("Pod %s was incorrectly scheduled to node1", pod.Name)
+			// 7. Verify that nominated node names did not change to node1 despite node1 having free space and higher score from preferNode1ScorePlugin
+			err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 3*time.Second, false, func(ctx context.Context) (bool, error) {
+				_, err := cs.CoreV1().Pods(ns).Get(ctx, "pod2", metav1.GetOptions{})
+				if apierrors.IsNotFound(err) {
+					t.Fatalf("pod2 got removed")
+				}
+				_, err = cs.CoreV1().Pods(ns).Get(ctx, "pod3", metav1.GetOptions{})
+				if apierrors.IsNotFound(err) {
+					t.Fatalf("pod3 got removed")
+				}
+
+				for _, pod := range preemptorPods {
+					events, err := cs.CoreV1().Events(ns).List(ctx, metav1.ListOptions{
+						FieldSelector: "involvedObject.name=" + pod.Name,
+					})
+					if err != nil {
+						return false, err
+					}
+					for _, event := range events.Items {
+						t.Logf("Event: %v", event.Message)
+					}
+
+					p, err := cs.CoreV1().Pods(ns).Get(ctx, pod.Name, metav1.GetOptions{})
+					if err != nil {
+						return false, err
+					}
+					if p.Spec.NodeName == "node1" {
+						t.Errorf("Pod %s was incorrectly scheduled to node1", pod.Name)
+						return false, nil
+					}
+					if p.Status.NominatedNodeName != initialNNNs[pod.Name] {
+						t.Errorf("Pod %s NominatedNodeName changed from %s to %s. NodeName = %s", pod.Name, initialNNNs[pod.Name], p.Status.NominatedNodeName, p.Spec.NodeName)
+						return false, nil
+					}
+				}
 				return false, nil
+			})
+			if err != nil && !errors.Is(err, context.DeadlineExceeded) && !wait.Interrupted(err) {
+				t.Fatalf("Unexpected error while checking NNN persistence: %v", err)
 			}
-			if p.Status.NominatedNodeName != initialNNNs[pod.Name] {
-				t.Errorf("Pod %s NominatedNodeName changed from %s to %s. NodeName = %s", pod.Name, initialNNNs[pod.Name], p.Status.NominatedNodeName, p.Spec.NodeName)
-				return false, nil
-			}
-		}
-		return false, nil
-	})
-	if err != nil && !errors.Is(err, context.DeadlineExceeded) && !wait.Interrupted(err) {
-		t.Fatalf("Unexpected error while checking NNN persistence: %v", err)
+		})
 	}
 }
 
 // TestCompositePodGroupPreemption tests preemption scenarios involving composite pod groups.
 func TestCompositePodGroupPreemption(t *testing.T) {
-	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.GenericWorkload:                 true,
-		features.CompositePodGroup:               true,
-		features.TopologyAwareWorkloadScheduling: true,
-	})
-
 	tests := []struct {
 		name                           string
 		nodes                          []*v1.Node
@@ -2784,123 +2777,129 @@ func (p *stateVerifierPostFilterPlugin) PodGroupPostFilter(ctx context.Context, 
 var _ fwk.PodGroupPostFilterPlugin = &stateVerifierPostFilterPlugin{}
 
 func TestPodGroupCycleStatePreserved(t *testing.T) {
-	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.GenericWorkload: true,
-	})
+	for _, cpgEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("CPG enabled: %v", cpgEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: cpgEnabled,
+				features.CompositePodGroup:               cpgEnabled,
+			})
 
-	stateSaverPluginName := "stateSaverPreFilterPlugin"
-	stateVerifierPluginName := "stateVerifierPostFilterPlugin"
+			stateSaverPluginName := "stateSaverPreFilterPlugin"
+			stateVerifierPluginName := "stateVerifierPostFilterPlugin"
 
-	var stateSaver stateSaverPreFilterPlugin
-	var stateVerifier stateVerifierPostFilterPlugin
+			var stateSaver stateSaverPreFilterPlugin
+			var stateVerifier stateVerifierPostFilterPlugin
 
-	registry := make(frameworkruntime.Registry)
-	err := registry.Register(stateSaverPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
-		stateSaver = stateSaverPreFilterPlugin{
-			name:   stateSaverPluginName,
-			handle: fh,
-		}
-		return &stateSaver, nil
-	})
-	if err != nil {
-		t.Fatalf("Failed to register stateSaverPreFilterPlugin: %v", err)
-	}
+			registry := make(frameworkruntime.Registry)
+			err := registry.Register(stateSaverPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+				stateSaver = stateSaverPreFilterPlugin{
+					name:   stateSaverPluginName,
+					handle: fh,
+				}
+				return &stateSaver, nil
+			})
+			if err != nil {
+				t.Fatalf("Failed to register stateSaverPreFilterPlugin: %v", err)
+			}
 
-	err = registry.Register(stateVerifierPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
-		stateVerifier = stateVerifierPostFilterPlugin{
-			name: stateVerifierPluginName,
-		}
-		return &stateVerifier, nil
-	})
-	if err != nil {
-		t.Fatalf("Failed to register stateVerifierPostFilterPlugin: %v", err)
-	}
+			err = registry.Register(stateVerifierPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+				stateVerifier = stateVerifierPostFilterPlugin{
+					name: stateVerifierPluginName,
+				}
+				return &stateVerifier, nil
+			})
+			if err != nil {
+				t.Fatalf("Failed to register stateVerifierPostFilterPlugin: %v", err)
+			}
 
-	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
-		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: ptr.To(v1.DefaultSchedulerName),
-			Plugins: &configv1.Plugins{
-				MultiPoint: configv1.PluginSet{
-					Enabled: []configv1.Plugin{
-						{Name: stateSaverPluginName},
-						{Name: names.DefaultPreemption},
-						{Name: stateVerifierPluginName},
+			cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+				Profiles: []configv1.KubeSchedulerProfile{{
+					SchedulerName: ptr.To(v1.DefaultSchedulerName),
+					Plugins: &configv1.Plugins{
+						MultiPoint: configv1.PluginSet{
+							Enabled: []configv1.Plugin{
+								{Name: stateSaverPluginName},
+								{Name: names.DefaultPreemption},
+								{Name: stateVerifierPluginName},
+							},
+							Disabled: []configv1.Plugin{
+								{Name: names.DefaultPreemption},
+							},
+						},
 					},
-					Disabled: []configv1.Plugin{
-						{Name: names.DefaultPreemption},
-					},
-				},
-			},
-		}},
-	})
+				}},
+			})
 
-	testCtx := testutils.InitTestSchedulerWithNS(t, "state-preserved",
-		scheduler.WithProfiles(cfg.Profiles...),
-		scheduler.WithFrameworkOutOfTreeRegistry(registry),
-		scheduler.WithPodMaxBackoffSeconds(1),
-		scheduler.WithPodInitialBackoffSeconds(0),
-	)
-	cs, ns := testCtx.ClientSet, testCtx.NS.Name
+			testCtx := testutils.InitTestSchedulerWithNS(t, "state-preserved",
+				scheduler.WithProfiles(cfg.Profiles...),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry),
+				scheduler.WithPodMaxBackoffSeconds(1),
+				scheduler.WithPodInitialBackoffSeconds(0),
+			)
+			cs, ns := testCtx.ClientSet, testCtx.NS.Name
 
-	// 1. Create node with 3 CPU capacity
-	node := st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj()
-	if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("Failed to create node: %v", err)
-	}
+			// 1. Create node with 3 CPU capacity
+			node := st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj()
+			if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create node: %v", err)
+			}
 
-	// 2. Create high-pod (priority 500, CPU 2) and low-pod (priority 10, CPU 1)
-	highPod := st.MakePod().Name("high-pod").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Priority(500).ZeroTerminationGracePeriod().Node("node1").Obj()
-	lowPod := st.MakePod().Name("low-pod").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).ZeroTerminationGracePeriod().Node("node1").Obj()
+			// 2. Create high-pod (priority 500, CPU 2) and low-pod (priority 10, CPU 1)
+			highPod := st.MakePod().Name("high-pod").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Priority(500).ZeroTerminationGracePeriod().Node("node1").Obj()
+			lowPod := st.MakePod().Name("low-pod").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").Priority(10).ZeroTerminationGracePeriod().Node("node1").Obj()
 
-	for _, p := range []*v1.Pod{highPod, lowPod} {
-		if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
-			t.Fatalf("Failed to create pod %s: %v", p.Name, err)
-		}
-	}
+			for _, p := range []*v1.Pod{highPod, lowPod} {
+				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create pod %s: %v", p.Name, err)
+				}
+			}
 
-	// Wait for initial pods to be scheduled
-	for _, p := range []*v1.Pod{highPod, lowPod} {
-		if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, testutils.PodScheduled(cs, ns, p.Name)); err != nil {
-			t.Fatalf("Failed to wait for initial pod %s to schedule: %v", p.Name, err)
-		}
-	}
+			// Wait for initial pods to be scheduled
+			for _, p := range []*v1.Pod{highPod, lowPod} {
+				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, testutils.PodScheduled(cs, ns, p.Name)); err != nil {
+					t.Fatalf("Failed to wait for initial pod %s to schedule: %v", p.Name, err)
+				}
+			}
 
-	// 3. Create preemptor pods belonging to pg1 (each needing CPU 2)
-	preemptor1 := st.MakePod().Name("preemptor-1").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg1").Priority(100).ZeroTerminationGracePeriod().Obj()
-	preemptor2 := st.MakePod().Name("preemptor-2").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg1").Priority(100).ZeroTerminationGracePeriod().Obj()
+			// 3. Create preemptor pods belonging to pg1 (each needing CPU 2)
+			preemptor1 := st.MakePod().Name("preemptor-1").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg1").Priority(100).ZeroTerminationGracePeriod().Obj()
+			preemptor2 := st.MakePod().Name("preemptor-2").Namespace(ns).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("pg1").Priority(100).ZeroTerminationGracePeriod().Obj()
 
-	for _, p := range []*v1.Pod{preemptor1, preemptor2} {
-		if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
-			t.Fatalf("Failed to create preemptor pod %s: %v", p.Name, err)
-		}
-	}
+			for _, p := range []*v1.Pod{preemptor1, preemptor2} {
+				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create preemptor pod %s: %v", p.Name, err)
+				}
+			}
 
-	// 4. Create PodGroup with minCount=2 and priority=100
-	pg := st.MakePodGroup().Name("pg1").Namespace(ns).Priority(100).MinCount(2).Obj()
-	if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("Failed to create PodGroup pg1: %v", err)
-	}
+			// 4. Create PodGroup with minCount=2 and priority=100
+			pg := st.MakePodGroup().Name("pg1").Namespace(ns).Priority(100).MinCount(2).Obj()
+			if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create PodGroup pg1: %v", err)
+			}
 
-	var recordedPods sets.Set[string]
+			var recordedPods sets.Set[string]
 
-	// 5. Verify that stateVerifierPostFilterPlugin was called and state was preserved
-	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
-		stateVerifier.lock.Lock()
-		recordedPods = sets.New(stateVerifier.recordedPodNames...)
-		defer stateVerifier.lock.Unlock()
-		return stateVerifier.called, nil
-	})
-	if err != nil {
-		t.Fatalf("Timed out waiting for stateVerifierPostFilterPlugin to be called: %v", err)
-	}
+			// 5. Verify that stateVerifierPostFilterPlugin was called and state was preserved
+			err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+				stateVerifier.lock.Lock()
+				recordedPods = sets.New(stateVerifier.recordedPodNames...)
+				defer stateVerifier.lock.Unlock()
+				return stateVerifier.called, nil
+			})
+			if err != nil {
+				t.Fatalf("Timed out waiting for stateVerifierPostFilterPlugin to be called: %v", err)
+			}
 
-	if stateVerifier.readErr != nil {
-		t.Errorf("Expected no error reading stateSaverKey from PodGroupCycleState, got: %v", stateVerifier.readErr)
-	}
+			if stateVerifier.readErr != nil {
+				t.Errorf("Expected no error reading stateSaverKey from PodGroupCycleState, got: %v", stateVerifier.readErr)
+			}
 
-	expectedPods := sets.New("high-pod", "low-pod")
+			expectedPods := sets.New("high-pod", "low-pod")
 
-	if !recordedPods.IsSuperset(expectedPods) {
-		t.Errorf("PodGroupCycleState lost pod information! Expected pods %v to be in state, got %v", sets.List(expectedPods), sets.List(recordedPods))
+			if !recordedPods.IsSuperset(expectedPods) {
+				t.Errorf("PodGroupCycleState lost pod information! Expected pods %v to be in state, got %v", sets.List(expectedPods), sets.List(recordedPods))
+			}
+		})
 	}
 }
