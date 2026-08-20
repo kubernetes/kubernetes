@@ -566,6 +566,9 @@ type PersistentVolumeClaimSpec struct {
 	Resources VolumeResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
 	// volumeName is the binding reference to the PersistentVolume backing this claim.
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:alpha(since: "1.37")=+k8s:update=NoModify
+	// +k8s:alpha(since: "1.37")=+k8s:update=NoUnset
 	VolumeName string `json:"volumeName,omitempty" protobuf:"bytes,3,opt,name=volumeName"`
 	// storageClassName is the name of the StorageClass required by the claim.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1

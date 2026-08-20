@@ -22,3 +22,24 @@
   errorType: '*'
   origin: '*'
   reason: Not served by kube-apiserver.
+
+- apiVersion: v1
+  kind: Pod
+  path: spec.volumes[*].ephemeral.volumeClaimTemplate.spec.volumeName
+  errorType: FieldValueInvalid
+  origin: update
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: v1
+  kind: PodTemplate
+  path: template.spec.volumes[*].ephemeral.volumeClaimTemplate.spec.volumeName
+  errorType: FieldValueInvalid
+  origin: update
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: v1
+  kind: ReplicationController
+  path: spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate.spec.volumeName
+  errorType: FieldValueInvalid
+  origin: update
+  reason: Nested in a Pod volume list without update correlation.
