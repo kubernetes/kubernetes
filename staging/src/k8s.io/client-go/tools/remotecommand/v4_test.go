@@ -20,6 +20,10 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
+
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func TestV4ErrorDecoder(t *testing.T) {
@@ -31,6 +35,10 @@ func TestV4ErrorDecoder(t *testing.T) {
 	}
 
 	for _, test := range []Test{
+		{
+			message: "",
+			err:     "error stream closed before receiving a status message: command execution may have been interrupted",
+		},
 		{
 			message: "{}",
 			err:     "error stream protocol error: unknown error",
@@ -68,5 +76,29 @@ func TestV4ErrorDecoder(t *testing.T) {
 		if got := fmt.Sprintf("%v", err); !strings.Contains(got, want) {
 			t.Errorf("wrong error for message %q: want=%q, got=%q", test.message, want, got)
 		}
+	}
+}
+
+func TestV4WatchErrorStreamEmptyMessage(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	// Simulate an empty error stream (e.g., connection closed during kubelet restart).
+	// With errorDecoderV4, this should return an error, not nil.
+	h := newStreamProtocolV4(StreamOptions{}).(*streamProtocolV4)
+	h.errorStream = strings.NewReader("")
+
+	ch := watchErrorStream(logger, h.errorStream, &errorDecoderV4{})
+	if ch == nil {
+		t.Fatal("unexpected nil channel")
+	}
+
+	select {
+	case err := <-ch:
+		if err == nil {
+			t.Error("expected an error for empty error stream with v4 decoder, got nil")
+		} else if !strings.Contains(err.Error(), "error stream closed before receiving a status message") {
+			t.Errorf("unexpected error message: %v", err)
+		}
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("timed out waiting for error")
 	}
 }
