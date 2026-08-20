@@ -276,14 +276,10 @@ func (u updateMyCRDV1Beta1Schema) Do(ctx *ratchetingTestContext) error {
 					sentinelName: fmt.Sprintf("invalid-%d", counter),
 				}}.Do(ctx)
 
-			if err == nil {
-				return false, errors.New("expected error when creating sentinel resource")
-			}
-
 			// Check to see if the returned error message contains our
 			// unique string. UUID should be unique enough to just check
 			// simple existence in the error.
-			if strings.Contains(err.Error(), uuidString) {
+			if err != nil && strings.Contains(err.Error(), uuidString) {
 				return true, nil
 			}
 
