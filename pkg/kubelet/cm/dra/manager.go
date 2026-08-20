@@ -789,8 +789,8 @@ func (m *Manager) unprepareResources(ctx context.Context, podUID types.UID, name
 // PodMightNeedToUnprepareResources returns true if the pod might need to
 // unprepare resources
 func (m *Manager) PodMightNeedToUnprepareResources(uid types.UID) bool {
-	m.cache.Lock()
-	defer m.cache.Unlock()
+	m.cache.RLock()
+	defer m.cache.RUnlock()
 	return m.cache.hasPodReference(uid)
 }
 
