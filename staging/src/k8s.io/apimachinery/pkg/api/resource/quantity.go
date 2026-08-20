@@ -371,7 +371,16 @@ func ParseQuantity(str string) (Quantity, error) {
 	// of an amount.  Arguably, this should be inf.RoundHalfUp (normal rounding), but that would have
 	// the side effect of rounding values < .5n to zero.
 	if v, ok := amount.Unscaled(); v != int64(0) || !ok {
-		amount.Round(amount, Nano.infScale(), inf.RoundUp)
+		// A value smaller than 1n rounds up to 1n. The unscaled part is below
+		// 2^BitLen and so below 10^BitLen, so a scale of at least BitLen+9 leaves
+		// the value under 10^-9; set 1n directly instead of having Round build a
+		// 10^scale big.Int to reach the same result.
+		if int(amount.Scale()) >= amount.UnscaledBig().BitLen()+9 {
+			amount.SetUnscaled(1)
+			amount.SetScale(Nano.infScale())
+		} else {
+			amount.Round(amount, Nano.infScale(), inf.RoundUp)
+		}
 	}
 
 	// The max is just a simple cap.
