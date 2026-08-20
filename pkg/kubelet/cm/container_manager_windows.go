@@ -399,3 +399,11 @@ func (cm *containerManagerImpl) PodHasExclusiveCPUs(logger klog.Logger, pod *v1.
 func (cm *containerManagerImpl) ContainerHasExclusiveCPUs(logger klog.Logger, pod *v1.Pod, container *v1.Container) bool {
 	return containerHasExclusiveCPUs(logger, cm.cpuManager, pod, container)
 }
+
+func (cm *containerManagerImpl) AllocationMode(res v1.ResourceName) (ResourceAllocationMode, bool) {
+	// run from the cheapest to the most expensive
+	if cm.cpuManager.CanAllocateExclusively(res) || cm.memoryManager.CanAllocateExclusively(res) || cm.deviceManager.CanAllocateExclusively(res) {
+		return ResourceAllocationModeExclusive, true
+	}
+	return ResourceAllocationModeShared, false
+}
