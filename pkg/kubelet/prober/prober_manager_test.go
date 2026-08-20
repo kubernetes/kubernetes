@@ -1017,3 +1017,63 @@ func testProbeWorkersSurviveSyncContextCancellation(tCtx ktesting.TContext) {
 		}
 	}
 }
+
+func TestCanInheritProbeState(t *testing.T) {
+	const (
+		containerName = "test-container"
+		oldID         = "test://old_container_id"
+		newID         = "test://new_container_id"
+	)
+
+	tests := []struct {
+		name                 string
+		apiContainerStatuses []v1.ContainerStatus
+		runtimeID            string
+		expected             bool
+	}{
+		{
+			name:                 "no status from the API server is available",
+			apiContainerStatuses: nil,
+			runtimeID:            newID,
+			expected:             true,
+		},
+		{
+			name:                 "the API server knows the same container",
+			apiContainerStatuses: []v1.ContainerStatus{{Name: containerName, ContainerID: oldID}},
+			runtimeID:            oldID,
+			expected:             true,
+		},
+		{
+			name:                 "the container was replaced",
+			apiContainerStatuses: []v1.ContainerStatus{{Name: containerName, ContainerID: oldID}},
+			runtimeID:            newID,
+			expected:             false,
+		},
+		{
+			name:                 "the container is not in the API server status",
+			apiContainerStatuses: []v1.ContainerStatus{{Name: "other-container", ContainerID: oldID}},
+			runtimeID:            newID,
+			expected:             true,
+		},
+		{
+			name:                 "the API server status has no container ID",
+			apiContainerStatuses: []v1.ContainerStatus{{Name: containerName}},
+			runtimeID:            newID,
+			expected:             true,
+		},
+		{
+			name:                 "the runtime has no container ID",
+			apiContainerStatuses: []v1.ContainerStatus{{Name: containerName, ContainerID: oldID}},
+			runtimeID:            "",
+			expected:             true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := canInheritProbeState(tc.apiContainerStatuses, containerName, tc.runtimeID); got != tc.expected {
+				t.Errorf("canInheritProbeState() = %v, want %v", got, tc.expected)
+			}
+		})
+	}
+}
