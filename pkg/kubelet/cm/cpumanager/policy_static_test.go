@@ -693,6 +693,32 @@ func TestStaticPolicyAdd(t *testing.T) {
 	}
 }
 
+func TestStaticPolicyStrictCPUReservationPreservesSharedPool(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	reservedCPUs := cpuset.New(0)
+	policy, err := NewStaticPolicy(
+		logger,
+		topoSingleSocketHT,
+		reservedCPUs.Size(),
+		reservedCPUs,
+		topologymanager.NewFakeManager(logger),
+		map[string]string{StrictCPUReservationOption: "true"},
+	)
+	require.NoError(t, err)
+
+	defaultCPUSet := cpuset.New(1, 2, 3, 4, 5, 6, 7)
+	st := &mockState{
+		assignments:   state.ContainerCPUAssignments{},
+		defaultCPUSet: defaultCPUSet,
+	}
+	pod := makePod("fakePod", "fakeContainer", "7000m", "7000m")
+
+	err = policy.Allocate(logger, st, pod, &pod.Spec.Containers[0], lifecycle.AddOperation)
+	require.EqualError(t, err, "exclusive CPU allocation would empty the shared CPU pool")
+	require.Empty(t, st.assignments)
+	require.Equal(t, defaultCPUSet, st.defaultCPUSet)
+}
+
 func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
 	logger, _ := ktesting.NewTestContext(t)
 	tm := topologymanager.NewFakeManager(logger)
