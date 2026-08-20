@@ -203,3 +203,74 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 		})
 	}
 }
+
+// TestMemoryManagerRestoreStateWithMemoryDrift simulates a reboot after which
+// the total memory reported for each NUMA node changes by a few MiB, because
+// the kernel frees a varying amount of boot-time memory (see
+// https://issue.k8s.io/131253). The manager must still start and restore the
+// recorded assignment instead of failing with "the expected machine state is
+// different from the real one".
+func TestMemoryManagerRestoreStateWithMemoryDrift(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Memory Manager static policy is not available on Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, false)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, false)
+
+	tCtx := ktesting.Init(t)
+	logger, ctx := ktesting.NewTestContext(t)
+
+	nodeAllocatableReservation := v1.ResourceList{
+		v1.ResourceMemory: *resource.NewQuantity(2*gb, resource.BinarySI),
+	}
+	systemReservedMemory := []kubeletconfig.MemoryReservation{
+		{NumaNode: 0, Limits: v1.ResourceList{v1.ResourceMemory: *resource.NewQuantity(gb, resource.BinarySI)}},
+		{NumaNode: 1, Limits: v1.ResourceList{v1.ResourceMemory: *resource.NewQuantity(gb, resource.BinarySI)}},
+	}
+	affinity := topologymanager.NewFakeManager(logger)
+	sDir := t.TempDir()
+	pod := getPodWithContainersAndPodLevelResources("pod1", "", "", nil, []containerSpec{
+		{name: "container1", memRequest: "100Mi", memLimit: "100Mi"},
+	})
+	activePods := func() []*v1.Pod { return []*v1.Pod{pod} }
+
+	// First boot: initialize the state and allocate the pod so the state file
+	// holds a real assignment.
+	machineInfo := returnMachineInfo()
+	mgr, err := NewManager(logger, string(PolicyTypeStatic), &machineInfo, nodeAllocatableReservation, systemReservedMemory, sDir, affinity)
+	if err != nil {
+		t.Fatalf("could not create manager: %v", err)
+	}
+	if err := mgr.Start(tCtx, activePods, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap()); err != nil {
+		t.Fatalf("could not start manager: %v", err)
+	}
+	for i := range pod.Spec.Containers {
+		container := &pod.Spec.Containers[i]
+		if err := mgr.Allocate(ctx, pod, container, lifecycle.AddOperation); err != nil {
+			t.Fatalf("could not allocate container %s: %v", container.Name, err)
+		}
+		mgr.AddContainer(logger, pod, container, container.Name)
+	}
+	blocks := mgr.State().GetMemoryBlocks(string(pod.UID), "container1")
+	if len(blocks) == 0 {
+		t.Fatalf("expected memory blocks after allocation")
+	}
+
+	// Reboot: cAdvisor reports a slightly smaller total for each NUMA node.
+	rebootedMachineInfo := returnMachineInfo()
+	rebootedMachineInfo.Topology[0].Memory -= 4 * mb
+	rebootedMachineInfo.Topology[1].Memory -= 4 * mb
+
+	mgr2, err := NewManager(logger, string(PolicyTypeStatic), &rebootedMachineInfo, nodeAllocatableReservation, systemReservedMemory, sDir, affinity)
+	if err != nil {
+		t.Fatalf("could not create manager after reboot: %v", err)
+	}
+	// Before the fix this returns "the expected machine state is different from
+	// the real one" and the node stays NotReady.
+	if err := mgr2.Start(tCtx, activePods, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap()); err != nil {
+		t.Fatalf("manager should start after a small NUMA node memory drift: %v", err)
+	}
+	if restored := mgr2.State().GetMemoryBlocks(string(pod.UID), "container1"); len(restored) != len(blocks) {
+		t.Fatalf("expected %d restored memory blocks after reboot, got %d", len(blocks), len(restored))
+	}
+}
