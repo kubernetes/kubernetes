@@ -2127,6 +2127,53 @@ func TestMonitorNodeHealthMarkPodsNotReady(t *testing.T) {
 			},
 			expectedPodStatusUpdate: true,
 		},
+		// Node status updated to False. Then grace period passes and it goes to Unknown.
+		// Expect pods status updated.
+		{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: v1.NodeStatus{
+							Conditions: []v1.NodeCondition{
+								{
+									Type:               v1.NodeReady,
+									Status:             v1.ConditionFalse,
+									LastHeartbeatTime:  fakeNow,
+									LastTransitionTime: fakeNow,
+								},
+							},
+							Capacity: v1.ResourceList{
+								v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+								v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			timeToPass: 1 * time.Minute,
+			// newNodeStatus represents the input status in the fake client before monitorNodeHealth runs.
+			// The heartbeat is expired, so the controller will transition the status to Unknown.
+			newNodeStatus: v1.NodeStatus{
+				Conditions: []v1.NodeCondition{
+					{
+						Type:               v1.NodeReady,
+						Status:             v1.ConditionFalse,
+						LastHeartbeatTime:  fakeNow,
+						LastTransitionTime: fakeNow,
+					},
+				},
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+					v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+				},
+			},
+			expectedPodStatusUpdate: true,
+		},
 	}
 
 	tCtx := ktesting.Init(t)
@@ -2427,6 +2474,63 @@ func TestMonitorNodeHealthMarkPodsNotReadyRetry(t *testing.T) {
 				{
 					timeToPass: 1 * time.Minute,
 					newNodes:   makeNodes(v1.ConditionFalse, timePlusTwoMinutes, timePlusTwoMinutes),
+				},
+			},
+			expectedPodStatusUpdates: 1,
+		},
+		// Node created long time ago, with status updated by kubelet exceeds grace period.
+		// First monitorNodeHealth check will fail to list pods (with False -> Unknown transition).
+		// Second monitorNodeHealth check will update pod status to NotReady (retry).
+		{
+			desc: "unsuccessful pod list on false -> unknown transition, retry required",
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: v1.NodeStatus{
+							Conditions: []v1.NodeCondition{
+								{
+									Type:               v1.NodeReady,
+									Status:             v1.ConditionFalse,
+									LastHeartbeatTime:  timeNow,
+									LastTransitionTime: timeNow,
+								},
+							},
+							Capacity: v1.ResourceList{
+								v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+								v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			fakeGetPodsAssignedToNode: func(c *fake.Clientset) func(string) ([]*v1.Pod, error) {
+				i := 0
+				f := fakeGetPodsAssignedToNode(c)
+				return func(nodeName string) ([]*v1.Pod, error) {
+					i++
+					if i == 1 {
+						return nil, fmt.Errorf("fake error")
+					}
+					return f(nodeName)
+				}
+			},
+			nodeIterations: []nodeIteration{
+				{
+					timeToPass: 0,
+					newNodes:   makeNodes(v1.ConditionFalse, timeNow, timeNow),
+				},
+				{
+					timeToPass: 1 * time.Minute,
+					newNodes:   makeNodes(v1.ConditionFalse, timeNow, timeNow),
+				},
+				{
+					timeToPass: 1 * time.Minute,
+					newNodes:   makeNodes(v1.ConditionFalse, timeNow, timeNow),
 				},
 			},
 			expectedPodStatusUpdates: 1,
@@ -4093,5 +4197,122 @@ func TestProcessPodMarkPodNotReady(t *testing.T) {
 				t.Errorf("expect pod status updated to be %v, but got %v", item.expectedPodStatusUpdate, podStatusUpdated)
 			}
 		})
+	}
+}
+
+func TestNodeStatusChangeEventGeneration(t *testing.T) {
+	fakeNow := metav1.Date(2016, 9, 10, 12, 0, 0, 0, time.UTC)
+	fakeNodeHandler := &testutil.FakeNodeHandler{
+		Existing: []*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					UID:               "1234567890",
+					CreationTimestamp: metav1.Date(2015, 8, 10, 0, 0, 0, 0, time.UTC),
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  fakeNow,
+							LastTransitionTime: fakeNow,
+						},
+					},
+				},
+			},
+		},
+		Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+	}
+
+	tCtx := ktesting.Init(t)
+	nodeController, _ := newNodeLifecycleControllerFromClient(
+		tCtx,
+		fakeNodeHandler,
+		testRateLimiterQPS,
+		testRateLimiterQPS,
+		testLargeClusterThreshold,
+		testUnhealthyThreshold,
+		testNodeMonitorGracePeriod,
+		testNodeMonitorGracePeriod,
+		testNodeMonitorPeriod,
+	)
+	nodeController.now = func() metav1.Time { return fakeNow }
+	fakeRecorder := testutil.NewFakeRecorder()
+	nodeController.recorder = fakeRecorder
+	nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(fakeNodeHandler.Clientset)
+
+	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// First run to populate nodeHealthMap
+	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if err := nodeController.monitorNodeHealth(tCtx); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Clear events (RegisteredNode event is recorded on first run)
+	fakeRecorder.Events = []*v1.Event{}
+
+	// 1. Transition True -> Unknown (via heartbeat expiration)
+	nodeController.now = func() metav1.Time { return metav1.Time{Time: fakeNow.Add(10 * time.Minute)} } // Exceeds grace period
+	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if err := nodeController.monitorNodeHealth(tCtx); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Expect NodeUnreachable event
+	foundUnreachable := false
+	for _, event := range fakeRecorder.Events {
+		if event.Reason == "NodeUnreachable" {
+			foundUnreachable = true
+			break
+		}
+	}
+	if !foundUnreachable {
+		t.Errorf("Expected NodeUnreachable event not found. Events: %v", fakeRecorder.Events)
+	}
+
+	// Clear events and reset node for False -> Unknown test
+	fakeRecorder.Events = []*v1.Event{}
+	nodeController.now = func() metav1.Time { return fakeNow }
+	fakeNodeHandler.UpdatedNodes = nil
+	fakeNodeHandler.UpdatedNodeStatuses = nil
+	fakeNodeHandler.Existing[0].Status.Conditions[0].Status = v1.ConditionFalse
+	fakeNodeHandler.Existing[0].Status.Conditions[0].LastHeartbeatTime = fakeNow
+	fakeNodeHandler.Existing[0].Status.Conditions[0].LastTransitionTime = fakeNow
+	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	// Run once to update nodeHealthMap with False status
+	if err := nodeController.monitorNodeHealth(tCtx); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	fakeRecorder.Events = []*v1.Event{}
+
+	// 2. Transition False -> Unknown (via heartbeat expiration)
+	nodeController.now = func() metav1.Time { return metav1.Time{Time: fakeNow.Add(10 * time.Minute)} } // Exceeds grace period
+	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if err := nodeController.monitorNodeHealth(tCtx); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Expect NodeUnreachable event
+	foundUnreachable = false
+	for _, event := range fakeRecorder.Events {
+		if event.Reason == "NodeUnreachable" {
+			foundUnreachable = true
+			break
+		}
+	}
+	if !foundUnreachable {
+		t.Errorf("Expected NodeUnreachable event not found. Events: %v", fakeRecorder.Events)
 	}
 }
