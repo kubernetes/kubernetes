@@ -426,6 +426,42 @@ func RunBenchmarkStoreList(ctx context.Context, b *testing.B, store storage.Inte
 	}
 }
 
+func RunBenchmarkStoreListFieldSelector(ctx context.Context, b *testing.B, store storage.Interface, data BenchmarkData, useIndex bool) {
+	nodeName := data.NodeNames[0]
+	expectedElements := podsOnNode(data, nodeName)
+	b.Run(fmt.Sprintf("Indexed=%v", useIndex), func(b *testing.B) {
+		objectCount := atomic.Uint64{}
+		listCount := atomic.Uint64{}
+
+		b.SetParallelism(4)
+		b.ResetTimer()
+		b.RunParallel(func(pb *testing.PB) {
+			for pb.Next() {
+				opts := storage.ListOptions{
+					Recursive: true,
+					Predicate: storage.SelectionPredicate{
+						GetAttrs: podAttr,
+						Label:    labels.Everything(),
+						Field:    fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName}),
+					},
+				}
+				if useIndex {
+					opts.Predicate.IndexFields = []string{"spec.nodeName"}
+				}
+				objects, lists := paginateList(ctx, store, "/pods/", opts)
+				if objects != expectedElements {
+					panic(fmt.Sprintf("expected %d objects, got %d", expectedElements, objects))
+				}
+				objectCount.Add(uint64(objects))
+				listCount.Add(uint64(lists))
+			}
+		})
+		elapsedSeconds := b.Elapsed().Seconds()
+		b.ReportMetric(float64(objectCount.Load())/elapsedSeconds, "list-objs/s")
+		b.ReportMetric(float64(listCount.Load())/elapsedSeconds, "list-calls/s")
+	})
+}
+
 func runBenchmarkStoreList(ctx context.Context, b *testing.B, store storage.Interface, limit int64, match metav1.ResourceVersionMatch, scope scope, data BenchmarkData, useIndex bool) {
 	objectCount := atomic.Uint64{}
 	listCount := atomic.Uint64{}
@@ -509,6 +545,16 @@ func paginateList(ctx context.Context, store storage.Interface, key string, opts
 		objectCount += len(listOut.Items)
 	}
 	return objectCount, listCount
+}
+
+func podsOnNode(data BenchmarkData, nodeName string) int {
+	count := 0
+	for _, pod := range data.Pods {
+		if pod.Spec.NodeName == nodeName {
+			count++
+		}
+	}
+	return count
 }
 
 func podAttr(obj runtime.Object) (labels.Set, fields.Set, error) {

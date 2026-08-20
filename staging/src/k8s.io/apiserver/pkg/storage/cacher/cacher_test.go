@@ -785,6 +785,19 @@ func BenchmarkStoreList(b *testing.B) {
 			}
 		})
 	}
+	const fieldSelectorObjectCount = 5_000
+	for _, matchPercent := range []int{1, 10, 20, 50, 100} {
+		b.Run(fmt.Sprintf("FieldSelector/Objects=%d/MatchPercent=%d", fieldSelectorObjectCount, matchPercent), func(b *testing.B) {
+			matchedObjectCount := fieldSelectorObjectCount * matchPercent / 100
+			data := storagetesting.PrepareBenchmarkData(1, fieldSelectorObjectCount, fieldSelectorObjectCount/matchedObjectCount)
+			ctx, cacher, _, terminate := testSetupWithEtcdServer(b, withNodeNameAndNamespaceIndex)
+			b.Cleanup(terminate)
+			require.NoError(b, storagetesting.PrecreateBenchmarkPods(ctx, cacher, data))
+			for _, useIndex := range []bool{false, true} {
+				storagetesting.RunBenchmarkStoreListFieldSelector(ctx, b, cacher, data, useIndex)
+			}
+		})
+	}
 }
 
 func BenchmarkStoreStats(b *testing.B) {
