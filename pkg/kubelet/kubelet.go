@@ -368,18 +368,30 @@ func newCrashLoopBackOff(kubeCfg *kubeletconfiginternal.KubeletConfiguration) (t
 	return boMax, boInitial
 }
 
-// makePodSourceConfig creates a config.PodConfig from the given
-// KubeletConfiguration or returns an error.
-func makePodSourceConfig(ctx context.Context, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *Dependencies, nodeName types.NodeName, nodeHasSynced func() bool) (*config.PodConfig, error) {
-	logger := klog.FromContext(ctx)
+// staticPodURLHeaderAndKeys canonicalizes the StaticPodURLHeader config map
+// into an http.Header and a sorted slice of canonicalized header key names.
+func staticPodURLHeaderAndKeys(headers map[string][]string) (http.Header, []string) {
 	manifestURLHeader := make(http.Header)
-	if len(kubeCfg.StaticPodURLHeader) > 0 {
-		for k, v := range kubeCfg.StaticPodURLHeader {
+	if len(headers) > 0 {
+		for k, v := range headers {
 			for i := range v {
-				manifestURLHeader.Add(k, v[i])
+				manifestURLHeader.Add(k, v[i]) // Add canonicalizes k internally
 			}
 		}
 	}
+	// Collect keys from the header after Add has canonicalized them,
+	// avoiding the need for a separate http.CanonicalHeaderKey call.
+	keys := make([]string, 0, len(manifestURLHeader))
+	for k := range manifestURLHeader {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return manifestURLHeader, keys
+}
+
+func makePodSourceConfig(ctx context.Context, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *Dependencies, nodeName types.NodeName, nodeHasSynced func() bool) (*config.PodConfig, error) {
+	logger := klog.FromContext(ctx)
+	manifestURLHeader, manifestURLHeaderKeys := staticPodURLHeaderAndKeys(kubeCfg.StaticPodURLHeader)
 
 	// source of all configuration
 	cfg := config.NewPodConfig(kubeDeps.Recorder, kubeDeps.PodStartupLatencyTracker)
@@ -392,7 +404,7 @@ func makePodSourceConfig(ctx context.Context, kubeCfg *kubeletconfiginternal.Kub
 
 	// define url config source
 	if kubeCfg.StaticPodURL != "" {
-		logger.Info("Adding pod URL with HTTP header", "URL", kubeCfg.StaticPodURL, "header", manifestURLHeader)
+		logger.Info("Adding pod URL with HTTP headers", "URL", kubeCfg.StaticPodURL, "header", manifestURLHeaderKeys)
 		config.NewSourceURL(logger, kubeCfg.StaticPodURL, manifestURLHeader, nodeName, kubeCfg.HTTPCheckFrequency.Duration, cfg.Channel(ctx, kubetypes.HTTPSource))
 	}
 
