@@ -40,6 +40,7 @@ type Event struct {
 	metav1.ObjectMeta `json:"metadata" protobuf:"bytes,1,opt,name=metadata"`
 
 	// eventTime is the time when this Event was first observed. It is required.
+	// +required
 	EventTime metav1.MicroTime `json:"eventTime" protobuf:"bytes,2,opt,name=eventTime"`
 
 	// series is data about the Event series this event represents or nil if it's a singleton Event.
@@ -48,18 +49,22 @@ type Event struct {
 
 	// reportingController is the name of the controller that emitted this Event, e.g. `kubernetes.io/kubelet`.
 	// This field cannot be empty for new Events.
+	// +required
 	ReportingController string `json:"reportingController,omitempty" protobuf:"bytes,4,opt,name=reportingController"`
 
 	// reportingInstance is the ID of the controller instance, e.g. `kubelet-xyzf`.
 	// This field cannot be empty for new Events and it can have at most 128 characters.
+	// +required
 	ReportingInstance string `json:"reportingInstance,omitempty" protobuf:"bytes,5,opt,name=reportingInstance"`
 
 	// action is what action was taken/failed regarding to the regarding object. It is machine-readable.
 	// This field cannot be empty for new Events and it can have at most 128 characters.
+	// +required
 	Action string `json:"action,omitempty" protobuf:"bytes,6,name=action"`
 
 	// reason is why the action was taken. It is human-readable.
 	// This field cannot be empty for new Events and it can have at most 128 characters.
+	// +required
 	Reason string `json:"reason,omitempty" protobuf:"bytes,7,name=reason"`
 
 	// regarding contains the object this Event is about. In most cases it's an Object reporting controller
@@ -82,6 +87,7 @@ type Event struct {
 	// type is the type of this event (Normal, Warning), new types could be added in the future.
 	// It is machine-readable.
 	// This field cannot be empty for new Events.
+	// +required
 	Type string `json:"type,omitempty" protobuf:"bytes,11,opt,name=type"`
 
 	// deprecatedSource is the deprecated field assuring backward compatibility with core.v1 Event type.
@@ -104,8 +110,10 @@ type Event struct {
 // how this struct is updated on heartbeats and can guide customized reporter implementations.
 type EventSeries struct {
 	// count is the number of occurrences in this series up to the last heartbeat time.
+	// +required
 	Count int32 `json:"count" protobuf:"varint,1,opt,name=count"`
 	// lastObservedTime is the time when last Event from the series was seen before last heartbeat.
+	// +required
 	LastObservedTime metav1.MicroTime `json:"lastObservedTime" protobuf:"bytes,2,opt,name=lastObservedTime"`
 }
 
