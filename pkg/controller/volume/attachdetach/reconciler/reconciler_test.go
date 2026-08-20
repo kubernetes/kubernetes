@@ -19,6 +19,7 @@ package reconciler
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync"
 	"testing"
 	"time"
@@ -50,6 +51,10 @@ const (
 	maxWaitForUnmountDuration     = 50 * time.Millisecond
 	maxLongWaitForUnmountDuration = 4200 * time.Second
 	volumeAttachedCheckTimeout    = 5 * time.Second
+	// Generous on purpose: the conditions are met within a few reconciler loop
+	// periods on an idle machine, but a loaded CI machine can starve the
+	// reconciler goroutine for far longer.
+	waitForConditionTimeout = 30 * time.Second
 )
 
 var registerMetrics sync.Once
@@ -1418,7 +1423,7 @@ func waitForMultiAttachErrorOnNode(
 		return false, nil
 	}
 
-	err := retryWithExponentialBackOff(100*time.Millisecond, multAttachCheckFunc)
+	err := waitForCondition(100*time.Millisecond, multAttachCheckFunc)
 	if err != nil {
 		t.Fatalf("Timed out waiting for MultiAttach Error to be set on non-attached node")
 	}
@@ -1428,7 +1433,7 @@ func waitForNewAttacherCallCount(
 	t *testing.T,
 	expectedCallCount int,
 	fakePlugin *volumetesting.FakeVolumePlugin) {
-	err := retryWithExponentialBackOff(
+	err := waitForCondition(
 		time.Duration(5*time.Millisecond),
 		func() (bool, error) {
 			actualCallCount := fakePlugin.GetNewAttacherCallCount()
@@ -1455,7 +1460,7 @@ func waitForNewDetacherCallCount(
 	t *testing.T,
 	expectedCallCount int,
 	fakePlugin *volumetesting.FakeVolumePlugin) {
-	err := retryWithExponentialBackOff(
+	err := waitForCondition(
 		time.Duration(5*time.Millisecond),
 		func() (bool, error) {
 			actualCallCount := fakePlugin.GetNewDetacherCallCount()
@@ -1486,7 +1491,7 @@ func waitForAttachCallCount(
 		return
 	}
 
-	err := retryWithExponentialBackOff(
+	err := waitForCondition(
 		time.Duration(5*time.Millisecond),
 		func() (bool, error) {
 			for i, attacher := range fakePlugin.GetAttachers() {
@@ -1523,7 +1528,7 @@ func waitForTotalAttachCallCount(
 		return
 	}
 
-	err := retryWithExponentialBackOff(
+	err := waitForCondition(
 		time.Duration(5*time.Millisecond),
 		func() (bool, error) {
 			totalCount := 0
@@ -1557,7 +1562,7 @@ func waitForDetachCallCount(
 		return
 	}
 
-	err := retryWithExponentialBackOff(
+	err := waitForCondition(
 		time.Duration(5*time.Millisecond),
 		func() (bool, error) {
 			for i, detacher := range fakePlugin.GetDetachers() {
@@ -1594,7 +1599,7 @@ func waitForTotalDetachCallCount(
 		return
 	}
 
-	err := retryWithExponentialBackOff(
+	err := waitForCondition(
 		time.Duration(5*time.Millisecond),
 		func() (bool, error) {
 			totalCount := 0
@@ -1626,7 +1631,7 @@ func waitForAttachedToNodesCount(
 	volumeName v1.UniqueVolumeName,
 	asw cache.ActualStateOfWorld) {
 
-	err := retryWithExponentialBackOff(
+	err := waitForCondition(
 		time.Duration(5*time.Millisecond),
 		func() (bool, error) {
 			count := len(asw.GetNodesForAttachedVolume(volumeName))
@@ -1673,7 +1678,7 @@ func waitForVolumeAttachStateToNode(
 	expectedAttachState cache.AttachState,
 	asw cache.ActualStateOfWorld) {
 
-	err := retryWithExponentialBackOff(
+	err := waitForCondition(
 		time.Duration(500*time.Millisecond),
 		func() (bool, error) {
 			attachState := asw.GetAttachState(volumeName, nodeName)
@@ -1701,7 +1706,7 @@ func waitForVolumeAddedToNode(
 	nodeName k8stypes.NodeName,
 	asw cache.ActualStateOfWorld) {
 
-	err := retryWithExponentialBackOff(
+	err := waitForCondition(
 		time.Duration(500*time.Millisecond),
 		func() (bool, error) {
 			volumes := asw.GetAttachedVolumes()
@@ -1733,7 +1738,7 @@ func waitForVolumeRemovedFromNode(
 	nodeName k8stypes.NodeName,
 	asw cache.ActualStateOfWorld) {
 
-	err := retryWithExponentialBackOff(
+	err := waitForCondition(
 		time.Duration(500*time.Millisecond),
 		func() (bool, error) {
 			volumes := asw.GetAttachedVolumes()
@@ -1848,14 +1853,18 @@ func verifyNewDetacherCallCount(
 	}
 }
 
-func retryWithExponentialBackOff(initialDuration time.Duration, fn wait.ConditionFunc) error {
-	backoff := wait.Backoff{
-		Duration: initialDuration,
-		Factor:   3,
-		Jitter:   0,
-		Steps:    6,
-	}
-	return wait.ExponentialBackoff(backoff, fn)
+func waitForCondition(interval time.Duration, fn wait.ConditionFunc) error {
+	ctx, cancel := context.WithTimeout(context.Background(), waitForConditionTimeout)
+	defer cancel()
+
+	delay := wait.Backoff{
+		Duration: interval,
+		Factor:   2,
+		Cap:      time.Second,
+		Steps:    math.MaxInt32,
+	}.DelayFunc()
+
+	return delay.Until(ctx, true /* immediate */, false /* sliding */, fn.WithContext())
 }
 
 // verifies the force detach metric with reason
