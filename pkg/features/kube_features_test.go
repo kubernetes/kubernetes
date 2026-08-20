@@ -21,6 +21,7 @@ import (
 	"slices"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/component-base/featuregate"
@@ -99,6 +100,29 @@ func TestAllDependenciesRegistered(t *testing.T) {
 	for _, f := range slices.Sorted(maps.Keys(defaultVersionedKubernetesFeatureGates)) {
 		if _, depsRegistered := registeredDependencies[f]; !depsRegistered {
 			t.Errorf("Feature %s did not register dependencies. All features must record explicit feature dependencies, even if there are none.", f)
+		}
+	}
+}
+
+func TestFeatureGateAPIDependenciesWellFormed(t *testing.T) {
+	registeredFeatures := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
+
+	for feature, gvrs := range FeatureGateAPIDependencies() {
+		if _, ok := registeredFeatures[feature]; !ok {
+			t.Errorf("feature gate %q in the API dependency map is not registered in the DefaultFeatureGate", feature)
+		}
+		if len(gvrs) == 0 {
+			t.Errorf("feature gate %q declares an empty API dependency list; omit the entry instead", feature)
+		}
+		seen := map[schema.GroupVersionResource]bool{}
+		for _, gvr := range gvrs {
+			if gvr.Version == "" || gvr.Resource == "" {
+				t.Errorf("feature gate %q has a malformed API dependency %#v: version and resource must be set", feature, gvr)
+			}
+			if seen[gvr] {
+				t.Errorf("feature gate %q lists duplicate API dependency %s", feature, gvr)
+			}
+			seen[gvr] = true
 		}
 	}
 }
