@@ -36,6 +36,8 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2"
+	klogtesting "k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -414,6 +416,50 @@ func TestRelistWithCache(t *testing.T) {
 	}
 	// Now that we are able to query status for pods[1], pleg should generate an event.
 	assert.Exactly(t, []*PodLifecycleEvent{events[1]}, actualEvents)
+}
+
+func TestContainerFinishedLog(t *testing.T) {
+	logger := klogtesting.NewLogger(t, klogtesting.NewConfig(klogtesting.Verbosity(2), klogtesting.BufferLogs(true)))
+	tCtx := klog.NewContext(context.Background(), logger)
+
+	runtimeMock := containertest.NewMockRuntime(t)
+	pleg := newTestGenericPLEGWithRuntimeMock(runtimeMock)
+
+	container := createTestContainer("c0", kubecontainer.ContainerStateExited)
+	pod := &kubecontainer.Pod{
+		ID:         "test-pod-uid",
+		Name:       "my-pod",
+		Namespace:  "my-namespace",
+		Containers: []*kubecontainer.Container{container},
+	}
+	status := &kubecontainer.PodStatus{
+		ID:        pod.ID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		ContainerStatuses: []*kubecontainer.Status{{
+			ID:       container.ID,
+			Name:     "my-container",
+			State:    kubecontainer.ContainerStateExited,
+			ExitCode: 137,
+		}},
+	}
+	runtimeMock.EXPECT().GetPods(mock.Anything, true).Return([]*kubecontainer.Pod{pod}, nil).Times(1)
+	runtimeMock.EXPECT().GetPodStatus(mock.Anything, pod).Return(status, nil).Times(1)
+
+	pleg.Relist(tCtx)
+
+	underlier, ok := logger.GetSink().(klogtesting.Underlier)
+	require.True(t, ok, "Should have had a ktesting LogSink, got %T", logger.GetSink())
+	logs := underlier.GetBuffer().String()
+	for _, want := range []string{
+		"container finished",
+		`pod="my-namespace/my-pod"`,
+		`podUID="test-pod-uid"`,
+		`containerName="my-container"`,
+		"exitCode=137",
+	} {
+		assert.Contains(t, logs, want)
+	}
 }
 
 func TestRemoveCacheEntry(t *testing.T) {

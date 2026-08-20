@@ -377,8 +377,9 @@ func (g *GenericPLEG) reconcilePodRecord(ctx context.Context, pid types.UID) {
 	// Update the internal storage and send out the events.
 	g.podRecords.update(pid)
 
-	// Map from containerId to exit code; used as a temporary cache for lookup
-	containerExitCode := make(map[string]int)
+	// Map from containerID to container status; used as a temporary cache to look
+	// up the name and exit code of finished containers.
+	containerStatuses := make(map[string]*kubecontainer.Status)
 
 	for i := range events {
 		// Filter out events that are not reliable and no other components use yet.
@@ -393,17 +394,20 @@ func (g *GenericPLEG) reconcilePodRecord(ctx context.Context, pid types.UID) {
 		}
 		// Log exit code of containers when they finished in a particular event
 		if events[i].Type == ContainerDied {
-			// Fill up containerExitCode map for ContainerDied event when first time appeared
-			if len(containerExitCode) == 0 && pod != nil {
-				if err == nil {
-					for _, containerStatus := range status.ContainerStatuses {
-						containerExitCode[containerStatus.ID.ID] = containerStatus.ExitCode
-					}
+			// Fill up containerStatuses map for ContainerDied event when first time appeared.
+			if len(containerStatuses) == 0 && pod != nil {
+				for _, containerStatus := range status.ContainerStatuses {
+					containerStatuses[containerStatus.ID.ID] = containerStatus
 				}
 			}
 			if containerID, ok := events[i].Data.(string); ok {
-				if exitCode, ok := containerExitCode[containerID]; ok && pod != nil {
-					logger.V(2).Info("Generic (PLEG): container finished", "podID", pod.ID, "containerID", containerID, "exitCode", exitCode)
+				if containerStatus, ok := containerStatuses[containerID]; ok {
+					logger.V(2).Info("Generic (PLEG): container finished",
+						"pod", klog.KRef(pod.Namespace, pod.Name),
+						"podUID", pod.ID,
+						"containerName", containerStatus.Name,
+						"containerID", containerID,
+						"exitCode", containerStatus.ExitCode)
 				}
 			}
 		}
