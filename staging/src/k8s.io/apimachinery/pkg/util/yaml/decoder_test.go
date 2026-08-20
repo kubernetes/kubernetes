@@ -244,6 +244,65 @@ stuff: 3
 	}
 }
 
+func TestDecodeYAMLWithDirective(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "YAML 1.1 directive with content",
+			input: "%YAML 1.1\n---\nstuff: 1\n",
+			want:  `yaml.generic{"stuff":1}`,
+		},
+		{
+			name:  "TAG directive with content",
+			input: "%TAG !e! tag:example.com,2000:\n---\nstuff: 2\n",
+			want:  `yaml.generic{"stuff":2}`,
+		},
+		{
+			name:  "directive followed by second document",
+			input: "%YAML 1.1\n---\nstuff: 1\n---\nstuff: 2\n",
+			want:  `yaml.generic{"stuff":1}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewYAMLToJSONDecoder(bytes.NewReader([]byte(tt.input)))
+			obj := generic{}
+			if err := s.Decode(&obj); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if fmt.Sprintf("%#v", obj) != tt.want {
+				t.Errorf("expected %s, got %#v", tt.want, obj)
+			}
+		})
+	}
+}
+
+func TestYAMLReaderWithDirective(t *testing.T) {
+	input := "%YAML 1.1\n---\nstuff: 1\n---\nother: 2\n"
+	reader := NewYAMLReader(bufio.NewReader(bytes.NewReader([]byte(input))))
+
+	doc1, err := reader.Read()
+	if err != nil {
+		t.Fatalf("unexpected error reading first document: %v", err)
+	}
+	expected1 := "%YAML 1.1\n---\nstuff: 1\n"
+	if string(doc1) != expected1 {
+		t.Errorf("first document: expected %q, got %q", expected1, string(doc1))
+	}
+
+	doc2, err := reader.Read()
+	if err != nil {
+		t.Fatalf("unexpected error reading second document: %v", err)
+	}
+	expected2 := "other: 2\n"
+	if string(doc2) != expected2 {
+		t.Errorf("second document: expected %q, got %q", expected2, string(doc2))
+	}
+}
+
 func TestDecodeBrokenYAML(t *testing.T) {
 	s := NewYAMLOrJSONDecoder(bytes.NewReader([]byte(`---
 stuff: 1
