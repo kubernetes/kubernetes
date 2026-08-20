@@ -24,9 +24,12 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/component-base/metrics/testutil"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
@@ -90,6 +93,68 @@ func TestRepair(t *testing.T) {
 	}
 	if repairErrors != 1 {
 		t.Fatalf("1 error expected, got %v", repairErrors)
+	}
+}
+
+func TestRepairRetriesServiceList(t *testing.T) {
+	clearMetrics()
+	fakeClient := fake.NewSimpleClientset()
+	listAttempts := 0
+	fakeClient.PrependReactor("list", "services", func(action clienttesting.Action) (bool, k8sruntime.Object, error) {
+		listAttempts++
+		if listAttempts == 1 {
+			return true, nil, apierrors.NewTooManyRequests("storage is (re)initializing", 1)
+		}
+		return false, nil, nil
+	})
+
+	registry := &mockRangeRegistry{
+		item: &api.RangeAllocation{Range: "100-200"},
+	}
+	pr, err := net.ParsePortRange(registry.item.Range)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), *pr, registry)
+
+	if err := r.runOnce(); err != nil {
+		t.Fatal(err)
+	}
+	if listAttempts != 2 {
+		t.Fatalf("expected 2 service list attempts, got %d", listAttempts)
+	}
+	if !registry.updateCalled {
+		t.Fatal("expected repaired port allocation to be persisted")
+	}
+}
+
+func TestRepairDoesNotRetryNonRetryableServiceListError(t *testing.T) {
+	clearMetrics()
+	fakeClient := fake.NewSimpleClientset()
+	listAttempts := 0
+	fakeClient.PrependReactor("list", "services", func(action clienttesting.Action) (bool, k8sruntime.Object, error) {
+		listAttempts++
+		return true, nil, fmt.Errorf("authorization failed")
+	})
+
+	registry := &mockRangeRegistry{
+		item: &api.RangeAllocation{Range: "100-200"},
+	}
+	pr, err := net.ParsePortRange(registry.item.Range)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), *pr, registry)
+
+	err = r.runOnce()
+	if err == nil || !strings.Contains(err.Error(), "authorization failed") {
+		t.Fatalf("expected authorization error, got %v", err)
+	}
+	if listAttempts != 1 {
+		t.Fatalf("expected 1 service list attempt, got %d", listAttempts)
+	}
+	if registry.updateCalled {
+		t.Fatal("did not expect port allocation to be persisted")
 	}
 }
 
