@@ -837,12 +837,19 @@ func (m *kubeGenericRuntimeManager) InitializeActuatedPod(logger klog.Logger, al
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		return
 	}
-	if _, ok := m.actuatedState.GetPodResourceInfo(allocatedPod.UID); ok {
+	if actuatedPod, ok := m.actuatedState.GetPod(allocatedPod.UID); ok {
+		// Legacy checkpoints migrated from V1 only populated resource requirements, leaving the
+		// rest of the PodSpec empty. Hydrate non-resource PodSpec metadata while preserving actuated resources.
+		if len(actuatedPod.Spec.Containers) == 0 || actuatedPod.Spec.Containers[0].Image == "" {
+			hydratedPod, _ := state.UpdatePodFromCheckpoint(allocatedPod, actuatedPod)
+			if err := m.actuatedState.SetPod(logger, hydratedPod); err != nil {
+				logger.Error(err, "Failed to hydrate actuated pod checkpoint", "pod", klog.KObj(allocatedPod))
+			}
+		}
 		return
 	}
-	info := allocation.ResourceInfoForPod(allocatedPod)
-	if err := m.actuatedState.SetPodResourceInfo(logger, allocatedPod.UID, info); err != nil {
-		logger.Error(err, "Failed to initialize actuated pod resource info checkpoint", "pod", klog.KObj(allocatedPod))
+	if err := m.actuatedState.SetPod(logger, allocatedPod); err != nil {
+		logger.Error(err, "Failed to initialize actuated pod checkpoint", "pod", klog.KObj(allocatedPod))
 	}
 }
 
@@ -2299,7 +2306,7 @@ func (m *kubeGenericRuntimeManager) GetContainerStatus(ctx context.Context, podU
 func (m *kubeGenericRuntimeManager) GarbageCollect(ctx context.Context, gcPolicy kubecontainer.GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error {
 	logger := klog.FromContext(ctx)
 	// Remove terminated pods from the actuated state.
-	for uid := range m.actuatedState.GetPodResourceInfoMap() {
+	for _, uid := range m.actuatedState.GetPodUIDs() {
 		if m.podStateProvider.ShouldPodContentBeRemoved(uid) {
 			if err := m.actuatedState.RemovePod(logger, uid); err != nil {
 				// No need to act on the error beyond logging it here.
