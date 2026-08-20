@@ -126,6 +126,16 @@ func (s *SelectionPredicate) MatchesObjectAttributes(l labels.Set, f fields.Set)
 	return matched
 }
 
+// MatchesObjectAndSharding returns true if the given object matches both the 
+// sharding configuration and the object attributes (labels and fields).
+func (s *SelectionPredicate) MatchesObjectAndSharding(obj runtime.Object, label labels.Set, field fields.Set) (bool, error) {
+    matched, err := s.MatchesSharding(obj)
+    if err != nil || !matched {
+        return false, err
+    }
+    return s.MatchesObjectAttributes(label, field), nil
+}
+
 // MatchesSingleNamespace will return (namespace, true) if and only if s.Field matches on the object's
 // namespace.
 func (s *SelectionPredicate) MatchesSingleNamespace() (string, bool) {
