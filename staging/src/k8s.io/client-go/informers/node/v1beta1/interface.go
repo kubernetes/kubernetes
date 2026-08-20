@@ -24,7 +24,7 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// RuntimeClasses returns a RuntimeClassInformer.
+	// RuntimeClasses returns a TypedRuntimeClassInformer.
 	RuntimeClasses() TypedRuntimeClassInformer
 }
 

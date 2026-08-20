@@ -24,9 +24,9 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// CronJobs returns a CronJobInformer.
+	// CronJobs returns a TypedCronJobInformer.
 	CronJobs() TypedCronJobInformer
-	// Jobs returns a JobInformer.
+	// Jobs returns a TypedJobInformer.
 	Jobs() TypedJobInformer
 }
 

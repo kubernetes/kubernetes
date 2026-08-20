@@ -24,7 +24,7 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// Foos returns a FooInformer.
+	// Foos returns a TypedFooInformer.
 	Foos() TypedFooInformer
 }
 

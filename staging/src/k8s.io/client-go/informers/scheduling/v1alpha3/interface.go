@@ -24,11 +24,11 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// CompositePodGroups returns a CompositePodGroupInformer.
+	// CompositePodGroups returns a TypedCompositePodGroupInformer.
 	CompositePodGroups() TypedCompositePodGroupInformer
-	// PodGroups returns a PodGroupInformer.
+	// PodGroups returns a TypedPodGroupInformer.
 	PodGroups() TypedPodGroupInformer
-	// Workloads returns a WorkloadInformer.
+	// Workloads returns a TypedWorkloadInformer.
 	Workloads() TypedWorkloadInformer
 }
 

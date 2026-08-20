@@ -24,17 +24,17 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// MutatingAdmissionPolicies returns a MutatingAdmissionPolicyInformer.
+	// MutatingAdmissionPolicies returns a TypedMutatingAdmissionPolicyInformer.
 	MutatingAdmissionPolicies() TypedMutatingAdmissionPolicyInformer
-	// MutatingAdmissionPolicyBindings returns a MutatingAdmissionPolicyBindingInformer.
+	// MutatingAdmissionPolicyBindings returns a TypedMutatingAdmissionPolicyBindingInformer.
 	MutatingAdmissionPolicyBindings() TypedMutatingAdmissionPolicyBindingInformer
-	// MutatingWebhookConfigurations returns a MutatingWebhookConfigurationInformer.
+	// MutatingWebhookConfigurations returns a TypedMutatingWebhookConfigurationInformer.
 	MutatingWebhookConfigurations() TypedMutatingWebhookConfigurationInformer
-	// ValidatingAdmissionPolicies returns a ValidatingAdmissionPolicyInformer.
+	// ValidatingAdmissionPolicies returns a TypedValidatingAdmissionPolicyInformer.
 	ValidatingAdmissionPolicies() TypedValidatingAdmissionPolicyInformer
-	// ValidatingAdmissionPolicyBindings returns a ValidatingAdmissionPolicyBindingInformer.
+	// ValidatingAdmissionPolicyBindings returns a TypedValidatingAdmissionPolicyBindingInformer.
 	ValidatingAdmissionPolicyBindings() TypedValidatingAdmissionPolicyBindingInformer
-	// ValidatingWebhookConfigurations returns a ValidatingWebhookConfigurationInformer.
+	// ValidatingWebhookConfigurations returns a TypedValidatingWebhookConfigurationInformer.
 	ValidatingWebhookConfigurations() TypedValidatingWebhookConfigurationInformer
 }
 

@@ -24,7 +24,7 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// ClusterTrustBundles returns a ClusterTrustBundleInformer.
+	// ClusterTrustBundles returns a TypedClusterTrustBundleInformer.
 	ClusterTrustBundles() TypedClusterTrustBundleInformer
 }
 

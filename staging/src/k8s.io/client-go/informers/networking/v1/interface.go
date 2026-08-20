@@ -24,15 +24,15 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// IPAddresses returns a IPAddressInformer.
+	// IPAddresses returns a TypedIPAddressInformer.
 	IPAddresses() TypedIPAddressInformer
-	// Ingresses returns a IngressInformer.
+	// Ingresses returns a TypedIngressInformer.
 	Ingresses() TypedIngressInformer
-	// IngressClasses returns a IngressClassInformer.
+	// IngressClasses returns a TypedIngressClassInformer.
 	IngressClasses() TypedIngressClassInformer
-	// NetworkPolicies returns a NetworkPolicyInformer.
+	// NetworkPolicies returns a TypedNetworkPolicyInformer.
 	NetworkPolicies() TypedNetworkPolicyInformer
-	// ServiceCIDRs returns a ServiceCIDRInformer.
+	// ServiceCIDRs returns a TypedServiceCIDRInformer.
 	ServiceCIDRs() TypedServiceCIDRInformer
 }
 

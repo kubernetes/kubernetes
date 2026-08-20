@@ -24,9 +24,9 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// ClusterTestTypes returns a ClusterTestTypeInformer.
+	// ClusterTestTypes returns a TypedClusterTestTypeInformer.
 	ClusterTestTypes() TypedClusterTestTypeInformer
-	// TestTypes returns a TestTypeInformer.
+	// TestTypes returns a TypedTestTypeInformer.
 	TestTypes() TypedTestTypeInformer
 }
 

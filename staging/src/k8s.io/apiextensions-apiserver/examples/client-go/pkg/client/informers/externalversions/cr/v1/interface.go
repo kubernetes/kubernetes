@@ -24,7 +24,7 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// Examples returns a ExampleInformer.
+	// Examples returns a TypedExampleInformer.
 	Examples() TypedExampleInformer
 }
 

@@ -24,11 +24,11 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// CSIStorageCapacities returns a CSIStorageCapacityInformer.
+	// CSIStorageCapacities returns a TypedCSIStorageCapacityInformer.
 	CSIStorageCapacities() TypedCSIStorageCapacityInformer
-	// VolumeAttachments returns a VolumeAttachmentInformer.
+	// VolumeAttachments returns a TypedVolumeAttachmentInformer.
 	VolumeAttachments() TypedVolumeAttachmentInformer
-	// VolumeAttributesClasses returns a VolumeAttributesClassInformer.
+	// VolumeAttributesClasses returns a TypedVolumeAttributesClassInformer.
 	VolumeAttributesClasses() TypedVolumeAttributesClassInformer
 }
 

@@ -24,7 +24,7 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// EndpointSlices returns a EndpointSliceInformer.
+	// EndpointSlices returns a TypedEndpointSliceInformer.
 	EndpointSlices() TypedEndpointSliceInformer
 }
 

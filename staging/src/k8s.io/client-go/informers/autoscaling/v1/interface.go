@@ -24,7 +24,7 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// HorizontalPodAutoscalers returns a HorizontalPodAutoscalerInformer.
+	// HorizontalPodAutoscalers returns a TypedHorizontalPodAutoscalerInformer.
 	HorizontalPodAutoscalers() TypedHorizontalPodAutoscalerInformer
 }
 

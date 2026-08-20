@@ -24,7 +24,7 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// TestTypes returns a TestTypeInformer.
+	// TestTypes returns a TypedTestTypeInformer.
 	TestTypes() TypedTestTypeInformer
 }
 

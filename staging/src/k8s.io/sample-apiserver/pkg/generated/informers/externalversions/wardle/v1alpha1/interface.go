@@ -24,9 +24,9 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// Fischers returns a FischerInformer.
+	// Fischers returns a TypedFischerInformer.
 	Fischers() TypedFischerInformer
-	// Flunders returns a FlunderInformer.
+	// Flunders returns a TypedFlunderInformer.
 	Flunders() TypedFlunderInformer
 }
 

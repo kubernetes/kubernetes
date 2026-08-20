@@ -84,7 +84,7 @@ var versionTemplate = `
 // Interface provides access to all the informers in this group version.
 type Interface interface {
 	$range .types -$
-		// $.|publicPlural$ returns a $.|public$Informer.
+		// $.|publicPlural$ returns a Typed$.|public$Informer.
 		$.|publicPlural$() Typed$.|public$Informer
 	$end$
 }

@@ -24,7 +24,7 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// APIServices returns a APIServiceInformer.
+	// APIServices returns a TypedAPIServiceInformer.
 	APIServices() TypedAPIServiceInformer
 }
 

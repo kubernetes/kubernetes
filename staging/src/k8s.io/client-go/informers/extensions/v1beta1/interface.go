@@ -24,15 +24,15 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// DaemonSets returns a DaemonSetInformer.
+	// DaemonSets returns a TypedDaemonSetInformer.
 	DaemonSets() TypedDaemonSetInformer
-	// Deployments returns a DeploymentInformer.
+	// Deployments returns a TypedDeploymentInformer.
 	Deployments() TypedDeploymentInformer
-	// Ingresses returns a IngressInformer.
+	// Ingresses returns a TypedIngressInformer.
 	Ingresses() TypedIngressInformer
-	// NetworkPolicies returns a NetworkPolicyInformer.
+	// NetworkPolicies returns a TypedNetworkPolicyInformer.
 	NetworkPolicies() TypedNetworkPolicyInformer
-	// ReplicaSets returns a ReplicaSetInformer.
+	// ReplicaSets returns a TypedReplicaSetInformer.
 	ReplicaSets() TypedReplicaSetInformer
 }
 

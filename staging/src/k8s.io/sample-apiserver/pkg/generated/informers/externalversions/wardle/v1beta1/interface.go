@@ -24,7 +24,7 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// Flunders returns a FlunderInformer.
+	// Flunders returns a TypedFlunderInformer.
 	Flunders() TypedFlunderInformer
 }
 
