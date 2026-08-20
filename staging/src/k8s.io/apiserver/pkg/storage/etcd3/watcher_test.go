@@ -32,21 +32,25 @@ import (
 	grpccodes "google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 
+	"k8s.io/apimachinery/pkg/api/apitesting"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/sharding"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
+	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
 	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
+	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -726,5 +730,73 @@ func TestWatchWithShardSelector(t *testing.T) {
 			}
 			expectAddedEvent(t, w, "pod-in")
 		})
+	}
+}
+
+// TestFatalOnDecodeErrorIsPerWatcher verifies that a watcher keeps the fatalOnDecodeError setting
+// it was constructed with, rather than reading the process-global value at decode time.
+//
+// Watch events are decoded on goroutines spawned by concurrentOrderedEventProcessing, and nothing
+// joins those goroutines to the test that created the watcher. Reading the global at decode time
+// let a decode error that one test legitimately expects panic the whole test binary once the
+// global had been restored to true, and the panic was attributed to whichever unrelated test
+// happened to be running. See https://github.com/kubernetes/kubernetes/issues/140979.
+func TestFatalOnDecodeErrorIsPerWatcher(t *testing.T) {
+	codec := &testCodec{Codec: apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)}
+	codec.setFailing(true)
+
+	newWatchChan := func(fatalOnDecodeError bool) *watchChan {
+		w := &watcher{
+			codec:              codec,
+			newFunc:            newPod,
+			objectType:         "*example.Pod",
+			groupResource:      schema.GroupResource{Resource: "pods"},
+			versioner:          storage.APIObjectVersioner{},
+			transformer:        identity.NewEncryptCheckTransformer(),
+			fatalOnDecodeError: fatalOnDecodeError,
+		}
+		wc := w.createWatchChan(context.Background(), "/pods/test-ns/", 0, true, false, false, storage.Everything)
+		t.Cleanup(wc.cancel)
+		return wc
+	}
+
+	e := &event{key: "/pods/test-ns/foo", value: []byte("undecodable"), rev: 1, isCreated: true}
+
+	// Stand in for an unrelated test having restored the global to true while this watcher's
+	// event-processing goroutines are still draining.
+	TestOnlySetFatalOnDecodeError(t, true)
+
+	t.Run("constructed with fatalOnDecodeError=false", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("expected a decode error, got panic: %v", r)
+			}
+		}()
+		if _, _, err := newWatchChan(false).prepareObjs(e); err == nil {
+			t.Error("expected a decode error, got none")
+		}
+	})
+
+	t.Run("constructed with fatalOnDecodeError=true", func(t *testing.T) {
+		defer func() {
+			if recover() == nil {
+				t.Error("expected a panic on decode error, got none")
+			}
+		}()
+		_, _, err := newWatchChan(true).prepareObjs(e)
+		t.Errorf("expected a panic on decode error, got err %v", err)
+	})
+}
+
+// TestNewCapturesFatalOnDecodeError verifies that New snapshots the process-global
+// fatalOnDecodeError, so that TestOnlySetFatalOnDecodeError's opt-out sticks for the lifetime of
+// the storage it was set up for. See https://github.com/kubernetes/kubernetes/issues/140979.
+func TestNewCapturesFatalOnDecodeError(t *testing.T) {
+	TestOnlySetFatalOnDecodeError(t, false)
+
+	_, store, _ := testSetup(t)
+
+	if store.watcher.fatalOnDecodeError {
+		t.Error("watcher.fatalOnDecodeError = true, want false to match the value set before the store was created")
 	}
 }
