@@ -172,7 +172,7 @@ func Convert_v1_CustomResourceDefinitionSpec_To_apiextensions_CustomResourceDefi
 	if additionalPrinterColumnsIdentical {
 		out.AdditionalPrinterColumns = additionalPrinterColumns
 	}
-	if selectableFieldsIdentical {
+	if validationIdentical && selectableFieldsIdentical {
 		out.SelectableFields = selectableFields
 	}
 	for i := range out.Versions {
@@ -185,7 +185,7 @@ func Convert_v1_CustomResourceDefinitionSpec_To_apiextensions_CustomResourceDefi
 		if additionalPrinterColumnsIdentical {
 			out.Versions[i].AdditionalPrinterColumns = nil
 		}
-		if selectableFieldsIdentical {
+		if validationIdentical && selectableFieldsIdentical {
 			out.Versions[i].SelectableFields = nil
 		}
 	}
