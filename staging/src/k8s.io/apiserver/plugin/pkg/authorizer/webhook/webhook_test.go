@@ -17,7 +17,10 @@ limitations under the License.
 package webhook
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -289,5 +292,72 @@ func Test_resourceAttributesFrom(t *testing.T) {
 				t.Errorf("resourceAttributesFrom() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func Test_shouldCache(t *testing.T) {
+	smallSpec := authorizationv1.SubjectAccessReviewSpec{
+		User: "alice",
+		ResourceAttributes: &authorizationv1.ResourceAttributes{
+			Verb: "list", Resource: "pods",
+		},
+	}
+	smallKey, err := json.Marshal(smallSpec)
+	if err != nil {
+		t.Fatalf("marshal small spec: %v", err)
+	}
+
+	tests := []struct {
+		name string
+		key  []byte
+		want bool
+	}{
+		{"empty", nil, true},
+		{"small legitimate", smallKey, true},
+		{"just under limit", bytes.Repeat([]byte("a"), maxCacheKeySize-1), true},
+		{"at limit", bytes.Repeat([]byte("a"), maxCacheKeySize), false},
+		{"over limit", bytes.Repeat([]byte("a"), maxCacheKeySize+1), false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := shouldCache(tc.key); got != tc.want {
+				t.Fatalf("shouldCache(key len=%d) = %v, want %v", len(tc.key), got, tc.want)
+			}
+		})
+	}
+}
+
+// Test_shouldCache_rejectsLargeFieldSelectorFromAttributes reproduces the cache-poisoning
+// DoS path: a requester-controlled fieldSelector with thousands of terms produces a SAR
+// spec whose JSON key far exceeds maxCacheKeySize, yet the scalar-field check
+// used to pass because selector requirements were not counted. The fix measures the key.
+func Test_shouldCache_rejectsLargeFieldSelectorFromAttributes(t *testing.T) {
+	reqs := make(fields.Requirements, 5000)
+	for i := range reqs {
+		reqs[i] = fields.Requirement{
+			Field:    "spec.nodeName",
+			Operator: selection.Equals,
+			Value:    fmt.Sprintf("node-%04d", i),
+		}
+	}
+	attr := authorizer.AttributesRecord{
+		Verb:                      "list",
+		Resource:                  "pods",
+		FieldSelectorRequirements: reqs,
+	}
+
+	spec := authorizationv1.SubjectAccessReviewSpec{
+		User:               "alice",
+		ResourceAttributes: resourceAttributesFrom(attr),
+	}
+	key, err := json.Marshal(spec)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if len(key) <= maxCacheKeySize {
+		t.Fatalf("test premise broken: key is only %d bytes, need > %d to exercise the gate", len(key), maxCacheKeySize)
+	}
+	if shouldCache(key) {
+		t.Fatalf("shouldCache returned true for %d-byte fieldSelector key; cache would be poisoned", len(key))
 	}
 }
