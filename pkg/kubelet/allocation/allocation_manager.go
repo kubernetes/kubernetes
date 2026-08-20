@@ -112,6 +112,15 @@ type Manager interface {
 
 	// GetAllocatedPods returns all active pods with their allocated resources.
 	GetAllocatedPods() []*v1.Pod
+
+	// CheckResizeProgress atomically reads the current allocation and checks
+	// whether a resize is still in progress. This is serialized with
+	// retryPendingResizes to prevent a stale SyncPod snapshot from clearing
+	// the PodResizeInProgressCondition that the allocation manager just set.
+	// The isResizeInProgress callback receives the pod with current allocation
+	// applied and should return true if the resize has not yet been actuated.
+	// Returns the cleared generation and true if the resize completed.
+	CheckResizeProgress(pod *v1.Pod, isResizeInProgress func(allocatedPod *v1.Pod) bool) (int64, bool)
 }
 
 type manager struct {
@@ -586,6 +595,19 @@ func (m *manager) AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod)
 	}
 
 	return ok, reason, message
+}
+
+func (m *manager) CheckResizeProgress(pod *v1.Pod, isResizeInProgress func(allocatedPod *v1.Pod) bool) (int64, bool) {
+	m.allocationMutex.Lock()
+	defer m.allocationMutex.Unlock()
+
+	allocatedPod, _ := m.UpdatePodFromAllocation(pod)
+	if isResizeInProgress(allocatedPod) {
+		m.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
+		return 0, false
+	}
+	generation, cleared := m.statusManager.ClearPodResizeInProgressCondition(pod.UID)
+	return generation, cleared
 }
 
 func (m *manager) RemovePod(logger klog.Logger, uid types.UID) {

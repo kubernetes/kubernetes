@@ -2091,17 +2091,13 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		// Check whether a resize is in progress so we can set the PodResizeInProgressCondition accordingly.
-		if kl.containerRuntime.IsPodResizeInProgress(pod, podStatus) {
-			kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
-		} else if generation, cleared := kl.statusManager.ClearPodResizeInProgressCondition(pod.UID); cleared {
-			// (Allocated == Actual) => clear the resize in-progress status.
+		generation, completed := kl.allocationManager.CheckResizeProgress(pod, func(allocatedPod *v1.Pod) bool {
+			return kl.containerRuntime.IsPodResizeInProgress(allocatedPod, podStatus)
+		})
+		if completed {
 			msg := events.PodResizeCompletedMsg(logger, pod, generation)
 			kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeNormal, events.ResizeCompleted, "%s", msg)
 		}
-		// TODO(natasha41575): There is a race condition here, where the goroutine in the
-		// allocation manager may allocate a new resize and unconditionally set the
-		// PodResizeInProgressCondition before we set the status below.
 	}
 
 	// Generate final API pod status with pod and status manager status

@@ -30,6 +30,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -162,10 +163,21 @@ type TestKubelet struct {
 	pluginManagerStopCh  chan struct{}
 	mounter              mount.Interface
 	volumePlugin         *volumetest.FakeVolumePlugin
+	// podSyncWG tracks pod syncs triggered asynchronously by the allocation
+	// manager (e.g. from retryPendingResizes), mirroring the production pod
+	// worker which dispatches syncs on a separate goroutine. Tests that trigger
+	// these syncs should Wait on it before asserting or tearing down.
+	podSyncWG *sync.WaitGroup
 }
 
 func (tk *TestKubelet) Cleanup() {
 	if tk.kubelet != nil {
+		// Drain any pod syncs triggered asynchronously by the allocation
+		// manager (via triggerPodSync) before tearing down, so a stray
+		// goroutine can't run SyncPod against a removed root directory.
+		if tk.podSyncWG != nil {
+			tk.podSyncWG.Wait()
+		}
 		if tk.pluginManagerStopCh != nil {
 			close(tk.pluginManagerStopCh)
 			tk.pluginManagerStopCh = nil
@@ -339,10 +351,22 @@ func newTestKubeletWithImageList(
 		Namespace: "",
 	}
 
+	podSyncWG := &sync.WaitGroup{}
 	kubelet.allocationManager = allocation.NewInMemoryManager(
 		logger,
 		kubelet.statusManager,
-		func(ctx context.Context, pod *v1.Pod) { kubelet.HandlePodSyncs(ctx, []*v1.Pod{pod}) },
+		// The production pod worker dispatches syncs asynchronously, so the
+		// allocation manager can trigger a sync while holding allocationMutex
+		// (e.g. from retryPendingResizes) without the resulting SyncPod, which
+		// re-acquires allocationMutex via CheckResizeProgress, deadlocking.
+		// Mirror that here by running the sync on a separate goroutine.
+		func(ctx context.Context, pod *v1.Pod) {
+			podSyncWG.Add(1)
+			go func() {
+				defer podSyncWG.Done()
+				kubelet.HandlePodSyncs(ctx, []*v1.Pod{pod})
+			}()
+		},
 		kubelet.GetActivePods,
 		kubelet.podManager.GetPodByUID,
 		config.NewSourcesReady(func(_ sets.Set[string]) bool { return enableResizing }),
@@ -484,6 +508,7 @@ func newTestKubeletWithImageList(
 		pluginManagerStopCh:  pluginManagerStopCh,
 		mounter:              nil,
 		volumePlugin:         plug,
+		podSyncWG:            podSyncWG,
 	}
 }
 
@@ -4297,6 +4322,109 @@ func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
 	}
 }
 
+func TestSyncPodResizeCompletionUsesCurrentAllocation(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	tCtx := ktesting.Init(t)
+
+	testKubelet := newTestKubeletExcludeAdmitHandlers(t, false /* controllerAttachDetachEnabled */, true /*enableResizing*/)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	kubelet.recorder = record.NewFakeRecorder(20)
+
+	cpu100m := resource.MustParse("100m")
+	cpu200m := resource.MustParse("200m")
+
+	pod := podWithUIDNameNsSpec("resize-race-pod", "resize-race-pod", "ns", v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Name:  "c1",
+				Image: "i1",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu100m},
+				},
+			},
+		},
+	})
+	pod.Generation = 2
+	kubelet.podManager.SetPods([]*v1.Pod{pod})
+
+	t.Run("stale snapshot should not clear in-progress condition", func(t *testing.T) {
+		// Set allocation to 100m, then update to 200m (simulating the
+		// allocation manager goroutine accepting a deferred resize).
+		require.NoError(t, kubelet.allocationManager.SetAllocatedResources(klog.FromContext(tCtx), pod))
+		resizedPod := pod.DeepCopy()
+		resizedPod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = cpu200m
+		require.NoError(t, kubelet.allocationManager.SetAllocatedResources(klog.FromContext(tCtx), resizedPod))
+		kubelet.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
+
+		// Simulate actuated state at 100m: resize is in progress if
+		// allocated != 100m.
+		testKubelet.fakeRuntime.PodResizeInProgressFunc = func(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
+			allocatedCPU := allocatedPod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU]
+			return !allocatedCPU.Equal(cpu100m)
+		}
+
+		// SyncPod receives the stale 100m pod. Without the fix it would
+		// pass 100m to IsPodResizeInProgress, see 100m == actuated, and
+		// clear the condition. With the fix it re-reads allocation (200m),
+		// sees 200m != actuated, and keeps the condition.
+		isTerminal, _, err := kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
+		require.False(t, isTerminal)
+		require.NoError(t, err)
+
+		gotConditions := kubelet.statusManager.GetPodResizeConditions(pod.UID)
+		require.NotNil(t, gotConditions, "PodResizeInProgress condition should not have been cleared")
+		var foundInProgress bool
+		for _, c := range gotConditions {
+			if c.Type == v1.PodResizeInProgress {
+				foundInProgress = true
+			}
+		}
+		require.True(t, foundInProgress, "PodResizeInProgress condition should still be set")
+
+		fakeRecorder := kubelet.recorder.(*record.FakeRecorder)
+		for len(fakeRecorder.Events) > 0 {
+			event := <-fakeRecorder.Events
+			require.NotContains(t, event, "ResizeCompleted", "unexpected ResizeCompleted event: %s", event)
+		}
+	})
+
+	t.Run("completed resize should clear condition and emit event", func(t *testing.T) {
+		// Set allocation to 200m, and actuated state to also be 200m, so
+		// the resize is no longer in progress.
+		resizedPod := pod.DeepCopy()
+		resizedPod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = cpu200m
+		require.NoError(t, kubelet.allocationManager.SetAllocatedResources(klog.FromContext(tCtx), resizedPod))
+		kubelet.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
+		testKubelet.fakeRuntime.PodResizeInProgressFunc = func(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
+			allocatedCPU := allocatedPod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU]
+			return !allocatedCPU.Equal(cpu200m)
+		}
+
+		isTerminal, _, err := kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
+		require.False(t, isTerminal)
+		require.NoError(t, err)
+
+		gotConditions := kubelet.statusManager.GetPodResizeConditions(pod.UID)
+		for _, c := range gotConditions {
+			require.NotEqual(t, v1.PodResizeInProgress, c.Type, "PodResizeInProgress condition should have been cleared")
+		}
+
+		fakeRecorder := kubelet.recorder.(*record.FakeRecorder)
+		var foundCompleted bool
+		for len(fakeRecorder.Events) > 0 {
+			event := <-fakeRecorder.Events
+			if strings.Contains(event, "ResizeCompleted") {
+				foundCompleted = true
+			}
+		}
+		require.True(t, foundCompleted, "expected ResizeCompleted event")
+	})
+}
+
 func TestHandlePodUpdates_RecordContainerRequestedResizes(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)
 	metrics.Register()
@@ -5398,6 +5526,10 @@ func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 
 			kubelet.statusManager.ClearPodResizePendingCondition(pendingResizeDesired.UID, metrics.DeferredResizeResolutionAccepted)
 			kubelet.HandlePodReconcile(tCtx, []*v1.Pod{tc.newPod})
+			// Wait for any pod syncs triggered by retryPendingResizes (which run
+			// asynchronously, mirroring the production pod worker) to finish
+			// before asserting and tearing down.
+			testKubelet.podSyncWG.Wait()
 			require.Equal(t, tc.shouldRetryPendingResize, kubelet.statusManager.IsPodResizeDeferred(pendingResizeDesired.UID))
 
 			if !tc.setAllocation {
