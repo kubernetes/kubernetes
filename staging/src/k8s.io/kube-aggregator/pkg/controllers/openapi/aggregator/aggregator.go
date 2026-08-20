@@ -26,7 +26,9 @@ import (
 
 	restful "github.com/emicklei/go-restful/v3"
 
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-openapi/pkg/aggregator"
@@ -128,6 +130,15 @@ func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.
 			continue
 		}
 		delegationHandlers = append(delegationHandlers, handler)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.OpenAPIV2BytesCache) {
+		// Aggregate marshaled spec bytes instead of parsed specs so that no
+		// parsed spec structures are retained between merges.
+		aggregatorSpecJSON, err := aggregatorOpenAPISpec.MarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+		return buildAndRegisterSpecAggregatorBytesForLocalServices(downloader, aggregatorSpecJSON, delegationHandlers, pathHandler), nil
 	}
 	s := buildAndRegisterSpecAggregatorForLocalServices(downloader, aggregatorOpenAPISpec, delegationHandlers, pathHandler)
 	return s, nil

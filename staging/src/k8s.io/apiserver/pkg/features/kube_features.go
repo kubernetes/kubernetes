@@ -201,6 +201,15 @@ const (
 	// in the spec returned from kube-apiserver.
 	OpenAPIEnums featuregate.Feature = "OpenAPIEnums"
 
+	// owner: @seans3
+	//
+	// Serves /openapi/v2 from marshaled spec bytes instead of retaining the
+	// parsed spec structures, substantially reducing apiserver memory. The
+	// served bytes and ETags are identical to the default path. Note that
+	// with this feature enabled GenericAPIServer.StaticOpenAPISpec is left
+	// nil; servers needing a parsed base spec must build their own copy.
+	OpenAPIV2BytesCache featuregate.Feature = "OpenAPIV2BytesCache"
+
 	// owner: @stlaz
 	//
 	// Enable kube-apiserver to accept UIDs via request header authentication.
@@ -426,6 +435,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	OpenAPIEnums: {
 		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	OpenAPIV2BytesCache: {
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	RemoteRequestHeaderUID: {

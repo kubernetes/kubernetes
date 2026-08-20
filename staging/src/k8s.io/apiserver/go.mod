@@ -7,6 +7,7 @@ go 1.26.0
 godebug default=go1.26
 
 require (
+	github.com/NYTimes/gziphandler v1.1.1
 	github.com/blang/semver/v4 v4.0.0
 	github.com/coreos/go-oidc v2.5.0+incompatible
 	github.com/coreos/go-systemd/v22 v22.7.0
@@ -66,7 +67,6 @@ require (
 
 require (
 	cel.dev/expr v0.25.1 // indirect
-	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect

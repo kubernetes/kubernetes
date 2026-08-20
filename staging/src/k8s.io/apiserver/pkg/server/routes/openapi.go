@@ -52,6 +52,28 @@ func (oa OpenAPI) InstallV2(c *restful.Container, mux *mux.PathRecorderMux) (*ha
 	return openAPIVersionedService, spec
 }
 
+// InstallV2Bytes is the bytes-mode variant of InstallV2, used when the
+// OpenAPIV2BytesCache feature gate is enabled. It builds the same spec as
+// InstallV2, marshals it, and serves /openapi/v2 from the marshaled bytes so
+// that the parsed spec can be garbage collected instead of being retained for
+// the lifetime of the server. Callers needing a parsed base spec must build
+// their own copy.
+func (oa OpenAPI) InstallV2Bytes(c *restful.Container, mux *mux.PathRecorderMux) *OpenAPIV2BytesService {
+	spec, err := builder2.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices(c.RegisteredWebServices()), oa.Config)
+	if err != nil {
+		klog.Fatalf("Failed to build open api spec for root: %v", err)
+	}
+	spec.Definitions = handler.PruneDefaults(spec.Definitions)
+	json, err := spec.MarshalJSON()
+	if err != nil {
+		klog.Fatalf("Failed to marshal open api spec for root: %v", err)
+	}
+	openAPIVersionedService := NewOpenAPIV2BytesService(json)
+	openAPIVersionedService.RegisterOpenAPIVersionedService("/openapi/v2", mux)
+
+	return openAPIVersionedService
+}
+
 // InstallV3 adds the static group/versions defined in the RegisteredWebServices to the OpenAPI v3 spec.
 // This only covers built-in resources served via go-restful; CRDs and aggregated APIs publish
 // their OpenAPI v3 specs through separate code paths.
