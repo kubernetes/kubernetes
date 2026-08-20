@@ -371,7 +371,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	// inter-pod affinity to one or more victims, but we have decided not to
 	// support this case for performance reasons. Having affinity to lower
 	// importance (priority) pods is not a recommended configuration anyway.
-	if status := pl.fh.RunFilterPluginsWithNominatedPods(ctx, cycleState, preemptor, nodeInfo); !status.IsSuccess() {
+	if status := pl.fh.RunFilterWithNominatedPods(ctx, cycleState, preemptor, nodeInfo); !status.IsSuccess() {
 		return nil, 0, status
 	}
 
@@ -390,8 +390,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 		if err := addVictim(v); err != nil {
 			return false, err
 		}
-
-		status := pl.fh.RunFilterPluginsWithNominatedPods(ctx, cycleState, preemptor, nodeInfo)
+		status := pl.fh.RunFilterWithNominatedPods(ctx, cycleState, preemptor, nodeInfo)
 		fits := status.IsSuccess()
 		if !fits {
 			if err := removeVictim(v); err != nil {
