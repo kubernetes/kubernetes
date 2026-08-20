@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
@@ -141,11 +142,11 @@ func (sc *stateCheckpoint) GetPodResourceInfo(podUID types.UID) (PodResourceInfo
 	return sc.cache.GetPodResourceInfo(podUID)
 }
 
-// SetContainerResoruces sets resources information for a pod's container
-func (sc *stateCheckpoint) SetContainerResources(logger klog.Logger, podUID types.UID, containerName string, resources v1.ResourceRequirements) error {
+// SetContainerResources sets resources information for a pod's container
+func (sc *stateCheckpoint) SetContainerResources(logger klog.Logger, podUID types.UID, containerName string, containerType podutil.ContainerType, resources v1.ResourceRequirements) error {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
-	err := sc.cache.SetContainerResources(logger, podUID, containerName, resources)
+	err := sc.cache.SetContainerResources(logger, podUID, containerName, containerType, resources)
 	if err != nil {
 		return err
 	}
@@ -229,7 +230,7 @@ func (sc *noopStateCheckpoint) GetPodResourceInfo(_ types.UID) (PodResourceInfo,
 	return PodResourceInfo{}, false
 }
 
-func (sc *noopStateCheckpoint) SetContainerResources(_ klog.Logger, _ types.UID, _ string, _ v1.ResourceRequirements) error {
+func (sc *noopStateCheckpoint) SetContainerResources(_ klog.Logger, _ types.UID, _ string, _ podutil.ContainerType, _ v1.ResourceRequirements) error {
 	return nil
 }
 

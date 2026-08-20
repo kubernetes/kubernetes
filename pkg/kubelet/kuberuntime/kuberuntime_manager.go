@@ -590,6 +590,8 @@ type containerToKillInfo struct {
 type containerToUpdateInfo struct {
 	// The spec of the container.
 	container *v1.Container
+	// Type of the container.
+	containerType podutil.ContainerType
 	// ID of the runtime container that needs resource update
 	kubeContainerID kubecontainer.ContainerID
 	// Desired resources for the running container
@@ -729,8 +731,10 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 	}
 
 	var container v1.Container
+	containerType := podutil.Containers
 	if initContainer {
 		container = pod.Spec.InitContainers[containerIdx]
+		containerType = podutil.InitContainers
 	} else {
 		container = pod.Spec.Containers[containerIdx]
 	}
@@ -779,6 +783,7 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 	markContainerForUpdate := func(rName v1.ResourceName, desiredValue, currentValue int64) {
 		cUpdateInfo := containerToUpdateInfo{
 			container:                 &container,
+			containerType:             containerType,
 			kubeContainerID:           kubeContainerStatus.ID,
 			desiredContainerResources: desiredResources,
 			currentContainerResources: &currentResources,
@@ -1252,7 +1257,7 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 				v1.ResourceMemory: *resource.NewQuantity(cInfo.currentContainerResources.memoryRequest, resource.BinarySI),
 			}
 		}
-		if err := m.updateContainerResources(ctx, pod, container, cInfo.kubeContainerID); err != nil {
+		if err := m.updateContainerResources(ctx, pod, container, cInfo.kubeContainerID, cInfo.containerType); err != nil {
 			// Log error and abort as container updates need to succeed in the order determined by computePodResizeAction.
 			// The recovery path is for SyncPod to keep retrying at later times until it succeeds.
 			logger.Error(err, "updateContainerResources failed", "container", container.Name, "cID", cInfo.kubeContainerID,
@@ -1923,7 +1928,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 
 		container := &pod.Spec.InitContainers[idx]
 		// Start the next init container.
-		if err := start(ctx, "init container", metrics.InitContainer, containerStartSpec(container)); err != nil {
+		if err := start(ctx, "init container", metrics.InitContainer, initContainerStartSpec(container)); err != nil {
 			if podutil.IsRestartableInitContainer(container) {
 				logger.V(4).Info("Failed to start the restartable init container for the pod, skipping", "initContainerName", container.Name, "pod", klog.KObj(pod))
 				continue
