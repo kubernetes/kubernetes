@@ -301,59 +301,6 @@ func (_c *MockRuntime_GarbageCollect_Call) RunAndReturn(run func(ctx context.Con
 	return _c
 }
 
-// GeneratePodStatus provides a mock function for the type MockRuntime
-func (_mock *MockRuntime) GeneratePodStatus(event *v1.ContainerEventResponse) *container.PodStatus {
-	ret := _mock.Called(event)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GeneratePodStatus")
-	}
-
-	var r0 *container.PodStatus
-	if returnFunc, ok := ret.Get(0).(func(*v1.ContainerEventResponse) *container.PodStatus); ok {
-		r0 = returnFunc(event)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*container.PodStatus)
-		}
-	}
-	return r0
-}
-
-// MockRuntime_GeneratePodStatus_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GeneratePodStatus'
-type MockRuntime_GeneratePodStatus_Call struct {
-	*mock.Call
-}
-
-// GeneratePodStatus is a helper method to define mock.On call
-//   - event *v1.ContainerEventResponse
-func (_e *MockRuntime_Expecter) GeneratePodStatus(event interface{}) *MockRuntime_GeneratePodStatus_Call {
-	return &MockRuntime_GeneratePodStatus_Call{Call: _e.mock.On("GeneratePodStatus", event)}
-}
-
-func (_c *MockRuntime_GeneratePodStatus_Call) Run(run func(event *v1.ContainerEventResponse)) *MockRuntime_GeneratePodStatus_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *v1.ContainerEventResponse
-		if args[0] != nil {
-			arg0 = args[0].(*v1.ContainerEventResponse)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *MockRuntime_GeneratePodStatus_Call) Return(podStatus *container.PodStatus) *MockRuntime_GeneratePodStatus_Call {
-	_c.Call.Return(podStatus)
-	return _c
-}
-
-func (_c *MockRuntime_GeneratePodStatus_Call) RunAndReturn(run func(event *v1.ContainerEventResponse) *container.PodStatus) *MockRuntime_GeneratePodStatus_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GetContainerLogs provides a mock function for the type MockRuntime
 func (_mock *MockRuntime) GetContainerLogs(ctx context.Context, pod *v10.Pod, containerID container.ContainerID, logOptions *v10.PodLogOptions, stdout io.Writer, stderr io.Writer) error {
 	ret := _mock.Called(ctx, pod, containerID, logOptions, stdout, stderr)

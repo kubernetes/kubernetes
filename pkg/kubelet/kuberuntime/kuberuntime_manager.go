@@ -2140,28 +2140,6 @@ func (m *kubeGenericRuntimeManager) killPodWithSyncResult(ctx context.Context, p
 	return
 }
 
-func (m *kubeGenericRuntimeManager) GeneratePodStatus(event *runtimeapi.ContainerEventResponse) *kubecontainer.PodStatus {
-	ctx := context.TODO() // This context will be passed as parameter in the future
-	podUID := kubetypes.UID(event.PodSandboxStatus.Metadata.Uid)
-	podIPs := m.determinePodSandboxIPs(ctx, event.PodSandboxStatus.Metadata.Namespace, event.PodSandboxStatus.Metadata.Name, event.PodSandboxStatus)
-
-	kubeContainerStatuses := []*kubecontainer.Status{}
-	for _, status := range event.ContainersStatuses {
-		kubeContainerStatuses = append(kubeContainerStatuses, m.convertToKubeContainerStatus(ctx, podUID, status))
-	}
-
-	sort.Sort(containerStatusByCreated(kubeContainerStatuses))
-
-	return &kubecontainer.PodStatus{
-		ID:                kubetypes.UID(event.PodSandboxStatus.Metadata.Uid),
-		Name:              event.PodSandboxStatus.Metadata.Name,
-		Namespace:         event.PodSandboxStatus.Metadata.Namespace,
-		IPs:               podIPs,
-		SandboxStatuses:   []*runtimeapi.PodSandboxStatus{event.PodSandboxStatus},
-		ContainerStatuses: kubeContainerStatuses,
-	}
-}
-
 // GetPodStatus retrieves the status of the pod, including the
 // information of all containers in the pod that are visible in Runtime.
 func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, pod *kubecontainer.Pod) (*kubecontainer.PodStatus, error) {
@@ -2189,14 +2167,6 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, pod *kubec
 	}
 
 	sandboxStatuses := []*runtimeapi.PodSandboxStatus{}
-	containerStatuses := []*kubecontainer.Status{}
-	activeContainerStatuses := []*kubecontainer.Status{}
-
-	// Since we rely on the sandbox & container IDs in the kubecontainer.Pod, we must be
-	// conservative and use it's timestamp as the status timestamp. Otherwise, we risk reporting a
-	// newer PodStatus timestamp that is missing Sandboxes or Containers that should have been
-	// present at that time.
-	timestamp := pod.Timestamp
 
 	podIPs := []string{}
 	var activePodSandboxID string
@@ -2223,44 +2193,15 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, pod *kubec
 			podIPs = m.determinePodSandboxIPs(ctx, pod.Namespace, pod.Name, resp.Status)
 			activePodSandboxID = podSandboxID
 		}
-
-		if idx == 0 && utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
-			if resp.Timestamp == 0 {
-				// If the Evented PLEG is enabled in the kubelet, but not in the runtime
-				// then the pod status we get will not have the timestamp set.
-				// e.g. CI job 'pull-kubernetes-e2e-gce-alpha-features' will runs with
-				// features gate enabled, which includes Evented PLEG, but uses the
-				// runtime without Evented PLEG support.
-				logger.V(4).Info("Runtime does not set pod status timestamp")
-				containerStatuses, activeContainerStatuses, err = m.getPodContainerStatuses(ctx, pod, activePodSandboxID)
-				if err != nil {
-					if m.logReduction.ShouldMessageBePrinted(err.Error(), podFullName) {
-						logger.Error(err, "getPodContainerStatuses for pod failed")
-					}
-					return nil, err
-				}
-			} else {
-				// Get the statuses of all containers visible to the pod and
-				// timestamp from sandboxStatus.
-				timestamp = time.Unix(0, resp.Timestamp)
-				for _, cs := range resp.ContainersStatuses {
-					cStatus := m.convertToKubeContainerStatus(ctx, pod.ID, cs)
-					containerStatuses = append(containerStatuses, cStatus)
-				}
-			}
-		}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
-		// Get statuses of all containers visible in the pod.
-		var err error
-		containerStatuses, activeContainerStatuses, err = m.getPodContainerStatuses(ctx, pod, activePodSandboxID)
-		if err != nil {
-			if m.logReduction.ShouldMessageBePrinted(err.Error(), podFullName) {
-				logger.Error(err, "getPodContainerStatuses for pod failed")
-			}
-			return nil, err
+	// Get statuses of all containers visible in the pod.
+	containerStatuses, activeContainerStatuses, err := m.getPodContainerStatuses(ctx, pod, activePodSandboxID)
+	if err != nil {
+		if m.logReduction.ShouldMessageBePrinted(err.Error(), podFullName) {
+			logger.Error(err, "getPodContainerStatuses for pod failed")
 		}
+		return nil, err
 	}
 
 	m.logReduction.ClearID(podFullName)
@@ -2272,7 +2213,6 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, pod *kubec
 		SandboxStatuses:         sandboxStatuses,
 		ContainerStatuses:       containerStatuses,
 		ActiveContainerStatuses: activeContainerStatuses,
-		TimeStamp:               timestamp,
 	}, nil
 }
 
