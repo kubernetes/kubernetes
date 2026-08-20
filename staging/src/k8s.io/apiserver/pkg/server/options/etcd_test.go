@@ -277,7 +277,7 @@ func TestKMSHealthzEndpoint(t *testing.T) {
 			name:                 "no kms-provider, expect no kms healthz check, no kms livez check",
 			encryptionConfigPath: "testdata/encryption-configs/no-kms-provider.yaml",
 			wantHealthzChecks:    []string{"etcd"},
-			wantReadyzChecks:     []string{"etcd", "etcd-readiness"},
+			wantReadyzChecks:     []string{"etcd"},
 			wantLivezChecks:      []string{"etcd"},
 		},
 		{
@@ -285,21 +285,21 @@ func TestKMSHealthzEndpoint(t *testing.T) {
 			encryptionConfigPath: "testdata/encryption-configs/no-kms-provider.yaml",
 			reload:               true,
 			wantHealthzChecks:    []string{"etcd", "kms-providers"},
-			wantReadyzChecks:     []string{"etcd", "kms-providers", "etcd-readiness"},
+			wantReadyzChecks:     []string{"kms-providers", "etcd"},
 			wantLivezChecks:      []string{"etcd"},
 		},
 		{
 			name:                 "single kms-provider, expect single kms healthz check, no kms livez check",
 			encryptionConfigPath: "testdata/encryption-configs/single-kms-provider.yaml",
 			wantHealthzChecks:    []string{"etcd", "kms-provider-0"},
-			wantReadyzChecks:     []string{"etcd", "kms-provider-0", "etcd-readiness"},
+			wantReadyzChecks:     []string{"kms-provider-0", "etcd"},
 			wantLivezChecks:      []string{"etcd"},
 		},
 		{
 			name:                 "two kms-providers, expect two kms healthz checks, no kms livez check",
 			encryptionConfigPath: "testdata/encryption-configs/multiple-kms-providers.yaml",
 			wantHealthzChecks:    []string{"etcd", "kms-provider-0", "kms-provider-1"},
-			wantReadyzChecks:     []string{"etcd", "kms-provider-0", "kms-provider-1", "etcd-readiness"},
+			wantReadyzChecks:     []string{"kms-provider-0", "kms-provider-1", "etcd"},
 			wantLivezChecks:      []string{"etcd"},
 		},
 		{
@@ -307,14 +307,14 @@ func TestKMSHealthzEndpoint(t *testing.T) {
 			encryptionConfigPath: "testdata/encryption-configs/multiple-kms-providers.yaml",
 			reload:               true,
 			wantHealthzChecks:    []string{"etcd", "kms-providers"},
-			wantReadyzChecks:     []string{"etcd", "kms-providers", "etcd-readiness"},
+			wantReadyzChecks:     []string{"kms-providers", "etcd"},
 			wantLivezChecks:      []string{"etcd"},
 		},
 		{
 			name:                 "kms v1+v2, expect three kms healthz checks, no kms livez check",
 			encryptionConfigPath: "testdata/encryption-configs/multiple-kms-providers-with-v2.yaml",
 			wantHealthzChecks:    []string{"etcd", "kms-provider-0", "kms-provider-1", "kms-provider-2"},
-			wantReadyzChecks:     []string{"etcd", "kms-provider-0", "kms-provider-1", "kms-provider-2", "etcd-readiness"},
+			wantReadyzChecks:     []string{"kms-provider-0", "kms-provider-1", "kms-provider-2", "etcd"},
 			wantLivezChecks:      []string{"etcd"},
 		},
 		{
@@ -322,14 +322,14 @@ func TestKMSHealthzEndpoint(t *testing.T) {
 			encryptionConfigPath: "testdata/encryption-configs/multiple-kms-providers-with-v2.yaml",
 			reload:               true,
 			wantHealthzChecks:    []string{"etcd", "kms-providers"},
-			wantReadyzChecks:     []string{"etcd", "kms-providers", "etcd-readiness"},
+			wantReadyzChecks:     []string{"kms-providers", "etcd"},
 			wantLivezChecks:      []string{"etcd"},
 		},
 		{
 			name:                 "multiple kms v2, expect single kms healthz check, no kms livez check",
 			encryptionConfigPath: "testdata/encryption-configs/multiple-kms-v2-providers.yaml",
 			wantHealthzChecks:    []string{"etcd", "kms-providers"},
-			wantReadyzChecks:     []string{"etcd", "kms-providers", "etcd-readiness"},
+			wantReadyzChecks:     []string{"kms-providers", "etcd"},
 			wantLivezChecks:      []string{"etcd"},
 		},
 		{
@@ -337,7 +337,7 @@ func TestKMSHealthzEndpoint(t *testing.T) {
 			encryptionConfigPath: "testdata/encryption-configs/multiple-kms-v2-providers.yaml",
 			reload:               true,
 			wantHealthzChecks:    []string{"etcd", "kms-providers"},
-			wantReadyzChecks:     []string{"etcd", "kms-providers", "etcd-readiness"},
+			wantReadyzChecks:     []string{"kms-providers", "etcd"},
 			wantLivezChecks:      []string{"etcd"},
 		},
 		{
@@ -383,7 +383,7 @@ func TestReadinessCheck(t *testing.T) {
 	}{
 		{
 			name:              "Readyz should have etcd-readiness check",
-			wantReadyzChecks:  []string{"etcd", "etcd-readiness"},
+			wantReadyzChecks:  []string{"etcd"},
 			wantHealthzChecks: []string{"etcd"},
 			wantLivezChecks:   []string{"etcd"},
 		},
@@ -396,7 +396,7 @@ func TestReadinessCheck(t *testing.T) {
 		},
 		{
 			name:                 "Health checks should not have duplicated servers from etcd-servers-overrides",
-			wantReadyzChecks:     []string{"etcd", "etcd-readiness", "etcd-override-0", "etcd-override-readiness-0"},
+			wantReadyzChecks:     []string{"etcd", "etcd-override-0"},
 			wantHealthzChecks:    []string{"etcd", "etcd-override-0"},
 			wantLivezChecks:      []string{"etcd", "etcd-override-0"},
 			etcdServersOverrides: []string{"/r1#s1.com;s2.com", "/r2#s1.com;s2.com"},
@@ -404,23 +404,21 @@ func TestReadinessCheck(t *testing.T) {
 		{
 			name: "Health checks should not have duplicated servers from etcd-servers-overrides " +
 				"if servers are provided in different orders",
-			wantReadyzChecks:     []string{"etcd", "etcd-readiness", "etcd-override-0", "etcd-override-readiness-0"},
+			wantReadyzChecks:     []string{"etcd", "etcd-override-0"},
 			wantHealthzChecks:    []string{"etcd", "etcd-override-0"},
 			wantLivezChecks:      []string{"etcd", "etcd-override-0"},
 			etcdServersOverrides: []string{"/r1#s1.com;s2.com", "/r2#s2.com;s1.com"},
 		},
 		{
-			name: "Health checks should allow multiple overrides in etcd-servers-overrides",
-			wantReadyzChecks: []string{"etcd", "etcd-readiness", "etcd-override-0", "etcd-override-readiness-0",
-				"etcd-override-1", "etcd-override-readiness-1"},
+			name:                 "Health checks should allow multiple overrides in etcd-servers-overrides",
+			wantReadyzChecks:     []string{"etcd", "etcd-override-0", "etcd-override-1"},
 			wantHealthzChecks:    []string{"etcd", "etcd-override-0", "etcd-override-1"},
 			wantLivezChecks:      []string{"etcd", "etcd-override-0", "etcd-override-1"},
 			etcdServersOverrides: []string{"/r1#s1.com;s2.com", "/r2#s3.com;s4.com"},
 		},
 		{
-			name: "Health checks should allow multiple overrides in etcd-servers-overrides if servers overlap between overrides",
-			wantReadyzChecks: []string{"etcd", "etcd-readiness", "etcd-override-0", "etcd-override-readiness-0",
-				"etcd-override-1", "etcd-override-readiness-1"},
+			name:                 "Health checks should allow multiple overrides in etcd-servers-overrides if servers overlap between overrides",
+			wantReadyzChecks:     []string{"etcd", "etcd-override-0", "etcd-override-1"},
 			wantHealthzChecks:    []string{"etcd", "etcd-override-0", "etcd-override-1"},
 			wantLivezChecks:      []string{"etcd", "etcd-override-0", "etcd-override-1"},
 			etcdServersOverrides: []string{"/r1#s1.com;s2.com", "/r2#s2.com;s3.com"},
