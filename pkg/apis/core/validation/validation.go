@@ -2571,10 +2571,17 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 
 	// PVController needs to update PVC.Spec w/ VolumeName.
 	// Claims are immutable in order to enforce quota, range limits, etc. without gaming the system.
-	if len(oldPvc.Spec.VolumeName) == 0 {
-		// volumeName changes are allowed once.
-		oldPvcClone.Spec.VolumeName = newPvcClone.Spec.VolumeName // +k8s:verify-mutation:reason=clone
+	// A volumeName may be set once, but cannot be modified or cleared after it is set.
+	if len(oldPvc.Spec.VolumeName) > 0 {
+		if len(newPvc.Spec.VolumeName) == 0 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "volumeName"), nil, "field cannot be cleared once set").WithOrigin("update").MarkCoveredByDeclarative().MarkAlpha())
+		} else if newPvc.Spec.VolumeName != oldPvc.Spec.VolumeName {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "volumeName"), nil, "field cannot be modified once set").WithOrigin("update").MarkCoveredByDeclarative().MarkAlpha())
+		}
 	}
+	// Exclude VolumeName from the generic spec comparison because its set-once
+	// transition is handled by the field-specific check above.
+	oldPvcClone.Spec.VolumeName = newPvcClone.Spec.VolumeName // +k8s:verify-mutation:reason=clone
 
 	if validateStorageClassUpgradeFromAnnotation(oldPvcClone.Annotations, newPvcClone.Annotations,
 		oldPvcClone.Spec.StorageClassName, newPvcClone.Spec.StorageClassName) {
