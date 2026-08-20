@@ -106,6 +106,7 @@ func NewTypedRateLimitingQueueWithConfig[T comparable](rateLimiter TypedRateLimi
 	return &rateLimitingType[T]{
 		TypedDelayingInterface: config.DelayingQueue,
 		rateLimiter:            rateLimiter,
+		metrics:                newRateLimiterMetrics(config.Name, config.MetricsProvider),
 	}
 }
 
@@ -131,11 +132,14 @@ type rateLimitingType[T comparable] struct {
 	TypedDelayingInterface[T]
 
 	rateLimiter TypedRateLimiter[T]
+	metrics     rateLimiterMetrics
 }
 
 // AddRateLimited AddAfter's the item based on the time when the rate limiter says it's ok
 func (q *rateLimitingType[T]) AddRateLimited(item T) {
-	q.TypedDelayingInterface.AddAfter(item, q.rateLimiter.When(item))
+	delay := q.rateLimiter.When(item)
+	q.metrics.addRateLimiterDelay(delay)
+	q.TypedDelayingInterface.AddAfter(item, delay)
 }
 
 func (q *rateLimitingType[T]) NumRequeues(item T) int {
