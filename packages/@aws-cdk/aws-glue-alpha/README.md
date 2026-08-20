@@ -450,13 +450,15 @@ certain types of data stores.
 
 * **Networking - the CDK determines the best fit subnet for Glue connection
 configuration**
-    The prior version of the glue-alpha-module requires the developer to
-    specify the subnet of the Connection when it’s defined. Now, you can still
-    specify the specific subnet you want to use, but are no longer required
-    to. You are only required to provide a VPC and either a public or private
-    subnet selection. Without a specific subnet provided, the L2 leverages the
-    existing [EC2 Subnet Selection](https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_ec2/SubnetSelection.html)
-    library to make the best choice selection for the subnet.
+    You can specify the exact subnet of the Connection when it's defined, but
+    you are not required to. Instead, you can provide a `vpc` and, optionally, a
+    `vpcSubnets` selection, and the L2 leverages the existing
+    [EC2 Subnet Selection](https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_ec2/SubnetSelection.html)
+    library to make the best choice selection for the subnet. A Glue connection
+    targets a single subnet, so the first subnet of the selection is used.
+    `subnet` and `vpc` are mutually exclusive.
+
+Pin the connection to a specific subnet:
 
 ```ts
 declare const securityGroup: ec2.SecurityGroup;
@@ -467,6 +469,20 @@ new glue.Connection(this, 'MyConnection', {
   securityGroups: [securityGroup],
   // The VPC subnet which contains the data source
   subnet,
+});
+```
+
+Or let the CDK select a subnet from a VPC:
+
+```ts
+declare const securityGroup: ec2.SecurityGroup;
+declare const vpc: ec2.Vpc;
+new glue.Connection(this, 'MyConnection', {
+  type: glue.ConnectionType.NETWORK,
+  securityGroups: [securityGroup],
+  vpc,
+  // Optional - defaults to private subnets
+  vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
 });
 ```
 

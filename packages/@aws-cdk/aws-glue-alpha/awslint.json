@@ -110,6 +110,10 @@
     "interface-extends-ref:@aws-cdk/aws-glue-alpha.ITable",
     "interface-extends-ref:@aws-cdk/aws-glue-alpha.IWorkflow",
     "prefer-ref-interface:@aws-cdk/aws-glue-alpha.DatabaseProps.catalog",
+    "prefer-ref-interface:@aws-cdk/aws-glue-alpha.ConnectionProps.vpc",
+    "prefer-ref-interface:aws-cdk-lib.aws_ec2.ClientVpnEndpointOptions.securityGroups",
+    "prefer-ref-interface:aws-cdk-lib.aws_ec2.SubnetSelection.subnets",
+    "prefer-ref-interface:aws-cdk-lib.aws_ec2.InterfaceVpcEndpointOptions.securityGroups",
     "no-unused-type:@aws-cdk/aws-glue-alpha.S3EncryptionMode"
   ]
 }

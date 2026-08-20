@@ -1,7 +1,7 @@
 import type * as ec2 from 'aws-cdk-lib/aws-ec2';
 import { CfnConnection } from 'aws-cdk-lib/aws-glue';
 import * as cdk from 'aws-cdk-lib/core';
-import { memoizedGetter } from 'aws-cdk-lib/core/lib/helpers-internal';
+import { lit, memoizedGetter } from 'aws-cdk-lib/core/lib/helpers-internal';
 import { addConstructMetadata, MethodMetadata } from 'aws-cdk-lib/core/lib/metadata-resource';
 import { propertyInjectable } from 'aws-cdk-lib/core/lib/prop-injectable';
 import type * as constructs from 'constructs';
@@ -290,9 +290,34 @@ export interface ConnectionOptions {
 
   /**
    * The VPC subnet to connect to resources within a VPC. See more at https://docs.aws.amazon.com/glue/latest/dg/start-connecting.html.
-   * @default no subnet
+   *
+   * Mutually exclusive with `vpc`: provide `subnet` to pin the connection to a
+   * specific subnet, or provide `vpc` (optionally with `vpcSubnets`) to let the
+   * CDK select one for you.
+   *
+   * @default - no subnet, unless `vpc` is provided
    */
   readonly subnet?: ec2.ISubnet;
+
+  /**
+   * The VPC to connect to resources within. When provided, the CDK selects a
+   * subnet from this VPC using `vpcSubnets`. A Glue connection targets a single
+   * subnet, so the first subnet of the selection is used.
+   *
+   * Mutually exclusive with `subnet`.
+   *
+   * @default - no VPC, the subnet is taken from `subnet` if provided
+   */
+  readonly vpc?: ec2.IVpc;
+
+  /**
+   * Which subnets of `vpc` to select the connection subnet from. Only used when
+   * `vpc` is provided. Since a Glue connection targets a single subnet, the
+   * first subnet of the selection is used.
+   *
+   * @default - private subnets
+   */
+  readonly vpcSubnets?: ec2.SubnetSelection;
 }
 
 /**
@@ -365,9 +390,11 @@ export class Connection extends cdk.Resource implements IConnection {
 
     this.properties = props.properties || {};
 
-    const physicalConnectionRequirements = props.subnet || props.securityGroups ? {
-      availabilityZone: props.subnet ? props.subnet.availabilityZone : undefined,
-      subnetId: props.subnet ? props.subnet.subnetId : undefined,
+    const subnet = this.resolveSubnet(props);
+
+    const physicalConnectionRequirements = subnet || props.securityGroups ? {
+      availabilityZone: subnet ? subnet.availabilityZone : undefined,
+      subnetId: subnet ? subnet.subnetId : undefined,
       securityGroupIdList: props.securityGroups ? props.securityGroups.map(sg => sg.securityGroupId) : undefined,
     } : undefined;
 
@@ -394,6 +421,38 @@ export class Connection extends cdk.Resource implements IConnection {
         physicalConnectionRequirements,
       },
     });
+  }
+
+  /**
+   * Determines the single subnet the connection should target, either from an
+   * explicit `subnet` or by selecting one from `vpc`.
+   */
+  private resolveSubnet(props: ConnectionProps): ec2.ISubnet | undefined {
+    if (props.subnet && props.vpc) {
+      throw new cdk.ValidationError(lit`ConnectionSubnetConflict`, 'cannot specify both `subnet` and `vpc`; provide `subnet` for a specific subnet, or `vpc` (optionally with `vpcSubnets`) to let the CDK select one', this);
+    }
+
+    if (props.vpcSubnets && !props.vpc) {
+      throw new cdk.ValidationError(lit`ConnectionVpcSubnetsWithoutVpc`, '`vpcSubnets` can only be specified together with `vpc`', this);
+    }
+
+    if (props.subnet) {
+      return props.subnet;
+    }
+
+    if (props.vpc) {
+      // A Glue connection targets a single subnet, so use the first subnet of the selection.
+      const selected = props.vpc.selectSubnets(props.vpcSubnets);
+      // `isPendingLookup` is true for imported VPCs whose subnets are not yet
+      // resolved (e.g. `fromLookup`), where an empty selection is expected and
+      // will materialize on a later synth. Only fail on a genuinely empty selection.
+      if (!selected.isPendingLookup && selected.subnets.length === 0) {
+        throw new cdk.ValidationError(lit`ConnectionNoSubnetsSelected`, '`vpcSubnets` selected no subnets from the provided `vpc`; adjust the selection or use `subnet` to target a specific subnet', this);
+      }
+      return selected.subnets[0];
+    }
+
+    return undefined;
   }
 
   /**
