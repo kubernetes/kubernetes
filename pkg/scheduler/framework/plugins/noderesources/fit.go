@@ -93,12 +93,11 @@ var nodeResourceStrategyTypeMap = map[config.ScoringStrategyType]scorer{
 type Fit struct {
 	ignoredResources                                   sets.Set[string]
 	ignoredResourceGroups                              sets.Set[string]
-	enableInPlacePodVerticalScaling                    bool
-	enablePodLevelResources                            bool
-	enableDRAExtendedResource                          bool
-	enableInPlacePodLevelResourcesVerticalScaling      bool
 	enableInPlacePodVerticalScalingSchedulerPreemption bool
 	handle                                             fwk.Handle
+	// Feature flags that the scorer reads too are kept only on the embedded
+	// scorer. Redeclaring them here would shadow the scorer's own copies and
+	// leave them unset.
 	*resourceAllocationScorer
 	placementScorer *resourceAllocationScorer
 }
@@ -195,7 +194,7 @@ func (pl *Fit) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *f
 	}, nil
 }
 
-func getScorer(strategy *config.ScoringStrategy) (*resourceAllocationScorer, error) {
+func getScorer(strategy *config.ScoringStrategy, fts feature.Features) (*resourceAllocationScorer, error) {
 	if strategy == nil {
 		return nil, fmt.Errorf("scoring strategy not specified")
 	}
@@ -203,7 +202,12 @@ func getScorer(strategy *config.ScoringStrategy) (*resourceAllocationScorer, err
 	if !exists {
 		return nil, fmt.Errorf("scoring strategy %s is not supported", strategy.Type)
 	}
-	return scorerFactory(strategy), nil
+	scorer := scorerFactory(strategy)
+	scorer.enableInPlacePodVerticalScaling = fts.EnableInPlacePodVerticalScaling
+	scorer.enablePodLevelResources = fts.EnablePodLevelResources
+	scorer.enableDRAExtendedResource = fts.EnableDRAExtendedResource
+	scorer.enableInPlacePodLevelResourcesVerticalScaling = fts.EnableInPlacePodLevelResourcesVerticalScaling
+	return scorer, nil
 }
 
 // NewFit initializes a new plugin and returns it.
@@ -216,12 +220,11 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 		return nil, err
 	}
 
-	scorer, err := getScorer(args.ScoringStrategy)
+	scorer, err := getScorer(args.ScoringStrategy, fts)
 	if err != nil {
 		return nil, err
 	}
 	if fts.EnableDRAExtendedResource {
-		scorer.enableDRAExtendedResource = true
 		scorer.draManager = h.SharedDRAManager()
 		scorer.draFeatures = dynamicresources.AllocatorFeatures(fts)
 		// Create a CEL cache for device class selector compilation
@@ -233,13 +236,9 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 	}
 
 	pl := &Fit{
-		ignoredResources:                                   sets.New(args.IgnoredResources...),
-		ignoredResourceGroups:                              sets.New(args.IgnoredResourceGroups...),
-		enableInPlacePodVerticalScaling:                    fts.EnableInPlacePodVerticalScaling,
-		handle:                                             h,
-		enablePodLevelResources:                            fts.EnablePodLevelResources,
-		enableDRAExtendedResource:                          fts.EnableDRAExtendedResource,
-		enableInPlacePodLevelResourcesVerticalScaling:      fts.EnableInPlacePodLevelResourcesVerticalScaling,
+		ignoredResources:      sets.New(args.IgnoredResources...),
+		ignoredResourceGroups: sets.New(args.IgnoredResourceGroups...),
+		handle:                h,
 		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
 		resourceAllocationScorer:                           scorer,
 	}
@@ -248,7 +247,7 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 		placementScorer, err := getScorer(&config.ScoringStrategy{
 			Type:      config.MostAllocated,
 			Resources: args.ScoringStrategy.Resources,
-		})
+		}, fts)
 		if err != nil {
 			return nil, err
 		}
