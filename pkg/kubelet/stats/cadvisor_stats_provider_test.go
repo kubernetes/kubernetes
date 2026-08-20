@@ -659,7 +659,7 @@ func TestCadvisorImagesFsStatsKubeletSeparateDiskOff(t *testing.T) {
 	mockCadvisor.EXPECT().ImagesFsInfo(ctx).Return(imageFsInfo, nil)
 	mockRuntime.EXPECT().ImageStats(ctx).Return(imageStats, nil)
 
-	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil)
+	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil, nil)
 	stats, _, err := provider.ImageFsStats(ctx)
 	assert.NoError(err)
 
@@ -740,7 +740,7 @@ func TestImageFsStatsCustomResponse(t *testing.T) {
 			mockCadvisor.EXPECT().ContainerFsInfo(ctx).Return(res, nil)
 		}
 
-		provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil)
+		provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil, nil)
 		stats, containerfs, err := provider.ImageFsStats(ctx)
 		if tc.shouldErr {
 			require.Error(t, err, desc)
@@ -777,7 +777,7 @@ func TestCadvisorImagesFsStats(t *testing.T) {
 	mockCadvisor.EXPECT().ImagesFsInfo(ctx).Return(imageFsInfo, nil)
 	mockRuntime.EXPECT().ImageFsInfo(ctx).Return(imageFsInfoResponse, nil)
 
-	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil)
+	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil, nil)
 	stats, containerfs, err := provider.ImageFsStats(ctx)
 	assert.NoError(err)
 
@@ -831,7 +831,7 @@ func TestCadvisorSplitImagesFsStats(t *testing.T) {
 	mockRuntime.EXPECT().ImageFsInfo(ctx).Return(imageFsInfoResponse, nil)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, true)
 
-	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil)
+	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil, nil)
 	stats, containerfs, err := provider.ImageFsStats(ctx)
 	assert.NoError(err)
 
@@ -884,7 +884,7 @@ func TestCadvisorSameDiskDifferentLocations(t *testing.T) {
 	mockRuntime.EXPECT().ImageFsInfo(ctx).Return(imageFsInfoResponse, nil)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, true)
 
-	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil)
+	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil, nil)
 	stats, containerfs, err := provider.ImageFsStats(ctx)
 	require.NoError(t, err, "imageFsStats should have no error")
 
