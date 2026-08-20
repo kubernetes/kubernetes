@@ -160,7 +160,9 @@ func NewDependencyGraphBuilder(
 			Name: "garbage_collector_attempt_to_orphan",
 		},
 	)
-	absentOwnerCache := NewReferenceCache(500)
+	// Increased from 500 to 5000 to improve cache hit rate in large clusters
+	// where many distinct owners may be absent during GC startup.
+	absentOwnerCache := NewReferenceCache(5000)
 	graphBuilder := &GraphBuilder{
 		eventRecorder:    eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "garbage-collector-controller"}),
 		eventBroadcaster: eventBroadcaster,
