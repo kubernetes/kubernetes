@@ -74,7 +74,10 @@ const (
 	// When the scheduling queue requeues Pods, which was rejected with UnschedulableAndUnresolvable in the last scheduling,
 	// the Pod goes through backoff.
 	UnschedulableAndUnresolvable
-	// Wait is used when a Permit plugin finds a pod scheduling should wait.
+	// Wait is used in the following scenarios:
+	// - when a Permit plugin finds a pod scheduling should wait.
+	// - when a PlacementFeasible plugin finds a pod group cannot be scheduled in the current partially evaluated placement,
+	//   but may become schedulable once more pods are evaluated.
 	Wait
 	// Skip is used in the following scenarios:
 	// - when a Bind plugin chooses to skip binding.
@@ -466,14 +469,14 @@ type QueueSortPlugin interface {
 
 // EnqueueExtensions is an optional interface that plugins can implement to efficiently
 // move unschedulable Pods in internal scheduling queues.
-// In the scheduler, Pods can be unschedulable by PreEnqueue, PreFilter, Filter, Reserve, and Permit plugins,
+// In the scheduler, Pods can be unschedulable by PreEnqueue, PreFilter, Filter, Reserve, Permit and PlacementFeasible plugins,
 // and Pods rejected by these plugins are requeued based on this extension point.
 // Failures from other extension points are regarded as temporal errors (e.g., network failure),
 // and the scheduler requeue Pods without this extension point - always requeue Pods to activeQ after backoff.
 // This is because such temporal errors cannot be resolved by specific cluster events,
 // and we have no choose but keep retrying scheduling until the failure is resolved.
 //
-// Plugins that make pod unschedulable (PreEnqueue, PreFilter, Filter, Reserve, and Permit plugins) must implement this interface,
+// Plugins that make pod unschedulable (PreEnqueue, PreFilter, Filter, Reserve, Permit and PlacementFeasible plugins) must implement this interface,
 // otherwise the default implementation will be used, which is less efficient in requeueing Pods rejected by the plugin.
 //
 // Also, if EventsToRegister returns an empty list, that means the Pods failed by the plugin are not requeued by any events,
@@ -836,6 +839,32 @@ type PlacementScorePlugin interface {
 
 	// PlacementScoreExtensions returns a PlacementScoreExtensions interface if it implements one, or nil if does not.
 	PlacementScoreExtensions() PlacementScoreExtensions
+}
+
+// PlacementFeasiblePlugin is an interface for plugins that are called after each pod in a pod group is evaluated.
+// It is used to determine if a pod group is schedulable, may become schedulable or will not become schedulable regardless of the scheduling result of the remaining pods in the pod group.
+type PlacementFeasiblePlugin interface {
+	Plugin
+
+	// PlacementFeasible is called after each pod in a pod group is evaluated.
+	// placementProgress contains information that plugins might additionally need when determining whether pod group scheduling placement is feasible.
+	// Return Wait status if the pod group cannot be scheduled in the current partially evaluated placement, but may become schedulable once more pods are evaluated.
+	// Return Unschedulable status if the pod group cannot be scheduled in the current placement.
+	// The scheduler will give up this placement and won't even evaluate remaining pods. The placement will remain eligible for preemption.
+	// Return Success status if the pod group can be scheduled in the current partially evaluated placement.
+	// After returning Success, the plugin should keep returning Success for the remaining pods.
+	PlacementFeasible(ctx context.Context, placementCycleState PlacementCycleState, podGroupInfo PodGroupInfo, placementProgress PlacementProgress) *Status
+}
+
+// PlacementProgress contains information that plugins implementing the PlacementFeasiblePlugin
+// interface might additionally need when determining whether pod group scheduling placement is feasible.
+type PlacementProgress struct {
+	// Remaining is the number of children that have not been evaluated yet in the current scheduling cycle. For pod groups, this is the number of unscheduled pods.
+	Remaining int
+	// Scheduled is the number of children scheduled so far in the current pod group scheduling cycle
+	// for a particular (composite) pod group and placement. For a pod group the field includes the pods that are assigned
+	// or assumed in the current PodGroup scheduling cycle.
+	Scheduled int
 }
 
 // Handle provides data and some tools that plugins can use. It is

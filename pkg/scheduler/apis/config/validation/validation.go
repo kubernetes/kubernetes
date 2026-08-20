@@ -177,6 +177,9 @@ func validatePluginConfig(path *field.Path, apiVersion string, profile *config.K
 			"preBind":            profile.Plugins.PreBind,
 			"bind":               profile.Plugins.Bind,
 			"postBind":           profile.Plugins.PostBind,
+			"placementGenerate":  profile.Plugins.PlacementGenerate,
+			"placementScore":     profile.Plugins.PlacementScore,
+			"placementFeasible":  profile.Plugins.PlacementFeasible,
 			"podGroupPostFilter": profile.Plugins.PodGroupPostFilter,
 		}
 

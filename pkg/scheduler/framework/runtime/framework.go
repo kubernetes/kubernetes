@@ -44,7 +44,6 @@ import (
 	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
@@ -79,7 +78,7 @@ type frameworkImpl struct {
 	podGroupPostFilterPlugins []fwk.PodGroupPostFilterPlugin
 
 	placementGeneratePlugins   []fwk.PlacementGeneratePlugin
-	placementFeasiblePlugins   []framework.PlacementFeasiblePlugin
+	placementFeasiblePlugins   []fwk.PlacementFeasiblePlugin
 	placementScorePlugins      []fwk.PlacementScorePlugin
 	placementScorePluginWeight map[string]int
 
@@ -140,6 +139,7 @@ func (f *frameworkImpl) getExtensionPoints(plugins *config.Plugins) []extensionP
 		{&plugins.QueueSort, &f.queueSortPlugins},
 		{&plugins.PlacementGenerate, &f.placementGeneratePlugins},
 		{&plugins.PlacementScore, &f.placementScorePlugins},
+		{&plugins.PlacementFeasible, &f.placementFeasiblePlugins},
 		{&plugins.PodGroupPostFilter, &f.podGroupPostFilterPlugins},
 	}
 }
@@ -486,19 +486,6 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		f.computeBatchablePlugins()
 	}
 
-	// Use GangScheduling plugin as the only PlacementFeasiblePlugin.
-	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-		if gs, ok := f.pluginsMap[names.GangScheduling]; ok {
-			if p, ok := gs.(framework.PlacementFeasiblePlugin); ok {
-				f.placementFeasiblePlugins = append(f.placementFeasiblePlugins, p)
-			} else {
-				return nil, fmt.Errorf("GenericWorkload is enabled, but GangScheduling plugin does not fulfill PlacementFeasiblePlugin interface")
-			}
-		} else {
-			logger.Error(nil, "GenericWorkload is enabled, but GangScheduling plugin is not set. Gang scheduling using PodGroups may not work as expected.")
-		}
-	}
-
 	if options.captureProfile != nil {
 		if len(outputProfile.PluginConfig) != 0 {
 			sort.Slice(outputProfile.PluginConfig, func(i, j int) bool {
@@ -736,9 +723,9 @@ func (f *frameworkImpl) expandMultiPointPlugins(logger klog.Logger, profile *con
 
 func shouldHaveEnqueueExtensions(p fwk.Plugin) bool {
 	switch p.(type) {
-	// Only PreEnqueue, PreFilter, Filter, Reserve, and Permit plugins can (should) have EnqueueExtensions.
+	// Only PreEnqueue, PreFilter, Filter, Reserve, Permit and PlacementFeasible plugins can (should) have EnqueueExtensions.
 	// See the comment of EnqueueExtensions for more detailed reason here.
-	case fwk.PreEnqueuePlugin, fwk.PreFilterPlugin, fwk.FilterPlugin, fwk.ReservePlugin, fwk.PermitPlugin:
+	case fwk.PreEnqueuePlugin, fwk.PreFilterPlugin, fwk.FilterPlugin, fwk.ReservePlugin, fwk.PermitPlugin, fwk.PlacementFeasiblePlugin:
 		return true
 	}
 	return false
@@ -746,7 +733,7 @@ func shouldHaveEnqueueExtensions(p fwk.Plugin) bool {
 
 func (f *frameworkImpl) fillEnqueueExtensions(p fwk.Plugin) {
 	if !shouldHaveEnqueueExtensions(p) {
-		// Ignore EnqueueExtensions from plugin which isn't PreEnqueue, PreFilter, Filter, Reserve, and Permit.
+		// Ignore EnqueueExtensions from plugin which isn't PreEnqueue, PreFilter, Filter, Reserve, Permit and PlacementFeasible.
 		return
 	}
 
@@ -2151,28 +2138,40 @@ func (f *frameworkImpl) runPermitPlugin(ctx context.Context, pl fwk.PermitPlugin
 	return status, timeout
 }
 
-// RunPlacementFeasiblePlugins runs the set of configured Permit plugins that implement PlacementFeasible interface.
+// RunPlacementFeasiblePlugins runs the set of configured PlacementFeasible plugins.
 // The result will be Success if all plugins return Success.
 // The only other valid statuses are Wait and Unschedulable.
 // If any plugin returns invalid status, the result will be Error and the remaining plugins won't be invoked.
 // Otherwise, if at least 1 plugin returns Unschedulable, the remaining plugins won't be invoked and the result will be Unschedulable.
 // Otherwise, if at least 1 plugin returns Wait, the remaining plugins will be invoked and the result will be Wait.
-func (f *frameworkImpl) RunPlacementFeasiblePlugins(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo, args framework.PlacementProgress) (status *fwk.Status) {
+func (f *frameworkImpl) RunPlacementFeasiblePlugins(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo, args fwk.PlacementProgress) (status *fwk.Status) {
 	startTime := time.Now()
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PlacementFeasible, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
+	logger := klog.FromContext(ctx)
+	verboseLogs := logger.V(4).Enabled()
+	if verboseLogs {
+		logger = klog.LoggerWithName(logger, "PlacementFeasible")
+	}
 	for _, pl := range f.placementFeasiblePlugins {
+		ctx := ctx
+		if verboseLogs {
+			logger := klog.LoggerWithName(logger, pl.Name())
+			ctx = klog.NewContext(ctx, logger)
+		}
 		plStatus := f.runPlacementFeasiblePlugin(ctx, pl, placementCycleState, podGroupInfo, args)
 		if plStatus.IsSuccess() {
 			continue
 		}
 		if plStatus.Code() == fwk.Wait {
+			logger.V(4).Info("Plugin asked to wait for PodGroup placement to be feasible", "podGroupType", podGroupInfo.GetType(), "podGroup", klog.KObj(podGroupInfo), "plugin", pl.Name(), "status", plStatus.Message())
 			status = plStatus.WithPlugin(pl.Name())
 			continue
 		}
 		if plStatus.Code() == fwk.Unschedulable {
+			logger.V(4).Info("PodGroup placement rejected by plugin", "podGroupType", podGroupInfo.GetType(), "podGroup", klog.KObj(podGroupInfo), "plugin", pl.Name(), "status", plStatus.Message())
 			return plStatus.WithPlugin(pl.Name())
 		}
 		if plStatus.IsError() {
@@ -2184,7 +2183,7 @@ func (f *frameworkImpl) RunPlacementFeasiblePlugins(ctx context.Context, placeme
 	return status
 }
 
-func (f *frameworkImpl) runPlacementFeasiblePlugin(ctx context.Context, pl framework.PlacementFeasiblePlugin, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, args framework.PlacementProgress) *fwk.Status {
+func (f *frameworkImpl) runPlacementFeasiblePlugin(ctx context.Context, pl fwk.PlacementFeasiblePlugin, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, args fwk.PlacementProgress) *fwk.Status {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.PlacementFeasible(ctx, state, podGroup, args)
 	}

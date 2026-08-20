@@ -125,6 +125,7 @@ func mergePlugins(logger klog.Logger, defaultPlugins, customPlugins *v1.Plugins)
 	defaultPlugins.PostBind = mergePluginSet(logger, defaultPlugins.PostBind, customPlugins.PostBind)
 	defaultPlugins.PlacementGenerate = mergePluginSet(logger, defaultPlugins.PlacementGenerate, customPlugins.PlacementGenerate)
 	defaultPlugins.PlacementScore = mergePluginSet(logger, defaultPlugins.PlacementScore, customPlugins.PlacementScore)
+	defaultPlugins.PlacementFeasible = mergePluginSet(logger, defaultPlugins.PlacementFeasible, customPlugins.PlacementFeasible)
 	defaultPlugins.PodGroupPostFilter = mergePluginSet(logger, defaultPlugins.PodGroupPostFilter, customPlugins.PodGroupPostFilter)
 	return defaultPlugins
 }

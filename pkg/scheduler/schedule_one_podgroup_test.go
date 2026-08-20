@@ -137,20 +137,17 @@ func (d *fakePlacementFeasiblePluginData) Clone() fwk.StateData {
 	return &fakePlacementFeasiblePluginData{placementIndex: d.placementIndex}
 }
 
-var _ framework.PlacementFeasiblePlugin = &fakePlacementFeasiblePlugin{}
-var _ fwk.PermitPlugin = &fakePlacementFeasiblePlugin{}
+var _ fwk.PlacementFeasiblePlugin = &fakePlacementFeasiblePlugin{}
 
 func (mp *fakePlacementFeasiblePlugin) Name() string {
-	// Name has to be GangScheduling for the PlacementFeasible plugin to be used.
-	// TODO: Remove this once the restriction is taken off.
-	return names.GangScheduling
+	return "fakePlacementFeasiblePlugin"
 }
 
 // PlacementFeasible simulates the evaluation of pod group placement constraints.
 // The mock uses a 2D slice (placementFeasibleStatuses) where:
 // - The outer slice represents distinct placements (e.g., when evaluating multiple topology placements).
 // - The inner slice represents the pod-by-pod evaluation within a single placement.
-func (mp *fakePlacementFeasiblePlugin) PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo, args framework.PlacementProgress) *fwk.Status {
+func (mp *fakePlacementFeasiblePlugin) PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo, args fwk.PlacementProgress) *fwk.Status {
 	// If no mock statuses are configured, always succeed.
 	if len(mp.placementFeasibleStatuses) == 0 {
 		return nil
@@ -188,10 +185,6 @@ func (mp *fakePlacementFeasiblePlugin) PlacementFeasible(ctx context.Context, pl
 		}
 	}
 	return nil
-}
-
-func (mp *fakePlacementFeasiblePlugin) Permit(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (*fwk.Status, time.Duration) {
-	return fwk.NewStatus(fwk.Error, "unexpected call to permit"), 0
 }
 
 func TestValidatePodGroup(t *testing.T) {
@@ -1475,7 +1468,7 @@ func TestPodGroupSchedulingAlgorithm(t *testing.T) {
 						tf.RegisterPostFilterPlugin(tt.plugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 							return tt.plugin, nil
 						}),
-						tf.RegisterPermitPlugin(placementFeasiblePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+						tf.RegisterPlacementFeasiblePlugin(placementFeasiblePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 							return placementFeasiblePlugin, nil
 						}),
 					}
@@ -2827,7 +2820,7 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 					tf.RegisterFilterPlugin(tt.placementPlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 						return &tt.placementPlugin, nil
 					}),
-					tf.RegisterPermitPlugin(placementFeasiblePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					tf.RegisterPlacementFeasiblePlugin(placementFeasiblePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 						return placementFeasiblePlugin, nil
 					}),
 				}
@@ -3283,8 +3276,7 @@ var hierarchyKey fwk.StateKey = "hierarchyTracker"
 var _ fwk.FilterPlugin = &multiLevelPlacementStateTracker{}
 var _ fwk.PlacementGeneratePlugin = &multiLevelPlacementStateTracker{}
 var _ fwk.PlacementScorePlugin = &multiLevelPlacementStateTracker{}
-var _ framework.PlacementFeasiblePlugin = &multiLevelPlacementStateTracker{}
-var _ fwk.PermitPlugin = &multiLevelPlacementStateTracker{}
+var _ fwk.PlacementFeasiblePlugin = &multiLevelPlacementStateTracker{}
 
 type multiLevelPlacementStateTracker struct {
 	mu                            sync.Mutex
@@ -3297,7 +3289,7 @@ type multiLevelPlacementStateTracker struct {
 }
 
 func (p *multiLevelPlacementStateTracker) Name() string {
-	return names.GangScheduling
+	return "multiLevelPlacementStateTracker"
 }
 
 func collectHierarchyFromPlacementCycleState(cycleState fwk.PlacementCycleState, results *[]string) error {
@@ -3345,11 +3337,7 @@ func (p *multiLevelPlacementStateTracker) Filter(ctx context.Context, state fwk.
 	return nil
 }
 
-func (p *multiLevelPlacementStateTracker) Permit(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (*fwk.Status, time.Duration) {
-	return nil, 0
-}
-
-func (p *multiLevelPlacementStateTracker) PlacementFeasible(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, args framework.PlacementProgress) *fwk.Status {
+func (p *multiLevelPlacementStateTracker) PlacementFeasible(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, args fwk.PlacementProgress) *fwk.Status {
 	if args.Scheduled == 0 {
 		if podGroup.GetPodGroup() != nil {
 			trajectory := []string{}
@@ -3473,7 +3461,7 @@ func TestPlacementCycleStateLifecycle_MultiLevel(t *testing.T) {
 		tf.RegisterFilterPlugin(tracker.Name(), func(_ context.Context, _ runtime.Object, h fwk.Handle) (fwk.Plugin, error) {
 			return tracker, nil
 		}),
-		tf.RegisterPermitPlugin(tracker.Name(), func(_ context.Context, _ runtime.Object, h fwk.Handle) (fwk.Plugin, error) {
+		tf.RegisterPlacementFeasiblePlugin(tracker.Name(), func(_ context.Context, _ runtime.Object, h fwk.Handle) (fwk.Plugin, error) {
 			return tracker, nil
 		}),
 	}
@@ -3906,7 +3894,7 @@ func TestCPGSchedulingPlacementAlgorithm(t *testing.T) {
 				tf.RegisterReservePlugin(tt.placementPlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 					return &tt.placementPlugin, nil
 				}),
-				tf.RegisterPermitPlugin(placementFeasiblePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+				tf.RegisterPlacementFeasiblePlugin(placementFeasiblePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 					return placementFeasiblePlugin, nil
 				}),
 			}
@@ -4202,8 +4190,7 @@ func TestCPGSchedulingPlacementAlgorithm_Scoring(t *testing.T) {
 				tf.RegisterFilterPlugin(placementPlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 					return &placementPlugin, nil
 				}),
-				tf.RegisterPermitPlugin(gangscheduling.Name, gangPluginFactory),
-				tf.RegisterPluginAsExtensions(gangscheduling.Name, gangPluginFactory, "PlacementFeasible"),
+				tf.RegisterPlacementFeasiblePlugin(gangscheduling.Name, gangPluginFactory),
 			}
 
 			for i, placementScorePluginData := range tt.pluginData {
@@ -4587,7 +4574,7 @@ func TestScheduleOnePodGroup_SchedulerNameMismatchUpdatesStatus(t *testing.T) {
 	}
 }
 
-func TestCPGHierarchicalScheduling_ScheduleOnePodGroup(t *testing.T) {
+func TestCPGHierarchicalScheduling_RecursiveAlgorithm(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.CompositePodGroup:               true,
 		features.GenericWorkload:                 true,
@@ -4673,8 +4660,8 @@ func TestCPGHierarchicalScheduling_ScheduleOnePodGroup(t *testing.T) {
 	defer cancel()
 
 	// Mock PlacementFeasible plugin
-	fakeGS := &fakePlacementFeasiblePlugin{}
-	fakeGS.placementFeasibleStatuses = [][]fwk.Code{
+	fakePlacementFeasible := &fakePlacementFeasiblePlugin{}
+	fakePlacementFeasible.placementFeasibleStatuses = [][]fwk.Code{
 		// Four distinct scheduling cycles:
 		// 1. cpg-root (success, 1 call: before children scheduling, evaluated=0)
 		// 2. pg1 scheduling (success, 2 calls: before and after p1, evaluated=0 and 1)
@@ -4689,8 +4676,8 @@ func TestCPGHierarchicalScheduling_ScheduleOnePodGroup(t *testing.T) {
 	registry := frameworkruntime.Registry{
 		queuesort.Name:     queuesort.New,
 		defaultbinder.Name: defaultbinder.New,
-		names.GangScheduling: func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
-			return fakeGS, nil
+		fakePlacementFeasible.Name(): func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
+			return fakePlacementFeasible, nil
 		},
 	}
 
@@ -4703,9 +4690,8 @@ func TestCPGHierarchicalScheduling_ScheduleOnePodGroup(t *testing.T) {
 			Bind: config.PluginSet{
 				Enabled: []config.Plugin{{Name: defaultbinder.Name}},
 			},
-			// Enable GangScheduling to run PlacementFeasible
-			Permit: config.PluginSet{
-				Enabled: []config.Plugin{{Name: names.GangScheduling}},
+			PlacementFeasible: config.PluginSet{
+				Enabled: []config.Plugin{{Name: fakePlacementFeasible.Name()}},
 			},
 		},
 	}
@@ -4992,7 +4978,7 @@ func TestCPGHierarchicalScheduling_Internal(t *testing.T) {
 		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		tf.RegisterPermitPlugin(gangscheduling.Name, gangPluginFactory),
-		tf.RegisterPluginAsExtensions(gangscheduling.Name, gangPluginFactory, "PlacementFeasible"),
+		tf.RegisterPlacementFeasiblePlugin(gangscheduling.Name, gangPluginFactory),
 	}
 
 	clientObjs := []runtime.Object{testNode, rootCPG, cpgSub1, cpgSub2, cpgSub3, pg1, pg2, pg3, pg4, pg5, pg6, pg7}
@@ -5229,7 +5215,7 @@ func TestCPGMinGroupCount_Internal(t *testing.T) {
 		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		tf.RegisterPermitPlugin(gangscheduling.Name, gangPluginFactory),
-		tf.RegisterPluginAsExtensions(gangscheduling.Name, gangPluginFactory, "PlacementFeasible"),
+		tf.RegisterPlacementFeasiblePlugin(gangscheduling.Name, gangPluginFactory),
 	}
 
 	queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
@@ -5456,7 +5442,7 @@ func TestCPGBasicWithGangChildren_Internal(t *testing.T) {
 		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		tf.RegisterPermitPlugin(gangscheduling.Name, gangPluginFactory),
-		tf.RegisterPluginAsExtensions(gangscheduling.Name, gangPluginFactory, "PlacementFeasible"),
+		tf.RegisterPlacementFeasiblePlugin(gangscheduling.Name, gangPluginFactory),
 	}
 
 	queue := internalqueue.NewSchedulingQueue(nil, informerFactory)

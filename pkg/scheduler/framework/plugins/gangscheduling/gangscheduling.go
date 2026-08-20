@@ -28,7 +28,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -54,7 +53,7 @@ type GangScheduling struct {
 var _ fwk.EnqueueExtensions = &GangScheduling{}
 var _ fwk.PreEnqueuePlugin = &GangScheduling{}
 var _ fwk.PermitPlugin = &GangScheduling{}
-var _ framework.PlacementFeasiblePlugin = &GangScheduling{}
+var _ fwk.PlacementFeasiblePlugin = &GangScheduling{}
 
 // New initializes a new plugin and returns it.
 func New(_ context.Context, _ runtime.Object, fh fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
@@ -486,7 +485,7 @@ func (pl *GangScheduling) allowAssumedPodsInHierarchy(snapshot fwk.PodGroupManag
 // PlacementFeasible is responsible for enforcing the gang's MinCount constraint in the pod group scheduling cycle.
 // The function will only return success once the gang's MinCount is satisfied or if the pod group is not using gang scheduling policy.
 // In case there are not enough remaining pods to satisfy the gang's MinCount, it returns Unschedulable which will terminate the pod group scheduling cycle early.
-func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo, args framework.PlacementProgress) *fwk.Status {
+func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo, args fwk.PlacementProgress) *fwk.Status {
 	minCount := getMinCount(podGroupInfo)
 	remaining := args.Remaining
 	scheduled := args.Scheduled
