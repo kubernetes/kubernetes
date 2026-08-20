@@ -1488,7 +1488,9 @@ type CapacityRequirements struct {
 	// If the device allows multiple allocation,
 	// the aggregated amount across all requests must not exceed the capacity value.
 	// The consumed capacity, which may be adjusted based on the requestPolicy if defined,
-	// is recorded in the resource claim’s status.devices[*].consumedCapacity field.
+	// is recorded in the resource claim's status.devices[*].consumedCapacity field.
+	//
+	// Requests may have at most 32 entries.
 	//
 	// +optional
 	Requests map[QualifiedName]resource.Quantity `json:"requests,omitempty" protobuf:"bytes,1,rep,name=requests,castkey=QualifiedName"`
@@ -1554,6 +1556,9 @@ const (
 	FirstAvailableDeviceRequestMaxSize = 8
 	DeviceTolerationsMaxLength         = 16
 	DeviceDerivedAttributesMaxSize     = 32
+	// MaxCapacityRequirements is the maximum number of entries allowed in
+	// CapacityRequirements.Requests.
+	MaxCapacityRequirements = 32
 )
 
 // +enum
