@@ -2260,6 +2260,132 @@ func TestAdmitPodWithDRAResources(t *testing.T) {
 	}
 }
 
+func TestIsDRAExtendedResource(t *testing.T) {
+	containerName := "container1"
+	resourceName := "domain1.com/resource1"
+	podWithMapping := &v1.Pod{
+		Status: v1.PodStatus{
+			ExtendedResourceClaimStatus: &v1.PodExtendedResourceClaimStatus{
+				RequestMappings: []v1.ContainerExtendedResourceRequest{
+					{
+						ContainerName: containerName,
+						ResourceName:  resourceName,
+					},
+				},
+			},
+		},
+	}
+
+	testCases := map[string]struct {
+		pod           *v1.Pod
+		containerName string
+		resourceName  string
+		expected      bool
+	}{
+		"resource mapped to the container": {
+			pod:           podWithMapping,
+			containerName: containerName,
+			resourceName:  resourceName,
+			expected:      true,
+		},
+		"resource mapped to a different container": {
+			pod:           podWithMapping,
+			containerName: "container2",
+			resourceName:  resourceName,
+			expected:      false,
+		},
+		"resource not mapped": {
+			pod:           podWithMapping,
+			containerName: containerName,
+			resourceName:  "domain1.com/resource2",
+			expected:      false,
+		},
+		"pod without extended resource claim status": {
+			pod:           &v1.Pod{},
+			containerName: containerName,
+			resourceName:  resourceName,
+			expected:      false,
+		},
+	}
+
+	for description, test := range testCases {
+		t.Run(description, func(t *testing.T) {
+			require.Equal(t, test.expected, isDRAExtendedResource(test.pod, test.containerName, test.resourceName))
+		})
+	}
+}
+
+// TestGetDeviceRunContainerOptionsWithDRAResourceAndStaleDevicePluginState verifies
+// that a DRA-backed extended resource is not mistaken for a device plugin resource
+// when the device manager still holds allocated devices under the same name.
+func TestGetDeviceRunContainerOptionsWithDRAResourceAndStaleDevicePluginState(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testCases := map[string]struct {
+		enableFeatureGate bool
+		checkError        func(t require.TestingT, err error, msgAndArgs ...interface{})
+	}{
+		"DRAExtendedResource enabled": {
+			enableFeatureGate: true,
+			checkError:        require.NoError,
+		},
+		"DRAExtendedResource disabled": {
+			enableFeatureGate: false,
+			checkError:        require.Error,
+		},
+	}
+
+	containerName := "container1"
+	resourceName := "domain1.com/resource1"
+
+	for description, test := range testCases {
+		t.Run(description, func(t *testing.T) {
+			if !test.enableFeatureGate {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.enableFeatureGate)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: uuid.NewUUID(),
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: containerName,
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(resourceName): resource.MustParse("1"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtendedResourceClaimStatus: &v1.PodExtendedResourceClaimStatus{
+						RequestMappings: []v1.ContainerExtendedResourceRequest{
+							{
+								ContainerName: containerName,
+								ResourceName:  resourceName,
+							},
+						},
+					},
+				},
+			}
+
+			testManager := &ManagerImpl{
+				endpoints:  make(map[string]endpointInfo),
+				podDevices: newPodDevices(),
+				allocatedDevices: map[string]sets.Set[string]{
+					resourceName: sets.New("Dev"),
+				},
+			}
+
+			_, err := testManager.GetDeviceRunContainerOptions(tCtx, pod, &pod.Spec.Containers[0])
+			test.checkError(t, err)
+		})
+	}
+}
+
 // TestEndpointSyncOnDisconnect verifies that when a device plugin disconnects,
 // the device manager correctly updates its internal state by marking all
 // devices from that endpoint as unhealthy. It ensures that the healthyDevices
