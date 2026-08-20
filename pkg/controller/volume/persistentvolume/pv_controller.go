@@ -604,61 +604,56 @@ func (ctrl *PersistentVolumeController) syncVolume(ctx context.Context, volume *
 		if err != nil {
 			return err
 		}
-		if !found {
-			// If the PV was created by an external PV provisioner or
-			// bound by external PV binder (e.g. kube-scheduler), it's
-			// possible under heavy load that the corresponding PVC is not synced to
-			// controller local cache yet. So we need to double-check PVC in
-			//   1) informer cache
-			//   2) apiserver if not found in informer cache
-			// to make sure we will not reclaim a PV wrongly.
-			// Note that only non-released and non-failed volumes will be
-			// updated to Released state when PVC does not exist.
-			if volume.Status.Phase != v1.VolumeReleased && volume.Status.Phase != v1.VolumeFailed {
-				obj, err = ctrl.claimLister.PersistentVolumeClaims(volume.Spec.ClaimRef.Namespace).Get(volume.Spec.ClaimRef.Name)
-				if err != nil && !apierrors.IsNotFound(err) {
-					return err
-				}
-				found = !apierrors.IsNotFound(err)
-				if !found {
-					obj, err = ctrl.kubeClient.CoreV1().PersistentVolumeClaims(volume.Spec.ClaimRef.Namespace).Get(ctx, volume.Spec.ClaimRef.Name, metav1.GetOptions{})
-					if err != nil && !apierrors.IsNotFound(err) {
-						return err
-					}
-					found = !apierrors.IsNotFound(err)
-				}
-			}
-		}
-		if !found {
-			logger.V(4).Info("Synchronizing PersistentVolume, claim not found", "PVC", klog.KRef(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name), "volumeName", volume.Name)
-			// Fall through with claim = nil
-		} else {
+		if found {
 			var ok bool
 			claim, ok = obj.(*v1.PersistentVolumeClaim)
 			if !ok {
-				return fmt.Errorf("cannot convert object from volume cache to volume %q!?: %#v", claim.Spec.VolumeName, obj)
+				return fmt.Errorf("cannot convert object from volume cache to claim %q!?: %#v", claimName, obj)
 			}
-			logger.V(4).Info("Synchronizing PersistentVolume, claim found", "PVC", klog.KRef(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name), "claimStatus", getClaimStatusForLogging(claim), "volumeName", volume.Name)
 		}
-		if claim != nil && claim.UID != volume.Spec.ClaimRef.UID {
-			// The claim that the PV was pointing to was deleted, and another
-			// with the same name created.
-			// in some cases, the cached claim is not the newest, and the volume.Spec.ClaimRef.UID is newer than cached.
-			// so we should double check by calling apiserver and get the newest claim, then compare them.
-			logger.V(4).Info("Maybe cached claim is not the newest one, we should fetch it from apiserver", "PVC", klog.KRef(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name))
-
-			claim, err = ctrl.kubeClient.CoreV1().PersistentVolumeClaims(volume.Spec.ClaimRef.Namespace).Get(ctx, volume.Spec.ClaimRef.Name, metav1.GetOptions{})
+		// discardStaleClaim drops the claim if it is not the one the PV is bound
+		// to: the claim the PV was pointing to was deleted and another one with the
+		// same name but a different UID was created. Note the apiserver Get below
+		// returns a non-nil empty claim (with an empty UID) on NotFound, which this
+		// treats as stale as well.
+		discardStaleClaim := func() {
+			if claim != nil && claim.UID != volume.Spec.ClaimRef.UID {
+				logger.V(4).Info("Synchronizing PersistentVolume, claim has a different UID than pv.ClaimRef, the bound one must have been deleted", "PVC", klog.KRef(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name), "volumeName", volume.Name)
+				claim = nil
+			}
+		}
+		discardStaleClaim()
+		// A released or failed volume was already reclaimed, so skip the
+		// double-check below - otherwise a retained PV bound to a recreated
+		// same-name PVC would GET it from the apiserver on every sync (15s).
+		alreadyReleased := volume.Status.Phase == v1.VolumeReleased || volume.Status.Phase == v1.VolumeFailed
+		if claim == nil && !alreadyReleased {
+			// If the PV was created by an external PV provisioner or
+			// bound by external PV binder (e.g. kube-scheduler), it's
+			// possible under heavy load that the corresponding PVC is not synced to
+			// controller local cache yet, or the cache holds a stale claim with an outdated UID.
+			// So we need to double-check PVC in
+			//   1) informer cache
+			//   2) apiserver if not confirmed by the informer cache
+			// to make sure we will not reclaim a PV wrongly.
+			claim, err = ctrl.claimLister.PersistentVolumeClaims(volume.Spec.ClaimRef.Namespace).Get(volume.Spec.ClaimRef.Name)
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
-			} else if claim != nil {
-				// Treat the volume as bound to a missing claim.
-				if claim.UID != volume.Spec.ClaimRef.UID {
-					logger.V(4).Info("Synchronizing PersistentVolume, claim has a newer UID than pv.ClaimRef, the old one must have been deleted", "PVC", klog.KRef(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name), "volumeName", volume.Name)
-					claim = nil
-				} else {
-					logger.V(4).Info("Synchronizing PersistentVolume, claim has a same UID with pv.ClaimRef", "PVC", klog.KRef(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name), "volumeName", volume.Name)
-				}
 			}
+			discardStaleClaim()
+			if claim == nil {
+				claim, err = ctrl.kubeClient.CoreV1().PersistentVolumeClaims(volume.Spec.ClaimRef.Namespace).Get(ctx, volume.Spec.ClaimRef.Name, metav1.GetOptions{})
+				if err != nil && !apierrors.IsNotFound(err) {
+					return err
+				}
+				discardStaleClaim()
+			}
+		}
+		if claim == nil {
+			logger.V(4).Info("Synchronizing PersistentVolume, claim not found", "PVC", klog.KRef(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name), "volumeName", volume.Name)
+			// Fall through with claim = nil
+		} else {
+			logger.V(4).Info("Synchronizing PersistentVolume, claim found", "PVC", klog.KRef(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name), "claimStatus", getClaimStatusForLogging(claim), "volumeName", volume.Name)
 		}
 
 		if claim == nil {
@@ -669,7 +664,7 @@ func (ctrl *PersistentVolumeController) syncVolume(ctx context.Context, volume *
 			// Do not overwrite previous Failed state - let the user see that
 			// something went wrong, while we still re-try to reclaim the
 			// volume.
-			if volume.Status.Phase != v1.VolumeReleased && volume.Status.Phase != v1.VolumeFailed {
+			if !alreadyReleased {
 				// Also, log this only once:
 				logger.V(2).Info("Volume is released and reclaim policy will be executed", "volumeName", volume.Name, "reclaimPolicy", volume.Spec.PersistentVolumeReclaimPolicy)
 				if volume, err = ctrl.updateVolumePhase(ctx, volume, v1.VolumeReleased, ""); err != nil {
