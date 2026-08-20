@@ -620,6 +620,14 @@ func (q *Quantity) Sub(y Quantity) {
 	if q.IsZero() {
 		q.Format = y.Format
 	}
+	if q.d.Dec == nil && y.d.Dec == nil && q.i.value == 0 && y.i.value == mostNegative {
+		// 0 - y is exactly -y. Negating a copy of y keeps y's own scale and avoids
+		// aligning it against a scale-0 zero in the inf.Dec fallback, which builds
+		// 10^scale and overflows inf.Dec at the most negative scale.
+		q.i = y.i
+		q.Neg()
+		return
+	}
 	if q.d.Dec == nil && y.d.Dec == nil && q.i.Sub(y.i) {
 		return
 	}
@@ -658,8 +666,13 @@ func (q *Quantity) CmpInt64(y int64) int {
 func (q *Quantity) Neg() {
 	q.s = ""
 	if q.d.Dec == nil {
-		q.i.value = -q.i.value
-		return
+		// -mostNegative overflows int64 and switches to inf.Dec, unless its scale
+		// can't be represented there, in which case it keeps the wrapped result.
+		if q.i.value != mostNegative || !q.i.scale.canInfScale() {
+			q.i.value = -q.i.value
+			return
+		}
+		q.ToDec()
 	}
 	q.d.Dec.Neg(q.d.Dec)
 }
