@@ -17,7 +17,6 @@ limitations under the License.
 package gangscheduling
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -1754,10 +1753,10 @@ func TestPlacementFeasible(t *testing.T) {
 			pgName := "test-pg"
 			namespace := "default"
 
-			pgInfo := &testPodGroupInfo{
-				namespace:       namespace,
-				name:            pgName,
-				unscheduledPods: tc.unscheduledPods,
+			pgInfo := &schedulerframework.PodGroupInfo{
+				Namespace:       namespace,
+				Name:            pgName,
+				UnscheduledPods: tc.unscheduledPods,
 			}
 
 			var objs []runtime.Object
@@ -1772,8 +1771,8 @@ func TestPlacementFeasible(t *testing.T) {
 				} else {
 					cpg.Spec.SchedulingPolicy.Basic = &schedulingv1alpha3.CompositeBasicSchedulingPolicy{}
 				}
-				pgInfo.groupType = fwk.CompositePodGroupKeyType
-				pgInfo.cpg = cpg
+				pgInfo.Type = fwk.CompositePodGroupKeyType
+				pgInfo.CompositePodGroup = cpg
 				objs = append(objs, cpg)
 			} else {
 				pg := st.MakePodGroup().Namespace(namespace).Name(pgName).ParentCompositePodGroup("cpg-root").Obj()
@@ -1782,8 +1781,8 @@ func TestPlacementFeasible(t *testing.T) {
 				} else {
 					pg.Spec.SchedulingPolicy.Basic = &schedulingv1beta1.BasicSchedulingPolicy{}
 				}
-				pgInfo.groupType = fwk.PodGroupKeyType
-				pgInfo.podGroup = pg
+				pgInfo.Type = fwk.PodGroupKeyType
+				pgInfo.PodGroup = pg
 				objs = append(objs, pg)
 			}
 
@@ -1836,30 +1835,6 @@ func TestPlacementFeasible(t *testing.T) {
 			}
 		})
 	}
-}
-
-type testPodGroupInfo struct {
-	namespace       string
-	name            string
-	groupType       fwk.EntityKeyType
-	unscheduledPods []*v1.Pod
-	cpg             *schedulingv1alpha3.CompositePodGroup
-	podGroup        *schedulingv1beta1.PodGroup
-}
-
-func (t *testPodGroupInfo) GetNamespace() string                     { return t.namespace }
-func (t *testPodGroupInfo) GetName() string                          { return t.name }
-func (t *testPodGroupInfo) GetUnscheduledPods() []*v1.Pod            { return t.unscheduledPods }
-func (t *testPodGroupInfo) GetPodGroup() *schedulingv1beta1.PodGroup { return t.podGroup }
-func (t *testPodGroupInfo) GetType() fwk.EntityKeyType               { return t.groupType }
-func (t *testPodGroupInfo) GetKey() string {
-	return fmt.Sprintf("%s/%s/%s", t.groupType, t.namespace, t.name)
-}
-func (t *testPodGroupInfo) GetCompositePodGroup() *schedulingv1alpha3.CompositePodGroup {
-	return t.cpg
-}
-func (t *testPodGroupInfo) GetChildren() []fwk.PodGroupInfo {
-	return nil
 }
 
 type mockPodGroupManager struct {
