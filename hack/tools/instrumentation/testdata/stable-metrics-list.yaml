@@ -534,7 +534,7 @@
 - name: plugin_evaluation_total
   subsystem: scheduler
   help: Number of attempts to schedule pods by each plugin and the extension point
-    (available only in PreFilter, Filter, PreScore, and Score).
+    (available only in PreFilter, Filter, PreScore, and Score), by scheduler profile.
   type: Counter
   stabilityLevel: BETA
   labels:
@@ -623,9 +623,9 @@
   - 16.384
 - name: unschedulable_pods
   subsystem: scheduler
-  help: The number of unschedulable pods broken down by plugin name. A pod will increment
-    the gauge for all plugins that caused it to not schedule and so this metric have
-    meaning only when broken down by plugin.
+  help: The number of unschedulable pods broken down by plugin name and scheduler
+    profile. A pod will increment the gauge for all plugins that caused it to not
+    schedule and so this metric has meaning only when broken down by plugin.
   type: Gauge
   stabilityLevel: BETA
   labels:
@@ -1120,7 +1120,8 @@
   stabilityLevel: STABLE
 - name: framework_extension_point_duration_seconds
   subsystem: scheduler
-  help: Latency for running all plugins of a specific extension point.
+  help: Latency for running all plugins of a specific extension point, by scheduler
+    profile.
   type: Histogram
   stabilityLevel: STABLE
   labels:
@@ -1192,8 +1193,9 @@
   - queue
 - name: schedule_attempts_total
   subsystem: scheduler
-  help: Number of attempts to schedule pods, by the result. 'unschedulable' means
-    a pod could not be scheduled, while 'error' means an internal scheduler problem.
+  help: Number of attempts to schedule pods, by the result and scheduler profile.
+    'unschedulable' means a pod could not be scheduled, while 'error' means an internal
+    scheduler problem.
   type: Counter
   stabilityLevel: STABLE
   labels:
@@ -1201,7 +1203,8 @@
   - result
 - name: scheduling_attempt_duration_seconds
   subsystem: scheduler
-  help: Scheduling attempt latency in seconds (scheduling algorithm + binding)
+  help: Scheduling attempt latency in seconds (scheduling algorithm + binding), by
+    scheduler profile.
   type: Histogram
   stabilityLevel: STABLE
   labels:
