@@ -28,6 +28,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -55,6 +57,14 @@ func newRealImageGCManager(policy ImageGCPolicy, mockStatsProvider stats.Provide
 		recorder:      &record.FakeRecorder{},
 		tracer:        noopoteltrace.NewTracerProvider().Tracer(""),
 	}, fakeRuntime
+}
+
+type fakePodGetter struct {
+	pods []*v1.Pod
+}
+
+func (f *fakePodGetter) GetPods() []*v1.Pod {
+	return f.pods
 }
 
 // Accessors used for thread-safe testing.
@@ -122,6 +132,7 @@ func makeContainer(id int) *container.Container {
 		ID:      container.ContainerID{Type: "test", ID: fmt.Sprintf("container-%d", id)},
 		Image:   imageName(id),
 		ImageID: imageID(id),
+		State:   container.ContainerStateRunning,
 	}
 }
 
@@ -141,12 +152,14 @@ func TestDetectImagesInitialDetect(t *testing.T) {
 				{
 					ID:      container.ContainerID{Type: "test", ID: fmt.Sprintf("container-%d", 1)},
 					ImageID: imageID(1),
+					State:   container.ContainerStateRunning,
 					// The image filed is not set to simulate a no-name image
 				},
 				{
 					ID:      container.ContainerID{Type: "test", ID: fmt.Sprintf("container-%d", 2)},
 					Image:   imageName(2),
 					ImageID: imageID(2),
+					State:   container.ContainerStateRunning,
 				},
 			},
 		}},
@@ -189,6 +202,7 @@ func TestDetectImagesInitialDetectWithRuntimeHandlerInImageCriAPIFeatureGate(t *
 				{
 					ID:      container.ContainerID{Type: "test", ID: fmt.Sprintf("container-%d", 1)},
 					ImageID: imageID(1),
+					State:   container.ContainerStateRunning,
 					// The image field is not set to simulate a no-name image
 					ImageRuntimeHandler: testRuntimeHandler,
 				},
@@ -196,6 +210,7 @@ func TestDetectImagesInitialDetectWithRuntimeHandlerInImageCriAPIFeatureGate(t *
 					ID:      container.ContainerID{Type: "test", ID: fmt.Sprintf("container-%d", 2)},
 					Image:   imageName(2),
 					ImageID: imageID(2),
+					State:   container.ContainerStateRunning,
 					// The runtime handler field is not set to simulate the case when
 					// the feature gate "RuntimeHandlerInImageCriApi" is on and container runtime has not implemented
 					// KEP 4216, which means that runtimeHandler string is not set in the
@@ -422,6 +437,46 @@ func TestDetectImagesContainerStopped(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(zero, container2.firstDetected)
 	assert.True(container2.lastUsed.Equal(withContainer.lastUsed))
+}
+
+func TestDetectImagesWithPodSpecReferencingImageCreateContainerConfigError(t *testing.T) {
+	// Simulates CreateContainerConfigError: image was pulled but no container exists
+	// in the runtime. The pod spec references the image. Without PodGetter, the image
+	// would be GC'd and re-pulled repeatedly.
+	ctx := ktesting.Init(t)
+	mockStatsProvider := statstest.NewMockProvider(t)
+
+	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
+	fakeRuntime.ImageList = []container.Image{
+		makeImage(0, 1024),
+		makeImage(1, 2048),
+	}
+	// No containers in runtime - simulating CreateContainerConfigError
+	fakeRuntime.AllPodList = []*containertest.FakePod{}
+
+	// PodGetter returns a non-terminal pod that references image-1
+	manager.podGetter = &fakePodGetter{
+		pods: []*v1.Pod{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"},
+				Status:     v1.PodStatus{Phase: v1.PodPending},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "test", Image: imageID(1)},
+					},
+				},
+			},
+		},
+	}
+
+	imagesInUse, err := manager.detectImages(ctx, zero)
+	require.NoError(t, err)
+	assert := assert.New(t)
+	assert.True(imagesInUse.Has(imageID(1)), "image referenced by pod spec should be in use")
+	// lastUsed should be updated for the image
+	record, ok := manager.getImageRecord(imageID(1))
+	require.True(t, ok)
+	assert.False(record.lastUsed.Equal(zero), "lastUsed should be set for pod-spec-referenced image")
 }
 
 func TestDetectImagesWithRemovedImages(t *testing.T) {
@@ -942,10 +997,55 @@ func TestValidateImageGCPolicy(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if _, err := NewImageGCManager(nil, nil, nil, nil, nil, tc.imageGCPolicy, noopoteltrace.NewTracerProvider()); err != nil {
+		if _, err := NewImageGCManager(nil, nil, nil, nil, nil, tc.imageGCPolicy, noopoteltrace.NewTracerProvider(), nil); err != nil {
 			if err.Error() != tc.expectErr {
 				t.Errorf("[%s:]Expected err:%v, but got:%v", tc.name, tc.expectErr, err.Error())
 			}
 		}
+	}
+}
+
+func TestIsContainerActuallyUsingImage(t *testing.T) {
+	testCases := []struct {
+		name           string
+		containerState container.State
+		expected       bool
+	}{
+		{
+			name:           "running container should be using image",
+			containerState: container.ContainerStateRunning,
+			expected:       true,
+		},
+		{
+			name:           "created container should be using image",
+			containerState: container.ContainerStateCreated,
+			expected:       true,
+		},
+		{
+			name:           "exited container should not be using image",
+			containerState: container.ContainerStateExited,
+			expected:       false,
+		},
+		{
+			name:           "unknown container should not be using image",
+			containerState: container.ContainerStateUnknown,
+			expected:       false,
+		},
+		{
+			name:           "empty state should not be using image",
+			containerState: "",
+			expected:       false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			container := &container.Container{
+				ID:    container.ContainerID{Type: "test", ID: "test-container"},
+				State: tc.containerState,
+			}
+			result := isContainerActuallyUsingImage(container)
+			assert.Equal(t, tc.expected, result)
+		})
 	}
 }
