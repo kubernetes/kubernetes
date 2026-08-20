@@ -287,6 +287,15 @@ const (
 	// Enables post-start-hook for storage readiness
 	WatchCacheInitializationPostStartHook featuregate.Feature = "WatchCacheInitializationPostStartHook"
 
+	// owner: @nami-ant
+	// kep: https://kep.k8s.io/6268
+	//
+	// Watchers whose buffer fills up are resumed from the watch cache event
+	// history once they catch up, instead of being terminated. A watcher is
+	// terminated for cause only when its resume position has aged out of the
+	// history, which is reported to the client as an in-stream 410 error.
+	WatchCacheStallResume featuregate.Feature = "WatchCacheStallResume"
+
 	// owner: @p0lyn0mial
 	//
 	// Allow the API server to stream individual items instead of chunking
@@ -482,6 +491,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	WatchCacheStallResume: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Alpha},
 	},
 
 	WatchList: {

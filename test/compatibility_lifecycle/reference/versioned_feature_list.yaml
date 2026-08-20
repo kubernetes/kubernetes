@@ -2296,6 +2296,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.37"
+- name: WatchCacheStallResume
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: WatchList
   versionedSpecs:
   - default: false

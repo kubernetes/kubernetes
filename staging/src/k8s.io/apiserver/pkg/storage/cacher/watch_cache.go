@@ -670,6 +670,24 @@ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, key string,
 	return w.history.GetIntervalLocked(resourceVersion, w.storage.ListResourceVersion(), w.RWMutex.RLocker())
 }
 
+// ringCatchUp is a watcher's source of catch-up intervals. It reads only the
+// watch cache event history, never the store: a watcher that resumes after a
+// stall re-reads recent events, and a resume position that has aged out of the
+// history is reported as ResourceExpired instead of being turned into a
+// re-list of the whole state.
+type ringCatchUp struct {
+	cache *watchCache
+}
+
+// intervalSince returns an interval over the events newer than the given
+// resourceVersion, or a ResourceExpired error if that position is no longer
+// covered by the history.
+func (r *ringCatchUp) intervalSince(resourceVersion uint64) (*watchCacheInterval, error) {
+	r.cache.RLock()
+	defer r.cache.RUnlock()
+	return r.cache.history.GetIntervalLocked(resourceVersion, r.cache.storage.ListResourceVersion(), r.cache.RWMutex.RLocker())
+}
+
 // getIntervalFromStoreLocked returns a watchCacheInterval
 // that covers the entire storage state.
 // This function assumes to be called under the watchCache lock.
