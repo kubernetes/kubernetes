@@ -19,6 +19,7 @@ package prober
 import (
 	"context"
 	"math/rand"
+	"net/http"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
+	httpprobe "k8s.io/kubernetes/pkg/probe/http"
 )
 
 // worker handles the periodic probing of its assigned container. Each worker has a go-routine
@@ -71,6 +73,10 @@ type worker struct {
 
 	// If set, skip probing.
 	onHold bool
+
+	// Cached HTTP request for HTTP probes, built once from the probe spec.
+	// Reused across probe cycles to avoid creating a new request object each time.
+	httpRequest *http.Request
 
 	// proberResultsMetricLabels holds the labels attached to this worker
 	// for the ProberResults metric by result.
@@ -345,8 +351,18 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		}
 	}
 
+	// Build and cache the HTTP request for HTTP probes to avoid recreating it on every probe cycle.
+	if w.httpRequest == nil && w.spec.HTTPGet != nil && status.PodIP != "" {
+		req, err := httpprobe.NewRequestForHTTPGetAction(w.spec.HTTPGet, &w.container, status.PodIP, "probe")
+		if err != nil {
+			logger.V(4).Info("HTTP-Probe failed to create cached request", "error", err)
+		} else {
+			w.httpRequest = req
+		}
+	}
+
 	// Note, exec probe does NOT have access to pod environment variables or downward API
-	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
+	result, err := w.probeManager.prober.probeWithCachedHTTPRequest(ctx, w.probeType, w.pod, status, w.container, w.containerID, w.httpRequest)
 	if err != nil {
 		// Prober error, throw away the result.
 		return true
