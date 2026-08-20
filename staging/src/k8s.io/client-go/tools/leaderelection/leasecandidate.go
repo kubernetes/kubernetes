@@ -39,7 +39,10 @@ import (
 	coordinationv1beta1listers "k8s.io/client-go/listers/coordination/v1beta1"
 )
 
-const requeueInterval = 5 * time.Minute
+const (
+	requeueInterval = 5 * time.Minute
+	releaseTimeout  = 5 * time.Second
+)
 
 type CacheSyncWaiter interface {
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
@@ -133,6 +136,11 @@ func (c *LeaseCandidate) Run(ctx context.Context) {
 	defer func() {
 		c.queue.ShutDown()
 		wg.Wait()
+		releaseCtx, cancel := context.WithTimeout(context.Background(), releaseTimeout)
+		defer cancel()
+		if err := c.release(releaseCtx); err != nil {
+			logger.Error(err, "Failed to release lease candidate")
+		}
 	}()
 
 	c.informerFactory.Start(ctx.Done())
@@ -200,6 +208,16 @@ func (c *LeaseCandidate) ensureLease(ctx context.Context) error {
 		return err
 	}
 	return nil
+}
+
+// release deletes the LeaseCandidate object from the API server to avoid
+// stale candidates interfering with future elections.
+func (c *LeaseCandidate) release(ctx context.Context) error {
+	err := c.leaseClient.Delete(ctx, c.name, metav1.DeleteOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	return err
 }
 
 func (c *LeaseCandidate) newLeaseCandidate() *v1beta1.LeaseCandidate {
