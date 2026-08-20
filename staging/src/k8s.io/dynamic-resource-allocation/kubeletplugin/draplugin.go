@@ -129,7 +129,15 @@ type DRAPlugin interface {
 	// for some other ResourceClaim. Kubernetes tries very hard to ensure
 	// that, but if something went wrong, then the DRA driver is the last
 	// line of defense against using the same device for two different
-	// unrelated workloads.
+	// unrelated workloads. Real-world scenarios in which this can occur:
+	// - Pod force-deletion (such as via kubectl delete pod --force --grace-period=0)
+	// - Node loss
+	// In these cases, the control-plane record can be removed immediately while 
+	// node-level teardown runs asynchronously. This can lead to a race condition 
+	// where a replacement pod's claim is prepared before the previous container 
+	// has fully stopped. Because Kubernetes cannot guarantee exclusive device 
+	// handoff in this scenario, the DRA driver must enforce idempotence and device 
+	// exclusivity to prevent concurrent preparation.
 	//
 	// If an error is returned, the result is ignored. Otherwise the result
 	// must have exactly one entry for each claim, identified by the UID of
