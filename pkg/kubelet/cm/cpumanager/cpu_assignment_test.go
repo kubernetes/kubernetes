@@ -406,6 +406,45 @@ func TestCPUAccumulatorFreeCPUs(t *testing.T) {
 	}
 }
 
+func TestSortAvailableUncoreCaches(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	testCases := []struct {
+		description   string
+		topo          *topology.CPUTopology
+		availableCPUs cpuset.CPUSet
+		expect        []int
+	}{
+		{
+			"topology with 1 (default) uncore cache, 0 cpus reserved",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "0-79"),
+			[]int{0},
+		},
+		{
+			"topology with 2 uncore caches, multi numa per uncore, 2 cpus reserved",
+			topoDualSocketSubNumaPerSocketHTMonolithicUncore,
+			mustParseCPUSet(t, "1-119,121-239"), // two cpu(s) from uncore0 reserved
+			[]int{0, 1},
+		},
+		{
+			"topology with 24 uncore caches, single numa per uncore, 3 cpus reserved",
+			topoDualSocketSingleNumaPerSocketSMTUncore,
+			mustParseCPUSet(t, "0-90,92-151,153-282,284-383"), // two cpu(s) from uncore11 and one from uncore19 reserved
+			[]int{11, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 19, 12, 13, 14, 15, 16, 17, 18, 20, 21, 22, 23},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			acc := newCPUAccumulator(logger, tc.topo, tc.availableCPUs, 0, CPUSortingStrategyPacked)
+			result := acc.sortAvailableUncoreCaches()
+			if !reflect.DeepEqual(result, tc.expect) {
+				t.Errorf("expected %v to equal %v", result, tc.expect)
+			}
+		})
+	}
+}
+
 func TestCPUAccumulatorTake(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
