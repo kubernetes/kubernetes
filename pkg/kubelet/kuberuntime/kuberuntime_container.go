@@ -780,17 +780,55 @@ func (m *kubeGenericRuntimeManager) toKubeContainerStatus(ctx context.Context, p
 	return cStatus
 }
 
+func (m *kubeGenericRuntimeManager) registerContainerExitCancel(containerID string, cancel context.CancelFunc) func() {
+	m.containerExitCancelsLock.Lock()
+	m.containerExitCancels[containerID] = cancel
+	m.containerExitCancelsLock.Unlock()
+
+	return func() {
+		m.containerExitCancelsLock.Lock()
+		defer m.containerExitCancelsLock.Unlock()
+		delete(m.containerExitCancels, containerID)
+	}
+}
+
+// NotifyContainerDied cancels a sleep lifecycle hook running for the container.
+func (m *kubeGenericRuntimeManager) NotifyContainerDied(containerID string) {
+	m.containerExitCancelsLock.Lock()
+	cancel := m.containerExitCancels[containerID]
+	delete(m.containerExitCancels, containerID)
+	m.containerExitCancelsLock.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+}
+
 // executePreStopHook runs the pre-stop lifecycle hooks if applicable and returns the duration it takes.
 func (m *kubeGenericRuntimeManager) executePreStopHook(ctx context.Context, pod *v1.Pod, containerID kubecontainer.ContainerID, containerSpec *v1.Container, gracePeriod int64) int64 {
 	logger := klog.FromContext(ctx)
+	hookCtx := ctx
+	if containerSpec.Lifecycle.PreStop.Sleep != nil {
+		var cancelHook context.CancelFunc
+		hookCtx, cancelHook = context.WithCancel(ctx)
+		defer cancelHook()
+		unregister := m.registerContainerExitCancel(containerID.ID, cancelHook)
+		defer unregister()
+
+		status, err := m.runtimeService.ContainerStatus(ctx, containerID.ID, false)
+		if crierror.IsNotFound(err) || err == nil && status.GetStatus().GetState() == runtimeapi.ContainerState_CONTAINER_EXITED {
+			logger.V(3).Info("Skipping preStop sleep hook because container already exited", "pod", klog.KObj(pod), "podUID", pod.UID,
+				"containerName", containerSpec.Name, "containerID", containerID.String())
+			return 0
+		}
+	}
 	logger.V(3).Info("Running preStop hook", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", containerSpec.Name, "containerID", containerID.String())
 
 	start := metav1.Now()
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		defer utilruntime.HandleCrashWithContext(ctx)
-		if _, err := m.runner.Run(ctx, containerID, pod, containerSpec, containerSpec.Lifecycle.PreStop); err != nil {
+		defer utilruntime.HandleCrashWithContext(hookCtx)
+		if _, err := m.runner.Run(hookCtx, containerID, pod, containerSpec, containerSpec.Lifecycle.PreStop); err != nil {
 			logger.Error(err, "PreStop hook failed", "pod", klog.KObj(pod), "podUID", pod.UID,
 				"containerName", containerSpec.Name, "containerID", containerID.String())
 			// do not record the message in the event so that secrets won't leak from the server.
