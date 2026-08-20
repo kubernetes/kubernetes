@@ -64,15 +64,30 @@ func newHealthInfoCache(logger klog.Logger, stateFile string) (*healthInfoCache,
 	return cache, nil
 }
 
-// loadFromCheckpoint loads the cache from the state file.
-func (cache *healthInfoCache) loadFromCheckpoint() error {
+// loadFromCheckpoint loads the cache from the state file. On return,
+// cache.HealthInfo always points to a non-nil map, and every driver entry
+// has a non-nil Devices map — even if the file was missing, unreadable, or
+// decoded a nil map at either level (e.g., `null` or
+// `{"driverA":{"Devices":null}}`), which json.Unmarshal would otherwise
+// silently turn into a nil map, causing a panic on the first update.
+func (cache *healthInfoCache) loadFromCheckpoint() (err error) {
+	defer func() {
+		if cache.HealthInfo == nil || *cache.HealthInfo == nil {
+			cache.HealthInfo = &state.DevicesHealthMap{}
+		}
+		for name, driver := range *cache.HealthInfo {
+			if driver.Devices == nil {
+				driver.Devices = make(map[string]state.DeviceHealth)
+				(*cache.HealthInfo)[name] = driver
+			}
+		}
+	}()
 	if cache.stateFile == "" {
 		return nil
 	}
 	data, err := os.ReadFile(cache.stateFile)
 	if err != nil {
 		if os.IsNotExist(err) {
-			cache.HealthInfo = &state.DevicesHealthMap{}
 			return nil
 		}
 		return err
