@@ -797,18 +797,6 @@ func (pgqi *QueuedPodGroupInfo) Type() fwk.EntityKeyType {
 // AddPod adds a pod to the queued pod group info, if the pod belongs to the pod group.
 // In case of hierarchy, we need to go to all leaf PodGroups.
 func (pgqi *QueuedPodGroupInfo) AddPod(pInfo *QueuedPodInfo) {
-	if pInfo.Pod.Namespace != pgqi.GetNamespace() {
-		return
-	}
-
-	if pgqi.GetPodGroup() == nil && pgqi.GetCompositePodGroup() == nil {
-		return
-	}
-
-	if pInfo.Pod.Spec.SchedulingGroup == nil || pInfo.Pod.Spec.SchedulingGroup.PodGroupName == nil {
-		return
-	}
-
 	leafPG, _ := findNodeAndParent(pgqi.PodGroupInfo, nil, *pInfo.Pod.Spec.SchedulingGroup.PodGroupName)
 	if leafPG == nil {
 		return
@@ -818,7 +806,7 @@ func (pgqi *QueuedPodGroupInfo) AddPod(pInfo *QueuedPodInfo) {
 		pgqi.QueuedPodInfos = make(map[fwk.EntityKey][]*QueuedPodInfo)
 	}
 
-	key := fwk.PodGroupKey(leafPG.Namespace, leafPG.Name)
+	key := fwk.PodGroupKey(leafPG.GetNamespace(), leafPG.GetName())
 	index, _ := slices.BinarySearchFunc(pgqi.QueuedPodInfos[key], pInfo, PodGroupMemberPodsOrderingFunc)
 
 	pgqi.QueuedPodInfos[key] = slices.Insert(pgqi.QueuedPodInfos[key], index, pInfo)
@@ -828,18 +816,6 @@ func (pgqi *QueuedPodGroupInfo) AddPod(pInfo *QueuedPodInfo) {
 // RemovePod removes a pod from the queued pod group info, if the pod belongs to the pod group.
 // In case of hierarchy, we need to go to all leaf PodGroups.
 func (pgqi *QueuedPodGroupInfo) RemovePod(pod *v1.Pod) *QueuedPodInfo {
-	if pod.Namespace != pgqi.GetNamespace() {
-		return nil
-	}
-
-	if pgqi.QueuedPodInfos == nil {
-		return nil
-	}
-
-	if pod.Spec.SchedulingGroup == nil || pod.Spec.SchedulingGroup.PodGroupName == nil {
-		return nil
-	}
-
 	key := fwk.PodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
 	list, exists := pgqi.QueuedPodInfos[key]
 	if !exists {
@@ -932,14 +908,6 @@ func (pgqi *QueuedPodGroupInfo) ForEachPodInfo(fn func(pInfo *QueuedPodInfo) boo
 }
 
 func (pgqi *QueuedPodGroupInfo) Update(pod *v1.Pod) (*QueuedPodInfo, error) {
-	if pgqi.QueuedPodInfos == nil {
-		return nil, fmt.Errorf("pod %s/%s to update not found in the queued group info", pod.Namespace, pod.Name)
-	}
-
-	if pod.Spec.SchedulingGroup == nil || pod.Spec.SchedulingGroup.PodGroupName == nil {
-		return nil, fmt.Errorf("pod %s/%s to update not found in the queued group info", pod.Namespace, pod.Name)
-	}
-
 	key := fwk.PodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
 	list, exists := pgqi.QueuedPodInfos[key]
 	if !exists {
@@ -970,17 +938,6 @@ func (pgqi *QueuedPodGroupInfo) Update(pod *v1.Pod) (*QueuedPodInfo, error) {
 // Gated returns true if the pod is gated by any plugin.
 func (pgqi *QueuedPodGroupInfo) Gated() bool {
 	return pgqi.QueueingParams.GatingPlugin != ""
-}
-
-// GetPriority returns the pod group's priority.
-func (pgqi *QueuedPodGroupInfo) GetPriority() int32 {
-	if pgqi.PodGroup != nil {
-		return schedutil.PodGroupPriority(pgqi.PodGroup)
-	}
-	if pgqi.CompositePodGroup != nil {
-		return schedutil.CompositePodGroupPriority(pgqi.CompositePodGroup)
-	}
-	return 0
 }
 
 func (pgqi *QueuedPodGroupInfo) Size() int {
@@ -1041,70 +998,18 @@ func (pgqi *QueuedPodGroupInfo) SetFlushTimestamp(t time.Time) {
 	pgqi.FlushTimestamp = t
 }
 
-// AddPodGroup adds a pod group to the queued pod group info hierarchy.
-func (pgqi *QueuedPodGroupInfo) AddPodGroup(pg *schedulingv1beta1.PodGroup) {
-	// We only add non-root pod groups to the hierarchy, because the root
-	// pod group is already present in the hierarchy.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) || pg.Spec.ParentCompositePodGroupName == nil {
+// AddSubtree adds a subtree to the queued pod group info hierarchy.
+// It shouldn't be called when the QueuedPodGroupInfo's root is a PodGroup (not CompositePodGroup).
+func (pgqi *QueuedPodGroupInfo) AddSubtree(subtree *PodGroupInfo) {
+	parentName := subtree.GetParentCompositePodGroupName()
+	if parentName == nil {
 		return
 	}
 
-	parent, _ := findNodeAndParent(pgqi.PodGroupInfo, nil, *pg.Spec.ParentCompositePodGroupName)
-	if parent != nil && parent.GetCompositePodGroup() != nil {
-		for _, child := range parent.Children {
-			if child.GetName() == pg.Name {
-				return
-			}
-		}
-		pgInfo := &PodGroupInfo{
-			Namespace: pg.Namespace,
-			Name:      pg.Name,
-			Type:      fwk.PodGroupKeyType,
-			PodGroup:  pg,
-			Children:  make([]*PodGroupInfo, 0),
-		}
-		parent.Children = append(parent.Children, pgInfo)
-	}
-}
-
-// UpdatePodGroup updates a pod group in the queued pod group info hierarchy.
-func (pgqi *QueuedPodGroupInfo) UpdatePodGroup(pg *schedulingv1beta1.PodGroup) {
-	node, _ := findNodeAndParent(pgqi.PodGroupInfo, nil, pg.Name)
-	if node != nil && node.GetPodGroup() != nil {
-		node.PodGroup = pg
-	}
-}
-
-// RemovePodGroup removes a pod group from the queued pod group info hierarchy.
-// It returns a slice of all pods within the hierarchy of the removed pod group.
-func (pgqi *QueuedPodGroupInfo) RemovePodGroup(pg *schedulingv1beta1.PodGroup) []*QueuedPodInfo {
-	node, parent := findNodeAndParent(pgqi.PodGroupInfo, nil, pg.Name)
-	if node == nil {
-		return nil
-	}
-
+	parent, _ := findNodeAndParent(pgqi.PodGroupInfo, nil, *parentName)
 	if parent != nil {
-		for i, child := range parent.Children {
-			if child.GetName() == pg.Name {
-				parent.Children = append(parent.Children[:i], parent.Children[i+1:]...)
-				break
-			}
-		}
-	}
-
-	return pgqi.deleteSubtreePods(node)
-}
-
-// AddCompositePodGroup adds a composite pod group to the queued pod group info hierarchy.
-func (pgqi *QueuedPodGroupInfo) AddCompositePodGroup(cpg *schedulingv1alpha3.CompositePodGroup, subtree *PodGroupInfo) {
-	if cpg.Spec.ParentCompositePodGroupName == nil {
-		return
-	}
-
-	parent, _ := findNodeAndParent(pgqi.PodGroupInfo, nil, *cpg.Spec.ParentCompositePodGroupName)
-	if parent != nil && parent.GetCompositePodGroup() != nil {
 		for _, child := range parent.Children {
-			if child.GetName() == cpg.Name {
+			if child.GetName() == subtree.GetName() {
 				return
 			}
 		}
@@ -1112,25 +1017,25 @@ func (pgqi *QueuedPodGroupInfo) AddCompositePodGroup(cpg *schedulingv1alpha3.Com
 	}
 }
 
-// UpdateCompositePodGroup updates a composite pod group in the queued pod group info hierarchy.
-func (pgqi *QueuedPodGroupInfo) UpdateCompositePodGroup(cpg *schedulingv1alpha3.CompositePodGroup) {
-	node, _ := findNodeAndParent(pgqi.PodGroupInfo, nil, cpg.Name)
-	if node != nil && node.GetCompositePodGroup() != nil {
-		node.CompositePodGroup = cpg
+// UpdateGenericPodGroup updates a generic pod group in the queued pod group info hierarchy.
+func (pgqi *QueuedPodGroupInfo) UpdateGenericPodGroup(gpg *GenericPodGroup) {
+	node, _ := findNodeAndParent(pgqi.PodGroupInfo, nil, gpg.GetName())
+	if node != nil {
+		node.GenericPodGroup = gpg
 	}
 }
 
-// RemoveCompositePodGroup removes a composite pod group from the queued pod group info hierarchy.
-// It returns a slice of all pods within the hierarchy of the removed composite pod group.
-func (pgqi *QueuedPodGroupInfo) RemoveCompositePodGroup(cpg *schedulingv1alpha3.CompositePodGroup) []*QueuedPodInfo {
-	node, parent := findNodeAndParent(pgqi.PodGroupInfo, nil, cpg.Name)
+// RemoveGenericPodGroup removes a generic pod group from the queued pod group info hierarchy.
+// It returns a slice of all pods within the hierarchy of the removed pod group / composite pod group.
+func (pgqi *QueuedPodGroupInfo) RemoveGenericPodGroup(gpg *GenericPodGroup) []*QueuedPodInfo {
+	node, parent := findNodeAndParent(pgqi.PodGroupInfo, nil, gpg.GetName())
 	if node == nil {
 		return nil
 	}
 
 	if parent != nil {
 		for i, child := range parent.Children {
-			if child.GetName() == cpg.Name {
+			if child.GetName() == gpg.GetName() {
 				parent.Children = append(parent.Children[:i], parent.Children[i+1:]...)
 				break
 			}
@@ -1146,11 +1051,9 @@ func findNodeAndParent(curr, parent *PodGroupInfo, name string) (*PodGroupInfo, 
 	if curr.GetName() == name {
 		return curr, parent
 	}
-	if curr.GetCompositePodGroup() != nil {
-		for _, child := range curr.Children {
-			if n, p := findNodeAndParent(child, curr, name); n != nil {
-				return n, p
-			}
+	for _, child := range curr.Children {
+		if n, p := findNodeAndParent(child, curr, name); n != nil {
+			return n, p
 		}
 	}
 	return nil, nil
@@ -1161,12 +1064,13 @@ func findNodeAndParent(curr, parent *PodGroupInfo, name string) (*PodGroupInfo, 
 // It returns a flat slice of all QueuedPodInfo elements that were successfully removed.
 func (pgqi *QueuedPodGroupInfo) deleteSubtreePods(curr *PodGroupInfo) []*QueuedPodInfo {
 	removedPods := make([]*QueuedPodInfo, 0)
-	if curr.GetPodGroup() != nil {
-		key := fwk.PodGroupKey(curr.Namespace, curr.Name)
+	if curr.GetType() == fwk.PodGroupKeyType {
+		key := fwk.PodGroupKey(curr.GetNamespace(), curr.GetName())
 		if pods, ok := pgqi.QueuedPodInfos[key]; ok {
 			removedPods = append(removedPods, pods...)
 			delete(pgqi.QueuedPodInfos, key)
 		}
+		return removedPods
 	}
 	for _, child := range curr.Children {
 		removedPods = append(removedPods, pgqi.deleteSubtreePods(child)...)
@@ -1174,57 +1078,119 @@ func (pgqi *QueuedPodGroupInfo) deleteSubtreePods(curr *PodGroupInfo) []*QueuedP
 	return removedPods
 }
 
-func newQueuedPodGroupInfo(pg *schedulingv1beta1.PodGroup) *QueuedPodGroupInfo {
-	return &QueuedPodGroupInfo{
-		PodGroupInfo: &PodGroupInfo{
-			Namespace: pg.Namespace,
-			Name:      pg.Name,
-			Type:      fwk.PodGroupKeyType,
-			PodGroup:  pg,
-			Children:  make([]*PodGroupInfo, 0),
-		},
-		QueuedPodInfos: make(map[fwk.EntityKey][]*QueuedPodInfo),
-	}
+// GenericPodGroup is a wrapper around either a PodGroup or a CompositePodGroup API object,
+// providing a unified interface for scheduler's internal operations on PodGroup objects.
+type GenericPodGroup struct {
+	// PodGroup is a PodGroup API object.
+	PodGroup *schedulingv1beta1.PodGroup
+	// CompositePodGroup is a CompositePodGroup API object.
+	// It can be set only when CompositePodGroup feature is enabled.
+	CompositePodGroup *schedulingv1alpha3.CompositePodGroup
 }
 
-// PodGroupInfo is a wrapper around the PodGroup API object together with a list of pods that belong to the pod group.
-// Typically used as an input to pod group scheduling cycle plugins.
+// NewGenericPodGroup returns a GenericPodGroup for a PodGroup.
+func NewGenericPodGroup(pg *schedulingv1beta1.PodGroup) *GenericPodGroup {
+	return &GenericPodGroup{PodGroup: pg}
+}
+
+// NewGenericCompositePodGroup returns a GenericPodGroup for a CompositePodGroup.
+func NewGenericCompositePodGroup(cpg *schedulingv1alpha3.CompositePodGroup) *GenericPodGroup {
+	return &GenericPodGroup{CompositePodGroup: cpg}
+}
+
+func (gpg *GenericPodGroup) GetPodGroup() *schedulingv1beta1.PodGroup {
+	return gpg.PodGroup
+}
+
+func (gpg *GenericPodGroup) GetCompositePodGroup() *schedulingv1alpha3.CompositePodGroup {
+	return gpg.CompositePodGroup
+}
+
+func (gpg *GenericPodGroup) GetName() string {
+	if gpg.PodGroup != nil {
+		return gpg.PodGroup.Name
+	}
+	return gpg.CompositePodGroup.Name
+}
+
+func (gpg *GenericPodGroup) GetNamespace() string {
+	if gpg.PodGroup != nil {
+		return gpg.PodGroup.Namespace
+	}
+	return gpg.CompositePodGroup.Namespace
+}
+
+func (gpg *GenericPodGroup) GetType() fwk.EntityKeyType {
+	if gpg.PodGroup != nil {
+		return fwk.PodGroupKeyType
+	}
+	return fwk.CompositePodGroupKeyType
+}
+
+func (gpg *GenericPodGroup) GetKey() fwk.EntityKey {
+	if gpg.PodGroup != nil {
+		return fwk.PodGroupKey(gpg.PodGroup.Namespace, gpg.PodGroup.Name)
+	}
+	return fwk.CompositePodGroupKey(gpg.CompositePodGroup.Namespace, gpg.CompositePodGroup.Name)
+}
+
+// GetParentCompositePodGroupName returns the parent composite pod group name of the GenericPodGroup.
+// This should be used only when the feature feature gate CompositePodGroup is enabled.
+func (gpg *GenericPodGroup) GetParentCompositePodGroupName() *string {
+	if gpg.PodGroup != nil {
+		return gpg.PodGroup.Spec.ParentCompositePodGroupName
+	}
+	return gpg.CompositePodGroup.Spec.ParentCompositePodGroupName
+}
+
+// HasParent returns true if the GenericPodGroup has a parent.
+// This should be used only when the feature feature gate CompositePodGroup is enabled.
+func (gpg *GenericPodGroup) HasParent() bool {
+	return gpg.GetParentCompositePodGroupName() != nil
+}
+
+// GetParentKey returns the parent key of the GenericPodGroup.
+// This should be used only when the feature CompositePodGroup feature gate is enabled.
+func (gpg *GenericPodGroup) GetParentKey() (fwk.EntityKey, bool) {
+	parentName := gpg.GetParentCompositePodGroupName()
+	if parentName == nil {
+		return fwk.EntityKey{}, false
+	}
+	return fwk.CompositePodGroupKey(gpg.GetNamespace(), *parentName), true
+}
+
+func (gpg *GenericPodGroup) GetPriority() int32 {
+	if gpg.PodGroup != nil {
+		return schedutil.PodGroupPriority(gpg.PodGroup)
+	}
+	return schedutil.CompositePodGroupPriority(gpg.CompositePodGroup)
+}
+
+func (gpg *GenericPodGroup) GetCreationTimestamp() time.Time {
+	if gpg.PodGroup != nil {
+		return gpg.PodGroup.CreationTimestamp.Time
+	}
+	return gpg.CompositePodGroup.CreationTimestamp.Time
+}
+
+// PodGroupInfo enriches GenericPodGroup with information about pod group hierarchy.
+// For PodGroups, it contains a list of unscheduled pods.
+// For CompositePodGroups, it contains a list of children.
+// This type is typically used as an input to pod group scheduling cycle plugins.
 type PodGroupInfo struct {
-	// Namespace is a namespace of this pod group.
-	Namespace string
-	// Name is a name of this pod group.
-	Name string
-	// Type is a type of the pod group: either composite pod group or pod group.
-	Type fwk.EntityKeyType
+	*GenericPodGroup
 	// UnscheduledPods are pods that are currently being considered for scheduling.
 	// It can be useful to also retrieve the scheduled (assumed or assigned) pods.
 	// PodGroupManager.PodGroupState can be used for that.
 	// The order of the pods is deterministic and based on signature, priority and timestamp.
 	// Only leaf pod groups have unscheduled pods.
 	UnscheduledPods []*v1.Pod
-	// PodGroup is a PodGroup API object.
-	PodGroup *schedulingv1beta1.PodGroup
-	// CompositePodGroup is a CompositePodGroup API object.
-	// It should be set only when CompositePodGroup feature is enabled.
-	CompositePodGroup *schedulingv1alpha3.CompositePodGroup
 	// Children are the child pod groups of this pod group. Only composite pod groups have children.
 	Children []*PodGroupInfo
 }
 
-func (pgi *PodGroupInfo) GetName() string {
-	return pgi.Name
-}
-
-func (pgi *PodGroupInfo) GetNamespace() string {
-	return pgi.Namespace
-}
-
-func (pgi *PodGroupInfo) GetType() fwk.EntityKeyType {
-	return pgi.Type
-}
-
 func (pgi *PodGroupInfo) GetKey() string {
-	return fmt.Sprintf("%s/%s/%s", pgi.Type, pgi.Namespace, pgi.Name)
+	return fmt.Sprintf("%s/%s/%s", pgi.GetType(), pgi.GetNamespace(), pgi.GetName())
 }
 
 // GetUnscheduledPods returns the unscheduled pods for this pod group.
@@ -1241,14 +1207,6 @@ func (pgi *PodGroupInfo) GetUnscheduledPods() []*v1.Pod {
 	return pods
 }
 
-func (pgi *PodGroupInfo) GetPodGroup() *schedulingv1beta1.PodGroup {
-	return pgi.PodGroup
-}
-
-func (pgi *PodGroupInfo) GetCompositePodGroup() *schedulingv1alpha3.CompositePodGroup {
-	return pgi.CompositePodGroup
-}
-
 func (pgi *PodGroupInfo) GetChildren() []fwk.PodGroupInfo {
 	if len(pgi.Children) == 0 {
 		return nil
@@ -1258,13 +1216,6 @@ func (pgi *PodGroupInfo) GetChildren() []fwk.PodGroupInfo {
 		children[i] = child
 	}
 	return children
-}
-
-func (pgi *PodGroupInfo) GetCreationTimestamp() time.Time {
-	if pgi.PodGroup != nil {
-		return pgi.PodGroup.CreationTimestamp.Time
-	}
-	return pgi.CompositePodGroup.CreationTimestamp.Time
 }
 
 func (pgi *PodGroupInfo) GetChildGroups() []*PodGroupInfo {
@@ -1285,9 +1236,9 @@ func (pgi *PodGroupInfo) GetChildGroups() []*PodGroupInfo {
 		if aTime.After(bTime) {
 			return 1
 		}
-		if a.Name < b.Name {
+		if a.GetName() < b.GetName() {
 			return -1
-		} else if a.Name > b.Name {
+		} else if a.GetName() > b.GetName() {
 			return 1
 		}
 		return 0

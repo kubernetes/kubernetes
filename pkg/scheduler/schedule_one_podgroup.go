@@ -98,9 +98,6 @@ func (sched *Scheduler) scheduleOnePodGroup(ctx context.Context, podGroupInfo *f
 	if err := sched.reconcilePodGroupWithSnapshot(podGroupInfo.PodGroupInfo); err != nil {
 		// It can happen that the hierarchy was popped from the scheduling queue before it observed the change of shape.
 		// (Composite)PodGroup should come back to the scheduling queue.
-		// We set the underlying API object to nil to signify that we don't want to update its condition in failure handler.
-		podGroupInfo.PodGroup = nil
-		podGroupInfo.CompositePodGroup = nil
 		sched.handlePodGroupFailureBeforeScheduling(ctx, podGroupInfo, err)
 		return
 	}
@@ -132,8 +129,8 @@ func (sched *Scheduler) scheduleOnePodGroup(ctx context.Context, podGroupInfo *f
 // This is needed because PodGroupInfo popped from the queue can have older PodGroup/CompositePodGroup objects.
 // Any differences in the hierarchy shape (added or removed subtrees) will result in error.
 func (sched *Scheduler) reconcilePodGroupWithSnapshot(pgi *framework.PodGroupInfo) error {
-	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) && (pgi.GetType() == fwk.CompositePodGroupKeyType || pgi.CompositePodGroup != nil) {
-		compositePodGroup, err := sched.nodeInfoSnapshot.CompositePodGroups().Get(pgi.Namespace, pgi.Name)
+	if pgi.GetType() == fwk.CompositePodGroupKeyType {
+		compositePodGroup, err := sched.nodeInfoSnapshot.CompositePodGroups().Get(pgi.GetNamespace(), pgi.GetName())
 		if err != nil {
 			return err
 		}
@@ -142,7 +139,7 @@ func (sched *Scheduler) reconcilePodGroupWithSnapshot(pgi *framework.PodGroupInf
 				ptr.Deref(compositePodGroup.Spec.ParentCompositePodGroupName, "[unset]"),
 				ptr.Deref(pgi.CompositePodGroup.Spec.ParentCompositePodGroupName, "[unset]"))
 		}
-		cpgs, err := sched.nodeInfoSnapshot.CompositePodGroupStates().Get(pgi.Namespace, pgi.Name)
+		cpgs, err := sched.nodeInfoSnapshot.CompositePodGroupStates().Get(pgi.GetNamespace(), pgi.GetName())
 		if err != nil {
 			return err
 		}
@@ -156,9 +153,9 @@ func (sched *Scheduler) reconcilePodGroupWithSnapshot(pgi *framework.PodGroupInf
 				return err
 			}
 		}
-		pgi.CompositePodGroup = compositePodGroup
+		pgi.GenericPodGroup = framework.NewGenericCompositePodGroup(compositePodGroup)
 	} else {
-		podGroup, err := sched.nodeInfoSnapshot.PodGroups().Get(pgi.Namespace, pgi.Name)
+		podGroup, err := sched.nodeInfoSnapshot.PodGroups().Get(pgi.GetNamespace(), pgi.GetName())
 		if err != nil {
 			return err
 		}
@@ -168,7 +165,7 @@ func (sched *Scheduler) reconcilePodGroupWithSnapshot(pgi *framework.PodGroupInf
 				ptr.Deref(podGroup.Spec.ParentCompositePodGroupName, "[unset]"),
 				ptr.Deref(pgi.PodGroup.Spec.ParentCompositePodGroupName, "[unset]"))
 		}
-		pgi.PodGroup = podGroup
+		pgi.GenericPodGroup = framework.NewGenericPodGroup(podGroup)
 	}
 	return nil
 }
@@ -310,7 +307,7 @@ func (sched *Scheduler) validateScheduledPods(podGroupInfo *framework.PodGroupIn
 		return nil
 	}
 
-	podGroupState, err := sched.nodeInfoSnapshot.PodGroupStates().Get(podGroupInfo.Namespace, podGroupInfo.Name)
+	podGroupState, err := sched.nodeInfoSnapshot.PodGroupStates().Get(podGroupInfo.GetNamespace(), podGroupInfo.GetName())
 	if err != nil {
 		return fmt.Errorf("failed to get pod group state: %w", err)
 	}
@@ -429,7 +426,7 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 	pgResults := sched.runRootSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, rootPodGroupInfo)
 	rootStatus := pgResults[pgKey(rootPodGroupInfo.PodGroupInfo)].status
 	var completePGResults map[fwk.EntityKey]*podGroupAlgorithmResult
-	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) && rootPodGroupInfo.GetType() == fwk.CompositePodGroupKeyType {
+	if rootPodGroupInfo.GetType() == fwk.CompositePodGroupKeyType {
 		completePGResults = completeCompositePodGroupAlgorithmResult(ctx, rootPodGroupInfo, podGroupCycleState, pgResults)
 	} else {
 		// pgResults has exactly 1 element.
@@ -467,7 +464,7 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 func (sched *Scheduler) runRootSchedulingAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, rootPodGroupInfo *framework.QueuedPodGroupInfo) map[fwk.EntityKey]*podGroupAlgorithmResult {
 	var revertFns revertFns
 	defer revertFns.revert()
-	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) && rootPodGroupInfo.GetType() == fwk.CompositePodGroupKeyType {
+	if rootPodGroupInfo.GetType() == fwk.CompositePodGroupKeyType {
 		result := map[fwk.EntityKey]*podGroupAlgorithmResult{}
 		rootResult, childRevertFns := sched.podGroupSchedulingRecursiveAlgorithm(ctx, schedFwk, podGroupCycleState, rootPodGroupInfo, rootPodGroupInfo.PodGroupInfo, result)
 		revertFns = childRevertFns
@@ -574,7 +571,7 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Running a pod group scheduling algorithm", "podGroup", klog.KObj(podGroupInfo), "unscheduledPodsCount", len(queuedPodInfos))
 
-	podGroupState, err := sched.nodeInfoSnapshot.PodGroupStates().Get(podGroupInfo.Namespace, podGroupInfo.Name)
+	podGroupState, err := sched.nodeInfoSnapshot.PodGroupStates().Get(podGroupInfo.GetNamespace(), podGroupInfo.GetName())
 	if err != nil {
 		result.status = fwk.AsStatus(fmt.Errorf("failed to get podGroup state for podGroup %s to compute gang feasibility: %w", klog.KObj(podGroupInfo), err))
 		return result, nil
@@ -944,9 +941,13 @@ func (sched *Scheduler) updatePodGroupCondition(ctx context.Context,
 	podGroupInfo *framework.PodGroupInfo, condition *metav1.Condition) {
 	logger := klog.FromContext(ctx)
 
+	// Get the newest object from cache to ensure the update below serves on the newest object possible.
+	pg, err := sched.Cache.PodGroups().Get(podGroupInfo.GetNamespace(), podGroupInfo.GetName())
+	if err != nil {
+		return
+	}
 	// If the PodGroup was already successfully scheduled, don't regress the
 	// condition back to False on a subsequent cycle for extra pods.
-	pg := podGroupInfo.PodGroup
 	existing := apimeta.FindStatusCondition(pg.Status.Conditions, condition.Type)
 	if existing != nil && existing.Status == metav1.ConditionTrue && condition.Status != metav1.ConditionTrue {
 		return
@@ -958,7 +959,7 @@ func (sched *Scheduler) updatePodGroupCondition(ctx context.Context,
 		return
 	}
 
-	if err := util.PatchPodGroupStatus(ctx, sched.client, podGroupInfo.Name, podGroupInfo.Namespace, &pg.Status, newStatus); err != nil {
+	if err := util.PatchPodGroupStatus(ctx, sched.client, podGroupInfo.GetName(), podGroupInfo.GetNamespace(), &pg.Status, newStatus); err != nil {
 		utilruntime.HandleErrorWithLogger(logger, err, "Failed to update PodGroup status", "podGroup", klog.KObj(podGroupInfo))
 	}
 }
@@ -1293,11 +1294,11 @@ func (sched *Scheduler) podGroupSchedulingAlgorithm(ctx context.Context, schedFw
 // The returned revertFns propagates revert functions from all child pod group evaluations up to the root level.
 func (sched *Scheduler) podGroupSchedulingRecursiveAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, root *framework.QueuedPodGroupInfo, podGroupInfo *framework.PodGroupInfo, results map[fwk.EntityKey]*podGroupAlgorithmResult) (*podGroupAlgorithmResult, revertFns) {
 	logger := klog.FromContext(ctx)
-	logger.V(5).Info("Running recursive podgroup scheduling algorithm", "rootType", podGroupInfo.Type, "root", klog.KObj(podGroupInfo))
+	logger.V(5).Info("Running recursive podgroup scheduling algorithm", "rootType", podGroupInfo.GetType(), "root", klog.KObj(podGroupInfo))
 
 	var algorithmResult *podGroupAlgorithmResult
 	var childRevertFns revertFns
-	if podGroupInfo.Type == fwk.PodGroupKeyType {
+	if podGroupInfo.GetType() == fwk.PodGroupKeyType {
 		algorithmResult, childRevertFns = sched.podGroupSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, podGroupInfo, root)
 		results[pgKey(podGroupInfo)] = algorithmResult
 	} else {
@@ -1379,10 +1380,10 @@ func (sched *Scheduler) compositePodGroupSchedulingDefaultAlgorithm(ctx context.
 }
 
 func pgKey(pgi *framework.PodGroupInfo) fwk.EntityKey {
-	if pgi.Type == fwk.CompositePodGroupKeyType {
-		return fwk.CompositePodGroupKey(pgi.Namespace, pgi.Name)
+	if pgi.GetType() == fwk.CompositePodGroupKeyType {
+		return fwk.CompositePodGroupKey(pgi.GetNamespace(), pgi.GetName())
 	}
-	return fwk.PodGroupKey(pgi.Namespace, pgi.Name)
+	return fwk.PodGroupKey(pgi.GetNamespace(), pgi.GetName())
 }
 
 // assumeSubtreeWithRevert runs assumeAndReserveWithRevert on all pods within the subtree.
