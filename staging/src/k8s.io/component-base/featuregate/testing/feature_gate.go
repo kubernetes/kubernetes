@@ -38,6 +38,10 @@ func init() {
 	featureFlagOverride = map[featuregate.Feature]string{}
 }
 
+type ThawableFeatureGate interface {
+	ThawForTest()
+}
+
 type FeatureOverrides = map[featuregate.Feature]bool
 
 // SetFeatureGateDuringTest sets the specified gate to the specified value for duration of the test.
