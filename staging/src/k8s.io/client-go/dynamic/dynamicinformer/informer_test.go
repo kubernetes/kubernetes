@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
@@ -387,6 +388,51 @@ func TestDynamicSharedInformerFactory(t *testing.T) {
 				t.Errorf("tested informer haven't received an object, waited %v", timeout)
 			}
 		})
+	}
+}
+
+func TestDynamicSharedInformerFactoryReplacesStoppedInformer(t *testing.T) {
+	gvr := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
+	fakeClient := fake.NewSimpleDynamicClientWithCustomListKinds(
+		runtime.NewScheme(),
+		map[schema.GroupVersionResource]string{gvr: "DeploymentList"},
+	)
+	factory := dynamicinformer.NewDynamicSharedInformerFactory(fakeClient, 0)
+
+	first := factory.ForResource(gvr)
+	if duplicate := factory.ForResource(gvr); duplicate != first {
+		t.Fatal("ForResource returned a new informer before the cached informer stopped")
+	}
+
+	firstCtx, stopFirst := context.WithTimeout(t.Context(), 5*time.Second)
+	factory.Start(firstCtx.Done())
+	if synced := factory.WaitForCacheSync(firstCtx.Done()); !synced[gvr] {
+		stopFirst()
+		t.Fatalf("first informer for %s did not sync", gvr)
+	}
+	stopFirst()
+	if err := wait.PollUntilContextTimeout(t.Context(), time.Millisecond, 5*time.Second, true, func(context.Context) (bool, error) {
+		return first.Informer().IsStopped(), nil
+	}); err != nil {
+		t.Fatalf("timed out waiting for first informer to stop: %v", err)
+	}
+
+	replacement := factory.ForResource(gvr)
+	if replacement == first {
+		t.Fatal("ForResource returned the stopped informer")
+	}
+	if duplicate := factory.ForResource(gvr); duplicate != replacement {
+		t.Fatal("ForResource did not cache the replacement informer")
+	}
+
+	replacementCtx, stopReplacement := context.WithTimeout(t.Context(), 5*time.Second)
+	factory.Start(replacementCtx.Done())
+	defer func() {
+		stopReplacement()
+		factory.Shutdown()
+	}()
+	if synced := factory.WaitForCacheSync(replacementCtx.Done()); !synced[gvr] {
+		t.Fatalf("replacement informer for %s did not sync", gvr)
 	}
 }
 
