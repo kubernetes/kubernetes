@@ -18,8 +18,10 @@ package admission
 
 import (
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
+	policygeneric "k8s.io/apiserver/pkg/admission/plugin/policy/generic"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	policyloader "k8s.io/kubernetes/pkg/admission/plugin/policy/manifest/loader"
@@ -30,7 +32,12 @@ import (
 
 // PluginInitializer is used for initialization of the Kubernetes specific admission plugins.
 type PluginInitializer struct {
-	loaders *initializer.ManifestLoaders
+	loaders           *initializer.ManifestLoaders
+	paramKindResolver *crdParamKindResolver
+}
+
+type wantsParamKindResolver interface {
+	SetParamKindResolver(policygeneric.ParamKindResolver)
 }
 
 var _ admission.PluginInitializer = &PluginInitializer{}
@@ -38,8 +45,21 @@ var _ admission.PluginInitializer = &PluginInitializer{}
 // NewPluginInitializer constructs new instance of PluginInitializer
 func NewPluginInitializer() *PluginInitializer {
 	return &PluginInitializer{
-		loaders: newManifestLoaders(),
+		loaders:           newManifestLoaders(),
+		paramKindResolver: newCRDParamKindResolver(),
 	}
+}
+
+// ExpectCustomResourceDefinitionInformer makes policy sources wait for the CRD
+// informer when the apiextensions API is enabled.
+func (i *PluginInitializer) ExpectCustomResourceDefinitionInformer() {
+	i.paramKindResolver.ExpectCustomResourceDefinitionInformer()
+}
+
+// SetCustomResourceDefinitionInformer attaches the informer owned by the
+// apiextensions server before either server starts.
+func (i *PluginInitializer) SetCustomResourceDefinitionInformer(informer apiextensionsinformers.CustomResourceDefinitionInformer) error {
+	return i.paramKindResolver.SetCustomResourceDefinitionInformer(informer)
 }
 
 // Initialize checks the initialization interfaces implemented by each plugin
@@ -47,6 +67,9 @@ func NewPluginInitializer() *PluginInitializer {
 func (i *PluginInitializer) Initialize(plugin admission.Interface) {
 	if wants, ok := plugin.(initializer.WantsManifestLoaders); ok {
 		wants.SetManifestLoaders(i.loaders)
+	}
+	if wants, ok := plugin.(wantsParamKindResolver); ok {
+		wants.SetParamKindResolver(i.paramKindResolver)
 	}
 }
 
