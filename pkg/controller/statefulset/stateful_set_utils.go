@@ -519,6 +519,21 @@ func getPodRevision(pod *v1.Pod) string {
 	return pod.Labels[apps.StatefulSetRevisionLabel]
 }
 
+// isOnStaleRevision returns true if the Pod's revision is neither the current nor
+// the update revision of its StatefulSet. Such a Pod is left behind by a previous,
+// failed rollout (for example a Pod stuck in ImagePullBackOff from a bad image that
+// has since been superseded by a newer revision). It can never become healthy on its
+// own and must be recreated at the correct revision. A Pod without a revision label
+// is not considered stale: it has not been assigned to any revision and its state is
+// not comparable to the set revisions.
+func isOnStaleRevision(pod *v1.Pod, currentRevisionName, updateRevisionName string) bool {
+	revision := getPodRevision(pod)
+	if revision == "" {
+		return false
+	}
+	return revision != currentRevisionName && revision != updateRevisionName
+}
+
 // newStatefulSetPod returns a new Pod conforming to the set's Spec with an identity generated from ordinal.
 func newStatefulSetPod(set *apps.StatefulSet, ordinal int) *v1.Pod {
 	pod, _ := controller.GetPodFromTemplate(&set.Spec.Template, set, metav1.NewControllerRef(set, controllerKind))

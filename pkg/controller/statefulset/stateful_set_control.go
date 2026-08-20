@@ -418,7 +418,7 @@ func updateStatus(status *apps.StatefulSetStatus, minReadySeconds int32, current
 	}
 }
 
-func (ssc *defaultStatefulSetControl) processReplica(ctx context.Context, set *apps.StatefulSet, updateSet *apps.StatefulSet, monotonic bool, replicas []*v1.Pod, i int, now time.Time) (bool, error) {
+func (ssc *defaultStatefulSetControl) processReplica(ctx context.Context, set *apps.StatefulSet, updateSet *apps.StatefulSet, currentRevisionName, updateRevisionName string, monotonic bool, replicas []*v1.Pod, i int, now time.Time) (bool, error) {
 	logger := klog.FromContext(ctx)
 
 	// Note that pods with phase Succeeded will also trigger this event. This is
@@ -467,6 +467,28 @@ func (ssc *defaultStatefulSetControl) processReplica(ctx context.Context, set *a
 	if isTerminating(replicas[i]) && monotonic {
 		logger.V(4).Info("StatefulSet is waiting for Pod to Terminate",
 			"statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[i]))
+		return true, nil
+	}
+
+	// If a Pod is on a revision that is neither the current nor the update revision (for
+	// example a Pod left in ImagePullBackOff by a previous, failed rollout) and it is not
+	// available, it can never recover on its own. Waiting for it to become Running and Ready
+	// would block the rollout indefinitely, so delete it now to let the next sync recreate it
+	// at the correct revision. This is gated on the RollingUpdate strategy: OnDelete requires
+	// the user to delete Pods manually, and Recreate handles old-revision deletion itself.
+	if monotonic &&
+		set.Spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType &&
+		isOnStaleRevision(replicas[i], currentRevisionName, updateRevisionName) &&
+		isUnavailable(replicas[i], set.Spec.MinReadySeconds, now) {
+		if replicas[i].DeletionTimestamp == nil {
+			logger.V(2).Info("StatefulSet is deleting unavailable Pod on a stale revision to allow the rollout to proceed",
+				"statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[i]),
+				"currentRevision", currentRevisionName, "updateRevision", updateRevisionName,
+				"podRevision", getPodRevision(replicas[i]))
+			if err := ssc.podControl.DeleteStatefulPod(set, replicas[i]); err != nil {
+				return true, err
+			}
+		}
 		return true, nil
 	}
 
@@ -685,7 +707,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(ctx context.Context, set
 
 	// First, process each living replica. Exit if we run into an error or something blocking in monotonic mode.
 	processReplicaFn := func(i int) (bool, error) {
-		return ssc.processReplica(ctx, set, updateSet, monotonic, replicas, i, now)
+		return ssc.processReplica(ctx, set, updateSet, currentRevision.Name, updateRevision.Name, monotonic, replicas, i, now)
 	}
 	if shouldExit, err := runForAll(replicas, processReplicaFn, monotonic); shouldExit || err != nil {
 		updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, now, replicas, condemned)
