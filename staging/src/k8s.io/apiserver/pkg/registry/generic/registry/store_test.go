@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/util/resourceversion"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -3135,4 +3136,203 @@ func TestValidateIndexers(t *testing.T) {
 			t.Errorf("%v: expected no error, but got %v", tc.name, err)
 		}
 	}
+}
+
+func TestUpdateEmptyFinalizersRV(t *testing.T) {
+	podName := "foo"
+	podWithFinalizer := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName, Finalizers: []string{"foo.com/x"}},
+		Spec:       example.PodSpec{NodeName: "machine"},
+	}
+
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	destroyFunc, registry := newTestGenericStoreRegistry(t, scheme, false)
+	defer destroyFunc()
+
+	// 1. Create the pod with finalizer
+	if _, err := registry.Create(ctx, podWithFinalizer, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// 2. Delete object with nil delete options to mark it as deleting but not delete it immediately
+	_, wasDeleted, err := registry.Delete(ctx, podName, rest.ValidateAllObjectFunc, nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if wasDeleted {
+		t.Fatalf("Expected pod not to be deleted immediately")
+	}
+
+	// 3. Retrieve the pod to get the latest ResourceVersion with DeletionTimestamp set
+	obj, err := registry.Get(ctx, podName, &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	podAfterDelete := obj.(*example.Pod)
+	if podAfterDelete.DeletionTimestamp == nil {
+		t.Fatalf("Expected DeletionTimestamp to be set")
+	}
+
+	// 4. Perform an Update that removes the finalizer AND makes another change (Spec.NodeName)
+	podWithNoFinalizer := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName, ResourceVersion: podAfterDelete.ResourceVersion},
+		Spec:       example.PodSpec{NodeName: "anothermachine"},
+	}
+
+	// Enable ReturnDeletedObject on registry to return the full object
+	registry.ReturnDeletedObject = true
+
+	updatedObj, creating, err := registry.Update(ctx, podName, rest.DefaultUpdatedObjectInfo(podWithNoFinalizer), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if creating {
+		t.Fatalf("Expected creating to be false")
+	}
+
+	updatedPod, ok := updatedObj.(*example.Pod)
+	if !ok {
+		t.Fatalf("Expected updated object to be *example.Pod, got %T", updatedObj)
+	}
+
+	// Verify that the finalizer is gone
+	if len(updatedPod.Finalizers) != 0 {
+		t.Errorf("Expected finalizers to be empty, but got %v", updatedPod.Finalizers)
+	}
+	// Verify that other changes (Spec.NodeName) are correctly reflected in the returned object
+	if updatedPod.Spec.NodeName != "anothermachine" {
+		t.Errorf("Expected Spec.NodeName to be %q, but got %q", "anothermachine", updatedPod.Spec.NodeName)
+	}
+	// Verify that the returned ResourceVersion is greater than the one before the update (indicating it represents the deletion transaction)
+	cmp, err := resourceversion.CompareResourceVersion(updatedPod.ResourceVersion, podAfterDelete.ResourceVersion)
+	if err != nil {
+		t.Fatalf("Unexpected error comparing resource versions: %v", err)
+	}
+	if cmp <= 0 {
+		t.Errorf("Expected ResourceVersion %q to be greater than the one before update %q", updatedPod.ResourceVersion, podAfterDelete.ResourceVersion)
+	}
+}
+
+func TestStoreDeleteRaceRV(t *testing.T) {
+	podName := "foo"
+	pod := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName},
+		Spec:       example.PodSpec{NodeName: "machine"},
+	}
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+
+	testCases := []struct {
+		name                string
+		returnDeletedObject bool
+	}{
+		{"ReturnDeletedObject=true", true},
+		{"ReturnDeletedObject=false", false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			destroyFunc, registry := newTestGenericStoreRegistry(t, scheme, false)
+			defer destroyFunc()
+
+			defaultDeleteStrategy := testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
+			registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
+			registry.ReturnDeletedObject = tc.returnDeletedObject
+
+			objCreated, err := registry.Create(ctx, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			createdPod := objCreated.(*example.Pod)
+			podKey, _ := registry.KeyFunc(ctx, podName)
+
+			// Setup the racing delete storage wrapper
+			racingStorage := &racingDeleteStorage{
+				Interface:   registry.Storage.Storage,
+				t:           t,
+				keyToDelete: podKey,
+			}
+			registry.Storage.Storage = racingStorage
+
+			// Trigger deletion with grace period 0 to use graceful strategy but delete immediately.
+			gracePeriod := int64(0)
+			delOpts := &metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod}
+
+			obj, deleted, err := registry.Delete(ctx, podName, rest.ValidateAllObjectFunc, delOpts)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if !deleted {
+				t.Fatal("Expected object to be considered deleted")
+			}
+
+			var returnedRV string
+			if tc.returnDeletedObject {
+				returnedAccessor, err := meta.Accessor(obj)
+				if err != nil {
+					t.Fatalf("Failed to get accessor: %v", err)
+				}
+				returnedRV = returnedAccessor.GetResourceVersion()
+			} else {
+				statusObj, ok := obj.(*metav1.Status)
+				if !ok {
+					t.Fatalf("Expected *metav1.Status, got %T", obj)
+				}
+				returnedRV = statusObj.ResourceVersion
+			}
+
+			if tc.returnDeletedObject {
+				// If returnDeletedObject is true, setRVFromNotFound clears the ResourceVersion
+				if returnedRV != "" {
+					t.Errorf("Expected empty ResourceVersion, but got %q", returnedRV)
+				}
+			} else {
+				// If returnDeletedObject is false, it populates ResourceVersion from the NotFound error
+				if returnedRV == "" {
+					t.Errorf("Expected non-empty ResourceVersion")
+				}
+				cmp, err := resourceversion.CompareResourceVersion(returnedRV, createdPod.ResourceVersion)
+				if err != nil {
+					t.Fatalf("Unexpected error comparing resource versions: %v", err)
+				}
+				if cmp <= 0 {
+					t.Errorf("Expected final ResourceVersion %q to be greater than created ResourceVersion %q", returnedRV, createdPod.ResourceVersion)
+				}
+				// Ensure the returned ResourceVersion is identical to the actual deletion revision
+				racingStorage.capturedDeleteRVMux.Lock()
+				expectedRV := racingStorage.capturedDeleteRV
+				racingStorage.capturedDeleteRVMux.Unlock()
+				if returnedRV != expectedRV {
+					t.Errorf("Expected final ResourceVersion to be identical to actual deletion revision (%q), but got %q", expectedRV, returnedRV)
+				}
+			}
+		})
+	}
+}
+
+type racingDeleteStorage struct {
+	storage.Interface
+	t                   *testing.T
+	keyToDelete         string
+	once                sync.Once
+	capturedDeleteRV    string
+	capturedDeleteRVMux sync.Mutex
+}
+
+func (s *racingDeleteStorage) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object, opts storage.DeleteOptions) error {
+	if key == s.keyToDelete {
+		s.once.Do(func() {
+			// Perform the delete operation directly against the underlying etcd storage.
+			// This deletes the key and increments etcd revision.
+			err := s.Interface.Delete(ctx, key, out, nil, validateDeletion, nil, opts)
+			if err != nil {
+				s.t.Errorf("Failed to delete key in racing goroutine: %v", err)
+			}
+			if acc, err := meta.Accessor(out); err == nil {
+				s.capturedDeleteRVMux.Lock()
+				s.capturedDeleteRV = acc.GetResourceVersion()
+				s.capturedDeleteRVMux.Unlock()
+			}
+		})
+	}
+	return s.Interface.Delete(ctx, key, out, preconditions, validateDeletion, cachedExistingObject, opts)
 }

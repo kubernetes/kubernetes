@@ -43,6 +43,7 @@ type DeviceTaintRuleInterface interface {
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 	UpdateStatus(ctx context.Context, deviceTaintRule *resourcev1beta2.DeviceTaintRule, opts v1.UpdateOptions) (*resourcev1beta2.DeviceTaintRule, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts v1.DeleteOptions) (v1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*resourcev1beta2.DeviceTaintRule, error)
 	List(ctx context.Context, opts v1.ListOptions) (*resourcev1beta2.DeviceTaintRuleList, error)

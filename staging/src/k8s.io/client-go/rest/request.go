@@ -1561,3 +1561,21 @@ func ValidatePathSegmentName(name string, prefix bool) []string {
 	}
 	return IsValidPathSegmentName(name)
 }
+
+type staticDecoder struct {
+	obj runtime.Object
+}
+
+func (d staticDecoder) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
+	return d.obj, nil, nil
+}
+
+// NewResultWithObject returns a Result that contains the decoded object.
+func NewResultWithObject(obj runtime.Object, err error, statusCode int) Result {
+	return Result{
+		err:        err,
+		statusCode: statusCode,
+		body:       []byte("static"),
+		decoder:    staticDecoder{obj},
+	}
+}

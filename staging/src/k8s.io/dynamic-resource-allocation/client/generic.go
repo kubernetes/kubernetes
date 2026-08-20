@@ -18,6 +18,7 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -67,6 +68,7 @@ type funcs[T, TL, TAC any] interface {
 	Create(context.Context, *T, metav1.CreateOptions) (*T, error)
 	Update(context.Context, *T, metav1.UpdateOptions) (*T, error)
 	Delete(context.Context, string, metav1.DeleteOptions) error
+	DeleteWithResult(context.Context, string, metav1.DeleteOptions) (metav1.APIResult, error)
 	DeleteCollection(context.Context, metav1.DeleteOptions, metav1.ListOptions) error
 	Get(context.Context, string, metav1.GetOptions) (*T, error)
 	List(context.Context, metav1.ListOptions) (*TL, error)
@@ -147,6 +149,24 @@ func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC, O2P, O2, O2L, O2AC]) D
 	})
 	_, err := apis.run()
 	return err
+}
+
+func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC, O2P, O2, O2L, O2AC]) DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions) (metav1.APIResult, error) {
+	apis := newCall(t.c, func(currentAPI int32) (metav1.APIResult, error) {
+		switch currentAPI {
+		case useV1beta1API:
+			return deleteWithConversion[N, O, NP, OP](func() (metav1.APIResult, error) {
+				return t.v1beta1.DeleteWithResult(ctx, name, opts)
+			})
+		case useV1beta2API:
+			return deleteWithConversion[N, O2, NP, O2P](func() (metav1.APIResult, error) {
+				return t.v1beta2.DeleteWithResult(ctx, name, opts)
+			})
+		default:
+			return t.native.DeleteWithResult(ctx, name, opts)
+		}
+	})
+	return apis.run()
 }
 
 func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC, O2P, O2, O2L, O2AC]) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
@@ -293,6 +313,48 @@ func getWithConversion[N, O any](call func() (*O, error)) (*N, error) {
 		return nil, err
 	}
 	return value, nil
+}
+
+func deleteWithConversion[N, O any, NP objectPtr[N], OP objectPtr[O]](call func() (metav1.APIResult, error)) (metav1.APIResult, error) {
+	res, err := call()
+	if err != nil {
+		return res, err
+	}
+	if res == nil {
+		return nil, nil
+	}
+	obj, err := res.Get()
+	if err != nil {
+		return res, err
+	}
+	if _, ok := obj.(*metav1.Status); ok {
+		return res, nil
+	}
+	typedIn, ok := obj.(OP)
+	if !ok {
+		return nil, fmt.Errorf("unexpected return type %T, expected %T", obj, typedIn)
+	}
+	value := NP(new(N))
+	if err := scheme.Convert(typedIn, value, nil); err != nil {
+		return nil, err
+	}
+	return convertingAPIResult{
+		APIResult:    res,
+		convertedObj: value,
+	}, nil
+}
+
+type convertingAPIResult struct {
+	metav1.APIResult
+	convertedObj runtime.Object
+}
+
+func (c convertingAPIResult) Get() (runtime.Object, error) {
+	return c.convertedObj, nil
+}
+
+func (c convertingAPIResult) Into(obj runtime.Object) error {
+	return scheme.Convert(c.convertedObj, obj, nil)
 }
 
 func watchWithConversion[NP objectPtr[N], N any, OP runtime.Object](call func() (watch.Interface, error)) (watch.Interface, error) {

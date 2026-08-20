@@ -653,6 +653,26 @@ func ShouldDeleteDuringUpdate(ctx context.Context, key string, obj, existing run
 	return oldMeta.GetDeletionGracePeriodSeconds() == nil || *oldMeta.GetDeletionGracePeriodSeconds() == 0
 }
 
+func setRVFromNotFound(err error, lastKnown runtime.Object, returnDeletedObject bool) runtime.Object {
+	obj := lastKnown.DeepCopyObject()
+	accessor, aErr := meta.Accessor(obj)
+	if aErr != nil {
+		return obj
+	}
+	if returnDeletedObject {
+		// clear the resource version since we can't return an RV that corresponds to both the object content and the storage version
+		accessor.SetResourceVersion("")
+	} else {
+		if rv, ok := storage.ResourceVersion(err); ok && rv != "" {
+			accessor.SetResourceVersion(rv)
+		} else {
+			// clear the resource version since we don't know the storage version at this point
+			accessor.SetResourceVersion("")
+		}
+	}
+	return obj
+}
+
 // deleteWithoutFinalizers handles deleting an object ignoring its finalizer list.
 // Used for objects that are either been finalized or have never initialized.
 func (e *Store) deleteWithoutFinalizers(ctx context.Context, name, key string, obj runtime.Object, preconditions *storage.Preconditions, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
@@ -664,6 +684,7 @@ func (e *Store) deleteWithoutFinalizers(ctx context.Context, name, key string, o
 		// requests to remove all finalizers from the object, so we
 		// ignore the NotFound error.
 		if storage.IsNotFound(err) {
+			obj = setRVFromNotFound(err, obj, e.ReturnDeletedObject)
 			_, err := e.finalizeDelete(ctx, obj, true, options)
 			// clients are expecting an updated object if a PUT succeeded,
 			// but finalizeDelete returns a metav1.Status, so return
@@ -672,10 +693,15 @@ func (e *Store) deleteWithoutFinalizers(ctx context.Context, name, key string, o
 		}
 		return nil, false, storeerr.InterpretDeleteError(err, e.qualifiedResourceFromContext(ctx), name)
 	}
-	_, err := e.finalizeDelete(ctx, out, true, options)
-	// clients are expecting an updated object if a PUT succeeded, but
-	// finalizeDelete returns a metav1.Status, so return the object in
-	// the request instead.
+	// clients are expecting the updated object if a PUT succeeded. We preserve
+	// any other updates in 'obj' but update its resource version to match the
+	// actual deletion transaction.
+	if outAccessor, err := meta.Accessor(out); err == nil {
+		if objAccessor, err := meta.Accessor(obj); err == nil {
+			objAccessor.SetResourceVersion(outAccessor.GetResourceVersion())
+		}
+	}
+	_, err := e.finalizeDelete(ctx, obj, true, options)
 	return obj, false, err
 }
 
@@ -1282,6 +1308,7 @@ func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.V
 		if storage.IsNotFound(err) && ignoreNotFound && lastExisting != nil {
 			// The lastExisting object may not be the last state of the object
 			// before its deletion, but it's the best approximation.
+			lastExisting = setRVFromNotFound(err, lastExisting, e.ReturnDeletedObject)
 			out, err := e.finalizeDelete(ctx, lastExisting, true, options)
 			return out, true, err
 		}
@@ -1479,6 +1506,7 @@ func (e *Store) finalizeDelete(ctx context.Context, obj runtime.Object, runHooks
 		UID:   accessor.GetUID(),
 	}
 	status := &metav1.Status{Status: metav1.StatusSuccess, Details: details}
+	status.ResourceVersion = accessor.GetResourceVersion()
 	return status, nil
 }
 
