@@ -20,14 +20,45 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/cache"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/component-helpers/storage/volume"
+	"k8s.io/component-helpers/storage/volume/assumecache"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
+
+// fakePVInformer is a minimal assumecache.Informer for unit tests that only
+// need a standalone persistentVolumeOrderedIndex over an in-memory indexer.
+type fakePVInformer struct {
+	indexer cache.Indexer
+}
+
+func (f *fakePVInformer) AddEventHandler(handler cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error) {
+	return nil, nil
+}
+
+func (f *fakePVInformer) GetIndexer() cache.Indexer {
+	return f.indexer
+}
+
+// newPersistentVolumeOrderedIndex builds a persistentVolumeOrderedIndex backed
+// by a standalone assume cache, for tests that exercise the matching logic
+// without a running informer.
+func newPersistentVolumeOrderedIndex() persistentVolumeOrderedIndex {
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{accessModesIndex: accessModesIndexFunc})
+	c, err := assumecache.NewAssumeCache[*v1.PersistentVolume](klog.Background(), &fakePVInformer{indexer: indexer}, schema.GroupResource{Resource: "persistentvolumes"})
+	if err != nil {
+		panic(err)
+	}
+	return persistentVolumeOrderedIndex{c}
+}
 
 func makePVC(size string, modfn func(*v1.PersistentVolumeClaim)) *v1.PersistentVolumeClaim {
 	fs := v1.PersistentVolumeFilesystem
@@ -77,7 +108,7 @@ func makeVolumeModePVC(size string, mode *v1.PersistentVolumeMode, modfn func(*v
 func TestMatchVolume(t *testing.T) {
 	volList := newPersistentVolumeOrderedIndex()
 	for _, pv := range createTestVolumes() {
-		volList.store.Add(pv)
+		require.NoError(t, volList.Indexer().Add(pv))
 	}
 
 	scenarios := map[string]struct {
@@ -259,8 +290,8 @@ func TestMatchingWithBoundVolumes(t *testing.T) {
 		},
 	}
 
-	volumeIndex.store.Add(pv1)
-	volumeIndex.store.Add(pv2)
+	require.NoError(t, volumeIndex.Indexer().Add(pv1))
+	require.NoError(t, volumeIndex.Indexer().Add(pv2))
 
 	claim := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -293,7 +324,7 @@ func TestMatchingWithBoundVolumes(t *testing.T) {
 func TestListByAccessModes(t *testing.T) {
 	volList := newPersistentVolumeOrderedIndex()
 	for _, pv := range createTestVolumes() {
-		volList.store.Add(pv)
+		require.NoError(t, volList.Indexer().Add(pv))
 	}
 
 	volumes, err := volList.listByAccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany})
@@ -324,7 +355,7 @@ func TestListByAccessModes(t *testing.T) {
 func TestAllPossibleAccessModes(t *testing.T) {
 	index := newPersistentVolumeOrderedIndex()
 	for _, pv := range createTestVolumes() {
-		index.store.Add(pv)
+		require.NoError(t, index.Indexer().Add(pv))
 	}
 
 	// the mock PVs creates contain 2 types of accessmodes:   RWO+ROX and RWO+ROW+RWX
@@ -411,9 +442,9 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 	}
 
 	index := newPersistentVolumeOrderedIndex()
-	index.store.Add(gce)
-	index.store.Add(ebs)
-	index.store.Add(nfs)
+	require.NoError(t, index.Indexer().Add(gce))
+	require.NoError(t, index.Indexer().Add(ebs))
+	require.NoError(t, index.Indexer().Add(nfs))
 
 	volume, _ := index.findBestMatchForClaim(claim, false)
 	if volume.Name != ebs.Name {
@@ -1102,7 +1133,7 @@ func createVolumeModeNilTestVolume() *v1.PersistentVolume {
 
 func createTestVolOrderedIndex(pv *v1.PersistentVolume) persistentVolumeOrderedIndex {
 	volFile := newPersistentVolumeOrderedIndex()
-	volFile.store.Add(pv)
+	_ = volFile.Indexer().Add(pv)
 	return volFile
 }
 
@@ -1376,11 +1407,11 @@ func TestFindingPreboundVolumes(t *testing.T) {
 	pvBadMode.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}
 
 	index := newPersistentVolumeOrderedIndex()
-	index.store.Add(pv1)
-	index.store.Add(pv5)
-	index.store.Add(pv8)
-	index.store.Add(pvBadSize)
-	index.store.Add(pvBadMode)
+	require.NoError(t, index.Indexer().Add(pv1))
+	require.NoError(t, index.Indexer().Add(pv5))
+	require.NoError(t, index.Indexer().Add(pv8))
+	require.NoError(t, index.Indexer().Add(pvBadSize))
+	require.NoError(t, index.Indexer().Add(pvBadMode))
 
 	// expected exact match on size
 	volume, _ := index.findBestMatchForClaim(claim, false)
@@ -1423,7 +1454,7 @@ func TestFindingPreboundVolumes(t *testing.T) {
 func TestBestMatchDelayed(t *testing.T) {
 	volList := newPersistentVolumeOrderedIndex()
 	for _, pv := range createTestVolumes() {
-		volList.store.Add(pv)
+		require.NoError(t, volList.Indexer().Add(pv))
 	}
 
 	// binding through PV controller should be delayed
