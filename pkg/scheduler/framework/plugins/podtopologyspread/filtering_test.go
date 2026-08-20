@@ -1480,6 +1480,47 @@ func TestPreFilterState(t *testing.T) {
 			},
 			wantPrefilterStatus: fwk.NewStatus(fwk.Skip),
 		},
+		{
+			name: "empty (non-nil) label selector counts all pods per domain",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule,
+					&metav1.LabelSelector{}, nil, nil, nil, nil).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
+			},
+			want: &preFilterState{
+				Constraints: []topologySpreadConstraint{
+					{
+						MaxSkew:            1,
+						TopologyKey:        "zone",
+						Selector:           labels.Everything(),
+						MinDomains:         1,
+						NodeAffinityPolicy: v1.NodeInclusionPolicyHonor,
+						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
+					},
+				},
+				CriticalPaths: []*criticalPaths{
+					{{"zone2", 2}, {"zone1", 3}},
+				},
+				TpValueToMatchNum: []map[string]int{
+					{
+						"zone1": 3, // p-a1, p-a2, p-b1
+						"zone2": 2, // p-y1, p-y2
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2996,6 +3037,32 @@ func TestSingleConstraint(t *testing.T) {
 				"node-y": fwk.Unschedulable,
 			},
 			enableNodeInclusionPolicy: true,
+		},
+		{
+			name: "empty (non-nil) label selector should count all namespace pods",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", v1.DoNotSchedule,
+					&metav1.LabelSelector{}, // {} -> Everything(); NOT nil
+					nil, nil, nil, nil).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+			},
+			// zone1 has 2 matching pods, zone2 has 0, maxSkew=1:
+			// placing into zone1 -> skew 3 > 1 -> Unschedulable; zone2 -> Success.
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Unschedulable,
+				"node-b": fwk.Unschedulable,
+				"node-x": fwk.Success,
+				"node-y": fwk.Success,
+			},
 		},
 	}
 	for _, tt := range tests {
