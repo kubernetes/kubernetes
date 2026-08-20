@@ -48,6 +48,7 @@ type ErrorMatcher struct {
 	matchSource                   bool
 	matchAncestorShortCircuit     bool
 	matchShortCircuit             bool
+	matchCoveredByDeclarative     bool
 	// normalizationRules holds the pre-compiled regex patterns for path normalization.
 	normalizationRules []NormalizationRule
 }
@@ -117,6 +118,9 @@ func (m ErrorMatcher) Matches(want, got *Error) bool {
 		return false
 	}
 	if m.matchShortCircuit && want.ShortCircuit != got.ShortCircuit {
+		return false
+	}
+	if m.matchCoveredByDeclarative && want.CoveredByDeclarative != got.CoveredByDeclarative {
 		return false
 	}
 
@@ -193,6 +197,10 @@ func (m ErrorMatcher) Render(e *Error) string {
 	if m.matchShortCircuit {
 		comma()
 		fmt.Fprintf(&buf, "ShortCircuit=%t", e.ShortCircuit)
+	}
+	if m.matchCoveredByDeclarative {
+		comma()
+		fmt.Fprintf(&buf, "CoveredByDeclarative=%t", e.CoveredByDeclarative)
 	}
 	return "{" + buf.String() + "}"
 }
@@ -286,6 +294,12 @@ func (m ErrorMatcher) MatchAncestorShortCircuit() ErrorMatcher {
 // MatchShortCircuit returns a derived ErrorMatcher which also matches by the ShortCircuit value.
 func (m ErrorMatcher) MatchShortCircuit() ErrorMatcher {
 	m.matchShortCircuit = true
+	return m
+}
+
+// ByCoveredByDeclarative returns a derived ErrorMatcher which also matches by the CoveredByDeclarative value.
+func (m ErrorMatcher) ByCoveredByDeclarative() ErrorMatcher {
+	m.matchCoveredByDeclarative = true
 	return m
 }
 

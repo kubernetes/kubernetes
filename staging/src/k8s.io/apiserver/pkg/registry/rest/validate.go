@@ -214,15 +214,18 @@ func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field
 	fuzzyMatcher := field.ErrorMatcher{}.ByType().ByOrigin().RequireOriginWhenInvalid().ByFieldNormalized(opts.NormalizationRules)
 	fuzzyMatcherWithShortCircuit := fuzzyMatcher.MatchAncestorShortCircuit()
 
-	// Dedupe imperative errors using the fuzzy matcher (type, field, and origin) as they are
-	// not intended and come from (buggy) duplicate validation calls.
+	// Dedupe imperative errors using the fuzzy matcher (type, field, origin, and coveredByDeclarative flag)
+	// as they are not intended and come from (buggy) duplicate validation calls.
+	// Matching by CoveredByDeclarative ensures we don't deduplicate and accidentally drop generic
+	// covered validations that happen to produce the same error signature as tighter semantic constraints.
 	// This is necessary as without deduping we could get unmatched
 	// imperative errors for cases that are correct (matching).
+	dedupeMatcher := fuzzyMatcher.ByCoveredByDeclarative()
 	dedupedImperativeErrs := field.ErrorList{}
 	for _, err := range imperativeErrs {
 		found := false
 		for _, existingErr := range dedupedImperativeErrs {
-			if fuzzyMatcher.Matches(existingErr, err) {
+			if dedupeMatcher.Matches(existingErr, err) {
 				found = true
 				break
 			}
