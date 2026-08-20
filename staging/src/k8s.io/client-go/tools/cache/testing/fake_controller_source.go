@@ -62,6 +62,7 @@ type FakeControllerSource struct {
 	changes     []watch.Event // one change per resourceVersion
 	Broadcaster *watch.Broadcaster
 	lastRV      int
+	shutdown    bool
 
 	// Set this to simulate an error on List()
 	ListError error
@@ -162,6 +163,9 @@ func (f *FakeControllerSource) Change(e watch.Event, watchProbability float64) {
 }
 
 func (f *FakeControllerSource) getListItemsLocked() ([]runtime.Object, error) {
+	if f.shutdown {
+		return nil, errFakeControllerSourceShutdown
+	}
 	list := make([]runtime.Object, 0, len(f.Items))
 	for _, obj := range f.Items {
 		// Must make a copy to allow clients to modify the object.
@@ -243,6 +247,9 @@ func (f *FakePVCControllerSource) List(options metav1.ListOptions) (runtime.Obje
 func (f *FakeControllerSource) Watch(options metav1.ListOptions) (watch.Interface, error) {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
+	if f.shutdown {
+		return nil, errFakeControllerSourceShutdown
+	}
 	rc, err := strconv.Atoi(options.ResourceVersion)
 	if err != nil {
 		return nil, err
@@ -282,10 +289,13 @@ func (f *FakeControllerSource) Watch(options metav1.ListOptions) (watch.Interfac
 	return f.Broadcaster.Watch()
 }
 
+var errFakeControllerSourceShutdown = errors.New("fake controller source is shut down")
+
 // Shutdown closes the underlying broadcaster, waiting for events to be
-// delivered. It's an error to call any method after calling shutdown. This is
-// enforced by Shutdown() leaving f locked.
+// delivered. List and Watch return an error after Shutdown.
 func (f *FakeControllerSource) Shutdown() {
-	f.lock.Lock() // Purposely no unlock.
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.shutdown = true
 	f.Broadcaster.Shutdown()
 }

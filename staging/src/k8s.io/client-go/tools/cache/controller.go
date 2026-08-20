@@ -171,6 +171,16 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 // RunWithContext implements [Controller.RunWithContext].
 func (c *controller) RunWithContext(ctx context.Context) {
 	defer utilruntime.HandleCrashWithContext(ctx)
+
+	// The reflector must not outlive this call when processLoop panics and
+	// unwinds past the normal shutdown path.
+	ctx, cancel := context.WithCancel(ctx)
+	var wg wait.Group
+	defer func() {
+		cancel()
+		wg.Wait()
+	}()
+
 	go func() {
 		<-ctx.Done()
 		c.config.Queue.Close()
@@ -202,12 +212,9 @@ func (c *controller) RunWithContext(ctx context.Context) {
 	c.reflector = r
 	c.reflectorMutex.Unlock()
 
-	var wg wait.Group
-
 	wg.StartWithContext(ctx, r.RunWithContext)
 
 	wait.UntilWithContext(ctx, c.processLoop, time.Second)
-	wg.Wait()
 }
 
 // Returns true once this controller has completed an initial resource listing

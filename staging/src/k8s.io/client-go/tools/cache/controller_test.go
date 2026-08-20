@@ -472,6 +472,58 @@ func TestPanicPropagated(t *testing.T) {
 	}
 }
 
+func TestRunWithContextStopsReflectorAfterProcessPanic(t *testing.T) {
+	_, testCtx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(testCtx)
+	defer cancel()
+
+	fakeWatch := watch.NewRaceFreeFake()
+	watchStarted := make(chan struct{})
+	controller := New(&Config{
+		Queue: NewDeltaFIFOWithOptions(DeltaFIFOOptions{}),
+		ListerWatcher: &ListWatch{
+			ListFunc: func(metav1.ListOptions) (runtime.Object, error) {
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "1"}}, nil
+			},
+			WatchFunc: func(metav1.ListOptions) (watch.Interface, error) {
+				close(watchStarted)
+				return fakeWatch, nil
+			},
+		},
+		ObjectType: &v1.Pod{},
+		Process: func(interface{}, bool) error {
+			panic("process panic")
+		},
+	})
+
+	propagated := make(chan interface{}, 1)
+	go func() {
+		defer func() {
+			propagated <- recover()
+		}()
+		controller.RunWithContext(ctx)
+	}()
+
+	select {
+	case <-watchStarted:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("reflector did not start watching")
+	}
+	fakeWatch.Action(watch.Bookmark, &v1.Pod{ObjectMeta: metav1.ObjectMeta{
+		ResourceVersion: "1",
+		Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
+	}})
+	fakeWatch.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test", ResourceVersion: "2"}})
+
+	select {
+	case panicValue := <-propagated:
+		assert.Equal(t, "process panic", panicValue)
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("controller did not propagate the process panic")
+	}
+	assert.True(t, fakeWatch.IsStopped(), "controller returned before its reflector stopped")
+}
+
 func TestTransformingInformer(t *testing.T) {
 	// source simulates an apiserver object endpoint.
 	source := newFakeControllerSource(t)
