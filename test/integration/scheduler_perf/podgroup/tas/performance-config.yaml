@@ -48,6 +48,98 @@
       podsPerGroup: 3
   - name: 5000Nodes_750Gangs_3000Pods
     labels: [performance]
+    # SLO: minimum pod scheduling throughput (pods/sec, SchedulingThroughput average).
+    # Calibrated from a benchmark run (adaptive ~630 pods/sec vs ~113 with the limit disabled);
+    # set well above the no-limit baseline and below normal variance to catch a real regression.
+    threshold: 400
+    params:
+      initNodes: 5000
+      initPodGroups: 750
+      podsPerGroup: 4
+  - name: 5000Nodes_1500Gangs_6000Pods
+    labels: [performance]
+    # Calibrated (adaptive ~574 pods/sec vs ~111 with the limit disabled).
+    threshold: 350
+    params:
+      initNodes: 5000
+      initPodGroups: 1500
+      podsPerGroup: 4
+  - name: 5000Nodes_2250Gangs_9000Pods
+    labels: [performance]
+    # Calibrated (adaptive ~547 pods/sec vs ~109 with the limit disabled).
+    threshold: 350
+    params:
+      initNodes: 5000
+      initPodGroups: 2250
+      podsPerGroup: 4
+  - name: 5000Nodes_3Gangs_3000Pods_1000PerGroup
+    labels: [performance]
+    # Calibrated (adaptive ~975 pods/sec vs ~224 with the limit disabled).
+    threshold: 550
+    params:
+      initNodes: 5000
+      initPodGroups: 3
+      podsPerGroup: 1000
+  - name: 5000Nodes_6Gangs_6000Pods_1000PerGroup
+    labels: [performance]
+    # Calibrated (adaptive ~625 pods/sec vs ~139 with the limit disabled); conservative due to
+    # higher run-to-run variance on the low-gang-count workloads.
+    threshold: 350
+    params:
+      initNodes: 5000
+      initPodGroups: 6
+      podsPerGroup: 1000
+  - name: 5000Nodes_9Gangs_9000Pods_1000PerGroup
+    labels: [performance]
+    # Calibrated (adaptive ~642 pods/sec vs ~132 with the limit disabled); conservative due to
+    # higher run-to-run variance on the low-gang-count workloads.
+    threshold: 350
+    params:
+      initNodes: 5000
+      initPodGroups: 9
+      podsPerGroup: 1000
+
+
+
+# Baseline for measuring the performance impact of the adaptive placement limit. This test case mirrors
+# the TopologyAwareScheduling workloads but disables the limit (percentageOfPlacementsToScore: 100), so
+# every generated placement is scored. Comparing its throughput against TopologyAwareScheduling shows
+# the impact of the limit.
+- name: TopologyAwareSchedulingScoreAllPlacements
+  featureGates:
+    GenericWorkload: true
+    TopologyAwareWorkloadScheduling: true
+  schedulerConfigPath: scheduler-config-score-all-placements.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: templates/node.yaml
+  - opcode: createNamespaces
+    prefix: tas-ns
+    count: 1
+  - opcode: createPodGroups
+    countParam: $initPodGroups
+    namespace: tas-ns-0
+    templatePath: templates/podgroup.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+  - opcode: createPods
+    countParam: $initPodGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: tas-ns-0
+    podTemplatePath: templates/gang-pod.yaml
+    collectMetrics: true
+    templateParams:
+      podsPerGroup: $podsPerGroup
+  workloads:
+  - name: 10Nodes_3Gangs
+    labels: [integration-test, short]
+    params:
+      initNodes: 10
+      initPodGroups: 3
+      podsPerGroup: 3
+  - name: 5000Nodes_750Gangs_3000Pods
+    labels: [performance]
     params:
       initNodes: 5000
       initPodGroups: 750
@@ -82,5 +174,3 @@
       initNodes: 5000
       initPodGroups: 9
       podsPerGroup: 1000
-
-
