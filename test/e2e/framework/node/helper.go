@@ -205,6 +205,16 @@ func AddExtendedResource(ctx context.Context, clientSet clientset.Interface, nod
 
 	_, err = clientSet.CoreV1().Nodes().Patch(ctx, nodeName, types.StrategicMergePatchType, []byte(patchPayload), metav1.PatchOptions{}, "status")
 	framework.ExpectNoError(err)
+
+	err = wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+		node, err := clientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		q, ok := node.Status.Allocatable[extendedResource]
+		return ok && q.Cmp(extendedResourceQuantity) >= 0, nil
+	})
+	framework.ExpectNoError(err, "Failed waiting for extended resource %s to be reflected in allocatable on node %s", extendedResourceName, nodeName)
 }
 
 // RemoveExtendedResource removes a fake resource from the Node.

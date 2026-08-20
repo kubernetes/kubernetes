@@ -58,7 +58,7 @@ const (
 	podGroup
 )
 
-var _ = SIGDescribe("WorkloadAwarePreemption", framework.WithFeatureGate(features.GenericWorkload), func() {
+var _ = SIGDescribe("WorkloadAwarePreemption", framework.WithSerial(), framework.WithFeatureGate(features.GenericWorkload), func() {
 	f := framework.NewDefaultFramework("workload-aware-preemption")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
