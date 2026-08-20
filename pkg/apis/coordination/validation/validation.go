@@ -98,7 +98,7 @@ func ValidateLeaseCandidateSpec(spec *coordination.LeaseCandidateSpec, fldPath *
 	allErrs := field.ErrorList{}
 
 	if len(spec.LeaseName) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("leaseName"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("leaseName"), "").MarkCoveredByDeclarative())
 	}
 
 	ev := semver.Version{}
