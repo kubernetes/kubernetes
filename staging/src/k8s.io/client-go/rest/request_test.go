@@ -327,6 +327,16 @@ func TestRequestURIContext(t *testing.T) {
 
 type NotAnAPIObject struct{}
 
+type closeTrackingReadCloser struct {
+	io.Reader
+	closed bool
+}
+
+func (r *closeTrackingReadCloser) Close() error {
+	r.closed = true
+	return nil
+}
+
 func (obj NotAnAPIObject) GroupVersionKind() *schema.GroupVersionKind       { return nil }
 func (obj NotAnAPIObject) SetGroupVersionKind(gvk *schema.GroupVersionKind) {}
 
@@ -2255,6 +2265,28 @@ func TestWatchUnknownContentType(t *testing.T) {
 	_, err := s.Get().Prefix("path/to/watch/thing").Watch(context.Background())
 	if err == nil {
 		t.Fatalf("Expected to fail due to lack of known stream serialization for content type")
+	}
+}
+
+func TestWatchUnknownContentTypeClosesBody(t *testing.T) {
+	body := &closeTrackingReadCloser{Reader: strings.NewReader("unexpected watch body")}
+	req := &Request{contentConfig: defaultContentConfig()}
+	resp := &http.Response{
+		Header: http.Header{
+			"Content-Type": []string{"foobar"},
+		},
+		Body: body,
+	}
+
+	watcher, err := req.newStreamWatcher(context.Background(), resp)
+	if err == nil {
+		if watcher != nil {
+			watcher.Stop()
+		}
+		t.Fatal("Expected to fail due to lack of known stream serialization for content type")
+	}
+	if !body.closed {
+		t.Fatal("Expected response body to be closed when stream negotiation fails")
 	}
 }
 
