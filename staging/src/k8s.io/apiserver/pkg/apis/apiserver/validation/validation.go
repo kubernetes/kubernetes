@@ -83,6 +83,12 @@ func ValidateAuthenticationConfiguration(compiler authenticationcel.Compiler, c 
 		}
 	}
 
+	// Validate top-level userValidationRules (applied to all authenticators)
+	if len(c.UserValidationRules) > 0 {
+		state := &validationState{}
+		allErrs = append(allErrs, validateUserValidationRules(compiler, state, c.UserValidationRules, field.NewPath("userValidationRules"))...)
+	}
+
 	return allErrs
 }
 
@@ -91,6 +97,14 @@ func ValidateAuthenticationConfiguration(compiler authenticationcel.Compiler, c 
 // This is exported for use in oidc package.
 func CompileAndValidateJWTAuthenticator(compiler authenticationcel.Compiler, authenticator api.JWTAuthenticator, disallowedIssuers []string) (authenticationcel.CELMapper, field.ErrorList) {
 	return validateJWTAuthenticator(compiler, authenticator, nil, sets.New(disallowedIssuers...), utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthenticationConfigurationEgressSelector))
+}
+
+// CompileAndValidateUserValidationRules validates the given top-level user validation rules and returns
+// a compiled UserMapper. This is exported for use in the authenticator package.
+func CompileAndValidateUserValidationRules(compiler authenticationcel.Compiler, rules []api.UserValidationRule) (authenticationcel.UserMapper, field.ErrorList) {
+	state := &validationState{}
+	errs := validateUserValidationRules(compiler, state, rules, field.NewPath("userValidationRules"))
+	return state.mapper.UserValidationRules, errs
 }
 
 func validateJWTAuthenticator(compiler authenticationcel.Compiler, authenticator api.JWTAuthenticator, fldPath *field.Path, disallowedIssuers sets.Set[string], structuredAuthnEgressSelectorFeatureEnabled bool) (authenticationcel.CELMapper, field.ErrorList) {
