@@ -18,14 +18,19 @@ package volumeattachment
 
 import (
 	"context"
-
-	"k8s.io/apiserver/pkg/registry/rest"
+	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
+	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/apis/storage/validation"
@@ -150,5 +155,60 @@ func (volumeAttachmentStatusStrategy) PrepareForUpdate(ctx context.Context, obj,
 				newVolumeAttachment.Status.DetachError.ErrorCode = nil
 			}
 		}
+	}
+}
+
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	va, ok := obj.(*storage.VolumeAttachment)
+	if !ok {
+		return nil, nil, fmt.Errorf("given object is not a VolumeAttachment")
+	}
+	return labels.Set(va.ObjectMeta.Labels), ToSelectableFields(va), nil
+}
+
+// ToSelectableFields returns a field set that represents the object for
+// field selector filtering. For VolumeAttachments, this includes
+// metadata.name and spec.nodeName.
+func ToSelectableFields(va *storage.VolumeAttachment) fields.Set {
+	// Allocate with enough capacity for the fields we add plus
+	// the object meta fields added by AddObjectMetaFieldsSet.
+	objectMetaFieldsSet := make(fields.Set, 2)
+	objectMetaFieldsSet["spec.nodeName"] = va.Spec.NodeName
+	// false = non-namespaced resource (VolumeAttachments are cluster-scoped)
+	return generic.AddObjectMetaFieldsSet(objectMetaFieldsSet, &va.ObjectMeta, false)
+}
+
+// MatchVolumeAttachment returns a generic matcher for a given label and field
+// selector.
+func MatchVolumeAttachment(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
+	return apistorage.SelectionPredicate{
+		Label:       label,
+		Field:       field,
+		GetAttrs:    GetAttrs,
+		IndexFields: []string{"spec.nodeName"},
+	}
+}
+
+// NodeNameTriggerFunc returns the spec.nodeName of the given object.
+// It is used as a trigger function for the watch cache index.
+func NodeNameTriggerFunc(obj runtime.Object) string {
+	return obj.(*storage.VolumeAttachment).Spec.NodeName
+}
+
+// NodeNameIndexFunc indexes VolumeAttachments by spec.nodeName for
+// efficient field-selector based listing.
+func NodeNameIndexFunc(obj interface{}) ([]string, error) {
+	va, ok := obj.(*storage.VolumeAttachment)
+	if !ok {
+		return nil, fmt.Errorf("not a VolumeAttachment")
+	}
+	return []string{va.Spec.NodeName}, nil
+}
+
+// Indexers returns the indexers for VolumeAttachment storage.
+func Indexers() *cache.Indexers {
+	return &cache.Indexers{
+		apistorage.FieldIndex("spec.nodeName"): NodeNameIndexFunc,
 	}
 }
