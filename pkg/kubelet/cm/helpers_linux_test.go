@@ -1446,3 +1446,188 @@ func TestCPUSharesEqualAfterV2RoundTrip(t *testing.T) {
 		})
 	}
 }
+
+// quantityEqual compares two optional quantities, treating nil as "unset".
+func quantityEqual(expected, actual *resource.Quantity) bool {
+	if expected == nil || actual == nil {
+		return expected == nil && actual == nil
+	}
+	return expected.Cmp(*actual) == 0
+}
+
+func quantityString(q *resource.Quantity) string {
+	if q == nil {
+		return "<nil>"
+	}
+	return q.String()
+}
+
+// Note: these helpers dereference individual ResourceConfig fields after only
+// checking that the config itself is non-nil, so a config carrying nil fields
+// is not a valid input and is intentionally left uncovered here.
+func TestCPURequestsFromConfig(t *testing.T) {
+	testCases := []struct {
+		name     string
+		config   *ResourceConfig
+		expected *resource.Quantity
+	}{
+		{
+			name:     "nil config yields no request",
+			config:   nil,
+			expected: nil,
+		},
+		{
+			name:     "zero shares yields no request",
+			config:   &ResourceConfig{CPUShares: ptr.To[uint64](0)},
+			expected: nil,
+		},
+		{
+			// Shares below MinShares convert to 0 milliCPU, which is not a
+			// meaningful request.
+			name:     "shares below MinShares yields no request",
+			config:   &ResourceConfig{CPUShares: ptr.To[uint64](1)},
+			expected: nil,
+		},
+		{
+			name:     "MinShares rounds up to 2m",
+			config:   &ResourceConfig{CPUShares: ptr.To[uint64](MinShares)},
+			expected: resource.NewMilliQuantity(2, resource.DecimalSI),
+		},
+		{
+			// cgroup v2 readback granularity: 102 shares maps back to 100m.
+			name:     "lossy v2 readback shares",
+			config:   &ResourceConfig{CPUShares: ptr.To[uint64](102)},
+			expected: resource.NewMilliQuantity(100, resource.DecimalSI),
+		},
+		{
+			name:     "one CPU worth of shares",
+			config:   &ResourceConfig{CPUShares: ptr.To[uint64](SharesPerCPU)},
+			expected: resource.NewMilliQuantity(1000, resource.DecimalSI),
+		},
+		{
+			name:     "two CPUs worth of shares",
+			config:   &ResourceConfig{CPUShares: ptr.To[uint64](2 * SharesPerCPU)},
+			expected: resource.NewMilliQuantity(2000, resource.DecimalSI),
+		},
+		{
+			name:     "MaxShares",
+			config:   &ResourceConfig{CPUShares: ptr.To[uint64](MaxShares)},
+			expected: resource.NewMilliQuantity(256000, resource.DecimalSI),
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			actual := CPURequestsFromConfig(testCase.config)
+			if !quantityEqual(testCase.expected, actual) {
+				t.Errorf("expected cpu request %v, got %v", quantityString(testCase.expected), quantityString(actual))
+			}
+		})
+	}
+}
+
+func TestCPULimitsFromConfig(t *testing.T) {
+	testCases := []struct {
+		name     string
+		config   *ResourceConfig
+		expected *resource.Quantity
+	}{
+		{
+			name:     "nil config yields no limit",
+			config:   nil,
+			expected: nil,
+		},
+		{
+			name:     "zero period yields no limit",
+			config:   &ResourceConfig{CPUQuota: ptr.To[int64](100000), CPUPeriod: ptr.To[uint64](0)},
+			expected: nil,
+		},
+		{
+			// -1 is the cgroup representation of an unlimited quota.
+			name:     "unlimited quota yields no limit",
+			config:   &ResourceConfig{CPUQuota: ptr.To[int64](-1), CPUPeriod: ptr.To[uint64](QuotaPeriod)},
+			expected: nil,
+		},
+		{
+			name:     "zero quota yields no limit",
+			config:   &ResourceConfig{CPUQuota: ptr.To[int64](0), CPUPeriod: ptr.To[uint64](QuotaPeriod)},
+			expected: nil,
+		},
+		{
+			name:     "full quota over default period",
+			config:   &ResourceConfig{CPUQuota: ptr.To[int64](100000), CPUPeriod: ptr.To[uint64](QuotaPeriod)},
+			expected: resource.NewMilliQuantity(1000, resource.DecimalSI),
+		},
+		{
+			name:     "partial quota over default period",
+			config:   &ResourceConfig{CPUQuota: ptr.To[int64](20000), CPUPeriod: ptr.To[uint64](QuotaPeriod)},
+			expected: resource.NewMilliQuantity(200, resource.DecimalSI),
+		},
+		{
+			name:     "minimum quota over default period",
+			config:   &ResourceConfig{CPUQuota: ptr.To[int64](MinQuotaPeriod), CPUPeriod: ptr.To[uint64](QuotaPeriod)},
+			expected: resource.NewMilliQuantity(MinMilliCPULimit, resource.DecimalSI),
+		},
+		{
+			// A custom period must scale the quota, not be assumed to be QuotaPeriod.
+			name:     "quota over custom period",
+			config:   &ResourceConfig{CPUQuota: ptr.To[int64](10000), CPUPeriod: ptr.To[uint64](50000)},
+			expected: resource.NewMilliQuantity(200, resource.DecimalSI),
+		},
+		{
+			name:     "quota exceeding one CPU",
+			config:   &ResourceConfig{CPUQuota: ptr.To[int64](250000), CPUPeriod: ptr.To[uint64](QuotaPeriod)},
+			expected: resource.NewMilliQuantity(2500, resource.DecimalSI),
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			actual := CPULimitsFromConfig(testCase.config)
+			if !quantityEqual(testCase.expected, actual) {
+				t.Errorf("expected cpu limit %v, got %v", quantityString(testCase.expected), quantityString(actual))
+			}
+		})
+	}
+}
+
+func TestMemoryLimitsFromConfig(t *testing.T) {
+	testCases := []struct {
+		name     string
+		config   *ResourceConfig
+		expected *resource.Quantity
+	}{
+		{
+			name:     "nil config yields no limit",
+			config:   nil,
+			expected: nil,
+		},
+		{
+			name:     "zero memory yields no limit",
+			config:   &ResourceConfig{Memory: ptr.To[int64](0)},
+			expected: nil,
+		},
+		{
+			// -1 is the cgroup representation of unlimited memory.
+			name:     "negative memory yields no limit",
+			config:   &ResourceConfig{Memory: ptr.To[int64](-1)},
+			expected: nil,
+		},
+		{
+			name:     "single byte limit",
+			config:   &ResourceConfig{Memory: ptr.To[int64](1)},
+			expected: resource.NewQuantity(1, resource.BinarySI),
+		},
+		{
+			name:     "one gibibyte limit",
+			config:   &ResourceConfig{Memory: ptr.To[int64](1024 * 1024 * 1024)},
+			expected: resource.NewQuantity(1024*1024*1024, resource.BinarySI),
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			actual := MemoryLimitsFromConfig(testCase.config)
+			if !quantityEqual(testCase.expected, actual) {
+				t.Errorf("expected memory limit %v, got %v", quantityString(testCase.expected), quantityString(actual))
+			}
+		})
+	}
+}
