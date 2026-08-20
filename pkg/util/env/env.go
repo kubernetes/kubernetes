@@ -17,12 +17,12 @@ limitations under the License.
 package env
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 )
 
 // GetEnvAsStringOrFallback returns the env variable for the given key
-// and falls back to the given defaultValue if not set
 func GetEnvAsStringOrFallback(key, defaultValue string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -31,12 +31,11 @@ func GetEnvAsStringOrFallback(key, defaultValue string) string {
 }
 
 // GetEnvAsIntOrFallback returns the env variable (parsed as integer) for
-// the given key and falls back to the given defaultValue if not set
 func GetEnvAsIntOrFallback(key string, defaultValue int) (int, error) {
 	if v := os.Getenv(key); v != "" {
 		value, err := strconv.Atoi(v)
 		if err != nil {
-			return defaultValue, err
+			return defaultValue, fmt.Errorf("failed to parse env var %q as int: %w", key, err)
 		}
 		return value, nil
 	}
@@ -44,12 +43,11 @@ func GetEnvAsIntOrFallback(key string, defaultValue int) (int, error) {
 }
 
 // GetEnvAsFloat64OrFallback returns the env variable (parsed as float64) for
-// the given key and falls back to the given defaultValue if not set
 func GetEnvAsFloat64OrFallback(key string, defaultValue float64) (float64, error) {
 	if v := os.Getenv(key); v != "" {
 		value, err := strconv.ParseFloat(v, 64)
 		if err != nil {
-			return defaultValue, err
+			return defaultValue, fmt.Errorf("failed to parse env var %q as float64: %w", key, err)
 		}
 		return value, nil
 	}
