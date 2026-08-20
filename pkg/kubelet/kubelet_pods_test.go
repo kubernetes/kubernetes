@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/user"
 	"path/filepath"
 	"reflect"
 	goruntime "runtime"
@@ -8563,6 +8564,44 @@ func TestParseGetSubIdsOutput(t *testing.T) {
 					t.Errorf("%s: got (%d, %d), want (%d, %d)", tc.name, gotFirstID, gotRangeLen, tc.wantFirstID, tc.wantRangeLen)
 				}
 			}
+		})
+	}
+}
+
+func TestGetKubeletMappingsDefault(t *testing.T) {
+	tests := []struct {
+		name         string
+		idsPerPod    uint32
+		wantFirstID  uint32
+		wantRangeLen uint32
+	}{
+		{
+			name:         "default idsPerPod",
+			idsPerPod:    65536,
+			wantFirstID:  65536,
+			wantRangeLen: (1 << 32) - 2*65536,
+		},
+		{
+			name:         "custom idsPerPod",
+			idsPerPod:    65536 * 16,
+			wantFirstID:  65536 * 16,
+			wantRangeLen: (1 << 32) - 2*65536*16,
+		},
+	}
+
+	if _, err := user.Lookup("kubelet"); err == nil {
+		t.Skip("a kubelet user exists, getKubeletMappings() will use its subordinate IDs")
+	}
+
+	logger, _ := ktesting.NewTestContext(t)
+	kl := &Kubelet{}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gotFirstID, gotRangeLen, err := kl.getKubeletMappings(logger, tc.idsPerPod)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantFirstID, gotFirstID)
+			assert.Equal(t, tc.wantRangeLen, gotRangeLen)
 		})
 	}
 }
