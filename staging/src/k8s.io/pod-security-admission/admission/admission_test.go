@@ -1268,3 +1268,60 @@ func (a *testAttributes) GetOldObject() (runtime.Object, error) {
 		return a.AttributesRecord.GetOldObject()
 	}
 }
+
+// TestIsSignificantPodUpdateSecurityAnnotations asserts that a pod update whose only
+// change is a seccomp or AppArmor annotation is significant, so the change is
+// re-evaluated against the pod security policy instead of being admitted
+// without evaluation.
+func TestIsSignificantPodUpdateSecurityAnnotations(t *testing.T) {
+	const testContainer = "test-container"
+
+	basePod := func() *corev1.Pod {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "test-pod",
+				Namespace:   "test-ns",
+				Annotations: map[string]string{},
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: testContainer, Image: "image:1"}},
+			},
+		}
+	}
+
+	tests := []struct {
+		name   string
+		mutate func(*corev1.Pod)
+	}{
+		{
+			name: "apparmor annotation change",
+			mutate: func(p *corev1.Pod) {
+				p.Annotations[corev1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix+testContainer] = "unconfined"
+			},
+		},
+		{
+			name: "seccomp pod annotation change",
+			mutate: func(p *corev1.Pod) {
+				p.Annotations[corev1.SeccompPodAnnotationKey] = "unconfined"
+			},
+		},
+		{
+			name: "seccomp container annotation change",
+			mutate: func(p *corev1.Pod) {
+				p.Annotations[corev1.SeccompContainerAnnotationKeyPrefix+testContainer] = "unconfined"
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			oldPod := basePod()
+			newPod := oldPod.DeepCopy()
+			tt.mutate(newPod)
+
+			if !isSignificantPodUpdate(newPod, oldPod) {
+				t.Errorf("expected annotation-only update to be significant, got insignificant")
+			}
+		})
+	}
+}
