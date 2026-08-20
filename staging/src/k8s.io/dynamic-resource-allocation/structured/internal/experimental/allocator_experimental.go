@@ -273,6 +273,11 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 						minDevicesPerRequest = reqData.numDevices
 					}
 				}
+				// Compare against the remaining capacity before adding, so a very
+				// large count cannot overflow the running total.
+				if minDevicesPerRequest > resourceapi.AllocationResultsMaxSize-minDevicesPerClaim {
+					return nil, fmt.Errorf("claim %s, request %s: adding %d devices exceeds the claim limit of %d, with %d already accounted for", klog.KObj(claim), request.Name, minDevicesPerRequest, resourceapi.AllocationResultsMaxSize, minDevicesPerClaim)
+				}
 				minDevicesPerClaim += minDevicesPerRequest
 			} else {
 				reqData, err := alloc.validateDeviceRequest(&exactDeviceRequestAccessor{request: request}, nil, requestKey, pools)
@@ -280,19 +285,17 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 					return nil, err
 				}
 				alloc.requestData[requestKey] = reqData
+				if reqData.numDevices > resourceapi.AllocationResultsMaxSize-minDevicesPerClaim {
+					return nil, fmt.Errorf("claim %s, request %s: adding %d devices exceeds the claim limit of %d, with %d already accounted for", klog.KObj(claim), request.Name, reqData.numDevices, resourceapi.AllocationResultsMaxSize, minDevicesPerClaim)
+				}
 				minDevicesPerClaim += reqData.numDevices
 			}
 		}
+		// minDevicesPerClaim is only a lower bound (a subrequest may pick more),
+		// so allocateOne enforces the same limit again during allocation.
 		alloc.logger.V(6).Info("Checked claim", "claim", klog.KObj(claim), "minDevices", minDevicesPerClaim)
-		// Check that we don't end up with too many results.
-		// This isn't perfectly reliable because numDevicesPerClaim is
-		// only a lower bound, so allocation also has to check this.
-		if minDevicesPerClaim > resourceapi.AllocationResultsMaxSize {
-			return nil, fmt.Errorf("claim %s: number of requested devices %d exceeds the claim limit of %d", klog.KObj(claim), minDevicesPerClaim, resourceapi.AllocationResultsMaxSize)
-		}
 
-		// If we don't, then we can pre-allocate the result slices for
-		// appending the actual results later.
+		// Pre-allocate the result slices for appending the actual results later.
 		alloc.result[claimIndex].devices = make([]internalDeviceResult, 0, minDevicesPerClaim)
 
 		// Constraints are assumed to be monotonic: once a constraint returns
@@ -1287,13 +1290,13 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool, st
 		return success, err
 	}
 
-	// Before trying to allocate devices, check if allocating the devices
-	// in the current request will put us over the threshold.
-	// We can calculate this by adding the number of already allocated devices with the number
-	// of devices in the current request, and then finally subtract the deviceIndex since we
-	// don't want to double count any devices already allocated for the current request.
-	numDevicesAfterAlloc := len(alloc.result[r.claimIndex].devices) + requestData.numDevices - r.deviceIndex
-	if numDevicesAfterAlloc > resourceapi.AllocationResultsMaxSize {
+	// Before trying to allocate, check whether the current request still fits:
+	// compare what it still needs against what the claim can still hold, so a
+	// large count cannot wrap the sum. deviceIndex < numDevices here (checked
+	// above), so remaining stays non-negative.
+	remaining := requestData.numDevices - r.deviceIndex
+	available := resourceapi.AllocationResultsMaxSize - len(alloc.result[r.claimIndex].devices)
+	if remaining > available {
 		// Return a special error so we can identify this situation in the
 		// callers and do more aggressive backtracking.
 		return false, errAllocationResultMaxSizeExceeded
