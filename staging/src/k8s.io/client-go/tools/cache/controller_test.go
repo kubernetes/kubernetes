@@ -1013,42 +1013,90 @@ func TestReplaceEvents(t *testing.T) {
 	// Test that both atomic and non-atomic replace have the same behavior
 	// in regards to events and store state.
 	for _, atomic := range []bool{false, true} {
-		source := fcache.NewFakeControllerSource()
-		t.Cleanup(func() {
-			source.Shutdown()
-		})
-		store := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
-		fifoOptions := RealFIFOOptions{
-			AtomicEvents: atomic,
-		}
-		if !atomic {
-			fifoOptions.KnownObjects = store
-		}
-		fifo := NewRealFIFOWithOptions(fifoOptions)
-		recorder := newEventRecorder(store, DeletionHandlingMetaNamespaceKeyFunc)
-
-		cfg := &Config{
-			Queue:            fifo,
-			ListerWatcher:    source,
-			ObjectType:       &v1.Pod{},
-			FullResyncPeriod: 0,
-
-			Process: func(obj interface{}, isInInitialList bool) error {
-				if deltas, ok := obj.(Deltas); ok {
-					return processDeltas(fifo.logger, recorder, store, deltas, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
-				}
-				return errors.New("object given as Process argument is not Deltas")
-			},
-			ProcessBatch: func(deltaList []Delta, isInInitialList bool) error {
-				return processDeltasInBatch(fifo.logger, recorder, store, deltaList, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
-			},
-		}
-		c := New(cfg)
-		go c.RunWithContext(ctx)
-		if !WaitForCacheSync(ctx.Done(), c.HasSynced) {
-			t.Fatal("Timed out waiting for cache sync")
-		}
+		fifo, recorder, store := startReplaceEventsController(t, ctx, atomic)
 		testReplaceEvents(t, ctx, fifo, recorder, store, atomic)
+	}
+}
+
+// startReplaceEventsController wires a RealFIFO to a fresh store and event
+// recorder and runs a controller over them, so that a test can call Add and
+// Replace on the queue and observe the resulting handler calls.
+func startReplaceEventsController(t *testing.T, ctx context.Context, atomic bool) (*RealFIFO, *eventRecorder, Store) {
+	t.Helper()
+	source := fcache.NewFakeControllerSource()
+	t.Cleanup(func() {
+		source.Shutdown()
+	})
+	store := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+	fifoOptions := RealFIFOOptions{
+		AtomicEvents: atomic,
+	}
+	if !atomic {
+		fifoOptions.KnownObjects = store
+	}
+	fifo := NewRealFIFOWithOptions(fifoOptions)
+	recorder := newEventRecorder(store, DeletionHandlingMetaNamespaceKeyFunc)
+
+	cfg := &Config{
+		Queue:            fifo,
+		ListerWatcher:    source,
+		ObjectType:       &v1.Pod{},
+		FullResyncPeriod: 0,
+
+		Process: func(obj interface{}, isInInitialList bool) error {
+			if deltas, ok := obj.(Deltas); ok {
+				return processDeltas(fifo.logger, recorder, store, deltas, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
+			}
+			return errors.New("object given as Process argument is not Deltas")
+		},
+		ProcessBatch: func(deltaList []Delta, isInInitialList bool) error {
+			return processDeltasInBatch(fifo.logger, recorder, store, deltaList, isInInitialList, DeletionHandlingMetaNamespaceKeyFunc)
+		},
+	}
+	c := New(cfg)
+	go c.RunWithContext(ctx)
+	if !WaitForCacheSync(ctx.Done(), c.HasSynced) {
+		t.Fatal("Timed out waiting for cache sync")
+	}
+	return fifo, recorder, store
+}
+
+// TestReplaceEventsRecreatedObject pins the behavior an object is subject to
+// when it is deleted and recreated under the same name while the watch is
+// broken, and the reflector recovers with a full list.
+//
+// Deletions are detected by comparing sets of keys, and ObjectMeta.UID is not
+// part of a key. The recreated object's key is present both in the known
+// objects and in the replaced list, so no deletion is detected: the two
+// distinct objects are reported to the handler as a single update, with no
+// delete and no add. Consumers that care about object identity have to compare
+// ObjectMeta.UID themselves - see the contract documented on SharedInformer.
+func TestReplaceEventsRecreatedObject(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	for _, atomic := range []bool{false, true} {
+		t.Run("atomic "+strconv.FormatBool(atomic), func(t *testing.T) {
+			fifo, recorder, store := startReplaceEventsController(t, ctx, atomic)
+
+			original := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "default", UID: "uid-1", ResourceVersion: "1"}}
+			recreated := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "default", UID: "uid-2", ResourceVersion: "2"}}
+
+			require.NoError(t, fifo.Add(original), "failed to add")
+			require.NoError(t, recorder.waitForEventCount(ctx, 1, 5*time.Second), "failed to receive the initial add, got: %v", recorder.getHistory())
+			recorder.clearHistory()
+
+			// The object was deleted and recreated while the watch was down, so the
+			// list only ever sees the recreated one.
+			require.NoError(t, fifo.Replace([]interface{}{recreated}, "2"), "failed to replace")
+			require.NoError(t, recorder.waitForEventCount(ctx, 1, 5*time.Second), "failed to receive the replace event, got: %v", recorder.getHistory())
+
+			assert.Equal(t, []eventRecord{
+				{Action: "update", Key: "default/pod-1", EventRV: "2", StoreRV: "2", UID: "uid-2", OldUID: "uid-1"},
+			}, recorder.getHistory(), "expected a single update carrying both UIDs, with no delete and no add")
+			assert.Equal(t, []interface{}{recreated}, store.List())
+		})
 	}
 }
 
@@ -1433,6 +1481,11 @@ type eventRecord struct {
 	EventRV         string
 	StoreRV         string
 	IsInInitialList bool
+	// UID and OldUID are only set for objects that carry one. They exist so that
+	// tests can observe an update whose old and new object are different objects
+	// sharing a key, which is what a delete+recreate across a relist looks like.
+	UID    string
+	OldUID string
 }
 
 type eventRecorder struct {
@@ -1453,16 +1506,16 @@ func newEventRecorder(store Store, keyFunc KeyFunc) *eventRecorder {
 }
 
 func (m *eventRecorder) OnAdd(obj interface{}, isInInitialList bool) {
-	m.record("add", obj, isInInitialList)
+	m.record("add", nil, obj, isInInitialList)
 }
-func (m *eventRecorder) OnUpdate(_, obj interface{}) {
-	m.record("update", obj, false)
+func (m *eventRecorder) OnUpdate(old, obj interface{}) {
+	m.record("update", old, obj, false)
 }
 func (m *eventRecorder) OnDelete(obj interface{}) {
-	m.record("delete", obj, false)
+	m.record("delete", nil, obj, false)
 }
 
-func (m *eventRecorder) record(action string, obj interface{}, isInInitialList bool) {
+func (m *eventRecorder) record(action string, old, obj interface{}, isInInitialList bool) {
 	m.historyLock.Lock()
 	defer m.historyLock.Unlock()
 	key, _ := m.keyFunc(obj)
@@ -1472,8 +1525,17 @@ func (m *eventRecorder) record(action string, obj interface{}, isInInitialList b
 	}
 
 	eventRV := ""
+	uid := ""
 	if accessor, err := meta.Accessor(obj); err == nil {
 		eventRV = accessor.GetResourceVersion()
+		uid = string(accessor.GetUID())
+	}
+
+	oldUID := ""
+	if old != nil {
+		if accessor, err := meta.Accessor(old); err == nil {
+			oldUID = string(accessor.GetUID())
+		}
 	}
 
 	storeRV := ""
@@ -1489,6 +1551,8 @@ func (m *eventRecorder) record(action string, obj interface{}, isInInitialList b
 		EventRV:         eventRV,
 		StoreRV:         storeRV,
 		IsInInitialList: isInInitialList,
+		UID:             uid,
+		OldUID:          oldUID,
 	})
 	select {
 	case m.updateCh <- true:

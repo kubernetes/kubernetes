@@ -19,6 +19,7 @@ package queue
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -271,6 +272,67 @@ func TestPriorityQueue_Add(t *testing.T) {
 				t.Errorf("Expected medPod and unschedPod to be still present in nominatedPods: %v", q.nominator.nominatedPods["node1"])
 			}
 		})
+	}
+}
+
+// A Pod that is deleted while its scheduling attempt is running can still be requeued, because
+// the queue deliberately treats a NotFound from the pod lister as "no information". If the name
+// is reused afterwards, the Add of the new Pod has to evict that leftover. moveToActiveQ only
+// evicts an entity with the same key from unschedulableEntities, even though it documents that
+// the entity has to be removed from the backoffQ first, so without an explicit eviction the
+// dead entry stays in the backoffQ next to the live Pod in the activeQ.
+func TestPriorityQueue_Add_EvictsStaleBackoffEntry(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	const rejectorPlugin = "fakePlugin"
+	oldPod := st.MakePod().Name("foo").Namespace("ns").UID("old-uid").Obj()
+	recreatedPod := st.MakePod().Name("foo").Namespace("ns").UID("new-uid").Obj()
+
+	metrics.UnschedulableReason(rejectorPlugin, oldPod.Spec.SchedulerName).Set(0)
+
+	c := testingclock.NewFakeClock(time.Now())
+	q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c))
+
+	q.Add(ctx, oldPod)
+	if _, err := q.Pop(logger); err != nil {
+		t.Fatalf("Pop failed: %v", err)
+	}
+	// The Pod is deleted while it is in flight, which the queue cannot observe, and its failure
+	// handler requeues it anyway. A cluster event during the same scheduling cycle routes the
+	// requeue to the backoffQ rather than to unschedulableEntities.
+	q.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
+	if err := q.AddUnschedulablePodIfNotPresent(logger, newQueuedPodInfoForLookup(oldPod, rejectorPlugin), q.SchedulingCycle()); err != nil {
+		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
+	}
+	if !q.backoffQ.has(newQueuedPodInfoForLookup(oldPod)) {
+		t.Fatalf("Expected the deleted pod to be in the backoffQ")
+	}
+	if val, _ := testutil.GetGaugeMetricValue(metrics.UnschedulableReason(rejectorPlugin, oldPod.Spec.SchedulerName)); val != 1 {
+		t.Fatalf("Expected the unschedulable reason metric to be 1, got %v", val)
+	}
+
+	// The name is reused by a new Pod.
+	q.Add(ctx, recreatedPod)
+
+	if q.backoffQ.has(newQueuedPodInfoForLookup(recreatedPod)) {
+		t.Errorf("Expected the stale entry to be evicted from the backoffQ")
+	}
+	if val, _ := testutil.GetGaugeMetricValue(metrics.UnschedulableReason(rejectorPlugin, oldPod.Spec.SchedulerName)); val != 0 {
+		t.Errorf("Expected the unschedulable reason metric of the evicted entry to be dropped, got %v", val)
+	}
+
+	// Completing the backoff must not resurrect the stale entry. moveToActiveQ would push it
+	// into the activeQ heap, which is keyed by namespace/name, and overwrite the live Pod.
+	c.Step(2 * time.Minute)
+	q.flushBackoffQCompleted(logger)
+	popped, err := q.Pop(logger)
+	if err != nil {
+		t.Fatalf("Pop failed: %v", err)
+	}
+	if got := popped.(*framework.QueuedPodInfo).Pod.UID; got != recreatedPod.UID {
+		t.Errorf("Popped pod UID = %v, want %v", got, recreatedPod.UID)
 	}
 }
 
@@ -1315,6 +1377,184 @@ func TestPriorityQueue_AddUnschedulablePodIfNotPresent(t *testing.T) {
 	// unschedulablePodInfo is inserted to unschedulable pod pool because no events happened during scheduling.
 	if diff := cmp.Diff(unschedulablePodInfo.Pod, getUnschedulablePod(q, unschedulablePodInfo.Pod)); diff != "" {
 		t.Errorf("Unexpected pod in unschedulableEntities (-want, +got):\n%s", diff)
+	}
+}
+
+// A Pod can be deleted and recreated under the same name while its scheduling attempt is still
+// running. The informer collapses that into a single update event, which Scheduler.updatePod
+// splits into a delete and an add, and the scheduling goroutine can pop the recreated Pod
+// before the failure handler of the previous instance requeues it. The namespace/name slot is
+// empty at that point, so the checks in AddUnschedulablePodIfNotPresent find nothing and would
+// admit the dead Pod into the live Pod's slot, after which the live Pod's own requeue fails
+// with "already present" and it is dropped from the queue for good.
+func TestPriorityQueue_AddUnschedulablePodIfNotPresent_PodRecreated(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	oldPod := st.MakePod().Name("foo").Namespace("ns").UID("old-uid").Obj()
+	recreatedPod := st.MakePod().Name("foo").Namespace("ns").UID("new-uid").Obj()
+
+	// The informer indexer already holds the recreated Pod, because client-go writes the store
+	// before it dispatches the notification that drives Delete and Add on this queue.
+	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{recreatedPod}, WithClock(testingclock.NewFakeClock(time.Now())))
+
+	q.Add(ctx, oldPod)
+	if _, err := q.Pop(logger); err != nil {
+		t.Fatalf("Pop failed: %v", err)
+	}
+	// Scheduler.updatePod splits the collapsed update event. Delete is a no-op for a Pod that
+	// is in flight, and Add puts the recreated Pod into the activeQ.
+	q.Delete(logger, oldPod)
+	q.Add(ctx, recreatedPod)
+	// The scheduling goroutine pops the recreated Pod while the previous instance is still
+	// unwinding on the binding goroutine.
+	if _, err := q.Pop(logger); err != nil {
+		t.Fatalf("Pop of the recreated pod failed: %v", err)
+	}
+
+	err := q.AddUnschedulablePodIfNotPresent(logger, newQueuedPodInfoForLookup(oldPod, "plugin"), q.SchedulingCycle())
+	if !errors.Is(err, ErrPodSuperseded) {
+		t.Errorf("AddUnschedulablePodIfNotPresent() error = %v, want %v", err, ErrPodSuperseded)
+	}
+	if pInfo, ok := q.GetPod(oldPod.Name, oldPod.Namespace, nil); ok {
+		t.Errorf("Expected the previous instance not to be requeued, but the queue holds pod UID %v", pInfo.Pod.UID)
+	}
+
+	// The recreated Pod must still be able to come back from its own failed attempt.
+	if err := q.AddUnschedulablePodIfNotPresent(logger, newQueuedPodInfoForLookup(recreatedPod, "plugin"), q.SchedulingCycle()); err != nil {
+		t.Fatalf("unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
+	}
+	pInfo, ok := q.GetPod(recreatedPod.Name, recreatedPod.Namespace, nil)
+	if !ok {
+		t.Fatalf("Failed to get pod %s/%s from queue", recreatedPod.Namespace, recreatedPod.Name)
+	}
+	if pInfo.Pod.UID != recreatedPod.UID {
+		t.Errorf("Queue holds pod UID %v, want %v", pInfo.Pod.UID, recreatedPod.UID)
+	}
+}
+
+// TestPriorityQueue_AddUnschedulablePodIfNotPresent_Superseded pins down when a requeue is
+// rejected because the Pod that owns the namespace/name slot changed, and - just as important -
+// when it must still be accepted.
+func TestPriorityQueue_AddUnschedulablePodIfNotPresent_Superseded(t *testing.T) {
+	pod := st.MakePod().Name("foo").Namespace("ns").UID("old-uid").Obj()
+	recreatedPod := st.MakePod().Name("foo").Namespace("ns").UID("new-uid").Obj()
+
+	tests := []struct {
+		name       string
+		objs       []runtime.Object
+		plugins    []string
+		doneBefore bool
+		wantErr    error
+		wantQueued bool
+	}{
+		{
+			name:       "pod was recreated under the same name",
+			objs:       []runtime.Object{recreatedPod},
+			plugins:    []string{"fooPlugin"},
+			wantErr:    ErrPodSuperseded,
+			wantQueued: false,
+		},
+		{
+			// Control: the ordinary case must keep working.
+			name:       "pod is still the one that owns its name",
+			objs:       []runtime.Object{pod},
+			plugins:    []string{"fooPlugin"},
+			wantQueued: true,
+		},
+		{
+			// podSuperseded deliberately treats a NotFound as "no information", so a Pod that
+			// was deleted while in flight is still requeued, exactly as before this check
+			// existed. Every queue test built on an empty informer relies on this.
+			name:       "pod was deleted and not recreated",
+			objs:       nil,
+			plugins:    []string{"fooPlugin"},
+			wantQueued: true,
+		},
+		{
+			// Done is called before PreBind runs, so a PreBind or Bind failure legitimately
+			// requeues a Pod that is no longer in inFlightPods. Gating the requeue on in-flight
+			// membership instead of on the Pod's identity would silently drop those retries.
+			name:       "binding failure requeues a pod that is no longer in flight",
+			objs:       []runtime.Object{pod},
+			doneBefore: true,
+			wantQueued: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), tt.objs, WithClock(testingclock.NewFakeClock(time.Now())))
+
+			q.Add(ctx, pod)
+			if _, err := q.Pop(logger); err != nil {
+				t.Fatalf("Pop failed: %v", err)
+			}
+			if tt.doneBefore {
+				q.Done(pod.UID)
+			}
+
+			err := q.AddUnschedulablePodIfNotPresent(logger, newQueuedPodInfoForLookup(pod, tt.plugins...), q.SchedulingCycle())
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Errorf("AddUnschedulablePodIfNotPresent() error = %v, want %v", err, tt.wantErr)
+				}
+			} else if err != nil {
+				t.Errorf("AddUnschedulablePodIfNotPresent() error = %v, want nil", err)
+			}
+
+			pInfo, ok := q.GetPod(pod.Name, pod.Namespace, nil)
+			if ok != tt.wantQueued {
+				t.Fatalf("Pod queued = %v, want %v", ok, tt.wantQueued)
+			}
+			if ok && pInfo.Pod.UID != pod.UID {
+				t.Errorf("Queue holds pod UID %v, want %v", pInfo.Pod.UID, pod.UID)
+			}
+		})
+	}
+}
+
+// For a pod group member the three name-keyed checks in AddUnschedulablePodIfNotPresent are
+// structurally dead: they look up pod/namespace/name while the only queued entity is keyed
+// podgroup/namespace/podgroupname. Nothing but the identity check stops a stale instance from
+// overwriting the live one in the group's member state, which would wedge the whole gang.
+func TestPriorityQueue_AddUnschedulablePodIfNotPresent_PodGroupMemberRecreated(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	const podGroupName = "pg1"
+	oldPod := withPodGroupName(st.MakePod().Name("foo").Namespace("ns").UID("old-uid").Obj(), podGroupName)
+	recreatedPod := withPodGroupName(st.MakePod().Name("foo").Namespace("ns").UID("new-uid").Obj(), podGroupName)
+
+	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{recreatedPod}, WithClock(testingclock.NewFakeClock(time.Now())))
+	q.AddPodGroup(logger, st.MakePodGroup().Name(podGroupName).Namespace(oldPod.Namespace).Priority(midPriority).Obj())
+
+	q.Add(ctx, oldPod)
+	if _, err := q.Pop(logger); err != nil {
+		t.Fatalf("Pop failed: %v", err)
+	}
+	// Scheduler.updatePod splits the collapsed update event into a delete and an add.
+	q.Delete(logger, oldPod)
+	q.Add(ctx, recreatedPod)
+
+	err := q.AddUnschedulablePodIfNotPresent(logger, newQueuedPodInfoForLookup(oldPod, "plugin"), q.SchedulingCycle())
+	if !errors.Is(err, ErrPodSuperseded) {
+		t.Errorf("AddUnschedulablePodIfNotPresent() error = %v, want %v", err, ErrPodSuperseded)
+	}
+
+	pInfo, ok := q.GetPod(recreatedPod.Name, recreatedPod.Namespace, recreatedPod.Spec.SchedulingGroup)
+	if !ok {
+		t.Fatalf("Failed to get pod %s/%s from queue", recreatedPod.Namespace, recreatedPod.Name)
+	}
+	if pInfo.Pod.UID != recreatedPod.UID {
+		t.Errorf("Pod group member has UID %v, want the live pod %v", pInfo.Pod.UID, recreatedPod.UID)
 	}
 }
 
@@ -2890,10 +3130,11 @@ func TestPriorityQueue_NominatedPodsForNode(t *testing.T) {
 
 func TestPriorityQueue_NominatedPodDeleted(t *testing.T) {
 	tests := []struct {
-		name      string
-		podInfo   *framework.PodInfo
-		deletePod bool
-		wantLen   int
+		name        string
+		podInfo     *framework.PodInfo
+		deletePod   bool
+		recreatePod bool
+		wantLen     int
 	}{
 		{
 			name:    "alive pod gets added into PodNominator",
@@ -2905,6 +3146,17 @@ func TestPriorityQueue_NominatedPodDeleted(t *testing.T) {
 			podInfo:   highPriNominatedPodInfo,
 			deletePod: true,
 			wantLen:   0,
+		},
+		{
+			// Scheduler.unreserveAndForget restores the nomination that Assume removed, working
+			// off the Pod snapshot taken at Pop, so it can hand us an instance that no longer
+			// exists. The nominator is keyed by UID and every cleanup path is driven by an
+			// event, but every future event for this name carries the new UID, so such an entry
+			// would never be reclaimed.
+			name:        "recreated pod shouldn't be added into PodNominator",
+			podInfo:     highPriNominatedPodInfo,
+			recreatePod: true,
+			wantLen:     0,
 		},
 		{
 			name:    "pod without .status.nominatedPodName specified shouldn't be added into PodNominator",
@@ -2930,6 +3182,15 @@ func TestPriorityQueue_NominatedPodDeleted(t *testing.T) {
 			if tt.deletePod {
 				// Simulate that the test pod gets deleted physically.
 				informerFactory.Core().V1().Pods().Informer().GetStore().Delete(tt.podInfo.Pod)
+			}
+			if tt.recreatePod {
+				// Simulate that the test pod gets deleted and recreated under the same name.
+				recreated := tt.podInfo.Pod.DeepCopy()
+				recreated.UID = tt.podInfo.Pod.UID + "-recreated"
+				err := informerFactory.Core().V1().Pods().Informer().GetStore().Update(recreated)
+				if err != nil {
+					t.Fatalf("unexpected error from update api call: %v", err)
+				}
 			}
 
 			q.AddNominatedPod(logger, tt.podInfo, nil)

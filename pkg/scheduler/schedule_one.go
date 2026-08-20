@@ -39,6 +39,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
+	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
@@ -1204,29 +1205,40 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 	if e != nil {
 		logger.Info("Pod doesn't exist in informer cache", "pod", klog.KObj(pod), "err", e)
 		// We need to call DonePod here because we don't call AddUnschedulablePodIfNotPresent in this case.
-	} else {
+	} else if cachedPod.UID != podInfo.Pod.UID {
+		// This is checked before the NodeName branch below, because everything that follows -
+		// the requeue, the nomination and the status patch - addresses the Pod by
+		// namespace/name only. A recreated Pod that is already bound would otherwise skip this
+		// check and get the previous instance's condition patched onto it.
+		logger.V(2).Info("Pod was recreated while handling scheduling failure. Skip requeueing and status updates.", "pod", klog.KObj(pod), "oldUID", podInfo.Pod.UID, "newUID", cachedPod.UID)
+		// Drop any nomination this instance still holds. The nominator is keyed by UID, so this
+		// cannot affect the recreated Pod, and no future event will ever carry the old UID.
+		sched.SchedulingQueue.DeleteNominatedPodIfExists(podInfo.Pod)
+		return
+	} else if len(cachedPod.Spec.NodeName) != 0 && !isDeferredResize {
 		// In the case of extender, the pod may have been bound successfully, but timed out returning its response to the scheduler.
 		// It could result in the live version to carry .spec.nodeName, and that's inconsistent with the internal-queued version.
 		// For deferred resize pods, being assigned to a node in the cache is expected and not an inconsistent extender binding timeout.
-		if len(cachedPod.Spec.NodeName) != 0 && !isDeferredResize {
-			logger.Info("Pod has been assigned to node. Abort adding it back to queue.", "pod", klog.KObj(pod), "node", cachedPod.Spec.NodeName)
-			// We need to call DonePod here because we don't call AddUnschedulablePodIfNotPresent in this case.
-		} else {
-			if cachedPod.UID != podInfo.Pod.UID {
-				logger.V(2).Info("Pod was recreated while handling scheduling failure. Skip requeueing and status updates.", "pod", klog.KObj(pod), "oldUID", podInfo.Pod.UID, "newUID", cachedPod.UID)
+		logger.Info("Pod has been assigned to node. Abort adding it back to queue.", "pod", klog.KObj(pod), "node", cachedPod.Spec.NodeName)
+		// We need to call DonePod here because we don't call AddUnschedulablePodIfNotPresent in this case.
+	} else {
+		// As <cachedPod> is from SharedInformer, we need to do a DeepCopy() here.
+		// ignore this err since apiserver doesn't properly validate affinity terms
+		// and we can't fix the validation for backwards compatibility.
+		podInfo.PodInfo, _ = framework.NewPodInfo(cachedPod.DeepCopy())
+		pod = podInfo.Pod
+		nominatedPodInfo = podInfo.PodInfo
+		if err := sched.SchedulingQueue.AddUnschedulablePodIfNotPresent(logger, podInfo, sched.SchedulingQueue.SchedulingCycle()); err != nil {
+			if errors.Is(err, internalqueue.ErrPodSuperseded) {
+				// The queue detected, under its own lock, that this Pod was superseded while
+				// the lister read above was in flight. Skip the nomination and the status
+				// patch below, because both address the Pod by namespace/name only.
+				calledDone = true
 				return
 			}
-			// As <cachedPod> is from SharedInformer, we need to do a DeepCopy() here.
-			// ignore this err since apiserver doesn't properly validate affinity terms
-			// and we can't fix the validation for backwards compatibility.
-			podInfo.PodInfo, _ = framework.NewPodInfo(cachedPod.DeepCopy())
-			pod = podInfo.Pod
-			nominatedPodInfo = podInfo.PodInfo
-			if err := sched.SchedulingQueue.AddUnschedulablePodIfNotPresent(logger, podInfo, sched.SchedulingQueue.SchedulingCycle()); err != nil {
-				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred")
-			}
-			calledDone = true
+			utilruntime.HandleErrorWithContext(ctx, err, "Error occurred")
 		}
+		calledDone = true
 	}
 
 	// Deferred resize pods are already bound to and running on their assigned node. The scheduler only
@@ -1303,5 +1315,5 @@ func updatePod(ctx context.Context, client clientset.Interface, apiCacher fwk.AP
 	if nnnNeedsUpdate {
 		podStatusCopy.NominatedNodeName = nominatingInfo.NominatedNodeName
 	}
-	return util.PatchPodStatus(ctx, client, pod.Name, pod.Namespace, &pod.Status, podStatusCopy)
+	return util.PatchPodStatus(ctx, client, pod.Name, pod.Namespace, pod.UID, &pod.Status, podStatusCopy)
 }
