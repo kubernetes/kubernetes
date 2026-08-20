@@ -50,10 +50,8 @@ func (formatTagValidator) ValidScopes() sets.Set[Scope] {
 
 var (
 	// Keep this list alphabetized.
-	// TODO: uncomment the following when we've done the homework
-	// to be sure it works the current state of IP manual-ratcheting
-	// ipSloppyValidator         = types.Name{Package: libValidationPkg, Name: "IPSloppy"}
 	extendedResourceNameValidator       = types.Name{Package: libValidationPkg, Name: "ExtendedResourceName"}
+	ipSloppyValidator                   = types.Name{Package: libValidationPkg, Name: "IPSloppy"}
 	labelKeyValidator                   = types.Name{Package: libValidationPkg, Name: "LabelKey"}
 	labelValueValidator                 = types.Name{Package: libValidationPkg, Name: "LabelValue"}
 	longNameCaselessValidator           = types.Name{Package: libValidationPkg, Name: "LongNameCaseless"}
@@ -93,12 +91,9 @@ func getFormatValidationFunction(format string) (FunctionGen, error) {
 	case "k8s-extended-resource-name":
 		return Function(formatTagName, DefaultFlags, extendedResourceNameValidator).
 			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-extended-resource-name", ""}), nil
-	// TODO: uncomment the following when we've done the homework
-	// to be sure it works the current state of IP manual-ratcheting
-	/*
-		case "k8s-ip":
-			return Function(formatTagName, DefaultFlags, ipSloppyValidator), nil
-	*/
+	case "k8s-ip":
+		return Function(formatTagName, DefaultFlags, ipSloppyValidator).
+			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-ip", ""}), nil
 	case "k8s-label-key":
 		return Function(formatTagName, DefaultFlags, labelKeyValidator).
 			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-label-key", ""}), nil
