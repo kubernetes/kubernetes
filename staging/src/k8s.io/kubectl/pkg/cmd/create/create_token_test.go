@@ -340,6 +340,7 @@ status:
 				}),
 			}
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+			tf.ClientConfigVal.NegotiatedSerializer = ns
 
 			ioStreams, _, stdout, _ := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdCreateToken(tf, ioStreams)
