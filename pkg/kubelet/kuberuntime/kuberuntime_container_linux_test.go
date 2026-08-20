@@ -1518,6 +1518,40 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 	}
 }
 
+func TestGenerateLinuxContainerResourcesOversizedCPULimit(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	assert.NoError(t, err)
+	m.cpuCFSQuota = true
+
+	// A small request with a representable but enormous limit: MilliValue stays a
+	// large positive int64, so the quota conversion returns the unlimited -1 rail
+	// rather than the minimum, and shares still follow the request.
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "12345678", Name: "foo", Namespace: "bar"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name: "c1",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+					Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("100000000000")},
+				},
+			}},
+		},
+	}
+
+	got := m.generateLinuxContainerResources(tCtx, pod, &pod.Spec.Containers[0], false)
+	if got.CpuQuota != -1 {
+		t.Errorf("CpuQuota = %d, want -1 (an oversized limit is unlimited, not the minimum)", got.CpuQuota)
+	}
+	if got.CpuPeriod != 100000 {
+		t.Errorf("CpuPeriod = %d, want 100000", got.CpuPeriod)
+	}
+	if got.CpuShares != 102 {
+		t.Errorf("CpuShares = %d, want 102 (from the 100m request)", got.CpuShares)
+	}
+}
+
 func TestGenerateLinuxContainerResourcesWithDRA(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	_, _, m, err := createTestRuntimeManager(tCtx)

@@ -146,6 +146,16 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(ctx context.C
 
 // calculateCPUMaximum calculates the maximum CPU given a limit and a number of cpus while ensuring it's in range [1,10000].
 func calculateCPUMaximum(cpuLimit *resource.Quantity, cpuCount int64) int64 {
+	// Compare the original Quantity: MilliValue() wraps for a limit past the
+	// int64 range, so a huge positive limit projects to a negative milliCPU
+	// and would slip past a post-projection guard.
+	if cpuLimit.Sign() <= 0 {
+		return 1
+	}
+	if cpuLimit.CmpInt64(cpuCount) >= 0 {
+		return 10000
+	}
+	// The limit is below cpuCount, so 10*milliCPU stays well within int64.
 	cpuMaximum := 10 * cpuLimit.MilliValue() / cpuCount
 
 	// ensure cpuMaximum is in range [1, 10000].
