@@ -251,7 +251,11 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	getCmd := get.NewCmdGet("kubectl", f, o.IOStreams)
 	getCmd.ValidArgsFunction = utilcomp.ResourceTypeAndNameCompletionFunc(f)
 	debugCmd := debug.NewCmdDebug(f, o.IOStreams)
-	debugCmd.ValidArgsFunction = utilcomp.ResourceTypeAndNameCompletionFunc(f)
+	// debug takes a single positional (POD | TYPE/NAME), so use the pod-family
+	// completion: pod names and <type>/<name> slash forms. The get-style
+	// completion (bare <type> then space-separated <name>) produces invalid
+	// commands such as "kubectl debug pods <name>".
+	debugCmd.ValidArgsFunction = utilcomp.PodResourceNameCompletionFunc(f)
 
 	groups := templates.CommandGroups{
 		{
