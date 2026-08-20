@@ -26,11 +26,15 @@ import (
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/component-base/metrics/legacyregistry"
 
 	flowcontrol "k8s.io/api/flowcontrol/v1"
 )
 
 func TestUpdateBorrowing(t *testing.T) {
+	metrics.Register()
+	metrics.Reset()
+
 	startTime := time.Now()
 	clk, _ := testeventclock.NewFake(startTime, 0, nil)
 	plcExempt := fcboot.MandatoryPriorityLevelConfigurationExempt
@@ -160,5 +164,30 @@ func TestUpdateBorrowing(t *testing.T) {
 	} else {
 		t.Logf("Scenario 3: expected and got %d for lo", expected)
 	}
+	if expected, actual := float64(stateExempt.currentCL), priorityLevelTargetSeats(t, plcExempt.Name); expected != actual {
+		t.Errorf("Scenario 3: expected target seats %v, got %v for exempt", expected, actual)
+	}
+}
 
+func priorityLevelTargetSeats(t *testing.T, priorityLevel string) float64 {
+	t.Helper()
+
+	metricFamilies, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("Failed to gather metrics: %v", err)
+	}
+	for _, family := range metricFamilies {
+		if family.GetName() != "apiserver_flowcontrol_target_seats" {
+			continue
+		}
+		for _, metric := range family.Metric {
+			for _, label := range metric.Label {
+				if label.GetName() == "priority_level" && label.GetValue() == priorityLevel {
+					return metric.GetGauge().GetValue()
+				}
+			}
+		}
+	}
+	t.Fatalf("Target seats metric not found for priority level %q", priorityLevel)
+	return 0
 }
