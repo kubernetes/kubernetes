@@ -637,6 +637,74 @@ func TestCPGScheduling(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "TestCPGNonGreedyResourceStealingPrevention",
+			// TestCPGNonGreedyResourceStealingPrevention verifies that two-pass non-greedy scheduling
+			// prevents an early child group (pg1) from greedily consuming all node resources (4 CPU)
+			// and starving a sibling child group (pg2), allowing both child groups to satisfy their minCount.
+			//
+			// Tree structure:
+			//
+			//	        cpg-root (Gang, MinGroup: 2)
+			//	       /                            \
+			//	     pg1 (Gang, Min: 2)          pg2 (Gang, Min: 2)
+			//	  (4 pods, 1 CPU each)         (2 pods, 1 CPU each)
+			//
+			// Node capacity: 4 CPU
+			// Pass 1 (Non-greedy): pg1 schedules 2 pods (2 CPU), pg2 schedules 2 pods (2 CPU). Total: 4 CPU.
+			// Pass 2 (Greedy): pg1 tries remaining 2 pods, which fail due to full node capacity.
+			// Both child groups reach quorum and root CPG succeeds!
+			steps: []stepsframework.Step{
+				{
+					Name:        "Create Node with 4 CPUs",
+					CreateNodes: []*v1.Node{st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()},
+				},
+				{
+					Name: "Create Workload",
+					CreateWorkloads: []*schedulingapi.Workload{
+						st.MakeWorkload().Name("workload-cpg-non-greedy").
+							Children(
+								st.MakeCompositePodGroupTemplate().Name("root-t").MinGroupCount(2).Priority(100).Children(
+									st.MakePodGroupTemplate().Name("gang-t1").MinCount(2).Priority(100),
+									st.MakePodGroupTemplate().Name("gang-t2").MinCount(2).Priority(100),
+								),
+							).Obj(),
+					},
+				},
+				{
+					Name:                    "Create root CPG",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("workload-cpg-non-greedy", "root-t").MinGroupCount(2).Priority(100).Obj(),
+				},
+				{
+					Name:           "Create pg1",
+					CreatePodGroup: st.MakePodGroup().Name("pg1").WorkloadRef("workload-cpg-non-greedy", "gang-t1").ParentCompositePodGroup("cpg-root").Priority(100).MinCount(2).Obj(),
+				},
+				{
+					Name:           "Create pg2",
+					CreatePodGroup: st.MakePodGroup().Name("pg2").WorkloadRef("workload-cpg-non-greedy", "gang-t2").ParentCompositePodGroup("cpg-root").Priority(100).MinCount(2).Obj(),
+				},
+				{
+					Name: "Create Pods",
+					CreatePods: concatPods(
+						makeTestPods("pg1", "1", "1", "1", "1"),
+						makeTestPods("pg2", "1", "1"),
+					),
+				},
+				{
+					Name: "Wait for Pass 1 scheduled pods",
+					WaitForPodsScheduled: []string{
+						"pg1-pod-0", "pg1-pod-1",
+						"pg2-pod-0", "pg2-pod-1",
+					},
+				},
+				{
+					Name: "Wait for remaining pods to be unschedulable",
+					WaitForPodsUnschedulable: []string{
+						"pg1-pod-2", "pg1-pod-3",
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
