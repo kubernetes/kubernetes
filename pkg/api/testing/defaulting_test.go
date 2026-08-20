@@ -100,6 +100,8 @@ func TestDefaulting(t *testing.T) {
 		{Group: "certificates.k8s.io", Version: "v1", Kind: "PodCertificateRequestList"}:                           {},
 		{Group: "certificates.k8s.io", Version: "v1beta1", Kind: "CertificateSigningRequest"}:                      {},
 		{Group: "certificates.k8s.io", Version: "v1beta1", Kind: "CertificateSigningRequestList"}:                  {},
+		{Group: "checkpoint.k8s.io", Version: "v1alpha1", Kind: "PodCheckpoint"}:                                   {},
+		{Group: "checkpoint.k8s.io", Version: "v1alpha1", Kind: "PodCheckpointList"}:                               {},
 		{Group: "discovery.k8s.io", Version: "v1", Kind: "EndpointSlice"}:                                          {},
 		{Group: "discovery.k8s.io", Version: "v1", Kind: "EndpointSliceList"}:                                      {},
 		{Group: "discovery.k8s.io", Version: "v1beta1", Kind: "EndpointSlice"}:                                     {},

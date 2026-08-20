@@ -218,6 +218,14 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 
 	logger := klog.FromContext(ctx)
 	startTime := time.Now()
+
+	// Skip probing while the pod's probes are suspended (e.g. during a
+	// checkpoint, when containers are frozen). Keep the worker alive and leave
+	// the last result untouched so the liveness manager takes no action.
+	if w.probeManager.isSuspended(w.pod.UID) {
+		return true
+	}
+
 	status, ok := w.probeManager.statusManager.GetPodStatus(w.pod.UID)
 	if !ok {
 		// Either the pod has not been created yet, or it was already deleted.
