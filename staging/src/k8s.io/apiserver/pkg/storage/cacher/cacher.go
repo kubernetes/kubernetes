@@ -475,13 +475,19 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	go func() {
 		defer cacher.stopWg.Done()
 		defer cacher.terminateAllWatchers()
-		wait.Until(
-			func() {
-				if !cacher.isStopped() {
-					cacher.startCaching(stopCh)
-				}
-			}, time.Second, stopCh,
-		)
+		delayFn := wait.Backoff{
+			Duration: time.Second,
+			Cap:      time.Minute,
+			Steps:    60,
+			Factor:   1.5,
+			Jitter:   1.0,
+		}.DelayWithReset(clock.RealClock{}, time.Minute)
+		_ = delayFn.Until(wait.ContextForChannel(stopCh), true, true, func(context.Context) (bool, error) {
+			if !cacher.isStopped() {
+				cacher.startCaching(stopCh)
+			}
+			return false, nil
+		})
 	}()
 	return cacher, nil
 }
