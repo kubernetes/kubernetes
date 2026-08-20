@@ -694,13 +694,34 @@ func TestParseFeatureSpec(t *testing.T) {
 		{
 			name: "spec by field name",
 			expectedFeatureSpec: featureSpec{
-				Default: true, LockToDefault: true, PreRelease: "Beta", Version: "1.31",
+				Default: true, LockToDefault: true, PreRelease: "Beta", Version: "1.31", MinCompatibilityVersion: "1.31",
 			},
 			val: &ast.CompositeLit{
 				Elts: []ast.Expr{
 					&ast.KeyValueExpr{
 						Key: &ast.Ident{
 							Name: "Version",
+						},
+						Value: &ast.CallExpr{
+							Fun: &ast.SelectorExpr{
+								X: &ast.Ident{
+									Name: "version",
+								},
+								Sel: &ast.Ident{
+									Name: "MustParse",
+								},
+							},
+							Args: []ast.Expr{
+								&ast.BasicLit{
+									Kind:  token.STRING,
+									Value: "\"1.31\"",
+								},
+							},
+						},
+					},
+					&ast.KeyValueExpr{
+						Key: &ast.Ident{
+							Name: "MinCompatibilityVersion",
 						},
 						Value: &ast.CallExpr{
 							Fun: &ast.SelectorExpr{
