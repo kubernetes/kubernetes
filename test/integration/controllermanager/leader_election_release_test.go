@@ -66,7 +66,6 @@ func TestLeaderElectionReleaseOnCancel(t *testing.T) {
 	kcm, err := kubecontrollermanagertesting.StartTestServer(t, ctx, []string{
 		"--kubeconfig=" + kubeConfigFile,
 		"--leader-elect=true",
-		"--feature-gates=ControllerManagerReleaseLeaderElectionLockOnExit=true",
 	})
 	if err != nil {
 		t.Fatalf("failed to start KCM: %v", err)
