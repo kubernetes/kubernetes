@@ -1632,6 +1632,39 @@ func (tc *Controller) podEvictionTime(pod *v1.Pod) *evictionAndReason {
 		}
 	}
 
+	// Also check extended resource claims (KEP-5004, DRAExtendedResource).
+	// Pods using extended resource backed by DRA have their claim reference in
+	// pod.Status.ExtendedResourceClaimStatus, not in pod.Spec.ResourceClaims.
+	// Without this, NoExecute device taint eviction silently skips pods that
+	// request devices via the extended resource field (e.g. nvidia.com/gpu: 1),
+	// which is the default path for existing GPU workloads.
+	if pod.Status.ExtendedResourceClaimStatus != nil {
+		claimName := pod.Status.ExtendedResourceClaimStatus.ResourceClaimName
+		allocatedClaim, ok := tc.allocatedClaims[types.NamespacedName{Namespace: pod.Namespace, Name: claimName}]
+		if ok && allocatedClaim.eviction != nil {
+			if eviction == nil {
+				eviction = allocatedClaim.eviction
+			} else {
+				newEvictionTime := &evictionAndReason{
+					when:   allocatedClaim.eviction.when,
+					reason: slices.Clone(allocatedClaim.eviction.reason),
+				}
+				for _, reason := range eviction.reason {
+					index, found := slices.BinarySearchFunc(newEvictionTime.reason, reason, func(a, b trackedTaint) int { return a.Compare(b) })
+					if !found {
+						newEvictionTime.reason = slices.Insert(newEvictionTime.reason, index, reason)
+					}
+				}
+				if eviction.when.Before(&newEvictionTime.when) {
+					newEvictionTime.when = eviction.when
+				}
+				if !eviction.equal(newEvictionTime) {
+					eviction = newEvictionTime
+				}
+			}
+		}
+	}
+
 	return eviction
 }
 
