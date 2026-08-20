@@ -57,7 +57,7 @@ var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.Wit
 			initialConfig.ImageMaximumGCAge = metav1.Duration{Duration: time.Duration(time.Minute * 1)}
 			initialConfig.ImageMinimumGCAge = metav1.Duration{Duration: time.Duration(time.Second * 1)}
 		})
-		ginkgo.It("should GC unused images", func(ctx context.Context) {
+		ginkgo.It("should GC unused images", f.WithSlow(), func(ctx context.Context) {
 			pod := innocentPod()
 			e2epod.NewPodClient(f).CreateBatch(ctx, []*v1.Pod{pod})
 
@@ -77,7 +77,7 @@ var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.Wit
 				return len(gcdImageList)
 			}, checkGCUntil, checkGCFreq).Should(gomega.BeNumerically("<", len(allImages)))
 		})
-		ginkgo.It("should not GC unused images prematurely", func(ctx context.Context) {
+		ginkgo.It("should not GC unused images prematurely", f.WithSlow(), func(ctx context.Context) {
 			pod := innocentPod()
 			e2epod.NewPodClient(f).CreateBatch(ctx, []*v1.Pod{pod})
 
