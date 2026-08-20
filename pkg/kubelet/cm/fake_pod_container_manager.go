@@ -99,7 +99,7 @@ func (m *FakePodContainerManager) GetAllPodsFromCgroups(_ klog.Logger) (map[type
 	return grp, nil
 }
 
-func (m *FakePodContainerManager) IsPodCgroup(cgroupfs string) (bool, types.UID) {
+func (m *FakePodContainerManager) IsPodCgroup(_ string) (bool, types.UID) {
 	m.Lock()
 	defer m.Unlock()
 	m.CalledFunctions = append(m.CalledFunctions, "IsPodCgroup")
@@ -120,7 +120,7 @@ func (cm *FakePodContainerManager) GetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceNa
 	return nil, nil
 }
 
-func (cm *FakePodContainerManager) SetPodCgroupConfig(_ klog.Logger, pod *v1.Pod, resourceConfig *ResourceConfig) error {
+func (cm *FakePodContainerManager) SetPodCgroupConfig(_ klog.Logger, _ *v1.Pod, _ *ResourceConfig) error {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "SetPodCgroupConfig")

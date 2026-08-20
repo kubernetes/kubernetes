@@ -56,8 +56,8 @@ type runtimeService interface {
 
 type sourcesReadyStub struct{}
 
-func (s *sourcesReadyStub) AddSource(source string) {}
-func (s *sourcesReadyStub) AllReady() bool          { return true }
+func (s *sourcesReadyStub) AddSource(_ string) {}
+func (s *sourcesReadyStub) AllReady() bool     { return true }
 
 // Manager interface provides methods for Kubelet to manage pod memory.
 type Manager interface {

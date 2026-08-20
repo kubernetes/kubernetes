@@ -35,7 +35,7 @@ type fakeManager struct {
 	state state.State
 }
 
-func (m *fakeManager) Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
+func (m *fakeManager) Start(ctx context.Context, _ ActivePodsFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ runtimeService, _ containermap.ContainerMap) error {
 	logger := klog.FromContext(ctx)
 	logger.Info("Start()")
 	return nil
@@ -105,7 +105,7 @@ func (m *fakeManager) GetPodMemory(podUID string) []state.Block {
 	return []state.Block{}
 }
 
-func (m *fakeManager) GetResourceIsolationLevel(pod *v1.Pod, container *v1.Container) cmqos.ResourceIsolationLevel {
+func (m *fakeManager) GetResourceIsolationLevel(_ *v1.Pod, _ *v1.Container) cmqos.ResourceIsolationLevel {
 	return cmqos.ResourceIsolationContainer
 }
 
