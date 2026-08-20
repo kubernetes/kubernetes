@@ -30,8 +30,8 @@ func TestNumEndpointsAndSlices(t *testing.T) {
 	p80 := int32(80)
 	p443 := int32(443)
 
-	pmKey80443 := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}, {Port: &p443}})
-	pmKey80 := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}})
+	pmKey80443 := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}, {Port: &p443}}, discovery.AddressTypeIPv4)
+	pmKey80 := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}}, discovery.AddressTypeIPv4)
 
 	spCacheEfficient := NewEndpointPortCache()
 	spCacheEfficient.Set(pmKey80, EfficiencyInfo{Endpoints: 45, Slices: 1})
