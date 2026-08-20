@@ -76,7 +76,7 @@ var _ rest.CategoriesProvider = &REST{}
 
 // Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
 func (r *REST) Categories() []string {
-	return []string{"all"}
+	return []string{"all", "podautoscalers"}
 }
 
 // StatusREST implements the REST endpoint for changing the status of a daemonset
