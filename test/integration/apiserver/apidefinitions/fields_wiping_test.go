@@ -19,10 +19,12 @@ package apidefinitions
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -48,6 +50,7 @@ func TestFieldsWipingConsistency(t *testing.T) {
 		"certificatesigningrequests.v1.certificates.k8s.io",
 		"cronjobs.v1.batch",
 		"daemonsets.v1.apps",
+		"deployments.v1.apps", // only wipes label
 		"horizontalpodautoscalers.v1.autoscaling",
 		"horizontalpodautoscalers.v2.autoscaling",
 		"ingresses.v1.networking.k8s.io",
@@ -110,6 +113,9 @@ func TestFieldsWipingConsistency(t *testing.T) {
 		}
 		statusLabels["test-status-ssa"] = "true"
 		statusObj.SetLabels(statusLabels)
+		statusObj.SetAnnotations(map[string]string{"test-status-ssa": "true"})
+		statusObj.SetFinalizers([]string{"foregroundDeletion"})
+		statusObj.SetOwnerReferences([]metav1.OwnerReference{{APIVersion: "example.com/v1", Kind: "Example", Name: "ssa", UID: types.UID("uid")}})
 		_, err = rsc.ApplyStatus(context.TODO(), name, statusObj, metav1.ApplyOptions{FieldManager: "status-manager", Force: true})
 		if err != nil {
 			t.Fatalf("Failed to apply status via SSA: %v", err)
@@ -125,11 +131,11 @@ func TestFieldsWipingConsistency(t *testing.T) {
 
 		// Infer GetResetFields behavior from managedFields.
 		ssaStatusResetsSpec := true
-		ssaStatusResetsMetadata := true
+		ssaStatusMetadataOwnership := metadataOwnership{}
 		for _, mf := range baseline.GetManagedFields() {
 			if mf.Manager == "status-manager" && mf.Subresource == "status" {
 				ssaStatusResetsSpec = !managedFieldsOwnTopLevelField(t, mf.FieldsV1, "spec")
-				ssaStatusResetsMetadata = !managedFieldsOwnLabel(t, mf.FieldsV1, "test-status-ssa")
+				ssaStatusMetadataOwnership = managedFieldsOwnMetadata(t, mf.FieldsV1)
 			}
 		}
 
@@ -163,14 +169,28 @@ func TestFieldsWipingConsistency(t *testing.T) {
 			statusWipesSpec = true
 		}
 
+		originalMetadata := extractMutableMetadata(baseline)
+
 		// Check /status PrepareForUpdate metadata wiping
-		var statusWipesMetadata bool
-		labelPatch := []byte(`{"metadata": {"labels": {"test-wipe-label": "test-value"}}}`)
-		result, err := rsc.Patch(context.TODO(), name, types.MergePatchType, labelPatch, metav1.PatchOptions{}, "status")
+		metadataPatch := []byte(`{"metadata": {
+			"annotations": {"test-wipe-annotation": "test-value"},
+			"labels": {"test-wipe-label": "test-value"},
+			"finalizers": ["orphan"],
+			"ownerReferences":[{"apiVersion":"example.com/v1","kind":"Example","name":"myname","uid":"myuid"}]
+		}}`)
+		result, err := rsc.Patch(context.TODO(), name, types.MergePatchType, metadataPatch, metav1.PatchOptions{}, "status")
 		if err != nil {
 			t.Fatalf("Failed to patch status endpoint with different metadata labels: %v", err)
 		}
-		statusWipesMetadata = !checkPatch(t, string(labelPatch), "metadata", result.Object)
+		modifiedMetadata := extractMutableMetadata(result)
+
+		statusMutableMetadata := metadataOwnership{
+			labels:          !reflect.DeepEqual(originalMetadata.Labels, modifiedMetadata.Labels),
+			annotations:     !reflect.DeepEqual(originalMetadata.Annotations, modifiedMetadata.Annotations),
+			finalizers:      !reflect.DeepEqual(originalMetadata.Finalizers, modifiedMetadata.Finalizers),
+			ownerReferences: !reflect.DeepEqual(originalMetadata.OwnerReferences, modifiedMetadata.OwnerReferences),
+		}
+		statusWipesMetadata := reflect.DeepEqual(originalMetadata, modifiedMetadata)
 
 		if ssaMainResetsStatus != mainWipesStatus {
 			t.Errorf("Main endpoint: SSA ResetStatus (%v) and PrepareForUpdate wipeStatus (%v) behaviors do not match.", ssaMainResetsStatus, mainWipesStatus)
@@ -178,8 +198,8 @@ func TestFieldsWipingConsistency(t *testing.T) {
 		if ssaStatusResetsSpec != statusWipesSpec {
 			t.Errorf("Status endpoint: SSA ResetSpec (%v) and PrepareForUpdate wipeSpec (%v) behaviors do not match.", ssaStatusResetsSpec, statusWipesSpec)
 		}
-		if ssaStatusResetsMetadata != statusWipesMetadata {
-			t.Errorf("Status endpoint: SSA ResetMetadata (%v) and PrepareForUpdate wipeMetadata (%v) behaviors do not match.", ssaStatusResetsMetadata, statusWipesMetadata)
+		if ssaStatusMetadataOwnership != statusMutableMetadata {
+			t.Errorf("Status endpoint: ssaStatusMetadataOwnership (%v) and PrepareForUpdate statusMutableMetadata (%v) behaviors do not match.", ssaStatusMetadataOwnership, statusMutableMetadata)
 		}
 
 		// Enforce field wiping behaviors, with allowlists for pre-existing exceptions.
@@ -192,6 +212,15 @@ func TestFieldsWipingConsistency(t *testing.T) {
 			t.Logf("Failed to delete %v: %v", name, err)
 		}
 	})
+}
+
+func extractMutableMetadata(obj *unstructured.Unstructured) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Labels:          obj.GetLabels(),
+		Annotations:     obj.GetAnnotations(),
+		Finalizers:      obj.GetFinalizers(),
+		OwnerReferences: obj.GetOwnerReferences(),
+	}
 }
 
 // checkPatch checks if field values under fieldScope (e.g. spec, status, metdata) in objData match the values
@@ -244,24 +273,31 @@ func assertWiped(t *testing.T, gvr schema.GroupVersionResource, msg string, wipe
 }
 
 // managedFieldsOwnLabel checks whether a FieldsV1 set contains a metadata label.
-func managedFieldsOwnLabel(t *testing.T, fieldsV1 *metav1.FieldsV1, labelKey string) bool {
+func managedFieldsOwnMetadata(t *testing.T, fieldsV1 *metav1.FieldsV1) metadataOwnership {
 	t.Helper()
+	var result metadataOwnership
 	if fieldsV1 == nil {
-		return false
+		return result
 	}
 	var fields map[string]interface{}
 	if err := json.Unmarshal(fieldsV1.GetRawBytes(), &fields); err != nil {
 		t.Logf("Failed to unmarshal FieldsV1: %v", err)
-		return false
+		return result
 	}
 	metadata, ok := fields["f:metadata"].(map[string]interface{})
 	if !ok {
-		return false
+		return result
 	}
-	labels, ok := metadata["f:labels"].(map[string]interface{})
-	if !ok {
-		return false
-	}
-	_, ok = labels["f:"+labelKey]
-	return ok
+	_, result.labels = metadata["f:labels"]
+	_, result.annotations = metadata["f:annotations"]
+	_, result.finalizers = metadata["f:finalizers"]
+	_, result.ownerReferences = metadata["f:ownerReferences"]
+	return result
+}
+
+type metadataOwnership struct {
+	labels          bool
+	annotations     bool
+	finalizers      bool
+	ownerReferences bool
 }
