@@ -255,10 +255,21 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		w.containerID = kubecontainer.ParseContainerID(logger, c.ContainerID)
 
 		if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) {
+			// The container start time alone cannot tell a container that survived the
+			// kubelet restart apart from a new container the runtime created while the
+			// kubelet could not reach the API server, so compare the container ID the
+			// kubelet last observed from the API server with the one the runtime reports.
+			// See https://github.com/kubernetes/kubernetes/issues/141473
+			apiContainerStatuses := w.pod.Status.ContainerStatuses
+			if w.isInitContainer() {
+				apiContainerStatuses = w.pod.Status.InitContainerStatuses
+			}
+			canInherit := canInheritProbeState(apiContainerStatuses, w.container.Name, c.ContainerID)
+
 			// On kubelet restart, we don't want to immediately set the probe result to Failure,
 			// as this could cause a container that was Ready to become NotReady.
 			isRestart := false
-			if c.State.Running != nil {
+			if canInherit && c.State.Running != nil {
 				containerStartTime := c.State.Running.StartedAt.Time
 				if !containerStartTime.IsZero() && containerStartTime.Before(kubeletRestartGracePeriod(w.probeManager.start)) {
 					isRestart = true
