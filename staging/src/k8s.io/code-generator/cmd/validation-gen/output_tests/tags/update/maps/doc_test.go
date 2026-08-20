@@ -129,4 +129,60 @@ func TestUpdateMapTags(t *testing.T) {
 			field.Invalid(field.NewPath("eachValNoModifyMap").Key("a"), nil, "cannot be modified").WithOrigin("update"),
 		})
 	}
+
+	// Pointer Map NoSet
+	{
+		old := base
+		old.PointerMapNoSet = nil
+		cur := base
+		cur.PointerMapNoSet = map[string]*string{"a": new("1")}
+
+		st.Value(&cur).OldValue(&old).ExpectMatches(matcher, field.ErrorList{
+			field.Invalid(field.NewPath("pointerMapNoSet"), nil, "field cannot be set once created").WithOrigin("update"),
+		})
+
+		// nil -> nil is allowed
+		st.Value(&old).OldValue(&old).ExpectValid()
+	}
+
+	// Pointer Map NoAddItem
+	{
+		old := base
+		old.PointerMapNoAdd = map[string]*string{"a": new("1")}
+		cur := base
+		cur.PointerMapNoAdd = map[string]*string{"a": new("1"), "b": new("2")}
+
+		st.Value(&cur).OldValue(&old).ExpectMatches(matcher, field.ErrorList{
+			field.Forbidden(field.NewPath("pointerMapNoAdd").Key("b"), "item may not be added").WithOrigin("update"),
+		})
+	}
+
+	// Pointer Map NoRemoveItem
+	{
+		old := base
+		old.PointerMapNoRemove = map[string]*MapItem{
+			"a": {Name: "a", Value: "1"},
+			"b": {Name: "b", Value: "2"},
+		}
+		cur := base
+		cur.PointerMapNoRemove = map[string]*MapItem{
+			"a": {Name: "a", Value: "1"},
+		}
+
+		st.Value(&cur).OldValue(&old).ExpectMatches(matcher, field.ErrorList{
+			field.Forbidden(field.NewPath("pointerMapNoRemove").Key("b"), "item may not be removed").WithOrigin("update"),
+		})
+	}
+
+	// Nil element in pointer map on update should trigger Required error from PtrMapNoNils
+	{
+		old := base
+		old.PointerMapNoAdd = map[string]*string{"a": new("1")}
+		cur := base
+		cur.PointerMapNoAdd = map[string]*string{"a": nil}
+
+		st.Value(&cur).OldValue(&old).ExpectMatches(matcher, field.ErrorList{
+			field.Required(field.NewPath("pointerMapNoAdd").Key("a"), ""),
+		})
+	}
 }
