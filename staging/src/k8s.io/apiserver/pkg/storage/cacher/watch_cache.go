@@ -388,9 +388,9 @@ func (c *watchCache) waitUntilFreshAndGetList(ctx context.Context, key string, o
 		return listResp{}, "", err
 	}
 	if exists {
-		return listResp{Items: []interface{}{obj}, ResourceVersion: readResourceVersion}, "", nil
+		return listResp{Snapshot: store.NewOrderedListSnapshot([]interface{}{obj}), ResourceVersion: readResourceVersion}, "", nil
 	}
-	return listResp{ResourceVersion: readResourceVersion}, "", nil
+	return listResp{Snapshot: store.NewOrderedListSnapshot(nil), ResourceVersion: readResourceVersion}, "", nil
 }
 
 // WaitUntilFreshAndList returns list of pointers to `storeElement` objects along
@@ -448,15 +448,16 @@ func (w *watchCache) waitUntilFreshAndList(ctx context.Context, key string, opts
 }
 
 func (w *watchCache) waitAndListExactRV(ctx context.Context, key, continueKey string, resourceVersion uint64) (resp listResp, index string, err error) {
-	store, err := w.waitAndGetExactSnapshot(ctx, resourceVersion)
+	snap, err := w.waitAndGetExactSnapshot(ctx, resourceVersion)
 	if err != nil {
 		return listResp{}, "", err
 	}
-	items, err := store.OrderedListPrefix(key, continueKey)
 	return listResp{
-		Items:           items,
+		Snapshot:        snap,
+		Key:             key,
+		Continue:        continueKey,
 		ResourceVersion: resourceVersion,
-	}, "", err
+	}, "", nil
 }
 
 func (w *watchCache) waitAndGetExactSnapshot(ctx context.Context, resourceVersion uint64) (store.Snapshot, error) {
@@ -495,12 +496,10 @@ func (w *watchCache) waitAndListLatestRV(ctx context.Context, minResourceVersion
 	if err != nil {
 		return listResp{}, "", err
 	}
-	items, err := snap.OrderedListPrefix(key, continueKey)
-	if err != nil {
-		return listResp{}, "", err
-	}
 	return listResp{
-		Items:           items,
+		Snapshot:        snap,
+		Key:             key,
+		Continue:        continueKey,
 		ResourceVersion: resourceVersion,
 	}, index, nil
 }

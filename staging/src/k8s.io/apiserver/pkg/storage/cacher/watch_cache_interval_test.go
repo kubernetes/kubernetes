@@ -19,6 +19,7 @@ package cacher
 import (
 	"errors"
 	"fmt"
+	"iter"
 	"reflect"
 	"sort"
 	"sync"
@@ -540,6 +541,20 @@ func (s *countingSnapshot) GetByKey(string) (interface{}, bool, error) {
 func (s *countingSnapshot) OrderedListPrefix(_, _ string) ([]interface{}, error) {
 	s.orderedListPrefixCalls++
 	return s.items, nil
+}
+
+func (s *countingSnapshot) RangePrefix(_, _ string) iter.Seq2[*store.Element, error] {
+	return func(yield func(*store.Element, error) bool) {
+		for _, item := range s.items {
+			if !yield(item.(*store.Element), nil) {
+				return
+			}
+		}
+	}
+}
+
+func (s *countingSnapshot) Count(_, _ string) int {
+	return len(s.items)
 }
 
 // TestLazySnapshotCacheIntervalSourceEmpty checks that on an empty snapshot Next() returns
