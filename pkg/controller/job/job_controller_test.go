@@ -24,6 +24,7 @@ import (
 	"slices"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -8071,6 +8072,111 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestSyncOrphanPodsBySelectorRetryOnFailure(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	clientset := fake.NewClientset()
+	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
+	manager, err := NewController(ctx, clientset, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), sharedInformers.Scheduling().V1beta1().Workloads(), sharedInformers.Scheduling().V1beta1().PodGroups())
+	if err != nil {
+		t.Fatalf("Error creating Job controller: %v", err)
+	}
+	manager.podStoreSynced = alwaysReady
+	manager.jobStoreSynced = alwaysReady
+	manager.podControl = &controller.FakePodControl{}
+
+	podInformer := sharedInformers.Core().V1().Pods().Informer()
+	go podInformer.RunWithContext(ctx)
+	cache.WaitForCacheSync(ctx.Done(), podInformer.HasSynced)
+
+	selector := &metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			"app": "test",
+		},
+	}
+	selectorString, err := metav1.LabelSelectorAsSelector(selector)
+	if err != nil {
+		t.Fatalf("Error parsing pod label selector: %v", err)
+	}
+
+	pod1 := buildPod().name("pod1").ns("default").labels(selector.MatchLabels).deletionTimestamp().trackingFinalizer().Pod
+	pod2 := buildPod().name("pod2").ns("default").labels(selector.MatchLabels).deletionTimestamp().trackingFinalizer().Pod
+	pod3 := buildPod().name("pod3").ns("default").labels(selector.MatchLabels).deletionTimestamp().trackingFinalizer().Pod
+
+	podIndexer := podInformer.GetIndexer()
+	if err := podIndexer.Add(pod1); err != nil {
+		t.Fatalf("Failed to add pod1 to indexer: %v", err)
+	}
+	if err := podIndexer.Add(pod2); err != nil {
+		t.Fatalf("Failed to add pod2 to indexer: %v", err)
+	}
+	if err := podIndexer.Add(pod3); err != nil {
+		t.Fatalf("Failed to add pod3 to indexer: %v", err)
+	}
+
+	_, err = clientset.CoreV1().Pods("default").Create(ctx, pod1, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Creating pod1: %v", err)
+	}
+	_, err = clientset.CoreV1().Pods("default").Create(ctx, pod2, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Creating pod2: %v", err)
+	}
+	_, err = clientset.CoreV1().Pods("default").Create(ctx, pod3, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Creating pod3: %v", err)
+	}
+
+	orphanKey := orphanPodKey{
+		kind:      OrphanPodKeyKindSelector,
+		namespace: "default",
+		value:     selectorString.String(),
+	}
+
+	fakePodControl := manager.podControl.(*controller.FakePodControl)
+	fakePodControl.Err = errors.New("server temporarily unavailable")
+
+	err = manager.syncOrphanPod(ctx, orphanKey)
+	if err != nil {
+		t.Fatalf("syncOrphanPod should not return error even if some pods fail: %v", err)
+	}
+
+	if len(fakePodControl.Patches) != 3 {
+		t.Errorf("Expected 3 patch attempts (one for each pod), got %d", len(fakePodControl.Patches))
+	}
+
+	fakePodControl.Patches = nil
+	fakePodControl.Err = nil
+
+	time.Sleep(2 * time.Second)
+
+	for range 3 {
+		key, quit := manager.orphanQueue.Get()
+		if quit {
+			t.Fatalf("Queue unexpectedly empty")
+		}
+		if key.kind != OrphanPodKeyKindName {
+			t.Errorf("Expected requeued key kind to be %v, got %v", OrphanPodKeyKindName, key.kind)
+		}
+		manager.orphanQueue.Done(key)
+
+		err := manager.syncOrphanPod(ctx, key)
+		if err != nil {
+			t.Fatalf("syncOrphanPod failed on retry: %v", err)
+		}
+	}
+
+	if len(fakePodControl.Patches) != 3 {
+		t.Errorf("Expected 3 patch attempts on retry, got %d", len(fakePodControl.Patches))
+	}
+
+	for i, patch := range fakePodControl.Patches {
+		patchStr := string(patch)
+		if !strings.Contains(patchStr, "$deleteFromPrimitiveList/finalizers") || !strings.Contains(patchStr, batch.JobTrackingFinalizer) {
+			t.Errorf("Patch %d: expected finalizer removal patch, got %s", i, patchStr)
+		}
 	}
 }
 
