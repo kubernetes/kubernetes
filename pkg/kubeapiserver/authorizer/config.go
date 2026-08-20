@@ -113,6 +113,7 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 			node.RegisterMetrics()
 			graph := node.NewGraph()
 			node.AddGraphEventHandlers(
+				ctx,
 				graph,
 				config.VersionedInformerFactory.Core().V1().Nodes(),
 				config.VersionedInformerFactory.Core().V1().Pods(),
