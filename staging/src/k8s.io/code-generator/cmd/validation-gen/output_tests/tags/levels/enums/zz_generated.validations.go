@@ -94,7 +94,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.EnumField
+	{ // field Struct.EnumField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/enums.Enum)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *Enum,
@@ -116,7 +116,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("enumField"), &obj.EnumField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.EnumFieldBeta
+	{ // field Struct.EnumFieldBeta (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/enums.BetaEnum)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *BetaEnum,

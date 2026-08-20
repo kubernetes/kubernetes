@@ -277,9 +277,9 @@ func Validate_ConfigMap(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.ConfigMap) (errs field.ErrorList) {
 
-	// field corev1.ConfigMap.TypeMeta has no validation
+	// field ConfigMap.TypeMeta has no validation
 
-	{ // field corev1.ConfigMap.ObjectMeta
+	{ // field ConfigMap.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -301,9 +301,9 @@ func Validate_ConfigMap(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field corev1.ConfigMap.Immutable has no validation
-	// field corev1.ConfigMap.Data has no validation
-	// field corev1.ConfigMap.BinaryData has no validation
+	// field ConfigMap.Immutable has no validation
+	// field ConfigMap.Data has no validation
+	// field ConfigMap.BinaryData has no validation
 	return errs
 }
 
@@ -313,9 +313,9 @@ func Validate_Endpoints(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.Endpoints) (errs field.ErrorList) {
 
-	// field corev1.Endpoints.TypeMeta has no validation
+	// field Endpoints.TypeMeta has no validation
 
-	{ // field corev1.Endpoints.ObjectMeta
+	{ // field Endpoints.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -337,7 +337,7 @@ func Validate_Endpoints(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field corev1.Endpoints.Subsets has no validation
+	// field Endpoints.Subsets has no validation
 	return errs
 }
 
@@ -347,9 +347,9 @@ func Validate_Event(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.Event) (errs field.ErrorList) {
 
-	// field corev1.Event.TypeMeta has no validation
+	// field Event.TypeMeta has no validation
 
-	{ // field corev1.Event.ObjectMeta
+	{ // field Event.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -371,20 +371,20 @@ func Validate_Event(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field corev1.Event.InvolvedObject has no validation
-	// field corev1.Event.Reason has no validation
-	// field corev1.Event.Message has no validation
-	// field corev1.Event.Source has no validation
-	// field corev1.Event.FirstTimestamp has no validation
-	// field corev1.Event.LastTimestamp has no validation
-	// field corev1.Event.Count has no validation
-	// field corev1.Event.Type has no validation
-	// field corev1.Event.EventTime has no validation
-	// field corev1.Event.Series has no validation
-	// field corev1.Event.Action has no validation
-	// field corev1.Event.Related has no validation
-	// field corev1.Event.ReportingController has no validation
-	// field corev1.Event.ReportingInstance has no validation
+	// field Event.InvolvedObject has no validation
+	// field Event.Reason has no validation
+	// field Event.Message has no validation
+	// field Event.Source has no validation
+	// field Event.FirstTimestamp has no validation
+	// field Event.LastTimestamp has no validation
+	// field Event.Count has no validation
+	// field Event.Type has no validation
+	// field Event.EventTime has no validation
+	// field Event.Series has no validation
+	// field Event.Action has no validation
+	// field Event.Related has no validation
+	// field Event.ReportingController has no validation
+	// field Event.ReportingInstance has no validation
 	return errs
 }
 
@@ -394,7 +394,7 @@ func Validate_EvictionResponder(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.EvictionResponder) (errs field.ErrorList) {
 
-	{ // field corev1.EvictionResponder.Name
+	{ // field EvictionResponder.Name (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -430,7 +430,7 @@ func Validate_EvictionResponder(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
-	{ // field corev1.EvictionResponder.Priority
+	{ // field EvictionResponder.Priority (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -478,9 +478,9 @@ func Validate_LimitRange(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.LimitRange) (errs field.ErrorList) {
 
-	// field corev1.LimitRange.TypeMeta has no validation
+	// field LimitRange.TypeMeta has no validation
 
-	{ // field corev1.LimitRange.ObjectMeta
+	{ // field LimitRange.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -502,7 +502,7 @@ func Validate_LimitRange(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field corev1.LimitRange.Spec has no validation
+	// field LimitRange.Spec has no validation
 	return errs
 }
 
@@ -512,9 +512,9 @@ func Validate_Namespace(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.Namespace) (errs field.ErrorList) {
 
-	// field corev1.Namespace.TypeMeta has no validation
+	// field Namespace.TypeMeta has no validation
 
-	{ // field corev1.Namespace.ObjectMeta
+	{ // field Namespace.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -536,8 +536,8 @@ func Validate_Namespace(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field corev1.Namespace.Spec has no validation
-	// field corev1.Namespace.Status has no validation
+	// field Namespace.Spec has no validation
+	// field Namespace.Status has no validation
 	return errs
 }
 
@@ -547,9 +547,9 @@ func Validate_Node(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.Node) (errs field.ErrorList) {
 
-	// field corev1.Node.TypeMeta has no validation
+	// field Node.TypeMeta has no validation
 
-	{ // field corev1.Node.ObjectMeta
+	{ // field Node.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -571,7 +571,7 @@ func Validate_Node(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field corev1.Node.Spec
+	{ // field Node.Spec (k8s.io/api/core/v1.NodeSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *corev1.NodeSpec,
@@ -593,7 +593,7 @@ func Validate_Node(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	// field corev1.Node.Status has no validation
+	// field Node.Status has no validation
 	return errs
 }
 
@@ -603,7 +603,7 @@ func Validate_NodeAllocatableMappedResources(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.NodeAllocatableMappedResources) (errs field.ErrorList) {
 
-	{ // field corev1.NodeAllocatableMappedResources.Name
+	{ // field NodeAllocatableMappedResources.Name (k8s.io/api/core/v1.ResourceName)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *corev1.ResourceName,
@@ -632,7 +632,7 @@ func Validate_NodeAllocatableMappedResources(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
-	{ // field corev1.NodeAllocatableMappedResources.Quantity
+	{ // field NodeAllocatableMappedResources.Quantity (k8s.io/apimachinery/pkg/api/resource.Quantity)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *resource.Quantity,
@@ -670,7 +670,7 @@ func Validate_NodeAllocatableOverheadResources(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.NodeAllocatableOverheadResources) (errs field.ErrorList) {
 
-	{ // field corev1.NodeAllocatableOverheadResources.Name
+	{ // field NodeAllocatableOverheadResources.Name (k8s.io/api/core/v1.ResourceName)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *corev1.ResourceName,
@@ -699,7 +699,7 @@ func Validate_NodeAllocatableOverheadResources(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
-	{ // field corev1.NodeAllocatableOverheadResources.PerPod
+	{ // field NodeAllocatableOverheadResources.PerPod (k8s.io/apimachinery/pkg/api/resource.Quantity)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *resource.Quantity,
@@ -727,7 +727,7 @@ func Validate_NodeAllocatableOverheadResources(
 		errs = append(errs, fn(fldPath.Child("perPod"), obj.PerPod, oldVal, oldObj != nil)...)
 	}
 
-	{ // field corev1.NodeAllocatableOverheadResources.PerContainer
+	{ // field NodeAllocatableOverheadResources.PerContainer (k8s.io/apimachinery/pkg/api/resource.Quantity)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *resource.Quantity,
@@ -764,7 +764,7 @@ func Validate_NodeAllocatableResourceClaimStatus(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.NodeAllocatableResourceClaimStatus) (errs field.ErrorList) {
 
-	{ // field corev1.NodeAllocatableResourceClaimStatus.ResourceClaimName
+	{ // field NodeAllocatableResourceClaimStatus.ResourceClaimName (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -793,7 +793,7 @@ func Validate_NodeAllocatableResourceClaimStatus(
 		errs = append(errs, fn(fldPath.Child("resourceClaimName"), &obj.ResourceClaimName, oldVal, oldObj != nil)...)
 	}
 
-	{ // field corev1.NodeAllocatableResourceClaimStatus.Containers
+	{ // field NodeAllocatableResourceClaimStatus.Containers ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -825,7 +825,7 @@ func Validate_NodeAllocatableResourceClaimStatus(
 		errs = append(errs, fn(fldPath.Child("containers"), obj.Containers, oldVal, oldObj != nil)...)
 	}
 
-	{ // field corev1.NodeAllocatableResourceClaimStatus.Mapping
+	{ // field NodeAllocatableResourceClaimStatus.Mapping ([]k8s.io/api/core/v1.NodeAllocatableMappedResources)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []corev1.NodeAllocatableMappedResources,
@@ -867,7 +867,7 @@ func Validate_NodeAllocatableResourceClaimStatus(
 		errs = append(errs, fn(fldPath.Child("mapping"), obj.Mapping, oldVal, oldObj != nil)...)
 	}
 
-	{ // field corev1.NodeAllocatableResourceClaimStatus.Overhead
+	{ // field NodeAllocatableResourceClaimStatus.Overhead ([]k8s.io/api/core/v1.NodeAllocatableOverheadResources)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []corev1.NodeAllocatableOverheadResources,
@@ -918,7 +918,7 @@ func Validate_NodePodPreemptionPolicy(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.NodePodPreemptionPolicy) (errs field.ErrorList) {
 
-	{ // field corev1.NodePodPreemptionPolicy.DisableResizePreemption
+	{ // field NodePodPreemptionPolicy.DisableResizePreemption ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -966,10 +966,10 @@ func Validate_NodeSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.NodeSpec) (errs field.ErrorList) {
 
-	// field corev1.NodeSpec.PodCIDR has no validation
-	// field corev1.NodeSpec.PodCIDRs has no validation
+	// field NodeSpec.PodCIDR has no validation
+	// field NodeSpec.PodCIDRs has no validation
 
-	{ // field corev1.NodeSpec.ProviderID
+	{ // field NodeSpec.ProviderID (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1001,12 +1001,12 @@ func Validate_NodeSpec(
 		errs = append(errs, fn(fldPath.Child("providerID"), &obj.ProviderID, oldVal, oldObj != nil)...)
 	}
 
-	// field corev1.NodeSpec.Unschedulable has no validation
-	// field corev1.NodeSpec.Taints has no validation
-	// field corev1.NodeSpec.ConfigSource has no validation
-	// field corev1.NodeSpec.DoNotUseExternalID has no validation
+	// field NodeSpec.Unschedulable has no validation
+	// field NodeSpec.Taints has no validation
+	// field NodeSpec.ConfigSource has no validation
+	// field NodeSpec.DoNotUseExternalID has no validation
 
-	{ // field corev1.NodeSpec.PodPreemptionPolicy
+	{ // field NodeSpec.PodPreemptionPolicy (k8s.io/api/core/v1.NodePodPreemptionPolicy)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *corev1.NodePodPreemptionPolicy,
@@ -1052,9 +1052,9 @@ func Validate_PersistentVolume(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.PersistentVolume) (errs field.ErrorList) {
 
-	// field corev1.PersistentVolume.TypeMeta has no validation
+	// field PersistentVolume.TypeMeta has no validation
 
-	{ // field corev1.PersistentVolume.ObjectMeta
+	{ // field PersistentVolume.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -1076,8 +1076,8 @@ func Validate_PersistentVolume(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field corev1.PersistentVolume.Spec has no validation
-	// field corev1.PersistentVolume.Status has no validation
+	// field PersistentVolume.Spec has no validation
+	// field PersistentVolume.Status has no validation
 	return errs
 }
 
@@ -1087,9 +1087,9 @@ func Validate_PersistentVolumeClaim(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.PersistentVolumeClaim) (errs field.ErrorList) {
 
-	// field corev1.PersistentVolumeClaim.TypeMeta has no validation
+	// field PersistentVolumeClaim.TypeMeta has no validation
 
-	{ // field corev1.PersistentVolumeClaim.ObjectMeta
+	{ // field PersistentVolumeClaim.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -1111,9 +1111,9 @@ func Validate_PersistentVolumeClaim(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field corev1.PersistentVolumeClaim.Spec has no validation
+	// field PersistentVolumeClaim.Spec has no validation
 
-	{ // field corev1.PersistentVolumeClaim.Status
+	{ // field PersistentVolumeClaim.Status (k8s.io/api/core/v1.PersistentVolumeClaimStatus)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *corev1.PersistentVolumeClaimStatus,
@@ -1144,16 +1144,16 @@ func Validate_PersistentVolumeClaimStatus(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.PersistentVolumeClaimStatus) (errs field.ErrorList) {
 
-	// field corev1.PersistentVolumeClaimStatus.Phase has no validation
-	// field corev1.PersistentVolumeClaimStatus.AccessModes has no validation
-	// field corev1.PersistentVolumeClaimStatus.Capacity has no validation
-	// field corev1.PersistentVolumeClaimStatus.Conditions has no validation
-	// field corev1.PersistentVolumeClaimStatus.AllocatedResources has no validation
-	// field corev1.PersistentVolumeClaimStatus.AllocatedResourceStatuses has no validation
-	// field corev1.PersistentVolumeClaimStatus.CurrentVolumeAttributesClassName has no validation
-	// field corev1.PersistentVolumeClaimStatus.ModifyVolumeStatus has no validation
+	// field PersistentVolumeClaimStatus.Phase has no validation
+	// field PersistentVolumeClaimStatus.AccessModes has no validation
+	// field PersistentVolumeClaimStatus.Capacity has no validation
+	// field PersistentVolumeClaimStatus.Conditions has no validation
+	// field PersistentVolumeClaimStatus.AllocatedResources has no validation
+	// field PersistentVolumeClaimStatus.AllocatedResourceStatuses has no validation
+	// field PersistentVolumeClaimStatus.CurrentVolumeAttributesClassName has no validation
+	// field PersistentVolumeClaimStatus.ModifyVolumeStatus has no validation
 
-	{ // field corev1.PersistentVolumeClaimStatus.HealthStatus
+	{ // field PersistentVolumeClaimStatus.HealthStatus (k8s.io/api/core/v1.VolumeHealthStatus)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *corev1.VolumeHealthStatus,
@@ -1192,9 +1192,9 @@ func Validate_Pod(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.Pod) (errs field.ErrorList) {
 
-	// field corev1.Pod.TypeMeta has no validation
+	// field Pod.TypeMeta has no validation
 
-	{ // field corev1.Pod.ObjectMeta
+	{ // field Pod.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -1216,7 +1216,7 @@ func Validate_Pod(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field corev1.Pod.Spec
+	{ // field Pod.Spec (k8s.io/api/core/v1.PodSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *corev1.PodSpec,
@@ -1238,7 +1238,7 @@ func Validate_Pod(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	{ // field corev1.Pod.Status
+	{ // field Pod.Status (k8s.io/api/core/v1.PodStatus)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *corev1.PodStatus,
@@ -1285,31 +1285,31 @@ func Validate_PodSpec(
 		errs = append(errs, e...)
 	}
 
-	// field corev1.PodSpec.Volumes has no validation
-	// field corev1.PodSpec.InitContainers has no validation
-	// field corev1.PodSpec.Containers has no validation
-	// field corev1.PodSpec.EphemeralContainers has no validation
-	// field corev1.PodSpec.RestartPolicy has no validation
-	// field corev1.PodSpec.TerminationGracePeriodSeconds has no validation
-	// field corev1.PodSpec.ActiveDeadlineSeconds has no validation
-	// field corev1.PodSpec.DNSPolicy has no validation
-	// field corev1.PodSpec.NodeSelector has no validation
-	// field corev1.PodSpec.ServiceAccountName has no validation
-	// field corev1.PodSpec.DeprecatedServiceAccount has no validation
-	// field corev1.PodSpec.AutomountServiceAccountToken has no validation
-	// field corev1.PodSpec.NodeName has no validation
-	// field corev1.PodSpec.HostNetwork has no validation
-	// field corev1.PodSpec.HostPID has no validation
-	// field corev1.PodSpec.HostIPC has no validation
-	// field corev1.PodSpec.ShareProcessNamespace has no validation
-	// field corev1.PodSpec.SecurityContext has no validation
-	// field corev1.PodSpec.ImagePullSecrets has no validation
-	// field corev1.PodSpec.Hostname has no validation
-	// field corev1.PodSpec.Subdomain has no validation
-	// field corev1.PodSpec.Affinity has no validation
-	// field corev1.PodSpec.SchedulerName has no validation
+	// field PodSpec.Volumes has no validation
+	// field PodSpec.InitContainers has no validation
+	// field PodSpec.Containers has no validation
+	// field PodSpec.EphemeralContainers has no validation
+	// field PodSpec.RestartPolicy has no validation
+	// field PodSpec.TerminationGracePeriodSeconds has no validation
+	// field PodSpec.ActiveDeadlineSeconds has no validation
+	// field PodSpec.DNSPolicy has no validation
+	// field PodSpec.NodeSelector has no validation
+	// field PodSpec.ServiceAccountName has no validation
+	// field PodSpec.DeprecatedServiceAccount has no validation
+	// field PodSpec.AutomountServiceAccountToken has no validation
+	// field PodSpec.NodeName has no validation
+	// field PodSpec.HostNetwork has no validation
+	// field PodSpec.HostPID has no validation
+	// field PodSpec.HostIPC has no validation
+	// field PodSpec.ShareProcessNamespace has no validation
+	// field PodSpec.SecurityContext has no validation
+	// field PodSpec.ImagePullSecrets has no validation
+	// field PodSpec.Hostname has no validation
+	// field PodSpec.Subdomain has no validation
+	// field PodSpec.Affinity has no validation
+	// field PodSpec.SchedulerName has no validation
 
-	{ // field corev1.PodSpec.Tolerations
+	{ // field PodSpec.Tolerations ([]k8s.io/api/core/v1.Toleration)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []corev1.Toleration,
@@ -1341,26 +1341,26 @@ func Validate_PodSpec(
 		errs = append(errs, fn(fldPath.Child("tolerations"), obj.Tolerations, oldVal, oldObj != nil)...)
 	}
 
-	// field corev1.PodSpec.HostAliases has no validation
-	// field corev1.PodSpec.PriorityClassName has no validation
-	// field corev1.PodSpec.Priority has no validation
-	// field corev1.PodSpec.DNSConfig has no validation
-	// field corev1.PodSpec.ReadinessGates has no validation
-	// field corev1.PodSpec.RuntimeClassName has no validation
-	// field corev1.PodSpec.EnableServiceLinks has no validation
-	// field corev1.PodSpec.PreemptionPolicy has no validation
-	// field corev1.PodSpec.Overhead has no validation
-	// field corev1.PodSpec.TopologySpreadConstraints has no validation
-	// field corev1.PodSpec.SetHostnameAsFQDN has no validation
-	// field corev1.PodSpec.OS has no validation
-	// field corev1.PodSpec.HostUsers has no validation
-	// field corev1.PodSpec.SchedulingGates has no validation
-	// field corev1.PodSpec.ResourceClaims has no validation
-	// field corev1.PodSpec.Resources has no validation
-	// field corev1.PodSpec.HostnameOverride has no validation
-	// field corev1.PodSpec.SchedulingGroup has no validation
+	// field PodSpec.HostAliases has no validation
+	// field PodSpec.PriorityClassName has no validation
+	// field PodSpec.Priority has no validation
+	// field PodSpec.DNSConfig has no validation
+	// field PodSpec.ReadinessGates has no validation
+	// field PodSpec.RuntimeClassName has no validation
+	// field PodSpec.EnableServiceLinks has no validation
+	// field PodSpec.PreemptionPolicy has no validation
+	// field PodSpec.Overhead has no validation
+	// field PodSpec.TopologySpreadConstraints has no validation
+	// field PodSpec.SetHostnameAsFQDN has no validation
+	// field PodSpec.OS has no validation
+	// field PodSpec.HostUsers has no validation
+	// field PodSpec.SchedulingGates has no validation
+	// field PodSpec.ResourceClaims has no validation
+	// field PodSpec.Resources has no validation
+	// field PodSpec.HostnameOverride has no validation
+	// field PodSpec.SchedulingGroup has no validation
 
-	{ // field corev1.PodSpec.EvictionResponders
+	{ // field PodSpec.EvictionResponders ([]k8s.io/api/core/v1.EvictionResponder)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []corev1.EvictionResponder,
@@ -1411,28 +1411,28 @@ func Validate_PodStatus(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.PodStatus) (errs field.ErrorList) {
 
-	// field corev1.PodStatus.ObservedGeneration has no validation
-	// field corev1.PodStatus.Phase has no validation
-	// field corev1.PodStatus.Conditions has no validation
-	// field corev1.PodStatus.Message has no validation
-	// field corev1.PodStatus.Reason has no validation
-	// field corev1.PodStatus.NominatedNodeName has no validation
-	// field corev1.PodStatus.HostIP has no validation
-	// field corev1.PodStatus.HostIPs has no validation
-	// field corev1.PodStatus.PodIP has no validation
-	// field corev1.PodStatus.PodIPs has no validation
-	// field corev1.PodStatus.StartTime has no validation
-	// field corev1.PodStatus.InitContainerStatuses has no validation
-	// field corev1.PodStatus.ContainerStatuses has no validation
-	// field corev1.PodStatus.QOSClass has no validation
-	// field corev1.PodStatus.EphemeralContainerStatuses has no validation
-	// field corev1.PodStatus.Resize has no validation
-	// field corev1.PodStatus.ResourceClaimStatuses has no validation
-	// field corev1.PodStatus.ExtendedResourceClaimStatus has no validation
-	// field corev1.PodStatus.AllocatedResources has no validation
-	// field corev1.PodStatus.Resources has no validation
+	// field PodStatus.ObservedGeneration has no validation
+	// field PodStatus.Phase has no validation
+	// field PodStatus.Conditions has no validation
+	// field PodStatus.Message has no validation
+	// field PodStatus.Reason has no validation
+	// field PodStatus.NominatedNodeName has no validation
+	// field PodStatus.HostIP has no validation
+	// field PodStatus.HostIPs has no validation
+	// field PodStatus.PodIP has no validation
+	// field PodStatus.PodIPs has no validation
+	// field PodStatus.StartTime has no validation
+	// field PodStatus.InitContainerStatuses has no validation
+	// field PodStatus.ContainerStatuses has no validation
+	// field PodStatus.QOSClass has no validation
+	// field PodStatus.EphemeralContainerStatuses has no validation
+	// field PodStatus.Resize has no validation
+	// field PodStatus.ResourceClaimStatuses has no validation
+	// field PodStatus.ExtendedResourceClaimStatus has no validation
+	// field PodStatus.AllocatedResources has no validation
+	// field PodStatus.Resources has no validation
 
-	{ // field corev1.PodStatus.NodeAllocatableResourceClaimStatuses
+	{ // field PodStatus.NodeAllocatableResourceClaimStatuses ([]k8s.io/api/core/v1.NodeAllocatableResourceClaimStatus)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []corev1.NodeAllocatableResourceClaimStatus,
@@ -1474,7 +1474,7 @@ func Validate_PodStatus(
 		errs = append(errs, fn(fldPath.Child("nodeAllocatableResourceClaimStatuses"), obj.NodeAllocatableResourceClaimStatuses, oldVal, oldObj != nil)...)
 	}
 
-	{ // field corev1.PodStatus.VolumeHealth
+	{ // field PodStatus.VolumeHealth ([]k8s.io/api/core/v1.PodVolumeHealth)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []corev1.PodVolumeHealth,
@@ -1521,9 +1521,9 @@ func Validate_PodTemplate(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.PodTemplate) (errs field.ErrorList) {
 
-	// field corev1.PodTemplate.TypeMeta has no validation
+	// field PodTemplate.TypeMeta has no validation
 
-	{ // field corev1.PodTemplate.ObjectMeta
+	{ // field PodTemplate.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -1545,7 +1545,7 @@ func Validate_PodTemplate(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field corev1.PodTemplate.Template
+	{ // field PodTemplate.Template (k8s.io/api/core/v1.PodTemplateSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *corev1.PodTemplateSpec,
@@ -1576,9 +1576,9 @@ func Validate_PodTemplateSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.PodTemplateSpec) (errs field.ErrorList) {
 
-	// field corev1.PodTemplateSpec.ObjectMeta has no validation
+	// field PodTemplateSpec.ObjectMeta has no validation
 
-	{ // field corev1.PodTemplateSpec.Spec
+	{ // field PodTemplateSpec.Spec (k8s.io/api/core/v1.PodSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *corev1.PodSpec,
@@ -1609,7 +1609,7 @@ func Validate_PodVolumeHealth(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.PodVolumeHealth) (errs field.ErrorList) {
 
-	{ // field corev1.PodVolumeHealth.Name
+	{ // field PodVolumeHealth.Name (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -1638,7 +1638,7 @@ func Validate_PodVolumeHealth(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
-	{ // field corev1.PodVolumeHealth.HealthConditions
+	{ // field PodVolumeHealth.HealthConditions ([]k8s.io/api/core/v1.VolumeHealthCondition)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []corev1.VolumeHealthCondition,
@@ -1684,7 +1684,7 @@ func Validate_PodVolumeHealth(
 		errs = append(errs, fn(fldPath.Child("healthConditions"), obj.HealthConditions, oldVal, oldObj != nil)...)
 	}
 
-	// field corev1.PodVolumeHealth.LastTransitionTime has no validation
+	// field PodVolumeHealth.LastTransitionTime has no validation
 	return errs
 }
 
@@ -1694,9 +1694,9 @@ func Validate_ReplicationController(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.ReplicationController) (errs field.ErrorList) {
 
-	// field corev1.ReplicationController.TypeMeta has no validation
+	// field ReplicationController.TypeMeta has no validation
 
-	{ // field corev1.ReplicationController.ObjectMeta
+	{ // field ReplicationController.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -1733,7 +1733,7 @@ func Validate_ReplicationController(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field corev1.ReplicationController.Spec
+	{ // field ReplicationController.Spec (k8s.io/api/core/v1.ReplicationControllerSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *corev1.ReplicationControllerSpec,
@@ -1755,7 +1755,7 @@ func Validate_ReplicationController(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	// field corev1.ReplicationController.Status has no validation
+	// field ReplicationController.Status has no validation
 	return errs
 }
 
@@ -1765,7 +1765,7 @@ func Validate_ReplicationControllerSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.ReplicationControllerSpec) (errs field.ErrorList) {
 
-	{ // field corev1.ReplicationControllerSpec.Replicas
+	{ // field ReplicationControllerSpec.Replicas (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -1798,7 +1798,7 @@ func Validate_ReplicationControllerSpec(
 		errs = append(errs, fn(fldPath.Child("replicas"), obj.Replicas, oldVal, oldObj != nil)...)
 	}
 
-	{ // field corev1.ReplicationControllerSpec.MinReadySeconds
+	{ // field ReplicationControllerSpec.MinReadySeconds (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -1823,9 +1823,9 @@ func Validate_ReplicationControllerSpec(
 		errs = append(errs, fn(fldPath.Child("minReadySeconds"), &obj.MinReadySeconds, oldVal, oldObj != nil)...)
 	}
 
-	// field corev1.ReplicationControllerSpec.Selector has no validation
+	// field ReplicationControllerSpec.Selector has no validation
 
-	{ // field corev1.ReplicationControllerSpec.Template
+	{ // field ReplicationControllerSpec.Template (k8s.io/api/core/v1.PodTemplateSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *corev1.PodTemplateSpec,
@@ -1864,9 +1864,9 @@ func Validate_ResourceQuota(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.ResourceQuota) (errs field.ErrorList) {
 
-	// field corev1.ResourceQuota.TypeMeta has no validation
+	// field ResourceQuota.TypeMeta has no validation
 
-	{ // field corev1.ResourceQuota.ObjectMeta
+	{ // field ResourceQuota.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -1888,8 +1888,8 @@ func Validate_ResourceQuota(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field corev1.ResourceQuota.Spec has no validation
-	// field corev1.ResourceQuota.Status has no validation
+	// field ResourceQuota.Spec has no validation
+	// field ResourceQuota.Status has no validation
 	return errs
 }
 
@@ -1899,9 +1899,9 @@ func Validate_Secret(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.Secret) (errs field.ErrorList) {
 
-	// field corev1.Secret.TypeMeta has no validation
+	// field Secret.TypeMeta has no validation
 
-	{ // field corev1.Secret.ObjectMeta
+	{ // field Secret.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -1923,11 +1923,11 @@ func Validate_Secret(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field corev1.Secret.Immutable has no validation
-	// field corev1.Secret.Data has no validation
-	// field corev1.Secret.StringData has no validation
+	// field Secret.Immutable has no validation
+	// field Secret.Data has no validation
+	// field Secret.StringData has no validation
 
-	{ // field corev1.Secret.Type
+	{ // field Secret.Type (k8s.io/api/core/v1.SecretType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *corev1.SecretType,
@@ -1968,9 +1968,9 @@ func Validate_Service(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.Service) (errs field.ErrorList) {
 
-	// field corev1.Service.TypeMeta has no validation
+	// field Service.TypeMeta has no validation
 
-	{ // field corev1.Service.ObjectMeta
+	{ // field Service.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -1992,8 +1992,8 @@ func Validate_Service(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field corev1.Service.Spec has no validation
-	// field corev1.Service.Status has no validation
+	// field Service.Spec has no validation
+	// field Service.Status has no validation
 	return errs
 }
 
@@ -2003,9 +2003,9 @@ func Validate_ServiceAccount(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.ServiceAccount) (errs field.ErrorList) {
 
-	// field corev1.ServiceAccount.TypeMeta has no validation
+	// field ServiceAccount.TypeMeta has no validation
 
-	{ // field corev1.ServiceAccount.ObjectMeta
+	{ // field ServiceAccount.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -2027,9 +2027,9 @@ func Validate_ServiceAccount(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field corev1.ServiceAccount.Secrets has no validation
-	// field corev1.ServiceAccount.ImagePullSecrets has no validation
-	// field corev1.ServiceAccount.AutomountServiceAccountToken has no validation
+	// field ServiceAccount.Secrets has no validation
+	// field ServiceAccount.ImagePullSecrets has no validation
+	// field ServiceAccount.AutomountServiceAccountToken has no validation
 	return errs
 }
 
@@ -2039,7 +2039,7 @@ func Validate_Toleration(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.Toleration) (errs field.ErrorList) {
 
-	{ // field corev1.Toleration.Key
+	{ // field Toleration.Key (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -2070,10 +2070,10 @@ func Validate_Toleration(
 		errs = append(errs, fn(fldPath.Child("key"), &obj.Key, oldVal, oldObj != nil)...)
 	}
 
-	// field corev1.Toleration.Operator has no validation
-	// field corev1.Toleration.Value has no validation
-	// field corev1.Toleration.Effect has no validation
-	// field corev1.Toleration.TolerationSeconds has no validation
+	// field Toleration.Operator has no validation
+	// field Toleration.Value has no validation
+	// field Toleration.Effect has no validation
+	// field Toleration.TolerationSeconds has no validation
 	return errs
 }
 
@@ -2083,7 +2083,7 @@ func Validate_VolumeHealthCondition(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.VolumeHealthCondition) (errs field.ErrorList) {
 
-	{ // field corev1.VolumeHealthCondition.Status
+	{ // field VolumeHealthCondition.Status (k8s.io/api/core/v1.VolumeHealthStatusType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *corev1.VolumeHealthStatusType,
@@ -2114,7 +2114,7 @@ func Validate_VolumeHealthCondition(
 		errs = append(errs, fn(fldPath.Child("status"), &obj.Status, oldVal, oldObj != nil)...)
 	}
 
-	{ // field corev1.VolumeHealthCondition.Reason
+	{ // field VolumeHealthCondition.Reason (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -2146,7 +2146,7 @@ func Validate_VolumeHealthCondition(
 		errs = append(errs, fn(fldPath.Child("reason"), &obj.Reason, oldVal, oldObj != nil)...)
 	}
 
-	{ // field corev1.VolumeHealthCondition.Message
+	{ // field VolumeHealthCondition.Message (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -2186,7 +2186,7 @@ func Validate_VolumeHealthStatus(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *corev1.VolumeHealthStatus) (errs field.ErrorList) {
 
-	{ // field corev1.VolumeHealthStatus.HealthConditions
+	{ // field VolumeHealthStatus.HealthConditions ([]k8s.io/api/core/v1.VolumeHealthCondition)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []corev1.VolumeHealthCondition,
@@ -2232,7 +2232,7 @@ func Validate_VolumeHealthStatus(
 		errs = append(errs, fn(fldPath.Child("healthConditions"), obj.HealthConditions, oldVal, oldObj != nil)...)
 	}
 
-	// field corev1.VolumeHealthStatus.LastTransitionTime has no validation
+	// field VolumeHealthStatus.LastTransitionTime has no validation
 	return errs
 }
 

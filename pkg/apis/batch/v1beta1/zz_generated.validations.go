@@ -67,9 +67,9 @@ func Validate_CronJob(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *batchv1beta1.CronJob) (errs field.ErrorList) {
 
-	// field batchv1beta1.CronJob.TypeMeta has no validation
+	// field CronJob.TypeMeta has no validation
 
-	{ // field batchv1beta1.CronJob.ObjectMeta
+	{ // field CronJob.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -91,7 +91,7 @@ func Validate_CronJob(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field batchv1beta1.CronJob.Spec
+	{ // field CronJob.Spec (k8s.io/api/batch/v1beta1.CronJobSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *batchv1beta1.CronJobSpec,
@@ -113,7 +113,7 @@ func Validate_CronJob(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	// field batchv1beta1.CronJob.Status has no validation
+	// field CronJob.Status has no validation
 	return errs
 }
 
@@ -123,7 +123,7 @@ func Validate_CronJobSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *batchv1beta1.CronJobSpec) (errs field.ErrorList) {
 
-	{ // field batchv1beta1.CronJobSpec.Schedule
+	{ // field CronJobSpec.Schedule (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -152,12 +152,12 @@ func Validate_CronJobSpec(
 		errs = append(errs, fn(fldPath.Child("schedule"), &obj.Schedule, oldVal, oldObj != nil)...)
 	}
 
-	// field batchv1beta1.CronJobSpec.TimeZone has no validation
-	// field batchv1beta1.CronJobSpec.StartingDeadlineSeconds has no validation
-	// field batchv1beta1.CronJobSpec.ConcurrencyPolicy has no validation
-	// field batchv1beta1.CronJobSpec.Suspend has no validation
+	// field CronJobSpec.TimeZone has no validation
+	// field CronJobSpec.StartingDeadlineSeconds has no validation
+	// field CronJobSpec.ConcurrencyPolicy has no validation
+	// field CronJobSpec.Suspend has no validation
 
-	{ // field batchv1beta1.CronJobSpec.JobTemplate
+	{ // field CronJobSpec.JobTemplate (k8s.io/api/batch/v1beta1.JobTemplateSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *batchv1beta1.JobTemplateSpec,
@@ -179,8 +179,8 @@ func Validate_CronJobSpec(
 		errs = append(errs, fn(fldPath.Child("jobTemplate"), &obj.JobTemplate, oldVal, oldObj != nil)...)
 	}
 
-	// field batchv1beta1.CronJobSpec.SuccessfulJobsHistoryLimit has no validation
-	// field batchv1beta1.CronJobSpec.FailedJobsHistoryLimit has no validation
+	// field CronJobSpec.SuccessfulJobsHistoryLimit has no validation
+	// field CronJobSpec.FailedJobsHistoryLimit has no validation
 	return errs
 }
 
@@ -190,9 +190,9 @@ func Validate_JobTemplateSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *batchv1beta1.JobTemplateSpec) (errs field.ErrorList) {
 
-	// field batchv1beta1.JobTemplateSpec.ObjectMeta has no validation
+	// field JobTemplateSpec.ObjectMeta has no validation
 
-	{ // field batchv1beta1.JobTemplateSpec.Spec
+	{ // field JobTemplateSpec.Spec (k8s.io/api/batch/v1.JobSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *apibatchv1.JobSpec,

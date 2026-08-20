@@ -76,7 +76,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.ResourcePoolNameField
+	{ // field Struct.ResourcePoolNameField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -100,7 +100,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("resourcePoolNameField"), &obj.ResourcePoolNameField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ResourcePoolNamePtrField
+	{ // field Struct.ResourcePoolNamePtrField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -124,7 +124,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("resourcePoolNamePtrField"), obj.ResourcePoolNamePtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ResourcePoolNameTypedefField
+	{ // field Struct.ResourcePoolNameTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/format/k8s-resource-pool-name.ResourcePoolNameStringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *ResourcePoolNameStringType,

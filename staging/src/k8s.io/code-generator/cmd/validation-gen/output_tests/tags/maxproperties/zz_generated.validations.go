@@ -64,7 +64,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.Max0Field
+	{ // field Struct.Max0Field (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -93,7 +93,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("max0Field"), obj.Max0Field, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Max10Field
+	{ // field Struct.Max10Field (map[string]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]string,
@@ -122,7 +122,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("max10Field"), obj.Max10Field, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Max0TypedefKeyField
+	{ // field Struct.Max0TypedefKeyField (map[k8s.io/code-generator/cmd/validation-gen/output_tests/tags/maxproperties.StringKey]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[StringKey]string,
@@ -151,7 +151,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("max0TypedefKeyField"), obj.Max0TypedefKeyField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.Max10TypedefKeyField
+	{ // field Struct.Max10TypedefKeyField (map[k8s.io/code-generator/cmd/validation-gen/output_tests/tags/maxproperties.StringKey]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[StringKey]string,

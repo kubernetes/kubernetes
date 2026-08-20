@@ -66,7 +66,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.Subfield
+	{ // field Struct.Subfield (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/subfield/unions.SubStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *SubStruct,

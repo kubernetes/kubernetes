@@ -95,9 +95,9 @@ func Validate_CSIStorageCapacity(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *storagev1alpha1.CSIStorageCapacity) (errs field.ErrorList) {
 
-	// field storagev1alpha1.CSIStorageCapacity.TypeMeta has no validation
+	// field CSIStorageCapacity.TypeMeta has no validation
 
-	{ // field storagev1alpha1.CSIStorageCapacity.ObjectMeta
+	{ // field CSIStorageCapacity.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -119,10 +119,10 @@ func Validate_CSIStorageCapacity(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field storagev1alpha1.CSIStorageCapacity.NodeTopology has no validation
-	// field storagev1alpha1.CSIStorageCapacity.StorageClassName has no validation
-	// field storagev1alpha1.CSIStorageCapacity.Capacity has no validation
-	// field storagev1alpha1.CSIStorageCapacity.MaximumVolumeSize has no validation
+	// field CSIStorageCapacity.NodeTopology has no validation
+	// field CSIStorageCapacity.StorageClassName has no validation
+	// field CSIStorageCapacity.Capacity has no validation
+	// field CSIStorageCapacity.MaximumVolumeSize has no validation
 	return errs
 }
 
@@ -132,9 +132,9 @@ func Validate_VolumeAttachment(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *storagev1alpha1.VolumeAttachment) (errs field.ErrorList) {
 
-	// field storagev1alpha1.VolumeAttachment.TypeMeta has no validation
+	// field VolumeAttachment.TypeMeta has no validation
 
-	{ // field storagev1alpha1.VolumeAttachment.ObjectMeta
+	{ // field VolumeAttachment.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -156,7 +156,7 @@ func Validate_VolumeAttachment(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field storagev1alpha1.VolumeAttachment.Spec
+	{ // field VolumeAttachment.Spec (k8s.io/api/storage/v1alpha1.VolumeAttachmentSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *storagev1alpha1.VolumeAttachmentSpec,
@@ -187,7 +187,7 @@ func Validate_VolumeAttachment(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	// field storagev1alpha1.VolumeAttachment.Status has no validation
+	// field VolumeAttachment.Status has no validation
 	return errs
 }
 
@@ -197,7 +197,7 @@ func Validate_VolumeAttachmentSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *storagev1alpha1.VolumeAttachmentSpec) (errs field.ErrorList) {
 
-	{ // field storagev1alpha1.VolumeAttachmentSpec.Attacher
+	{ // field VolumeAttachmentSpec.Attacher (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -232,8 +232,8 @@ func Validate_VolumeAttachmentSpec(
 		errs = append(errs, fn(fldPath.Child("attacher"), &obj.Attacher, oldVal, oldObj != nil)...)
 	}
 
-	// field storagev1alpha1.VolumeAttachmentSpec.Source has no validation
-	// field storagev1alpha1.VolumeAttachmentSpec.NodeName has no validation
+	// field VolumeAttachmentSpec.Source has no validation
+	// field VolumeAttachmentSpec.NodeName has no validation
 	return errs
 }
 
@@ -243,9 +243,9 @@ func Validate_VolumeAttributesClass(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *storagev1alpha1.VolumeAttributesClass) (errs field.ErrorList) {
 
-	// field storagev1alpha1.VolumeAttributesClass.TypeMeta has no validation
+	// field VolumeAttributesClass.TypeMeta has no validation
 
-	{ // field storagev1alpha1.VolumeAttributesClass.ObjectMeta
+	{ // field VolumeAttributesClass.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -267,7 +267,7 @@ func Validate_VolumeAttributesClass(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field storagev1alpha1.VolumeAttributesClass.DriverName has no validation
-	// field storagev1alpha1.VolumeAttributesClass.Parameters has no validation
+	// field VolumeAttributesClass.DriverName has no validation
+	// field VolumeAttributesClass.Parameters has no validation
 	return errs
 }

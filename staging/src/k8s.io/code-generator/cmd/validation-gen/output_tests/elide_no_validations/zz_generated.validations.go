@@ -125,7 +125,7 @@ func Validate_HasFieldVal(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *HasFieldVal) (errs field.ErrorList) {
 
-	{ // field HasFieldVal.S
+	{ // field HasFieldVal.S (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -188,7 +188,7 @@ func Validate_T1(
 
 	// field T1.TypeMeta has no validation
 
-	{ // field T1.HasTypeVal
+	{ // field T1.HasTypeVal (k8s.io/code-generator/cmd/validation-gen/output_tests/elide_no_validations.HasTypeVal)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *HasTypeVal,
@@ -210,7 +210,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("hasTypeVal"), &obj.HasTypeVal, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.HasFieldVal
+	{ // field T1.HasFieldVal (k8s.io/code-generator/cmd/validation-gen/output_tests/elide_no_validations.HasFieldVal)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *HasFieldVal,
@@ -234,7 +234,7 @@ func Validate_T1(
 
 	// field T1.HasNoVal has no validation
 
-	{ // field T1.HasNoValFieldVal
+	{ // field T1.HasNoValFieldVal (k8s.io/code-generator/cmd/validation-gen/output_tests/elide_no_validations.HasNoVal)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *HasNoVal,
@@ -258,7 +258,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("hasNoValFieldVal"), &obj.HasNoValFieldVal, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.ValidatedSlice
+	{ // field T1.ValidatedSlice (k8s.io/code-generator/cmd/validation-gen/output_tests/elide_no_validations.TypedefSliceWithValidations)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj TypedefSliceWithValidations,
@@ -280,7 +280,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("validatedSlice"), obj.ValidatedSlice, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.ValidatedMap
+	{ // field T1.ValidatedMap (k8s.io/code-generator/cmd/validation-gen/output_tests/elide_no_validations.TypedefMapWithValidations)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj TypedefMapWithValidations,
@@ -302,7 +302,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("validatedMap"), obj.ValidatedMap, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.ValidatedMapKey
+	{ // field T1.ValidatedMapKey (k8s.io/code-generator/cmd/validation-gen/output_tests/elide_no_validations.TypedefMapWithKeyValidations)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj TypedefMapWithKeyValidations,
@@ -324,7 +324,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("validatedMapKey"), obj.ValidatedMapKey, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.DeepValidatedSlice
+	{ // field T1.DeepValidatedSlice (k8s.io/code-generator/cmd/validation-gen/output_tests/elide_no_validations.DeepTypedefSlice)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj DeepTypedefSlice,
@@ -346,7 +346,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("deepValidatedSlice"), obj.DeepValidatedSlice, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.DeepValidatedMap
+	{ // field T1.DeepValidatedMap (k8s.io/code-generator/cmd/validation-gen/output_tests/elide_no_validations.DeepTypedefMap)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj DeepTypedefMap,
@@ -368,7 +368,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("deepValidatedMap"), obj.DeepValidatedMap, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.DoubleDeepValidatedSlice
+	{ // field T1.DoubleDeepValidatedSlice (k8s.io/code-generator/cmd/validation-gen/output_tests/elide_no_validations.DoubleDeepTypedefSlice)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj DoubleDeepTypedefSlice,
@@ -390,7 +390,7 @@ func Validate_T1(
 		errs = append(errs, fn(fldPath.Child("doubleDeepValidatedSlice           "), obj.DoubleDeepValidatedSlice, oldVal, oldObj != nil)...)
 	}
 
-	{ // field T1.DoubleDeepValidatedMap
+	{ // field T1.DoubleDeepValidatedMap (k8s.io/code-generator/cmd/validation-gen/output_tests/elide_no_validations.DoubleDeepTypedefMap)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj DoubleDeepTypedefMap,

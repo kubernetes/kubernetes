@@ -63,7 +63,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.RequiredField
+	{ // field Struct.RequiredField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -92,7 +92,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("requiredField"), obj.RequiredField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.RequiredFieldBeta
+	{ // field Struct.RequiredFieldBeta (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,

@@ -101,7 +101,7 @@ func Validate_T(
 
 	// field T.TypeMeta has no validation
 
-	{ // field T.S
+	{ // field T.S (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,

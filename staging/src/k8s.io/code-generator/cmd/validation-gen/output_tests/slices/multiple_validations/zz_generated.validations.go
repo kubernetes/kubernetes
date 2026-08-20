@@ -71,7 +71,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.ListField
+	{ // field Struct.ListField ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,

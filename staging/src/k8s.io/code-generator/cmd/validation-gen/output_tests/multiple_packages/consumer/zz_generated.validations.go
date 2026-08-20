@@ -64,7 +64,7 @@ func Validate_Consumer(
 
 	// field Consumer.TypeMeta has no validation
 
-	{ // field Consumer.Shared
+	{ // field Consumer.Shared (k8s.io/code-generator/cmd/validation-gen/output_tests/multiple_packages/types.T2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *types.T2,

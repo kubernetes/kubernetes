@@ -64,7 +64,7 @@ func Validate_UniqueStruct(
 
 	// field UniqueStruct.TypeMeta has no validation
 
-	{ // field UniqueStruct.AlphaUniqueSet
+	{ // field UniqueStruct.AlphaUniqueSet ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -89,7 +89,7 @@ func Validate_UniqueStruct(
 		errs = append(errs, fn(fldPath.Child("alphaUniqueSet"), obj.AlphaUniqueSet, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UniqueStruct.BetaUniqueSet
+	{ // field UniqueStruct.BetaUniqueSet ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,

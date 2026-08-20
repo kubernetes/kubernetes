@@ -63,7 +63,7 @@ func Validate_MyType(
 
 	// field MyType.TypeMeta has no validation
 
-	{ // field MyType.UUIDField
+	{ // field MyType.UUIDField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -94,7 +94,7 @@ func Validate_MyType(
 		errs = append(errs, fn(fldPath.Child("uuidField"), &obj.UUIDField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field MyType.UUIDPtrField
+	{ // field MyType.UUIDPtrField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -125,7 +125,7 @@ func Validate_MyType(
 		errs = append(errs, fn(fldPath.Child("uuidPtrField"), obj.UUIDPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field MyType.UUIDTypedefField
+	{ // field MyType.UUIDTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/format/k8s-uuid.UUIDStringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *UUIDStringType,

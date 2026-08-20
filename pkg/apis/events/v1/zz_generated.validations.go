@@ -64,9 +64,9 @@ func Validate_Event(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *eventsv1.Event) (errs field.ErrorList) {
 
-	// field eventsv1.Event.TypeMeta has no validation
+	// field Event.TypeMeta has no validation
 
-	{ // field eventsv1.Event.ObjectMeta
+	{ // field Event.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -88,19 +88,19 @@ func Validate_Event(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field eventsv1.Event.EventTime has no validation
-	// field eventsv1.Event.Series has no validation
-	// field eventsv1.Event.ReportingController has no validation
-	// field eventsv1.Event.ReportingInstance has no validation
-	// field eventsv1.Event.Action has no validation
-	// field eventsv1.Event.Reason has no validation
-	// field eventsv1.Event.Regarding has no validation
-	// field eventsv1.Event.Related has no validation
-	// field eventsv1.Event.Note has no validation
-	// field eventsv1.Event.Type has no validation
-	// field eventsv1.Event.DeprecatedSource has no validation
-	// field eventsv1.Event.DeprecatedFirstTimestamp has no validation
-	// field eventsv1.Event.DeprecatedLastTimestamp has no validation
-	// field eventsv1.Event.DeprecatedCount has no validation
+	// field Event.EventTime has no validation
+	// field Event.Series has no validation
+	// field Event.ReportingController has no validation
+	// field Event.ReportingInstance has no validation
+	// field Event.Action has no validation
+	// field Event.Reason has no validation
+	// field Event.Regarding has no validation
+	// field Event.Related has no validation
+	// field Event.Note has no validation
+	// field Event.Type has no validation
+	// field Event.DeprecatedSource has no validation
+	// field Event.DeprecatedFirstTimestamp has no validation
+	// field Event.DeprecatedLastTimestamp has no validation
+	// field Event.DeprecatedCount has no validation
 	return errs
 }

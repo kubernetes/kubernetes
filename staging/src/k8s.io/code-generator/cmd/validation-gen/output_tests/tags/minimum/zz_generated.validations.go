@@ -108,7 +108,7 @@ func Validate_BasicStruct(
 
 	// field BasicStruct.TypeMeta has no validation
 
-	{ // field BasicStruct.IntField
+	{ // field BasicStruct.IntField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -132,7 +132,7 @@ func Validate_BasicStruct(
 		errs = append(errs, fn(fldPath.Child("intField"), &obj.IntField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field BasicStruct.IntPtrField
+	{ // field BasicStruct.IntPtrField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -156,7 +156,7 @@ func Validate_BasicStruct(
 		errs = append(errs, fn(fldPath.Child("intPtrField"), obj.IntPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field BasicStruct.Int16Field
+	{ // field BasicStruct.Int16Field (int16)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int16,
@@ -180,7 +180,7 @@ func Validate_BasicStruct(
 		errs = append(errs, fn(fldPath.Child("int16Field"), &obj.Int16Field, oldVal, oldObj != nil)...)
 	}
 
-	{ // field BasicStruct.Int32Field
+	{ // field BasicStruct.Int32Field (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -204,7 +204,7 @@ func Validate_BasicStruct(
 		errs = append(errs, fn(fldPath.Child("int32Field"), &obj.Int32Field, oldVal, oldObj != nil)...)
 	}
 
-	{ // field BasicStruct.Int64Field
+	{ // field BasicStruct.Int64Field (int64)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int64,
@@ -228,7 +228,7 @@ func Validate_BasicStruct(
 		errs = append(errs, fn(fldPath.Child("int64Field"), &obj.Int64Field, oldVal, oldObj != nil)...)
 	}
 
-	{ // field BasicStruct.UintField
+	{ // field BasicStruct.UintField (uint)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *uint,
@@ -252,7 +252,7 @@ func Validate_BasicStruct(
 		errs = append(errs, fn(fldPath.Child("uintField"), &obj.UintField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field BasicStruct.UintPtrField
+	{ // field BasicStruct.UintPtrField (uint)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *uint,
@@ -276,7 +276,7 @@ func Validate_BasicStruct(
 		errs = append(errs, fn(fldPath.Child("uintPtrField"), obj.UintPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field BasicStruct.Uint16Field
+	{ // field BasicStruct.Uint16Field (uint16)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *uint16,
@@ -300,7 +300,7 @@ func Validate_BasicStruct(
 		errs = append(errs, fn(fldPath.Child("uint16Field"), &obj.Uint16Field, oldVal, oldObj != nil)...)
 	}
 
-	{ // field BasicStruct.Uint32Field
+	{ // field BasicStruct.Uint32Field (uint32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *uint32,
@@ -324,7 +324,7 @@ func Validate_BasicStruct(
 		errs = append(errs, fn(fldPath.Child("uint32Field"), &obj.Uint32Field, oldVal, oldObj != nil)...)
 	}
 
-	{ // field BasicStruct.Uint64Field
+	{ // field BasicStruct.Uint64Field (uint64)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *uint64,
@@ -348,7 +348,7 @@ func Validate_BasicStruct(
 		errs = append(errs, fn(fldPath.Child("uint64Field"), &obj.Uint64Field, oldVal, oldObj != nil)...)
 	}
 
-	{ // field BasicStruct.TypedefField
+	{ // field BasicStruct.TypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/minimum.IntType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *IntType,
@@ -370,7 +370,7 @@ func Validate_BasicStruct(
 		errs = append(errs, fn(fldPath.Child("typedefField"), &obj.TypedefField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field BasicStruct.TypedefPtrField
+	{ // field BasicStruct.TypedefPtrField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/minimum.IntType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *IntType,
@@ -416,7 +416,7 @@ func Validate_NegativeMinimumStruct(
 
 	// field NegativeMinimumStruct.TypeMeta has no validation
 
-	{ // field NegativeMinimumStruct.NegativeMinimumField
+	{ // field NegativeMinimumStruct.NegativeMinimumField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -440,7 +440,7 @@ func Validate_NegativeMinimumStruct(
 		errs = append(errs, fn(fldPath.Child("negativeMinimumField"), &obj.NegativeMinimumField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field NegativeMinimumStruct.NegativeMinimumPtrField
+	{ // field NegativeMinimumStruct.NegativeMinimumPtrField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -464,7 +464,7 @@ func Validate_NegativeMinimumStruct(
 		errs = append(errs, fn(fldPath.Child("negativeMinimumPtrField"), obj.NegativeMinimumPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field NegativeMinimumStruct.OptionalNegativeMinimumField
+	{ // field NegativeMinimumStruct.OptionalNegativeMinimumField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -495,7 +495,7 @@ func Validate_NegativeMinimumStruct(
 		errs = append(errs, fn(fldPath.Child("optionalNegativeMinimumField"), &obj.OptionalNegativeMinimumField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field NegativeMinimumStruct.OptionalNegativeMinimumPtrField
+	{ // field NegativeMinimumStruct.OptionalNegativeMinimumPtrField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -526,7 +526,7 @@ func Validate_NegativeMinimumStruct(
 		errs = append(errs, fn(fldPath.Child("optionalNegativeMinimumPtrField"), obj.OptionalNegativeMinimumPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field NegativeMinimumStruct.RequiredNegativeMinimumField
+	{ // field NegativeMinimumStruct.RequiredNegativeMinimumField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -558,7 +558,7 @@ func Validate_NegativeMinimumStruct(
 		errs = append(errs, fn(fldPath.Child("requiredNegativeMinimumField"), &obj.RequiredNegativeMinimumField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field NegativeMinimumStruct.RequiredNegativeMinimumPtrField
+	{ // field NegativeMinimumStruct.RequiredNegativeMinimumPtrField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -601,7 +601,7 @@ func Validate_OptionalStruct(
 
 	// field OptionalStruct.TypeMeta has no validation
 
-	{ // field OptionalStruct.OptionalIntField
+	{ // field OptionalStruct.OptionalIntField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -632,7 +632,7 @@ func Validate_OptionalStruct(
 		errs = append(errs, fn(fldPath.Child("optionalIntField"), &obj.OptionalIntField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field OptionalStruct.OptionalIntPtrField
+	{ // field OptionalStruct.OptionalIntPtrField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -663,7 +663,7 @@ func Validate_OptionalStruct(
 		errs = append(errs, fn(fldPath.Child("optionalIntPtrField"), obj.OptionalIntPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field OptionalStruct.OptionalTypedefField
+	{ // field OptionalStruct.OptionalTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/minimum.IntType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *IntType,
@@ -693,7 +693,7 @@ func Validate_OptionalStruct(
 		errs = append(errs, fn(fldPath.Child("optionalTypedefField"), &obj.OptionalTypedefField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field OptionalStruct.OptionalTypedefPtrField
+	{ // field OptionalStruct.OptionalTypedefPtrField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/minimum.IntType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *IntType,
@@ -734,7 +734,7 @@ func Validate_RequiredStruct(
 
 	// field RequiredStruct.TypeMeta has no validation
 
-	{ // field RequiredStruct.RequiredIntField
+	{ // field RequiredStruct.RequiredIntField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -766,7 +766,7 @@ func Validate_RequiredStruct(
 		errs = append(errs, fn(fldPath.Child("requiredIntField"), &obj.RequiredIntField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field RequiredStruct.RequiredIntPtrField
+	{ // field RequiredStruct.RequiredIntPtrField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -798,7 +798,7 @@ func Validate_RequiredStruct(
 		errs = append(errs, fn(fldPath.Child("requiredIntPtrField"), obj.RequiredIntPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field RequiredStruct.RequiredTypedefField
+	{ // field RequiredStruct.RequiredTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/minimum.IntType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *IntType,
@@ -829,7 +829,7 @@ func Validate_RequiredStruct(
 		errs = append(errs, fn(fldPath.Child("requiredTypedefField"), &obj.RequiredTypedefField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field RequiredStruct.RequiredTypedefPtrField
+	{ // field RequiredStruct.RequiredTypedefPtrField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/minimum.IntType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *IntType,
