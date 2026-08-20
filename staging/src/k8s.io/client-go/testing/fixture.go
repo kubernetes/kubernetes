@@ -771,15 +771,6 @@ func (t *managedFieldObjectTracker) Create(gvr schema.GroupVersionResource, obj 
 		return err
 	}
 
-	objType, err := meta.TypeAccessor(obj)
-	if err != nil {
-		return err
-	}
-	// Stamp GVK
-	apiVersion, kind := gvk.ToAPIVersionAndKind()
-	objType.SetAPIVersion(apiVersion)
-	objType.SetKind(kind)
-
 	objMeta, err := meta.Accessor(obj)
 	if err != nil {
 		return err
