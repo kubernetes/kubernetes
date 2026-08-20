@@ -200,6 +200,13 @@ func (cronJobStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 	newJob := obj.(*batch.CronJob)
 	oldJob := old.(*batch.CronJob)
 	newJob.Spec = oldJob.Spec
+
+	// Drop the nextScheduleTime status field when the CronJobsNextScheduleTime
+	// feature is disabled, unless the old object already had it set (which allows
+	// the value to persist if the feature is disabled after having been enabled).
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CronJobsNextScheduleTime) && oldJob.Status.NextScheduleTime == nil {
+		newJob.Status.NextScheduleTime = nil
+	}
 }
 
 func (cronJobStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {

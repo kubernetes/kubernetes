@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	batchv1informers "k8s.io/client-go/informers/batch/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -46,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/cronjob/metrics"
 	jobutil "k8s.io/kubernetes/pkg/controller/job/util"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/parsers"
 	"k8s.io/utils/ptr"
 )
@@ -535,6 +537,11 @@ func (jm *ControllerV2) syncCronJob(
 
 	if cronJob.Spec.Suspend != nil && *cronJob.Spec.Suspend {
 		logger.V(4).Info("Not starting job because the cron is suspended", "cronjob", klog.KObj(cronJob))
+		// A suspended CronJob has no next scheduled time.
+		if utilfeature.DefaultFeatureGate.Enabled(features.CronJobsNextScheduleTime) && cronJob.Status.NextScheduleTime != nil {
+			cronJob.Status.NextScheduleTime = nil
+			updateStatus = true
+		}
 		return nil, updateStatus, nil
 	}
 
@@ -545,6 +552,16 @@ func (jm *ControllerV2) syncCronJob(
 		logger.V(2).Info("Unparseable schedule", "cronjob", klog.KObj(cronJob), "schedule", cronJob.Spec.Schedule, "err", err)
 		jm.recorder.Eventf(cronJob, corev1.EventTypeWarning, "UnparseableSchedule", "unparseable schedule: %q : %s", cronJob.Spec.Schedule, err)
 		return nil, updateStatus, nil
+	}
+
+	// Surface the next scheduled time in status when the feature is enabled. This is
+	// the next time the schedule fires after now, in the CronJob's time zone.
+	if utilfeature.DefaultFeatureGate.Enabled(features.CronJobsNextScheduleTime) {
+		next := metav1.NewTime(sched.Next(now))
+		if cronJob.Status.NextScheduleTime == nil || !cronJob.Status.NextScheduleTime.Equal(&next) {
+			cronJob.Status.NextScheduleTime = &next
+			updateStatus = true
+		}
 	}
 
 	scheduledTime, err := nextScheduleTime(logger, cronJob, now, sched, jm.recorder)
