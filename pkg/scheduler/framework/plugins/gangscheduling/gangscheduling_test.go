@@ -1206,7 +1206,7 @@ func TestGangSchedulingFlow(t *testing.T) {
 
 			cycleState := schedulerframework.NewCycleState()
 			if tt.isDuringPodGroupSchedulingCycle {
-				cycleState.SetPodGroupSchedulingCycle(cycleState)
+				cycleState.SetPodGroupCycleState(cycleState)
 			}
 
 			pod := tt.pod.DeepCopy()
@@ -1815,7 +1815,7 @@ func TestPlacementFeasible(t *testing.T) {
 			pl.snapshotLister = mockLister
 
 			cycleState := schedulerframework.NewCycleState()
-			cycleState.SetPodGroupSchedulingCycle(cycleState)
+			cycleState.SetPodGroupCycleState(cycleState)
 
 			scheduled := tc.initialScheduledCount
 			for i, code := range tc.podStatuses {

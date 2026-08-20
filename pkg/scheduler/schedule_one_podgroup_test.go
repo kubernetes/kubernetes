@@ -1937,7 +1937,7 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 					continue
 				}
 				placementCycleState := framework.NewCycleState()
-				placementCycleState.SetPodGroupSchedulingCycle(podGroupCycleState)
+				placementCycleState.SetPodGroupCycleState(podGroupCycleState)
 				result.podCtx = initPodSchedulingContext(ctx, pod, placementCycleState)
 				algorithmResult.podResults = append(algorithmResult.podResults, result)
 			}
@@ -5047,7 +5047,7 @@ func TestCPGHierarchicalScheduling_Internal(t *testing.T) {
 	}
 	t.Logf("Node info list size: %d", func() int { l, _ := snapshot.NodeInfos().List(); return len(l) }())
 	podGroupCycleState := framework.NewCycleState()
-	podGroupCycleState.SetPodGroupSchedulingCycle(podGroupCycleState)
+	podGroupCycleState.SetPodGroupCycleState(podGroupCycleState)
 	sched.podGroupCycle(ctx, schedFwk, podGroupCycleState, podGroupInfo, time.Now())
 
 	lock.Lock()

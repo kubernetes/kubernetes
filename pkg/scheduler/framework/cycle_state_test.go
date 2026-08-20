@@ -206,7 +206,7 @@ func TestPlacementCycleState(t *testing.T) {
 		state := NewCycleState()
 		podGroupState := NewCycleState()
 		placementState := NewCycleState()
-		placementState.SetPodGroupSchedulingCycle(podGroupState)
+		placementState.SetPodGroupCycleState(podGroupState)
 		placementState.Write("testkey", &fakeData{data: "placementdata"})
 
 		state.SetPlacementCycleState(placementState)
