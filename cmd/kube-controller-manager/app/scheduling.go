@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	schedulinginformers "k8s.io/client-go/informers/scheduling/v1alpha3"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 
@@ -48,11 +49,19 @@ func newPodGroupProtectionController(ctx context.Context, controllerContext Cont
 		return nil, err
 	}
 
+	var compositePodGroupInformer schedulinginformers.CompositePodGroupInformer
+	isCompositePodGroupEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup)
+	if isCompositePodGroupEnabled {
+		compositePodGroupInformer = controllerContext.InformerFactory.Scheduling().V1alpha3().CompositePodGroups()
+	}
+
 	pgProtectionController, err := podgroupprotection.NewPodGroupProtectionController(
 		klog.FromContext(ctx),
 		controllerContext.InformerFactory.Scheduling().V1beta1().PodGroups(),
+		compositePodGroupInformer,
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		client,
+		isCompositePodGroupEnabled,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init %s: %w", controllerName, err)

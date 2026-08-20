@@ -44,13 +44,25 @@ func TestAdmit(t *testing.T) {
 	pgWithFinalizer := pg.DeepCopy()
 	pgWithFinalizer.Finalizers = []string{schedulingapi.PodGroupProtectionFinalizer}
 
+	cpg := &schedulingapi.CompositePodGroup{
+		TypeMeta: metav1.TypeMeta{Kind: "CompositePodGroup"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-compositepodgroup",
+			Namespace: "default",
+		},
+	}
+
+	cpgWithFinalizer := cpg.DeepCopy()
+	cpgWithFinalizer.Finalizers = []string{schedulingapi.CompositePodGroupProtectionFinalizer}
+
 	tests := []struct {
-		name           string
-		enabled        bool
-		resource       schema.GroupVersionResource
-		object         runtime.Object
-		expectedObject runtime.Object
-		namespace      string
+		name                  string
+		enabled               bool
+		compositeGroupEnabled bool
+		resource              schema.GroupVersionResource
+		object                runtime.Object
+		expectedObject        runtime.Object
+		namespace             string
 	}{
 		{
 			name:           "podgroup create with plugin enabled, add finalizer",
@@ -76,11 +88,42 @@ func TestAdmit(t *testing.T) {
 			expectedObject: pg,
 			namespace:      pg.Namespace,
 		},
+		{
+			name:                  "compositepodgroup create with plugin enabled, add finalizer",
+			compositeGroupEnabled: true,
+			resource:              schedulingapi.SchemeGroupVersion.WithResource("compositepodgroups"),
+			object:                cpg,
+			expectedObject:        cpgWithFinalizer,
+			namespace:             cpg.Namespace,
+		},
+		{
+			name:                  "compositepodgroup finalizer already exists, no new finalizer",
+			compositeGroupEnabled: true,
+			resource:              schedulingapi.SchemeGroupVersion.WithResource("compositepodgroups"),
+			object:                cpgWithFinalizer,
+			expectedObject:        cpgWithFinalizer,
+			namespace:             cpgWithFinalizer.Namespace,
+		},
+		{
+			name:                  "compositepodgroup create with plugin disabled, no finalizer added",
+			compositeGroupEnabled: false,
+			resource:              schedulingapi.SchemeGroupVersion.WithResource("compositepodgroups"),
+			object:                cpg,
+			expectedObject:        cpg,
+			namespace:             cpg.Namespace,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, test.enabled)
+			if test.compositeGroupEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareWorkloadScheduling, true)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CompositePodGroup, true)
+			} else {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, test.enabled)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CompositePodGroup, false)
+			}
 
 			ctrl := newPlugin()
 			ctrl.InspectFeatureGates(utilfeature.DefaultFeatureGate)
