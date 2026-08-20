@@ -620,15 +620,15 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 	expected := `
 # HELP apiserver_watch_events_dispatch_duration_seconds [ALPHA] Histogram of watch event dispatch latency broken by resource type and pipeline stage. The 'total' stage is the end-to-end latency of a delivered event.
 # TYPE apiserver_watch_events_dispatch_duration_seconds histogram
-apiserver_watch_events_dispatch_duration_seconds_bucket{group="",resource="pods",stage="cache_to_watcher",le="+Inf"} 2
-apiserver_watch_events_dispatch_duration_seconds_sum{group="",resource="pods",stage="cache_to_watcher"} 0
-apiserver_watch_events_dispatch_duration_seconds_count{group="",resource="pods",stage="cache_to_watcher"} 2
 apiserver_watch_events_dispatch_duration_seconds_bucket{group="",resource="pods",stage="storage_to_cache",le="+Inf"} 2
 apiserver_watch_events_dispatch_duration_seconds_sum{group="",resource="pods",stage="storage_to_cache"} 2
 apiserver_watch_events_dispatch_duration_seconds_count{group="",resource="pods",stage="storage_to_cache"} 2
 apiserver_watch_events_dispatch_duration_seconds_bucket{group="",resource="pods",stage="total",le="+Inf"} 2
 apiserver_watch_events_dispatch_duration_seconds_sum{group="",resource="pods",stage="total"} 4
 apiserver_watch_events_dispatch_duration_seconds_count{group="",resource="pods",stage="total"} 2
+apiserver_watch_events_dispatch_duration_seconds_bucket{group="",resource="pods",stage="watcher_to_client_handler",le="+Inf"} 2
+apiserver_watch_events_dispatch_duration_seconds_sum{group="",resource="pods",stage="watcher_to_client_handler"} 0
+apiserver_watch_events_dispatch_duration_seconds_count{group="",resource="pods",stage="watcher_to_client_handler"} 2
 `
 	if err := testutil.GatherAndCompare(gatherWithoutBuckets(registry), strings.NewReader(expected), "apiserver_watch_events_dispatch_duration_seconds"); err != nil {
 		t.Fatal(err)
