@@ -636,7 +636,7 @@ func (ctrl *PersistentVolumeController) syncVolume(ctx context.Context, volume *
 			var ok bool
 			claim, ok = obj.(*v1.PersistentVolumeClaim)
 			if !ok {
-				return fmt.Errorf("cannot convert object from volume cache to volume %q!?: %#v", claim.Spec.VolumeName, obj)
+				return fmt.Errorf("cannot convert object from claim cache to claim %q!?: %#v", claimName, obj)
 			}
 			logger.V(4).Info("Synchronizing PersistentVolume, claim found", "PVC", klog.KRef(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name), "claimStatus", getClaimStatusForLogging(claim), "volumeName", volume.Name)
 		}
