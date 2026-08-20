@@ -39,6 +39,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+const directParamReadTimeout = time.Second
+
 // PolicyInvocation is a single policy-binding-param tuple from a Policy Hook
 // in the context of a specific request. The params have already been resolved
 // and any error in configuration or setting up the invocation is stored in
@@ -171,14 +173,15 @@ func (d *policyDispatcher[P, B, E]) Dispatch(ctx context.Context, a admission.At
 			}
 
 			// Collect params for this binding
-			params, err := CollectParams(
+			params, err := CollectParamsWithContext(
+				ctx,
 				policyAccessor.GetParamKind(),
 				hook.ParamInformer,
+				hook.ParamMapping,
 				hook.ParamScope,
 				bindingAccessor.GetParamRef(),
 				a.GetNamespace(),
 				hook.DynamicClient,
-				hook.RESTMapper,
 			)
 			if err != nil {
 				// There was an error collecting params for this binding.
@@ -271,7 +274,7 @@ func (d *policyDispatcher[P, B, E]) Dispatch(ctx context.Context, a admission.At
 // returns a single-element list with a nil param.
 //
 // The dynamicClient and restMapper parameters enable direct API fallback when
-// the informer cache hasn't received the watch event for a newly created param yet.
+// the informer cache has not synchronized a parameter yet.
 func CollectParams(
 	paramKind *v1.ParamKind,
 	paramInformer informers.GenericInformer,
@@ -281,10 +284,60 @@ func CollectParams(
 	dynamicClient dynamic.Interface,
 	restMapper meta.RESTMapper,
 ) ([]runtime.Object, error) {
+	if paramKind != nil && paramRef != nil && paramInformer != nil {
+		timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		if !cache.WaitForCacheSync(timeoutCtx.Done(), paramInformer.Informer().HasSynced) {
+			return nil, fmt.Errorf("paramKind kind `%v` not yet synced to use for admission", paramKind.String())
+		}
+	}
+	return collectParams(context.Background(), paramKind, paramInformer, paramScope, nil, paramRef, namespace, dynamicClient, restMapper)
+}
+
+// CollectParamsWithContext resolves parameters using the mapping selected by
+// the policy source. Named parameters use the informer as the fast path and
+// direct reads during initial synchronization or on cache misses. Selector
+// references retain the bounded informer synchronization wait.
+func CollectParamsWithContext(
+	ctx context.Context,
+	paramKind *v1.ParamKind,
+	paramInformer informers.GenericInformer,
+	paramMapping *meta.RESTMapping,
+	paramScope meta.RESTScope,
+	paramRef *v1.ParamRef,
+	namespace string,
+	dynamicClient dynamic.Interface,
+) ([]runtime.Object, error) {
+	if paramMapping != nil {
+		paramScope = paramMapping.Scope
+	}
+	if paramRef != nil && paramRef.Selector != nil && paramInformer != nil {
+		timeoutCtx, cancel := context.WithTimeout(ctx, directParamReadTimeout)
+		defer cancel()
+		if !cache.WaitForCacheSync(timeoutCtx.Done(), paramInformer.Informer().HasSynced) {
+			return nil, fmt.Errorf("paramKind kind `%v` not yet synced to use for admission", paramKind.String())
+		}
+	}
+	return collectParams(ctx, paramKind, paramInformer, paramScope, paramMapping, paramRef, namespace, dynamicClient, nil)
+}
+
+func collectParams(
+	ctx context.Context,
+	paramKind *v1.ParamKind,
+	paramInformer informers.GenericInformer,
+	paramScope meta.RESTScope,
+	paramMapping *meta.RESTMapping,
+	paramRef *v1.ParamRef,
+	namespace string,
+	dynamicClient dynamic.Interface,
+	restMapper meta.RESTMapper,
+) ([]runtime.Object, error) {
 	// If definition has paramKind, paramRef is required in binding.
 	// If definition has no paramKind, paramRef set in binding will be ignored.
 	var params []runtime.Object
 	var paramStore cache.GenericNamespaceLister
+	var paramsNamespace string
+	var informerSynced bool
 
 	// Make sure the param kind is ready to use
 	if paramKind != nil && paramRef != nil {
@@ -292,12 +345,15 @@ func CollectParams(
 			return nil, fmt.Errorf("paramKind kind `%v` not known",
 				paramKind.String())
 		}
+		if paramScope == nil {
+			return nil, fmt.Errorf("paramKind kind `%v` has no REST scope", paramKind.String())
+		}
 
 		// Set up cluster-scoped, or namespaced access to the params
 		// "default" if not provided, and paramKind is namespaced
 		paramStore = paramInformer.Lister()
 		if paramScope.Name() == meta.RESTScopeNameNamespace {
-			paramsNamespace := namespace
+			paramsNamespace = namespace
 			if len(paramRef.Namespace) > 0 {
 				paramsNamespace = paramRef.Namespace
 			} else if len(paramsNamespace) == 0 {
@@ -308,17 +364,7 @@ func CollectParams(
 
 			paramStore = paramInformer.Lister().ByNamespace(paramsNamespace)
 		}
-
-		// If the param informer for this admission policy has not yet
-		// had time to perform an initial listing, don't attempt to use
-		// it.
-		timeoutCtx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-		defer cancel()
-
-		if !cache.WaitForCacheSync(timeoutCtx.Done(), paramInformer.Informer().HasSynced) {
-			return nil, fmt.Errorf("paramKind kind `%v` not yet synced to use for admission",
-				paramKind.String())
-		}
+		informerSynced = paramInformer.Informer().HasSynced()
 	}
 
 	// Find params to use with policy
@@ -341,17 +387,21 @@ func CollectParams(
 			return nil, fmt.Errorf("paramRef.name and paramRef.selector are mutually exclusive")
 		}
 
-		// First attempt: try to get the param from the informer cache (fast path)
-		param, err := paramStore.Get(paramRef.Name)
-
-		// If cache returns NotFound and we have a client, try direct API call as fallback.
-		// This handles the race condition where resources (ConfigMap, Policy, Binding, and Param)
-		// are created in quick succession. The informer cache may have completed its initial
-		// sync (checked by WaitForCacheSync above), but newly created params might not have
-		// propagated to the cache yet. The direct API call ensures we get the correct answer
-		// without timing-dependent retry logic.
-		if apierrors.IsNotFound(err) && dynamicClient != nil && restMapper != nil && paramKind != nil {
-			param, err = getParamDirectly(dynamicClient, restMapper, paramKind, paramRef, namespace, paramScope)
+		var param runtime.Object
+		var err error
+		if informerSynced {
+			param, err = paramStore.Get(paramRef.Name)
+		}
+		if !informerSynced || apierrors.IsNotFound(err) {
+			mapping, mappingErr := mappingForDirectRead(paramKind, paramMapping, restMapper)
+			if mappingErr != nil {
+				return nil, mappingErr
+			}
+			if dynamicClient != nil && mapping != nil {
+				param, err = getParamDirectly(ctx, dynamicClient, mapping, paramRef.Name, paramsNamespace)
+			} else if !informerSynced {
+				return nil, fmt.Errorf("paramKind kind `%v` not yet synced to use for admission", paramKind.String())
+			}
 		}
 
 		switch {
@@ -369,6 +419,9 @@ func CollectParams(
 			// and unset namespace for cluster scoped resource
 			return nil, err
 		default:
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
 			// Internal error
 			utilruntime.HandleError(err)
 			return nil, err
@@ -384,6 +437,9 @@ func CollectParams(
 
 		paramList, err := paramStore.List(selector)
 		if err != nil {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
 			// There was a bad internal error
 			utilruntime.HandleError(err)
 			return nil, err
@@ -404,61 +460,49 @@ func CollectParams(
 	return params, nil
 }
 
-// getParamDirectly performs a direct API call to retrieve a param when the informer
-// cache doesn't have it yet. This handles the race condition where a param resource
-// is created but the watch event hasn't propagated to the informer cache.
-func getParamDirectly(
-	dynamicClient dynamic.Interface,
-	restMapper meta.RESTMapper,
-	paramKind *v1.ParamKind,
-	paramRef *v1.ParamRef,
-	namespace string,
-	paramScope meta.RESTScope,
-) (runtime.Object, error) {
-	// Convert GVK to GVR using the RESTMapper
+func mappingForDirectRead(paramKind *v1.ParamKind, mapping *meta.RESTMapping, restMapper meta.RESTMapper) (*meta.RESTMapping, error) {
+	if mapping != nil {
+		return mapping, nil
+	}
+	if restMapper == nil {
+		return nil, nil
+	}
 	gv, err := schema.ParseGroupVersion(paramKind.APIVersion)
 	if err != nil {
 		return nil, fmt.Errorf("invalid paramKind APIVersion %q: %w", paramKind.APIVersion, err)
 	}
-	gvk := gv.WithKind(paramKind.Kind)
-
-	mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	mapping, err = restMapper.RESTMapping(gv.WithKind(paramKind.Kind).GroupKind(), gv.Version)
+	if meta.IsNoMatchError(err) {
+		return nil, nil
+	}
 	if err != nil {
-		// An unknown paramKind (CRD not registered or deleted) is reported as
-		// NotFound so the caller routes it through ParameterNotFoundAction
-		// instead of failing the admission request as an internal error.
-		if meta.IsNoMatchError(err) {
-			return nil, apierrors.NewNotFound(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, paramRef.Name)
-		}
-		return nil, fmt.Errorf("failed to find REST mapping for %v: %w", gvk, err)
+		return nil, fmt.Errorf("failed to find REST mapping for %v: %w", gv.WithKind(paramKind.Kind), err)
 	}
+	return mapping, nil
+}
 
-	// Determine the namespace for the Get request
-	var targetNamespace string
-	if paramScope.Name() == meta.RESTScopeNameNamespace {
-		if len(paramRef.Namespace) > 0 {
-			targetNamespace = paramRef.Namespace
-		} else {
-			targetNamespace = namespace
-		}
-	}
-
-	// Perform the direct API call with a timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+func getParamDirectly(
+	ctx context.Context,
+	dynamicClient dynamic.Interface,
+	mapping *meta.RESTMapping,
+	name string,
+	namespace string,
+) (runtime.Object, error) {
+	ctx, cancel := context.WithTimeout(ctx, directParamReadTimeout)
 	defer cancel()
-
-	var resourceClient dynamic.ResourceInterface
-	if targetNamespace != "" {
-		resourceClient = dynamicClient.Resource(mapping.Resource).Namespace(targetNamespace)
-	} else {
-		resourceClient = dynamicClient.Resource(mapping.Resource)
-	}
-
-	param, err := resourceClient.Get(ctx, paramRef.Name, metav1.GetOptions{})
+	resourceClient := paramResourceClient(dynamicClient, mapping, namespace)
+	param, err := resourceClient.Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
-	return convertParamToInformerRepresentation(gvk, param)
+	return convertParamToInformerRepresentation(mapping.GroupVersionKind, param)
+}
+
+func paramResourceClient(dynamicClient dynamic.Interface, mapping *meta.RESTMapping, namespace string) dynamic.ResourceInterface {
+	if mapping.Scope.Name() == meta.RESTScopeNameNamespace {
+		return dynamicClient.Resource(mapping.Resource).Namespace(namespace)
+	}
+	return dynamicClient.Resource(mapping.Resource)
 }
 
 // convertParamToInformerRepresentation makes a get response object look like an informer object by
