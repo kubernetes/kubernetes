@@ -1026,9 +1026,9 @@ var _ = SIGDescribe("Pods", func() {
 			framework.ExpectNoError(err, "failed to unmarshal JSON bytes to a Pod object type")
 			podStatusUpdated := podStatus
 			podStatusFieldPatchCount := 0
-			podStatusFieldPatchCountTotal := 2
+			podStatusFieldPatchCountTotal := 3
 			for pos, cond := range podStatusUpdated.Status.Conditions {
-				if (cond.Type == v1.PodReady && cond.Status == v1.ConditionTrue) || (cond.Type == v1.ContainersReady && cond.Status == v1.ConditionTrue) {
+				if (cond.Type == v1.PodReady && cond.Status == v1.ConditionTrue) || (cond.Type == v1.ContainersReady && cond.Status == v1.ConditionTrue) || (cond.Type == v1.PodReadyToStartContainers && cond.Status == v1.ConditionTrue) {
 					podStatusUpdated.Status.Conditions[pos].Status = v1.ConditionFalse
 					podStatusFieldPatchCount++
 				}
@@ -1041,9 +1041,9 @@ var _ = SIGDescribe("Pods", func() {
 
 		ginkgo.By("check the Pod again to ensure its Ready conditions are False")
 		podStatusFieldPatchCount := 0
-		podStatusFieldPatchCountTotal := 2
+		podStatusFieldPatchCountTotal := 3
 		for _, cond := range podStatusUpdate.Status.Conditions {
-			if (cond.Type == v1.PodReady && cond.Status == v1.ConditionFalse) || (cond.Type == v1.ContainersReady && cond.Status == v1.ConditionFalse) {
+			if (cond.Type == v1.PodReady && cond.Status == v1.ConditionFalse) || (cond.Type == v1.ContainersReady && cond.Status == v1.ConditionFalse) || (cond.Type == v1.PodReadyToStartContainers && cond.Status == v1.ConditionFalse) {
 				podStatusFieldPatchCount++
 			}
 		}
