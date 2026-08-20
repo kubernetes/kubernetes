@@ -20,11 +20,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
 	"net"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -35,13 +33,13 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -49,38 +47,8 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// NodePortRange should match whatever the default/configured range is
-var NodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
-
 // It is copied from "k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 var errAllocated = errors.New("provided port is already allocated")
-
-// staticPortRange implements port allocation model described here
-// https://github.com/kubernetes/enhancements/tree/master/keps/sig-network/3668-reserved-service-nodeport-range
-type staticPortRange struct {
-	sync.Mutex
-	baseport      int32
-	length        int32
-	reservedPorts sets.Set[int32]
-}
-
-func calculateRange(size int32) int32 {
-	var minPort int32 = 16
-	var step int32 = 32
-	var maxPort int32 = 128
-	return min(max(minPort, size/step), maxPort)
-}
-
-var staticPortAllocator *staticPortRange
-
-// Initialize only once per test
-func init() {
-	staticPortAllocator = &staticPortRange{
-		baseport:      int32(NodePortRange.Base),
-		length:        calculateRange(int32(NodePortRange.Size)),
-		reservedPorts: sets.New[int32](),
-	}
-}
 
 // TestJig is a test jig to help service testing.
 type TestJig struct {
@@ -106,41 +74,8 @@ func NewTestJig(client clientset.Interface, namespace, name string) *TestJig {
 	return j
 }
 
-// reservePort reserves the port provided as input.
-// If an invalid port was provided or if the port is already reserved, it returns false
-func (s *staticPortRange) reservePort(port int32) bool {
-	s.Lock()
-	defer s.Unlock()
-	if port < s.baseport || port > s.baseport+s.length || s.reservedPorts.Has(port) {
-		return false
-	}
-	s.reservedPorts.Insert(port)
-	return true
-}
-
-// getUnusedPort returns a free port from the range and returns its number and nil value
-// the port is not allocated so the consumer should allocate it explicitly calling allocatePort()
-// if none is available then it returns -1 and error
-func (s *staticPortRange) getUnusedPort() (int32, error) {
-	s.Lock()
-	defer s.Unlock()
-	// start in a random offset
-	start := rand.Int31n(s.length)
-	for i := int32(0); i < s.length; i++ {
-		port := s.baseport + (start+i)%(s.length)
-		if !s.reservedPorts.Has(port) {
-			return port, nil
-		}
-	}
-	return -1, fmt.Errorf("no free ports were found")
-}
-
-// releasePort releases the port passed as an argument
-func (s *staticPortRange) releasePort(port int32) {
-	s.Lock()
-	defer s.Unlock()
-	s.reservedPorts.Delete(port)
-}
+// The static NodePort allocator lives in test/e2e/framework/network, since that package
+// needs it and can not import this one. The functions below forward to it.
 
 // GetUnusedStaticNodePort returns a free port in static range and a nil value
 // If no port in static range is available it returns -1 and an error value
@@ -148,7 +83,7 @@ func (s *staticPortRange) releasePort(port int32) {
 // You must allocate a port, then attempt to create the service, then call
 // ReserveStaticNodePort.
 func GetUnusedStaticNodePort() (int32, error) {
-	return staticPortAllocator.getUnusedPort()
+	return e2enetwork.GetUnusedStaticNodePort()
 }
 
 // ReserveStaticNodePort reserves the port provided as input. It is guaranteed
@@ -163,7 +98,7 @@ func GetUnusedStaticNodePort() (int32, error) {
 //
 // If an invalid port was provided or if the port is already reserved, it returns false
 func ReserveStaticNodePort(port int32) bool {
-	return staticPortAllocator.reservePort(port)
+	return e2enetwork.ReserveStaticNodePort(port)
 }
 
 // ReleaseStaticNodePort releases the specified port.
@@ -179,7 +114,7 @@ func ReserveStaticNodePort(port int32) bool {
 //		e2eservice.ReleaseStaticNodePort(nodePort)
 //	})
 func ReleaseStaticNodePort(port int32) {
-	staticPortAllocator.releasePort(port)
+	e2enetwork.ReleaseStaticNodePort(port)
 }
 
 // newServiceTemplate returns the default v1.Service template for this j, but
@@ -490,7 +425,7 @@ func (j *TestJig) sanityCheckService(svc *v1.Service, svcType v1.ServiceType) (*
 			return nil, fmt.Errorf("unexpected Spec.Ports[%d].NodePort (%d) for service", i, port.NodePort)
 		}
 		if hasNodePort {
-			if !NodePortRange.Contains(int(port.NodePort)) {
+			if !e2enetwork.NodePortRange.Contains(int(port.NodePort)) {
 				return nil, fmt.Errorf("out-of-range nodePort (%d) for service", port.NodePort)
 			}
 		}
@@ -568,10 +503,10 @@ func (j *TestJig) WaitForNewIngressIP(ctx context.Context, existingIP string, ti
 func (j *TestJig) ChangeServiceNodePort(ctx context.Context, initial int) (*v1.Service, error) {
 	var err error
 	var service *v1.Service
-	for i := 1; i < NodePortRange.Size; i++ {
-		offs1 := initial - NodePortRange.Base
-		offs2 := (offs1 + i) % NodePortRange.Size
-		newPort := NodePortRange.Base + offs2
+	for i := 1; i < e2enetwork.NodePortRange.Size; i++ {
+		offs1 := initial - e2enetwork.NodePortRange.Base
+		offs2 := (offs1 + i) % e2enetwork.NodePortRange.Size
+		newPort := e2enetwork.NodePortRange.Base + offs2
 		service, err = j.UpdateService(ctx, func(s *v1.Service) {
 			s.Spec.Ports[0].NodePort = int32(newPort)
 		})
