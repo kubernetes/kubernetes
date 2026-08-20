@@ -18,6 +18,7 @@ package volumemanager
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -29,6 +30,7 @@ import (
 
 // FakeVolumeManager is a test implementation that just tracks calls
 type FakeVolumeManager struct {
+	mu                        sync.Mutex
 	volumes                   map[v1.UniqueVolumeName]bool
 	reportedInUse             map[v1.UniqueVolumeName]bool
 	unmountDelay              time.Duration
@@ -75,6 +77,9 @@ func (f *FakeVolumeManager) WaitForAllPodsUnmount(ctx context.Context, pods []*v
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-time.After(f.unmountDelay):
+		f.mu.Lock()
+		f.volumes = nil
+		f.mu.Unlock()
 		return f.unmountError
 	}
 }
@@ -96,6 +101,8 @@ func (f *FakeVolumeManager) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int6
 
 // GetVolumesInUse returns a list of the initial volumes
 func (f *FakeVolumeManager) GetVolumesInUse() []v1.UniqueVolumeName {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	inuse := []v1.UniqueVolumeName{}
 	for v := range f.volumes {
 		inuse = append(inuse, v)
@@ -115,6 +122,8 @@ func (f *FakeVolumeManager) VolumeIsAttached(volumeName v1.UniqueVolumeName) boo
 
 // MarkVolumesAsReportedInUse adds the given volumes to the reportedInUse map
 func (f *FakeVolumeManager) MarkVolumesAsReportedInUse(volumesReportedAsInUse []v1.UniqueVolumeName) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	for _, reportedVolume := range volumesReportedAsInUse {
 		if _, ok := f.volumes[reportedVolume]; ok {
 			f.reportedInUse[reportedVolume] = true
@@ -125,6 +134,8 @@ func (f *FakeVolumeManager) MarkVolumesAsReportedInUse(volumesReportedAsInUse []
 // GetVolumesReportedInUse is a test function only that returns a list of volumes
 // from the reportedInUse map
 func (f *FakeVolumeManager) GetVolumesReportedInUse() []v1.UniqueVolumeName {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	inuse := []v1.UniqueVolumeName{}
 	for reportedVolume := range f.reportedInUse {
 		inuse = append(inuse, reportedVolume)
