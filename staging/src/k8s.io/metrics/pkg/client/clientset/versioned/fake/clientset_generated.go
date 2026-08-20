@@ -28,8 +28,6 @@ import (
 	clientset "k8s.io/metrics/pkg/client/clientset/versioned"
 	metricsv1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1"
 	fakemetricsv1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1/fake"
-	metricsv1alpha1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1alpha1"
-	fakemetricsv1alpha1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1alpha1/fake"
 	metricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 	fakemetricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1/fake"
 )
@@ -102,11 +100,6 @@ var (
 // MetricsV1 retrieves the MetricsV1Client
 func (c *Clientset) MetricsV1() metricsv1.MetricsV1Interface {
 	return &fakemetricsv1.FakeMetricsV1{Fake: &c.Fake}
-}
-
-// MetricsV1alpha1 retrieves the MetricsV1alpha1Client
-func (c *Clientset) MetricsV1alpha1() metricsv1alpha1.MetricsV1alpha1Interface {
-	return &fakemetricsv1alpha1.FakeMetricsV1alpha1{Fake: &c.Fake}
 }
 
 // MetricsV1beta1 retrieves the MetricsV1beta1Client
