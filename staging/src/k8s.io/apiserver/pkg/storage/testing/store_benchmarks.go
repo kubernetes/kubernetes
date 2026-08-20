@@ -426,6 +426,10 @@ func RunBenchmarkStoreList(ctx context.Context, b *testing.B, store storage.Inte
 	}
 }
 
+func RunBenchmarkStoreListUnfiltered(ctx context.Context, b *testing.B, store storage.Interface, data BenchmarkData) {
+	runBenchmarkStoreList(ctx, b, store, 0, "", cluster, data, false)
+}
+
 func runBenchmarkStoreList(ctx context.Context, b *testing.B, store storage.Interface, limit int64, match metav1.ResourceVersionMatch, scope scope, data BenchmarkData, useIndex bool) {
 	objectCount := atomic.Uint64{}
 	listCount := atomic.Uint64{}

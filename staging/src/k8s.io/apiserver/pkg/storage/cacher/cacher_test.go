@@ -750,6 +750,13 @@ func BenchmarkStoreWriteThroughput(b *testing.B) {
 
 func BenchmarkStoreList(b *testing.B) {
 	klog.SetLogger(logr.Discard())
+	b.Run("Unfiltered/Objects=5000", func(b *testing.B) {
+		data := storagetesting.PrepareBenchmarkData(1, 5_000, 1)
+		ctx, cacher, _, terminate := testSetupWithEtcdServer(b)
+		b.Cleanup(terminate)
+		require.NoError(b, storagetesting.PrecreateBenchmarkPods(ctx, cacher, data))
+		storagetesting.RunBenchmarkStoreListUnfiltered(ctx, b, cacher, data)
+	})
 	// Based on https://github.com/kubernetes/community/blob/master/sig-scalability/configs-and-limits/thresholds.md
 	dimensions := []struct {
 		namespaceCount       int

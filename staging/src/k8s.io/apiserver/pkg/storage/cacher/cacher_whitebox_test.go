@@ -2429,23 +2429,6 @@ func BenchmarkCacher_GetList(b *testing.B) {
 	}
 }
 
-func benchmarkPods(n int) []example.Pod {
-	pods := make([]example.Pod, n)
-	for i := range pods {
-		pods[i].Namespace = "default"
-		pods[i].Name = fmt.Sprintf("pod-%d", i)
-		pods[i].ResourceVersion = strconv.Itoa(i)
-		// Give each pod ~2KB of unique payload so the benchmark operates on
-		// realistically sized objects.
-		data := make([]byte, 1024*2)
-		rand.Read(data)
-		pods[i].Spec.NodeSelector = map[string]string{
-			"key": string(data),
-		}
-	}
-	return pods
-}
-
 func newDelegatorWithPods(tb testing.TB, pods []example.Pod) *CacheDelegator {
 	store := &cachertesting.MockStorage{
 		GetListFn: func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error {
@@ -2464,27 +2447,6 @@ func newDelegatorWithPods(tb testing.TB, pods []example.Pod) *CacheDelegator {
 	delegator := NewCacheDelegator(cacher, store)
 	tb.Cleanup(delegator.Stop)
 	return delegator
-}
-
-func BenchmarkCacher_GetList_AllPods(b *testing.B) {
-	totalObjectNum := 10_000
-	delegator := newDelegatorWithPods(b, benchmarkPods(totalObjectNum))
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		result := &example.PodList{}
-		err := delegator.GetList(context.TODO(), "/pods/", storage.ListOptions{
-			Predicate:       storage.Everything,
-			Recursive:       true,
-			ResourceVersion: "12345",
-		}, result)
-		if err != nil {
-			b.Fatalf("GetList cache: %v", err)
-		}
-		if len(result.Items) != totalObjectNum {
-			b.Fatalf("expect %d but got %d", totalObjectNum, len(result.Items))
-		}
-	}
 }
 
 // TestWatchListIsSynchronisedWhenNoEventsFromStoreReceived makes sure that
