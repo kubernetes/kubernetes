@@ -88,16 +88,37 @@ func (a int64Amount) AsInt64() (int64, bool) {
 }
 
 // AsScaledInt64 returns an int64 representing the value of this amount at the specified scale,
-// rounding up, or false if that would result in overflow. (1e20).AsScaledInt64(1) would result
-// in overflow because 1e19 is not representable as an int64. Note that setting a scale larger
-// than the current value may result in loss of precision - i.e. (1e-6).AsScaledInt64(0) would
-// return 1, because 0.000001 is rounded up to 1.
+// rounding away from zero. ok is false when the value overflows int64, in which case the result
+// saturates to mostNegative or mostPositive. (1e20).AsScaledInt64(1) overflows because 1e19 is not
+// representable as an int64. Setting a scale larger than the current value may lose precision:
+// (1e-6).AsScaledInt64(0) returns 1, because 0.000001 rounds away from zero to 1.
 func (a int64Amount) AsScaledInt64(scale Scale) (result int64, ok bool) {
-	if a.scale < scale {
-		result, _ = negativeScaleInt64(a.value, scale-a.scale)
+	if a.value == 0 {
+		return 0, true
+	}
+	// Source and target scales sit anywhere in the int32 range, so widen before
+	// subtracting: the true delta can need 33 bits.
+	delta := int64(a.scale) - int64(scale)
+	if delta < 0 {
+		// Scaling down. Past 10^-19 only the away-from-zero unit is left, so
+		// bound the distance before narrowing it back to a Scale.
+		if delta <= -19 {
+			if a.value < 0 {
+				return -1, true
+			}
+			return 1, true
+		}
+		result, _ = negativeScaleInt64(a.value, Scale(-delta))
 		return result, true
 	}
-	return positiveScaleInt64(a.value, a.scale-scale)
+	// Scaling up. 10^19 already exceeds int64, so saturate past that.
+	if delta >= 19 {
+		if a.value < 0 {
+			return mostNegative, false
+		}
+		return mostPositive, false
+	}
+	return positiveScaleInt64(a.value, Scale(delta))
 }
 
 // AsDec returns an inf.Dec representation of this value.

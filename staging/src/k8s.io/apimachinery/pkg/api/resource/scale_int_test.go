@@ -25,8 +25,8 @@ import (
 func TestScaledValueInternal(t *testing.T) {
 	tests := []struct {
 		unscaled *big.Int
-		scale    int
-		newScale int
+		scale    int64
+		newScale int64
 
 		want int64
 	}{
@@ -59,9 +59,12 @@ func TestScaledValueInternal(t *testing.T) {
 
 	for i, tt := range tests {
 		old := (&big.Int{}).Set(tt.unscaled)
-		got := scaledValue(tt.unscaled, tt.scale, tt.newScale)
+		got, ok := scaledValue(tt.unscaled, tt.scale, tt.newScale)
 		if got != tt.want {
 			t.Errorf("#%d: got = %v, want %v", i, got, tt.want)
+		}
+		if !ok {
+			t.Errorf("#%d: reported overflow, want a representable value", i)
 		}
 		if tt.unscaled.Cmp(old) != 0 {
 			t.Errorf("#%d: unscaled = %v, want %v", i, tt.unscaled, old)

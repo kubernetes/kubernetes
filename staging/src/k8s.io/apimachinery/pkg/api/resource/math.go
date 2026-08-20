@@ -135,32 +135,48 @@ func int64MultiplyScale1000(a int64) (int64, bool) {
 	return c, c/1000 == a
 }
 
-// positiveScaleInt64 multiplies base by 10^scale, returning false if the
-// value overflows. Passing a negative scale is undefined.
+// positiveScaleInt64 multiplies base by 10^scale. On overflow it returns false
+// and saturates to the int64 rail matching base's sign, so the AsScaledInt64
+// accessors surface a clamped value instead of a wrapped one. Passing a
+// negative scale is undefined.
 func positiveScaleInt64(base int64, scale Scale) (int64, bool) {
+	if base == 0 {
+		// 0 * 10^scale is 0 for any scale; short-circuit before the default
+		// case, whose loop would otherwise run scale times without overflowing.
+		return 0, true
+	}
+	var result int64
+	ok := true
 	switch scale {
 	case 0:
 		return base, true
 	case 1:
-		return int64MultiplyScale10(base)
+		result, ok = int64MultiplyScale10(base)
 	case 2:
-		return int64MultiplyScale100(base)
+		result, ok = int64MultiplyScale100(base)
 	case 3:
-		return int64MultiplyScale1000(base)
+		result, ok = int64MultiplyScale1000(base)
 	case 6:
-		return int64MultiplyScale(base, 1000000)
+		result, ok = int64MultiplyScale(base, 1000000)
 	case 9:
-		return int64MultiplyScale(base, 1000000000)
+		result, ok = int64MultiplyScale(base, 1000000000)
 	default:
-		value := base
-		var ok bool
+		result = base
 		for i := Scale(0); i < scale; i++ {
-			if value, ok = int64MultiplyScale(value, 10); !ok {
-				return 0, false
+			if result, ok = int64MultiplyScale(result, 10); !ok {
+				break
 			}
 		}
-		return value, true
 	}
+	if !ok {
+		// base * 10^scale keeps base's sign until it overflows, so the rail is
+		// determined by that sign.
+		if base < 0 {
+			return mostNegative, false
+		}
+		return mostPositive, false
+	}
+	return result, true
 }
 
 // negativeScaleInt64 reduces base by the provided scale, rounding up, until the
