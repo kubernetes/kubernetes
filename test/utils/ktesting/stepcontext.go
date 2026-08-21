@@ -16,18 +16,35 @@ limitations under the License.
 
 package ktesting
 
+import (
+	"strings"
+
+	"k8s.io/klog/v2"
+)
+
 // WithStep creates a context where a prefix is added to all errors and log
 // messages, similar to how errors are wrapped. This can be nested, leaving a
 // trail of "bread crumbs" that help figure out where in a test some problem
 // occurred or why some log output gets written:
 //
-//	ERROR: bake cake: set heat for baking: oven not found
+//	ERROR: bake cake/set heat for baking: oven not found
 //
 // The string should describe the operation that is about to happen ("starting
 // the controller", "list items") or what is being operated on ("HTTP server").
-// Multiple different prefixes get concatenated with a colon.
+// Multiple different prefixes get concatenated with a slash, the same
+// separator klog uses for logger names (see below).
+//
+// The context's logger (as retrieved through [TContext.Logger] or
+// [klog.FromContext]) also gets updated by adding the step as name via
+// logr.Logger.WithName.
 func (tCtx TContext) WithStep(step string) TContext {
-	tCtx.steps += step + ": "
+	if tCtx.steps == "" {
+		tCtx.steps = step + ": "
+	} else {
+		tCtx.steps = strings.TrimSuffix(tCtx.steps, ": ") + "/" + step + ": "
+	}
+	logger := klog.FromContext(tCtx.Context).WithName(step)
+	tCtx.Context = klog.NewContext(tCtx.Context, logger)
 	return tCtx
 }
 

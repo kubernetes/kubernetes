@@ -433,7 +433,7 @@ type TContext struct {
 	// for Cancel
 	cancel func(cause error)
 
-	// steps is a concatenation ("step1: step2: step3: ") of steps passed to WithStep.
+	// steps is a concatenation ("step1/step2/step3: ") of steps passed to WithStep.
 	// It's empty if there are no steps.
 	steps string
 
