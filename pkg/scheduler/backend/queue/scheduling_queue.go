@@ -557,16 +557,15 @@ func (p *PriorityQueue) isEntityWorthRequeuing(logger klog.Logger, entity framew
 	// For pod groups, if any pod is worth requeuing, the whole group is worth it.
 	// But we should prioritize higher strategies.
 	bestStrategy := queueSkip
-	entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+	for pInfo := range entity.ForEachPodInfo() {
 		strategy := p.isPodWorthRequeuing(logger, pInfo, event, oldObj, newObj, hintKeys)
 		if strategy > bestStrategy {
 			bestStrategy = strategy
 		}
 		if bestStrategy == queueImmediately {
-			return false
+			return bestStrategy
 		}
-		return true
-	})
+	}
 	return bestStrategy
 }
 
@@ -700,7 +699,7 @@ func (p *PriorityQueue) runPreEnqueuePlugins(ctx context.Context, entity framewo
 	var anyGatedPodInfo *framework.QueuedPodInfo
 	// Run PreEnqueue plugins for each pod, even if it could stop after the first being gated,
 	// as we need to populate any per-pod metrics.
-	entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+	for pInfo := range entity.ForEachPodInfo() {
 		p.runPreEnqueuePluginsForPod(ctx, pInfo)
 		if pInfo.Gated() {
 			// If any pod is gated, the whole entity is gated.
@@ -708,8 +707,7 @@ func (p *PriorityQueue) runPreEnqueuePlugins(ctx context.Context, entity framewo
 			// and tracked individually, complicating the flow.
 			anyGatedPodInfo = pInfo
 		}
-		return true
-	})
+	}
 	if anyGatedPodInfo != nil {
 		// Copying the gating plugin info only from a single pod is sufficient,
 		// because if the entity is a pod group, all pods should be ungated before the entire pod group can be ungated,
@@ -1457,12 +1455,11 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 // decreaseUnschedulableReasonMetric decreases the metrics for the rejector plugins
 // which are both UnschedulablePlugins and PendingPlugins.
 func decreaseUnschedulableReasonMetric(entity framework.QueuedEntityInfo) {
-	entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+	for pInfo := range entity.ForEachPodInfo() {
 		for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
 			metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
 		}
-		return true
-	})
+	}
 }
 
 // Delete deletes the entity from activeQ, backoffQ or unschedulableEntities.
@@ -1848,10 +1845,9 @@ func (p *PriorityQueue) UnschedulablePods() []*v1.Pod {
 	defer p.lock.RUnlock()
 	var result []*v1.Pod
 	for _, entity := range p.unschedulableEntities.entityInfoMap {
-		entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+		for pInfo := range entity.ForEachPodInfo() {
 			result = append(result, pInfo.Pod)
-			return true
-		})
+		}
 	}
 	return result
 }
@@ -1930,15 +1926,12 @@ func (p *PriorityQueue) getPod(podLookup *v1.Pod, unlockedActiveQ unlockedActive
 		}
 		return p.pendingPodGroupPods.get(podLookup)
 	}
-	var foundPodInfo *framework.QueuedPodInfo
-	entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+	for pInfo := range entity.ForEachPodInfo() {
 		if pInfo.Pod.Name == podLookup.Name && pInfo.Pod.Namespace == podLookup.Namespace {
-			foundPodInfo = pInfo
-			return false
+			return pInfo
 		}
-		return true
-	})
-	return foundPodInfo
+	}
+	return nil
 }
 
 var pendingPodsSummary = "activeQ:%v; backoffQ:%v; unschedulableEntities:%v"
@@ -1957,11 +1950,10 @@ func (p *PriorityQueue) PendingPods() ([]*v1.Pod, string) {
 	result = append(result, backoffQPods...)
 	unschedulablePodsLen := 0
 	for _, entity := range p.unschedulableEntities.entityInfoMap {
-		entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+		for pInfo := range entity.ForEachPodInfo() {
 			result = append(result, pInfo.Pod)
 			unschedulablePodsLen++
-			return true
-		})
+		}
 	}
 	if !p.isGenericWorkloadEnabled {
 		return result, fmt.Sprintf(pendingPodsSummary, activeQLen, backoffQLen, unschedulablePodsLen)

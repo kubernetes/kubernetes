@@ -242,12 +242,9 @@ func TestPriorityQueue_Add(t *testing.T) {
 
 			getPod := func(entity framework.QueuedEntityInfo) *v1.Pod {
 				if tt.usePodGroups {
-					var pod *v1.Pod
-					entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
-						pod = pInfo.Pod
-						return false
-					})
-					return pod
+					for pInfo := range entity.ForEachPodInfo() {
+						return pInfo.Pod
+					}
 				}
 				return entity.(*framework.QueuedPodInfo).Pod
 			}
@@ -1226,13 +1223,12 @@ func popPod(t *testing.T, logger klog.Logger, q *PriorityQueue, pod *v1.Pod) *fr
 	case *framework.QueuedPodInfo:
 		pInfo = specificEntity
 	case *framework.QueuedPodGroupInfo:
-		specificEntity.ForEachPodInfo(func(pi *framework.QueuedPodInfo) bool {
+		for pi := range specificEntity.ForEachPodInfo() {
 			if pi.Pod.UID == pod.UID {
 				pInfo = pi
-				return false
+				break
 			}
-			return true
-		})
+		}
 	default:
 		t.Fatalf("unexpected popped entity type: %T", entity)
 	}
@@ -1522,10 +1518,9 @@ func TestPriorityQueue_Pop(t *testing.T) {
 				if _, isPodGroup := gotEntity.(*framework.QueuedPodGroupInfo); isPodGroup != tt.usePodGroups {
 					t.Errorf("Expected queued pod group: %v, got: %v", tt.usePodGroups, isPodGroup)
 				}
-				gotEntity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+				for pInfo := range gotEntity.ForEachPodInfo() {
 					gotPods = append(gotPods, pInfo.Pod.Name)
-					return true
-				})
+				}
 			}
 
 			if diff := cmp.Diff(tt.wantPods, gotPods); diff != "" {
@@ -6666,13 +6661,12 @@ func TestAddPodGroupMember(t *testing.T) {
 
 				// Verify effective addition of the incoming pod
 				foundMember := false
-				entity.(*framework.QueuedPodGroupInfo).ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+				for pInfo := range entity.ForEachPodInfo() {
 					if pInfo.Pod.Name == tt.incomingPod.Name {
 						foundMember = true
-						return false
+						break
 					}
-					return true
-				})
+				}
 				if !foundMember {
 					t.Errorf("Incoming pod %s was not found in the pod group members", tt.incomingPod.Name)
 				}
@@ -6881,12 +6875,11 @@ func TestDeletePodGroupMember(t *testing.T) {
 				}
 
 				// Verify effective removal of the deleted pod
-				entity.(*framework.QueuedPodGroupInfo).ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+				for pInfo := range entity.ForEachPodInfo() {
 					if pInfo.Pod.Name == tt.podToDelete.Name {
 						t.Errorf("Deleted pod %s is still present in the pod group members", tt.podToDelete.Name)
 					}
-					return true
-				})
+				}
 			}
 
 			if pendingLen := q.pendingPodGroupPods.len(); pendingLen != tt.expectedPodsInPending {
@@ -7135,16 +7128,15 @@ func TestUpdatePodGroupMember(t *testing.T) {
 
 				// Verify effective update of the updated pod
 				foundUpdated := false
-				entity.(*framework.QueuedPodGroupInfo).ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+				for pInfo := range entity.ForEachPodInfo() {
 					if pInfo.Pod.Name == tt.newPod.Name {
 						foundUpdated = true
 						if diff := cmp.Diff(tt.newPod, pInfo.Pod); diff != "" {
 							t.Errorf("Queued member pod differs from newPod (-want +got):\n%s", diff)
 						}
-						return false
+						break
 					}
-					return true
-				})
+				}
 				if !foundUpdated {
 					t.Errorf("Updated pod %s was not found in the pod group members", tt.newPod.Name)
 				}
@@ -7511,13 +7503,12 @@ func TestMoveAllToActiveOrBackoffQueuePodGroupMember(t *testing.T) {
 
 				if tt.expectedGroupSize > 0 {
 					foundPod := false
-					entity.(*framework.QueuedPodGroupInfo).ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+					for pInfo := range entity.ForEachPodInfo() {
 						if pInfo.Pod.Name == tt.initialPods[0].Name {
 							foundPod = true
-							return false
+							break
 						}
-						return true
-					})
+					}
 					if !foundPod {
 						t.Errorf("Pod %s was not found in the pod group members", tt.initialPods[0].Name)
 					}
@@ -9411,10 +9402,9 @@ func getActivePodGroups(q *PriorityQueue) map[string][]string {
 	for _, pgInfo := range getActivePodGroupInfos(q) {
 		key := fmt.Sprintf("%s/%s", pgInfo.GetType(), pgInfo.GetName())
 		var pods []string
-		pgInfo.ForEachPodInfo(func(pi *framework.QueuedPodInfo) bool {
+		for pi := range pgInfo.ForEachPodInfo() {
 			pods = append(pods, pi.Pod.Name)
-			return true
-		})
+		}
 		result[key] = pods
 	}
 	return result

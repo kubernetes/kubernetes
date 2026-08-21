@@ -137,18 +137,17 @@ func (sched *Scheduler) reconcilePodGroupWithSnapshot(pgi *framework.PodGroupInf
 // handlePodGroupFailureBeforeScheduling handles the failure of a (composite) pod group that occurred before scheduling.
 func (sched *Scheduler) handlePodGroupFailureBeforeScheduling(ctx context.Context, podGroupInfo *framework.QueuedPodGroupInfo, err error) {
 	logger := klog.FromContext(ctx)
-	podGroupInfo.ForEachPodInfo(func(podInfo *framework.QueuedPodInfo) bool {
+	for podInfo := range podGroupInfo.ForEachPodInfo() {
 		podFwk, podFwkErr := sched.frameworkForPod(podInfo.Pod)
 		if podFwkErr != nil {
 			// This shouldn't happen, because we only accept for scheduling the pods
 			// which specify a scheduler name that matches one of the profiles.
 			logger.Error(podFwkErr, "Error occurred")
 			sched.SchedulingQueue.Done(podInfo.Pod.UID)
-		} else {
-			sched.FailureHandler(ctx, podFwk, podInfo, fwk.AsStatus(err), clearNominatedNode, time.Now())
+			continue
 		}
-		return true
-	})
+		sched.FailureHandler(ctx, podFwk, podInfo, fwk.AsStatus(err), clearNominatedNode, time.Now())
+	}
 	sched.updatePodGroupConditionWithError(ctx, podGroupInfo.PodGroupInfo, err)
 	err = sched.SchedulingQueue.AddAttemptedPodGroupIfNeeded(logger, podGroupInfo, sched.SchedulingQueue.SchedulingCycle(), fwk.AsStatus(err))
 	if err != nil {
@@ -179,7 +178,6 @@ func (sched *Scheduler) updatePodGroupConditionWithError(ctx context.Context, pg
 func (sched *Scheduler) validatePodGroup(podGroupInfo *framework.QueuedPodGroupInfo) error {
 	schedulerName := ""
 	podGroupPriority := podGroupInfo.GetPriority()
-	var err error
 
 	var pgPreemptionPolicy v1.PreemptionPolicy
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodGroupPreemptionPolicy) {
@@ -213,18 +211,17 @@ func (sched *Scheduler) validatePodGroup(podGroupInfo *framework.QueuedPodGroupI
 		}
 		return nil
 	}
-	podGroupInfo.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+	for pInfo := range podGroupInfo.ForEachPodInfo() {
 		if schedulerName == "" {
 			schedulerName = pInfo.Pod.Spec.SchedulerName
 		}
-		err = validatePod(pInfo.Pod)
-		return err == nil
-	})
-	if err != nil {
-		return err
+		err := validatePod(pInfo.Pod)
+		if err != nil {
+			return err
+		}
 	}
 
-	err = sched.validateScheduledPods(podGroupInfo.PodGroupInfo, validatePod)
+	err := sched.validateScheduledPods(podGroupInfo.PodGroupInfo, validatePod)
 	if err != nil {
 		return err
 	}
@@ -286,12 +283,10 @@ func (sched *Scheduler) validateScheduledPods(podGroupInfo *framework.PodGroupIn
 // frameworkForPodGroup obtains the concrete scheduler framework for the entire pod group.
 // Assumes [Scheduler.validatePodGroup] has been called before.
 func (sched *Scheduler) frameworkForPodGroup(podGroupInfo *framework.QueuedPodGroupInfo) framework.Framework {
-	var result framework.Framework
-	podGroupInfo.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
-		result = sched.Profiles[pInfo.Pod.Spec.SchedulerName]
-		return false
-	})
-	return result
+	for pInfo := range podGroupInfo.ForEachPodInfo() {
+		return sched.Profiles[pInfo.Pod.Spec.SchedulerName]
+	}
+	return nil
 }
 
 // skipPodGroupPodSchedule skips the scheduling of particular pods from the group when they should no longer be considered.
