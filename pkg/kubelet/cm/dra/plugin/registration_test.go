@@ -258,7 +258,12 @@ func TestRegistrationHandler(t *testing.T) {
 			}
 			plugin := draPlugins.get(test.driverName)
 			require.NotNil(t, plugin, "plugin should be registered")
-			t.Cleanup(func() {
+			// This runs as a defer instead of a t.Cleanup/tCtx.Cleanup callback
+			// because it depends on tCtx and draPlugins' background wiping
+			// (which uses tCtx as its context) still being active. By the time
+			// Cleanup callbacks run, tCtx is already canceled; a defer in the
+			// test function itself still executes beforehand.
+			defer func() {
 				if client != nil {
 					// Create the slice as if the plugin had done that while it runs.
 					_, err := client.ResourceV1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
@@ -272,7 +277,7 @@ func TestRegistrationHandler(t *testing.T) {
 				if test.withClient {
 					requireNoSlices(tCtx)
 				}
-			})
+			}()
 			// Which plugin was chosen is random in this test: it depends on which plugin was detected as connected,
 			// which can be both, one, or none at this point. Some attributes are common to both.
 			assert.Equal(t, test.driverName, plugin.driverName, "DRA driver driver name")

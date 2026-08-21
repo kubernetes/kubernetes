@@ -49,8 +49,8 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testfwk "k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/integration/util"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -211,6 +211,8 @@ func (f *fakeCRPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWi
 // TestCustomResourceEnqueue constructs a fake plugin that registers custom resources
 // to verify Pods failed by this plugin can be moved properly upon CR events.
 func TestCustomResourceEnqueue(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
 	// Start API Server with apiextensions supported.
 	server := apiservertesting.StartTestServerOrDie(
 		t, apiservertesting.NewDefaultTestServerOptions(),
@@ -302,7 +304,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	)
 	testutils.SyncSchedulerInformerFactory(testCtx)
 
-	defer testutils.CleanupTest(t, testCtx)
+	defer testutils.CleanupTest(tCtx, testCtx)
 
 	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
 	// Create one Node.
