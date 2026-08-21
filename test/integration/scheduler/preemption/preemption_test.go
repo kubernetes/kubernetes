@@ -1119,6 +1119,9 @@ func TestPreemption(t *testing.T) {
 	}
 }
 
+// TestAsyncPreemption is equivalent for TestPodGroupAsyncPreemption
+// in test/integration/scheduler/preemption/podgroup/podgrouppreemption_test.go
+// When adding test here, add also test there.
 func TestAsyncPreemption(t *testing.T) {
 	tests := []struct {
 		Name  string
@@ -1868,7 +1871,7 @@ func TestAsyncPreemption(t *testing.T) {
 			blockBindingChannel := make(chan struct{})
 			defer close(blockBindingChannel)
 			preemptionConfig := asyncframework.AsyncPreemptionTestConfig{
-				EnableWAP:              false,
+				EnableGenericWorkload:  false,
 				PreemptionDoneChannels: preemptionDoneChannels,
 				BlockBindingChannel:    blockBindingChannel,
 			}
@@ -1883,10 +1886,10 @@ func TestAsyncPreemption(t *testing.T) {
 			defer testCtx.Scheduler.SchedulingQueue.Close()
 
 			createdPods := []*v1.Pod{}
-			defer testutils.CleanupPods(testCtx.Ctx, cs, t, createdPods)
+			defer func() {
+				testutils.CleanupPods(testCtx.Ctx, cs, t, createdPods)
+			}()
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 			config := asyncframework.AsyncPreemptionStepRunnerConfig{
 				CreatedPods:            createdPods,
 				ClientSet:              cs,
@@ -1895,11 +1898,13 @@ func TestAsyncPreemption(t *testing.T) {
 				PreemptionPlugin:       preemptionPlugin,
 				BlockBindingChannel:    blockBindingChannel,
 			}
-			asyncframework.RunAsyncPreemptionSteps(ctx, t, test.Steps, testCtx, config)
+			asyncframework.RunAsyncPreemptionSteps(testCtx, t, test.Steps, config)
 		})
 	}
 }
 
+// There is equivalent test for pod group preemption at: test/integration/scheduler/preemption/podgroup/podgrouppreemption_test.go
+// When adding new test cases for pod group preemption with waiting pods, add them to this test.
 func TestPreemptionRespectsWaitingPod(t *testing.T) {
 	// 1. Create a "blocking" permit plugin that signals when it's running and waits for a specific close.
 	// 2. Create a big node on which low-priority pod will be scheduled.

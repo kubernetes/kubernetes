@@ -76,7 +76,7 @@ func TestPodGroupPreemption(t *testing.T) {
 		preemptorPodsQueuedInCreationOrder bool
 		pdb                                *policyv1.PodDisruptionBudget
 		expectedScheduled                  []string
-		candidatesForPreemption            []string
+		expectedCandidatesForPreemption    []string
 		expectedUnschedulable              []string
 		expectedToHaveNNNInfo              []string
 		expectedPodsPreemptedByWAP         int
@@ -111,10 +111,10 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:          []string{"high-1", "high-2", "high-3"},
-			candidatesForPreemption:    []string{"low-1", "low-2", "low-3"},
-			expectedToHaveNNNInfo:      []string{"high-1", "high-2", "high-3"},
-			expectedPodsPreemptedByWAP: 3,
+			expectedScheduled:               []string{"high-1", "high-2", "high-3"},
+			expectedCandidatesForPreemption: []string{"low-1", "low-2", "low-3"},
+			expectedToHaveNNNInfo:           []string{"high-1", "high-2", "high-3"},
+			expectedPodsPreemptedByWAP:      3,
 		},
 		{
 			name: "Full PodGroup Preemption for basic policy",
@@ -134,10 +134,10 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:          []string{"high-1", "high-2", "high-3"},
-			candidatesForPreemption:    []string{"low-1", "low-2", "low-3"},
-			expectedToHaveNNNInfo:      []string{"high-1", "high-2", "high-3"},
-			expectedPodsPreemptedByWAP: 3,
+			expectedScheduled:               []string{"high-1", "high-2", "high-3"},
+			expectedCandidatesForPreemption: []string{"low-1", "low-2", "low-3"},
+			expectedToHaveNNNInfo:           []string{"high-1", "high-2", "high-3"},
+			expectedPodsPreemptedByWAP:      3,
 		},
 		{
 			name: "Partial Preemption",
@@ -161,12 +161,12 @@ func TestPodGroupPreemption(t *testing.T) {
 			},
 			// With custom scoring, preemptor pods will prefer on high-1 node
 			// which will force preemption of low-1 pod.
-			expectedScheduled:          []string{"high-1", "high-2", "high-3", "low-2"},
-			candidatesForPreemption:    []string{"low-1"},
-			expectedToHaveNNNInfo:      []string{"high-1", "high-2", "high-3"},
-			expectedPodsPreemptedByWAP: 1,
-			customPluginName:           "mockScorePlugin",
-			customPluginFunc:           newPresetScorePlugin(map[string]int64{"node1": 100, "node2": 0}),
+			expectedScheduled:               []string{"high-1", "high-2", "high-3", "low-2"},
+			expectedCandidatesForPreemption: []string{"low-1"},
+			expectedToHaveNNNInfo:           []string{"high-1", "high-2", "high-3"},
+			expectedPodsPreemptedByWAP:      1,
+			customPluginName:                "mockScorePlugin",
+			customPluginFunc:                newPresetScorePlugin(map[string]int64{"node1": 100, "node2": 0}),
 		},
 		{
 			name: "Partial Preemption with basic policy",
@@ -190,12 +190,12 @@ func TestPodGroupPreemption(t *testing.T) {
 			},
 			// With custom scoring, preemptor pods will prefer high-1 node
 			// which will force preemption of low-1 pod.
-			expectedScheduled:          []string{"high-1", "high-2", "high-3", "very-low-1"},
-			candidatesForPreemption:    []string{"low-1"},
-			expectedToHaveNNNInfo:      []string{},
-			expectedPodsPreemptedByWAP: 1,
-			customPluginName:           "mockScorePlugin",
-			customPluginFunc:           newPresetScorePlugin(map[string]int64{"node1": 100, "node2": 0}),
+			expectedScheduled:               []string{"high-1", "high-2", "high-3", "very-low-1"},
+			expectedCandidatesForPreemption: []string{"low-1"},
+			expectedToHaveNNNInfo:           []string{},
+			expectedPodsPreemptedByWAP:      1,
+			customPluginName:                "mockScorePlugin",
+			customPluginFunc:                newPresetScorePlugin(map[string]int64{"node1": 100, "node2": 0}),
 		},
 		{
 			name: "PDB Violation Handling (Reprieve)",
@@ -221,10 +221,10 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "0.5"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "0.5"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:          []string{"high-1", "high-2"},
-			candidatesForPreemption:    []string{"low-3"},
-			expectedToHaveNNNInfo:      []string{"high-1", "high-2"},
-			expectedPodsPreemptedByWAP: 1,
+			expectedScheduled:               []string{"high-1", "high-2"},
+			expectedCandidatesForPreemption: []string{"low-3"},
+			expectedToHaveNNNInfo:           []string{"high-1", "high-2"},
+			expectedPodsPreemptedByWAP:      1,
 		},
 		{
 			name: "Multi-node Preemption",
@@ -247,10 +247,10 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-4").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:          []string{"high-1", "high-2", "high-3", "high-4"},
-			candidatesForPreemption:    []string{"low-1", "low-2", "low-3", "low-4"},
-			expectedToHaveNNNInfo:      []string{"high-1", "high-2", "high-3", "high-4"},
-			expectedPodsPreemptedByWAP: 4,
+			expectedScheduled:               []string{"high-1", "high-2", "high-3", "high-4"},
+			expectedCandidatesForPreemption: []string{"low-1", "low-2", "low-3", "low-4"},
+			expectedToHaveNNNInfo:           []string{"high-1", "high-2", "high-3", "high-4"},
+			expectedPodsPreemptedByWAP:      4,
 		},
 		{
 			name: "Insufficient Resources (No Preemption)",
@@ -270,11 +270,11 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:          []string{"mid-1", "low-1", "low-2"},
-			candidatesForPreemption:    []string{},
-			expectedUnschedulable:      []string{"high-1", "high-2", "high-3"},
-			expectedToHaveNNNInfo:      []string{},
-			expectedPodsPreemptedByWAP: 0,
+			expectedScheduled:               []string{"mid-1", "low-1", "low-2"},
+			expectedCandidatesForPreemption: []string{},
+			expectedUnschedulable:           []string{"high-1", "high-2", "high-3"},
+			expectedToHaveNNNInfo:           []string{},
+			expectedPodsPreemptedByWAP:      0,
 		},
 		{
 			name: "Priority-based Victim Selection",
@@ -293,10 +293,10 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:          []string{"high-1", "high-2", "mid-1"},
-			candidatesForPreemption:    []string{"low-1", "low-2"},
-			expectedToHaveNNNInfo:      []string{"high-1", "high-2"},
-			expectedPodsPreemptedByWAP: 2,
+			expectedScheduled:               []string{"high-1", "high-2", "mid-1"},
+			expectedCandidatesForPreemption: []string{"low-1", "low-2"},
+			expectedToHaveNNNInfo:           []string{"high-1", "high-2"},
+			expectedPodsPreemptedByWAP:      2,
 		},
 		{
 			name: "Preempt the whole PodGroup even if preempting a single Pod would suffice",
@@ -315,10 +315,10 @@ func TestPodGroupPreemption(t *testing.T) {
 			preemptorPods: []*v1.Pod{
 				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:          []string{"high-1"},
-			candidatesForPreemption:    []string{"low-1", "low-2", "low-3"},
-			expectedToHaveNNNInfo:      []string{"high-1"},
-			expectedPodsPreemptedByWAP: 3,
+			expectedScheduled:               []string{"high-1"},
+			expectedCandidatesForPreemption: []string{"low-1", "low-2", "low-3"},
+			expectedToHaveNNNInfo:           []string{"high-1"},
+			expectedPodsPreemptedByWAP:      3,
 		},
 		{
 			name: "Preempt the whole basic PodGroup with a PodGroup disruption mode",
@@ -337,10 +337,10 @@ func TestPodGroupPreemption(t *testing.T) {
 			preemptorPods: []*v1.Pod{
 				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:          []string{"high-1"},
-			candidatesForPreemption:    []string{"low-1", "low-2", "low-3"},
-			expectedToHaveNNNInfo:      []string{"high-1"},
-			expectedPodsPreemptedByWAP: 3,
+			expectedScheduled:               []string{"high-1"},
+			expectedCandidatesForPreemption: []string{"low-1", "low-2", "low-3"},
+			expectedToHaveNNNInfo:           []string{"high-1"},
+			expectedPodsPreemptedByWAP:      3,
 		},
 		{
 			name: "Pods from a single gang PodGroup with DisruptionModeSingle can be preempted individually by the higher priority gang PodGroup",
@@ -360,12 +360,12 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
 			// We expect one of the pods from victim-pg to be preempted, but do not choose specific pod.
-			expectedScheduled:          []string{"high-1"},
-			candidatesForPreemption:    []string{"low-1", "low-2", "low-3"},
-			expectedPodsPreemptedByWAP: 1,
+			expectedScheduled:               []string{"high-1"},
+			expectedCandidatesForPreemption: []string{"low-1", "low-2", "low-3"},
+			expectedPodsPreemptedByWAP:      1,
 		},
 		{
-			name: "Pods from a single gang PodGroup with DisruptionModeSingle can be preempted individually by the higher priority gang PodGroup even bellow mincount",
+			name: "Pods from a single gang PodGroup with DisruptionModeSingle can be preempted individually by the higher priority gang PodGroup even below mincount",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
@@ -382,9 +382,9 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
 			// We expect one of the pods from victim-pg to be preempted, but do not choose specific pod.
-			expectedScheduled:          []string{"high-1"},
-			candidatesForPreemption:    []string{"low-1", "low-2", "low-3"},
-			expectedPodsPreemptedByWAP: 1,
+			expectedScheduled:               []string{"high-1"},
+			expectedCandidatesForPreemption: []string{"low-1", "low-2", "low-3"},
+			expectedPodsPreemptedByWAP:      1,
 		},
 		{
 			name: "Pods from a single gang PodGroup with DisruptionModeSingle can be preempted individually by the higher priority basic PodGroup",
@@ -404,9 +404,9 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
 			// We expect one of the pods from victim-pg to be preempted, but do not choose specific pod.
-			expectedScheduled:          []string{"high-1"},
-			candidatesForPreemption:    []string{"low-1", "low-2", "low-3"},
-			expectedPodsPreemptedByWAP: 1,
+			expectedScheduled:               []string{"high-1"},
+			expectedCandidatesForPreemption: []string{"low-1", "low-2", "low-3"},
+			expectedPodsPreemptedByWAP:      1,
 		},
 		{
 			name: "Pods from a single basic PodGroup with DisruptionModeSingle can be preempted individually by the higher priority gang PodGroup",
@@ -426,9 +426,9 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
 			// We expect one of the pods from victim-pg to be preempted, but do not choose specific pod.
-			expectedScheduled:          []string{"high-1"},
-			candidatesForPreemption:    []string{"low-1", "low-2", "low-3"},
-			expectedPodsPreemptedByWAP: 1,
+			expectedScheduled:               []string{"high-1"},
+			expectedCandidatesForPreemption: []string{"low-1", "low-2", "low-3"},
+			expectedPodsPreemptedByWAP:      1,
 		},
 		{
 			name: "Pods from a single basic PodGroup with DisruptionModeSingle can be preempted individually by the higher priority basic PodGroup",
@@ -448,9 +448,9 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
 			// We expect one of the pods from victim-pg to be preempted, but do not choose specific pod.
-			expectedScheduled:          []string{"high-1"},
-			candidatesForPreemption:    []string{"low-1", "low-2", "low-3"},
-			expectedPodsPreemptedByWAP: 1,
+			expectedScheduled:               []string{"high-1"},
+			expectedCandidatesForPreemption: []string{"low-1", "low-2", "low-3"},
+			expectedPodsPreemptedByWAP:      1,
 		},
 		{
 			name: "Gang scheduling: schedule as many pods as possible without preempting higher priority pods, but still more than minCount",
@@ -476,7 +476,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			},
 			preemptorPodsQueuedInCreationOrder: true,
 			expectedScheduled:                  []string{"p-a", "p-b", "p3", "p4"},
-			candidatesForPreemption:            []string{"p1", "p2"},
+			expectedCandidatesForPreemption:    []string{"p1", "p2"},
 			expectedUnschedulable:              []string{"p-c"},
 			expectedToHaveNNNInfo:              []string{"p-a", "p-b"},
 			expectedPodsPreemptedByWAP:         2,
@@ -502,10 +502,10 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("p-b").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("p-c").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:          []string{"p-a", "p-b", "p-c"},
-			candidatesForPreemption:    []string{"v1", "v2", "v3"},
-			expectedToHaveNNNInfo:      []string{"p-a", "p-b", "p-c"},
-			expectedPodsPreemptedByWAP: 3,
+			expectedScheduled:               []string{"p-a", "p-b", "p-c"},
+			expectedCandidatesForPreemption: []string{"v1", "v2", "v3"},
+			expectedToHaveNNNInfo:           []string{"p-a", "p-b", "p-c"},
+			expectedPodsPreemptedByWAP:      3,
 		},
 		{
 			name: "Gang scheduling: preempt a pod group victim but do not schedule full pod group",
@@ -533,11 +533,11 @@ func TestPodGroupPreemption(t *testing.T) {
 			},
 			preemptorPodsQueuedInCreationOrder: true,
 			// p-a will preempt victim-pg, p-b will schedule to empty space, so only p-a will have NNN info.
-			expectedScheduled:          []string{"p-a", "p-b", "v3", "v4"},
-			candidatesForPreemption:    []string{"v1", "v2"},
-			expectedUnschedulable:      []string{"p-c"},
-			expectedToHaveNNNInfo:      []string{"p-a"},
-			expectedPodsPreemptedByWAP: 2,
+			expectedScheduled:               []string{"p-a", "p-b", "v3", "v4"},
+			expectedCandidatesForPreemption: []string{"v1", "v2"},
+			expectedUnschedulable:           []string{"p-c"},
+			expectedToHaveNNNInfo:           []string{"p-a"},
+			expectedPodsPreemptedByWAP:      2,
 		},
 		{
 			name: "Basic scheduling: schedule as many pods as possible without preempting higher priority pods",
@@ -563,7 +563,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			},
 			preemptorPodsQueuedInCreationOrder: true,
 			expectedScheduled:                  []string{"p-a", "p-b", "p3", "p4"},
-			candidatesForPreemption:            []string{"p1", "p2"},
+			expectedCandidatesForPreemption:    []string{"p1", "p2"},
 			expectedUnschedulable:              []string{"p-c"},
 			expectedToHaveNNNInfo:              []string{"p-a", "p-b"},
 			expectedPodsPreemptedByWAP:         2,
@@ -589,8 +589,8 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("p-b").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("p-c").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:       []string{"p-a", "p-b", "p-c"},
-			candidatesForPreemption: []string{"v1", "v2", "v3"},
+			expectedScheduled:               []string{"p-a", "p-b", "p-c"},
+			expectedCandidatesForPreemption: []string{"v1", "v2", "v3"},
 			// There are no guarantees about NNN,
 			// depending on the number of queued pods in WAS cycle
 			// WAP can preempt different number of pods
@@ -627,11 +627,11 @@ func TestPodGroupPreemption(t *testing.T) {
 			},
 			preemptorPodsQueuedInCreationOrder: true,
 			// p-a will preempt "victim-pg" and p-b will schedule to empty space, so only p-a will have NNN info.
-			expectedScheduled:          []string{"p-a", "p-b", "v3", "v4"},
-			candidatesForPreemption:    []string{"v1", "v2"},
-			expectedUnschedulable:      []string{"p-c"},
-			expectedToHaveNNNInfo:      []string{"p-a"},
-			expectedPodsPreemptedByWAP: 2,
+			expectedScheduled:               []string{"p-a", "p-b", "v3", "v4"},
+			expectedCandidatesForPreemption: []string{"v1", "v2"},
+			expectedUnschedulable:           []string{"p-c"},
+			expectedToHaveNNNInfo:           []string{"p-a"},
+			expectedPodsPreemptedByWAP:      2,
 		},
 
 		{
@@ -652,11 +652,11 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).PreemptionPolicy(v1.PreemptNever).Obj(),
 				st.MakePod().Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).PreemptionPolicy(v1.PreemptNever).Obj(),
 			},
-			expectedScheduled:              []string{"low-1", "low-2", "low-3"},
-			candidatesForPreemption:        []string{},
-			expectedUnschedulable:          []string{"high-1", "high-2", "high-3"},
-			expectedPodsPreemptedByWAP:     0,
-			enablePodGroupPreemptionPolicy: true,
+			expectedScheduled:               []string{"low-1", "low-2", "low-3"},
+			expectedCandidatesForPreemption: []string{},
+			expectedUnschedulable:           []string{"high-1", "high-2", "high-3"},
+			expectedPodsPreemptedByWAP:      0,
+			enablePodGroupPreemptionPolicy:  true,
 		},
 		{
 			name: "PodGroup with PreemptLowerPriority preemption policy performs preemption, with PodGroupPreemptionPolicy enabled",
@@ -676,10 +676,10 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:              []string{"high-1", "high-2", "high-3"},
-			candidatesForPreemption:        []string{"low-1", "low-2", "low-3"},
-			expectedPodsPreemptedByWAP:     3,
-			enablePodGroupPreemptionPolicy: true,
+			expectedScheduled:               []string{"high-1", "high-2", "high-3"},
+			expectedCandidatesForPreemption: []string{"low-1", "low-2", "low-3"},
+			expectedPodsPreemptedByWAP:      3,
+			enablePodGroupPreemptionPolicy:  true,
 		},
 		{
 			name: "PodGroup with default preemption policy performs preemption, with PodGroupPreemptionPolicy enabled",
@@ -699,10 +699,10 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:              []string{"high-1", "high-2", "high-3"},
-			candidatesForPreemption:        []string{"low-1", "low-2", "low-3"},
-			expectedPodsPreemptedByWAP:     3,
-			enablePodGroupPreemptionPolicy: true,
+			expectedScheduled:               []string{"high-1", "high-2", "high-3"},
+			expectedCandidatesForPreemption: []string{"low-1", "low-2", "low-3"},
+			expectedPodsPreemptedByWAP:      3,
+			enablePodGroupPreemptionPolicy:  true,
 		},
 		{
 			name: "PodGroup with PreemptNever preemption policy in all pods does not perform preemption, with PodGroupPreemptionPolicy disabled",
@@ -722,10 +722,10 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).PreemptionPolicy(v1.PreemptNever).Obj(),
 				st.MakePod().Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).PreemptionPolicy(v1.PreemptNever).Obj(),
 			},
-			expectedScheduled:          []string{"low-1", "low-2", "low-3"},
-			candidatesForPreemption:    []string{},
-			expectedUnschedulable:      []string{"high-1", "high-2", "high-3"},
-			expectedPodsPreemptedByWAP: 0,
+			expectedScheduled:               []string{"low-1", "low-2", "low-3"},
+			expectedCandidatesForPreemption: []string{},
+			expectedUnschedulable:           []string{"high-1", "high-2", "high-3"},
+			expectedPodsPreemptedByWAP:      0,
 		},
 		{
 			name: "Gang scheduling: preemption with node resources",
@@ -743,10 +743,10 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("preemptor-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("preemptor-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:          []string{"preemptor-1", "preemptor-2"},
-			candidatesForPreemption:    []string{"initial-pod"},
-			expectedToHaveNNNInfo:      []string{"preemptor-1", "preemptor-2"},
-			expectedPodsPreemptedByWAP: 1,
+			expectedScheduled:               []string{"preemptor-1", "preemptor-2"},
+			expectedCandidatesForPreemption: []string{"initial-pod"},
+			expectedToHaveNNNInfo:           []string{"preemptor-1", "preemptor-2"},
+			expectedPodsPreemptedByWAP:      1,
 		},
 		{
 			name: "Gang scheduling: preemption with node resources, prioritizes reprieval of higher priority pods",
@@ -767,10 +767,10 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("preemptor-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).
 					NodeSelector(map[string]string{"kubernetes.io/hostname": "node2"}).Obj(),
 			},
-			expectedScheduled:          []string{"preemptor-1", "preemptor-2"},
-			candidatesForPreemption:    []string{"initial-pod-1"},
-			expectedToHaveNNNInfo:      []string{"preemptor-1", "preemptor-2"},
-			expectedPodsPreemptedByWAP: 1,
+			expectedScheduled:               []string{"preemptor-1", "preemptor-2"},
+			expectedCandidatesForPreemption: []string{"initial-pod-1"},
+			expectedToHaveNNNInfo:           []string{"preemptor-1", "preemptor-2"},
+			expectedPodsPreemptedByWAP:      1,
 		},
 		{
 			name: "Gang scheduling: preemption with pod level resources",
@@ -790,10 +790,10 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("preemptor-2").PodLevelResourceRequests(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).
 					PodAntiAffinityExists("app", "kubernetes.io/hostname", st.PodAntiAffinityWithRequiredReq).Obj(),
 			},
-			expectedScheduled:          []string{"preemptor-1", "preemptor-2"},
-			candidatesForPreemption:    []string{"initial-pod"},
-			expectedToHaveNNNInfo:      []string{"preemptor-1", "preemptor-2"},
-			expectedPodsPreemptedByWAP: 1,
+			expectedScheduled:               []string{"preemptor-1", "preemptor-2"},
+			expectedCandidatesForPreemption: []string{"initial-pod"},
+			expectedToHaveNNNInfo:           []string{"preemptor-1", "preemptor-2"},
+			expectedPodsPreemptedByWAP:      1,
 		},
 		{
 			// Even though there is enough resources to keep initial pod when scheduling preemptor
@@ -815,10 +815,10 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("preemptor-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1.5"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).
 					PodAntiAffinityExists("app", "kubernetes.io/hostname", st.PodAntiAffinityWithRequiredReq).Obj(),
 			},
-			expectedScheduled:          []string{"preemptor-1", "preemptor-2"},
-			candidatesForPreemption:    []string{"initial-pod"},
-			expectedToHaveNNNInfo:      []string{"preemptor-1", "preemptor-2"},
-			expectedPodsPreemptedByWAP: 1,
+			expectedScheduled:               []string{"preemptor-1", "preemptor-2"},
+			expectedCandidatesForPreemption: []string{"initial-pod"},
+			expectedToHaveNNNInfo:           []string{"preemptor-1", "preemptor-2"},
+			expectedPodsPreemptedByWAP:      1,
 		},
 		{
 			// Even though there is enough resources to keep initial pod when scheduling preemptor
@@ -838,10 +838,10 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("preemptor-1").ContainerPort([]v1.ContainerPort{{ContainerPort: 8080, HostPort: 8080}}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1.5"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("preemptor-2").ContainerPort([]v1.ContainerPort{{ContainerPort: 8080, HostPort: 8080}}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1.5"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:          []string{"preemptor-1", "preemptor-2"},
-			candidatesForPreemption:    []string{"initial-pod"},
-			expectedToHaveNNNInfo:      []string{"preemptor-1", "preemptor-2"},
-			expectedPodsPreemptedByWAP: 1,
+			expectedScheduled:               []string{"preemptor-1", "preemptor-2"},
+			expectedCandidatesForPreemption: []string{"initial-pod"},
+			expectedToHaveNNNInfo:           []string{"preemptor-1", "preemptor-2"},
+			expectedPodsPreemptedByWAP:      1,
 		},
 		{
 			// Even though there is enough resources to keep initial pod when scheduling preemptor
@@ -887,10 +887,10 @@ func TestPodGroupPreemption(t *testing.T) {
 					return p
 				}(),
 			},
-			expectedScheduled:          []string{"preemptor-1", "preemptor-2"},
-			candidatesForPreemption:    []string{"initial-pod"},
-			expectedToHaveNNNInfo:      []string{"preemptor-1", "preemptor-2"},
-			expectedPodsPreemptedByWAP: 1,
+			expectedScheduled:               []string{"preemptor-1", "preemptor-2"},
+			expectedCandidatesForPreemption: []string{"initial-pod"},
+			expectedToHaveNNNInfo:           []string{"preemptor-1", "preemptor-2"},
+			expectedPodsPreemptedByWAP:      1,
 		},
 		{
 			name: "Gang scheduling: preemption with pod topology spread constraints, single reprieve",
@@ -936,10 +936,10 @@ func TestPodGroupPreemption(t *testing.T) {
 					return p
 				}(),
 			},
-			expectedScheduled:          []string{"preemptor-1", "preemptor-2"},
-			candidatesForPreemption:    []string{"initial-pod"},
-			expectedToHaveNNNInfo:      []string{"preemptor-1", "preemptor-2"},
-			expectedPodsPreemptedByWAP: 1,
+			expectedScheduled:               []string{"preemptor-1", "preemptor-2"},
+			expectedCandidatesForPreemption: []string{"initial-pod"},
+			expectedToHaveNNNInfo:           []string{"preemptor-1", "preemptor-2"},
+			expectedPodsPreemptedByWAP:      1,
 		},
 		{
 			// This scenario verifies that during reprieval we respect Reserve plugins.
@@ -959,12 +959,12 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("p-a").Label("test-plugin", "true").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("p-b").Label("test-plugin", "true").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("preemptor-pg").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:          []string{"p-a", "p-b", "v2"},
-			candidatesForPreemption:    []string{"v1"},
-			expectedUnschedulable:      []string{},
-			expectedToHaveNNNInfo:      []string{},
-			expectedPodsPreemptedByWAP: 1,
-			customPluginName:           "mockReservePlugin",
+			expectedScheduled:               []string{"p-a", "p-b", "v2"},
+			expectedCandidatesForPreemption: []string{"v1"},
+			expectedUnschedulable:           []string{},
+			expectedToHaveNNNInfo:           []string{},
+			expectedPodsPreemptedByWAP:      1,
+			customPluginName:                "mockReservePlugin",
 			customPluginFunc: func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 				return &mockReservePlugin{maxPods: 2}, nil
 			},
@@ -986,10 +986,10 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:          []string{"pg-pod-1", "pg-pod-2", "high-1", "high-2"},
-			candidatesForPreemption:    []string{"low-1"},
-			expectedPodsPreemptedByWAP: 1,
-			tempRemovePG:               true,
+			expectedScheduled:               []string{"pg-pod-1", "pg-pod-2", "high-1", "high-2"},
+			expectedCandidatesForPreemption: []string{"low-1"},
+			expectedPodsPreemptedByWAP:      1,
+			tempRemovePG:                    true,
 			// both preemptor pods will become schedulable at once, but there will be only place for 1 pod without preemption
 			// the scheduling cycle should prefer binding this pod over preempting to make room for both pods
 			// preemption will be called in the subsequent cycle to make room for the second pod.
@@ -1012,10 +1012,10 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:          []string{"pg-pod-1", "pg-pod-2", "high-1", "high-2"},
-			candidatesForPreemption:    []string{"low-1"},
-			expectedPodsPreemptedByWAP: 1,
-			tempRemovePG:               true,
+			expectedScheduled:               []string{"pg-pod-1", "pg-pod-2", "high-1", "high-2"},
+			expectedCandidatesForPreemption: []string{"low-1"},
+			expectedPodsPreemptedByWAP:      1,
+			tempRemovePG:                    true,
 			// both preemptor pods will become schedulable at once, but there will be only place for 1 pod without preemption
 			// the scheduling cycle should prefer binding this pod over preempting to make room for both pods
 			// preemption will be called in the subsequent cycle to make room for the second pod.
@@ -1038,11 +1038,11 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:          []string{"high-1", "high-2"},
-			candidatesForPreemption:    []string{"low-1", "low-2"},
-			expectedToHaveNNNInfo:      []string{"high-1", "high-2"},
-			expectedPodsPreemptedByWAP: 2,
-			tempRemovePG:               true,
+			expectedScheduled:               []string{"high-1", "high-2"},
+			expectedCandidatesForPreemption: []string{"low-1", "low-2"},
+			expectedToHaveNNNInfo:           []string{"high-1", "high-2"},
+			expectedPodsPreemptedByWAP:      2,
+			tempRemovePG:                    true,
 		},
 		{
 			name: "Topology-Aware Preemption: two topologies, only one eligible",
@@ -1065,11 +1065,11 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:          []string{"high-1", "high-2", "high-priority-initial-1", "high-priority-initial-2"},
-			candidatesForPreemption:    []string{"low-1", "low-2"},
-			expectedToHaveNNNInfo:      []string{"high-1", "high-2"},
-			expectedPodsPreemptedByWAP: 2,
-			tempRemovePG:               true,
+			expectedScheduled:               []string{"high-1", "high-2", "high-priority-initial-1", "high-priority-initial-2"},
+			expectedCandidatesForPreemption: []string{"low-1", "low-2"},
+			expectedToHaveNNNInfo:           []string{"high-1", "high-2"},
+			expectedPodsPreemptedByWAP:      2,
+			tempRemovePG:                    true,
 		},
 		{
 			name: "Topology-Aware Preemption: two topologies, both eligible, selects higher scored topology",
@@ -1092,13 +1092,13 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:          []string{"high-1", "high-2", "low-1", "low-2"},
-			candidatesForPreemption:    []string{"low-3", "low-4"},
-			expectedToHaveNNNInfo:      []string{"high-1", "high-2"},
-			expectedPodsPreemptedByWAP: 2,
-			tempRemovePG:               true,
-			customPluginName:           "mockScorePlugin",
-			customPluginFunc:           newPresetScorePlugin(map[string]int64{"node1": 0, "node2": 0, "node3": 100, "node4": 100}),
+			expectedScheduled:               []string{"high-1", "high-2", "low-1", "low-2"},
+			expectedCandidatesForPreemption: []string{"low-3", "low-4"},
+			expectedToHaveNNNInfo:           []string{"high-1", "high-2"},
+			expectedPodsPreemptedByWAP:      2,
+			tempRemovePG:                    true,
+			customPluginName:                "mockScorePlugin",
+			customPluginFunc:                newPresetScorePlugin(map[string]int64{"node1": 0, "node2": 0, "node3": 100, "node4": 100}),
 		},
 		{
 			// Even after removing low prio pods in each topology, none of them becomes available.
@@ -1122,11 +1122,11 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
 			},
-			expectedScheduled:          []string{"low-1", "low-2", "high-priority-initial-1", "high-priority-initial-2"},
-			candidatesForPreemption:    nil,
-			expectedToHaveNNNInfo:      nil,
-			expectedPodsPreemptedByWAP: 0,
-			tempRemovePG:               true,
+			expectedScheduled:               []string{"low-1", "low-2", "high-priority-initial-1", "high-priority-initial-2"},
+			expectedCandidatesForPreemption: nil,
+			expectedToHaveNNNInfo:           nil,
+			expectedPodsPreemptedByWAP:      0,
+			tempRemovePG:                    true,
 		},
 	}
 
@@ -1313,7 +1313,7 @@ func TestPodGroupPreemption(t *testing.T) {
 				wapCalls := 0
 				err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 					wapCalls = 0
-					for _, podName := range tt.candidatesForPreemption {
+					for _, podName := range tt.expectedCandidatesForPreemption {
 						events, err := cs.CoreV1().Events(ns).List(ctx, metav1.ListOptions{
 							FieldSelector: "involvedObject.name=" + podName,
 						})
@@ -1351,17 +1351,17 @@ func TestPodGroupPreemption(t *testing.T) {
 			}
 
 			// 8. Verify preempted pods
-			if len(tt.candidatesForPreemption) > 0 {
+			if len(tt.expectedCandidatesForPreemption) > 0 {
 				var preemptedCount int
 				var notPreemptedPods []string
-				// Subgroup of pods(might be all) in candidatesForPreemption is expected to be preempted.
+				// Subgroup of pods (might be all) in candidatesForPreemption is expected to be preempted.
 				// Preemption has finished, because all expected pods were scheduled - checked in step 7.
 				// Retry will be performed when there is an error or number of preempted pod do not match expectedPodsPreemptedByWAP.
 				err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, 5*time.Second, false,
 					func(ctx context.Context) (bool, error) {
 						preemptedCount = 0
 						notPreemptedPods = nil
-						for _, podName := range tt.candidatesForPreemption {
+						for _, podName := range tt.expectedCandidatesForPreemption {
 							pod, err := cs.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
 							if err != nil {
 								if apierrors.IsNotFound(err) {
@@ -1383,7 +1383,7 @@ func TestPodGroupPreemption(t *testing.T) {
 						return preemptedCount == tt.expectedPodsPreemptedByWAP, nil
 					})
 				if err != nil {
-					t.Errorf("Expected exactly %d pods from %v to be preempted, but only %d pods were preempted, not preempted pods: %v. Error: %v", tt.expectedPodsPreemptedByWAP, tt.candidatesForPreemption, preemptedCount, notPreemptedPods, err)
+					t.Errorf("Expected exactly %d pods from %v to be preempted, but only %d pods were preempted, not preempted pods: %v. Error: %v", tt.expectedPodsPreemptedByWAP, tt.expectedCandidatesForPreemption, preemptedCount, notPreemptedPods, err)
 				}
 			}
 
@@ -2734,6 +2734,9 @@ func TestPodGroupCycleStatePreserved(t *testing.T) {
 	}
 }
 
+// TestPodGroupAsyncPreemption is equivalent for TestAsyncPreemption
+// in test/integration/scheduler/preemption/preemption_test.go
+// When adding test here, add also test there.
 func TestPodGroupAsyncPreemption(t *testing.T) {
 
 	tests := []struct {
@@ -2758,25 +2761,35 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				{
 					Name: "create pod group for preemptor",
 					CreatePodGroup: &asyncframework.CreatePodGroup{
-						PodGroup: st.MakePodGroup().Name("pg-preemptor").MinCount(1).Priority(100).Obj(),
+						PodGroup: st.MakePodGroup().Name("pg-preemptor").MinCount(2).Priority(100).Obj(),
 					},
 				},
 				{
-					Name: "create a preemptor Pod",
+					Name: "create a preemptor Pods",
 					CreatePod: &asyncframework.CreatePod{
-						Pod: st.MakePod().Name("preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).PodGroupName("pg-preemptor").Obj(),
+						Pod: st.MakePod().Name("preemptor-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Priority(100).PodGroupName("pg-preemptor").Obj(),
+					},
+				},
+				{
+					Name: "create a preemptor Pods",
+					CreatePod: &asyncframework.CreatePod{
+						Pod: st.MakePod().Name("preemptor-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Priority(100).PodGroupName("pg-preemptor").Obj(),
 					},
 				},
 				{
 					Name: "schedule the preemptor Pod",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:             "preemptor",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:        "pg-preemptor",
 						ExpectUnschedulable: true,
 					},
 				},
 				{
 					Name:            "check the pod is in the queue and gated",
-					PodGatedInQueue: "preemptor",
+					PodGatedInQueue: "preemptor-1",
+				},
+				{
+					Name:            "check the pod is in the queue and gated",
+					PodGatedInQueue: "preemptor-2",
 				},
 				{
 					Name:                 "check the preemptor Pod making the preemption API calls",
@@ -2784,12 +2797,12 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				},
 				{
 					Name:               "complete the preemption API calls",
-					CompletePreemption: "preemptor",
+					CompletePreemption: "pg-preemptor",
 				},
 				{
 					Name: "schedule the preemptor Pod after the preemption",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:       "preemptor",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:  "pg-preemptor",
 						ExpectSuccess: true,
 					},
 				},
@@ -2822,8 +2835,8 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				},
 				{
 					Name: "schedule the preemptor Pod",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:             "preemptor",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:        "pg-preemptor",
 						ExpectUnschedulable: true,
 					},
 				},
@@ -2837,12 +2850,12 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				},
 				{
 					Name:               "complete the preemption API call",
-					CompletePreemption: "preemptor",
+					CompletePreemption: "pg-preemptor",
 				},
 				{
 					Name: "schedule the preemptor Pod again and expect it to be scheduled",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:       "preemptor",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:  "pg-preemptor",
 						ExpectSuccess: true,
 					},
 				},
@@ -2876,8 +2889,8 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				},
 				{
 					Name: "schedule the preemptor Pod",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:             "preemptor-high-priority",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:        "pg-preemptor",
 						ExpectUnschedulable: true,
 					},
 				},
@@ -2905,27 +2918,27 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				},
 				{
 					Name: "schedule the mid-priority Pod",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:       "pod-mid-priority",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:  "pg-mid-priority",
 						ExpectInQueue: true,
 					},
 				},
 				{
 					Name:               "complete the preemption API calls",
-					CompletePreemption: "preemptor-high-priority",
+					CompletePreemption: "pg-preemptor",
 				},
 				{
 					// the preemptor pod should be popped from the queue before the mid-priority pod.
 					Name: "schedule the preemptor Pod again",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:       "preemptor-high-priority",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:  "pg-preemptor",
 						ExpectSuccess: true,
 					},
 				},
 				{
 					Name: "schedule the mid-priority Pod again",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:       "pod-mid-priority",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:  "pg-mid-priority",
 						ExpectInQueue: true,
 					},
 				},
@@ -2959,8 +2972,8 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				},
 				{
 					Name: "schedule the preemptor Pod",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:             "preemptor-high-priority",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:        "pg-preemptor",
 						ExpectUnschedulable: true,
 					},
 				},
@@ -2988,8 +3001,8 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				},
 				{
 					Name: "schedule the super-high-priority Pod",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:             "preemptor-super-high-priority",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:        "pg-preemptor-super-high-priority",
 						ExpectUnschedulable: true,
 					},
 				},
@@ -3006,16 +3019,16 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				},
 				{
 					Name:               "complete the preemption API calls of super-high-priority",
-					CompletePreemption: "preemptor-super-high-priority",
+					CompletePreemption: "pg-preemptor-super-high-priority",
 				},
 				{
 					Name:               "complete the preemption API calls of high-priority",
-					CompletePreemption: "preemptor-high-priority",
+					CompletePreemption: "pg-preemptor",
 				},
 				{
 					Name: "schedule the super-high-priority Pod",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:       "preemptor-super-high-priority",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:  "pg-preemptor-super-high-priority",
 						ExpectSuccess: true,
 					},
 				},
@@ -3024,8 +3037,8 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				// We set the time to 1s to give some time for pod to be considered unschedulable.
 				{
 					Name: "schedule the high-priority Pod",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:       "preemptor-high-priority",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:  "pg-preemptor",
 						ExpectInQueue: true,
 					},
 				},
@@ -3060,8 +3073,8 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				},
 				{
 					Name: "schedule the preemptor Pod",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:             "preemptor-high-priority",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:        "pg-preemptor",
 						ExpectUnschedulable: true,
 					},
 				},
@@ -3090,8 +3103,8 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				},
 				{
 					Name: "schedule the mid-priority Pod",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:             "preemptor-mid-priority",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:        "pg-second-preemptor",
 						ExpectUnschedulable: true,
 					},
 				},
@@ -3105,24 +3118,24 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				},
 				{
 					Name:               "complete the preemption API calls",
-					CompletePreemption: "preemptor-mid-priority",
+					CompletePreemption: "pg-second-preemptor",
 				},
 				{
 					Name:               "complete the preemption API calls",
-					CompletePreemption: "preemptor-high-priority",
+					CompletePreemption: "pg-preemptor",
 				},
 				{
 					// the preemptor pod should be popped from the queue before the mid-priority pod.
 					Name: "schedule the preemptor Pod again",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:       "preemptor-high-priority",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:  "pg-preemptor",
 						ExpectSuccess: true,
 					},
 				},
 				{
 					Name: "schedule the mid-priority Pod again",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:       "preemptor-mid-priority",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:  "pg-second-preemptor",
 						ExpectSuccess: true,
 					},
 				},
@@ -3165,19 +3178,19 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				},
 				{
 					Name: "schedule the preemptor Pod",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:             "preemptor",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:        "pg-preemptor",
 						ExpectUnschedulable: true,
 					},
 				},
 				{
 					Name:               "complete the preemption API call",
-					CompletePreemption: "preemptor",
+					CompletePreemption: "pg-preemptor",
 				},
 				{
 					Name: "schedule the preemptor Pod again and expect it to be scheduled (assumed victim pod was forgotten)",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:       "preemptor",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:  "pg-preemptor",
 						ExpectSuccess: true,
 					},
 				},
@@ -3224,19 +3237,19 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				},
 				{
 					Name: "schedule the preemptor Pod",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:             "preemptor",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:        "pg-preemptor",
 						ExpectUnschedulable: true,
 					},
 				},
 				{
 					Name:               "complete the preemption API call",
-					CompletePreemption: "preemptor",
+					CompletePreemption: "pg-preemptor",
 				},
 				{
 					Name: "schedule the preemptor Pod again and expect it to be scheduled (assumed victim pod was forgotten)",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:       "preemptor",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:  "pg-preemptor",
 						ExpectSuccess: true,
 					},
 				},
@@ -3284,19 +3297,19 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				},
 				{
 					Name: "schedule the preemptor Pod",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:             "preemptor",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:        "pg-preemptor",
 						ExpectUnschedulable: true,
 					},
 				},
 				{
 					Name:               "complete the preemption API call",
-					CompletePreemption: "preemptor",
+					CompletePreemption: "pg-preemptor",
 				},
 				{
 					Name: "schedule the preemptor Pod again and expect it to be unschedulable (resources are still reserved by the victim)",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:       "preemptor",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:  "pg-preemptor",
 						ExpectInQueue: true,
 					},
 				},
@@ -3306,8 +3319,8 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				},
 				{
 					Name: "schedule the preemptor Pod again and expect it to be scheduled (victim pod unreserved its resources)",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:       "preemptor",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:  "pg-preemptor",
 						ExpectSuccess: true,
 					},
 				},
@@ -3341,8 +3354,8 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				},
 				{
 					Name: "schedule preemptor",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:             "preemptor",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:        "pg-preemptor",
 						ExpectUnschedulable: true,
 					},
 				},
@@ -3356,7 +3369,7 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				},
 				{
 					Name:               "complete preemption",
-					CompletePreemption: "preemptor",
+					CompletePreemption: "pg-preemptor",
 				},
 				{
 					Name:               "wait for victims to be deleted",
@@ -3372,8 +3385,8 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				},
 				{
 					Name: "verify preemptor scheduled",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:       "preemptor",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:  "pg-preemptor",
 						ExpectSuccess: true,
 					},
 				},
@@ -3417,19 +3430,19 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				},
 				{
 					Name: "schedule the preemptor Pod",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:             "preemptor",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:        "pg-preemptor",
 						ExpectUnschedulable: true,
 					},
 				},
 				{
 					Name:               "complete the preemption API call",
-					CompletePreemption: "preemptor",
+					CompletePreemption: "pg-preemptor",
 				},
 				{
 					Name: "schedule the preemptor Pod again and expect it to be unschedulable (resources are still reserved by the victim)",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:       "preemptor",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:  "pg-preemptor",
 						ExpectInQueue: true,
 					},
 				},
@@ -3439,8 +3452,8 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				},
 				{
 					Name: "schedule the preemptor Pod again and expect it to be scheduled (victim pod unreserved its resources)",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:       "preemptor",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:  "pg-preemptor",
 						ExpectSuccess: true,
 					},
 				},
@@ -3488,13 +3501,13 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				},
 				{
 					Name: "schedule the mid-priority preemptor Pod",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName: "preemptor-mid-priority",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName: "pg-preemptor",
 					},
 				},
 				{
 					Name:               "complete the preemption API calls",
-					CompletePreemption: "preemptor-mid-priority",
+					CompletePreemption: "pg-preemptor",
 				},
 				{
 					Name:            "check the mid-priority preemptor Pod is gated, waiting for the last victim to be preempted",
@@ -3527,8 +3540,8 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 					Name: "schedule the high-priority preemptor Pod and expect it to get scheduled on node1",
 					// While we don't check explicitly that Pod is scheduled on node1, we can assume that because
 					// Pod won't fit on node2 without preemption and there are enough resources on node1.
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:       "preemptor-high-priority",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:  "pg-high-priority-preemptor",
 						ExpectSuccess: true,
 					},
 				},
@@ -3538,20 +3551,20 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				},
 				{
 					Name: "check that mid-priority preemptor Pod got activated by completed preemption and try scheduling it again",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName: "preemptor-mid-priority",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName: "pg-preemptor",
 						// Pod won't fit on node1 anymore and should trigger preemptions on node2.
 						ExpectUnschedulable: true,
 					},
 				},
 				{
 					Name:               "complete the preemption API calls on node2",
-					CompletePreemption: "preemptor-mid-priority",
+					CompletePreemption: "pg-preemptor",
 				},
 				{
 					Name: "check that mid-priority Pod got activated, schedule it on node2",
-					SchedulePod: &asyncframework.SchedulePod{
-						PodName:       "preemptor-mid-priority",
+					SchedulePodGroup: &asyncframework.SchedulePodGroup{
+						PodGroupName:  "pg-preemptor",
 						ExpectSuccess: true,
 					},
 				},
@@ -3577,7 +3590,7 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 			blockBindingChannel := make(chan struct{})
 			defer close(blockBindingChannel)
 			preemptionConfig := asyncframework.AsyncPreemptionTestConfig{
-				EnableWAP:              true,
+				EnableGenericWorkload:  true,
 				PreemptionDoneChannels: preemptionDoneChannels,
 				BlockBindingChannel:    blockBindingChannel,
 			}
@@ -3592,10 +3605,10 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 			defer testCtx.Scheduler.SchedulingQueue.Close()
 
 			createdPods := []*v1.Pod{}
-			defer testutils.CleanupPods(testCtx.Ctx, cs, t, createdPods)
+			defer func() {
+				testutils.CleanupPods(testCtx.Ctx, cs, t, createdPods)
+			}()
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 			config := asyncframework.AsyncPreemptionStepRunnerConfig{
 				CreatedPods:            createdPods,
 				ClientSet:              cs,
@@ -3604,7 +3617,7 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				PreemptionPlugin:       preemptionPlugin,
 				BlockBindingChannel:    blockBindingChannel,
 			}
-			asyncframework.RunAsyncPreemptionSteps(ctx, t, test.Steps, testCtx, config)
+			asyncframework.RunAsyncPreemptionSteps(testCtx, t, test.Steps, config)
 		})
 	}
 }
@@ -3684,6 +3697,8 @@ func TestDisablePodGroupPreemption(t *testing.T) {
 
 // TestPodGroupPreemptionRespectsWaitingPod tests that preemption respects pods that are waiting in the Permit phase
 // (WaitOnPermit), simulating putting a pod in the waiting pods map with a custom permit plugin.
+// There is equivalent test for pod by pod preemption at: test/integration/scheduler/preemption/preemption_test.go
+// When adding new test cases for pod group preemption with waiting pods, add them to this test.
 func TestPodGroupPreemptionRespectsWaitingPod(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.GenericWorkload: true,

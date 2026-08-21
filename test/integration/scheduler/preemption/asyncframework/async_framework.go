@@ -99,6 +99,15 @@ type SchedulePod struct {
 	ExpectInQueue       bool
 }
 
+// SchedulePodGroup is a struct used for step scheduling a pod group.
+// It contains information of expected status after scheduling.
+type SchedulePodGroup struct {
+	PodGroupName        string
+	ExpectSuccess       bool
+	ExpectUnschedulable bool
+	ExpectInQueue       bool
+}
+
 // Step represents an action in the async preemption test.
 // Test is containing list of steps and is doing them in order.
 type Step struct {
@@ -113,11 +122,12 @@ type Step struct {
 	CreatePod *CreatePod
 	// CreateNode creates an additional Node.
 	CreateNode string
-	// SchedulePod schedules one Pod that is at the top of the activeQ.
-	// You should give a Pod name that is supposed to be scheduled.
+	// SchedulePod schedules one Pod by a given Pod name.
 	SchedulePod *SchedulePod
+	// SchedulePodGroup schedules one PodGroup by a given PodGroup name.
+	SchedulePodGroup *SchedulePodGroup
 	// CompletePreemption completes the preemption that is currently on-going.
-	// You should give a Pod name.
+	// You should give a Pod/PodGroup name.
 	CompletePreemption string
 	// PodGatedInQueue checks if the given Pod is in the scheduling queue and gated by the preemption.
 	// You should give a Pod name.
@@ -153,42 +163,43 @@ type AsyncPreemptionStepRunnerConfig struct {
 }
 
 // RunAsyncPreemptionSteps runs the async preemption test steps in order.
-func RunAsyncPreemptionSteps(ctx context.Context, t *testing.T, steps []Step, testCtx *testutils.TestContext, config AsyncPreemptionStepRunnerConfig) {
+func RunAsyncPreemptionSteps(testCtx *testutils.TestContext, t *testing.T, steps []Step, config AsyncPreemptionStepRunnerConfig) {
 	for _, step := range steps {
 		t.Logf("Running scenario: %s", step.Name)
 		switch {
 		case step.CreateNode != "":
-			cleanup := nodeCreation(ctx, t, step.CreateNode, config.ClientSet)
-			defer cleanup()
+			nodeCreation(testCtx, t, step.CreateNode, config.ClientSet)
 		case step.CreatePodGroup != nil:
-			createPodGroup(ctx, t, config.ClientSet, testCtx, step.CreatePodGroup)
+			createPodGroup(testCtx, t, config.ClientSet, step.CreatePodGroup)
 		case step.CreatePod != nil:
-			createPod(ctx, t, step.CreatePod, config.ClientSet, testCtx, &config.CreatedPods)
+			createPod(testCtx, t, step.CreatePod, config.ClientSet, &config.CreatedPods)
 		case step.SchedulePod != nil:
-			schedulePod(t, testCtx, step.SchedulePod, config.ClientSet, config.PreemptionDoneChannels)
+			schedulePod(testCtx, t, step.SchedulePod, config.ClientSet, config.PreemptionDoneChannels)
+		case step.SchedulePodGroup != nil:
+			schedulePodGroup(testCtx, t, step.SchedulePodGroup, config.ClientSet, config.PreemptionDoneChannels)
 		case step.ActivatePod != "":
-			activatePod(t, testCtx, step.ActivatePod, config.Logger)
+			activatePod(testCtx, t, step.ActivatePod, config.Logger)
 		case step.CompletePreemption != "":
 			completePreemption(t, step.CompletePreemption, config.PreemptionDoneChannels)
 		case step.PodGatedInQueue != "":
-			podGatedInQueue(t, testCtx, step.PodGatedInQueue, config.Logger)
+			podGatedInQueue(testCtx, t, step.PodGatedInQueue, config.Logger)
 		case step.PodRunningPreemption != nil:
-			podRunningPreemption(t, testCtx, config.CreatedPods, step.PodRunningPreemption, config.PreemptionPlugin)
+			podRunningPreemption(testCtx, t, config.CreatedPods, step.PodRunningPreemption, config.PreemptionPlugin)
 		case step.ResumeBind:
 			config.BlockBindingChannel <- struct{}{}
 		case step.VerifyPodInUnschedulable != "":
-			verifyPodInUnschedulable(t, testCtx, step.VerifyPodInUnschedulable)
+			verifyPodInUnschedulable(testCtx, t, step.VerifyPodInUnschedulable)
 		case step.FlushUnschedulable:
 			testCtx.Scheduler.SchedulingQueue.MoveAllToActiveOrBackoffQueue(config.Logger, framework.EventUnschedulableTimeout, nil, nil, nil)
 		case len(step.WaitForPodsDeleted) != 0:
-			waitForPodsDeleted(t, step.WaitForPodsDeleted, config.CreatedPods, testCtx, config.ClientSet)
+			waitForPodsDeleted(testCtx, t, step.WaitForPodsDeleted, config.CreatedPods, config.ClientSet)
 		}
 	}
 }
 
 // AsyncPreemptionTestConfig is a config for initialising the environment for async preemption tests.
 type AsyncPreemptionTestConfig struct {
-	EnableWAP              bool
+	EnableGenericWorkload  bool
 	PreemptionDoneChannels *sync.Map
 	BlockBindingChannel    chan struct{}
 	InitialBackoffSeconds  int64
@@ -201,30 +212,28 @@ func InitTestForAsyncPreemption(t *testing.T, config AsyncPreemptionTestConfig) 
 	featuresOverrides := featuregatetesting.FeatureOverrides{
 		features.SchedulerAsyncAPICalls:   true,
 		features.SchedulerAsyncPreemption: true,
-	}
-	if config.EnableWAP {
-		featuresOverrides[features.GenericWorkload] = true
+		features.GenericWorkload:          config.EnableGenericWorkload,
 	}
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuresOverrides)
 
 	registry := make(frameworkruntime.Registry)
 	// We need to use a custom preemption plugin to test async preemption behavior
-	delayedPreemptionPluginName, getPreemptionPlugin, err := initDelayedPreemptionPlugin(&registry, config.PreemptionDoneChannels, config.EnableWAP)
+	delayedPreemptionPluginName, getPreemptionPlugin, err := registerDelayedPreemptionPlugin(&registry, config.PreemptionDoneChannels, config.EnableGenericWorkload)
 	if err != nil {
 		t.Fatalf("Error registering a preemption plugin: %v", err)
 	}
 
-	blockingBindPluginName, err := initBlockBindingPlugin(registry, config.BlockBindingChannel)
+	blockingBindPluginName, err := registerBlockBindingPlugin(registry, config.BlockBindingChannel)
 	if err != nil {
 		t.Fatalf("Error registering a bind plugin: %v", err)
 	}
 
-	reservingPluginName, err := initReservingPlugin(registry)
+	reservingPluginName, err := registerReservingPlugin(registry)
 	if err != nil {
 		t.Fatalf("Error registering a reserving plugin: %v", err)
 	}
 
-	queueSkipFilterPluginName, err := initSkipFilterPlugin(registry)
+	queueSkipFilterPluginName, err := registerSkipFilterPlugin(registry)
 	if err != nil {
 		t.Fatalf("Error registering a queueSkipFilterPlugin plugin: %v", err)
 	}
@@ -264,9 +273,9 @@ func InitTestForAsyncPreemption(t *testing.T, config AsyncPreemptionTestConfig) 
 	return testCtx, getPreemptionPlugin(), cs
 }
 
-// initSkipFilterPlugin register fake plugin that will filter nodes with a specific name.
+// registerSkipFilterPlugin register fake plugin that will filter nodes with a specific name.
 // Importantly, this plugin always returns QueueSkip as the queue hint, simulating faulty queue hint implementation.
-func initSkipFilterPlugin(registry frameworkruntime.Registry) (string, error) {
+func registerSkipFilterPlugin(registry frameworkruntime.Registry) (string, error) {
 	queueSkipFilterPluginName := "queueSkipFilterPlugin"
 	err := registry.Register(queueSkipFilterPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 		return &queueSkipFilterPlugin{
@@ -277,9 +286,9 @@ func initSkipFilterPlugin(registry frameworkruntime.Registry) (string, error) {
 	return queueSkipFilterPluginName, err
 }
 
-// initReservingPlugin register fake plugin that will reserve some fake resources for one pod.
+// registerReservingPlugin register fake plugin that will reserve some fake resources for one pod.
 // This could be used to check scheduler's behavior when the victim has to unreserve these resources to let the preemptor schedule.
-func initReservingPlugin(registry frameworkruntime.Registry) (string, error) {
+func registerReservingPlugin(registry frameworkruntime.Registry) (string, error) {
 	reservingPluginName := "reservingPlugin"
 	err := registry.Register(reservingPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 		return &reservingPlugin{
@@ -291,8 +300,8 @@ func initReservingPlugin(registry frameworkruntime.Registry) (string, error) {
 	return reservingPluginName, err
 }
 
-// initBlockBindingPlugin register fake bind plugin that will block on binding for the specified pod name, until it receives a resume signal via the blockBindingChannel.
-func initBlockBindingPlugin(registry frameworkruntime.Registry, blockBindingChannel chan struct{}) (string, error) {
+// registerBlockBindingPlugin register fake bind plugin that will block on binding for the specified pod name, until it receives a resume signal via the blockBindingChannel.
+func registerBlockBindingPlugin(registry frameworkruntime.Registry, blockBindingChannel chan struct{}) (string, error) {
 	blockingBindPluginName := "blockingBindPlugin"
 	err := registry.Register(blockingBindPluginName, func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 		db, err := defaultbinder.New(ctx, o, fh)
@@ -310,12 +319,12 @@ func initBlockBindingPlugin(registry frameworkruntime.Registry, blockBindingChan
 	return blockingBindPluginName, err
 }
 
-// initDelayedPreemptionPlugin register a custom preemption plugin to test async preemption behavior.
-func initDelayedPreemptionPlugin(registry *frameworkruntime.Registry, preemptionDoneChannels *sync.Map, enableWAP bool) (string, func() *defaultpreemption.DefaultPreemption, error) {
+// registerDelayedPreemptionPlugin register a custom preemption plugin to test async preemption behavior.
+func registerDelayedPreemptionPlugin(registry *frameworkruntime.Registry, preemptionDoneChannels *sync.Map, enableGenericWorkload bool) (string, func() *defaultpreemption.DefaultPreemption, error) {
 	delayedPreemptionPluginName := "delay-preemption"
 	var preemptionPlugin *defaultpreemption.DefaultPreemption
 	err := registry.Register(delayedPreemptionPluginName, func(c context.Context, r runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
-		p, err := frameworkruntime.FactoryAdapter(plfeature.Features{EnableAsyncPreemption: true, EnableGenericWorkload: enableWAP}, defaultpreemption.New)(c, &config.DefaultPreemptionArgs{
+		p, err := frameworkruntime.FactoryAdapter(plfeature.Features{EnableAsyncPreemption: true, EnableGenericWorkload: enableGenericWorkload}, defaultpreemption.New)(c, &config.DefaultPreemptionArgs{
 			// Set default values to pass the validation at the initialization, not related to the test.
 			MinCandidateNodesPercentage: 10,
 			MinCandidateNodesAbsolute:   100,
@@ -345,7 +354,7 @@ func initDelayedPreemptionPlugin(registry *frameworkruntime.Registry, preemption
 	return delayedPreemptionPluginName, func() *defaultpreemption.DefaultPreemption { return preemptionPlugin }, err
 }
 
-func waitForPodsDeleted(t *testing.T, podIndexes []int, createdPods []*v1.Pod, testCtx *testutils.TestContext, cs kubernetes.Interface) {
+func waitForPodsDeleted(testCtx *testutils.TestContext, t *testing.T, podIndexes []int, createdPods []*v1.Pod, cs kubernetes.Interface) {
 	for _, podIndex := range podIndexes {
 		podName := createdPods[podIndex].Name
 		if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodDeleted(testCtx.Ctx, cs, testCtx.NS.Name, podName)); err != nil {
@@ -354,7 +363,7 @@ func waitForPodsDeleted(t *testing.T, podIndexes []int, createdPods []*v1.Pod, t
 	}
 }
 
-func verifyPodInUnschedulable(t *testing.T, testCtx *testutils.TestContext, podName string) {
+func verifyPodInUnschedulable(testCtx *testutils.TestContext, t *testing.T, podName string) {
 	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 200*time.Millisecond, false, func(ctx context.Context) (bool, error) {
 		if !PodInUnschedulablePodPool(t, testCtx.Scheduler.SchedulingQueue, podName) {
 			return false, fmt.Errorf("expected the pod %s to remain in the unschedulable queue after the scheduling attempt", podName)
@@ -368,7 +377,7 @@ func verifyPodInUnschedulable(t *testing.T, testCtx *testutils.TestContext, podN
 	}
 }
 
-func podRunningPreemption(t *testing.T, testCtx *testutils.TestContext, createdPods []*v1.Pod, podIndex *int, preemptionPlugin *defaultpreemption.DefaultPreemption) {
+func podRunningPreemption(testCtx *testutils.TestContext, t *testing.T, createdPods []*v1.Pod, podIndex *int, preemptionPlugin *defaultpreemption.DefaultPreemption) {
 	if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		pod := createdPods[*podIndex]
 		if pod.Spec.SchedulingGroup != nil && pod.Spec.SchedulingGroup.PodGroupName != nil {
@@ -383,7 +392,7 @@ func podRunningPreemption(t *testing.T, testCtx *testutils.TestContext, createdP
 	}
 }
 
-func podGatedInQueue(t *testing.T, testCtx *testutils.TestContext, podName string, logger klog.Logger) {
+func podGatedInQueue(testCtx *testutils.TestContext, t *testing.T, podName string, logger klog.Logger) {
 	pod := unschedulablePod(t, testCtx.Scheduler.SchedulingQueue, podName)
 	if pod == nil {
 		t.Fatalf("Expected the pod %s to be in the queue", podName)
@@ -400,16 +409,16 @@ func podGatedInQueue(t *testing.T, testCtx *testutils.TestContext, podName strin
 	}
 }
 
-func completePreemption(t *testing.T, podName string, preemptionDoneChannels *sync.Map) {
-	ch, ok := preemptionDoneChannels.Load(podName)
+func completePreemption(t *testing.T, preemptorName string, preemptionDoneChannels *sync.Map) {
+	ch, ok := preemptionDoneChannels.Load(preemptorName)
 	if !ok {
-		t.Fatalf("The preemptor Pod %q is not running preemption", podName)
+		t.Fatalf("The preemptor Pod %q is not running preemption", preemptorName)
 	}
 	close(ch.(chan struct{}))
-	preemptionDoneChannels.Delete(podName)
+	preemptionDoneChannels.Delete(preemptorName)
 }
 
-func activatePod(t *testing.T, testCtx *testutils.TestContext, podName string, logger klog.Logger) {
+func activatePod(testCtx *testutils.TestContext, t *testing.T, podName string, logger klog.Logger) {
 	pod := unschedulablePod(t, testCtx.Scheduler.SchedulingQueue, podName)
 	if pod == nil {
 		t.Fatalf("Expected the pod %s to be in unschedulable queue before activation phase", podName)
@@ -418,7 +427,7 @@ func activatePod(t *testing.T, testCtx *testutils.TestContext, podName string, l
 	testCtx.Scheduler.SchedulingQueue.Activate(logger, m)
 }
 
-func schedulePod(t *testing.T, testCtx *testutils.TestContext, schedulePodStep *SchedulePod, cs kubernetes.Interface, preemptionDoneChannels *sync.Map) {
+func schedulePod(testCtx *testutils.TestContext, t *testing.T, schedulePodStep *SchedulePod, cs kubernetes.Interface, preemptionDoneChannels *sync.Map) {
 	lastFailure := ""
 	if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
 		if len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()) == 0 {
@@ -439,9 +448,7 @@ func schedulePod(t *testing.T, testCtx *testutils.TestContext, schedulePodStep *
 
 	ch := make(chan struct{})
 	preemptionDoneChannels.Store(schedulePodStep.PodName, ch)
-	if pod, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, schedulePodStep.PodName, metav1.GetOptions{}); err == nil && pod.Spec.SchedulingGroup != nil {
-		preemptionDoneChannels.Store(*pod.Spec.SchedulingGroup.PodGroupName, ch)
-	}
+
 	testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
 
 	if schedulePodStep.ExpectSuccess {
@@ -463,13 +470,87 @@ func schedulePod(t *testing.T, testCtx *testutils.TestContext, schedulePodStep *
 	}
 }
 
-func createPod(ctx context.Context, t *testing.T, createPodStep *CreatePod, cs kubernetes.Interface, testCtx *testutils.TestContext, createdPods *[]*v1.Pod) {
+func schedulePodGroup(testCtx *testutils.TestContext, t *testing.T, schedulePodGroupStep *SchedulePodGroup, cs kubernetes.Interface, preemptionDoneChannels *sync.Map) {
+	lastFailure := ""
+	if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+		if len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()) == 0 {
+			lastFailure = fmt.Sprintf("Expected the pod group %s to be scheduled, but no pod arrives at the activeQ", schedulePodGroupStep.PodGroupName)
+			return false, nil
+		}
+
+		topPod := testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()[0]
+		topPodGroupName := ""
+		if topPod.Spec.SchedulingGroup != nil && topPod.Spec.SchedulingGroup.PodGroupName != nil {
+			topPodGroupName = *topPod.Spec.SchedulingGroup.PodGroupName
+		}
+		if topPodGroupName != schedulePodGroupStep.PodGroupName {
+			// need to wait more because maybe the queue will get another PodGroup that higher priority than the current top entity.
+			if topPodGroupName != "" {
+				lastFailure = fmt.Sprintf("The pod group %s is expected to be scheduled, but the top PodGroup is %s", schedulePodGroupStep.PodGroupName, topPodGroupName)
+			} else {
+				lastFailure = fmt.Sprintf("The pod group %s is expected to be scheduled, but the top Pod is %s", schedulePodGroupStep.PodGroupName, topPod.Name)
+			}
+			return false, nil
+		}
+
+		return true, nil
+	}); err != nil {
+		t.Fatal(lastFailure)
+	}
+
+	ch := make(chan struct{})
+	if _, ok := preemptionDoneChannels.Load(schedulePodGroupStep.PodGroupName); !ok {
+		preemptionDoneChannels.Store(schedulePodGroupStep.PodGroupName, ch)
+	}
+	testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
+
+	pods, err := cs.CoreV1().Pods(testCtx.NS.Name).List(testCtx.Ctx, metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("Failed to list pods in namespace %s: %v", testCtx.NS.Name, err)
+	}
+	var pgPods []*v1.Pod
+	for i := range pods.Items {
+		pod := &pods.Items[i]
+		if pod.Spec.SchedulingGroup != nil && pod.Spec.SchedulingGroup.PodGroupName != nil && *pod.Spec.SchedulingGroup.PodGroupName == schedulePodGroupStep.PodGroupName {
+			pgPods = append(pgPods, pod)
+		}
+	}
+	if len(pgPods) == 0 {
+		t.Fatalf("No pods found for pod group %s", schedulePodGroupStep.PodGroupName)
+	}
+
+	if schedulePodGroupStep.ExpectSuccess {
+		for _, pod := range pgPods {
+			if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, testCtx.NS.Name, pod.Name)); err != nil {
+				t.Fatalf("Expected the pod %s to be scheduled", pod.Name)
+			}
+		}
+	} else if schedulePodGroupStep.ExpectUnschedulable {
+		for _, pod := range pgPods {
+			if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+				return PodInUnschedulablePodPool(t, testCtx.Scheduler.SchedulingQueue, pod.Name), nil
+			}); err != nil {
+				t.Fatalf("Expected the pod %s to be in the unschedulable queue after the scheduling attempt", pod.Name)
+			}
+		}
+	} else if schedulePodGroupStep.ExpectInQueue {
+		for _, pod := range pgPods {
+			if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+				return podInQueue(t, testCtx.Scheduler.SchedulingQueue, pod.Name), nil
+			}); err != nil {
+				t.Fatalf("Expected the pod %s to be in the queue after the scheduling attempt", pod.Name)
+			}
+		}
+	}
+}
+
+func createPod(testCtx *testutils.TestContext, t *testing.T, createPodStep *CreatePod, cs kubernetes.Interface, createdPods *[]*v1.Pod) {
 	if createPodStep.Count == nil {
 		createPodStep.Count = new(1)
 	}
 
 	for i := 0; i < *createPodStep.Count; i++ {
-		pod, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(ctx, createPodStep.Pod, metav1.CreateOptions{})
+		pod, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, createPodStep.Pod, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to create a Pod %q: %v", pod.Name, err)
 		}
@@ -477,8 +558,8 @@ func createPod(ctx context.Context, t *testing.T, createPodStep *CreatePod, cs k
 	}
 }
 
-func createPodGroup(ctx context.Context, t *testing.T, cs kubernetes.Interface, testCtx *testutils.TestContext, createPodGroupStep *CreatePodGroup) {
-	_, err := cs.SchedulingV1beta1().PodGroups(testCtx.NS.Name).Create(ctx, createPodGroupStep.PodGroup, metav1.CreateOptions{})
+func createPodGroup(testCtx *testutils.TestContext, t *testing.T, cs kubernetes.Interface, createPodGroupStep *CreatePodGroup) {
+	_, err := cs.SchedulingV1beta1().PodGroups(testCtx.NS.Name).Create(testCtx.Ctx, createPodGroupStep.PodGroup, metav1.CreateOptions{})
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		t.Fatalf("Failed to create a PodGroup %q: %v", createPodGroupStep.PodGroup.Name, err)
 	}
@@ -496,16 +577,16 @@ func createPodGroup(ctx context.Context, t *testing.T, cs kubernetes.Interface, 
 	}
 }
 
-func nodeCreation(ctx context.Context, t *testing.T, nodeName string, cs kubernetes.Interface) func() {
+func nodeCreation(testCtx *testutils.TestContext, t *testing.T, nodeName string, cs kubernetes.Interface) {
 	newNode := st.MakeNode().Name(nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
-	if _, err := cs.CoreV1().Nodes().Create(ctx, newNode, metav1.CreateOptions{}); err != nil {
+	if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, newNode, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create an initial Node %q: %v", newNode.Name, err)
 	}
-	return func() {
-		if err := cs.CoreV1().Nodes().Delete(ctx, newNode.Name, metav1.DeleteOptions{}); err != nil {
+	t.Cleanup(func() {
+		if err := cs.CoreV1().Nodes().Delete(testCtx.Ctx, newNode.Name, metav1.DeleteOptions{}); err != nil {
 			t.Fatalf("Failed to delete the Node %q: %v", newNode.Name, err)
 		}
-	}
+	})
 }
 
 // PodInUnschedulablePodPool checks if the given Pod is in the unschedulable pod pool.
