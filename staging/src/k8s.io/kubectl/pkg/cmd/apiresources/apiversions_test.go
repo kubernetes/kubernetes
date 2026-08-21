@@ -26,20 +26,20 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
-func TestAPIVersionsComplete(t *testing.T) {
+func TestAPIVersionsToOptions(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 	cmd := NewCmdAPIVersions(tf, genericiooptions.NewTestIOStreamsDiscard())
 	parentCmd := &cobra.Command{Use: "kubectl"}
 	parentCmd.AddCommand(cmd)
-	o := NewAPIVersionsOptions(genericiooptions.NewTestIOStreamsDiscard())
+	flags := NewAPIVersionsFlags(tf, genericiooptions.NewTestIOStreamsDiscard())
 
-	err := o.Complete(tf, cmd, []string{})
+	_, err := flags.ToOptions(cmd, []string{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	err = o.Complete(tf, cmd, []string{"foo"})
+	_, err = flags.ToOptions(cmd, []string{"foo"})
 	if err == nil {
 		t.Fatalf("An error was expected but not returned")
 	}
