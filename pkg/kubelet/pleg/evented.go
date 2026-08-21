@@ -98,14 +98,15 @@ func (e *EventedPLEG) watchEventsChannel(ctx context.Context) {
 		}
 	}()
 
-	e.processCRIEvents(logger, containerEventsResponseCh)
+	e.processCRIEvents(ctx, containerEventsResponseCh)
 }
 
 // processCRIEvents processes the incoming CRI container events stream.
 // It acts as a fast-path hint: container terminations request an
 // immediate GenericPLEG relist. GenericPLEG remains the only component that
 // updates the pod cache and emits pod lifecycle events.
-func (e *EventedPLEG) processCRIEvents(logger klog.Logger, containerEventsResponseCh <-chan *runtimeapi.ContainerEventResponse) {
+func (e *EventedPLEG) processCRIEvents(ctx context.Context, containerEventsResponseCh <-chan *runtimeapi.ContainerEventResponse) {
+	logger := klog.FromContext(ctx)
 	for event := range containerEventsResponseCh {
 		// Ignore the event if PodSandboxStatus is nil.
 		// This might happen under some race condition where the podSandbox has

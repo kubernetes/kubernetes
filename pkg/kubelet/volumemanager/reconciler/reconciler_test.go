@@ -1113,6 +1113,7 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 }
 
 func Test_GenerateMapVolumeFunc_Plugin_Not_Found(t *testing.T) {
+	_, tCtx := ktesting.NewTestContext(t)
 	testCases := map[string]struct {
 		volumePlugins  []volume.VolumePlugin
 		expectErr      bool
@@ -1153,7 +1154,7 @@ func Test_GenerateMapVolumeFunc_Plugin_Not_Found(t *testing.T) {
 			volumeToMount := operationexecutor.VolumeToMount{
 				Pod:        pod,
 				VolumeSpec: tmpSpec}
-			err := oex.MountVolume(waitForAttachTimeout, volumeToMount, asw, false)
+			err := oex.MountVolume(tCtx, waitForAttachTimeout, volumeToMount, asw, false)
 			// Assert
 			if assert.Error(t, err) {
 				assert.ErrorContains(t, err, tc.expectedErrMsg)

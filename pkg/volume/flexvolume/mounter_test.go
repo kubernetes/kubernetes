@@ -19,6 +19,7 @@ package flexvolume
 import (
 	"testing"
 
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
@@ -31,6 +32,8 @@ import (
 func TestSetUpAt(tt *testing.T) {
 	t := harness.For(tt)
 	defer t.Close()
+
+	tCtx := ktesting.Init(tt)
 
 	spec := fakeVolumeSpec()
 	pod := &v1.Pod{
@@ -72,9 +75,13 @@ func TestSetUpAt(tt *testing.T) {
 
 	m, _ := plugin.newMounterInternal(spec, pod, mounter, plugin.runner)
 	var mounterArgs volume.MounterArgs
-	m.SetUpAt(rootDir+"/mount-dir", mounterArgs)
+	if err := m.SetUpAt(tCtx, rootDir+"/mount-dir", mounterArgs); err != nil {
+		t.Errorf("Failed to set up mounter: %v", err)
+	}
 
 	group := int64(42)
 	mounterArgs.FsGroup = &group
-	m.SetUpAt(rootDir+"/mount-dir", mounterArgs)
+	if err := m.SetUpAt(tCtx, rootDir+"/mount-dir", mounterArgs); err != nil {
+		t.Errorf("Failed to set up mounter: %v", err)
+	}
 }

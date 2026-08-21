@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	fakecsi "k8s.io/kubernetes/pkg/volume/csi/fake"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -329,6 +330,7 @@ func TestAttacherAttachWithInline(t *testing.T) {
 }
 
 func TestAttacherWithCSIDriver(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	tests := []struct {
 		name                   string
 		driver                 string
@@ -374,7 +376,7 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher, test.watchTimeout)
 			spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, test.driver, "test-vol"), false)
 
-			pluginCanAttach, err := plug.CanAttach(spec)
+			pluginCanAttach, err := plug.CanAttach(logger, spec)
 			if err != nil {
 				t.Fatalf("attacher.CanAttach failed: %s", err)
 			}
@@ -416,6 +418,9 @@ func TestAttacherWaitForVolumeAttachmentWithCSIDriver(t *testing.T) {
 	// In order to detect if the volume plugin would skip WaitForAttach for non-attachable drivers,
 	// we do not instantiate any VolumeAttachment. So if the plugin does not skip attach,  WaitForVolumeAttachment
 	// will return an error that volume attachment was not found.
+
+	logger, _ := ktesting.NewTestContext(t)
+
 	tests := []struct {
 		name         string
 		driver       string
@@ -467,7 +472,7 @@ func TestAttacherWaitForVolumeAttachmentWithCSIDriver(t *testing.T) {
 			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher, test.watchTimeout)
 			spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, test.driver, "test-vol"), false)
 
-			pluginCanAttach, err := plug.CanAttach(spec)
+			pluginCanAttach, err := plug.CanAttach(logger, spec)
 			if err != nil {
 				t.Fatalf("plugin.CanAttach test failed: %s", err)
 			}
@@ -650,6 +655,7 @@ func TestAttacherWaitForAttachWithInline(t *testing.T) {
 }
 
 func TestAttacherVolumesAreAttached(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	type attachedSpec struct {
 		volName  string
 		spec     *volume.Spec
@@ -720,7 +726,7 @@ func TestAttacherVolumesAreAttached(t *testing.T) {
 			}
 
 			// retrieve attached status
-			stats, err := csiAttacher.VolumesAreAttached(specs, types.NodeName(nodeName))
+			stats, err := csiAttacher.VolumesAreAttached(logger, specs, types.NodeName(nodeName))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -743,6 +749,7 @@ func TestAttacherVolumesAreAttached(t *testing.T) {
 }
 
 func TestAttacherVolumesAreAttachedWithInline(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	type attachedSpec struct {
 		volName  string
 		spec     *volume.Spec
@@ -791,7 +798,7 @@ func TestAttacherVolumesAreAttachedWithInline(t *testing.T) {
 			}
 
 			// retrieve attached status
-			stats, err := csiAttacher.VolumesAreAttached(specs, types.NodeName(nodeName))
+			stats, err := csiAttacher.VolumesAreAttached(logger, specs, types.NodeName(nodeName))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -980,6 +987,7 @@ func TestAttacherMountDevice(t *testing.T) {
 	var testFSGroup int64 = 3000
 	nonFinalError := volumetypes.NewUncertainProgressError("")
 	transientError := volumetypes.NewTransientOperationFailure("")
+	logger, _ := ktesting.NewTestContext(t)
 
 	testCases := []struct {
 		testName                       string
@@ -1221,6 +1229,7 @@ func TestAttacherMountDevice(t *testing.T) {
 
 			// Run
 			err := csiAttacher.MountDevice(
+				logger,
 				tc.spec,
 				tc.devicePath,
 				tc.deviceMountPath,
@@ -1301,6 +1310,7 @@ func TestAttacherMountDevice(t *testing.T) {
 func TestAttacherMountDeviceWithInline(t *testing.T) {
 	pvName := "test-pv"
 	var testFSGroup int64 = 3000
+	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
 		testName                 string
 		volName                  string
@@ -1427,6 +1437,7 @@ func TestAttacherMountDeviceWithInline(t *testing.T) {
 
 			// Run
 			err = csiAttacher.MountDevice(
+				logger,
 				tc.spec,
 				tc.devicePath,
 				tc.deviceMountPath,

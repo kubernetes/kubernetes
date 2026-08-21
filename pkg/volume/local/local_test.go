@@ -19,6 +19,7 @@ limitations under the License.
 package local
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/mount-utils"
 	testingexec "k8s.io/utils/exec/testing"
 )
@@ -237,6 +239,7 @@ func TestGetVolumeName(t *testing.T) {
 }
 
 func TestInvalidLocalPath(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	tmpDir, plug := getPlugin(t)
 	defer os.RemoveAll(tmpDir)
 
@@ -246,7 +249,7 @@ func TestInvalidLocalPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = mounter.SetUp(volume.MounterArgs{})
+	err = mounter.SetUp(tCtx, volume.MounterArgs{})
 	expectedMsg := "invalid path: /no/backsteps/allowed/.. must not contain '..'"
 	if err.Error() != expectedMsg {
 		t.Fatalf("expected error `%s` but got `%s`", expectedMsg, err)
@@ -257,6 +260,8 @@ func TestBlockDeviceGlobalPathAndMountDevice(t *testing.T) {
 	// Block device global mount path testing
 	tmpBlockDir, plug := getDeviceMountablePluginWithBlockPath(t, true)
 	defer os.RemoveAll(tmpBlockDir)
+
+	logger, _ := ktesting.NewTestContext(t)
 
 	dm, err := plug.newDeviceMounterInternal(plug.host.(volume.KubeletVolumeHost), plug.host.GetMounter(), &testingexec.FakeExec{DisableScripts: true})
 	if err != nil {
@@ -276,7 +281,7 @@ func TestBlockDeviceGlobalPathAndMountDevice(t *testing.T) {
 
 	fmt.Println("expected global path is:", expectedGlobalPath)
 
-	err = dm.MountDevice(pvSpec, tmpBlockDir, expectedGlobalPath, volume.DeviceMounterArgs{})
+	err = dm.MountDevice(logger, pvSpec, tmpBlockDir, expectedGlobalPath, volume.DeviceMounterArgs{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -304,6 +309,8 @@ func TestFSGlobalPathAndMountDevice(t *testing.T) {
 	tmpFSDir, plug := getDeviceMountablePluginWithBlockPath(t, false)
 	defer os.RemoveAll(tmpFSDir)
 
+	logger, _ := ktesting.NewTestContext(t)
+
 	dm, err := plug.newDeviceMounterInternal(plug.host.(volume.KubeletVolumeHost), plug.host.GetMounter(), &testingexec.FakeExec{DisableScripts: true})
 	if err != nil {
 		t.Errorf("Failed to make a new device mounter: %v", err)
@@ -321,7 +328,7 @@ func TestFSGlobalPathAndMountDevice(t *testing.T) {
 	}
 
 	// Actually, we will do nothing if the local path is FS type
-	err = dm.MountDevice(pvSpec, tmpFSDir, expectedGlobalPath, volume.DeviceMounterArgs{})
+	err = dm.MountDevice(logger, pvSpec, tmpFSDir, expectedGlobalPath, volume.DeviceMounterArgs{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -357,6 +364,7 @@ func TestNodeExpand(t *testing.T) {
 }
 
 func TestMountUnmount(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	tmpDir, plug := getPlugin(t)
 	defer os.RemoveAll(tmpDir)
 
@@ -375,7 +383,7 @@ func TestMountUnmount(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
-	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+	if err := mounter.SetUp(tCtx, volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 
@@ -410,6 +418,7 @@ func TestMountUnmount(t *testing.T) {
 
 // TestMapUnmap tests block map and unmap interfaces.
 func TestMapUnmap(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	tmpDir, plug := getBlockPlugin(t)
 	defer os.RemoveAll(tmpDir)
 
@@ -442,11 +451,11 @@ func TestMapUnmap(t *testing.T) {
 	var devPath string
 
 	if customMapper, ok := mapper.(volume.CustomBlockVolumeMapper); ok {
-		_, err = customMapper.SetUpDevice()
+		_, err = customMapper.SetUpDevice(logger)
 		if err != nil {
 			t.Errorf("Failed to SetUpDevice, err: %v", err)
 		}
-		devPath, err = customMapper.MapPodDevice()
+		devPath, err = customMapper.MapPodDevice(logger)
 		if err != nil {
 			t.Errorf("Failed to MapPodDevice, err: %v", err)
 		}
@@ -479,7 +488,7 @@ func TestMapUnmap(t *testing.T) {
 	}
 }
 
-func testFSGroupMount(plug volume.VolumePlugin, pod *v1.Pod, tmpDir string, fsGroup int64) error {
+func testFSGroupMount(tCtx context.Context, plug volume.VolumePlugin, pod *v1.Pod, tmpDir string, fsGroup int64) error {
 	mounter, err := plug.NewMounter(getTestVolume(false, tmpDir, false, nil), pod)
 	if err != nil {
 		return err
@@ -496,7 +505,7 @@ func testFSGroupMount(plug volume.VolumePlugin, pod *v1.Pod, tmpDir string, fsGr
 
 	var mounterArgs volume.MounterArgs
 	mounterArgs.FsGroup = &fsGroup
-	if err := mounter.SetUp(mounterArgs); err != nil {
+	if err := mounter.SetUp(tCtx, mounterArgs); err != nil {
 		return err
 	}
 	return nil
@@ -637,6 +646,7 @@ func TestConstructBlockVolumeSpec(t *testing.T) {
 }
 
 func TestMountOptions(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	tmpDir, plug := getPlugin(t)
 	defer os.RemoveAll(tmpDir)
 
@@ -653,7 +663,7 @@ func TestMountOptions(t *testing.T) {
 	fakeMounter := mount.NewFakeMounter(nil)
 	mounter.(*localVolumeMounter).mounter = fakeMounter
 
-	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+	if err := mounter.SetUp(tCtx, volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	mountOptions := fakeMounter.MountPoints[0].Opts

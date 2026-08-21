@@ -82,7 +82,7 @@ func (plugin *iscsiPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.Volume != nil && spec.Volume.ISCSI != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.ISCSI != nil)
 }
 
-func (plugin *iscsiPlugin) RequiresRemount(spec *volume.Spec) bool {
+func (plugin *iscsiPlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool {
 	return false
 }
 
@@ -90,7 +90,7 @@ func (plugin *iscsiPlugin) SupportsMountOption() bool {
 	return true
 }
 
-func (plugin *iscsiPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+func (plugin *iscsiPlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return true, nil
 }
 
@@ -371,11 +371,11 @@ func (b *iscsiDiskMounter) GetAttributes() volume.Attributes {
 	}
 }
 
-func (b *iscsiDiskMounter) SetUp(mounterArgs volume.MounterArgs) error {
-	return b.SetUpAt(b.GetPath(), mounterArgs)
+func (b *iscsiDiskMounter) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
+	return b.SetUpAt(ctx, b.GetPath(), mounterArgs)
 }
 
-func (b *iscsiDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (b *iscsiDiskMounter) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
 	err := diskSetUp(b.manager, *b, dir, b.mounter, mounterArgs)
 	if err != nil {

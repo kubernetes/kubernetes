@@ -36,6 +36,7 @@ import (
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -862,6 +863,7 @@ func TestPluginNewDetacher(t *testing.T) {
 }
 
 func TestPluginCanAttach(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	tests := []struct {
 		name       string
 		driverName string
@@ -903,7 +905,7 @@ func TestPluginCanAttach(t *testing.T) {
 			plug, tmpDir := newTestPlugin(t, fakeCSIClient)
 			defer os.RemoveAll(tmpDir)
 
-			pluginCanAttach, err := plug.CanAttach(test.spec)
+			pluginCanAttach, err := plug.CanAttach(logger, test.spec)
 			if err != nil && !test.shouldFail {
 				t.Fatalf("unexpected plugin.CanAttach error: %s", err)
 			}
@@ -915,6 +917,7 @@ func TestPluginCanAttach(t *testing.T) {
 }
 
 func TestPluginFindAttachablePlugin(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	tests := []struct {
 		name       string
 		driverName string
@@ -978,7 +981,7 @@ func TestPluginFindAttachablePlugin(t *testing.T) {
 
 			plugMgr := host.GetPluginMgr()
 
-			plugin, err := plugMgr.FindAttachablePluginBySpec(test.spec)
+			plugin, err := plugMgr.FindAttachablePluginBySpec(logger, test.spec)
 			if err != nil && !test.shouldFail {
 				t.Fatalf("unexpected error calling pluginMgr.FindAttachablePluginBySpec: %s", err)
 			}

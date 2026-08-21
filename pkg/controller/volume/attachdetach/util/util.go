@@ -221,7 +221,7 @@ func ProcessPodVolumes(logger klog.Logger, pod *v1.Pod, addVolumes bool, desired
 		}
 
 		attachableVolumePlugin, err :=
-			volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+			volumePluginMgr.FindAttachablePluginBySpec(logger, volumeSpec)
 		if err != nil || attachableVolumePlugin == nil {
 			logger.V(10).Info("Skipping volume for pod, it does not implement attacher interface", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "err", err)
 			continue
