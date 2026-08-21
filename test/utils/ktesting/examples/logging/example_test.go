@@ -23,8 +23,10 @@ package logging
 // the tests and check the output, use "go test -tags example ."
 
 import (
+	"flag"
 	"testing"
 
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -50,11 +52,21 @@ func TestFatalf(t *testing.T) {
 	tCtx.Log("not reached")
 }
 
-func TestInfo(t *testing.T) {
+func TestFormat(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	tCtx.Log("hello via Log")
-	tCtx.Logger().Info("hello via Info")
+	tCtx.Logf("hello via tCtx.Logf (unstructured logging): x is %d", 1)
+	tCtx.Logger().Info("hello via tCtx.Logger().Info (structured logging)", "x", 1)
 	tCtx.Error("some", "thing")
+}
+
+func TestVerbosity(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	var fs flag.FlagSet
+	klog.InitFlags(&fs)
+	tCtx.Logf("klog verbosity: %s", fs.Lookup("v").Value.String())
+	tCtx.Logger().V(1).Info("V=1")
+	tCtx.Logger().V(2).Info("V=2")
 }
 
 func TestWithStep(t *testing.T) {
