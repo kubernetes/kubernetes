@@ -5,7 +5,7 @@ import { FingerprintDiskCache } from './fingerprint-disk-cache';
 import { IgnoreStrategy } from './ignore';
 import type { FingerprintOptions } from './options';
 import { IgnoreMode, SymlinkFollowMode } from './options';
-import { isInternalPath } from './utils';
+import { isInternalPath, resolveLinkTarget } from './utils';
 import { UnscopedValidationError } from '../errors';
 import { lit } from '../private/literal-string';
 
@@ -98,12 +98,6 @@ export function fingerprint(fileOrDirectory: string, options: FingerprintOptions
     }
   }
 
-  function _resolveLinkTarget(realPath: string, linkTarget: string): string {
-    return path.isAbsolute(linkTarget)
-      ? path.resolve(linkTarget)
-      : path.resolve(path.dirname(realPath), linkTarget);
-  }
-
   // --- Core traversal ---
 
   function _processDirectory(symbolicPath: string, realPath: string) {
@@ -131,7 +125,7 @@ export function fingerprint(fileOrDirectory: string, options: FingerprintOptions
 
   function _processSymlink(symbolicPath: string, realPath: string) {
     const linkTarget = fs.readlinkSync(realPath);
-    const resolvedLinkTarget = _resolveLinkTarget(realPath, linkTarget);
+    const resolvedLinkTarget = resolveLinkTarget(realPath, linkTarget);
 
     if (!_shouldFollowLink(resolvedLinkTarget)) {
       // Not following — hash the link target string itself

@@ -29,6 +29,9 @@ describe('fs copy', () => {
       '        .hidden',
       '    subdir3 (D)',
       '        file3.txt',
+      'subdir4 (D)',
+      '    file4.txt',
+      '    local-link4.txt => file4.txt',
     ]);
   });
 
