@@ -619,7 +619,6 @@ func newTestDRAManager(tCtx ktesting.TContext, objects ...apiruntime.Object) *dy
 
 	informerFactory.Start(tCtx.Done())
 	tCtx.Cleanup(func() {
-		tCtx.Cancel("test has completed")
 		// Now we can wait for all goroutines to stop.
 		informerFactory.Shutdown()
 	})

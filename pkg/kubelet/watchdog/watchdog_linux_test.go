@@ -156,9 +156,6 @@ func TestHealthCheckerStart(t *testing.T) {
 		tCtx.SyncTest(tt.name, func(tCtx ktesting.TContext) {
 			tCtx = ktesting.Init(tCtx, initoption.BufferLogs(true))
 			logger := tCtx.Logger()
-			defer func() {
-				tCtx.Cancel("test has completed")
-			}()
 
 			// Mock SdWatchdogEnabled to return a valid value
 			mockClient := &mockWatchdogClient{
