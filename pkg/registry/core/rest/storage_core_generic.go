@@ -64,6 +64,12 @@ type GenericConfig struct {
 
 	LoopbackClientConfig *restclient.Config
 	Informers            informers.SharedInformerFactory
+
+	// skipServiceAccount, when true, skips building serviceaccount storage here.
+	// It is set by legacyProvider, which builds a pod-aware serviceaccount
+	// storage itself; without this the resource would get two storages, and
+	// therefore two cachers and two etcd watches, for the same GroupResource.
+	skipServiceAccount bool
 }
 
 func (c *GenericConfig) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
@@ -110,15 +116,17 @@ func (c *GenericConfig) NewRESTStorage(apiResourceConfigSource serverstorage.API
 	}
 
 	var serviceAccountStorage *serviceaccountstore.REST
-	if c.ServiceAccountIssuer != nil {
-		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.APIAudiences, authorizerfactory.NewAlwaysDenyAuthorizer(), c.ServiceAccountMaxExpiration, newNotFoundGetter(schema.GroupResource{Resource: "pods"}), secretStorage.Store, newNotFoundGetter(schema.GroupResource{Resource: "nodes"}),
-			notFoundValidatingWebhookConfigurations{}, notFoundMutatingWebhookConfigurations{}, c.ExtendExpiration, c.MaxExtendedExpiration)
-	} else {
-		serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, nil, nil, authorizerfactory.NewAlwaysDenyAuthorizer(), 0, newNotFoundGetter(schema.GroupResource{Resource: "pods"}), newNotFoundGetter(schema.GroupResource{Resource: "secrets"}), newNotFoundGetter(schema.GroupResource{Resource: "nodes"}),
-			notFoundValidatingWebhookConfigurations{}, notFoundMutatingWebhookConfigurations{}, false, c.MaxExtendedExpiration)
-	}
-	if err != nil {
-		return genericapiserver.APIGroupInfo{}, err
+	if !c.skipServiceAccount {
+		if c.ServiceAccountIssuer != nil {
+			serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.APIAudiences, authorizerfactory.NewAlwaysDenyAuthorizer(), c.ServiceAccountMaxExpiration, newNotFoundGetter(schema.GroupResource{Resource: "pods"}), secretStorage.Store, newNotFoundGetter(schema.GroupResource{Resource: "nodes"}),
+				notFoundValidatingWebhookConfigurations{}, notFoundMutatingWebhookConfigurations{}, c.ExtendExpiration, c.MaxExtendedExpiration)
+		} else {
+			serviceAccountStorage, err = serviceaccountstore.NewREST(restOptionsGetter, nil, nil, authorizerfactory.NewAlwaysDenyAuthorizer(), 0, newNotFoundGetter(schema.GroupResource{Resource: "pods"}), newNotFoundGetter(schema.GroupResource{Resource: "secrets"}), newNotFoundGetter(schema.GroupResource{Resource: "nodes"}),
+				notFoundValidatingWebhookConfigurations{}, notFoundMutatingWebhookConfigurations{}, false, c.MaxExtendedExpiration)
+		}
+		if err != nil {
+			return genericapiserver.APIGroupInfo{}, err
+		}
 	}
 
 	storage := map[string]rest.Storage{}
@@ -141,7 +149,7 @@ func (c *GenericConfig) NewRESTStorage(apiResourceConfigSource serverstorage.API
 		storage[resource] = secretStorage
 	}
 
-	if resource := "serviceaccounts"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
+	if resource := "serviceaccounts"; !c.skipServiceAccount && apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
 		storage[resource] = serviceAccountStorage
 		if serviceAccountStorage.Token != nil {
 			storage[resource+"/token"] = serviceAccountStorage.Token
