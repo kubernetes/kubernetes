@@ -2101,6 +2101,21 @@ describe('vpc', () => {
       expect(subnetIds).toEqual(vpc.isolatedSubnets.map(s => s.subnetId));
     });
 
+    test('can select subnets by environment-agnostic AZ', () => {
+      // GIVEN
+      const stack = new Stack();
+      const vpc = new Vpc(stack, 'VPC');
+
+      // WHEN
+      const { subnetIds } = vpc.selectSubnets({
+        subnetType: SubnetType.PRIVATE_WITH_EGRESS,
+        availabilityZones: [stack.availabilityZones[0], stack.availabilityZones[1]],
+      });
+
+      // THEN
+      expect(subnetIds).toHaveLength(2); // 2 private subnets
+    });
+
     test('can select subnets by name', () => {
       // GIVEN
       const stack = getTestStack();

@@ -927,10 +927,7 @@ export class Stack extends Construct implements ITaggable {
     // denominator is 2 AZs across all AWS regions.
     const agnostic = Token.isUnresolved(this.account) || Token.isUnresolved(this.region);
     if (agnostic) {
-      return this.node.tryGetContext(cxapi.AVAILABILITY_ZONE_FALLBACK_CONTEXT_KEY) || [
-        Fn.select(0, Fn.getAzs()),
-        Fn.select(1, Fn.getAzs()),
-      ];
+      return this.node.tryGetContext(cxapi.AVAILABILITY_ZONE_FALLBACK_CONTEXT_KEY) || firstTwoAgnosticAzs();
     }
 
     const value = ContextProvider.getValue(this, {
@@ -1881,6 +1878,20 @@ function count(xs: string[]): Record<string, number> {
   return ret;
 }
 
+const firstTwoAgnosticAzs = (() => {
+  let cache: string[] | undefined;
+
+  return () => {
+    if (!cache) {
+      cache = [
+        Fn.select(0, Fn.getAzs()),
+        Fn.select(1, Fn.getAzs()),
+      ];
+    }
+    return cache;
+  };
+})();
+
 /**
  * Reason comparison function, in curried form
  */
@@ -1928,3 +1939,4 @@ function makeCustomCoupledReference(value: any, strength: ReferenceStrength): Cu
   }
   return new CustomCoupledReference(resolvable, strength);
 }
+

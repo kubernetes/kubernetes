@@ -84,6 +84,20 @@ describe('stack', () => {
     expect(stack.artifactId).toBe(expected);
   });
 
+  test('getter values involving tokens return the same value every invocation', () => {
+    const app = new App({});
+
+    // WHEN
+    const stack = new Stack(app, 'Stack');
+
+    // THEN
+    expect(stack.availabilityZones).toEqual(stack.availabilityZones);
+    expect(stack.partition).toEqual(stack.partition);
+    expect(stack.urlSuffix).toEqual(stack.urlSuffix);
+    expect(stack.stackId).toEqual(stack.stackId);
+    expect(stack.notificationArns).toEqual(stack.notificationArns);
+  });
+
   test('stack objects have some template-level properties, such as Description, Version, Transform', () => {
     const stack = new Stack();
     stack.templateOptions.templateFormatVersion = 'MyTemplateVersion';
