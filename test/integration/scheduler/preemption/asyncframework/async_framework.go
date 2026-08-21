@@ -51,6 +51,7 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -582,8 +583,8 @@ func nodeCreation(testCtx *testutils.TestContext, t *testing.T, nodeName string,
 	if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, newNode, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create an initial Node %q: %v", newNode.Name, err)
 	}
-	t.Cleanup(func() {
-		if err := cs.CoreV1().Nodes().Delete(testCtx.Ctx, newNode.Name, metav1.DeleteOptions{}); err != nil {
+	ktesting.Init(t).CleanupCtx(func(tCtx ktesting.TContext) {
+		if err := cs.CoreV1().Nodes().Delete(tCtx, newNode.Name, metav1.DeleteOptions{}); err != nil {
 			t.Fatalf("Failed to delete the Node %q: %v", newNode.Name, err)
 		}
 	})

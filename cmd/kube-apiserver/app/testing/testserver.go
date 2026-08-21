@@ -26,6 +26,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -33,6 +34,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -40,7 +42,7 @@ import (
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -110,6 +112,14 @@ type TestServerInstanceOptions struct {
 	BinaryVersion string
 	// Set non-default request timeout in the server.
 	RequestTimeout time.Duration
+
+	// observeTearDown, if non-nil, gets called with tCtx right after it
+	// gets canceled during tear-down. It is used only by StartTestServer's
+	// own tests, to verify that the context is canceled (Err() ==
+	// context.Canceled) with the intended cause (parent context
+	// cancellation, explicit tear-down, or test completion), obtainable
+	// via context.Cause(tCtx).
+	observeTearDown func(ctx context.Context)
 }
 
 // TestServer return values supplied by kube-test-ApiServer
@@ -153,6 +163,10 @@ func NewDefaultTestServerOptions() *TestServerInstanceOptions {
 // Note: we return a tear-down func instead of a stop channel because the later will leak temporary
 // files that because Golang testing's call to os.Exit will not give a stop channel go routine
 // enough time to remove temporary files.
+//
+// The servers run until one of these happen:
+//   - test ends and cleanup starts
+//   - the tear-down func is called (blocks)
 func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
 	// Some callers may have initialize ktesting already.
 	tCtx, ok := t.(ktesting.TContext)
@@ -163,6 +177,17 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	} else {
 		tCtx = ktesting.Init(t)
 	}
+	// This code manages the lifecycle of tCtx itself, via the explicit
+	// tCtx.Cancel("tearing down") call in tearDown below. This ensures that
+	// the metrics invariant check below runs before context cancellation.
+	//
+	// While starting up, ctx cancellation gets propagated directly, without going through
+	// the full teardown.
+	parentCtx := tCtx
+	tCtx = tCtx.WithoutCancel()
+	stopCtxPropagation := context.AfterFunc(parentCtx, func() {
+		tCtx.CancelBecause(context.Cause(parentCtx))
+	})
 
 	if instanceOptions == nil {
 		instanceOptions = NewDefaultTestServerOptions()
@@ -174,10 +199,13 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	}
 
 	var errCh chan error
-	tearDown := func() {
+	tearDown := func(cause error) {
 		// Cancel is stopping apiserver and cleaning up
 		// after itself, including shutting down its storage layer.
-		tCtx.Cancel("tearing down")
+		tCtx.CancelBecause(cause)
+		if instanceOptions.observeTearDown != nil {
+			instanceOptions.observeTearDown(tCtx)
+		}
 
 		// If the apiserver was started, let's wait for it to
 		// shutdown clearly.
@@ -190,8 +218,9 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		os.RemoveAll(result.TmpDir)
 	}
 	defer func() {
+		// In case of a premature exit, tearn down immediately before returning.
 		if result.TearDownFn == nil {
-			tearDown()
+			tearDown(errors.New("server startup failed"))
 		}
 	}()
 
@@ -507,7 +536,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		}
 
 		if _, err := client.CoreV1().Namespaces().Get(context.TODO(), "default", metav1.GetOptions{}); err != nil {
-			if !errors.IsNotFound(err) {
+			if !apierrors.IsNotFound(err) {
 				t.Logf("Unable to get default namespace: %v", err)
 			}
 			return false, nil
@@ -523,31 +552,47 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		return result, fmt.Errorf("create etcd client: %w", err)
 	}
 
-	// from here the caller must call tearDown
 	result.ClientConfig = restclient.CopyConfig(server.GenericAPIServer.LoopbackClientConfig)
 	result.ClientConfig.QPS = 1000
 	result.ClientConfig.Burst = 10000
 	result.ServerOpts = s
-	result.TearDownFn = func() {
+	// etcdClient.Close fails when called more than once.
+	// Checking metrics also is needed only once.
+	var tearDownOnce sync.Once
+	tearDownAll := func(cause error) {
 		defer func() {
 			if err := etcdClient.Close(); err != nil {
 				tCtx.Errorf("Failed to close etcd client: %v", err)
 			}
 		}()
-		defer tearDown()
+		defer tearDown(cause)
 		if instanceOptions.DisableInvariantChecks {
 			return
 		}
+		// Might have been canceled while removing the ctx forwarding.
 		if tCtx.Err() != nil {
-			tCtx.Logf("Skipping metrics scrape because context is already canceled: %v", tCtx.Err())
+			tCtx.Logf("Skipping metrics scrape because context is already canceled: %v", context.Cause(tCtx))
 			return
 		}
 		if err := metrics.CheckMetricInvariants(tCtx, client, false); err != nil {
 			tCtx.Errorf("Invariant check failed (if the test intentionally breaks metrics/auth, consider setting DisableInvariantChecks: true in TestServerInstanceOptions): %v", err)
 		}
 	}
+	// From now on we stop the ctx forwarding and rely only on
+	// proper tear-down at the test end or an explicit request.
+	// Removal races with parent context cancellation, so it it
+	// is possible that tear-down starts while the context is
+	// already canceled.
+	stopCtxPropagation()
+
+	result.TearDownFn = func() {
+		tearDownOnce.Do(func() { tearDownAll(errors.New("tear-down requested")) })
+	}
 	result.EtcdClient = etcdClient
 	result.EtcdStoragePrefix = storageConfig.Prefix
+	t.Cleanup(func() {
+		tearDownOnce.Do(func() { tearDownAll(errors.New("test has completed")) })
+	})
 
 	return result, nil
 }

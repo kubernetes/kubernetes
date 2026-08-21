@@ -18,11 +18,13 @@ package framework
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"os"
 	"path"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -69,14 +71,40 @@ type TestServerSetup struct {
 	ModifyServerConfig     func(*controlplane.Config)
 	// DisableInvariantChecks skips the invariant checks at the end of the test.
 	DisableInvariantChecks bool
+
+	// observeTearDown, if non-nil, gets called with the server's internal
+	// context right after it gets canceled during tear-down. It is used
+	// only by StartTestServer's own tests, to verify that the context is
+	// canceled (ctx.Err() == context.Canceled) with the intended cause
+	// (parent context cancellation, explicit tear-down, or test
+	// completion), obtainable via context.Cause(ctx).
+	observeTearDown func(ctx context.Context)
 }
 
 type TearDownFunc func()
 
 // StartTestServer runs a kube-apiserver, optionally calling out to the setup.ModifyServerRunOptions and setup.ModifyServerConfig functions
 // TODO (pohly): convert to ktesting contexts
+//
+// The kube-apiserver runs until one of the following happens:
+//   - ctx cancellation
+//   - TearDownFunc gets called (blocks until shutdown is complete)
+//   - the test ends and cleanup starts
 func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (client.Interface, *rest.Config, TearDownFunc) {
-	ctx, cancel := context.WithCancel(ctx)
+	// This code manages the lifecycle of ctx itself, via the explicit
+	// cancel call in tearDown below. It must not get canceled
+	// automatically once the test ends because TearDownFn still needs a
+	// working context at that point, in particular for the metrics
+	// invariant check below.
+	//
+	// While starting up, ctx cancellation gets propagated directly, without going through
+	// the full teardown.
+	parentCtx := ctx
+	ctx = context.WithoutCancel(ctx)
+	ctx, cancel := context.WithCancelCause(ctx)
+	stopCtxPropagation := context.AfterFunc(parentCtx, func() {
+		cancel(context.Cause(parentCtx))
+	})
 
 	certDir, err := os.MkdirTemp("", "test-integration-"+strings.ReplaceAll(t.Name(), "/", "_"))
 	if err != nil {
@@ -264,11 +292,17 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 		t.Fatal(err)
 	}
 
-	tearDownFn := func() {
+	// tearDown runs exactly once, either triggered by
+	// the parent context cancellation (context.AfterFunc), test cleanup
+	// or an explicit request to tear down.
+	var tearDownOnce sync.Once
+	tearDown := func(cause error) {
 		// Scrape metrics before stopping
 		if !setup.DisableInvariantChecks {
+			// Context cancellation might have been propagated during startup,
+			// therefore the context might be canceled already.
 			if ctx.Err() != nil {
-				t.Logf("Skipping metrics scrape because context is already canceled: %v", ctx.Err())
+				t.Logf("Skipping metrics scrape because context is already canceled: %v", context.Cause(ctx))
 			} else {
 				if err := metrics.CheckMetricInvariants(ctx, kubeAPIServerClient, false); err != nil {
 					t.Errorf("Invariant check failed (if the test intentionally breaks metrics/auth, consider setting DisableInvariantChecks: true in TestServerSetup): %v", err)
@@ -277,7 +311,10 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 		}
 		// Calling cancel function is stopping apiserver and cleaning up
 		// after itself, including shutting down its storage layer.
-		cancel()
+		cancel(cause)
+		if setup.observeTearDown != nil {
+			setup.observeTearDown(ctx)
+		}
 
 		// If the apiserver was started, let's wait for it to
 		// shutdown clearly.
@@ -291,6 +328,22 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 			t.Log(err)
 		}
 	}
+	tearDownFn := func(cause error) {
+		tearDownOnce.Do(func() { tearDown(cause) })
+	}
+	t.Cleanup(func() {
+		tearDownFn(errors.New("test has completed"))
+	})
 
-	return kubeAPIServerClient, kubeAPIServerClientConfig, tearDownFn
+	// Swap the simple cancellation propagation with the more complete tear-down.
+	// This is not atomic, so tear-down has to be prepared for ctx to be canceled
+	// already when it starts.
+	context.AfterFunc(parentCtx, func() {
+		tearDownFn(context.Cause(parentCtx))
+	})
+	stopCtxPropagation()
+
+	return kubeAPIServerClient, kubeAPIServerClientConfig, func() {
+		tearDownFn(errors.New("tear-down requested"))
+	}
 }
