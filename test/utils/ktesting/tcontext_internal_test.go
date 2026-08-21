@@ -20,6 +20,8 @@ package ktesting
 
 import (
 	"context"
+	"maps"
+	"slices"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -28,6 +30,39 @@ import (
 
 	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 )
+
+func TestSyncTestInit(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		// This must work inside a synctest bubble, despite Deadline panicking there.
+		// We then don't have a deadline.
+		tCtx := Init(t)
+		deadline, ok := tCtx.Deadline()
+		if ok {
+			tCtx.Errorf("Expected no deadline, got %s", deadline)
+		}
+		if !tCtx.IsSyncTest() {
+			tCtx.Errorf("Expected to run as synctest")
+		}
+		tCtx.Expect(getRunningTests()).To(gomega.ContainElement(gomega.Equal(t.Name())))
+	})
+}
+
+func TestNormalInit(t *testing.T) {
+	// The outcome depends on how the unit test was started.
+	// See below for deterministic deadline/no deadline testing.
+	expectDeadline, expectOK := t.Deadline()
+	expectDeadline = expectDeadline.Add(-DefaultCleanupGracePeriod)
+	tCtx := Init(t)
+	actualDeadline, actualOK := tCtx.Deadline()
+	tCtx.Expect(actualOK).To(gomega.Equal(expectOK), "have deadline")
+	if expectOK {
+		tCtx.Expect(actualDeadline).To(gomega.BeTemporally("~", expectDeadline, 2*time.Second), "deadline")
+	}
+	if tCtx.IsSyncTest() {
+		tCtx.Errorf("Expected to not run as synctest")
+	}
+	tCtx.Expect(getRunningTests()).To(gomega.ContainElement(gomega.Equal(t.Name())))
+}
 
 // deadlineT2 mirrors the deadlineT helper in ktesting_test.
 type deadlineT2 struct {
@@ -52,6 +87,7 @@ func TestDefaultCleanupGracePeriod(t *testing.T) {
 		if tCtx.cleanupGracePeriod != DefaultCleanupGracePeriod {
 			t.Errorf("expected cleanupGracePeriod %v, got %v", DefaultCleanupGracePeriod, tCtx.cleanupGracePeriod)
 		}
+		tCtx.Expect(getRunningTests()).To(gomega.ContainElement(gomega.Equal(t.Name())))
 	})
 }
 
@@ -76,6 +112,7 @@ func TestCustomCleanupGracePeriod(t *testing.T) {
 		tCtx.Expect(actualDeadline).To(
 			gomega.BeTemporally("==", expect),
 			"context deadline should be shifted by the custom grace period")
+		tCtx.Expect(getRunningTests()).To(gomega.ContainElement(gomega.Equal(t.Name())))
 	})
 }
 
@@ -87,6 +124,7 @@ func TestInitCtxCleanupGracePeriod(t *testing.T) {
 	if tCtx.cleanupGracePeriod != custom {
 		t.Errorf("expected cleanupGracePeriod %v, got %v", custom, tCtx.cleanupGracePeriod)
 	}
+	tCtx.Expect(getRunningTests()).To(gomega.ContainElement(gomega.Equal(t.Name())))
 }
 
 // TestInitCtxDefaultCleanupGracePeriod verifies that InitCtx falls back to
@@ -96,4 +134,13 @@ func TestInitCtxDefaultCleanupGracePeriod(t *testing.T) {
 	if tCtx.cleanupGracePeriod != DefaultCleanupGracePeriod {
 		t.Errorf("expected cleanupGracePeriod %v, got %v", DefaultCleanupGracePeriod, tCtx.cleanupGracePeriod)
 	}
+	tCtx.Expect(getRunningTests()).To(gomega.ContainElement(gomega.Equal(t.Name())))
+}
+
+// getRunningTests reports all currently running tests, sorted by name.
+func getRunningTests() []string {
+	defaultProgressReporter.reportMutex.Lock()
+	defer defaultProgressReporter.reportMutex.Unlock()
+
+	return slices.Sorted(maps.Keys(defaultProgressReporter.runningTests))
 }

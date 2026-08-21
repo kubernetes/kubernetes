@@ -305,36 +305,65 @@ limitations under the License.
 //
 // While polling, sending the Go test binary
 // a SIGUSR1 will cause ktesting to print a summary of the current situation,
-// which includes the reason why Gomega is still polling. This feature is also
-// supported by Ginkgo in E2E suites. Compared to the implementation in Ginkgo,
-// the one in ktesting is still pretty rudimentary and, for example, lacks
-// information about the running test and source code backtraces. TODO: track running tests
+// which includes the reason why Gomega is still polling, prefixed with the
+// name of the test that the polling belongs to, as well as the names of all
+// currently running tests and sub-tests. This feature is also supported by
+// Ginkgo in E2E suites. Compared to the implementation in Ginkgo, the one in
+// ktesting is still pretty rudimentary and, for example, lacks source code
+// backtraces.
+//
+// The following example runs two parallel sub-tests which both get stuck
+// in an Eventually call. The progress report lists the parent test and both
+// sub-tests as currently running, then shows each sub-test's own
+// explanation, indented and prefixed by the name of the sub-test that it
+// belongs to:
 //
 //	go test -tags example -timeout=20s k8s.io/kubernetes/test/utils/ktesting/examples/with_ktesting & pid=$!; sleep 5; killall -USR1 with_ktesting.test; wait $pid
 //	...
 //	You requested a progress report.
+//	Currently running:
+//	        TestTimeout
+//	        TestTimeout/baking
+//	        TestTimeout/heating
 //
-//	Expected
-//	    <int>: 1
-//	to equal
-//	    <int>: 2
-//	--- FAIL: TestTimeout (15.00s)
-//	    example_test.go:36: I0821 13:47:30.120022] Using "/tmp/TestTimeout41206428/001" as temporary directory.
-//	    example_test.go:42: Will fail shortly before the test suite deadline at 2026-08-21 13:47:50.119703298 +0200 CEST m=+20.000741721.
+//	TestTimeout/heating:
+//	        waiting for oven to reach baking temperature
+//	        Expected
+//	            <int>: 1
+//	        to equal
+//	            <int>: 2
+//
+//	TestTimeout/baking:
+//	        waiting for cake to be done
+//	        Expected
+//	            <int>: 1
+//	        to equal
+//	            <int>: 2
+//	--- FAIL: TestTimeout (0.00s)
+//	    example_test.go:36: I0821 16:19:33.413274] Using "/tmp/TestTimeout2324884183/001" as temporary directory.
+//	    example_test.go:41: Will fail shortly before the test suite deadline at 2026-08-21 16:19:53.413099637 +0200 CEST m=+20.000483031.
 //	    contexthelper.go:75:
-//	        INFO: canceling context: test suite deadline (2026-08-21 13:47:50 +0200 CEST) is close, need to clean up before the 5s cleanup grace period
+//	        INFO: canceling context: test suite deadline (2026-08-21 16:19:53 +0200 CEST) is close, need to clean up before the 5s cleanup grace period
 //
-//	    example_test.go:47: FATAL ERROR: I0821 13:47:45.120112]
-//	                Context was cancelled (cause: test suite deadline (2026-08-21 13:47:50 +0200 CEST) is close, need to clean up before the 5s cleanup grace period) after 15.000s.
+//	    --- FAIL: TestTimeout/heating (15.00s)
+//	        example_test.go:48: FATAL ERROR: I0821 16:19:48.414372]
+//	                Context was cancelled (cause: test suite deadline (2026-08-21 16:19:53 +0200 CEST) is close, need to clean up before the 5s cleanup grace period) after 15.001s.
+//	                waiting for oven to reach baking temperature
 //	                Expected
 //	                    <int>: 1
 //	                to equal
 //	                    <int>: 2
-//	    example_test.go:53: FATAL ERROR: I0821 13:47:45.120138]
-//	                turning off oven not implemented
+//	    --- FAIL: TestTimeout/baking (15.00s)
+//	        example_test.go:55: FATAL ERROR: I0821 16:19:48.414730]
+//	                Context was cancelled (cause: test suite deadline (2026-08-21 16:19:53 +0200 CEST) is close, need to clean up before the 5s cleanup grace period) after 15.001s.
+//	                waiting for cake to be done
+//	                Expected
+//	                    <int>: 1
+//	                to equal
+//	                    <int>: 2
 //	    example_test.go:38: Cleaning up...
 //	FAIL
-//	FAIL    k8s.io/kubernetes/test/utils/ktesting/examples/with_ktesting    15.004s
+//	FAIL    k8s.io/kubernetes/test/utils/ktesting/examples/with_ktesting    15.007s
 //
 // Normally, raising an assertion inside a polling callback is wrong. In the following example,
 // a failed assertion aborts the test instead of triggering a retry:

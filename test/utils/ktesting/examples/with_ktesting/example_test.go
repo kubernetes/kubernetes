@@ -41,7 +41,17 @@ func TestTimeout(t *testing.T) {
 		t.Logf("Will fail shortly before the test suite deadline at %s.", deadline)
 	}
 
-	tCtx.Eventually(func(tCtx ktesting.TContext) (int, error) {
-		return 1, nil
-	}).WithTimeout(time.Minute).Should(gomega.Equal(2))
+	tCtx.Run("heating", func(tCtx ktesting.TContext) {
+		tCtx.Parallel()
+		tCtx.Eventually(func(tCtx ktesting.TContext) (int, error) {
+			return 1, nil
+		}).WithTimeout(time.Minute).Should(gomega.Equal(2), "waiting for oven to reach baking temperature")
+	})
+
+	tCtx.Run("baking", func(tCtx ktesting.TContext) {
+		tCtx.Parallel()
+		tCtx.Eventually(func(tCtx ktesting.TContext) (int, error) {
+			return 1, nil
+		}).WithTimeout(time.Minute).Should(gomega.Equal(2), "waiting for cake to be done")
+	})
 }

@@ -27,7 +27,7 @@ import (
 // constructs a new TContext where [TContext.Cancel] cancels only the new
 // context.
 func (tCtx TContext) WithCancel() TContext {
-	ctx, cancel := context.WithCancelCause(tCtx)
+	ctx, cancel := context.WithCancelCause(tCtx.Context)
 
 	tCtx.Context = ctx
 	tCtx.cancel = cancel
@@ -38,7 +38,7 @@ func (tCtx TContext) WithCancel() TContext {
 // Calling Cancel will only cancel the new context.
 // This matches [context.WithoutCancel].
 func (tCtx TContext) WithoutCancel() TContext {
-	ctx := context.WithoutCancel(tCtx)
+	ctx := context.WithoutCancel(tCtx.Context)
 
 	tCtx.Context = ctx
 	tCtx = tCtx.WithCancel() // Re-create a cancelable TContext.
@@ -51,7 +51,7 @@ func (tCtx TContext) WithoutCancel() TContext {
 // once the timeout is reached. It may be empty, in which case the usual
 // "context canceled" error is used.
 func (tCtx TContext) WithTimeout(timeout time.Duration, timeoutCause string) TContext {
-	ctx, cancel := withTimeout(tCtx, tCtx.TB(), timeout, timeoutCause)
+	ctx, cancel := withTimeout(tCtx.Context, tCtx.TB(), timeout, timeoutCause)
 
 	tCtx.Context = ctx
 	tCtx.cancel = cancel
@@ -60,7 +60,7 @@ func (tCtx TContext) WithTimeout(timeout time.Duration, timeoutCause string) TCo
 
 // WithLogger constructs a new context with a different logger.
 func (tCtx TContext) WithLogger(logger klog.Logger) TContext {
-	ctx := klog.NewContext(tCtx, logger)
+	ctx := klog.NewContext(tCtx.Context, logger)
 
 	tCtx.Context = ctx
 	return tCtx
