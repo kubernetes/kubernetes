@@ -192,6 +192,9 @@ type ActualStateOfWorld interface {
 
 	// UpdateReconstructedVolumeAttachability updates volume attachability from the API server.
 	UpdateReconstructedVolumeAttachability(volumeName v1.UniqueVolumeName, volumeAttachable bool)
+
+	// MarkVolumeAttachability updates attachability for an existing volume.
+	MarkVolumeAttachability(volumeName v1.UniqueVolumeName, attachable bool)
 }
 
 // MountedVolume represents a volume that has successfully been mounted to a pod.
@@ -605,6 +608,23 @@ func (asw *actualStateOfWorld) UpdateReconstructedVolumeAttachability(volumeName
 	if volumeObj.pluginIsAttachable != volumeAttachabilityUncertain {
 		// Reconciler must have updated volume state, i.e. when a pod uses the volume and
 		// succeeded mounting the volume. Such update has fixed the device path.
+		return
+	}
+
+	if attachable {
+		volumeObj.pluginIsAttachable = volumeAttachabilityTrue
+	} else {
+		volumeObj.pluginIsAttachable = volumeAttachabilityFalse
+	}
+	asw.attachedVolumes[volumeName] = volumeObj
+}
+
+func (asw *actualStateOfWorld) MarkVolumeAttachability(volumeName v1.UniqueVolumeName, attachable bool) {
+	asw.Lock()
+	defer asw.Unlock()
+
+	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
+	if !volumeExists {
 		return
 	}
 

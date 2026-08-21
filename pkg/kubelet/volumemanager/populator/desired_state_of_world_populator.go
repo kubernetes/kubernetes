@@ -212,6 +212,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods(logger klog.L
 					// It is not possible right now for a CSI plugin to be both attachable and non-deviceMountable
 					// So the uniqueVolumeName should remain the same after the attachability change
 					dswp.desiredStateOfWorld.MarkVolumeAttachability(volumeToMount.VolumeName, false)
+					dswp.actualStateOfWorld.MarkVolumeAttachability(volumeToMount.VolumeName, false)
 					logger.Info("Volume changes from attachable to non-attachable", "volumeName", volumeToMount.VolumeName)
 					continue
 				}
