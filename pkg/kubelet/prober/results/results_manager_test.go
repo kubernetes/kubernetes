@@ -99,6 +99,44 @@ func TestUpdates(t *testing.T) {
 	expectUpdate(Update{barID, Success, pod.UID}, "changed bar")
 }
 
+func TestSeed(t *testing.T) {
+	m := NewManager()
+
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod"}}
+	fooID := kubecontainer.ContainerID{Type: "test", ID: "foo"}
+
+	expectNoUpdate := func(msg string) {
+		select {
+		case u := <-m.Updates():
+			t.Errorf("Unexpected update %v: %s", u, msg)
+		default:
+			// Pass
+		}
+	}
+
+	// Seeding populates the cache like Set does...
+	m.Seed(fooID, Success)
+	result, found := m.Get(fooID)
+	assert.True(t, found, "seeded result found")
+	assert.Equal(t, Success, result, "seeded result")
+
+	// ...but never sends an update, even when it changes the cached value.
+	expectNoUpdate("new seed")
+	m.Seed(fooID, Failure)
+	expectNoUpdate("changed seed")
+	result, _ = m.Get(fooID)
+	assert.Equal(t, Failure, result, "reseeded result")
+
+	// A subsequent Set still reports a change against the seeded value.
+	m.Set(fooID, Success, pod)
+	select {
+	case u := <-m.Updates():
+		assert.Equal(t, Update{fooID, Success, pod.UID}, u, "set after seed")
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Error("Timed out waiting for update after Set")
+	}
+}
+
 func TestResult_ToPrometheusType(t *testing.T) {
 	tests := []struct {
 		name     string

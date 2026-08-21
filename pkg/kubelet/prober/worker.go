@@ -19,6 +19,7 @@ package prober
 import (
 	"context"
 	"math/rand"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -71,6 +72,16 @@ type worker struct {
 
 	// If set, skip probing.
 	onHold bool
+
+	// mu guards cancel and stopped, which are written by stop() from other
+	// goroutines and by run() from the worker's own goroutine.
+	mu sync.Mutex
+	// cancel aborts an in-flight probe. It is installed by run() and invoked by
+	// stop(); it is nil until run() starts.
+	cancel context.CancelFunc
+	// stopped records that stop() was called, so a run() that starts afterwards
+	// still cancels its context.
+	stopped bool
 
 	// proberResultsMetricLabels holds the labels attached to this worker
 	// for the ProberResults metric by result.
@@ -159,6 +170,20 @@ func (w *worker) run(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	probeTickerPeriod := time.Duration(w.spec.PeriodSeconds) * time.Second
 
+	// Give the worker a context of its own so stop() can abort a probe that is
+	// already executing, rather than only preventing the next one.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	w.mu.Lock()
+	w.cancel = cancel
+	stopped := w.stopped
+	w.mu.Unlock()
+	if stopped {
+		// stop() ran before this goroutine got scheduled and so missed the
+		// cancel func; honor it here.
+		cancel()
+	}
+
 	// If kubelet restarted the probes could be started in rapid succession.
 	// Let the worker wait for a random portion of tickerPeriod before probing.
 	// Do it only if the kubelet has started recently.
@@ -201,9 +226,18 @@ probeLoop:
 	}
 }
 
-// stop stops the probe worker. The worker handles cleanup and removes itself from its manager.
+// stop stops the probe worker, aborting any probe that is currently executing.
+// The worker handles cleanup and removes itself from its manager.
 // It is safe to call stop multiple times.
 func (w *worker) stop() {
+	w.mu.Lock()
+	w.stopped = true
+	cancel := w.cancel
+	w.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+
 	select {
 	case w.stopCh <- struct{}{}:
 	default: // Non-blocking.
@@ -346,7 +380,7 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	}
 
 	// Note, exec probe does NOT have access to pod environment variables or downward API
-	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
+	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status.PodIP, w.container, w.containerID)
 	if err != nil {
 		// Prober error, throw away the result.
 		return true

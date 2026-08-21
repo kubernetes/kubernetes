@@ -17,7 +17,9 @@ limitations under the License.
 package prober
 
 import (
+	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -26,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -1109,5 +1112,68 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 				t.Errorf("Expected result %v, but got: %v", tc.expectedResult, result)
 			}
 		})
+	}
+}
+
+// hangingRunner blocks in RunInContainer until its context is canceled,
+// standing in for a CRI exec that keeps running inside a container which is
+// being torn down.
+type hangingRunner struct {
+	entered chan struct{}
+	once    sync.Once
+}
+
+func (r *hangingRunner) RunInContainer(ctx context.Context, _ kubecontainer.ContainerID, _ []string, _ time.Duration) ([]byte, error) {
+	r.once.Do(func() { close(r.entered) })
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+// TestStopCancelsInFlightProbe verifies that stop() aborts a probe that is
+// already executing instead of only preventing the next one, and that the
+// aborted probe records no result.
+// Regression test for https://github.com/kubernetes/kubernetes/issues/140977.
+func TestStopCancelsInFlightProbe(t *testing.T) {
+	ktesting.Init(t).SyncTest("", testStopCancelsInFlightProbe)
+}
+
+func testStopCancelsInFlightProbe(tCtx ktesting.TContext) {
+	t := tCtx.TB()
+	m := newTestManager()
+	// Probe through the real exec prober so the runner sees the worker's
+	// context, the way the CRI client does.
+	runner := &hangingRunner{entered: make(chan struct{})}
+	m.prober = newProber(runner, &record.FakeRecorder{})
+
+	w := newTestWorker(m, liveness, v1.Probe{})
+	key := probeKey{testPodUID, testContainerName, liveness}
+	m.workers[key] = w
+	m.statusManager.SetPodStatus(tCtx.Logger(), w.pod, getTestRunningStatus())
+	go w.run(tCtx)
+
+	select {
+	case <-runner.entered:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("Probe never started executing")
+	}
+
+	w.stop()
+
+	if err := waitForWorkerExit(t, m, []probeKey{key}); err != nil {
+		t.Fatalf("Worker did not exit after stop(); the in-flight probe was not canceled: %v", err)
+	}
+
+	// A canceled probe says nothing about container health. Recording it as a
+	// liveness Failure would get the container killed while it is already
+	// being torn down.
+	for {
+		select {
+		case update := <-m.livenessManager.Updates():
+			if update.Result != results.Success {
+				t.Fatalf("Canceled probe recorded %v; expected it to be discarded", update.Result)
+			}
+		default:
+			return
+		}
 	}
 }

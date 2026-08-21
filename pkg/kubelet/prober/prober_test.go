@@ -255,7 +255,7 @@ func TestProbe(t *testing.T) {
 				prober.exec = fakeExecProber{test.execResult, nil}
 			}
 
-			result, err := prober.probe(ctx, pType, &v1.Pod{}, v1.PodStatus{}, testContainer, containerID)
+			result, err := prober.probe(ctx, pType, &v1.Pod{}, "", testContainer, containerID)
 
 			if test.expectError {
 				require.Error(t, err, "[%s] Expected probe error but no error was returned.", testID)
@@ -268,7 +268,7 @@ func TestProbe(t *testing.T) {
 			if len(test.expectCommand) > 0 {
 				prober.exec = execprobe.New()
 				prober.runner = &containertest.FakeContainerCommandRunner{}
-				_, err := prober.probe(ctx, pType, &v1.Pod{}, v1.PodStatus{}, testContainer, containerID)
+				_, err := prober.probe(ctx, pType, &v1.Pod{}, "", testContainer, containerID)
 				require.NoError(t, err, "[%s] Didn't expect probe error ", testID)
 
 				if !reflect.DeepEqual(test.expectCommand, prober.runner.(*containertest.FakeContainerCommandRunner).Cmd) {
@@ -392,7 +392,7 @@ func TestRunProbeHTTPGetHTTP2ProtocolFeatureGateDisabled(t *testing.T) {
 	// Gate off: kubelet silently falls back to HTTP/1.1 rather than
 	// failing with a gate error. The probe will fail with a connection
 	// error (no server), but must NOT fail due to the feature gate.
-	res, _, err := pb.runProbe(context.Background(), readiness, p, pod, status, container, containerID)
+	res, _, err := pb.runProbe(context.Background(), readiness, p, pod, status.PodIP, container, containerID)
 	if res == probe.Unknown {
 		t.Errorf("gate-off probe should fall back to HTTP/1.1, not return Unknown")
 	}

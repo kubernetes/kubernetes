@@ -892,6 +892,26 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				return conf
 			},
 			errMsg: `invalid configuration: duplicate sysctl "net.ipv4.ip_forward" found in defaultPodSysctls`,
+		}, {
+			name: "ContainerScopedProbes conflicts with ChangeContainerStatusOnKubeletRestart",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates[string(features.ContainerScopedProbes)] = true
+				conf.FeatureGates[string(features.ChangeContainerStatusOnKubeletRestart)] = true
+				return conf
+			},
+			errMsg: "invalid configuration: feature gates ContainerScopedProbes and ChangeContainerStatusOnKubeletRestart cannot both be enabled",
+		}, {
+			name: "ContainerScopedProbes alone is valid",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates[string(features.ContainerScopedProbes)] = true
+				return conf
+			},
+		}, {
+			name: "ChangeContainerStatusOnKubeletRestart alone is valid",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates[string(features.ChangeContainerStatusOnKubeletRestart)] = true
+				return conf
+			},
 		},
 	}
 
