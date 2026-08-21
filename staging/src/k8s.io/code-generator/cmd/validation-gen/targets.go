@@ -584,12 +584,12 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 	targetList = append(targetList, testTargets(args.TestOutputRoot, args.TestOutputFilePrefix, groupKindReports, allowlist, boilerplate)...)
 
 	if len(linter.lintErrors) > 0 {
-		buf := strings.Builder{}
+		buf := &strings.Builder{}
 
 		for t, errs := range linter.lintErrors {
-			buf.WriteString(fmt.Sprintf("  type %v:\n", t))
+			fmt.Fprintf(buf, "  type %v:\n", t)
 			for _, err := range errs {
-				buf.WriteString(fmt.Sprintf("    %s\n", err.Error()))
+				fmt.Fprintf(buf, "    %s\n", err.Error())
 			}
 		}
 		klog.Fatalf("lint failed:\n%s", buf.String())
