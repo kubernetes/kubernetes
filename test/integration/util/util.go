@@ -77,7 +77,6 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/utils/ptr"
 )
 
 // ShutdownFunc represents the function handle to be called, typically in a defer handler, to shutdown a running module
@@ -750,9 +749,9 @@ func InitTestSchedulerWithNS(t *testing.T, nsPrefix string, opts ...scheduler.Op
 func InitTestDisablePreemption(t *testing.T, nsPrefix string) *TestContext {
 	cfg := configtesting.V1ToInternalWithDefaults(t, kubeschedulerconfigv1.KubeSchedulerConfiguration{
 		Profiles: []kubeschedulerconfigv1.KubeSchedulerProfile{{
-			SchedulerName: ptr.To(v1.DefaultSchedulerName),
+			SchedulerName: new(v1.DefaultSchedulerName),
 			Plugins: &kubeschedulerconfigv1.Plugins{
-				PostFilter: kubeschedulerconfigv1.PluginSet{
+				MultiPoint: kubeschedulerconfigv1.PluginSet{
 					Disabled: []kubeschedulerconfigv1.Plugin{
 						{Name: defaultpreemption.Name},
 					},
@@ -915,9 +914,7 @@ func InitPausePod(conf *PausePodConfig) *v1.Pod {
 		}
 	}
 	if conf.PodGroupName != "" {
-		pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
-			PodGroupName: &conf.PodGroupName,
-		}
+		pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: new(conf.PodGroupName)}
 	}
 	return pod
 }
