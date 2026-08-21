@@ -1,16 +1,15 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { performance } from 'perf_hooks';
 import type { PolicyValidationReportJson } from '@aws-cdk/cloud-assembly-schema';
 import { Construct } from 'constructs';
 import * as cxapi from '../../../cx-api';
 import * as core from '../../lib';
-import { readPerfCounters } from '../../lib/private/perf';
+import { readPerfCounters, resetCounters } from '../../lib/private/perf';
 
 let consoleErrorMock: jest.SpyInstance;
 beforeEach(() => {
-  performance.clearMeasures();
+  resetCounters();
   consoleErrorMock = jest.spyOn(console, 'error').mockImplementation(() => { return true; });
   jest.spyOn(console, 'log').mockImplementation(() => { return true; });
   process.exitCode = undefined;

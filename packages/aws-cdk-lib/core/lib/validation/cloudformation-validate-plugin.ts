@@ -2,7 +2,7 @@ import { RegoEngine, TemplateFile, version } from '@aws/cloudformation-validate'
 import type { Engine, EngineConfig, RuleInfo, Severity } from '@aws/cloudformation-validate';
 import type { PolicyValidationPluginReport, PolicyViolatingResource } from './report';
 import type { IPolicyValidationPlugin, IPolicyValidationContext } from './validation';
-import { profileSpan, recordCounter } from '../private/perf';
+import { profileSpan, recordPerformanceEntry } from '../private/perf';
 
 const VALIDATE_DETAILED_METRIC = 'CloudFormationValidate.validate';
 const DIAGNOSTICS_METRIC = 'CloudFormationValidate.diagnostics';
@@ -132,7 +132,10 @@ export class CloudFormationValidatePlugin implements IPolicyValidationPlugin {
         });
       })();
 
-      recordCounter(DIAGNOSTICS_METRIC, report.diagnostics.length, { telemetry: true });
+      recordPerformanceEntry(DIAGNOSTICS_METRIC, {
+        count: report.diagnostics.length,
+        telemetry: true,
+      });
       const diagnosticsBySeverity = new Map<Severity, number>();
 
       for (const diagnostic of report.diagnostics) {
@@ -140,7 +143,10 @@ export class CloudFormationValidatePlugin implements IPolicyValidationPlugin {
       }
 
       for (const [severity, count] of diagnosticsBySeverity) {
-        recordCounter(`${DIAGNOSTICS_METRIC}.${severity}`, count, { telemetry: true });
+        recordPerformanceEntry(`${DIAGNOSTICS_METRIC}.${severity}`, {
+          count,
+          telemetry: true,
+        });
       }
 
       for (const diagnostic of report.diagnostics) {
