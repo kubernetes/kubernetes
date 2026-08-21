@@ -369,7 +369,8 @@ func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, podStatus *v
 				}
 			}
 
-			if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) {
+			if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) &&
+				canInheritProbeState(pod.Status.ContainerStatuses, c.Name, c.ContainerID) {
 				// Find the container spec for the container status.
 				var containerSpec *v1.Container
 				for j := range pod.Spec.Containers {
@@ -423,7 +424,8 @@ func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, podStatus *v
 					logger.Info("Failed to trigger a manual run", "probe", w.probeType.String())
 				}
 			}
-			if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) {
+			if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) &&
+				canInheritProbeState(pod.Status.InitContainerStatuses, c.Name, c.ContainerID) {
 				m.setReadyStateOnKubeletRestart(logger, &ready, pod, &podStatus.InitContainerStatuses[i], &initContainer)
 			}
 		}
@@ -459,4 +461,15 @@ func (m *manager) workerCount() int {
 // status changes for containers that were previously ready.
 func kubeletRestartGracePeriod(start time.Time) time.Time {
 	return start.Add(-time.Second * 10)
+}
+
+// canInheritProbeState checks whether the container the API server last knew about with the given
+// container name is the same container the kubelet is currently probing.
+// A replacement container must not inherit the previous container's probe state after kubelet restarts.
+func canInheritProbeState(apiContainerStatuses []v1.ContainerStatus, name, runtimeID string) bool {
+	apiContainerStatus, ok := podutil.GetContainerStatus(apiContainerStatuses, name)
+	if !ok || apiContainerStatus.ContainerID == "" || runtimeID == "" {
+		return true
+	}
+	return apiContainerStatus.ContainerID == runtimeID
 }
