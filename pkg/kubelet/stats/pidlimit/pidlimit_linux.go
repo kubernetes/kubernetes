@@ -19,10 +19,8 @@ limitations under the License.
 package pidlimit
 
 import (
-	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -74,13 +72,5 @@ func runningTaskCount() (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	fields := strings.Fields(string(bytes))
-	if len(fields) < 5 {
-		return 0, fmt.Errorf("not enough fields in /proc/loadavg")
-	}
-	subfields := strings.Split(fields[3], "/")
-	if len(subfields) != 2 {
-		return 0, fmt.Errorf("error parsing fourth field of /proc/loadavg")
-	}
-	return strconv.ParseInt(subfields[1], 10, 64)
+	return parseRunningTaskCount(string(bytes))
 }
