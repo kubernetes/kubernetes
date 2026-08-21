@@ -154,6 +154,7 @@ func (r *Reconciler) Reconcile(logger klog.Logger, service *corev1.Service, pods
 		} else {
 			r.endpointSliceTracker.ExpectDeletion(sliceToDelete)
 			metrics.EndpointSliceChanges.WithLabelValues("delete").Inc()
+			metrics.EndpointSliceChangesTotal.WithLabelValues("delete").Inc()
 		}
 	}
 
@@ -448,6 +449,7 @@ func (r *Reconciler) finalize(
 			}
 			r.endpointSliceTracker.Update(createdSlice)
 			metrics.EndpointSliceChanges.WithLabelValues("create").Inc()
+			metrics.EndpointSliceChangesTotal.WithLabelValues("create").Inc()
 		}
 	}
 
@@ -459,6 +461,7 @@ func (r *Reconciler) finalize(
 		}
 		r.endpointSliceTracker.Update(updatedSlice)
 		metrics.EndpointSliceChanges.WithLabelValues("update").Inc()
+		metrics.EndpointSliceChangesTotal.WithLabelValues("update").Inc()
 	}
 
 	for _, endpointSlice := range slicesToDelete {
@@ -468,6 +471,7 @@ func (r *Reconciler) finalize(
 		}
 		r.endpointSliceTracker.ExpectDeletion(endpointSlice)
 		metrics.EndpointSliceChanges.WithLabelValues("delete").Inc()
+		metrics.EndpointSliceChangesTotal.WithLabelValues("delete").Inc()
 	}
 
 	topologyLabel := "Disabled"
