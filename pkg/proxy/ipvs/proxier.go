@@ -681,7 +681,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	// We assume that if this was called, we really want to sync them,
 	// even if nothing changed in the meantime. In other words, callers are
 	// responsible for detecting no-op changes and not calling this function.
-	_ = proxier.svcPortMap.Update(proxier.serviceChanges)
+	serviceUpdateResult := proxier.svcPortMap.Update(proxier.serviceChanges)
 	endpointUpdateResult := proxier.endpointsMap.Update(proxier.endpointsChanges)
 
 	proxier.logger.V(3).Info("Syncing ipvs proxier rules")
@@ -1246,9 +1246,9 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("internal", string(proxier.ipFamily)).Set(float64(proxier.serviceNoLocalEndpointsInternal.Len()))
 	metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("external", string(proxier.ipFamily)).Set(float64(proxier.serviceNoLocalEndpointsExternal.Len()))
 
-	if endpointUpdateResult.ConntrackCleanupRequired {
+	if endpointUpdateResult.ConntrackCleanupRequired || serviceUpdateResult.ConntrackCleanupRequired {
 		// Finish housekeeping, clear stale conntrack entries for UDP Services
-		conntrack.CleanStaleEntries(proxier.conntrack, proxier.ipFamily, proxier.svcPortMap, proxier.endpointsMap)
+		conntrack.CleanStaleEntries(proxier.conntrack, proxier.ipFamily, proxier.svcPortMap, proxier.endpointsMap, serviceUpdateResult.DeletedServices)
 	}
 	return
 }

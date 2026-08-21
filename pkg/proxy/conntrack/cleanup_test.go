@@ -323,7 +323,7 @@ func TestCleanStaleEntries(t *testing.T) {
 	)
 
 	legacyregistry.MustRegister(metrics.ReconcileConntrackFlowsDeletedEntriesTotal)
-	CleanStaleEntries(ct, testIPFamily, svcPortMap, endpointsMap)
+	CleanStaleEntries(ct, testIPFamily, svcPortMap, endpointsMap, nil)
 	actualEntries, _ := ct.ListEntries(ipFamilyMap[testIPFamily])
 
 	metricCount, err := testutil.GetCounterMetricValue(metrics.ReconcileConntrackFlowsDeletedEntriesTotal.WithLabelValues(string(testIPFamily)))
@@ -430,7 +430,7 @@ func TestPerformanceCleanStaleEntries(t *testing.T) {
 	fake := &fakeHandler{entries: flows}
 	ct := newConntracker(fake)
 
-	CleanStaleEntries(ct, testIPFamily, svcPortMap, endpointsMap)
+	CleanStaleEntries(ct, testIPFamily, svcPortMap, endpointsMap, nil)
 	actualEntries, _ := ct.ListEntries(ipFamilyMap[testIPFamily])
 	if len(actualEntries) != expectedEntries {
 		t.Errorf("unexpected number of entries, got %d expected %d", len(actualEntries), expectedEntries)
@@ -547,7 +547,417 @@ func TestServiceWithoutEndpoints(t *testing.T) {
 		},
 	)
 
-	CleanStaleEntries(ct, testIPFamily, svcPortMap, endpointsMap)
+	CleanStaleEntries(ct, testIPFamily, svcPortMap, endpointsMap, nil)
+	actualEntries, _ := ct.ListEntries(ipFamilyMap[testIPFamily])
+
+	require.Len(t, actualEntries, len(entriesAfterCleanup))
+
+	// sort the actual flows before comparison
+	sort.Slice(actualEntries, func(i, j int) bool {
+		return actualEntries[i].String() < actualEntries[j].String()
+	})
+	// sort the expected flows before comparison
+	sort.Slice(entriesAfterCleanup, func(i, j int) bool {
+		return entriesAfterCleanup[i].String() < entriesAfterCleanup[j].String()
+	})
+
+	if diff := cmp.Diff(entriesAfterCleanup, actualEntries); len(diff) > 0 {
+		t.Errorf("unexpected entries after cleanup: %s", diff)
+	}
+}
+
+func TestDeletedUDPServices(t *testing.T) {
+	sct := proxy.NewServiceChangeTracker(v1.IPv4Protocol, nil, nil)
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testServiceName,
+			Namespace: testServiceNamespace,
+		},
+		Spec: v1.ServiceSpec{
+			ClusterIP:   testClusterIP,
+			ExternalIPs: []string{testExternalIP},
+			Ports: []v1.ServicePort{
+				{
+					Name:     "test-udp",
+					Port:     testServicePort,
+					NodePort: testServiceNodePort,
+					Protocol: v1.ProtocolUDP,
+				},
+			},
+		},
+		Status: v1.ServiceStatus{
+			LoadBalancer: v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{{
+					IP: testLoadBalancerIP,
+				}},
+			},
+		},
+	}
+
+	sct.Update(nil, svc)
+	svcPortMap := make(proxy.ServicePortMap)
+	_ = svcPortMap.Update(sct)
+
+	udpPortName := proxy.ServicePortName{
+		NamespacedName: types.NamespacedName{
+			Namespace: svc.Namespace,
+			Name:      svc.Name,
+		},
+		Port:     svc.Spec.Ports[0].Name,
+		Protocol: svc.Spec.Ports[0].Protocol,
+	}
+
+	// Capture the ServicePort data before deleting the service.
+	deletedSvc := svcPortMap[udpPortName]
+
+	sct.Update(svc, nil)
+	_ = svcPortMap.Update(sct)
+	if len(svcPortMap) != 0 {
+		t.Fatalf("expected svcPortMap to be empty after deletion, got %+v", svcPortMap)
+	}
+
+	deletedServices := proxy.ServicePortMap{
+		udpPortName: deletedSvc,
+	}
+
+	flows := []*netlink.ConntrackFlow{}
+	var entriesAfterCleanup []*netlink.ConntrackFlow
+
+	// UDP flows to the deleted service's frontends are stale and must be
+	// cleared. Since the service is deleted, endpoints are forced empty and
+	// all flows to its frontends are removed.
+	for _, origDest := range []string{testClusterIP, testLoadBalancerIP, testExternalIP} {
+		for _, dnatDest := range []string{testServingEndpointIP, testDeletedEndpointIP} {
+			flows = append(flows, generateConntrackEntry(origDest, testServicePort, dnatDest, testEndpointPort, unix.IPPROTO_UDP))
+		}
+	}
+
+	// UDP entries not directed to a service frontend are preserved.
+	entry := generateConntrackEntry(testExternalIP, testNonServicePort, testDeletedEndpointIP, testEndpointPort, unix.IPPROTO_UDP)
+	flows = append(flows, entry)
+	entriesAfterCleanup = append(entriesAfterCleanup, entry)
+
+	// non-UDP entries must be preserved.
+	entry = generateConntrackEntry(testExternalIP, testServicePort, testDeletedEndpointIP, testEndpointPort, unix.IPPROTO_TCP)
+	flows = append(flows, entry)
+	entriesAfterCleanup = append(entriesAfterCleanup, entry)
+
+	// *:NodePort entries are matched on the destination port only, which with
+	// an empty endpoints set would also remove flows not owned by kube-proxy,
+	// so NodePort cleanup is skipped for deleted services and these entries
+	// must be preserved.
+	entry = generateConntrackEntry("", testServiceNodePort, testDeletedEndpointIP, testEndpointPort, unix.IPPROTO_UDP)
+	flows = append(flows, entry)
+	entriesAfterCleanup = append(entriesAfterCleanup, entry)
+
+	ct := newConntracker(
+		&fakeHandler{
+			entries: flows,
+		},
+	)
+
+	CleanStaleEntries(ct, testIPFamily, svcPortMap, nil, deletedServices)
+	actualEntries, _ := ct.ListEntries(ipFamilyMap[testIPFamily])
+
+	require.Len(t, actualEntries, len(entriesAfterCleanup))
+
+	// sort the actual flows before comparison
+	sort.Slice(actualEntries, func(i, j int) bool {
+		return actualEntries[i].String() < actualEntries[j].String()
+	})
+	// sort the expected flows before comparison
+	sort.Slice(entriesAfterCleanup, func(i, j int) bool {
+		return entriesAfterCleanup[i].String() < entriesAfterCleanup[j].String()
+	})
+
+	if diff := cmp.Diff(entriesAfterCleanup, actualEntries); len(diff) > 0 {
+		t.Errorf("unexpected entries after cleanup: %s", diff)
+	}
+}
+
+// TestDeletedUDPServicesWithLingeringEndpoints checks that a deleted service's
+// flows are cleared even when its EndpointSlice has not been deleted yet. The
+// EndpointSlice deletion can lag the Service deletion by a sync, and a service is
+// reported as deleted only once, so resolving a deleted service against
+// endpointsMap would leak its flows permanently.
+func TestDeletedUDPServicesWithLingeringEndpoints(t *testing.T) {
+	sct := proxy.NewServiceChangeTracker(v1.IPv4Protocol, nil, nil)
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testServiceName,
+			Namespace: testServiceNamespace,
+		},
+		Spec: v1.ServiceSpec{
+			ClusterIP:   testClusterIP,
+			ExternalIPs: []string{testExternalIP},
+			Ports: []v1.ServicePort{
+				{
+					Name:     "test-udp",
+					Port:     testServicePort,
+					NodePort: testServiceNodePort,
+					Protocol: v1.ProtocolUDP,
+				},
+			},
+		},
+		Status: v1.ServiceStatus{
+			LoadBalancer: v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{{
+					IP: testLoadBalancerIP,
+				}},
+			},
+		},
+	}
+
+	sct.Update(nil, svc)
+	svcPortMap := make(proxy.ServicePortMap)
+	_ = svcPortMap.Update(sct)
+
+	udpPortName := proxy.ServicePortName{
+		NamespacedName: types.NamespacedName{
+			Namespace: svc.Namespace,
+			Name:      svc.Name,
+		},
+		Port:     svc.Spec.Ports[0].Name,
+		Protocol: svc.Spec.Ports[0].Protocol,
+	}
+
+	// Capture the ServicePort data before deleting the service.
+	deletedSvc := svcPortMap[udpPortName]
+
+	sct.Update(svc, nil)
+	_ = svcPortMap.Update(sct)
+	if len(svcPortMap) != 0 {
+		t.Fatalf("expected svcPortMap to be empty after deletion, got %+v", svcPortMap)
+	}
+
+	deletedServices := proxy.ServicePortMap{
+		udpPortName: deletedSvc,
+	}
+
+	// endpointsMap still holds a serving endpoint for the deleted service,
+	// as it would if the EndpointSlice deletion lands a sync later.
+	ect := proxy.NewEndpointsChangeTracker(v1.IPv4Protocol, "test-worker", nil, nil)
+	ect.EndpointSliceUpdate(&discovery.EndpointSlice{
+		AddressType: discovery.AddressTypeIPv4,
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-0", testServiceName),
+			Namespace: testServiceNamespace,
+			Labels:    map[string]string{discovery.LabelServiceName: testServiceName},
+		},
+		Endpoints: []discovery.Endpoint{
+			{
+				Addresses:  []string{testServingEndpointIP},
+				Conditions: discovery.EndpointConditions{Serving: new(true)},
+			},
+		},
+		Ports: []discovery.EndpointPort{
+			{
+				Name:     new(svc.Spec.Ports[0].Name),
+				Port:     new(int32(testEndpointPort)),
+				Protocol: new(v1.ProtocolUDP),
+			},
+		},
+	}, false)
+	endpointsMap := make(proxy.EndpointsMap)
+	_ = endpointsMap.Update(ect)
+
+	var flows []*netlink.ConntrackFlow
+
+	// UDP flows to the deleted service's frontends are stale and must be cleared,
+	// even though they are DNATed to the lingering serving endpoint.
+	for _, origDest := range []string{testClusterIP, testLoadBalancerIP, testExternalIP} {
+		flows = append(flows, generateConntrackEntry(origDest, testServicePort, testServingEndpointIP, testEndpointPort, unix.IPPROTO_UDP))
+	}
+
+	// *:NodePort entries are matched on the destination port only, so NodePort
+	// cleanup is skipped for a service registered with an empty endpoints set and
+	// this entry must be preserved. It would be removed if the deleted service
+	// were resolved against endpointsMap, since that would register its NodePort.
+	nodePortEntry := generateConntrackEntry("", testServiceNodePort, testDeletedEndpointIP, testEndpointPort, unix.IPPROTO_UDP)
+	flows = append(flows, nodePortEntry)
+	entriesAfterCleanup := []*netlink.ConntrackFlow{nodePortEntry}
+
+	ct := newConntracker(
+		&fakeHandler{
+			entries: flows,
+		},
+	)
+
+	CleanStaleEntries(ct, testIPFamily, svcPortMap, endpointsMap, deletedServices)
+	actualEntries, _ := ct.ListEntries(ipFamilyMap[testIPFamily])
+
+	require.Len(t, actualEntries, len(entriesAfterCleanup))
+	if diff := cmp.Diff(entriesAfterCleanup, actualEntries); len(diff) > 0 {
+		t.Errorf("unexpected entries after cleanup: %s", diff)
+	}
+}
+
+func TestDeletedUDPServicesIPReuse(t *testing.T) {
+	sct := proxy.NewServiceChangeTracker(v1.IPv4Protocol, nil, nil)
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testServiceName,
+			Namespace: testServiceNamespace,
+		},
+		Spec: v1.ServiceSpec{
+			ClusterIP:   testClusterIP,
+			ExternalIPs: []string{testExternalIP},
+			Ports: []v1.ServicePort{
+				{
+					Name:     "test-udp",
+					Port:     testServicePort,
+					NodePort: testServiceNodePort,
+					Protocol: v1.ProtocolUDP,
+				},
+			},
+		},
+		Status: v1.ServiceStatus{
+			LoadBalancer: v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{{
+					IP: testLoadBalancerIP,
+				}},
+			},
+		},
+	}
+
+	sct.Update(nil, svc)
+	svcPortMap := make(proxy.ServicePortMap)
+	_ = svcPortMap.Update(sct)
+
+	udpPortName := proxy.ServicePortName{
+		NamespacedName: types.NamespacedName{
+			Namespace: svc.Namespace,
+			Name:      svc.Name,
+		},
+		Port:     svc.Spec.Ports[0].Name,
+		Protocol: svc.Spec.Ports[0].Protocol,
+	}
+
+	// Capture the ServicePort data before deleting the service.
+	deletedSvc := svcPortMap[udpPortName]
+
+	sct.Update(svc, nil)
+	_ = svcPortMap.Update(sct)
+	if len(svcPortMap) != 0 {
+		t.Fatalf("expected svcPortMap to be empty after deletion, got %+v", svcPortMap)
+	}
+
+	deletedServices := proxy.ServicePortMap{
+		udpPortName: deletedSvc,
+	}
+
+	// Create a second service that reuses the deleted service's frontend IPs.
+	reusedServiceName := "cleanup-test-reused"
+	svc2 := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      reusedServiceName,
+			Namespace: testServiceNamespace,
+		},
+		Spec: v1.ServiceSpec{
+			ClusterIP:   testClusterIP,
+			ExternalIPs: []string{testExternalIP},
+			Ports: []v1.ServicePort{
+				{
+					Name:     "test-udp",
+					Port:     testServicePort,
+					NodePort: testServiceNodePort,
+					Protocol: v1.ProtocolUDP,
+				},
+			},
+		},
+		Status: v1.ServiceStatus{
+			LoadBalancer: v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{{
+					IP: testLoadBalancerIP,
+				}},
+			},
+		},
+	}
+
+	sct.Update(nil, svc2)
+	_ = svcPortMap.Update(sct)
+
+	udpPortName2 := proxy.ServicePortName{
+		NamespacedName: types.NamespacedName{
+			Namespace: svc2.Namespace,
+			Name:      svc2.Name,
+		},
+		Port:     svc2.Spec.Ports[0].Name,
+		Protocol: svc2.Spec.Ports[0].Protocol,
+	}
+	if svcPortMap[udpPortName2] == nil {
+		t.Fatalf("expected svcPortMap to contain reused service %q", udpPortName2.String())
+	}
+
+	ect := proxy.NewEndpointsChangeTracker(v1.IPv4Protocol, "test-worker", nil, nil)
+	eps := &discovery.EndpointSlice{
+		AddressType: discovery.AddressTypeIPv4,
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-0", reusedServiceName),
+			Namespace: testServiceNamespace,
+			Labels:    map[string]string{discovery.LabelServiceName: reusedServiceName},
+		},
+		Endpoints: []discovery.Endpoint{
+			{
+				Addresses:  []string{testServingEndpointIP},
+				Conditions: discovery.EndpointConditions{Serving: new(true)},
+			},
+		},
+		Ports: []discovery.EndpointPort{
+			{
+				Name:     new("test-udp"),
+				Port:     new(int32(testEndpointPort)),
+				Protocol: new(v1.ProtocolUDP),
+			},
+		},
+	}
+
+	ect.EndpointSliceUpdate(eps, false)
+	endpointsMap := make(proxy.EndpointsMap)
+	_ = endpointsMap.Update(ect)
+
+	flows := []*netlink.ConntrackFlow{}
+	var entriesAfterCleanup []*netlink.ConntrackFlow
+
+	// Flows to the reused frontend IPs that are DNATed to the current
+	// service's serving endpoint must be preserved.
+	for _, origDest := range []string{testClusterIP, testLoadBalancerIP, testExternalIP} {
+		entry := generateConntrackEntry(origDest, testServicePort, testServingEndpointIP, testEndpointPort, unix.IPPROTO_UDP)
+		flows = append(flows, entry)
+		entriesAfterCleanup = append(entriesAfterCleanup, entry)
+	}
+
+	// Flows to the reused frontend IPs that are DNATed to a deleted endpoint
+	// must be cleared.
+	for _, origDest := range []string{testClusterIP, testLoadBalancerIP, testExternalIP} {
+		flows = append(flows, generateConntrackEntry(origDest, testServicePort, testDeletedEndpointIP, testEndpointPort, unix.IPPROTO_UDP))
+	}
+
+	// UDP entries not directed to a service frontend are preserved.
+	entry := generateConntrackEntry(testExternalIP, testNonServicePort, testDeletedEndpointIP, testEndpointPort, unix.IPPROTO_UDP)
+	flows = append(flows, entry)
+	entriesAfterCleanup = append(entriesAfterCleanup, entry)
+
+	// non-UDP entries must be preserved.
+	entry = generateConntrackEntry(testExternalIP, testServicePort, testDeletedEndpointIP, testEndpointPort, unix.IPPROTO_TCP)
+	flows = append(flows, entry)
+	entriesAfterCleanup = append(entriesAfterCleanup, entry)
+
+	// *:NodePort entries are matched on the destination port only. The
+	// current service has serving endpoints, so only flows to a deleted
+	// endpoint are stale.
+	entry = generateConntrackEntry("", testServiceNodePort, testServingEndpointIP, testEndpointPort, unix.IPPROTO_UDP)
+	flows = append(flows, entry)
+	entriesAfterCleanup = append(entriesAfterCleanup, entry)
+	flows = append(flows, generateConntrackEntry("", testServiceNodePort, testDeletedEndpointIP, testEndpointPort, unix.IPPROTO_UDP))
+
+	ct := newConntracker(
+		&fakeHandler{
+			entries: flows,
+		},
+	)
+
+	CleanStaleEntries(ct, testIPFamily, svcPortMap, endpointsMap, deletedServices)
 	actualEntries, _ := ct.ListEntries(ipFamilyMap[testIPFamily])
 
 	require.Len(t, actualEntries, len(entriesAfterCleanup))
