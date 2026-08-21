@@ -1270,6 +1270,131 @@ describe('table', () => {
 });
 
 describe('grants', () => {
+  test('grants.readData includes index ARN when a GSI is added after construction', () => {
+    // GIVEN
+    const stack = new Stack();
+    const table = new TableV2(stack, 'Table', {
+      partitionKey: { name: 'pk', type: AttributeType.STRING },
+    });
+    const role = new iam.Role(stack, 'Role', { assumedBy: new iam.AccountRootPrincipal() });
+
+    // WHEN
+    table.addGlobalSecondaryIndex({
+      indexName: 'gsi1',
+      partitionKey: { name: 'gsiPk', type: AttributeType.STRING },
+    });
+    table.grants.readData(role);
+
+    // THEN
+    Template.fromStack(stack).hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Effect: 'Allow',
+            Resource: Match.arrayWith([
+              Match.objectLike({
+                'Fn::Join': ['', Match.arrayWith(['/index/*'])],
+              }),
+            ]),
+          }),
+        ]),
+      },
+    });
+  });
+
+  test('grants.readData includes index ARN when a GSI is provided via props', () => {
+    // GIVEN
+    const stack = new Stack();
+    const table = new TableV2(stack, 'Table', {
+      partitionKey: { name: 'pk', type: AttributeType.STRING },
+      globalSecondaryIndexes: [{
+        indexName: 'gsi1',
+        partitionKey: { name: 'gsiPk', type: AttributeType.STRING },
+      }],
+    });
+    const role = new iam.Role(stack, 'Role', { assumedBy: new iam.AccountRootPrincipal() });
+
+    // WHEN
+    table.grants.readData(role);
+
+    // THEN
+    Template.fromStack(stack).hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Effect: 'Allow',
+            Resource: Match.arrayWith([
+              Match.objectLike({
+                'Fn::Join': ['', Match.arrayWith(['/index/*'])],
+              }),
+            ]),
+          }),
+        ]),
+      },
+    });
+  });
+
+  test('grants.readData includes index ARN when an LSI is added after construction', () => {
+    // GIVEN
+    const stack = new Stack();
+    const table = new TableV2(stack, 'Table', {
+      partitionKey: { name: 'pk', type: AttributeType.STRING },
+      sortKey: { name: 'sk', type: AttributeType.STRING },
+    });
+    const role = new iam.Role(stack, 'Role', { assumedBy: new iam.AccountRootPrincipal() });
+
+    // WHEN
+    table.addLocalSecondaryIndex({
+      indexName: 'lsi1',
+      sortKey: { name: 'lsiSk', type: AttributeType.STRING },
+    });
+    table.grants.readData(role);
+
+    // THEN
+    Template.fromStack(stack).hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Effect: 'Allow',
+            Resource: Match.arrayWith([
+              Match.objectLike({
+                'Fn::Join': ['', Match.arrayWith(['/index/*'])],
+              }),
+            ]),
+          }),
+        ]),
+      },
+    });
+  });
+
+  test('grants.readData omits index ARN when the table has no indexes', () => {
+    // GIVEN
+    const stack = new Stack();
+    const table = new TableV2(stack, 'Table', {
+      partitionKey: { name: 'pk', type: AttributeType.STRING },
+    });
+    const role = new iam.Role(stack, 'Role', { assumedBy: new iam.AccountRootPrincipal() });
+
+    // WHEN
+    table.grants.readData(role);
+
+    // THEN
+    Template.fromStack(stack).hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Effect: 'Allow',
+            Resource: Match.not(Match.arrayWith([
+              Match.objectLike({
+                'Fn::Join': ['', Match.arrayWith(['/index/*'])],
+              }),
+            ])),
+          }),
+        ]),
+      },
+    });
+  });
+
   test('grantReadData with AccountRootPrincipal uses wildcard resources', () => {
     // GIVEN
     const stack = new Stack();
