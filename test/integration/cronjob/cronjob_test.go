@@ -151,10 +151,7 @@ func TestCronJobLaunchesPodAndCleansUp(t *testing.T) {
 	tCtx := ktesting.Init(t)
 
 	closeFn, cjc, jc, informerSet, clientSet := setup(tCtx, t)
-	defer closeFn()
-
-	// When shutting down, cancel must be called before closeFn.
-	defer tCtx.Cancel("test has completed")
+	tCtx.Cleanup(closeFn)
 
 	cronJobName := "foo"
 	namespaceName := "simple-cronjob-test"

@@ -68,11 +68,10 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 
 	tCtx := ktesting.Init(t)
 	closeFn, rm, informers, _, clientSet := rmSetup(tCtx, t)
-	defer closeFn()
+	tCtx.Cleanup(closeFn)
 
 	ns := framework.CreateNamespaceOrDie(clientSet, "concurrent-eviction-requests", t)
 	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
-	defer tCtx.Cancel("test has completed")
 
 	informers.Start(tCtx.Done())
 	go rm.Run(tCtx, 1)
@@ -181,11 +180,10 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 func TestTerminalPodEviction(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	closeFn, rm, informers, _, clientSet := rmSetup(tCtx, t)
-	defer closeFn()
+	tCtx.Cleanup(closeFn)
 
 	ns := framework.CreateNamespaceOrDie(clientSet, "terminalpod-eviction", t)
 	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
-	defer tCtx.Cancel("test has completed")
 
 	informers.Start(tCtx.Done())
 	go rm.Run(tCtx, 1)
@@ -255,8 +253,7 @@ func TestTerminalPodEviction(t *testing.T) {
 func TestEvictionVersions(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	closeFn, rm, informers, config, clientSet := rmSetup(tCtx, t)
-	defer closeFn()
-	defer tCtx.Cancel("test has completed")
+	tCtx.Cleanup(closeFn)
 
 	informers.Start(tCtx.Done())
 	go rm.Run(tCtx, 1)
@@ -365,11 +362,10 @@ func TestEvictionWithFinalizers(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			closeFn, rm, informers, _, clientSet := rmSetup(tCtx, t)
-			defer closeFn()
+			tCtx.Cleanup(closeFn)
 
 			ns := framework.CreateNamespaceOrDie(clientSet, "eviction-with-finalizers", t)
 			defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
-			defer tCtx.Cancel("test has completed")
 
 			informers.Start(tCtx.Done())
 			go rm.Run(tCtx, 1)
@@ -440,11 +436,10 @@ func TestEvictionWithUnhealthyPodEvictionPolicy(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			closeFn, rm, informers, _, clientSet := rmSetup(tCtx, t)
-			defer closeFn()
+			tCtx.Cleanup(closeFn)
 
 			ns := framework.CreateNamespaceOrDie(clientSet, "eviction-with-pdb-pod-healthy-policy", t)
 			defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
-			defer tCtx.Cancel("test has completed")
 
 			informers.Start(tCtx.Done())
 			go rm.Run(tCtx, 1)
@@ -533,12 +528,11 @@ func TestEvictionWithPrecondition(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			closeFn, rm, informers, _, clientSet := rmSetup(tCtx, t)
-			defer closeFn()
+			tCtx.Cleanup(closeFn)
 
 			ns := framework.CreateNamespaceOrDie(clientSet, "eviction-with-preconditions", t)
 			defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
 
-			defer tCtx.Cancel("test has completed")
 			informers.Start(tCtx.Done())
 			go rm.Run(tCtx, 1)
 

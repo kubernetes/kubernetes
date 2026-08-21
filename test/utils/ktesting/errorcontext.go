@@ -75,6 +75,17 @@ type failures struct {
 	error
 }
 
+// Unwrap gives errors.Is and errors.As access to the individual errors
+// joined together by errors.Join in finalize. Embedding only promotes
+// Error() because the embedded field has the static type error, which
+// doesn't declare Unwrap, so it has to be forwarded explicitly here.
+func (e failures) Unwrap() []error {
+	if joined, ok := e.error.(interface{ Unwrap() []error }); ok {
+		return joined.Unwrap()
+	}
+	return nil
+}
+
 func (e failures) GomegaString() string {
 	// We don't need to repeat the string. Errors already get formatted once by Gomega itself,
 	// then it calls GomegaString for a summary that isn't necessary anymore.
@@ -131,12 +142,28 @@ func (tCtx TContext) Logf(format string, args ...any) {
 	tCtx.TB().Log(tCtx.buildHeader("", " ") + tCtx.steps + indent(msg, false))
 }
 
+// reportFailure writes msg to the underlying TB as an "ERROR" or "FATAL
+// ERROR", depending on fatal. testing.T itself already logs the source code
+// location of the call (via t.Helper() bookkeeping), so this does not also
+// dump a stack backtrace: only [TContext.ExpectNoError] and
+// [TContext.AssertNoError] do that, for a [FailureError] with a captured
+// backtrace from its original occurrence.
+func (tCtx TContext) reportFailure(fatal bool, msg string) {
+	tCtx.Helper()
+	if fatal {
+		// FATAL ERROR *before* header to make it stand out as failure.
+		tCtx.TB().Fatal("FATAL ERROR:" + tCtx.buildHeader(" ", "\n") + indent(tCtx.steps+msg, true))
+		return
+	}
+	// ERROR *before* header to make it stand out as failure.
+	tCtx.TB().Error("ERROR:" + tCtx.buildHeader(" ", "\n") + indent(tCtx.steps+msg, true))
+}
+
 func (tCtx TContext) Error(args ...any) {
 	if tCtx.capture == nil {
 		tCtx.Helper()
 		msg := strings.TrimSpace(fmt.Sprintln(args...))
-		// ERROR *before* header to make it stand out as failure.
-		tCtx.TB().Error("ERROR:" + tCtx.buildHeader(" ", "\n") + indent(tCtx.steps+msg, true))
+		tCtx.reportFailure(false, msg)
 		return
 	}
 
@@ -149,7 +176,10 @@ func (tCtx TContext) Error(args ...any) {
 	// line breaks. Besides, Sprintln (required for `go vet printf`) also
 	// adds a trailing newline that we don't want.
 	msg := strings.TrimSpace(fmt.Sprintln(args...))
-	tCtx.capture.errors = append(tCtx.capture.errors, errors.New(tCtx.steps+msg))
+	tCtx.capture.errors = append(tCtx.capture.errors, FailureError{
+		Msg:            tCtx.steps + msg,
+		FullStackTrace: captureBacktrace(),
+	})
 	tCtx.capture.failed = true
 }
 
@@ -158,8 +188,7 @@ func (tCtx TContext) Errorf(format string, args ...any) {
 		tCtx.Helper()
 		// Enable `go vet printf` by directly calling fmt.Sprintln.
 		msg := strings.TrimSpace(fmt.Sprintf(format, args...))
-		// ERROR *before* header to make it stand out as failure.
-		tCtx.TB().Error("ERROR:" + tCtx.buildHeader(" ", "\n") + indent(tCtx.steps+msg, true))
+		tCtx.reportFailure(false, msg)
 		return
 	}
 
@@ -167,7 +196,10 @@ func (tCtx TContext) Errorf(format string, args ...any) {
 	defer tCtx.capture.mutex.Unlock()
 
 	msg := strings.TrimSpace(fmt.Sprintf(format, args...))
-	tCtx.capture.errors = append(tCtx.capture.errors, errors.New(tCtx.steps+msg))
+	tCtx.capture.errors = append(tCtx.capture.errors, FailureError{
+		Msg:            tCtx.steps + msg,
+		FullStackTrace: captureBacktrace(),
+	})
 	tCtx.capture.failed = true
 }
 
@@ -180,6 +212,10 @@ func (tCtx TContext) Fail() {
 	tCtx.capture.mutex.Lock()
 	defer tCtx.capture.mutex.Unlock()
 
+	tCtx.capture.errors = append(tCtx.capture.errors, FailureError{
+		Msg:            errFailedWithNoExplanation.Error(),
+		FullStackTrace: captureBacktrace(),
+	})
 	tCtx.capture.failed = true
 }
 
@@ -192,6 +228,12 @@ func (tCtx TContext) FailNow() {
 	tCtx.capture.mutex.Lock()
 	defer tCtx.capture.mutex.Unlock()
 
+	if !tCtx.capture.failed {
+		tCtx.capture.errors = append(tCtx.capture.errors, FailureError{
+			Msg:            errFailedWithNoExplanation.Error(),
+			FullStackTrace: captureBacktrace(),
+		})
+	}
 	tCtx.capture.failed = true
 	panic(failed)
 }
@@ -212,8 +254,7 @@ func (tCtx TContext) Fatal(args ...any) {
 		tCtx.Helper()
 		// Enable `go vet printf` by directly calling fmt.Sprintln.
 		msg := strings.TrimSpace(fmt.Sprintln(args...))
-		// FATAL ERROR *before* header to make it stand out as failure.
-		tCtx.TB().Fatal("FATAL ERROR:" + tCtx.buildHeader(" ", "\n") + indent(tCtx.steps+msg, true))
+		tCtx.reportFailure(true, msg)
 	}
 
 	tCtx.Error(args...)
@@ -225,8 +266,7 @@ func (tCtx TContext) Fatalf(format string, args ...any) {
 		tCtx.Helper()
 		// Enable `go vet printf` by directly calling fmt.Sprintf.
 		msg := strings.TrimSpace(fmt.Sprintf(format, args...))
-		// FATAL ERROR *before* header to make it stand out as failure.
-		tCtx.TB().Fatal("FATAL ERROR:" + tCtx.buildHeader(" ", "\n") + indent(tCtx.steps+msg, true))
+		tCtx.reportFailure(true, msg)
 		return
 	}
 

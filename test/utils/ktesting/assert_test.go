@@ -360,7 +360,7 @@ func TestAssert(t *testing.T) {
 			cb: func(tCtx TContext) {
 				tCtx.ExpectNoError(fmt.Errorf("doing something: %w", FailureError{Msg: "fake error", FullStackTrace: "abc\nxyz"}))
 			},
-			expectTrace: `(LOG) <klog header>: Failed at:
+			expectTrace: `(LOG) <klog header>: failed at:
 	abc
 	xyz
 (FATAL) FATAL ERROR: <klog header>:
@@ -372,7 +372,7 @@ func TestAssert(t *testing.T) {
 				tCtx.ExpectNoError(fmt.Errorf("doing something: %w", FailureError{Msg: "fake error", FullStackTrace: "abc\nxyz"}), "testing error checking")
 			},
 			expectTrace: `(LOG) <klog header>: testing error checking
-(LOG) <klog header>: Failed at:
+(LOG) <klog header>: failed at:
 	abc
 	xyz
 (FATAL) FATAL ERROR: <klog header>:

@@ -4659,7 +4659,6 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 	fh, err := runtime.NewFramework(tCtx, nil, nil, opts...)
 	tCtx.ExpectNoError(err, "create scheduler framework")
 	tCtx.Cleanup(func() {
-		tCtx.Cancel("test has completed")
 		runtime.WaitForShutdown(fh)
 	})
 
@@ -4687,8 +4686,6 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 
 	tc.informerFactory.Start(tCtx.Done())
 	tCtx.Cleanup(func() {
-		// Need to cancel before waiting for the shutdown.
-		tCtx.Cancel("test is done")
 		// Now we can wait for all goroutines to stop.
 		tc.informerFactory.Shutdown()
 	})

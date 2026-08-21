@@ -116,11 +116,10 @@ func testSleep() {
 func TestPersistentVolumeRecycler(t *testing.T) {
 	klog.V(2).Infof("TestPersistentVolumeRecycler started")
 	s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection"}, framework.SharedEtcd())
-	defer s.TearDownFn()
+	t.Cleanup(s.TearDownFn)
 	namespaceName := "pv-recycler"
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 
 	testClient, ctrl, informers, watchPV, watchPVC := createClients(tCtx, namespaceName, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
@@ -173,11 +172,10 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 func TestPersistentVolumeDeleter(t *testing.T) {
 	klog.V(2).Infof("TestPersistentVolumeDeleter started")
 	s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection"}, framework.SharedEtcd())
-	defer s.TearDownFn()
+	t.Cleanup(s.TearDownFn)
 	namespaceName := "pv-deleter"
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 	testClient, ctrl, informers, watchPV, watchPVC := createClients(tCtx, namespaceName, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -234,11 +232,10 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 	// PVC. Only this specific PVC should get bound.
 	klog.V(2).Infof("TestPersistentVolumeBindRace started")
 	s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection"}, framework.SharedEtcd())
-	defer s.TearDownFn()
+	t.Cleanup(s.TearDownFn)
 	namespaceName := "pv-bind-race"
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 	testClient, ctrl, informers, watchPV, watchPVC := createClients(tCtx, namespaceName, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -307,11 +304,10 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 // TestPersistentVolumeClaimLabelSelector test binding using label selectors
 func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
 	s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection"}, framework.SharedEtcd())
-	defer s.TearDownFn()
+	t.Cleanup(s.TearDownFn)
 	namespaceName := "pvc-label-selector"
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 	testClient, controller, informers, watchPV, watchPVC := createClients(tCtx, namespaceName, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -389,11 +385,10 @@ func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
 // MatchExpressions label selectors
 func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
 	s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection"}, framework.SharedEtcd())
-	defer s.TearDownFn()
+	t.Cleanup(s.TearDownFn)
 	namespaceName := "pvc-match-expressions"
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 	testClient, controller, informers, watchPV, watchPVC := createClients(tCtx, namespaceName, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -490,11 +485,10 @@ func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
 // different size.
 func TestPersistentVolumeMultiPVs(t *testing.T) {
 	s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection"}, framework.SharedEtcd())
-	defer s.TearDownFn()
+	t.Cleanup(s.TearDownFn)
 	namespaceName := "multi-pvs"
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 	testClient, controller, informers, watchPV, watchPVC := createClients(tCtx, namespaceName, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -679,10 +673,9 @@ func TestPersistentVolumeClaimVolumeAttirbutesClassName(t *testing.T) {
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.featureEnabled)
 			s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection"}, framework.SharedEtcd())
-			defer s.TearDownFn()
+			t.Cleanup(s.TearDownFn)
 
 			tCtx := ktesting.Init(t)
-			defer tCtx.Cancel("test has completed")
 			testClient, controller, informers, watchPV, watchPVC := createClients(tCtx, namespaceName, t, s, defaultSyncPeriod)
 			defer watchPV.Stop()
 			defer watchPVC.Stop()
@@ -758,11 +751,10 @@ func TestPersistentVolumeClaimVolumeAttirbutesClassName(t *testing.T) {
 // This test is configurable by KUBE_INTEGRATION_PV_* variables.
 func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 	s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection"}, framework.SharedEtcd())
-	defer s.TearDownFn()
+	t.Cleanup(s.TearDownFn)
 	namespaceName := "multi-pvs-pvcs"
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 	testClient, binder, informers, watchPV, watchPVC := createClients(tCtx, namespaceName, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -920,7 +912,7 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 // The controller should not unbind any volumes when it starts.
 func TestPersistentVolumeControllerStartup(t *testing.T) {
 	s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection"}, framework.SharedEtcd())
-	defer s.TearDownFn()
+	t.Cleanup(s.TearDownFn)
 	namespaceName := "controller-startup"
 
 	objCount := getObjectCount()
@@ -929,7 +921,6 @@ func TestPersistentVolumeControllerStartup(t *testing.T) {
 	syncPeriod := getSyncPeriod(shortSyncPeriod)
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 	testClient, binder, informers, watchPV, watchPVC := createClients(tCtx, namespaceName, t, s, shortSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -1052,11 +1043,10 @@ func TestPersistentVolumeControllerStartup(t *testing.T) {
 // This test is configurable by KUBE_INTEGRATION_PV_* variables.
 func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection"}, framework.SharedEtcd())
-	defer s.TearDownFn()
+	t.Cleanup(s.TearDownFn)
 	namespaceName := "provision-multi-pvs"
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 	testClient, binder, informers, watchPV, watchPVC := createClients(tCtx, namespaceName, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -1148,11 +1138,10 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 // PVs with different access modes.
 func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 	s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection"}, framework.SharedEtcd())
-	defer s.TearDownFn()
+	t.Cleanup(s.TearDownFn)
 	namespaceName := "multi-pvs-diff-access"
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 	testClient, controller, informers, watchPV, watchPVC := createClients(tCtx, namespaceName, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
@@ -1231,13 +1220,12 @@ func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
 // and without presence of a default SC.
 func TestRetroactiveStorageClassAssignment(t *testing.T) {
 	s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=DefaultStorageClass"}, framework.SharedEtcd())
-	defer s.TearDownFn()
+	t.Cleanup(s.TearDownFn)
 	namespaceName := "retro-pvc-sc"
 	defaultStorageClassName := "gold"
 	storageClassName := "silver"
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 	testClient, binder, informers, watchPV, watchPVC := createClients(tCtx, namespaceName, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()

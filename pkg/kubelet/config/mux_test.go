@@ -30,7 +30,6 @@ import (
 
 func TestConfigurationChannels(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("TestConfigurationChannels completed")
 
 	mux := newMux(nil)
 	channelOne := mux.ChannelWithContext(tCtx, "one")
@@ -45,7 +44,6 @@ func TestConfigurationChannels(t *testing.T) {
 
 func TestMergeInvoked(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("TestMergeInvoked completed")
 
 	const expectedSource = "one"
 	done := make(chan interface{})
@@ -83,7 +81,6 @@ func (f mergeFunc) Merge(ctx context.Context, source string, update sourceUpdate
 
 func TestSimultaneousMerge(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("TestSimultaneousMerge completed")
 
 	ch := make(chan bool, 2)
 	mux := newMux(mergeFunc(func(ctx context.Context, source string, update sourceUpdate) error {

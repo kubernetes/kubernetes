@@ -503,7 +503,6 @@ func TestDeleteUnusedImagesLimitByImageLiveTime(t *testing.T) {
 }
 
 func testDeleteUnusedImagesLimitByImageLiveTime(tCtx ktesting.TContext) {
-	defer tCtx.Cancel("test completed")
 	t := tCtx.TB()
 	mockStatsProvider := statstest.NewMockProvider(t)
 

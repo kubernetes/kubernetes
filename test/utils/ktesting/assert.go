@@ -21,6 +21,9 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
+	"runtime/debug"
+	"strings"
 
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
@@ -57,6 +60,67 @@ func (f FailureError) Is(target error) bool {
 //	    ...
 //	}
 var ErrFailure error = FailureError{}
+
+// NewFailure creates a new [FailureError] with msg as its message, recording
+// the current stack backtrace in [FailureError.FullStackTrace] so that
+// [TContext.ExpectNoError] and [TContext.AssertNoError] can log it later,
+// when the error eventually gets turned into a test failure.
+//
+// Use it in helper code which detects a failure and wants to return an error
+// through normal Go error handling instead of failing the test directly:
+//
+//	func doSomething(tCtx ktesting.TContext) error {
+//	    ...
+//	    if !ok {
+//	        return ktesting.NewFailure(fmt.Sprintf("something went wrong: %s", reason))
+//	    }
+//	    return nil
+//	}
+func NewFailure(msg string) FailureError {
+	return FailureError{
+		Msg:            msg,
+		FullStackTrace: captureBacktrace(),
+	}
+}
+
+// runtimeStackFrameRE matches source file paths of stack frames inside the Go
+// runtime or testing packages, Gomega's own internal plumbing, plus ktesting's
+// own source code (but not code in subpackages like the examples). None of
+// those add useful information for diagnosing test failures: the former are
+// internal implementation details, the latter merely point back at the
+// ktesting API call that triggered capturing the backtrace.
+var runtimeStackFrameRE = regexp.MustCompile(`/src/testing/|/src/runtime/|/onsi/gomega/|/test/utils/ktesting/[^/]+\.go:`)
+
+// captureBacktrace returns a pruned stack backtrace pointing at the caller of
+// captureBacktrace, suitable for use as [FailureError.FullStackTrace].
+func captureBacktrace() string {
+	// Skip the frames for runtime/debug.Stack itself and this function.
+	// Any remaining ktesting-internal frames (e.g. Error, Errorf, Fatal,
+	// Fatalf, NewFailure) get filtered out below via runtimeStackFrameRE,
+	// regardless of how deep the call chain to captureBacktrace is.
+	return pruneStack(string(debug.Stack()), 2)
+}
+
+// pruneStack removes the given number of leading frames (as pairs of
+// function name + file:line, in the format produced by [runtime/debug.Stack])
+// plus any frames matched by runtimeStackFrameRE.
+func pruneStack(fullStackTrace string, skip int) string {
+	stack := strings.Split(fullStackTrace, "\n")
+	// Ignore the "goroutine 1 [running]:" header line, if present.
+	if len(stack) > 0 && strings.HasPrefix(stack[0], "goroutine ") {
+		stack = stack[1:]
+	}
+	if len(stack) > 2*skip {
+		stack = stack[2*skip:]
+	}
+	var pruned []string
+	for i := 0; i < len(stack)/2; i++ {
+		if !runtimeStackFrameRE.MatchString(stack[i*2+1]) {
+			pruned = append(pruned, stack[i*2], stack[i*2+1])
+		}
+	}
+	return strings.Join(pruned, "\n")
+}
 
 func gomegaAssertion(tCtx TContext, fatal bool, actual interface{}, extra ...interface{}) gomega.Assertion {
 	testingT := gtypes.GomegaTestingT(tCtx)
@@ -106,17 +170,17 @@ func (a assertTestingT) Fatalf(format string, args ...any) {
 //	tCtx.ExpectNoError(somehelper.CreateSomething(tCtx, ...), "creating the second foobar")
 func (tCtx TContext) ExpectNoError(err error, explain ...interface{}) {
 	tCtx.Helper()
-	tCtx.noError(tCtx.Fatalf, err, explain...)
+	tCtx.noError(true, err, explain...)
 }
 
 // AssertNoError is a variant of ExpectNoError which reports an unexpected
 // error without aborting the test. It returns true if there was no error.
 func (tCtx TContext) AssertNoError(err error, explain ...interface{}) bool {
 	tCtx.Helper()
-	return tCtx.noError(tCtx.Errorf, err, explain...)
+	return tCtx.noError(false, err, explain...)
 }
 
-func (tCtx TContext) noError(failf func(format string, args ...any), err error, explain ...interface{}) bool {
+func (tCtx TContext) noError(fatal bool, err error, explain ...interface{}) bool {
 	if err == nil {
 		return true
 	}
@@ -124,21 +188,27 @@ func (tCtx TContext) noError(failf func(format string, args ...any), err error, 
 	tCtx.Helper()
 	description := buildDescription(explain...)
 
+	fail := tCtx.Errorf
+	if fatal {
+		fail = tCtx.Fatalf
+	}
+
 	if errors.Is(err, ErrFailure) {
 		var failure FailureError
 		if tCtx.capture == nil && errors.As(err, &failure) {
 			if backtrace := failure.Backtrace(); backtrace != "" {
 				if description != "" {
-					tCtx.Log(description)
+					tCtx.Logf("%s: failed at:\n%s", description, backtrace)
+				} else {
+					tCtx.Logf("failed at:\n%s", backtrace)
 				}
-				tCtx.Logf("Failed at:\n%s", backtrace)
 			}
 		}
 		if description != "" {
-			failf("%s: %s", description, err.Error())
+			fail("%s: %s", description, err.Error())
 			return false
 		}
-		failf("%s", err.Error())
+		fail("%s", err.Error())
 		return false
 	}
 
@@ -148,7 +218,7 @@ func (tCtx TContext) noError(failf func(format string, args ...any), err error, 
 	if tCtx.capture == nil {
 		tCtx.Logf("%s:\n%s", description, format.Object(err, 0))
 	}
-	failf("%s: %v", description, err.Error())
+	fail("%s: %v", description, err.Error())
 	return false
 }
 

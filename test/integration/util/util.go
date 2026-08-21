@@ -559,12 +559,6 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 		t.Fatal(err)
 	}
 
-	oldCloseFn := testCtx.CloseFn
-	testCtx.CloseFn = func() {
-		tCtx.Cancel("tearing down apiserver")
-		oldCloseFn()
-	}
-
 	if nsPrefix != "default" {
 		testCtx.NS = framework.CreateNamespaceOrDie(testCtx.ClientSet, nsPrefix+string(uuid.NewUUID()), t)
 	} else {

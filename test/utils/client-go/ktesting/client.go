@@ -63,11 +63,11 @@ func set(tCtx ktesting.TContext, data data) TContext {
 // having to pass all of them down into call chains of test helper functions as
 // separate parameters.
 //
-// All methods which have a [ktesting.TContext] in their prototype get
-// overridden such that they work with a TContext instead. This ensures
-// that the new methods are always accessible.
+// All methods which return the base TContext get overridden such that the
+// extended TContext is returned instead. This ensures that the new methods are
+// always accessible. Callbacks can use a base or extended TContext.
 //
-// When calling functions which expect a [ktesting.TContext] pass
+// When calling functions which expect the base TContext, pass
 // the TContext field embedded here.
 type TContext struct {
 	ktesting.TContext
@@ -109,6 +109,9 @@ func (tCtx TContext) WithRESTConfig(cfg *rest.Config) TContext {
 }
 
 // WithClients uses an existing config and clients.
+//
+// ktesting itself does not care which of these parameters are nil,
+// but consumers of the resulting TContext might need real instances.
 func WithClients(tCtx ktesting.TContext, cfg *rest.Config, mapper *restmapper.DeferredDiscoveryRESTMapper, client clientset.Interface, dynamic dynamic.Interface, apiextensions apiextensions.Interface) TContext {
 	return set(tCtx, data{
 		restConfig:    cfg,
@@ -119,6 +122,10 @@ func WithClients(tCtx ktesting.TContext, cfg *rest.Config, mapper *restmapper.De
 	})
 }
 
+// WithClients returns a new TContext with the given config and clients.
+//
+// ktesting itself does not care which of these parameters are nil,
+// but consumers of the resulting TContext might need real instances.
 func (tCtx TContext) WithClients(cfg *rest.Config, mapper *restmapper.DeferredDiscoveryRESTMapper, client clientset.Interface, dynamic dynamic.Interface, apiextensions apiextensions.Interface) TContext {
 	return WithClients(tCtx.TContext, cfg, mapper, client, dynamic, apiextensions)
 }

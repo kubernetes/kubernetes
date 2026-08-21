@@ -721,10 +721,9 @@ func testEnoughRequests(tCtx ktesting.TContext) {
 				runOpts = append(runOpts, runtime.WithSharedDRAManager(testDRAManager))
 			}
 			fh, _ := runtime.NewFramework(tCtx, nil, nil, runOpts...)
-			defer func() {
-				tCtx.Cancel("test has completed")
+			tCtx.Cleanup(func() {
 				runtime.WaitForShutdown(fh)
-			}()
+			})
 			p, err := NewFit(tCtx, &test.args, fh, plfeature.Features{EnablePodLevelResources: test.podLevelResourcesEnabled, EnableDRAExtendedResource: test.draExtendedResourceEnabled})
 			tCtx.ExpectNoError(err, "create fit plugin")
 			cycleState := framework.NewCycleState()
@@ -1260,10 +1259,9 @@ func testFitScore(tCtx ktesting.TContext) {
 			state := framework.NewCycleState()
 			snapshot := cache.NewSnapshot(test.existingPods, test.nodes)
 			fh, _ := runtime.NewFramework(tCtx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
-			defer func() {
-				tCtx.Cancel("test has completed")
+			tCtx.Cleanup(func() {
 				runtime.WaitForShutdown(fh)
-			}()
+			})
 			args := test.nodeResourcesFitArgs
 			p, err := NewFit(tCtx, &args, fh, plfeature.Features{
 				EnableDRAExtendedResource: test.draObjects != nil,
@@ -2438,10 +2436,9 @@ func testFitSignPod(tCtx ktesting.TContext) {
 				runOpts = append(runOpts, runtime.WithSharedDRAManager(testDRAManager))
 			}
 			fh, _ := runtime.NewFramework(tCtx, nil, nil, runOpts...)
-			defer func() {
-				tCtx.Cancel("test has completed")
+			tCtx.Cleanup(func() {
 				runtime.WaitForShutdown(fh)
-			}()
+			})
 
 			p, err := NewFit(tCtx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, fh, plfeature.Features{
 				EnableDRAExtendedResource: !test.disableDRAExtendedResource,
@@ -3265,10 +3262,9 @@ func TestDeferredResizeFit(t *testing.T) {
 			nodeInfo.SetNode(&node)
 
 			fh, _ := runtime.NewFramework(tCtx, nil, nil)
-			defer func() {
-				tCtx.Cancel("test has completed")
+			tCtx.Cleanup(func() {
 				runtime.WaitForShutdown(fh)
-			}()
+			})
 
 			p, err := NewFit(tCtx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, fh, plfeature.Features{
 				EnablePodLevelResources:                            true,

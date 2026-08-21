@@ -18,6 +18,7 @@ package ktesting_test
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -54,6 +55,39 @@ func TestCancelAutomatic(t *testing.T) {
 		// Blocks until the context gets canceled automatically.
 		<-tCtx.Done()
 	}()
+}
+
+func TestCancelBeforeCleanup(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		// Blocks until the context gets canceled automatically.
+		<-tCtx.Done()
+	}()
+
+	// This gets registered *after* Init and thus, due to the usual LIFO
+	// order of Cleanup callbacks, runs *before* ktesting's own internal
+	// callback which guarantees eventual cancellation as a fallback.
+	// Nonetheless, tCtx must already be canceled here: like
+	// [testing.T.Context], it gets derived from testing.T's own context,
+	// which the "testing" package cancels before any Cleanup-registered
+	// function runs, this one included.
+	t.Cleanup(func() {
+		select {
+		case <-done:
+		case <-time.After(10 * time.Second):
+			t.Fatal("tCtx should already have been canceled by the time this Cleanup function runs")
+		}
+
+		// The explanation must be more useful than the generic
+		// "context canceled" which a plain [testing.T.Context] would
+		// provide.
+		cause := context.Cause(tCtx)
+		if expected := fmt.Sprintf("test %s is cleaning up", t.Name()); cause == nil || cause.Error() != expected {
+			t.Errorf("expected cancellation cause %q, got: %v", expected, cause)
+		}
+	})
 }
 
 func TestSyncTestInit(t *testing.T) {
