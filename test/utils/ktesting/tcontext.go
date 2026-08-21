@@ -292,6 +292,12 @@ func (tCtx TContext) withTB(tb TB) TContext {
 		logger := newLogger(tb, false /* don't buffer logs in sub-test */)
 		tCtx.Context = klog.NewContext(tCtx.Context, logger)
 	}
+	if !tCtx.isSyncTest {
+		// Sub-tests don't go through Init, so without this call they
+		// wouldn't show up in the "Currently running" list of a
+		// progress report.
+		defaultProgressReporter.trackRunningTest(tb)
+	}
 	return tCtx.WithCancel()
 }
 
@@ -359,7 +365,7 @@ func (tCtx TContext) WithContext(ctx context.Context) TContext {
 
 // WithValue wraps [context.WithValue] such that the result is again a TContext.
 func (tCtx TContext) WithValue(key, val any) TContext {
-	ctx := context.WithValue(tCtx, key, val)
+	ctx := context.WithValue(tCtx.Context, key, val)
 	return tCtx.WithContext(ctx)
 }
 
@@ -519,7 +525,7 @@ func (tCtx TContext) CleanupCtx(cb func(TContext)) {
 		// context then has *no* deadline. In the code path above for
 		// Ginkgo, Ginkgo is more sophisticated and also applies
 		// timeouts to cleanup calls which accept a context.
-		childCtx := tCtx.WithContext(context.WithoutCancel(tCtx))
+		childCtx := tCtx.WithContext(context.WithoutCancel(tCtx.Context))
 		cb(childCtx)
 	})
 }

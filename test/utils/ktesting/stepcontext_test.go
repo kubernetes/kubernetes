@@ -118,9 +118,73 @@ func TestProgressReport(t *testing.T) {
 	defaultProgressReporter.progressChannel <- os.Interrupt
 	report := <-out.stream
 	tCtx.Expect(report).To(gomega.Equal(`You requested a progress report.
+Currently running:
+	TestProgressReport
 
-step: hello world
+TestProgressReport:
+	step: hello world
 `), "report")
+
+	gomega.NewGomegaWithT(t).Expect(context.Cause(interruptCtx)).To(gomega.Succeed(), "not interrupted yet")
+	defaultProgressReporter.signalChannel <- os.Interrupt
+	message := <-out.stream
+	tCtx.Expect(message).To(gomega.Equal(`
+
+INFO: canceling test context: received interrupt signal
+
+`))
+	gomega.NewGomegaWithT(t).Eventually(func() error { return context.Cause(tCtx) }).WithTimeout(30*time.Second).To(gomega.MatchError(gomega.Equal("received interrupt signal")), "interrupted")
+}
+
+func TestProgressReportSubTest(t *testing.T) {
+	oldOut := defaultProgressReporter.out
+	out := newOutputStream()
+	defaultProgressReporter.out = out
+	t.Cleanup(func() {
+		goleak.VerifyNone(t)
+		defaultProgressReporter.out = oldOut
+
+		// If we get here, the defaultProgressReporter is not active anymore,
+		// but the interrupt context should still be canceled.
+		gomega.NewGomegaWithT(t).Expect(defaultProgressReporter.usageCount).To(gomega.Equal(int64(0)), "usage count")
+		gomega.NewGomegaWithT(t).Expect(context.Cause(interruptCtx)).To(gomega.MatchError(gomega.Equal("received interrupt signal")), "interrupted persistently")
+
+		// Reset for next test.
+		interruptCtx, interrupted = context.WithCancelCause(context.Background())
+	})
+
+	// This must use a real testing.T, otherwise Init doesn't initialize signal handling.
+	tCtx := Init(t)
+
+	// Sub-tests must show up in the "Currently running" list, in
+	// addition to the parent test, and their progress report must be
+	// indented and prefixed with their own (sub-test) name, with every
+	// line of a multi-line report indented.
+	tCtx.Run("sub", func(tCtx TContext) {
+		removeReporter := tCtx.Value("GINKGO_SPEC_CONTEXT").(ginkgoReporter).AttachProgressReporter(func() string { return "line one\nline two" })
+		defer removeReporter()
+
+		defaultProgressReporter.progressChannel <- os.Interrupt
+		report := <-out.stream
+		tCtx.Expect(report).To(gomega.Equal(`You requested a progress report.
+Currently running:
+	TestProgressReportSubTest
+	TestProgressReportSubTest/sub
+
+TestProgressReportSubTest/sub:
+	line one
+	line two
+`), "report")
+	})
+
+	// After the sub-test finished, only the parent test remains.
+	defaultProgressReporter.progressChannel <- os.Interrupt
+	report := <-out.stream
+	tCtx.Expect(report).To(gomega.Equal(`You requested a progress report.
+Currently running:
+	TestProgressReportSubTest
+Currently there is no information about test progress available.
+`), "report after sub-test completion")
 
 	gomega.NewGomegaWithT(t).Expect(context.Cause(interruptCtx)).To(gomega.Succeed(), "not interrupted yet")
 	defaultProgressReporter.signalChannel <- os.Interrupt

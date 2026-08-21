@@ -67,13 +67,16 @@ func (tCtx TContext) Step(step string, cb func(tCtx TContext)) {
 }
 
 // Value intercepts a search for the special "GINKGO_SPEC_CONTEXT" and
-// wraps the underlying reporter so that the steps are visible in the report.
+// wraps the underlying reporter so that the recorded steps and the name of
+// the running test are visible in the progress report.
 func (tCtx TContext) Value(key any) any {
-	if tCtx.steps != "" {
-		if s, ok := key.(string); ok && s == ginkgoSpecContextKey {
-			if reporter, ok := tCtx.Context.Value(key).(ginkgoReporter); ok {
-				return ginkgoReporter(&stepReporter{reporter: reporter, steps: tCtx.steps})
-			}
+	if s, ok := key.(string); ok && s == ginkgoSpecContextKey {
+		// When we construct a new TContext, we have to be careful to not wrap
+		// our own TContext instance. Otherwise this tCtx.Context.Value call
+		// here will call TContext.Value once more and wrap a ginkgoReporter inside
+		// a ginkgoReporter recursively.
+		if reporter, ok := tCtx.Context.Value(key).(ginkgoReporter); ok {
+			return ginkgoReporter(&stepReporter{reporter: reporter, testName: tCtx.Name(), steps: tCtx.steps})
 		}
 	}
 	return tCtx.Context.Value(key)
@@ -81,6 +84,7 @@ func (tCtx TContext) Value(key any) any {
 
 type stepReporter struct {
 	reporter ginkgoReporter
+	testName string
 	steps    string
 }
 
@@ -88,7 +92,7 @@ var _ ginkgoReporter = &stepReporter{}
 
 func (s *stepReporter) AttachProgressReporter(reporter func() string) func() {
 	return s.reporter.AttachProgressReporter(func() string {
-		report := reporter()
-		return s.steps + report
+		report := s.steps + reporter()
+		return s.testName + ":\n" + indent(report, true)
 	})
 }
