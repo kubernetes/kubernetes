@@ -211,34 +211,73 @@ limitations under the License.
 // the stack backtrace at that point to the error. Gomega assert failures can
 // be turned into such an error (see next section).
 //
-// TODO: example, NewFailure, gomega
-//
 // [TContext.ExpectNoError] and [TContext.AssertNoError]
 // have special support for this error and errors wrapping it:
 //   - skip the "unexpected error" prefix that it normally adds for other errors
-//   - log the stack without including it in the failure message itself
+//   - log the stack backtrace captured at the time of the original failure,
+//     without including it in the failure message itself
+//
+// Direct calls to [TContext.Error], [TContext.Fatal] and their variants (including
+// indirectly through Gomega assertions) do not log a stack backtrace: `go test`
+// already prints the source code location of the failing call because ktesting
+// marks all of these methods as helpers. Only [TContext.ExpectNoError] and
+// [TContext.AssertNoError] add a backtrace, because there the location of the
+// failure (recorded earlier, when the [FailureError] was created) is different
+// from the location where it gets reported.
 //
 // The second approach makes tests and helpers simpler. One downside is that
-// failure texts only include a stack backtrace, but no information about the
-// context in which the failure occurred. For example, the loop variable when
-// called repeatedly or the complete object when calling a helper for one field
-// of it are often useful additional information.
+// failure texts don't include additional context about the situation in which
+// the failure occurred. For example, the loop variable when called repeatedly
+// or the complete object when calling a helper for one field of it are often
+// useful additional information.
 //
 // [TContext.WithStep] allows adding some text to all log output and error messages that
 // get emitted via the TContext instances returned by WithStep. In this example, "bake cake"
 // and "set heat for baking" are passed to two different WithStep calls and "oven not found" to
-// [TContext.Fatal]:
+// [TContext.Fatal]. There are two "FATAL ERRORs" because a cleanup function also fails:
 //
 //	go test -tags example -v -run=TestWithStep k8s.io/kubernetes/test/utils/ktesting/examples/logging
 //	=== RUN   TestWithStep
-//	    example_test.go:82: I0820 14:33:51.450774] bake cake: set heat for baking: Log()
-//	    example_test.go:83: I0820 14:33:51.450781] Logger().Info()   #### TODO: why no prefix?!
-//	    example_test.go:84: FATAL ERROR: I0820 14:33:51.450790]
-//	                bake cake: set heat for baking: oven not found ### TODO: why no backtrace?
+//	    baking_test.go:27: I0821 14:32:38.902849] bake cake: set heat for baking: Log()
+//	    baking_test.go:28: I0821 14:32:38.902868] Logger().Info()   #### TODO: why no prefix?!
+//	    baking_test.go:29: FATAL ERROR: I0821 14:32:38.902878]
+//	                bake cake: set heat for baking: oven not found
+//	    baking_test.go:35: FATAL ERROR: I0821 14:32:38.902893]
+//	                turning off oven not implemented
 //	--- FAIL: TestWithStep (0.00s)
 //
 // The two approaches can be mixed. [TContext.WithError] enables calling a helper function
 // which use assertions in another helper function which is supposed to return an error.
+//
+//	=== RUN   TestWithError
+//	    example_test.go:92: I0821 14:32:39.093652] checking oven temperature: failed at:
+//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.checkTemperature({{0x724b40, 0x17abd3c96270}, {{0x72b838, 0x17abd3c266c8}}, 0x71f020, 0x17abd3c92090, {0x0, 0x0}, 0x0, {0x0, ...}, ...}, ...)
+//	                        /nvme/gopath/src/k8s.io/kubernetes/test/utils/ktesting/examples/logging/example_test.go:100 +0x67
+//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.TestWithError(0x17abd3c266c8?)
+//	                        /nvme/gopath/src/k8s.io/kubernetes/test/utils/ktesting/examples/logging/example_test.go:92 +0x12b
+//	    example_test.go:92: ERROR: I0821 14:32:39.093670]
+//	                checking oven temperature: oven temperature 42°C is too low for baking
+//	    example_test.go:93: I0821 14:32:39.093722] checking oven readiness: failed at:
+//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.checkOvenReady({{0x724b40, 0x17abd3c96270}, {{0x72b838, 0x17abd3c266c8}}, 0x71f020, 0x17abd3c92090, {0x0, 0x0}, 0x0, {0x0, ...}, ...}, ...)
+//	                        /nvme/gopath/src/k8s.io/kubernetes/test/utils/ktesting/examples/logging/example_test.go:110 +0x306
+//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.TestWithError(0x17abd3c266c8?)
+//	                        /nvme/gopath/src/k8s.io/kubernetes/test/utils/ktesting/examples/logging/example_test.go:93 +0x205
+//	    example_test.go:93: ERROR: I0821 14:32:39.093730]
+//	                checking oven readiness: oven is not ready yet
+//	    baking_test.go:27: I0821 14:32:39.093735] Log()
+//	    baking_test.go:28: I0821 14:32:39.093749] Logger().Info()
+//	    example_test.go:94: I0821 14:32:39.093779] baking cake: failed at:
+//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.heatOven({{0x724b40, 0x17abd3c96270}, {{0x72b838, 0x17abd3c266c8}}, 0x71f020, 0x17abd3c92090, {0x0, 0x0}, 0x0, {0x0, ...}, ...})
+//	                        /nvme/gopath/src/k8s.io/kubernetes/test/utils/ktesting/examples/logging/baking_test.go:29 +0x1a5
+//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.bakeCake({{0x724b40, 0x17abd3c96270}, {{0x72b838, 0x17abd3c266c8}}, 0x71f020, 0x17abd3c92090, {0x0, 0x0}, 0x0, {0x0, ...}, ...})
+//	                        /nvme/gopath/src/k8s.io/kubernetes/test/utils/ktesting/examples/logging/example_test.go:118 +0x22d
+//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.TestWithError(0x17abd3c266c8?)
+//	                        /nvme/gopath/src/k8s.io/kubernetes/test/utils/ktesting/examples/logging/example_test.go:94 +0x2db
+//	    example_test.go:94: ERROR: I0821 14:32:39.093786]
+//	                baking cake: oven not found
+//	    baking_test.go:35: FATAL ERROR: I0821 14:32:39.093794]
+//	                turning off oven not implemented
+//	--- FAIL: TestWithError (0.00s)
 //
 // Even with this support in ktesting, the downside of the approach with
 // assertions is that the caller must be aware. WithStep should be used
@@ -280,20 +319,22 @@ limitations under the License.
 //	to equal
 //	    <int>: 2
 //	--- FAIL: TestTimeout (15.00s)
-//	    example_test.go:36: I0820 17:29:47.724238] Using "/tmp/TestTimeout318943657/001" as temporary directory.
-//	    example_test.go:41: Will fail shortly before the test suite deadline at 2026-08-20 17:30:07.723559925 +0200 CEST m=+20.000434039.
+//	    example_test.go:36: I0821 13:47:30.120022] Using "/tmp/TestTimeout41206428/001" as temporary directory.
+//	    example_test.go:42: Will fail shortly before the test suite deadline at 2026-08-21 13:47:50.119703298 +0200 CEST m=+20.000741721.
 //	    contexthelper.go:75:
-//	        INFO: canceling context: test suite deadline (2026-08-20 17:30:07 +0200 CEST) is close, need to clean up before the 5s cleanup grace period
+//	        INFO: canceling context: test suite deadline (2026-08-21 13:47:50 +0200 CEST) is close, need to clean up before the 5s cleanup grace period
 //
-//	    example_test.go:46: FATAL ERROR: I0820 17:30:02.725654]
-//	                Context was cancelled (cause: test suite deadline (2026-08-20 17:30:07 +0200 CEST) is close, need to clean up before the 5s cleanup grace period) after 15.001s.
+//	    example_test.go:47: FATAL ERROR: I0821 13:47:45.120112]
+//	                Context was cancelled (cause: test suite deadline (2026-08-21 13:47:50 +0200 CEST) is close, need to clean up before the 5s cleanup grace period) after 15.000s.
 //	                Expected
 //	                    <int>: 1
 //	                to equal
 //	                    <int>: 2
+//	    example_test.go:53: FATAL ERROR: I0821 13:47:45.120138]
+//	                turning off oven not implemented
 //	    example_test.go:38: Cleaning up...
 //	FAIL
-//	FAIL    k8s.io/kubernetes/test/utils/ktesting/examples/with_ktesting    15.007s
+//	FAIL    k8s.io/kubernetes/test/utils/ktesting/examples/with_ktesting    15.004s
 //
 // Normally, raising an assertion inside a polling callback is wrong. In the following example,
 // a failed assertion aborts the test instead of triggering a retry:
