@@ -1024,8 +1024,13 @@ const browser = new agentcore.BrowserCustom(this, "MyBrowser", {
   },
 });
 
-// The browser construct automatically grants S3 permissions to the execution role
-// when recording is enabled, so no additional IAM configuration is needed
+// When recording is enabled with an S3 location, the browser construct grants the
+// execution role least-privilege access to write recordings: s3:PutObject,
+// s3:ListMultipartUploadParts, and s3:AbortMultipartUpload, scoped to the recording
+// prefix objects (bucket/prefix/*). No additional IAM configuration is needed. If the
+// recording bucket is encrypted with a customer managed KMS key, grant the execution
+// role kms:GenerateDataKey and kms:Decrypt on that key separately, since the bucket is
+// imported by name.
 ```
 
 ### Browser with Browser signing

@@ -1255,6 +1255,157 @@ describe('BrowserCustom recording configuration with S3 location tests', () => {
     });
   });
 
+  test('Should grant exactly the least-privilege recording actions scoped to the prefix', () => {
+    const app = new cdk.App();
+    const stack = new cdk.Stack(app, 'test-stack', {
+      env: {
+        account: '123456789012',
+        region: 'us-east-1',
+      },
+    });
+
+    new BrowserCustom(stack, 'test-browser-with-recording', {
+      browserCustomName: 'test_browser_with_recording',
+      networkConfiguration: BrowserNetworkConfiguration.usingPublicNetwork(),
+      recordingConfig: {
+        enabled: true,
+        s3Location: {
+          bucketName: 'my-recording-bucket',
+          objectKey: 'recordings/',
+        },
+      },
+    });
+
+    const template = Template.fromStack(stack);
+
+    // Exact statement match: the auto-created execution role has no inline
+    // statements of its own, so its default policy must contain exactly this
+    // one least-privilege recording statement. Any added/removed action or
+    // changed resource fails this assertion.
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: [
+          {
+            Action: [
+              's3:PutObject',
+              's3:ListMultipartUploadParts',
+              's3:AbortMultipartUpload',
+            ],
+            Effect: 'Allow',
+            Resource: {
+              'Fn::Join': [
+                '',
+                ['arn:', { Ref: 'AWS::Partition' }, ':s3:::my-recording-bucket/recordings/*'],
+              ],
+            },
+          },
+        ],
+        Version: '2012-10-17',
+      },
+    });
+
+    // applyBefore() must make the browser resource depend on the recording policy,
+    // so the policy exists before the browser is created.
+    template.hasResource('AWS::BedrockAgentCore::BrowserCustom', {
+      DependsOn: Match.arrayWith([Match.stringLikeRegexp('.*ServiceRoleDefaultPolicy.*')]),
+    });
+  });
+
+  test('Should normalize a concrete prefix with no trailing slash to prefix/*', () => {
+    const app = new cdk.App();
+    const stack = new cdk.Stack(app, 'test-stack', {
+      env: { account: '123456789012', region: 'us-east-1' },
+    });
+
+    new BrowserCustom(stack, 'test-browser-no-slash', {
+      browserCustomName: 'test_browser_no_slash',
+      networkConfiguration: BrowserNetworkConfiguration.usingPublicNetwork(),
+      recordingConfig: {
+        enabled: true,
+        s3Location: {
+          bucketName: 'my-recording-bucket',
+          objectKey: 'recordings', // no trailing slash
+        },
+      },
+    });
+
+    const template = Template.fromStack(stack);
+
+    // A concrete object key without a trailing slash is normalized: a '/' is added
+    // before the '*' so the grant is scoped to '.../recordings/*' (the folder),
+    // not the broader '.../recordings*'.
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: [
+          Match.objectLike({
+            Action: [
+              's3:PutObject',
+              's3:ListMultipartUploadParts',
+              's3:AbortMultipartUpload',
+            ],
+            Resource: {
+              'Fn::Join': [
+                '',
+                ['arn:', { Ref: 'AWS::Partition' }, ':s3:::my-recording-bucket/recordings/*'],
+              ],
+            },
+          }),
+        ],
+      },
+    });
+  });
+
+  test('Should handle a tokenized recording prefix (current behavior, no normalization)', () => {
+    const app = new cdk.App();
+    const stack = new cdk.Stack(app, 'test-stack', {
+      env: { account: '123456789012', region: 'us-east-1' },
+    });
+
+    const prefixParam = new cdk.CfnParameter(stack, 'PrefixParam', { type: 'String' });
+
+    new BrowserCustom(stack, 'test-browser-token-prefix', {
+      browserCustomName: 'test_browser_token_prefix',
+      networkConfiguration: BrowserNetworkConfiguration.usingPublicNetwork(),
+      recordingConfig: {
+        enabled: true,
+        s3Location: {
+          bucketName: 'my-recording-bucket',
+          objectKey: prefixParam.valueAsString, // unresolved token
+        },
+      },
+    });
+
+    const template = Template.fromStack(stack);
+
+    // A tokenized prefix cannot be inspected at synth, so it is embedded verbatim
+    // and a '*' is appended after it. No trailing-slash normalization is possible.
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: [
+          Match.objectLike({
+            Action: [
+              's3:PutObject',
+              's3:ListMultipartUploadParts',
+              's3:AbortMultipartUpload',
+            ],
+            Resource: {
+              'Fn::Join': [
+                '',
+                [
+                  'arn:',
+                  { Ref: 'AWS::Partition' },
+                  ':s3:::my-recording-bucket/',
+                  { Ref: 'PrefixParam' },
+                  '*',
+                ],
+              ],
+            },
+          }),
+        ],
+      },
+    });
+  });
+
   test('Should handle recording config with enabled true but no S3 location', () => {
     const app = new cdk.App();
     const stack = new cdk.Stack(app, 'test-stack', {
