@@ -238,11 +238,11 @@ limitations under the License.
 //
 //	go test -tags example -v -run=TestWithStep k8s.io/kubernetes/test/utils/ktesting/examples/logging
 //	=== RUN   TestWithStep
-//	    baking_test.go:27: I0821 14:32:38.902849] bake cake: set heat for baking: Log()
-//	    baking_test.go:28: I0821 14:32:38.902868] Logger().Info()   #### TODO: why no prefix?!
-//	    baking_test.go:29: FATAL ERROR: I0821 14:32:38.902878]
-//	                bake cake: set heat for baking: oven not found
-//	    baking_test.go:35: FATAL ERROR: I0821 14:32:38.902893]
+//	    baking_test.go:29: I0821 17:08:55.019097] bake cake/set heat for baking: Log()
+//	    baking_test.go:30: I0821 17:08:55.019114] bake cake/set heat for baking: Logger().Info()
+//	    baking_test.go:31: FATAL ERROR: I0821 17:08:55.019128]
+//	                bake cake/set heat for baking: oven not found
+//	    baking_test.go:37: FATAL ERROR: I0821 17:08:55.019143]
 //	                turning off oven not implemented
 //	--- FAIL: TestWithStep (0.00s)
 //
@@ -250,32 +250,32 @@ limitations under the License.
 // which use assertions in another helper function which is supposed to return an error.
 //
 //	=== RUN   TestWithError
-//	    example_test.go:92: I0821 14:32:39.093652] checking oven temperature: failed at:
-//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.checkTemperature({{0x724b40, 0x17abd3c96270}, {{0x72b838, 0x17abd3c266c8}}, 0x71f020, 0x17abd3c92090, {0x0, 0x0}, 0x0, {0x0, ...}, ...}, ...)
+//	    example_test.go:92: I0821 15:01:50.576258] checking oven temperature: failed at:
+//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.checkTemperature({{0x725d20, 0x30e55d1e2bd0}, {{0x72ca58, 0x30e55d1b4b48}}, 0x7201e8, 0x30e55cfd6d50, {0x0, 0x0}, 0x0, {0x0, ...}, ...}, ...)
 //	                        /nvme/gopath/src/k8s.io/kubernetes/test/utils/ktesting/examples/logging/example_test.go:100 +0x67
-//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.TestWithError(0x17abd3c266c8?)
+//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.TestWithError(0x30e55d1b4b48?)
 //	                        /nvme/gopath/src/k8s.io/kubernetes/test/utils/ktesting/examples/logging/example_test.go:92 +0x12b
-//	    example_test.go:92: ERROR: I0821 14:32:39.093670]
+//	    example_test.go:92: ERROR: I0821 15:01:50.576273]
 //	                checking oven temperature: oven temperature 42°C is too low for baking
-//	    example_test.go:93: I0821 14:32:39.093722] checking oven readiness: failed at:
-//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.checkOvenReady({{0x724b40, 0x17abd3c96270}, {{0x72b838, 0x17abd3c266c8}}, 0x71f020, 0x17abd3c92090, {0x0, 0x0}, 0x0, {0x0, ...}, ...}, ...)
+//	    example_test.go:93: I0821 15:01:50.576325] checking oven readiness: failed at:
+//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.checkOvenReady({{0x725d20, 0x30e55d1e2bd0}, {{0x72ca58, 0x30e55d1b4b48}}, 0x7201e8, 0x30e55cfd6d50, {0x0, 0x0}, 0x0, {0x0, ...}, ...}, ...)
 //	                        /nvme/gopath/src/k8s.io/kubernetes/test/utils/ktesting/examples/logging/example_test.go:110 +0x306
-//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.TestWithError(0x17abd3c266c8?)
+//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.TestWithError(0x30e55d1b4b48?)
 //	                        /nvme/gopath/src/k8s.io/kubernetes/test/utils/ktesting/examples/logging/example_test.go:93 +0x205
-//	    example_test.go:93: ERROR: I0821 14:32:39.093730]
+//	    example_test.go:93: ERROR: I0821 15:01:50.576338]
 //	                checking oven readiness: oven is not ready yet
-//	    baking_test.go:27: I0821 14:32:39.093735] Log()
-//	    baking_test.go:28: I0821 14:32:39.093749] Logger().Info()
-//	    example_test.go:94: I0821 14:32:39.093779] baking cake: failed at:
-//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.heatOven({{0x724b40, 0x17abd3c96270}, {{0x72b838, 0x17abd3c266c8}}, 0x71f020, 0x17abd3c92090, {0x0, 0x0}, 0x0, {0x0, ...}, ...})
-//	                        /nvme/gopath/src/k8s.io/kubernetes/test/utils/ktesting/examples/logging/baking_test.go:29 +0x1a5
-//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.bakeCake({{0x724b40, 0x17abd3c96270}, {{0x72b838, 0x17abd3c266c8}}, 0x71f020, 0x17abd3c92090, {0x0, 0x0}, 0x0, {0x0, ...}, ...})
+//	    baking_test.go:29: I0821 15:01:50.576343] Log()
+//	    baking_test.go:30: I0821 15:01:50.576351] Logger().Info()
+//	    example_test.go:94: I0821 15:01:50.576384] baking cake: failed at:
+//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.heatOven({{0x725d20, 0x30e55d1e2bd0}, {{0x72ca58, 0x30e55d1b4b48}}, 0x7201e8, 0x30e55cfd6d50, {0x0, 0x0}, 0x0, {0x0, ...}, ...})
+//	                        /nvme/gopath/src/k8s.io/kubernetes/test/utils/ktesting/examples/logging/baking_test.go:31 +0x1a5
+//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.bakeCake({{0x725d20, 0x30e55d1e2bd0}, {{0x72ca58, 0x30e55d1b4b48}}, 0x7201e8, 0x30e55cfd6d50, {0x0, 0x0}, 0x0, {0x0, ...}, ...})
 //	                        /nvme/gopath/src/k8s.io/kubernetes/test/utils/ktesting/examples/logging/example_test.go:118 +0x22d
-//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.TestWithError(0x17abd3c266c8?)
+//	                k8s.io/kubernetes/test/utils/ktesting/examples/logging.TestWithError(0x30e55d1b4b48?)
 //	                        /nvme/gopath/src/k8s.io/kubernetes/test/utils/ktesting/examples/logging/example_test.go:94 +0x2db
-//	    example_test.go:94: ERROR: I0821 14:32:39.093786]
+//	    example_test.go:94: ERROR: I0821 15:01:50.576390]
 //	                baking cake: oven not found
-//	    baking_test.go:35: FATAL ERROR: I0821 14:32:39.093794]
+//	    baking_test.go:37: FATAL ERROR: I0821 15:01:50.576397]
 //	                turning off oven not implemented
 //	--- FAIL: TestWithError (0.00s)
 //

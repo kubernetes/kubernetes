@@ -45,6 +45,22 @@ func TestStepContext(t *testing.T) {
 	step: Errorf a b 42
 `,
 		},
+		"nested steps": {
+			cb: func(tCtx TContext) {
+				tCtx = tCtx.WithStep("step 1").WithStep("step 2")
+				tCtx.Log("Log")
+				tCtx.Error("Error")
+				tCtx.Logger().Info("Info")
+			},
+			// Multiple steps get concatenated with "/", the same
+			// separator klog uses for logger names, both for the
+			// plain text prefix and for the logger's name.
+			expectTrace: `(LOG) <klog header>: step 1/step 2: Log
+(ERROR) ERROR: <klog header>:
+	step 1/step 2: Error
+(LOG) <klog header> step 1/step 2: Info
+`,
+		},
 		"fatal": {
 			cb: func(tCtx TContext) {
 				tCtx = tCtx.WithStep("step")
