@@ -438,7 +438,6 @@ func run(tCtx ktesting.TContext, whatRE string) {
 			tCtx.ExpectNoError(err, "add claim event handler")
 			informerFactory.StartWithContext(tCtx)
 			tCtx.Cleanup(func() {
-				tCtx.Cancel("test is done")
 				_ = informerFactory.Resource().V1().ResourceClaims().Informer().RemoveEventHandler(claimHandle)
 				informerFactory.Shutdown()
 			})

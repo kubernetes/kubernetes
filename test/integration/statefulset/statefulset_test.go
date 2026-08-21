@@ -127,8 +127,7 @@ func TestVolumeTemplateNoopUpdate(t *testing.T) {
 }
 
 func TestSpecReplicasChange(t *testing.T) {
-	tCtx, closeFn, rm, informers, c := scSetup(t)
-	defer closeFn()
+	tCtx, rm, informers, c := scSetup(t)
 	ns := framework.CreateNamespaceOrDie(c, "test-spec-replicas-change", t)
 	defer framework.DeleteNamespaceOrDie(c, ns, t)
 	cancel := runControllerAndInformers(tCtx, rm, informers)
@@ -170,8 +169,7 @@ func TestSpecReplicasChange(t *testing.T) {
 }
 
 func TestDeletingAndTerminatingPods(t *testing.T) {
-	tCtx, closeFn, rm, informers, c := scSetup(t)
-	defer closeFn()
+	tCtx, rm, informers, c := scSetup(t)
 	ns := framework.CreateNamespaceOrDie(c, "test-deleting-and-failed-pods", t)
 	defer framework.DeleteNamespaceOrDie(c, ns, t)
 	cancel := runControllerAndInformers(tCtx, rm, informers)
@@ -288,8 +286,7 @@ func TestStatefulSetAvailable(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tCtx, closeFn, rm, informers, c := scSetup(t)
-			defer closeFn()
+			tCtx, rm, informers, c := scSetup(t)
 			ns := framework.CreateNamespaceOrDie(c, "test-available-pods", t)
 			defer framework.DeleteNamespaceOrDie(c, ns, t)
 			cancel := runControllerAndInformers(tCtx, rm, informers)
@@ -387,8 +384,7 @@ func TestStatefulSetStatusWithPodFail(t *testing.T) {
 			}
 		},
 	})
-	defer closeFn()
-	defer tCtx.Cancel("test has completed")
+	tCtx.Cleanup(closeFn)
 	resyncPeriod := 12 * time.Hour
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "statefulset-informers")), resyncPeriod)
 	ssc := statefulset.NewStatefulSetController(
@@ -471,8 +467,7 @@ func TestAutodeleteOwnerRefs(t *testing.T) {
 		},
 	}
 
-	tCtx, closeFn, rm, informers, c := scSetup(t)
-	defer closeFn()
+	tCtx, rm, informers, c := scSetup(t)
 	cancel := runControllerAndInformers(tCtx, rm, informers)
 	defer cancel()
 
@@ -514,8 +509,7 @@ func TestAutodeleteOwnerRefs(t *testing.T) {
 }
 
 func TestDeletingPodForRollingUpdatePartition(t *testing.T) {
-	tCtx, closeFn, rm, informers, c := scSetup(t)
-	defer closeFn()
+	tCtx, rm, informers, c := scSetup(t)
 	ns := framework.CreateNamespaceOrDie(c, "test-deleting-pod-for-rolling-update-partition", t)
 	defer framework.DeleteNamespaceOrDie(c, ns, t)
 	cancel := runControllerAndInformers(tCtx, rm, informers)
@@ -693,8 +687,7 @@ func TestStatefulSetStartOrdinal(t *testing.T) {
 		},
 	}
 
-	tCtx, closeFn, rm, informers, c := scSetup(t)
-	defer closeFn()
+	tCtx, rm, informers, c := scSetup(t)
 	cancel := runControllerAndInformers(tCtx, rm, informers)
 	defer cancel()
 
@@ -767,8 +760,7 @@ func TestStatefulSetStartOrdinal(t *testing.T) {
 	}
 }
 func TestStatefulSetPodSubdomain(t *testing.T) {
-	tCtx, closeFn, rm, informers, c := scSetup(t)
-	defer closeFn()
+	tCtx, rm, informers, c := scSetup(t)
 	ns := framework.CreateNamespaceOrDie(c, "test-pod-subdomain", t)
 	defer framework.DeleteNamespaceOrDie(c, ns, t)
 	cancel := runControllerAndInformers(tCtx, rm, informers)
@@ -801,8 +793,7 @@ func TestStatefulSetPodSubdomain(t *testing.T) {
 
 func TestRecreateStatefulSetUpdate(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetRecreateStrategy, true)
-	tCtx, closeFn, rm, informers, c := scSetup(t)
-	defer closeFn()
+	tCtx, rm, informers, c := scSetup(t)
 	ns := framework.CreateNamespaceOrDie(c, "test-recreate-update", t)
 	defer framework.DeleteNamespaceOrDie(c, ns, t)
 	cancel := runControllerAndInformers(tCtx, rm, informers)

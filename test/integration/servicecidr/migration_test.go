@@ -197,7 +197,7 @@ func TestMigrateServiceCIDR(t *testing.T) {
 			"--disable-admission-plugins=ServiceAccount",
 		},
 		etcdOptions)
-	defer s2.TearDownFn()
+	t.Cleanup(s2.TearDownFn)
 
 	client2, err := clientset.NewForConfig(s2.ClientConfig)
 	if err != nil {
@@ -211,7 +211,6 @@ func TestMigrateServiceCIDR(t *testing.T) {
 
 	// ServiceCIDR controller
 	tCtx2 := ktesting.Init(t)
-	defer tCtx2.Cancel("tearing down ServiceCIDR controller 2")
 	informers2 := informers.NewSharedInformerFactory(client2, resyncPeriod)
 	go servicecidrs.NewController(
 		tCtx2,

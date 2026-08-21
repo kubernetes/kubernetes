@@ -42,7 +42,6 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon"
@@ -57,11 +56,11 @@ import (
 
 var zero = int64(0)
 
-func setup(t *testing.T) (context.Context, kubeapiservertesting.TearDownFunc, *daemon.DaemonSetsController, informers.SharedInformerFactory, clientset.Interface) {
+func setup(t *testing.T) (context.Context, *daemon.DaemonSetsController, informers.SharedInformerFactory, clientset.Interface) {
 	return setupWithServerSetup(t, framework.TestServerSetup{})
 }
 
-func setupWithServerSetup(t *testing.T, serverSetup framework.TestServerSetup) (context.Context, kubeapiservertesting.TearDownFunc, *daemon.DaemonSetsController, informers.SharedInformerFactory, clientset.Interface) {
+func setupWithServerSetup(t *testing.T, serverSetup framework.TestServerSetup) (context.Context, *daemon.DaemonSetsController, informers.SharedInformerFactory, clientset.Interface) {
 	tCtx := ktesting.Init(t)
 	modifyServerRunOptions := serverSetup.ModifyServerRunOptions
 	serverSetup.ModifyServerRunOptions = func(opts *options.ServerRunOptions) {
@@ -112,13 +111,16 @@ func setupWithServerSetup(t *testing.T, serverSetup framework.TestServerSetup) (
 	eventBroadcaster.StartRecordingToSink(tCtx.Done())
 	go sched.Run(tCtx)
 
-	tearDownFn := func() {
-		tCtx.Cancel("tearing down apiserver")
+	// The scheduler above (and the DaemonSets controller started by the
+	// caller) run with tCtx, so tCtx must get canceled before the server
+	// shuts down, to avoid them logging errors while (or after) the test
+	// binary considers the test done.
+	tCtx.Cleanup(func() {
 		closeFn()
 		eventBroadcaster.Shutdown()
-	}
+	})
 
-	return tCtx, tearDownFn, dc, informers, clientSet
+	return tCtx, dc, informers, clientSet
 }
 
 func testLabels() map[string]string {
@@ -532,8 +534,7 @@ func forEachStrategy(t *testing.T, tf func(t *testing.T, strategy *apps.DaemonSe
 
 func TestOneNodeDaemonLaunchesPod(t *testing.T) {
 	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
-		ctx, closeFn, dc, informers, clientset := setup(t)
-		defer closeFn()
+		ctx, dc, informers, clientset := setup(t)
 		ns := framework.CreateNamespaceOrDie(clientset, "one-node-daemonset-test", t)
 		defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
@@ -565,8 +566,7 @@ func TestOneNodeDaemonLaunchesPod(t *testing.T) {
 
 func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
 	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
-		ctx, closeFn, dc, informers, clientset := setup(t)
-		defer closeFn()
+		ctx, dc, informers, clientset := setup(t)
 		ns := framework.CreateNamespaceOrDie(clientset, "simple-daemonset-test", t)
 		defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
@@ -612,8 +612,7 @@ func TestSimpleDaemonSetRestartsPodsOnTerminalPhase(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
-				ctx, closeFn, dc, informers, clientset := setup(t)
-				defer closeFn()
+				ctx, dc, informers, clientset := setup(t)
 				ns := framework.CreateNamespaceOrDie(clientset, "daemonset-restart-terminal-pod-test", t)
 				defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
@@ -657,8 +656,7 @@ func TestSimpleDaemonSetRestartsPodsOnTerminalPhase(t *testing.T) {
 
 func TestDaemonSetWithNodeSelectorLaunchesPods(t *testing.T) {
 	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
-		ctx, closeFn, dc, informers, clientset := setup(t)
-		defer closeFn()
+		ctx, dc, informers, clientset := setup(t)
 		ns := framework.CreateNamespaceOrDie(clientset, "simple-daemonset-test", t)
 		defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
@@ -720,8 +718,7 @@ func TestDaemonSetWithNodeSelectorLaunchesPods(t *testing.T) {
 
 func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
-		ctx, closeFn, dc, informers, clientset := setup(t)
-		defer closeFn()
+		ctx, dc, informers, clientset := setup(t)
 		ns := framework.CreateNamespaceOrDie(clientset, "simple-daemonset-test", t)
 		defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
@@ -761,8 +758,7 @@ func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 // not schedule Pods onto the nodes with insufficient resource.
 func TestInsufficientCapacityNode(t *testing.T) {
 	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
-		ctx, closeFn, dc, informers, clientset := setup(t)
-		defer closeFn()
+		ctx, dc, informers, clientset := setup(t)
 		ns := framework.CreateNamespaceOrDie(clientset, "insufficient-capacity", t)
 		defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
@@ -819,8 +815,7 @@ func TestInsufficientCapacityNode(t *testing.T) {
 // TestLaunchWithHashCollision tests that a DaemonSet can be updated even if there is a
 // hash collision with an existing ControllerRevision
 func TestLaunchWithHashCollision(t *testing.T) {
-	ctx, closeFn, dc, informers, clientset := setup(t)
-	defer closeFn()
+	ctx, dc, informers, clientset := setup(t)
 	ns := framework.CreateNamespaceOrDie(clientset, "one-node-daemonset-test", t)
 	defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
@@ -924,8 +919,7 @@ func TestLaunchWithHashCollision(t *testing.T) {
 // 2. Add a node to ensure the controller sync
 // 3. The dsc is expected to "PATCH" the existing pod label with new hash and deletes the old controllerrevision once finishes the update
 func TestDSCUpdatesPodLabelAfterDedupCurHistories(t *testing.T) {
-	ctx, closeFn, dc, informers, clientset := setup(t)
-	defer closeFn()
+	ctx, dc, informers, clientset := setup(t)
 	ns := framework.CreateNamespaceOrDie(clientset, "one-node-daemonset-test", t)
 	defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
@@ -1053,8 +1047,7 @@ func TestDSCUpdatesPodLabelAfterDedupCurHistories(t *testing.T) {
 // TestTaintedNode tests tainted node isn't expected to have pod scheduled
 func TestTaintedNode(t *testing.T) {
 	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
-		ctx, closeFn, dc, informers, clientset := setup(t)
-		defer closeFn()
+		ctx, dc, informers, clientset := setup(t)
 		ns := framework.CreateNamespaceOrDie(clientset, "tainted-node", t)
 		defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
@@ -1112,8 +1105,7 @@ func TestTaintedNode(t *testing.T) {
 // to the Unschedulable nodes.
 func TestUnschedulableNodeDaemonDoesLaunchPod(t *testing.T) {
 	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
-		ctx, closeFn, dc, informers, clientset := setup(t)
-		defer closeFn()
+		ctx, dc, informers, clientset := setup(t)
 		ns := framework.CreateNamespaceOrDie(clientset, "daemonset-unschedulable-test", t)
 		defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
@@ -1176,14 +1168,13 @@ func TestUnschedulableNodeDaemonDoesLaunchPod(t *testing.T) {
 func TestUpdateStatusDespitePodCreationFailure(t *testing.T) {
 	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
 		limitedPodNumber := 2
-		ctx, closeFn, dc, informers, clientset := setupWithServerSetup(t, framework.TestServerSetup{
+		ctx, dc, informers, clientset := setupWithServerSetup(t, framework.TestServerSetup{
 			ModifyServerConfig: func(config *controlplane.Config) {
 				config.ControlPlane.Generic.AdmissionControl = &fakePodFailAdmission{
 					limitedPodNumber: limitedPodNumber,
 				}
 			},
 		})
-		defer closeFn()
 		ns := framework.CreateNamespaceOrDie(clientset, "update-status-despite-pod-failure", t)
 		defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
@@ -1214,8 +1205,7 @@ func TestDaemonSetRollingUpdateWithTolerations(t *testing.T) {
 	var taints []v1.Taint
 	var node *v1.Node
 	var tolerations []v1.Toleration
-	ctx, closeFn, dc, informers, clientset := setup(t)
-	defer closeFn()
+	ctx, dc, informers, clientset := setup(t)
 	ns := framework.CreateNamespaceOrDie(clientset, "daemonset-rollingupdate-with-tolerations-test", t)
 	defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 

@@ -298,8 +298,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 
 	// Create the controller
 	var wg sync.WaitGroup
-	defer wg.Wait()
-	defer tCtx.Cancel("test case terminating")
+	tCtx.Cleanup(wg.Wait)
 
 	adcObj, err := NewAttachDetachController(
 		tCtx,
@@ -555,8 +554,7 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 
 	// Create the controller
 	var wg sync.WaitGroup
-	defer wg.Wait()
-	defer tCtx.Cancel("test case terminating")
+	tCtx.Cleanup(wg.Wait)
 
 	adc := createADC(t, tCtx, fakeKubeClient, informerFactory, plugins)
 
