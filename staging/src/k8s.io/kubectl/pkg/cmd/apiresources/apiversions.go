@@ -37,23 +37,32 @@ var (
 		kubectl api-versions`))
 )
 
-// APIVersionsOptions have the data required for API versions
+// APIVersionsFlags directly reflect the information that CLI is gathering via flags
+type APIVersionsFlags struct {
+	RESTClientGetter genericclioptions.RESTClientGetter
+
+	genericiooptions.IOStreams
+}
+
+// NewAPIVersionsFlags returns a default APIVersionsFlags
+func NewAPIVersionsFlags(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericiooptions.IOStreams) *APIVersionsFlags {
+	return &APIVersionsFlags{
+		RESTClientGetter: restClientGetter,
+		IOStreams:        ioStreams,
+	}
+}
+
+// APIVersionsOptions is the start of the data required to perform the operation. As new fields are added,
+// add them here instead of referencing the cmd.Flags()
 type APIVersionsOptions struct {
 	discoveryClient discovery.CachedDiscoveryInterface
 
 	genericiooptions.IOStreams
 }
 
-// NewAPIVersionsOptions creates the options for APIVersions
-func NewAPIVersionsOptions(ioStreams genericiooptions.IOStreams) *APIVersionsOptions {
-	return &APIVersionsOptions{
-		IOStreams: ioStreams,
-	}
-}
-
 // NewCmdAPIVersions creates the `api-versions` command
 func NewCmdAPIVersions(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericiooptions.IOStreams) *cobra.Command {
-	o := NewAPIVersionsOptions(ioStreams)
+	flags := NewAPIVersionsFlags(restClientGetter, ioStreams)
 	cmd := &cobra.Command{
 		Use:                   "api-versions",
 		Short:                 i18n.T("Print the supported API versions on the server, in the form of \"group/version\""),
@@ -61,21 +70,27 @@ func NewCmdAPIVersions(restClientGetter genericclioptions.RESTClientGetter, ioSt
 		Example:               apiversionsExample,
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(restClientGetter, cmd, args))
+			o, err := flags.ToOptions(cmd, args)
+			cmdutil.CheckErr(err)
 			cmdutil.CheckErr(o.RunAPIVersions())
 		},
 	}
 	return cmd
 }
 
-// Complete adapts from the command line args and factory to the data required
-func (o *APIVersionsOptions) Complete(restClientGetter genericclioptions.RESTClientGetter, cmd *cobra.Command, args []string) error {
+// ToOptions converts from CLI inputs to runtime inputs
+func (flags *APIVersionsFlags) ToOptions(cmd *cobra.Command, args []string) (*APIVersionsOptions, error) {
 	if len(args) != 0 {
-		return cmdutil.UsageErrorf(cmd, "unexpected arguments: %v", args)
+		return nil, cmdutil.UsageErrorf(cmd, "unexpected arguments: %v", args)
 	}
-	var err error
-	o.discoveryClient, err = restClientGetter.ToDiscoveryClient()
-	return err
+	discoveryClient, err := flags.RESTClientGetter.ToDiscoveryClient()
+	if err != nil {
+		return nil, err
+	}
+	return &APIVersionsOptions{
+		discoveryClient: discoveryClient,
+		IOStreams:       flags.IOStreams,
+	}, nil
 }
 
 // RunAPIVersions does the work
