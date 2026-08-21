@@ -21,14 +21,17 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 func TestStateMemory_EmptyDirVolumeLimits(t *testing.T) {
 	logger := klog.TODO()
-	state := NewStateMemory(logger, PodResourceInfoMap{})
+	state := NewStateMemory(logger, PodMap{})
 
 	podUID := types.UID("pod-1")
 	volName := "volume-1"
@@ -74,4 +77,147 @@ func TestStateMemory_EmptyDirVolumeLimits(t *testing.T) {
 	qty2, exists2 := state.GetEmptyDirVolumeLimit(podUID, anotherVolName)
 	assert.True(t, exists2)
 	assert.True(t, anotherLimit.Equal(*qty2))
+}
+
+func TestStateMemory_ResourceIsolation(t *testing.T) {
+	logger := klog.TODO()
+	state := NewStateMemory(logger, PodMap{})
+
+	podUID := types.UID("pod-1")
+	containerName := "container-1"
+	volumeName := "volume-1"
+
+	// Set container resources
+	containerResources := v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU: resource.MustParse("250m"),
+		},
+	}
+	err := state.SetContainerResources(logger, podUID, containerName, podutil.Containers, containerResources)
+	require.NoError(t, err)
+
+	// Verify container resources are set, and others are nil/empty
+	res, found := state.GetContainerResources(podUID, containerName)
+	assert.True(t, found)
+	assert.True(t, containerResources.Requests.Cpu().Equal(*res.Requests.Cpu()))
+
+	podRes, found := state.GetPodLevelResources(podUID)
+	assert.False(t, found)
+	assert.Nil(t, podRes)
+
+	volLimit, found := state.GetEmptyDirVolumeLimit(podUID, volumeName)
+	assert.False(t, found)
+	assert.Nil(t, volLimit)
+
+	// Set pod-level resources
+	podResources := &v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceMemory: resource.MustParse("512Mi"),
+		},
+	}
+	err = state.SetPodLevelResources(logger, podUID, podResources)
+	require.NoError(t, err)
+
+	// Verify pod-level resources are set, AND container resources are still intact
+	podRes, found = state.GetPodLevelResources(podUID)
+	assert.True(t, found)
+	assert.True(t, podResources.Requests.Memory().Equal(*podRes.Requests.Memory()))
+
+	res, found = state.GetContainerResources(podUID, containerName)
+	assert.True(t, found)
+	assert.True(t, containerResources.Requests.Cpu().Equal(*res.Requests.Cpu()))
+
+	volLimit, found = state.GetEmptyDirVolumeLimit(podUID, volumeName)
+	assert.False(t, found)
+	assert.Nil(t, volLimit)
+
+	// Set emptyDir volume limit
+	targetLimit := resource.MustParse("256Mi")
+	err = state.SetEmptyDirVolumeLimit(podUID, volumeName, &targetLimit)
+	require.NoError(t, err)
+
+	// Verify volume limit is set, AND both container and pod-level resources are still intact
+	volLimit, found = state.GetEmptyDirVolumeLimit(podUID, volumeName)
+	assert.True(t, found)
+	assert.True(t, targetLimit.Equal(*volLimit))
+
+	res, found = state.GetContainerResources(podUID, containerName)
+	assert.True(t, found)
+	assert.True(t, containerResources.Requests.Cpu().Equal(*res.Requests.Cpu()))
+
+	podRes, found = state.GetPodLevelResources(podUID)
+	assert.True(t, found)
+	assert.True(t, podResources.Requests.Memory().Equal(*podRes.Requests.Memory()))
+
+	// Update container resources again
+	updatedContainerResources := v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU: resource.MustParse("500m"),
+		},
+	}
+	err = state.SetContainerResources(logger, podUID, containerName, podutil.Containers, updatedContainerResources)
+	require.NoError(t, err)
+
+	// Verify container resources are updated, AND both pod-level resources and volume limits are still intact
+	res, found = state.GetContainerResources(podUID, containerName)
+	assert.True(t, found)
+	assert.True(t, updatedContainerResources.Requests.Cpu().Equal(*res.Requests.Cpu()))
+
+	podRes, found = state.GetPodLevelResources(podUID)
+	assert.True(t, found)
+	assert.True(t, podResources.Requests.Memory().Equal(*podRes.Requests.Memory()))
+
+	volLimit, found = state.GetEmptyDirVolumeLimit(podUID, volumeName)
+	assert.True(t, found)
+	assert.True(t, targetLimit.Equal(*volLimit))
+}
+
+func TestStateMemory_GetPodUIDs(t *testing.T) {
+	logger := klog.TODO()
+	state := NewStateMemory(logger, PodMap{})
+
+	assert.Empty(t, state.GetPodUIDs())
+
+	pod1 := types.UID("pod-1")
+	pod2 := types.UID("pod-2")
+
+	require.NoError(t, state.SetPod(logger, &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: pod1}}))
+	require.NoError(t, state.SetPod(logger, &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: pod2}}))
+
+	uids := state.GetPodUIDs()
+	assert.ElementsMatch(t, []types.UID{pod1, pod2}, uids)
+
+	require.NoError(t, state.RemovePod(logger, pod1))
+	assert.Equal(t, []types.UID{pod2}, state.GetPodUIDs())
+}
+
+func TestStateMemory_HasPod(t *testing.T) {
+	logger := klog.TODO()
+	state := NewStateMemory(logger, PodMap{})
+
+	podUID := types.UID("pod-1")
+	assert.False(t, state.HasPod(podUID))
+
+	require.NoError(t, state.SetPod(logger, &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}}))
+	assert.True(t, state.HasPod(podUID))
+
+	require.NoError(t, state.RemovePod(logger, podUID))
+	assert.False(t, state.HasPod(podUID))
+}
+
+func TestStateMemory_ToPodList(t *testing.T) {
+	logger := klog.TODO()
+	sm := newStateMemory(logger, PodMap{})
+
+	podList := sm.toPodList()
+	assert.Empty(t, podList.Items)
+
+	pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "pod-1"}}
+	pod2 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "pod-2"}}
+
+	require.NoError(t, sm.SetPod(logger, pod1))
+	require.NoError(t, sm.SetPod(logger, pod2))
+
+	podList = sm.toPodList()
+	require.Len(t, podList.Items, 2)
 }
