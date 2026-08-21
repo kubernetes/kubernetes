@@ -139,13 +139,15 @@ jobs:
   # proceed to check it out and run it in a privileged context (CodeBuild
   # with Atmosphere).
   #
-  # Instead of gating this job with a GitHub Environment (like integration-test-deployment.yml),
+  # Instead of gating this job with a protected GitHub Environment (like integration-test-deployment.yml),
   # we rely solely on verify-approval.js to check whether the approval is valid and
-  # non-stale. This allows the workflow to run automatically without any manual
-  # interaction from the maintainer.
+  # non-stale. The environment here (post-approval-integ-test-deployment) has no
+  # protection rules — it exists only to scope the Atmosphere variables. This allows
+  # the workflow to run automatically without any manual interaction from the maintainer.
   deploy:
     needs: validate
     if: needs.validate.outputs.has_snapshots == 'true'
+    environment: post-approval-integ-test-deployment
     runs-on: codebuild-aws-cdk-github-actions-deployment-integ-runner-${{ github.run_id }}-${{ github.run_attempt }}
     timeout-minutes: 180
 
