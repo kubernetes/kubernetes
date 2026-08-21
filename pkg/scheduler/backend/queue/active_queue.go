@@ -74,8 +74,10 @@ type activeQueuer interface {
 type unlockedActiveQueuer interface {
 	unlockedActiveQueueReader
 	// update updates the pod in activeQ if oldEntity is already in the queue and the pod is present there.
+	// For grouping pods in opportunistic batching, signatures are used. When pod spec changes
+	// signature might change, if it does newSignature is used to update and properly place pods in queue.
 	// It returns new pod info if updated, nil otherwise.
-	update(newPod *v1.Pod, oldEntity framework.QueuedEntityInfo) *framework.QueuedPodInfo
+	update(newPod *v1.Pod, oldEntity framework.QueuedEntityInfo, newSignature fwk.PodSignature) *framework.QueuedPodInfo
 	// addEventsIfPodInFlight adds events to inFlightEvents if the newPod is in inFlightPods.
 	// It returns true if pushed the event to the inFlightEvents.
 	addEventsIfPodInFlight(oldPod, newPod *v1.Pod, events []fwk.ClusterEvent) bool
@@ -109,10 +111,12 @@ func newUnlockedActiveQueue(queue *heap.Heap[framework.QueuedEntityInfo], inFlig
 }
 
 // update updates the pod in activeQ if oldEntity is already in the queue and the pod is present there.
+// For grouping pods in opportunistic batching, signatures are used. When pod spec changes
+// signature might change, if it does newSignature is used to update and properly place pods in queue.
 // It returns new pod info if updated, nil otherwise.
-func (uaq *unlockedActiveQueue) update(newPod *v1.Pod, oldEntity framework.QueuedEntityInfo) *framework.QueuedPodInfo {
+func (uaq *unlockedActiveQueue) update(newPod *v1.Pod, oldEntity framework.QueuedEntityInfo, newSignature fwk.PodSignature) *framework.QueuedPodInfo {
 	if entity, exists := uaq.queue.Get(oldEntity); exists {
-		podInfo, err := entity.Update(newPod)
+		podInfo, err := entity.Update(newPod, newSignature)
 		if err != nil {
 			return nil
 		}

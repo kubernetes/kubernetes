@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
@@ -784,7 +785,7 @@ func TestWorkloadForest_GetRootLookupInfoForPod(t *testing.T) {
 			if wantFound := tt.wantInfo != nil; gotFound != wantFound {
 				t.Errorf("Expected found: %v, got: %v", wantFound, gotFound)
 			}
-			if diff := cmp.Diff(tt.wantInfo, gotInfo); diff != "" {
+			if diff := cmp.Diff(tt.wantInfo, gotInfo, cmpopts.IgnoreUnexported(framework.QueuedPodGroupInfo{})); diff != "" {
 				t.Errorf("Unexpected QueuedPodGroupInfo (-want,+got)\n%s", diff)
 			}
 		})
@@ -910,7 +911,7 @@ func TestWorkloadForest_GetRootLookupInfoForPodGroup(t *testing.T) {
 			if wantFound := tt.wantInfo != nil; gotFound != wantFound {
 				t.Errorf("Expected found: %v, got: %v", wantFound, gotFound)
 			}
-			if diff := cmp.Diff(tt.wantInfo, gotInfo); diff != "" {
+			if diff := cmp.Diff(tt.wantInfo, gotInfo, cmpopts.IgnoreUnexported(framework.QueuedPodGroupInfo{})); diff != "" {
 				t.Errorf("Unexpected QueuedPodGroupInfo (-want,+got)\n%s", diff)
 			}
 		})
@@ -978,7 +979,7 @@ func TestWorkloadForest_GetRootLookupInfoForCPG(t *testing.T) {
 			if wantFound := tt.wantInfo != nil; gotFound != wantFound {
 				t.Errorf("Expected found: %v, got: %v", wantFound, gotFound)
 			}
-			if diff := cmp.Diff(tt.wantInfo, gotInfo); diff != "" {
+			if diff := cmp.Diff(tt.wantInfo, gotInfo, cmpopts.IgnoreUnexported(framework.QueuedPodGroupInfo{})); diff != "" {
 				t.Errorf("Unexpected QueuedPodGroupInfo (-want,+got)\n%s", diff)
 			}
 		})
