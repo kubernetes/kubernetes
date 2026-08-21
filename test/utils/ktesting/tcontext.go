@@ -196,9 +196,9 @@ func Init(tb TB, opts ...InitOption) TContext {
 		tCtx.cancel = cancelTimeout
 	} else {
 		tCtx = tCtx.WithCancel()
-		tCtx.Cleanup(func() {
+		cancelWhenDone(tb, func() {
 			tCtx.Cancel(cleanupErr(tCtx.Name()).Error())
-		})
+		}, nil)
 	}
 	tCtx.perTestHeader = header
 

@@ -111,11 +111,11 @@ limitations under the License.
 // cancel function. Instead, [TContext.Cancel] can be used to cancel the new TContext
 // instance. [TContext.Cancel] works in all instances, regardless how they were created.
 //
-// A context created by [Init] automatically gets cancelled as soon as the
-// test or sub-test function returns. Use [TContext.CleanupCtx] to register cleanup
-// callbacks when a TContext instance is needed during cleanup: in contrast to the test's
-// TContext, that TContext instance passed to the cleanup callback will not be canceled.
-// TODO: change when the TContext gets canceled.
+// A context created by [Init] automatically gets canceled as soon as the
+// test or sub-test function returns, just like [testing.T.Context]. Use
+// [TContext.CleanupCtx] to register cleanup callbacks when a TContext instance
+// is needed during cleanup: in contrast to the test's TContext, that TContext
+// instance passed to the cleanup callback will not be canceled.
 //
 // In contrast to [context.WithTimeout], a timeout explanation can be specified
 // for [context.Cause] by passing a non-empty string to [TContext.WithTimeout].
