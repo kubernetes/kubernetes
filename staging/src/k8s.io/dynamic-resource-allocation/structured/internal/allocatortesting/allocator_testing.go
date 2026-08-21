@@ -4105,6 +4105,87 @@ func TestAllocator(t *testing.T,
 			node:          node(node1, region1),
 			expectResults: nil,
 		},
+		// device1 is allocated and still published, but only in a slice targeting another
+		// node. The pool must scan those slices too, so device1 counts as present (no fail
+		// closed) and its 8Gi is deducted, leaving device2 room to allocate.
+		"partitionable-devices-allocated-device-present-in-not-targeting-slice": {
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+			},
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 3), driverA,
+					device(device2, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+				),
+				sliceWithDevices(slice2, node2, resourcePool(pool1, 3), driverA,
+					device(device1, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+				),
+				sliceWithCounterSets(slice3, node1, resourcePool(pool1, 3), driverA,
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("16Gi"),
+						},
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
+		// driver-b/pool-1 has an allocated device it no longer publishes, so that pool
+		// fails closed. The index is keyed by the full driver+pool ID, so driver-a/pool-1
+		// is untouched and its candidate device2 still allocates.
+		"partitionable-devices-missing-device-isolated-by-pool-id": {
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverB, pool1, device1),
+			},
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device2, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("8Gi"),
+							},
+						),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("8Gi"),
+						},
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
 		"partitionable-devices-multiple-capacity-pools": {
 			features: Features{
 				PrioritizedList:      true,
