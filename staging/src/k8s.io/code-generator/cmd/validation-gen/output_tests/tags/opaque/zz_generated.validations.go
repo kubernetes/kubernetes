@@ -521,13 +521,13 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.SliceOfStructField"); len(e) != 0 {
-				errs = append(errs, e...)
-			}
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherStruct) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.SliceOfStructField vals")
 				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.SliceOfStructField"); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
@@ -555,13 +555,13 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.SliceOfOpaqueStructField"); len(e) != 0 {
-				errs = append(errs, e...)
-			}
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherStruct) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.SliceOfOpaqueStructField vals")
 				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.SliceOfOpaqueStructField"); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -585,9 +585,6 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListMapOfStructField"); len(e) != 0 {
-				errs = append(errs, e...)
-			}
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a *OtherStruct, b *OtherStruct) bool { return a.StringField == b.StringField }, validate.DirectEqual,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherStruct) field.ErrorList {
@@ -598,6 +595,9 @@ func Validate_Struct(
 			// lists with map semantics require unique keys
 			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *OtherStruct, b *OtherStruct) bool { return a.StringField == b.StringField }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListMapOfStructField"); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
@@ -626,9 +626,6 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListMapOfOpaqueStructField"); len(e) != 0 {
-				errs = append(errs, e...)
-			}
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a *OtherStruct, b *OtherStruct) bool { return a.StringField == b.StringField }, validate.DirectEqual,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherStruct) field.ErrorList {
@@ -639,6 +636,9 @@ func Validate_Struct(
 			// lists with map semantics require unique keys
 			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *OtherStruct, b *OtherStruct) bool { return a.StringField == b.StringField }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListMapOfOpaqueStructField"); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -668,13 +668,13 @@ func Validate_Struct(
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapOfStringToStructField"); len(e) != 0 {
-				errs = append(errs, e...)
-			}
 			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherStruct) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapOfStringToStructField vals")
 				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapOfStringToStructField"); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the map and call the key type's validation function
@@ -712,13 +712,13 @@ func Validate_Struct(
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapOfStringToOpaqueStructField"); len(e) != 0 {
-				errs = append(errs, e...)
-			}
 			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherStruct) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapOfStringToOpaqueStructField vals")
 				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapOfStringToOpaqueStructField"); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return

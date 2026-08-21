@@ -83,12 +83,6 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListField #1"); len(e) != 0 {
-				errs = append(errs, e...)
-			}
-			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListField #2"); len(e) != 0 {
-				errs = append(errs, e...)
-			}
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListField[*] #1")
@@ -99,6 +93,12 @@ func Validate_Struct(
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListField[*] #2")
 				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListField #1"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListField #2"); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return

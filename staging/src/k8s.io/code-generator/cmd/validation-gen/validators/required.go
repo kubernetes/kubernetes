@@ -67,16 +67,20 @@ func (requirednessTagValidator) ValidScopes() sets.Set[Scope] {
 	return requirednessTagValidScopes
 }
 
-func (rtv requirednessTagValidator) GetValidations(context Context, _ codetags.Tag) (Validations, error) {
+func (rtv requirednessTagValidator) GetValidations(context Context, _ SchemaMetadata, _ codetags.Tag) (EmittedGroup, error) {
+	var vals Validations
+	var err error
 	switch rtv.mode {
 	case requirednessRequired:
-		return rtv.doRequired(context)
+		vals, err = rtv.doRequired(context)
 	case requirednessOptional:
-		return rtv.doOptional(context)
+		vals, err = rtv.doOptional(context)
 	case requirednessForbidden:
-		return rtv.doForbidden(context)
+		vals, err = rtv.doForbidden(context)
+	default:
+		panic(fmt.Sprintf("unknown requiredness mode: %q", rtv.mode))
 	}
-	panic(fmt.Sprintf("unknown requiredness mode: %q", rtv.mode))
+	return EmittedGroup{Validations: vals}, err
 }
 
 var (

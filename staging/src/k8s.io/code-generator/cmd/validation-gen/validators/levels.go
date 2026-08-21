@@ -34,16 +34,32 @@ const (
 func init() {
 	RegisterTagValidator(&levelTagValidator{tagName: alphaTagName, level: ValidationStabilityLevelAlpha})
 	RegisterTagValidator(&levelTagValidator{tagName: betaTagName, level: ValidationStabilityLevelBeta})
+	RegisterEmissionFinalizer(FinalizeStabilityOrder, stabilityFinalizer{})
+}
+
+// stabilityFinalizer applies an EmittedGroup's StabilityLevel. Stability
+// marking is owned here, next to the tags which declare stability levels.
+type stabilityFinalizer struct{}
+
+func (stabilityFinalizer) Name() string { return "stability" }
+
+func (stabilityFinalizer) Finalize(_ Context, group EmittedGroup) (EmittedGroup, error) {
+	if group.StabilityLevel == "" {
+		return group, nil
+	}
+	group.Validations = wrapWithStabilityLevel(group.Validations, group.StabilityLevel)
+	group.StabilityLevel = ""
+	return group, nil
 }
 
 type levelTagValidator struct {
-	validator TagValidationExtractor
+	extractor Extractor
 	tagName   string
 	level     ValidationStabilityLevel
 }
 
 func (ltv *levelTagValidator) Init(cfg Config) {
-	ltv.validator = cfg.TagValidator
+	ltv.extractor = cfg.Extractor
 }
 
 func (ltv *levelTagValidator) TagName() string {
@@ -56,13 +72,13 @@ func (levelTagValidator) ValidScopes() sets.Set[Scope] {
 	return levelTagsValidScopes
 }
 
-func (ltv *levelTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (ltv *levelTagValidator) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (EmittedGroup, error) {
 	if tag.ValueType != codetags.ValueTypeTag || tag.ValueTag == nil {
-		return Validations{}, fmt.Errorf("requires a validation tag as its value payload")
+		return EmittedGroup{}, fmt.Errorf("requires a validation tag as its value payload")
 	}
 
 	if len(tag.Args) > 1 {
-		return Validations{}, fmt.Errorf("at most one optional kubernetes version argument is supported")
+		return EmittedGroup{}, fmt.Errorf("at most one optional kubernetes version argument is supported")
 	}
 
 	var version string
@@ -70,24 +86,50 @@ func (ltv *levelTagValidator) GetValidations(context Context, tag codetags.Tag) 
 		arg := tag.Args[0]
 		version = arg.Value
 		if !kubeVersionRegex.MatchString(version) {
-			return Validations{}, fmt.Errorf("invalid kubernetes version format, expected <major>.<minor>, got %s", version)
+			return EmittedGroup{}, fmt.Errorf("invalid kubernetes version format, expected <major>.<minor>, got %s", version)
 		}
 	}
 
 	context.StabilityLevel = ltv.level
-	validations, err := ltv.validator.ExtractTagValidations(context, *tag.ValueTag)
+	validations, err := ltv.extractor.ExtractTagValidations(context, metadata, *tag.ValueTag)
 	if err != nil {
-		return Validations{}, err
+		return EmittedGroup{}, err
 	}
 
-	validations = WrapFunctions(validations, func(fn FunctionGen, scope DeferredScope) FunctionGen {
-		if fn.StabilityLevelSelfManaged {
-			return fn
+	return EmittedGroup{
+		Validations:    validations,
+		StabilityLevel: ltv.level,
+	}, nil
+}
+
+// wrapWithStabilityLevel applies a stability level to all functions in validations
+// that are not self-managed, ensuring similarity between how type-level and field-level
+// validations process stability levels.
+func wrapWithStabilityLevel(validations Validations, level ValidationStabilityLevel) Validations {
+	if level == "" {
+		return validations
+	}
+	for i, fn := range validations.Functions {
+		if !fn.StabilityLevelSelfManaged {
+			fn.StabilityLevel = level
+			validations.Functions[i] = fn
 		}
-		fn.StabilityLevel = ltv.level
-		return fn
-	})
-	return validations, nil
+	}
+	for i, fn := range validations.TypeFunctions {
+		if !fn.StabilityLevelSelfManaged {
+			fn.StabilityLevel = level
+			validations.TypeFunctions[i] = fn
+		}
+	}
+	return validations
+}
+
+func (ltv *levelTagValidator) CollectMetadata(context Context, tag codetags.Tag) (SchemaMetadata, error) {
+	if tag.ValueTag == nil {
+		return SchemaMetadata{}, nil
+	}
+	context.StabilityLevel = ltv.level
+	return ltv.extractor.ExtractMetadata(context, *tag.ValueTag)
 }
 
 func (ltv *levelTagValidator) Docs() TagDoc {

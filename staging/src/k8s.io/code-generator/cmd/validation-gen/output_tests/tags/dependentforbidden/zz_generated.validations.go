@@ -107,6 +107,38 @@ func Validate_AllKinds(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *AllKinds) (errs field.ErrorList) {
 
+	if e := validate.DependentForbidden(ctx, op, fldPath, obj, oldObj, "intTrigger",
+		func(obj *AllKinds) bool {
+			if obj == nil {
+				return false
+			}
+			var z int
+			return obj.IntTrigger != z
+		}, "intDep",
+		func(obj *AllKinds) bool {
+			if obj == nil {
+				return false
+			}
+			var z int
+			return obj.IntDep != z
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+	if e := validate.DependentForbidden(ctx, op, fldPath, obj, oldObj, "mapTrigger",
+		func(obj *AllKinds) bool {
+			if obj == nil {
+				return false
+			}
+			return len(obj.MapTrigger) != 0
+		}, "mapDep",
+		func(obj *AllKinds) bool {
+			if obj == nil {
+				return false
+			}
+			return len(obj.MapDep) != 0
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
 	if e := validate.DependentForbidden(ctx, op, fldPath, obj, oldObj, "ptrTrigger",
 		func(obj *AllKinds) bool {
 			if obj == nil {
@@ -134,38 +166,6 @@ func Validate_AllKinds(
 				return false
 			}
 			return len(obj.SliceDep) != 0
-		}); len(e) != 0 {
-		errs = append(errs, e...)
-	}
-	if e := validate.DependentForbidden(ctx, op, fldPath, obj, oldObj, "mapTrigger",
-		func(obj *AllKinds) bool {
-			if obj == nil {
-				return false
-			}
-			return len(obj.MapTrigger) != 0
-		}, "mapDep",
-		func(obj *AllKinds) bool {
-			if obj == nil {
-				return false
-			}
-			return len(obj.MapDep) != 0
-		}); len(e) != 0 {
-		errs = append(errs, e...)
-	}
-	if e := validate.DependentForbidden(ctx, op, fldPath, obj, oldObj, "intTrigger",
-		func(obj *AllKinds) bool {
-			if obj == nil {
-				return false
-			}
-			var z int
-			return obj.IntTrigger != z
-		}, "intDep",
-		func(obj *AllKinds) bool {
-			if obj == nil {
-				return false
-			}
-			var z int
-			return obj.IntDep != z
 		}); len(e) != 0 {
 		errs = append(errs, e...)
 	}

@@ -28,8 +28,9 @@ var localSchemeBuilder = testscheme.New()
 type Struct struct {
 	TypeMeta int
 
-	DiscriminatorField         Discriminator         `json:"discriminatorField"`
-	DiscriminatorFieldDisabled DiscriminatorDisabled `json:"discriminatorFieldDisabled"`
+	DiscriminatorField         Discriminator                   `json:"discriminatorField"`
+	DiscriminatorFieldDisabled DiscriminatorDisabled           `json:"discriminatorFieldDisabled"`
+	IndependentDiscriminator   IndependentFeatureDiscriminator `json:"independentDiscriminator"`
 }
 
 type Discriminator struct {
@@ -52,4 +53,13 @@ type DiscriminatorDisabled struct {
 
 	// +k8s:ifDisabled(FeatureZ)=+k8s:ifMode("B")=+k8s:optional
 	FieldB *string `json:"fieldB"`
+}
+
+type IndependentFeatureDiscriminator struct {
+	// +k8s:modeDiscriminator
+	Discriminator string `json:"discriminator"`
+
+	// +k8s:ifEnabled(FeatureA)=+k8s:ifMode("A")=+k8s:required
+	// +k8s:ifEnabled(FeatureB)=+k8s:ifMode("B")=+k8s:required
+	SharedField *string `json:"sharedField"`
 }

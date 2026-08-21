@@ -139,6 +139,32 @@ func Validate_MyListStruct(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *MyListStruct) (errs field.ErrorList) {
 
+	func() { // cohort = "tasks"
+		if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "tasks",
+			func(o *MyListStruct) []Task { return o.Tasks }, validate.SemanticDeepEqual,
+			func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []Task) field.ErrorList {
+				return validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_levels_unions_MyListStruct_tasks_,
+					func(list []Task) bool {
+						for i := range list {
+							if list[i].Name == "failed" {
+								return true
+							}
+						}
+						return false
+					},
+					func(list []Task) bool {
+						for i := range list {
+							if list[i].Name == "succeeded" {
+								return true
+							}
+						}
+						return false
+					}).MarkAlpha()
+			}); len(e) != 0 {
+			errs = append(errs, e...)
+		}
+	}()
+
 	// field MyListStruct.TypeMeta has no validation
 
 	{ // field MyListStruct.Tasks
@@ -153,25 +179,6 @@ func Validate_MyListStruct(
 				}
 			}
 			// call field-attached validations
-			if e := validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_levels_unions_MyListStruct_tasks_,
-				func(list []Task) bool {
-					for i := range list {
-						if list[i].Name == "failed" {
-							return true
-						}
-					}
-					return false
-				},
-				func(list []Task) bool {
-					for i := range list {
-						if list[i].Name == "succeeded" {
-							return true
-						}
-					}
-					return false
-				}).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
 			// lists with map semantics require unique keys
 			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *Task, b *Task) bool { return a.Name == b.Name }); len(e) != 0 {
@@ -197,6 +204,32 @@ func Validate_MyListStructBeta(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *MyListStructBeta) (errs field.ErrorList) {
 
+	func() { // cohort = "tasksBeta"
+		if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "tasksBeta",
+			func(o *MyListStructBeta) []Task { return o.TasksBeta }, validate.SemanticDeepEqual,
+			func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []Task) field.ErrorList {
+				return validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_levels_unions_MyListStructBeta_tasksBeta_,
+					func(list []Task) bool {
+						for i := range list {
+							if list[i].Name == "failed" {
+								return true
+							}
+						}
+						return false
+					},
+					func(list []Task) bool {
+						for i := range list {
+							if list[i].Name == "succeeded" {
+								return true
+							}
+						}
+						return false
+					}).MarkBeta()
+			}); len(e) != 0 {
+			errs = append(errs, e...)
+		}
+	}()
+
 	// field MyListStructBeta.TypeMeta has no validation
 
 	{ // field MyListStructBeta.TasksBeta
@@ -211,25 +244,6 @@ func Validate_MyListStructBeta(
 				}
 			}
 			// call field-attached validations
-			if e := validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_levels_unions_MyListStructBeta_tasksBeta_,
-				func(list []Task) bool {
-					for i := range list {
-						if list[i].Name == "failed" {
-							return true
-						}
-					}
-					return false
-				},
-				func(list []Task) bool {
-					for i := range list {
-						if list[i].Name == "succeeded" {
-							return true
-						}
-					}
-					return false
-				}).MarkBeta(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
 			// lists with map semantics require unique keys
 			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *Task, b *Task) bool { return a.Name == b.Name }); len(e) != 0 {

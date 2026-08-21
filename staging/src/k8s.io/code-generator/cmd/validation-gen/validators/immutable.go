@@ -49,13 +49,13 @@ var (
 	immutableValidator = types.Name{Package: libValidationPkg, Name: "Immutable"}
 )
 
-func (immutableTagValidator) GetValidations(context Context, _ codetags.Tag) (Validations, error) {
+func (immutableTagValidator) GetValidations(context Context, _ SchemaMetadata, _ codetags.Tag) (EmittedGroup, error) {
 	var result Validations
 
 	// Use ShortCircuit flag so immutable runs in the same group as +k8s:optional.
 	result.AddFunction(Function(immutableTagName, ShortCircuit, immutableValidator).
 		WithEmits(Emission{field.ErrorTypeInvalid, "immutable", ""}))
-	return result, nil
+	return EmittedGroup{Validations: result}, nil
 }
 
 func (itv immutableTagValidator) Docs() TagDoc {

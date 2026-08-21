@@ -40,41 +40,9 @@ var newUnionMembership = types.Name{Package: libValidationPkg, Name: "NewUnionMe
 var unionVariablePrefix = "unionMembershipFor"
 
 func init() {
-	// Unions are comprised of multiple tags that need to share information.
-	// For field-based unions: tags are on struct fields, validation is on the struct
-	// For item-based unions: tags are on list items (via +k8s:item), validation is on the list
-
-	// "shared" maps from field path strings (key) to union definitions (value)
-	// key examples:
-	//   - struct union: "MyStruct" (validation on the struct type)
-	//   - list union: "Pipeline.Tasks" (validation on the list field)
-	shared := map[string]unions{}
-	RegisterTagValidator(unionDiscriminatorTagValidator{shared})
-	RegisterTagValidator(unionMemberTagValidator{shared})
-}
-
-func getUnionValidations(shared map[string]unions, context Context) (Validations, error) {
-	// unions are keyed by ParentPath for struct fields (ScopeField), or Path for others.
-	structPath := context.ParentPath
-	parentType := context.ParentType
-
-	// TODO: Add support for map items once map item validation is implemented
-
-	// Extract the most concrete type possible.
-	if k := util.NonPointer(util.NativeType(parentType)).Kind; k != types.Struct && k != types.Slice {
-		return Validations{}, nil
-	}
-
-	unions := shared[structPath.String()]
-	if len(unions) == 0 {
-		return Validations{}, nil
-	}
-	delete(shared, structPath.String())
-
-	result, err := processUnionValidations(structPath, parentType, unions, unionVariablePrefix,
-		unionMemberTagName, unionValidator, discriminatedUnionValidator,
-		Emission{field.ErrorTypeInvalid, "union", ""})
-	return result, err
+	RegisterTagValidator(unionDiscriminatorTagValidator{})
+	RegisterTagValidator(unionMemberTagValidator{})
+	RegisterAggregateEmitter(AggregateUnionsOrder, unionAggregateEmitter{})
 }
 
 const (
@@ -82,9 +50,7 @@ const (
 	unionMemberTagName        = "k8s:unionMember"
 )
 
-type unionDiscriminatorTagValidator struct {
-	shared map[string]unions
-}
+type unionDiscriminatorTagValidator struct{}
 
 func (unionDiscriminatorTagValidator) Init(_ Config) {}
 
@@ -92,20 +58,10 @@ func (unionDiscriminatorTagValidator) TagName() string {
 	return unionDiscriminatorTagName
 }
 
-// Shared between unionDiscriminatorTagValidator and unionMemberTagValidator.
-var unionTagValidScopes = sets.New(ScopeField, ScopeListVal)
+var unionTagValidScopes = sets.New(ScopeType, ScopeField, ScopeListVal)
 
 func (unionDiscriminatorTagValidator) ValidScopes() sets.Set[Scope] {
 	return unionTagValidScopes
-}
-
-func (udtv unionDiscriminatorTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
-	err := processDiscriminatorValidations(udtv.shared, context, tag)
-	if err != nil {
-		return Validations{}, err
-	}
-	// Configure descriminator for the union. Validations are emitted by the union member validator.
-	return Validations{}, nil
 }
 
 func (udtv unionDiscriminatorTagValidator) Docs() TagDoc {
@@ -123,9 +79,7 @@ func (udtv unionDiscriminatorTagValidator) Docs() TagDoc {
 	}
 }
 
-type unionMemberTagValidator struct {
-	shared map[string]unions
-}
+type unionMemberTagValidator struct{}
 
 func (unionMemberTagValidator) Init(_ Config) {}
 
@@ -137,18 +91,126 @@ func (unionMemberTagValidator) ValidScopes() sets.Set[Scope] {
 	return unionTagValidScopes
 }
 
-func (umtv unionMemberTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
-	err := processMemberValidations(umtv.shared, context, tag)
+// unionAggregateEmitter generates union enforcement functions from the union
+// metadata collected off member and discriminator tags.
+type unionAggregateEmitter struct{}
+
+func (unionAggregateEmitter) Name() string { return "unions" }
+
+func (unionAggregateEmitter) GenerateGroups(context Context, metadata SchemaMetadata) ([]EmittedGroup, error) {
+	u1, err := generateUnionGroupsForType(metadata, false, unionVariablePrefix,
+		unionMemberTagName, unionValidator, discriminatedUnionValidator,
+		Emission{field.ErrorTypeInvalid, "union", ""})
 	if err != nil {
-		return Validations{}, err
+		return nil, err
 	}
-	return Validations{
-		Deferred: []DeferredGen{
-			Deferred(ParentContext, func() (Validations, error) {
-				return getUnionValidations(umtv.shared, context)
-			}),
-		},
-	}, nil
+	u2, err := generateUnionGroupsForType(metadata, true, zeroOrOneOfVariablePrefix,
+		zeroOrOneOfMemberTagName, zeroOrOneOfUnionValidator, types.Name{},
+		Emission{field.ErrorTypeInvalid, "zeroOrOneOf", ""})
+	if err != nil {
+		return nil, err
+	}
+	return append(u1, u2...), nil
+}
+
+func generateUnionGroupsForType(metadata SchemaMetadata, isZeroOrOneOf bool, varPrefix string, memberTagName string, defaultValidator types.Name, discriminatedValidator types.Name, emit Emission) ([]EmittedGroup, error) {
+	sortedUnions := metadata.SortedUnions()
+	if len(sortedUnions) == 0 {
+		return nil, nil
+	}
+
+	type unionGroupKey struct {
+		condKey string
+		pKey    string
+	}
+	type unionGroupVal struct {
+		cond   Conditions
+		unions unions
+	}
+	grouped := map[unionGroupKey]unionGroupVal{}
+	hasUnemitted := false
+	for _, uDef := range sortedUnions {
+		if uDef.isZeroOrOneOf == isZeroOrOneOf {
+			var pStr string
+			if uDef.parentPath != nil {
+				pStr = uDef.parentPath.String()
+			}
+			emittedKey := fmt.Sprintf("union:%v:%s:%s:%s", isZeroOrOneOf, uDef.name, pStr, uDef.conditions.Key())
+			if !metadata.MarkEmitted(emittedKey) {
+				hasUnemitted = true
+			}
+			key := unionGroupKey{
+				condKey: uDef.conditions.Key(),
+				pKey:    pStr,
+			}
+			val := grouped[key]
+			if val.unions == nil {
+				val.cond = uDef.conditions
+				val.unions = unions{}
+			}
+			val.unions[uDef.name] = uDef
+			grouped[key] = val
+		}
+	}
+
+	keys := make([]unionGroupKey, 0, len(grouped))
+	for k := range grouped {
+		keys = append(keys, k)
+	}
+	slices.SortFunc(keys, func(a, b unionGroupKey) int {
+		if cmp := grouped[a].cond.Compare(grouped[b].cond); cmp != 0 {
+			return cmp
+		}
+		return strings.Compare(a.pKey, b.pKey)
+	})
+
+	if !hasUnemitted {
+		return nil, nil
+	}
+
+	var groups []EmittedGroup
+	for _, key := range keys {
+		group := grouped[key]
+		cond := group.cond
+		targetUnions := group.unions
+		targetUnionsList := targetUnions.SortedList()
+
+		var targetPath *field.Path
+		var targetType *types.Type
+		if len(targetUnionsList) > 0 {
+			uDef := targetUnionsList[0]
+			targetPath = uDef.parentPath
+			targetType = uDef.parentType
+		}
+
+		var targetStabilityLevel ValidationStabilityLevel
+		for _, u := range targetUnionsList {
+			if u.stabilityLevel != "" {
+				if targetStabilityLevel != "" && targetStabilityLevel != u.stabilityLevel {
+					return nil, fmt.Errorf("conflicting stability levels %q and %q for union target path %q", targetStabilityLevel, u.stabilityLevel, targetPath)
+				}
+				targetStabilityLevel = u.stabilityLevel
+			}
+		}
+
+		result, err := processUnionValidations(targetPath, targetType, targetUnions, varPrefix,
+			memberTagName, defaultValidator, discriminatedValidator,
+			emit)
+		if err != nil {
+			return nil, err
+		}
+
+		groups = append(groups, EmittedGroup{
+			Validations:    result,
+			Conditions:     cond,
+			StabilityLevel: targetStabilityLevel,
+			TargetPath:     targetPath,
+			TargetType:     targetType,
+			Hoist:          true,
+		})
+	}
+
+	return groups, nil
 }
 
 func (umtv unionMemberTagValidator) Docs() TagDoc {
@@ -176,6 +238,13 @@ func (umtv unionMemberTagValidator) Docs() TagDoc {
 // composed of either a set of struct fields (with an optional disctriminator),
 // or a set of list items (stored as selection criteria).
 type union struct {
+	parentPath     *field.Path
+	parentType     *types.Type
+	name           string
+	isZeroOrOneOf  bool
+	conditions     Conditions
+	stabilityLevel ValidationStabilityLevel
+
 	// members provides field information about all the members of the union.
 	// Each item provides a fieldName and discriminatorValue pair, where the
 	// name identifies the field or selector (for use in errors) and the
@@ -199,11 +268,114 @@ type union struct {
 	itemMembers map[string][]ListSelectorTerm
 }
 
+// Discriminator returns the discriminator field name or nil if undiscriminated.
+func (u *union) Discriminator() *string {
+	return u.discriminator
+}
+
+// DiscriminatorMember returns the discriminator member or nil if undiscriminated.
+func (u *union) DiscriminatorMember() *types.Member {
+	return u.discriminatorMember
+}
+
+// Members returns the members of the union.
+func (u *union) Members() []unionMember {
+	return u.members
+}
+
+// FieldMembers returns the struct field members of the union.
+func (u *union) FieldMembers() []*types.Member {
+	return u.fieldMembers
+}
+
+// ItemMembers returns the list item selector criteria of the union.
+func (u *union) ItemMembers() map[string][]ListSelectorTerm {
+	return u.itemMembers
+}
+
+// Merge merges another union definition into u.
+func (u *union) Merge(other *union) error {
+	if other == nil {
+		return nil
+	}
+	if other.discriminator != nil {
+		u.discriminator = other.discriminator
+		u.discriminatorMember = other.discriminatorMember
+	}
+	if other.stabilityLevel != "" {
+		if u.stabilityLevel != "" && u.stabilityLevel != other.stabilityLevel {
+			pStr := ""
+			if u.parentPath != nil {
+				pStr = u.parentPath.String()
+			}
+			return fmt.Errorf("conflicting stability levels %q and %q for union target path %q", u.stabilityLevel, other.stabilityLevel, pStr)
+		}
+		u.stabilityLevel = other.stabilityLevel
+	}
+	u.conditions = u.conditions.Merge(other.conditions)
+	u.isZeroOrOneOf = u.isZeroOrOneOf || other.isZeroOrOneOf
+	u.members = append(u.members, other.members...)
+	u.fieldMembers = append(u.fieldMembers, other.fieldMembers...)
+	if other.itemMembers != nil {
+		if u.itemMembers == nil {
+			u.itemMembers = make(map[string][]ListSelectorTerm)
+		}
+		for itemKey, terms := range other.itemMembers {
+			u.itemMembers[itemKey] = append(u.itemMembers[itemKey], terms...)
+		}
+	}
+	return nil
+}
+
+func (u *union) DeepCopy() *union {
+	if u == nil {
+		return nil
+	}
+	out := *u
+	if u.members != nil {
+		out.members = append([]unionMember(nil), u.members...)
+	}
+	if u.fieldMembers != nil {
+		out.fieldMembers = append([]*types.Member(nil), u.fieldMembers...)
+	}
+	if u.discriminator != nil {
+		d := *u.discriminator
+		out.discriminator = &d
+	}
+	if u.itemMembers != nil {
+		out.itemMembers = make(map[string][]ListSelectorTerm, len(u.itemMembers))
+		for k, v := range u.itemMembers {
+			out.itemMembers[k] = append([]ListSelectorTerm(nil), v...)
+		}
+	}
+	return &out
+}
+
 type unionMember struct {
 	fieldName          string
 	discriminatorValue string
 }
 
+// FieldName returns the field name of the union member.
+func (m unionMember) FieldName() string {
+	return m.fieldName
+}
+
+// DiscriminatorValue returns the discriminator value string for this member.
+func (m unionMember) DiscriminatorValue() string {
+	return m.discriminatorValue
+}
+
+// Unions are comprised of multiple tags that need to share information.
+// For field-based unions: tags are on struct fields, validation is on the struct
+// For item-based unions: tags are on list items (via +k8s:item), validation is on the list
+// "shared" maps from field path strings (key) to union definitions (value)
+// key examples:
+//   - struct union: "MyStruct" (validation on the struct type)
+//   - list union: "Pipeline.Tasks" (validation on the list field)
+//
+// unions are keyed by ParentPath for struct fields (ScopeField), or Path for others.
+// TODO: Add support for map items once map item validation is implemented
 // unions represents all the unions for a go struct.
 type unions map[string]*union
 
@@ -221,9 +393,27 @@ func (us unions) getOrCreate(name string) *union {
 	var ok bool
 	if u, ok = us[name]; !ok {
 		u = newUnion()
+		u.name = name
 		us[name] = u
 	}
 	return u
+}
+
+func (us unions) SortedList() []*union {
+	if len(us) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(us))
+	for k := range us {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+
+	list := make([]*union, 0, len(keys))
+	for _, k := range keys {
+		list = append(list, us[k])
+	}
+	return list
 }
 
 func processUnionValidations(structPath *field.Path, parentType *types.Type, unions unions, varPrefix string,
@@ -375,6 +565,8 @@ func createItemExtractor(listType *types.Type, elemType *types.Type, selector []
 	return extractor, nil
 }
 
+// Shared between unionDiscriminatorTagValidator and unionMemberTagValidator.
+// Configure discriminator for the union. Validations are emitted by the union member validator.
 // processDiscriminatorValidations processes union discriminator tags. It is a
 // free function, rather than a method so that it can be called from other
 // union-like tags.
@@ -384,17 +576,34 @@ func processDiscriminatorValidations(shared map[string]unions, context Context, 
 	if t := util.NonPointer(util.NativeType(context.Type)); t != types.String {
 		return fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
 	}
-	if shared[context.ParentPath.String()] == nil {
-		shared[context.ParentPath.String()] = unions{}
+	parentKey := ""
+	if context.ParentPath != nil {
+		parentKey = context.ParentPath.String()
+	}
+	if shared[parentKey] == nil {
+		shared[parentKey] = unions{}
 	}
 	unionArg, _ := tag.NamedArg("union") // optional
-	u := shared[context.ParentPath.String()].getOrCreate(unionArg.Value)
+	u := shared[parentKey].getOrCreate(unionArg.Value)
+	u.parentPath = context.ParentPath
+	u.parentType = context.ParentType
+	if !context.Conditions.Empty() {
+		u.conditions = u.conditions.Merge(context.Conditions)
+	}
+	if context.StabilityLevel != "" {
+		if u.stabilityLevel != "" && u.stabilityLevel != context.StabilityLevel {
+			return fmt.Errorf("conflicting stability levels %q and %q for union target path %q", u.stabilityLevel, context.StabilityLevel, context.ParentPath)
+		}
+		u.stabilityLevel = context.StabilityLevel
+	}
 
 	var discriminatorFieldName string
-	if jsonAnnotation, ok := tags.LookupJSON(*context.Member); ok {
-		discriminatorFieldName = jsonAnnotation.Name
-		u.discriminator = &discriminatorFieldName
-		u.discriminatorMember = context.Member
+	if context.Member != nil {
+		if jsonAnnotation, ok := tags.LookupJSON(*context.Member); ok {
+			discriminatorFieldName = jsonAnnotation.Name
+			u.discriminator = &discriminatorFieldName
+			u.discriminatorMember = context.Member
+		}
 	}
 
 	return nil
@@ -417,6 +626,9 @@ func processMemberValidations(shared map[string]unions, context Context, tag cod
 // It is a free function, rather than a method so that it can be called from
 // other union-like tags.
 func processFieldMemberValidations(shared map[string]unions, context Context, tag codetags.Tag) error {
+	if context.Member == nil {
+		return fmt.Errorf("struct-field union member has no member info in context")
+	}
 	nt := util.NativeType(context.Member.Type)
 	switch nt.Kind {
 	case types.Pointer, types.Map, types.Slice, types.Builtin:
@@ -425,21 +637,22 @@ func processFieldMemberValidations(shared map[string]unions, context Context, ta
 		// In particular non-pointer structs are not supported.
 		return fmt.Errorf("can only be used on nilable and primitive types (%s)", nt.Kind)
 	}
-	if context.Member == nil {
-		return fmt.Errorf("struct-field union member has no member info in context")
-	}
 
 	jsonTag, ok := tags.LookupJSON(*context.Member)
 	if !ok {
-		return fmt.Errorf("field %q is a union member but has no JSON struct field tag", context.Member)
+		return fmt.Errorf("field %q is a union member but has no JSON struct field tag", context.Member.Name)
 	}
 	fieldName := jsonTag.Name
 	if len(fieldName) == 0 {
-		return fmt.Errorf("field %q is a union member but has no JSON name", context.Member)
+		return fmt.Errorf("field %q is a union member but has no JSON name", context.Member.Name)
 	}
 
-	if shared[context.ParentPath.String()] == nil {
-		shared[context.ParentPath.String()] = unions{}
+	parentKey := ""
+	if context.ParentPath != nil {
+		parentKey = context.ParentPath.String()
+	}
+	if shared[parentKey] == nil {
+		shared[parentKey] = unions{}
 	}
 
 	// See if the tag specified a member name.
@@ -449,7 +662,18 @@ func processFieldMemberValidations(shared map[string]unions, context Context, ta
 	}
 
 	unionArg, _ := tag.NamedArg("union") // optional
-	u := shared[context.ParentPath.String()].getOrCreate(unionArg.Value)
+	u := shared[parentKey].getOrCreate(unionArg.Value)
+	u.parentPath = context.ParentPath
+	u.parentType = context.ParentType
+	if !context.Conditions.Empty() {
+		u.conditions = u.conditions.Merge(context.Conditions)
+	}
+	if context.StabilityLevel != "" {
+		if u.stabilityLevel != "" && u.stabilityLevel != context.StabilityLevel {
+			return fmt.Errorf("conflicting stability levels %q and %q for union target path %q", u.stabilityLevel, context.StabilityLevel, context.ParentPath)
+		}
+		u.stabilityLevel = context.StabilityLevel
+	}
 	u.members = append(u.members, unionMember{fieldName, memberName})
 
 	u.fieldMembers = append(u.fieldMembers, context.Member)
@@ -470,8 +694,12 @@ func processListMemberValidations(shared map[string]unions, context Context, tag
 	// human-friendly. eg: `field[{"name": "succeeded"}]`
 	fieldName := lastPathElement(context.Path)
 
-	if shared[context.ParentPath.String()] == nil {
-		shared[context.ParentPath.String()] = unions{}
+	parentKey := ""
+	if context.ParentPath != nil {
+		parentKey = context.ParentPath.String()
+	}
+	if shared[parentKey] == nil {
+		shared[parentKey] = unions{}
 	}
 
 	// See if the tag specified a member name.
@@ -481,7 +709,18 @@ func processListMemberValidations(shared map[string]unions, context Context, tag
 	}
 
 	unionArg, _ := tag.NamedArg("union") // optional
-	u := shared[context.ParentPath.String()].getOrCreate(unionArg.Value)
+	u := shared[parentKey].getOrCreate(unionArg.Value)
+	u.parentPath = context.ParentPath
+	u.parentType = context.ParentType
+	if !context.Conditions.Empty() {
+		u.conditions = u.conditions.Merge(context.Conditions)
+	}
+	if context.StabilityLevel != "" {
+		if u.stabilityLevel != "" && u.stabilityLevel != context.StabilityLevel {
+			return fmt.Errorf("conflicting stability levels %q and %q for union target path %q", u.stabilityLevel, context.StabilityLevel, context.ParentPath)
+		}
+		u.stabilityLevel = context.StabilityLevel
+	}
 	u.members = append(u.members, unionMember{fieldName, memberName})
 
 	if _, found := u.itemMembers[fieldName]; found {
@@ -520,4 +759,73 @@ func sanitizeName(name string) string {
 	name = strings.ReplaceAll(name, ".", "_")
 	re := regexp.MustCompile(`[^a-zA-Z0-9_]`)
 	return re.ReplaceAllString(name, "_")
+}
+
+func (udtv unionDiscriminatorTagValidator) CollectMetadata(context Context, tag codetags.Tag) (SchemaMetadata, error) {
+	return collectUnionTagMetadata(context, tag)
+}
+
+func (umtv unionMemberTagValidator) CollectMetadata(context Context, tag codetags.Tag) (SchemaMetadata, error) {
+	return collectUnionTagMetadata(context, tag)
+}
+
+func (zomtv zeroOrOneOfMemberTagValidator) CollectMetadata(context Context, tag codetags.Tag) (SchemaMetadata, error) {
+	return collectUnionTagMetadata(context, tag)
+}
+
+func collectUnionTagMetadata(context Context, tag codetags.Tag) (SchemaMetadata, error) {
+	shared := map[string]unions{}
+	var err error
+	switch tag.Name {
+	case unionDiscriminatorTagName:
+		err = processDiscriminatorValidations(shared, context, tag)
+	case unionMemberTagName:
+		err = processMemberValidations(shared, context, tag)
+	case zeroOrOneOfMemberTagName:
+		err = processZeroOrOneOfMemberTag(shared, context, tag)
+	}
+	if err != nil {
+		return SchemaMetadata{}, err
+	}
+
+	res := SchemaMetadata{}
+	keys := make([]string, 0, len(shared))
+	for k := range shared {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+
+	// Union fragments from all members of a struct must land on the same
+	// node so that they merge into one union: key by the enclosing struct's
+	// path, which is the parent of the member declaring the tag.
+	rootPath := context.ParentPath
+	if rootPath == nil {
+		rootPath = context.Path
+	}
+	for _, k := range keys {
+		uMap := shared[k]
+		node := res.GetOrCreateNode(nodeKeyFor(rootPath))
+		for _, uDef := range uMap.SortedList() {
+			node.Unions = append(node.Unions, Conditional[*union]{
+				Conditions:     uDef.conditions,
+				StabilityLevel: uDef.stabilityLevel,
+				Payload:        uDef,
+			})
+		}
+	}
+	return res, nil
+}
+
+func processZeroOrOneOfMemberTag(shared map[string]unions, context Context, tag codetags.Tag) error {
+	unionArg, _ := tag.NamedArg("union") // optional
+	key := ""
+	if context.ParentPath != nil {
+		key = context.ParentPath.String()
+	}
+	if shared[key] == nil {
+		shared[key] = unions{}
+	}
+	u := shared[key].getOrCreate(unionArg.Value)
+	u.isZeroOrOneOf = true
+	return processMemberValidations(shared, context, tag)
 }

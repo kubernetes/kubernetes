@@ -97,6 +97,11 @@ func Validate_TaskList(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj TaskList) (errs field.ErrorList) {
 
+	// lists with map semantics require unique keys
+	if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+		func(a *Task, b *Task) bool { return a.Name == b.Name }); len(e) != 0 {
+		errs = append(errs, e...)
+	}
 	if e := validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_item_zerorooneof_typedef_TaskList_,
 		func(list TaskList) bool {
 			for i := range list {
@@ -114,11 +119,6 @@ func Validate_TaskList(
 			}
 			return false
 		}); len(e) != 0 {
-		errs = append(errs, e...)
-	}
-	// lists with map semantics require unique keys
-	if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
-		func(a *Task, b *Task) bool { return a.Name == b.Name }); len(e) != 0 {
 		errs = append(errs, e...)
 	}
 

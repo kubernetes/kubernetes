@@ -18,6 +18,7 @@ package validators
 
 import (
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -56,50 +57,74 @@ const (
 	dependencyForbidden dependencyMode = dependentForbiddenTagName
 )
 
+type dependencyMetadata struct {
+	mode              dependencyMode
+	triggerMember     *types.Member
+	dependentMember   *types.Member
+	triggerJSONName   string
+	dependentJSONName string
+	stabilityLevel    ValidationStabilityLevel
+	conditions        Conditions
+}
+
+func (dm dependencyMetadata) Compare(other dependencyMetadata) int {
+	if cmp := strings.Compare(dm.triggerJSONName, other.triggerJSONName); cmp != 0 {
+		return cmp
+	}
+	if cmp := strings.Compare(dm.dependentJSONName, other.dependentJSONName); cmp != 0 {
+		return cmp
+	}
+	if cmp := strings.Compare(string(dm.mode), string(other.mode)); cmp != 0 {
+		return cmp
+	}
+	return dm.conditions.Compare(other.conditions)
+}
+
+func (dm dependencyMetadata) DeepCopy() dependencyMetadata {
+	return dm
+}
+
 func (dependencyTagValidator) Init(_ Config) {}
 
 func (dtv dependencyTagValidator) TagName() string {
 	return string(dtv.mode)
 }
 
-var dependencyTagValidScopes = sets.New(ScopeField)
+var dependencyTagValidScopes = sets.New(ScopeType, ScopeField)
 
 func (dependencyTagValidator) ValidScopes() sets.Set[Scope] {
 	return dependencyTagValidScopes
 }
 
-func (dtv dependencyTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (dtv dependencyTagValidator) CollectMetadata(context Context, tag codetags.Tag) (SchemaMetadata, error) {
 	if context.Member == nil {
-		return Validations{}, fmt.Errorf("must be used on a struct field")
+		return SchemaMetadata{}, fmt.Errorf("must be used on a struct field")
 	}
 
 	parentType := util.NonPointer(util.NativeType(context.ParentType))
 	if parentType.Kind != types.Struct {
-		return Validations{}, fmt.Errorf("parent type must be a struct (got %s)", parentType.Kind)
+		return SchemaMetadata{}, fmt.Errorf("parent type must be a struct (got %s)", parentType.Kind)
 	}
 
 	if len(tag.Args) != 1 {
-		return Validations{}, fmt.Errorf("expected exactly one argument naming the dependent field, got %d", len(tag.Args))
+		return SchemaMetadata{}, fmt.Errorf("expected exactly one argument naming the dependent field, got %d", len(tag.Args))
 	}
 	dependentJSONName := tag.Args[0].Value
 
 	dependentMember := util.GetMemberByJSON(parentType, dependentJSONName)
 	if dependentMember == nil {
-		return Validations{}, fmt.Errorf("no sibling field with JSON name %q", dependentJSONName)
+		return SchemaMetadata{}, fmt.Errorf("no sibling field with JSON name %q", dependentJSONName)
 	}
 	if dependentMember.Name == context.Member.Name {
-		return Validations{}, fmt.Errorf("trigger and dependent field must be different (both are %q)", dependentJSONName)
+		return SchemaMetadata{}, fmt.Errorf("trigger and dependent field must be different (both are %q)", dependentJSONName)
 	}
 
 	triggerJSONTag, ok := tags.LookupJSON(*context.Member)
 	if !ok || triggerJSONTag.Name == "" {
-		return Validations{}, fmt.Errorf("trigger field %q has no JSON name", context.Member.Name)
+		return SchemaMetadata{}, fmt.Errorf("trigger field %q has no JSON name", context.Member.Name)
 	}
 	triggerJSONName := triggerJSONTag.Name
 
-	// "Is set" has an obvious meaning for these kinds: pointer non-nil,
-	// slice/map non-empty, builtin non-zero. We don't restrict what a
-	// pointer points to — in practice it's a builtin or a struct.
 	for _, m := range []struct {
 		role   string
 		member *types.Member
@@ -108,44 +133,105 @@ func (dtv dependencyTagValidator) GetValidations(context Context, tag codetags.T
 		switch nt.Kind {
 		case types.Pointer, types.Map, types.Slice, types.Builtin:
 		default:
-			return Validations{}, fmt.Errorf("%s field %q has unsupported type kind %s",
+			return SchemaMetadata{}, fmt.Errorf("%s field %q has unsupported type kind %s",
 				m.role, m.member.Name, nt.Kind)
 		}
 	}
 
-	tagName := string(dtv.mode)
-	var validator types.Name
-	var emitType field.ErrorType
-	var origin string
-	switch dtv.mode {
-	case dependencyRequired:
-		validator, emitType, origin = dependentRequiredValidator, field.ErrorTypeRequired, "dependentRequired"
-	case dependencyForbidden:
-		validator, emitType, origin = dependentForbiddenValidator, field.ErrorTypeForbidden, "dependentForbidden"
-	default:
-		panic(fmt.Sprintf("unknown dependency mode: %q", dtv.mode))
+	meta := dependencyMetadata{
+		mode:              dtv.mode,
+		triggerMember:     context.Member,
+		dependentMember:   dependentMember,
+		triggerJSONName:   triggerJSONName,
+		dependentJSONName: dependentJSONName,
+		stabilityLevel:    context.StabilityLevel,
+		conditions:        context.Conditions,
 	}
 
-	ptrType := types.PointerTo(context.ParentType)
-	triggerExtractor := createMemberExtractor(ptrType, context.Member)
-	dependentExtractor := createMemberExtractor(ptrType, dependentMember)
-
-	// Emit at the parent — the check needs both sibling fields.
-	return Validations{
-		Deferred: []DeferredGen{
-			Deferred(ParentContext, func() (Validations, error) {
-				fn := Function(tagName, DefaultFlags, validator,
-					triggerJSONName, triggerExtractor,
-					dependentJSONName, dependentExtractor,
-				).WithEmits(Emission{
-					Type:         emitType,
-					Origin:       origin,
-					PathFragment: "." + dependentJSONName,
-				})
-				return Validations{Functions: []FunctionGen{fn}}, nil
-			}),
+	res := SchemaMetadata{}
+	node := res.GetOrCreateNode(nodeKeyFor(context.Path))
+	node.Dependencies = []Conditional[*dependencyMetadata]{
+		{
+			Conditions:     context.Conditions,
+			StabilityLevel: context.StabilityLevel,
+			Payload:        &meta,
 		},
-	}, nil
+	}
+	return res, nil
+}
+
+func (dtv dependencyTagValidator) GetValidations(context Context, metadata SchemaMetadata, tag codetags.Tag) (EmittedGroup, error) {
+	if context.Scope != ScopeField {
+		return EmittedGroup{}, nil
+	}
+	deps := metadata.SortedDependencies()
+	if len(deps) == 0 {
+		return EmittedGroup{}, nil
+	}
+
+	hasUnemitted := false
+	for _, dm := range deps {
+		emittedKey := fmt.Sprintf("dep:%s:%s:%s:%s", dm.mode, dm.triggerJSONName, dm.dependentJSONName, dm.conditions.Key())
+		if !metadata.MarkEmitted(emittedKey) {
+			hasUnemitted = true
+		}
+	}
+	if !hasUnemitted {
+		return EmittedGroup{}, nil
+	}
+
+	structType := context.ParentType
+	if structType == nil {
+		return EmittedGroup{}, fmt.Errorf("missing ParentType for field scope")
+	}
+	if k := util.NonPointer(util.NativeType(structType)).Kind; k != types.Struct {
+		return EmittedGroup{}, nil
+	}
+
+	var result Validations
+	ptrType := types.PointerTo(structType)
+
+	for _, dm := range deps {
+		cond := dm.conditions
+		var validator types.Name
+		var emitType field.ErrorType
+		var origin string
+		switch dm.mode {
+		case dependencyRequired:
+			validator, emitType, origin = dependentRequiredValidator, field.ErrorTypeRequired, "dependentRequired"
+		case dependencyForbidden:
+			validator, emitType, origin = dependentForbiddenValidator, field.ErrorTypeForbidden, "dependentForbidden"
+		default:
+			return EmittedGroup{}, fmt.Errorf("unknown dependency mode: %q", dm.mode)
+		}
+
+		// Emit at the parent — the check needs both sibling fields.
+		triggerExtractor := createMemberExtractor(ptrType, dm.triggerMember)
+		dependentExtractor := createMemberExtractor(ptrType, dm.dependentMember)
+
+		fn := Function(string(dm.mode), DefaultFlags, validator,
+			dm.triggerJSONName, triggerExtractor,
+			dm.dependentJSONName, dependentExtractor,
+		).WithEmits(Emission{
+			Type:         emitType,
+			Origin:       origin,
+			PathFragment: "." + dm.dependentJSONName,
+		})
+
+		finalized, err := FinalizeGroup(context, EmittedGroup{
+			Validations:    Validations{Functions: []FunctionGen{fn}},
+			Conditions:     cond,
+			StabilityLevel: dm.stabilityLevel,
+			TargetType:     structType,
+			Hoist:          true,
+		})
+		if err != nil {
+			return EmittedGroup{}, err
+		}
+		result.Add(finalized)
+	}
+
+	return EmittedGroup{Validations: result}, nil
 }
 
 func (dtv dependencyTagValidator) Docs() TagDoc {

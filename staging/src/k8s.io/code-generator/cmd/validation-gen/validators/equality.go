@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
@@ -52,14 +53,14 @@ var (
 	neqValidator = types.Name{Package: libValidationPkg, Name: "NEQ"}
 )
 
-func (v neqTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (v neqTagValidator) GetValidations(context Context, _ SchemaMetadata, tag codetags.Tag) (EmittedGroup, error) {
 	t := util.NonPointer(util.NativeType(context.Type))
 	if !util.IsDirectComparable(t) {
-		return Validations{}, fmt.Errorf("can only be used on comparable types (e.g. string, int, bool), but got %s", rootTypeString(context.Type, t))
+		return EmittedGroup{}, fmt.Errorf("can only be used on comparable types (e.g. string, int, bool), but got %s", rootTypeString(context.Type, t))
 	}
 
 	if tag.ValueType == codetags.ValueTypeNone {
-		return Validations{}, fmt.Errorf("missing required payload")
+		return EmittedGroup{}, fmt.Errorf("missing required payload")
 	}
 
 	var disallowedValue any
@@ -68,32 +69,32 @@ func (v neqTagValidator) GetValidations(context Context, tag codetags.Tag) (Vali
 	switch {
 	case t == types.String:
 		if tag.ValueType != codetags.ValueTypeString {
-			return Validations{}, fmt.Errorf("type mismatch: field is a string, but payload is of type %s", tag.ValueType)
+			return EmittedGroup{}, fmt.Errorf("type mismatch: field is a string, but payload is of type %s", tag.ValueType)
 		}
 		disallowedValue = tag.Value
 	case t == types.Bool:
 		if tag.ValueType != codetags.ValueTypeBool {
-			return Validations{}, fmt.Errorf("type mismatch: field is a bool, but payload is of type %s", tag.ValueType)
+			return EmittedGroup{}, fmt.Errorf("type mismatch: field is a bool, but payload is of type %s", tag.ValueType)
 		}
 		disallowedValue, err = util.ParseBool(tag.Value)
 		if err != nil {
-			return Validations{}, fmt.Errorf("invalid bool value for payload: %w", err)
+			return EmittedGroup{}, fmt.Errorf("invalid bool value for payload: %w", err)
 		}
 	case types.IsInteger(t):
 		if tag.ValueType != codetags.ValueTypeInt {
-			return Validations{}, fmt.Errorf("type mismatch: field is an integer, but payload is of type %s", tag.ValueType)
+			return EmittedGroup{}, fmt.Errorf("type mismatch: field is an integer, but payload is of type %s", tag.ValueType)
 		}
 		disallowedValue, err = util.ParseInt(tag.Value)
 		if err != nil {
-			return Validations{}, fmt.Errorf("invalid integer value for payload: %w", err)
+			return EmittedGroup{}, fmt.Errorf("invalid integer value for payload: %w", err)
 		}
 	default:
-		return Validations{}, fmt.Errorf("unsupported type for 'neq' tag: %s", t.Name)
+		return EmittedGroup{}, fmt.Errorf("unsupported type for 'neq' tag: %s", t.Name)
 	}
 
 	fn := Function(v.TagName(), DefaultFlags, neqValidator, disallowedValue).
 		WithEmits(Emission{field.ErrorTypeInvalid, "neq", ""})
-	return Validations{Functions: []FunctionGen{fn}}, nil
+	return EmittedGroup{Validations: Validations{Functions: []FunctionGen{fn}}}, nil
 }
 
 func (v neqTagValidator) Docs() TagDoc {

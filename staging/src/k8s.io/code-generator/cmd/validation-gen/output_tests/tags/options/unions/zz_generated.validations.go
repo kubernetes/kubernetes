@@ -56,14 +56,71 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
-var zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_options_unions_Struct_zeroOrOneOfItem_ = validate.NewUnionMembership(validate.NewUnionMember("zeroOrOneOfItem[{\"name\": \"succeeded\"}]"), validate.NewUnionMember("zeroOrOneOfItem[{\"name\": \"failed\"}]"))
 var zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_options_unions_Struct_zeroOrOneOfItemDisabled_ = validate.NewUnionMembership(validate.NewUnionMember("zeroOrOneOfItemDisabled[{\"name\": \"succeeded\"}]"), validate.NewUnionMember("zeroOrOneOfItemDisabled[{\"name\": \"failed\"}]"))
+var zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_options_unions_Struct_zeroOrOneOfItem_ = validate.NewUnionMembership(validate.NewUnionMember("zeroOrOneOfItem[{\"name\": \"succeeded\"}]"), validate.NewUnionMember("zeroOrOneOfItem[{\"name\": \"failed\"}]"))
 
 // Validate_Struct validates an instance of Struct according
 // to declarative validation rules in the API schema.
 func Validate_Struct(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *Struct) (errs field.ErrorList) {
+
+	func() { // cohort = "zeroOrOneOfItemDisabled"
+		if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "zeroOrOneOfItemDisabled",
+			func(o *Struct) []Task { return o.ZeroOrOneOfItemDisabled }, validate.SemanticDeepEqual,
+			func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []Task) field.ErrorList {
+				return validate.IfOption(ctx, op, fldPath, obj, oldObj, "FeatureX", false,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []Task) field.ErrorList {
+						return validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_options_unions_Struct_zeroOrOneOfItemDisabled_,
+							func(list []Task) bool {
+								for i := range list {
+									if list[i].Name == "failed" {
+										return true
+									}
+								}
+								return false
+							},
+							func(list []Task) bool {
+								for i := range list {
+									if list[i].Name == "succeeded" {
+										return true
+									}
+								}
+								return false
+							})
+					})
+			}); len(e) != 0 {
+			errs = append(errs, e...)
+		}
+	}()
+	func() { // cohort = "zeroOrOneOfItem"
+		if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "zeroOrOneOfItem",
+			func(o *Struct) []Task { return o.ZeroOrOneOfItem }, validate.SemanticDeepEqual,
+			func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []Task) field.ErrorList {
+				return validate.IfOption(ctx, op, fldPath, obj, oldObj, "FeatureX", true,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []Task) field.ErrorList {
+						return validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_options_unions_Struct_zeroOrOneOfItem_,
+							func(list []Task) bool {
+								for i := range list {
+									if list[i].Name == "failed" {
+										return true
+									}
+								}
+								return false
+							},
+							func(list []Task) bool {
+								for i := range list {
+									if list[i].Name == "succeeded" {
+										return true
+									}
+								}
+								return false
+							})
+					})
+			}); len(e) != 0 {
+			errs = append(errs, e...)
+		}
+	}()
 
 	// field Struct.TypeMeta has no validation
 
@@ -167,28 +224,6 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "FeatureX", true,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []Task) field.ErrorList {
-					return validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_options_unions_Struct_zeroOrOneOfItem_,
-						func(list []Task) bool {
-							for i := range list {
-								if list[i].Name == "failed" {
-									return true
-								}
-							}
-							return false
-						},
-						func(list []Task) bool {
-							for i := range list {
-								if list[i].Name == "succeeded" {
-									return true
-								}
-							}
-							return false
-						})
-				}); len(e) != 0 {
-				errs = append(errs, e...)
-			}
 			// lists with map semantics require unique keys
 			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *Task, b *Task) bool { return a.Name == b.Name }); len(e) != 0 {
@@ -215,28 +250,6 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "FeatureX", false,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []Task) field.ErrorList {
-					return validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_options_unions_Struct_zeroOrOneOfItemDisabled_,
-						func(list []Task) bool {
-							for i := range list {
-								if list[i].Name == "failed" {
-									return true
-								}
-							}
-							return false
-						},
-						func(list []Task) bool {
-							for i := range list {
-								if list[i].Name == "succeeded" {
-									return true
-								}
-							}
-							return false
-						})
-				}); len(e) != 0 {
-				errs = append(errs, e...)
-			}
 			// lists with map semantics require unique keys
 			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *Task, b *Task) bool { return a.Name == b.Name }); len(e) != 0 {

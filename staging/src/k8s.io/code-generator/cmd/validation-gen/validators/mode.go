@@ -39,14 +39,30 @@ const (
 var validGroupNameRegex = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]*$`)
 
 func init() {
-	RegisterTagValidator(&modeDiscriminatorTagValidator{discriminatorDefinitions})
-	RegisterTagValidator(&ifModeTagValidator{discriminatorDefinitions, nil})
+	RegisterTagValidator(&modeDiscriminatorTagValidator{})
+	RegisterTagValidator(&ifModeTagValidator{})
+	RegisterAggregateEmitter(AggregateModesOrder, modeAggregateEmitter{})
+}
+
+// modeAggregateEmitter generates discriminated-mode validations from the
+// discriminator metadata collected off modeDiscriminator and ifMode tags.
+type modeAggregateEmitter struct{}
+
+func (modeAggregateEmitter) Name() string { return "modes" }
+
+func (modeAggregateEmitter) GenerateGroups(context Context, metadata SchemaMetadata) ([]EmittedGroup, error) {
+	v, err := generateModeValidations(context, metadata)
+	if err != nil {
+		return nil, err
+	}
+	if v.Empty() {
+		return nil, nil
+	}
+	return []EmittedGroup{{Validations: v}}, nil
 }
 
 // discriminatorDefinitions stores all discriminator definitions found by tag validators.
 // Key is the struct path.
-var discriminatorDefinitions = map[string]discriminatorGroups{}
-
 type discriminatorGroups map[string]*discriminatorGroup
 
 type discriminatorGroup struct {
@@ -65,6 +81,76 @@ type memberRule struct {
 	value          string
 	validations    Validations
 	stabilityLevel ValidationStabilityLevel
+	conditions     Conditions
+}
+
+func (dg *discriminatorGroup) merge(other *discriminatorGroup) error {
+	if other == nil {
+		return nil
+	}
+	if other.discriminatorMember != nil {
+		if dg.discriminatorMember != nil && dg.discriminatorMember != other.discriminatorMember {
+			return fmt.Errorf("duplicate discriminator: %q", dg.name)
+		}
+		dg.discriminatorMember = other.discriminatorMember
+	}
+	if len(other.members) > 0 {
+		if dg.members == nil {
+			dg.members = make(map[string]*fieldMemberRules)
+		}
+		for fieldName, fmr := range other.members {
+			if existingFmr, ok := dg.members[fieldName]; ok {
+				if fmr.member != nil {
+					existingFmr.member = fmr.member
+				}
+				for _, r := range fmr.rules {
+					existingFmr.rules = append(existingFmr.rules, r.DeepCopy())
+				}
+			} else {
+				dg.members[fieldName] = fmr.DeepCopy()
+			}
+		}
+	}
+	return nil
+}
+
+func (dg *discriminatorGroup) DeepCopy() *discriminatorGroup {
+	if dg == nil {
+		return nil
+	}
+	out := &discriminatorGroup{
+		name:                dg.name,
+		discriminatorMember: dg.discriminatorMember,
+	}
+	if dg.members != nil {
+		out.members = make(map[string]*fieldMemberRules, len(dg.members))
+		for k, v := range dg.members {
+			out.members[k] = v.DeepCopy()
+		}
+	}
+	return out
+}
+
+func (fmr *fieldMemberRules) DeepCopy() *fieldMemberRules {
+	if fmr == nil {
+		return nil
+	}
+	out := &fieldMemberRules{
+		member: fmr.member,
+	}
+	if fmr.rules != nil {
+		out.rules = make([]memberRule, len(fmr.rules))
+		for i, r := range fmr.rules {
+			out.rules[i] = r.DeepCopy()
+		}
+	}
+	return out
+}
+
+func (mr memberRule) DeepCopy() memberRule {
+	out := mr
+	out.validations = mr.validations.Clone()
+	return out
 }
 
 func (mg discriminatorGroups) getOrCreate(name string) *discriminatorGroup {
@@ -82,50 +168,166 @@ func (mg discriminatorGroups) getOrCreate(name string) *discriminatorGroup {
 	return g
 }
 
-type modeDiscriminatorTagValidator struct {
-	shared map[string]discriminatorGroups
+func (mg discriminatorGroups) SortedList() []*discriminatorGroup {
+	if len(mg) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(mg))
+	for k := range mg {
+		keys = append(keys, k)
+	}
+	// Sort group names for deterministic output
+	slices.Sort(keys)
+
+	list := make([]*discriminatorGroup, 0, len(keys))
+	for _, k := range keys {
+		list = append(list, mg[k])
+	}
+	return list
 }
 
-func (mdtv *modeDiscriminatorTagValidator) Init(_ Config) {}
+type modeDiscriminatorTagValidator struct {
+	extractor Extractor
+}
+
+func (mdtv *modeDiscriminatorTagValidator) Init(cfg Config) {
+	mdtv.extractor = cfg.Extractor
+}
 
 func (mdtv *modeDiscriminatorTagValidator) TagName() string {
 	return modeDiscriminatorTagName
 }
 
 func (mdtv *modeDiscriminatorTagValidator) ValidScopes() sets.Set[Scope] {
-	return sets.New(ScopeField)
+	return sets.New(ScopeType, ScopeField)
 }
 
-func (mdtv *modeDiscriminatorTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
-	if util.NativeType(context.Type).Kind == types.Pointer {
-		return Validations{}, fmt.Errorf("can only be used on non-pointer types")
+// collectModes gathers discriminator metadata. Validations are emitted by modeAggregateEmitter during type validation extraction.
+func (mdtv *modeDiscriminatorTagValidator) collectModes(context Context, tag codetags.Tag) (discriminatorGroups, error) {
+	if context.Member == nil {
+		return nil, nil
+	}
+	member := context.Member
+	groups := make(discriminatorGroups)
+
+	if tag.Name == modeDiscriminatorTagName {
+		if util.NativeType(member.Type).Kind == types.Pointer {
+			return nil, fmt.Errorf("can only be used on non-pointer types")
+		}
+		if t := util.NonPointer(util.NativeType(member.Type)); t.Kind != types.Builtin || (t.Name.Name != "string" && t.Name.Name != "bool") {
+			return nil, fmt.Errorf("can only be used on string or bool types (%s)", rootTypeString(member.Type, t))
+		}
+		groupName := ""
+		if nameArg, ok := tag.NamedArg("modality"); ok {
+			groupName = nameArg.Value
+		}
+		if groupName != "" && !validGroupNameRegex.MatchString(groupName) {
+			return nil, fmt.Errorf("discriminator group name must match %s, got %q", validGroupNameRegex.String(), groupName)
+		}
+		if groupName == "default" {
+			return nil, fmt.Errorf("discriminator group name %q is reserved", groupName)
+		}
+		group := groups.getOrCreate(groupName)
+		if group.discriminatorMember != nil && group.discriminatorMember != member {
+			return nil, fmt.Errorf("duplicate discriminator: %q", groupName)
+		}
+		group.discriminatorMember = member
 	}
 
-	if t := util.NonPointer(util.NativeType(context.Type)); t.Kind != types.Builtin || (t.Name.Name != "string" && t.Name.Name != "bool") {
-		return Validations{}, fmt.Errorf("can only be used on string or bool types (%s)", rootTypeString(context.Type, t))
+	if tag.Name == ifModeTagName {
+		if tag.ValueTag == nil {
+			return nil, fmt.Errorf("missing required payload")
+		}
+		groupName := ""
+		if modeArg, ok := tag.NamedArg("modality"); ok {
+			groupName = modeArg.Value
+		}
+		if groupName == "default" {
+			return nil, fmt.Errorf("discriminator group name %q is reserved", groupName)
+		}
+		value := ""
+		if valArg, ok := tag.NamedArg("mode"); ok {
+			value = valArg.Value
+		} else if len(tag.Args) > 0 && tag.Args[0].Name == "" {
+			value = tag.Args[0].Value
+		} else {
+			return nil, fmt.Errorf("missing required mode")
+		}
+
+		group := groups.getOrCreate(groupName)
+		fieldName := member.Name
+		if rules, ok := group.members[fieldName]; ok {
+			if rules.member != member {
+				return nil, fmt.Errorf("internal error: member mismatch for field %q", fieldName)
+			}
+		} else {
+			group.members[fieldName] = &fieldMemberRules{member: member}
+		}
+
+		payloadValidations, err := mdtv.extractor.ExtractTagValidations(context, SchemaMetadata{}, *tag.ValueTag)
+		if err != nil {
+			return nil, err
+		}
+
+		group.members[fieldName].rules = append(group.members[fieldName].rules, memberRule{
+			value:          value,
+			validations:    payloadValidations,
+			stabilityLevel: context.StabilityLevel,
+			conditions:     context.Conditions,
+		})
 	}
 
-	if mdtv.shared[context.ParentPath.String()] == nil {
-		mdtv.shared[context.ParentPath.String()] = make(discriminatorGroups)
+	if len(groups) == 0 {
+		return nil, nil
 	}
-	groupName := ""
-	if nameArg, ok := tag.NamedArg("modality"); ok {
-		groupName = nameArg.Value
-	}
-	if groupName != "" && !validGroupNameRegex.MatchString(groupName) {
-		return Validations{}, fmt.Errorf("discriminator group name must match %s, got %q", validGroupNameRegex.String(), groupName)
-	}
-	if groupName == "default" {
-		return Validations{}, fmt.Errorf("discriminator group name %q is reserved", groupName)
-	}
-	group := mdtv.shared[context.ParentPath.String()].getOrCreate(groupName)
-	if group.discriminatorMember != nil && group.discriminatorMember != context.Member {
-		return Validations{}, fmt.Errorf("duplicate discriminator: %q", groupName)
-	}
-	group.discriminatorMember = context.Member
 
-	// configures descriminator metadata, Validations are emitted by  modeDiscriminatorTagValidator.
-	return Validations{}, nil
+	return groups, nil
+}
+
+func (mdtv *modeDiscriminatorTagValidator) CollectMetadata(context Context, tag codetags.Tag) (SchemaMetadata, error) {
+	modes, err := mdtv.collectModes(context, tag)
+	if err != nil || len(modes) == 0 {
+		return SchemaMetadata{}, err
+	}
+	res := SchemaMetadata{}
+	// Mode groups belong to the enclosing struct: key by its path, which is
+	// the parent of the member declaring the tag.
+	rootPath := context.ParentPath
+	if rootPath == nil {
+		rootPath = context.Path
+	}
+	node := res.GetOrCreateNode(nodeKeyFor(rootPath))
+	for _, g := range modes.SortedList() {
+		node.Modes = append(node.Modes, Conditional[*discriminatorGroup]{
+			Conditions:     context.Conditions,
+			StabilityLevel: context.StabilityLevel,
+			Payload:        g,
+		})
+	}
+	return res, nil
+}
+
+func generateModeValidations(context Context, metadata SchemaMetadata) (Validations, error) {
+	modes, err := metadata.Modes()
+	if err != nil {
+		return Validations{}, err
+	}
+	if len(modes) == 0 {
+		return Validations{}, nil
+	}
+
+	hasUnemitted := false
+	for _, m := range modes {
+		emittedKey := fmt.Sprintf("mode:%s", m.name)
+		if !metadata.MarkEmitted(emittedKey) {
+			hasUnemitted = true
+		}
+	}
+	if !hasUnemitted {
+		return Validations{}, nil
+	}
+
+	return getDiscriminatorValidations(modes, context)
 }
 
 func (mdtv *modeDiscriminatorTagValidator) Docs() TagDoc {
@@ -143,14 +345,9 @@ func (mdtv *modeDiscriminatorTagValidator) Docs() TagDoc {
 	}
 }
 
-type ifModeTagValidator struct {
-	shared    map[string]discriminatorGroups
-	validator TagValidationExtractor
-}
+type ifModeTagValidator struct{}
 
-func (imtv *ifModeTagValidator) Init(cfg Config) {
-	imtv.validator = cfg.TagValidator
-}
+func (imtv *ifModeTagValidator) Init(_ Config) {}
 
 func (imtv *ifModeTagValidator) TagName() string {
 	return ifModeTagName
@@ -160,63 +357,9 @@ func (imtv *ifModeTagValidator) ValidScopes() sets.Set[Scope] {
 	return sets.New(ScopeField)
 }
 
-func (imtv *ifModeTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
-	if tag.ValueTag == nil {
-		return Validations{}, fmt.Errorf("missing required payload")
-	}
-
-	groupName := ""
-	if modeArg, ok := tag.NamedArg("modality"); ok {
-		groupName = modeArg.Value
-	}
-	if groupName == "default" {
-		return Validations{}, fmt.Errorf("discriminator group name %q is reserved", groupName)
-	}
-
-	value := ""
-	if valArg, ok := tag.NamedArg("mode"); ok {
-		value = valArg.Value
-	} else if len(tag.Args) > 0 && tag.Args[0].Name == "" {
-		// Positional argument
-		value = tag.Args[0].Value
-	} else {
-		return Validations{}, fmt.Errorf("missing required mode")
-	}
-
-	if imtv.shared[context.ParentPath.String()] == nil {
-		imtv.shared[context.ParentPath.String()] = make(discriminatorGroups)
-	}
-	group := imtv.shared[context.ParentPath.String()].getOrCreate(groupName)
-
-	fieldName := context.Member.Name
-	if rules, ok := group.members[fieldName]; ok {
-		if rules.member != context.Member {
-			return Validations{}, fmt.Errorf("internal error: member mismatch for field %q", fieldName)
-		}
-	} else {
-		group.members[fieldName] = &fieldMemberRules{
-			member: context.Member,
-		}
-	}
-
-	payloadValidations, err := imtv.validator.ExtractTagValidations(context, *tag.ValueTag)
-	if err != nil {
-		return Validations{}, err
-	}
-
-	group.members[fieldName].rules = append(group.members[fieldName].rules, memberRule{
-		value:          value,
-		validations:    payloadValidations,
-		stabilityLevel: context.StabilityLevel,
-	})
-
-	return Validations{
-		Deferred: []DeferredGen{
-			Deferred(ParentContext, func() (Validations, error) {
-				return getDiscriminatorValidations(imtv.shared, context)
-			}),
-		},
-	}, nil
+func (imtv *ifModeTagValidator) CollectMetadata(context Context, tag codetags.Tag) (SchemaMetadata, error) {
+	mdtv := &modeDiscriminatorTagValidator{extractor: globalRegistry}
+	return mdtv.CollectMetadata(context, tag)
 }
 
 func (imtv *ifModeTagValidator) Docs() TagDoc {
@@ -246,32 +389,20 @@ func (imtv *ifModeTagValidator) Docs() TagDoc {
 	}
 }
 
-func getDiscriminatorValidations(shared map[string]discriminatorGroups, context Context) (Validations, error) {
-	structPath := context.ParentPath.String()
-
-	// Extract the most concrete type possible.
-	if k := util.NonPointer(util.NativeType(context.ParentType)).Kind; k != types.Struct {
+func getDiscriminatorValidations(groups discriminatorGroups, context Context) (Validations, error) {
+	if k := util.NonPointer(util.NativeType(context.Type)).Kind; k != types.Struct {
 		return Validations{}, nil
 	}
 
-	groups, ok := shared[structPath]
-	if !ok || len(groups) == 0 {
+	if len(groups) == 0 {
 		return Validations{}, nil
 	}
-	// deleting to ensure we don't process the same struct twice.
-	delete(shared, structPath)
 
 	var result Validations
+	structType := util.NonPointer(util.NativeType(context.Type))
 
-	// Sort group names for deterministic output
-	groupNames := make([]string, 0, len(groups))
-	for name := range groups {
-		groupNames = append(groupNames, name)
-	}
-	slices.Sort(groupNames)
-
-	for _, gn := range groupNames {
-		group := groups[gn]
+	for _, group := range groups.SortedList() {
+		gn := group.name
 		if group.discriminatorMember == nil {
 			if len(group.members) > 0 {
 				if gn == "default" {
@@ -289,7 +420,7 @@ func getDiscriminatorValidations(shared map[string]discriminatorGroups, context 
 
 		for _, fn := range fieldNames {
 			rules := group.members[fn]
-			v, err := generateMemberFieldValidation(context.ParentType, group, rules)
+			v, err := generateMemberFieldValidation(structType, group, rules)
 			if err != nil {
 				return Validations{}, err
 			}
@@ -324,6 +455,8 @@ func generateMemberFieldValidation(structType *types.Type, group *discriminatorG
 		return Validations{}, err
 	}
 
+	commonCond := uniformConditions(rules.rules)
+
 	// Prepare DiscriminatedRules
 	// Mark each rule's validation functions with their stability level before
 	// aggregating by value, so that different rules for the same value can
@@ -336,14 +469,17 @@ func generateMemberFieldValidation(structType *types.Type, group *discriminatorG
 			rulesByValue[rule.value] = &Validations{}
 			values = append(values, rule.value)
 		}
-		// Mark each validation function with its stability level before merging.
-		v := rule.validations
-		if rule.stabilityLevel != "" {
-			marked := make([]FunctionGen, len(v.Functions))
-			for i, f := range v.Functions {
-				marked[i] = f.WithStabilityLevel(rule.stabilityLevel)
-			}
-			v.Functions = marked
+		ruleCond := rule.conditions
+		if !commonCond.Empty() {
+			ruleCond = Conditions{}
+		}
+		v, err := FinalizeGroup(Context{Type: nilableFieldType}, EmittedGroup{
+			Validations:    rule.validations,
+			Conditions:     ruleCond,
+			StabilityLevel: rule.stabilityLevel,
+		})
+		if err != nil {
+			return Validations{}, err
 		}
 		// Accumulate this rule's validations with others that share the same discriminator value.
 		rulesByValue[rule.value].Add(v)
@@ -437,7 +573,26 @@ func generateMemberFieldValidation(structType *types.Type, group *discriminatorG
 	// skip the level wrapping in the upstream. Processing the stability level
 	// in the upstream will override the stability levels of the wrapped validators.
 	fn.StabilityLevelSelfManaged = true
-	return Validations{Functions: []FunctionGen{fn}}, nil
+
+	return FinalizeGroup(Context{Type: structType}, EmittedGroup{
+		Validations: Validations{Functions: []FunctionGen{fn}},
+		Conditions:  commonCond,
+	})
+}
+
+// uniformConditions returns the common conditions if all rules share
+// the same ones, or Conditions{} if they differ.
+func uniformConditions(rules []memberRule) Conditions {
+	if len(rules) == 0 {
+		return Conditions{}
+	}
+	cond := rules[0].conditions
+	for i := 1; i < len(rules); i++ {
+		if rules[i].conditions.Compare(cond) != 0 {
+			return Conditions{}
+		}
+	}
+	return cond
 }
 
 // uniformStabilityLevel returns the common stability level if all rules share

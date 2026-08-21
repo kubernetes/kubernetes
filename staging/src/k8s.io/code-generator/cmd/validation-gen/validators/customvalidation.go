@@ -76,7 +76,7 @@ func (customValidationTagValidator) ValidScopes() sets.Set[Scope] {
 	return customValidationTagValidScopes
 }
 
-func (v *customValidationTagValidator) GetValidations(context Context, _ codetags.Tag) (Validations, error) {
+func (v *customValidationTagValidator) GetValidations(context Context, _ SchemaMetadata, _ codetags.Tag) (EmittedGroup, error) {
 	// Resolve the output package for the type that owns the call site (the type
 	// itself, or the containing struct for a field), as done for Validate_<Type>.
 	definingType := context.Type
@@ -85,7 +85,7 @@ func (v *customValidationTagValidator) GetValidations(context Context, _ codetag
 	}
 	outPkg, ok := v.inputToCanonicalPkg[definingType.Name.Package]
 	if !ok {
-		return Validations{}, fmt.Errorf("cannot resolve generated package for %s (is it being processed by validation-gen?)", definingType.Name.Package)
+		return EmittedGroup{}, fmt.Errorf("cannot resolve generated package for %s (is it being processed by validation-gen?)", definingType.Name.Package)
 	}
 
 	// Resolve the function name from the naming convention.
@@ -105,7 +105,7 @@ func (v *customValidationTagValidator) GetValidations(context Context, _ codetag
 	// Fail with a clear error if the function is missing or mis-typed, rather
 	// than silently skipping validation or emitting code that won't compile.
 	if err := v.checkFunction(fn, valueType); err != nil {
-		return Validations{}, err
+		return EmittedGroup{}, err
 	}
 	v.claimed[fn] = true
 
@@ -114,7 +114,7 @@ func (v *customValidationTagValidator) GetValidations(context Context, _ codetag
 	// synthesize a coverage case for it. The runtime call is unaffected.
 	var result Validations
 	result.AddFunction(Function(customValidationTagName, DefaultFlags, fn).WithComment("custom validation"))
-	return result, nil
+	return EmittedGroup{Validations: result}, nil
 }
 
 // VerifyCustomValidationsHaveTags errors for any ValidateCustom_* function that

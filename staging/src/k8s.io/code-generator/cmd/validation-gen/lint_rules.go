@@ -231,6 +231,7 @@ func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
 
 		typeVals, err := extractor.ExtractValidations(
 			validators.Context{Scope: validators.ScopeType, Type: t},
+			validators.SchemaMetadata{},
 			filterTags(tTags)...,
 		)
 		if err != nil {
@@ -284,6 +285,7 @@ func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
 				}
 				fieldVals, err := extractor.ExtractValidations(
 					validators.Context{Scope: validators.ScopeField, Type: m.Type},
+					validators.SchemaMetadata{},
 					filterTags(mTags)...,
 				)
 				if err != nil {
@@ -345,6 +347,7 @@ func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
 
 		fieldVals, err := extractor.ExtractValidations(
 			validators.Context{Scope: validators.ScopeField, Type: t},
+			validators.SchemaMetadata{},
 			filterTags(tags)...,
 		)
 		if err != nil {

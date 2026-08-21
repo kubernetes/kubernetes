@@ -66,25 +66,25 @@ func (maxLengthTagValidator) ValidScopes() sets.Set[Scope] {
 
 var maxLengthValidator = types.Name{Package: libValidationPkg, Name: "MaxLength"}
 
-func (maxLengthTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (maxLengthTagValidator) GetValidations(context Context, _ SchemaMetadata, tag codetags.Tag) (EmittedGroup, error) {
 	var result Validations
 
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
 	if t := util.NonPointer(util.NativeType(context.Type)); t != types.String {
-		return Validations{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
+		return EmittedGroup{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
 	}
 
 	intVal, err := util.ParseInt(tag.Value)
 	if err != nil {
-		return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
+		return EmittedGroup{}, fmt.Errorf("failed to parse tag payload as int: %w", err)
 	}
 	if intVal < 0 {
-		return result, fmt.Errorf("must be greater than or equal to zero")
+		return EmittedGroup{}, fmt.Errorf("must be greater than or equal to zero")
 	}
 	result.AddFunction(Function(maxLengthTagName, DefaultFlags, maxLengthValidator, intVal).
 		WithEmits(Emission{field.ErrorTypeTooLong, "maxLength", ""}))
-	return result, nil
+	return EmittedGroup{Validations: result}, nil
 }
 
 func (mltv maxLengthTagValidator) Docs() TagDoc {
@@ -120,25 +120,25 @@ func (maxBytesTagValidator) ValidScopes() sets.Set[Scope] {
 
 var maxBytesValidator = types.Name{Package: libValidationPkg, Name: "MaxBytes"}
 
-func (maxBytesTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (maxBytesTagValidator) GetValidations(context Context, _ SchemaMetadata, tag codetags.Tag) (EmittedGroup, error) {
 	var result Validations
 
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
 	if t := util.NonPointer(util.NativeType(context.Type)); t != types.String {
-		return Validations{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
+		return EmittedGroup{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
 	}
 
 	intVal, err := util.ParseInt(tag.Value)
 	if err != nil {
-		return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
+		return EmittedGroup{}, fmt.Errorf("failed to parse tag payload as int: %w", err)
 	}
 	if intVal < 0 {
-		return result, fmt.Errorf("must be greater than or equal to zero")
+		return EmittedGroup{}, fmt.Errorf("must be greater than or equal to zero")
 	}
 	result.AddFunction(Function(maxBytesTagName, DefaultFlags, maxBytesValidator, intVal).
 		WithEmits(Emission{field.ErrorTypeTooLong, "maxBytes", ""}))
-	return result, nil
+	return EmittedGroup{Validations: result}, nil
 }
 
 func (mbtv maxBytesTagValidator) Docs() TagDoc {
@@ -179,24 +179,24 @@ func (minItemsTagValidator) ValidScopes() sets.Set[Scope] {
 
 var minItemsValidator = types.Name{Package: libValidationPkg, Name: "MinItems"}
 
-func (minItemsTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (minItemsTagValidator) GetValidations(context Context, _ SchemaMetadata, tag codetags.Tag) (EmittedGroup, error) {
 	var result Validations
 
 	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
 	if t := util.NativeType(context.Type); t.Kind != types.Slice && t.Kind != types.Array {
-		return Validations{}, fmt.Errorf("can only be used on list types (%s)", rootTypeString(context.Type, t))
+		return EmittedGroup{}, fmt.Errorf("can only be used on list types (%s)", rootTypeString(context.Type, t))
 	}
 
 	intVal, err := util.ParseInt(tag.Value)
 	if err != nil {
-		return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
+		return EmittedGroup{}, fmt.Errorf("failed to parse tag payload as int: %w", err)
 	}
 	if intVal < 0 {
-		return result, fmt.Errorf("must be greater than or equal to zero")
+		return EmittedGroup{}, fmt.Errorf("must be greater than or equal to zero")
 	}
 	result.AddFunction(Function(minItemsTagName, DefaultFlags, minItemsValidator, intVal).
 		WithEmits(Emission{field.ErrorTypeTooFew, "minItems", ""}))
-	return result, nil
+	return EmittedGroup{Validations: result}, nil
 }
 
 func (mitv minItemsTagValidator) Docs() TagDoc {
@@ -233,32 +233,32 @@ func (minPropertiesTagValidator) ValidScopes() sets.Set[Scope] {
 
 var minPropertiesValidator = types.Name{Package: libValidationPkg, Name: "MinProperties"}
 
-func (minPropertiesTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (minPropertiesTagValidator) GetValidations(context Context, _ SchemaMetadata, tag codetags.Tag) (EmittedGroup, error) {
 	var result Validations
 
 	// NOTE: pointers to maps are not supported, so we should never see a pointer here.
 	t := util.NativeType(context.Type)
 	if t.Kind != types.Map {
-		return Validations{}, fmt.Errorf("can only be used on map types (%s)", rootTypeString(context.Type, t))
+		return EmittedGroup{}, fmt.Errorf("can only be used on map types (%s)", rootTypeString(context.Type, t))
 	}
 	keyType := util.NativeType(t.Key)
 	if keyType.Kind != types.Builtin || keyType.Name.Name != "string" {
-		return Validations{}, fmt.Errorf("can only be used on map types with string-based keys (%s)", rootTypeString(context.Type, t))
+		return EmittedGroup{}, fmt.Errorf("can only be used on map types with string-based keys (%s)", rootTypeString(context.Type, t))
 	}
 
 	intVal, err := util.ParseInt(tag.Value)
 	if err != nil {
-		return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
+		return EmittedGroup{}, fmt.Errorf("failed to parse tag payload as int: %w", err)
 	}
 	if intVal < 0 {
-		return result, fmt.Errorf("must be greater than or equal to zero")
+		return EmittedGroup{}, fmt.Errorf("must be greater than or equal to zero")
 	}
 	if intVal > 100000 {
-		return result, fmt.Errorf("must be less than or equal to 100000")
+		return EmittedGroup{}, fmt.Errorf("must be less than or equal to 100000")
 	}
 	result.AddFunction(Function(minPropertiesTagName, DefaultFlags, minPropertiesValidator, intVal).
 		WithEmits(Emission{field.ErrorTypeTooFew, "minProperties", ""}))
-	return result, nil
+	return EmittedGroup{Validations: result}, nil
 }
 
 func (mptv minPropertiesTagValidator) Docs() TagDoc {
@@ -297,25 +297,25 @@ func (maxItemsTagValidator) ValidScopes() sets.Set[Scope] {
 
 var maxItemsValidator = types.Name{Package: libValidationPkg, Name: "MaxItems"}
 
-func (maxItemsTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (maxItemsTagValidator) GetValidations(context Context, _ SchemaMetadata, tag codetags.Tag) (EmittedGroup, error) {
 	var result Validations
 
 	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
 	if t := util.NativeType(context.Type); t.Kind != types.Slice && t.Kind != types.Array {
-		return Validations{}, fmt.Errorf("can only be used on list types (%s)", rootTypeString(context.Type, t))
+		return EmittedGroup{}, fmt.Errorf("can only be used on list types (%s)", rootTypeString(context.Type, t))
 	}
 
 	intVal, err := util.ParseInt(tag.Value)
 	if err != nil {
-		return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
+		return EmittedGroup{}, fmt.Errorf("failed to parse tag payload as int: %w", err)
 	}
 	if intVal < 0 {
-		return result, fmt.Errorf("must be greater than or equal to zero")
+		return EmittedGroup{}, fmt.Errorf("must be greater than or equal to zero")
 	}
 	// Note: maxItems short-circuits other validations for safety.
 	result.AddFunction(Function(maxItemsTagName, ShortCircuit, maxItemsValidator, intVal).
 		WithEmits(Emission{field.ErrorTypeTooMany, "maxItems", ""}))
-	return result, nil
+	return EmittedGroup{Validations: result}, nil
 }
 
 func (mitv maxItemsTagValidator) Docs() TagDoc {
@@ -352,33 +352,33 @@ func (maxPropertiesTagValidator) ValidScopes() sets.Set[Scope] {
 
 var maxPropertiesValidator = types.Name{Package: libValidationPkg, Name: "MaxProperties"}
 
-func (maxPropertiesTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (maxPropertiesTagValidator) GetValidations(context Context, _ SchemaMetadata, tag codetags.Tag) (EmittedGroup, error) {
 	var result Validations
 
 	// NOTE: pointers to maps are not supported, so we should never see a pointer here.
 	t := util.NativeType(context.Type)
 	if t.Kind != types.Map {
-		return Validations{}, fmt.Errorf("can only be used on map types (%s)", rootTypeString(context.Type, t))
+		return EmittedGroup{}, fmt.Errorf("can only be used on map types (%s)", rootTypeString(context.Type, t))
 	}
 	keyType := util.NativeType(t.Key)
 	if keyType.Kind != types.Builtin || keyType.Name.Name != "string" {
-		return Validations{}, fmt.Errorf("can only be used on map types with string-based keys (%s)", rootTypeString(context.Type, t))
+		return EmittedGroup{}, fmt.Errorf("can only be used on map types with string-based keys (%s)", rootTypeString(context.Type, t))
 	}
 
 	intVal, err := util.ParseInt(tag.Value)
 	if err != nil {
-		return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
+		return EmittedGroup{}, fmt.Errorf("failed to parse tag payload as int: %w", err)
 	}
 	if intVal < 0 {
-		return result, fmt.Errorf("must be greater than or equal to zero")
+		return EmittedGroup{}, fmt.Errorf("must be greater than or equal to zero")
 	}
 	if intVal > 100000 {
-		return result, fmt.Errorf("must be less than or equal to 100000")
+		return EmittedGroup{}, fmt.Errorf("must be less than or equal to 100000")
 	}
 	// Note: maxProperties short-circuits other validations.
 	result.AddFunction(Function(maxPropertiesTagName, ShortCircuit, maxPropertiesValidator, intVal).
 		WithEmits(Emission{field.ErrorTypeTooMany, "maxProperties", ""}))
-	return result, nil
+	return EmittedGroup{Validations: result}, nil
 }
 
 func (mptv maxPropertiesTagValidator) Docs() TagDoc {
@@ -412,36 +412,36 @@ func (minimumTagValidator) ValidScopes() sets.Set[Scope] {
 
 var minimumValidator = types.Name{Package: libValidationPkg, Name: "Minimum"}
 
-func (minimumTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (minimumTagValidator) GetValidations(context Context, _ SchemaMetadata, tag codetags.Tag) (EmittedGroup, error) {
 	var result Validations
 
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
 	t := util.NonPointer(util.NativeType(context.Type))
 	if !types.IsInteger(t) {
-		return result, fmt.Errorf("can only be used on integer types (%s)", rootTypeString(context.Type, t))
+		return EmittedGroup{}, fmt.Errorf("can only be used on integer types (%s)", rootTypeString(context.Type, t))
 	}
 
 	bitSize, err := intBitSize(t)
 	if err != nil {
-		return result, err
+		return EmittedGroup{}, err
 	}
 	if isUnsignedInt(t) {
 		uintVal, err := util.ParseUnsignedInt(tag.Value, bitSize)
 		if err != nil {
-			return result, fmt.Errorf("failed to parse tag payload: %w", err)
+			return EmittedGroup{}, fmt.Errorf("failed to parse tag payload: %w", err)
 		}
 		result.AddFunction(Function(minimumTagName, DefaultFlags, minimumValidator, uintVal).
 			WithEmits(Emission{field.ErrorTypeInvalid, "minimum", ""}))
 	} else {
 		intVal, err := util.ParseSignedInt(tag.Value, bitSize)
 		if err != nil {
-			return result, fmt.Errorf("failed to parse tag payload: %w", err)
+			return EmittedGroup{}, fmt.Errorf("failed to parse tag payload: %w", err)
 		}
 		result.AddFunction(Function(minimumTagName, DefaultFlags, minimumValidator, intVal).
 			WithEmits(Emission{field.ErrorTypeInvalid, "minimum", ""}))
 	}
-	return result, nil
+	return EmittedGroup{Validations: result}, nil
 }
 
 func (mtv minimumTagValidator) Docs() TagDoc {
@@ -475,36 +475,36 @@ func (maximumTagValidator) ValidScopes() sets.Set[Scope] {
 
 var maximumValidator = types.Name{Package: libValidationPkg, Name: "Maximum"}
 
-func (maximumTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (maximumTagValidator) GetValidations(context Context, _ SchemaMetadata, tag codetags.Tag) (EmittedGroup, error) {
 	var result Validations
 
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
 	t := util.NonPointer(util.NativeType(context.Type))
 	if !types.IsInteger(t) {
-		return result, fmt.Errorf("can only be used on integer types (%s)", rootTypeString(context.Type, t))
+		return EmittedGroup{}, fmt.Errorf("can only be used on integer types (%s)", rootTypeString(context.Type, t))
 	}
 
 	bitSize, err := intBitSize(t)
 	if err != nil {
-		return result, err
+		return EmittedGroup{}, err
 	}
 	if isUnsignedInt(t) {
 		uintVal, err := util.ParseUnsignedInt(tag.Value, bitSize)
 		if err != nil {
-			return result, fmt.Errorf("failed to parse tag payload: %w", err)
+			return EmittedGroup{}, fmt.Errorf("failed to parse tag payload: %w", err)
 		}
 		result.AddFunction(Function(maximumTagName, DefaultFlags, maximumValidator, uintVal).
 			WithEmits(Emission{field.ErrorTypeInvalid, "maximum", ""}))
 	} else {
 		intVal, err := util.ParseSignedInt(tag.Value, bitSize)
 		if err != nil {
-			return result, fmt.Errorf("failed to parse tag payload: %w", err)
+			return EmittedGroup{}, fmt.Errorf("failed to parse tag payload: %w", err)
 		}
 		result.AddFunction(Function(maximumTagName, DefaultFlags, maximumValidator, intVal).
 			WithEmits(Emission{field.ErrorTypeInvalid, "maximum", ""}))
 	}
-	return result, nil
+	return EmittedGroup{Validations: result}, nil
 }
 
 func (mtv maximumTagValidator) Docs() TagDoc {
@@ -538,18 +538,18 @@ func (minLengthTagValidator) ValidScopes() sets.Set[Scope] {
 
 var minLengthValidator = types.Name{Package: libValidationPkg, Name: "MinLength"}
 
-func (minLengthTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (minLengthTagValidator) GetValidations(context Context, _ SchemaMetadata, tag codetags.Tag) (EmittedGroup, error) {
 	var result Validations
 
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
 	if t := util.NonPointer(util.NativeType(context.Type)); t != types.String {
-		return result, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
+		return EmittedGroup{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
 	}
 
 	intVal, err := util.ParseInt(tag.Value)
 	if err != nil {
-		return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
+		return EmittedGroup{}, fmt.Errorf("failed to parse tag payload as int: %w", err)
 	}
 
 	// Usage of `+k8s:minLength=0` is useful as a semantic representation of the fact that
@@ -562,7 +562,7 @@ func (minLengthTagValidator) GetValidations(context Context, tag codetags.Tag) (
 		result.AddFunction(Function(minLengthTagName, DefaultFlags, minLengthValidator, intVal).
 			WithEmits(Emission{field.ErrorTypeTooShort, "minLength", ""}))
 	}
-	return result, nil
+	return EmittedGroup{Validations: result}, nil
 }
 
 func (mltv minLengthTagValidator) Docs() TagDoc {

@@ -102,19 +102,17 @@ func TestListKeys(t *testing.T) {
 		// Case 1: Alpha listType, Standard Key -> Alpha Error
 		field.Duplicate(field.NewPath("alphaListTypeStandardKey").Index(1), MapItem{Key: "a", Value: 2}).MarkAlpha(),
 
-		// Case 2: Standard listType, Alpha Key -> Normal Error
-		// The alpha key is treated as a functional key for the list validation.
-		field.Duplicate(field.NewPath("standardListTypeAlphaKey").Index(1), MapItem{Key: "b", Value: 2}),
+		// Case 2: Standard listType, Alpha Key -> Alpha Error
+		field.Duplicate(field.NewPath("standardListTypeAlphaKey").Index(1), MapItem{Key: "b", Value: 2}).MarkAlpha(),
 
 		// Case 3: Alpha listType, Alpha Key -> Alpha Error
 		field.Duplicate(field.NewPath("alphaListTypeAlphaKey").Index(1), MapItem{Key: "c", Value: 2}).MarkAlpha(),
 
-		// Case 4: Standard listType, Alpha Key1, Standard Key2 -> Normal Error
-		// Both keys participate in the uniqueness check.
-		field.Duplicate(field.NewPath("standardListTypeMixedKeys1").Index(1), MultiKeyItem{Key1: "d", Key2: 1, Value: 2}),
+		// Case 4: Standard listType, Alpha Key1, Standard Key2 -> Alpha Error
+		field.Duplicate(field.NewPath("standardListTypeMixedKeys1").Index(1), MultiKeyItem{Key1: "d", Key2: 1, Value: 2}).MarkAlpha(),
 
-		// Case 5: Standard listType, Standard Key1, Alpha Key2 -> Normal Error
-		field.Duplicate(field.NewPath("standardListTypeMixedKeys2").Index(1), MultiKeyItem{Key1: "e", Key2: 1, Value: 2}),
+		// Case 5: Standard listType, Standard Key1, Alpha Key2 -> Alpha Error
+		field.Duplicate(field.NewPath("standardListTypeMixedKeys2").Index(1), MultiKeyItem{Key1: "e", Key2: 1, Value: 2}).MarkAlpha(),
 
 		// Case 6: Alpha listType, Alpha Key1, Standard Key2 -> Alpha Error
 		field.Duplicate(field.NewPath("alphaListTypeMixedKeys1").Index(1), MultiKeyItem{Key1: "f", Key2: 1, Value: 2}).MarkAlpha(),
@@ -122,11 +120,11 @@ func TestListKeys(t *testing.T) {
 		// Case 7: Alpha listType, Standard Key1, Alpha Key2 -> Alpha Error
 		field.Duplicate(field.NewPath("alphaListTypeMixedKeys2").Index(1), MultiKeyItem{Key1: "g", Key2: 1, Value: 2}).MarkAlpha(),
 
-		// Case 11: Standard listType, Beta Key1, Standard Key2 -> Normal Error
-		field.Duplicate(field.NewPath("standardListTypeMixedKeysBeta1").Index(1), MultiKeyItem{Key1: "k", Key2: 1, Value: 2}),
+		// Case 11: Standard listType, Beta Key1, Standard Key2 -> Beta Error
+		field.Duplicate(field.NewPath("standardListTypeMixedKeysBeta1").Index(1), MultiKeyItem{Key1: "k", Key2: 1, Value: 2}).MarkBeta(),
 
-		// Case 12: Standard listType, Standard Key1, Beta Key2 -> Normal Error
-		field.Duplicate(field.NewPath("standardListTypeMixedKeysBeta2").Index(1), MultiKeyItem{Key1: "l", Key2: 1, Value: 2}),
+		// Case 12: Standard listType, Standard Key1, Beta Key2 -> Beta Error
+		field.Duplicate(field.NewPath("standardListTypeMixedKeysBeta2").Index(1), MultiKeyItem{Key1: "l", Key2: 1, Value: 2}).MarkBeta(),
 
 		// Case 13: Beta listType, Beta Key1, Standard Key2 -> Beta Error
 		field.Duplicate(field.NewPath("betaListTypeMixedKeys1").Index(1), MultiKeyItem{Key1: "m", Key2: 1, Value: 2}).MarkBeta(),
@@ -137,9 +135,8 @@ func TestListKeys(t *testing.T) {
 		// Case 8: Beta listType, Standard Key -> Beta Error
 		field.Duplicate(field.NewPath("betaListTypeStandardKey").Index(1), MapItem{Key: "h", Value: 2}).MarkBeta(),
 
-		// Case 9: Standard listType, Beta Key -> Normal Error
-		// The beta key is treated as a functional key for the list validation.
-		field.Duplicate(field.NewPath("standardListTypeBetaKey").Index(1), MapItem{Key: "i", Value: 2}),
+		// Case 9: Standard listType, Beta Key -> Beta Error
+		field.Duplicate(field.NewPath("standardListTypeBetaKey").Index(1), MapItem{Key: "i", Value: 2}).MarkBeta(),
 
 		// Case 10: Beta listType, Beta Key -> Beta Error
 		field.Duplicate(field.NewPath("betaListTypeBetaKey").Index(1), MapItem{Key: "j", Value: 2}).MarkBeta(),
