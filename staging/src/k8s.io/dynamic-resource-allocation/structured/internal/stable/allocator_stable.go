@@ -74,6 +74,10 @@ type Allocator struct {
 	// access to this map must be synchronized.
 	availableCounters map[PoolID]counterSets
 	mutex             sync.RWMutex
+	// allocatedDeviceIDsByPool groups allocated device IDs by pool so checkAvailableCounters
+	// can spot a device a pool no longer publishes. Built once via the Once, then read-only.
+	allocatedDeviceIDsByPool     map[PoolID]sets.Set[DeviceID]
+	allocatedDeviceIDsByPoolOnce sync.Once
 	// numAllocateOneInvocations counts the number of times the allocateOne
 	// function is called for the allocator. This is a measurement of the
 	// amount of work the allocator had to do to allocate devices
@@ -94,14 +98,31 @@ func NewAllocator(ctx context.Context,
 	slices []*resourceapi.ResourceSlice,
 	celCache *cel.Cache,
 ) (*Allocator, error) {
-	return &Allocator{
+	a := &Allocator{
 		features:          features,
 		allocatedDevices:  allocatedDevices,
 		classLister:       classLister,
 		slices:            slices,
 		celCache:          celCache,
 		availableCounters: make(map[PoolID]counterSets),
-	}, nil
+	}
+	return a, nil
+}
+
+// allocatedDeviceIDsByPool groups allocated device IDs by pool so checkAvailableCounters
+// can spot a device a pool no longer publishes without rescanning the whole set per pool.
+func allocatedDeviceIDsByPool(allocatedDevices sets.Set[DeviceID]) map[PoolID]sets.Set[DeviceID] {
+	byPool := make(map[PoolID]sets.Set[DeviceID])
+	for id := range allocatedDevices {
+		poolID := PoolID{Driver: id.Driver, Pool: id.Pool}
+		ids := byPool[poolID]
+		if ids == nil {
+			ids = sets.New[DeviceID]()
+			byPool[poolID] = ids
+		}
+		ids.Insert(id)
+	}
+	return byPool
 }
 
 func (a *Allocator) Channel() internal.AllocatorChannel {
@@ -1341,7 +1362,9 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 
 		// Update the data structure to reflect counters already consumed by allocated devices. This
 		// only includes devices where the allocation process has completed, so this will never
-		// change during the allocation process.
+		// change during the allocation process. Record each published DeviceID too, so an allocated
+		// device the pool dropped is detectable below.
+		poolDeviceIDs := sets.New[DeviceID]()
 		for _, resourceSlices := range [][]*draapi.ResourceSlice{pool.DeviceSlicesTargetingNode, pool.DeviceSlicesNotTargetingNode} {
 			for _, slice := range resourceSlices {
 				for _, device := range slice.Spec.Devices {
@@ -1350,6 +1373,7 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 						Pool:   slice.Spec.Pool.Name,
 						Device: device.Name,
 					}
+					poolDeviceIDs.Insert(deviceID)
 					// Devices that aren't allocated doesn't consume any counters, so we don't
 					// need to consider them.
 					if !alloc.allocatedDevices.Has(deviceID) {
@@ -1376,11 +1400,33 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 			}
 		}
 
+		// Build the per-pool allocated-device index lazily on first use, so a pod whose
+		// candidates never reach a counter check pays nothing.
+		alloc.allocatedDeviceIDsByPoolOnce.Do(func() {
+			alloc.allocatedDeviceIDsByPool = allocatedDeviceIDsByPool(alloc.allocatedDevices)
+		})
+
+		// A device the pool no longer publishes has no slice to reconstruct its counter use
+		// from, so the pool's availability is unknowable; fail closed rather than over-commit.
+		for allocatedID := range alloc.allocatedDeviceIDsByPool[poolID] {
+			if !poolDeviceIDs.Has(allocatedID) {
+				alloc.logger.V(5).Info("Marking counter pool unavailable: an allocated device is no longer published in any slice",
+					"pool", poolID, "device", allocatedID)
+				availableCountersForPool = nil
+				break
+			}
+		}
+
 		// Set the available counters on the allocator so we don't have to
 		// compute this again.
 		alloc.mutex.Lock()
 		alloc.availableCounters[poolID] = availableCountersForPool
 		alloc.mutex.Unlock()
+	}
+
+	// Counter availability is unknowable (an allocated device was dropped); skip this pool.
+	if availableCountersForPool == nil {
+		return false, nil
 	}
 
 	// Update the consumedCounters data structure with the counters consumed
