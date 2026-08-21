@@ -445,8 +445,9 @@ A `Connection` allows Glue jobs, crawlers and development endpoints to access
 certain types of data stores.
 
 * **Secrets Management**
-    You must specify JDBC connection credentials in Secrets Manager and
-    provide the Secrets Manager Key name as a property to the job connection.
+    Manage JDBC connection credentials in Secrets Manager and pass the secret
+    to the connection via the `secret` property (see the example below), rather
+    than embedding credentials in `properties`.
 
 * **Networking - the CDK determines the best fit subnet for Glue connection
 configuration**
@@ -486,7 +487,7 @@ new glue.Connection(this, 'MyConnection', {
 });
 ```
 
-For RDS `Connection` by JDBC, it is recommended to manage credentials using AWS Secrets Manager. To use Secret, specify `SECRET_ID` in `properties` like the following code. Note that in this case, the subnet must have a route to the AWS Secrets Manager VPC endpoint or to the AWS Secrets Manager endpoint through a NAT gateway.
+For RDS `Connection` by JDBC, it is recommended to manage credentials using AWS Secrets Manager. Pass the secret via the `secret` property: Glue reads the credentials at runtime through the connection's `SECRET_ID`, so the secret value never enters the template. Note that in this case, the subnet must have a route to the AWS Secrets Manager VPC endpoint or to the AWS Secrets Manager endpoint through a NAT gateway.
 
 ```ts
 declare const securityGroup: ec2.SecurityGroup;
@@ -496,18 +497,18 @@ new glue.Connection(this, "RdsConnection", {
   type: glue.ConnectionType.JDBC,
   securityGroups: [securityGroup],
   subnet,
+  secret: db.secret,
   properties: {
     JDBC_CONNECTION_URL: `jdbc:mysql://${db.clusterEndpoint.socketAddress}/databasename`,
     JDBC_ENFORCE_SSL: "false",
-    SECRET_ID: db.secret!.secretName,
   },
 });
 ```
 
-Connection `properties` are emitted verbatim into the CloudFormation template, so
-any credential placed there in plaintext is stored in plaintext in the template,
-`cdk.out`, and source control. Reference a Secrets Manager secret through
-`SECRET_ID` (as above) instead. If a property key looks like a credential (for
+Prefer the `secret` property over placing credentials in `properties`. Connection
+`properties` are emitted verbatim into the CloudFormation template, so any
+credential placed there in plaintext is stored in plaintext in the template,
+`cdk.out`, and source control. If a property key looks like a credential (for
 example `PASSWORD`, `SECRET`, or `TOKEN`) and holds a plaintext literal, the
 construct emits a synthesis-time warning.
 

@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
-import { Template } from 'aws-cdk-lib/assertions';
+import { Annotations, Match, Template } from 'aws-cdk-lib/assertions';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as glue from '../lib';
 
 test('a connection with connection properties', () => {
@@ -219,6 +220,69 @@ test('addProperty', () => {
       },
     },
   });
+});
+
+test('a secret is wired to the SECRET_ID connection property', () => {
+  const stack = new cdk.Stack();
+  const secret = new secretsmanager.Secret(stack, 'Secret');
+
+  new glue.Connection(stack, 'Connection', {
+    type: glue.ConnectionType.JDBC,
+    properties: { JDBC_CONNECTION_URL: 'jdbc:server://server:443/connection' },
+    secret,
+  });
+
+  Template.fromStack(stack).hasResourceProperties('AWS::Glue::Connection', {
+    ConnectionInput: {
+      ConnectionProperties: {
+        JDBC_CONNECTION_URL: 'jdbc:server://server:443/connection',
+        SECRET_ID: stack.resolve(secret.secretRef.secretId),
+      },
+    },
+  });
+});
+
+test('setting both `secret` and a SECRET_ID property throws', () => {
+  const stack = new cdk.Stack();
+  const secret = new secretsmanager.Secret(stack, 'Secret');
+
+  new glue.Connection(stack, 'Connection', {
+    type: glue.ConnectionType.JDBC,
+    secret,
+    properties: { SECRET_ID: 'arn:aws:secretsmanager:us-east-1:123456789012:secret:other' },
+  });
+
+  expect(() => Template.fromStack(stack)).toThrow('cannot set both `secret` and a `SECRET_ID` connection property');
+});
+
+test('setting `secret` and adding a SECRET_ID via addProperty throws', () => {
+  const stack = new cdk.Stack();
+  const secret = new secretsmanager.Secret(stack, 'Secret');
+
+  const connection = new glue.Connection(stack, 'Connection', {
+    type: glue.ConnectionType.JDBC,
+    secret,
+  });
+  connection.addProperty('SECRET_ID', 'arn:aws:secretsmanager:us-east-1:123456789012:secret:other');
+
+  expect(() => Template.fromStack(stack)).toThrow('cannot set both `secret` and a `SECRET_ID` connection property');
+});
+
+test('referencing a secret does not trigger the plaintext-secret warning', () => {
+  const stack = new cdk.Stack();
+  // An imported secret has a literal ARN; the SECRET_ID it populates is a
+  // reference, not a credential, so it must not be flagged.
+  const secret = secretsmanager.Secret.fromSecretCompleteArn(
+    stack, 'Secret', 'arn:aws:secretsmanager:us-east-1:123456789012:secret:creds-AbCdEf');
+
+  new glue.Connection(stack, 'Connection', {
+    type: glue.ConnectionType.JDBC,
+    secret,
+  });
+
+  Annotations.fromStack(stack).hasNoWarning(
+    '/Default/Connection',
+    Match.stringLikeRegexp('.*plaintext secret.*'));
 });
 
 test('fromConnectionName', () => {

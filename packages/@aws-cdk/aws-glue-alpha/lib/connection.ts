@@ -1,5 +1,6 @@
 import type * as ec2 from 'aws-cdk-lib/aws-ec2';
 import { CfnConnection } from 'aws-cdk-lib/aws-glue';
+import type { ISecretRef } from 'aws-cdk-lib/aws-secretsmanager';
 import * as cdk from 'aws-cdk-lib/core';
 import { lit, memoizedGetter } from 'aws-cdk-lib/core/lib/helpers-internal';
 import { addConstructMetadata, MethodMetadata } from 'aws-cdk-lib/core/lib/metadata-resource';
@@ -276,6 +277,18 @@ export interface ConnectionOptions {
   readonly properties?: { [key: string]: string };
 
   /**
+   * A reference to a Secrets Manager secret holding the credentials for this connection.
+   *
+   * The secret is referenced through the connection's `SECRET_ID` property, so
+   * Glue reads the credentials at runtime and the secret value never appears in
+   * the synthesized template. Prefer this over placing credentials directly in
+   * `properties`. Accepts any `secretsmanager.ISecret`.
+   *
+   * @default - no secret; any credentials must be supplied via `properties`
+   */
+  readonly secret?: ISecretRef;
+
+  /**
    * A list of criteria that can be used in selecting this connection.
    * This is useful for filtering the results of https://awscli.amazonaws.com/v2/documentation/api/latest/reference/glue/get-connections.html
    * @default no match criteria
@@ -398,20 +411,32 @@ export class Connection extends cdk.Resource implements IConnection {
       securityGroupIdList: props.securityGroups ? props.securityGroups.map(sg => sg.securityGroupId) : undefined,
     } : undefined;
 
+    const secretId = props.secret?.secretRef.secretId;
+
     this.resource = new CfnConnection(this, 'Resource', {
       catalogId: cdk.Stack.of(this).account,
       connectionInput: {
         connectionProperties: cdk.Lazy.any({
           produce: () => {
             // Inspect the final property set at synthesis time so properties
-            // added via `addProperty` are covered as well.
+            // added via `addProperty` are covered as well — a `SECRET_ID` added
+            // after construction would otherwise be silently overwritten by the
+            // one injected from `secret`.
+            if (secretId !== undefined && this.properties.SECRET_ID !== undefined) {
+              throw new cdk.ValidationError(lit`ConnectionSecretConflict`, 'cannot set both `secret` and a `SECRET_ID` connection property', this);
+            }
+            // The `SECRET_ID` injected from `secret` is a reference, not a
+            // credential, so it is merged in after this scan.
             warnOnPlaintextSecrets(
               this,
               this.properties,
               '@aws-cdk/aws-glue-alpha:plaintextConnectionSecret',
-              'Reference a Secrets Manager secret through the connection\'s `SECRET_ID` property instead.',
+              'Pass a Secrets Manager secret via the connection\'s `secret` property instead.',
             );
-            return Object.keys(this.properties).length > 0 ? this.properties : undefined;
+            const properties = secretId !== undefined
+              ? { ...this.properties, SECRET_ID: secretId }
+              : this.properties;
+            return Object.keys(properties).length > 0 ? properties : undefined;
           },
         }),
         connectionType: props.type.name,
