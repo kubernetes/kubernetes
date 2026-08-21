@@ -30,6 +30,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
+	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	utiltesting "k8s.io/client-go/util/testing"
 	endptspkg "k8s.io/kubernetes/pkg/api/v1/endpoints"
@@ -1105,6 +1107,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			ResourceVersion: "",
 			Name:            "foo",
+			Namespace:       ns,
 			Labels: map[string]string{
 				LabelManagedBy:       ControllerName,
 				v1.IsHeadlessService: "",
@@ -1162,6 +1165,7 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			ResourceVersion: "",
 			Name:            "foo",
+			Namespace:       ns,
 			Labels:          serviceLabels,
 		},
 		Subsets: endptspkg.SortSubsets(expectedSubsets),
@@ -1501,7 +1505,8 @@ func TestSyncEndpointsHeadlessWithoutPort(t *testing.T) {
 	endpointsHandler.ValidateRequestCount(t, 1)
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "foo",
+			Name:      "foo",
+			Namespace: ns,
 			Labels: map[string]string{
 				LabelManagedBy:       ControllerName,
 				v1.IsHeadlessService: "",
@@ -3302,5 +3307,49 @@ func TestPodToEndpointAddressForServiceEmptyIPFamilies(t *testing.T) {
 				t.Errorf("got IP %q (IPv6=%v), want family %v", addr.IP, isV6, tc.wantFamily)
 			}
 		})
+	}
+}
+
+// TestSyncServiceFailedCreateEndpointsEventHasNamespace verifies that when
+// syncService fails to create a brand new Endpoints object, the resulting
+// FailedToCreateEndpoint event carries the service's namespace on
+// involvedObject, not just in the message text.
+func TestSyncServiceFailedCreateEndpointsEventHasNamespace(t *testing.T) {
+	ns := "target-ns"
+	tCtx := ktesting.Init(t)
+	client, controller := newFakeController(tCtx, 0*time.Second)
+
+	controller.serviceStore.Add(&v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: v1.ServiceSpec{
+			Selector: map[string]string{"foo": "bar"},
+			Ports:    []v1.ServicePort{{Port: 80}},
+		},
+	})
+
+	client.PrependReactor("create", "endpoints", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{Resource: "endpoints"}, "foo")
+	})
+
+	gotEvents := make(chan *v1.Event, 1)
+	watcher := controller.eventBroadcaster.StartEventWatcher(func(e *v1.Event) {
+		if e.Reason == "FailedToCreateEndpoint" {
+			gotEvents <- e
+		}
+	})
+	defer watcher.Stop()
+
+	if err := controller.syncService(tCtx, ns+"/foo"); err == nil {
+		t.Fatal("expected syncService to return the AlreadyExists error")
+	}
+
+	var gotEvent *v1.Event
+	select {
+	case gotEvent = <-gotEvents:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for a FailedToCreateEndpoint event to be recorded")
+	}
+	if gotEvent.InvolvedObject.Namespace != ns {
+		t.Errorf("event involvedObject.namespace = %q, want %q", gotEvent.InvolvedObject.Namespace, ns)
 	}
 }
