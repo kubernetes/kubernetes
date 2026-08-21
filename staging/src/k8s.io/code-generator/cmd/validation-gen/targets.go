@@ -184,13 +184,13 @@ func deepEqualFuncTag(pkg *types.Package) types.Name {
 func parseDeepEqualFunc(val string) types.Name {
 	lastSlash := strings.LastIndex(val, "/")
 	if lastSlash == -1 {
-		dot := strings.Index(val, ".")
-		if dot == -1 {
+		pkg, sym, found := strings.Cut(val, ".")
+		if !found {
 			return types.Name{Name: val}
 		}
 		return types.Name{
-			Package: val[:dot],
-			Name:    val[dot+1:],
+			Package: pkg,
+			Name:    sym,
 		}
 	}
 	dot := lastSlash + strings.Index(val[lastSlash:], ".")
@@ -587,12 +587,12 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 	targetList = append(targetList, testTargets(args.TestOutputRoot, args.TestOutputFilePrefix, groupKindReports, allowlist, boilerplate)...)
 
 	if len(linter.lintErrors) > 0 {
-		buf := strings.Builder{}
+		buf := &strings.Builder{}
 
 		for t, errs := range linter.lintErrors {
-			buf.WriteString(fmt.Sprintf("  type %v:\n", t))
+			fmt.Fprintf(buf, "  type %v:\n", t)
 			for _, err := range errs {
-				buf.WriteString(fmt.Sprintf("    %s\n", err.Error()))
+				fmt.Fprintf(buf, "    %s\n", err.Error())
 			}
 		}
 		klog.Fatalf("lint failed:\n%s", buf.String())
