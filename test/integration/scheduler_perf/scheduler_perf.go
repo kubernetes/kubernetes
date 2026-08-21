@@ -818,7 +818,6 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
 					scheduler, informerFactory, schedulerDone, tCtx := setupTestCase(b, tc, featureGates, w, opts)
 					tCtx.TB().Cleanup(func() {
-						tCtx.Cancel("workload is done")
 						<-schedulerDone
 						// Reset metrics to prevent metrics generated in current workload gets
 						// carried over to the next workload.
@@ -946,7 +945,6 @@ func RunIntegrationPerfScheduling(t *testing.T, configFile string, options ...Sc
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
 					scheduler, informerFactory, schedulerDone, tCtx := setupTestCase(t, tc, featureGates, w, opts)
 					tCtx.TB().Cleanup(func() {
-						tCtx.Cancel("workload is done")
 						<-schedulerDone
 						// Reset metrics to prevent metrics generated in current workload gets
 						// carried over to the next workload.
@@ -1138,7 +1136,6 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *Workload, topicName st
 	}
 
 	tCtx.TB().Cleanup(func() {
-		tCtx.Cancel("workload is done")
 		executor.wait()
 	})
 

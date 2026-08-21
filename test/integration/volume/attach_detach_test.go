@@ -148,10 +148,9 @@ var defaultTimerConfig = attachdetach.TimerConfig{
 func TestPodTerminationWithNodeOOSDetach(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
-	defer server.TearDownFn()
+	t.Cleanup(server.TearDownFn)
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 	testClient, ctrl, pvCtrl, podgcCtrl, informers := createAdClients(tCtx, t, server, defaultSyncPeriod, attachdetach.TimerConfig{
 		ReconcilerLoopPeriod:                        100 * time.Millisecond,
 		ReconcilerMaxWaitForUnmountDuration:         6 * time.Second,
@@ -240,7 +239,7 @@ func TestPodTerminationWithNodeOOSDetach(t *testing.T) {
 func TestPodDeletionWithDswp(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
-	defer server.TearDownFn()
+	t.Cleanup(server.TearDownFn)
 
 	namespaceName := "test-pod-deletion"
 	node := &v1.Node{
@@ -253,7 +252,6 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	}
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 	testClient, ctrl, pvCtrl, podgcCtrl, informers := createAdClients(tCtx, t, server, defaultSyncPeriod, defaultTimerConfig)
 
 	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
@@ -315,7 +313,7 @@ func initCSIObjects(stopCh <-chan struct{}, informers clientgoinformers.SharedIn
 func TestPodUpdateWithADC(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
-	defer server.TearDownFn()
+	t.Cleanup(server.TearDownFn)
 	namespaceName := "test-pod-update"
 
 	node := &v1.Node{
@@ -328,7 +326,6 @@ func TestPodUpdateWithADC(t *testing.T) {
 	}
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 	testClient, ctrl, pvCtrl, podgcCtrl, informers := createAdClients(tCtx, t, server, defaultSyncPeriod, defaultTimerConfig)
 
 	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
@@ -504,7 +501,7 @@ func createAdClients(ctx context.Context, t *testing.T, server *kubeapiservertes
 func TestPodAddedByDswp(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
-	defer server.TearDownFn()
+	t.Cleanup(server.TearDownFn)
 	namespaceName := "test-pod-deletion"
 
 	node := &v1.Node{
@@ -517,7 +514,6 @@ func TestPodAddedByDswp(t *testing.T) {
 	}
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 	testClient, ctrl, pvCtrl, podgcCtrl, informers := createAdClients(tCtx, t, server, defaultSyncPeriod, defaultTimerConfig)
 
 	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
@@ -582,10 +578,9 @@ func TestPodAddedByDswp(t *testing.T) {
 func TestPVCBoundWithADC(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
-	defer server.TearDownFn()
+	t.Cleanup(server.TearDownFn)
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
 
 	namespaceName := "test-pod-deletion"
 

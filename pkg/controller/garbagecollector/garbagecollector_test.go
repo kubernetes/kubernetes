@@ -1039,10 +1039,9 @@ func TestGarbageCollectorSync(t *testing.T) {
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 
 	var wg sync.WaitGroup
-	defer wg.Wait()
 
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("test has completed")
+	tCtx.Cleanup(wg.Wait)
 	logger := tCtx.Logger()
 
 	alwaysStarted := make(chan struct{})

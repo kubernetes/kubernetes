@@ -1655,11 +1655,7 @@ func testEventHandlers(tCtx ktesting.TContext) {
 			tCtx.Cleanup(ec.queue.ShutDown)
 
 			informerFactory.StartWithContext(tCtx)
-			stopInformers := func() {
-				tCtx.Cancel("stopping informers")
-				informerFactory.Shutdown()
-			}
-			tCtx.Cleanup(stopInformers)
+			tCtx.Cleanup(informerFactory.Shutdown)
 
 			drainQueue := func() []string {
 				tCtx.Wait()
