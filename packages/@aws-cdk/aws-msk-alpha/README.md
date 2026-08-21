@@ -239,7 +239,7 @@ For more information, see [Amazon MSK Express Brokers](https://docs.aws.amazon.c
 
 **Note:** When using Express Brokers, the following constraints apply:
 
-- Apache Kafka version must be 3.6.x, 3.8.x, or 3.9.x
+- Apache Kafka version must be 3.6.x, 3.8.x, 3.9.x, or 4.2.x
 - You must specify the `instanceType`
 - The VPC must have at least 3 subnets (across 3 AZs)
 - `ebsStorageInfo` is not supported

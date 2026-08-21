@@ -1,6 +1,5 @@
 {
-  "enableLookups": true,
-  "version": "53.0.0",
+  "version": "54.0.0",
   "testCases": {
     "MskExpressCluster/DefaultTest": {
       "stacks": [
@@ -10,5 +9,6 @@
       "assertionStackName": "MskExpressClusterDefaultTestDeployAssert83DE4F95"
     }
   },
-  "minimumCliVersion": "2.1123.0"
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
 }

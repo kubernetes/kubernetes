@@ -10,12 +10,13 @@ class ExpressMskStack extends cdk.Stack {
     super(scope, id, props);
     const vpc = new ec2.Vpc(this, 'VPC', {
       maxAzs: 3,
+      natGateways: 1,
       restrictDefaultSecurityGroup: false,
     });
 
     const expressCluster = new msk.Cluster(this, 'ExpressCluster', {
       clusterName: 'integ-test-express',
-      kafkaVersion: msk.KafkaVersion.V3_8_X,
+      kafkaVersion: msk.KafkaVersion.V4_2_X_KRAFT,
       vpc,
       brokerType: msk.BrokerType.EXPRESS,
       instanceType: ec2.InstanceType.of(

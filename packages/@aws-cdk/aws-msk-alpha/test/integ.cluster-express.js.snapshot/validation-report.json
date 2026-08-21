@@ -1,0 +1,27 @@
+{
+  "version": "54.0.0",
+  "title": "Validation Report",
+  "pluginReports": [
+    {
+      "pluginName": "CloudFormation Validate",
+      "pluginVersion": "1.2.0",
+      "conclusion": "success",
+      "metadata": {},
+      "violations": [
+        {
+          "ruleName": "F0001",
+          "description": "Resources section must exist and be non-empty",
+          "severity": "warning",
+          "ruleMetadata": {
+            "category": "Structure"
+          },
+          "violatingConstructs": [
+            {
+              "constructPath": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
