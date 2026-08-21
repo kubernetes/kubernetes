@@ -99,8 +99,6 @@ var (
 	)
 
 	// EndpointSliceChangesTotal tracks the number of changes to Endpoint Slices.
-	// Introduced at ALPHA; a follow-up can graduate it to BETA after the
-	// required soak period (new metrics cannot be introduced at BETA).
 	EndpointSliceChangesTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      EndpointSliceSubsystem,
