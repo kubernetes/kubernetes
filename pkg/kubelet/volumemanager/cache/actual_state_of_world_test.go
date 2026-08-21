@@ -701,6 +701,49 @@ func Test_MarkVolumeAsDetached_Negative_PodInVolume(t *testing.T) {
 	verifyPodExistsInVolumeAsw(t, podName, generatedVolumeName, "fake/device/path" /* expectedDevicePath */, asw)
 }
 
+// Calls MarkVolumeAsAttached() once to add volume
+// Calls MarkVolumeAttachability() to set the volume as non-attachable
+// Verifies volume still exists in ASW via GetAttachedVolume()
+// Verifies PluginIsAttachable is updated to false
+func TestMarkVolumeAttachability(t *testing.T) {
+	volumePluginMgr, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
+	asw := NewActualStateOfWorld("mynode", volumePluginMgr)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: "pod1uid"},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{{
+				Name: "volume-name",
+				VolumeSource: v1.VolumeSource{
+					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+						PDName: "fake-device1",
+					},
+				},
+			}},
+		},
+	}
+	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
+	volumeName, err := util.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
+	if err != nil {
+		t.Fatalf("GetUniqueVolumeNameFromSpec failed: %v", err)
+	}
+
+	logger, _ := ktesting.NewTestContext(t)
+	if err := asw.MarkVolumeAsAttached(logger, volumeName, volumeSpec, "", "fake/device/path"); err != nil {
+		t.Fatalf("MarkVolumeAsAttached failed: %v", err)
+	}
+
+	asw.MarkVolumeAttachability(volumeName, false)
+
+	attachedVolume, found := asw.GetAttachedVolume(volumeName)
+	if !found {
+		t.Fatalf("Expected volume %q to remain in ASW", volumeName)
+	}
+	if attachedVolume.PluginIsAttachable {
+		t.Fatalf("Expected volume %q to be non-attachable", volumeName)
+	}
+}
+
 func getTestPod(podName, podUID, outerVolumeName, pdName string) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
