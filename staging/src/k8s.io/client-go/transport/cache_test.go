@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"sync"
@@ -996,4 +997,121 @@ func installFakeMetrics(t *testing.T) (*recordingCreateCalls, *recordingCacheGCC
 		metrics.TransportCacheEntries = origEntries
 	})
 	return createCalls, gcCalls, rotationGCCalls, cacheEntries
+}
+
+// TestTLSConfigKeyDoesNotReadPathKeyedFiles asserts that building the transport cache
+// key does not read credential files whose path, rather than content, is what the key
+// is built from. A client that constructs one REST client per group-version calls
+// tlsConfigKey once per client, so reading here costs one open per file per client even
+// when every call after the first is a cache hit.
+func TestTLSConfigKeyDoesNotReadPathKeyedFiles(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientgofeaturegate.ClientsAllowCARotation, true)
+
+	dir := t.TempDir()
+	caFile := filepath.Join(dir, "ca.crt")
+	certFile := filepath.Join(dir, "tls.crt")
+	keyFile := filepath.Join(dir, "tls.key")
+	for f, data := range map[string]string{caFile: rootCACert, certFile: certData, keyFile: keyData} {
+		if err := os.WriteFile(f, []byte(data), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	newConfig := func() *Config {
+		return &Config{TLS: TLSConfig{CAFile: caFile, CertFile: certFile, KeyFile: keyFile}}
+	}
+
+	config := newConfig()
+	key, canCache, err := tlsConfigKey(config)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !canCache {
+		t.Fatal("expected a cacheable config")
+	}
+	if !config.TLS.ReloadCAFiles || !config.TLS.ReloadTLSFiles {
+		t.Fatalf("expected both reload flags to be set, got ReloadCAFiles=%v ReloadTLSFiles=%v",
+			config.TLS.ReloadCAFiles, config.TLS.ReloadTLSFiles)
+	}
+	if len(config.TLS.CAData) != 0 || len(config.TLS.CertData) != 0 || len(config.TLS.KeyData) != 0 {
+		t.Error("expected no credential data to be loaded while building the cache key")
+	}
+
+	// Removing the files must not change the key, which proves they were never read.
+	for _, f := range []string{caFile, certFile, keyFile} {
+		if err := os.Remove(f); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	key2, canCache2, err := tlsConfigKey(newConfig())
+	if err != nil {
+		t.Fatalf("unexpected error after removing the credential files: %v", err)
+	}
+	if !canCache2 {
+		t.Fatal("expected a cacheable config")
+	}
+	if key != key2 {
+		t.Errorf("expected identical cache keys, got:\n\t%s\n\t%s", key, key2)
+	}
+}
+
+// TestTLSConfigForLoadsPathKeyedFiles asserts that TLSConfigFor still loads the
+// credential data that tlsConfigKey now skips, so a cache miss is unaffected.
+func TestTLSConfigForLoadsPathKeyedFiles(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientgofeaturegate.ClientsAllowCARotation, true)
+
+	dir := t.TempDir()
+	caFile := filepath.Join(dir, "ca.crt")
+	certFile := filepath.Join(dir, "tls.crt")
+	keyFile := filepath.Join(dir, "tls.key")
+	for f, data := range map[string]string{caFile: rootCACert, certFile: certData, keyFile: keyData} {
+		if err := os.WriteFile(f, []byte(data), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	config := &Config{TLS: TLSConfig{CAFile: caFile, CertFile: certFile, KeyFile: keyFile}}
+	if _, _, err := tlsConfigKey(config); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	tlsConfig, err := TLSConfigFor(config)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if tlsConfig == nil {
+		t.Fatal("expected a tls.Config")
+	}
+	if tlsConfig.RootCAs == nil {
+		t.Error("expected RootCAs to be populated from the CA file")
+	}
+	if string(config.TLS.CAData) != rootCACert {
+		t.Error("expected TLSConfigFor to load CAData")
+	}
+	if string(config.TLS.CertData) != certData || string(config.TLS.KeyData) != keyData {
+		t.Error("expected TLSConfigFor to load CertData/KeyData")
+	}
+}
+
+// TestTLSConfigKeyStillReadsContentKeyedFiles asserts the complement: when the key is
+// built from content rather than path, tlsConfigKey must keep reading the files, so two
+// configs naming different files with identical content still share a transport.
+func TestTLSConfigKeyStillReadsContentKeyedFiles(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientgofeaturegate.ClientsAllowCARotation, false)
+
+	caFile1 := writeCAFile(t, []byte(testCACert1))
+	caFile2 := writeCAFile(t, []byte(testCACert1))
+
+	key1, canCache1, err := tlsConfigKey(&Config{TLS: TLSConfig{CAFile: caFile1}})
+	if err != nil || !canCache1 {
+		t.Fatalf("unexpected: err=%v, canCache=%v", err, canCache1)
+	}
+	key2, canCache2, err := tlsConfigKey(&Config{TLS: TLSConfig{CAFile: caFile2}})
+	if err != nil || !canCache2 {
+		t.Fatalf("unexpected: err=%v, canCache=%v", err, canCache2)
+	}
+	if key1 != key2 {
+		t.Errorf("expected identical cache keys for identical CA content, got:\n\t%s\n\t%s", key1, key2)
+	}
 }

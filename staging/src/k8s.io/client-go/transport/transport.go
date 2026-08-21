@@ -146,7 +146,9 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 
 	var dynamicCertLoader func() (*tls.Certificate, error)
 	if c.TLS.ReloadTLSFiles {
-		dynamicCertLoader = cachingCertificateLoader(c.TLS.CertFile, c.TLS.KeyFile)
+		// loadTLSFiles above has already read the cert and the key, so seed the loader
+		// with what it read rather than making it open both files a second time.
+		dynamicCertLoader = cachingCertificateLoader(c.TLS.CertFile, c.TLS.KeyFile, c.TLS.CertData, c.TLS.KeyData)
 	}
 
 	if c.HasCertAuth() || c.HasCertCallback() {
@@ -210,10 +212,10 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
-// loadTLSFiles copies the data from the CertFile, KeyFile, and CAFile fields into the CertData,
-// KeyData, and CAFile fields, or returns an error. If no error is returned, all three fields are
-// either populated or were empty to start.
-func loadTLSFiles(c *Config) error {
+// setReloadFiles decides whether the CA and the client cert/key are to be reloaded
+// from disk rather than pinned to the contents read once, based purely on which of the
+// file and data fields are populated. It reads no files.
+func setReloadFiles(c *Config) error {
 	// Check that we are purely loading CA from file
 	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.ClientsAllowCARotation) {
 		if len(c.TLS.CAFile) > 0 && len(c.TLS.CAData) == 0 {
@@ -226,6 +228,17 @@ func loadTLSFiles(c *Config) error {
 	// Check that we are purely loading certs and keys from files
 	if len(c.TLS.CertFile) > 0 && len(c.TLS.CertData) == 0 && len(c.TLS.KeyFile) > 0 && len(c.TLS.KeyData) == 0 {
 		c.TLS.ReloadTLSFiles = true
+	}
+
+	return nil
+}
+
+// loadTLSFiles copies the data from the CertFile, KeyFile, and CAFile fields into the CertData,
+// KeyData, and CAFile fields, or returns an error. If no error is returned, all three fields are
+// either populated or were empty to start.
+func loadTLSFiles(c *Config) error {
+	if err := setReloadFiles(c); err != nil {
+		return err
 	}
 
 	var err error
@@ -241,6 +254,41 @@ func loadTLSFiles(c *Config) error {
 
 	c.TLS.KeyData, err = dataFromSliceOrFile(c.TLS.KeyData, c.TLS.KeyFile)
 	return err
+}
+
+// loadTLSFilesForKey sets the reload flags and loads only the credential data that
+// actually participates in the transport cache key. Credentials that the key
+// represents by path -- the CA when ReloadCAFiles is set, the client cert and key when
+// ReloadTLSFiles is set -- are deliberately not read here: their contents do not affect
+// the key, and TLSConfigFor loads them via loadTLSFiles on a cache miss. This keeps a
+// cache hit from re-reading every credential file, which is what a client that builds
+// one REST client per group-version ends up doing.
+func loadTLSFilesForKey(c *Config) error {
+	if err := setReloadFiles(c); err != nil {
+		return err
+	}
+
+	var err error
+	if !c.TLS.ReloadCAFiles {
+		c.TLS.CAData, err = dataFromSliceOrFile(c.TLS.CAData, c.TLS.CAFile)
+		if err != nil {
+			return err
+		}
+	}
+
+	if !c.TLS.ReloadTLSFiles {
+		c.TLS.CertData, err = dataFromSliceOrFile(c.TLS.CertData, c.TLS.CertFile)
+		if err != nil {
+			return err
+		}
+
+		c.TLS.KeyData, err = dataFromSliceOrFile(c.TLS.KeyData, c.TLS.KeyFile)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // dataFromSliceOrFile returns data from the slice (if non-empty), or from the file,
@@ -390,10 +438,26 @@ func newCertificateCacheEntry(certFile, keyFile string) certificateCacheEntry {
 	return certificateCacheEntry{cert: &cert, err: err, birth: time.Now()}
 }
 
+// newCertificateCacheEntryFromData builds an entry from cert and key contents that have
+// already been read off disk, so that seeding the cache costs no further opens.
+func newCertificateCacheEntryFromData(certData, keyData []byte) certificateCacheEntry {
+	cert, err := tls.X509KeyPair(certData, keyData)
+	return certificateCacheEntry{cert: &cert, err: err, birth: time.Now()}
+}
+
 // cachingCertificateLoader ensures that we don't hammer the filesystem when opening many connections
-// the underlying cert files are read at most once every second
-func cachingCertificateLoader(certFile, keyFile string) func() (*tls.Certificate, error) {
-	current := newCertificateCacheEntry(certFile, keyFile)
+// the underlying cert files are read at most once every second.
+//
+// certData and keyData are the contents of certFile and keyFile as the caller has already
+// read them; they seed the cache so that the first entry costs no additional reads. Pass
+// nil for either to have the initial entry read from disk like every later one.
+func cachingCertificateLoader(certFile, keyFile string, certData, keyData []byte) func() (*tls.Certificate, error) {
+	var current certificateCacheEntry
+	if len(certData) > 0 && len(keyData) > 0 {
+		current = newCertificateCacheEntryFromData(certData, keyData)
+	} else {
+		current = newCertificateCacheEntry(certFile, keyFile)
+	}
 	var currentMtx sync.RWMutex
 
 	return func() (*tls.Certificate, error) {

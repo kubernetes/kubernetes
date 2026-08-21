@@ -24,6 +24,9 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
+	"reflect"
 	"testing"
 
 	clientgofeaturegate "k8s.io/client-go/features"
@@ -619,5 +622,78 @@ func TestRootCertPoolEmptyData(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestCachingCertificateLoaderSeededFromData asserts that the seeded loader returns the
+// same certificate as one that reads from disk, and that seeding costs no file access.
+func TestCachingCertificateLoaderSeededFromData(t *testing.T) {
+	dir := t.TempDir()
+	certFile := filepath.Join(dir, "tls.crt")
+	keyFile := filepath.Join(dir, "tls.key")
+	if err := os.WriteFile(certFile, []byte(certData), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(keyFile, []byte(keyData), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	fromDisk, err := cachingCertificateLoader(certFile, keyFile, nil, nil)()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Remove the files first: a seeded loader must not need them for its first entry.
+	for _, f := range []string{certFile, keyFile} {
+		if err := os.Remove(f); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	seeded, err := cachingCertificateLoader(certFile, keyFile, []byte(certData), []byte(keyData))()
+	if err != nil {
+		t.Fatalf("unexpected error from the seeded loader: %v", err)
+	}
+
+	if !reflect.DeepEqual(fromDisk.Certificate, seeded.Certificate) {
+		t.Error("expected the seeded loader to produce the same certificate as reading from disk")
+	}
+}
+
+// TestTLSConfigForDoesNotRereadCertAndKey asserts that TLSConfigFor produces a working
+// client certificate without opening the cert and key files a second time, by removing
+// them between loading the config and asking for the certificate.
+func TestTLSConfigForDoesNotRereadCertAndKey(t *testing.T) {
+	dir := t.TempDir()
+	certFile := filepath.Join(dir, "tls.crt")
+	keyFile := filepath.Join(dir, "tls.key")
+	if err := os.WriteFile(certFile, []byte(certData), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(keyFile, []byte(keyData), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	c := &Config{TLS: TLSConfig{CertFile: certFile, KeyFile: keyFile}}
+	tlsConfig, err := TLSConfigFor(c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !c.TLS.ReloadTLSFiles {
+		t.Fatal("expected ReloadTLSFiles to be set for file-based credentials")
+	}
+
+	for _, f := range []string{certFile, keyFile} {
+		if err := os.Remove(f); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	cert, err := tlsConfig.GetClientCertificate(&tls.CertificateRequestInfo{})
+	if err != nil {
+		t.Fatalf("expected the seeded certificate, got: %v", err)
+	}
+	if len(cert.Certificate) == 0 {
+		t.Error("expected a non-empty client certificate")
 	}
 }

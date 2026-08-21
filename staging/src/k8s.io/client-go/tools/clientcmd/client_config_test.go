@@ -18,6 +18,7 @@ package clientcmd
 
 import (
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -1383,5 +1384,68 @@ func TestClientCertOverrideData(t *testing.T) {
 
 			tc.validate(t, authInfo)
 		})
+	}
+}
+
+func TestConfirmUsableProbesCredentialFilesOnce(t *testing.T) {
+	dir := t.TempDir()
+	certFile := filepath.Join(dir, "client.crt")
+	keyFile := filepath.Join(dir, "client.key")
+	caFile := filepath.Join(dir, "ca.crt")
+	for _, f := range []string{certFile, keyFile, caFile} {
+		if err := os.WriteFile(f, []byte("ignored"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	cfg := clientcmdapi.NewConfig()
+	cfg.Clusters["clean"] = &clientcmdapi.Cluster{
+		Server:               "https://localhost:8443",
+		CertificateAuthority: caFile,
+	}
+	cfg.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
+		ClientCertificate: certFile,
+		ClientKey:         keyFile,
+	}
+	cfg.Contexts["clean"] = &clientcmdapi.Context{Cluster: "clean", AuthInfo: "clean"}
+	cfg.CurrentContext = "clean"
+
+	config := NewNonInteractiveClientConfig(*cfg, "clean", &ConfigOverrides{}, nil).(*DirectClientConfig)
+
+	if err := config.ConfirmUsable(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Removing the files must not change the answer: the second call is memoized, and
+	// both ClientConfig and Namespace reach ConfirmUsable on the same object.
+	for _, f := range []string{certFile, keyFile, caFile} {
+		if err := os.Remove(f); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := config.ConfirmUsable(); err != nil {
+		t.Errorf("expected the memoized result, got: %v", err)
+	}
+	if _, _, err := config.Namespace(); err != nil {
+		t.Errorf("expected Namespace to reuse the memoized result, got: %v", err)
+	}
+}
+
+func TestConfirmUsableMemoizesErrors(t *testing.T) {
+	cfg := clientcmdapi.NewConfig()
+	cfg.CurrentContext = "missing"
+
+	config := NewNonInteractiveClientConfig(*cfg, "missing", &ConfigOverrides{}, nil).(*DirectClientConfig)
+
+	first := config.ConfirmUsable()
+	if first == nil {
+		t.Fatal("expected an error for a config with a missing context")
+	}
+	second := config.ConfirmUsable()
+	if second == nil {
+		t.Fatal("expected the memoized error on the second call")
+	}
+	if first.Error() != second.Error() {
+		t.Errorf("expected the same error, got %q and %q", first, second)
 	}
 }

@@ -251,8 +251,10 @@ func (v *trackedTransport) WrappedRoundTripper() http.RoundTripper {
 
 // tlsConfigKey returns a unique key for tls.Config objects returned from TLSConfigFor
 func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
-	// Make sure ca/key/cert content is loaded
-	if err := loadTLSFiles(c); err != nil {
+	// Make sure the reload flags are set and that the ca/key/cert content the key is
+	// built from is loaded. Content the key refers to by path is left for TLSConfigFor
+	// to load on a cache miss.
+	if err := loadTLSFilesForKey(c); err != nil {
 		return tlsCacheKey{}, false, err
 	}
 
