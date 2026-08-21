@@ -246,6 +246,10 @@ func newLogger(tb TB, bufferLogs bool) klog.Logger {
 	return logger
 }
 
+// InitOption is an alias for the options provided through the [initoption] package.
+//
+// They are in a separate package to separate the main API from the less
+// commonly used configuration and to simplify auto-completion.
 type InitOption = initoption.InitOption
 
 // InitCtx is a variant of [Init] which uses an already existing context and
