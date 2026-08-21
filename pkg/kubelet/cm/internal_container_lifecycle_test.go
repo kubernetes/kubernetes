@@ -17,6 +17,7 @@ limitations under the License.
 package cm
 
 import (
+	"fmt"
 	"testing"
 
 	"k8s.io/klog/v2"
@@ -47,12 +48,18 @@ func (memoryManager *mockMemoryManager) AddContainer(klog.Logger, *v1.Pod, *v1.C
 }
 
 type mockTopologyManager struct {
-	called bool
+	called    bool
+	removeErr error
 	topologymanager.Manager
 }
 
 func (topologyManager *mockTopologyManager) AddContainer(klog.Logger, *v1.Pod, *v1.Container, string) {
 	topologyManager.called = true
+}
+
+func (topologyManager *mockTopologyManager) RemoveContainer(klog.Logger, string) error {
+	topologyManager.called = true
+	return topologyManager.removeErr
 }
 
 func TestPreStartContainer(t *testing.T) {
@@ -105,5 +112,51 @@ func TestPreStartContainer(t *testing.T) {
 		if !tManager.(*mockTopologyManager).called {
 			t.Errorf("TopologyManager's AddContainer method must be called during container startup")
 		}
+	}
+}
+
+func TestPostStopContainer(t *testing.T) {
+	containerID := "42"
+
+	tests := []struct {
+		name          string
+		lifecycle     internalContainerLifecycleImpl
+		expectedError bool
+	}{
+		{
+			name: "TopologyManager RemoveContainer is called and succeeds",
+			lifecycle: internalContainerLifecycleImpl{
+				topologyManager: &mockTopologyManager{},
+			},
+			expectedError: false,
+		},
+		{
+			name: "TopologyManager RemoveContainer error is propagated",
+			lifecycle: internalContainerLifecycleImpl{
+				topologyManager: &mockTopologyManager{
+					removeErr: fmt.Errorf("remove container failed"),
+				},
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			err := test.lifecycle.PostStopContainer(logger, containerID)
+
+			tManager := test.lifecycle.topologyManager
+			if !tManager.(*mockTopologyManager).called {
+				t.Errorf("TopologyManager's RemoveContainer method must be called during container stop")
+			}
+
+			if test.expectedError && err == nil {
+				t.Errorf("expected an error from PostStopContainer, got nil")
+			}
+			if !test.expectedError && err != nil {
+				t.Errorf("expected no error from PostStopContainer, got: %v", err)
+			}
+		})
 	}
 }
