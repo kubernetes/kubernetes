@@ -141,7 +141,150 @@ func TestUpdateValue(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			op := operation.Operation{Type: tt.op}
+			errs := UpdateValue(context.TODO(), op, field.NewPath("test"), &tt.value, &tt.oldValue, func(a, b string) bool { return a == b }, tt.constraints...)
+			if len(errs) != tt.wantErrs {
+				t.Errorf("UpdateValue() returned %d errors, want %d: %v", len(errs), tt.wantErrs, errs)
+			}
+			for i, msg := range tt.wantMsgs {
+				if i >= len(errs) {
+					t.Errorf("Expected error message %q not found", msg)
+					continue
+				}
+				if errs[i].Detail != msg {
+					t.Errorf("UpdateValue() error message = %q, want %q", errs[i].Detail, msg)
+				}
+			}
+		})
+	}
+}
+
+func TestUpdateValueByCompare(t *testing.T) {
+	tests := []struct {
+		name        string
+		op          operation.Type
+		value       string
+		oldValue    string
+		constraints []UpdateConstraint
+		wantErrs    int
+		wantMsgs    []string
+	}{
+		{
+			name:        "NoSet - unset to set transition (forbidden)",
+			op:          operation.Update,
+			value:       "value",
+			oldValue:    "",
+			constraints: []UpdateConstraint{NoSet},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be set once created"},
+		},
+		{
+			name:        "NoUnset - set to unset transition (forbidden)",
+			op:          operation.Update,
+			value:       "",
+			oldValue:    "value",
+			constraints: []UpdateConstraint{NoUnset},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be cleared once set"},
+		},
+		{
+			name:        "NoModify - set to different value (forbidden)",
+			op:          operation.Update,
+			value:       "value2",
+			oldValue:    "value1",
+			constraints: []UpdateConstraint{NoModify},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be modified once set"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			op := operation.Operation{Type: tt.op}
 			errs := UpdateValueByCompare(context.TODO(), op, field.NewPath("test"), &tt.value, &tt.oldValue, tt.constraints...)
+			if len(errs) != tt.wantErrs {
+				t.Errorf("UpdateValueByCompare() returned %d errors, want %d: %v", len(errs), tt.wantErrs, errs)
+			}
+			for i, msg := range tt.wantMsgs {
+				if i >= len(errs) {
+					t.Errorf("Expected error message %q not found", msg)
+					continue
+				}
+				if errs[i].Detail != msg {
+					t.Errorf("UpdateValueByCompare() error message = %q, want %q", errs[i].Detail, msg)
+				}
+			}
+		})
+	}
+}
+
+func TestUpdateValue_CustomMatchFunc(t *testing.T) {
+	type NonComparableStruct struct {
+		Name string
+		Tags []string
+	}
+
+	customEquiv := func(a, b NonComparableStruct) bool {
+		return a.Name == b.Name && (len(a.Tags) == 0 && len(b.Tags) == 0 || (len(a.Tags) == len(b.Tags) && a.Tags[0] == b.Tags[0]))
+	}
+
+	tests := []struct {
+		name        string
+		op          operation.Type
+		value       NonComparableStruct
+		oldValue    NonComparableStruct
+		constraints []UpdateConstraint
+		wantErrs    int
+		wantMsgs    []string
+	}{
+		{
+			name:        "NoSet - unset to set (forbidden)",
+			op:          operation.Update,
+			value:       NonComparableStruct{Name: "foo", Tags: []string{"a"}},
+			oldValue:    NonComparableStruct{},
+			constraints: []UpdateConstraint{NoSet},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be set once created"},
+		},
+		{
+			name:        "NoUnset - set to unset (forbidden)",
+			op:          operation.Update,
+			value:       NonComparableStruct{},
+			oldValue:    NonComparableStruct{Name: "foo", Tags: []string{"a"}},
+			constraints: []UpdateConstraint{NoUnset},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be cleared once set"},
+		},
+		{
+			name:        "NoModify - zero to non-zero transition (allowed)",
+			op:          operation.Update,
+			value:       NonComparableStruct{Name: "foo", Tags: []string{"a"}},
+			oldValue:    NonComparableStruct{},
+			constraints: []UpdateConstraint{NoModify},
+			wantErrs:    0,
+		},
+		{
+			name:        "NoModify - non-zero to zero transition (allowed)",
+			op:          operation.Update,
+			value:       NonComparableStruct{},
+			oldValue:    NonComparableStruct{Name: "foo", Tags: []string{"a"}},
+			constraints: []UpdateConstraint{NoModify},
+			wantErrs:    0,
+		},
+		{
+			name:        "NoModify - non-zero to non-zero transition (forbidden)",
+			op:          operation.Update,
+			value:       NonComparableStruct{Name: "foo", Tags: []string{"b"}},
+			oldValue:    NonComparableStruct{Name: "foo", Tags: []string{"a"}},
+			constraints: []UpdateConstraint{NoModify},
+			wantErrs:    1,
+			wantMsgs:    []string{"field cannot be modified once set"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			op := operation.Operation{Type: tt.op}
+			errs := UpdateValue(context.TODO(), op, field.NewPath("test"), &tt.value, &tt.oldValue, customEquiv, tt.constraints...)
 			if len(errs) != tt.wantErrs {
 				t.Errorf("UpdateValue() returned %d errors, want %d: %v", len(errs), tt.wantErrs, errs)
 			}

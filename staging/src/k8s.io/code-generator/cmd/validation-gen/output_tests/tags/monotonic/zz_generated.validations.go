@@ -258,7 +258,8 @@ func Validate_Struct(
 			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoUnset).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.UpdateValue(ctx, op, fldPath, obj, oldObj,
+				func(a int, b int) bool { return a == b }, validate.NoUnset).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}

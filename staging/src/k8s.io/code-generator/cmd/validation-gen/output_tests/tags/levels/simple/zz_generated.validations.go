@@ -219,7 +219,8 @@ func Validate_SpecialValidationStruct(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.UpdateValue(ctx, op, fldPath, obj, oldObj,
+				func(a string, b string) bool { return a == b }, validate.NoModify).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -248,7 +249,8 @@ func Validate_SpecialValidationStruct(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkBeta().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.UpdateValue(ctx, op, fldPath, obj, oldObj,
+				func(a string, b string) bool { return a == b }, validate.NoModify).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}

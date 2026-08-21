@@ -696,7 +696,7 @@ func Validate_CompositePodGroupStatus(
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a *v1.Condition, b *v1.Condition) bool { return a.Type == b.Type }, validate.SemanticDeepEqual, validation.Validate_Condition); len(e) != 0 {
+				func(a *v1.Condition, b *v1.Condition) bool { return a.Type == b.Type }, deepEqualImpl_, validation.Validate_Condition); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -985,7 +985,7 @@ func Validate_CompositePodGroupTemplate(
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a *PodGroupTemplate, b *PodGroupTemplate) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_PodGroupTemplate); len(e) != 0 {
+				func(a *PodGroupTemplate, b *PodGroupTemplate) bool { return a.Name == b.Name }, deepEqualImpl_, Validate_PodGroupTemplate); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -1032,7 +1032,7 @@ func Validate_CompositePodGroupTemplate(
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a *CompositePodGroupTemplate, b *CompositePodGroupTemplate) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_CompositePodGroupTemplate); len(e) != 0 {
+				func(a *CompositePodGroupTemplate, b *CompositePodGroupTemplate) bool { return a.Name == b.Name }, deepEqualImpl_, Validate_CompositePodGroupTemplate); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -1744,7 +1744,7 @@ func Validate_PodGroupSpec(
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a *PodGroupResourceClaim, b *PodGroupResourceClaim) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_PodGroupResourceClaim); len(e) != 0 {
+				func(a *PodGroupResourceClaim, b *PodGroupResourceClaim) bool { return a.Name == b.Name }, deepEqualImpl_, Validate_PodGroupResourceClaim); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -1938,7 +1938,7 @@ func Validate_PodGroupStatus(
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a *v1.Condition, b *v1.Condition) bool { return a.Type == b.Type }, validate.SemanticDeepEqual, validation.Validate_Condition); len(e) != 0 {
+				func(a *v1.Condition, b *v1.Condition) bool { return a.Type == b.Type }, deepEqualImpl_, validation.Validate_Condition); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -1980,7 +1980,7 @@ func Validate_PodGroupStatus(
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a *PodGroupResourceClaimStatus, b *PodGroupResourceClaimStatus) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_PodGroupResourceClaimStatus); len(e) != 0 {
+				func(a *PodGroupResourceClaimStatus, b *PodGroupResourceClaimStatus) bool { return a.Name == b.Name }, deepEqualImpl_, Validate_PodGroupResourceClaimStatus); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -2130,7 +2130,7 @@ func Validate_PodGroupTemplate(
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a *PodGroupResourceClaim, b *PodGroupResourceClaim) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_PodGroupResourceClaim); len(e) != 0 {
+				func(a *PodGroupResourceClaim, b *PodGroupResourceClaim) bool { return a.Name == b.Name }, deepEqualImpl_, Validate_PodGroupResourceClaim); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -3298,7 +3298,7 @@ func Validate_WorkloadSpec(
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a *PodGroupTemplate, b *PodGroupTemplate) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_PodGroupTemplate); len(e) != 0 {
+				func(a *PodGroupTemplate, b *PodGroupTemplate) bool { return a.Name == b.Name }, deepEqualImpl_, Validate_PodGroupTemplate); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -3352,7 +3352,7 @@ func Validate_WorkloadSpec(
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a *CompositePodGroupTemplate, b *CompositePodGroupTemplate) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_CompositePodGroupTemplate); len(e) != 0 {
+				func(a *CompositePodGroupTemplate, b *CompositePodGroupTemplate) bool { return a.Name == b.Name }, deepEqualImpl_, Validate_CompositePodGroupTemplate); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -3365,4 +3365,9 @@ func Validate_WorkloadSpec(
 	}
 
 	return errs
+}
+
+// deepEqualImpl_ is a validate.MatchFunc which allows the implementation of deep-equality to be defined at codegen time.
+func deepEqualImpl_[T any](a, b T) bool {
+	return equality.Semantic.DeepEqual(a, b)
 }

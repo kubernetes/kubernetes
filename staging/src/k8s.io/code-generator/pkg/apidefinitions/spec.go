@@ -96,6 +96,7 @@ var (
 		InputTag:      "k8s:validation-gen-input",
 		ValueMode:     TypeFilterList,
 		AuxTags: []string{
+			"k8s:validation-gen-deep-equal-func",
 			"k8s:validation-gen-nolint",
 			"k8s:validation-gen-scheme-registry",
 			"k8s:validation-gen-test-fixture",

@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"k8s.io/apimachinery/pkg/api/validate"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -143,7 +143,7 @@ func TestValidateEvictionRequestStatusUpdate(t *testing.T) {
 	}
 	for name, tc := range successCases {
 		t.Run(name, func(t *testing.T) {
-			if validate.SemanticDeepEqual(tc.oldInput, tc.input) {
+			if equality.Semantic.DeepEqual(tc.oldInput, tc.input) {
 				t.Errorf("Expected oldInput and input to differ")
 			}
 			oldEvictionRequest := mkValidEvictionRequest()
@@ -812,7 +812,7 @@ func TestValidateEvictionStatusUpdate(t *testing.T) {
 	}
 	for name, tc := range successCases {
 		t.Run(name, func(t *testing.T) {
-			if !tc.explicitEmptyUpdate && validate.SemanticDeepEqual(tc.oldInput, tc.input) {
+			if !tc.explicitEmptyUpdate && equality.Semantic.DeepEqual(tc.oldInput, tc.input) {
 				t.Errorf("Expected oldInput and input to differ")
 			}
 			// Ensure that the validation doesn't depend on the order of list elements.

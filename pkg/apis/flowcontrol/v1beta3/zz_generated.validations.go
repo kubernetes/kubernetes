@@ -309,7 +309,7 @@ func Validate_PriorityLevelConfigurationSpec(
 		},
 		func(obj *flowcontrolv1beta3.PriorityLevelConfigurationSpec) flowcontrolv1beta3.PriorityLevelEnablement {
 			return obj.Type
-		}, validate.SemanticDeepEqual,
+		}, deepEqualImpl_,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta3.ExemptPriorityLevelConfiguration) field.ErrorList {
 			errs := field.ErrorList{}
 			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkBeta()...)
@@ -340,7 +340,7 @@ func Validate_PriorityLevelConfigurationSpec(
 		},
 		func(obj *flowcontrolv1beta3.PriorityLevelConfigurationSpec) flowcontrolv1beta3.PriorityLevelEnablement {
 			return obj.Type
-		}, validate.SemanticDeepEqual,
+		}, deepEqualImpl_,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *flowcontrolv1beta3.LimitedPriorityLevelConfiguration) field.ErrorList {
 			errs := field.ErrorList{}
 			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkBeta()...)
@@ -455,4 +455,9 @@ func Validate_PriorityLevelConfigurationSpec(
 	}
 
 	return errs
+}
+
+// deepEqualImpl_ is a validate.MatchFunc which allows the implementation of deep-equality to be defined at codegen time.
+func deepEqualImpl_[T any](a, b T) bool {
+	return equality.Semantic.DeepEqual(a, b)
 }

@@ -157,7 +157,7 @@ func Validate_StructWithMaps(
 				}
 			}
 			// call field-attached validations
-			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual,
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, deepEqualImpl_,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NonComparableStruct) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field MapTest.MapNonComparableStructField[*]")
 				}); len(e) != 0 {
@@ -173,4 +173,9 @@ func Validate_StructWithMaps(
 	}
 
 	return errs
+}
+
+// deepEqualImpl_ is a validate.MatchFunc which allows the implementation of deep-equality to be defined at codegen time.
+func deepEqualImpl_[T any](a, b T) bool {
+	return equality.Semantic.DeepEqual(a, b)
 }

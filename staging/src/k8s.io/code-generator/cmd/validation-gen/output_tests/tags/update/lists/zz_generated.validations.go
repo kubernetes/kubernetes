@@ -426,7 +426,7 @@ func Validate_UpdateListStruct(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.ValSliceUpdate(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.ValSliceUpdate(ctx, op, fldPath, obj, oldObj, deepEqualImpl_, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -434,7 +434,7 @@ func Validate_UpdateListStruct(
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
-			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual); len(e) != 0 {
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, deepEqualImpl_); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -626,4 +626,9 @@ func Validate_UpdateListStruct(
 	}
 
 	return errs
+}
+
+// deepEqualImpl_ is a validate.MatchFunc which allows the implementation of deep-equality to be defined at codegen time.
+func deepEqualImpl_[T any](a, b T) bool {
+	return equality.Semantic.DeepEqual(a, b)
 }

@@ -26,6 +26,10 @@ import (
 	"k8s.io/gengo/v2/types"
 )
 
+var (
+	DeepEqualImpl = types.Name{Name: "deepEqualImpl_"}
+)
+
 // TagValidator describes a single validation tag and how to use it. To be
 // findable by validation-gen, a TagValidator must be registered - see
 // RegisterTagValidator.

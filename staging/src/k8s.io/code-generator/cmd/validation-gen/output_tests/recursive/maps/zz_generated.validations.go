@@ -193,7 +193,7 @@ func Validate_T1(
 				}
 			}
 			// iterate the map and call the value type's validation function
-			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_T5); len(e) != 0 {
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, deepEqualImpl_, Validate_T5); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -217,7 +217,7 @@ func Validate_T1(
 				}
 			}
 			// iterate the map and call the value type's validation function
-			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_T6); len(e) != 0 {
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, deepEqualImpl_, Validate_T6); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -250,7 +250,7 @@ func Validate_T2(
 				}
 			}
 			// iterate the map and call the value type's validation function
-			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_T1); len(e) != 0 {
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, deepEqualImpl_, Validate_T1); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -318,7 +318,7 @@ func Validate_T4(
 				}
 			}
 			// iterate the map and call the value type's validation function
-			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_T3); len(e) != 0 {
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, deepEqualImpl_, Validate_T3); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -355,7 +355,7 @@ func Validate_T5(
 				errs = append(errs, e...)
 			}
 			// iterate the map and call the value type's validation function
-			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_T5); len(e) != 0 {
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, deepEqualImpl_, Validate_T5); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -412,7 +412,7 @@ func Validate_T6(
 				}
 			}
 			// iterate the map and call the value type's validation function
-			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_T6); len(e) != 0 {
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, deepEqualImpl_, Validate_T6); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -425,4 +425,9 @@ func Validate_T6(
 	}
 
 	return errs
+}
+
+// deepEqualImpl_ is a validate.MatchFunc which allows the implementation of deep-equality to be defined at codegen time.
+func deepEqualImpl_[T any](a, b T) bool {
+	return equality.Semantic.DeepEqual(a, b)
 }

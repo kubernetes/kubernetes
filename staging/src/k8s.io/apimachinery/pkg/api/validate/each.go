@@ -18,6 +18,7 @@ package validate
 
 import (
 	"context"
+	"reflect"
 	"slices"
 	"sort"
 
@@ -163,6 +164,36 @@ func EachMapVal[K ~string, V any](ctx context.Context, op operation.Operation, f
 	return errs
 }
 
+// EachPtrMapVal validates each value in newMap (which is a map of pointers)
+// using the specified validation function, passing the corresponding old value
+// from oldMap if the key exists in oldMap.
+// For update operations, it implements validation ratcheting by skipping validation
+// when the old value exists and the equiv function confirms the values are equivalent.
+//
+// The equiv function will never be called with nil arguments.
+//
+// If equiv is nil, value-based ratcheting is disabled and all values will be validated.
+func EachPtrMapVal[K ~string, V any](ctx context.Context, op operation.Operation, fldPath *field.Path, newMap, oldMap map[K]*V,
+	equiv MatchFunc[*V], validator ValidateFunc[*V]) field.ErrorList {
+	var errs field.ErrorList
+	for key, val := range newMap {
+		if val == nil {
+			// Ignore nil items; they are supposed to have been checked by PtrMapNoNils.
+			continue
+		}
+
+		old := oldMap[key]
+
+		// If the operation is an update, for validation ratcheting, skip re-validating if the old
+		// value is found and the equiv function confirms the values are equivalent.
+		if op.Type == operation.Update && old != nil && equiv != nil && equiv(val, old) {
+			continue
+		}
+		errs = append(errs, validator(ctx, op, fldPath.Key(string(key)), val, old)...)
+	}
+	return errs
+}
+
 // EachMapKey validates each element of newMap with the specified
 // validation function.
 func EachMapKey[K ~string, T any](ctx context.Context, op operation.Operation, fldPath *field.Path, newMap, oldMap map[K]T,
@@ -261,8 +292,20 @@ func PtrSliceUnique[T any](_ context.Context, _ operation.Operation, fldPath *fi
 // arguments of type interface{}/any. The wrapper satisfies the type
 // constraints of MatchFunc while leveraging the underlying semantic equality
 // logic. It can be used by any other function that needs to call DeepEqual.
+//
+// Deprecated: Callers should use equality.Semantic.DeepEqual directly.
 func SemanticDeepEqual[T any](a, b T) bool {
 	return equality.Semantic.DeepEqual(a, b)
+}
+
+// ReflectDeepEqual is a MatchFunc that uses reflect.DeepEqual to compare two
+// values.
+// This wrapper is needed because MatchFunc requires a function that takes two
+// arguments of specific type T, while reflect.DeepEqual takes arguments of
+// type interface{}/any. It can be used by any other function that needs to
+// call DeepEqual.
+func ReflectDeepEqual[T any](a, b T) bool {
+	return reflect.DeepEqual(a, b)
 }
 
 // DirectEqual is a MatchFunc that dereferences two pointers and uses the ==
@@ -286,6 +329,17 @@ func PtrSliceNoNils[T any](_ context.Context, _ operation.Operation, fldPath *fi
 	for i := range newSlice {
 		if newSlice[i] == nil {
 			errs = append(errs, field.Required(fldPath.Index(i), ""))
+		}
+	}
+	return
+}
+
+// PtrMapNoNils returns a Required error for each nil element in a map of
+// pointers.
+func PtrMapNoNils[K ~string, V any](_ context.Context, _ operation.Operation, fldPath *field.Path, newMap, _ map[K]*V) (errs field.ErrorList) {
+	for key, val := range newMap {
+		if val == nil {
+			errs = append(errs, field.Required(fldPath.Key(string(key)), ""))
 		}
 	}
 	return

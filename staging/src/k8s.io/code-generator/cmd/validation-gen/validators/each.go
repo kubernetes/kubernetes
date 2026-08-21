@@ -70,6 +70,7 @@ var (
 	validateEachValSliceVal = types.Name{Package: libValidationPkg, Name: "EachValSliceVal"}
 	validateEachPtrSliceVal = types.Name{Package: libValidationPkg, Name: "EachPtrSliceVal"}
 	validateEachMapVal      = types.Name{Package: libValidationPkg, Name: "EachMapVal"}
+	validateEachPtrMapVal   = types.Name{Package: libValidationPkg, Name: "EachPtrMapVal"}
 )
 
 func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
@@ -240,10 +241,16 @@ func (evtv eachValTagValidator) getMapValidations(t *types.Type, validations Val
 	if util.IsDirectComparable(util.NonPointer(util.NativeType(nt.Elem))) {
 		equivArg = Identifier(validateDirectEqual)
 	}
+
+	validateFunc := validateEachMapVal
+	if nt.Elem.Kind == types.Pointer {
+		validateFunc = validateEachPtrMapVal
+	}
+
 	wrapped := WrapFunctions(validations, func(vfn FunctionGen, _ DeferredScope) FunctionGen {
 		comm := vfn.Comments
 		vfn.Comments = nil
-		return Function(eachValTagName, vfn.Flags, validateEachMapVal, equivArg, WrapperFunction{Function: vfn, ObjType: nt.Elem, PathFragment: "[*]"}).WithComments(comm...)
+		return Function(eachValTagName, vfn.Flags, validateFunc, equivArg, WrapperFunction{Function: vfn, ObjType: nt.Elem, PathFragment: "[*]"}).WithComments(comm...)
 	})
 	return Validations{
 		Functions:     wrapped.Functions,
@@ -387,10 +394,17 @@ func (ektv eachKeyTagValidator) Docs() TagDoc {
 
 var (
 	validatePtrSliceNoNils = types.Name{Package: libValidationPkg, Name: "PtrSliceNoNils"}
+	validatePtrMapNoNils   = types.Name{Package: libValidationPkg, Name: "PtrMapNoNils"}
 )
 
 // PtrSliceNoNils returns a synthetic validation that rejects nil elements of a
 // pointer slice. It is not tag-driven; the generator injects it for []*T fields.
 func PtrSliceNoNils(elemType types.Name) FunctionGen {
 	return Function("PtrSliceNoNils", ShortCircuit, validatePtrSliceNoNils).WithTypeArgs(elemType)
+}
+
+// PtrMapNoNils returns a synthetic validation that rejects nil elements of a
+// pointer map. It is not tag-driven; the generator injects it for map[K]*V fields.
+func PtrMapNoNils(keyType, elemType types.Name) FunctionGen {
+	return Function("PtrMapNoNils", ShortCircuit, validatePtrMapNoNils).WithTypeArgs(keyType, elemType)
 }
