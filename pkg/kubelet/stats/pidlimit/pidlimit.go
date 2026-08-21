@@ -17,6 +17,10 @@ limitations under the License.
 package pidlimit
 
 import (
+	"fmt"
+	"strconv"
+	"strings"
+
 	"k8s.io/api/core/v1"
 )
 
@@ -24,3 +28,15 @@ const (
 	// PIDs is the (internal) name for this resource
 	PIDs v1.ResourceName = "pid"
 )
+
+func parseRunningTaskCount(loadavg string) (int64, error) {
+	fields := strings.Fields(loadavg)
+	if len(fields) < 5 {
+		return 0, fmt.Errorf("not enough fields in /proc/loadavg")
+	}
+	subfields := strings.Split(fields[3], "/")
+	if len(subfields) != 2 {
+		return 0, fmt.Errorf("error parsing fourth field of /proc/loadavg")
+	}
+	return strconv.ParseInt(subfields[1], 10, 64)
+}
