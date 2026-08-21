@@ -25,6 +25,7 @@ enum DockerStubCommand {
   SINGLE_FILE = 'DOCKER_STUB_SINGLE_FILE',
   SINGLE_FILE_WITHOUT_EXT = 'DOCKER_STUB_SINGLE_FILE_WITHOUT_EXT',
   VOLUME_SINGLE_ARCHIVE = 'DOCKER_STUB_VOLUME_SINGLE_ARCHIVE',
+  SYMLINK = 'DOCKER_STUB_SYMLINK',
 }
 
 const FIXTURE_TEST1_DIR = path.join(__dirname, 'fs', 'fixtures', 'test1');
@@ -1496,6 +1497,22 @@ describe('staging', () => {
         outputType: BundlingOutput.ARCHIVED,
       },
     })).toThrow(/Bundling output directory is expected to include only a single file when `output` is set to `ARCHIVED` or `SINGLE_FILE`/);
+  });
+
+  test('rejects bundled output that is a symlink', () => {
+    // GIVEN
+    const app = new App({ context: { [cxapi.NEW_STYLE_STACK_SYNTHESIS_CONTEXT]: false } });
+    const stack = new Stack(app, 'stack');
+    const directory = path.join(__dirname, 'fs', 'fixtures', 'test1');
+
+    // WHEN / THEN
+    expect(() => new AssetStaging(stack, 'Asset', {
+      sourcePath: directory,
+      bundling: {
+        image: DockerImage.fromRegistry('alpine'),
+        command: [DockerStubCommand.SYMLINK],
+      },
+    })).toThrow(/output from bundling is not allowed to be a symlink/);
   });
 
   test('bundling that produces a single file with SINGLE_FILE', () => {

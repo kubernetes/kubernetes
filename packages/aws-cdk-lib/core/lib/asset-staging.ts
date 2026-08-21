@@ -670,6 +670,8 @@ function determineBundledAsset(scope: Construct, bundleDir: string, outputType: 
     case BundlingOutput.SINGLE_FILE:
       if (!archiveFile) {
         throw new ValidationError(lit`BundlingOutputDirectoryExpectedSingleFile`, 'Bundling output directory is expected to include only a single file when `output` is set to `ARCHIVED` or `SINGLE_FILE`', scope);
+      } else if (fs.lstatSync(archiveFile).isSymbolicLink()) {
+        throw new ValidationError(lit`SymlinkInBundlingOutput`, 'The output from bundling is not allowed to be a symlink.', scope);
       }
       return { path: archiveFile, packaging: FileAssetPackaging.FILE, extension: getExtension(archiveFile) };
   }
