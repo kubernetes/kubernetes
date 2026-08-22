@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
@@ -1252,43 +1253,43 @@ func (sched *Scheduler) evaluatePlacement(ctx context.Context, schedFwk framewor
 	return result
 }
 
-// nominatedPlacement returns the placement that should be evaluated first because it best
-// matches the pods' NominatedNodeName, or nil when no placement holds any nominated node.
-// A nominated node is typically set by a previous preemption cycle, so preferring its
-// placement mirrors pod-by-pod scheduling, which tries the nominated node before all others.
-// When nominations span placements, the one honoring the most pods' nominations is chosen.
+// nominatedPlacement returns the placement to evaluate first because it holds the pods'
+// NominatedNodeName, or nil when zero or more than one placement matches. A nominated node is
+// typically set by a previous preemption cycle, so preferring its placement mirrors pod-by-pod
+// scheduling, which tries the nominated node before all others.
+//
+// The framework contract permits overlapping placements, so a nominated node can appear in more
+// than one. NNN alone can't tell which placement WAP picked last cycle, so we only take the fast
+// path when exactly one placement matches; otherwise the caller scores every placement, which is
+// deterministic regardless of the order the generator returned them.
 func nominatedPlacement(placements []*fwk.Placement, podGroupInfo *framework.PodGroupInfo, queuedPodGroupInfo *framework.QueuedPodGroupInfo) *fwk.Placement {
-	// Count nominated nodes across the pods of the currently evaluated pod group node
+	// Collect nominated nodes across the pods of the currently evaluated pod group node
 	// (podGroupInfo), which for CPG TAS is the CPG or PG carrying the TAS constraints, not the
 	// whole hierarchy rooted at queuedPodGroupInfo.
-	//
-	// We count instead of using a set because pods in the group can carry different
-	// NominatedNodeNames when preemption nominated them independently. Counting lets us pick the
-	// placement covering the most nominated pods; a set would drop those tallies and couldn't rank
-	// placements that only partially overlap the nominated nodes.
-	nominatedNodeCounts := make(map[string]int)
+	nominatedNodes := sets.New[string]()
 	for _, podInfo := range queuedPodGroupInfo.QueuedPodInfos[pgKey(podGroupInfo)] {
 		if nnn := podInfo.Pod.Status.NominatedNodeName; nnn != "" {
-			nominatedNodeCounts[nnn]++
+			nominatedNodes.Insert(nnn)
 		}
 	}
-	if len(nominatedNodeCounts) == 0 {
+	if nominatedNodes.Len() == 0 {
 		return nil
 	}
 
-	var best *fwk.Placement
-	bestCount := 0
+	var matched *fwk.Placement
 	for _, placement := range placements {
-		count := 0
 		for _, node := range placement.Nodes {
-			count += nominatedNodeCounts[node.Node().Name]
-		}
-		if count > bestCount {
-			bestCount = count
-			best = placement
+			if nominatedNodes.Has(node.Node().Name) {
+				if matched != nil {
+					// Overlap: fall back to scoring all placements.
+					return nil
+				}
+				matched = placement
+				break
+			}
 		}
 	}
-	return best
+	return matched
 }
 
 // findBestPlacement uses PlacementScore plugins to determine the best placement based on the scheduling results.

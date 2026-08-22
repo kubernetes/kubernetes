@@ -2973,16 +2973,22 @@ func TestNominatedPlacement(t *testing.T) {
 			want:       rack2,
 		},
 		{
-			name:       "placement holding the most nominated nodes wins",
-			placements: []*fwk.Placement{rack1, rack12},
-			podGroup:   podGroupWithNominations("node-1", "node-2"),
-			want:       rack12,
+			name:       "single placement matching several nominated nodes wins",
+			placements: []*fwk.Placement{rack1, rack23},
+			podGroup:   podGroupWithNominations("node-2", "node-3"),
+			want:       rack23,
 		},
 		{
-			name:       "placement honoring the most pods wins over one holding more nominated nodes",
-			placements: []*fwk.Placement{rack1, rack23},
-			podGroup:   podGroupWithNominations("node-1", "node-1", "node-1", "node-2", "node-3"),
-			want:       rack1,
+			name:       "overlapping placements sharing a nominated node returns nil",
+			placements: []*fwk.Placement{rack12, rack23},
+			podGroup:   podGroupWithNominations("node-2"),
+			want:       nil,
+		},
+		{
+			name:       "distinct placements each holding a nominated node returns nil",
+			placements: []*fwk.Placement{rack1, rack2},
+			podGroup:   podGroupWithNominations("node-1", "node-2"),
+			want:       nil,
 		},
 	}
 	for _, tt := range tests {
@@ -2991,6 +2997,21 @@ func TestNominatedPlacement(t *testing.T) {
 				t.Errorf("nominatedPlacement() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// TestNominatedPlacementOrderIndependent asserts that when nominated nodes fall into overlapping
+// placements the fallback (nil) is returned regardless of the order the generator returned them,
+// so placement selection can't depend on slice order.
+func TestNominatedPlacementOrderIndependent(t *testing.T) {
+	rack12 := placementWithNodes("rack-12", "node-1", "node-2")
+	rack23 := placementWithNodes("rack-23", "node-2", "node-3")
+	pg := podGroupWithNominations("node-2")
+
+	forward := nominatedPlacement([]*fwk.Placement{rack12, rack23}, pg.PodGroupInfo, pg)
+	reverse := nominatedPlacement([]*fwk.Placement{rack23, rack12}, pg.PodGroupInfo, pg)
+	if forward != nil || reverse != nil {
+		t.Errorf("nominatedPlacement() = %v (forward), %v (reverse), want nil for both", forward, reverse)
 	}
 }
 
