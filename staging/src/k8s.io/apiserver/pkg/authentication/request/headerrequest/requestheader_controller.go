@@ -48,6 +48,10 @@ type RequestHeaderAuthRequestProvider interface {
 	UIDHeaders() []string
 	GroupHeaders() []string
 	ExtraHeaderPrefixes() []string
+	// AllowedClientNames returns the common names the front proxy client certificate may have.
+	// An empty result means any common name is accepted, so unlike the header accessors above
+	// this one retains its last known value once the configmap is deleted. See
+	// clearRequestHeaderBundle.
 	AllowedClientNames() []string
 }
 
@@ -78,7 +82,8 @@ type RequestHeaderAuthRequestController struct {
 
 	queue workqueue.TypedRateLimitingInterface[string]
 
-	// exportedRequestHeaderBundle is a requestHeaderBundle that contains the last read, non-zero length content of the configmap
+	// exportedRequestHeaderBundle is a requestHeaderBundle that contains the last read content of the
+	// configmap. It is cleared when the configmap is deleted, see clearRequestHeaderBundle.
 	exportedRequestHeaderBundle atomic.Value
 
 	usernameHeadersKey     string
@@ -193,12 +198,12 @@ func (c *RequestHeaderAuthRequestController) Run(ctx context.Context, workers in
 	<-ctx.Done()
 }
 
-// // RunOnce runs a single sync loop
+// RunOnce runs a single sync loop
 func (c *RequestHeaderAuthRequestController) RunOnce(ctx context.Context) error {
 	configMap, err := c.client.CoreV1().ConfigMaps(c.configmapNamespace).Get(ctx, c.configmapName, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
-		// ignore, authConfigMap is nil now
+		c.clearRequestHeaderBundle()
 		return nil
 	case errors.IsForbidden(err):
 		klog.Warningf("Unable to get configmap/%s in %s.  Usually fixed by "+
@@ -240,9 +245,33 @@ func (c *RequestHeaderAuthRequestController) processNextWorkItem() bool {
 func (c *RequestHeaderAuthRequestController) sync() error {
 	configMap, err := c.configmapLister.Get(c.configmapName)
 	if err != nil {
+		if errors.IsNotFound(err) {
+			// returning nil keeps the workqueue from retrying a deletion forever
+			c.clearRequestHeaderBundle()
+			return nil
+		}
 		return err
 	}
 	return c.syncConfigMap(configMap)
+}
+
+// clearRequestHeaderBundle drops the header names read from the configmap so that
+// request header authentication stops recognizing them once the configmap is gone.
+//
+// The allowed client names are deliberately kept. An empty allowed-names list means
+// "any common name is acceptable" to x509.Verifier, so clearing them would widen the
+// common name check rather than narrow it. x509.Verifier reads the allowed names and
+// the wrapped handler reads the username headers as two separate loads, so on a delete
+// immediately followed by a recreate those reads can land on either side of the
+// recreation; keeping the last known list means that window is never wider than it was
+// before the delete. It cannot narrow it either: if the configmap has never been read
+// there is nothing to keep, and a recreate that removes a name still accepts it until
+// the next sync.
+func (c *RequestHeaderAuthRequestController) clearRequestHeaderBundle() {
+	c.exportedRequestHeaderBundle.Store(&requestHeaderBundle{
+		AllowedClientNames: c.AllowedClientNames(),
+	})
+	klog.InfoS("Cleared request header values, configmap was deleted", "name", c.name)
 }
 
 func (c *RequestHeaderAuthRequestController) syncConfigMap(configMap *corev1.ConfigMap) error {
