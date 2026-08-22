@@ -545,34 +545,35 @@ func podGroupPotentiallyFeasible(ctx context.Context, schedFwk framework.Framewo
 // It returns the algorithm result together with the revert function.
 // The returned revert function rolls back tentative node reservations for the pod if the overall
 // pod group fails to schedule.
-func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, schedFwk framework.Framework, placementCycleState *framework.CycleState, podGroupInfo *framework.PodGroupInfo, podInfo *framework.QueuedPodInfo) (algorithmResult, func()) {
+//
+// Pods of a pod group are assumed into the snapshot rather than the cache: the group's placement
+// stays tentative until the whole group is submitted, and a snapshot assume is dropped by the
+// next UpdateSnapshot instead of outliving the cycle.
+func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, schedFwk framework.Framework,
+	placementCycleState *framework.CycleState, podGroupInfo *framework.PodGroupInfo,
+	podInfo *framework.QueuedPodInfo) (algorithmResult, func()) {
+
 	pod := podInfo.Pod
 	podCtx := initPodSchedulingContext(ctx, pod, placementCycleState)
 	logger := podCtx.logger
 	ctx = klog.NewContext(ctx, logger)
 	start := time.Now()
 
-	logger.V(4).Info("Attempting to schedule a pod belonging to a pod group", "podGroup", klog.KObj(podGroupInfo), "pod", klog.KObj(pod))
+	logger.V(4).Info("Attempting to schedule a pod belonging to a pod group",
+		"podGroup", klog.KObj(podGroupInfo), "pod", klog.KObj(pod))
 
 	scheduleResult, status := sched.schedulingAlgorithm(ctx, podCtx.state, schedFwk, podInfo, start)
-	if !status.IsSuccess() {
-		return algorithmResult{
-			podInfo:            podInfo,
-			scheduleResult:     scheduleResult,
-			podCtx:             podCtx,
-			schedulingDuration: time.Since(start),
-			status:             status,
-		}, nil
-	}
-	assumeStatus, revertFn := sched.algorithm.assumeAndReserveWithRevert(ctx, podCtx.state, schedFwk, podInfo, scheduleResult)
-	if !assumeStatus.IsSuccess() {
-		return algorithmResult{
-			podInfo:            podInfo,
-			scheduleResult:     ScheduleResult{nominatingInfo: clearNominatedNode},
-			podCtx:             podCtx,
-			schedulingDuration: time.Since(start),
-			status:             assumeStatus,
-		}, nil
+	var revertFn func()
+	if status.IsSuccess() {
+		var assumeStatus *fwk.Status
+		assumeStatus, revertFn = sched.algorithm.AssumeAndReserveInSnapshot(
+			ctx, podCtx.state, schedFwk, podInfo, scheduleResult)
+		if !assumeStatus.IsSuccess() {
+			// The evaluation succeeded but the placement could not be held: drop the
+			// result and clear the nomination, as the single-pod cycle does.
+			scheduleResult = ScheduleResult{nominatingInfo: clearNominatedNode}
+			status = assumeStatus
+		}
 	}
 
 	return algorithmResult{
@@ -1296,7 +1297,7 @@ func (sched *Scheduler) assumeSubtreeWithRevert(ctx context.Context, schedFwk fr
 			if !podResult.status.IsSuccess() || podResult.GetNodeName() == "" {
 				continue
 			}
-			status, revert := sched.algorithm.assumeAndReserveWithRevert(ctx, podResult.podCtx.state, schedFwk, podResult.podInfo, podResult.scheduleResult)
+			status, revert := sched.algorithm.AssumeAndReserveInSnapshot(ctx, podResult.podCtx.state, schedFwk, podResult.podInfo, podResult.scheduleResult)
 			if revert != nil {
 				revertFns = append(revertFns, revert)
 			}
