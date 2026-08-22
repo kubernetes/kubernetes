@@ -2321,6 +2321,9 @@ func RunTestDeleteWithConflictAndMissingExpectedTransformOrDecodeError(ctx conte
 
 	// Initially, TransformFromStorage or Decode should fail.
 	setFailing(true)
+	// Watch goroutines can outlive the test; a store left failing panics them once
+	// decode errors become fatal again.
+	defer setFailing(false)
 
 	err := store.Delete(ctx, key, &example.Pod{}, nil, injectUpdate, nil,
 		storage.DeleteOptions{ExpectTransformOrDecodeError: true})
@@ -2340,6 +2343,10 @@ func RunTestDeleteExpectedTransformOrDecodeError(ctx context.Context, t testing.
 	}
 
 	setFailing(true)
+	// Watch goroutines can outlive the test; a store left failing panics them once
+	// decode errors become fatal again.
+	defer setFailing(false)
+
 	err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil,
 		storage.DeleteOptions{ExpectTransformOrDecodeError: true})
 	if err != nil {
