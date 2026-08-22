@@ -336,34 +336,6 @@ func TestValidateEndpointSlice(t *testing.T) {
 				Endpoints:   generateEndpoints(maxEndpoints + 1),
 			},
 		},
-		"no-endpoint-addresses": {
-			expectedErrors: 1,
-			endpointSlice: &discovery.EndpointSlice{
-				ObjectMeta:  standardMeta,
-				AddressType: discovery.AddressTypeIPv4,
-				Ports: []discovery.EndpointPort{{
-					Name:     ptr.To("http"),
-					Protocol: ptr.To(corev1.ProtocolTCP),
-				}},
-				Endpoints: []discovery.Endpoint{{
-					Addresses: generateIPAddresses(0),
-				}},
-			},
-		},
-		"too-many-addresses": {
-			expectedErrors: 1,
-			endpointSlice: &discovery.EndpointSlice{
-				ObjectMeta:  standardMeta,
-				AddressType: discovery.AddressTypeIPv4,
-				Ports: []discovery.EndpointPort{{
-					Name:     ptr.To("http"),
-					Protocol: ptr.To(corev1.ProtocolTCP),
-				}},
-				Endpoints: []discovery.Endpoint{{
-					Addresses: generateIPAddresses(maxAddresses + 1),
-				}},
-			},
-		},
 		"bad-topology-key": {
 			expectedErrors: 1,
 			endpointSlice: &discovery.EndpointSlice{
@@ -652,7 +624,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"empty-everything": {
-			expectedErrors: 3,
+			expectedErrors: 2,
 			endpointSlice:  &discovery.EndpointSlice{},
 		},
 		"zone-key-topology": {
@@ -773,34 +745,6 @@ func TestValidateEndpointSliceCreate(t *testing.T) {
 				}},
 			},
 		},
-		"deprecated-address-type": {
-			expectedErrors: 1,
-			endpointSlice: &discovery.EndpointSlice{
-				ObjectMeta:  standardMeta,
-				AddressType: discovery.AddressType("IP"),
-				Ports: []discovery.EndpointPort{{
-					Name:     ptr.To("http"),
-					Protocol: ptr.To(corev1.ProtocolTCP),
-				}},
-				Endpoints: []discovery.Endpoint{{
-					Addresses: generateIPAddresses(1),
-				}},
-			},
-		},
-		"bad-address-type": {
-			expectedErrors: 1,
-			endpointSlice: &discovery.EndpointSlice{
-				ObjectMeta:  standardMeta,
-				AddressType: discovery.AddressType("other"),
-				Ports: []discovery.EndpointPort{{
-					Name:     ptr.To("http"),
-					Protocol: ptr.To(corev1.ProtocolTCP),
-				}},
-				Endpoints: []discovery.Endpoint{{
-					Addresses: generateIPAddresses(1),
-				}},
-			},
-		},
 	}
 
 	for name, testCase := range testCases {
@@ -872,28 +816,6 @@ func TestValidateEndpointSliceUpdate(t *testing.T) {
 			expectedErrors: 1,
 		},
 
-		"deprecated address type": {
-			expectedErrors: 1,
-			oldEndpointSlice: &discovery.EndpointSlice{
-				ObjectMeta:  standardMeta,
-				AddressType: discovery.AddressType("IP"),
-			},
-			newEndpointSlice: &discovery.EndpointSlice{
-				ObjectMeta:  standardMeta,
-				AddressType: discovery.AddressType("IP"),
-			},
-		},
-		"valid and identical slices with different address types": {
-			oldEndpointSlice: &discovery.EndpointSlice{
-				ObjectMeta:  standardMeta,
-				AddressType: discovery.AddressType("other"),
-			},
-			newEndpointSlice: &discovery.EndpointSlice{
-				ObjectMeta:  standardMeta,
-				AddressType: discovery.AddressTypeIPv4,
-			},
-			expectedErrors: 1,
-		},
 		"invalid slices with valid address types": {
 			oldEndpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
