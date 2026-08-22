@@ -54,7 +54,7 @@ func (plugin *iscsiPlugin) NewAttacher() (volume.Attacher, error) {
 	}, nil
 }
 
-func (plugin *iscsiPlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
+func (plugin *iscsiPlugin) VerifyExhaustedResource(_ klog.Logger, _ *volume.Spec) bool {
 	return false
 }
 
@@ -71,7 +71,7 @@ func (attacher *iscsiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName
 	return "", nil
 }
 
-func (attacher *iscsiAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
+func (attacher *iscsiAttacher) VolumesAreAttached(logger klog.Logger, specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
 	volumesAttachedCheck := make(map[*volume.Spec]bool)
 	for _, spec := range specs {
 		volumesAttachedCheck[spec] = true
@@ -103,7 +103,7 @@ func (attacher *iscsiAttacher) GetDeviceMountPath(
 	return attacher.manager.MakeGlobalPDName(*mounter.iscsiDisk), nil
 }
 
-func (attacher *iscsiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, mountArgs volume.DeviceMounterArgs) error {
+func (attacher *iscsiAttacher) MountDevice(logger klog.Logger, spec *volume.Spec, devicePath string, deviceMountPath string, mountArgs volume.DeviceMounterArgs) error {
 	mounter := attacher.host.GetMounter()
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
@@ -183,7 +183,7 @@ func (detacher *iscsiDetacher) UnmountDevice(deviceMountPath string) error {
 	return nil
 }
 
-func (plugin *iscsiPlugin) CanAttach(spec *volume.Spec) (bool, error) {
+func (plugin *iscsiPlugin) CanAttach(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return true, nil
 }
 

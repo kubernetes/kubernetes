@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
+	"k8s.io/klog/v2"
 	. "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
@@ -143,11 +144,11 @@ func (f *fakeVolumeHost) GetPluginMgr() *VolumePluginMgr {
 	return f.pluginMgr
 }
 
-func (f *fakeVolumeHost) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error) {
+func (f *fakeVolumeHost) GetAttachedVolumesFromNodeStatus(ctx context.Context) (map[v1.UniqueVolumeName]string, error) {
 	return map[v1.UniqueVolumeName]string{}, nil
 }
 
-func (f *fakeVolumeHost) NewWrapperMounter(volName string, spec Spec, pod *v1.Pod) (Mounter, error) {
+func (f *fakeVolumeHost) NewWrapperMounter(logger klog.Logger, volName string, spec Spec, pod *v1.Pod) (Mounter, error) {
 	// The name of wrapper volume is set to "wrapped_{wrapped_volume_name}"
 	wrapperVolumeName := "wrapped_" + volName
 	if spec.Volume != nil {
@@ -173,19 +174,19 @@ func (f *fakeVolumeHost) NewWrapperUnmounter(volName string, spec Spec, podUID t
 	return plug.NewUnmounter(spec.Name(), podUID)
 }
 
-func (f *fakeVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
+func (f *fakeVolumeHost) GetNodeAllocatable(ctx context.Context) (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
 }
 
-func (f *fakeVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
-	return func(namespace, name string) (*v1.Secret, error) {
-		return f.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+func (f *fakeVolumeHost) GetSecretFunc() func(ctx context.Context, namespace, name string) (*v1.Secret, error) {
+	return func(ctx context.Context, namespace, name string) (*v1.Secret, error) {
+		return f.kubeClient.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
 	}
 }
 
-func (f *fakeVolumeHost) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
-	return func(namespace, name string) (*v1.ConfigMap, error) {
-		return f.kubeClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+func (f *fakeVolumeHost) GetConfigMapFunc() func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error) {
+	return func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error) {
+		return f.kubeClient.CoreV1().ConfigMaps(namespace).Get(ctx, name, metav1.GetOptions{})
 	}
 }
 
@@ -199,7 +200,7 @@ func (f *fakeVolumeHost) DeleteServiceAccountTokenFunc() func(types.UID) {
 	return func(types.UID) {}
 }
 
-func (f *fakeVolumeHost) GetNodeLabels() (map[string]string, error) {
+func (f *fakeVolumeHost) GetNodeLabels(ctx context.Context) (map[string]string, error) {
 	if f.nodeLabels == nil {
 		f.nodeLabels = map[string]string{"test-label": "test-value"}
 	}
@@ -373,7 +374,7 @@ func (f *fakeKubeletVolumeHost) GetInformerFactory() informers.SharedInformerFac
 	return f.informerFactory
 }
 
-func (f *fakeKubeletVolumeHost) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error) {
+func (f *fakeKubeletVolumeHost) GetAttachedVolumesFromNodeStatus(_ context.Context) (map[v1.UniqueVolumeName]string, error) {
 	result := map[v1.UniqueVolumeName]string{}
 	if f.node != nil {
 		for _, av := range f.node.Status.VolumesAttached {
@@ -393,7 +394,7 @@ func (f *fakeKubeletVolumeHost) CSIDriversSynced() cache.InformerSynced {
 	return nil
 }
 
-func (f *fakeKubeletVolumeHost) WaitForCacheSync() error {
+func (f *fakeKubeletVolumeHost) WaitForCacheSync(_ klog.Logger) error {
 	return nil
 }
 

@@ -465,7 +465,7 @@ func (adc *attachDetachController) populateDesiredStateOfWorld(logger klog.Logge
 					"volumeName", podVolume.Name)
 				continue
 			}
-			plugin, err := adc.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+			plugin, err := adc.volumePluginMgr.FindAttachablePluginBySpec(logger, volumeSpec)
 			if err != nil || plugin == nil {
 				logger.V(10).Info(
 					"Skipping volume for pod: it does not implement attacher interface",
@@ -738,7 +738,7 @@ func (adc *attachDetachController) processVolumeAttachments(logger klog.Logger) 
 		}
 
 		if plugin == nil {
-			plugin, err = adc.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+			plugin, err = adc.volumePluginMgr.FindAttachablePluginBySpec(logger, volumeSpec)
 			if err != nil || plugin == nil {
 				// Currently VA objects are created for CSI volumes only. nil plugin is unexpected, generate a warning
 				logger.Info("Skipping processing the volume on node, no attacher interface found", "node", klog.KRef("", string(nodeName)), "PV", klog.KRef("", *pvName), "err", err)
@@ -816,7 +816,7 @@ func (adc *attachDetachController) GetKubeClient() clientset.Interface {
 	return adc.kubeClient
 }
 
-func (adc *attachDetachController) NewWrapperMounter(volName string, spec volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
+func (adc *attachDetachController) NewWrapperMounter(logger klog.Logger, volName string, spec volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	return nil, fmt.Errorf("NewWrapperMounter not supported by Attach/Detach controller's VolumeHost implementation")
 }
 
@@ -828,22 +828,22 @@ func (adc *attachDetachController) GetMounter() mount.Interface {
 	return nil
 }
 
-func (adc *attachDetachController) GetNodeAllocatable() (v1.ResourceList, error) {
+func (adc *attachDetachController) GetNodeAllocatable(ctx context.Context) (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
 }
 
-func (adc *attachDetachController) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error) {
+func (adc *attachDetachController) GetAttachedVolumesFromNodeStatus(ctx context.Context) (map[v1.UniqueVolumeName]string, error) {
 	return map[v1.UniqueVolumeName]string{}, nil
 }
 
-func (adc *attachDetachController) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
-	return func(_, _ string) (*v1.Secret, error) {
+func (adc *attachDetachController) GetSecretFunc() func(ctx context.Context, namespace, name string) (*v1.Secret, error) {
+	return func(_ context.Context, _, _ string) (*v1.Secret, error) {
 		return nil, fmt.Errorf("GetSecret unsupported in attachDetachController")
 	}
 }
 
-func (adc *attachDetachController) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
-	return func(_, _ string) (*v1.ConfigMap, error) {
+func (adc *attachDetachController) GetConfigMapFunc() func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error) {
+	return func(_ context.Context, _, _ string) (*v1.ConfigMap, error) {
 		return nil, fmt.Errorf("GetConfigMap unsupported in attachDetachController")
 	}
 }
@@ -869,7 +869,7 @@ func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.N
 	}
 }
 
-func (adc *attachDetachController) GetNodeLabels() (map[string]string, error) {
+func (adc *attachDetachController) GetNodeLabels(ctx context.Context) (map[string]string, error) {
 	return nil, fmt.Errorf("GetNodeLabels() unsupported in Attach/Detach controller")
 }
 

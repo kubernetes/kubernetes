@@ -17,6 +17,7 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -96,11 +97,12 @@ func getTargetPath(uid types.UID, specVolumeID string, host volume.VolumeHost) s
 // volume.Mounter methods
 var _ volume.Mounter = &csiMountMgr{}
 
-func (c *csiMountMgr) SetUp(mounterArgs volume.MounterArgs) error {
-	return c.SetUpAt(c.GetPath(), mounterArgs)
+func (c *csiMountMgr) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
+	return c.SetUpAt(ctx, c.GetPath(), mounterArgs)
 }
 
-func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (c *csiMountMgr) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
+	logger := klog.FromContext(ctx)
 	klog.V(4).Info(log("Mounter.SetUpAt(%s)", dir))
 
 	csi, err := c.csiClientGetter.Get()
@@ -120,11 +122,11 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 
 	// Check CSIDriver.Spec.Mode to ensure that the CSI driver
 	// supports the current volumeLifecycleMode.
-	if err := c.supportsVolumeLifecycleMode(); err != nil {
+	if err := c.supportsVolumeLifecycleMode(logger); err != nil {
 		return volumetypes.NewTransientOperationFailure(log("mounter.SetupAt failed to check volume lifecycle mode: %s", err))
 	}
 
-	fsGroupPolicy, err := c.getFSGroupPolicy()
+	fsGroupPolicy, err := c.getFSGroupPolicy(logger)
 	if err != nil {
 		return volumetypes.NewTransientOperationFailure(log("mounter.SetupAt failed to check fsGroup policy: %s", err))
 	}
@@ -196,7 +198,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		// search for attachment by VolumeAttachment.Spec.Source.PersistentVolumeName
 		if c.publishContext == nil {
 			nodeName := string(c.plugin.host.GetNodeName())
-			c.publishContext, err = c.plugin.getPublishContext(c.k8s, volumeHandle, string(driverName), nodeName)
+			c.publishContext, err = c.plugin.getPublishContext(ctx, c.k8s, volumeHandle, string(driverName), nodeName)
 			if err != nil {
 				// we could have a transient error associated with fetching publish context
 				return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to fetch publishContext: %v", err))
@@ -226,7 +228,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	}
 
 	// Inject pod information into volume_attributes
-	podInfoEnabled, err := c.plugin.podInfoEnabled(string(c.driverName))
+	podInfoEnabled, err := c.plugin.podInfoEnabled(logger, string(c.driverName))
 	if err != nil {
 		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to assemble volume attributes: %v", err))
 	}
@@ -262,7 +264,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 
 	var selinuxLabelMount bool
 	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
-		support, err := c.plugin.SupportsSELinuxContextMount(c.spec)
+		support, err := c.plugin.SupportsSELinuxContextMount(logger, c.spec)
 		if err != nil {
 			return errors.New(log("failed to query for SELinuxMount support: %s", err))
 		}
@@ -506,13 +508,13 @@ func (c *csiMountMgr) supportsFSGroup(fsType string, fsGroup *int64, driverPolic
 
 // getFSGroupPolicy returns if the CSI driver supports a volume in the given mode.
 // An error indicates that it isn't supported and explains why.
-func (c *csiMountMgr) getFSGroupPolicy() (storage.FSGroupPolicy, error) {
+func (c *csiMountMgr) getFSGroupPolicy(logger klog.Logger) (storage.FSGroupPolicy, error) {
 	// Retrieve CSIDriver. It's not an error if the driver isn't found
 	// (CSIDriver is optional)
 	var csiDriver *storage.CSIDriver
 	driver := string(c.driverName)
 	if c.plugin.csiDriverLister != nil {
-		c, err := c.plugin.getCSIDriver(driver)
+		c, err := c.plugin.getCSIDriver(logger, driver)
 		if err != nil && !apierrors.IsNotFound(err) {
 			// Some internal error.
 			return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, err
@@ -533,13 +535,13 @@ func (c *csiMountMgr) getFSGroupPolicy() (storage.FSGroupPolicy, error) {
 
 // supportsVolumeMode checks whether the CSI driver supports a volume in the given mode.
 // An error indicates that it isn't supported and explains why.
-func (c *csiMountMgr) supportsVolumeLifecycleMode() error {
+func (c *csiMountMgr) supportsVolumeLifecycleMode(logger klog.Logger) error {
 	// Retrieve CSIDriver. It's not an error if the driver isn't found
 	// (CSIDriver is optional), but then only persistent volumes are supported.
 	var csiDriver *storage.CSIDriver
 	driver := string(c.driverName)
 	if c.plugin.csiDriverLister != nil {
-		c, err := c.plugin.getCSIDriver(driver)
+		c, err := c.plugin.getCSIDriver(logger, driver)
 		if err != nil && !apierrors.IsNotFound(err) {
 			// Some internal error.
 			return err

@@ -630,7 +630,9 @@ func IsMultiAttachAllowed(volumeSpec *volume.Spec) bool {
 
 // IsAttachableVolume checks if the given volumeSpec is an attachable volume or not
 func IsAttachableVolume(volumeSpec *volume.Spec, volumePluginMgr *volume.VolumePluginMgr) bool {
-	attachableVolumePlugin, _ := volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+	// Use klog.TODO() because we currently do not have a proper logger to pass in.
+	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
+	attachableVolumePlugin, _ := volumePluginMgr.FindAttachablePluginBySpec(klog.TODO(), volumeSpec)
 	if attachableVolumePlugin != nil {
 		volumeAttacher, err := attachableVolumePlugin.NewAttacher()
 		if err == nil && volumeAttacher != nil {

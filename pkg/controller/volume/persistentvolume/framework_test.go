@@ -988,7 +988,7 @@ func (plugin *mockVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	return true
 }
 
-func (plugin *mockVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
+func (plugin *mockVolumePlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool {
 	return false
 }
 
@@ -1004,7 +1004,7 @@ func (plugin *mockVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string
 	return volume.ReconstructedVolume{}, nil
 }
 
-func (plugin *mockVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+func (plugin *mockVolumePlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return false, nil
 }
 

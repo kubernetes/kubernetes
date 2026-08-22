@@ -17,6 +17,7 @@ limitations under the License.
 package operationexecutor
 
 import (
+	"context"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -47,7 +48,7 @@ func NewFakeOGCounter(opFunc func() volumetypes.OperationContext) OperationGener
 	}
 }
 
-func (f *fakeOGCounter) GenerateMountVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater, isRemount bool) volumetypes.GeneratedOperations {
+func (f *fakeOGCounter) GenerateMountVolumeFunc(ctx context.Context, waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater, isRemount bool) volumetypes.GeneratedOperations {
 	return f.recordFuncCall("GenerateMountVolumeFunc")
 }
 
@@ -63,7 +64,7 @@ func (f *fakeOGCounter) GenerateDetachVolumeFunc(logger klog.Logger, volumeToDet
 	return f.recordFuncCall("GenerateDetachVolumeFunc"), nil
 }
 
-func (f *fakeOGCounter) GenerateVolumesAreAttachedFunc(attachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
+func (f *fakeOGCounter) GenerateVolumesAreAttachedFunc(logger klog.Logger, attachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
 	return f.recordFuncCall("GenerateVolumesAreAttachedFunc"), nil
 }
 
@@ -71,11 +72,11 @@ func (f *fakeOGCounter) GenerateUnmountDeviceFunc(deviceToDetach AttachedVolume,
 	return f.recordFuncCall("GenerateUnmountDeviceFunc"), nil
 }
 
-func (f *fakeOGCounter) GenerateVerifyControllerAttachedVolumeFunc(logger klog.Logger, volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
+func (f *fakeOGCounter) GenerateVerifyControllerAttachedVolumeFunc(ctx context.Context, volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
 	return f.recordFuncCall("GenerateVerifyControllerAttachedVolumeFunc"), nil
 }
 
-func (f *fakeOGCounter) GenerateMapVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
+func (f *fakeOGCounter) GenerateMapVolumeFunc(ctx context.Context, waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
 	return f.recordFuncCall("GenerateMapVolumeFunc"), nil
 }
 

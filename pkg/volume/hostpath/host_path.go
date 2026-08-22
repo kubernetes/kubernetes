@@ -17,6 +17,7 @@ limitations under the License.
 package hostpath
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"regexp"
@@ -100,7 +101,7 @@ func (plugin *hostPathPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.HostPath != nil)
 }
 
-func (plugin *hostPathPlugin) RequiresRemount(spec *volume.Spec) bool {
+func (plugin *hostPathPlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool {
 	return false
 }
 
@@ -108,7 +109,7 @@ func (plugin *hostPathPlugin) SupportsMountOption() bool {
 	return false
 }
 
-func (plugin *hostPathPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+func (plugin *hostPathPlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return false, nil
 }
 
@@ -238,7 +239,7 @@ func (b *hostPathMounter) GetAttributes() volume.Attributes {
 }
 
 // SetUp does nothing.
-func (b *hostPathMounter) SetUp(mounterArgs volume.MounterArgs) error {
+func (b *hostPathMounter) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
 	err := validation.ValidatePathNoBacksteps(b.GetPath())
 	if err != nil {
 		return fmt.Errorf("invalid HostPath `%s`: %v", b.GetPath(), err)
@@ -255,7 +256,7 @@ func (b *hostPathMounter) SetUp(mounterArgs volume.MounterArgs) error {
 }
 
 // SetUpAt does not make sense for host paths - probably programmer error.
-func (b *hostPathMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (b *hostPathMounter) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
 	return fmt.Errorf("SetUpAt() does not make sense for host paths")
 }
 

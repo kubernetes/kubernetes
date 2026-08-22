@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/emptydir"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -203,6 +204,7 @@ func TestDownwardAPI(t *testing.T) {
 }
 
 func TestCollectDataWithUser(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	caseMappingUser1 := int64(1001)
 	caseMappingUser2 := int64(1002)
 
@@ -305,7 +307,7 @@ func TestCollectDataWithUser(t *testing.T) {
 			}
 		}()
 
-		actualPayload, err := CollectData(tc.mappings, &pod, host, &tc.mode, tc.user)
+		actualPayload, err := CollectData(tCtx, tc.mappings, &pod, host, &tc.mode, tc.user)
 		if err != nil {
 			t.Errorf("%v: unexpected failure making payload: %v", tc.name, err)
 			continue
@@ -327,6 +329,7 @@ type downwardAPITest struct {
 }
 
 func newDownwardAPITest(t *testing.T, name string, volumeFiles, podLabels, podAnnotations map[string]string, modes map[string]int32) *downwardAPITest {
+	tCtx := ktesting.Init(t)
 	defaultMode := int32(0644)
 	var files []v1.DownwardAPIVolumeFile
 	for path, fieldPath := range volumeFiles {
@@ -378,7 +381,7 @@ func newDownwardAPITest(t *testing.T, name string, volumeFiles, podLabels, podAn
 
 	volumePath := mounter.GetPath()
 
-	err = mounter.SetUp(volume.MounterArgs{})
+	err = mounter.SetUp(tCtx, volume.MounterArgs{})
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -495,6 +498,7 @@ type reSetUp struct {
 }
 
 func (step reSetUp) run(test *downwardAPITest) {
+	tCtx := ktesting.Init(test.t)
 	if step.newLabels != nil {
 		test.pod.ObjectMeta.Labels = step.newLabels
 	}
@@ -505,7 +509,7 @@ func (step reSetUp) run(test *downwardAPITest) {
 	}
 
 	// now re-run Setup
-	if err = test.mounter.SetUp(volume.MounterArgs{}); err != nil {
+	if err = test.mounter.SetUp(tCtx, volume.MounterArgs{}); err != nil {
 		test.t.Errorf("Failed to re-setup volume: %v", err)
 	}
 
