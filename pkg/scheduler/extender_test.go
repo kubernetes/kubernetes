@@ -354,7 +354,7 @@ func TestSchedulerWithExtenders(t *testing.T) {
 				nodeInfoSnapshot: emptySnapshot,
 				logger:           logger,
 			}
-			sched.initAlgorithm()
+			sched.initAlgorithm(ctx)
 			sched.applyDefaultHandlers()
 
 			if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
