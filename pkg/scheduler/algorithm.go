@@ -189,58 +189,79 @@ func (a *SchedulingAlgorithm) SchedulePod(ctx context.Context, schedFramework fr
 	}, err
 }
 
-// findNodesThatFitPod filters the nodes to find the ones that fit the pod based on the framework
-// filter plugins and filter extenders.
-func (a *SchedulingAlgorithm) findNodesThatFitPod(ctx context.Context, schedFramework framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) ([]fwk.NodeInfo, framework.Diagnosis, string, error) {
+// preFilterOutcome captures the state and intermediate results produced while running
+// PreFilter plugins for a pod. It aggregates node candidates and plugin diagnoses so
+// downstream candidate selection and filtering can proceed without re-evaluating cluster
+// snapshots or dropping diagnostic context needed for preemption.
+type preFilterOutcome struct {
+	// result is the optional node subset returned by PreFilter plugins. When non-nil
+	// and containing a specific node set, getCandidateNodes restricts filter evaluations
+	// to only these nodes instead of scanning the full cluster snapshot.
+	result *fwk.PreFilterResult
+
+	// allNodes holds the complete list of nodes in the placement snapshot prior to
+	// plugin narrowing. The algorithm retains this full set so it can accurately
+	// advance nextStartNodeIndex across cycles to prevent node starvation.
+	allNodes []fwk.NodeInfo
+
+	// diagnosis accumulates rejection reasons, messages, and plugin failure statuses
+	// encountered during PreFilter. It is propagated to the caller and preemption
+	// logic if no candidate nodes fit the pod.
+	diagnosis *framework.Diagnosis
+}
+
+// prefilterNodes runs PreFilter plugins against the current cluster placement snapshot and captures
+// the outcome for downstream filtering.
+//
+// It retains the complete snapshot node list so nextStartNodeIndex can advance uniformly across
+// cycles even if PreFilter restricts candidate nodes. When a plugin explicitly rejects the pod,
+// the rejection status is broadcast across all absent nodes in Diagnosis.NodeToStatus so preemption
+// (PostFilter) has the necessary diagnostic context without triggering a full filter pass.
+func (a *SchedulingAlgorithm) prefilterNodes(ctx context.Context, schedFramework framework.Framework, state fwk.CycleState, pod *v1.Pod) (preFilterOutcome, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	diagnosis := framework.Diagnosis{
 		NodeToStatus: framework.NewDefaultNodeToStatus(),
 	}
-	allNodes, err := a.nodeInfoSnapshot.ListNodesInPlacement()
-	if err != nil {
-		return nil, diagnosis, "", err
+	prefilterOutcome := preFilterOutcome{
+		diagnosis: &diagnosis,
 	}
+	allNodes, err := a.nodeInfoSnapshot.ListNodesInPlacement()
+	prefilterOutcome.allNodes = allNodes
+	if err != nil {
+		return prefilterOutcome, fwk.AsStatus(err)
+	}
+
 	// Run "prefilter" plugins.
-	pod := podInfo.Pod
 	preRes, s, unscheduledPlugins := schedFramework.RunPreFilterPlugins(ctx, state, pod)
+	prefilterOutcome.result = preRes
 	diagnosis.UnschedulablePlugins = unscheduledPlugins
 	if !s.IsSuccess() {
-		if !s.IsRejected() {
-			return nil, diagnosis, "", s.AsError()
-		}
-		// All nodes in NodeToStatus will have the same status so that they can be handled in the preemption.
-		diagnosis.NodeToStatus.SetAbsentNodesStatus(s)
+		if s.IsRejected() {
+			// All nodes in NodeToStatus will have the same status so that they can be handled in the preemption.
+			diagnosis.NodeToStatus.SetAbsentNodesStatus(s)
 
-		// Record the messages from PreFilter in Diagnosis.PreFilterMsg.
-		msg := s.Message()
-		diagnosis.PreFilterMsg = msg
-		logger.V(5).Info("Status after running PreFilter plugins for pod", "pod", klog.KObj(pod), "status", msg)
-		diagnosis.AddPluginStatus(s)
-		return nil, diagnosis, "", nil
+			// Record the messages from PreFilter in Diagnosis.PreFilterMsg.
+			msg := s.Message()
+			diagnosis.PreFilterMsg = msg
+			logger.V(5).Info("Status after running PreFilter plugins for pod", "pod", klog.KObj(pod), "status", msg)
+			diagnosis.AddPluginStatus(s)
+		}
+		return prefilterOutcome, s
 	}
 
-	var nodeHint string
-	if a.opportunisticBatchingEnabled() {
-		// We get the node hint even if we have a nominated name for simplicity, but we could potentially avoid it
-		// in this scenario in the future.
-		nodeHint = schedFramework.GetNodeHint(ctx, pod, podInfo.PodSignature, state, a.cycleProvider())
-	}
+	return prefilterOutcome, nil
+}
 
-	// "NominatedNodeName" can potentially be set in a previous scheduling cycle as a result of preemption.
-	// This node is likely the only candidate that will fit the pod, and hence we try it first before iterating over all nodes.
-	// We take the same tack for hinted nodes from the batch module.
-	if len(pod.Status.NominatedNodeName) > 0 || len(nodeHint) > 0 {
-		feasibleNodes, err := a.evaluateNominatedNode(ctx, pod, schedFramework, state, nodeHint, diagnosis)
-		if err != nil {
-			utilruntime.HandleErrorWithContext(ctx, err, "Evaluation failed on nominated node", "pod", klog.KObj(pod), "node", pod.Status.NominatedNodeName)
-		}
-		// Nominated node passes all the filters, scheduler is good to assign this node to the pod.
-		if len(feasibleNodes) != 0 {
-			return feasibleNodes, diagnosis, nodeHint, nil
-		}
-	}
-
-	nodes := allNodes
+// getCandidateNodes derives the subset of nodes to evaluate in Filter from the PreFilter outcome.
+//
+// When PreFilter plugins return a restricted set of node names, each name is validated against
+// the placement snapshot to prevent invalid or out-of-placement references from entering parallel
+// filter workers. Any cluster nodes omitted by PreFilter are marked UnschedulableAndUnresolvable
+// in Diagnosis.NodeToStatus so preemption avoids attempting unresolvable evictions on them.
+func (a *SchedulingAlgorithm) getCandidateNodes(preFilterOutcome preFilterOutcome) []fwk.NodeInfo {
+	nodes := preFilterOutcome.allNodes
+	diagnosis := preFilterOutcome.diagnosis
+	preRes := preFilterOutcome.result
 	if !preRes.AllNodes() {
 		nodes = make([]fwk.NodeInfo, 0, len(preRes.NodeNames))
 		for nodeName := range preRes.NodeNames {
@@ -250,22 +271,23 @@ func (a *SchedulingAlgorithm) findNodesThatFitPod(ctx context.Context, schedFram
 				nodes = append(nodes, nodeInfo)
 			}
 		}
-		diagnosis.NodeToStatus.SetAbsentNodesStatus(fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("node(s) didn't satisfy plugin(s) %v", sets.List(unscheduledPlugins))))
-	}
-	feasibleNodes, err := a.findNodesThatPassFilters(ctx, schedFramework, state, pod, &diagnosis, nodes)
-	// always try to update the a.nextStartNodeIndex regardless of whether an error has occurred
-	// this is helpful to make sure that all the nodes have a chance to be searched
-	processedNodes := len(feasibleNodes) + diagnosis.NodeToStatus.Len()
-	if len(allNodes) > 0 {
-		a.nextStartNodeIndex = (a.nextStartNodeIndex + processedNodes) % len(allNodes)
-	}
-	if err != nil {
-		return nil, diagnosis, nodeHint, err
+		diagnosis.NodeToStatus.SetAbsentNodesStatus(fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("node(s) didn't satisfy plugin(s) %v", sets.List(diagnosis.UnschedulablePlugins))))
 	}
 
+	return nodes
+}
+
+// filterWithExtenders filters candidate nodes through configured scheduling extenders and updates
+// diagnostic accounting for queue requeueing.
+//
+// Because external extenders lack event-driven requeueing hooks (EnqueueExtensions), any extender
+// rejection that reduces the feasible set adds framework.ExtenderName to Diagnosis.UnschedulablePlugins.
+// This ensures unschedulable pods are retried on any cluster event rather than waiting for plugin-specific
+// triggers.
+func (a *SchedulingAlgorithm) filterWithExtenders(ctx context.Context, schedFramework framework.Framework, pod *v1.Pod, feasibleNodes []fwk.NodeInfo, diagnosis *framework.Diagnosis) ([]fwk.NodeInfo, error) {
 	feasibleNodesAfterExtender, err := findNodesThatPassExtenders(ctx, schedFramework.Extenders(), pod, feasibleNodes, diagnosis.NodeToStatus)
 	if err != nil {
-		return nil, diagnosis, nodeHint, err
+		return nil, err
 	}
 	if len(feasibleNodesAfterExtender) != len(feasibleNodes) {
 		// Extenders filtered out some nodes.
@@ -282,7 +304,64 @@ func (a *SchedulingAlgorithm) findNodesThatFitPod(ctx context.Context, schedFram
 		diagnosis.UnschedulablePlugins.Insert(framework.ExtenderName)
 	}
 
-	return feasibleNodesAfterExtender, diagnosis, nodeHint, nil
+	return feasibleNodesAfterExtender, nil
+}
+
+// findNodesThatFitPod filters the nodes to find the ones that fit the pod based on the framework
+// filter plugins and filter extenders.
+func (a *SchedulingAlgorithm) findNodesThatFitPod(ctx context.Context, schedFramework framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) ([]fwk.NodeInfo, framework.Diagnosis, string, error) {
+	pod := podInfo.Pod
+	preFilterOut, status := a.prefilterNodes(ctx, schedFramework, state, pod)
+	diagnosis := preFilterOut.diagnosis
+	if !status.IsSuccess() {
+		if status.IsRejected() {
+			return nil, *diagnosis, "", nil
+		}
+		return nil, *diagnosis, "", status.AsError()
+	}
+
+	var nodeHint string
+	if a.opportunisticBatchingEnabled() {
+		// We get the node hint even if we have a nominated name for simplicity, but we could potentially avoid it
+		// in this scenario in the future.
+		nodeHint = schedFramework.GetNodeHint(ctx, pod, podInfo.PodSignature, state, a.cycleProvider())
+	}
+
+	// "NominatedNodeName" can potentially be set in a previous scheduling cycle as a result of preemption.
+	// This node is likely the only candidate that will fit the pod, and hence we try it first before iterating over all nodes.
+	// We take the same tack for hinted nodes from the batch module.
+	if len(pod.Status.NominatedNodeName) > 0 || len(nodeHint) > 0 {
+		feasibleNodes, err := a.evaluateNominatedNode(ctx, pod, schedFramework, state, nodeHint, *diagnosis)
+		if err != nil {
+			utilruntime.HandleErrorWithContext(ctx, err, "Evaluation failed on nominated node", "pod", klog.KObj(pod), "node", pod.Status.NominatedNodeName)
+		}
+		// Nominated node passes all the filters, scheduler is good to assign this node to the pod.
+		if len(feasibleNodes) != 0 {
+			return feasibleNodes, *diagnosis, nodeHint, nil
+		}
+	}
+
+	nodes := a.getCandidateNodes(preFilterOut)
+
+	// The budget is computed from the candidate list, which PreFilter may have narrowed —
+	// not from allNodes. findAll mode takes every candidate and skips the budget entirely.
+	numNodesToFind := a.numNodesToFind(schedFramework, int32(len(nodes)))
+	feasibleNodes, err := a.findNodesThatPassFilters(ctx, schedFramework, state, pod, diagnosis, nodes, numNodesToFind)
+	// always try to update the a.nextStartNodeIndex regardless of whether an error has occurred
+	// this is helpful to make sure that all the nodes have a chance to be searched
+	processedNodes := len(feasibleNodes) + diagnosis.NodeToStatus.Len()
+	if len(preFilterOut.allNodes) > 0 {
+		a.nextStartNodeIndex = (a.nextStartNodeIndex + processedNodes) % len(preFilterOut.allNodes)
+	}
+	if err != nil {
+		return nil, *diagnosis, nodeHint, err
+	}
+
+	feasibleNodes, err = a.filterWithExtenders(ctx, schedFramework, pod, feasibleNodes, diagnosis)
+	if err != nil {
+		return nil, *diagnosis, nodeHint, err
+	}
+	return feasibleNodes, *diagnosis, nodeHint, nil
 }
 
 func (a *SchedulingAlgorithm) evaluateNominatedNode(ctx context.Context, pod *v1.Pod, schedFramework framework.Framework, state fwk.CycleState, nodeHint string, diagnosis framework.Diagnosis) ([]fwk.NodeInfo, error) {
@@ -305,7 +384,7 @@ func (a *SchedulingAlgorithm) evaluateNominatedNode(ctx context.Context, pod *v1
 		return nil, nil
 	}
 	node := []fwk.NodeInfo{nodeInfo}
-	feasibleNodes, err := a.findNodesThatPassFilters(ctx, schedFramework, state, pod, &diagnosis, node)
+	feasibleNodes, err := a.findNodesThatPassFilters(ctx, schedFramework, state, pod, &diagnosis, node, int32(len(node)))
 	if err != nil {
 		return nil, err
 	}
@@ -325,12 +404,13 @@ func (a *SchedulingAlgorithm) findNodesThatPassFilters(
 	state fwk.CycleState,
 	pod *v1.Pod,
 	diagnosis *framework.Diagnosis,
-	nodes []fwk.NodeInfo) ([]fwk.NodeInfo, error) {
+	nodes []fwk.NodeInfo,
+	numNodesToFind int32) ([]fwk.NodeInfo, error) {
 	numAllNodes := len(nodes)
-	numNodesToFind := a.numFeasibleNodesToFind(schedFramework.PercentageOfNodesToScore(), int32(numAllNodes))
-	if !hasExtenderFilters(schedFramework) && !hasScoring(schedFramework) {
-		numNodesToFind = 1
-	}
+	// The budget can exceed the candidate list: numNodesToFind applies the n = 1
+	// shortcut for profiles with neither extender filters nor scoring, which would
+	// otherwise ask for one node out of an empty candidate list.
+	numNodesToFind = min(numNodesToFind, int32(numAllNodes))
 
 	// Create feasible list with enough space to avoid growing it
 	// and allow assigning.
@@ -404,6 +484,17 @@ func (a *SchedulingAlgorithm) findNodesThatPassFilters(
 	return feasibleNodes, nil
 }
 
+// numNodesToFind decides how many feasible nodes Filter should collect, following
+// kube-scheduler's percentageOfNodesToScore policy. A profile that neither filters
+// through extenders nor scores has no use for a second candidate, so one is enough.
+func (a *SchedulingAlgorithm) numNodesToFind(schedFramework framework.Framework, numAllNodes int32) int32 {
+	n := a.numFeasibleNodesToFind(schedFramework.PercentageOfNodesToScore(), numAllNodes)
+	if !hasExtenderFilters(schedFramework) && !hasScoring(schedFramework) {
+		n = 1
+	}
+	return n
+}
+
 // numFeasibleNodesToFind returns the number of feasible nodes that once found, the scheduler stops
 // its search for more feasible nodes.
 func (a *SchedulingAlgorithm) numFeasibleNodesToFind(percentageOfNodesToScore *int32, numAllNodes int32) (numNodes int32) {
@@ -431,13 +522,13 @@ func (a *SchedulingAlgorithm) numFeasibleNodesToFind(percentageOfNodesToScore *i
 	return numNodes
 }
 
-// assume signals to the cache that a pod is already in the cache, so that binding can be asynchronous.
-// When called during pod group scheduling cycle, pod is assumed in the snapshot instead.
-func (a *SchedulingAlgorithm) assume(logger klog.Logger, schedFramework framework.Framework, state fwk.CycleState, assumedPodInfo *framework.QueuedPodInfo, host string) error {
-	// Optimistically assume that the binding will succeed and send it to apiserver
-	// in the background.
-	// If the binding fails, scheduler will release resources allocated to assumed pod
-	// immediately.
+// prepareAssumedPod returns the copy of podInfo that will be recorded as assumed:
+// bound to host and carrying the DRA allocations computed for this cycle. It
+// touches no store — the caller decides where the result is recorded.
+func (a *SchedulingAlgorithm) prepareAssumedPod(logger klog.Logger, state fwk.CycleState,
+	podInfo *framework.QueuedPodInfo, host string) *framework.QueuedPodInfo {
+
+	assumedPodInfo := podInfo.DeepCopy()
 	assumedPodInfo.Pod.Spec.NodeName = host
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) {
 		// If DRANodeAllocatableResources is enabled, copy the calculated node allocatable resource claim status
@@ -447,126 +538,141 @@ func (a *SchedulingAlgorithm) assume(logger klog.Logger, schedFramework framewor
 		// Any potential NodeAllocatableResourceClaimStatuses from a previously failed scheduling attempt is overwritten.
 		// This field is not explicitly cleared as the Pod object is reconstructed in handleSchedulingFailure()
 		// before re-queueing.
-		assumedPodInfo.Pod.Status.NodeAllocatableResourceClaimStatuses = dynamicresources.ExtractPodNodeAllocatableResourceClaimStatus(logger, state, host)
+		assumedPodInfo.Pod.Status.NodeAllocatableResourceClaimStatuses =
+			dynamicresources.ExtractPodNodeAllocatableResourceClaimStatus(logger, state, host)
 	}
-
-	if state.IsPodGroupSchedulingCycle() {
-		err := a.nodeInfoSnapshot.AssumePod(assumedPodInfo.PodInfo)
-		if err != nil {
-			logger.Error(err, "Scheduler snapshot AssumePod failed")
-			return err
-		}
-	} else {
-		if err := a.cache.AssumePod(logger, assumedPodInfo.Pod); err != nil {
-			logger.Error(err, "Scheduler cache AssumePod failed")
-			return err
-		}
-	}
-	// if "assumed" is a nominated pod, we should remove it from internal cache
-	schedFramework.DeleteNominatedPodIfExists(assumedPodInfo.Pod)
-
-	return nil
+	return assumedPodInfo
 }
 
-// assumeAndReserve assumes and reserves the pod in scheduler's memory.
-func (a *SchedulingAlgorithm) assumeAndReserve(
-	ctx context.Context,
-	state fwk.CycleState,
-	schedFramework framework.Framework,
-	podInfo *framework.QueuedPodInfo,
-	scheduleResult ScheduleResult,
-) (*framework.QueuedPodInfo, *fwk.Status) {
-	logger := klog.FromContext(ctx)
-	// Tell the cache to assume that a pod now is running on a given node, even though it hasn't been bound yet.
-	// This allows us to keep scheduling without waiting on binding to occur.
-	assumedPodInfo := podInfo.DeepCopy()
-	assumedPod := assumedPodInfo.Pod
-	// assume modifies `assumedPod` by setting NodeName=scheduleResult.SuggestedHost
-	err := a.assume(logger, schedFramework, state, assumedPodInfo, scheduleResult.SuggestedHost)
-	if err != nil {
-		// This is most probably result of a BUG in retrying logic.
-		// We report an error here so that pod scheduling can be retried.
-		// This relies on the fact that Error will check if the pod has been bound
-		// to a node and if so will not add it back to the unscheduled pods queue
-		// (otherwise this would cause an infinite loop).
-		return assumedPodInfo, fwk.AsStatus(err)
-	}
-
-	// Run the Reserve method of reserve plugins.
-	if sts := schedFramework.RunReservePluginsReserve(ctx, state, assumedPod, scheduleResult.SuggestedHost); !sts.IsSuccess() {
-		// trigger un-reserve to clean up state associated with the reserved Pod
-		err := a.unreserveAndForget(ctx, state, schedFramework, assumedPodInfo, scheduleResult.SuggestedHost)
-		if err != nil {
-			utilruntime.HandleErrorWithContext(ctx, err, "ForgetPod failed")
-		}
-
-		if sts.IsRejected() {
+// reserve runs Reserve plugins for the assumed pod and converts plugin rejections
+// into a single-node FitError.
+func (a *SchedulingAlgorithm) reserve(ctx context.Context, state fwk.CycleState,
+	schedFramework framework.Framework, assumedPodInfo *framework.QueuedPodInfo,
+	origPod *v1.Pod, host string) *fwk.Status {
+	if status := schedFramework.RunReservePluginsReserve(ctx, state, assumedPodInfo.Pod, host); !status.IsSuccess() {
+		if status.IsRejected() {
 			fitErr := &framework.FitError{
 				NumAllNodes: 1,
-				Pod:         podInfo.Pod,
+				Pod:         origPod,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatus: framework.NewDefaultNodeToStatus(),
 				},
 			}
-			fitErr.Diagnosis.NodeToStatus.Set(scheduleResult.SuggestedHost, sts)
-			fitErr.Diagnosis.AddPluginStatus(sts)
-			return assumedPodInfo, fwk.NewStatus(sts.Code()).WithError(fitErr)
+			fitErr.Diagnosis.NodeToStatus.Set(host, status)
+			fitErr.Diagnosis.AddPluginStatus(status)
+			return fwk.NewStatus(status.Code()).WithError(fitErr)
 		}
-		return assumedPodInfo, sts
+		return status
+	}
+	return nil
+}
+
+// FindAllNodesThatFitPod evaluates all placement nodes without early-exit shortcuts
+// so callers inspecting cluster capacity or running custom batching receive exhaustive results.
+func (a *SchedulingAlgorithm) FindAllNodesThatFitPod(ctx context.Context, state fwk.CycleState, schedFramework framework.Framework, podInfo *framework.QueuedPodInfo) ([]fwk.NodeInfo, framework.Diagnosis, error) {
+	pod := podInfo.Pod
+	preFilterOutcome, status := a.prefilterNodes(ctx, schedFramework, state, pod)
+	diagnosis := preFilterOutcome.diagnosis
+	if !status.IsSuccess() {
+		if status.IsRejected() {
+			return nil, *diagnosis, nil
+		}
+		return nil, *diagnosis, status.AsError()
+	}
+
+	nodes := a.getCandidateNodes(preFilterOutcome)
+	feasibleNodes, err := a.findNodesThatPassFilters(ctx, schedFramework, state, pod, diagnosis, nodes, int32(len(nodes)))
+	if err != nil {
+		return nil, *diagnosis, err
+	}
+	feasibleNodes, err = a.filterWithExtenders(ctx, schedFramework, pod, feasibleNodes, diagnosis)
+
+	return feasibleNodes, *diagnosis, err
+}
+
+// AssumeAndReserveInCache assumes the pod into the scheduler cache and runs Reserve plugins.
+// If Reserve plugins fail, the assumption is rolled back from the cache.
+func (a *SchedulingAlgorithm) AssumeAndReserveInCache(ctx context.Context, state fwk.CycleState,
+	schedFramework framework.Framework, podInfo *framework.QueuedPodInfo,
+	scheduleResult ScheduleResult) (*framework.QueuedPodInfo, *fwk.Status) {
+
+	logger := klog.FromContext(ctx)
+	host := scheduleResult.SuggestedHost
+	if a.cache == nil {
+		return podInfo, fwk.AsStatus(errors.New("the SchedulingAlgorithm was built without a cache: " +
+			"pass one to NewSchedulingAlgorithm, or assume into the snapshot instead"))
+	}
+	assumedPodInfo := a.prepareAssumedPod(logger, state, podInfo, host)
+	if err := a.cache.AssumePod(logger, assumedPodInfo.Pod); err != nil {
+		logger.Error(err, "Scheduler cache AssumePod failed")
+		return assumedPodInfo, fwk.AsStatus(err)
+	}
+	schedFramework.DeleteNominatedPodIfExists(assumedPodInfo.Pod)
+
+	if status := a.reserve(ctx, state, schedFramework, assumedPodInfo, podInfo.Pod, host); status != nil {
+		if err := a.UnreserveAndForgetFromCache(ctx, state, schedFramework, assumedPodInfo, host); err != nil {
+			utilruntime.HandleErrorWithContext(ctx, err, "UnreserveAndForgetFromCache failed")
+		}
+		return assumedPodInfo, status
 	}
 	return assumedPodInfo, nil
 }
 
-// unreserveAndForget unreserves and forgets the pod from scheduler's memory.
-// This function shouldn't be called during binding cycle with a state, where IsPodGroupSchedulingCycle is set to true,
-// but this shouldn't happen, because such pods with such state cannot reach binding.
-func (a *SchedulingAlgorithm) unreserveAndForget(
-	ctx context.Context,
-	state fwk.CycleState,
-	schedFramework framework.Framework,
-	assumedPodInfo *framework.QueuedPodInfo,
-	nodeName string,
-) error {
-	logger := klog.FromContext(ctx)
+// UnreserveAndForgetFromCache runs Unreserve plugins and forgets the pod from the scheduler cache.
+func (a *SchedulingAlgorithm) UnreserveAndForgetFromCache(ctx context.Context, state fwk.CycleState,
+	schedFramework framework.Framework, assumedPodInfo *framework.QueuedPodInfo, nodeName string) error {
 
+	logger := klog.FromContext(ctx)
 	schedFramework.RunReservePluginsUnreserve(ctx, state, assumedPodInfo.Pod, nodeName)
-	if state.IsPodGroupSchedulingCycle() {
-		err := a.nodeInfoSnapshot.ForgetPod(logger, assumedPodInfo.Pod)
-		if err != nil {
-			return err
-		}
-		if assumedPodInfo.Pod.Status.NominatedNodeName != "" {
-			// Assume method removed the nomination, but since we are reverting that stage for pod groups,
-			// we need to revert that operation as well.
-			nominatingInfo := &fwk.NominatingInfo{
-				NominatedNodeName: assumedPodInfo.Pod.Status.NominatedNodeName,
-				NominatingMode:    fwk.ModeOverride,
-			}
-			// AssumedPodInfo can be used here, because the whole pod object is not stored in the nominator.
-			schedFramework.AddNominatedPod(logger, assumedPodInfo.PodInfo, nominatingInfo)
-		}
-		return nil
-	}
+	// No nomination restore here: a pod that fails after a cache assume goes back
+	// through handleSchedulingFailure, which re-adds the nomination itself.
 	return a.cache.ForgetPod(logger, assumedPodInfo.Pod)
 }
 
-// assumeAndReserveWithRevert assumes and reserves the pod, returning a function that
-// reverts both steps. It is used by pod group scheduling, where a placement stays
-// tentative until the whole group is submitted.
-func (a *SchedulingAlgorithm) assumeAndReserveWithRevert(ctx context.Context,
-	state fwk.CycleState,
-	schedFramework framework.Framework,
-	podInfo *framework.QueuedPodInfo,
-	scheduleResult ScheduleResult,
-) (*fwk.Status, func()) {
-	assumedPodInfo, assumeStatus := a.assumeAndReserve(ctx, state, schedFramework, podInfo, scheduleResult)
-	if !assumeStatus.IsSuccess() {
-		return assumeStatus, nil
+// AssumeAndReserveInSnapshot assumes the pod into the transient node snapshot and runs Reserve plugins.
+// Returns a revert function to roll back the assumption and reservation from the snapshot if needed.
+func (a *SchedulingAlgorithm) AssumeAndReserveInSnapshot(ctx context.Context, state fwk.CycleState,
+	schedFramework framework.Framework, podInfo *framework.QueuedPodInfo,
+	scheduleResult ScheduleResult) (*fwk.Status, func()) {
+
+	logger := klog.FromContext(ctx)
+	host := scheduleResult.SuggestedHost
+
+	assumedPodInfo := a.prepareAssumedPod(logger, state, podInfo, host)
+	if err := a.nodeInfoSnapshot.AssumePod(assumedPodInfo.PodInfo); err != nil {
+		logger.Error(err, "Scheduler snapshot AssumePod failed")
+		return fwk.AsStatus(err), nil
 	}
-	return assumeStatus, func() {
-		err := a.unreserveAndForget(ctx, state, schedFramework, assumedPodInfo, scheduleResult.SuggestedHost)
-		if err != nil {
+	schedFramework.DeleteNominatedPodIfExists(assumedPodInfo.Pod)
+
+	revert := func() {
+		if err := a.unreserveAndForgetFromSnapshot(ctx, state, schedFramework, assumedPodInfo, host); err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "ForgetPod failed")
 		}
 	}
+	if status := a.reserve(ctx, state, schedFramework, assumedPodInfo, podInfo.Pod, host); status != nil {
+		revert()
+		return status, nil
+	}
+	return nil, revert
+}
+
+// unreserveAndForgetFromSnapshot runs Unreserve plugins, forgets the pod from the node snapshot,
+// and restores any existing pod nomination.
+func (a *SchedulingAlgorithm) unreserveAndForgetFromSnapshot(ctx context.Context, state fwk.CycleState,
+	schedFramework framework.Framework, assumedPodInfo *framework.QueuedPodInfo, nodeName string) error {
+
+	logger := klog.FromContext(ctx)
+	schedFramework.RunReservePluginsUnreserve(ctx, state, assumedPodInfo.Pod, nodeName)
+	if err := a.nodeInfoSnapshot.ForgetPod(logger, assumedPodInfo.Pod); err != nil {
+		return err
+	}
+	if assumedPodInfo.Pod.Status.NominatedNodeName != "" {
+		// The assume removed the nomination; reverting a tentative assume restores it.
+		schedFramework.AddNominatedPod(logger, assumedPodInfo.PodInfo, &fwk.NominatingInfo{
+			NominatedNodeName: assumedPodInfo.Pod.Status.NominatedNodeName,
+			NominatingMode:    fwk.ModeOverride,
+		})
+	}
+	return nil
 }

@@ -197,7 +197,7 @@ func (sched *Scheduler) prepareForBindingCycle(
 	podsToActivate *framework.PodsToActivate,
 	scheduleResult ScheduleResult,
 ) (*framework.QueuedPodInfo, *fwk.Status) {
-	assumedPodInfo, status := sched.algorithm.assumeAndReserve(ctx, state, schedFramework, podInfo, scheduleResult)
+	assumedPodInfo, status := sched.algorithm.AssumeAndReserveInCache(ctx, state, schedFramework, podInfo, scheduleResult)
 	if !status.IsSuccess() {
 		return assumedPodInfo, status
 	}
@@ -209,7 +209,7 @@ func (sched *Scheduler) prepareForBindingCycle(
 		schedFramework.AddWaitingPod(assumedPod, pluginsWaitTime)
 	} else if !runPermitStatus.IsSuccess() {
 		// trigger un-reserve plugins to clean up state associated with the reserved Pod
-		err := sched.algorithm.unreserveAndForget(ctx, state, schedFramework, assumedPodInfo, scheduleResult.SuggestedHost)
+		err := sched.algorithm.UnreserveAndForgetFromCache(ctx, state, schedFramework, assumedPodInfo, scheduleResult.SuggestedHost)
 		if err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "ForgetPod failed")
 		}
@@ -428,7 +428,7 @@ func (sched *Scheduler) handleBindingCycleError(
 
 	assumedPod := podInfo.Pod
 	// trigger un-reserve plugins to clean up state associated with the reserved Pod
-	if forgetErr := sched.algorithm.unreserveAndForget(ctx, state, fwk, podInfo, scheduleResult.SuggestedHost); forgetErr != nil {
+	if forgetErr := sched.algorithm.UnreserveAndForgetFromCache(ctx, state, fwk, podInfo, scheduleResult.SuggestedHost); forgetErr != nil {
 		utilruntime.HandleErrorWithContext(ctx, forgetErr, "ForgetPod failed")
 	} else {
 		// "Forget"ing an assumed Pod in binding cycle should be treated as a PodDelete event,
