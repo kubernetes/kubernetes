@@ -25,6 +25,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -145,6 +146,21 @@ func (c *ConfigMapCAController) AddListener(listener Listener) {
 func (c *ConfigMapCAController) loadCABundle() error {
 	configMap, err := c.configmapLister.ConfigMaps(c.configmapNamespace).Get(c.configmapName)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// the configmap has been deleted, so stop verifying against a CA that no longer
+			// exists. only clear something we actually loaded: RunOnce reads this lister before
+			// Run starts the informer, so a cold start always lands here with nothing loaded,
+			// and the periodic resync would otherwise re-notify listeners on every pass.
+			uncastObj := c.caBundle.Load()
+			if uncastObj == nil || len(uncastObj.(*caBundleAndVerifier).caBundle) == 0 {
+				return nil
+			}
+			// an empty caBundleAndVerifier is the cleared sentinel; atomic.Value cannot store nil.
+			c.storeAndNotify(&caBundleAndVerifier{})
+			klog.InfoS("Cleared CA bundle, configmap was deleted", "name", c.Name())
+
+			return nil
+		}
 		return err
 	}
 	caBundle := configMap.Data[c.configmapKey]
@@ -161,13 +177,19 @@ func (c *ConfigMapCAController) loadCABundle() error {
 	if err != nil {
 		return err
 	}
+	c.storeAndNotify(caBundleAndVerifier)
+
+	return nil
+}
+
+// storeAndNotify publishes the given bundle and wakes all listeners so dependent TLS
+// configuration can pick it up.
+func (c *ConfigMapCAController) storeAndNotify(caBundleAndVerifier *caBundleAndVerifier) {
 	c.caBundle.Store(caBundleAndVerifier)
 
 	for _, listener := range c.listeners {
 		listener.Enqueue()
 	}
-
-	return nil
 }
 
 // hasCAChanged returns true if the caBundle is different than the current.
@@ -260,8 +282,7 @@ func (c *ConfigMapCAController) CurrentCABundleContent() []byte {
 	if uncastObj == nil {
 		return nil // this can happen if we've been unable load data from the apiserver for some reason
 	}
-
-	return c.caBundle.Load().(*caBundleAndVerifier).caBundle
+	return uncastObj.(*caBundleAndVerifier).caBundle
 }
 
 // VerifyOptions provides verifyoptions compatible with authenticators
@@ -272,6 +293,13 @@ func (c *ConfigMapCAController) VerifyOptions() (x509.VerifyOptions, bool) {
 		// In this case, we should not accept any connections on the basis of this ca bundle.
 		return x509.VerifyOptions{}, false
 	}
+	caBundle := uncastObj.(*caBundleAndVerifier)
+	if len(caBundle.caBundle) == 0 {
+		// the configmap was deleted and we cleared the bundle. a zero x509.VerifyOptions has nil
+		// Roots, which certificate verification treats as "use the host trust store", so
+		// returning it here would widen trust rather than remove it.
+		return x509.VerifyOptions{}, false
+	}
 
-	return uncastObj.(*caBundleAndVerifier).verifyOptions, true
+	return caBundle.verifyOptions, true
 }
