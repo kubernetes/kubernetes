@@ -318,6 +318,12 @@ type tracker struct {
 	// also tracked by GroupVersionResource instead of GroupVersion, so the
 	// same is done here to match how List is implemented.
 	resourceVersions map[schema.GroupVersionResource]int64
+	// deletedResourceVersions tracks the highest resource version of any
+	// deleted object per GVR, so that a Watch requested with a resource
+	// version older than a deletion can detect that it can no longer serve
+	// the complete stream (the deletion event has already been lost) and
+	// reject, causing the reflector to relist and converge.
+	deletedResourceVersions map[schema.GroupVersionResource]int64
 }
 
 // versionedObject stores an object together with the resource version that was
@@ -341,7 +347,8 @@ func NewObjectTracker(scheme ObjectScheme, decoder runtime.Decoder) ObjectTracke
 		decoder:          decoder,
 		objects:          make(map[schema.GroupVersionResource]map[types.NamespacedName]versionedObject),
 		watchers:         make(map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher),
-		resourceVersions: make(map[schema.GroupVersionResource]int64),
+		resourceVersions:         make(map[schema.GroupVersionResource]int64),
+		deletedResourceVersions: make(map[schema.GroupVersionResource]int64),
 	}
 }
 
@@ -440,6 +447,18 @@ func (t *tracker) Watch(gvr schema.GroupVersionResource, ns string, opts ...meta
 	// Deliver all objects that match the list options, for example
 	// between the initial List and the following Watch.
 	if addExisting {
+		// A deletion in that same window can no longer be delivered: the
+		// deleted object is gone from t.objects and no tombstone is kept.
+		// Reject the watch like the real API server would for an expired
+		// resource version, so that the reflector relists and converges on
+		// the tracker's contents instead of holding onto a phantom object
+		// forever.
+		if addFromRV > 0 {
+			if deletedRV, ok := t.deletedResourceVersions[gvr]; ok && addFromRV < deletedRV {
+				return nil, apierrors.NewResourceExpired(fmt.Sprintf("too old resource version: %d; a deletion happened at resource version %d, which can no longer be delivered", addFromRV, deletedRV))
+			}
+		}
+
 		objs := t.objects[gvr]
 		matchingObjs, err := filterByNamespace(objs, ns)
 		if err != nil {
@@ -727,6 +746,21 @@ func (t *tracker) Delete(gvr schema.GroupVersionResource, ns, name string, opts 
 	}
 
 	delete(objs, namespacedName)
+
+	// Bump the resource version for the deletion, like any other change.
+	// This ensures that a Watch started with a resource version from a
+	// List that still included the deleted object can detect that it can
+	// no longer serve the deletion event and reject the watch.
+	resourceVersion, ok := t.resourceVersions[gvr]
+	if !ok {
+		resourceVersion = 1
+	}
+	resourceVersion++
+	t.resourceVersions[gvr] = resourceVersion
+	if resourceVersion > t.deletedResourceVersions[gvr] {
+		t.deletedResourceVersions[gvr] = resourceVersion
+	}
+
 	for _, w := range t.getWatches(gvr, ns) {
 		w.Delete(obj.DeepCopyObject())
 	}
