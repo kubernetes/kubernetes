@@ -447,6 +447,9 @@
             "description": "selector can be used to match multiple param objects based on their labels. Supply selector: {} to match all resources of the ParamKind.\n\nIf multiple params are found, they are all evaluated with the policy expressions and the results are ANDed together.\n\nOne of `name` or `selector` must be set, but `name` and `selector` are mutually exclusive properties. If one is set, the other must be unset."
           }
         },
+        "required": [
+          "parameterNotFoundAction"
+        ],
         "type": "object",
         "x-kubernetes-map-type": "atomic"
       },

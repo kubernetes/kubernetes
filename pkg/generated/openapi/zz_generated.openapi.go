@@ -2636,6 +2636,7 @@ func schema_k8sio_api_admissionregistration_v1_ParamRef(ref common.ReferenceCall
 						},
 					},
 				},
+				Required: []string{"parameterNotFoundAction"},
 			},
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
@@ -5959,6 +5960,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_ParamRef(ref common.Referenc
 						},
 					},
 				},
+				Required: []string{"parameterNotFoundAction"},
 			},
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
