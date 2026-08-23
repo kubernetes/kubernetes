@@ -79,6 +79,21 @@ func TestExplainErrors(t *testing.T) {
 	require.ErrorContains(t, err, "unrecognized format: unknown-format")
 }
 
+// TestExplainInvalidFieldPathWritesNoOutput verifies that when explain fails on
+// an invalid field path, nothing (not even the KIND/VERSION header) is written
+// to the output writer. A failing command must not emit partial output to
+// stdout, which would otherwise pollute pipes and redirects.
+func TestExplainInvalidFieldPathWritesNoOutput(t *testing.T) {
+	var buf bytes.Buffer
+
+	podsGVR := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
+	client := openapitest.NewEmbeddedFileClient()
+
+	err := PrintModelDescription([]string{"spec", "nonexistentfield"}, &buf, client, podsGVR, false, 0, "plaintext")
+	require.ErrorContains(t, err, `field "nonexistentfield" does not exist`)
+	require.Empty(t, buf.String(), "no output should be written to w when explain fails")
+}
+
 // Shows that the correct GVR is fetched from the open api client when
 // given to explain
 func TestExplainOpenAPIClient(t *testing.T) {
