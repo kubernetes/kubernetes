@@ -246,6 +246,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 			factory := informers.NewSharedInformerFactory(client, time.Hour /* disable resync */)
 			csiDriverInformer := factory.Storage().V1().CSIDrivers()
 			vaLister := factory.Storage().V1().VolumeAttachments().Lister()
+			pvLister := factory.Core().V1().PersistentVolumes().Lister()
 			if driverInfo != nil {
 				csiDriverInformer.Informer().GetStore().Add(driverInfo)
 			}
@@ -260,6 +261,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 				"fakeNode",
 				csiDriverInformer.Lister(),
 				vaLister,
+				pvLister,
 			)
 			attachDetachPlugMgr := attachDetachVolumeHost.GetPluginMgr()
 			csiClient := setupClient(t, true)

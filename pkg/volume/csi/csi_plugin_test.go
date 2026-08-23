@@ -75,10 +75,11 @@ func newTestPluginWithVolumeHost(t *testing.T, client *fakeclient.Clientset, hos
 	csiDriverLister := csiDriverInformer.Lister()
 	volumeAttachmentInformer := factory.Storage().V1().VolumeAttachments()
 	volumeAttachmentLister := volumeAttachmentInformer.Lister()
+	pvLister := factory.Core().V1().PersistentVolumes().Lister()
 
 	factory.Start(wait.NeverStop)
 	syncedTypes := factory.WaitForCacheSync(wait.NeverStop)
-	if len(syncedTypes) != 2 {
+	if len(syncedTypes) != 3 {
 		t.Fatalf("informers are not synced")
 	}
 	for ty, ok := range syncedTypes {
@@ -115,6 +116,7 @@ func newTestPluginWithVolumeHost(t *testing.T, client *fakeclient.Clientset, hos
 			"fakeNode",
 			csiDriverLister,
 			volumeAttachmentLister,
+			pvLister,
 		)
 	default:
 		t.Fatalf("Unsupported volume host type")

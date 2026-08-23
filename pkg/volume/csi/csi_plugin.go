@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	csitranslationplugins "k8s.io/csi-translation-lib/plugins"
@@ -69,6 +70,10 @@ type csiPlugin struct {
 	csiDriverInformer         cache.SharedIndexInformer
 	serviceAccountTokenGetter func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
 	volumeAttachmentLister    storagelisters.VolumeAttachmentLister
+	// persistentVolumeLister is only set when the plugin runs in the
+	// attach/detach controller. It is used to tell whether a PV that a
+	// VolumeAttachment refers to is being deleted.
+	persistentVolumeLister corelisters.PersistentVolumeLister
 }
 
 // ProbeVolumePlugins returns implemented plugins
@@ -299,6 +304,10 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 			if p.volumeAttachmentLister == nil {
 				klog.Error(log("VolumeAttachmentLister not found on AttachDetachVolumeHost"))
 			}
+			p.persistentVolumeLister = adcHost.PersistentVolumeLister()
+			if p.persistentVolumeLister == nil {
+				klog.Error(log("PersistentVolumeLister not found on AttachDetachVolumeHost"))
+			}
 		}
 		kletHost, ok := host.(volume.KubeletVolumeHost)
 		if ok {
@@ -312,6 +321,9 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 			}
 			// We don't run the volumeAttachmentLister in the kubelet context
 			p.volumeAttachmentLister = nil
+			// Attaching is not supported from the kubelet, so the kubelet has no
+			// use for the PersistentVolume lister either.
+			p.persistentVolumeLister = nil
 
 			informerFactory := kletHost.GetInformerFactory()
 			if informerFactory == nil {
