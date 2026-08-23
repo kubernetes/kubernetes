@@ -286,7 +286,7 @@ func RecordRetroactiveStorageClassMetric(success bool) {
 }
 
 // RecordVolumeOperationErrorMetric records error count into metric
-// volume_operation_total_errors for provisioning/deletion operations
+// volume_operation_errors_total for provisioning/deletion operations
 func RecordVolumeOperationErrorMetric(pluginName, opName string) {
 	if pluginName == "" {
 		pluginName = "N/A"
