@@ -204,8 +204,7 @@ func TestAttacherAttach(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Logf("test case: %s", tc.name)
 			fakeClient := fakeclient.NewSimpleClientset()
-			plug, tmpDir := newTestPluginWithAttachDetachVolumeHost(t, fakeClient)
-			defer os.RemoveAll(tmpDir)
+			plug, _ := newTestPluginWithAttachDetachVolumeHost(t, fakeClient)
 
 			attacher, err := plug.NewAttacher()
 			if err != nil {
@@ -291,8 +290,7 @@ func TestAttacherAttachWithInline(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Logf("test case: %s", tc.name)
 			fakeClient := fakeclient.NewSimpleClientset()
-			plug, tmpDir := newTestPluginWithAttachDetachVolumeHost(t, fakeClient)
-			defer os.RemoveAll(tmpDir)
+			plug, _ := newTestPluginWithAttachDetachVolumeHost(t, fakeClient)
 
 			attacher, err := plug.NewAttacher()
 			if err != nil {
@@ -364,8 +362,7 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 				getTestCSIDriver("attachable", nil, &bTrue, nil),
 				getTestCSIDriver("nil", nil, nil, nil),
 			)
-			plug, tmpDir := newTestPluginWithAttachDetachVolumeHost(t, fakeClient)
-			defer os.RemoveAll(tmpDir)
+			plug, _ := newTestPluginWithAttachDetachVolumeHost(t, fakeClient)
 
 			attacher, err := plug.NewAttacher()
 			if err != nil {
@@ -457,8 +454,7 @@ func TestAttacherWaitForVolumeAttachmentWithCSIDriver(t *testing.T) {
 					Spec: v1.NodeSpec{},
 				},
 			)
-			plug, tmpDir := newTestPlugin(t, fakeClient)
-			defer os.RemoveAll(tmpDir)
+			plug, _ := newTestPlugin(t, fakeClient)
 
 			attacher, err := plug.NewAttacher()
 			if err != nil {
@@ -533,8 +529,7 @@ func TestAttacherWaitForAttach(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fakeclient.NewSimpleClientset()
-			plug, tmpDir := newTestPlugin(t, fakeClient)
-			defer os.RemoveAll(tmpDir)
+			plug, _ := newTestPlugin(t, fakeClient)
 
 			attacher, err := plug.NewAttacher()
 			if err != nil {
@@ -615,8 +610,7 @@ func TestAttacherWaitForAttachWithInline(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fakeclient.NewSimpleClientset()
-			plug, tmpDir := newTestPlugin(t, fakeClient)
-			defer os.RemoveAll(tmpDir)
+			plug, _ := newTestPlugin(t, fakeClient)
 
 			attacher, err := plug.NewAttacher()
 			if err != nil {
@@ -696,8 +690,7 @@ func TestAttacherVolumesAreAttached(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			plug, tmpDir := newTestPluginWithAttachDetachVolumeHost(t, nil)
-			defer os.RemoveAll(tmpDir)
+			plug, _ := newTestPluginWithAttachDetachVolumeHost(t, nil)
 
 			attacher, err := plug.NewAttacher()
 			if err != nil {
@@ -767,8 +760,7 @@ func TestAttacherVolumesAreAttachedWithInline(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			plug, tmpDir := newTestPlugin(t, nil)
-			defer os.RemoveAll(tmpDir)
+			plug, _ := newTestPlugin(t, nil)
 
 			attacher, err := plug.NewAttacher()
 			if err != nil {
@@ -845,8 +837,7 @@ func TestAttacherDetach(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Logf("running test: %v", tc.name)
 			fakeClient := fakeclient.NewSimpleClientset()
-			plug, tmpDir := newTestPluginWithAttachDetachVolumeHost(t, fakeClient)
-			defer os.RemoveAll(tmpDir)
+			plug, _ := newTestPluginWithAttachDetachVolumeHost(t, fakeClient)
 
 			if tc.reactor != nil {
 				fakeClient.PrependReactor("*", "*", tc.reactor)
@@ -895,8 +886,7 @@ func TestAttacherGetDeviceMountPath(t *testing.T) {
 	// Setup
 	// Create a new attacher
 	fakeClient := fakeclient.NewSimpleClientset()
-	plug, tmpDir := newTestPlugin(t, fakeClient)
-	defer os.RemoveAll(tmpDir)
+	plug, _ := newTestPlugin(t, fakeClient)
 	attacher, err0 := plug.NewAttacher()
 	if err0 != nil {
 		t.Fatalf("failed to create new attacher: %v", err0)
@@ -1173,7 +1163,6 @@ func TestAttacherMountDevice(t *testing.T) {
 			// Create a new attacher
 			fakeClient := fakeclient.NewSimpleClientset()
 			plug, tmpDir := newTestPlugin(t, fakeClient)
-			defer os.RemoveAll(tmpDir)
 
 			attacher, err0 := plug.NewAttacher()
 			if err0 != nil {
@@ -1391,7 +1380,6 @@ func TestAttacherMountDeviceWithInline(t *testing.T) {
 			// Create a new attacher
 			fakeClient := fakeclient.NewSimpleClientset()
 			plug, tmpDir := newTestPlugin(t, fakeClient)
-			defer os.RemoveAll(tmpDir)
 
 			fakeWatcher := watch.NewRaceFreeFake()
 			fakeClient.Fake.PrependWatchReactor("volumeattachments", core.DefaultWatchReactor(fakeWatcher, nil))
@@ -1536,7 +1524,6 @@ func TestAttacherUnmountDevice(t *testing.T) {
 			// Create a new attacher
 			fakeClient := fakeclient.NewSimpleClientset()
 			plug, tmpDir := newTestPlugin(t, fakeClient)
-			defer os.RemoveAll(tmpDir)
 			attacher, err0 := plug.NewAttacher()
 			if err0 != nil {
 				t.Fatalf("failed to create new attacher: %v", err0)
