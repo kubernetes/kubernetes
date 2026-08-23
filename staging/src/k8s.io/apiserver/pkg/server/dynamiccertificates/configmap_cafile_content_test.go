@@ -203,3 +203,53 @@ func TestConfigMapCAControllerReloadsAfterRecreation(t *testing.T) {
 		t.Errorf("expected the reload to notify listeners, got %d notifications", listener.count)
 	}
 }
+
+func TestConfigMapCAControllerDeletedStateMatchesNeverFoundState(t *testing.T) {
+	deleted, deletedListener := newTestConfigMapCAController(t)
+	if err := setConfigMaps(deleted); err != nil {
+		t.Fatal(err)
+	}
+	if err := deleted.loadCABundle(); err != nil {
+		t.Fatal(err)
+	}
+
+	neverFound := &ConfigMapCAController{
+		name:               "test::never-found",
+		configmapNamespace: testCAConfigMapNamespace,
+		configmapName:      testCAConfigMapName,
+		configmapKey:       testCAConfigMapKey,
+	}
+	listener := &countingListener{}
+	neverFound.AddListener(listener)
+	if err := setConfigMaps(neverFound); err != nil {
+		t.Fatal(err)
+	}
+	if err := neverFound.loadCABundle(); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, scenario := range []struct {
+		name     string
+		c        *ConfigMapCAController
+		listener *countingListener
+		notifies int
+	}{
+		{name: "configmap never existed", c: neverFound, listener: listener, notifies: 0},
+		{name: "configmap was deleted", c: deleted, listener: deletedListener, notifies: 2},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			if _, ok := scenario.c.VerifyOptions(); ok {
+				t.Error("expected verify options to be unavailable")
+			}
+			if content := scenario.c.CurrentCABundleContent(); len(content) != 0 {
+				t.Errorf("expected no ca bundle content, got %d bytes", len(content))
+			}
+			if scenario.c.caBundle.Load() != nil {
+				t.Error("expected no bundle to be stored")
+			}
+			if scenario.listener.count != scenario.notifies {
+				t.Errorf("expected %d notifications, got %d", scenario.notifies, scenario.listener.count)
+			}
+		})
+	}
+}

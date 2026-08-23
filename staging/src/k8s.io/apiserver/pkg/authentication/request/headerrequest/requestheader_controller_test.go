@@ -259,10 +259,9 @@ func TestRequestHeaderAuthRequestControllerSyncOnce(t *testing.T) {
 }
 
 // expectedHeadersAfterDeletion is the state both sync and RunOnce must reach once the
-// configmap is gone: every header name dropped, but the last allowed client names kept.
-// An empty allowed-names list means "allow any common name" to x509.Verifier, so dropping
-// them too would widen the common name check instead of revoking trust.
-var expectedHeadersAfterDeletion = expectedHeadersHolder{allowedClientNames: []string{"names-val"}}
+// configmap is gone: it is deliberately identical to the never-loaded state, where all
+// accessors return nil, including AllowedClientNames.
+var expectedHeadersAfterDeletion = expectedHeadersHolder{}
 
 func TestRequestHeaderAuthRequestControllerSyncClearsHeadersOnConfigMapDeletion(t *testing.T) {
 	target := newDefaultTarget()
@@ -283,6 +282,38 @@ func TestRequestHeaderAuthRequestControllerSyncClearsHeadersOnConfigMapDeletion(
 	}
 
 	validateExpectedHeaders(t, target, expectedHeadersAfterDeletion)
+}
+
+func TestRequestHeaderAuthRequestControllerDeletedStateMatchesNeverFoundState(t *testing.T) {
+	loaded := newDefaultTarget()
+
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	if err := indexer.Add(defaultConfigMap(t, []string{"user-val"}, []string{"uid-val"}, []string{"group-val"}, []string{"extra-val"}, []string{"names-val"})); err != nil {
+		t.Fatal(err)
+	}
+	loaded.configmapLister = corev1listers.NewConfigMapLister(indexer).ConfigMaps(defConfigMapNamespace)
+	if err := loaded.sync(); err != nil {
+		t.Fatal(err)
+	}
+
+	// the configmap is deleted, so the lister no longer has it
+	loaded.configmapLister = corev1listers.NewConfigMapLister(cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})).ConfigMaps(defConfigMapNamespace)
+	if err := loaded.sync(); err != nil {
+		t.Fatal(err)
+	}
+
+	fresh := newDefaultTarget()
+	for _, scenario := range []struct {
+		name   string
+		target *RequestHeaderAuthRequestController
+	}{
+		{name: "configmap never existed", target: fresh},
+		{name: "configmap was deleted", target: loaded},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			validateExpectedHeaders(t, scenario.target, expectedHeadersHolder{})
+		})
+	}
 }
 
 func TestRequestHeaderAuthRequestControllerSyncKeepsHeadersOnMalformedConfigMap(t *testing.T) {
@@ -360,18 +391,15 @@ func TestRequestHeaderAuthRequestControllerRunOnceKeepsHeadersOnOtherAPIErrors(t
 	validateExpectedHeaders(t, target, expected)
 }
 
-// TestRequestHeaderAuthRequestControllerClearedBundleRejectsRecreatedConfigMapRace covers the
+// TestRequestHeaderAuthRequestControllerFailsClosedDuringDeleteRecreateTransition covers the
 // window where the configmap is deleted and immediately recreated, which is what happens in a
-// real cluster because the kube-apiserver rewrites it. The x509 verifier reads the allowed
-// client names before the wrapped handler reads the username headers, so those two reads can
-// land on either side of the recreation. If the cleared bundle dropped the allowed client
-// names, this read ordering would skip the common name check entirely and then honor the
-// restored username headers, letting a certificate through that the configmap never allowed.
-func TestRequestHeaderAuthRequestControllerClearedBundleRejectsRecreatedConfigMapRace(t *testing.T) {
+// real cluster because the kube-apiserver rewrites it. The two controllers consuming the
+// configmap sync independently, so during the transition one side can already serve restored
+// content while the other is still cleared, and every interleaving must reject requests until
+// both sides are live again.
+func TestRequestHeaderAuthRequestControllerFailsClosedDuringDeleteRecreateTransition(t *testing.T) {
 	target := newDefaultTarget()
 
-	// the client certificate generated below uses the common name "not-allowed-client",
-	// which is deliberately absent from the configmap's allowed list ("front-proxy-client").
 	configMap := defaultConfigMap(t, []string{"X-Remote-User"}, nil, nil, nil, []string{"front-proxy-client"})
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 	if err := indexer.Add(configMap); err != nil {
@@ -382,59 +410,90 @@ func TestRequestHeaderAuthRequestControllerClearedBundleRejectsRecreatedConfigMa
 		t.Fatal(err)
 	}
 
-	// the configmap is deleted
-	target.configmapLister = corev1listers.NewConfigMapLister(cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})).ConfigMaps(defConfigMapNamespace)
-	if err := target.sync(); err != nil {
-		t.Fatal(err)
-	}
+	roots, allowedClientCert := newTestClientCert(t, "front-proxy-client")
+	_, disallowedClientCert := newTestClientCert(t, "not-allowed-client")
 
-	// it comes back, but the controller has not synced it yet
-	recreatedIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
-	if err := recreatedIndexer.Add(configMap); err != nil {
-		t.Fatal(err)
-	}
-	target.configmapLister = corev1listers.NewConfigMapLister(recreatedIndexer).ConfigMaps(defConfigMapNamespace)
-
-	roots, clientCert := newTestClientCert(t, "not-allowed-client")
-
-	usernameHeadersRead := false
-	// The CA controller is independent and may still be serving the old CA, so keep
-	// certificate verification passing and let the common name check decide.
-	auth := NewDynamicVerifyOptionsSecure(
-		x509request.StaticVerifierFn(x509.VerifyOptions{
+	// mirrors ConfigMapCAController.VerifyOptions across the transition: unavailable while
+	// the CA half is cleared, available again once it has synced the recreated configmap
+	caCleared := false
+	verifyOptionsFn := x509request.VerifyOptionFunc(func() (x509.VerifyOptions, bool) {
+		if caCleared {
+			return x509.VerifyOptions{}, false
+		}
+		return x509.VerifyOptions{
 			Roots:     roots,
 			KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-		}),
+		}, true
+	})
+	auth := NewDynamicVerifyOptionsSecure(
+		verifyOptionsFn,
 		StringSliceProviderFunc(target.AllowedClientNames),
-		StringSliceProviderFunc(func() []string {
-			// the recreation becomes visible only after the common name check has run
-			usernameHeadersRead = true
-			if err := target.sync(); err != nil {
-				t.Fatal(err)
-			}
-			return target.UsernameHeaders()
-		}),
+		StringSliceProviderFunc(target.UsernameHeaders),
 		StringSliceProviderFunc(target.UIDHeaders),
 		StringSliceProviderFunc(target.GroupHeaders),
 		StringSliceProviderFunc(target.ExtraHeaderPrefixes),
 	)
 
-	req, err := http.NewRequest(http.MethodGet, "/", nil)
-	if err != nil {
+	request := func(cert *x509.Certificate) bool {
+		req, err := http.NewRequest(http.MethodGet, "/", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("X-Remote-User", "user")
+		req.TLS = &tls.ConnectionState{PeerCertificates: []*x509.Certificate{cert}}
+		_, ok, _ := auth.AuthenticateRequest(req)
+		return ok
+	}
+
+	// normal operation before the deletion
+	if !request(allowedClientCert) {
+		t.Fatal("expected authentication to succeed before the configmap is deleted")
+	}
+	if request(disallowedClientCert) {
+		t.Fatal("expected the disallowed common name to be rejected before the configmap is deleted")
+	}
+
+	// the configmap is deleted: both halves clear
+	caCleared = true
+	emptyLister := corev1listers.NewConfigMapLister(cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})).ConfigMaps(defConfigMapNamespace)
+	target.configmapLister = emptyLister
+	if err := target.sync(); err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("X-Remote-User", "spoofed-user")
-	req.TLS = &tls.ConnectionState{PeerCertificates: []*x509.Certificate{clientCert}}
+	validateExpectedHeaders(t, target, expectedHeadersAfterDeletion)
+	if request(allowedClientCert) {
+		t.Fatal("expected rejection while the configmap is deleted")
+	}
 
-	resp, ok, err := auth.AuthenticateRequest(req)
-	if err == nil {
-		t.Fatal("expected the preserved allowed client names to reject the certificate")
+	// recreated: the CA half reloads first, the header half has not seen the recreation yet
+	recreatedIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	if err := recreatedIndexer.Add(configMap); err != nil {
+		t.Fatal(err)
 	}
-	if ok {
-		t.Fatalf("unexpected successful authentication as %v", resp)
+	recreatedLister := corev1listers.NewConfigMapLister(recreatedIndexer).ConfigMaps(defConfigMapNamespace)
+	caCleared = false
+	target.configmapLister = emptyLister
+	if request(allowedClientCert) {
+		t.Fatal("expected rejection until the header half resyncs the recreated configmap")
 	}
-	if usernameHeadersRead {
-		t.Fatal("username headers were read before the common name check, so this test no longer simulates the race it was written for; rebuild the simulation rather than deleting this assertion")
+
+	// the header half resynced instead, the CA half is still cleared
+	caCleared = true
+	target.configmapLister = recreatedLister
+	if err := target.sync(); err != nil {
+		t.Fatal(err)
+	}
+	if request(allowedClientCert) {
+		t.Fatal("expected rejection until the CA half reloads the recreated configmap")
+	}
+
+	// both halves live again
+	caCleared = false
+	if !request(allowedClientCert) {
+		t.Fatal("expected authentication to succeed once both controllers resynced the recreated configmap")
+	}
+	if request(disallowedClientCert) {
+		t.Fatal("expected the disallowed common name to stay rejected after the recreation")
 	}
 }
 

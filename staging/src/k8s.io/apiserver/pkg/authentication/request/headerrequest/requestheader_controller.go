@@ -49,9 +49,6 @@ type RequestHeaderAuthRequestProvider interface {
 	GroupHeaders() []string
 	ExtraHeaderPrefixes() []string
 	// AllowedClientNames returns the common names the front proxy client certificate may have.
-	// An empty result means any common name is accepted, so unlike the header accessors above
-	// this one retains its last known value once the configmap is deleted. See
-	// clearRequestHeaderBundle.
 	AllowedClientNames() []string
 }
 
@@ -83,8 +80,9 @@ type RequestHeaderAuthRequestController struct {
 	queue workqueue.TypedRateLimitingInterface[string]
 
 	// exportedRequestHeaderBundle is a requestHeaderBundle that contains the last read content of the
-	// configmap. It is cleared when the configmap is deleted, see clearRequestHeaderBundle.
-	exportedRequestHeaderBundle atomic.Value
+	// configmap. It is nil when the configmap has never been read and nil again once the configmap
+	// is deleted, see clearRequestHeaderBundle, so those two states are indistinguishable.
+	exportedRequestHeaderBundle atomic.Pointer[requestHeaderBundle]
 
 	usernameHeadersKey     string
 	uidHeadersKey          string
@@ -255,22 +253,12 @@ func (c *RequestHeaderAuthRequestController) sync() error {
 	return c.syncConfigMap(configMap)
 }
 
-// clearRequestHeaderBundle drops the header names read from the configmap so that
-// request header authentication stops recognizing them once the configmap is gone.
-//
-// The allowed client names are deliberately kept. An empty allowed-names list means
-// "any common name is acceptable" to x509.Verifier, so clearing them would widen the
-// common name check rather than narrow it. x509.Verifier reads the allowed names and
-// the wrapped handler reads the username headers as two separate loads, so on a delete
-// immediately followed by a recreate those reads can land on either side of the
-// recreation; keeping the last known list means that window is never wider than it was
-// before the delete. It cannot narrow it either: if the configmap has never been read
-// there is nothing to keep, and a recreate that removes a name still accepts it until
-// the next sync.
+// clearRequestHeaderBundle resets the bundle to the same state as when the controller has
+// never read the configmap, so a deleted configmap is indistinguishable from one that never
+// existed. With no username headers configured, request header authentication rejects every
+// request regardless of what AllowedClientNames reports.
 func (c *RequestHeaderAuthRequestController) clearRequestHeaderBundle() {
-	c.exportedRequestHeaderBundle.Store(&requestHeaderBundle{
-		AllowedClientNames: c.AllowedClientNames(),
-	})
+	c.exportedRequestHeaderBundle.Store(nil)
 	klog.InfoS("Cleared request header values, configmap was deleted", "name", c.name)
 }
 
@@ -298,12 +286,7 @@ func (c *RequestHeaderAuthRequestController) hasRequestHeaderBundleChanged(cm *c
 	}
 
 	// check to see if we have a change. If the values are the same, do nothing.
-	loadedHeadersBundle, ok := rawHeaderBundle.(*requestHeaderBundle)
-	if !ok {
-		return true, currentHeadersBundle, nil
-	}
-
-	if !equality.Semantic.DeepEqual(loadedHeadersBundle, currentHeadersBundle) {
+	if !equality.Semantic.DeepEqual(*rawHeaderBundle, *currentHeadersBundle) {
 		return true, currentHeadersBundle, nil
 	}
 	return false, nil, nil
@@ -346,11 +329,10 @@ func (c *RequestHeaderAuthRequestController) getRequestHeaderBundleFromConfigMap
 }
 
 func (c *RequestHeaderAuthRequestController) loadRequestHeaderFor(key string) []string {
-	rawHeaderBundle := c.exportedRequestHeaderBundle.Load()
-	if rawHeaderBundle == nil {
+	headerBundle := c.exportedRequestHeaderBundle.Load()
+	if headerBundle == nil {
 		return nil // this can happen if we've been unable load data from the apiserver for some reason
 	}
-	headerBundle := rawHeaderBundle.(*requestHeaderBundle)
 
 	switch key {
 	case c.usernameHeadersKey:
