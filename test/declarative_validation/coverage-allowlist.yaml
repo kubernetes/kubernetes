@@ -25,9 +25,23 @@
 
 - apiVersion: v1
   kind: Pod
+  path: spec.volumes[*].ephemeral.volumeClaimTemplate
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: v1
+  kind: Pod
   path: spec.volumes[*].ephemeral.volumeClaimTemplate.spec.volumeName
   errorType: FieldValueInvalid
   origin: update
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: v1
+  kind: PodTemplate
+  path: template.spec.volumes[*].ephemeral.volumeClaimTemplate
+  errorType: FieldValueRequired
+  origin: '*'
   reason: Nested in a Pod volume list without update correlation.
 
 - apiVersion: v1
@@ -39,6 +53,195 @@
 
 - apiVersion: v1
   kind: ReplicationController
+  path: spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: v1
+  kind: ReplicationController
+  path: spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate.spec.volumeName
+  errorType: FieldValueInvalid
+  origin: update
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: apps/v1
+  kind: DaemonSet
+  path: spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: apps/v1
+  kind: DaemonSet
+  path: spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate.spec.volumeName
+  errorType: FieldValueInvalid
+  origin: update
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: apps/v1beta2
+  kind: DaemonSet
+  path: spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: apps/v1beta2
+  kind: DaemonSet
+  path: spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate.spec.volumeName
+  errorType: FieldValueInvalid
+  origin: update
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: apps/v1
+  kind: Deployment
+  path: spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: apps/v1
+  kind: Deployment
+  path: spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate.spec.volumeName
+  errorType: FieldValueInvalid
+  origin: update
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: apps/v1beta1
+  kind: Deployment
+  path: spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: apps/v1beta1
+  kind: Deployment
+  path: spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate.spec.volumeName
+  errorType: FieldValueInvalid
+  origin: update
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: apps/v1beta2
+  kind: Deployment
+  path: spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: apps/v1beta2
+  kind: Deployment
+  path: spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate.spec.volumeName
+  errorType: FieldValueInvalid
+  origin: update
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: apps/v1
+  kind: ReplicaSet
+  path: spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: apps/v1
+  kind: ReplicaSet
+  path: spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate.spec.volumeName
+  errorType: FieldValueInvalid
+  origin: update
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: apps/v1beta2
+  kind: ReplicaSet
+  path: spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: apps/v1beta2
+  kind: ReplicaSet
+  path: spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate.spec.volumeName
+  errorType: FieldValueInvalid
+  origin: update
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: apps/v1
+  kind: StatefulSet
+  path: spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: apps/v1
+  kind: StatefulSet
+  path: spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate.spec.volumeName
+  errorType: FieldValueInvalid
+  origin: update
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: apps/v1beta1
+  kind: StatefulSet
+  path: spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: apps/v1beta1
+  kind: StatefulSet
+  path: spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate.spec.volumeName
+  errorType: FieldValueInvalid
+  origin: update
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: apps/v1beta2
+  kind: StatefulSet
+  path: spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: apps/v1beta2
+  kind: StatefulSet
+  path: spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate.spec.volumeName
+  errorType: FieldValueInvalid
+  origin: update
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: batch/v1
+  kind: CronJob
+  path: spec.jobTemplate.spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: batch/v1
+  kind: CronJob
+  path: spec.jobTemplate.spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate.spec.volumeName
+  errorType: FieldValueInvalid
+  origin: update
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: batch/v1beta1
+  kind: CronJob
+  path: spec.jobTemplate.spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: batch/v1beta1
+  kind: CronJob
+  path: spec.jobTemplate.spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate.spec.volumeName
+  errorType: FieldValueInvalid
+  origin: update
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: batch/v1
+  kind: Job
+  path: spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate
+  errorType: FieldValueRequired
+  origin: '*'
+  reason: Nested in a Pod volume list without update correlation.
+
+- apiVersion: batch/v1
+  kind: Job
   path: spec.template.spec.volumes[*].ephemeral.volumeClaimTemplate.spec.volumeName
   errorType: FieldValueInvalid
   origin: update
