@@ -59,7 +59,7 @@ message HTTPIngressPath {
 
   // backend defines the referenced service endpoint to which the traffic
   // will be forwarded to.
-  // +optional
+  // +required
   optional IngressBackend backend = 2;
 }
 
@@ -365,7 +365,7 @@ message IngressServiceBackend {
 
   // port of the referenced service. A port name or port number
   // is required for a IngressServiceBackend.
-  // +optional
+  // +required
   optional ServiceBackendPort port = 2;
 }
 

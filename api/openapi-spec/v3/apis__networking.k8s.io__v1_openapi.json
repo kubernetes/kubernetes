@@ -48,7 +48,8 @@
           }
         },
         "required": [
-          "pathType"
+          "pathType",
+          "backend"
         ],
         "type": "object"
       },
@@ -529,7 +530,8 @@
           }
         },
         "required": [
-          "name"
+          "name",
+          "port"
         ],
         "type": "object"
       },

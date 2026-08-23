@@ -515,7 +515,7 @@ type HTTPIngressPath struct {
 
 	// backend defines the referenced service endpoint to which the traffic
 	// will be forwarded to.
-	// +optional
+	// +required
 	Backend IngressBackend `json:"backend" protobuf:"bytes,2,opt,name=backend"`
 }
 
@@ -543,7 +543,7 @@ type IngressServiceBackend struct {
 
 	// port of the referenced service. A port name or port number
 	// is required for a IngressServiceBackend.
-	// +optional
+	// +required
 	Port ServiceBackendPort `json:"port,omitempty" protobuf:"bytes,2,opt,name=port"`
 }
 

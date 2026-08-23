@@ -244,6 +244,11 @@ linters:
       
       # NonPointerStructs - Existing fields that are non-pointer structs but where the current rules are incorrect.
       
+      # IngressBackend and ServiceBackendPort are union-like structs, but nonpointerstructs does not understand unions today.
+      # Validation makes these require at least one of the fields within to be set.
+      - text: "nonpointerstructs: field (HTTPIngressPath\\.Backend|IngressServiceBackend\\.Port) is a non-pointer struct with no required fields\\..*"
+        path: "staging/src/k8s.io/api/networking/v1/types\\.go"
+      
       # The (PodGroupSpec|PodGroupTemplate|CompositePodGroupSpec|CompositePodGroupTemplate).SchedulingPolicy field is a union type, but nonpointerstructs does not understand unions today.
       # Validation makes this require at least one of the fields within to be set.
       - text: "nonpointerstructs: field (PodGroupSpec|PodGroupTemplate|CompositePodGroupSpec|CompositePodGroupTemplate)\\.SchedulingPolicy is a non-pointer struct with no required fields\\..*"

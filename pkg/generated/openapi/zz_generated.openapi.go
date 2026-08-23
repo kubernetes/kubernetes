@@ -42448,7 +42448,7 @@ func schema_k8sio_api_networking_v1_HTTPIngressPath(ref common.ReferenceCallback
 						},
 					},
 				},
-				Required: []string{"pathType"},
+				Required: []string{"pathType", "backend"},
 			},
 		},
 		Dependencies: []string{
@@ -43137,7 +43137,7 @@ func schema_k8sio_api_networking_v1_IngressServiceBackend(ref common.ReferenceCa
 						},
 					},
 				},
-				Required: []string{"name"},
+				Required: []string{"name", "port"},
 			},
 		},
 		Dependencies: []string{
