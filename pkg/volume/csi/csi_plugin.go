@@ -214,7 +214,7 @@ func (p *csiPlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
 	}
 
 	volumeHandle := spec.PersistentVolume.Spec.CSI.VolumeHandle
-	attachmentName := getAttachmentName(volumeHandle, pluginName, string(p.host.GetNodeName()))
+	attachmentName := GetVolumeAttachmentName(volumeHandle, pluginName, string(p.host.GetNodeName()))
 	kubeClient := p.host.GetKubeClient()
 
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
@@ -785,7 +785,7 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod) (vo
 
 	// persist volume info data for teardown
 	node := string(p.host.GetNodeName())
-	attachID := getAttachmentName(pvSource.VolumeHandle, pvSource.Driver, node)
+	attachID := GetVolumeAttachmentName(pvSource.VolumeHandle, pvSource.Driver, node)
 	volData := map[string]string{
 		volDataKey.specVolID:    spec.Name(),
 		volDataKey.volHandle:    pvSource.VolumeHandle,
@@ -924,7 +924,7 @@ func (p *csiPlugin) getPublishContext(client clientset.Interface, handle, driver
 		return nil, nil
 	}
 
-	attachID := getAttachmentName(handle, driver, nodeName)
+	attachID := GetVolumeAttachmentName(handle, driver, nodeName)
 
 	// search for attachment by VolumeAttachment.Spec.Source.PersistentVolumeName
 	attachment, err := client.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, meta.GetOptions{})

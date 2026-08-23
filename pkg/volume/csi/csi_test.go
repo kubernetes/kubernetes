@@ -268,7 +268,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 
 			volSpec := test.specFunc(test.specName, test.driver, test.volName)
 			pod := test.podFunc()
-			attachName := getAttachmentName(test.volName, test.driver, string(attachDetachVolumeHost.GetNodeName()))
+			attachName := GetVolumeAttachmentName(test.volName, test.driver, string(attachDetachVolumeHost.GetNodeName()))
 			t.Log("csiTest.VolumeAll starting...")
 
 			// *************** Attach/Mount volume resources ****************//

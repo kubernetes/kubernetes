@@ -129,7 +129,7 @@ func TestAttacherAttach(t *testing.T) {
 			nodeName:   "testnode-01",
 			driverName: "testdriver-01",
 			volumeName: "testvol-01",
-			attachID:   getAttachmentName("testvol-01", "testdriver-01", "testnode-01"),
+			attachID:   GetVolumeAttachmentName("testvol-01", "testdriver-01", "testnode-01"),
 			spec:       volume.NewSpecFromPersistentVolume(makeTestPV("pv01", 10, "testdriver-01", "testvol-01"), false),
 		},
 		{
@@ -137,7 +137,7 @@ func TestAttacherAttach(t *testing.T) {
 			nodeName:   "node02",
 			driverName: "driver02",
 			volumeName: "vol02",
-			attachID:   getAttachmentName("vol02", "driver02", "node02"),
+			attachID:   GetVolumeAttachmentName("vol02", "driver02", "node02"),
 			spec:       volume.NewSpecFromPersistentVolume(makeTestPV("pv01", 10, "driver02", "vol02"), false),
 		},
 		{
@@ -145,7 +145,7 @@ func TestAttacherAttach(t *testing.T) {
 			nodeName:     "node02",
 			driverName:   "driver02",
 			volumeName:   "vol01",
-			attachID:     getAttachmentName("vol02", "driver02", "node02"),
+			attachID:     GetVolumeAttachmentName("vol02", "driver02", "node02"),
 			spec:         volume.NewSpecFromPersistentVolume(makeTestPV("pv01", 10, "driver02", "vol01"), false),
 			shouldFail:   true,
 			watchTimeout: testWatchFailTimeout,
@@ -155,7 +155,7 @@ func TestAttacherAttach(t *testing.T) {
 			nodeName:     "node02",
 			driverName:   "driver000",
 			volumeName:   "vol02",
-			attachID:     getAttachmentName("vol02", "driver02", "node02"),
+			attachID:     GetVolumeAttachmentName("vol02", "driver02", "node02"),
 			spec:         volume.NewSpecFromPersistentVolume(makeTestPV("pv01", 10, "driver01", "vol02"), false),
 			shouldFail:   true,
 			watchTimeout: testWatchFailTimeout,
@@ -165,7 +165,7 @@ func TestAttacherAttach(t *testing.T) {
 			nodeName:     "node000",
 			driverName:   "driver000",
 			volumeName:   "vol02",
-			attachID:     getAttachmentName("vol02", "driver02", "node02"),
+			attachID:     GetVolumeAttachmentName("vol02", "driver02", "node02"),
 			spec:         volume.NewSpecFromPersistentVolume(makeTestPV("pv01", 10, "driver02", "vol02"), false),
 			shouldFail:   true,
 			watchTimeout: testWatchFailTimeout,
@@ -175,7 +175,7 @@ func TestAttacherAttach(t *testing.T) {
 			nodeName:            "node02",
 			driverName:          "driver02",
 			volumeName:          "vol02",
-			attachID:            getAttachmentName("vol02", "driver02", "node02"),
+			attachID:            GetVolumeAttachmentName("vol02", "driver02", "node02"),
 			spec:                volume.NewSpecFromPersistentVolume(makeTestPV("pv01", 10, "driver02", "vol02"), false),
 			injectAttacherError: true,
 			shouldFail:          true,
@@ -185,7 +185,7 @@ func TestAttacherAttach(t *testing.T) {
 			nodeName:   "node000",
 			driverName: "driver000",
 			volumeName: "vol02",
-			attachID:   getAttachmentName("vol02", "driver02", "node02"),
+			attachID:   GetVolumeAttachmentName("vol02", "driver02", "node02"),
 			spec:       volume.NewSpecFromVolume(makeTestVol("pv01", "driver02")),
 			shouldFail: true, // csi not enabled
 		},
@@ -194,7 +194,7 @@ func TestAttacherAttach(t *testing.T) {
 			nodeName:   "node000",
 			driverName: "driver000",
 			volumeName: "vol02",
-			attachID:   getAttachmentName("vol02", "driver02", "node02"),
+			attachID:   GetVolumeAttachmentName("vol02", "driver02", "node02"),
 			shouldFail: true, // csi not enabled
 		},
 	}
@@ -259,20 +259,20 @@ func TestAttacherAttachWithInline(t *testing.T) {
 		{
 			name:     "test ok 1 with PV",
 			nodeName: "node01",
-			attachID: getAttachmentName("vol01", "driver01", "node01"),
+			attachID: GetVolumeAttachmentName("vol01", "driver01", "node01"),
 			spec:     volume.NewSpecFromPersistentVolume(makeTestPV("pv01", 10, "driver01", "vol01"), false),
 		},
 		{
 			name:       "test failure, attach with volSrc",
 			nodeName:   "node01",
-			attachID:   getAttachmentName("vol01", "driver01", "node01"),
+			attachID:   GetVolumeAttachmentName("vol01", "driver01", "node01"),
 			spec:       volume.NewSpecFromVolume(makeTestVol("vol01", "driver01")),
 			shouldFail: true,
 		},
 		{
 			name:                "attacher error",
 			nodeName:            "node02",
-			attachID:            getAttachmentName("vol02", "driver02", "node02"),
+			attachID:            GetVolumeAttachmentName("vol02", "driver02", "node02"),
 			spec:                volume.NewSpecFromPersistentVolume(makeTestPV("pv02", 10, "driver02", "vol02"), false),
 			injectAttacherError: true,
 			shouldFail:          true,
@@ -280,7 +280,7 @@ func TestAttacherAttachWithInline(t *testing.T) {
 		{
 			name:       "missing spec",
 			nodeName:   "node02",
-			attachID:   getAttachmentName("vol02", "driver02", "node02"),
+			attachID:   GetVolumeAttachmentName("vol02", "driver02", "node02"),
 			shouldFail: true,
 		},
 	}
@@ -398,7 +398,7 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 			}(spec)
 
 			if test.expectVolumeAttachment {
-				expectedAttachID := getAttachmentName("test-vol", test.driver, "fakeNode")
+				expectedAttachID := GetVolumeAttachmentName("test-vol", test.driver, "fakeNode")
 				status := storage.VolumeAttachmentStatus{
 					Attached: true,
 				}
@@ -498,20 +498,20 @@ func TestAttacherWaitForAttach(t *testing.T) {
 			driver: "attachable",
 			makeAttachment: func() *storage.VolumeAttachment {
 
-				testAttachID := getAttachmentName("test-vol", "attachable", "fakeNode")
+				testAttachID := GetVolumeAttachmentName("test-vol", "attachable", "fakeNode")
 				successfulAttachment := makeTestAttachment(testAttachID, "fakeNode", "test-pv")
 				successfulAttachment.Status.Attached = true
 				return successfulAttachment
 			},
 			spec:             volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "attachable", "test-vol"), false),
-			expectedAttachID: getAttachmentName("test-vol", "attachable", "fakeNode"),
+			expectedAttachID: GetVolumeAttachmentName("test-vol", "attachable", "fakeNode"),
 			expectError:      false,
 		},
 		{
 			name: "failed attach with vol source",
 			makeAttachment: func() *storage.VolumeAttachment {
 
-				testAttachID := getAttachmentName("test-vol", "attachable", "fakeNode")
+				testAttachID := GetVolumeAttachmentName("test-vol", "attachable", "fakeNode")
 				successfulAttachment := makeTestAttachment(testAttachID, "fakeNode", "volSrc01")
 				successfulAttachment.Status.Attached = true
 				return successfulAttachment
@@ -578,20 +578,20 @@ func TestAttacherWaitForAttachWithInline(t *testing.T) {
 			name: "successful attach with PV",
 			makeAttachment: func() *storage.VolumeAttachment {
 
-				testAttachID := getAttachmentName("test-vol", "attachable", "fakeNode")
+				testAttachID := GetVolumeAttachmentName("test-vol", "attachable", "fakeNode")
 				successfulAttachment := makeTestAttachment(testAttachID, "fakeNode", "test-pv")
 				successfulAttachment.Status.Attached = true
 				return successfulAttachment
 			},
 			spec:             volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "attachable", "test-vol"), false),
-			expectedAttachID: getAttachmentName("test-vol", "attachable", "fakeNode"),
+			expectedAttachID: GetVolumeAttachmentName("test-vol", "attachable", "fakeNode"),
 			expectError:      false,
 		},
 		{
 			name: "failed attach with volSrc",
 			makeAttachment: func() *storage.VolumeAttachment {
 
-				testAttachID := getAttachmentName("test-vol", "attachable", "fakeNode")
+				testAttachID := GetVolumeAttachmentName("test-vol", "attachable", "fakeNode")
 				successfulAttachment := makeTestAttachment(testAttachID, "fakeNode", "volSrc01")
 				successfulAttachment.Status.Attached = true
 				return successfulAttachment
@@ -703,7 +703,7 @@ func TestAttacherVolumesAreAttached(t *testing.T) {
 			// create and save volume attchments
 			for _, attachedSpec := range tc.attachedSpecs {
 				specs = append(specs, attachedSpec.spec)
-				attachID := getAttachmentName(attachedSpec.volName, testDriver, nodeName)
+				attachID := GetVolumeAttachmentName(attachedSpec.volName, testDriver, nodeName)
 				attachment := makeTestAttachment(attachID, nodeName, attachedSpec.spec.Name())
 				attachment.Status.Attached = attachedSpec.attached
 				_, err := csiAttacher.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{})
@@ -773,7 +773,7 @@ func TestAttacherVolumesAreAttachedWithInline(t *testing.T) {
 			// create and save volume attchments
 			for _, attachedSpec := range tc.attachedSpecs {
 				specs = append(specs, attachedSpec.spec)
-				attachID := getAttachmentName(attachedSpec.volName, testDriver, nodeName)
+				attachID := GetVolumeAttachmentName(attachedSpec.volName, testDriver, nodeName)
 				attachment := makeTestAttachment(attachID, nodeName, attachedSpec.spec.Name())
 				attachment.Status.Attached = attachedSpec.attached
 				_, err := csiAttacher.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{})
@@ -815,13 +815,13 @@ func TestAttacherDetach(t *testing.T) {
 		reactor      func(action core.Action) (handled bool, ret runtime.Object, err error)
 		watchTimeout time.Duration
 	}{
-		{name: "normal test", volID: "vol-001", attachID: getAttachmentName("vol-001", testDriver, nodeName)},
-		{name: "normal test 2", volID: "vol-002", attachID: getAttachmentName("vol-002", testDriver, nodeName)},
-		{name: "object not found", volID: "vol-non-existing", attachID: getAttachmentName("vol-003", testDriver, nodeName)},
+		{name: "normal test", volID: "vol-001", attachID: GetVolumeAttachmentName("vol-001", testDriver, nodeName)},
+		{name: "normal test 2", volID: "vol-002", attachID: GetVolumeAttachmentName("vol-002", testDriver, nodeName)},
+		{name: "object not found", volID: "vol-non-existing", attachID: GetVolumeAttachmentName("vol-003", testDriver, nodeName)},
 		{
 			name:       "API error",
 			volID:      "vol-004",
-			attachID:   getAttachmentName("vol-004", testDriver, nodeName),
+			attachID:   GetVolumeAttachmentName("vol-004", testDriver, nodeName),
 			shouldFail: true, // All other API errors should be propagated to caller
 			reactor: func(action core.Action) (handled bool, ret runtime.Object, err error) {
 				// return Forbidden to all DELETE requests
@@ -1178,7 +1178,7 @@ func TestAttacherMountDevice(t *testing.T) {
 			}
 
 			nodeName := string(csiAttacher.plugin.host.GetNodeName())
-			attachID := getAttachmentName(tc.volName, testDriver, nodeName)
+			attachID := GetVolumeAttachmentName(tc.volName, testDriver, nodeName)
 
 			if tc.createAttachment {
 				// Set up volume attachment
@@ -1396,7 +1396,7 @@ func TestAttacherMountDeviceWithInline(t *testing.T) {
 			}
 
 			nodeName := string(csiAttacher.plugin.host.GetNodeName())
-			attachID := getAttachmentName(tc.volName, testDriver, nodeName)
+			attachID := GetVolumeAttachmentName(tc.volName, testDriver, nodeName)
 
 			// Set up volume attachment
 			attachment := makeTestAttachment(attachID, nodeName, pvName)

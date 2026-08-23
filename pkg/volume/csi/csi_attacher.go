@@ -77,7 +77,7 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 	}
 
 	node := string(nodeName)
-	attachID := getAttachmentName(pvSrc.VolumeHandle, pvSrc.Driver, node)
+	attachID := GetVolumeAttachmentName(pvSrc.VolumeHandle, pvSrc.Driver, node)
 
 	attachment, err := c.plugin.volumeAttachmentLister.Get(attachID)
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -134,7 +134,7 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 
 	klog.V(4).Info(log("attacher.Attach finished OK with VolumeAttachment object [%s]", attachID))
 
-	// Don't return attachID as a devicePath. We can reconstruct the attachID using getAttachmentName()
+	// Don't return attachID as a devicePath. We can reconstruct the attachID using GetVolumeAttachmentName()
 	return "", nil
 }
 
@@ -150,7 +150,7 @@ func (c *csiAttacher) WaitForAttach(spec *volume.Spec, _ string, pod *v1.Pod, _ 
 	}
 
 	volumeHandle := source.VolumeHandle
-	attachID := getAttachmentName(source.VolumeHandle, source.Driver, string(c.plugin.host.GetNodeName()))
+	attachID := GetVolumeAttachmentName(source.VolumeHandle, source.Driver, string(c.plugin.host.GetNodeName()))
 
 	attach, err := c.k8s.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, metav1.GetOptions{})
 	if err != nil {
@@ -225,7 +225,7 @@ func (c *csiAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.No
 			}
 		}
 
-		attachID := getAttachmentName(volumeHandle, driverName, string(nodeName))
+		attachID := GetVolumeAttachmentName(volumeHandle, driverName, string(nodeName))
 		var attach *storage.VolumeAttachment
 		if c.plugin.volumeAttachmentLister != nil {
 			attach, err = c.plugin.volumeAttachmentLister.Get(attachID)
@@ -437,7 +437,7 @@ func (c *csiAttacher) Detach(volumeName string, nodeName types.NodeName) error {
 
 	driverName := parts[0]
 	volID = parts[1]
-	attachID = getAttachmentName(volID, driverName, string(nodeName))
+	attachID = GetVolumeAttachmentName(volID, driverName, string(nodeName))
 
 	if err := c.k8s.StorageV1().VolumeAttachments().Delete(context.TODO(), attachID, metav1.DeleteOptions{}); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -589,8 +589,11 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 	return nil
 }
 
-// getAttachmentName returns csi-<sha256(volName,csiDriverName,NodeName)>
-func getAttachmentName(volName, csiDriverName, nodeName string) string {
+// GetVolumeAttachmentName returns csi-<sha256(volName,csiDriverName,NodeName)>, the name of
+// the VolumeAttachment object for one volume handle attached to one node. Note that the
+// PersistentVolume name does not take part in it: several PersistentVolumes of the same
+// volume can share a VolumeAttachment.
+func GetVolumeAttachmentName(volName, csiDriverName, nodeName string) string {
 	result := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", volName, csiDriverName, nodeName)))
 	return fmt.Sprintf("csi-%x", result)
 }
