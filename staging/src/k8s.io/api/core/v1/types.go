@@ -201,6 +201,7 @@ type VolumeSource struct {
 	// persistent volumes at the same time.
 	//
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:optional
 	Ephemeral *EphemeralVolumeSource `json:"ephemeral,omitempty" protobuf:"bytes,29,opt,name=ephemeral"`
 	// image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.
 	// The volume is resolved at pod startup depending on which PullPolicy value is provided:
@@ -2479,6 +2480,7 @@ type EphemeralVolumeSource struct {
 	// to the PVC after it has been created.
 	//
 	// Required, must not be nil.
+	// +k8s:alpha(since: "1.37")=+k8s:required
 	VolumeClaimTemplate *PersistentVolumeClaimTemplate `json:"volumeClaimTemplate,omitempty" protobuf:"bytes,1,opt,name=volumeClaimTemplate"`
 
 	// ReadOnly is tombstoned to show why 2 is a reserved protobuf tag.
@@ -4362,6 +4364,7 @@ type PodSpec struct {
 	// List of volumes that can be mounted by containers belonging to the pod.
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes
 	// +optional
+	// +k8s:alpha(since: "1.37")=+k8s:optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
