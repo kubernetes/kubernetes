@@ -21,6 +21,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -249,7 +250,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 
 			factory := informers.NewSharedInformerFactory(client, time.Hour /* disable resync */)
 			csiDriverInformer := factory.Storage().V1().CSIDrivers()
-			volumeAttachmentInformer := factory.Storage().V1().VolumeAttachments()
+			vaLister := factory.Storage().V1().VolumeAttachments().Lister()
 			if driverInfo != nil {
 				csiDriverInformer.Informer().GetStore().Add(driverInfo)
 			}
@@ -263,7 +264,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 				ProbeVolumePlugins(),
 				"fakeNode",
 				csiDriverInformer.Lister(),
-				volumeAttachmentInformer.Lister(),
+				vaLister,
 			)
 			attachDetachPlugMgr := attachDetachVolumeHost.GetPluginMgr()
 			csiClient := setupClient(t, true)
@@ -305,14 +306,15 @@ func TestCSI_VolumeAll(t *testing.T) {
 				}
 
 				// creates VolumeAttachment and blocks until it is marked attached (done by external attacher)
-				go func() {
+				var attachWG sync.WaitGroup
+				attachWG.Go(func() {
 					attachID, err := volAttacher.Attach(volSpec, attachDetachVolumeHost.GetNodeName())
 					if err != nil {
 						t.Errorf("csiTest.VolumeAll attacher.Attach failed: %s", err)
 						return
 					}
 					t.Logf("csiTest.VolumeAll got attachID %s", attachID)
-				}()
+				})
 
 				// Simulates external-attacher and marks VolumeAttachment.Status.Attached = true
 				markVolumeAttached(t, attachDetachVolumeHost.GetKubeClient(), nil, attachName, storage.VolumeAttachmentStatus{Attached: true})
@@ -329,6 +331,9 @@ func TestCSI_VolumeAll(t *testing.T) {
 
 				t.Log("csiTest.VolumeAll attacher.WaitForAttach succeeded OK, attachment ID:", devicePath)
 
+				// Wait for the attach goroutine to observe the attachment before Detach deletes it.
+				attachWG.Wait()
+
 			} else {
 				t.Log("csiTest.VolumeAll volume attacher not found, skipping attachment")
 			}
@@ -342,7 +347,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 				ProbeVolumePlugins(),
 				"fakeNode",
 				csiDriverInformer.Lister(),
-				volumeAttachmentInformer.Lister(),
+				vaLister,
 			)
 			kubeletPlugMgr := kubeletVolumeHost.GetPluginMgr()
 
