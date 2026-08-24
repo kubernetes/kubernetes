@@ -201,6 +201,21 @@ const (
 	// in the spec returned from kube-apiserver.
 	OpenAPIEnums featuregate.Feature = "OpenAPIEnums"
 
+	// owner: @seans3
+	//
+	// Defers building the per-group-version /openapi/v3 specs of built-in
+	// resources until each one is first requested (instead of building all
+	// of them at server startup), and retains only the serialized bytes of
+	// specs that were requested rather than the parsed spec graphs. The
+	// /openapi/v3 discovery document is served without building any spec.
+	// Served content is unchanged; the per-group-version hash embedded in
+	// discovery URLs and returned as ETag is derived from the server build,
+	// its configuration and the registered routes instead of the serialized
+	// content. Note that with this feature enabled
+	// GenericAPIServer.OpenAPIV3VersionedService is left nil and
+	// GenericAPIServer.OpenAPIV3LazyService is populated instead.
+	OpenAPIV3LazyBuild featuregate.Feature = "OpenAPIV3LazyBuild"
+
 	// owner: @stlaz
 	//
 	// Enable kube-apiserver to accept UIDs via request header authentication.
@@ -426,6 +441,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	OpenAPIEnums: {
 		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	OpenAPIV3LazyBuild: {
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	RemoteRequestHeaderUID: {

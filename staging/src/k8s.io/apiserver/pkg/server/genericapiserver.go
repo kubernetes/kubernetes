@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"net/http"
 	gpath "path"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -58,6 +60,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	basecompatibility "k8s.io/component-base/compatibility"
 	"k8s.io/component-base/featuregate"
+	componentbaseversion "k8s.io/component-base/version"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/klog/v2"
 	openapibuilder3 "k8s.io/kube-openapi/pkg/builder3"
@@ -184,6 +187,12 @@ type GenericAPIServer struct {
 	// OpenAPIV3VersionedService controls the /openapi/v3 endpoint and can be used to update the served spec.
 	// It is set during PrepareRun if `openAPIConfig` is non-nil unless `skipOpenAPIInstallation` is true.
 	OpenAPIV3VersionedService *handler3.OpenAPIService
+
+	// OpenAPIV3LazyService controls the /openapi/v3 endpoint when the
+	// OpenAPIV3LazyBuild feature gate is enabled, in which case
+	// OpenAPIV3VersionedService is nil. Use OpenAPIV3Updater to publish
+	// additional group-versions regardless of the gate.
+	OpenAPIV3LazyService *routes.OpenAPIV3LazyService
 
 	// StaticOpenAPISpec is the spec derived from the restful container endpoints.
 	// It is set during PrepareRun.
@@ -440,6 +449,42 @@ type preparedGenericAPIServer struct {
 	*GenericAPIServer
 }
 
+// OpenAPIV3Updater returns the object through which additional OpenAPI v3
+// group-versions are published, whichever of OpenAPIV3VersionedService and
+// OpenAPIV3LazyService is installed, or nil if neither is.
+func (s *GenericAPIServer) OpenAPIV3Updater() routes.OpenAPIV3Updater {
+	if s.OpenAPIV3LazyService != nil {
+		return s.OpenAPIV3LazyService
+	}
+	if s.OpenAPIV3VersionedService != nil {
+		return s.OpenAPIV3VersionedService
+	}
+	return nil
+}
+
+// openAPIV3BuildIdentity identifies everything about this process, other than
+// the registered routes and the OpenAPI config, that determines the OpenAPI v3
+// spec generated for a built-in group-version: the binary and the feature
+// gate settings (which influence the generated definitions, e.g. OpenAPIEnums).
+// It salts the etags served by OpenAPIV3LazyService.
+func openAPIV3BuildIdentity() string {
+	gates := utilfeature.DefaultMutableFeatureGate.GetAll()
+	names := make([]string, 0, len(gates))
+	for name := range gates {
+		names = append(names, string(name))
+	}
+	sort.Strings(names)
+	var b strings.Builder
+	b.WriteString(componentbaseversion.Get().String())
+	for _, name := range names {
+		b.WriteByte('\n')
+		b.WriteString(name)
+		b.WriteByte('=')
+		b.WriteString(strconv.FormatBool(utilfeature.DefaultFeatureGate.Enabled(featuregate.Feature(name))))
+	}
+	return b.String()
+}
+
 // PrepareRun does post API installation setup steps. It calls recursively the same function of the delegates.
 func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	s.delegationTarget.PrepareRun()
@@ -451,9 +496,15 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	}
 
 	if s.openAPIV3Config != nil && !s.skipOpenAPIInstallation {
-		s.OpenAPIV3VersionedService = routes.OpenAPI{
-			V3Config: s.openAPIV3Config,
-		}.InstallV3(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
+		if utilfeature.DefaultFeatureGate.Enabled(features.OpenAPIV3LazyBuild) {
+			s.OpenAPIV3LazyService = routes.OpenAPI{
+				V3Config: s.openAPIV3Config,
+			}.InstallV3Lazy(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux, openAPIV3BuildIdentity())
+		} else {
+			s.OpenAPIV3VersionedService = routes.OpenAPI{
+				V3Config: s.openAPIV3Config,
+			}.InstallV3(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
+		}
 	}
 
 	s.installHealthz()
