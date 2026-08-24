@@ -643,7 +643,14 @@ func (m *managerImpl) evictPod(logger klog.Logger, pod *v1.Pod, gracePeriodOverr
 	m.recorder.AnnotatedEventf(pod, annotations, v1.EventTypeWarning, Reason, "%s", evictMsg)
 	// this is a blocking call and should only return when the pod and its containers are killed.
 	logger.V(3).Info("Evicting pod", "pod", klog.KObj(pod), "podUID", pod.UID, "message", evictMsg)
-	err := m.killPodFunc(pod, true, &gracePeriodOverride, func(status *v1.PodStatus) {
+	// A negative grace period override defers to the pod specified
+	// termination grace period (see --eviction-max-pod-grace-period),
+	// which killPodFunc honors when the override is nil.
+	var override *int64
+	if gracePeriodOverride >= 0 {
+		override = &gracePeriodOverride
+	}
+	err := m.killPodFunc(pod, true, override, func(status *v1.PodStatus) {
 		status.Phase = v1.PodFailed
 		status.Reason = Reason
 		status.Message = evictMsg
