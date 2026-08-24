@@ -375,10 +375,12 @@ func TestOpenAPIV3LazyBuild(t *testing.T) {
 				assert.Nil(s.OpenAPIV3VersionedService)
 				assert.NotNil(s.OpenAPIV3LazyService)
 				assert.Equal(s.OpenAPIV3LazyService, s.OpenAPIV3Updater())
+				assert.Nil(s.openAPIV3Config.Definitions, "the pre-computed definitions map must be released after PrepareRun")
 			} else {
 				assert.NotNil(s.OpenAPIV3VersionedService)
 				assert.Nil(s.OpenAPIV3LazyService)
 				assert.Equal(s.OpenAPIV3VersionedService, s.OpenAPIV3Updater())
+				assert.NotNil(s.openAPIV3Config.Definitions)
 			}
 
 			server := httptest.NewServer(s.Handler.Director)

@@ -207,7 +207,9 @@ const (
 	// resources until each one is first requested (instead of building all
 	// of them at server startup), and retains only the serialized bytes of
 	// specs that were requested rather than the parsed spec graphs. The
-	// /openapi/v3 discovery document is served without building any spec.
+	// /openapi/v3 discovery document is served without building any spec,
+	// and the pre-computed OpenAPI definitions map is released after
+	// startup instead of being retained for the life of the process.
 	// Served content is unchanged; the per-group-version hash embedded in
 	// discovery URLs and returned as ETag is derived from the server build,
 	// its configuration and the registered routes instead of the serialized

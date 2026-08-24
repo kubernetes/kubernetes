@@ -500,6 +500,16 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 			s.OpenAPIV3LazyService = routes.OpenAPI{
 				V3Config: s.openAPIV3Config,
 			}.InstallV3Lazy(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux, openAPIV3BuildIdentity())
+			// DefaultOpenAPIV3Config pre-computes every OpenAPI definition
+			// and retains the map in Definitions so that the many builds
+			// performed while installing API groups (getOpenAPIModels) and
+			// the eager InstallV3 loop share it. With lazy builds nothing
+			// uses it after PrepareRun except the occasional on-demand
+			// group-version build, which regenerates the definitions it
+			// needs transiently instead (builder3 falls back to
+			// GetDefinitions when Definitions is nil). Release the map so it
+			// does not stay resident for the life of the process.
+			s.openAPIV3Config.Definitions = nil
 		} else {
 			s.OpenAPIV3VersionedService = routes.OpenAPI{
 				V3Config: s.openAPIV3Config,
