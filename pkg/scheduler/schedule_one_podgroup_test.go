@@ -4586,10 +4586,11 @@ func TestScheduleOnePodGroup_SchedulerNameMismatchUpdatesStatus(t *testing.T) {
 	}
 }
 
-type unreserveStateTrackerPlugin struct {
-	name                   string
-	failReserveOnSecondPod bool
-	failBind               bool
+type podGroupStateTrackerPlugin struct {
+	name             string
+	podToTrack       string
+	failReserveOnPod string
+	failBind         bool
 
 	mu                  sync.Mutex
 	syncReserveCount    int
@@ -4599,32 +4600,32 @@ type unreserveStateTrackerPlugin struct {
 	asyncUnreserveCount int
 }
 
-var _ fwk.ReservePlugin = &unreserveStateTrackerPlugin{}
-var _ fwk.PermitPlugin = &unreserveStateTrackerPlugin{}
-var _ fwk.BindPlugin = &unreserveStateTrackerPlugin{}
+var _ fwk.ReservePlugin = &podGroupStateTrackerPlugin{}
+var _ fwk.PermitPlugin = &podGroupStateTrackerPlugin{}
+var _ fwk.BindPlugin = &podGroupStateTrackerPlugin{}
 
-func (u *unreserveStateTrackerPlugin) Name() string { return u.name }
+func (u *podGroupStateTrackerPlugin) Name() string { return u.name }
 
-func (u *unreserveStateTrackerPlugin) Reserve(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
+func (u *podGroupStateTrackerPlugin) Reserve(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
 	u.mu.Lock()
 	defer u.mu.Unlock()
-	if p.Name == "p1" {
+	if p.Name == u.podToTrack {
 		if state.GetPodGroupSchedulingCycle() != nil {
 			u.syncReserveCount++
 		} else {
 			u.asyncReserveCount++
 		}
 	}
-	if u.failReserveOnSecondPod && p.Name == "p2" {
-		return fwk.NewStatus(fwk.Error, "simulated reserve error for p2")
+	if u.failReserveOnPod != "" && p.Name == u.failReserveOnPod {
+		return fwk.NewStatus(fwk.Error, fmt.Sprintf("simulated reserve error for %s", p.Name))
 	}
 	return nil
 }
 
-func (u *unreserveStateTrackerPlugin) Permit(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) (*fwk.Status, time.Duration) {
+func (u *podGroupStateTrackerPlugin) Permit(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) (*fwk.Status, time.Duration) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
-	if p.Name == "p1" {
+	if p.Name == u.podToTrack {
 		if state.GetPodGroupSchedulingCycle() == nil {
 			u.asyncPermitCount++
 		}
@@ -4632,10 +4633,10 @@ func (u *unreserveStateTrackerPlugin) Permit(ctx context.Context, state fwk.Cycl
 	return nil, 0
 }
 
-func (u *unreserveStateTrackerPlugin) Unreserve(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) {
+func (u *podGroupStateTrackerPlugin) Unreserve(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
-	if p.Name == "p1" {
+	if p.Name == u.podToTrack {
 		if state.GetPodGroupSchedulingCycle() != nil {
 			u.syncUnreserveCount++
 		} else {
@@ -4644,7 +4645,7 @@ func (u *unreserveStateTrackerPlugin) Unreserve(ctx context.Context, state fwk.C
 	}
 }
 
-func (u *unreserveStateTrackerPlugin) Bind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
+func (u *podGroupStateTrackerPlugin) Bind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
 	if u.failBind {
 		return fwk.NewStatus(fwk.Error, "simulated bind error")
 	}
@@ -4659,34 +4660,37 @@ func TestScheduleOnePodGroup_PodGroupStateAvailability(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
 
 	tests := []struct {
-		name                   string
-		failReserveOnSecondPod bool
-		failBind               bool
-		expectSyncReserve      int
-		expectAsyncReserve     int
-		expectPermit           int
-		expectSyncUnreserve    int
-		expectAsyncUnreserve   int
+		name                 string
+		podToTrack           string
+		failReserveOnPod     string
+		failBind             bool
+		expectSyncReserve    int
+		expectAsyncReserve   int
+		expectPermit         int
+		expectSyncUnreserve  int
+		expectAsyncUnreserve int
 	}{
 		{
-			name:                   "sync Unreserve has PodGroupState available",
-			failReserveOnSecondPod: true,
-			failBind:               false,
-			expectSyncReserve:      1,
-			expectAsyncReserve:     0,
-			expectPermit:           0,
-			expectSyncUnreserve:    1,
-			expectAsyncUnreserve:   0,
+			name:                 "sync Unreserve has PodGroupState available",
+			podToTrack:           "p1",
+			failReserveOnPod:     "p2",
+			failBind:             false,
+			expectSyncReserve:    1,
+			expectAsyncReserve:   0,
+			expectPermit:         0,
+			expectSyncUnreserve:  1,
+			expectAsyncUnreserve: 0,
 		},
 		{
-			name:                   "async Unreserve does not have PodGroupState available",
-			failReserveOnSecondPod: false,
-			failBind:               true,
-			expectSyncReserve:      1,
-			expectAsyncReserve:     1,
-			expectPermit:           1,
-			expectSyncUnreserve:    1,
-			expectAsyncUnreserve:   1,
+			name:                 "async Unreserve does not have PodGroupState available",
+			podToTrack:           "p1",
+			failReserveOnPod:     "",
+			failBind:             true,
+			expectSyncReserve:    1,
+			expectAsyncReserve:   1,
+			expectPermit:         1,
+			expectSyncUnreserve:  1,
+			expectAsyncUnreserve: 1,
 		},
 	}
 
@@ -4712,10 +4716,11 @@ func TestScheduleOnePodGroup_PodGroupStateAvailability(t *testing.T) {
 				},
 			}
 
-			trackerPlugin := &unreserveStateTrackerPlugin{
-				name:                   "unreserve-state-tracker",
-				failReserveOnSecondPod: tt.failReserveOnSecondPod,
-				failBind:               tt.failBind,
+			trackerPlugin := &podGroupStateTrackerPlugin{
+				name:             "podgroup-state-tracker",
+				podToTrack:       tt.podToTrack,
+				failReserveOnPod: tt.failReserveOnPod,
+				failBind:         tt.failBind,
 			}
 
 			registry := frameworkruntime.Registry{
