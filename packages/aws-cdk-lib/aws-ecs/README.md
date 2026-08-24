@@ -1140,26 +1140,26 @@ Since AWS has changed the [ARN format for ECS](https://docs.aws.amazon.com/Amazo
 feature flag `@aws-cdk/aws-ecs:arnFormatIncludesClusterName` must be enabled to use the new ARN format.
 The feature flag changes behavior for the entire CDK project. Therefore it is not possible to mix the old and the new format in one CDK project.
 
-```tss
+```ts
 declare const cluster: ecs.Cluster;
 
 // Import service from EC2 service attributes
-const service = ecs.Ec2Service.fromEc2ServiceAttributes(this, 'EcsService', {
+const ec2ServiceFromAttributes = ecs.Ec2Service.fromEc2ServiceAttributes(this, 'Ec2ServiceFromAttributes', {
   serviceArn: 'arn:aws:ecs:us-west-2:123456789012:service/my-http-service',
   cluster,
 });
 
 // Import service from EC2 service ARN
-const service = ecs.Ec2Service.fromEc2ServiceArn(this, 'EcsService', 'arn:aws:ecs:us-west-2:123456789012:service/my-http-service');
+const ec2ServiceFromArn = ecs.Ec2Service.fromEc2ServiceArn(this, 'Ec2ServiceFromArn', 'arn:aws:ecs:us-west-2:123456789012:service/my-http-service');
 
 // Import service from Fargate service attributes
-const service = ecs.FargateService.fromFargateServiceAttributes(this, 'EcsService', {
+const fargateServiceFromAttributes = ecs.FargateService.fromFargateServiceAttributes(this, 'FargateServiceFromAttributes', {
   serviceArn: 'arn:aws:ecs:us-west-2:123456789012:service/my-http-service',
   cluster,
 });
 
 // Import service from Fargate service ARN
-const service = ecs.FargateService.fromFargateServiceArn(this, 'EcsService', 'arn:aws:ecs:us-west-2:123456789012:service/my-http-service');
+const fargateServiceFromArn = ecs.FargateService.fromFargateServiceArn(this, 'FargateServiceFromArn', 'arn:aws:ecs:us-west-2:123456789012:service/my-http-service');
 ```
 
 ### Availability Zone rebalancing
