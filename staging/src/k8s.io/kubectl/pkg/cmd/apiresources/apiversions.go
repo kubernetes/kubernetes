@@ -70,7 +70,7 @@ func NewCmdAPIVersions(restClientGetter genericclioptions.RESTClientGetter, ioSt
 		Example:               apiversionsExample,
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, args []string) {
-			o, err := flags.ToOptions(cmd, args)
+			o, err := flags.ToOptions(args)
 			cmdutil.CheckErr(err)
 			cmdutil.CheckErr(o.RunAPIVersions())
 		},
@@ -79,9 +79,9 @@ func NewCmdAPIVersions(restClientGetter genericclioptions.RESTClientGetter, ioSt
 }
 
 // ToOptions converts from CLI inputs to runtime inputs
-func (flags *APIVersionsFlags) ToOptions(cmd *cobra.Command, args []string) (*APIVersionsOptions, error) {
+func (flags *APIVersionsFlags) ToOptions(args []string) (*APIVersionsOptions, error) {
 	if len(args) != 0 {
-		return nil, cmdutil.UsageErrorf(cmd, "unexpected arguments: %v", args)
+		return nil, fmt.Errorf("unexpected arguments: %v", args)
 	}
 	discoveryClient, err := flags.RESTClientGetter.ToDiscoveryClient()
 	if err != nil {

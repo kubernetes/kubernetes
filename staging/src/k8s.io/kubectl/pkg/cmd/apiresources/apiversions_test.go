@@ -19,63 +19,64 @@ package apiresources
 import (
 	"testing"
 
-	"github.com/spf13/cobra"
-
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	"k8s.io/client-go/discovery"
+	fakediscovery "k8s.io/client-go/discovery/fake"
+	clienttesting "k8s.io/client-go/testing"
 )
 
+// fakeCachedDiscoveryClient wraps a fake discovery client
+type fakeCachedDiscoveryClient struct {
+	discovery.DiscoveryInterface
+	invalidations int
+}
+
+var _ discovery.CachedDiscoveryInterface = &fakeCachedDiscoveryClient{}
+
+func (d *fakeCachedDiscoveryClient) Fresh() bool {
+	return true
+}
+
+func (d *fakeCachedDiscoveryClient) Invalidate() {
+	d.invalidations++
+}
+
+func newFakeCachedDiscoveryClient(resources []*metav1.APIResourceList) *fakeCachedDiscoveryClient {
+	return &fakeCachedDiscoveryClient{
+		DiscoveryInterface: &fakediscovery.FakeDiscovery{Fake: &clienttesting.Fake{Resources: resources}},
+	}
+}
+
 func TestAPIVersionsToOptions(t *testing.T) {
-	tf := cmdtesting.NewTestFactory()
-	defer tf.Cleanup()
-	cmd := NewCmdAPIVersions(tf, genericiooptions.NewTestIOStreamsDiscard())
-	parentCmd := &cobra.Command{Use: "kubectl"}
-	parentCmd.AddCommand(cmd)
+	tf := genericclioptions.NewTestConfigFlags().WithDiscoveryClient(newFakeCachedDiscoveryClient(nil))
 	flags := NewAPIVersionsFlags(tf, genericiooptions.NewTestIOStreamsDiscard())
 
-	_, err := flags.ToOptions(cmd, []string{})
+	_, err := flags.ToOptions([]string{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	_, err = flags.ToOptions(cmd, []string{"foo"})
+	_, err = flags.ToOptions([]string{"foo"})
 	if err == nil {
 		t.Fatalf("An error was expected but not returned")
 	}
-	expectedError := `unexpected arguments: [foo]
-See 'kubectl api-versions -h' for help and examples`
+	expectedError := `unexpected arguments: [foo]`
 	if err.Error() != expectedError {
 		t.Fatalf("Unexpected error: %v\n expected: %v", err, expectedError)
 	}
 }
 
 func TestAPIVersionsRun(t *testing.T) {
-	dc := cmdtesting.NewFakeCachedDiscoveryClient()
-	dc.Groups = []*v1.APIGroup{
-		{
-			Name: "",
-			Versions: []v1.GroupVersionForDiscovery{
-				{GroupVersion: "v1"},
-			},
-		},
-		{
-			Name: "foo",
-			Versions: []v1.GroupVersionForDiscovery{
-				{GroupVersion: "foo/v1beta1"},
-				{GroupVersion: "foo/v1"},
-				{GroupVersion: "foo/v2"},
-			},
-		},
-		{
-			Name: "bar",
-			Versions: []v1.GroupVersionForDiscovery{
-				{GroupVersion: "bar/v1"},
-			},
-		},
-	}
-	tf := cmdtesting.NewTestFactory().WithDiscoveryClient(dc)
-	defer tf.Cleanup()
+	dc := newFakeCachedDiscoveryClient([]*metav1.APIResourceList{
+		{GroupVersion: "v1"},
+		{GroupVersion: "foo/v1beta1"},
+		{GroupVersion: "foo/v1"},
+		{GroupVersion: "foo/v2"},
+		{GroupVersion: "bar/v1"},
+	})
+	tf := genericclioptions.NewTestConfigFlags().WithDiscoveryClient(dc)
 
 	ioStreams, _, out, errOut := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdAPIVersions(tf, ioStreams)
@@ -96,7 +97,7 @@ v1
 	}
 
 	expectedInvalidations := 1
-	if dc.Invalidations != expectedInvalidations {
-		t.Fatalf("unexpected invalidations: %d, expected: %d", dc.Invalidations, expectedInvalidations)
+	if dc.invalidations != expectedInvalidations {
+		t.Fatalf("unexpected invalidations: %d, expected: %d", dc.invalidations, expectedInvalidations)
 	}
 }
