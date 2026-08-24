@@ -766,10 +766,17 @@ func (jm *ControllerV2) removeOldestJobs(ctx context.Context, cj *batchv1.CronJo
 	return updateStatus
 }
 
-// deleteJob reaps a job, deleting the job, the pods and the reference in the active list
+// deleteJob reaps a job, deleting the job, the pods and the reference in the active list.
+// A NotFound error is treated as success: the job is already gone, which is the
+// desired state (for example a previous sync deleted it before the job informer caught up).
 func deleteJob(logger klog.Logger, cj *batchv1.CronJob, job *batchv1.Job, jc jobControlInterface, recorder record.EventRecorder) bool {
 	// delete the job itself...
 	if err := jc.DeleteJob(job.Namespace, job.Name); err != nil {
+		if errors.IsNotFound(err) {
+			logger.V(4).Info("Job has already been deleted", "job", klog.KObj(job), "cronjob", klog.KObj(cj))
+			deleteFromActiveList(cj, job.ObjectMeta.UID)
+			return true
+		}
 		recorder.Eventf(cj, corev1.EventTypeWarning, "FailedDelete", "Deleted job: %v", err)
 		logger.Error(err, "Error deleting job from cronjob", "job", klog.KObj(job), "cronjob", klog.KObj(cj))
 		return false
