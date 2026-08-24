@@ -531,6 +531,38 @@ var _ = SIGDescribe("Kubectl client", func() {
 			}
 		})
 
+		ginkgo.It("should support exec with an explicit proxy URL", func(ctx context.Context) {
+			// testContextHost is a KUBECONFIG URL
+			testContextHost := getTestContextHost()
+
+			// an explicit proxy-url can be used even when the API server is on localhost.
+			ginkgo.By("Starting a test HTTP proxy")
+			var proxyLogs bytes.Buffer
+			testSrv := httptest.NewServer(utilnettesting.NewHTTPProxyHandler(ginkgo.GinkgoTB(), func(req *http.Request) bool {
+				fmt.Fprintf(&proxyLogs, "Proxy received %s request for %s\n", req.Method, req.Host)
+				return true
+			}))
+			defer testSrv.Close()
+			proxyAddr := testSrv.URL
+
+			ginkgo.By("Executing kubectl with an explicit proxy URL")
+			output := e2ekubectl.NewKubectlCommand(ns, "--proxy-url="+proxyAddr, "exec", podRunningTimeoutArg, simplePodName, "--", "echo", "running", "in", "container").ExecOrDie(ns)
+
+			// Verify the exec request completed successfully.
+			expectedExecOutput := "running in container\n"
+			if output != expectedExecOutput {
+				framework.Failf("Unexpected kubectl exec output. Wanted %q, got %q", expectedExecOutput, output)
+			}
+
+			// Verify that the request to the API server went through the proxy.
+			expectedProxyLog := fmt.Sprintf("Proxy received CONNECT request for %s", strings.TrimSuffix(strings.TrimPrefix(testContextHost, "https://"), "/api"))
+
+			proxyLog := proxyLogs.String()
+			if !strings.Contains(proxyLog, expectedProxyLog) {
+				framework.Failf("Expected proxy connection was not observed. Wanted %q in proxy logs but got %q", expectedProxyLog, proxyLog)
+			}
+		})
+
 		// https://issues.k8s.io/128314
 		f.It(f.WithSlow(), "should support exec idle connections", func(ctx context.Context) {
 			ginkgo.By("executing a command in the container")
