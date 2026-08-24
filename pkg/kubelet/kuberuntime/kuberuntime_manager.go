@@ -129,7 +129,7 @@ type kubeGenericRuntimeManager struct {
 
 	// Cancels sleep lifecycle hooks when their containers exit.
 	containerExitCancelsLock sync.Mutex
-	containerExitCancels     map[string]context.CancelFunc
+	containerExitCancels     map[string]context.CancelCauseFunc
 
 	// RuntimeHelper that wraps kubelet to generate runtime container options.
 	runtimeHelper kubecontainer.RuntimeHelper
@@ -296,7 +296,7 @@ func NewKubeGenericRuntimeManager(
 		memoryReservationPolicy:      memoryReservationPolicy,
 		podLogsDirectory:             podLogsDirectory,
 		podInitContainerTimeRecorder: podInitContainerTimeRecorder,
-		containerExitCancels:         make(map[string]context.CancelFunc),
+		containerExitCancels:         make(map[string]context.CancelCauseFunc),
 	}
 
 	// Initialize swap controller availability check with lazy evaluation

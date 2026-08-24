@@ -815,7 +815,7 @@ func (m *kubeGenericRuntimeManager) toKubeContainerStatus(ctx context.Context, p
 	return cStatus
 }
 
-func (m *kubeGenericRuntimeManager) registerContainerExitCancel(containerID string, cancel context.CancelFunc) func() {
+func (m *kubeGenericRuntimeManager) registerContainerExitCancel(containerID string, cancel context.CancelCauseFunc) func() {
 	m.containerExitCancelsLock.Lock()
 	m.containerExitCancels[containerID] = cancel
 	m.containerExitCancelsLock.Unlock()
@@ -834,7 +834,7 @@ func (m *kubeGenericRuntimeManager) NotifyContainerDied(containerID string) {
 	delete(m.containerExitCancels, containerID)
 	m.containerExitCancelsLock.Unlock()
 	if cancel != nil {
-		cancel()
+		cancel(kubecontainer.ErrContainerExited)
 	}
 }
 
@@ -843,9 +843,9 @@ func (m *kubeGenericRuntimeManager) executePreStopHook(ctx context.Context, pod 
 	logger := klog.FromContext(ctx)
 	hookCtx := ctx
 	if containerSpec.Lifecycle.PreStop.Sleep != nil {
-		var cancelHook context.CancelFunc
-		hookCtx, cancelHook = context.WithCancel(ctx)
-		defer cancelHook()
+		var cancelHook context.CancelCauseFunc
+		hookCtx, cancelHook = context.WithCancelCause(ctx)
+		defer cancelHook(nil)
 		unregister := m.registerContainerExitCancel(containerID.ID, cancelHook)
 		defer unregister()
 
