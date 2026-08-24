@@ -950,6 +950,28 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			expectedMetrics: claimCreateMetrics{},
 		},
 		{
+			name: "clear-reserved-when-deleted-before-scheduling",
+			pods: func() []*v1.Pod {
+				pod := testPodWithResource.DeepCopy()
+				deleted := metav1.Now()
+				pod.DeletionTimestamp = &deleted
+				pod.Spec.NodeName = ""
+				return []*v1.Pod{pod}
+			}(),
+			key: claimKey(testClaimReserved),
+			claims: func() []*resourceapi.ResourceClaim {
+				claims := []*resourceapi.ResourceClaim{testClaimReserved.DeepCopy()}
+				claims[0].OwnerReferences = nil
+				return claims
+			}(),
+			expectedClaims: func() []resourceapi.ResourceClaim {
+				claims := []resourceapi.ResourceClaim{*testClaimAllocated.DeepCopy()}
+				claims[0].OwnerReferences = nil
+				return claims
+			}(),
+			expectedMetrics: claimCreateMetrics{},
+		},
+		{
 			name:            "remove-reserved",
 			pods:            []*v1.Pod{testPod},
 			key:             claimKey(testClaimReservedTwice),
