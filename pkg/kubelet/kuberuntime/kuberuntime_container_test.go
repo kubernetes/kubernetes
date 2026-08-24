@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -226,7 +227,8 @@ func TestExecutePreStopSleepHook(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+			recorder := record.NewFakeRecorder(1)
+			fakeRuntime, _, m, err := createTestRuntimeManager(tCtx, withRecorder(recorder))
 			require.NoError(t, err)
 
 			pod := makeTestPod("pod", "namespace", "pod-uid", []v1.Container{{
@@ -264,6 +266,11 @@ func TestExecutePreStopSleepHook(t *testing.T) {
 				assert.Zero(t, elapsed)
 			case <-time.After(5 * time.Second):
 				t.Fatal("preStop sleep hook did not return after the container exited")
+			}
+			select {
+			case event := <-recorder.Events:
+				t.Fatalf("unexpected event after clean container exit: %s", event)
+			default:
 			}
 		})
 	}

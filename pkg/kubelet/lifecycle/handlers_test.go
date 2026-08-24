@@ -811,6 +811,7 @@ func TestRunSleepHandler(t *testing.T) {
 		name                          string
 		sleepSeconds                  int64
 		terminationGracePeriodSeconds int64
+		cancelCause                   error
 		expectErr                     bool
 		expectedErr                   string
 	}{
@@ -826,14 +827,25 @@ func TestRunSleepHandler(t *testing.T) {
 			expectErr:                     true,
 			expectedErr:                   "container terminated before sleep hook finished",
 		},
+		{
+			name:                          "container exited before sleep finished",
+			sleepSeconds:                  30,
+			terminationGracePeriodSeconds: 30,
+			cancelCause:                   kubecontainer.ErrContainerExited,
+		},
 	}
 
 	for _, tt := range tests {
 		tCtx.SyncTest(tt.name, func(tCtx ktesting.TContext) {
 			t := tCtx.TB()
 			pod.Spec.Containers[0].Lifecycle.PreStop.Sleep = &v1.SleepAction{Seconds: tt.sleepSeconds}
-			ctx, cancel := context.WithTimeout(tCtx, time.Duration(tt.terminationGracePeriodSeconds)*time.Second)
-			defer cancel()
+			timeoutCtx, cancelTimeout := context.WithTimeout(tCtx, time.Duration(tt.terminationGracePeriodSeconds)*time.Second)
+			defer cancelTimeout()
+			ctx, cancel := context.WithCancelCause(timeoutCtx)
+			defer cancel(nil)
+			if tt.cancelCause != nil {
+				cancel(tt.cancelCause)
+			}
 
 			_, err := handlerRunner.Run(ctx, containerID, &pod, &container, container.Lifecycle.PreStop)
 
