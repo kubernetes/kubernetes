@@ -17569,6 +17569,55 @@ func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
 			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].overhead[0].name",
 			errorMsg:    "must be a node allocatable resource name",
 		},
+		{
+			name: "Valid ResourceClaimName from ExtendedResourceClaimStatus",
+			spec: core.PodSpec{
+				Containers: []core.Container{
+					{Name: "c1", Image: "image"},
+				},
+			},
+			podStatus: core.PodStatus{
+				ExtendedResourceClaimStatus: &core.PodExtendedResourceClaimStatus{
+					ResourceClaimName: "extended-claim1",
+				},
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "extended-claim1",
+						Containers:        []string{"c1"},
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "Invalid ResourceClaimName not matching ExtendedResourceClaimStatus",
+			spec: core.PodSpec{
+				Containers: []core.Container{
+					{Name: "c1", Image: "image"},
+				},
+			},
+			podStatus: core.PodStatus{
+				ExtendedResourceClaimStatus: &core.PodExtendedResourceClaimStatus{
+					ResourceClaimName: "extended-claim1",
+				},
+				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "some-other-claim",
+						Containers:        []string{"c1"},
+						Mapping: []core.NodeAllocatableMappedResources{
+							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorType:   field.ErrorTypeInvalid,
+			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].resourceClaimName",
+			errorMsg:    "no mapping found in pod reference",
+		},
 	}
 
 	for _, tc := range testCases {
