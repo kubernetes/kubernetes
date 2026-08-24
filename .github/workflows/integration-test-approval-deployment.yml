@@ -56,7 +56,7 @@ jobs:
 
       - name: Find PR from head SHA
         id: find-pr
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             // GitHub does not provide the PR number in workflow_run events for fork PRs.
@@ -92,7 +92,7 @@ jobs:
 
       - name: Check for snapshot changes
         id: check-snapshots
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const { data: comparison } = await github.rest.repos.compareCommits({
@@ -120,7 +120,7 @@ jobs:
       # its own pending/success/failure/cancelled statuses.
       - name: Post status (success — skipped, no snapshots)
         if: steps.check-snapshots.outputs.has_snapshots == 'false'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             await github.rest.repos.createCommitStatus({
@@ -153,7 +153,7 @@ jobs:
 
     steps:
       - name: Post status (pending — running tests)
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             await github.rest.repos.createCommitStatus({
@@ -201,7 +201,7 @@ jobs:
 
       - name: Post status (success — tests passed)
         if: success()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             await github.rest.repos.createCommitStatus({
@@ -216,7 +216,7 @@ jobs:
 
       - name: Post status (failure — tests failed)
         if: failure()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             await github.rest.repos.createCommitStatus({
@@ -231,7 +231,7 @@ jobs:
 
       - name: Post status (failure — cancelled)
         if: cancelled()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             await github.rest.repos.createCommitStatus({
