@@ -50,7 +50,7 @@ jobs:
 
     steps:
       - name: Checkout default branch (main)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: main
 
@@ -170,7 +170,7 @@ jobs:
       # approved. This SHA is pinned from the workflow_run event — even if new
       # commits are pushed after approval, this checkout is unaffected.
       - name: Checkout PR head for test execution
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ needs.validate.outputs.approved_sha }}
           fetch-depth: 0
