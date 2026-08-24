@@ -544,6 +544,68 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "node1"}, ObjectMeta: metav1.ObjectMeta{Namespace: "subteam1.team2", Labels: podLabel}}},
 			node: &node1,
 		},
+		{
+			name: "affinity with negative NamespaceSelector excludes existing pod namespace",
+			pod: createPodWithAffinityTerms("subteam1.team1", "", podLabel2,
+				[]v1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "service",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"securityscan"},
+								},
+							},
+						},
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "team",
+									Operator: metav1.LabelSelectorOpNotIn,
+									Values:   []string{"team1"},
+								},
+							},
+						},
+						TopologyKey: "region",
+					},
+				}, nil),
+			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "node1"}, ObjectMeta: metav1.ObjectMeta{Namespace: "subteam1.team1", Labels: podLabel}}},
+			node: &node1,
+			wantFilterStatus: fwk.NewStatus(
+				fwk.UnschedulableAndUnresolvable,
+				ErrReasonAffinityRulesNotMatch,
+			),
+		},
+		{
+			name: "anti-affinity with negative NamespaceSelector excludes existing pod namespace",
+			pod: createPodWithAffinityTerms("subteam1.team1", "", podLabel2, nil,
+				[]v1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "service",
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"securityscan"},
+								},
+							},
+						},
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "team",
+									Operator: metav1.LabelSelectorOpNotIn,
+									Values:   []string{"team1"},
+								},
+							},
+						},
+						TopologyKey: "region",
+					},
+				}),
+			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "node1"}, ObjectMeta: metav1.ObjectMeta{Namespace: "subteam1.team1", Labels: podLabel}}},
+			node: &node1,
+		},
 	}
 
 	for _, test := range tests {
