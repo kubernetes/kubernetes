@@ -6334,6 +6334,14 @@ func validateNodeAllocatableResourceClaimStatus(podStatus core.PodStatus, podSpe
 				}
 			}
 		}
+		// Extended resources backed by DRA are satisfied by a scheduler-created
+		// ResourceClaim that is not referenced in podSpec.ResourceClaims nor in
+		// podStatus.ResourceClaimStatuses. Its name is recorded in
+		// podStatus.ExtendedResourceClaimStatus instead.
+		if !found && podStatus.ExtendedResourceClaimStatus != nil &&
+			podStatus.ExtendedResourceClaimStatus.ResourceClaimName == nodeAllocatableStatus.ResourceClaimName {
+			found = true
+		}
 
 		if !found {
 			allErrs = append(allErrs, field.Invalid(statusFldPath.Child("resourceClaimName"), nodeAllocatableStatus.ResourceClaimName, "no mapping found in pod reference"))

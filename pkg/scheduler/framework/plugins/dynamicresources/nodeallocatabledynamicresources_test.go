@@ -1356,14 +1356,91 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 	}
 }
 
+func TestExtractPodNodeAllocatableResourceClaimStatus(t *testing.T) {
+	logger := klog.TODO()
+	nodeName := "node-a"
+	original := []v1.NodeAllocatableResourceClaimStatus{
+		{
+			ResourceClaimName: specialClaimInMemName,
+			Containers:        []string{"c1"},
+			Mapping: []v1.NodeAllocatableMappedResources{{
+				Name:     v1.ResourceCPU,
+				Quantity: new(resource.MustParse("1")),
+			}},
+		},
+	}
+
+	t.Run("no cycle state", func(t *testing.T) {
+		got := ExtractPodNodeAllocatableResourceClaimStatus(logger, framework.NewCycleState(), nodeName)
+		if got != nil {
+			t.Errorf("ExtractPodNodeAllocatableResourceClaimStatus() = %v, want nil", got)
+		}
+	})
+
+	t.Run("unknown node", func(t *testing.T) {
+		state := framework.NewCycleState()
+		state.Write(stateKey, &stateData{
+			nodeAllocations: map[string]nodeAllocation{
+				nodeName: {nodeAllocatableResourceClaimStatuses: cloneNodeAllocatableResourceClaimStatuses(original)},
+			},
+		})
+		got := ExtractPodNodeAllocatableResourceClaimStatus(logger, state, "other-node")
+		if got != nil {
+			t.Errorf("ExtractPodNodeAllocatableResourceClaimStatus() = %v, want nil", got)
+		}
+	})
+
+	t.Run("returns a copy not the cycle-state slice", func(t *testing.T) {
+		state := framework.NewCycleState()
+		draState := &stateData{
+			nodeAllocations: map[string]nodeAllocation{
+				nodeName: {nodeAllocatableResourceClaimStatuses: cloneNodeAllocatableResourceClaimStatuses(original)},
+			},
+		}
+		state.Write(stateKey, draState)
+
+		got := ExtractPodNodeAllocatableResourceClaimStatus(logger, state, nodeName)
+		if diff := cmp.Diff(original, got); diff != "" {
+			t.Errorf("ExtractPodNodeAllocatableResourceClaimStatus() diff (-want +got):\n%s", diff)
+		}
+		if len(got) == 0 {
+			t.Fatal("ExtractPodNodeAllocatableResourceClaimStatus() returned empty status")
+		}
+
+		got[0].ResourceClaimName = "mutated-by-caller"
+		got[0].Mapping[0].Quantity.Add(resource.MustParse("1"))
+
+		inState := draState.nodeAllocations[nodeName].nodeAllocatableResourceClaimStatuses
+		if diff := cmp.Diff(original, inState); diff != "" {
+			t.Errorf("mutating extracted status changed cycle state (-want +got):\n%s", diff)
+		}
+	})
+}
+
 func TestPatchNodeAllocatableResourceClaimStatus(t *testing.T) {
 	pod := st.MakePod().Name("test-pod").Namespace("test-ns").UID("pod-uid").Obj()
+	placeholderStatus := []v1.NodeAllocatableResourceClaimStatus{
+		{
+			ResourceClaimName: specialClaimInMemName,
+			Containers:        []string{"c1"},
+			Mapping: []v1.NodeAllocatableMappedResources{{
+				Name:     v1.ResourceCPU,
+				Quantity: new(resource.MustParse("1")),
+			}},
+		},
+	}
+	realClaim := &resourceapi.ResourceClaim{ObjectMeta: metav1.ObjectMeta{Name: "real-claim-name"}}
 
 	tests := []struct {
 		name                               string
 		assumedPodStatus                   v1.PodStatus
 		finalPodNodeAllocatableClaimStatus []v1.NodeAllocatableResourceClaimStatus
+		extendedClaim                      *resourceapi.ResourceClaim
 		wantPatch                          bool
+		wantClaimNameInPatch               string
+		wantClaimNameNotInPatch            string
+		wantAssumedClaimName               string
+		wantComputedClaimName              string
 		setPatchError                      error
 		wantStatus                         *fwk.Status
 	}{
@@ -1454,6 +1531,37 @@ func TestPatchNodeAllocatableResourceClaimStatus(t *testing.T) {
 			setPatchError: errors.New("inject patch error"),
 			wantStatus:    statusError(klog.TODO(), fmt.Errorf("updating pod test-ns/test-pod NodeAllocatableResourceClaimStatuses: %w", errors.New("inject patch error"))),
 		},
+		{
+			name:                               "placeholder rewritten after DeepEqual, assumed pod unchanged",
+			assumedPodStatus:                   v1.PodStatus{NodeAllocatableResourceClaimStatuses: placeholderStatus},
+			finalPodNodeAllocatableClaimStatus: cloneNodeAllocatableResourceClaimStatuses(placeholderStatus),
+			extendedClaim:                      realClaim,
+			wantPatch:                          true,
+			wantClaimNameInPatch:               "real-claim-name",
+			wantClaimNameNotInPatch:            specialClaimInMemName,
+			wantAssumedClaimName:               specialClaimInMemName,
+			wantComputedClaimName:              "real-claim-name",
+			wantStatus:                         nil,
+		},
+		{
+			name:             "mismatch still fails when a real extended claim exists",
+			assumedPodStatus: v1.PodStatus{NodeAllocatableResourceClaimStatuses: placeholderStatus},
+			finalPodNodeAllocatableClaimStatus: []v1.NodeAllocatableResourceClaimStatus{
+				{
+					ResourceClaimName: specialClaimInMemName,
+					Containers:        []string{"c1"},
+					Mapping: []v1.NodeAllocatableMappedResources{{
+						Name:     v1.ResourceCPU,
+						Quantity: new(resource.MustParse("2")),
+					}},
+				},
+			},
+			extendedClaim:         realClaim,
+			wantPatch:             false,
+			wantAssumedClaimName:  specialClaimInMemName,
+			wantComputedClaimName: specialClaimInMemName,
+			wantStatus:            statusError(klog.TODO(), errors.New("assumed pod status does not match calculated status to be patched")),
+		},
 	}
 
 	for _, tt := range tests {
@@ -1473,7 +1581,7 @@ func TestPatchNodeAllocatableResourceClaimStatus(t *testing.T) {
 					return true, nil, tt.setPatchError
 				})
 			}
-			status := pl.patchNodeAllocatableResourceClaimStatus(ctx, podToUpdate, tt.finalPodNodeAllocatableClaimStatus)
+			status := pl.patchNodeAllocatableResourceClaimStatus(ctx, podToUpdate, tt.finalPodNodeAllocatableClaimStatus, tt.extendedClaim)
 
 			if tt.wantStatus != nil && status != nil {
 				if tt.wantStatus.Code() != status.Code() {
@@ -1488,15 +1596,35 @@ func TestPatchNodeAllocatableResourceClaimStatus(t *testing.T) {
 
 			actions := fakeClient.Actions()
 			gotPatch := false
+			var patchBody string
 			for _, action := range actions {
 				if action.Matches("patch", "pods") && action.GetSubresource() == "status" {
 					gotPatch = true
+					patchBody = string(action.(clienttesting.PatchAction).GetPatch())
 					break
 				}
 			}
 
 			if gotPatch != tt.wantPatch {
 				t.Errorf("patchNodeAllocatableResourceClaimStatus() gotPatch = %v, want %v", gotPatch, tt.wantPatch)
+			}
+			if tt.wantClaimNameInPatch != "" && !strings.Contains(patchBody, tt.wantClaimNameInPatch) {
+				t.Errorf("patch %s does not contain claim name %q", patchBody, tt.wantClaimNameInPatch)
+			}
+			if tt.wantClaimNameNotInPatch != "" && strings.Contains(patchBody, tt.wantClaimNameNotInPatch) {
+				t.Errorf("patch %s still contains claim name %q", patchBody, tt.wantClaimNameNotInPatch)
+			}
+			if tt.wantAssumedClaimName != "" {
+				got := podToUpdate.Status.NodeAllocatableResourceClaimStatuses[0].ResourceClaimName
+				if got != tt.wantAssumedClaimName {
+					t.Errorf("assumed pod ResourceClaimName = %q, want %q", got, tt.wantAssumedClaimName)
+				}
+			}
+			if tt.wantComputedClaimName != "" {
+				got := tt.finalPodNodeAllocatableClaimStatus[0].ResourceClaimName
+				if got != tt.wantComputedClaimName {
+					t.Errorf("computed status ResourceClaimName = %q, want %q", got, tt.wantComputedClaimName)
+				}
 			}
 		})
 	}
@@ -2160,6 +2288,71 @@ func TestFilterSlicesForNode(t *testing.T) {
 
 			if diff := cmp.Diff(tt.wantNames, gotNames); diff != "" {
 				t.Errorf("filterSlicesForNode() diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestReplaceSpecialClaimNameInStatus(t *testing.T) {
+	claim := func(name string) *resourceapi.ResourceClaim {
+		return &resourceapi.ResourceClaim{ObjectMeta: metav1.ObjectMeta{Name: name}}
+	}
+
+	tests := []struct {
+		name          string
+		extendedClaim *resourceapi.ResourceClaim
+		statuses      []v1.NodeAllocatableResourceClaimStatus
+		want          []v1.NodeAllocatableResourceClaimStatus
+	}{
+		{
+			name:          "placeholder replaced with real claim name",
+			extendedClaim: claim("real-claim-name"),
+			statuses: []v1.NodeAllocatableResourceClaimStatus{
+				{ResourceClaimName: specialClaimInMemName},
+			},
+			want: []v1.NodeAllocatableResourceClaimStatus{
+				{ResourceClaimName: "real-claim-name"},
+			},
+		},
+		{
+			name:          "only placeholder entries are rewritten",
+			extendedClaim: claim("real-claim-name"),
+			statuses: []v1.NodeAllocatableResourceClaimStatus{
+				{ResourceClaimName: "user-claim"},
+				{ResourceClaimName: specialClaimInMemName},
+			},
+			want: []v1.NodeAllocatableResourceClaimStatus{
+				{ResourceClaimName: "user-claim"},
+				{ResourceClaimName: "real-claim-name"},
+			},
+		},
+		{
+			name:          "nil extended claim is a no-op",
+			extendedClaim: nil,
+			statuses: []v1.NodeAllocatableResourceClaimStatus{
+				{ResourceClaimName: specialClaimInMemName},
+			},
+			want: []v1.NodeAllocatableResourceClaimStatus{
+				{ResourceClaimName: specialClaimInMemName},
+			},
+		},
+		{
+			name:          "claim not yet created in API server is a no-op",
+			extendedClaim: claim(specialClaimInMemName),
+			statuses: []v1.NodeAllocatableResourceClaimStatus{
+				{ResourceClaimName: specialClaimInMemName},
+			},
+			want: []v1.NodeAllocatableResourceClaimStatus{
+				{ResourceClaimName: specialClaimInMemName},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			replaceSpecialClaimNameInStatus(tt.extendedClaim, tt.statuses)
+			if diff := cmp.Diff(tt.want, tt.statuses); diff != "" {
+				t.Errorf("replaceSpecialClaimNameInStatus() diff (-want +got):\n%s", diff)
 			}
 		})
 	}

@@ -57,6 +57,7 @@ func testNodeAllocatableResources(tCtx ktesting.TContext, enabled bool) {
 	tCtx.Run("OverheadMappingsBoth", testNodeAllocatableResourcesWithOverheadBoth)
 	tCtx.Run("OverheadMappingsInsufficient", testNodeAllocatableResourcesWithOverheadInsufficient)
 	tCtx.Run("ClaimSharingOverhead", testNodeAllocatableResourceClaimSharingOverhead)
+	tCtx.Run("ExtendedResource", testNodeAllocatableExtendedResource)
 }
 
 func setupTestEnv(tCtx ktesting.TContext, nodeNum int) *testEnv {
@@ -904,6 +905,70 @@ func testNodeAllocatableResourcesWithOverheadInsufficient(tCtx ktesting.TContext
 	pod, _ := createPodWithNodeAllocatableClaim(tCtx, env, claimName, podName, 1)
 
 	expectPodUnschedulable(tCtx, pod, "Insufficient memory")
+}
+
+// testNodeAllocatableExtendedResource is a regression test for
+// https://github.com/kubernetes/kubernetes/issues/141467. It exercises the
+// intersection of two features: an extended resource backed by DRA (the
+// scheduler creates the ResourceClaim during PreBind) and a device that
+// contributes node allocatable resources. Before the fix, PreBind left the
+// in-memory placeholder claim name "<extended-resources>" in the node
+// allocatable claim status and the API server rejected the pod status patch, so
+// the pod never got scheduled.
+func testNodeAllocatableExtendedResource(tCtx ktesting.TContext) {
+	tCtx.Parallel()
+	env := setupTestEnv(tCtx, 2)
+
+	// Implicit extended resource name derived from the DeviceClass. The pod
+	// requests this instead of referencing a ResourceClaim directly, so the
+	// scheduler creates the claim during PreBind.
+	resourceName := resourceapi.ResourceDeviceClassPrefix + env.class.Name
+
+	cpuMultiplier := resource.MustParse("1")
+	devices := []resourceapi.Device{
+		{
+			Name: "extended-node-allocatable-device",
+			NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+				v1.ResourceCPU: {Mapping: &resourceapi.NodeAllocatableMapping{DeviceMultiplier: &cpuMultiplier}},
+			},
+		},
+	}
+	slice := makeSlice(env, devices)
+	env.poolName = env.namespace + "-pool-extended"
+	slice.Spec.Pool.Name = env.poolName
+	createSliceAndStartScheduler(tCtx, slice)
+
+	podName := "pod-extended-node-allocatable"
+	pod := st.MakePod().Name(podName).Namespace(env.namespace).Container("test-container").Obj()
+	pod.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": env.nodeName}
+	pod = createPodWithExtendedResource(tCtx, env.namespace, resourceName, "1", pod)
+
+	// With the fix, PreBind succeeds and the pod is scheduled. Without it, the
+	// pod stays unschedulable because the pod status patch fails validation.
+	waitForPodScheduled(tCtx, env.namespace, pod.Name)
+
+	// The node allocatable status must reference the real extended-resource
+	// claim name (recorded in ExtendedResourceClaimStatus), never the in-memory
+	// placeholder "<extended-resources>".
+	tCtx.Eventually(func(tCtx ktesting.TContext) error {
+		p, err := tCtx.Client().CoreV1().Pods(env.namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if p.Status.ExtendedResourceClaimStatus == nil {
+			return fmt.Errorf("pod has no ExtendedResourceClaimStatus yet")
+		}
+		realClaimName := p.Status.ExtendedResourceClaimStatus.ResourceClaimName
+		if len(p.Status.NodeAllocatableResourceClaimStatuses) == 0 {
+			return fmt.Errorf("pod has no NodeAllocatableResourceClaimStatuses yet")
+		}
+		for _, s := range p.Status.NodeAllocatableResourceClaimStatuses {
+			if s.ResourceClaimName != realClaimName {
+				return fmt.Errorf("node allocatable status references claim name %q, want real extended resource claim name %q", s.ResourceClaimName, realClaimName)
+			}
+		}
+		return nil
+	}).WithTimeout(30*time.Second).WithPolling(200*time.Millisecond).Should(gomega.Succeed(), "node allocatable status should reference the real extended resource claim name")
 }
 
 func testNodeAllocatableResourceClaimSharingOverhead(tCtx ktesting.TContext) {
