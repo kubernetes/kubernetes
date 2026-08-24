@@ -52,7 +52,8 @@ type DesiredStateOfWorld interface {
 	// specified volume and is scheduled to the specified node.
 	// A unique volumeName is generated from the volumeSpec and returned on
 	// success.
-	// If the pod already exists under the specified volume, this is a no-op.
+	// If the pod already exists under the specified volume, only the recorded
+	// volume spec may change, see [isAttachablePV].
 	// If volumeSpec is not an attachable volume plugin, an error is returned.
 	// If no volume with the name volumeName exists in the list of volumes that
 	// should be attached to the specified node, the volume is implicitly added.
@@ -165,7 +166,7 @@ type volumeToAttach struct {
 
 	// spec is the volume spec containing the specification for this volume.
 	// Used to generate the volume plugin object, and passed to attach/detach
-	// methods.
+	// methods. See [isAttachablePV] for which PersistentVolume this is.
 	spec *volume.Spec
 
 	// scheduledPods is a map containing the set of pods that reference this
@@ -173,6 +174,22 @@ type volumeToAttach struct {
 	// the name of the pod and the value is a pod object containing more
 	// information about the pod.
 	scheduledPods map[types.UniquePodName]pod
+}
+
+// isAttachablePV reports whether the spec's PersistentVolume can still be
+// attached, which is what a volume records the spec of.
+//
+// Several PersistentVolumes can map to one volume, because the PV name does not
+// take part in the unique volume name, so a PV re-created for the same
+// underlying volume reaches AddPod while pods that use the previous one are
+// still scheduled to the node. An attacher refuses a PV that is being deleted,
+// and a deletionTimestamp is never cleared, so such a PV must never displace the
+// recorded spec, however stale that spec is.
+func isAttachablePV(volumeSpec *volume.Spec) bool {
+	// An inline volume spec, including a PersistentVolume synthesized by CSI
+	// migration, is not an API object and cannot be deleted on its own.
+	return volumeSpec.PersistentVolume == nil ||
+		volumeSpec.PersistentVolume.DeletionTimestamp == nil
 }
 
 // The pod represents a pod that references the underlying volume and is
@@ -241,6 +258,10 @@ func (dsw *desiredStateOfWorld) AddPod(
 			spec:                     volumeSpec,
 			scheduledPods:            make(map[types.UniquePodName]pod),
 		}
+		dsw.nodesManaged[nodeName].volumesToAttach[volumeName] = volumeObj
+	} else if isAttachablePV(volumeSpec) {
+		// Follow the PersistentVolume the pods use, from a fresh copy of it.
+		volumeObj.spec = volumeSpec
 		dsw.nodesManaged[nodeName].volumesToAttach[volumeName] = volumeObj
 	}
 	if _, podExists := volumeObj.scheduledPods[podName]; !podExists {

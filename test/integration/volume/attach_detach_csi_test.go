@@ -115,13 +115,16 @@ func TestVolumeAttachmentOfTerminatingPVIsReplaced(t *testing.T) {
 	// external-attacher to attach it.
 	previousAttachment := waitForVolumeAttachment(tCtx, testClient, previousPV.Name)
 
-	// The workload is restarted while the volume is still not attached: its pod is
-	// replaced and its PV is recreated under a new name for the same volume handle.
+	// The workload is restarted while the volume is still not attached: its PV is recreated
+	// under a new name for the same volume handle, and its pod is replaced by one that
+	// arrives before it is gone. The volume therefore never leaves the desired state of
+	// world, so the controller has to replace the PersistentVolume recorded for it rather
+	// than record the new one when the volume is added.
+	currentPV, currentPVC := createBoundCSIPVAndPVC(tCtx, testClient, ns.Name, "test-pv-current", "test-pvc-current")
+	currentPod := createCSITestPod(tCtx, testClient, ns.Name, "test-pod-current", currentPVC.Name)
 	if err := testClient.CoreV1().Pods(ns.Name).Delete(tCtx, previousPod.Name, *metav1.NewDeleteOptions(0)); err != nil {
 		tCtx.Fatalf("Failed to delete the pod of the previous generation: %v", err)
 	}
-	currentPV, currentPVC := createBoundCSIPVAndPVC(tCtx, testClient, ns.Name, "test-pv-current", "test-pvc-current")
-	currentPod := createCSITestPod(tCtx, testClient, ns.Name, "test-pod-current", currentPVC.Name)
 	terminatePV(tCtx, testClient, previousPV.Name)
 
 	// external-attacher refuses to attach a PV that is being deleted. This also ends the
