@@ -639,7 +639,7 @@ func ValidateDeploymentSpec(spec, oldSpec *apps.DeploymentSpec, fldPath *field.P
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
 
 	if spec.Selector == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), "").MarkCoveredByDeclarative())
 	} else {
 		// validate selector strictly, spec.selector was always required to pass LabelSelectorAsSelector below
 		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, unversionedvalidation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: false}, fldPath.Child("selector"))...)
@@ -892,7 +892,7 @@ func ValidateDeploymentUpdate(update, old *apps.Deployment, opts apivalidation.P
 	allErrs = append(allErrs, ValidateDeploymentSpec(&update.Spec, &old.Spec, field.NewPath("spec"), opts)...)
 	allErrs = append(allErrs, validateSchedulingAndDelegationAnnotations(&update.ObjectMeta, &old.ObjectMeta, &update.Spec, &old.Spec, field.NewPath("spec", "scheduling"))...)
 	allErrs = append(allErrs, validateDelegationAnnotationsUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata", "annotations"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.Selector, old.Spec.Selector, field.NewPath("spec").Child("selector"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.Selector, old.Spec.Selector, field.NewPath("spec").Child("selector")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 	allErrs = append(allErrs, validateDeploymentSchedulingUpdate(&update.Spec, &old.Spec, field.NewPath("spec").Child("scheduling"))...)
 	return allErrs
 }

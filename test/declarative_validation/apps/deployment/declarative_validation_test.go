@@ -295,6 +295,13 @@ func TestDeclarativeValidate(t *testing.T) {
 					field.Invalid(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), int64(2147483648), "").WithOrigin("maximum").MarkAlpha(),
 				},
 			},
+			"selector required": {
+				input: mkDeployment(tweakSelectorLabels(nil)),
+				expectedErrs: field.ErrorList{
+					field.Required(field.NewPath("spec").Child("selector"), "").MarkBeta(),
+					field.Invalid(field.NewPath("spec").Child("template").Child("metadata").Child("labels"), nil, "").MarkFromImperative(),
+				},
+			},
 		}
 
 		for _, tc := range poddeclarativevalidation.InvalidPodSpecTestcases(field.NewPath("spec", "template", "spec")) {
@@ -341,6 +348,8 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 			oldScheduling                *apps.DeploymentSchedulingConfiguration
 			scheduling                   *apps.DeploymentSchedulingConfiguration
 			enableWorkloadWithDeployment bool
+			oldObj                       *apps.Deployment
+			updateObj                    *apps.Deployment
 			expectedErrs                 field.ErrorList
 		}{
 			"adding scheduling after creation is immutable": {
@@ -449,6 +458,34 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 					},
 				},
 			},
+			"valid update": {
+				oldObj:    mkDeployment(),
+				updateObj: mkDeployment(tweakReplicas(2)),
+			},
+			"selector changed": {
+				oldObj:    mkDeployment(),
+				updateObj: mkDeployment(tweakSelectorLabels(map[string]string{"name": "c"})),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("spec").Child("template").Child("metadata").Child("labels"), nil, "").MarkFromImperative(),
+					field.Invalid(field.NewPath("spec").Child("selector"), nil, "").WithOrigin("immutable").MarkBeta(),
+				},
+			},
+			"selector set from unset": {
+				oldObj:    mkDeployment(tweakSelectorLabels(nil)),
+				updateObj: mkDeployment(),
+				expectedErrs: field.ErrorList{
+					field.Invalid(field.NewPath("spec").Child("selector"), nil, "").WithOrigin("immutable").MarkBeta(),
+				},
+			},
+			"selector unset from set": {
+				oldObj:    mkDeployment(),
+				updateObj: mkDeployment(tweakSelectorLabels(nil)),
+				expectedErrs: field.ErrorList{
+					field.Required(field.NewPath("spec").Child("selector"), "").MarkBeta(),
+					field.Invalid(field.NewPath("spec").Child("template").Child("metadata").Child("labels"), nil, "").MarkFromImperative(),
+					field.Invalid(field.NewPath("spec").Child("selector"), nil, "").WithOrigin("immutable").MarkBeta(),
+				},
+			},
 		}
 		for name, tc := range testCases {
 			t.Run(name, func(t *testing.T) {
@@ -457,11 +494,36 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 					features.WorkloadWithDeployment: tc.enableWorkloadWithDeployment,
 				})
 				old := mkSchedulingDeployment(tc.oldScheduling)
+				if tc.oldObj != nil {
+					old = tc.oldObj
+				}
 				old.ResourceVersion = "1"
-				update := old.DeepCopy()
-				update.Spec.Scheduling = tc.scheduling
+				var update *apps.Deployment
+				if tc.updateObj != nil {
+					update = tc.updateObj
+				} else {
+					update = old.DeepCopy()
+					update.Spec.Scheduling = tc.scheduling
+				}
+				update.ResourceVersion = "2"
 				apitesting.VerifyUpdateValidationEquivalence(t, ctx, update, old, registry.Strategy, tc.expectedErrs)
 			})
 		}
+	}
+}
+
+func tweakSelectorLabels(labels map[string]string) func(*apps.Deployment) {
+	return func(deploy *apps.Deployment) {
+		if labels == nil {
+			deploy.Spec.Selector = nil
+			return
+		}
+		deploy.Spec.Selector = &metav1.LabelSelector{MatchLabels: labels}
+	}
+}
+
+func tweakReplicas(replicas int32) func(*apps.Deployment) {
+	return func(deploy *apps.Deployment) {
+		deploy.Spec.Replicas = replicas
 	}
 }

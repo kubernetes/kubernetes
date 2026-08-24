@@ -109,6 +109,10 @@ func init() {
 			"spec.scheduling.schedulingPolicy.gang.minCount": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
+			"spec.selector": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+				{ErrorType: "FieldValueRequired"},
+			},
 			"spec.template.spec.activeDeadlineSeconds": {
 				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
