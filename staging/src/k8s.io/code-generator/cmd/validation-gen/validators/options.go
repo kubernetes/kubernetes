@@ -30,17 +30,37 @@ const (
 )
 
 func init() {
-	RegisterTagValidator(&ifTagValidator{true, nil})
-	RegisterTagValidator(&ifTagValidator{false, nil})
+	RegisterTagValidator(&ifTagValidator{enabled: true})
+	RegisterTagValidator(&ifTagValidator{enabled: false})
+	RegisterValidationWrapper(FinalizeConditionsOrder, conditionsFinalizer{})
+}
+
+// conditionsFinalizer applies an ValidationGroup's Conditions. Condition
+// wrapping is owned here, next to the tags which declare conditions.
+type conditionsFinalizer struct{}
+
+func (conditionsFinalizer) Name() string { return "conditions" }
+
+func (conditionsFinalizer) Wrap(context Context, group ValidationGroup) (ValidationGroup, error) {
+	if group.Conditions.Empty() {
+		return group, nil
+	}
+	wrapContext := context
+	if group.FieldType != nil {
+		wrapContext.Type = group.FieldType
+	}
+	group.Validations = wrapWithConditions(group.Validations, group.Conditions, wrapContext)
+	group.Conditions = nil
+	return group, nil
 }
 
 type ifTagValidator struct {
 	enabled   bool
-	validator TagValidationExtractor
+	extractor Extractor
 }
 
 func (itv *ifTagValidator) Init(cfg Config) {
-	itv.validator = cfg.TagValidator
+	itv.extractor = cfg.Extractor
 }
 
 func (itv ifTagValidator) TagName() string {
@@ -60,25 +80,54 @@ var (
 	ifOption = types.Name{Package: libValidationPkg, Name: "IfOption"}
 )
 
-func (itv ifTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (itv ifTagValidator) GetFieldValidation(context Context, metadata SchemaMetadata, tag codetags.Tag) (ValidationGroup, error) {
 	optionArg, ok := tag.PositionalArg()
 	if !ok {
-		return Validations{}, fmt.Errorf("missing required option name positional argument")
+		return ValidationGroup{}, fmt.Errorf("missing required option name positional argument")
 	}
 
-	validations, err := itv.validator.ExtractTagValidations(context, *tag.ValueTag)
+	if itv.enabled {
+		context.Conditions = context.Conditions.WithOptionEnabled(optionArg.Value)
+	} else {
+		context.Conditions = context.Conditions.WithOptionDisabled(optionArg.Value)
+	}
+
+	validations, err := itv.extractor.ExtractTagValidations(context, metadata, *tag.ValueTag)
 	if err != nil {
-		return Validations{}, err
+		return ValidationGroup{}, err
 	}
 
-	return WrapFunctions(validations, func(fn FunctionGen, scope DeferredScope) FunctionGen {
-		objType := context.Type
-		if scope == ParentContext {
-			objType = context.ParentType
-		}
+	return ValidationGroup{
+		Validations: validations,
+		Conditions:  context.Conditions,
+	}, nil
+}
 
-		return Function(itv.TagName(), fn.Flags, ifOption, optionArg.Value, itv.enabled, WrapperFunction{Function: fn, ObjType: objType})
-	}), nil
+// wrapWithConditions wraps validations with condition checks,
+// ensuring similarity between how type-level and field-level validations process conditions.
+func wrapWithConditions(validations Validations, cond Conditions, context Context) Validations {
+	if cond.Empty() {
+		return validations
+	}
+	res := validations
+	for _, c := range cond {
+		res = c.Wrap(res, context)
+	}
+	return res
+}
+
+func (itv ifTagValidator) CollectMetadata(context Context, tag codetags.Tag) (SchemaMetadata, error) {
+	if tag.ValueTag == nil {
+		return SchemaMetadata{}, nil
+	}
+	if optionArg, ok := tag.PositionalArg(); ok {
+		if itv.enabled {
+			context.Conditions = context.Conditions.WithOptionEnabled(optionArg.Value)
+		} else {
+			context.Conditions = context.Conditions.WithOptionDisabled(optionArg.Value)
+		}
+	}
+	return itv.extractor.ExtractMetadata(context, *tag.ValueTag)
 }
 
 func (itv ifTagValidator) Docs() TagDoc {

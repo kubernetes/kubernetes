@@ -18,8 +18,10 @@ package validators
 
 import (
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
@@ -31,15 +33,36 @@ const (
 
 func init() {
 	RegisterTagValidator(&subfieldTagValidator{})
+	RegisterValidationWrapper(FinalizeSubfieldOrder, subfieldFinalizer{})
+}
+
+// subfieldFinalizer re-homes an ValidationGroup's validations at its FieldPath
+// by nesting subfield wrappers. Subfield traversal is owned here, next to the
+// tag which declares subfields.
+type subfieldFinalizer struct{}
+
+func (subfieldFinalizer) Name() string { return "subfield" }
+
+func (subfieldFinalizer) Wrap(context Context, group ValidationGroup) (ValidationGroup, error) {
+	if group.FieldPath == nil {
+		return group, nil
+	}
+	wrapped, err := wrapWithSubfieldPath(group.Validations, group.FieldPath, context)
+	if err != nil {
+		return ValidationGroup{}, err
+	}
+	group.Validations = wrapped
+	group.FieldPath = nil
+	return group, nil
 }
 
 type subfieldTagValidator struct {
-	validator              TagValidationExtractor
+	extractor              Extractor
 	processedShortCircuits map[string]bool
 }
 
 func (stv *subfieldTagValidator) Init(cfg Config) {
-	stv.validator = cfg.TagValidator
+	stv.extractor = cfg.Extractor
 	stv.processedShortCircuits = make(map[string]bool)
 }
 
@@ -57,13 +80,13 @@ var (
 	validateSubfield = types.Name{Package: libValidationPkg, Name: "Subfield"}
 )
 
-func (stv *subfieldTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (stv *subfieldTagValidator) GetFieldValidation(context Context, metadata SchemaMetadata, tag codetags.Tag) (ValidationGroup, error) {
 	// TODO: Support nested subfields once the generated validation code can
 	// prevent nil pointer dereferences by checking optionality or requiredness
 	// for intermediate fields.
 	for t := tag.ValueTag; t != nil; t = t.ValueTag {
 		if t.Name == subfieldTagName {
-			return Validations{}, fmt.Errorf("nested +%s tags are unsupported; apply validations directly to the nested type instead", subfieldTagName)
+			return ValidationGroup{}, fmt.Errorf("nested +%s tags are unsupported; apply validations directly to the nested type instead", subfieldTagName)
 		}
 	}
 
@@ -73,101 +96,218 @@ func (stv *subfieldTagValidator) GetValidations(context Context, tag codetags.Ta
 	t := context.Type
 	nt := util.NonPointer(util.NativeType(t))
 	if nt.Kind != types.Struct {
-		return Validations{}, fmt.Errorf("can only be used on struct types: %v", nt.Kind)
+		return ValidationGroup{}, fmt.Errorf("can only be used on struct types: %v", nt.Kind)
 	}
-	subname := args[0].Value
-	submemb := util.GetMemberByJSON(nt, subname)
-	if submemb == nil {
-		return Validations{}, fmt.Errorf("no field for json name %q", subname)
+	fieldName := args[0].Value
+	targetField := util.GetMemberByJSON(nt, fieldName)
+	if targetField == nil {
+		return ValidationGroup{}, fmt.Errorf("no field for json name %q", fieldName)
 	}
 
 	subContext := Context{
 		Scope:          ScopeField,
-		Type:           submemb.Type,
-		Path:           context.Path.Child(subname),
-		Member:         submemb,
+		Type:           targetField.Type,
+		Path:           context.Path.Child(fieldName),
+		Member:         targetField,
 		ParentPath:     context.Path,
 		ParentType:     context.Type,
+		ParentMember:   context.Member,
 		StabilityLevel: context.StabilityLevel,
 	}
 
-	nilableStructType := context.Type
+	tagValidations, err := stv.extractor.ExtractTagValidations(subContext, metadata, *tag.ValueTag)
+	if err != nil {
+		return ValidationGroup{}, err
+	}
+
+	// Subfield's own validations (which contain its short-circuits) are added first,
+	// and inherited parent member short-circuits are added second. The cohort-based
+	// partitioner (sortIntoCohorts) will then sort them so that all short-circuits
+	// run first, preserving the relative addition order (subfield short-circuits
+	// first, then inherited short-circuits). Finally, non-short-circuits will run.
+	var combined Validations
+	combined.Add(tagValidations)
+	if !isFieldOpaque(context) {
+		fieldValidations, err := stv.extractMemberShortCircuits(subContext)
+		if err != nil {
+			return ValidationGroup{}, err
+		}
+		combined.Add(fieldValidations)
+	}
+
+	return ValidationGroup{
+		Validations: combined,
+		FieldPath:  context.Path.Child(fieldName),
+		FieldType:  targetField.Type,
+	}, nil
+}
+
+// wrapWithSubfield wraps validations in a subfield validation step for a single member,
+// ensuring similarity between how type-level and field-level validations process subfields.
+func wrapWithSubfield(validations Validations, fieldName string, parentType *types.Type, targetField *types.Member) Validations {
+	nilableStructType := parentType
 	if !util.IsNilableType(nilableStructType) {
 		nilableStructType = types.PointerTo(nilableStructType)
 	}
-
-	nilableFieldType := submemb.Type
+	nilableFieldType := targetField.Type
 	fieldExprPrefix := ""
 	if !util.IsNilableType(nilableFieldType) {
 		nilableFieldType = types.PointerTo(nilableFieldType)
 		fieldExprPrefix = "&"
 	}
 
-	// getFn is the function that retrieves the subfield value from the
-	// struct.
 	getFn := FunctionLiteral{
 		Parameters: []ParamResult{{"o", nilableStructType}},
 		Results:    []ParamResult{{"", nilableFieldType}},
+		Body:       fmt.Sprintf("return %so.%s", fieldExprPrefix, targetField.Name),
 	}
-	getFn.Body = fmt.Sprintf("return %so.%s", fieldExprPrefix, submemb.Name)
 
 	// equivArg compares the correlated elements in the old and new lists, for
 	// ratcheting. directComparable selects "==" vs semantic DeepEqual.
+	// It must be a pointer, since other nilable types are not directly
+	// comparable.
 	var equivArg any = Identifier(validateSemanticDeepEqual)
-	if util.IsDirectComparable(util.NonPointer(util.NativeType(submemb.Type))) {
-		// It must be a pointer, since other nilable types are not directly
-		// comparable.
+	if util.IsDirectComparable(util.NonPointer(util.NativeType(targetField.Type))) {
 		equivArg = Identifier(validateDirectEqual)
 	}
 
-	tagValidations, err := stv.validator.ExtractTagValidations(subContext, *tag.ValueTag)
-	if err != nil {
-		return Validations{}, err
+	for i, fn := range validations.Functions {
+		f := Function(subfieldTagName, fn.Flags, validateSubfield, fieldName, getFn, equivArg,
+			WrapperFunction{Function: fn, ObjType: targetField.Type, PathFragment: "." + fieldName})
+		f.Cohort = fieldName
+		validations.Functions[i] = f
+	}
+	for i, fn := range validations.TypeFunctions {
+		f := Function(subfieldTagName, fn.Flags, validateSubfield, fieldName, getFn, equivArg,
+			WrapperFunction{Function: fn, ObjType: targetField.Type, PathFragment: "." + fieldName})
+		f.Cohort = fieldName
+		validations.TypeFunctions[i] = f
+	}
+	return validations
+}
+
+// wrapWithSubfieldPath traces a dotted path and repeatedly wraps the provided validations
+// for each segment using wrapWithSubfield. A nil target or a target equal to
+// the context path means the validations apply at the current context and are
+// returned unchanged; a target that cannot be resolved from the context is an
+// error.
+func wrapWithSubfieldPath(validations Validations, fieldPath *field.Path, context Context) (Validations, error) {
+	if fieldPath == nil || context.Path == nil {
+		return validations, nil
+	}
+	fieldPathStr := fieldPath.String()
+	enclosingPathStr := context.Path.String()
+	if fieldPathStr == enclosingPathStr {
+		return validations, nil
 	}
 
-	// Only the parent-member short-circuit inheritance depends on opaque-tag
-	// globals (see globalOpaqueTypes / globalOpaqueMembers in opaque.go), so
-	// defer just that decision until all opaque tags have been registered. The
-	// rest of the wrapping is independent and runs eagerly.
-	result := Validations{}
-	result.AddDeferred(Deferred(ThisContext, func() (Validations, error) {
-		// Subfield's own validations (which contain its short-circuits) are added first,
-		// and inherited parent member short-circuits are added second. The cohort-based
-		// partitioner (sortIntoCohorts) will then sort them so that all short-circuits
-		// run first, preserving the relative addition order (subfield short-circuits
-		// first, then inherited short-circuits). Finally, non-short-circuits will run.
-		var combined Validations
-		combined.Add(tagValidations)
-		if !isFieldOpaque(context) {
-			fieldValidations, err := stv.extractMemberShortCircuits(subContext)
-			if err != nil {
-				return Validations{}, err
-			}
-			combined.Add(fieldValidations)
-		}
+	relPathStr := strings.TrimPrefix(fieldPathStr, enclosingPathStr+".")
+	if relPathStr == fieldPathStr { // Did not have the prefix
+		return Validations{}, fmt.Errorf("target path %q is not a descendant of context path %q", fieldPathStr, enclosingPathStr)
+	}
 
-		mapped := WrapFunctions(combined, func(fn FunctionGen, scope DeferredScope) FunctionGen {
-			// ParentContext functions (e.g. Union) emit without a cohort.
-			if scope == ParentContext {
-				return fn
-			}
-			f := Function(subfieldTagName, fn.Flags, validateSubfield, subname, getFn, equivArg,
-				WrapperFunction{Function: fn, ObjType: submemb.Type, PathFragment: "." + subname})
-			f.Cohort = subname
-			return f
+	pathSegments := strings.Split(relPathStr, ".")
+	currType := context.Type
+
+	type fieldHop struct {
+		fieldName string
+		parent  *types.Type
+		targetField *types.Member
+	}
+	var hops []fieldHop
+
+	for _, hop := range pathSegments {
+		st := util.NonPointer(util.NativeType(currType))
+		if st.Kind != types.Struct {
+			return Validations{}, fmt.Errorf("cannot resolve %q in target path %q: %v is not a struct", hop, fieldPathStr, st.Kind)
+		}
+		sm := util.GetMemberByJSON(st, hop)
+		if sm == nil {
+			return Validations{}, fmt.Errorf("cannot resolve %q in target path %q: no field for json name %q in %v", hop, fieldPathStr, hop, st.Name)
+		}
+		hops = append(hops, fieldHop{
+			fieldName: hop,
+			parent:  currType,
+			targetField: sm,
 		})
+		currType = sm.Type
+	}
 
-		for i := range mapped.Deferred {
-			// The validations belong to the subfield, so re-scope ParentContext
-			// (which would target the enclosing struct) to ThisContext.
-			if mapped.Deferred[i].Scope == ParentContext {
-				mapped.Deferred[i].Scope = ThisContext
-			}
+	for i := len(hops) - 1; i >= 0; i-- {
+		hop := hops[i]
+		validations = wrapWithSubfield(validations, hop.fieldName, hop.parent, hop.targetField)
+	}
+
+	return validations, nil
+}
+
+// resolveSubfieldContext traverses a dotted subfield path from the given context,
+// updating Scope, Type, Path, Member, ParentPath, and ParentType so that
+// downstream validators operate directly on the target nested field without
+// managing their own path-resolution loops.
+func resolveSubfieldContext(context Context, subPath string) Context {
+	if subPath == "" {
+		return context
+	}
+	subSegments := strings.Split(subPath, ".")
+	currCtxType := context.Type
+	if context.Member != nil {
+		currCtxType = context.Member.Type
+	}
+	currPath := context.Path
+	var lastMemb *types.Member
+	var lastParentType *types.Type
+	var lastParentPath *field.Path
+	lastParentMember := context.Member
+	valid := true
+	for i, seg := range subSegments {
+		st := util.NonPointer(util.NativeType(currCtxType))
+		if st.Kind != types.Struct && context.ParentType != nil && lastMemb == nil {
+			st = util.NonPointer(util.NativeType(context.ParentType))
+			currPath = context.ParentPath
 		}
+		if st.Kind != types.Struct {
+			valid = false
+			break
+		}
+		sm := util.GetMemberByJSON(st, seg)
+		if sm == nil {
+			valid = false
+			break
+		}
+		if i > 0 {
+			lastParentMember = lastMemb
+		}
+		lastMemb = sm
+		lastParentType = currCtxType
+		lastParentPath = currPath
+		currCtxType = sm.Type
+		if currPath != nil {
+			currPath = currPath.Child(seg)
+		}
+	}
+	if valid && lastMemb != nil {
+		context = Context{
+			Scope:          ScopeField,
+			Type:           lastMemb.Type,
+			Path:           currPath,
+			Member:         lastMemb,
+			ListSelector:   context.ListSelector,
+			ParentPath:     lastParentPath,
+			ParentType:     lastParentType,
+			ParentMember:   lastParentMember,
+			Conditions:     context.Conditions,
+			StabilityLevel: context.StabilityLevel,
+		}
+	}
+	return context
+}
 
-		return mapped, nil
-	}))
-	return result, nil
+func (stv *subfieldTagValidator) Unwrap(context Context, tag codetags.Tag) (Context, error) {
+	if arg, ok := tag.PositionalArg(); ok {
+		context = resolveSubfieldContext(context, arg.Value)
+	}
+	return context, nil
 }
 
 // extractMemberShortCircuits extracts short-circuit validations (e.g. required,
@@ -182,19 +322,30 @@ func (stv *subfieldTagValidator) extractMemberShortCircuits(subContext Context) 
 	}
 	stv.processedShortCircuits[key] = true
 
-	ve, ok := stv.validator.(ValidationExtractor)
-	if !ok {
-		return Validations{}, fmt.Errorf("validator does not implement ValidationExtractor")
-	}
-	tags, err := ve.ExtractTags(subContext, subContext.Member.CommentLines)
+	tags, err := stv.extractor.ExtractTags(subContext, subContext.Member.CommentLines)
 	if err != nil {
 		return Validations{}, err
 	}
-	memberValidations, err := ve.ExtractValidations(subContext, tags...)
+	memberMeta, err := stv.extractor.ExtractMetadata(subContext, tags...)
+	if err != nil {
+		return Validations{}, err
+	}
+	memberValidations, err := stv.extractor.ExtractValidations(subContext, memberMeta, tags...)
 	if err != nil {
 		return Validations{}, err
 	}
 	return copyShortCircuitsAsNonError(memberValidations), nil
+}
+
+func (stv *subfieldTagValidator) CollectMetadata(context Context, tag codetags.Tag) (SchemaMetadata, error) {
+	if tag.ValueTag == nil {
+		return SchemaMetadata{}, nil
+	}
+	subContext, err := stv.Unwrap(context, tag)
+	if err != nil {
+		return SchemaMetadata{}, err
+	}
+	return stv.extractor.ExtractMetadata(subContext, *tag.ValueTag)
 }
 
 func (stv *subfieldTagValidator) Docs() TagDoc {
@@ -218,9 +369,9 @@ func (stv *subfieldTagValidator) Docs() TagDoc {
 	}
 }
 
-// copyShortCircuitsAsNonError recursively traverses the validations (and deferred ones)
-// and returns a new Validations object containing only the functions that have
-// ShortCircuit flag set. The returned functions are also marked as NonError.
+// copyShortCircuitsAsNonError traverses the validations and returns a new
+// Validations object containing only the functions that have ShortCircuit
+// flag set. The returned functions are also marked as NonError.
 func copyShortCircuitsAsNonError(v Validations) Validations {
 	res := Validations{}
 	for _, fn := range v.Functions {
@@ -228,15 +379,6 @@ func copyShortCircuitsAsNonError(v Validations) Validations {
 			fn.Flags |= NonError
 			res.AddFunction(fn)
 		}
-	}
-	for _, d := range v.Deferred {
-		res.AddDeferred(Deferred(d.Scope, func() (Validations, error) {
-			inner, err := d.Callback()
-			if err != nil {
-				return Validations{}, err
-			}
-			return copyShortCircuitsAsNonError(inner), nil
-		}))
 	}
 	return res
 }

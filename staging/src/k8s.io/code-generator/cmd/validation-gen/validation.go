@@ -220,7 +220,7 @@ func (td *typeDiscoverer) Init(c *generator.Context) error {
 			}
 			if len(tgs) > 0 {
 				// Also check that the tgs are valid.
-				if _, err := td.validator.ExtractValidations(context, tgs...); err != nil {
+				if _, err := td.validator.ExtractValidations(context, validators.SchemaMetadata{}, tgs...); err != nil {
 					return fmt.Errorf("constant %s: %w", cnst.Name, err)
 				}
 			}
@@ -264,6 +264,7 @@ type typeNode struct {
 	underlying *childNode   // populated when this type is an alias
 
 	typeValidations validators.Validations // validations on the type
+	schemaMeta      validators.SchemaMetadata
 
 	// These are not the same as typeValidations, and are not considered in
 	// hasValidations. These let us emit the iteration code for list and
@@ -367,6 +368,25 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 		}
 	}
 
+	// Phase 1: Collect ALL metadata for this type before discovering children.
+	consts := td.constantsByType[t]
+	typeContext := validators.Context{
+		Scope:          validators.ScopeType,
+		Type:           t,
+		Path:           fldPath,
+		Member:         nil, // NA when discovering a type
+		ParentPath:     nil, // NA when discovering a type
+		Constants:      consts,
+		ListSelector:   nil, // NA for type scope
+		ParentType:     nil, // NA for type scope
+		StabilityLevel: "",  // Default to stable unless overridden
+	}
+	schemaMeta, err := td.validator.CollectMetadata(typeContext)
+	if err != nil {
+		return nil, fmt.Errorf("%v: metadata extraction failed: %w", fldPath, err)
+	}
+	thisNode.schemaMeta = schemaMeta
+
 	// Discover into this type before extracting type validations.
 	switch t.Kind {
 	case types.Builtin, types.Interface:
@@ -457,16 +477,19 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 		if err != nil {
 			return nil, fmt.Errorf("%v: %w", fldPath, err)
 		}
-		if validations, err := td.validator.ExtractValidations(context, extractedTags...); err != nil {
+
+		if validations, err := td.validator.ExtractValidations(context, thisNode.schemaMeta, extractedTags...); err != nil {
 			return nil, fmt.Errorf("%v: %w", fldPath, err)
-		} else if validations.Empty() {
-			klog.V(6).InfoS("no type-attached validations", "type", t)
 		} else {
-			if util.NonPointer(util.NativeType(t)).Kind == types.Map && util.NonPointer(util.NativeType(t)).Elem.Kind == types.Slice {
-				return nil, fmt.Errorf("field %s: validation for map of slices is not supported", fldPath)
+			if validations.Empty() {
+				klog.V(6).InfoS("no type-attached validations", "type", t)
+			} else {
+				if util.NonPointer(util.NativeType(t)).Kind == types.Map && util.NonPointer(util.NativeType(t)).Elem.Kind == types.Slice {
+					return nil, fmt.Errorf("field %s: validation for map of slices is not supported", fldPath)
+				}
+				klog.V(5).InfoS("found type-attached validations", "n", len(validations.Functions), "type", t)
+				thisNode.typeValidations.Add(validations)
 			}
-			klog.V(5).InfoS("found type-attached validations", "n", len(validations.Functions), "type", t)
-			thisNode.typeValidations.Add(validations)
 		}
 
 		// Handle type definitions whose output depends on the rest of type
@@ -502,7 +525,7 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 						//
 						// Note: the first argument to Function() is really
 						// only for debugging.
-						v, err := validators.ForEachVal(fldPath, thisNode.valueType,
+						v, err := validators.ForEachVal(typeContext, thisNode.schemaMeta, fldPath, thisNode.valueType,
 							validators.Function("iterateListValues", validators.DefaultFlags, funcName).
 								WithComment("iterate the list and call the type's validation function"))
 						if err != nil {
@@ -567,7 +590,7 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 						//
 						// Note: the first argument to Function() is really
 						// only for debugging.
-						v, err := validators.ForEachVal(fldPath, thisNode.valueType,
+						v, err := validators.ForEachVal(typeContext, thisNode.schemaMeta, fldPath, thisNode.valueType,
 							validators.Function("iterateMapValues", validators.DefaultFlags, funcName).
 								WithComment("iterate the map and call the value type's validation function"))
 						if err != nil {
@@ -579,40 +602,6 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 				}
 			}
 		}
-	}
-
-	// These are validations that could not be fully resolved during tag extraction
-	// (e.g., because they need to wrap inner validations or depend on the full
-	// type graph being discovered). We resolve them iteratively because a
-	// deferred validation may yield further deferred validations.
-	deferred := thisNode.typeValidations.Deferred
-	thisNode.typeValidations.Deferred = nil
-	depth := 0
-	for len(deferred) > 0 {
-		depth++
-		if depth > 10 {
-			return nil, fmt.Errorf("deferred validation recursion depth exceeded "+
-				"10 for type %s at path %s", thisNode.valueType.String(), fldPath.String())
-		}
-		var nextDeferred []validators.DeferredGen
-		for _, def := range deferred {
-			res, err := def.Callback()
-			if err != nil {
-				return nil, err
-			}
-			if len(res.Deferred) > 0 {
-				nextDeferred = append(nextDeferred, res.Deferred...)
-				res.Deferred = nil
-			}
-			// Deferred validations can originate from fields with ParentContext scope (e.g., UnionValidations)
-			// or from validations on type definitions with ThisContext scope (e.g., eachVal on a slice type).
-			if def.Scope == validators.ThisContext || def.Scope == validators.ParentContext {
-				thisNode.typeValidations.Add(res)
-			} else {
-				return nil, fmt.Errorf("unexpected scope %v", def.Scope)
-			}
-		}
-		deferred = nextDeferred
 	}
 
 	return thisNode, nil
@@ -761,18 +750,24 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 		if err != nil {
 			return fmt.Errorf("field %s: %w", childPath.String(), err)
 		}
-		if validations, err := td.validator.ExtractValidations(context, tags...); err != nil {
+		if validations, err := td.validator.ExtractValidations(context, thisNode.schemaMeta, tags...); err != nil {
 			return fmt.Errorf("field %s: %w", childPath.String(), err)
-		} else if validations.Empty() {
-			klog.V(6).InfoS("no field-attached validations", "field", childPath)
 		} else {
-			klog.V(5).InfoS("found field-attached validations", "n", len(validations.Functions), "field", childPath)
-			if util.NonPointer(util.NativeType(childType)).Kind == types.Map && util.NonPointer(util.NativeType(childType)).Elem.Kind == types.Slice {
-				return fmt.Errorf("field %s: validation for map of slices is not supported", childPath)
+			if validations.Empty() {
+				klog.V(6).InfoS("no field-attached validations", "field", childPath)
+			} else {
+				klog.V(5).InfoS("found field-attached validations", "n", len(validations.Functions), "field", childPath)
+				if util.NonPointer(util.NativeType(childType)).Kind == types.Map && util.NonPointer(util.NativeType(childType)).Elem.Kind == types.Slice {
+					return fmt.Errorf("field %s: validation for map of slices is not supported", childPath)
+				}
+				if len(validations.TypeFunctions) > 0 {
+					thisNode.typeValidations.Functions = append(thisNode.typeValidations.Functions, validations.TypeFunctions...)
+					validations.TypeFunctions = nil
+				}
+				child.fieldValidations.Add(validations)
+				// TODO: re-visit erroring on specific cases where variable generation is not supported for field validations
+				// currently there are some cases where we want variable generation for field validations
 			}
-			child.fieldValidations.Add(validations)
-			// TODO: re-visit erroring on specific cases where variable generation is not supported for field validations
-			// currently there are some cases where we want variable generation for field validations
 		}
 
 		// Handle non-included types.
@@ -822,7 +817,7 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 					//
 					// Note: the first argument to Function() is really
 					// only for debugging.
-					v, err := validators.ForEachVal(childPath, childType,
+					v, err := validators.ForEachValContext(context, thisNode.schemaMeta, childPath, childType,
 						validators.Function("iterateListValues", validators.DefaultFlags, funcName).
 							WithComment("iterate the list and call the type's validation function"))
 					if err != nil {
@@ -885,7 +880,7 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 					//
 					// Note: the first argument to Function() is really
 					// only for debugging.
-					v, err := validators.ForEachVal(childPath, childType,
+					v, err := validators.ForEachValContext(context, thisNode.schemaMeta, childPath, childType,
 						validators.Function("iterateMapValues", validators.DefaultFlags, funcName).
 							WithComment("iterate the map and call the value type's validation function"))
 					if err != nil {
@@ -898,48 +893,6 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 		}
 
 		fields = append(fields, child)
-	}
-
-	for _, child := range fields {
-		// Process deferred validations for the field. Similar to type-level
-		// deferred validations, these are resolved iteratively until no more
-		// deferred validations are produced.
-		deferred := child.fieldValidations.Deferred
-		child.fieldValidations.Deferred = nil
-		depth := 0
-		for len(deferred) > 0 {
-			depth++
-			if depth > 10 {
-				return fmt.Errorf("deferred validation recursion depth exceeded "+
-					"10 for field %s of type %s", child.name, thisNode.valueType.String())
-			}
-			var nextDeferred []validators.DeferredGen
-			for _, def := range deferred {
-				res, err := def.Callback()
-				if err != nil {
-					return fmt.Errorf("deferred validation callback failed for field %s of type %s: %w",
-						child.name, thisNode.valueType.String(), err)
-				}
-				if len(res.Deferred) > 0 {
-					nextDeferred = append(nextDeferred, res.Deferred...)
-					res.Deferred = nil
-				}
-				// Map the resolved validations to the appropriate context:
-				// - ThisContext maps to the field's validations.
-				// - ParentContext maps to the containing type's validations.
-				//   This occurs when a validation specified on a field actually applies to the
-				//   entire struct (e.g., union validations that enforce rules across multiple fields).
-				switch def.Scope {
-				case validators.ThisContext:
-					child.fieldValidations.Add(res)
-				case validators.ParentContext:
-					thisNode.typeValidations.Add(res)
-				default:
-					return fmt.Errorf("unexpected scope %v", def.Scope)
-				}
-			}
-			deferred = nextDeferred
-		}
 	}
 
 	thisNode.fields = fields
@@ -1547,48 +1500,6 @@ func (g *genValidations) emitCallsToValidators(c *generator.Context, validations
 				}
 				if isShortCircuit {
 					sw.Do(".MarkShortCircuit()", nil)
-				}
-			}
-
-			// If validation is conditional, wrap the validation function with a conditions check.
-			if !v.Conditions.Empty() {
-				emitBaseFunction := emitCall
-				emitCall = func() {
-					// emitOptionLookup emits "<var>, defined := op.HasOption(<option>)" and
-					// surfaces an undefined option as an internal error.
-					emitOptionLookup := func(varName, option string) {
-						la := generator.Args{"field": targs["field"], "fmt": targs["fmt"], "opt": strconv.Quote(option)}
-						sw.Do("  "+varName+", defined := op.HasOption($.opt$)\n", la)
-						sw.Do("  if !defined {\n", nil)
-						sw.Do("    return $.field.ErrorList|raw${$.field.InternalError|raw$(fldPath, $.fmt.Errorf|raw$(\"undefined validation option %q\", $.opt$))}\n", la)
-						sw.Do("  }\n", nil)
-					}
-					sw.Do("func() $.field.ErrorList|raw$ {\n", targs)
-					if len(v.Conditions.OptionEnabled) > 0 {
-						emitOptionLookup("optionEnabled", v.Conditions.OptionEnabled)
-					}
-					if len(v.Conditions.OptionDisabled) > 0 {
-						emitOptionLookup("optionDisabled", v.Conditions.OptionDisabled)
-					}
-					sw.Do("  if ", nil)
-					firstCondition := true
-					if len(v.Conditions.OptionEnabled) > 0 {
-						sw.Do("optionEnabled", nil)
-						firstCondition = false
-					}
-					if len(v.Conditions.OptionDisabled) > 0 {
-						if !firstCondition {
-							sw.Do(" && ", nil)
-						}
-						sw.Do("!optionDisabled", nil)
-					}
-					sw.Do(" {\n", nil)
-					sw.Do("    return ", nil)
-					emitBaseFunction()
-					sw.Do("\n", nil)
-					sw.Do("  }\n", nil)
-					sw.Do("  return nil // skip validation\n", nil)
-					sw.Do("}()", nil)
 				}
 			}
 

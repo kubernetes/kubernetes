@@ -92,12 +92,6 @@ func Validate_Struct(
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapField #1"); len(e) != 0 {
-				errs = append(errs, e...)
-			}
-			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapField #2"); len(e) != 0 {
-				errs = append(errs, e...)
-			}
 			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapField[*] #1")
@@ -108,6 +102,12 @@ func Validate_Struct(
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapField[*] #2")
 				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapField #1"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapField #2"); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return

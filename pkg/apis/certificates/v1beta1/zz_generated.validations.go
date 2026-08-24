@@ -154,6 +154,34 @@ func Validate_CertificateSigningRequestStatus(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *certificatesv1beta1.CertificateSigningRequestStatus) (errs field.ErrorList) {
 
+	func() { // cohort = "conditions"
+		if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "conditions",
+			func(o *certificatesv1beta1.CertificateSigningRequestStatus) []certificatesv1beta1.CertificateSigningRequestCondition {
+				return o.Conditions
+			}, validate.SemanticDeepEqual,
+			func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []certificatesv1beta1.CertificateSigningRequestCondition) field.ErrorList {
+				return validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_api_certificates_v1beta1_CertificateSigningRequestStatus_conditions_,
+					func(list []certificatesv1beta1.CertificateSigningRequestCondition) bool {
+						for i := range list {
+							if list[i].Type == "Approved" {
+								return true
+							}
+						}
+						return false
+					},
+					func(list []certificatesv1beta1.CertificateSigningRequestCondition) bool {
+						for i := range list {
+							if list[i].Type == "Denied" {
+								return true
+							}
+						}
+						return false
+					}).MarkBeta()
+			}); len(e) != 0 {
+			errs = append(errs, e...)
+		}
+	}()
+
 	{ // field certificatesv1beta1.CertificateSigningRequestStatus.Conditions
 		fn := func(
 			fldPath *field.Path,
@@ -173,25 +201,6 @@ func Validate_CertificateSigningRequestStatus(
 			}
 			if earlyReturn {
 				return // do not proceed
-			}
-			if e := validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_api_certificates_v1beta1_CertificateSigningRequestStatus_conditions_,
-				func(list []certificatesv1beta1.CertificateSigningRequestCondition) bool {
-					for i := range list {
-						if list[i].Type == "Approved" {
-							return true
-						}
-					}
-					return false
-				},
-				func(list []certificatesv1beta1.CertificateSigningRequestCondition) bool {
-					for i := range list {
-						if list[i].Type == "Denied" {
-							return true
-						}
-					}
-					return false
-				}).MarkBeta(); len(e) != 0 {
-				errs = append(errs, e...)
 			}
 			return
 		}

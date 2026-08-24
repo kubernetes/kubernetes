@@ -106,13 +106,13 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListField"); len(e) != 0 {
-				errs = append(errs, e...)
-			}
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherStruct) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListField[*]")
 				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListField"); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
@@ -140,13 +140,13 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListTypedefField"); len(e) != 0 {
-				errs = append(errs, e...)
-			}
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherTypedefStruct) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListTypedefField[*]")
 				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListTypedefField"); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
@@ -184,13 +184,13 @@ func Validate_Struct(
 			if earlyReturn {
 				return // do not proceed
 			}
-			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListPtrField"); len(e) != 0 {
-				errs = append(errs, e...)
-			}
 			if e := validate.EachPtrSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherStruct) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListPtrField[*]")
 				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListPtrField"); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function
@@ -226,13 +226,13 @@ func Validate_Struct(
 			if earlyReturn {
 				return // do not proceed
 			}
-			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListPtrTypedefField"); len(e) != 0 {
-				errs = append(errs, e...)
-			}
 			if e := validate.EachPtrSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherTypedefStruct) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListPtrTypedefField[*]")
 				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListPtrTypedefField"); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the list and call the type's validation function

@@ -136,7 +136,10 @@ func Validate_Struct(
 			earlyReturn := false
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "FeatureX", true,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-					return validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify)
+					return validate.IfOption(ctx, op, fldPath, obj, oldObj, "FeatureX", true,
+						func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+							return validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify)
+						})
 				}).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
@@ -168,7 +171,10 @@ func Validate_Struct(
 			earlyReturn := false
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "FeatureX", false,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-					return validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify)
+					return validate.IfOption(ctx, op, fldPath, obj, oldObj, "FeatureX", false,
+						func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+							return validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify)
+						})
 				}).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
