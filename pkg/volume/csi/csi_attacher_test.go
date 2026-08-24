@@ -17,6 +17,7 @@ limitations under the License.
 package csi
 
 import (
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"fmt"
@@ -25,6 +26,7 @@ import (
 	"path/filepath"
 	"reflect"
 	goruntime "runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -35,13 +37,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	fakecsi "k8s.io/kubernetes/pkg/volume/csi/fake"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -203,7 +208,7 @@ func TestAttacherAttach(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Logf("test case: %s", tc.name)
-			fakeClient := fakeclient.NewSimpleClientset()
+			fakeClient := fakeclient.NewSimpleClientset(specPVObjects(tc.spec)...)
 			plug, _ := newTestPluginWithAttachDetachVolumeHost(t, fakeClient)
 
 			attacher, err := plug.NewAttacher()
@@ -289,7 +294,7 @@ func TestAttacherAttachWithInline(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Logf("test case: %s", tc.name)
-			fakeClient := fakeclient.NewSimpleClientset()
+			fakeClient := fakeclient.NewSimpleClientset(specPVObjects(tc.spec)...)
 			plug, _ := newTestPluginWithAttachDetachVolumeHost(t, fakeClient)
 
 			attacher, err := plug.NewAttacher()
@@ -326,6 +331,429 @@ func TestAttacherAttachWithInline(t *testing.T) {
 	}
 }
 
+// TestAttacherAttachWithPVBeingDeleted covers volumes whose VolumeAttachment refers to a
+// PersistentVolume that is being deleted. Because the name of a VolumeAttachment is derived
+// from the volume handle and not from the PV name, several PVs sharing a volume handle map
+// to the same VolumeAttachment on a node, and a leftover VolumeAttachment of a deleted PV
+// would otherwise block attaching the current PV forever.
+func TestAttacherAttachWithPVBeingDeleted(t *testing.T) {
+	const (
+		driverName   = "driver01"
+		volumeHandle = "vol01"
+		nodeName     = "node01"
+		currentPV    = "pv-current"
+		stalePV      = "pv-stale"
+		// existingUID marks the VolumeAttachment a case starts with, so that an object that
+		// was deleted and created again can be told from one that was kept.
+		existingUID = "existing-uid"
+	)
+	attachID := GetVolumeAttachmentName(volumeHandle, driverName, nodeName)
+	// Messages of the two waits that Attach can time out in: for the VolumeAttachment to
+	// become attached, and for a VolumeAttachment that is being deleted to be gone.
+	attachTimeout := fmt.Sprintf("timed out waiting for external-attacher of %s CSI driver to attach volume", driverName)
+	detachTimeout := fmt.Sprintf("timed out waiting for external-attacher of %s CSI driver to detach volume", driverName)
+
+	makePV := func(name string, terminating bool) *v1.PersistentVolume {
+		pv := makeTestPV(name, 10, driverName, volumeHandle)
+		if terminating {
+			pv.DeletionTimestamp = new(metav1.Now())
+			pv.Finalizers = []string{"external-attacher/" + driverName}
+		}
+		return pv
+	}
+	// makeAttachment returns a VolumeAttachment that external-attacher has reported an
+	// attach error for, so no publish is in flight for it. It is marked attached on top of
+	// that when asked to: external-attacher does not report both, but status.attached must
+	// win over the error for an attacher that does.
+	makeAttachment := func(attached bool) *storage.VolumeAttachment {
+		attachment := makeTestAttachment(attachID, nodeName, stalePV)
+		attachment.UID = existingUID
+		attachment.Spec.Attacher = driverName
+		attachment.Status.Attached = attached
+		attachment.Status.AttachError = &storage.VolumeError{
+			Message: fmt.Sprintf("PersistentVolume %q is marked for deletion", stalePV),
+		}
+		return attachment
+	}
+	// makeAttachingAttachment returns a VolumeAttachment that external-attacher has not
+	// reported on yet, as if ControllerPublishVolume were still running for it.
+	makeAttachingAttachment := func() *storage.VolumeAttachment {
+		attachment := makeAttachment(false)
+		attachment.Status.AttachError = nil
+		return attachment
+	}
+	makeDeletedAttachment := func() *storage.VolumeAttachment {
+		attachment := makeAttachment(false)
+		attachment.DeletionTimestamp = new(metav1.Now())
+		return attachment
+	}
+	makeInlineAttachment := func() *storage.VolumeAttachment {
+		attachment := makeAttachment(false)
+		pvSpec := makePV(stalePV, true).Spec
+		attachment.Spec.Source = storage.VolumeAttachmentSource{InlineVolumeSpec: &pvSpec}
+		return attachment
+	}
+
+	testCases := []struct {
+		name string
+		// objs is what the API contains when the case starts, besides the PV to attach,
+		// which the harness adds. A PV that is missing from it is gone.
+		objs               []runtime.Object
+		existingAttachment *storage.VolumeAttachment
+		injectDeleteError  error
+		// injectVAFinalizer holds the VolumeAttachment Terminating when the attacher deletes
+		// it, the way external-attacher's finalizer does.
+		injectVAFinalizer bool
+		// specPVTerminating gives the PV to attach a deletionTimestamp.
+		specPVTerminating bool
+		// specPVGone keeps the PV to attach out of the API, as if its deletion had completed
+		// already.
+		specPVGone bool
+		// specInline attaches the spec as a migrated inline volume, whose PV is
+		// synthesized by the CSI translation and exists nowhere else.
+		specInline bool
+		// watchTimeout is how long Attach waits for the VolumeAttachment to reach the
+		// state it needs. Cases that expect it to give up cut it short: what they assert
+		// is decided before the wait starts, and the wait checks nothing before its first
+		// backoff expires anyway.
+		watchTimeout time.Duration
+		// expectAttachedPV is the PV that the VolumeAttachment is expected to refer to
+		// once it is attached. Empty means that the VolumeAttachment source is an inline
+		// volume spec.
+		expectAttachedPV   string
+		expectNoAttachment bool
+		// expectVAKept asserts that the VolumeAttachment the case started with is still the
+		// same object, rather than one that was deleted and created again.
+		expectVAKept       bool
+		expectErrorMessage string
+	}{
+		{
+			name:               "stale PV gone, replace VA",
+			existingAttachment: makeAttachment(false),
+			expectAttachedPV:   currentPV,
+		},
+		{
+			name:               "stale PV terminating, replace VA",
+			objs:               []runtime.Object{makePV(stalePV, true)},
+			existingAttachment: makeAttachment(false),
+			expectAttachedPV:   currentPV,
+		},
+		{
+			name:               "stale PV terminating, VA attached, keep",
+			objs:               []runtime.Object{makePV(stalePV, true)},
+			existingAttachment: makeAttachment(true),
+			expectAttachedPV:   stalePV,
+			expectVAKept:       true,
+		},
+		{
+			name:               "stale PV terminating, publish in flight, keep",
+			objs:               []runtime.Object{makePV(stalePV, true)},
+			existingAttachment: makeAttachingAttachment(),
+			expectAttachedPV:   stalePV,
+			expectVAKept:       true,
+			// lets Attach time out instead of attaching the volume as the other cases do:
+			// marking the VolumeAttachment attached would make it pass without the attacher
+			// ever having looked at it.
+			expectErrorMessage: attachTimeout,
+			watchTimeout:       10 * time.Millisecond,
+		},
+		{
+			name:               "stale PV alive, keep VA",
+			objs:               []runtime.Object{makePV(stalePV, false)},
+			existingAttachment: makeAttachment(false),
+			expectAttachedPV:   stalePV,
+			expectVAKept:       true,
+		},
+		{
+			name:       "inline spec, no PV lookup",
+			specInline: true,
+		},
+		{
+			name:               "VA with inline source, keep",
+			existingAttachment: makeInlineAttachment(),
+			expectVAKept:       true,
+		},
+		{
+			name:               "VA already deleting, wait for detach",
+			objs:               []runtime.Object{makePV(stalePV, true)},
+			existingAttachment: makeDeletedAttachment(),
+			expectAttachedPV:   stalePV,
+			expectVAKept:       true,
+			expectErrorMessage: detachTimeout,
+			watchTimeout:       10 * time.Millisecond,
+		},
+		{
+			name:               "spec PV terminating, no VA created",
+			specPVTerminating:  true,
+			expectNoAttachment: true,
+			expectErrorMessage: fmt.Sprintf("PersistentVolume %q is marked for deletion", currentPV),
+		},
+		{
+			name:               "spec PV gone, no VA created",
+			specPVGone:         true,
+			expectNoAttachment: true,
+			expectErrorMessage: fmt.Sprintf("persistentvolume %q not found", currentPV),
+		},
+		{
+			name:               "spec PV terminating, delete VA, no wait, create none",
+			specPVTerminating:  true,
+			existingAttachment: makeAttachment(false),
+			injectVAFinalizer:  true,
+			expectAttachedPV:   stalePV,
+			expectVAKept:       true,
+			expectErrorMessage: fmt.Sprintf("PersistentVolume %q is marked for deletion", currentPV),
+		},
+		{
+			name:               "delete conflict, keep VA",
+			existingAttachment: makeAttachment(false),
+			injectDeleteError:  apierrors.NewConflict(storage.Resource("volumeattachments"), attachID, fmt.Errorf("precondition failed")),
+			expectAttachedPV:   stalePV,
+			expectVAKept:       true,
+			expectErrorMessage: "failed to delete stale VolumeAttachment",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			specPV := makePV(currentPV, tc.specPVTerminating)
+			objs := tc.objs
+			if !tc.specPVGone && !tc.specInline {
+				objs = append(objs, specPV)
+			}
+			fakeClient := fakeclient.NewSimpleClientset(objs...)
+			fakeClient.PrependReactor("delete", "volumeattachments", func(action core.Action) (bool, runtime.Object, error) {
+				del := action.(core.DeleteActionImpl)
+				// A VolumeAttachment may only be deleted with preconditions, so that one that
+				// changed since it was read from the cache, and is attached by now, is not.
+				preconditions := del.DeleteOptions.Preconditions
+				if preconditions == nil || preconditions.ResourceVersion == nil || ptr.Deref(preconditions.UID, "") != existingUID {
+					t.Errorf("expecting UID %q and resourceVersion preconditions on the delete, got %+v", existingUID, preconditions)
+				}
+				switch {
+				case tc.injectDeleteError != nil:
+					return true, nil, tc.injectDeleteError
+				case tc.injectVAFinalizer:
+					markVolumeAttachmentTerminating(t, fakeClient, del)
+					return true, nil, nil
+				default:
+					return false, nil, nil
+				}
+			})
+
+			plug, _ := newTestPluginWithAttachDetachVolumeHost(t, fakeClient)
+
+			if tc.existingAttachment != nil {
+				// Create the VolumeAttachment through the client instead of seeding it into
+				// the fake client, and wait for the informer to serve it.
+				// Workaround lost delete events to informer #141528
+				if _, err := fakeClient.StorageV1().VolumeAttachments().Create(t.Context(), tc.existingAttachment, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("failed to create the existing VolumeAttachment: %v", err)
+				}
+				if err := wait.PollUntilContextTimeout(t.Context(), time.Millisecond, wait.ForeverTestTimeout, true,
+					func(context.Context) (bool, error) {
+						_, err := plug.volumeAttachmentLister.Get(attachID)
+						return err == nil, nil
+					}); err != nil {
+					t.Fatalf("the informer did not observe the existing VolumeAttachment: %v", err)
+				}
+			}
+
+			attacher, err := plug.NewAttacher()
+			if err != nil {
+				t.Fatalf("failed to create new attacher: %v", err)
+			}
+			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher, cmp.Or(tc.watchTimeout, testWatchFailTimeout))
+
+			var wg sync.WaitGroup
+			if tc.expectErrorMessage == "" {
+				wg.Go(func() {
+					// Let the Attach call finish by attaching the VolumeAttachment that it
+					// is waiting for, like external-attacher would.
+					markMatchingVolumeAttached(t, fakeClient, attachID, tc.expectAttachedPV)
+				})
+			}
+			spec := volume.NewSpecFromPersistentVolume(specPV, false)
+			spec.InlineVolumeSpecForCSIMigration = tc.specInline
+			_, err = csiAttacher.Attach(spec, types.NodeName(nodeName))
+			switch {
+			case tc.expectErrorMessage == "" && err != nil:
+				t.Errorf("expecting no failure, but got err: %v", err)
+			case tc.expectErrorMessage != "" && err == nil:
+				t.Errorf("expecting failure with %q, but got no err", tc.expectErrorMessage)
+			case tc.expectErrorMessage != "" && !strings.Contains(err.Error(), tc.expectErrorMessage):
+				t.Errorf("expecting failure with %q, but got err: %v", tc.expectErrorMessage, err)
+			}
+			wg.Wait()
+
+			attachment, err := fakeClient.StorageV1().VolumeAttachments().Get(t.Context(), attachID, metav1.GetOptions{})
+			if tc.expectNoAttachment {
+				if !apierrors.IsNotFound(err) {
+					t.Errorf("expecting no VolumeAttachment %s, got %+v (err: %v)", attachID, attachment, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("failed to get VolumeAttachment %s: %v", attachID, err)
+			}
+			if tc.expectAttachedPV == "" {
+				if attachment.Spec.Source.InlineVolumeSpec == nil {
+					t.Errorf("expecting VolumeAttachment with an inline volume spec, got %+v", attachment.Spec.Source)
+				}
+			} else if ptr.Deref(attachment.Spec.Source.PersistentVolumeName, "") != tc.expectAttachedPV {
+				t.Errorf("expecting VolumeAttachment of PV %q, got %+v", tc.expectAttachedPV, attachment.Spec.Source)
+			}
+			if tc.injectVAFinalizer && attachment.DeletionTimestamp == nil {
+				t.Errorf("expecting the stale VolumeAttachment to be deleted, but no delete was issued")
+			}
+			if (attachment.UID == existingUID) != tc.expectVAKept {
+				if tc.expectVAKept {
+					t.Errorf("expecting the existing VolumeAttachment to be kept, but it was recreated")
+				} else {
+					t.Errorf("expecting the existing VolumeAttachment to be replaced, but it was kept")
+				}
+			}
+		})
+	}
+}
+
+// flippingPVLister reports the named PersistentVolume as it is on the first Get and
+// terminating on every Get after that, as if it had been marked for deletion in between.
+// It is not safe for concurrent use.
+type flippingPVLister struct {
+	corelisters.PersistentVolumeLister
+	name string
+	seen bool
+}
+
+func (l *flippingPVLister) Get(name string) (*v1.PersistentVolume, error) {
+	pv, err := l.PersistentVolumeLister.Get(name)
+	if err != nil || name != l.name || !l.seen {
+		l.seen = l.seen || name == l.name
+		return pv, err
+	}
+	pv = pv.DeepCopy()
+	pv.DeletionTimestamp = new(metav1.Now())
+	return pv, nil
+}
+
+// TestAttacherAttachWithPVTerminatingBetweenReads covers a VolumeAttachment that refers to
+// the very PersistentVolume being attached, the one case in which Attach asks the lister
+// about the same PV twice. Both answers must come from the same read, so that this attempt
+// cannot delete the object because the PV is dying and then create a new one for that same
+// PV as if it were alive.
+func TestAttacherAttachWithPVTerminatingBetweenReads(t *testing.T) {
+	const (
+		driverName   = "driver01"
+		volumeHandle = "vol01"
+		nodeName     = "node01"
+		pvName       = "pv01"
+		existingUID  = "existing-uid"
+	)
+	attachID := GetVolumeAttachmentName(volumeHandle, driverName, nodeName)
+	pv := makeTestPV(pvName, 10, driverName, volumeHandle)
+
+	fakeClient := fakeclient.NewSimpleClientset(pv)
+	plug, _ := newTestPluginWithAttachDetachVolumeHost(t, fakeClient)
+
+	// A VolumeAttachment for this PV that external-attacher has already failed to attach.
+	attachment := makeTestAttachment(attachID, nodeName, pvName)
+	attachment.UID = existingUID
+	attachment.Spec.Attacher = driverName
+	attachment.Status.AttachError = &storage.VolumeError{Message: "mock error"}
+	if _, err := fakeClient.StorageV1().VolumeAttachments().Create(t.Context(), attachment, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("failed to create the existing VolumeAttachment: %v", err)
+	}
+	if err := wait.PollUntilContextTimeout(t.Context(), time.Millisecond, wait.ForeverTestTimeout, true,
+		func(context.Context) (bool, error) {
+			_, err := plug.volumeAttachmentLister.Get(attachID)
+			return err == nil, nil
+		}); err != nil {
+		t.Fatalf("the informer did not observe the existing VolumeAttachment: %v", err)
+	}
+	plug.persistentVolumeLister = &flippingPVLister{PersistentVolumeLister: plug.persistentVolumeLister, name: pvName}
+
+	attacher, err := plug.NewAttacher()
+	if err != nil {
+		t.Fatalf("failed to create new attacher: %v", err)
+	}
+	// The attach cannot succeed: the PV looked alive when Attach decided to wait for the
+	// existing VolumeAttachment, and nothing attaches it. Give up quickly.
+	csiAttacher := getCsiAttacherFromVolumeAttacher(attacher, 10*time.Millisecond)
+	_, err = csiAttacher.Attach(volume.NewSpecFromPersistentVolume(pv, false), nodeName)
+	if err == nil || !strings.Contains(err.Error(), "timed out") {
+		t.Errorf("expecting a timeout waiting for the VolumeAttachment to be attached, got err: %v", err)
+	}
+
+	attachment, err = fakeClient.StorageV1().VolumeAttachments().Get(t.Context(), attachID, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to get VolumeAttachment %s: %v", attachID, err)
+	}
+	if attachment.UID != existingUID {
+		t.Errorf("expecting the existing VolumeAttachment to be kept, but it was replaced")
+	}
+}
+
+// specPVObjects returns the PersistentVolume of the given spec, to be stored in a fake
+// client, if the spec has one that exists in the API. The synthesized PV of a migrated
+// inline volume does not: it is built by the CSI translation and never created anywhere.
+func specPVObjects(spec *volume.Spec) []runtime.Object {
+	if spec == nil || spec.PersistentVolume == nil || spec.InlineVolumeSpecForCSIMigration {
+		return nil
+	}
+	return []runtime.Object{spec.PersistentVolume}
+}
+
+// markVolumeAttachmentTerminating gives the VolumeAttachment of a delete request a
+// deletionTimestamp instead of removing it, the way the API server holds an object that a
+// finalizer still refers to. The fake client does not implement finalizers itself.
+func markVolumeAttachmentTerminating(t *testing.T, client *fakeclient.Clientset, del core.DeleteActionImpl) {
+	t.Helper()
+	obj, err := client.Tracker().Get(del.Resource, del.Namespace, del.Name)
+	if err != nil {
+		t.Errorf("failed to get VolumeAttachment %s: %v", del.Name, err)
+		return
+	}
+	attachment := obj.(*storage.VolumeAttachment)
+	attachment.DeletionTimestamp = new(metav1.Now())
+	if err := client.Tracker().Update(del.Resource, attachment, del.Namespace); err != nil {
+		t.Errorf("failed to mark VolumeAttachment %s Terminating: %v", del.Name, err)
+	}
+}
+
+// markMatchingVolumeAttached waits for a VolumeAttachment that refers to the given PV
+// (or, when pvName is empty, to an inline volume spec) and marks it as attached.
+func markMatchingVolumeAttached(t *testing.T, client clientset.Interface, attachID, pvName string) {
+	t.Helper()
+	err := wait.PollUntilContextTimeout(t.Context(), 10*time.Millisecond, testWatchTimeout, true,
+		func(ctx context.Context) (bool, error) {
+			attachment, err := client.StorageV1().VolumeAttachments().Get(ctx, attachID, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				return false, nil
+			}
+			if err != nil {
+				return false, err
+			}
+			if ptr.Deref(attachment.Spec.Source.PersistentVolumeName, "") != pvName {
+				return false, nil
+			}
+			if attachment.Status.Attached {
+				return true, nil
+			}
+			attachment.Status.Attached = true
+			attachment.Status.AttachError = nil
+			if _, err := client.StorageV1().VolumeAttachments().Update(ctx, attachment, metav1.UpdateOptions{}); err != nil {
+				if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
+					return false, nil
+				}
+				return false, err
+			}
+			return true, nil
+		})
+	if err != nil {
+		t.Errorf("failed to mark VolumeAttachment %s of PV %q attached: %v", attachID, pvName, err)
+	}
+}
+
 func TestAttacherWithCSIDriver(t *testing.T) {
 	tests := []struct {
 		name                   string
@@ -357,11 +785,12 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fakeclient.NewSimpleClientset(
+			spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, test.driver, "test-vol"), false)
+			fakeClient := fakeclient.NewSimpleClientset(append(specPVObjects(spec),
 				getTestCSIDriver("not-attachable", nil, &bFalse, nil),
 				getTestCSIDriver("attachable", nil, &bTrue, nil),
 				getTestCSIDriver("nil", nil, nil, nil),
-			)
+			)...)
 			plug, _ := newTestPluginWithAttachDetachVolumeHost(t, fakeClient)
 
 			attacher, err := plug.NewAttacher()
@@ -369,7 +798,6 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 				t.Fatalf("failed to create new attacher: %v", err)
 			}
 			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher, test.watchTimeout)
-			spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, test.driver, "test-vol"), false)
 
 			pluginCanAttach, err := plug.CanAttach(spec)
 			if err != nil {

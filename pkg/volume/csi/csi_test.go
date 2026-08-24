@@ -241,6 +241,11 @@ func TestCSI_VolumeAll(t *testing.T) {
 				Spec: api.NodeSpec{},
 			})
 
+			volSpec := test.specFunc(test.specName, test.driver, test.volName)
+			if volSpec != nil && volSpec.PersistentVolume != nil {
+				objs = append(objs, volSpec.PersistentVolume)
+			}
+
 			client := fakeclient.NewSimpleClientset(objs...)
 
 			factory := informers.NewSharedInformerFactory(client, time.Hour /* disable resync */)
@@ -266,7 +271,6 @@ func TestCSI_VolumeAll(t *testing.T) {
 			attachDetachPlugMgr := attachDetachVolumeHost.GetPluginMgr()
 			csiClient := setupClient(t, true)
 
-			volSpec := test.specFunc(test.specName, test.driver, test.volName)
 			pod := test.podFunc()
 			attachName := GetVolumeAttachmentName(test.volName, test.driver, string(attachDetachVolumeHost.GetNodeName()))
 			t.Log("csiTest.VolumeAll starting...")
