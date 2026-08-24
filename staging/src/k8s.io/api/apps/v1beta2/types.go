@@ -463,6 +463,8 @@ type DeploymentSpec struct {
 	// selected by this will be the ones affected by this deployment.
 	// It must match the pod template's labels.
 	// +required
+	// +k8s:alpha(since: "1.37")=+k8s:required
+	// +k8s:alpha(since: "1.37")=+k8s:immutable
 	Selector *metav1.LabelSelector `json:"selector" protobuf:"bytes,2,opt,name=selector"`
 
 	// Template describes the pods that will be created.
