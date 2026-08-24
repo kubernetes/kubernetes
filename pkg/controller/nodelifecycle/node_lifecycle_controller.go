@@ -753,10 +753,10 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 			pods, err := nc.getPodsAssignedToNode(node.Name)
 			if err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Unable to list pods of node", node.Name)
-				if currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue {
-					// If error happened during node status transition (Ready -> NotReady)
-					// we need to mark node for retry to force MarkPodsNotReady execution
-					// in the next iteration.
+				if transitionRequiresMarkingPodsNotReady(currentReadyCondition.Status, observedReadyCondition.Status) {
+					// If error happened during node status transition (Ready -> NotReady
+					// or NotReady -> Unknown) we need to mark node for retry to force
+					// MarkPodsNotReady execution in the next iteration.
 					nc.nodesToRetry.Store(node.Name, struct{}{})
 				}
 				return
@@ -768,6 +768,11 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 			case currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue:
 				// Report node event only once when status changed.
 				controllerutil.RecordNodeStatusChange(logger, nc.recorder, node, "NodeNotReady")
+				fallthrough
+			case transitionRequiresMarkingPodsNotReady(currentReadyCondition.Status, observedReadyCondition.Status):
+				// A NotReady -> Unknown transition means the kubelet stopped
+				// reporting, and pods it marked Ready while the node was NotReady
+				// would otherwise stay Ready forever. Mark them NotReady.
 				fallthrough
 			case needsRetry && observedReadyCondition.Status != v1.ConditionTrue:
 				if err = controllerutil.MarkPodsNotReady(ctx, nc.kubeClient, nc.recorder, pods, node.Name); err != nil {
@@ -790,6 +795,16 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 	nc.handleDisruption(ctx, zoneToNodeConditions, nodes)
 
 	return nil
+}
+
+// transitionRequiresMarkingPodsNotReady reports whether the observed->current
+// Ready condition transition requires marking all pods on the node NotReady:
+// the node left the Ready state, or a NotReady node became Unknown. In the
+// latter case the kubelet stopped reporting, so the pod readiness it last
+// reported can no longer be trusted.
+func transitionRequiresMarkingPodsNotReady(current, observed v1.ConditionStatus) bool {
+	return (current != v1.ConditionTrue && observed == v1.ConditionTrue) ||
+		(current == v1.ConditionUnknown && observed == v1.ConditionFalse)
 }
 
 func (nc *Controller) processTaintBaseEviction(ctx context.Context, node *v1.Node, currentReadyCondition *v1.NodeCondition) {
