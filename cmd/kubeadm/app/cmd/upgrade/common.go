@@ -29,7 +29,6 @@ import (
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/ptr"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
@@ -48,8 +47,9 @@ import (
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
-// enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
-func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []string, dryRun bool, upgradeApply bool, printer output.Printer) (clientset.Interface, upgrade.VersionGetter, *kubeadmapi.InitConfiguration, *kubeadmapi.UpgradeConfiguration, error) {
+// enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure.
+// It is only used by `kubeadm upgrade plan`, which never applies changes and therefore never dry-runs.
+func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []string, printer output.Printer) (clientset.Interface, upgrade.VersionGetter, *kubeadmapi.InitConfiguration, *kubeadmapi.UpgradeConfiguration, error) {
 	externalCfg := &kubeadmapiv1.UpgradeConfiguration{}
 	opt := configutil.LoadOrDefaultConfigurationOptions{}
 	upgradeCfg, err := configutil.LoadOrDefaultUpgradeConfiguration(flags.cfgPath, externalCfg, opt)
@@ -57,34 +57,17 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 		return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/upgrade config] FATAL")
 	}
 
-	// `dryRun` should be always be `false` for `kubeadm plan`.
-	isDryRun := ptr.To(false)
-	printConfigCfg := upgradeCfg.Plan.PrintConfig
-	ignoreErrCfg := upgradeCfg.Plan.IgnorePreflightErrors
-	ok := false
-	if upgradeApply {
-		printConfigCfg = upgradeCfg.Apply.PrintConfig
-		ignoreErrCfg = upgradeCfg.Apply.IgnorePreflightErrors
-		isDryRun, ok = cmdutil.ValueFromFlagsOrConfig(flagSet, options.DryRun, upgradeCfg.Apply.DryRun, &dryRun).(*bool)
-		if !ok {
-			return nil, nil, nil, nil, cmdutil.TypeMismatchErr("dryRun", "bool")
-		}
-	}
+	const isDryRun = false
 
-	client, err := getClient(flags.kubeConfigPath, *isDryRun, printer)
+	client, err := getClient(flags.kubeConfigPath, isDryRun, printer)
 	if err != nil {
 		return nil, nil, nil, nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
 	}
 
-	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors, ignoreErrCfg)
+	// The union of pre-flight errors is not stored back into .Plan.IgnorePreflightErrors as it's not used.
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors, upgradeCfg.Plan.IgnorePreflightErrors)
 	if err != nil {
 		return nil, nil, nil, nil, err
-	}
-
-	// Also set the union of pre-flight errors to UpgradeConfiguration, to provide a consistent view of the runtime configuration.
-	// .Plan.IgnorePreflightErrors is not set as it's not used.
-	if upgradeApply {
-		upgradeCfg.Apply.IgnorePreflightErrors = sets.List(ignorePreflightErrorsSet)
 	}
 
 	// Ensure the user is root
@@ -101,41 +84,14 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 		return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/init config] FATAL")
 	}
 
-	// Set the ImagePullPolicy and ImagePullSerial from the UpgradeApplyConfiguration to the InitConfiguration.
-	// These are used by preflight.RunPullImagesCheck() when running 'apply'.
-	if upgradeApply {
-		initCfg.NodeRegistration.ImagePullPolicy = upgradeCfg.Apply.ImagePullPolicy
-		initCfg.NodeRegistration.ImagePullSerial = upgradeCfg.Apply.ImagePullSerial
-	}
-
 	newK8sVersion := upgradeCfg.Plan.KubernetesVersion
-	if upgradeApply {
-		newK8sVersion = upgradeCfg.Apply.KubernetesVersion
-		// The version arg is mandatory, during upgrade apply, unless it's specified in the config file
-		if newK8sVersion == "" {
-			if err := cmdutil.ValidateExactArgNumber(args, []string{"version"}); err != nil {
-				return nil, nil, nil, nil, err
-			}
-		}
-	}
-
 	// If option was specified in both args and config file, args will overwrite the config file.
 	if len(args) == 1 {
 		newK8sVersion = args[0]
 	}
 
-	if upgradeApply {
-		// The `upgrade apply` version always overwrites the KubernetesVersion in the returned cfg with the target
-		// version. While this is not the same for `upgrade plan` where the KubernetesVersion should be the old
-		// one (because the call to getComponentConfigVersionStates requires the currently installed version).
-		// This also makes the KubernetesVersion value returned for `upgrade plan` consistent as that command
-		// allows to not specify a target version in which case KubernetesVersion will always hold the currently
-		// installed one.
-		initCfg.KubernetesVersion = newK8sVersion
-	}
-
 	// Run healthchecks against the cluster
-	if err := upgrade.CheckClusterHealth(client, &initCfg.ClusterConfiguration, ignorePreflightErrorsSet, dryRun, printer); err != nil {
+	if err := upgrade.CheckClusterHealth(client, &initCfg.ClusterConfiguration, ignorePreflightErrorsSet, isDryRun, printer); err != nil {
 		return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/health] FATAL")
 	}
 
@@ -147,7 +103,7 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 	}
 
 	// If the user told us to print this information out; do it!
-	printConfig, ok := cmdutil.ValueFromFlagsOrConfig(flagSet, options.PrintConfig, printConfigCfg, &flags.printConfig).(*bool)
+	printConfig, ok := cmdutil.ValueFromFlagsOrConfig(flagSet, options.PrintConfig, upgradeCfg.Plan.PrintConfig, &flags.printConfig).(*bool)
 	if ok && *printConfig {
 		printConfiguration(&initCfg.ClusterConfiguration, os.Stdout, printer)
 	} else if !ok {
