@@ -395,7 +395,8 @@ export class NatInstanceProvider extends NatProvider implements IConnectable {
         securityGroup: this._securityGroup,
         role,
         keyPair: this.props.keyPair,
-        keyName: this.props.keyName,
+        // presence of the key alone triggers the InstanceProps#keyName deprecation warning (#30806)
+        ...(this.props.keyName !== undefined ? { keyName: this.props.keyName } : {}),
         creditSpecification: this.props.creditSpecification,
       });
       // NAT instance routes all traffic, both ways
@@ -555,7 +556,8 @@ export class NatInstanceProviderV2 extends NatProvider implements IConnectable {
         associatePublicIpAddress: this.props.associatePublicIpAddress,
         securityGroup: this._securityGroup,
         keyPair: this.props.keyPair,
-        keyName: this.props.keyName,
+        // presence of the key alone triggers the InstanceProps#keyName deprecation warning (#30806)
+        ...(this.props.keyName !== undefined ? { keyName: this.props.keyName } : {}),
         creditSpecification: this.props.creditSpecification,
         userData,
       });

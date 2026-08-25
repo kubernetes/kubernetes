@@ -1,0 +1,14 @@
+{
+  "version": "54.0.0",
+  "testCases": {
+    "nat-instance-v2-no-key-name-integ-test/DefaultTest": {
+      "stacks": [
+        "aws-cdk-vpc-nat-instances-v2-no-key-name"
+      ],
+      "assertionStack": "nat-instance-v2-no-key-name-integ-test/DefaultTest/DeployAssert",
+      "assertionStackName": "natinstancev2nokeynameintegtestDefaultTestDeployAssert30CD1CA8"
+    }
+  },
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
+}
