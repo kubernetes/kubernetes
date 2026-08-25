@@ -6193,6 +6193,115 @@ func Test_isEntityWorthRequeuing(t *testing.T) {
 	}
 }
 
+type gatingPreEnqueuePlugin struct {
+	gatePods      sets.Set[string]
+	evaluatedPods []string
+}
+
+func (pl *gatingPreEnqueuePlugin) Name() string {
+	return "gatingPlugin"
+}
+
+func (pl *gatingPreEnqueuePlugin) PreEnqueue(_ context.Context, p *v1.Pod) *fwk.Status {
+	pl.evaluatedPods = append(pl.evaluatedPods, p.Name)
+	if pl.gatePods != nil && pl.gatePods.Has(p.Name) {
+		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "pod is gated")
+	}
+	return nil
+}
+
+var _ fwk.PreEnqueuePlugin = &gatingPreEnqueuePlugin{}
+
+func TestPriorityQueue_runPreEnqueuePlugins_PodGroup(t *testing.T) {
+	tests := []struct {
+		name                  string
+		gatePods              sets.Set[string]
+		expectedEvaluatedPods []string
+		expectedGatingPlugin  string
+		expectedGatedPods     map[string]bool
+	}{
+		{
+			name:                  "first pod is gated: returns and does not evaluate remaining pods",
+			gatePods:              sets.New("pod1", "pod2"),
+			expectedEvaluatedPods: []string{"pod1"},
+			expectedGatingPlugin:  "gatingPlugin",
+			expectedGatedPods: map[string]bool{
+				"pod1": true,
+				"pod2": false,
+				"pod3": false,
+			},
+		},
+		{
+			name:                  "second pod is gated: evaluates first two pods, returns before third",
+			gatePods:              sets.New("pod2"),
+			expectedEvaluatedPods: []string{"pod1", "pod2"},
+			expectedGatingPlugin:  "gatingPlugin",
+			expectedGatedPods: map[string]bool{
+				"pod1": false,
+				"pod2": true,
+				"pod3": false,
+			},
+		},
+		{
+			name:                  "no pods are gated: evaluates all pods",
+			gatePods:              sets.New[string](),
+			expectedEvaluatedPods: []string{"pod1", "pod2", "pod3"},
+			expectedGatingPlugin:  "",
+			expectedGatedPods: map[string]bool{
+				"pod1": false,
+				"pod2": false,
+				"pod3": false,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			plugin := &gatingPreEnqueuePlugin{
+				gatePods: tt.gatePods,
+			}
+			preEnqMap := map[string]map[string]fwk.PreEnqueuePlugin{
+				"": {
+					"gatingPlugin": plugin,
+				},
+			}
+			q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(preEnqMap))
+
+			pInfo1 := q.newQueuedPodInfo(ctx, st.MakePod().Name("pod1").Namespace("ns1").PodGroupName("pg1").Obj())
+			pInfo2 := q.newQueuedPodInfo(ctx, st.MakePod().Name("pod2").Namespace("ns1").PodGroupName("pg1").Obj())
+			pInfo3 := q.newQueuedPodInfo(ctx, st.MakePod().Name("pod3").Namespace("ns1").PodGroupName("pg1").Obj())
+
+			pg := st.MakePodGroup().Namespace("ns1").Name("pg1").Obj()
+			pgqi := &framework.QueuedPodGroupInfo{
+				PodGroupInfo: &framework.PodGroupInfo{
+					GenericPodGroup: framework.NewGenericPodGroup(pg),
+					Children:        make([]*framework.PodGroupInfo, 0),
+				},
+				QueuedPodInfos: make(map[fwk.EntityKey][]*framework.QueuedPodInfo),
+			}
+			pgqi.AddPod(pInfo1)
+			pgqi.AddPod(pInfo2)
+			pgqi.AddPod(pInfo3)
+
+			q.runPreEnqueuePlugins(ctx, pgqi)
+
+			if diff := cmp.Diff(tt.expectedEvaluatedPods, plugin.evaluatedPods); diff != "" {
+				t.Errorf("Unexpected evaluatedPods (-want,+got):\n%s", diff)
+			}
+			if pgqi.GetGatingPlugin() != tt.expectedGatingPlugin {
+				t.Errorf("Unexpected gatingPlugin: %s, want %s", pgqi.GetGatingPlugin(), tt.expectedGatingPlugin)
+			}
+			pgqi.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+				if wantGated := tt.expectedGatedPods[pInfo.Pod.Name]; pInfo.Gated() != wantGated {
+					t.Errorf("Unexpected gated state for pod %s, got: %v, want: %v", pInfo.Pod.Name, pInfo.Gated(), wantGated)
+				}
+				return true
+			})
+		})
+	}
+}
+
 func Test_queuedPodInfo_gatedSetUponCreationAndUnsetUponUpdate(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	plugin, _ := schedulinggates.New(ctx, nil, nil, plfeature.Features{})

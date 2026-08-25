@@ -703,8 +703,16 @@ func queueingHintToLabel(hint fwk.QueueingHint, err error) string {
 // to activeQ by related cluster event.
 func (p *PriorityQueue) runPreEnqueuePlugins(ctx context.Context, entity framework.QueuedEntityInfo) {
 	var anyGatedPodInfo *framework.QueuedPodInfo
-	// Run PreEnqueue plugins for each pod, even if it could stop after the first being gated,
-	// as we need to populate any per-pod metrics.
+	// Run PreEnqueue plugins for each pod until first gets gated.
+	// Breaking after the first gated pod is sufficient,
+	// because in case of pod groups, this specific pod has to be ungated before ungating the group.
+	// Gating conditions for other pods, even if caused by different plugins,
+	// will be handled in later runs.
+	// Note: As a consequence, the `unschedulable_pods` metric will only reflect the gating
+	// reason of the first gated pod in the group rather than all gated members simultaneously.
+	// However, the group is still accurately tracked in `pending_pods{queue="gated"}` /
+	// `pending_entities`, and gating reasons for subsequent pods will be recorded in later
+	// passes once preceding pods are ungated.
 	entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
 		p.runPreEnqueuePluginsForPod(ctx, pInfo)
 		if pInfo.Gated() {
@@ -712,6 +720,7 @@ func (p *PriorityQueue) runPreEnqueuePlugins(ctx context.Context, entity framewo
 			// Otherwise, such gated pod would have to be put in a separate entity object
 			// and tracked individually, complicating the flow.
 			anyGatedPodInfo = pInfo
+			return false
 		}
 		return true
 	})
