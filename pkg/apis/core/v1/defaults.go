@@ -206,9 +206,15 @@ func SetDefaults_Pod(obj *v1.Pod) {
 		defaultPodRequests(obj)
 	}
 
-	if obj.Spec.EnableServiceLinks == nil {
-		enableServiceLinks := v1.DefaultEnableServiceLinks
-		obj.Spec.EnableServiceLinks = &enableServiceLinks
+	if obj.Spec.Hermetic != nil && *obj.Spec.Hermetic {
+		if obj.Spec.EnableServiceLinks == nil {
+			obj.Spec.EnableServiceLinks = ptr.To(false)
+		}
+	} else {
+		if obj.Spec.EnableServiceLinks == nil {
+			enableServiceLinks := v1.DefaultEnableServiceLinks
+			obj.Spec.EnableServiceLinks = &enableServiceLinks
+		}
 	}
 
 	if obj.Spec.HostNetwork {
@@ -255,7 +261,11 @@ func SetDefaults_PodSpec(obj *v1.PodSpec) {
 	}
 	obj.DeprecatedServiceAccount = obj.ServiceAccountName
 	if obj.DNSPolicy == "" {
-		obj.DNSPolicy = v1.DNSClusterFirst
+		if obj.Hermetic != nil && *obj.Hermetic {
+			obj.DNSPolicy = v1.DNSNone
+		} else {
+			obj.DNSPolicy = v1.DNSClusterFirst
+		}
 	}
 	if obj.RestartPolicy == "" {
 		obj.RestartPolicy = v1.RestartPolicyAlways

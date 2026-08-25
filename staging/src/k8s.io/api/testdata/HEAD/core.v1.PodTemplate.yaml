@@ -667,6 +667,7 @@ template:
     evictionResponders:
     - name: nameValue
       priority: 2
+    hermetic: true
     hostAliases:
     - hostnames:
       - hostnamesValue
