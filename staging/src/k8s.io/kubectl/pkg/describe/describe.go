@@ -1761,12 +1761,11 @@ func printPersistentVolumeClaim(w PrefixWriter, pvc *corev1.PersistentVolumeClai
 	if isFullPVC {
 		w.Write(LEVEL_0, "Finalizers:\t%v\n", pvc.ObjectMeta.Finalizers)
 	}
-	storage := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
 	capacity := ""
 	accessModes := ""
 	if pvc.Spec.VolumeName != "" {
 		accessModes = storageutil.GetAccessModesAsString(pvc.Status.AccessModes)
-		storage = pvc.Status.Capacity[corev1.ResourceStorage]
+		storage := pvc.Status.Capacity[corev1.ResourceStorage]
 		capacity = formatResourceQuantity(corev1.ResourceStorage, storage)
 	}
 	w.Write(LEVEL_0, "Capacity:\t%s\n", capacity)
