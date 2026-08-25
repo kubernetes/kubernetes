@@ -324,15 +324,16 @@ func ListUsersInConfig(toComplete string) []string {
 func CompGetResourceList(restClientGetter genericclioptions.RESTClientGetter, cmd *cobra.Command, toComplete string, verbs ...string) []string {
 	buf := new(bytes.Buffer)
 	streams := genericiooptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: io.Discard}
-	o := apiresources.NewAPIResourceOptions(streams)
+	flags := apiresources.NewAPIResourceFlags(restClientGetter, streams)
 
 	// Get the list of resources
-	o.PrintFlags.OutputFormat = ptr.To("name")
-	o.Cached = true
-	o.Verbs = verbs
+	flags.PrintFlags.OutputFormat = ptr.To("name")
+	flags.Cached = true
+	flags.Verbs = verbs
 	// TODO:Should set --request-timeout=5s
 
-	if err := o.Complete(restClientGetter, cmd, nil); err != nil {
+	o, err := flags.ToOptions(cmd, nil)
+	if err != nil {
 		return []string{}
 	}
 
