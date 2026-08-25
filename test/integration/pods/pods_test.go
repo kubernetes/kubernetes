@@ -40,7 +40,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
-	"k8s.io/utils/ptr"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ipprfeature "k8s.io/component-helpers/nodedeclaredfeatures/features/inplacepodresize"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -49,6 +48,7 @@ import (
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/ptr"
 )
 
 func TestPodTopologyLabels(t *testing.T) {

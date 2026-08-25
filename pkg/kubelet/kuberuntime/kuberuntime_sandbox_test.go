@@ -395,3 +395,33 @@ func TestGeneratePodSandboxWindowsConfig_HostProcess(t *testing.T) {
 		})
 	}
 }
+
+func TestGeneratePodSandboxConfigHermetic(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	pod := newTestPod()
+	pod.Spec.Hermetic = ptr.To(true)
+
+	podSandboxConfig, err := m.generatePodSandboxConfig(tCtx, pod, 1)
+	assert.NoError(t, err)
+	assert.True(t, podSandboxConfig.Hermetic)
+	assert.Equal(t, "true", podSandboxConfig.Annotations[runtimeapi.SandboxHermeticAnnotation])
+}
+
+func TestDeterminePodSandboxIPsHermetic(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	hermeticSandbox := &runtimeapi.PodSandboxStatus{
+		Annotations: map[string]string{
+			runtimeapi.SandboxHermeticAnnotation: "true",
+		},
+		Network: nil,
+	}
+
+	ips := m.determinePodSandboxIPs(tCtx, "default", "hermetic-pod", hermeticSandbox)
+	assert.Empty(t, ips)
+}

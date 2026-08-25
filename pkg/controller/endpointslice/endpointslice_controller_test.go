@@ -377,6 +377,33 @@ func TestSyncServicePodSelection(t *testing.T) {
 	assert.EqualValues(t, &v1.ObjectReference{Kind: "Pod", Namespace: ns, Name: pod1.Name}, endpoint.TargetRef)
 }
 
+// Ensure SyncService ignores Hermetic Pods even if they match the selector.
+func TestSyncServiceHermeticPodSelection(t *testing.T) {
+	client, esController := newController(t, []string{"node-1"}, time.Duration(0))
+	ns := metav1.NamespaceDefault
+
+	pod1 := newPod(1, ns, true, 0, false)
+	esController.podStore.Add(pod1)
+
+	// ensure this hermetic pod matching selector is ignored
+	pod2 := newPod(2, ns, true, 0, false)
+	pod2.Spec.Hermetic = ptr.To(true)
+	esController.podStore.Add(pod2)
+
+	standardSyncService(t, esController, ns, "testing-1")
+	expectActions(t, client.Actions(), 1, "create", "endpointslices")
+
+	// an endpoint slice should be created, it should only reference pod1 (not hermetic pod2)
+	slices, err := client.DiscoveryV1().EndpointSlices(ns).List(context.TODO(), metav1.ListOptions{})
+	require.NoError(t, err, "Expected no error fetching endpoint slices")
+	assert.Len(t, slices.Items, 1, "Expected 1 endpoint slices")
+	slice := slices.Items[0]
+	assert.Len(t, slice.Endpoints, 1, "Expected 1 endpoint in first slice")
+	assert.NotEmpty(t, slice.Annotations[v1.EndpointsLastChangeTriggerTime])
+	endpoint := slice.Endpoints[0]
+	assert.EqualValues(t, &v1.ObjectReference{Kind: "Pod", Namespace: ns, Name: pod1.Name}, endpoint.TargetRef)
+}
+
 func TestSyncServiceEndpointSlicePendingDeletion(t *testing.T) {
 	client, esController := newController(t, []string{"node-1"}, time.Duration(0))
 	ns := metav1.NamespaceDefault
