@@ -140,12 +140,7 @@ func doGuaranteedPodResizeTests(f *framework.Framework) {
 	// All tests will perform the requested resize, and once completed, will roll back the change.
 	// This results in coverage of both the operation as described, and its reverse.
 	ginkgo.Describe("guaranteed pods with multiple containers", func() {
-		/*
-			Release: v1.35
-			Testname: In-place Pod Resize, guaranteed pods with multiple containers, net increase
-			Description: Issuing an in-place Pod Resize request via the Pod Resize subresource patch endpoint to modify CPU and memory requests and limits for a guaranteed pod with 3 containers with a net increase MUST result in the Pod resources being updated as expected.
-		*/
-		framework.ConformanceIt("3 containers - increase cpu & mem on c1, c2, decrease cpu & mem on c3 - net increase [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
+		ginkgo.It("3 containers - increase cpu & mem on c1, c2, decrease cpu & mem on c3 - net increase [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
 			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, false, originalCPU, originalMem)
 			for i := range originalContainers {
 				originalContainers[i].CPUPolicy = nil
@@ -170,12 +165,7 @@ func doGuaranteedPodResizeTests(f *framework.Framework) {
 			doPatchAndRollback(ctx, f, originalContainers, expectedContainers, nil, nil, true, false)
 		})
 
-		/*
-			Release: v1.35
-			Testname: In-place Pod Resize, guaranteed pods with multiple containers, net decrease
-			Description: Issuing an in-place Pod Resize request via the Pod Resize subresource patch endpoint to modify CPU and memory requests and limits for a pod with 3 containers with a net decrease MUST result in the Pod resources being updated as expected.
-		*/
-		framework.ConformanceIt("3 containers - increase cpu & mem on c1, decrease cpu & mem on c2, c3 - net decrease [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
+		ginkgo.It("3 containers - increase cpu & mem on c1, decrease cpu & mem on c2, c3 - net decrease [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
 			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, false, originalCPU, originalMem)
 			for i := range originalContainers {
 				originalContainers[i].CPUPolicy = nil
@@ -200,12 +190,7 @@ func doGuaranteedPodResizeTests(f *framework.Framework) {
 			doPatchAndRollback(ctx, f, originalContainers, expectedContainers, nil, nil, true, false)
 		})
 
-		/*
-			Release: v1.35
-			Testname: In-place Pod Resize, guaranteed pods with multiple containers, various operations
-			Description: Issuing an in-place Pod Resize request via the Pod Resize subresource patch endpoint to modify CPU and memory requests and limits for a pod with 3 containers with various operations MUST result in the Pod resources being updated as expected.
-		*/
-		framework.ConformanceIt("3 containers - increase: CPU (c1,c3), memory (c2, c3) ; decrease: CPU (c2) [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
+		ginkgo.It("3 containers - increase: CPU (c1,c3), memory (c2, c3) ; decrease: CPU (c2) [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
 			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, false, originalCPU, originalMem)
 			for i := range originalContainers {
 				originalContainers[i].CPUPolicy = nil
