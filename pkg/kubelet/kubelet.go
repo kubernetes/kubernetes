@@ -302,6 +302,7 @@ type Bootstrap interface {
 	ListenAndServeReadOnly(ctx context.Context, address net.IP, port uint, tp trace.TracerProvider)
 	ListenAndServePodResources(ctx context.Context)
 	ListenAndServePods(ctx context.Context)
+	ListenAndServeHealthz(ctx context.Context, address string, port int)
 	Run(ctx context.Context, updates <-chan kubetypes.PodUpdate)
 }
 
@@ -3308,7 +3309,10 @@ func (kl *Kubelet) SyncLoopHealthCheck(req *http.Request) error {
 		duration = minDuration
 	}
 	enterLoopTime := kl.LatestLoopEntryTime()
-	if !enterLoopTime.IsZero() && time.Now().After(enterLoopTime.Add(duration)) {
+	if enterLoopTime.IsZero() {
+		return fmt.Errorf("sync loop has not started yet")
+	}
+	if time.Now().After(enterLoopTime.Add(duration)) {
 		return fmt.Errorf("sync Loop took longer than expected")
 	}
 	return nil
@@ -3384,6 +3388,11 @@ func (kl *Kubelet) ListenAndServe(ctx context.Context, kubeCfg *kubeletconfigint
 // ListenAndServeReadOnly runs the kubelet HTTP server in read-only mode.
 func (kl *Kubelet) ListenAndServeReadOnly(ctx context.Context, address net.IP, port uint, tp trace.TracerProvider) {
 	server.ListenAndServeKubeletReadOnlyServer(ctx, kl, kl.resourceAnalyzer, kl.containerManager.GetHealthCheckers(), kl.flagz, address, port, tp)
+}
+
+// ListenAndServeHealthz runs the healthz HTTP server on the healthz port.
+func (kl *Kubelet) ListenAndServeHealthz(ctx context.Context, address string, port int) {
+	server.ListenAndServeHealthzServer(ctx, kl, address, port)
 }
 
 type kubeletPodsProvider struct {
