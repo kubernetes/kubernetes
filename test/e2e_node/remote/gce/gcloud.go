@@ -19,7 +19,9 @@ package gce
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
+	"strings"
 )
 
 type gceImage struct {
@@ -103,7 +105,16 @@ func runGCPCommand(args ...string) ([]byte, error) {
 }
 
 func runGCPCommandNoProject(args ...string) ([]byte, error) {
-	bytes, err := exec.Command("gcloud", args...).Output()
+	out, _, err := runGCPCommandNoProjectRusage(args...)
+	return out, err
+}
+
+// runGCPCommandNoProjectRusage runs gcloud and reports the child's peak RSS in kB,
+// for the image-resolution memory investigation (#141434).
+func runGCPCommandNoProjectRusage(args ...string) ([]byte, int64, error) {
+	cmd := exec.Command("gcloud", args...)
+	bytes, err := cmd.Output()
+	rss := childRSSkB(cmd)
 	if err != nil {
 		var message string
 		if ee, ok := err.(*exec.ExitError); ok {
@@ -111,9 +122,26 @@ func runGCPCommandNoProject(args ...string) ([]byte, error) {
 		} else {
 			message = fmt.Sprintf("%v", err)
 		}
-		return nil, fmt.Errorf("unable to run gcloud command\n %s \n %w", message, err)
+		return nil, rss, fmt.Errorf("unable to run gcloud command\n %s \n %w", message, err)
 	}
-	return bytes, nil
+	return bytes, rss, nil
+}
+
+// parentVmHWMkB returns this process's peak resident set size in kB.
+func parentVmHWMkB() int64 {
+	data, err := os.ReadFile("/proc/self/status")
+	if err != nil {
+		return -1
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(line, "VmHWM:") {
+			var kb int64
+			if _, err := fmt.Sscanf(line, "VmHWM: %d kB", &kb); err == nil {
+				return kb
+			}
+		}
+	}
+	return -1
 }
 
 func getGCEInstance(host string) (*gceInstance, error) {

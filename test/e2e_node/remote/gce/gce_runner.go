@@ -187,8 +187,12 @@ type GCEImage struct {
 
 // Returns an image name based on regex and given GCE project.
 func (g *GCERunner) getGCEImage(imageRegex, imageFamily string, project string) (string, error) {
-	data, err := runGCPCommandNoProject("compute", "images", "list",
-		"--format=json", "--project="+project)
+	start := time.Now()
+	args := []string{"compute", "images", "list", "--format=json", "--project=" + project}
+	if imageFamily != "" {
+		args = append(args, "--filter=family="+imageFamily)
+	}
+	data, childMaxRSSkB, err := runGCPCommandNoProjectRusage(args...)
 	if err != nil {
 		return "", fmt.Errorf("failed to list images in project %q: %w", project, err)
 	}
@@ -197,6 +201,10 @@ func (g *GCERunner) getGCEImage(imageRegex, imageFamily string, project string) 
 	if err != nil {
 		return "", fmt.Errorf("failed to parse images: %w", err)
 	}
+	// #141434 diagnostic: attribute the host memory used to resolve an image.
+	klog.InfoS("GCE image resolution memory", "project", project, "family", imageFamily, "regex", imageRegex,
+		"jsonBytes", len(data), "imageCount", len(images), "gcloudChildMaxRSSkB", childMaxRSSkB,
+		"parentVmHWMkB", parentVmHWMkB(), "duration", time.Since(start))
 
 	imageObjs := []imageObj{}
 	imageRe := regexp.MustCompile(imageRegex)
