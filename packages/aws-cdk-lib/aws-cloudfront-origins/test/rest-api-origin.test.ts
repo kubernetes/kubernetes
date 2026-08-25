@@ -185,3 +185,45 @@ test('throw error for configuring readTimeout less than responseCompletionTimeou
     });
   }).toThrow('responseCompletionTimeout must be equal to or greater than readTimeout (60s), got: 30s.');
 });
+
+test('validates readTimeout is at least 1 second', () => {
+  const api = new apigateway.RestApi(stack, 'RestApi');
+  api.root.addMethod('GET');
+
+  expect(() => {
+    new RestApiOrigin(api, { readTimeout: Duration.seconds(0) });
+  }).toThrow('readTimeout: Must be an int 1 seconds or greater; received 0.');
+});
+
+test.each([
+  Duration.seconds(121),
+  Duration.minutes(5),
+])('accepts readTimeout above the default quota, which the service validates at deploy time', (readTimeout) => {
+  const api = new apigateway.RestApi(stack, 'RestApi');
+  api.root.addMethod('GET');
+
+  expect(() => {
+    new RestApiOrigin(api, { readTimeout });
+  }).not.toThrow();
+});
+
+test('validates keepaliveTimeout is at least 1 second', () => {
+  const api = new apigateway.RestApi(stack, 'RestApi');
+  api.root.addMethod('GET');
+
+  expect(() => {
+    new RestApiOrigin(api, { keepaliveTimeout: Duration.seconds(0) });
+  }).toThrow('keepaliveTimeout: Must be an int 1 seconds or greater; received 0.');
+});
+
+test.each([
+  Duration.seconds(301),
+  Duration.minutes(10),
+])('accepts keepaliveTimeout above the default quota, which the service validates at deploy time', (keepaliveTimeout) => {
+  const api = new apigateway.RestApi(stack, 'RestApi');
+  api.root.addMethod('GET');
+
+  expect(() => {
+    new RestApiOrigin(api, { keepaliveTimeout });
+  }).not.toThrow();
+});

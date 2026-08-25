@@ -17,7 +17,9 @@
       {
        "CustomOriginConfig": {
         "IpAddressType": "dualstack",
+        "OriginKeepaliveTimeout": 200,
         "OriginProtocolPolicy": "https-only",
+        "OriginReadTimeout": 100,
         "OriginSSLProtocols": [
          "TLSv1.2"
         ]

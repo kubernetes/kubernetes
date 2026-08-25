@@ -583,9 +583,9 @@ const origin = new origins.LoadBalancerV2Origin(loadBalancer, {
 });
 ```
 
-Note that the `readTimeout` and `keepaliveTimeout` properties can extend their values over 60 seconds only if a limit increase request for CloudFront origin response timeout
-quota has been approved in the target account; otherwise, values over 60 seconds will produce an error at deploy time. Consider that this value is
-still limited to a maximum value of 180 seconds, which is a hard limit for that quota.
+Note that `readTimeout` and `keepaliveTimeout` are governed by two separate CloudFront service quotas: `Response timeout per origin`, which defaults to
+1-120 seconds, and `Keep-alive timeout per origin`, which defaults to 1-300 seconds. Neither is a hard limit. A value above the default requires an
+approved quota increase in the target account, and without one CloudFront rejects it at deploy time.
 
 ## From an HTTP endpoint
 

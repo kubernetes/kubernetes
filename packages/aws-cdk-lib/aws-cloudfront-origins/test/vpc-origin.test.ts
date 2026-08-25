@@ -206,9 +206,7 @@ test('VPC origin from an imported VpcOrigin resource', () => {
 
 test.each([
   Duration.seconds(0),
-  Duration.seconds(181),
-  Duration.minutes(5),
-])('VPC origin throws when readTimeout is %s - out of bounds', (readTimeout) => {
+])('VPC origin throws when readTimeout is %s - below the minimum', (readTimeout) => {
   // GIVEN
   const vpc = new ec2.Vpc(stack, 'Vpc');
   const loadBalancer = new elbv2.ApplicationLoadBalancer(stack, 'ALB', { vpc });
@@ -216,14 +214,26 @@ test.each([
   // WHEN
   expect(() => {
     VpcOrigin.withApplicationLoadBalancer(loadBalancer, { readTimeout });
-  }).toThrow(`readTimeout: Must be an int between 1 and 180 seconds (inclusive); received ${readTimeout.toSeconds()}`);
+  }).toThrow(`readTimeout: Must be an int 1 seconds or greater; received ${readTimeout.toSeconds()}`);
+});
+
+test.each([
+  Duration.seconds(121),
+  Duration.minutes(5),
+])('VPC origin accepts readTimeout of %s above the default quota', (readTimeout) => {
+  // GIVEN
+  const vpc = new ec2.Vpc(stack, 'Vpc');
+  const loadBalancer = new elbv2.ApplicationLoadBalancer(stack, 'ALB', { vpc });
+
+  // WHEN
+  expect(() => {
+    VpcOrigin.withApplicationLoadBalancer(loadBalancer, { readTimeout });
+  }).not.toThrow();
 });
 
 test.each([
   Duration.seconds(0),
-  Duration.seconds(181),
-  Duration.minutes(5),
-])('VPC origin throws when keepaliveTimeout is %s - out of bounds', (keepaliveTimeout) => {
+])('VPC origin throws when keepaliveTimeout is %s - below the minimum', (keepaliveTimeout) => {
   // GIVEN
   const vpc = new ec2.Vpc(stack, 'Vpc');
   const loadBalancer = new elbv2.ApplicationLoadBalancer(stack, 'ALB', { vpc });
@@ -231,7 +241,21 @@ test.each([
   // WHEN
   expect(() => {
     VpcOrigin.withApplicationLoadBalancer(loadBalancer, { keepaliveTimeout });
-  }).toThrow(`keepaliveTimeout: Must be an int between 1 and 180 seconds (inclusive); received ${keepaliveTimeout.toSeconds()}`);
+  }).toThrow(`keepaliveTimeout: Must be an int 1 seconds or greater; received ${keepaliveTimeout.toSeconds()}`);
+});
+
+test.each([
+  Duration.seconds(301),
+  Duration.minutes(10),
+])('VPC origin accepts keepaliveTimeout of %s above the default quota', (keepaliveTimeout) => {
+  // GIVEN
+  const vpc = new ec2.Vpc(stack, 'Vpc');
+  const loadBalancer = new elbv2.ApplicationLoadBalancer(stack, 'ALB', { vpc });
+
+  // WHEN
+  expect(() => {
+    VpcOrigin.withApplicationLoadBalancer(loadBalancer, { keepaliveTimeout });
+  }).not.toThrow();
 });
 
 test('VPC origin throws when no domainName is specified', () => {

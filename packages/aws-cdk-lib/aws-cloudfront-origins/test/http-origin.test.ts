@@ -71,20 +71,29 @@ test('renders an example with all available props', () => {
 
 test.each([
   Duration.seconds(0),
-  Duration.seconds(181),
-  Duration.minutes(5),
-])('validates readTimeout is an integer between 1 and 180 seconds - out of bounds', (readTimeout) => {
+])('validates readTimeout is at least 1 second', (readTimeout) => {
   expect(() => {
     new HttpOrigin('www.example.com', {
       readTimeout,
     });
-  }).toThrow(`readTimeout: Must be an int between 1 and 180 seconds (inclusive); received ${readTimeout.toSeconds()}.`);
+  }).toThrow(`readTimeout: Must be an int 1 seconds or greater; received ${readTimeout.toSeconds()}.`);
+});
+
+test.each([
+  Duration.seconds(121),
+  Duration.minutes(5),
+])('accepts readTimeout above the default quota, which the service validates at deploy time', (readTimeout) => {
+  expect(() => {
+    new HttpOrigin('www.example.com', {
+      readTimeout,
+    });
+  }).not.toThrow();
 });
 
 test.each([
   Duration.seconds(0.5),
   Duration.seconds(60.5),
-])('validates readTimeout is an integer between 1 and 180 seconds - not an int', (readTimeout) => {
+])('validates readTimeout is a whole number of seconds', (readTimeout) => {
   expect(() => {
     new HttpOrigin('www.example.com', {
       readTimeout,
@@ -94,20 +103,29 @@ test.each([
 
 test.each([
   Duration.seconds(0),
-  Duration.seconds(181),
-  Duration.minutes(5),
-])('validates keepaliveTimeout is an integer between 1 and 180 seconds - out of bounds', (keepaliveTimeout) => {
+])('validates keepaliveTimeout is at least 1 second', (keepaliveTimeout) => {
   expect(() => {
     new HttpOrigin('www.example.com', {
       keepaliveTimeout,
     });
-  }).toThrow(`keepaliveTimeout: Must be an int between 1 and 180 seconds (inclusive); received ${keepaliveTimeout.toSeconds()}.`);
+  }).toThrow(`keepaliveTimeout: Must be an int 1 seconds or greater; received ${keepaliveTimeout.toSeconds()}.`);
+});
+
+test.each([
+  Duration.seconds(301),
+  Duration.minutes(10),
+])('accepts keepaliveTimeout above the default quota, which the service validates at deploy time', (keepaliveTimeout) => {
+  expect(() => {
+    new HttpOrigin('www.example.com', {
+      keepaliveTimeout,
+    });
+  }).not.toThrow();
 });
 
 test.each([
   Duration.seconds(0.5),
   Duration.seconds(60.5),
-])('validates keepaliveTimeout is an integer between 1 and 180 seconds - not an int', (keepaliveTimeout) => {
+])('validates keepaliveTimeout is a whole number of seconds', (keepaliveTimeout) => {
   expect(() => {
     new HttpOrigin('www.example.com', {
       keepaliveTimeout,
