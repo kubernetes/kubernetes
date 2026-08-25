@@ -1266,6 +1266,8 @@ new glue.S3Table(this, 'MyTable', {
 });  
 ```
 
+For a type the `Schema` factories don't model, use `glue.Schema.custom('...')`, which takes the raw Glue input string.
+
 ## Public FAQ
 
 ### What are we launching today?
