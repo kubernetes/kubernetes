@@ -1600,6 +1600,24 @@ func TestFormatResourceQuantity(t *testing.T) {
 			quantity: "110",
 			expected: "110",
 		},
+		{
+			name:     "large binary suffix is preserved",
+			resource: corev1.ResourceStorage,
+			quantity: "1Pi",
+			expected: "1Pi",
+		},
+		{
+			name:     "exponent notation is preserved",
+			resource: corev1.ResourceStorage,
+			quantity: "1e3",
+			expected: "1e3",
+		},
+		{
+			name:     "negative memory is left untouched",
+			resource: corev1.ResourceMemory,
+			quantity: "-107374182400m",
+			expected: "-107374182400m",
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -2822,6 +2840,52 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 				if strings.Contains(str, unexpected) {
 					t.Errorf("unexpected to find %q in output: %q", unexpected, str)
 				}
+			}
+		})
+	}
+}
+
+func TestPrintEmptyDirVolumeSource(t *testing.T) {
+	fractional := resource.MustParse("0.1Gi")
+	whole := resource.MustParse("1Gi")
+
+	testCases := []struct {
+		name       string
+		sizeLimit  *resource.Quantity
+		expected   string
+		unexpected string
+	}{
+		{
+			name:       "fractional size limit is rounded up to whole bytes",
+			sizeLimit:  &fractional,
+			expected:   "107374183",
+			unexpected: "107374182400m",
+		},
+		{
+			name:      "whole size limit is unchanged",
+			sizeLimit: &whole,
+			expected:  "1Gi",
+		},
+		{
+			name:      "unset size limit",
+			sizeLimit: nil,
+			expected:  "<unset>",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			out := new(bytes.Buffer)
+			writer := NewPrefixWriter(out)
+			printEmptyDirVolumeSource(&corev1.EmptyDirVolumeSource{SizeLimit: test.sizeLimit}, writer)
+			writer.Flush()
+			output := out.String()
+
+			if !strings.Contains(output, test.expected) {
+				t.Errorf("expected to find %q in output: %q", test.expected, output)
+			}
+			if test.unexpected != "" && strings.Contains(output, test.unexpected) {
+				t.Errorf("unexpected to find %q in output: %q", test.unexpected, output)
 			}
 		})
 	}

@@ -1024,7 +1024,7 @@ func printHostPathVolumeSource(hostPath *corev1.HostPathVolumeSource, w PrefixWr
 func printEmptyDirVolumeSource(emptyDir *corev1.EmptyDirVolumeSource, w PrefixWriter) {
 	var sizeLimit string
 	if emptyDir.SizeLimit != nil && emptyDir.SizeLimit.Cmp(resource.Quantity{}) > 0 {
-		sizeLimit = fmt.Sprintf("%v", emptyDir.SizeLimit)
+		sizeLimit = formatResourceQuantity(corev1.ResourceStorage, *emptyDir.SizeLimit)
 	} else {
 		sizeLimit = "<unset>"
 	}
@@ -1906,9 +1906,13 @@ func isByteSizedResource(name corev1.ResourceName) bool {
 // whole bytes. A request of "0.1Gi" is stored as "107374182400m" because it is not
 // a whole number of bytes, and a fractional byte is not meaningful to display.
 // Quantities that are already whole bytes and resources not measured in bytes are
-// rendered unchanged.
+// rendered unchanged, as are negative quantities, which are rejected by API
+// validation for every resource this applies to.
 func formatResourceQuantity(name corev1.ResourceName, quantity resource.Quantity) string {
-	if _, exact := quantity.AsScale(0); exact || !isByteSizedResource(name) {
+	if quantity.Sign() <= 0 || !isByteSizedResource(name) {
+		return quantity.String()
+	}
+	if _, exact := quantity.AsScale(0); exact {
 		return quantity.String()
 	}
 	return resource.NewQuantity(quantity.Value(), quantity.Format).String()
