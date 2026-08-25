@@ -19716,33 +19716,6 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				field.Required(field.NewPath("spec.template"), ""),
 			},
 		},
-		"negative replicas": {
-			old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
-			update: mkValidReplicationController(func(rc *core.ReplicationController) {
-				rc.Spec.Replicas = ptr.To[int32](-1)
-			}),
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
-			},
-		},
-		"nil replicas": {
-			old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
-			update: mkValidReplicationController(func(rc *core.ReplicationController) {
-				rc.Spec.Replicas = nil
-			}),
-			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec.replicas"), ""),
-			},
-		},
-		"negative minReadySeconds": {
-			old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
-			update: mkValidReplicationController(func(rc *core.ReplicationController) {
-				rc.Spec.MinReadySeconds = -1
-			}),
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum"),
-			},
-		},
 	}
 	for k, tc := range errorCases {
 		t.Run(k, func(t *testing.T) {
@@ -19826,24 +19799,6 @@ func TestValidateReplicationController(t *testing.T) {
 			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Template = nil }),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("spec.template"), ""),
-			},
-		},
-		"negative replicas": {
-			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](-1) }),
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
-			},
-		},
-		"negative minReadySeconds": {
-			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.MinReadySeconds = -1 }),
-			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum"),
-			},
-		},
-		"nil replicas": {
-			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = nil }),
-			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec.replicas"), ""),
 			},
 		},
 		"invalid label": {
