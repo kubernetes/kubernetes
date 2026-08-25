@@ -557,12 +557,17 @@ func (p *PriorityQueue) isEntityWorthRequeuing(logger klog.Logger, entity framew
 	// For pod groups, if any pod is worth requeuing, the whole group is worth it.
 	// But we should prioritize higher strategies.
 	bestStrategy := queueSkip
+	hasPending := entity.HasPodsWithPendingPlugins()
 	entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
 		strategy := p.isPodWorthRequeuing(logger, pInfo, event, oldObj, newObj, hintKeys)
 		if strategy > bestStrategy {
 			bestStrategy = strategy
 		}
 		if bestStrategy == queueImmediately {
+			return false
+		}
+		// If no pods have pending plugins, the best strategy is queueAfterBackoff.
+		if !hasPending && bestStrategy == queueAfterBackoff {
 			return false
 		}
 		return true

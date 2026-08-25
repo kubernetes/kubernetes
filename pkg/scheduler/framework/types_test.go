@@ -22,8 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/sets"
-
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
@@ -31,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -356,6 +355,497 @@ func TestQueuedPodGroupInfoOrdering(t *testing.T) {
 			}
 			if diff := cmp.Diff(expectedUnscheduled, pgqi.UnscheduledPods); diff != "" {
 				t.Errorf("Unexpected order in UnscheduledPods (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestQueuedEntityInfo_HasPodsWithPendingPlugins(t *testing.T) {
+	podWithoutPending := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("pod1").PodGroupName("pg1").Obj()},
+	}
+	podWithPending1 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("pod2").PodGroupName("pg1").Obj()},
+		QueueingParams: QueueingParams{
+			PendingPlugins: sets.New("pluginA"),
+		},
+	}
+	podWithPending2 := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("pod3").PodGroupName("pg1").Obj()},
+		QueueingParams: QueueingParams{
+			PendingPlugins: sets.New("pluginB"),
+		},
+	}
+	nonExistentPod := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("nonexistent").PodGroupName("pg1").Obj()},
+	}
+	podGroup := st.MakePodGroup().Namespace("default").Name("pg1").Obj()
+	nonExistentPG := st.MakePodGroup().Namespace("default").Name("nonexistent-pg").Obj()
+
+	cpgRoot := st.MakeCompositePodGroup().Namespace("default").Name("cpg-root").Obj()
+	cpgChild := st.MakeCompositePodGroup().Namespace("default").Name("cpg-child").ParentCompositePodGroup("cpg-root").Obj()
+	cpgNested := st.MakeCompositePodGroup().Namespace("default").Name("cpg-nested").ParentCompositePodGroup("cpg-child").Obj()
+	nonExistentCPG := st.MakeCompositePodGroup().Namespace("default").Name("nonexistent-cpg").Obj()
+
+	pgChild1 := st.MakePodGroup().Namespace("default").Name("pg-child1").ParentCompositePodGroup("cpg-root").Obj()
+	pgChild2 := st.MakePodGroup().Namespace("default").Name("pg-child2").ParentCompositePodGroup("cpg-root").Obj()
+	pgLeaf1 := st.MakePodGroup().Namespace("default").Name("pg-leaf1").ParentCompositePodGroup("cpg-nested").Obj()
+	pgLeaf2 := st.MakePodGroup().Namespace("default").Name("pg-leaf2").ParentCompositePodGroup("cpg-nested").Obj()
+
+	podChild1WithPending := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("pod-c1").PodGroupName("pg-child1").Obj()},
+		QueueingParams: QueueingParams{
+			PendingPlugins: sets.New("pluginA"),
+		},
+	}
+	podChild1WithoutPending := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("pod-c1-np").PodGroupName("pg-child1").Obj()},
+	}
+	podChild2WithPending := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("pod-c2").PodGroupName("pg-child2").Obj()},
+		QueueingParams: QueueingParams{
+			PendingPlugins: sets.New("pluginB"),
+		},
+	}
+	podChild2WithoutPending := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("pod-c2-np").PodGroupName("pg-child2").Obj()},
+	}
+	podLeaf1WithPending := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("pod-l1").PodGroupName("pg-leaf1").Obj()},
+		QueueingParams: QueueingParams{
+			PendingPlugins: sets.New("pluginA"),
+		},
+	}
+	podLeaf2WithPending := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("pod-l2").PodGroupName("pg-leaf2").Obj()},
+		QueueingParams: QueueingParams{
+			PendingPlugins: sets.New("pluginB"),
+		},
+	}
+	podLeaf2WithoutPending := &QueuedPodInfo{
+		PodInfo: &PodInfo{Pod: st.MakePod().Namespace("default").Name("pod-l2-np").PodGroupName("pg-leaf2").Obj()},
+	}
+
+	tests := []struct {
+		name     string
+		entity   QueuedEntityInfo
+		expected bool
+	}{
+		{
+			name:     "single pod without pending plugins",
+			entity:   podWithoutPending,
+			expected: false,
+		},
+		{
+			name:     "single pod with pending plugins",
+			entity:   podWithPending1,
+			expected: true,
+		},
+		{
+			name: "empty pod group",
+			entity: &QueuedPodGroupInfo{
+				PodGroupInfo: &PodGroupInfo{
+					GenericPodGroup: NewGenericPodGroup(podGroup),
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "pod group with pod without pending plugins",
+			entity: func() *QueuedPodGroupInfo {
+				pgqi := &QueuedPodGroupInfo{
+					PodGroupInfo: &PodGroupInfo{
+						GenericPodGroup: NewGenericPodGroup(podGroup),
+					},
+				}
+				pgqi.AddPod(podWithoutPending)
+				return pgqi
+			}(),
+			expected: false,
+		},
+		{
+			name: "pod group with pod with pending plugins",
+			entity: func() *QueuedPodGroupInfo {
+				pgqi := &QueuedPodGroupInfo{
+					PodGroupInfo: &PodGroupInfo{
+						GenericPodGroup: NewGenericPodGroup(podGroup),
+					},
+				}
+				pgqi.AddPod(podWithPending1)
+				return pgqi
+			}(),
+			expected: true,
+		},
+		{
+			name: "pod group with multiple pods with pending plugins",
+			entity: func() *QueuedPodGroupInfo {
+				pgqi := &QueuedPodGroupInfo{
+					PodGroupInfo: &PodGroupInfo{
+						GenericPodGroup: NewGenericPodGroup(podGroup),
+					},
+				}
+				pgqi.AddPod(podWithoutPending)
+				pgqi.AddPod(podWithPending1)
+				pgqi.AddPod(podWithPending2)
+				return pgqi
+			}(),
+			expected: true,
+		},
+		{
+			name: "pod group after removing non-existent pod",
+			entity: func() *QueuedPodGroupInfo {
+				pgqi := &QueuedPodGroupInfo{
+					PodGroupInfo: &PodGroupInfo{
+						GenericPodGroup: NewGenericPodGroup(podGroup),
+					},
+				}
+				pgqi.AddPod(podWithPending1)
+				pgqi.RemovePod(nonExistentPod.Pod)
+				return pgqi
+			}(),
+			expected: true,
+		},
+		{
+			name: "pod group after removing pod without pending plugins",
+			entity: func() *QueuedPodGroupInfo {
+				pgqi := &QueuedPodGroupInfo{
+					PodGroupInfo: &PodGroupInfo{
+						GenericPodGroup: NewGenericPodGroup(podGroup),
+					},
+				}
+				pgqi.AddPod(podWithoutPending)
+				pgqi.AddPod(podWithPending1)
+				pgqi.RemovePod(podWithoutPending.Pod)
+				return pgqi
+			}(),
+			expected: true,
+		},
+		{
+			name: "pod group after removing one of multiple pods with pending plugins",
+			entity: func() *QueuedPodGroupInfo {
+				pgqi := &QueuedPodGroupInfo{
+					PodGroupInfo: &PodGroupInfo{
+						GenericPodGroup: NewGenericPodGroup(podGroup),
+					},
+				}
+				pgqi.AddPod(podWithPending1)
+				pgqi.AddPod(podWithPending2)
+				pgqi.RemovePod(podWithPending1.Pod)
+				return pgqi
+			}(),
+			expected: true,
+		},
+		{
+			name: "pod group after removing all pods with pending plugins",
+			entity: func() *QueuedPodGroupInfo {
+				pgqi := &QueuedPodGroupInfo{
+					PodGroupInfo: &PodGroupInfo{
+						GenericPodGroup: NewGenericPodGroup(podGroup),
+					},
+				}
+				pgqi.AddPod(podWithoutPending)
+				pgqi.AddPod(podWithPending1)
+				pgqi.RemovePod(podWithPending1.Pod)
+				return pgqi
+			}(),
+			expected: false,
+		},
+		{
+			name: "pod group after re-adding pod with pending plugins",
+			entity: func() *QueuedPodGroupInfo {
+				pgqi := &QueuedPodGroupInfo{
+					PodGroupInfo: &PodGroupInfo{
+						GenericPodGroup: NewGenericPodGroup(podGroup),
+					},
+				}
+				pgqi.AddPod(podWithPending1)
+				pgqi.RemovePod(podWithPending1.Pod)
+				pgqi.AddPod(podWithPending1)
+				return pgqi
+			}(),
+			expected: true,
+		},
+		{
+			name: "pod group with pending plugins after removing pod group",
+			entity: func() *QueuedPodGroupInfo {
+				gpg := NewGenericPodGroup(podGroup)
+				pgqi := &QueuedPodGroupInfo{
+					PodGroupInfo: &PodGroupInfo{
+						GenericPodGroup: gpg,
+					},
+				}
+				pgqi.AddPod(podWithoutPending)
+				pgqi.AddPod(podWithPending1)
+				pgqi.RemoveGenericPodGroup(gpg)
+				return pgqi
+			}(),
+			expected: false,
+		},
+		{
+			name: "pod group with pending plugins after removing non-existent pod group",
+			entity: func() *QueuedPodGroupInfo {
+				gpg := NewGenericPodGroup(podGroup)
+				pgqi := &QueuedPodGroupInfo{
+					PodGroupInfo: &PodGroupInfo{
+						GenericPodGroup: gpg,
+					},
+				}
+				pgqi.AddPod(podWithPending1)
+				pgqi.RemoveGenericPodGroup(NewGenericPodGroup(nonExistentPG))
+				return pgqi
+			}(),
+			expected: true,
+		},
+		{
+			name: "composite pod group after removing child pod group with pending plugins",
+			entity: func() *QueuedPodGroupInfo {
+				gpgChild1 := NewGenericPodGroup(pgChild1)
+				pgqi := &QueuedPodGroupInfo{
+					PodGroupInfo: &PodGroupInfo{
+						GenericPodGroup: NewGenericCompositePodGroup(cpgRoot),
+						Children: []*PodGroupInfo{
+							{
+								GenericPodGroup: gpgChild1,
+							},
+							{
+								GenericPodGroup: NewGenericPodGroup(pgChild2),
+							},
+						},
+					},
+				}
+				pgqi.AddPod(podChild1WithPending)
+				pgqi.AddPod(podChild2WithoutPending)
+				pgqi.RemoveGenericPodGroup(gpgChild1)
+				return pgqi
+			}(),
+			expected: false,
+		},
+		{
+			name: "composite pod group after removing child pod group with mixed pending and non-pending pods",
+			entity: func() *QueuedPodGroupInfo {
+				gpgChild1 := NewGenericPodGroup(pgChild1)
+				pgqi := &QueuedPodGroupInfo{
+					PodGroupInfo: &PodGroupInfo{
+						GenericPodGroup: NewGenericCompositePodGroup(cpgRoot),
+						Children: []*PodGroupInfo{
+							{
+								GenericPodGroup: gpgChild1,
+							},
+							{
+								GenericPodGroup: NewGenericPodGroup(pgChild2),
+							},
+						},
+					},
+				}
+				pgqi.AddPod(podChild1WithPending)
+				pgqi.AddPod(podChild1WithoutPending)
+				pgqi.AddPod(podChild2WithoutPending)
+				pgqi.RemoveGenericPodGroup(gpgChild1)
+				return pgqi
+			}(),
+			expected: false,
+		},
+		{
+			name: "composite pod group after removing one of multiple child pod groups with pending plugins",
+			entity: func() *QueuedPodGroupInfo {
+				gpgChild1 := NewGenericPodGroup(pgChild1)
+				pgqi := &QueuedPodGroupInfo{
+					PodGroupInfo: &PodGroupInfo{
+						GenericPodGroup: NewGenericCompositePodGroup(cpgRoot),
+						Children: []*PodGroupInfo{
+							{
+								GenericPodGroup: gpgChild1,
+							},
+							{
+								GenericPodGroup: NewGenericPodGroup(pgChild2),
+							},
+						},
+					},
+				}
+				pgqi.AddPod(podChild1WithPending)
+				pgqi.AddPod(podChild2WithPending)
+				pgqi.RemoveGenericPodGroup(gpgChild1)
+				return pgqi
+			}(),
+			expected: true,
+		},
+		{
+			name: "composite pod group after removing child pod group without pending plugins",
+			entity: func() *QueuedPodGroupInfo {
+				gpgChild2 := NewGenericPodGroup(pgChild2)
+				pgqi := &QueuedPodGroupInfo{
+					PodGroupInfo: &PodGroupInfo{
+						GenericPodGroup: NewGenericCompositePodGroup(cpgRoot),
+						Children: []*PodGroupInfo{
+							{
+								GenericPodGroup: NewGenericPodGroup(pgChild1),
+							},
+							{
+								GenericPodGroup: gpgChild2,
+							},
+						},
+					},
+				}
+				pgqi.AddPod(podChild1WithPending)
+				pgqi.AddPod(podChild2WithoutPending)
+				pgqi.RemoveGenericPodGroup(gpgChild2)
+				return pgqi
+			}(),
+			expected: true,
+		},
+		{
+			name: "composite pod group after removing child composite pod group with nested subtree pods with pending plugins",
+			entity: func() *QueuedPodGroupInfo {
+				gcpgChild := NewGenericCompositePodGroup(cpgChild)
+				pgqi := &QueuedPodGroupInfo{
+					PodGroupInfo: &PodGroupInfo{
+						GenericPodGroup: NewGenericCompositePodGroup(cpgRoot),
+						Children: []*PodGroupInfo{
+							{
+								GenericPodGroup: gcpgChild,
+								Children: []*PodGroupInfo{
+									{
+										GenericPodGroup: NewGenericCompositePodGroup(cpgNested),
+										Children: []*PodGroupInfo{
+											{
+												GenericPodGroup: NewGenericPodGroup(pgLeaf1),
+											},
+											{
+												GenericPodGroup: NewGenericPodGroup(pgLeaf2),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}
+				pgqi.AddPod(podLeaf1WithPending)
+				pgqi.AddPod(podLeaf2WithPending)
+				pgqi.RemoveGenericPodGroup(gcpgChild)
+				return pgqi
+			}(),
+			expected: false,
+		},
+		{
+			name: "composite pod group after removing child composite pod group while sibling branch has pending plugins",
+			entity: func() *QueuedPodGroupInfo {
+				gcpgChild := NewGenericCompositePodGroup(cpgChild)
+				pgqi := &QueuedPodGroupInfo{
+					PodGroupInfo: &PodGroupInfo{
+						GenericPodGroup: NewGenericCompositePodGroup(cpgRoot),
+						Children: []*PodGroupInfo{
+							{
+								GenericPodGroup: gcpgChild,
+								Children: []*PodGroupInfo{
+									{
+										GenericPodGroup: NewGenericPodGroup(pgLeaf1),
+									},
+								},
+							},
+							{
+								GenericPodGroup: NewGenericPodGroup(pgChild1),
+							},
+						},
+					},
+				}
+				pgqi.AddPod(podLeaf1WithPending)
+				pgqi.AddPod(podChild1WithPending)
+				pgqi.RemoveGenericPodGroup(gcpgChild)
+				return pgqi
+			}(),
+			expected: true,
+		},
+		{
+			name: "composite pod group after removing child composite pod group without pending plugins",
+			entity: func() *QueuedPodGroupInfo {
+				gcpgChild := NewGenericCompositePodGroup(cpgChild)
+				pgqi := &QueuedPodGroupInfo{
+					PodGroupInfo: &PodGroupInfo{
+						GenericPodGroup: NewGenericCompositePodGroup(cpgRoot),
+						Children: []*PodGroupInfo{
+							{
+								GenericPodGroup: gcpgChild,
+								Children: []*PodGroupInfo{
+									{
+										GenericPodGroup: NewGenericPodGroup(pgLeaf2),
+									},
+								},
+							},
+							{
+								GenericPodGroup: NewGenericPodGroup(pgChild1),
+							},
+						},
+					},
+				}
+				pgqi.AddPod(podLeaf2WithoutPending)
+				pgqi.AddPod(podChild1WithPending)
+				pgqi.RemoveGenericPodGroup(gcpgChild)
+				return pgqi
+			}(),
+			expected: true,
+		},
+		{
+			name: "composite pod group after removing non-existent composite pod group",
+			entity: func() *QueuedPodGroupInfo {
+				pgqi := &QueuedPodGroupInfo{
+					PodGroupInfo: &PodGroupInfo{
+						GenericPodGroup: NewGenericCompositePodGroup(cpgRoot),
+						Children: []*PodGroupInfo{
+							{
+								GenericPodGroup: NewGenericCompositePodGroup(cpgChild),
+								Children: []*PodGroupInfo{
+									{
+										GenericPodGroup: NewGenericPodGroup(pgLeaf1),
+									},
+								},
+							},
+						},
+					},
+				}
+				pgqi.AddPod(podLeaf1WithPending)
+				pgqi.RemoveGenericPodGroup(NewGenericCompositePodGroup(nonExistentCPG))
+				return pgqi
+			}(),
+			expected: true,
+		},
+		{
+			name: "composite pod group after removing all child pod groups with pending plugins",
+			entity: func() *QueuedPodGroupInfo {
+				gpgChild1 := NewGenericPodGroup(pgChild1)
+				gpgChild2 := NewGenericPodGroup(pgChild2)
+				pgqi := &QueuedPodGroupInfo{
+					PodGroupInfo: &PodGroupInfo{
+						GenericPodGroup: NewGenericCompositePodGroup(cpgRoot),
+						Children: []*PodGroupInfo{
+							{
+								GenericPodGroup: gpgChild1,
+							},
+							{
+								GenericPodGroup: gpgChild2,
+							},
+						},
+					},
+				}
+				pgqi.AddPod(podChild1WithPending)
+				pgqi.AddPod(podChild2WithPending)
+				pgqi.RemoveGenericPodGroup(gpgChild1)
+				pgqi.RemoveGenericPodGroup(gpgChild2)
+				return pgqi
+			}(),
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+				features.CompositePodGroup:               true,
+			})
+			if got := tt.entity.HasPodsWithPendingPlugins(); got != tt.expected {
+				t.Errorf("Unexpected HasPodsWithPendingPlugins: %v, want: %v", got, tt.expected)
 			}
 		})
 	}
