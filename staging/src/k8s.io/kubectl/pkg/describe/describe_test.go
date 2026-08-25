@@ -2503,6 +2503,23 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			expectedElements:   []string{"EndpointsNamespace", "glusterfsendpointname"},
 			unexpectedElements: []string{"VolumeMode", "Filesystem"},
 		},
+		{
+			name:   "fractional storage capacity",
+			plugin: "hostpath",
+			pv: &corev1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Spec: corev1.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1.PersistentVolumeSource{
+						HostPath: &corev1.HostPathVolumeSource{Type: new(corev1.HostPathType)},
+					},
+					Capacity: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("0.1Gi"),
+					},
+				},
+			},
+			expectedElements:   []string{"Capacity:", "107374183"},
+			unexpectedElements: []string{"107374182400m"},
+		},
 	}
 
 	for _, test := range testCases {
@@ -2757,6 +2774,24 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 			unexpectedElements: []string{"Events"},
 			describerSettings:  &DescriberSettings{ShowEvents: false},
 		},
+		{
+			name: "fractional storage capacity",
+			pvc: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					VolumeName:       "volume1",
+					StorageClassName: &goldClassName,
+				},
+				Status: corev1.PersistentVolumeClaimStatus{
+					Phase: corev1.ClaimBound,
+					Capacity: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("0.1Gi"),
+					},
+				},
+			},
+			expectedElements:   []string{"Capacity:", "107374183"},
+			unexpectedElements: []string{"107374182400m"},
+		},
 	}
 
 	for _, test := range testCases {
@@ -2789,6 +2824,34 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestDescribeVolumeClaimTemplates(t *testing.T) {
+	templates := []corev1.PersistentVolumeClaim{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "data"},
+			Spec: corev1.PersistentVolumeClaimSpec{
+				Resources: corev1.VolumeResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("0.1Gi"),
+					},
+				},
+			},
+		},
+	}
+
+	out := new(bytes.Buffer)
+	writer := NewPrefixWriter(out)
+	describeVolumeClaimTemplates(templates, writer)
+	writer.Flush()
+	output := out.String()
+
+	if !strings.Contains(output, "107374183") {
+		t.Errorf("expected to find %q in output: %q", "107374183", output)
+	}
+	if strings.Contains(output, "107374182400m") {
+		t.Errorf("unexpected to find %q in output: %q", "107374182400m", output)
 	}
 }
 

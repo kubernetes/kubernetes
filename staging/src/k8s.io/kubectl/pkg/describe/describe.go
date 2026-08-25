@@ -1578,7 +1578,7 @@ func describePersistentVolume(pv *corev1.PersistentVolume, events *corev1.EventL
 			w.Write(LEVEL_0, "VolumeMode:\t%v\n", *pv.Spec.VolumeMode)
 		}
 		storage := pv.Spec.Capacity[corev1.ResourceStorage]
-		w.Write(LEVEL_0, "Capacity:\t%s\n", storage.String())
+		w.Write(LEVEL_0, "Capacity:\t%s\n", formatResourceQuantity(corev1.ResourceStorage, storage))
 		printVolumeNodeAffinity(w, pv.Spec.NodeAffinity)
 		w.Write(LEVEL_0, "Message:\t%s\n", pv.Status.Message)
 		w.Write(LEVEL_0, "Source:\n")
@@ -1767,7 +1767,7 @@ func printPersistentVolumeClaim(w PrefixWriter, pvc *corev1.PersistentVolumeClai
 	if pvc.Spec.VolumeName != "" {
 		accessModes = storageutil.GetAccessModesAsString(pvc.Status.AccessModes)
 		storage = pvc.Status.Capacity[corev1.ResourceStorage]
-		capacity = storage.String()
+		capacity = formatResourceQuantity(corev1.ResourceStorage, storage)
 	}
 	w.Write(LEVEL_0, "Capacity:\t%s\n", capacity)
 	w.Write(LEVEL_0, "Access Modes:\t%s\n", accessModes)
@@ -2154,7 +2154,7 @@ func describeVolumeClaimTemplates(templates []corev1.PersistentVolumeClaim, w Pr
 		printLabelsMultilineWithIndent(w, "  ", "Labels", "\t", pvc.Labels, sets.New[string]())
 		printLabelsMultilineWithIndent(w, "  ", "Annotations", "\t", pvc.Annotations, sets.New[string]())
 		if capacity, ok := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; ok {
-			w.Write(LEVEL_1, "Capacity:\t%s\n", capacity.String())
+			w.Write(LEVEL_1, "Capacity:\t%s\n", formatResourceQuantity(corev1.ResourceStorage, capacity))
 		} else {
 			w.Write(LEVEL_1, "Capacity:\t%s\n", "<default>")
 		}
