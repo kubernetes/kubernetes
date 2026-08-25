@@ -331,6 +331,7 @@ func initTestPreferNominatedNode(t *testing.T, nsPrefix string, opts ...schedule
 		// Scheduler.NextEntity() may return nil when scheduler is shutting down.
 		if entity != nil {
 			entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+				pInfo.Pod = pInfo.Pod.DeepCopy()
 				pInfo.Pod.Status.NominatedNodeName = "node-1"
 				return true
 			})
