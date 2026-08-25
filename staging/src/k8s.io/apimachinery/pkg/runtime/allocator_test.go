@@ -87,6 +87,35 @@ func TestPutAllocatorKeepsSmallBuffer(t *testing.T) {
 	}
 }
 
+// TestAllocatorGrowthPolicy verifies the growth formula in both modes: with
+// a pool bound configured a buffer never grows past max(n, 2*cap); without
+// one the historical 2*cap+n formula is preserved.
+func TestAllocatorGrowthPolicy(t *testing.T) {
+	requests := []uint64{100, 130, 50, 260, 261}
+	for _, tc := range []struct {
+		name     string
+		bound    int
+		wantCaps []int
+	}{
+		{name: "bounded pool: max(n, 2*cap)", bound: 1 << 20, wantCaps: []int{100, 200, 200, 400, 400}},
+		{name: "unbounded pool: 2*cap+n", bound: 0, wantCaps: []int{100, 330, 330, 330, 330}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			withMaxPooledBufferCapacity(t, tc.bound)
+			target := &Allocator{}
+			for i, n := range requests {
+				buf := target.Allocate(n)
+				if uint64(len(buf)) != n {
+					t.Fatalf("request %d: got len %d, want %d", i, len(buf), n)
+				}
+				if cap(buf) != tc.wantCaps[i] {
+					t.Fatalf("request %d (n=%d): got cap %d, want %d", i, n, cap(buf), tc.wantCaps[i])
+				}
+			}
+		})
+	}
+}
+
 func TestPutAllocatorUnboundedByDefault(t *testing.T) {
 	for _, n := range []int{0, -1} {
 		withMaxPooledBufferCapacity(t, n)

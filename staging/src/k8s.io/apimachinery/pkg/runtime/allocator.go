@@ -106,7 +106,17 @@ func (a *Allocator) Allocate(n uint64) []byte {
 		return a.buf
 	}
 	// grow the buffer
-	size := uint64(2*cap(a.buf)) + n
+	var size uint64
+	if maxPooledBufferCapacity.Load() > 0 {
+		// With a pool bound configured, grow geometrically but never past
+		// what the request or plain doubling needs. Callers pass exact sizes
+		// (the protobuf encoder sizes the object first), so the historical
+		// 2*cap+n formula over-allocates by up to 3x the object size, and the
+		// excess is what the pool then retains.
+		size = max(n, uint64(2*cap(a.buf)))
+	} else {
+		size = uint64(2*cap(a.buf)) + n
+	}
 	a.buf = make([]byte, size)
 	a.buf = a.buf[:n]
 	return a.buf
