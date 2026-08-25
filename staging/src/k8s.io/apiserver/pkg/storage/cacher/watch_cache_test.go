@@ -136,7 +136,7 @@ func newTestWatchCache(capacity int, eventFreshDuration time.Duration, indexers 
 		defer wc.RUnlock()
 		return wc.resourceVersion, nil
 	}
-	wc.watchCache = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), eventFreshDuration, schema.GroupResource{Resource: "pods"}, pr, getCurrentRV)
+	wc.watchCache = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), eventFreshDuration, schema.GroupResource{Resource: "pods"}, pr, getCurrentRV, wc.stopCh)
 	// To preserve behavior of tests that assume a given capacity,
 	// resize it to th expected size.
 	wc.history.capacity = capacity
@@ -1427,4 +1427,41 @@ func getMaxItemRV(t *testing.T, versioner storage.Versioner, items []interface{}
 		maxRV = max(maxRV, itemRV)
 	}
 	return maxRV
+}
+
+// TestWatchCacheShrinkKeepsStartIndexMonotonic guards the invariant documented on
+// ResetLocked: startIndex must never decrease. A shrink of a partially filled ring
+// would otherwise pull startIndex back below the relist boundary and make events
+// that were discarded by the relist readable again.
+func TestWatchCacheShrinkKeepsStartIndexMonotonic(t *testing.T) {
+	store := newTestWatchCache(8, DefaultEventFreshDuration, &cache.Indexers{})
+	defer store.Stop()
+
+	history := store.history
+	history.lowerBoundCapacity = 2
+	history.upperBoundCapacity = 16
+
+	now := time.Now()
+	for i := 0; i < 8; i++ {
+		history.updateCache(&watchCacheEvent{RecordTime: now, ResourceVersion: uint64(i + 1)})
+	}
+
+	// A relist empties the ring but deliberately leaves capacity alone.
+	history.ResetLocked()
+	startAfterReset := history.startIndex
+
+	// A single event arrives well after the relist, so the ring is far from full.
+	history.updateCache(&watchCacheEvent{RecordTime: now.Add(2 * DefaultEventFreshDuration), ResourceVersion: 100})
+
+	history.resizeCacheLocked(now.Add(4 * DefaultEventFreshDuration))
+
+	if history.startIndex < startAfterReset {
+		t.Errorf("startIndex moved backward across a shrink: got %d, want >= %d", history.startIndex, startAfterReset)
+	}
+	for i := history.startIndex; i < history.endIndex; i++ {
+		if history.cache[i%history.capacity] == nil {
+			t.Errorf("resurrected empty slot at index %d after shrink (startIndex=%d, endIndex=%d, capacity=%d)",
+				i, history.startIndex, history.endIndex, history.capacity)
+		}
+	}
 }
