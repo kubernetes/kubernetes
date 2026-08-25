@@ -13,6 +13,7 @@ import * as cdk from '../../core';
 import { AssumptionError, ValidationError } from '../../core';
 import { lit } from '../../core/lib/private/literal-string';
 import { profileFn, profileSpan } from '../../core/lib/private/perf';
+import { posixShellEscape } from '../../core/lib/private/shell-escape';
 import { LAMBDA_NODEJS_SDK_V3_EXCLUDE_SMITHY_PACKAGES } from '../../cx-api';
 
 const ESBUILD_MAJOR_VERSION = '0';
@@ -671,14 +672,6 @@ class OsCommand {
  */
 function preparePosixShellCommand(argv: string[]): string {
   return argv.map(posixShellEscape).join(' ');
-}
-
-/**
- * Escapes a single argument for safe inclusion in a POSIX shell command.
- * Every argument is single-quoted unconditionally (like Python's shlex.quote).
- */
-function posixShellEscape(arg: string): string {
-  return "'" + arg.replace(/'/g, "'\\''") + "'";
 }
 
 function powershellEscape(arg: string): string {

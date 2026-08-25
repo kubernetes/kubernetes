@@ -3,7 +3,8 @@ import type { AssetCode, Runtime } from 'aws-cdk-lib/aws-lambda';
 import { Architecture, Code } from 'aws-cdk-lib/aws-lambda';
 import type { BundlingFileAccess, BundlingOptions as CdkBundlingOptions, DockerVolume } from 'aws-cdk-lib/core';
 import { AssetStaging, DockerImage, PERF_BUNDLING_SRC_SYM } from 'aws-cdk-lib/core';
-import { profileSpan } from 'aws-cdk-lib/core/lib/helpers-internal';
+import { UnscopedValidationError } from 'aws-cdk-lib/core/lib/errors';
+import { lit, posixShellEscape, profileSpan } from 'aws-cdk-lib/core/lib/helpers-internal';
 import { Packaging, DependenciesFile } from './packaging';
 import type { BundlingOptions, ICommandHooks } from './types';
 
@@ -57,6 +58,8 @@ export interface BundlingProps extends BundlingOptions {
  */
 export class Bundling implements CdkBundlingOptions {
   public static bundle(options: BundlingProps): AssetCode {
+    validateOutputPathSuffix(options.outputPathSuffix ?? '');
+
     return Code.fromAsset(options.entry, {
       assetHash: options.assetHash,
       assetHashType: options.assetHashType,
@@ -138,22 +141,22 @@ export class Bundling implements CdkBundlingOptions {
     let bundlingCommands: string[] = [];
     bundlingCommands.push(...options.commandHooks?.beforeBundling(options.inputDir, options.outputDir) ?? []);
 
-    const excludes = options.assetExcludes ?? [];
+    const excludes = [...(options.assetExcludes ?? [])];
     if (packaging.dependenciesFile == DependenciesFile.UV && !excludes.includes('.python-version')) {
       excludes.push('.python-version');
     }
 
-    const exclusionStr = excludes.map(item => `--exclude='${item}'`).join(' ');
+    const exclusionStr = excludes.map(item => `--exclude=${posixShellEscape(item)}`).join(' ');
     bundlingCommands.push([
-      'rsync', '-rLv', exclusionStr ?? '', `${options.inputDir}/`, options.outputDir,
+      'rsync', '-rLv', exclusionStr ?? '', posixShellEscape(`${options.inputDir}/`), posixShellEscape(options.outputDir),
     ].filter(item => item).join(' '));
-    bundlingCommands.push(`cd ${options.outputDir}`);
+    bundlingCommands.push(`cd ${posixShellEscape(options.outputDir)}`);
     bundlingCommands.push(packaging.exportCommand ?? '');
 
     if (packaging.dependenciesFile == DependenciesFile.UV) {
-      bundlingCommands.push(`uv pip install -r ${DependenciesFile.PIP} --target ${options.outputDir}`);
+      bundlingCommands.push(`uv pip install -r ${DependenciesFile.PIP} --target ${posixShellEscape(options.outputDir)}`);
     } else if (packaging.dependenciesFile) {
-      bundlingCommands.push(`python -m pip install -r ${DependenciesFile.PIP} -t ${options.outputDir}`);
+      bundlingCommands.push(`python -m pip install -r ${DependenciesFile.PIP} -t ${posixShellEscape(options.outputDir)}`);
     }
 
     bundlingCommands.push(...options.commandHooks?.afterBundling(options.inputDir, options.outputDir) ?? []);
@@ -176,4 +179,18 @@ interface BundlingCommandOptions {
  */
 function chain(commands: string[]): string {
   return commands.filter(c => !!c).join(' && ');
+}
+
+function validateOutputPathSuffix(outputPathSuffix: string): void {
+  const outputPath = path.posix.join(AssetStaging.BUNDLING_OUTPUT_DIR, outputPathSuffix);
+  if (pathEscapesRoot(path.posix.relative(AssetStaging.BUNDLING_OUTPUT_DIR, outputPath))) {
+    throw new UnscopedValidationError(
+      lit`OutputPathSuffixEscapesOutputDir`,
+      `outputPathSuffix (${outputPathSuffix}) should not escape ${AssetStaging.BUNDLING_OUTPUT_DIR}`,
+    );
+  }
+}
+
+function pathEscapesRoot(relativePath: string): boolean {
+  return path.posix.isAbsolute(relativePath) || relativePath === '..' || relativePath.startsWith('../');
 }

@@ -16,4 +16,5 @@ export * from '../private/literal-string';
 export * from './box';
 export { noBoxStackTraces } from '../no-box-stack-traces';
 export * from '../private/perf';
+export * from '../private/shell-escape';
 export type { ForestFile, TreeFile } from '../private/tree-metadata';
