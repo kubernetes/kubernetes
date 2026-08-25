@@ -2,6 +2,7 @@ import type { Construct } from 'constructs';
 import { QueuePolicy } from './policy';
 import { QueueGrants } from './sqs-grants.generated';
 import type { IQueueRef, QueueReference } from './sqs.generated';
+import * as cloudwatch from '../../aws-cloudwatch';
 import * as iam from '../../aws-iam';
 import type { GrantOnKeyResult, IEncryptedResource, IGrantable } from '../../aws-iam';
 import type * as kms from '../../aws-kms';
@@ -103,6 +104,21 @@ export interface IQueue extends IResource, IQueueRef {
    * @param queueActions The actions to grant
    */
   grant(grantee: iam.IGrantable, ...queueActions: string[]): iam.Grant;
+
+  /**
+   * The number of messages waiting to be picked up plus the number in flight
+   *
+   * `ApproximateNumberOfMessagesVisible + ApproximateNumberOfMessagesNotVisible`, as a metric math
+   * expression. Prefer this over `metricApproximateNumberOfMessagesVisible` when scaling consumers
+   * in: receiving a message lowers `Visible`, so a policy watching only `Visible` cannot tell a
+   * consumer that just picked up work from one that finished it.
+   *
+   * `statistic`, `unit` and dimensions apply to both underlying metrics, `label`, `color` and
+   * `period` to the expression.
+   *
+   * Maximum over 5 minutes
+   */
+  metricApproximateNumberOfMessagesOutstanding(props?: cloudwatch.MetricOptions): cloudwatch.MathExpression;
 }
 
 /**
@@ -285,6 +301,19 @@ export abstract class QueueBase extends Resource implements IQueue, IEncryptedRe
       actions,
       resourceArns: [this.queueArn],
       resource: this,
+    });
+  }
+
+  public metricApproximateNumberOfMessagesOutstanding(props?: cloudwatch.MetricOptions): cloudwatch.MathExpression {
+    return new cloudwatch.MathExpression({
+      expression: 'visible + notVisible',
+      usingMetrics: {
+        visible: this.metricApproximateNumberOfMessagesVisible(props),
+        notVisible: this.metricApproximateNumberOfMessagesNotVisible(props),
+      },
+      label: props?.label ?? 'Approximate number of messages outstanding',
+      color: props?.color,
+      period: props?.period,
     });
   }
 }
