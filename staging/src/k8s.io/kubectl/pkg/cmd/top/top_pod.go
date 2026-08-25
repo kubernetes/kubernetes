@@ -55,6 +55,7 @@ type TopPodOptions struct {
 	UseProtocolBuffers bool
 	Sum                bool
 	ShowSwap           bool
+	NodeName           string
 
 	PodClient       corev1client.PodsGetter
 	Printer         *metricsutil.TopCmdPrinter
@@ -120,6 +121,7 @@ func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericiooptions.
 	cmd.Flags().BoolVar(&o.UseProtocolBuffers, "use-protocol-buffers", o.UseProtocolBuffers, "Enables using protocol-buffers to access Metrics API.")
 	cmd.Flags().BoolVar(&o.Sum, "sum", o.Sum, "Print the sum of the resource usage")
 	cmd.Flags().BoolVar(&o.ShowSwap, "show-swap", o.ShowSwap, "Print pod resources related to swap memory.")
+	cmd.Flags().StringVar(&o.NodeName, "node", o.NodeName, "Filter pods by node name.")
 	return cmd
 }
 
@@ -171,64 +173,84 @@ func (o *TopPodOptions) Validate() error {
 	return nil
 }
 
-func (o TopPodOptions) RunTopPod() error {
-	var err error
-	labelSelector := labels.Everything()
-	if len(o.LabelSelector) > 0 {
-		labelSelector, err = labels.Parse(o.LabelSelector)
-		if err != nil {
-			return err
-		}
-	}
-	fieldSelector := fields.Everything()
-	if len(o.FieldSelector) > 0 {
-		fieldSelector, err = fields.ParseSelector(o.FieldSelector)
-		if err != nil {
-			return err
-		}
-	}
+ func (o TopPodOptions) RunTopPod() error {
+      var err error
+      labelSelector := labels.Everything()
+      if len(o.LabelSelector) > 0 {
+          labelSelector, err = labels.Parse(o.LabelSelector)
+          if err != nil {
+              return err
+          }
+      }
+      fieldSelector := fields.Everything()
+      if len(o.FieldSelector) > 0 {
+          fieldSelector, err = fields.ParseSelector(o.FieldSelector)
+          if err != nil {
+              return err
+          }
+      }
 
-	apiGroups, err := o.DiscoveryClient.ServerGroups()
-	if err != nil {
-		return err
-	}
+      apiGroups, err := o.DiscoveryClient.ServerGroups()
+      if err != nil {
+          return err
+      }
 
-	metricsAPIAvailable := SupportedMetricsAPIVersionAvailable(apiGroups)
+      metricsAPIAvailable := SupportedMetricsAPIVersionAvailable(apiGroups)
 
-	if metricsAPIAvailable == "" {
-		return errors.New("Metrics API not available")
-	}
-	metrics, err := getMetricsFromMetricsAPI(o.MetricsClient, o.Namespace, o.ResourceName, o.AllNamespaces, labelSelector, metricsAPIAvailable)
-	if err != nil {
-		return err
-	}
+      if metricsAPIAvailable == "" {
+          return errors.New("Metrics API not available")
+      }
+      metrics, err := getMetricsFromMetricsAPI(o.MetricsClient, o.Namespace, o.ResourceName, o.AllNamespaces, labelSelector, metricsAPIAvailable)
+      if err != nil {
+          return err
+      }
 
-	if len(metrics.Items) != 0 && len(o.FieldSelector) > 0 {
-		metrics, err = filterPodMetricsByFieldSelector(o, metrics, labelSelector, fieldSelector)
-		if err != nil {
-			return err
-		}
-	}
+      if len(metrics.Items) != 0 && len(o.FieldSelector) > 0 {
+          metrics, err = filterPodMetricsByFieldSelector(o, metrics, labelSelector, fieldSelector)
+          if err != nil {
+              return err
+          }
+      }
 
-	// First we check why no metrics have been received.
-	if len(metrics.Items) == 0 {
-		// If the API server query is successful but all the pods are newly created,
-		// the metrics are probably not ready yet, so we return the error here in the first place.
-		err := verifyEmptyMetrics(o, labelSelector, fieldSelector)
-		if err != nil {
-			return err
-		}
+      if len(o.NodeName) > 0 {
+          ns := metav1.NamespaceAll
+          if !o.AllNamespaces {
+              ns = o.Namespace
+          }
+          pods, err := o.PodClient.Pods(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector.String()})
+          if err != nil {
+              return err
+          }
+          nodePods := make(map[string]struct{})
+          for _, pod := range pods.Items {
+              if pod.Spec.NodeName == o.NodeName {
+                  nodePods[pod.Namespace+"/"+pod.Name] = struct{}{}
+              }
+          }
+          filtered := make([]metricsapi.PodMetrics, 0, len(metrics.Items))
+          for _, metric := range metrics.Items {
+              if _, ok := nodePods[metric.Namespace+"/"+metric.Name]; ok {
+                  filtered = append(filtered, metric)
+              }
+          }
+          metrics.Items = filtered
+      }
 
-		// if we had no errors, be sure we output something.
-		if o.AllNamespaces {
-			fmt.Fprintln(o.ErrOut, "No resources found")
-		} else {
-			fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
-		}
-	}
+      if len(metrics.Items) == 0 {
+          err := verifyEmptyMetrics(o, labelSelector, fieldSelector)
+          if err != nil {
+              return err
+          }
 
-	return o.Printer.PrintPodMetrics(metrics.Items, o.PrintContainers, o.AllNamespaces, o.NoHeaders, o.SortBy, o.Sum)
-}
+          if o.AllNamespaces {
+              fmt.Fprintln(o.ErrOut, "No resources found")
+          } else {
+              fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
+          }
+      }
+
+      return o.Printer.PrintPodMetrics(metrics.Items, o.PrintContainers, o.AllNamespaces, o.NoHeaders, o.SortBy, o.Sum)
+  }
 
 func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespace, resourceName string, allNamespaces bool, labelSelector labels.Selector, metricsAPIAvailable string) (*metricsapi.PodMetricsList, error) {
 	var err error
