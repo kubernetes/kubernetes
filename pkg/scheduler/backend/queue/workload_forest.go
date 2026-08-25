@@ -227,7 +227,7 @@ func (wf *workloadForest) buildPodGroupInfo(logger klog.Logger, gpg *framework.G
 }
 
 // buildQueuedPodGroupInfo constructs a QueuedPodGroupInfo starting from the provided root lookup info,
-// building out the full hierarchy of PodGroupInfo nodes and initializing the QueuedPodInfos map.
+// building out the full hierarchy of PodGroupInfo nodes.
 func (wf *workloadForest) buildQueuedPodGroupInfo(logger klog.Logger, rootLookup *framework.QueuedPodGroupInfo) *framework.QueuedPodGroupInfo {
 	key := rootLookup.GetKey()
 	gpg, ok := wf.podGroups[key]
@@ -235,7 +235,6 @@ func (wf *workloadForest) buildQueuedPodGroupInfo(logger klog.Logger, rootLookup
 		return nil
 	}
 	return &framework.QueuedPodGroupInfo{
-		PodGroupInfo:   wf.buildPodGroupInfo(logger, gpg, sets.New[fwk.EntityKey]()),
-		QueuedPodInfos: make(map[fwk.EntityKey][]*framework.QueuedPodInfo),
+		PodGroupInfo: wf.buildPodGroupInfo(logger, gpg, sets.New[fwk.EntityKey]()),
 	}
 }
