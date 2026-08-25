@@ -581,7 +581,8 @@
        "Ref": "BasicVpcIsolatedSubnet2SubnetC5099AAE"
       }
      ]
-    }
+    },
+    "MemorySize": 1024
    },
    "DependsOn": [
     "BasicVpcIsolatedSubnet1RouteTableAssociation1298F645",

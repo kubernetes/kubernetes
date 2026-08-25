@@ -577,7 +577,8 @@
        "Ref": "SgVpcIsolatedSubnet2Subnet9BE11239"
       }
      ]
-    }
+    },
+    "MemorySize": 1024
    },
    "DependsOn": [
     "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756Cc8e84b4ba9f2acb1031188c090de9949c4774177cfc81efdb372ae366b43bff1634f80a5af36768a8bfbServiceRoleDefaultPolicy4CE65E1C",

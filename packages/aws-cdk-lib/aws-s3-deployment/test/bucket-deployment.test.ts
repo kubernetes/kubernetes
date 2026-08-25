@@ -809,6 +809,22 @@ test('lambda execution role gets putObjectAcl permission when deploying with acc
   });
 });
 
+test('default memory limit is 1024MB', () => {
+  // GIVEN
+  const stack = new cdk.Stack();
+  const bucket = new s3.Bucket(stack, 'Dest');
+
+  // WHEN
+  new s3deploy.BucketDeployment(stack, 'Deploy', {
+    sources: [s3deploy.Source.asset(path.join(__dirname, 'my-website'))],
+    destinationBucket: bucket,
+    // memoryLimit not specified - should default to 1024MB
+  });
+
+  // THEN
+  Template.fromStack(stack).hasResourceProperties('AWS::Lambda::Function', { MemorySize: 1024 });
+});
+
 test('memoryLimit can be used to specify the memory limit for the deployment resource handler', () => {
   // GIVEN
   const stack = new cdk.Stack();
