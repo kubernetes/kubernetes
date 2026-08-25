@@ -116,7 +116,7 @@ func NewIngressInformerWithOptions(client kubernetes.Interface, namespace string
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewTypedIngressInformerWithOptions(client kubernetes.Interface, namespace string, options internalinterfaces.InformerOptions) IngressIndexInformer {
-	gvr := schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "ingresss"}
+	gvr := schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "ingresses"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
 	return cache.NewTypedSharedIndexInformer[*apiextensionsv1beta1.Ingress](cache.NewSharedIndexInformerWithOptions(

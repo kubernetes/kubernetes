@@ -214,14 +214,16 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 					internalVersionOutputDir, internalVersionOutputPkg,
 					groupPackageName, gv, groupGoNames[groupPackageName],
 					boilerplate, typesToGenerate,
-					args.InternalClientSetPackage, args.ListersPackage))
+					args.InternalClientSetPackage, args.ListersPackage,
+					genutil.PluralExceptionListToMapOrDie(args.PluralExceptions)))
 		} else {
 			targetList = append(targetList,
 				versionTarget(
 					externalVersionOutputDir, externalVersionOutputPkg,
 					groupPackageName, gv, groupGoNames[groupPackageName],
 					boilerplate, typesToGenerate,
-					args.VersionedClientSetPackage, args.ListersPackage))
+					args.VersionedClientSetPackage, args.ListersPackage,
+					genutil.PluralExceptionListToMapOrDie(args.PluralExceptions)))
 		}
 	}
 
@@ -348,7 +350,7 @@ func groupTarget(outputDirBase, outputPackageBase string, groupVersions clientge
 	}
 }
 
-func versionTarget(outputDirBase, outputPkgBase string, groupPkgName string, gv clientgentypes.GroupVersion, groupGoName string, boilerplate []byte, typesToGenerate []*types.Type, clientSetPackage, listersPackage string) generator.Target {
+func versionTarget(outputDirBase, outputPkgBase string, groupPkgName string, gv clientgentypes.GroupVersion, groupGoName string, boilerplate []byte, typesToGenerate []*types.Type, clientSetPackage, listersPackage string, pluralExceptions map[string]string) generator.Target {
 	subdir := []string{groupPkgName, strings.ToLower(gv.Version.NonEmpty())}
 	outputDir := filepath.Join(outputDirBase, filepath.Join(subdir...))
 	outputPkg := path.Join(outputPkgBase, path.Join(subdir...))
@@ -383,6 +385,7 @@ func versionTarget(outputDirBase, outputPkgBase string, groupPkgName string, gv 
 					clientSetPackage:          clientSetPackage,
 					listersPackage:            listersPackage,
 					internalInterfacesPackage: path.Join(outputPkgBase, subdirForInternalInterfaces),
+					pluralExceptions:          pluralExceptions,
 				})
 			}
 			return generators

@@ -115,7 +115,7 @@ func NewIPAddressInformerWithOptions(client kubernetes.Interface, options intern
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewTypedIPAddressInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) IPAddressIndexInformer {
-	gvr := schema.GroupVersionResource{Group: "networking.k8s.io", Version: "v1beta1", Resource: "ipaddresss"}
+	gvr := schema.GroupVersionResource{Group: "networking.k8s.io", Version: "v1beta1", Resource: "ipaddresses"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
 	return cache.NewTypedSharedIndexInformer[*apinetworkingv1beta1.IPAddress](cache.NewSharedIndexInformerWithOptions(
