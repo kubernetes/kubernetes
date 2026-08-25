@@ -1,0 +1,50 @@
+{
+  "/DefaultStorageClassTestStack/DefaultBucket": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/DefaultStorageClassTestStack/DefaultNamespace": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/DefaultStorageClassTestStack/DefaultTable": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/DefaultStorageClassTestStack/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/DefaultStorageClassTestStack/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/DefaultStorageClassTestStack/DefaultBucket/DefaultBucket": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DefaultBucket62385A75"
+    }
+  ],
+  "/DefaultStorageClassTestStack/DefaultNamespace/DefaultNamespace": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DefaultNamespaceD1A02467"
+    }
+  ],
+  "/DefaultStorageClassTestStack/DefaultTable/DefaultTable": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DefaultTable0A5768B5"
+    }
+  ]
+}

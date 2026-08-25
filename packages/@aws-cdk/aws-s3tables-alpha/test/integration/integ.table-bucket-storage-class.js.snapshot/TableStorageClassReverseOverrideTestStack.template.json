@@ -1,0 +1,90 @@
+{
+ "Resources": {
+  "ReverseOverrideBucketA24856EA": {
+   "Type": "AWS::S3Tables::TableBucket",
+   "Properties": {
+    "StorageClassConfiguration": {
+     "StorageClass": "INTELLIGENT_TIERING"
+    },
+    "TableBucketName": "sc-reverse-integ-test",
+    "UnreferencedFileRemoval": {}
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "ReverseOverrideNamespace3A8C0844": {
+   "Type": "AWS::S3Tables::Namespace",
+   "Properties": {
+    "Namespace": "reverse_override_ns",
+    "TableBucketARN": {
+     "Fn::GetAtt": [
+      "ReverseOverrideBucketA24856EA",
+      "TableBucketARN"
+     ]
+    }
+   },
+   "DependsOn": [
+    "ReverseOverrideBucketA24856EA"
+   ],
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "StandardOverrideTable0239DC8E": {
+   "Type": "AWS::S3Tables::Table",
+   "Properties": {
+    "Namespace": "reverse_override_ns",
+    "OpenTableFormat": "ICEBERG",
+    "StorageClassConfiguration": {
+     "StorageClass": "STANDARD"
+    },
+    "TableBucketARN": {
+     "Fn::GetAtt": [
+      "ReverseOverrideBucketA24856EA",
+      "TableBucketARN"
+     ]
+    },
+    "TableName": "standard_override_table",
+    "WithoutMetadata": "Yes"
+   },
+   "DependsOn": [
+    "ReverseOverrideNamespace3A8C0844"
+   ],
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

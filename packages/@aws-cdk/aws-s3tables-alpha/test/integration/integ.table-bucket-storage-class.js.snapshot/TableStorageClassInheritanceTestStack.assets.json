@@ -1,0 +1,20 @@
+{
+  "version": "52.0.0",
+  "files": {
+    "30a4f55907e17085c5f3188e7e5b3dae51f11f37842a338bca80d61719377f78": {
+      "displayName": "TableStorageClassInheritanceTestStack Template",
+      "source": {
+        "path": "TableStorageClassInheritanceTestStack.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-current_region-2bec3e60": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "30a4f55907e17085c5f3188e7e5b3dae51f11f37842a338bca80d61719377f78.json",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

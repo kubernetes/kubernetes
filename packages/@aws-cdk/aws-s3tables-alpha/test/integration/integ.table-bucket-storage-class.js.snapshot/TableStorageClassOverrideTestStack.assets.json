@@ -1,0 +1,20 @@
+{
+  "version": "52.0.0",
+  "files": {
+    "2acf61fa067903872d3630d05be0f7ce9514e8057f9e074afa07216d8cf8f913": {
+      "displayName": "TableStorageClassOverrideTestStack Template",
+      "source": {
+        "path": "TableStorageClassOverrideTestStack.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-current_region-28da03fc": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "2acf61fa067903872d3630d05be0f7ce9514e8057f9e074afa07216d8cf8f913.json",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

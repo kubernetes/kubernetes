@@ -1,0 +1,50 @@
+{
+  "/TableStorageClassReverseOverrideTestStack/ReverseOverrideBucket": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/TableStorageClassReverseOverrideTestStack/ReverseOverrideNamespace": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/TableStorageClassReverseOverrideTestStack/StandardOverrideTable": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/TableStorageClassReverseOverrideTestStack/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/TableStorageClassReverseOverrideTestStack/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/TableStorageClassReverseOverrideTestStack/ReverseOverrideBucket/ReverseOverrideBucket": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ReverseOverrideBucketA24856EA"
+    }
+  ],
+  "/TableStorageClassReverseOverrideTestStack/ReverseOverrideNamespace/ReverseOverrideNamespace": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ReverseOverrideNamespace3A8C0844"
+    }
+  ],
+  "/TableStorageClassReverseOverrideTestStack/StandardOverrideTable/StandardOverrideTable": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "StandardOverrideTable0239DC8E"
+    }
+  ]
+}

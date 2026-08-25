@@ -1,0 +1,87 @@
+{
+ "Resources": {
+  "InheritanceBucketDB1F2612": {
+   "Type": "AWS::S3Tables::TableBucket",
+   "Properties": {
+    "StorageClassConfiguration": {
+     "StorageClass": "INTELLIGENT_TIERING"
+    },
+    "TableBucketName": "sc-inherit-integ-test",
+    "UnreferencedFileRemoval": {}
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "InheritanceNamespace5239A08B": {
+   "Type": "AWS::S3Tables::Namespace",
+   "Properties": {
+    "Namespace": "inheritance_namespace",
+    "TableBucketARN": {
+     "Fn::GetAtt": [
+      "InheritanceBucketDB1F2612",
+      "TableBucketARN"
+     ]
+    }
+   },
+   "DependsOn": [
+    "InheritanceBucketDB1F2612"
+   ],
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "InheritingTable98E7E973": {
+   "Type": "AWS::S3Tables::Table",
+   "Properties": {
+    "Namespace": "inheritance_namespace",
+    "OpenTableFormat": "ICEBERG",
+    "TableBucketARN": {
+     "Fn::GetAtt": [
+      "InheritanceBucketDB1F2612",
+      "TableBucketARN"
+     ]
+    },
+    "TableName": "inheriting_table",
+    "WithoutMetadata": "Yes"
+   },
+   "DependsOn": [
+    "InheritanceNamespace5239A08B"
+   ],
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

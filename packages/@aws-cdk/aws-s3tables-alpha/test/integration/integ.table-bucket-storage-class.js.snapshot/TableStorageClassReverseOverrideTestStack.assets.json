@@ -1,0 +1,20 @@
+{
+  "version": "52.0.0",
+  "files": {
+    "2b0dcb48907571fc46071ad751084bc4e83953b280ac6a8c164c51868508681a": {
+      "displayName": "TableStorageClassReverseOverrideTestStack Template",
+      "source": {
+        "path": "TableStorageClassReverseOverrideTestStack.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-current_region-bdbcf6be": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "2b0dcb48907571fc46071ad751084bc4e83953b280ac6a8c164c51868508681a.json",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

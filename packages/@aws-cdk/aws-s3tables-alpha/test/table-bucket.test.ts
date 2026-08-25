@@ -326,6 +326,67 @@ describe('TableBucket', () => {
     });
   });
 
+  describe('created with STANDARD storage class', () => {
+    const TABLE_BUCKET_PROPS: s3tables.TableBucketProps = {
+      tableBucketName: 'standard-storage-bucket',
+      storageClass: s3tables.StorageClass.STANDARD,
+    };
+
+    beforeEach(() => {
+      new s3tables.TableBucket(stack, 'StandardStorageBucket', TABLE_BUCKET_PROPS);
+    });
+
+    test(`creates a ${TABLE_BUCKET_CFN_RESOURCE} resource`, () => {
+      Template.fromStack(stack).resourceCountIs(TABLE_BUCKET_CFN_RESOURCE, 1);
+    });
+
+    test('has StorageClassConfiguration with STANDARD storage class', () => {
+      Template.fromStack(stack).hasResourceProperties(TABLE_BUCKET_CFN_RESOURCE, {
+        'TableBucketName': TABLE_BUCKET_PROPS.tableBucketName,
+        'StorageClassConfiguration': {
+          'StorageClass': 'STANDARD',
+        },
+      });
+    });
+  });
+
+  describe('created with INTELLIGENT_TIERING storage class', () => {
+    const TABLE_BUCKET_PROPS: s3tables.TableBucketProps = {
+      tableBucketName: 'intelligent-tiering-bucket',
+      storageClass: s3tables.StorageClass.INTELLIGENT_TIERING,
+    };
+
+    beforeEach(() => {
+      new s3tables.TableBucket(stack, 'IntelligentTieringBucket', TABLE_BUCKET_PROPS);
+    });
+
+    test('has StorageClassConfiguration with INTELLIGENT_TIERING storage class', () => {
+      Template.fromStack(stack).hasResourceProperties(TABLE_BUCKET_CFN_RESOURCE, {
+        'TableBucketName': TABLE_BUCKET_PROPS.tableBucketName,
+        'StorageClassConfiguration': {
+          'StorageClass': 'INTELLIGENT_TIERING',
+        },
+      });
+    });
+  });
+
+  describe('created without storage class configuration', () => {
+    const TABLE_BUCKET_PROPS: s3tables.TableBucketProps = {
+      tableBucketName: 'no-storage-class-bucket',
+    };
+
+    beforeEach(() => {
+      new s3tables.TableBucket(stack, 'NoStorageClassBucket', TABLE_BUCKET_PROPS);
+    });
+
+    test('does not have StorageClassConfiguration property', () => {
+      const template = Template.fromStack(stack);
+      const resources = template.findResources(TABLE_BUCKET_CFN_RESOURCE);
+      const resourceKey = Object.keys(resources)[0];
+      expect(resources[resourceKey].Properties.StorageClassConfiguration).toBeUndefined();
+    });
+  });
+
   describe('validateUnreferencedFileRemoval', () => {
     it('should not throw error when unreferencedFileRemovalProperty is undefined', () => {
       expect(() => s3tables.TableBucket.validateUnreferencedFileRemoval(undefined)).not.toThrow();

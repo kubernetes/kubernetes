@@ -1,6 +1,6 @@
 import { Construct } from 'constructs';
 import { Stack, Tags } from 'aws-cdk-lib';
-import { TableBucket, UnreferencedFileRemovalStatus, TableBucketEncryption, RequestMetricsStatus, Namespace, Table, Status, OpenTableFormat, IcebergTransform, SortDirection, NullOrder } from '@aws-cdk/aws-s3tables-alpha';
+import { TableBucket, UnreferencedFileRemovalStatus, TableBucketEncryption, RequestMetricsStatus, StorageClass, Namespace, Table, Status, OpenTableFormat, IcebergTransform, SortDirection, NullOrder } from '@aws-cdk/aws-s3tables-alpha';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as kms from 'aws-cdk-lib/aws-kms';
 

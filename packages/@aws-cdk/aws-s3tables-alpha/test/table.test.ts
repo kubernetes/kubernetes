@@ -599,6 +599,70 @@ describe('Table', () => {
     });
   });
 
+  describe('created with STANDARD storage class', () => {
+    beforeEach(() => {
+      new s3tables.Table(stack, 'StandardStorageTable', {
+        tableName: 'standard_storage_table',
+        namespace,
+        openTableFormat: s3tables.OpenTableFormat.ICEBERG,
+        withoutMetadata: true,
+        storageClass: s3tables.StorageClass.STANDARD,
+      });
+    });
+
+    test('has StorageClassConfiguration with STANDARD storage class', () => {
+      Template.fromStack(stack).hasResourceProperties(TABLE_CFN_RESOURCE, {
+        'TableName': 'standard_storage_table',
+        'StorageClassConfiguration': {
+          'StorageClass': 'STANDARD',
+        },
+      });
+    });
+  });
+
+  describe('created with INTELLIGENT_TIERING storage class', () => {
+    beforeEach(() => {
+      new s3tables.Table(stack, 'IntelligentTieringTable', {
+        tableName: 'intelligent_tiering_table',
+        namespace,
+        openTableFormat: s3tables.OpenTableFormat.ICEBERG,
+        withoutMetadata: true,
+        storageClass: s3tables.StorageClass.INTELLIGENT_TIERING,
+      });
+    });
+
+    test('has StorageClassConfiguration with INTELLIGENT_TIERING storage class', () => {
+      Template.fromStack(stack).hasResourceProperties(TABLE_CFN_RESOURCE, {
+        'TableName': 'intelligent_tiering_table',
+        'StorageClassConfiguration': {
+          'StorageClass': 'INTELLIGENT_TIERING',
+        },
+      });
+    });
+  });
+
+  describe('created without storage class configuration', () => {
+    beforeEach(() => {
+      new s3tables.Table(stack, 'NoStorageClassTable', {
+        tableName: 'no_storage_class_table',
+        namespace,
+        openTableFormat: s3tables.OpenTableFormat.ICEBERG,
+        withoutMetadata: true,
+      });
+    });
+
+    test('does not have StorageClassConfiguration property', () => {
+      const template = Template.fromStack(stack);
+      const resources = template.findResources(TABLE_CFN_RESOURCE);
+      // Find the table resource (not the table bucket)
+      const tableResourceKey = Object.keys(resources).find(key =>
+        resources[key].Properties.TableName === 'no_storage_class_table',
+      );
+      expect(tableResourceKey).toBeDefined();
+      expect(resources[tableResourceKey!].Properties.StorageClassConfiguration).toBeUndefined();
+    });
+  });
+
   describe('tableProperties validation', () => {
     test('rejects duplicate keys in tableProperties', () => {
       expect(() => {

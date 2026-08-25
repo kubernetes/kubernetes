@@ -1,0 +1,50 @@
+{
+  "/TableStorageClassInheritanceTestStack/InheritanceBucket": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/TableStorageClassInheritanceTestStack/InheritanceNamespace": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/TableStorageClassInheritanceTestStack/InheritingTable": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/TableStorageClassInheritanceTestStack/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/TableStorageClassInheritanceTestStack/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/TableStorageClassInheritanceTestStack/InheritanceBucket/InheritanceBucket": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "InheritanceBucketDB1F2612"
+    }
+  ],
+  "/TableStorageClassInheritanceTestStack/InheritanceNamespace/InheritanceNamespace": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "InheritanceNamespace5239A08B"
+    }
+  ],
+  "/TableStorageClassInheritanceTestStack/InheritingTable/InheritingTable": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "InheritingTable98E7E973"
+    }
+  ]
+}
