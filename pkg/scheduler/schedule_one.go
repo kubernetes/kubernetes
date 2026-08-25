@@ -28,6 +28,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -39,6 +40,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
@@ -526,15 +528,29 @@ func (sched *Scheduler) handleBindingCycleError(
 		// It's intentional to "defer" this operation; otherwise MoveAllToActiveOrBackoffQueue() would
 		// add this event to in-flight events and thus move the assumed pod to backoffQ anyways if the plugins don't have appropriate QueueingHint.
 		if status.IsRejected() {
-			defer sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, assumedPod, nil, func(pod *v1.Pod) bool {
-				return assumedPod.UID != pod.UID
-			})
+			defer sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, assumedPod, nil, getDifferentUIDPreCheck(assumedPod.UID))
 		} else {
 			sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, assumedPod, nil, nil)
 		}
 	}
 
 	sched.FailureHandler(ctx, fwk, podInfo, status, clearNominatedNode, start)
+}
+
+// getDifferentUIDPreCheck is a PreEnqueueCheck function that selects only entities
+// that don't contain a pod with a specific UID.
+func getDifferentUIDPreCheck(uid types.UID) queue.PreEnqueueCheck {
+	return func(entity framework.QueuedEntityInfo) bool {
+		matchesUID := false
+		entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+			if pInfo.Pod.UID == uid {
+				matchesUID = true
+				return false
+			}
+			return true
+		})
+		return !matchesUID
+	}
 }
 
 func (sched *Scheduler) frameworkForPod(pod *v1.Pod) (framework.Framework, error) {

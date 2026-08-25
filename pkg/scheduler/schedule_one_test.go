@@ -5562,3 +5562,72 @@ func TestSchedulePodWithOpportunisticBatching(t *testing.T) {
 		})
 	}
 }
+
+func TestGetDifferentUIDPreCheck(t *testing.T) {
+	targetUID := types.UID("target-pod-uid")
+	otherUID := types.UID("other-pod-uid")
+
+	targetPod := st.MakePod().Name("target-pod").UID(string(targetUID)).PodGroupName("pg-with-target").Obj()
+	otherPod1 := st.MakePod().Name("other-pod1").UID(string(otherUID)).PodGroupName("pg-with-target").Obj()
+	otherPod2 := st.MakePod().Name("other-pod2").UID("another-uid").PodGroupName("pg-without-target").Obj()
+	otherPod3 := st.MakePod().Name("other-pod3").UID(string(otherUID)).PodGroupName("pg-without-target").Obj()
+
+	targetPodInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, targetPod)}
+	otherPodInfo1 := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, otherPod1)}
+	otherPodInfo2 := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, otherPod2)}
+	otherPodInfo3 := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, otherPod3)}
+
+	pgWithTarget := st.MakePodGroup().Name("pg-with-target").Obj()
+	pgWithTargetPod := &framework.QueuedPodGroupInfo{
+		PodGroupInfo: &framework.PodGroupInfo{
+			GenericPodGroup: framework.NewGenericPodGroup(pgWithTarget),
+		},
+	}
+	pgWithTargetPod.AddPod(otherPodInfo1)
+	pgWithTargetPod.AddPod(targetPodInfo)
+
+	pgWithoutTarget := st.MakePodGroup().Name("pg-without-target").Obj()
+	pgWithoutTargetPod := &framework.QueuedPodGroupInfo{
+		PodGroupInfo: &framework.PodGroupInfo{
+			GenericPodGroup: framework.NewGenericPodGroup(pgWithoutTarget),
+		},
+	}
+	pgWithoutTargetPod.AddPod(otherPodInfo2)
+	pgWithoutTargetPod.AddPod(otherPodInfo3)
+
+	tests := []struct {
+		name     string
+		entity   framework.QueuedEntityInfo
+		expected bool
+	}{
+		{
+			name:     "standalone pod matching UID is filtered out",
+			entity:   targetPodInfo,
+			expected: false,
+		},
+		{
+			name:     "standalone pod not matching UID passes",
+			entity:   otherPodInfo1,
+			expected: true,
+		},
+		{
+			name:     "pod group containing pod with UID is filtered out",
+			entity:   pgWithTargetPod,
+			expected: false,
+		},
+		{
+			name:     "pod group not containing pod with UID passes",
+			entity:   pgWithoutTargetPod,
+			expected: true,
+		},
+	}
+
+	preCheck := getDifferentUIDPreCheck(targetUID)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := preCheck(tt.entity); got != tt.expected {
+				t.Errorf("Unexpected getDifferentUIDPreCheck result for %s: want %v, got %v", tt.name, tt.expected, got)
+			}
+		})
+	}
+}

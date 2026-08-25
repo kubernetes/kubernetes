@@ -83,9 +83,9 @@ const (
 )
 
 // PreEnqueueCheck is a function type. It's used to build functions that
-// run against a Pod and the caller can choose to enqueue or skip the Pod
+// run against an entity and the caller can choose to enqueue or skip the entity
 // by the checking result.
-type PreEnqueueCheck func(pod *v1.Pod) bool
+type PreEnqueueCheck func(entity framework.QueuedEntityInfo) bool
 
 // PodSigner creates a scheduling signature for a pod that represents its scheduling requirements.
 // The signature is used by the opportunistic batching feature (KEP-5598) to reuse scheduling decisions.
@@ -1714,7 +1714,7 @@ func (p *PriorityQueue) collectEntitiesToEvaluate(logger klog.Logger, event fwk.
 		for nn := range hintKeys.candidatePods {
 			entityKey := fwk.PodKey(nn.Namespace, nn.Name).String()
 			if entity, exists := p.unschedulableEntities.entityInfoMap[entityKey]; exists {
-				if preCheck == nil || preCheck(entity.(*framework.QueuedPodInfo).Pod) {
+				if preCheck == nil || preCheck(entity) {
 					entities = append(entities, entity)
 				}
 				continue
@@ -1730,9 +1730,7 @@ func (p *PriorityQueue) collectEntitiesToEvaluate(logger klog.Logger, event fwk.
 					entityKey = fwk.PodGroupKey(nn.Namespace, *pod.Spec.SchedulingGroup.PodGroupName).String()
 					if entity, exists := p.unschedulableEntities.entityInfoMap[entityKey]; exists && !seen[entityKey] {
 						seen[entityKey] = true
-						// Only preCheck the specific pod identified by PreQueueingHint,
-						// not all members of the PodGroup.
-						if preCheck == nil || preCheck(pod) {
+						if preCheck == nil || preCheck(entity) {
 							entities = append(entities, entity)
 						}
 					}
@@ -1745,13 +1743,9 @@ func (p *PriorityQueue) collectEntitiesToEvaluate(logger klog.Logger, event fwk.
 	// No narrowing — evaluate all unschedulable entities.
 	entities := make([]framework.QueuedEntityInfo, 0, len(p.unschedulableEntities.entityInfoMap))
 	for _, entity := range p.unschedulableEntities.entityInfoMap {
-		entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
-			if preCheck == nil || preCheck(pInfo.Pod) {
-				entities = append(entities, entity)
-				return false
-			}
-			return true
-		})
+		if preCheck == nil || preCheck(entity) {
+			entities = append(entities, entity)
+		}
 	}
 	return entities, nil
 }
