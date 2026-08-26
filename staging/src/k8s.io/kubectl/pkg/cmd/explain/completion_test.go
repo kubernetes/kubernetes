@@ -21,54 +21,91 @@ import (
 	"slices"
 	"testing"
 
-	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 	"github.com/spf13/cobra"
 
-	sptest "k8s.io/apimachinery/pkg/util/strategicpatch/testing"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/discovery"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	discoveryfake "k8s.io/client-go/discovery/fake"
+	openapiclient "k8s.io/client-go/openapi"
+	"k8s.io/client-go/rest"
+	clientgotesting "k8s.io/client-go/testing"
+	clienttestutil "k8s.io/client-go/util/testing"
 )
 
-// openAPIV2DiscoveryClient serves the fake OpenAPI V2 document used by explain's
-// field completion. It embeds cmdtesting.FakeCachedDiscoveryClient so it satisfies
-// discovery.CachedDiscoveryInterface while only providing the OpenAPI schema.
-type openAPIV2DiscoveryClient struct {
-	*cmdtesting.FakeCachedDiscoveryClient
-	schema *sptest.Fake
+// completionDiscoveryClient serves the API resources the RESTMapper is built
+// from, and the OpenAPI V3 documents field completion reads. Anything else the
+// interface requires is inherited from the fake discovery client.
+type completionDiscoveryClient struct {
+	discovery.DiscoveryInterface
+	openAPIV3 openapiclient.Client
 }
 
-func (c *openAPIV2DiscoveryClient) OpenAPISchema() (*openapi_v2.Document, error) {
-	return c.schema.OpenAPISchema()
+func (c *completionDiscoveryClient) OpenAPIV3() openapiclient.Client { return c.openAPIV3 }
+func (c *completionDiscoveryClient) Fresh() bool                     { return true }
+func (c *completionDiscoveryClient) Invalidate()                     {}
+
+var _ discovery.CachedDiscoveryInterface = &completionDiscoveryClient{}
+
+// completionAPIResources are the resources the completion tests resolve. The
+// group versions match the OpenAPI V3 documents under testdata, except for the
+// autoscaling group, which is served in two versions on purpose: v2 is the
+// preferred one, so pinning v1 through --api-version has to be visible in the
+// completions.
+var completionAPIResources = []*metav1.APIResourceList{
+	{
+		GroupVersion: "v1",
+		APIResources: []metav1.APIResource{
+			{Name: "pods", Namespaced: true, Kind: "Pod"},
+		},
+	},
+	{
+		GroupVersion: "apps/v1",
+		APIResources: []metav1.APIResource{
+			{Name: "deployments", Namespaced: true, Kind: "Deployment"},
+		},
+	},
+	{
+		GroupVersion: "autoscaling/v2",
+		APIResources: []metav1.APIResource{
+			{Name: "horizontalpodautoscalers", Namespaced: true, Kind: "HorizontalPodAutoscaler"},
+		},
+	},
+	{
+		GroupVersion: "autoscaling/v1",
+		APIResources: []metav1.APIResource{
+			{Name: "horizontalpodautoscalers", Namespaced: true, Kind: "HorizontalPodAutoscaler"},
+		},
+	},
 }
 
-func newCompletionTestFactory(t *testing.T) *cmdtesting.TestFactory {
+// newCompletionRESTClientGetter returns a RESTClientGetter backed by the fake
+// API resources above and by the OpenAPI V3 documents under testdata.
+func newCompletionRESTClientGetter(t *testing.T) genericclioptions.RESTClientGetter {
 	t.Helper()
-	tf := cmdtesting.NewTestFactory()
-	t.Cleanup(tf.Cleanup)
 
-	fakeSchema := &sptest.Fake{Path: filepath.Join("..", "..", "..", "testdata", "openapi", "swagger.json")}
-	dc := &openAPIV2DiscoveryClient{
-		FakeCachedDiscoveryClient: cmdtesting.NewFakeCachedDiscoveryClient(),
-		schema:                    fakeSchema,
+	// explain_test.go lives in the external test package, so its testdata path
+	// is spelled out again here.
+	fakeServer, err := clienttestutil.NewFakeOpenAPIV3Server(filepath.Join("..", "..", "..", "testdata", "openapi", "v3"))
+	if err != nil {
+		t.Fatalf("error starting fake openapi server: %v", err)
 	}
-	// The RESTMapper set by NewTestFactory takes precedence, so wiring a discovery
-	// client only changes where the OpenAPI schema comes from.
-	tf.WithDiscoveryClient(dc)
-	return tf
-}
+	t.Cleanup(fakeServer.HttpServer.Close)
 
-// newCompletionCommand returns the command the completion function is invoked
-// with. It reads no flags off it, so a bare command is enough.
-func newCompletionCommand() *cobra.Command {
-	return &cobra.Command{}
-}
+	openAPIV3 := discovery.NewDiscoveryClientForConfigOrDie(&rest.Config{Host: fakeServer.HttpServer.URL}).OpenAPIV3()
+	discoveryClient := &completionDiscoveryClient{
+		DiscoveryInterface: &discoveryfake.FakeDiscovery{
+			Fake: &clientgotesting.Fake{Resources: completionAPIResources},
+		},
+		openAPIV3: openAPIV3,
+	}
 
-var _ discovery.CachedDiscoveryInterface = &openAPIV2DiscoveryClient{}
+	return genericclioptions.NewTestConfigFlags().WithDiscoveryClient(discoveryClient)
+}
 
 func TestResourceFieldCompletion(t *testing.T) {
-	tf := newCompletionTestFactory(t)
-	cmd := newCompletionCommand()
-	completeFn := resourceFieldCompletionFunc(tf, func() string { return "" })
+	restClientGetter := newCompletionRESTClientGetter(t)
+	completeFn := resourceFieldCompletionFunc(restClientGetter, func() string { return "" })
 
 	noSpace := cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveNoSpace
 
@@ -118,10 +155,20 @@ func TestResourceFieldCompletion(t *testing.T) {
 			wantDirective: cobra.ShellCompDirectiveNoFileComp,
 		},
 		{
-			// Group-qualified resource: fields come from a version present in the
-			// OpenAPI doc (apps/v1) even if the mapper lists apps/v1beta1 first.
+			// Map field: nodeSelector is map[string]string, which cannot be drilled into.
+			toComplete:    "pods.spec.nodeSelector.",
+			exactResults:  []string{},
+			wantDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+		{
 			toComplete:    "deployments.apps.",
 			mustContain:   "deployments.apps.spec.",
+			wantDirective: noSpace,
+		},
+		{
+			// A group-qualified resource name with no field matching the prefix.
+			toComplete:    "deployments.app",
+			exactResults:  []string{"deployments.apps."},
 			wantDirective: noSpace,
 		},
 		{
@@ -133,21 +180,29 @@ func TestResourceFieldCompletion(t *testing.T) {
 			wantDirective: noSpace,
 		},
 		{
-			toComplete:    "cronjobs.b",
-			exactResults:  []string{"cronjobs.batch."},
+			// Fields come from the group's preferred version (autoscaling/v2),
+			// which is the version explain describes without --api-version:
+			// metrics only exists there.
+			toComplete:    "horizontalpodautoscalers.spec.m",
+			exactResults:  []string{"horizontalpodautoscalers.spec.metrics.", "horizontalpodautoscalers.spec.maxReplicas", "horizontalpodautoscalers.spec.minReplicas"},
+			wantDirective: noSpace,
+		},
+		{
+			toComplete:    "horizontalpodautoscalers.spec.metrics.",
+			mustContain:   "horizontalpodautoscalers.spec.metrics.resource.",
 			wantDirective: noSpace,
 		},
 	}
 
 	// Second argument should always return nothing.
-	comps, directive := completeFn(cmd, []string{"pods"}, "pods.sp")
+	comps, directive := completeFn(newCompletionCommand(), []string{"pods"}, "pods.sp")
 	if len(comps) != 0 || directive != cobra.ShellCompDirectiveNoFileComp {
 		t.Errorf("expected no completions for second arg, got %v (%v)", comps, directive)
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.toComplete, func(t *testing.T) {
-			comps, directive := completeFn(cmd, []string{}, tc.toComplete)
+			comps, directive := completeFn(newCompletionCommand(), []string{}, tc.toComplete)
 			if directive != tc.wantDirective {
 				t.Errorf("directive: got %v, want %v", directive, tc.wantDirective)
 			}
@@ -171,14 +226,80 @@ func TestResourceFieldCompletion(t *testing.T) {
 }
 
 func TestResourceFieldCompletionWithAPIVersion(t *testing.T) {
-	tf := newCompletionTestFactory(t)
-	cmd := newCompletionCommand()
-	completeFn := resourceFieldCompletionFunc(tf, func() string { return "batch/v1beta1" })
+	restClientGetter := newCompletionRESTClientGetter(t)
 
-	// With --api-version set, explain does not accept group-qualified resource
-	// names, so they must not be offered.
-	comps, directive := completeFn(cmd, []string{}, "cronjobs.b")
-	if len(comps) != 0 || directive != cobra.ShellCompDirectiveNoFileComp {
-		t.Errorf("expected no completions with --api-version set, got %v (%v)", comps, directive)
+	cases := []struct {
+		name          string
+		apiVersion    string
+		toComplete    string
+		exactResults  []string
+		wantDirective cobra.ShellCompDirective
+	}{
+		{
+			// autoscaling/v1 has targetCPUUtilizationPercentage, the preferred
+			// version the mapper resolves to (autoscaling/v2) does not, so the
+			// completions have to follow the pinned version.
+			name:          "fields come from the pinned version",
+			apiVersion:    "autoscaling/v1",
+			toComplete:    "horizontalpodautoscalers.spec.t",
+			exactResults:  []string{"horizontalpodautoscalers.spec.targetCPUUtilizationPercentage"},
+			wantDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+		{
+			// The fields of the preferred version must not leak into a pinned one.
+			name:          "fields absent from the pinned version are not offered",
+			apiVersion:    "autoscaling/v1",
+			toComplete:    "horizontalpodautoscalers.spec.metric",
+			exactResults:  []string{},
+			wantDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+		{
+			// With --api-version set, explain does not accept group-qualified
+			// resource names, so they must not be offered.
+			name:          "group-qualified resource names are not offered",
+			apiVersion:    "apps/v1",
+			toComplete:    "deployments.app",
+			exactResults:  []string{},
+			wantDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+		{
+			// A version the server does not serve has no fields to offer.
+			name:          "unknown version yields no completions",
+			apiVersion:    "autoscaling/v2beta1",
+			toComplete:    "horizontalpodautoscalers.spec.m",
+			exactResults:  []string{},
+			wantDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+		{
+			name:          "malformed api version yields no completions",
+			apiVersion:    "a/b/c",
+			toComplete:    "pods.spec.",
+			exactResults:  []string{},
+			wantDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
 	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			completeFn := resourceFieldCompletionFunc(restClientGetter, func() string { return tc.apiVersion })
+			comps, directive := completeFn(newCompletionCommand(), []string{}, tc.toComplete)
+			if directive != tc.wantDirective {
+				t.Errorf("directive: got %v, want %v", directive, tc.wantDirective)
+			}
+			if len(comps) != len(tc.exactResults) {
+				t.Fatalf("completions: got %v, want %v", comps, tc.exactResults)
+			}
+			for i, want := range tc.exactResults {
+				if comps[i] != want {
+					t.Errorf("completion[%d]: got %q, want %q", i, comps[i], want)
+				}
+			}
+		})
+	}
+}
+
+// newCompletionCommand returns the command the completion function is invoked
+// with. It reads no flags off it, so a bare command is enough.
+func newCompletionCommand() *cobra.Command {
+	return &cobra.Command{}
 }

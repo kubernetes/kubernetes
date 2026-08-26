@@ -17,6 +17,7 @@ limitations under the License.
 package explain
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -24,11 +25,15 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/client-go/openapi3"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kubectl/pkg/explain"
 	"k8s.io/kubectl/pkg/util/completion"
-	"k8s.io/kubectl/pkg/util/openapi"
 )
+
+// schemaRefPrefix is the prefix of the references OpenAPI V3 documents use to
+// point at the reusable schemas in their components section.
+const schemaRefPrefix = "#/components/schemas/"
 
 // resourceFieldCompletionFunc returns a completion function for kubectl explain that completes:
 // - resource types when no dot is present (e.g., "pods", "deploy")
@@ -138,64 +143,110 @@ func resourceFieldCompletionFunc(restClientGetter genericclioptions.RESTClientGe
 }
 
 // fieldNamesForGVR returns the expandable and leaf field names at fieldsPath within the
-// OpenAPI v2 schema for gvr.
-// TODO: use the OpenAPI v3 schema so that CRD fields are always complete.
+// OpenAPI v3 schema for gvr.
 func fieldNamesForGVR(restClientGetter genericclioptions.RESTClientGetter, mapper meta.RESTMapper, gvr schema.GroupVersionResource, fieldsPath []string) (expandable, leaves []string) {
+	gvk, err := mapper.KindFor(gvr)
+	if err != nil || gvk.Empty() {
+		// The version may be one the RESTMapper does not know about, for instance
+		// when it comes from --api-version. Resolve the kind from the group
+		// resource then, but keep looking the schema up in the requested version.
+		preferred, err := mapper.KindFor(gvr.GroupResource().WithVersion(""))
+		if err != nil || preferred.Empty() {
+			return nil, nil
+		}
+		gvk = gvr.GroupVersion().WithKind(preferred.Kind)
+	}
+
 	discoveryClient, err := restClientGetter.ToDiscoveryClient()
 	if err != nil {
 		return nil, nil
 	}
-	openAPIResources, err := openapi.NewOpenAPIParser(discoveryClient).Parse()
-	if err != nil {
+	gvSpec, err := openapi3.NewRoot(discoveryClient.OpenAPIV3()).GVSpec(gvk.GroupVersion())
+	if err != nil || gvSpec.Components == nil {
 		return nil, nil
 	}
-	// The version picked by the parser, or the group's preferred version, may be
-	// absent from the OpenAPI document; try both.
-	var s proto.Schema
-	for _, v := range []schema.GroupVersionResource{gvr, gvr.GroupResource().WithVersion("")} {
-		if gvk, err := mapper.KindFor(v); err == nil && !gvk.Empty() {
-			if s = openAPIResources.LookupResource(gvk); s != nil {
-				break
-			}
+	schemas := gvSpec.Components.Schemas
+
+	s := schemaForGVK(schemas, gvk)
+	for _, field := range fieldsPath {
+		object := resolveToObject(s, schemas, map[string]bool{})
+		if object == nil {
+			return nil, nil
 		}
+		next, ok := object.Properties[field]
+		if !ok {
+			return nil, nil
+		}
+		s = &next
 	}
-	if s == nil {
+
+	object := resolveToObject(s, schemas, map[string]bool{})
+	if object == nil {
 		return nil, nil
 	}
-	s, err = explain.LookupSchemaForField(s, fieldsPath)
-	if err != nil {
-		return nil, nil
-	}
-	kind := resolveToKind(s, map[string]bool{})
-	if kind == nil {
-		return nil, nil
-	}
-	for _, name := range kind.Keys() {
-		if resolveToKind(kind.Fields[name], map[string]bool{}) != nil {
+	for name, field := range object.Properties {
+		if resolveToObject(&field, schemas, map[string]bool{}) != nil {
 			expandable = append(expandable, name)
 		} else {
 			leaves = append(leaves, name)
 		}
 	}
+	slices.Sort(expandable)
+	slices.Sort(leaves)
 	return expandable, leaves
 }
 
-// resolveToKind unwraps references and arrays until it reaches the object schema
-// holding named sub-fields, or nil for schemas that cannot be drilled into
-// (primitives, maps, ...). visited guards against reference cycles in the schema.
-func resolveToKind(s proto.Schema, visited map[string]bool) *proto.Kind {
-	switch t := s.(type) {
-	case *proto.Kind:
-		return t
-	case *proto.Array:
-		if t.SubType != nil {
-			return resolveToKind(t.SubType, visited)
+// schemaForGVK returns the schema the OpenAPI V3 document defines for gvk, or nil
+// when the document does not describe that kind.
+func schemaForGVK(schemas map[string]*spec.Schema, gvk schema.GroupVersionKind) *spec.Schema {
+	for _, s := range schemas {
+		values, ok := s.Extensions["x-kubernetes-group-version-kind"].([]interface{})
+		if !ok {
+			continue
 		}
-	case proto.Reference:
-		if sub := t.SubSchema(); sub != nil && !visited[t.Reference()] {
-			visited[t.Reference()] = true
-			return resolveToKind(sub, visited)
+		for _, value := range values {
+			candidate, ok := value.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if candidate["group"] == gvk.Group && candidate["version"] == gvk.Version && candidate["kind"] == gvk.Kind {
+				return s
+			}
 		}
 	}
 	return nil
+}
+
+// resolveToObject unwraps references and arrays until it reaches the schema
+// holding named sub-fields, or nil for schemas that cannot be drilled into
+// (primitives, maps, ...). visited guards against reference cycles in the schema.
+func resolveToObject(s *spec.Schema, schemas map[string]*spec.Schema, visited map[string]bool) *spec.Schema {
+	if s == nil {
+		return nil
+	}
+	if ref, ok := referencedSchemaName(s); ok {
+		if visited[ref] {
+			return nil
+		}
+		visited[ref] = true
+		return resolveToObject(schemas[ref], schemas, visited)
+	}
+	if s.Items != nil && s.Items.Schema != nil {
+		return resolveToObject(s.Items.Schema, schemas, visited)
+	}
+	if len(s.Properties) > 0 {
+		return s
+	}
+	return nil
+}
+
+// referencedSchemaName returns the name of the components schema s points at,
+// either through $ref directly or through the single-element allOf Kubernetes
+// generates when a description accompanies the reference.
+func referencedSchemaName(s *spec.Schema) (string, bool) {
+	ref := s.Ref.String()
+	if ref == "" && len(s.AllOf) == 1 {
+		ref = s.AllOf[0].Ref.String()
+	}
+	return strings.CutPrefix(ref, schemaRefPrefix)
 }
