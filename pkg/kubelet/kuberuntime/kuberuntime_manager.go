@@ -874,7 +874,7 @@ func keepOnlyResourceValues(pod *v1.Pod) {
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
 		for _, vol := range pod.Spec.Volumes {
-			if !allocation.VolHasMemoryBackedEmptyDirSizeLimit(&vol) {
+			if !allocation.VolHasMemoryBackedEmptyDir(&vol) {
 				continue
 			}
 			spec.Volumes = append(spec.Volumes, v1.Volume{
@@ -886,26 +886,19 @@ func keepOnlyResourceValues(pod *v1.Pod) {
 	pod.Spec = spec
 }
 
-func (m *kubeGenericRuntimeManager) getActuatedEmptyDirVolumeLimit(logger klog.Logger, pod *v1.Pod, volName string) *resource.Quantity {
-	if size, found := m.actuatedState.GetEmptyDirVolumeLimit(pod.UID, volName); found {
-		return size
-	}
-	logger.Error(nil, "Failed to read actuated empty dir volume limit", "pod", klog.KObj(pod), "volume", volName)
-	return nil
-}
-
 // computeVolumeResizeAction determines the actions required (if any) to resize volumes.
 func (m *kubeGenericRuntimeManager) computeVolumeResizeAction(ctx context.Context, pod *v1.Pod, changes *podActions) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
 		logger := klog.FromContext(ctx)
 		for _, vol := range pod.Spec.Volumes {
-			if !allocation.VolHasMemoryBackedEmptyDirSizeLimit(&vol) {
+			if !allocation.VolHasMemoryBackedEmptyDir(&vol) {
 				continue
 			}
-			actuatedSize := m.getActuatedEmptyDirVolumeLimit(logger, pod, vol.Name)
+			actuatedSize, found := m.actuatedState.GetEmptyDirVolumeLimit(pod.UID, vol.Name)
 			desiredSize := vol.EmptyDir.SizeLimit
 
-			if actuatedSize == nil {
+			if !found {
+				logger.Error(nil, "Failed to read actuated empty dir volume limit", "pod", klog.KObj(pod), "volume", vol.Name)
 				// If the actuation checkpoint is missing, force a sync to apply
 				// the limit and write the checkpoint. We treat it as an upsize
 				// (safer order) to ensure cgroup limits are expanded first.
@@ -913,12 +906,25 @@ func (m *kubeGenericRuntimeManager) computeVolumeResizeAction(ctx context.Contex
 				continue
 			}
 
-			// Compare current (actuated) size with new size
-			cmp := desiredSize.Cmp(*actuatedSize)
-			if cmp > 0 {
+			hasDesiredLimit := desiredSize != nil && !desiredSize.IsZero()
+			hasActuatedLimit := actuatedSize != nil && !actuatedSize.IsZero()
+
+			switch {
+			case !hasDesiredLimit && !hasActuatedLimit:
+				// Both are uncapped (nil or 0). No resize needed.
+			case !hasDesiredLimit:
+				// Removing sizeLimit: volume is uncapped (expands to node allocatable / pod limit). Upsize.
 				changes.VolumesToUpsize = append(changes.VolumesToUpsize, vol)
-			} else if cmp < 0 {
+			case !hasActuatedLimit:
+				// Adding sizeLimit: volume was uncapped and is now constrained. Downsize.
 				changes.VolumesToDownsize = append(changes.VolumesToDownsize, vol)
+			default:
+				cmp := desiredSize.Cmp(*actuatedSize)
+				if cmp > 0 {
+					changes.VolumesToUpsize = append(changes.VolumesToUpsize, vol)
+				} else if cmp < 0 {
+					changes.VolumesToDownsize = append(changes.VolumesToDownsize, vol)
+				}
 			}
 		}
 	}
@@ -1078,7 +1084,6 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	updateVolumeSize := func(volumes []v1.Volume) error {
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
 			for _, vol := range volumes {
-				desiredSize := vol.EmptyDir.SizeLimit
 				if err := m.runtimeHelper.ResizeEphemeralVolume(pod, vol.Name); err != nil {
 					return fmt.Errorf("failed to resize volume %s: %w", vol.Name, err)
 				}
@@ -2411,18 +2416,24 @@ func (m *kubeGenericRuntimeManager) IsPodResizeInProgress(allocatedPod *v1.Pod, 
 func (m *kubeGenericRuntimeManager) isMemoryBackedVolumeResizeInProgress(allocatedPod *v1.Pod) bool {
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
 		for _, volume := range allocatedPod.Spec.Volumes {
-			if !allocation.VolHasMemoryBackedEmptyDirSizeLimit(&volume) {
+			if !allocation.VolHasMemoryBackedEmptyDir(&volume) {
 				continue
 			}
 
-			desiredLimit := volume.EmptyDir.SizeLimit
+			allocatedLimit := volume.EmptyDir.SizeLimit
 			actuatedLimit, found := m.actuatedState.GetEmptyDirVolumeLimit(allocatedPod.UID, volume.Name)
 			if !found {
 				// No actuation checkpoint yet.
 				continue
 			}
 
-			if desiredLimit != nil && !desiredLimit.Equal(*actuatedLimit) {
+			hasDesiredLimit := allocatedLimit != nil && !allocatedLimit.IsZero()
+			hasActuatedLimit := actuatedLimit != nil && !actuatedLimit.IsZero()
+			if !hasDesiredLimit && !hasActuatedLimit {
+				// nil and 0 are considered equivalent for sizeLimit
+				continue
+			}
+			if hasDesiredLimit != hasActuatedLimit || !allocatedLimit.Equal(*actuatedLimit) {
 				return true
 			}
 		}
