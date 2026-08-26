@@ -6640,16 +6640,18 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 				}
 				// If it is emptyDir, check mutable constraints
 				if newVol.EmptyDir != nil && oldVol.EmptyDir != nil {
-					hasOldLimit := oldVol.EmptyDir.SizeLimit != nil && !oldVol.EmptyDir.SizeLimit.IsZero()
-					hasNewLimit := newVol.EmptyDir.SizeLimit != nil && !newVol.EmptyDir.SizeLimit.IsZero()
+					sizeChanged := false
+					hasOldLimit := oldVol.EmptyDir.SizeLimit != nil
+					hasNewLimit := newVol.EmptyDir.SizeLimit != nil
 					if hasOldLimit != hasNewLimit {
-						allErrs = append(allErrs, field.Forbidden(volPath.Child("emptyDir").Child("sizeLimit"), "adding or removing sizeLimit on an existing volume is not allowed"))
-					} else if oldVol.EmptyDir.SizeLimit != nil && newVol.EmptyDir.SizeLimit != nil {
+						sizeChanged = true
+					} else if hasOldLimit && hasNewLimit {
 						if oldVol.EmptyDir.SizeLimit.Cmp(*newVol.EmptyDir.SizeLimit) != 0 {
-							if newVol.EmptyDir.Medium != core.StorageMediumMemory {
-								allErrs = append(allErrs, field.Forbidden(volPath.Child("emptyDir").Child("sizeLimit"), "sizeLimit is only mutable for memory-backed emptyDir volumes"))
-							}
+							sizeChanged = true
 						}
+					}
+					if sizeChanged && newVol.EmptyDir.Medium != core.StorageMediumMemory {
+						allErrs = append(allErrs, field.Forbidden(volPath.Child("emptyDir").Child("sizeLimit"), "sizeLimit is only mutable for memory-backed emptyDir volumes"))
 					}
 				}
 			}
