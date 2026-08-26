@@ -103,9 +103,7 @@ func ValidateClusterRoleUpdate(role *rbac.ClusterRole, oldRole *rbac.ClusterRole
 // ValidatePolicyRule is exported to allow types outside of the RBAC API group to embed a rbac.PolicyRule and reuse this validation logic
 func ValidatePolicyRule(rule rbac.PolicyRule, isNamespaced bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(rule.Verbs) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("verbs"), "verbs must contain at least one value").MarkCoveredByDeclarative())
-	}
+	// Required verbs check has been migrated to declarative validation.
 
 	if len(rule.NonResourceURLs) > 0 {
 		if isNamespaced {
@@ -211,10 +209,7 @@ func ValidateClusterRoleBindingUpdate(roleBinding *rbac.ClusterRoleBinding, oldR
 // ValidateRoleBindingSubject is exported to allow types outside of the RBAC API group to embed a rbac.Subject and reuse this validation logic
 func ValidateRoleBindingSubject(subject rbac.Subject, isNamespaced bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-
-	if len(subject.Name) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
-	}
+	// Required subject name check has been migrated to declarative validation.
 
 	switch subject.Kind {
 	case rbac.ServiceAccountKind:
