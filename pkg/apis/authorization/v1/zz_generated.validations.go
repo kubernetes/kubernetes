@@ -31,6 +31,7 @@ import (
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	sets "k8s.io/apimachinery/pkg/util/sets"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -87,6 +88,576 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 	return nil
 }
 
+// Validate_AuthorizationOptions validates an instance of AuthorizationOptions according
+// to declarative validation rules in the API schema.
+func Validate_AuthorizationOptions(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *authorizationv1.AuthorizationOptions) (errs field.ErrorList) {
+
+	{ // field authorizationv1.AuthorizationOptions.HandledDecisionTypes
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []authorizationv1.ConditionsAwareDecisionType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with set semantics require unique values
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *authorizationv1.AuthorizationOptions) []authorizationv1.ConditionsAwareDecisionType {
+				return oldObj.HandledDecisionTypes
+			})
+		errs = append(errs, fn(fldPath.Child("handledDecisionTypes"), obj.HandledDecisionTypes, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_Condition validates an instance of Condition according
+// to declarative validation rules in the API schema.
+func Validate_Condition(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *authorizationv1.Condition) (errs field.ErrorList) {
+
+	{ // field authorizationv1.Condition.ID
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.LabelKey(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *authorizationv1.Condition) *string {
+				return &oldObj.ID
+			})
+		errs = append(errs, fn(fldPath.Child("id"), &obj.ID, oldVal, oldObj != nil)...)
+	}
+
+	{ // field authorizationv1.Condition.Condition
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.MaxBytes(ctx, op, fldPath, obj, oldObj, 10240).MarkBeta(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *authorizationv1.Condition) *string {
+				return &oldObj.Condition
+			})
+		errs = append(errs, fn(fldPath.Child("condition"), &obj.Condition, oldVal, oldObj != nil)...)
+	}
+
+	{ // field authorizationv1.Condition.Type
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.LabelKey(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *authorizationv1.Condition) *string {
+				return &oldObj.Type
+			})
+		errs = append(errs, fn(fldPath.Child("type"), &obj.Type, oldVal, oldObj != nil)...)
+	}
+
+	{ // field authorizationv1.Condition.Description
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.MaxBytes(ctx, op, fldPath, obj, oldObj, 1024).MarkBeta(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *authorizationv1.Condition) *string {
+				return &oldObj.Description
+			})
+		errs = append(errs, fn(fldPath.Child("description"), &obj.Description, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+var unionMembershipFor_k8s_io_api_authorization_v1_ConditionsAwareDecision_ = validate.NewDiscriminatedUnionMembership("type", validate.NewDiscriminatedUnionMember("deny", "Deny"), validate.NewDiscriminatedUnionMember("noOpinion", "NoOpinion"), validate.NewDiscriminatedUnionMember("allow", "Allow"), validate.NewDiscriminatedUnionMember("conditionsMap", "ConditionsMap"), validate.NewDiscriminatedUnionMember("union", "Union"))
+
+// Validate_ConditionsAwareDecision validates an instance of ConditionsAwareDecision according
+// to declarative validation rules in the API schema.
+func Validate_ConditionsAwareDecision(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *authorizationv1.ConditionsAwareDecision) (errs field.ErrorList) {
+
+	if e := validate.DiscriminatedUnion(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_api_authorization_v1_ConditionsAwareDecision_,
+		func(obj *authorizationv1.ConditionsAwareDecision) string {
+			if obj == nil {
+				return ""
+			}
+			return string(obj.Type)
+		},
+		func(obj *authorizationv1.ConditionsAwareDecision) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.Deny != nil
+		},
+		func(obj *authorizationv1.ConditionsAwareDecision) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.NoOpinion != nil
+		},
+		func(obj *authorizationv1.ConditionsAwareDecision) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.Allow != nil
+		},
+		func(obj *authorizationv1.ConditionsAwareDecision) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.ConditionsMap != nil
+		},
+		func(obj *authorizationv1.ConditionsAwareDecision) bool {
+			if obj == nil {
+				return false
+			}
+			return len(obj.Union) != 0
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	{ // field authorizationv1.ConditionsAwareDecision.Type
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *authorizationv1.ConditionsAwareDecisionType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_ConditionsAwareDecisionType(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *authorizationv1.ConditionsAwareDecision) *authorizationv1.ConditionsAwareDecisionType {
+				return &oldObj.Type
+			})
+		errs = append(errs, fn(fldPath.Child("type"), &obj.Type, oldVal, oldObj != nil)...)
+	}
+
+	{ // field authorizationv1.ConditionsAwareDecision.Deny
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *authorizationv1.UnconditionalDecision,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_UnconditionalDecision(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *authorizationv1.ConditionsAwareDecision) *authorizationv1.UnconditionalDecision {
+				return oldObj.Deny
+			})
+		errs = append(errs, fn(fldPath.Child("deny"), obj.Deny, oldVal, oldObj != nil)...)
+	}
+
+	{ // field authorizationv1.ConditionsAwareDecision.NoOpinion
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *authorizationv1.UnconditionalDecision,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_UnconditionalDecision(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *authorizationv1.ConditionsAwareDecision) *authorizationv1.UnconditionalDecision {
+				return oldObj.NoOpinion
+			})
+		errs = append(errs, fn(fldPath.Child("noOpinion"), obj.NoOpinion, oldVal, oldObj != nil)...)
+	}
+
+	{ // field authorizationv1.ConditionsAwareDecision.Allow
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *authorizationv1.UnconditionalDecision,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_UnconditionalDecision(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *authorizationv1.ConditionsAwareDecision) *authorizationv1.UnconditionalDecision {
+				return oldObj.Allow
+			})
+		errs = append(errs, fn(fldPath.Child("allow"), obj.Allow, oldVal, oldObj != nil)...)
+	}
+
+	{ // field authorizationv1.ConditionsAwareDecision.ConditionsMap
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *authorizationv1.ConditionsMap,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_ConditionsMap(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *authorizationv1.ConditionsAwareDecision) *authorizationv1.ConditionsMap {
+				return oldObj.ConditionsMap
+			})
+		errs = append(errs, fn(fldPath.Child("conditionsMap"), obj.ConditionsMap, oldVal, oldObj != nil)...)
+	}
+
+	{ // field authorizationv1.ConditionsAwareDecision.Union
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []authorizationv1.NamedConditionsAwareDecision,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *authorizationv1.NamedConditionsAwareDecision, b *authorizationv1.NamedConditionsAwareDecision) bool {
+					return a.AuthorizerName == b.AuthorizerName
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *authorizationv1.NamedConditionsAwareDecision, b *authorizationv1.NamedConditionsAwareDecision) bool {
+					return a.AuthorizerName == b.AuthorizerName
+				}, validate.SemanticDeepEqual, Validate_NamedConditionsAwareDecision); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *authorizationv1.ConditionsAwareDecision) []authorizationv1.NamedConditionsAwareDecision {
+				return oldObj.Union
+			})
+		errs = append(errs, fn(fldPath.Child("union"), obj.Union, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+var symbolsForConditionsAwareDecisionType = sets.New(authorizationv1.ConditionsAwareDecisionTypeAllow, authorizationv1.ConditionsAwareDecisionTypeConditionsMap, authorizationv1.ConditionsAwareDecisionTypeDeny, authorizationv1.ConditionsAwareDecisionTypeNoOpinion, authorizationv1.ConditionsAwareDecisionTypeUnion)
+
+// Validate_ConditionsAwareDecisionType validates an instance of ConditionsAwareDecisionType according
+// to declarative validation rules in the API schema.
+func Validate_ConditionsAwareDecisionType(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *authorizationv1.ConditionsAwareDecisionType) (errs field.ErrorList) {
+
+	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForConditionsAwareDecisionType, nil); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	return errs
+}
+
+// Validate_ConditionsMap validates an instance of ConditionsMap according
+// to declarative validation rules in the API schema.
+func Validate_ConditionsMap(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *authorizationv1.ConditionsMap) (errs field.ErrorList) {
+
+	{ // field authorizationv1.ConditionsMap.DenyConditions
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []authorizationv1.Condition,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 128).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *authorizationv1.Condition, b *authorizationv1.Condition) bool { return a.ID == b.ID }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *authorizationv1.Condition, b *authorizationv1.Condition) bool { return a.ID == b.ID }, validate.DirectEqual, Validate_Condition); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *authorizationv1.ConditionsMap) []authorizationv1.Condition {
+				return oldObj.DenyConditions
+			})
+		errs = append(errs, fn(fldPath.Child("denyConditions"), obj.DenyConditions, oldVal, oldObj != nil)...)
+	}
+
+	{ // field authorizationv1.ConditionsMap.NoOpinionConditions
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []authorizationv1.Condition,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 128).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *authorizationv1.Condition, b *authorizationv1.Condition) bool { return a.ID == b.ID }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *authorizationv1.Condition, b *authorizationv1.Condition) bool { return a.ID == b.ID }, validate.DirectEqual, Validate_Condition); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *authorizationv1.ConditionsMap) []authorizationv1.Condition {
+				return oldObj.NoOpinionConditions
+			})
+		errs = append(errs, fn(fldPath.Child("noOpinionConditions"), obj.NoOpinionConditions, oldVal, oldObj != nil)...)
+	}
+
+	{ // field authorizationv1.ConditionsMap.AllowConditions
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []authorizationv1.Condition,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 128).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *authorizationv1.Condition, b *authorizationv1.Condition) bool { return a.ID == b.ID }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *authorizationv1.Condition, b *authorizationv1.Condition) bool { return a.ID == b.ID }, validate.DirectEqual, Validate_Condition); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *authorizationv1.ConditionsMap) []authorizationv1.Condition {
+				return oldObj.AllowConditions
+			})
+		errs = append(errs, fn(fldPath.Child("allowConditions"), obj.AllowConditions, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
 // Validate_LocalSubjectAccessReview validates an instance of LocalSubjectAccessReview according
 // to declarative validation rules in the API schema.
 func Validate_LocalSubjectAccessReview(
@@ -118,7 +689,91 @@ func Validate_LocalSubjectAccessReview(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	// field authorizationv1.LocalSubjectAccessReview.Status has no validation
+	{ // field authorizationv1.LocalSubjectAccessReview.Status
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *authorizationv1.SubjectAccessReviewStatus,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_SubjectAccessReviewStatus(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *authorizationv1.LocalSubjectAccessReview) *authorizationv1.SubjectAccessReviewStatus {
+				return &oldObj.Status
+			})
+		errs = append(errs, fn(fldPath.Child("status"), &obj.Status, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_NamedConditionsAwareDecision validates an instance of NamedConditionsAwareDecision according
+// to declarative validation rules in the API schema.
+func Validate_NamedConditionsAwareDecision(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *authorizationv1.NamedConditionsAwareDecision) (errs field.ErrorList) {
+
+	{ // field authorizationv1.NamedConditionsAwareDecision.AuthorizerName
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.LongName(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *authorizationv1.NamedConditionsAwareDecision) *string {
+				return &oldObj.AuthorizerName
+			})
+		errs = append(errs, fn(fldPath.Child("authorizerName"), &obj.AuthorizerName, oldVal, oldObj != nil)...)
+	}
+
+	{ // field authorizationv1.NamedConditionsAwareDecision.Decision
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *authorizationv1.ConditionsAwareDecision,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_ConditionsAwareDecision(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *authorizationv1.NamedConditionsAwareDecision) *authorizationv1.ConditionsAwareDecision {
+				return &oldObj.Decision
+			})
+		errs = append(errs, fn(fldPath.Child("decision"), &obj.Decision, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 
@@ -153,7 +808,28 @@ func Validate_SelfSubjectAccessReview(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	// field authorizationv1.SelfSubjectAccessReview.Status has no validation
+	{ // field authorizationv1.SelfSubjectAccessReview.Status
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *authorizationv1.SubjectAccessReviewStatus,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_SubjectAccessReviewStatus(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *authorizationv1.SelfSubjectAccessReview) *authorizationv1.SubjectAccessReviewStatus {
+				return &oldObj.Status
+			})
+		errs = append(errs, fn(fldPath.Child("status"), &obj.Status, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 
@@ -237,6 +913,43 @@ func Validate_SelfSubjectAccessReviewSpec(
 		errs = append(errs, fn(fldPath.Child("nonResourceAttributes"), obj.NonResourceAttributes, oldVal, oldObj != nil)...)
 	}
 
+	{ // field authorizationv1.SelfSubjectAccessReviewSpec.AuthorizationOptions
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *authorizationv1.AuthorizationOptions,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "ConditionalAuthorization", false, validate.ForbiddenPointer).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "ConditionalAuthorization", false, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_AuthorizationOptions(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *authorizationv1.SelfSubjectAccessReviewSpec) *authorizationv1.AuthorizationOptions {
+				return oldObj.AuthorizationOptions
+			})
+		errs = append(errs, fn(fldPath.Child("authorizationOptions"), obj.AuthorizationOptions, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 
@@ -271,7 +984,28 @@ func Validate_SubjectAccessReview(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	// field authorizationv1.SubjectAccessReview.Status has no validation
+	{ // field authorizationv1.SubjectAccessReview.Status
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *authorizationv1.SubjectAccessReviewStatus,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_SubjectAccessReviewStatus(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *authorizationv1.SubjectAccessReview) *authorizationv1.SubjectAccessReviewStatus {
+				return &oldObj.Status
+			})
+		errs = append(errs, fn(fldPath.Child("status"), &obj.Status, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 
@@ -359,5 +1093,159 @@ func Validate_SubjectAccessReviewSpec(
 	// field authorizationv1.SubjectAccessReviewSpec.Groups has no validation
 	// field authorizationv1.SubjectAccessReviewSpec.Extra has no validation
 	// field authorizationv1.SubjectAccessReviewSpec.UID has no validation
+
+	{ // field authorizationv1.SubjectAccessReviewSpec.AuthorizationOptions
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *authorizationv1.AuthorizationOptions,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "ConditionalAuthorization", false, validate.ForbiddenPointer).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "ConditionalAuthorization", false, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_AuthorizationOptions(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *authorizationv1.SubjectAccessReviewSpec) *authorizationv1.AuthorizationOptions {
+				return oldObj.AuthorizationOptions
+			})
+		errs = append(errs, fn(fldPath.Child("authorizationOptions"), obj.AuthorizationOptions, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_SubjectAccessReviewStatus validates an instance of SubjectAccessReviewStatus according
+// to declarative validation rules in the API schema.
+func Validate_SubjectAccessReviewStatus(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *authorizationv1.SubjectAccessReviewStatus) (errs field.ErrorList) {
+
+	// field authorizationv1.SubjectAccessReviewStatus.Allowed has no validation
+	// field authorizationv1.SubjectAccessReviewStatus.Denied has no validation
+	// field authorizationv1.SubjectAccessReviewStatus.Reason has no validation
+	// field authorizationv1.SubjectAccessReviewStatus.EvaluationError has no validation
+
+	{ // field authorizationv1.SubjectAccessReviewStatus.ConditionalDecision
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *authorizationv1.ConditionsAwareDecision,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "ConditionalAuthorization", false, validate.ForbiddenPointer).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "ConditionalAuthorization", false, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_ConditionsAwareDecision(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *authorizationv1.SubjectAccessReviewStatus) *authorizationv1.ConditionsAwareDecision {
+				return oldObj.ConditionalDecision
+			})
+		errs = append(errs, fn(fldPath.Child("conditionalDecision"), obj.ConditionalDecision, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_UnconditionalDecision validates an instance of UnconditionalDecision according
+// to declarative validation rules in the API schema.
+func Validate_UnconditionalDecision(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *authorizationv1.UnconditionalDecision) (errs field.ErrorList) {
+
+	{ // field authorizationv1.UnconditionalDecision.Reason
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *authorizationv1.UnconditionalDecision) *string {
+				return &oldObj.Reason
+			})
+		errs = append(errs, fn(fldPath.Child("reason"), &obj.Reason, oldVal, oldObj != nil)...)
+	}
+
+	{ // field authorizationv1.UnconditionalDecision.EvaluationError
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *authorizationv1.UnconditionalDecision) *string {
+				return &oldObj.EvaluationError
+			})
+		errs = append(errs, fn(fldPath.Child("evaluationError"), &obj.EvaluationError, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
