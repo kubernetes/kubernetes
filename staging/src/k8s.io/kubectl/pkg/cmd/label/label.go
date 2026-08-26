@@ -241,6 +241,9 @@ func (o *LabelOptions) Validate() error {
 	if len(o.newLabels) < 1 && len(o.removeLabels) < 1 && !o.list {
 		return fmt.Errorf("at least one label update is required")
 	}
+	if o.list && (len(o.newLabels) > 0 || len(o.removeLabels) > 0) {
+		return fmt.Errorf("cannot modify labels when --list is specified")
+	}
 	return nil
 }
 
