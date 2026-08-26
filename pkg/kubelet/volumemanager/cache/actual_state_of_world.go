@@ -817,7 +817,7 @@ func shouldRecordVolumeInActuatedState(vol *v1.Volume) bool {
 		return true
 	}
 	return utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) &&
-		allocation.VolHasMemoryBackedEmptyDirSizeLimit(vol)
+		allocation.VolHasMemoryBackedEmptyDir(vol)
 }
 
 func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.MarkVolumeOpts) error {

@@ -1503,13 +1503,21 @@ func TestActualStateOfWorld_ActuatedVolumes_MemoryBackedOnlyWhenDynamicVolumesDi
 			},
 		},
 	}
+	uncappedMemVol := v1.Volume{
+		Name: "uncapped-mem-vol",
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{
+				Medium: v1.StorageMediumMemory,
+			},
+		},
+	}
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod1",
 			UID:  "pod1uid",
 		},
 		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{cmVol, memVol},
+			Volumes: []v1.Volume{cmVol, memVol, uncappedMemVol},
 		},
 	}
 	podName := util.GetUniquePodName(pod)
@@ -1531,8 +1539,8 @@ func TestActualStateOfWorld_ActuatedVolumes_MemoryBackedOnlyWhenDynamicVolumesDi
 		}))
 	}
 
-	// Only the memory-backed emptyDir volume should be recorded when DynamicNodeLocalEphemeralVolumes is disabled.
+	// Only the memory-backed emptyDir volumes should be recorded when DynamicNodeLocalEphemeralVolumes is disabled.
 	actuatedVols, ok := actuatedState.GetPodVolumes(pod.UID)
 	require.True(t, ok)
-	require.Equal(t, []v1.Volume{memVol}, actuatedVols)
+	require.Equal(t, []v1.Volume{memVol, uncappedMemVol}, actuatedVols)
 }

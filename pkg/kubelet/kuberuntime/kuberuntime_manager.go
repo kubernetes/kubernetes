@@ -879,23 +879,36 @@ func KeepOnlyResourceValues(pod *v1.Pod) {
 func (m *kubeGenericRuntimeManager) computeVolumeResizeAction(ctx context.Context, pod *v1.Pod, changes *podActions) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
 		for _, vol := range pod.Spec.Volumes {
-			if !allocation.VolHasMemoryBackedEmptyDirSizeLimit(&vol) {
+			if !allocation.VolHasMemoryBackedEmptyDir(&vol) {
 				continue
 			}
 			actuatedSize, found := m.actuatedState.GetEmptyDirVolumeLimit(pod.UID, vol.Name)
-			if !found || actuatedSize == nil {
+			if !found {
 				// If the volume is not in the actuated state, it is not mounted yet,
 				// so there is nothing to resize.
 				continue
 			}
 			desiredSize := vol.EmptyDir.SizeLimit
 
-			// Compare current (actuated) size with new size
-			cmp := desiredSize.Cmp(*actuatedSize)
-			if cmp > 0 {
+			hasDesiredLimit := desiredSize != nil && !desiredSize.IsZero()
+			hasActuatedLimit := actuatedSize != nil && !actuatedSize.IsZero()
+
+			switch {
+			case !hasDesiredLimit && !hasActuatedLimit:
+				// Both are uncapped (nil or 0). No resize needed.
+			case !hasDesiredLimit:
+				// Removing sizeLimit: volume is uncapped (expands to node allocatable / pod limit). Upsize.
 				changes.VolumesToUpsize = append(changes.VolumesToUpsize, vol)
-			} else if cmp < 0 {
+			case !hasActuatedLimit:
+				// Adding sizeLimit: volume was uncapped and is now constrained. Downsize.
 				changes.VolumesToDownsize = append(changes.VolumesToDownsize, vol)
+			default:
+				cmp := desiredSize.Cmp(*actuatedSize)
+				if cmp > 0 {
+					changes.VolumesToUpsize = append(changes.VolumesToUpsize, vol)
+				} else if cmp < 0 {
+					changes.VolumesToDownsize = append(changes.VolumesToDownsize, vol)
+				}
 			}
 		}
 	}
@@ -2401,18 +2414,24 @@ func (m *kubeGenericRuntimeManager) IsPodResizeInProgress(allocatedPod *v1.Pod, 
 func (m *kubeGenericRuntimeManager) isMemoryBackedVolumeResizeInProgress(allocatedPod *v1.Pod) bool {
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
 		for _, volume := range allocatedPod.Spec.Volumes {
-			if !allocation.VolHasMemoryBackedEmptyDirSizeLimit(&volume) {
+			if !allocation.VolHasMemoryBackedEmptyDir(&volume) {
 				continue
 			}
 
-			desiredLimit := volume.EmptyDir.SizeLimit
+			allocatedLimit := volume.EmptyDir.SizeLimit
 			actuatedLimit, found := m.actuatedState.GetEmptyDirVolumeLimit(allocatedPod.UID, volume.Name)
 			if !found {
 				// No actuation checkpoint yet.
 				continue
 			}
 
-			if desiredLimit != nil && !desiredLimit.Equal(*actuatedLimit) {
+			hasDesiredLimit := allocatedLimit != nil && !allocatedLimit.IsZero()
+			hasActuatedLimit := actuatedLimit != nil && !actuatedLimit.IsZero()
+			if !hasDesiredLimit && !hasActuatedLimit {
+				// nil and 0 are considered equivalent for sizeLimit
+				continue
+			}
+			if hasDesiredLimit != hasActuatedLimit || !allocatedLimit.Equal(*actuatedLimit) {
 				return true
 			}
 		}
