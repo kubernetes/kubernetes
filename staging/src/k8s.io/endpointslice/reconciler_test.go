@@ -683,6 +683,35 @@ func TestPlaceHolderSliceCompare(t *testing.T) {
 			y:    &discovery.EndpointSlice{AddressType: discovery.AddressTypeIPv6},
 			want: false,
 		},
+
+		{
+			desc: "OwnerReferences with different UID",
+			x: &discovery.EndpointSlice{ObjectMeta: metav1.ObjectMeta{
+				OwnerReferences: []metav1.OwnerReference{{UID: "uid-1"}},
+			}},
+			y: &discovery.EndpointSlice{ObjectMeta: metav1.ObjectMeta{
+				OwnerReferences: []metav1.OwnerReference{{UID: "uid-2"}},
+			}},
+			want: false,
+		},
+		{
+			desc: "OwnerReferences with different length",
+			x: &discovery.EndpointSlice{ObjectMeta: metav1.ObjectMeta{
+				OwnerReferences: []metav1.OwnerReference{{UID: "uid-1"}},
+			}},
+			y:    &discovery.EndpointSlice{},
+			want: false,
+		},
+		{
+			desc: "OwnerReferences matching",
+			x: &discovery.EndpointSlice{ObjectMeta: metav1.ObjectMeta{
+				OwnerReferences: []metav1.OwnerReference{{UID: "uid-1"}},
+			}},
+			y: &discovery.EndpointSlice{ObjectMeta: metav1.ObjectMeta{
+				OwnerReferences: []metav1.OwnerReference{{UID: "uid-1"}},
+			}},
+			want: true,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
