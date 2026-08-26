@@ -321,7 +321,7 @@ type conditionsAwareFakeAuthorizer struct {
 }
 
 func (f *conditionsAwareFakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-	return f.ConditionsAwareAuthorize(ctx, a).UnconditionalParts(true)
+	return f.ConditionsAwareAuthorize(ctx, a).UnconditionalPartsOrFailClosed()
 }
 
 func (f *conditionsAwareFakeAuthorizer) ConditionsAwareAuthorize(_ context.Context, _ authorizer.Attributes) authorizer.ConditionsAwareDecision {
