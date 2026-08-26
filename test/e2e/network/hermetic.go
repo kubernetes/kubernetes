@@ -21,9 +21,12 @@ import (
 	"strings"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -237,5 +240,154 @@ var _ = common.SIGDescribe("Hermetic", feature.Hermetic, func() {
 		framework.ExpectNoError(err, "failed to get pod")
 		gomega.Expect(fetchedPod.Status.ContainerStatuses).To(gomega.HaveLen(1))
 		gomega.Expect(fetchedPod.Status.ContainerStatuses[0].RestartCount).To(gomega.Equal(int32(0)))
+	})
+
+	ginkgo.It("should resolve local hostname to loopback in /etc/hosts, omit service env vars, and handle downward API", func(ctx context.Context) {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "hermetic-env-hosts",
+			},
+			Spec: v1.PodSpec{
+				Hermetic: ptr.To(true),
+				Containers: []v1.Container{{
+					Name:    "agnhost",
+					Image:   imageutils.GetE2EImage(imageutils.Agnhost),
+					Command: []string{"sleep", "3600"},
+					Env: []v1.EnvVar{
+						{
+							Name: "POD_IP",
+							ValueFrom: &v1.EnvVarSource{
+								FieldRef: &v1.ObjectFieldSelector{
+									FieldPath: "status.podIP",
+								},
+							},
+						},
+						{
+							Name: "HOST_IP",
+							ValueFrom: &v1.EnvVarSource{
+								FieldRef: &v1.ObjectFieldSelector{
+									FieldPath: "status.hostIP",
+								},
+							},
+						},
+					},
+				}},
+			},
+		}
+
+		ginkgo.By("Creating hermetic pod with downward API")
+		createdPod := podClient.Create(ctx, pod)
+
+		ginkgo.By("Waiting for pod to be running")
+		err := e2epod.WaitForPodNameRunningInNamespace(ctx, cs, createdPod.Name, createdPod.Namespace)
+		framework.ExpectNoError(err, "pod failed to reach Running state")
+
+		ginkgo.By("Verifying /etc/hosts maps the pod hostname to loopback")
+		stdout := e2epod.ExecShellInPod(ctx, f, createdPod.Name, "cat /etc/hosts")
+		gomega.Expect(stdout).To(gomega.ContainSubstring("127.0.0.1\thermetic-env-hosts"), "expected loopback entry for hostname in /etc/hosts")
+
+		ginkgo.By("Verifying ping $(hostname) succeeds inside container")
+		stdout = e2epod.ExecShellInPod(ctx, f, createdPod.Name, "ping -c 1 -W 2 $(hostname)")
+		gomega.Expect(stdout).To(gomega.ContainSubstring("1 packets transmitted, 1 packets received"), "hostname loopback ping failed")
+
+		ginkgo.By("Verifying environment variables omit service env vars and Downward API POD_IP is empty")
+		stdout = e2epod.ExecShellInPod(ctx, f, createdPod.Name, "env")
+		gomega.Expect(stdout).NotTo(gomega.ContainSubstring("KUBERNETES_SERVICE_HOST"), "service env vars should be omitted for hermetic pods")
+		gomega.Expect(stdout).To(gomega.ContainSubstring("POD_IP=\n"), "POD_IP should be empty")
+		gomega.Expect(stdout).To(gomega.MatchRegexp(`HOST_IP=\d+\.\d+\.\d+\.\d+`), "HOST_IP should be populated")
+	})
+
+	ginkgo.It("should manage hermetic workloads in Deployments, StatefulSets, and Jobs", func(ctx context.Context) {
+		ginkgo.By("Creating a hermetic Deployment")
+		var replicas int32 = 2
+		deploy := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "hermetic-deploy",
+			},
+			Spec: appsv1.DeploymentSpec{
+				Replicas: &replicas,
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"app": "hermetic-deploy"},
+				},
+				Template: v1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{"app": "hermetic-deploy"},
+					},
+					Spec: v1.PodSpec{
+						Hermetic: ptr.To(true),
+						Containers: []v1.Container{{
+							Name:    "agnhost",
+							Image:   imageutils.GetE2EImage(imageutils.Agnhost),
+							Command: []string{"sleep", "3600"},
+						}},
+					},
+				},
+			},
+		}
+		_, err := cs.AppsV1().Deployments(f.Namespace.Name).Create(ctx, deploy, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create hermetic deployment")
+		_, err = e2epod.WaitForPodsWithLabelRunningReady(ctx, cs, f.Namespace.Name, labels.SelectorFromSet(map[string]string{"app": "hermetic-deploy"}), 2, 1*time.Minute)
+		framework.ExpectNoError(err, "hermetic deployment pods failed to become ready")
+
+		ginkgo.By("Creating a hermetic StatefulSet")
+		sts := &appsv1.StatefulSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "hermetic-sts",
+			},
+			Spec: appsv1.StatefulSetSpec{
+				Replicas:    &replicas,
+				ServiceName: "hermetic-sts-headless",
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"app": "hermetic-sts"},
+				},
+				Template: v1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{"app": "hermetic-sts"},
+					},
+					Spec: v1.PodSpec{
+						Hermetic: ptr.To(true),
+						Containers: []v1.Container{{
+							Name:    "agnhost",
+							Image:   imageutils.GetE2EImage(imageutils.Agnhost),
+							Command: []string{"sleep", "3600"},
+						}},
+					},
+				},
+			},
+		}
+		_, err = cs.AppsV1().StatefulSets(f.Namespace.Name).Create(ctx, sts, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create hermetic statefulset")
+		_, err = e2epod.WaitForPodsWithLabelRunningReady(ctx, cs, f.Namespace.Name, labels.SelectorFromSet(map[string]string{"app": "hermetic-sts"}), 2, 1*time.Minute)
+		framework.ExpectNoError(err, "hermetic statefulset pods failed to become ready")
+
+		ginkgo.By("Creating a hermetic Job")
+		job := &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "hermetic-job",
+			},
+			Spec: batchv1.JobSpec{
+				Template: v1.PodTemplateSpec{
+					Spec: v1.PodSpec{
+						Hermetic:      ptr.To(true),
+						RestartPolicy: v1.RestartPolicyNever,
+						Containers: []v1.Container{{
+							Name:    "agnhost",
+							Image:   imageutils.GetE2EImage(imageutils.Agnhost),
+							Command: []string{"sh", "-c", "echo 'hermetic job running' && ping -c 1 127.0.0.1"},
+						}},
+					},
+				},
+			},
+		}
+		_, err = cs.BatchV1().Jobs(f.Namespace.Name).Create(ctx, job, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create hermetic job")
+		err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
+			j, err := cs.BatchV1().Jobs(f.Namespace.Name).Get(ctx, "hermetic-job", metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			return j.Status.Succeeded > 0, nil
+		})
+		framework.ExpectNoError(err, "hermetic job failed to complete")
 	})
 })

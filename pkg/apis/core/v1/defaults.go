@@ -267,6 +267,11 @@ func SetDefaults_PodSpec(obj *v1.PodSpec) {
 			obj.DNSPolicy = v1.DNSClusterFirst
 		}
 	}
+	if obj.Hermetic != nil && *obj.Hermetic {
+		if obj.EnableServiceLinks == nil {
+			obj.EnableServiceLinks = ptr.To(false)
+		}
+	}
 	if obj.RestartPolicy == "" {
 		obj.RestartPolicy = v1.RestartPolicyAlways
 	}

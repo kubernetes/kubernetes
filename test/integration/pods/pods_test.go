@@ -26,6 +26,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -2831,3 +2833,90 @@ func TestHermeticPodValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestHermeticWorkloadsTemplateValidation(t *testing.T) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	ns := framework.CreateNamespaceOrDie(client, "hermetic-workloads", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	ctx := context.Background()
+
+	// 1. Deployment with spec.template.spec.hermetic: true
+	deploy := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "hermetic-deploy", Namespace: ns.Name},
+		Spec: appsv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "hermetic-deploy"}},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "hermetic-deploy"}},
+				Spec: v1.PodSpec{
+					Hermetic:   ptr.To(true),
+					Containers: []v1.Container{{Name: "c", Image: "pause"}},
+				},
+			},
+		},
+	}
+	createdDeploy, err := client.AppsV1().Deployments(ns.Name).Create(ctx, deploy, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to create deployment with hermetic pod template: %v", err)
+	}
+	if createdDeploy.Spec.Template.Spec.DNSPolicy != v1.DNSNone {
+		t.Errorf("expected deployment template DNSPolicy to be %q, got %q", v1.DNSNone, createdDeploy.Spec.Template.Spec.DNSPolicy)
+	}
+	if createdDeploy.Spec.Template.Spec.EnableServiceLinks == nil || *createdDeploy.Spec.Template.Spec.EnableServiceLinks != false {
+		t.Errorf("expected deployment template enableServiceLinks to be false, got: %+v", createdDeploy.Spec.Template.Spec.EnableServiceLinks)
+	}
+
+	// 2. StatefulSet with spec.template.spec.hermetic: true
+	sts := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "hermetic-sts", Namespace: ns.Name},
+		Spec: appsv1.StatefulSetSpec{
+			Selector:    &metav1.LabelSelector{MatchLabels: map[string]string{"app": "hermetic-sts"}},
+			ServiceName: "headless",
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "hermetic-sts"}},
+				Spec: v1.PodSpec{
+					Hermetic:   ptr.To(true),
+					Containers: []v1.Container{{Name: "c", Image: "pause"}},
+				},
+			},
+		},
+	}
+	createdSts, err := client.AppsV1().StatefulSets(ns.Name).Create(ctx, sts, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to create statefulset with hermetic pod template: %v", err)
+	}
+	if createdSts.Spec.Template.Spec.DNSPolicy != v1.DNSNone {
+		t.Errorf("expected statefulset template DNSPolicy to be %q, got %q", v1.DNSNone, createdSts.Spec.Template.Spec.DNSPolicy)
+	}
+	if createdSts.Spec.Template.Spec.EnableServiceLinks == nil || *createdSts.Spec.Template.Spec.EnableServiceLinks != false {
+		t.Errorf("expected statefulset template enableServiceLinks to be false, got: %+v", createdSts.Spec.Template.Spec.EnableServiceLinks)
+	}
+
+	// 3. Job with spec.template.spec.hermetic: true
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "hermetic-job", Namespace: ns.Name},
+		Spec: batchv1.JobSpec{
+			Template: v1.PodTemplateSpec{
+				Spec: v1.PodSpec{
+					Hermetic:      ptr.To(true),
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers:    []v1.Container{{Name: "c", Image: "pause"}},
+				},
+			},
+		},
+	}
+	createdJob, err := client.BatchV1().Jobs(ns.Name).Create(ctx, job, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to create job with hermetic pod template: %v", err)
+	}
+	if createdJob.Spec.Template.Spec.DNSPolicy != v1.DNSNone {
+		t.Errorf("expected job template DNSPolicy to be %q, got %q", v1.DNSNone, createdJob.Spec.Template.Spec.DNSPolicy)
+	}
+	if createdJob.Spec.Template.Spec.EnableServiceLinks == nil || *createdJob.Spec.Template.Spec.EnableServiceLinks != false {
+		t.Errorf("expected job template enableServiceLinks to be false, got: %+v", createdJob.Spec.Template.Spec.EnableServiceLinks)
+	}
+}
+
