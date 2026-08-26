@@ -22,7 +22,6 @@ import (
 	"context"
 	_ "embed"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -655,69 +654,87 @@ func BenchmarkChunkingGzip(b *testing.B) {
 	}
 }
 
-func toProtoBuf(b *testing.B, list *v1.PodList) []byte {
-	out, err := list.Marshal()
-	if err != nil {
-		b.Fatalf("Failed to marshal list to protobuf: %v", err)
-	}
-	return out
-}
-
-func toJSON(b *testing.B, list *v1.PodList) []byte {
-	out, err := json.Marshal(list)
-	if err != nil {
-		b.Fatalf("Failed to marshal list to json: %v", err)
-	}
-	return out
-}
-
-func benchmarkSerializeObject(b *testing.B, payload []byte, gzip bool) {
-	req := &http.Request{
-		URL: &url.URL{Path: "/path"},
-	}
-	if gzip {
-		req.Header = http.Header{
-			"Accept-Encoding": []string{"gzip"},
-		}
-	}
-
+// benchmarkSerializeObject serves one response per iteration from a loopback
+// HTTPS server, with an in-process client reading the body back: the cost of
+// serialization plus net/http's write path, which the streaming collection
+// encoders drive one write per item.
+func benchmarkSerializeObject(b *testing.B, mediaType string, encoder runtime.Encoder, object runtime.Object, gzip, http2 bool) {
 	featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.APIResponseCompression, true)
 
-	encoder := &fakeEncoder{
-		buf: payload,
-	}
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		SerializeObject(mediaType, encoder, w, req, http.StatusOK, object)
+	}))
+	server.EnableHTTP2 = http2
+	server.StartTLS()
+	b.Cleanup(server.Close)
+	client := server.Client()
+	// Keep the transport from negotiating and transparently undoing gzip on
+	// its own: compression is a benchmark dimension.
+	client.Transport.(*http.Transport).DisableCompression = true
 
+	b.ReportAllocs()
 	b.ResetTimer()
-	responseBytesTotal := 0
+	var responseBytesTotal int64
 	for b.Loop() {
-		recorder := httptest.NewRecorder()
-		SerializeObject("application/json", encoder, recorder, req, http.StatusOK, nil /* object */)
-		result := recorder.Result()
-		if result.StatusCode != http.StatusOK {
-			b.Fatalf("incorrect status code: got %v;  want: %v", result.StatusCode, http.StatusOK)
+		req, err := http.NewRequest(http.MethodGet, server.URL, nil)
+		if err != nil {
+			b.Fatal(err)
 		}
-		responseBytesTotal += recorder.Body.Len()
+		if gzip {
+			req.Header.Set("Accept-Encoding", "gzip")
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			b.Fatal(err)
+		}
+		n, err := io.Copy(io.Discard, resp.Body)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if err := resp.Body.Close(); err != nil {
+			b.Fatal(err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			b.Fatalf("incorrect status code: got %v;  want: %v", resp.StatusCode, http.StatusOK)
+		}
+		if (resp.ProtoMajor == 2) != http2 {
+			b.Fatalf("got %s, want HTTP/2=%v", resp.Proto, http2)
+		}
+		if contentEncoding := resp.Header.Get("Content-Encoding"); (contentEncoding == "gzip") != gzip {
+			b.Fatalf("Content-Encoding %q, want gzip=%v", contentEncoding, gzip)
+		}
+		responseBytesTotal += n
 	}
-	b.ReportMetric(float64(responseBytesTotal/b.N), "writtenBytes/op")
+	b.ReportMetric(float64(responseBytesTotal/int64(b.N)), "writtenBytes/op")
 }
 
+// BenchmarkSerializeObject serves LIST responses of 100 to 100k exemplar Pods
+// through the streaming JSON and protobuf encoders, with and without gzip,
+// over loopback HTTPS with HTTP/1.1 and HTTP/2.
 func BenchmarkSerializeObject(b *testing.B) {
-	for _, count := range []int{1_000, 10_000, 100_000} {
+	scheme := runtime.NewScheme()
+	if err := v1.AddToScheme(scheme); err != nil {
+		b.Fatal(err)
+	}
+	medias := []struct {
+		name, mediaType string
+		encoder         runtime.Encoder
+	}{
+		{"Json", "application/json", jsonserializer.NewSerializerWithOptions(jsonserializer.DefaultMetaFactory, scheme, scheme, jsonserializer.SerializerOptions{StreamingCollectionsEncoding: true})},
+		{"Protobuf", "application/vnd.kubernetes.protobuf", protobuf.NewSerializerWithOptions(scheme, scheme, protobuf.SerializerOptions{StreamingCollectionsEncoding: true})},
+	}
+	for _, count := range []int{100, 1_000, 10_000, 100_000} {
 		b.Run(fmt.Sprintf("Count=%d", count), func(b *testing.B) {
-			medias := []struct {
-				name    string
-				convert func(*testing.B, *v1.PodList) []byte
-			}{
-				{"Json", toJSON},
-				{"Protobuf", toProtoBuf},
-			}
 			podList := benchmarkItems(b, count)
 			for _, media := range medias {
 				b.Run(fmt.Sprintf("MediaType=%s", media.name), func(b *testing.B) {
-					payload := media.convert(b, podList)
 					for _, gzip := range []bool{true, false} {
 						b.Run(fmt.Sprintf("Compression=%v", gzip), func(b *testing.B) {
-							benchmarkSerializeObject(b, payload, gzip)
+							for _, protocol := range []string{"HTTP1", "HTTP2"} {
+								b.Run(fmt.Sprintf("Protocol=%s", protocol), func(b *testing.B) {
+									benchmarkSerializeObject(b, media.mediaType, media.encoder, podList, gzip, protocol == "HTTP2")
+								})
+							}
 						})
 					}
 				})
