@@ -514,6 +514,10 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				st.MakeNode().Name("node1").Obj(),
 			},
 			initPods: []*v1.Pod{
+				// UIDs ensure deterministic sort order: p1 (v1) > p2 (v2) > p3 (v3) > p4 (v4) by lexicographic UID comparison.
+				// This is critical for determinism even when StartTime is identical, which can happen on systems with
+				// coarse clock granularity (e.g., Windows) where multiple pods are created with the same timestamp.
+				// Reprieve tries p1, p2 first (both fit), then p3 fails → victims = {p3, p4}.
 				st.MakePod().Name("p1").UID("v1").Node("node1").Priority(lowPriority).Obj(),
 				st.MakePod().Name("p2").UID("v2").Node("node1").Priority(lowPriority).Obj(),
 				st.MakePod().Name("p3").UID("v3").Node("node1").Priority(lowPriority).Obj(),

@@ -397,7 +397,39 @@ func TestMoreImportantVictim(t *testing.T) {
 			want: false,
 		},
 		{
-			name: "CPG vs Pod, same priority (CPG wins)",
+			name: "both Pods, same StartTime, vi1 has smaller UID",
+			vi1:  &victim{priority: 10, pods: []fwk.PodInfo{newPodInfo(st.MakePod().UID("alfa").Obj())}, earliestStartTime: now},
+			vi2:  &victim{priority: 10, pods: []fwk.PodInfo{newPodInfo(st.MakePod().UID("zulu").Obj())}, earliestStartTime: now},
+			want: true,
+		},
+		{
+			name: "both Pods, same StartTime, vi2 has smaller UID",
+			vi1:  &victim{priority: 10, pods: []fwk.PodInfo{newPodInfo(st.MakePod().UID("zulu").Obj())}, earliestStartTime: now},
+			vi2:  &victim{priority: 10, pods: []fwk.PodInfo{newPodInfo(st.MakePod().UID("alfa").Obj())}, earliestStartTime: now},
+			want: false,
+		},
+		{
+			name: "both PGs, same size, same StartTime, vi1 has smaller UID",
+			vi1: &victim{
+				priority: 10,
+				pods: []fwk.PodInfo{
+					newPodInfo(st.MakePod().UID("alfa").PodGroupName("pg").Obj()),
+					newPodInfo(st.MakePod().UID("alfa").PodGroupName("pg").Obj()),
+				},
+				earliestStartTime: now,
+			},
+			vi2: &victim{
+				priority: 10,
+				pods: []fwk.PodInfo{
+					newPodInfo(st.MakePod().UID("zulu").PodGroupName("pg").Obj()),
+					newPodInfo(st.MakePod().UID("zulu").PodGroupName("pg").Obj()),
+				},
+				earliestStartTime: now,
+			},
+			want: true,
+		},
+		{
+			name: "CPG vs Pod, same priority (CPG rank wins over Pod rank)",
 			vi1: &victim{
 				priority: 10,
 				keyType:  fwk.CompositePodGroupKeyType,
