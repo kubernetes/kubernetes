@@ -102,13 +102,13 @@ func (r ConditionEvaluationResult) IsUnevaluatable() bool {
 func (c ConditionsMap) Evaluate(ctx context.Context, data ConditionsData, evaluateConditionFn EvaluateConditionFunc) (Decision, string, error) {
 	// This is a translation between the generic, private function, and the interface we want to expose to callers.
 	return partiallyEvaluateConditionsMapInternal(ctx, c, data, func(ctx context.Context, cond Condition, condData ConditionsData) ConditionEvaluationResult {
-		// Because we never return "unevaluatable", the returned ConditionsAwareDecision is always one of Allow/Deny/NoOpinion, and thus can we split it into unconditionalParts
+		// Because we never return "unevaluatable", the returned ConditionsAwareDecision is always one of Allow/Deny/NoOpinion, and thus can we split it into UnconditionalParts
 		applied, err := evaluateConditionFn(ctx, cond, condData)
 		if err != nil {
 			return ConditionEvaluationResultError(err)
 		}
 		return ConditionEvaluationResultBoolean(applied)
-	}).unconditionalParts()
+	}).UnconditionalParts()
 }
 
 // partiallyEvaluateConditionsMapInternal evaluates the ConditionsMap primarily using the Conditions' own Evaluate() function,
