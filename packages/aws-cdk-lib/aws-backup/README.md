@@ -139,6 +139,19 @@ plan.addRule(new backup.BackupPlanRule({
 }));
 ```
 
+You can enable Backup indexes for specific resource types in the rule by using `indexActions`.
+Each rule can have at most one index action, and its `resourceTypes` must list at least one
+resource type to index.
+
+```ts
+declare const plan: backup.BackupPlan;
+plan.addRule(new backup.BackupPlanRule({
+  indexActions: [{
+      resourceTypes: [backup.IndexActionResourceType.S3],
+  }],
+}));
+```
+
 Ready-made rules are also available:
 
 ```ts

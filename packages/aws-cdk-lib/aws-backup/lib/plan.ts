@@ -235,6 +235,9 @@ export class BackupPlan extends Resource implements IBackupPlan {
       targetBackupVault: vault.backupVaultRef.backupVaultName,
       copyActions: rule.props.copyActions?.map(this.planCopyActions),
       recoveryPointTags: rule.props.recoveryPointTags,
+      indexActions: rule.props.indexActions?.map(indexAction => ({
+        resourceTypes: indexAction.resourceTypes.map(resourceType => resourceType.value),
+      })),
     });
   }
 

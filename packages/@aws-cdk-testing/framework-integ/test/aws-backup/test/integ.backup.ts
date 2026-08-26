@@ -62,6 +62,9 @@ class TestStack extends Stack {
       recoveryPointTags: {
         stage: 'prod',
       },
+      indexActions: [{
+        resourceTypes: [backup.IndexActionResourceType.S3],
+      }],
     }));
 
     plan.addRule(new backup.BackupPlanRule({
