@@ -189,8 +189,11 @@ func FindVolume(volumes []v1.Volume, name string, idxHint int) *v1.Volume {
 // IsMemoryBackedVolumeResizeRequested returns true if any of the pod's memory-backed emptyDir volumes has its size limit changed.
 func IsMemoryBackedVolumeResizeRequested(desiredPod, allocatedPod *v1.Pod) bool {
 	for i, vol := range desiredPod.Spec.Volumes {
+		if !VolHasMemoryBackedEmptyDir(&vol) {
+			continue
+		}
 		allocVol := FindVolume(allocatedPod.Spec.Volumes, vol.Name, i)
-		if allocVol == nil {
+		if allocVol == nil || !VolHasMemoryBackedEmptyDir(allocVol) {
 			continue
 		}
 		hasLimit, hasAllocLimit := VolHasMemoryBackedEmptyDirSizeLimit(&vol), VolHasMemoryBackedEmptyDirSizeLimit(allocVol)

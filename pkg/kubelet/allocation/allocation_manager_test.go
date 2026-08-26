@@ -655,7 +655,7 @@ func TestUpdatePodFromAllocationPending(t *testing.T) {
 		{"disk-backed emptyDir limit", func(pod, allocated *v1.Pod) {
 			pod.Spec.Volumes[1].EmptyDir.SizeLimit = new(resource.MustParse("128Mi"))
 		}, never, true, false},
-		{"emptyDir limit removed", func(pod, allocated *v1.Pod) { pod.Spec.Volumes[0].EmptyDir.SizeLimit = nil }, never, true, true},
+		{"emptyDir limit removed", func(pod, allocated *v1.Pod) { pod.Spec.Volumes[0].EmptyDir.SizeLimit = nil }, withMemoryBackedGate, true, true},
 		{"emptyDir limit added", func(pod, allocated *v1.Pod) {
 			pod.Spec.Volumes[2].EmptyDir.SizeLimit = new(resource.MustParse("64Mi"))
 		}, never, true, true},
@@ -3280,7 +3280,8 @@ func TestAllocationManager_EmptyDirVolumeLimits_AddPod(t *testing.T) {
 					},
 				},
 			},
-			expectedAllocated: false,
+			expectedAllocated: true,
+			expectedLimit:     nil,
 		},
 	}
 
@@ -3305,8 +3306,12 @@ func TestAllocationManager_EmptyDirVolumeLimits_AddPod(t *testing.T) {
 
 			if test.expectedAllocated {
 				require.True(t, exists, "emptyDir limit allocation should exist")
-				require.NotNil(t, limit)
-				assert.True(t, test.expectedLimit.Equal(*limit))
+				if test.expectedLimit != nil {
+					require.NotNil(t, limit)
+					assert.True(t, test.expectedLimit.Equal(*limit))
+				} else {
+					assert.Nil(t, limit)
+				}
 			} else {
 				assert.False(t, exists, "emptyDir limit allocation should not exist")
 				assert.Nil(t, limit)
@@ -3480,6 +3485,60 @@ func TestAllocationManager_EmptyDirVolumeLimits_UpdatePodFromAllocation(t *testi
 			checkpointLimit: resource.NewQuantity(1024*1024*128, resource.BinarySI),
 			expectedUpdated: false,
 			expectedLimit:   resource.NewQuantity(1024*1024*64, resource.BinarySI),
+		},
+		{
+			name:               "remove size limit from spec when checkpoint is nil",
+			featureGateEnabled: true,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "pod-5",
+					Name:      "mismatch-pod-5",
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(1024*1024*64, resource.BinarySI), // 64Mi in spec
+								},
+							},
+						},
+					},
+				},
+			},
+			checkpointLimit: nil,
+			expectedUpdated: true,
+			expectedLimit:   nil,
+		},
+		{
+			name:               "add size limit to spec when spec is nil and checkpoint is non-nil",
+			featureGateEnabled: true,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "pod-6",
+					Name:      "mismatch-pod-6",
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: nil, // nil in spec
+								},
+							},
+						},
+					},
+				},
+			},
+			checkpointLimit: resource.NewQuantity(1024*1024*128, resource.BinarySI),
+			expectedUpdated: true,
+			expectedLimit:   resource.NewQuantity(1024*1024*128, resource.BinarySI),
 		},
 	}
 
@@ -3921,6 +3980,160 @@ func TestAllocationManager_EmptyDirVolumeLimits_RetryPendingResizes(t *testing.T
 				},
 			},
 		},
+		{
+			name:          "successfully remove emptyDir limit when gate is enabled",
+			isGateEnabled: true,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:        "pod-6",
+					Name:       "resize-pod-6",
+					Namespace:  "default",
+					Generation: 1,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container-1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(1024*1024*128, resource.BinarySI), // 128Mi initial
+								},
+							},
+						},
+					},
+				},
+			},
+			targetPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:        "pod-6",
+					Name:       "resize-pod-6",
+					Namespace:  "default",
+					Generation: 2,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container-1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: nil, // Removed sizeLimit
+								},
+							},
+						},
+					},
+				},
+			},
+			expectResizeAllocated:  true,
+			expectedAllocatedLimit: nil,
+			expectedResizeConditions: []*v1.PodCondition{
+				{
+					Type:               v1.PodResizeInProgress,
+					Status:             "True",
+					ObservedGeneration: 2,
+				},
+			},
+		},
+		{
+			name:          "successfully add emptyDir limit when gate is enabled",
+			isGateEnabled: true,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:        "pod-7",
+					Name:       "resize-pod-7",
+					Namespace:  "default",
+					Generation: 1,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container-1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: nil, // Uncapped initial
+								},
+							},
+						},
+					},
+				},
+			},
+			targetPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:        "pod-7",
+					Name:       "resize-pod-7",
+					Namespace:  "default",
+					Generation: 2,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container-1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: resource.NewQuantity(1024*1024*256, resource.BinarySI), // Added 256Mi
+								},
+							},
+						},
+					},
+				},
+			},
+			expectResizeAllocated:  true,
+			expectedAllocatedLimit: resource.NewQuantity(1024*1024*256, resource.BinarySI),
+			expectedResizeConditions: []*v1.PodCondition{
+				{
+					Type:               v1.PodResizeInProgress,
+					Status:             "True",
+					ObservedGeneration: 2,
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -3949,11 +4162,12 @@ func TestAllocationManager_EmptyDirVolumeLimits_RetryPendingResizes(t *testing.T
 			// Verify the final checkpoint allocation
 			limit, exists := allocationManager.(*manager).allocated.GetEmptyDirVolumeLimit(test.pod.UID, "mem-vol")
 
+			require.True(t, exists)
 			if test.expectedAllocatedLimit != nil {
-				require.True(t, exists)
+				require.NotNil(t, limit)
 				assert.True(t, test.expectedAllocatedLimit.Equal(*limit))
 			} else {
-				assert.False(t, exists)
+				assert.Nil(t, limit)
 			}
 
 			// Verify status manager conditions
@@ -4223,4 +4437,151 @@ func setupNonAllocatedCapacityTest(t *testing.T) (Manager, *v1.Pod, *v1.Pod, klo
 	})
 
 	return allocationManager, runningPod, pendingPod, logger
+}
+
+func TestIsMemoryBackedVolumeResizeRequested(t *testing.T) {
+	tests := []struct {
+		name            string
+		allocatedLimit  *resource.Quantity
+		desiredLimit    *resource.Quantity
+		medium          v1.StorageMedium
+		allocatedMedium *v1.StorageMedium
+		expectedResult  bool
+	}{
+		{
+			name:           "both limits nil (uncapped, no change)",
+			allocatedLimit: nil,
+			desiredLimit:   nil,
+			medium:         v1.StorageMediumMemory,
+			expectedResult: false,
+		},
+		{
+			name:           "allocated nil, desired 0 (both uncapped, no change)",
+			allocatedLimit: nil,
+			desiredLimit:   resource.NewQuantity(0, resource.BinarySI),
+			medium:         v1.StorageMediumMemory,
+			expectedResult: false,
+		},
+		{
+			name:           "allocated 0, desired nil (both uncapped, no change)",
+			allocatedLimit: resource.NewQuantity(0, resource.BinarySI),
+			desiredLimit:   nil,
+			medium:         v1.StorageMediumMemory,
+			expectedResult: false,
+		},
+		{
+			name:           "both limits 0 (both uncapped, no change)",
+			allocatedLimit: resource.NewQuantity(0, resource.BinarySI),
+			desiredLimit:   resource.NewQuantity(0, resource.BinarySI),
+			medium:         v1.StorageMediumMemory,
+			expectedResult: false,
+		},
+		{
+			name:           "equal non-zero limits (no change)",
+			allocatedLimit: resource.NewQuantity(100*1024*1024, resource.BinarySI),
+			desiredLimit:   resource.NewQuantity(100*1024*1024, resource.BinarySI),
+			medium:         v1.StorageMediumMemory,
+			expectedResult: false,
+		},
+		{
+			name:           "limit changed from 100Mi to 200Mi",
+			allocatedLimit: resource.NewQuantity(100*1024*1024, resource.BinarySI),
+			desiredLimit:   resource.NewQuantity(200*1024*1024, resource.BinarySI),
+			medium:         v1.StorageMediumMemory,
+			expectedResult: true,
+		},
+		{
+			name:           "limit removed (100Mi to nil)",
+			allocatedLimit: resource.NewQuantity(100*1024*1024, resource.BinarySI),
+			desiredLimit:   nil,
+			medium:         v1.StorageMediumMemory,
+			expectedResult: true,
+		},
+		{
+			name:           "limit removed (100Mi to 0)",
+			allocatedLimit: resource.NewQuantity(100*1024*1024, resource.BinarySI),
+			desiredLimit:   resource.NewQuantity(0, resource.BinarySI),
+			medium:         v1.StorageMediumMemory,
+			expectedResult: true,
+		},
+		{
+			name:           "limit added (nil to 100Mi)",
+			allocatedLimit: nil,
+			desiredLimit:   resource.NewQuantity(100*1024*1024, resource.BinarySI),
+			medium:         v1.StorageMediumMemory,
+			expectedResult: true,
+		},
+		{
+			name:           "limit added (0 to 100Mi)",
+			allocatedLimit: resource.NewQuantity(0, resource.BinarySI),
+			desiredLimit:   resource.NewQuantity(100*1024*1024, resource.BinarySI),
+			medium:         v1.StorageMediumMemory,
+			expectedResult: true,
+		},
+		{
+			name:           "non-memory volume ignored even if limits differ",
+			allocatedLimit: resource.NewQuantity(100*1024*1024, resource.BinarySI),
+			desiredLimit:   resource.NewQuantity(200*1024*1024, resource.BinarySI),
+			medium:         v1.StorageMediumDefault,
+			expectedResult: false,
+		},
+		{
+			name:            "volume medium changed from memory to default is ignored",
+			allocatedLimit:  resource.NewQuantity(100*1024*1024, resource.BinarySI),
+			desiredLimit:    resource.NewQuantity(100*1024*1024, resource.BinarySI),
+			medium:          v1.StorageMediumDefault,
+			allocatedMedium: new(v1.StorageMediumMemory),
+			expectedResult:  false,
+		},
+		{
+			name:            "volume medium changed from default to memory is ignored",
+			allocatedLimit:  resource.NewQuantity(100*1024*1024, resource.BinarySI),
+			desiredLimit:    resource.NewQuantity(100*1024*1024, resource.BinarySI),
+			medium:          v1.StorageMediumMemory,
+			allocatedMedium: new(v1.StorageMediumDefault),
+			expectedResult:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			allocMed := tt.medium
+			if tt.allocatedMedium != nil {
+				allocMed = *tt.allocatedMedium
+			}
+			allocatedPod := &v1.Pod{
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    allocMed,
+									SizeLimit: tt.allocatedLimit,
+								},
+							},
+						},
+					},
+				},
+			}
+			desiredPod := &v1.Pod{
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "vol-1",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    tt.medium,
+									SizeLimit: tt.desiredLimit,
+								},
+							},
+						},
+					},
+				},
+			}
+
+			result := IsMemoryBackedVolumeResizeRequested(desiredPod, allocatedPod)
+			assert.Equal(t, tt.expectedResult, result)
+		})
+	}
 }
