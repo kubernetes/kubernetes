@@ -91,7 +91,7 @@ type ListMeta struct {
 	// The intended use of the remainingItemCount is *estimating* the size of a collection. Clients
 	// should not rely on the remainingItemCount to be set or to be exact.
 	// +optional
-	RemainingItemCount *int64 `json:"remainingItemCount,omitempty" protobuf:"bytes,4,opt,name=remainingItemCount"`
+	RemainingItemCount *int64 `json:"remainingItemCount,omitempty" protobuf:"varint,4,opt,name=remainingItemCount"`
 
 	// shardInfo is set when the list is a filtered subset of the full collection,
 	// as selected by a shard selector on the request. It echoes back the selector
@@ -603,7 +603,7 @@ type DeleteOptions struct {
 	// 'Foreground' - a cascading policy that deletes all dependents in the
 	// foreground.
 	// +optional
-	PropagationPolicy *DeletionPropagation `json:"propagationPolicy,omitempty" protobuf:"varint,4,opt,name=propagationPolicy"`
+	PropagationPolicy *DeletionPropagation `json:"propagationPolicy,omitempty" protobuf:"bytes,4,opt,name=propagationPolicy"`
 
 	// When present, indicates that modifications should not be
 	// persisted. An invalid or unrecognized dryRun directive will
