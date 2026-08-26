@@ -188,7 +188,7 @@ type RollingUpdateStatefulSetStrategy struct {
 	//
 	// +featureGate=MaxUnavailableStatefulSet
 	// +optional
-	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty" protobuf:"varint,2,opt,name=maxUnavailable"`
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty" protobuf:"bytes,2,opt,name=maxUnavailable"`
 }
 
 // PersistentVolumeClaimRetentionPolicyType is a string enumeration of the policies that will determine

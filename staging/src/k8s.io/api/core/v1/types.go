@@ -1557,7 +1557,7 @@ type SecretVolumeSource struct {
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
-	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"bytes,3,opt,name=defaultMode"`
+	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
 	// optional field specify whether the Secret or its keys must be defined
 	// +optional
 	Optional *bool `json:"optional,omitempty" protobuf:"varint,4,opt,name=optional"`
@@ -2881,7 +2881,7 @@ type TCPSocketAction struct {
 // GRPCAction specifies an action involving a GRPC service.
 type GRPCAction struct {
 	// Port number of the gRPC service. Number must be in the range 1 to 65535.
-	Port int32 `json:"port" protobuf:"bytes,1,opt,name=port"`
+	Port int32 `json:"port" protobuf:"varint,1,opt,name=port"`
 
 	// Service is the name of the service to place in the gRPC HealthCheckRequest
 	// (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
@@ -2928,7 +2928,7 @@ type ExecAction struct {
 // SleepAction describes a "sleep" action.
 type SleepAction struct {
 	// Seconds is the number of seconds to sleep.
-	Seconds int64 `json:"seconds" protobuf:"bytes,1,opt,name=seconds"`
+	Seconds int64 `json:"seconds" protobuf:"varint,1,opt,name=seconds"`
 }
 
 // Probe describes a health check to be performed against a container to determine whether it is
@@ -4533,7 +4533,7 @@ type PodSpec struct {
 	// this field from PriorityClassName.
 	// The higher the value, the higher the priority.
 	// +optional
-	Priority *int32 `json:"priority,omitempty" protobuf:"bytes,25,opt,name=priority"`
+	Priority *int32 `json:"priority,omitempty" protobuf:"varint,25,opt,name=priority"`
 	// Specifies the DNS parameters of a pod.
 	// Parameters specified here will be merged to the generated DNS
 	// configuration based on DNSPolicy.
@@ -4635,7 +4635,7 @@ type PodSpec struct {
 	// mitigating container breakout vulnerabilities even allowing users to run their
 	// containers as root without actually having root privileges on the host.
 	// +optional
-	HostUsers *bool `json:"hostUsers,omitempty" protobuf:"bytes,37,opt,name=hostUsers"`
+	HostUsers *bool `json:"hostUsers,omitempty" protobuf:"varint,37,opt,name=hostUsers"`
 
 	// SchedulingGates is an opaque list of values that if specified will block scheduling the pod.
 	// If schedulingGates is not empty, the pod will stay in the SchedulingGated state and the
@@ -6415,7 +6415,7 @@ type ServiceSpec struct {
 	// when updating a Service to no longer need it (e.g. changing type).
 	// This field cannot be updated once set.
 	// +optional
-	HealthCheckNodePort int32 `json:"healthCheckNodePort,omitempty" protobuf:"bytes,12,opt,name=healthCheckNodePort"`
+	HealthCheckNodePort int32 `json:"healthCheckNodePort,omitempty" protobuf:"varint,12,opt,name=healthCheckNodePort"`
 
 	// publishNotReadyAddresses indicates that any agent which deals with endpoints for this
 	// Service should disregard any indications of ready/not-ready.
@@ -6477,7 +6477,7 @@ type ServiceSpec struct {
 	// This field may only be set for services with type LoadBalancer and will
 	// be cleared if the type is changed to any other type.
 	// +optional
-	AllocateLoadBalancerNodePorts *bool `json:"allocateLoadBalancerNodePorts,omitempty" protobuf:"bytes,20,opt,name=allocateLoadBalancerNodePorts"`
+	AllocateLoadBalancerNodePorts *bool `json:"allocateLoadBalancerNodePorts,omitempty" protobuf:"varint,20,opt,name=allocateLoadBalancerNodePorts"`
 
 	// loadBalancerClass is the class of the load balancer implementation this Service belongs to.
 	// If specified, the value of this field must be a label-style identifier, with an optional prefix,
@@ -7635,7 +7635,7 @@ type PodLogOptions struct {
 	// Note that when "TailLines" is specified, "Stream" can only be set to nil or "All".
 	// +featureGate=PodLogsQuerySplitStreams
 	// +optional
-	Stream *string `json:"stream,omitempty" protobuf:"varint,10,opt,name=stream"`
+	Stream *string `json:"stream,omitempty" protobuf:"bytes,10,opt,name=stream"`
 }
 
 // +k8s:conversion-gen:explicit-from=net/url.Values
@@ -8751,7 +8751,7 @@ type WindowsSecurityContextOptions struct {
 	// (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers).
 	// In addition, if HostProcess is true then HostNetwork must also be set to true.
 	// +optional
-	HostProcess *bool `json:"hostProcess,omitempty" protobuf:"bytes,4,opt,name=hostProcess"`
+	HostProcess *bool `json:"hostProcess,omitempty" protobuf:"varint,4,opt,name=hostProcess"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
