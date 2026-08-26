@@ -1266,20 +1266,26 @@ func TestResizeEphemeralVolume(t *testing.T) {
 			expectedMountOpts:    nil,
 		},
 		{
-			name:                 "resize memory volume with nil newSize (error path)",
+			name:                 "resize memory volume with nil newSize (remount to default)",
 			medium:               v1.StorageMediumMemory,
 			isMountPoint:         true,
 			currentMountSizeOpts: []string{"size=104857600"},
 			newSize:              nil,
-			expectError:          true,
+			expectError:          false,
+			expectedMountAction:  "mount",
+			// Defaults to node allocatable memory (16Gi in fakeVolumeHost) when sizeLimit is nil
+			expectedMountOpts: []string{"remount", "size=17179869184"},
 		},
 		{
-			name:                 "resize memory volume with zero newSize (error path)",
+			name:                 "resize memory volume with zero newSize (remount to default)",
 			medium:               v1.StorageMediumMemory,
 			isMountPoint:         true,
 			currentMountSizeOpts: []string{"size=104857600"},
 			newSize:              &quantity0,
-			expectError:          true,
+			expectError:          false,
+			expectedMountAction:  "mount",
+			// Defaults to node allocatable memory (16Gi in fakeVolumeHost) when sizeLimit is zero
+			expectedMountOpts: []string{"remount", "size=17179869184"},
 		},
 	}
 
@@ -1319,7 +1325,7 @@ func TestResizeEphemeralVolume(t *testing.T) {
 			resizablePlugin, ok := plug.(volume.ResizableEphemeralVolumePlugin)
 			require.True(t, ok, "plugin does not implement ResizableEphemeralVolumePlugin")
 
-			err = resizablePlugin.ResizeEphemeralVolume(volumeSpec, pod, tt.newSize)
+			err = resizablePlugin.ResizeEphemeralVolume(volumeSpec, pod)
 			if tt.expectError {
 				require.Error(t, err)
 				return
