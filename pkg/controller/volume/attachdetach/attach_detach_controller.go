@@ -738,7 +738,7 @@ func (adc *attachDetachController) processVolumeAttachments(logger klog.Logger) 
 		}
 
 		if plugin == nil {
-			plugin, err = adc.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+			plugin, err = volumeutil.FindDetachablePluginBySpec(volumeSpec, &adc.volumePluginMgr)
 			if err != nil || plugin == nil {
 				// Currently VA objects are created for CSI volumes only. nil plugin is unexpected, generate a warning
 				logger.Info("Skipping processing the volume on node, no attacher interface found", "node", klog.KRef("", string(nodeName)), "PV", klog.KRef("", *pvName), "err", err)
