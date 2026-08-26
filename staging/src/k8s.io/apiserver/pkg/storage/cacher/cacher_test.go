@@ -44,6 +44,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
+	"k8s.io/apiserver/pkg/storage/testing/correctness"
 	"k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -800,4 +801,10 @@ func BenchmarkStoreStats(b *testing.B) {
 		}
 	}
 	storagetesting.RunBenchmarkStoreStats(ctx, b, cacher)
+}
+
+func TestCorrectness(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	t.Cleanup(terminate)
+	correctness.RunTestCorrectness(ctx, t, cacher, etcd3testing.PathPrefix())
 }
