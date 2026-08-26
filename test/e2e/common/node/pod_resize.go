@@ -67,6 +67,7 @@ var (
 	emptyDirSizeLimitZero      = ptr.To(resource.MustParse("0"))
 	originalEmptyDirSizeLimit  = ptr.To(resource.MustParse("64Mi"))
 	increasedEmptyDirSizeLimit = ptr.To(resource.MustParse("128Mi"))
+	exceededEmptyDirSizeLimit  = ptr.To(resource.MustParse("256Mi"))
 )
 
 func offsetCPU(index int, value string) string {
@@ -1015,6 +1016,9 @@ func doPodResizeMemoryVolumeTests(f *framework.Framework) {
 		ginkgo.Entry("volume resize add sizeLimit then remove (zero value)",
 			originalCPU, originalCPU, "200Mi", "200Mi", emptyDirSizeLimitZero, increasedEmptyDirSizeLimit,
 		),
+		ginkgo.Entry("volume resize sizeLimit exceeding pod memory limit is capped to pod limit",
+			originalCPU, originalCPU, "200Mi", "200Mi", originalEmptyDirSizeLimit, exceededEmptyDirSizeLimit,
+		),
 	)
 }
 
@@ -1413,10 +1417,10 @@ func verifyInitContainerResources(ctx context.Context, f *framework.Framework, p
 
 // calculateExpectedVolumeSizeLimit calculates the expected size of an emptyDir volume in MB.
 func calculateExpectedVolumeSizeLimit(sizeLimit *resource.Quantity, containerMemStr string) int64 {
-	// If no limit is specified, volume size defaults to the pod-level memory limit.
-	if sizeLimit != nil && !sizeLimit.IsZero() {
+	memQty := resource.MustParse(containerMemStr)
+	// If no limit is specified or the limit exceeds the pod memory limit, volume size defaults to the pod-level memory limit.
+	if sizeLimit != nil && !sizeLimit.IsZero() && sizeLimit.Cmp(memQty) < 0 {
 		return sizeLimit.Value() / (1024 * 1024)
 	}
-	memQty := resource.MustParse(containerMemStr)
 	return memQty.Value() / (1024 * 1024)
 }

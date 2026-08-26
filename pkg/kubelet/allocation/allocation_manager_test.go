@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -4032,6 +4033,132 @@ func TestIsMemoryBackedVolumeResizeRequested(t *testing.T) {
 
 			result := IsMemoryBackedVolumeResizeRequested(desiredPod, allocatedPod)
 			assert.Equal(t, tt.expectedResult, result)
+		})
+	}
+}
+
+func TestWarnIfVolumeSizeExceedsPodMemoryLimit(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, true)
+
+	tests := []struct {
+		name          string
+		pod           *v1.Pod
+		expectedEvent string
+	}{
+		{
+			name: "sizeLimit exceeds pod memory limit",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "default"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: ptr.To(resource.MustParse("200Mi")),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedEvent: fmt.Sprintf("Warning %s Volume \"mem-vol\" size limit (200Mi) exceeds total pod memory limit (100Mi)", events.VolumeSizeExceedsPodMemoryLimit),
+		},
+		{
+			name: "sizeLimit within pod memory limit",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "default"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceMemory: resource.MustParse("200Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: ptr.To(resource.MustParse("100Mi")),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedEvent: "",
+		},
+		{
+			name: "non-memory volume sizeLimit ignored",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "default"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "disk-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumDefault,
+									SizeLimit: ptr.To(resource.MustParse("200Mi")),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedEvent: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fakeRecorder := record.NewFakeRecorder(10)
+			m := &manager{
+				recorder: fakeRecorder,
+			}
+			m.warnIfVolumeSizeExceedsPodMemoryLimit(klog.Background(), tt.pod)
+
+			if len(tt.expectedEvent) > 0 {
+				select {
+				case event := <-fakeRecorder.Events:
+					assert.Equal(t, tt.expectedEvent, event)
+				default:
+					t.Fatalf("expected event %s, but none was emitted", tt.expectedEvent)
+				}
+			} else {
+				select {
+				case event := <-fakeRecorder.Events:
+					t.Fatalf("unexpected event emitted: %s", event)
+				default:
+				}
+			}
 		})
 	}
 }
