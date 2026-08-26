@@ -2,6 +2,17 @@
 // Used via Jest's `setupFilesAfterEnv` in both aws-cdk-lib and alpha module test suites.
 
 import * as cdk from '../core';
+import { getTemporarySchemasDirectory, hasTemporarySchemas } from './temporary-schema-validation';
+
+// Configure the validation plugin singleton ONCE at module load.
+// When temporary schemas are present (aws-cdk-private), the singleton is pre-configured
+// with schema overlays so it recognizes pre-GA properties. This avoids per-App plugin
+// registration which conflicts with tests that register their own plugin.
+if (hasTemporarySchemas()) {
+  cdk.CloudFormationValidatePlugin._configureSingleton({
+    _additionalSchemasDirectory: getTemporarySchemasDirectory(),
+  });
+}
 
 const APP_INIT_HOOK_SYMBOL = Symbol.for('@aws-cdk/core.App#initHook');
 (globalThis as any)[APP_INIT_HOOK_SYMBOL] = (app: cdk.App) => {
