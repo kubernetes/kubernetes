@@ -387,7 +387,7 @@ type MetricTarget struct {
 	// the requested value of the resource for the pods.
 	// Currently only valid for Resource metric source type
 	// +optional
-	AverageUtilization *int32 `json:"averageUtilization,omitempty" protobuf:"bytes,4,opt,name=averageUtilization"`
+	AverageUtilization *int32 `json:"averageUtilization,omitempty" protobuf:"varint,4,opt,name=averageUtilization"`
 }
 
 // MetricTargetType specifies the type of metric being targeted, and should be either
@@ -608,7 +608,7 @@ type MetricValueStatus struct {
 	// resource metric across all relevant pods, represented as a percentage of
 	// the requested value of the resource for the pods.
 	// +optional
-	AverageUtilization *int32 `json:"averageUtilization,omitempty" protobuf:"bytes,3,opt,name=averageUtilization"`
+	AverageUtilization *int32 `json:"averageUtilization,omitempty" protobuf:"varint,3,opt,name=averageUtilization"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
