@@ -26,6 +26,10 @@ enum DockerStubCommand {
   SINGLE_FILE_WITHOUT_EXT = 'DOCKER_STUB_SINGLE_FILE_WITHOUT_EXT',
   VOLUME_SINGLE_ARCHIVE = 'DOCKER_STUB_VOLUME_SINGLE_ARCHIVE',
   SYMLINK = 'DOCKER_STUB_SYMLINK',
+  DIR_WITH_LOCAL_SYMLINK = 'DOCKER_STUB_DIR_WITH_LOCAL_SYMLINK',
+  DIR_WITH_EXTERNAL_SYMLINK = 'DOCKER_STUB_DIR_WITH_EXTERNAL_SYMLINK',
+  DIR_WITH_NESTED_EXTERNAL_SYMLINK = 'DOCKER_STUB_DIR_WITH_NESTED_EXTERNAL_SYMLINK',
+  DIR_WITH_EXTERNAL_DIR_SYMLINK = 'DOCKER_STUB_DIR_WITH_EXTERNAL_DIR_SYMLINK',
 }
 
 const FIXTURE_TEST1_DIR = path.join(__dirname, 'fs', 'fixtures', 'test1');
@@ -1815,6 +1819,160 @@ describe('staging', () => {
       const staged = staging.absoluteStagedPath;
       expect(fs.lstatSync(staged).isSymbolicLink()).toBe(false);
       expect(fs.readFileSync(staged, 'utf8')).toEqual('file1\n');
+    });
+  });
+
+  describe('bundling output that is a directory containing symbolic links', () => {
+    const SYMLINK_THROW = /is an external symbolic link which is forbidden due to follow mode .*/;
+
+    // The source directory has no symlinks of its own, so only the symlinks that bundling
+    // writes into the output directory can trigger the BLOCK_EXTERNAL check.
+    const directory = path.join(__dirname, 'fs', 'fixtures', 'test1', 'subdir');
+
+    test('fails under mode BLOCK_EXTERNAL if the bundling output contains an external symlink', () => {
+      // GIVEN
+      const app = new App({ context: { [cxapi.NEW_STYLE_STACK_SYNTHESIS_CONTEXT]: false } });
+      const stack = new Stack(app, 'stack');
+
+      // WHEN - bundling writes an external symlink next to a second file, so the output is
+      // a directory (ZIP_DIRECTORY) instead of a single archive
+      expect(() => new AssetStaging(stack, 'Asset', {
+        sourcePath: directory,
+        follow: SymlinkFollowMode.BLOCK_EXTERNAL,
+        bundling: {
+          image: DockerImage.fromRegistry('alpine'),
+          command: [DockerStubCommand.DIR_WITH_EXTERNAL_SYMLINK],
+        },
+      })).toThrow(SYMLINK_THROW);
+    });
+
+    test('fails under mode BLOCK_EXTERNAL if the bundling output contains an external symlink and outputType is NOT_ARCHIVED', () => {
+      // GIVEN
+      const app = new App({ context: { [cxapi.NEW_STYLE_STACK_SYNTHESIS_CONTEXT]: false } });
+      const stack = new Stack(app, 'stack');
+
+      // WHEN - we throw whether NOT_ARCHIVED was asked for or auto-discovered
+      expect(() => new AssetStaging(stack, 'Asset', {
+        sourcePath: directory,
+        follow: SymlinkFollowMode.BLOCK_EXTERNAL,
+        bundling: {
+          image: DockerImage.fromRegistry('alpine'),
+          command: [DockerStubCommand.DIR_WITH_EXTERNAL_SYMLINK],
+          outputType: BundlingOutput.NOT_ARCHIVED,
+        },
+      })).toThrow(SYMLINK_THROW);
+    });
+
+    test('fails under mode BLOCK_EXTERNAL if the bundling output contains an external symlink and AssetHashType is Output', () => {
+      // GIVEN
+      const app = new App({ context: { [cxapi.NEW_STYLE_STACK_SYNTHESIS_CONTEXT]: false } });
+      const stack = new Stack(app, 'stack');
+
+      // WHEN - we should throw no matter the Asset Hash Type
+      expect(() => new AssetStaging(stack, 'Asset', {
+        sourcePath: directory,
+        assetHashType: AssetHashType.OUTPUT,
+        follow: SymlinkFollowMode.BLOCK_EXTERNAL,
+        bundling: {
+          image: DockerImage.fromRegistry('alpine'),
+          command: [DockerStubCommand.DIR_WITH_EXTERNAL_SYMLINK],
+          outputType: BundlingOutput.NOT_ARCHIVED,
+        },
+      })).toThrow(SYMLINK_THROW);
+    });
+
+    test('fails under mode BLOCK_EXTERNAL if there is an external symlink in a subdirectory of the bundling output', () => {
+      // GIVEN
+      const app = new App({ context: { [cxapi.NEW_STYLE_STACK_SYNTHESIS_CONTEXT]: false } });
+      const stack = new Stack(app, 'stack');
+
+      // WHEN - the whole output tree is walked, not just its top level
+      expect(() => new AssetStaging(stack, 'Asset', {
+        sourcePath: directory,
+        follow: SymlinkFollowMode.BLOCK_EXTERNAL,
+        bundling: {
+          image: DockerImage.fromRegistry('alpine'),
+          command: [DockerStubCommand.DIR_WITH_NESTED_EXTERNAL_SYMLINK],
+          outputType: BundlingOutput.NOT_ARCHIVED,
+        },
+      })).toThrow(SYMLINK_THROW);
+    });
+
+    test('fails under mode BLOCK_EXTERNAL if the bundling output contains a symlink to an external directory', () => {
+      // GIVEN
+      const app = new App({ context: { [cxapi.NEW_STYLE_STACK_SYNTHESIS_CONTEXT]: false } });
+      const stack = new Stack(app, 'stack');
+
+      // WHEN - a symlink to a directory is rejected, not descended into
+      expect(() => new AssetStaging(stack, 'Asset', {
+        sourcePath: directory,
+        follow: SymlinkFollowMode.BLOCK_EXTERNAL,
+        bundling: {
+          image: DockerImage.fromRegistry('alpine'),
+          command: [DockerStubCommand.DIR_WITH_EXTERNAL_DIR_SYMLINK],
+          outputType: BundlingOutput.NOT_ARCHIVED,
+        },
+      })).toThrow(SYMLINK_THROW);
+    });
+
+    // A symlink that resolves inside the bundling output is self-contained: whether the
+    // publisher follows it or preserves it, nothing outside the asset is packaged. Those
+    // must keep working, in every follow mode.
+    test.each([
+      [SymlinkFollowMode.BLOCK_EXTERNAL],
+      [SymlinkFollowMode.ALWAYS],
+    ])('does not fail under mode %s if the symlink in the bundling output resolves inside the output', (follow) => {
+      // GIVEN
+      const app = new App({ context: { [cxapi.NEW_STYLE_STACK_SYNTHESIS_CONTEXT]: false } });
+      const stack = new Stack(app, 'stack');
+
+      // WHEN
+      const staging = new AssetStaging(stack, 'Asset', {
+        sourcePath: directory,
+        follow,
+        bundling: {
+          image: DockerImage.fromRegistry('alpine'),
+          command: [DockerStubCommand.DIR_WITH_LOCAL_SYMLINK],
+          outputType: BundlingOutput.NOT_ARCHIVED,
+        },
+      });
+      app.synth();
+
+      // THEN - the output directory is staged as it was bundled, symlink intact
+      expect(staging.packaging).toEqual(FileAssetPackaging.ZIP_DIRECTORY);
+      expect(staging.isArchive).toEqual(true);
+      expect(fs.readdirSync(staging.absoluteStagedPath).sort()).toEqual(['local-link.txt', 'test.txt']);
+      const link = path.join(staging.absoluteStagedPath, 'local-link.txt');
+      expect(fs.lstatSync(link).isSymbolicLink()).toBe(true);
+      expect(fs.readlinkSync(link)).toEqual('test.txt');
+    });
+
+    // Only BLOCK_EXTERNAL asks for external symlinks to be blocked. The other modes are
+    // documented to follow or preserve them, so the bundling output is not inspected.
+    test.each([
+      [undefined], // EXTERNAL is also the default when `follow` is unset
+      [SymlinkFollowMode.EXTERNAL],
+      [SymlinkFollowMode.ALWAYS],
+      [SymlinkFollowMode.NEVER],
+    ])('does not inspect the bundling output under mode %s', (follow) => {
+      // GIVEN
+      const app = new App({ context: { [cxapi.NEW_STYLE_STACK_SYNTHESIS_CONTEXT]: false } });
+      const stack = new Stack(app, 'stack');
+
+      // WHEN
+      const staging = new AssetStaging(stack, 'Asset', {
+        sourcePath: directory,
+        follow,
+        bundling: {
+          image: DockerImage.fromRegistry('alpine'),
+          command: [DockerStubCommand.DIR_WITH_EXTERNAL_SYMLINK],
+          outputType: BundlingOutput.NOT_ARCHIVED,
+        },
+      });
+
+      // THEN
+      expect(staging.packaging).toEqual(FileAssetPackaging.ZIP_DIRECTORY);
+      expect(fs.lstatSync(path.join(staging.absoluteStagedPath, 'payload.zip')).isSymbolicLink()).toBe(true);
     });
   });
 });

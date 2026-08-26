@@ -44,6 +44,41 @@ if echo "$@" | grep "DOCKER_STUB_SYMLINK"; then
   exit 0
 fi
 
+# The following DOCKER_STUB_DIR_WITH_* commands produce a *directory* output (more than
+# one entry, so it is not auto-discovered as a single archive) that contains a symlink.
+
+if echo "$@" | grep "DOCKER_STUB_DIR_WITH_LOCAL_SYMLINK"; then
+  outdir=$(echo "$@" | xargs -n1 | grep "/asset-output" | head -n1 | cut -d":" -f1)
+  touch ${outdir}/test.txt
+  ln -s test.txt ${outdir}/local-link.txt # resolves inside the output directory
+  exit 0
+fi
+
+if echo "$@" | grep "DOCKER_STUB_DIR_WITH_EXTERNAL_SYMLINK"; then
+  outdir=$(echo "$@" | xargs -n1 | grep "/asset-output" | head -n1 | cut -d":" -f1)
+  echo decoy > ${outdir}/decoy.txt # a second entry, so the symlink is not the single output file
+  target=$(mktemp) # a real file, but outside of the output directory
+  ln -s ${target} ${outdir}/payload.zip
+  exit 0
+fi
+
+if echo "$@" | grep "DOCKER_STUB_DIR_WITH_NESTED_EXTERNAL_SYMLINK"; then
+  outdir=$(echo "$@" | xargs -n1 | grep "/asset-output" | head -n1 | cut -d":" -f1)
+  echo decoy > ${outdir}/decoy.txt
+  mkdir -p ${outdir}/subdir/subsubdir
+  target=$(mktemp) # a real file, but outside of the output directory
+  ln -s ${target} ${outdir}/subdir/subsubdir/payload.zip
+  exit 0
+fi
+
+if echo "$@" | grep "DOCKER_STUB_DIR_WITH_EXTERNAL_DIR_SYMLINK"; then
+  outdir=$(echo "$@" | xargs -n1 | grep "/asset-output" | head -n1 | cut -d":" -f1)
+  echo decoy > ${outdir}/decoy.txt
+  target=$(mktemp -d) # a real directory, but outside of the output directory
+  ln -s ${target} ${outdir}/payload
+  exit 0
+fi
+
 if echo "$@" | grep "DOCKER_STUB_SINGLE_FILE_WITHOUT_EXT"; then
   outdir=$(echo "$@" | xargs -n1 | grep "/asset-output" | head -n1 | cut -d":" -f1)
   touch ${outdir}/test # create a file witout extension

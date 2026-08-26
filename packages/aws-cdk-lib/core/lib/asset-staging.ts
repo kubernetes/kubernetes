@@ -207,7 +207,7 @@ export class AssetStaging extends Construct {
       // Check if we actually have to bundle for this stack
       skip = !stackOf(this).bundlingRequired;
       const bundling = props.bundling;
-      stageThisAsset = () => this.stageByBundling(bundling, skip);
+      stageThisAsset = () => this.stageByBundling(bundling, skip, props.follow);
     } else {
       stageThisAsset = () => this.stageByCopying();
     }
@@ -329,7 +329,7 @@ export class AssetStaging extends Construct {
    *
    * Optionally skip, in which case we pretend we did something but we don't really.
    */
-  private stageByBundling(bundling: BundlingOptions, skip: boolean): StagedAsset {
+  private stageByBundling(bundling: BundlingOptions, skip: boolean, followMode?: SymlinkFollowMode): StagedAsset {
     if (!this.sourceStats.isDirectory()) {
       throw new ValidationError(lit`AssetExpectedDirectoryForBundling`, `Asset ${this.sourcePath} is expected to be a directory when bundling`, this);
     }
@@ -361,7 +361,7 @@ export class AssetStaging extends Construct {
 
     // Check bundling output content and determine if we will need to archive
     const bundlingOutputType = bundling.outputType ?? BundlingOutput.AUTO_DISCOVER;
-    const bundledAsset = determineBundledAsset(this, bundleDir, bundlingOutputType);
+    const bundledAsset = determineBundledAsset(this, bundleDir, bundlingOutputType, followMode);
 
     // Calculate assetHash afterwards if we still must
     assetHash = assetHash ?? this.calculateHash(this.hashType, bundling, bundledAsset.path);
@@ -689,7 +689,7 @@ interface BundledAsset {
  * Returns the bundled asset to use based on the content of the bundle directory
  * and the type of output.
  */
-function determineBundledAsset(scope: Construct, bundleDir: string, outputType: BundlingOutput): BundledAsset {
+function determineBundledAsset(scope: Construct, bundleDir: string, outputType: BundlingOutput, followMode?: SymlinkFollowMode): BundledAsset {
   const archiveFile = findSingleFile(scope, bundleDir, outputType !== BundlingOutput.SINGLE_FILE);
 
   // auto-discover means that if there is an archive file, we take it as the
@@ -700,6 +700,9 @@ function determineBundledAsset(scope: Construct, bundleDir: string, outputType: 
 
   switch (outputType) {
     case BundlingOutput.NOT_ARCHIVED:
+      if (followMode == SymlinkFollowMode.BLOCK_EXTERNAL) {
+        validateInternalSymlinks(bundleDir, scope, followMode);
+      }
       return { path: bundleDir, packaging: FileAssetPackaging.ZIP_DIRECTORY };
     case BundlingOutput.ARCHIVED:
     case BundlingOutput.SINGLE_FILE:
