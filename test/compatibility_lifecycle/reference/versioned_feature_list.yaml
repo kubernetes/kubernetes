@@ -972,6 +972,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.37"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.38"
 - name: InPlacePodVerticalScalingSchedulerPreemption
   versionedSpecs:
   - default: false
