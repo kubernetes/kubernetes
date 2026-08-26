@@ -1,0 +1,14 @@
+{
+  "version": "54.0.0",
+  "testCases": {
+    "BedrockAgentCoreRuntimeObservabilityNoResourcePolicyTest/DefaultTest": {
+      "stacks": [
+        "aws-cdk-bedrock-agentcore-runtime-observability-no-resource-policy"
+      ],
+      "assertionStack": "BedrockAgentCoreRuntimeObservabilityNoResourcePolicyTest/DefaultTest/DeployAssert",
+      "assertionStackName": "BedrockAgentCoreRuntimeObservabilityNoResourcePolicyTestDefaultTestDeployAssert921099D9"
+    }
+  },
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
+}

@@ -1,0 +1,2 @@
+# No external dependencies required for the test runtime
+# The test application uses only Python standard library modules

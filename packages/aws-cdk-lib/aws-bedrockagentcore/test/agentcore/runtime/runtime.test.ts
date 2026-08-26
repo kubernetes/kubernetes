@@ -3477,6 +3477,121 @@ describe('Runtime observability tests', () => {
       ],
     });
   });
+
+  test('Should not create X-Ray resource policy when manageDeliveryResourcePolicy is false', () => {
+    const app = new cdk.App();
+    const stack = new cdk.Stack(app, 'NoXRayPolicyStack', {
+      env: {
+        account: '123456789012',
+        region: 'us-east-1',
+      },
+    });
+
+    const repository = new ecr.Repository(stack, 'TestRepository');
+    const agentRuntimeArtifact = AgentRuntimeArtifact.fromEcrRepository(repository, 'latest');
+
+    const runtime = new Runtime(stack, 'TracingRuntime', {
+      runtimeName: 'tracing_runtime',
+      agentRuntimeArtifact,
+      tracingEnabled: true,
+      manageDeliveryResourcePolicy: false,
+    });
+
+    const template = Template.fromStack(stack);
+    const resolvedRuntimeArn = stack.resolve(runtime.agentRuntimeArn);
+
+    // Delivery source, destination, and delivery should still be created
+    template.hasResourceProperties('AWS::Logs::DeliverySource', {
+      LogType: 'TRACES',
+      ResourceArn: resolvedRuntimeArn,
+    });
+
+    template.hasResourceProperties('AWS::Logs::DeliveryDestination', {
+      DeliveryDestinationType: 'XRAY',
+    });
+
+    // X-Ray resource policy should NOT be created
+    template.resourceCountIs('AWS::XRay::ResourcePolicy', 0);
+  });
+
+  test('Should not create CloudWatch Logs resource policy when manageDeliveryResourcePolicy is false', () => {
+    const app = new cdk.App();
+    const stack = new cdk.Stack(app, 'NoCwlPolicyStack', {
+      env: {
+        account: '123456789012',
+        region: 'us-east-1',
+      },
+    });
+
+    const repository = new ecr.Repository(stack, 'TestRepository');
+    const agentRuntimeArtifact = AgentRuntimeArtifact.fromEcrRepository(repository, 'latest');
+
+    const logGroup = new logs.LogGroup(stack, 'AppLogGroup');
+
+    const runtime = new Runtime(stack, 'LoggingRuntime', {
+      runtimeName: 'logging_runtime',
+      agentRuntimeArtifact,
+      loggingConfigs: [
+        {
+          logType: LogType.APPLICATION_LOGS,
+          destination: LoggingDestination.cloudWatchLogs(logGroup),
+        },
+      ],
+      manageDeliveryResourcePolicy: false,
+    });
+
+    const template = Template.fromStack(stack);
+    const resolvedRuntimeArn = stack.resolve(runtime.agentRuntimeArn);
+    const resolvedLogGroupArn = stack.resolve(logGroup.logGroupArn);
+
+    // Delivery source, destination, and delivery should still be created
+    template.hasResourceProperties('AWS::Logs::DeliverySource', {
+      LogType: 'APPLICATION_LOGS',
+      ResourceArn: resolvedRuntimeArn,
+    });
+
+    template.hasResourceProperties('AWS::Logs::DeliveryDestination', {
+      DeliveryDestinationType: 'CWL',
+      DestinationResourceArn: resolvedLogGroupArn,
+    });
+
+    // CloudWatch Logs resource policy should NOT be created
+    template.resourceCountIs('AWS::Logs::ResourcePolicy', 0);
+  });
+
+  test('Should not create any delivery resource policies when manageDeliveryResourcePolicy is false with both tracing and logging', () => {
+    const app = new cdk.App();
+    const stack = new cdk.Stack(app, 'NoPoliciesStack', {
+      env: {
+        account: '123456789012',
+        region: 'us-east-1',
+      },
+    });
+
+    const repository = new ecr.Repository(stack, 'TestRepository');
+    const agentRuntimeArtifact = AgentRuntimeArtifact.fromEcrRepository(repository, 'latest');
+
+    const logGroup = new logs.LogGroup(stack, 'AppLogGroup');
+
+    new Runtime(stack, 'FullObservabilityRuntime', {
+      runtimeName: 'full_observability_runtime',
+      agentRuntimeArtifact,
+      tracingEnabled: true,
+      loggingConfigs: [
+        {
+          logType: LogType.APPLICATION_LOGS,
+          destination: LoggingDestination.cloudWatchLogs(logGroup),
+        },
+      ],
+      manageDeliveryResourcePolicy: false,
+    });
+
+    const template = Template.fromStack(stack);
+
+    // Neither X-Ray nor CloudWatch Logs resource policies should be created
+    template.resourceCountIs('AWS::XRay::ResourcePolicy', 0);
+    template.resourceCountIs('AWS::Logs::ResourcePolicy', 0);
+  });
 });
 
 describe('Runtime applicationLogGroup tests', () => {
