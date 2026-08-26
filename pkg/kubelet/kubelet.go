@@ -3103,23 +3103,47 @@ func recordContainerResizeOperations(oldPod, newPod *v1.Pod) bool {
 
 // recordVolumeResizeOperations records if any of the pod's memory-backed emptyDir volumes needs to be resized, and returns true if so
 func recordVolumeResizeOperations(oldPod, newPod *v1.Pod) bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) || oldPod == nil || newPod == nil {
 		return false
 	}
-	return allocation.IsMemoryBackedVolumeResizeRequested(oldPod, newPod)
+	if len(oldPod.Spec.Volumes) != len(newPod.Spec.Volumes) {
+		// Validation prevents volumes from being added, removed, renamed, or reordered,
+		// so this should never happen.
+		return false
+	}
+	hasResize := false
+	for i, oldVol := range oldPod.Spec.Volumes {
+		if !allocation.VolHasMemoryBackedEmptyDir(&oldVol) {
+			continue
+		}
+		newVol := newPod.Spec.Volumes[i]
+		if op := resizeOperationForResources(newVol.EmptyDir.SizeLimit, oldVol.EmptyDir.SizeLimit); op != "" {
+			hasResize = true
+			metrics.VolumeRequestedResizes.WithLabelValues(string(newVol.EmptyDir.Medium), op).Inc()
+		}
+	}
+	return hasResize
 }
 
 func resizeOperationForResources(new, old *resource.Quantity) string {
-	if new.IsZero() && !old.IsZero() {
+	newZero := new == nil || new.IsZero()
+	oldZero := old == nil || old.IsZero()
+
+	if newZero && oldZero {
+		return ""
+	}
+	if newZero && !oldZero {
 		return "remove"
 	}
-	if old.IsZero() && !new.IsZero() {
+	if oldZero && !newZero {
 		return "add"
 	}
-	if new.Cmp(*old) < 0 {
+
+	cmp := new.Cmp(*old)
+	if cmp < 0 {
 		return "decrease"
 	}
-	if new.Cmp(*old) > 0 {
+	if cmp > 0 {
 		return "increase"
 	}
 	return ""

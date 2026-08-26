@@ -4925,6 +4925,19 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: volume_requested_resizes_total
+  subsystem: kubelet
+  help: Number of requested resizes, counted at the volume level. The 'medium' label
+    refers to the volume storage medium (e.g. 'Memory'); the 'operation' label can
+    be one of 'add', 'remove', 'increase' or 'decrease'.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - medium
+  - operation
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: kubelet_volume_stats_available_bytes
   help: Number of available bytes in the volume
   type: Custom
