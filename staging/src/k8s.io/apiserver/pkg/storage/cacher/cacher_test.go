@@ -203,7 +203,8 @@ func TestDeleteWithConflictAndMissingExpectedTransformOrDecodeError(t *testing.T
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
 
 	transformer := &testTransformer{Transformer: identity.NewEncryptCheckTransformer()}
-	ctx, s, _ := testSetup(t, withTransformer(transformer))
+	ctx, s, terminate := testSetup(t, withTransformer(transformer))
+	t.Cleanup(terminate)
 
 	storagetesting.RunTestDeleteWithConflictAndMissingExpectedTransformOrDecodeError(ctx, t, s, transformer.setFailing)
 }
