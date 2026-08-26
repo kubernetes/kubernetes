@@ -139,7 +139,7 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericiooptions.IO
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Get documentation for a resource"),
 		Long:                  explainLong + "\n\n" + cmdutil.SuggestAPIResources(parent),
-		ValidArgsFunction:     resourceFieldCompletionFunc(f),
+		ValidArgsFunction:     resourceFieldCompletionFunc(f, func() string { return flags.APIVersion }),
 		Example:               explainExamples,
 		Run: func(cmd *cobra.Command, args []string) {
 			o, err := flags.ToOptions(f, parent, args)

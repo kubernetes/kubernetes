@@ -57,13 +57,10 @@ func newCompletionTestFactory(t *testing.T) *cmdtesting.TestFactory {
 	return tf
 }
 
-// newCompletionCommand returns a command carrying only the flags that
-// resourceFieldCompletionFunc reads, so the tests exercise the completion
-// function itself rather than the full explain command wiring.
+// newCompletionCommand returns the command the completion function is invoked
+// with. It reads no flags off it, so a bare command is enough.
 func newCompletionCommand() *cobra.Command {
-	cmd := &cobra.Command{}
-	cmd.Flags().String("api-version", "", "")
-	return cmd
+	return &cobra.Command{}
 }
 
 var _ discovery.CachedDiscoveryInterface = &openAPIV2DiscoveryClient{}
@@ -71,7 +68,7 @@ var _ discovery.CachedDiscoveryInterface = &openAPIV2DiscoveryClient{}
 func TestResourceFieldCompletion(t *testing.T) {
 	tf := newCompletionTestFactory(t)
 	cmd := newCompletionCommand()
-	completeFn := resourceFieldCompletionFunc(tf)
+	completeFn := resourceFieldCompletionFunc(tf, func() string { return "" })
 
 	noSpace := cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveNoSpace
 
@@ -176,13 +173,10 @@ func TestResourceFieldCompletion(t *testing.T) {
 func TestResourceFieldCompletionWithAPIVersion(t *testing.T) {
 	tf := newCompletionTestFactory(t)
 	cmd := newCompletionCommand()
-	completeFn := resourceFieldCompletionFunc(tf)
+	completeFn := resourceFieldCompletionFunc(tf, func() string { return "batch/v1beta1" })
 
 	// With --api-version set, explain does not accept group-qualified resource
 	// names, so they must not be offered.
-	if err := cmd.Flags().Set("api-version", "batch/v1beta1"); err != nil {
-		t.Fatal(err)
-	}
 	comps, directive := completeFn(cmd, []string{}, "cronjobs.b")
 	if len(comps) != 0 || directive != cobra.ShellCompDirectiveNoFileComp {
 		t.Errorf("expected no completions with --api-version set, got %v (%v)", comps, directive)

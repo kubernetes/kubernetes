@@ -33,7 +33,9 @@ import (
 // resourceFieldCompletionFunc returns a completion function for kubectl explain that completes:
 // - resource types when no dot is present (e.g., "pods", "deploy")
 // - field paths when a dot is present (e.g., "pods.spec", "pods.spec.containers")
-func resourceFieldCompletionFunc(restClientGetter genericclioptions.RESTClientGetter) completion.CompletionFunc {
+// apiVersion reports the group/version the user pinned, if any; it is read at
+// completion time, after the flags have been parsed.
+func resourceFieldCompletionFunc(restClientGetter genericclioptions.RESTClientGetter, apiVersion func() string) completion.CompletionFunc {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) > 0 || strings.Contains(toComplete, "..") {
 			return nil, cobra.ShellCompDirectiveNoFileComp
@@ -65,14 +67,27 @@ func resourceFieldCompletionFunc(restClientGetter genericclioptions.RESTClientGe
 
 		var gvr schema.GroupVersionResource
 		var fieldsPath []string
-		apiVersion, _ := cmd.Flags().GetString("api-version")
-		if apiVersion == "" {
+		requestedAPIVersion := apiVersion()
+		if requestedAPIVersion == "" {
 			gvr, fieldsPath, err = explain.SplitAndParseResourceRequestWithMatchingPrefix(path, mapper)
 		} else {
 			gvr, fieldsPath, err = explain.SplitAndParseResourceRequest(path, mapper)
 		}
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		// The parsers resolve the version through the RESTMapper, which does not
+		// know about --api-version. Explain's Run applies the flag on top of the
+		// parsed result, so completion has to do the same to describe the same
+		// fields the command would print.
+		if requestedAPIVersion != "" {
+			gv, err := schema.ParseGroupVersion(requestedAPIVersion)
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			gvr.Group = gv.Group
+			gvr.Version = gv.Version
 		}
 
 		var comps []string
@@ -90,7 +105,7 @@ func resourceFieldCompletionFunc(restClientGetter genericclioptions.RESTClientGe
 			}
 		}
 
-		if apiVersion == "" {
+		if requestedAPIVersion == "" {
 			// The user may also still be typing a group-qualified resource name
 			// (e.g. "deployments.ap" → "deployments.apps."). Offer the names that
 			// extend toComplete and that the parser resolves back to themselves,
