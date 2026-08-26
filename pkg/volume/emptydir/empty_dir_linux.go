@@ -28,7 +28,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -111,16 +111,19 @@ func (m *realMountDetector) GetMountMedium(path string, requestedMedium v1.Stora
 }
 
 // ResizeEphemeralVolume resizes the volume on the node.
-func (plugin *emptyDirPlugin) ResizeEphemeralVolume(spec *volume.Spec, pod *v1.Pod, newSize *resource.Quantity) error {
+func (plugin *emptyDirPlugin) ResizeEphemeralVolume(spec *volume.Spec, pod *v1.Pod) error {
 	if spec.Volume == nil || spec.Volume.EmptyDir == nil {
 		return fmt.Errorf("spec does not reference an emptyDir volume type")
 	}
 	if spec.Volume.EmptyDir.Medium != v1.StorageMediumMemory {
 		return fmt.Errorf("only memory-backed emptyDir volumes support direct resize")
 	}
-	if newSize == nil || newSize.Value() == 0 {
-		return fmt.Errorf("addition or removal of size limit is not supported")
+
+	nodeAllocatable, err := plugin.host.GetNodeAllocatable()
+	if err != nil {
+		return err
 	}
+	desiredSize := calculateEmptyDirMemorySize(nodeAllocatable.Memory(), spec, pod)
 
 	dir := getPath(pod.UID, spec.Name(), plugin.host)
 	mounter := plugin.host.GetMounter()
@@ -140,8 +143,8 @@ func (plugin *emptyDirPlugin) ResizeEphemeralVolume(spec *volume.Spec, pod *v1.P
 		return fmt.Errorf("volume %s is not yet mounted; deferring resize", spec.Name())
 	}
 
-	options := []string{"remount", fmt.Sprintf("size=%d", newSize.Value())}
+	options := []string{"remount", fmt.Sprintf("size=%d", desiredSize.Value())}
 
-	klog.V(2).InfoS("Resizing emptyDir volume", "pod", klog.KObj(pod), "volume", spec.Name(), "newSize", newSize)
+	klog.V(2).InfoS("Resizing emptyDir volume", "pod", klog.KObj(pod), "volume", spec.Name(), "desiredSize", desiredSize)
 	return mounter.MountSensitiveWithoutSystemd("tmpfs", dir, "tmpfs", options, nil)
 }
