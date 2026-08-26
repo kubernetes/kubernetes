@@ -97,7 +97,10 @@ type Manager interface {
 	UpdatePodStatus(context.Context, *v1.Pod, *v1.PodStatus)
 }
 
-var _ Manager = &manager{}
+var (
+	_ Manager = &manager{}
+	_ Manager = &containerBoundManager{}
+)
 
 type manager struct {
 	kubecontainer.NoopContainerProbeLifecycle
