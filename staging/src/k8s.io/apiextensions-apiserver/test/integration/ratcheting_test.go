@@ -1953,6 +1953,7 @@ func BenchmarkRatcheting(b *testing.B) {
 			name = "RatchetingDisabled"
 		}
 		b.Run(name, func(b *testing.B) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(b, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
 			featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.CRDValidationRatcheting, ratchetingEnabled)
 			b.ResetTimer()
 
