@@ -1533,8 +1533,6 @@ export class TableV2MultiAccountReplica extends TableBaseV2 {
     this.grants = new TableGrants({
       table: this,
       regions: [],
-      encryptedResource: this.encryptionKey ? this : undefined,
-      policyResource: this,
     });
 
     this.grants.multiAccountReplicationFrom(props.replicaSourceTable.tableArn);
