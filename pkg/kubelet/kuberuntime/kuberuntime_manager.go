@@ -1055,8 +1055,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	updateVolumeSize := func(volumes []v1.Volume) error {
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
 			for _, vol := range volumes {
-				desiredSize := vol.EmptyDir.SizeLimit
-				if err := m.runtimeHelper.ResizeEphemeralVolume(pod, vol.Name, desiredSize); err != nil {
+				if err := m.runtimeHelper.ResizeEphemeralVolume(pod, vol.Name); err != nil {
 					return fmt.Errorf("failed to resize volume %s: %w", vol.Name, err)
 				}
 				if err := m.actuatedState.SetEmptyDirVolumeLimit(logger, pod.UID, vol.Name, vol.EmptyDir); err != nil {
