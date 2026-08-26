@@ -38,6 +38,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/utils/ptr"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo/v2"
@@ -60,6 +61,12 @@ const (
 	reducedMemLimit   = "40Mi"
 	increasedMem      = "40Mi"
 	increasedMemLimit = "50Mi"
+)
+
+var (
+	emptyDirSizeLimitZero      = ptr.To(resource.MustParse("0"))
+	originalEmptyDirSizeLimit  = ptr.To(resource.MustParse("64Mi"))
+	increasedEmptyDirSizeLimit = ptr.To(resource.MustParse("128Mi"))
 )
 
 func offsetCPU(index int, value string) string {
@@ -858,12 +865,12 @@ func doPodResizeReadAndReplaceTests(f *framework.Framework) {
 func doPodResizeMemoryVolumeTests(f *framework.Framework) {
 	// Tests the behavior when resizing memory-backed emptyDir volume limits:
 	// 1. Create a pod with memory-backed emptyDir volume of size origSizeLimit.
-	// 2. Resize the volume size limit up to desiredSizeLimit - should succeed without pod restart.
-	// 3. Rollback the volume size limit down to origSizeLimit - should succeed without pod restart.
+	// 2. Resize the volume size limit to desiredSizeLimit - should succeed without pod restart.
+	// 3. Rollback the volume size limit back to origSizeLimit - should succeed without pod restart.
 	// TODO: When InPlacePodVerticalScalingMemoryBackedVolumes is GA, move these tests to the InPlacePodVerticalScaling table as an
 	// as an additional parameter to test it with memory-backed emptyDir volumes.
 	ginkgo.DescribeTable("memory-backed emptyDir volume resize",
-		func(ctx context.Context, origCPU, desiredCPU, origMem, desiredMem, origSizeLimit, desiredSizeLimit string) {
+		func(ctx context.Context, origCPU, desiredCPU, origMem, desiredMem string, origSizeLimit, desiredSizeLimit *resource.Quantity) {
 			podClient := e2epod.NewPodClient(f)
 
 			originalContainers := []podresize.ResizableContainerInfo{{
@@ -886,14 +893,13 @@ func doPodResizeMemoryVolumeTests(f *framework.Framework) {
 			testPod := podresize.MakePodWithResizableContainers(f.Namespace.Name, "", tStamp, originalContainers, nil)
 			testPod.GenerateName = "resize-memory-vol-test-"
 
-			origQty := resource.MustParse(origSizeLimit)
 			testPod.Spec.Volumes = []v1.Volume{
 				{
 					Name: "mem-vol",
 					VolumeSource: v1.VolumeSource{
 						EmptyDir: &v1.EmptyDirVolumeSource{
 							Medium:    v1.StorageMediumMemory,
-							SizeLimit: &origQty,
+							SizeLimit: origSizeLimit,
 						},
 					},
 				},
@@ -912,7 +918,7 @@ func doPodResizeMemoryVolumeTests(f *framework.Framework) {
 			ginkgo.By("verifying initial volume mount size via df inside the container")
 			stdout, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, newPod.Name, "c1", "df", "-m", "/cache")
 			framework.ExpectNoError(err, "failed to run df inside container")
-			origMB := origQty.Value() / (1024 * 1024)
+			origMB := calculateExpectedVolumeSizeLimit(origSizeLimit, origMem)
 			gomega.Expect(stdout).To(gomega.ContainSubstring(strconv.FormatInt(origMB, 10)))
 
 			ginkgo.By("patching pod spec's emptyDir sizeLimit and container resources")
@@ -950,12 +956,10 @@ func doPodResizeMemoryVolumeTests(f *framework.Framework) {
 			resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, patchedPod, expected)
 			podresize.ExpectPodResized(ctx, f, resizedPod, expected)
 
-			desiredQty := resource.MustParse(desiredSizeLimit)
-
 			ginkgo.By("verifying new volume mount size via df inside the container")
 			stdout, _, err = e2epod.ExecCommandInContainerWithFullOutput(f, resizedPod.Name, "c1", "df", "-m", "/cache")
 			framework.ExpectNoError(err, "failed to run df inside container after resize")
-			desiredMB := desiredQty.Value() / (1024 * 1024)
+			desiredMB := calculateExpectedVolumeSizeLimit(desiredSizeLimit, desiredMem)
 			gomega.Expect(stdout).To(gomega.ContainSubstring(strconv.FormatInt(desiredMB, 10)))
 
 			ginkgo.By("rolling back to original state")
@@ -1000,10 +1004,16 @@ func doPodResizeMemoryVolumeTests(f *framework.Framework) {
 			podClient.DeleteSync(ctx, newPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 		},
 		ginkgo.Entry("volume resize (upsize then downsize)",
-			originalCPU, originalCPU, "200Mi", "200Mi", "64Mi", "128Mi",
+			originalCPU, originalCPU, "200Mi", "200Mi", originalEmptyDirSizeLimit, increasedEmptyDirSizeLimit,
 		),
 		ginkgo.Entry("volume resize + container resize (upsize then downsize)",
-			originalCPU, increasedCPU, "200Mi", "250Mi", "64Mi", "128Mi",
+			originalCPU, increasedCPU, "200Mi", "250Mi", originalEmptyDirSizeLimit, increasedEmptyDirSizeLimit,
+		),
+		ginkgo.Entry("volume resize add sizeLimit then remove (nil)",
+			originalCPU, originalCPU, "200Mi", "200Mi", nil, increasedEmptyDirSizeLimit,
+		),
+		ginkgo.Entry("volume resize add sizeLimit then remove (zero value)",
+			originalCPU, originalCPU, "200Mi", "200Mi", emptyDirSizeLimitZero, increasedEmptyDirSizeLimit,
 		),
 	)
 }
@@ -1399,4 +1409,14 @@ func verifyInitContainerResources(ctx context.Context, f *framework.Framework, p
 			return nil, nil
 		})),
 	)
+}
+
+// calculateExpectedVolumeSizeLimit calculates the expected size of an emptyDir volume in MB.
+func calculateExpectedVolumeSizeLimit(sizeLimit *resource.Quantity, containerMemStr string) int64 {
+	// If no limit is specified, volume size defaults to the pod-level memory limit.
+	if sizeLimit != nil && !sizeLimit.IsZero() {
+		return sizeLimit.Value() / (1024 * 1024)
+	}
+	memQty := resource.MustParse(containerMemStr)
+	return memQty.Value() / (1024 * 1024)
 }
