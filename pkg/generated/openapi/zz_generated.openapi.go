@@ -42760,6 +42760,7 @@ func schema_k8sio_api_networking_v1_IngressClass(ref common.ReferenceCallback) c
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -42889,6 +42890,7 @@ func schema_k8sio_api_networking_v1_IngressClassSpec(ref common.ReferenceCallbac
 						},
 					},
 				},
+				Required: []string{"controller"},
 			},
 		},
 		Dependencies: []string{
@@ -43058,7 +43060,6 @@ func schema_k8sio_api_networking_v1_IngressPortStatus(ref common.ReferenceCallba
 						},
 					},
 				},
-				Required: []string{"port", "protocol"},
 			},
 		},
 	}
@@ -43136,7 +43137,7 @@ func schema_k8sio_api_networking_v1_IngressServiceBackend(ref common.ReferenceCa
 						},
 					},
 				},
-				Required: []string{"name"},
+				Required: []string{"name", "port"},
 			},
 		},
 		Dependencies: []string{
@@ -43884,7 +43885,6 @@ func schema_k8sio_api_networking_v1beta1_HTTPIngressPath(ref common.ReferenceCal
 						},
 					},
 				},
-				Required: []string{"backend"},
 			},
 		},
 		Dependencies: []string{
@@ -44460,7 +44460,6 @@ func schema_k8sio_api_networking_v1beta1_IngressPortStatus(ref common.ReferenceC
 						},
 					},
 				},
-				Required: []string{"port", "protocol"},
 			},
 		},
 	}
