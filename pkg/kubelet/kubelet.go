@@ -3675,14 +3675,18 @@ type allocatedPodManager struct {
 }
 
 func (a *allocatedPodManager) getAllocatedPod(pod *v1.Pod) (*v1.Pod, bool) {
-	// TODO: Should this be a public method on the allocation manager?
+	// TODO: Add a method on the allocation manager for volumeManager to read the allocated pod
+	// without requiring a deep copy or DeepEqual check, especially in preparation for dynamic volumes.
 	if pod == nil {
 		return nil, false
 	}
-	if allocatedPod, ok := a.allocationManager.UpdatePodFromAllocation(pod); ok {
-		return allocatedPod, true
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) && allocation.PodHasMemoryBackedEmptyDir(pod) {
+		if allocatedPod, ok := a.allocationManager.UpdatePodFromAllocation(pod); ok {
+			return allocatedPod, true
+		}
 	}
-	// When there is no allocation stored for this pod, return the pod as-is.
+	// When the feature gate is disabled, the pod has no memory-backed emptyDir volumes, or there is
+	// no allocation stored for this pod, return the pod as-is.
 	return pod, true
 }
 

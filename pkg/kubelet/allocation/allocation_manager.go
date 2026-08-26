@@ -661,6 +661,22 @@ func IsResizableContainer(container *v1.Container, containerType podutil.Contain
 	}
 }
 
+func VolHasMemoryBackedEmptyDir(vol *v1.Volume) bool {
+	return vol != nil && vol.EmptyDir != nil && vol.EmptyDir.Medium == v1.StorageMediumMemory
+}
+
+func PodHasMemoryBackedEmptyDir(pod *v1.Pod) bool {
+	if pod == nil {
+		return false
+	}
+	for i := range pod.Spec.Volumes {
+		if VolHasMemoryBackedEmptyDir(&pod.Spec.Volumes[i]) {
+			return true
+		}
+	}
+	return false
+}
+
 func VolHasMemoryBackedEmptyDirSizeLimit(vol *v1.Volume) bool {
-	return vol != nil && vol.EmptyDir != nil && vol.EmptyDir.Medium == v1.StorageMediumMemory && vol.EmptyDir.SizeLimit != nil && !vol.EmptyDir.SizeLimit.IsZero()
+	return VolHasMemoryBackedEmptyDir(vol) && vol.EmptyDir.SizeLimit != nil && !vol.EmptyDir.SizeLimit.IsZero()
 }
