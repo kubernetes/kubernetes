@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	k8suuid "k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -55,7 +54,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/preemption"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	testfwk "k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
@@ -1024,7 +1022,7 @@ func TestPreemption(t *testing.T) {
 						test := tests[i]
 						t.Run(fmt.Sprintf("%s (Async preemption enabled: %v, Async API calls enabled: %v, ClearingNominatedNodeNameAfterBinding: %v)", test.name, asyncPreemptionEnabled, asyncAPICallsEnabled, clearingNominatedNodeNameAfterBinding), func(t *testing.T) {
 							testCtx := testutils.InitTestSchedulerWithOptions(t,
-								withNewNamespace(t, sharedAPICtx, "preemption"),
+								testutils.WithNewNamespace(t, sharedAPICtx, "preemption"),
 								0,
 								scheduler.WithProfiles(cfg.Profiles...),
 								scheduler.WithFrameworkOutOfTreeRegistry(registry))
@@ -2048,7 +2046,7 @@ func TestAsyncPreemption(t *testing.T) {
 				// It initializes the scheduler, but doesn't start.
 				// We manually trigger the scheduling cycle.
 				testCtx := testutils.InitTestSchedulerWithOptions(t,
-					withNewNamespace(t, sharedAPICtx, "preemption"),
+					testutils.WithNewNamespace(t, sharedAPICtx, "preemption"),
 					0,
 					scheduler.WithProfiles(cfg.Profiles...),
 					scheduler.WithFrameworkOutOfTreeRegistry(registry),
@@ -3086,7 +3084,7 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 							})
 
 							testCtx := testutils.InitTestSchedulerWithOptions(t,
-								withNewNamespace(t, sharedAPICtx, "preemption"),
+								testutils.WithNewNamespace(t, sharedAPICtx, "preemption"),
 								0,
 								scheduler.WithProfiles(cfg.Profiles...),
 								scheduler.WithFrameworkOutOfTreeRegistry(registry),
@@ -3222,25 +3220,4 @@ func TestInterPodAffinityPreemption(t *testing.T) {
 			}
 		}
 	}
-}
-
-// withNewNamespace creates a child TestContext that shares the API server from
-// parent but gets a fresh namespace. Only the namespace is deleted on t.Cleanup;
-// the API server lifecycle is managed by the caller. This is useful when
-// multiple subtests share one API server to avoid the per-subtest startup cost.
-func withNewNamespace(t *testing.T, parent *testutils.TestContext, nsPrefix string) *testutils.TestContext {
-	t.Helper()
-	ctx, cancel := context.WithCancel(parent.Ctx)
-	child := &testutils.TestContext{
-		ClientSet:  parent.ClientSet,
-		KubeConfig: parent.KubeConfig,
-		Ctx:        ctx,
-		CloseFn:    func() {}, // API server is owned by parent; do not tear it down here.
-	}
-	child.NS = testfwk.CreateNamespaceOrDie(child.ClientSet, nsPrefix+string(k8suuid.NewUUID()), t)
-	t.Cleanup(func() {
-		cancel()
-		testfwk.DeleteNamespaceOrDie(child.ClientSet, child.NS, t)
-	})
-	return child
 }
