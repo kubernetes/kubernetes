@@ -102,9 +102,12 @@ func (s *stateMemory) GetEmptyDirVolumeLimit(podUID types.UID, volumeName string
 	}
 
 	for _, vol := range pod.Spec.Volumes {
-		if vol.Name == volumeName && vol.EmptyDir != nil && vol.EmptyDir.SizeLimit != nil {
+		if vol.Name == volumeName && vol.EmptyDir != nil {
+			if vol.EmptyDir.SizeLimit == nil {
+				return nil, true
+			}
 			sizeLimitCopy := *vol.EmptyDir.SizeLimit
-			return &sizeLimitCopy, ok
+			return &sizeLimitCopy, true
 		}
 	}
 	return nil, false
