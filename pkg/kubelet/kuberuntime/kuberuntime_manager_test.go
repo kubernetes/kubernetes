@@ -4997,11 +4997,10 @@ type mockVolumeResizeRuntimeHelper struct {
 
 type mockResizeCall struct {
 	volumeName string
-	newSize    *resource.Quantity
 }
 
-func (f *mockVolumeResizeRuntimeHelper) ResizeEphemeralVolume(_ *v1.Pod, volumeName string, newSize *resource.Quantity) error {
-	f.resizeCalls = append(f.resizeCalls, mockResizeCall{volumeName: volumeName, newSize: newSize})
+func (f *mockVolumeResizeRuntimeHelper) ResizeEphemeralVolume(_ *v1.Pod, volumeName string) error {
+	f.resizeCalls = append(f.resizeCalls, mockResizeCall{volumeName: volumeName})
 	return f.resizeErr
 }
 
@@ -5174,8 +5173,8 @@ func TestDoPodResizeAction_Volumes(t *testing.T) {
 			volumesToDownsize: []string{"down-vol"},
 			volumesToUpsize:   []string{"up-vol"},
 			expectedCalls: []mockResizeCall{
-				{volumeName: "down-vol", newSize: resource.NewQuantity(100, resource.BinarySI)},
-				{volumeName: "up-vol", newSize: resource.NewQuantity(200, resource.BinarySI)},
+				{volumeName: "down-vol"},
+				{volumeName: "up-vol"},
 			},
 			expectedActuated: map[string]*resource.Quantity{
 				"down-vol": resource.NewQuantity(100, resource.BinarySI),
@@ -5188,7 +5187,7 @@ func TestDoPodResizeAction_Volumes(t *testing.T) {
 			volumesToUpsize:   []string{"up-vol"},
 			injectResizeError: fmt.Errorf("resize failed"),
 			expectedCalls: []mockResizeCall{
-				{volumeName: "down-vol", newSize: resource.NewQuantity(100, resource.BinarySI)},
+				{volumeName: "down-vol"},
 			},
 			expectedActuated:  map[string]*resource.Quantity{},
 			expectedResultErr: true,
@@ -5286,12 +5285,6 @@ func TestDoPodResizeAction_Volumes(t *testing.T) {
 			for idx, expectedCall := range tc.expectedCalls {
 				actualCall := helper.resizeCalls[idx]
 				assert.Equal(t, expectedCall.volumeName, actualCall.volumeName)
-				if expectedCall.newSize == nil {
-					assert.Nil(t, actualCall.newSize)
-				} else {
-					require.NotNil(t, actualCall.newSize)
-					assert.Equal(t, expectedCall.newSize.Value(), actualCall.newSize.Value())
-				}
 			}
 
 			// Check final actuated state
