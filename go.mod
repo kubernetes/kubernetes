@@ -15,6 +15,7 @@ require (
 	github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab
 	github.com/Microsoft/go-winio v0.6.2
 	github.com/Microsoft/hnslib v0.1.3
+	github.com/anishathalye/porcupine v1.3.0
 	github.com/blang/semver/v4 v4.0.0
 	github.com/container-storage-interface/spec v1.13.0
 	github.com/coredns/corefile-migration v1.0.35
