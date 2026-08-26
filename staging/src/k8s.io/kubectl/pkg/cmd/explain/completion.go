@@ -33,7 +33,7 @@ import (
 // resourceFieldCompletionFunc returns a completion function for kubectl explain that completes:
 // - resource types when no dot is present (e.g., "pods", "deploy")
 // - field paths when a dot is present (e.g., "pods.spec", "pods.spec.containers")
-func resourceFieldCompletionFunc(restClientGetter genericclioptions.RESTClientGetter) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+func resourceFieldCompletionFunc(restClientGetter genericclioptions.RESTClientGetter) completion.CompletionFunc {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) > 0 || strings.Contains(toComplete, "..") {
 			return nil, cobra.ShellCompDirectiveNoFileComp

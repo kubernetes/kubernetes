@@ -38,6 +38,10 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 )
 
+// CompletionFunc is the signature cobra expects for shell completion functions,
+// as returned by the completion helpers in this package.
+type CompletionFunc func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective)
+
 var factory cmdutil.Factory
 
 // SetFactoryForCompletion Store the factory which is needed by the completion functions.
