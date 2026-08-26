@@ -79,7 +79,8 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 			return kubeClient, nil
 		}
 	}
-	certificateStore, err := certificate.NewFileStore(
+	certificateStore, err := certificate.NewFileStoreWithLogger(
+		klog.Background(),
 		"kubelet-server",
 		certDirectory,
 		certDirectory,
@@ -206,7 +207,8 @@ func NewKubeletClientCertificateManager(
 	clientsetFn certificate.ClientsetFunc,
 ) (certificate.Manager, error) {
 
-	certificateStore, err := certificate.NewFileStore(
+	certificateStore, err := certificate.NewFileStoreWithLogger(
+		klog.Background(),
 		"kubelet-client",
 		certDirectory,
 		certDirectory,
