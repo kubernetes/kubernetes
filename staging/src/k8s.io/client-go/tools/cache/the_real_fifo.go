@@ -779,7 +779,7 @@ func (f *RealFIFO) Resync() error {
 
 		retErr := f.addToItems_locked(Sync, true, knownObj)
 		if retErr != nil {
-			return fmt.Errorf("couldn't queue object: %w", err)
+			return fmt.Errorf("couldn't queue object: %w", retErr)
 		}
 	}
 
