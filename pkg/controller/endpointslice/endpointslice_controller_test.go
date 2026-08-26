@@ -2188,3 +2188,41 @@ func Test_dropEndpointSlicesPendingDeletion(t *testing.T) {
 		t.Errorf("EndpointSlice was unexpectedly mutated. Expected: %+v, Mutated: %+v", epSlice3, result[1])
 	}
 }
+
+func TestSyncServiceServiceRecreated(t *testing.T) {
+	oldSvc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "recreated-svc",
+			Namespace: "default",
+			UID:       "uid-1",
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{{Port: 80}},
+		},
+	}
+
+	oldES := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "recreated-svc-abcde",
+			Namespace: "default",
+			UID:       "es-uid-1",
+			Labels:    map[string]string{discovery.LabelServiceName: "recreated-svc"},
+			OwnerReferences: []metav1.OwnerReference{{
+				UID: oldSvc.UID,
+			}},
+			Generation: 1,
+		},
+	}
+
+	logger, _ := ktesting.NewTestContext(t)
+	_, controller := newController(t, []string{"node-1"}, 1*time.Second)
+
+	// Simulate tracker tracking an old slice from previous service UID
+	controller.endpointSliceTracker.Update(oldES)
+
+	// Syncing recreated service with new UID must not fail with stale informer cache
+	err := controller.syncService(logger, "default/recreated-svc")
+	if err != nil {
+		t.Fatalf("Expected no error syncing recreated service, got: %v", err)
+	}
+}
