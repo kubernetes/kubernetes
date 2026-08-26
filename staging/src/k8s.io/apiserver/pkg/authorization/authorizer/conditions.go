@@ -155,24 +155,45 @@ func (d ConditionsAwareDecision) IsUnconditional() bool {
 	return d.IsAllow() || d.IsDeny() || d.IsNoOpinion()
 }
 
-// UnconditionalParts splits a ConditionsAwareDecision into the
-// triple that Authorize expects. If the decision is
-// conditional, FailureDecision() is returned.
-// This function is meant to be called when IsUnconditional() == true.
-func (d ConditionsAwareDecision) UnconditionalParts() (Decision, string, error) {
+// UnconditionalPartsOrError splits a ConditionsAwareDecision into the
+// standard (unconditional Decision, reason, error) triple.
+// A caller is expected to guard this call with d.IsUnconditional() first.
+// If this function is called on a conditional decision, an error is returned.
+func (d ConditionsAwareDecision) UnconditionalPartsOrError() (Decision, string, error) {
 	switch {
-	case d.IsAllow():
-		return DecisionAllow, d.Reason(), d.Error()
 	case d.IsDeny():
 		return DecisionDeny, d.Reason(), d.Error()
 	case d.IsNoOpinion():
 		return DecisionNoOpinion, d.Reason(), d.Error()
-	default:
-		// An error is not returned here, as that could yield a HTTP response code of 500 instead of 403.
-		// For the use-case described above with regards to calling this function in Authorize, not returning
-		// an error is important, as it is valid to always fail closed, as if this happens, no unconditional
-		// permissions were given the requestor.
-		return d.FailureDecision(), "failed closed: tried to return conditional decision to conditions-unaware authorizer", nil
+	case d.IsAllow():
+		return DecisionAllow, d.Reason(), d.Error()
+	default: // d is conditional, this is per definition a caller error.
+		return d.FailureDecision(), "failed closed", fmt.Errorf("tried to return an unexpected conditional decision during unconditional authorization")
+	}
+}
+
+// UnconditionalPartsOrFailClosed splits a ConditionsAwareDecision into the
+// standard (unconditional Decision, reason, error) triple.
+// If d is conditional, d.FailureDecision() will be returned along with
+// a reason describing that the decision would have been conditional,
+// if the caller opted into it.
+// No error is returned in the fail closed case, which means a 403 response code (as opposed to 500).
+func (d ConditionsAwareDecision) UnconditionalPartsOrFailClosed() (Decision, string, error) {
+	switch {
+	case d.IsDeny():
+		return DecisionDeny, d.Reason(), d.Error()
+	case d.IsNoOpinion():
+		return DecisionNoOpinion, d.Reason(), d.Error()
+	case d.IsAllow():
+		return DecisionAllow, d.Reason(), d.Error()
+	default: // d is conditional, "round down" to a safe unconditional decision
+		failureDecision := d.FailureDecision()
+		reason := fmt.Sprintf(
+			"failed closed from conditional decision (with possible outcomes %v) to %s during unconditional authorization",
+			sets.List(d.PossibleDecisions()),
+			failureDecision.String(),
+		)
+		return failureDecision, reason, nil
 	}
 }
 
