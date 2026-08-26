@@ -191,6 +191,55 @@ describe('cluster new api', () => {
       }).toThrow(errorMessage);
     });
 
+    test('serverlessV2 capacities can be tokens and synthesize without validation errors', () => {
+      // GIVEN
+      const stack = testStack();
+      const vpc = new ec2.Vpc(stack, 'VPC');
+      const maxAcu = new cdk.CfnParameter(stack, 'MaxAcu', { type: 'Number', default: 16 });
+      const minAcu = new cdk.CfnParameter(stack, 'MinAcu', { type: 'Number', default: 1 });
+
+      // WHEN
+      new DatabaseCluster(stack, 'Database', {
+        engine: DatabaseClusterEngine.AURORA_MYSQL,
+        vpc,
+        writer: ClusterInstance.serverlessV2('writer'),
+        serverlessV2MaxCapacity: maxAcu.valueAsNumber,
+        serverlessV2MinCapacity: minAcu.valueAsNumber,
+      });
+
+      // THEN
+      Template.fromStack(stack).hasResourceProperties('AWS::RDS::DBCluster', {
+        ServerlessV2ScalingConfiguration: {
+          MaxCapacity: { Ref: 'MaxAcu' },
+          MinCapacity: { Ref: 'MinAcu' },
+        },
+      });
+    });
+
+    test('serverlessV2 capacity validation still applies to the resolved value when only one is a token', () => {
+      // GIVEN
+      const stack = testStack();
+      const vpc = new ec2.Vpc(stack, 'VPC');
+      const maxAcu = new cdk.CfnParameter(stack, 'MaxAcu', { type: 'Number', default: 16 });
+
+      // WHEN - max is a token, min is a valid literal
+      new DatabaseCluster(stack, 'Database', {
+        engine: DatabaseClusterEngine.AURORA_MYSQL,
+        vpc,
+        writer: ClusterInstance.serverlessV2('writer'),
+        serverlessV2MaxCapacity: maxAcu.valueAsNumber,
+        serverlessV2MinCapacity: 0.5,
+      });
+
+      // THEN
+      Template.fromStack(stack).hasResourceProperties('AWS::RDS::DBCluster', {
+        ServerlessV2ScalingConfiguration: {
+          MaxCapacity: { Ref: 'MaxAcu' },
+          MinCapacity: 0.5,
+        },
+      });
+    });
+
     test.each([
       [cdk.Duration.seconds(299)],
       [cdk.Duration.seconds(86401)],
