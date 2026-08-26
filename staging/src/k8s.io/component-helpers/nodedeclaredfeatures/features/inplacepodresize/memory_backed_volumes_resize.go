@@ -70,11 +70,16 @@ func (f *memoryBackedVolumesResizeFeature) InferForUpdate(oldPodInfo, newPodInfo
 			// The volume is not memory backed. Standard validation will catch attempts to change volume type.
 			continue
 		}
-		if newVol.EmptyDir.SizeLimit == nil || oldVol.EmptyDir.SizeLimit == nil {
-			// Size limit is not set. Standard validation will catch attempts to add or remove size limit.
+		if oldVol.EmptyDir == nil || oldVol.EmptyDir.Medium != v1.StorageMediumMemory {
+			// The volume is not memory backed. Standard validation will catch attempts to change volume type.
 			continue
 		}
-		if newVol.EmptyDir.SizeLimit.Cmp(*oldVol.EmptyDir.SizeLimit) != 0 {
+		hasOldLimit := oldVol.EmptyDir.SizeLimit != nil
+		hasNewLimit := newVol.EmptyDir.SizeLimit != nil
+		if hasOldLimit != hasNewLimit {
+			return true
+		}
+		if hasOldLimit && hasNewLimit && newVol.EmptyDir.SizeLimit.Cmp(*oldVol.EmptyDir.SizeLimit) != 0 {
 			return true
 		}
 	}
