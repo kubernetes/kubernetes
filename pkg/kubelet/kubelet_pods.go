@@ -945,7 +945,7 @@ func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, co
 				}
 				// TODO: validate no NUL bytes
 				runtimeVal = string(runtimeValBytes)
-			case utilfeature.DefaultFeatureGate.Enabled(features.EnvFiles) && envVar.ValueFrom.FileKeyRef != nil:
+			case envVar.ValueFrom.FileKeyRef != nil:
 				f := envVar.ValueFrom.FileKeyRef
 				key := f.Key
 				volume := f.VolumeName
