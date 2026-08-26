@@ -69,6 +69,11 @@ type UpdatePod struct {
 	ModifyFn func(*v1.Pod)
 }
 
+type UpdateNode struct {
+	NodeName string
+	ModifyFn func(*v1.Node)
+}
+
 // Step is allowing us to create a test in a more readable way.
 // We can create test as a flow of steps, each step is an operation that will be performed on the cluster.
 // Every Step should have a Name, that is used to identify the step and one operation.
@@ -144,6 +149,8 @@ type Step struct {
 	CreateCompositePodGroup *schedulingv1alpha3.CompositePodGroup
 	// UpdateCompositePodGroup is used to update an existing composite pod group and wait for it to propagate.
 	UpdateCompositePodGroup *schedulingv1alpha3.CompositePodGroup
+	// DeleteCompositePodGroup is used to delete a composite pod group by name and wait for it to propagate.
+	DeleteCompositePodGroup string
 	// CreatePods is use to create pods in the cluster.
 	CreatePods []*v1.Pod
 	// CreatePodsInOrder is use to create pods in the cluster and have them enqueued by the scheduler in the specified order.
@@ -154,6 +161,8 @@ type Step struct {
 	DeletePods []string
 	// UpdatePod is used to mutate any field of the pod.
 	UpdatePod *UpdatePod
+	// UpdateNode is used to mutate any field of the node.
+	UpdateNode *UpdateNode
 	// WaitForPodsInActiveQ is used to check if the pods are present in ActiveQ.
 	WaitForPodsInActiveQ []string
 	// WaitForPodsInUnschedulableEntities is use to wait for pods to be in unschedulableEntities.
@@ -427,6 +436,36 @@ func deletePodGroup(testCtx *testutils.TestContext, ns string, pgName string) er
 	return nil
 }
 
+func deleteCompositePodGroup(testCtx *testutils.TestContext, ns string, cpgName string) error {
+	cs := testCtx.ClientSet
+	cpg, err := cs.SchedulingV1alpha3().CompositePodGroups(ns).Get(testCtx.Ctx, cpgName, metav1.GetOptions{})
+	if err == nil && len(cpg.Finalizers) > 0 {
+		cpg.Finalizers = nil
+		if _, err = cs.SchedulingV1alpha3().CompositePodGroups(ns).Update(testCtx.Ctx, cpg, metav1.UpdateOptions{}); err != nil {
+			return fmt.Errorf("failed to clear finalizers of composite pod group %s: %w", cpgName, err)
+		}
+	}
+	if err := cs.SchedulingV1alpha3().CompositePodGroups(ns).Delete(testCtx.Ctx, cpgName, metav1.DeleteOptions{}); err != nil {
+		return fmt.Errorf("failed to delete composite pod group %s: %w", cpgName, err)
+	}
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+		func(_ context.Context) (bool, error) {
+			_, err := testCtx.InformerFactory.Scheduling().V1alpha3().CompositePodGroups().Lister().CompositePodGroups(ns).Get(cpgName)
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					return true, nil
+				}
+				return false, err
+			}
+			return false, nil
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to wait for composite pod group %s deletion to propagate: %w", cpgName, err)
+	}
+	return nil
+}
+
 func createWorkloads(testCtx *testutils.TestContext, ns string, wls []*schedulingapi.Workload) error {
 	cs := testCtx.ClientSet
 	for _, wl := range wls {
@@ -442,8 +481,25 @@ func createWorkloads(testCtx *testutils.TestContext, ns string, wls []*schedulin
 func deletePods(testCtx *testutils.TestContext, ns string, podNames []string) error {
 	cs := testCtx.ClientSet
 	for _, podName := range podNames {
-		if err := cs.CoreV1().Pods(ns).Delete(testCtx.Ctx, podName, metav1.DeleteOptions{}); err != nil {
+		if err := cs.CoreV1().Pods(ns).Delete(testCtx.Ctx, podName, metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
 			return fmt.Errorf("failed to delete pod %s: %w", podName, err)
+		}
+	}
+	for _, podName := range podNames {
+		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+			func(_ context.Context) (bool, error) {
+				_, err := testCtx.InformerFactory.Core().V1().Pods().Lister().Pods(ns).Get(podName)
+				if err != nil {
+					if apierrors.IsNotFound(err) {
+						return true, nil
+					}
+					return false, err
+				}
+				return false, nil
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("failed to wait for pod %s deletion to propagate: %w", podName, err)
 		}
 	}
 	return nil
@@ -459,6 +515,20 @@ func updatePod(testCtx *testutils.TestContext, ns string, update *UpdatePod) err
 	_, err = cs.CoreV1().Pods(ns).Update(testCtx.Ctx, p, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to update pod %s: %w", update.PodName, err)
+	}
+	return nil
+}
+
+func updateNode(testCtx *testutils.TestContext, update *UpdateNode) error {
+	cs := testCtx.ClientSet
+	node, err := cs.CoreV1().Nodes().Get(testCtx.Ctx, update.NodeName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get node %s for update: %w", update.NodeName, err)
+	}
+	update.ModifyFn(node)
+	_, err = cs.CoreV1().Nodes().Update(testCtx.Ctx, node, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to update node %s: %w", update.NodeName, err)
 	}
 	return nil
 }
@@ -683,6 +753,8 @@ func RunSteps(testCtx *testutils.TestContext, t *testing.T, ns string, steps []S
 			err = createCompositePodGroup(testCtx, ns, step.CreateCompositePodGroup)
 		case step.UpdateCompositePodGroup != nil:
 			err = updateCompositePodGroup(testCtx, ns, step.UpdateCompositePodGroup)
+		case step.DeleteCompositePodGroup != "":
+			err = deleteCompositePodGroup(testCtx, ns, step.DeleteCompositePodGroup)
 		case step.CreatePodGroup != nil:
 			err = createPodGroup(testCtx, ns, step.CreatePodGroup)
 		case step.UpdatePodGroup != nil:
@@ -695,6 +767,8 @@ func RunSteps(testCtx *testutils.TestContext, t *testing.T, ns string, steps []S
 			err = deletePods(testCtx, ns, step.DeletePods)
 		case step.UpdatePod != nil:
 			err = updatePod(testCtx, ns, step.UpdatePod)
+		case step.UpdateNode != nil:
+			err = updateNode(testCtx, step.UpdateNode)
 		case step.WaitForPodsInActiveQ != nil:
 			err = waitForPodsInActiveQ(testCtx, step.WaitForPodsInActiveQ)
 		case step.WaitForPodsInUnschedulableEntities != nil:
