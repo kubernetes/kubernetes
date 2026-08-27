@@ -1442,7 +1442,7 @@ https://docs.aws.amazon.com/lambda/latest/dg/invocation-recursion.html
 
 ## Lambda with SnapStart
 
-SnapStart is currently supported on Python 3.12, Python 3.13, .NET 8, and Java 11 and later [Java managed runtimes](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html). SnapStart does not support provisioned concurrency, Amazon Elastic File System (Amazon EFS), or ephemeral storage greater than 512 MB. After you enable Lambda SnapStart for a particular Lambda function, publishing a new version of the function will trigger an optimization process.
+SnapStart is currently supported on Python 3.12, Python 3.13, .NET 8, and Java 11 and later [Java managed runtimes](https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html), as well as container image (OCI) deployments. SnapStart does not support provisioned concurrency, Amazon Elastic File System (Amazon EFS), or ephemeral storage greater than 512 MB. After you enable Lambda SnapStart for a particular Lambda function, publishing a new version of the function will trigger an optimization process.
 
 See [the AWS documentation](https://docs.aws.amazon.com/lambda/latest/dg/snapstart.html) to learn more about AWS Lambda SnapStart
 
@@ -1453,6 +1453,17 @@ const fn = new lambda.Function(this, 'MyFunction', {
   handler: 'example.Handler::handleRequest',
   snapStart: lambda.SnapStartConf.ON_PUBLISHED_VERSIONS,
   });
+
+const version = fn.currentVersion;
+```
+
+SnapStart can also be used with container image functions:
+
+```ts
+const fn = new lambda.DockerImageFunction(this, 'MyFunction', {
+  code: lambda.DockerImageCode.fromImageAsset(path.join(__dirname, 'docker-handler')),
+  snapStart: lambda.SnapStartConf.ON_PUBLISHED_VERSIONS,
+});
 
 const version = fn.currentVersion;
 ```

@@ -1,5 +1,5 @@
 {
-  "version": "38.0.1",
+  "version": "54.0.0",
   "testCases": {
     "lambda-runtime-management/DefaultTest": {
       "stacks": [
@@ -8,5 +8,6 @@
       "assertionStack": "lambda-runtime-management/DefaultTest/DeployAssert",
       "assertionStackName": "lambdaruntimemanagementDefaultTestDeployAssertDE680AF3"
     }
-  }
+  },
+  "minimumCliVersion": "2.1126.0"
 }

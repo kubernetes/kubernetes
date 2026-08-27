@@ -1,0 +1,515 @@
+{
+  "/aws-cdk-lambda-runtime-management": [
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "<anonymous> (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.lambda-snapstart.js:46:15)",
+        "...node internals..."
+      ]
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/JavaSnapstartLambda": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "code": "*",
+        "handler": "*",
+        "runtime": "*",
+        "snapStart": "*"
+      }
+    },
+    {
+      "type": "aws:cdk:warning",
+      "data": "SnapStart only supports published Lambda versions. Ignore if function already has published versions. [ack: @aws-cdk/aws-lambda:snapStartRequirePublish]",
+      "trace": [
+        "Annotations.addMessage (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/annotations.js:244:29)",
+        "Annotations.addWarningV2 (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/annotations.js:113:18)",
+        "WrappedClass.configureSnapStart (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/function.js:1303:43)",
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/function.js:769:33)",
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "Object.<anonymous> (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.lambda-snapstart.js:47:1)",
+        "Module._compile (node:internal/modules/cjs/loader:1364:14)",
+        "Module._extensions..js (node:internal/modules/cjs/loader:1422:10)",
+        "Module.load (node:internal/modules/cjs/loader:1203:32)",
+        "Module._load (node:internal/modules/cjs/loader:1019:12)",
+        "Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:128:12)",
+        "node:internal/main/run_main_module:28:49"
+      ]
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/Python312SnapstartLambda": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "code": "*",
+        "handler": "*",
+        "runtime": "*",
+        "snapStart": "*"
+      }
+    },
+    {
+      "type": "aws:cdk:warning",
+      "data": "SnapStart only supports published Lambda versions. Ignore if function already has published versions. [ack: @aws-cdk/aws-lambda:snapStartRequirePublish]",
+      "trace": [
+        "Annotations.addMessage (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/annotations.js:244:29)",
+        "Annotations.addWarningV2 (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/annotations.js:113:18)",
+        "WrappedClass.configureSnapStart (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/function.js:1303:43)",
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/function.js:769:33)",
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "Object.<anonymous> (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.lambda-snapstart.js:53:1)",
+        "Module._compile (node:internal/modules/cjs/loader:1364:14)",
+        "Module._extensions..js (node:internal/modules/cjs/loader:1422:10)",
+        "Module.load (node:internal/modules/cjs/loader:1203:32)",
+        "Module._load (node:internal/modules/cjs/loader:1019:12)",
+        "Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:128:12)",
+        "node:internal/main/run_main_module:28:49"
+      ]
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/Python313SnapstartLambda": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "code": "*",
+        "handler": "*",
+        "runtime": "*",
+        "snapStart": "*"
+      }
+    },
+    {
+      "type": "aws:cdk:warning",
+      "data": "SnapStart only supports published Lambda versions. Ignore if function already has published versions. [ack: @aws-cdk/aws-lambda:snapStartRequirePublish]",
+      "trace": [
+        "Annotations.addMessage (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/annotations.js:244:29)",
+        "Annotations.addWarningV2 (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/annotations.js:113:18)",
+        "WrappedClass.configureSnapStart (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/function.js:1303:43)",
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/function.js:769:33)",
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "Object.<anonymous> (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.lambda-snapstart.js:59:1)",
+        "Module._compile (node:internal/modules/cjs/loader:1364:14)",
+        "Module._extensions..js (node:internal/modules/cjs/loader:1422:10)",
+        "Module.load (node:internal/modules/cjs/loader:1203:32)",
+        "Module._load (node:internal/modules/cjs/loader:1019:12)",
+        "Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:128:12)",
+        "node:internal/main/run_main_module:28:49"
+      ]
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/DotnetSnapstartLambda": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "code": "*",
+        "handler": "*",
+        "runtime": "*",
+        "snapStart": "*"
+      }
+    },
+    {
+      "type": "aws:cdk:warning",
+      "data": "SnapStart only supports published Lambda versions. Ignore if function already has published versions. [ack: @aws-cdk/aws-lambda:snapStartRequirePublish]",
+      "trace": [
+        "Annotations.addMessage (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/annotations.js:244:29)",
+        "Annotations.addWarningV2 (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/annotations.js:113:18)",
+        "WrappedClass.configureSnapStart (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/function.js:1303:43)",
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/function.js:769:33)",
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "Object.<anonymous> (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.lambda-snapstart.js:65:1)",
+        "Module._compile (node:internal/modules/cjs/loader:1364:14)",
+        "Module._extensions..js (node:internal/modules/cjs/loader:1422:10)",
+        "Module.load (node:internal/modules/cjs/loader:1203:32)",
+        "Module._load (node:internal/modules/cjs/loader:1019:12)",
+        "Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:128:12)",
+        "node:internal/main/run_main_module:28:49"
+      ]
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/ContainerImageSnapstartLambda": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "code": "*",
+        "snapStart": "*"
+      }
+    },
+    {
+      "type": "aws:cdk:warning",
+      "data": "SnapStart only supports published Lambda versions. Ignore if function already has published versions. [ack: @aws-cdk/aws-lambda:snapStartRequirePublish]",
+      "trace": [
+        "Annotations.addMessage (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/annotations.js:244:29)",
+        "Annotations.addWarningV2 (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/annotations.js:113:18)",
+        "WrappedClass.configureSnapStart (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/function.js:1303:43)",
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/function.js:769:33)",
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "new DockerImageFunction (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/image-function.js:135:13)",
+        "new DockerImageFunction (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "Object.<anonymous> (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.lambda-snapstart.js:71:26)",
+        "Module._compile (node:internal/modules/cjs/loader:1364:14)",
+        "Module._extensions..js (node:internal/modules/cjs/loader:1422:10)",
+        "Module.load (node:internal/modules/cjs/loader:1203:32)",
+        "Module._load (node:internal/modules/cjs/loader:1019:12)",
+        "Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:128:12)",
+        "node:internal/main/run_main_module:28:49"
+      ]
+    },
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "code": "*",
+        "snapStart": "*"
+      }
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/ContainerImageSnapstartAlias": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "aliasName": "*",
+        "version": "*"
+      }
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "addBootstrapVersionRule (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:302:19)",
+        "DefaultStackSynthesizer.addBootstrapVersionRule (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:202:9)",
+        "DefaultStackSynthesizer.synthesize (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/stack-synthesizers/default-synthesizer.js:343:18)",
+        "/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:474: (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:474:3)",
+        "visit (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:531:9)",
+        "visit (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:528:9)",
+        "synthesizeTree (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:467:5)",
+        "synthesize (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:95:5)",
+        "App.synth (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/stage.js:220:96)",
+        "App.synth (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/app.js:208:27)"
+      ]
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "addBootstrapVersionRule (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:310:5)",
+        "DefaultStackSynthesizer.addBootstrapVersionRule (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:202:9)",
+        "DefaultStackSynthesizer.synthesize (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/stack-synthesizers/default-synthesizer.js:343:18)",
+        "/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:474: (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:474:3)",
+        "visit (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:531:9)",
+        "visit (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:528:9)",
+        "synthesizeTree (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:467:5)",
+        "synthesize (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:95:5)",
+        "App.synth (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/stage.js:220:96)",
+        "App.synth (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/app.js:208:27)"
+      ]
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/JavaSnapstartLambda/ServiceRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        },
+        "managedPolicies": [
+          {
+            "managedPolicyArn": "*"
+          }
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/JavaSnapstartLambda/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "JavaSnapstartLambdaB19F6BA4"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/function.js:732:29)",
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "<anonymous> (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.lambda-snapstart.js:47:1)",
+        "...node internals..."
+      ]
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/Python312SnapstartLambda/ServiceRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        },
+        "managedPolicies": [
+          {
+            "managedPolicyArn": "*"
+          }
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/Python312SnapstartLambda/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Python312SnapstartLambdaB0C15475"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/function.js:732:29)",
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "<anonymous> (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.lambda-snapstart.js:53:1)",
+        "...node internals..."
+      ]
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/Python313SnapstartLambda/ServiceRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        },
+        "managedPolicies": [
+          {
+            "managedPolicyArn": "*"
+          }
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/Python313SnapstartLambda/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Python313SnapstartLambda008EE7A4"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/function.js:732:29)",
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "<anonymous> (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.lambda-snapstart.js:59:1)",
+        "...node internals..."
+      ]
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/DotnetSnapstartLambda/ServiceRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        },
+        "managedPolicies": [
+          {
+            "managedPolicyArn": "*"
+          }
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/DotnetSnapstartLambda/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DotnetSnapstartLambda7DAEB52E"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/function.js:732:29)",
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "<anonymous> (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.lambda-snapstart.js:65:1)",
+        "...node internals..."
+      ]
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/ContainerImageSnapstartLambda/ServiceRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        },
+        "managedPolicies": [
+          {
+            "managedPolicyArn": "*"
+          }
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/ContainerImageSnapstartLambda/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ContainerImageSnapstartLambdaA1A8D795"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/function.js:732:29)",
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "new DockerImageFunction (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/image-function.js:135:13)",
+        "new DockerImageFunction (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "<anonymous> (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.lambda-snapstart.js:71:26)",
+        "...node internals..."
+      ]
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/ContainerImageSnapstartLambda/CurrentVersion": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "lambda": "*"
+      }
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/ContainerImageSnapstartAlias/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ContainerImageSnapstartAliasF4D42E37"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new Alias (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/alias.js:230:26)",
+        "new Alias (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "<anonymous> (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.lambda-snapstart.js:77:1)",
+        "...node internals..."
+      ]
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/ContainerImageSnapstartAlias/ScalingRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/JavaSnapstartLambda/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "JavaSnapstartLambdaServiceRole50CD4832"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new Role (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-iam/lib/role.js:491:34)",
+        "new Role (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/function.js:647:39)",
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "<anonymous> (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.lambda-snapstart.js:47:1)",
+        "...node internals..."
+      ]
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/JavaSnapstartLambda/Code/AssetBucket": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/Python312SnapstartLambda/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Python312SnapstartLambdaServiceRole16F303C0"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new Role (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-iam/lib/role.js:491:34)",
+        "new Role (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/function.js:647:39)",
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "<anonymous> (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.lambda-snapstart.js:53:1)",
+        "...node internals..."
+      ]
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/Python313SnapstartLambda/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Python313SnapstartLambdaServiceRoleC3989FBF"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new Role (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-iam/lib/role.js:491:34)",
+        "new Role (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/function.js:647:39)",
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "<anonymous> (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.lambda-snapstart.js:59:1)",
+        "...node internals..."
+      ]
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/DotnetSnapstartLambda/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DotnetSnapstartLambdaServiceRole222A9244"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new Role (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-iam/lib/role.js:491:34)",
+        "new Role (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/function.js:647:39)",
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "<anonymous> (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.lambda-snapstart.js:65:1)",
+        "...node internals..."
+      ]
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/DotnetSnapstartLambda/Code/AssetBucket": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/ContainerImageSnapstartLambda/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ContainerImageSnapstartLambdaServiceRole7968B8AF"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new Role (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-iam/lib/role.js:491:34)",
+        "new Role (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/function.js:647:39)",
+        "new Function (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "new DockerImageFunction (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/image-function.js:135:13)",
+        "new DockerImageFunction (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "<anonymous> (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.lambda-snapstart.js:71:26)",
+        "...node internals..."
+      ]
+    }
+  ],
+  "/aws-cdk-lambda-runtime-management/ContainerImageSnapstartLambda/CurrentVersion/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ContainerImageSnapstartLambdaCurrentVersion1F4901A42c47590495224991c3816c51ffc8ea8d"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new Version (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/lambda-version.js:207:29)",
+        "new Version (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
+        "get currentVersion (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/aws-lambda/lib/function.js:307:36)",
+        "<anonymous> (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.lambda-snapstart.js:79:31)",
+        "...node internals..."
+      ]
+    }
+  ]
+}

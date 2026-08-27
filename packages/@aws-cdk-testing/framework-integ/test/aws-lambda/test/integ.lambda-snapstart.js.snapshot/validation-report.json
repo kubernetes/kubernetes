@@ -1,0 +1,59 @@
+{
+  "version": "54.0.0",
+  "title": "Validation Report",
+  "pluginReports": [
+    {
+      "pluginName": "Construct Annotations",
+      "conclusion": "success",
+      "violations": [
+        {
+          "ruleName": "@aws-cdk/aws-lambda:snapStartRequirePublish",
+          "description": "SnapStart only supports published Lambda versions. Ignore if function already has published versions. [ack: @aws-cdk/aws-lambda:snapStartRequirePublish]",
+          "severity": "warning",
+          "violatingConstructs": [
+            {
+              "constructPath": "aws-cdk-lambda-runtime-management/JavaSnapstartLambda",
+              "constructFqn": "aws-cdk-lib.aws_lambda.Function",
+              "libraryVersion": "0.0.0",
+              "stackTraces": [
+                "<anonymous> (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.lambda-snapstart.js:46:15)\nRun with '--debug' to include location info"
+              ]
+            },
+            {
+              "constructPath": "aws-cdk-lambda-runtime-management/Python312SnapstartLambda",
+              "constructFqn": "aws-cdk-lib.aws_lambda.Function",
+              "libraryVersion": "0.0.0",
+              "stackTraces": [
+                "<anonymous> (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.lambda-snapstart.js:46:15)\nRun with '--debug' to include location info"
+              ]
+            },
+            {
+              "constructPath": "aws-cdk-lambda-runtime-management/Python313SnapstartLambda",
+              "constructFqn": "aws-cdk-lib.aws_lambda.Function",
+              "libraryVersion": "0.0.0",
+              "stackTraces": [
+                "<anonymous> (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.lambda-snapstart.js:46:15)\nRun with '--debug' to include location info"
+              ]
+            },
+            {
+              "constructPath": "aws-cdk-lambda-runtime-management/DotnetSnapstartLambda",
+              "constructFqn": "aws-cdk-lib.aws_lambda.Function",
+              "libraryVersion": "0.0.0",
+              "stackTraces": [
+                "<anonymous> (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.lambda-snapstart.js:46:15)\nRun with '--debug' to include location info"
+              ]
+            },
+            {
+              "constructPath": "aws-cdk-lambda-runtime-management/ContainerImageSnapstartLambda",
+              "constructFqn": "aws-cdk-lib.aws_lambda.DockerImageFunction",
+              "libraryVersion": "0.0.0",
+              "stackTraces": [
+                "<anonymous> (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.lambda-snapstart.js:46:15)\nRun with '--debug' to include location info"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
