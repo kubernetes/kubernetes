@@ -202,6 +202,10 @@ func (p *staticPolicy) AllocatePod(logger klog.Logger, s state.State, pod *v1.Po
 	if qos != v1.PodQOSGuaranteed {
 		return nil
 	}
+	if blocks := s.GetPodMemoryBlocks(podUID); blocks != nil {
+		logger.V(4).Info("Pod already present in state, skipping")
+		return nil
+	}
 
 	// 1. Calculate memory resources.
 	podTotalMemory, err := getPodRequestedResources(logger, pod)

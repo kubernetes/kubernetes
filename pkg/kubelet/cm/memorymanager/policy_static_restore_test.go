@@ -20,6 +20,8 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -155,6 +157,9 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 			}
 
 			// Verify state before restart
+			podMemoryAssignments := mgr.State().GetPodMemoryAssignments()
+			memoryAssignments := mgr.State().GetMemoryAssignments()
+			machineState := mgr.State().GetMachineState()
 			podBlocks := mgr.State().GetPodMemoryBlocks(string(pod.UID))
 			if tc.expectPodBlocks && len(podBlocks) == 0 {
 				t.Errorf("expected pod memory blocks to be present")
@@ -198,6 +203,22 @@ func TestMemoryManagerRestoreState(t *testing.T) {
 					if len(containerBlocksRestored) == 0 {
 						t.Errorf("expected container memory blocks to be present after restore for %s", container.Name)
 					}
+				}
+			}
+
+			if tc.podLevelResourceManagersEnabled && resourcehelper.IsPodLevelResourcesSet(pod) {
+				if err := mgr2.AllocatePod(logger, pod, lifecycle.AddOperation); err != nil {
+					t.Fatalf("could not allocate restored pod: %v", err)
+				}
+
+				if diff := cmp.Diff(podMemoryAssignments, mgr2.State().GetPodMemoryAssignments()); diff != "" {
+					t.Errorf("pod memory assignments changed after allocating restored pod (-want +got):\n%s", diff)
+				}
+				if diff := cmp.Diff(memoryAssignments, mgr2.State().GetMemoryAssignments()); diff != "" {
+					t.Errorf("container memory assignments changed after allocating restored pod (-want +got):\n%s", diff)
+				}
+				if diff := cmp.Diff(machineState, mgr2.State().GetMachineState()); diff != "" {
+					t.Errorf("machine state changed after allocating restored pod (-want +got):\n%s", diff)
 				}
 			}
 		})
