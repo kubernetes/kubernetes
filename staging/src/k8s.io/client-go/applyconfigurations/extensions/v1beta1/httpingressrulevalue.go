@@ -27,7 +27,7 @@ package v1beta1
 // to match against everything after the last '/' and before the first '?'
 // or '#'.
 type HTTPIngressRuleValueApplyConfiguration struct {
-	// A collection of paths that map requests to backends.
+	// paths is a collection of paths that map requests to backends.
 	Paths []HTTPIngressPathApplyConfiguration `json:"paths,omitempty"`
 }
 
