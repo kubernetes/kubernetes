@@ -209,3 +209,83 @@ func TestNegativeScaleInt64(t *testing.T) {
 		}
 	}
 }
+
+func TestMaxMilliQuantity(t *testing.T) {
+	bound := MaxMilliQuantity()
+
+	// The bound promises both accessors, so pin both.
+	if got := bound.MilliValue(); got != int64(mostPositive) {
+		t.Errorf("MaxMilliQuantity().MilliValue() = %d, want %d", got, int64(mostPositive))
+	}
+	if got := bound.ScaledValue(Milli); got != int64(mostPositive) {
+		t.Errorf("MaxMilliQuantity().ScaledValue(Milli) = %d, want %d", got, int64(mostPositive))
+	}
+
+	// The same must hold once the bound is decimal-backed, because this whole
+	// class of bug is representation-dependent.
+	decBound := MaxMilliQuantity()
+	decBound.ToDec()
+	if got := decBound.MilliValue(); got != int64(mostPositive) {
+		t.Errorf("MaxMilliQuantity().ToDec().MilliValue() = %d, want %d", got, int64(mostPositive))
+	}
+
+	// The bound is exact to the nano: one nano past it already needs MaxInt64+1
+	// milli-units and cannot fit.
+	past := MaxMilliQuantity()
+	past.Add(*NewScaledQuantity(1, Nano))
+
+	// MaxMilliValue cannot serve as the bound: 9223372036854775807m equals the
+	// bound and is safe, yet sorts above the whole-number MaxMilliValue, which is
+	// why the helper is not built from it.
+	fractional := MustParse("9223372036854775807m")
+	if got := fractional.Cmp(bound); got != 0 {
+		t.Fatalf("premise: %s should equal MaxMilliQuantity(), Cmp = %d", fractional.String(), got)
+	}
+	if fractional.Cmp(*NewQuantity(MaxMilliValue, DecimalSI)) <= 0 {
+		t.Fatalf("premise: %s should sort above MaxMilliValue", fractional.String())
+	}
+	if got := fractional.MilliValue(); got != int64(mostPositive) {
+		t.Errorf("(%s).MilliValue() = %d, want %d (safe, so the bound must not exclude it)",
+			fractional.String(), got, int64(mostPositive))
+	}
+
+	// For a non-negative q, q.Cmp(MaxMilliQuantity()) <= 0 reports whether q at
+	// milli scale fits an int64.
+	for _, tc := range []struct {
+		name   string
+		q      Quantity
+		within bool
+	}{
+		{"zero", *NewQuantity(0, DecimalSI), true},
+		{"the largest whole number that fits", *NewQuantity(MaxMilliValue, DecimalSI), true},
+		{"fractional, past MaxMilliValue but still safe", MustParse("9223372036854775807m"), true},
+		{"one nano past the bound", past, false},
+		{"larger than int64", MustParse("18446744073709551616"), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.q.Cmp(bound) <= 0; got != tc.within {
+				t.Errorf("(%s).Cmp(MaxMilliQuantity()) <= 0 = %v, want %v", tc.q.String(), got, tc.within)
+			}
+		})
+	}
+}
+
+// TestQuantityDocExamples pins the examples in the Quantity type doc.
+func TestQuantityDocExamples(t *testing.T) {
+	for _, tc := range []struct{ in, want string }{
+		// A decimal quantity is not capped at 2^63-1 in magnitude.
+		{"18446744073709551616", "18446744073709551616"},
+		// A binarySI one is: 8Ei is 2^63, and parses as 2^63-1.
+		{"8Ei", "9223372036854775807"},
+		// No quantity is limited to three decimal places.
+		{"1.2345", "1234500u"},
+		// Parsing rounds away from zero below nano.
+		{"0.9n", "1n"},
+		{"-0.9n", "-1n"},
+	} {
+		q := MustParse(tc.in)
+		if got := q.String(); got != tc.want {
+			t.Errorf("MustParse(%q).String() = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
