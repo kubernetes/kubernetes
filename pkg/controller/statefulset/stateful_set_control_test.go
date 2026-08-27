@@ -517,6 +517,80 @@ func RecreatesSucceededPodWithDeleteFailure(t *testing.T, set *apps.StatefulSet,
 	recreatesPod(t, set, invariants, v1.PodSucceeded, true)
 }
 
+func TestParallelScaleDownProcessesCondemnedPodsBeforeMissingReplicas(t *testing.T) {
+	set := burst(newStatefulSet(2))
+	client := fake.NewSimpleClientset(set)
+	om, _, ssc := setupController(client)
+
+	// Pod 0 is inside the desired range. Pod 1 is missing, while Pod 2
+	// is outside the desired range and should therefore be condemned.
+	for _, ordinal := range []int{0, 2} {
+		pod := newStatefulSetPod(set, ordinal)
+		pod.Status.Phase = v1.PodRunning
+		pod.Status.Conditions = []v1.PodCondition{
+			{
+				Type:   v1.PodReady,
+				Status: v1.ConditionTrue,
+			},
+		}
+		fakeResourceVersion(pod)
+
+		if err := om.podsIndexer.Add(pod); err != nil {
+			t.Fatalf("failed to add pod %s to indexer: %v", pod.Name, err)
+		}
+	}
+
+	// Simulate ResourceQuota preventing creation of missing Pod 1.
+	createErr := errors.New("exceeded quota")
+	om.SetCreateStatefulPodError(createErr, 1)
+
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Fatalf("failed to create selector: %v", err)
+	}
+
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatalf("failed to list pods: %v", err)
+	}
+
+	_, err = ssc.UpdateStatefulSet(
+		context.TODO(),
+		set,
+		pods,
+		time.Now(),
+	)
+	if err == nil || !strings.Contains(err.Error(), createErr.Error()) {
+		t.Fatalf("expected create error %v, got %v", createErr, err)
+	}
+
+	if got, want := om.deletePodTracker.requests, 1; got != want {
+		t.Fatalf(
+			"expected condemned pod to be deleted before replica creation failed: "+
+				"got %d delete requests, want %d",
+			got,
+			want,
+		)
+	}
+
+	if got, want := om.createPodTracker.requests, 1; got != want {
+		t.Fatalf(
+			"got %d create requests, want %d",
+			got,
+			want,
+		)
+	}
+
+	pods, err = om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatalf("failed to list pods after update: %v", err)
+	}
+
+	if pod := findPodByOrdinal(pods, 2); pod != nil {
+		t.Fatalf("condemned pod %s was not deleted", pod.Name)
+	}
+}
+
 func CreatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset(set)
 	om, _, ssc := setupController(client)
