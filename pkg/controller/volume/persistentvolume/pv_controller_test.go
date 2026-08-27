@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -886,5 +887,45 @@ func TestRetroactiveStorageClassAssignment(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	for _, test := range tests {
 		runSyncTests(t, ctx, test.tests, test.storageClasses, nil)
+	}
+}
+
+func TestCheckVolumeSatisfyClaim(t *testing.T) {
+	// The size check uses Cmp, so a capacity or request past int64 orders
+	// correctly instead of overflowing through Value().
+	const tooSmall = "requested PV is too small"
+	tests := []struct {
+		name         string
+		pvCapacity   string
+		claimRequest string
+		wantTooSmall bool
+	}{
+		{name: "capacity past int64, small request", pvCapacity: "9223372036854775808", claimRequest: "1Gi", wantTooSmall: false},
+		{name: "small capacity, request past int64", pvCapacity: "1Gi", claimRequest: "9223372036854775808", wantTooSmall: true},
+		{name: "capacity and request past int64, capacity smaller", pvCapacity: "9223372036854775808", claimRequest: "18446744073709551616", wantTooSmall: true},
+		{name: "capacity and request past int64, equal", pvCapacity: "9223372036854775808", claimRequest: "9223372036854775808", wantTooSmall: false},
+		{name: "ordinary capacity larger than request", pvCapacity: "10Gi", claimRequest: "1Gi", wantTooSmall: false},
+		{name: "ordinary capacity smaller than request", pvCapacity: "1Gi", claimRequest: "10Gi", wantTooSmall: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			volume := &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					Capacity: v1.ResourceList{v1.ResourceStorage: resource.MustParse(tc.pvCapacity)},
+				},
+			}
+			claim := &v1.PersistentVolumeClaim{
+				Spec: v1.PersistentVolumeClaimSpec{
+					Resources: v1.VolumeResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse(tc.claimRequest)},
+					},
+				},
+			}
+			err := checkVolumeSatisfyClaim(volume, claim)
+			gotTooSmall := err != nil && err.Error() == tooSmall
+			if gotTooSmall != tc.wantTooSmall {
+				t.Errorf("checkVolumeSatisfyClaim() reported too-small=%v (err=%v), want too-small=%v", gotTooSmall, err, tc.wantTooSmall)
+			}
+		})
 	}
 }
