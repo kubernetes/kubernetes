@@ -208,11 +208,10 @@ type kubeGenericRuntimeManager struct {
 	podInitContainerTimeRecorder PodInitContainerTimeRecorder
 }
 
-// KubeGenericRuntime is a interface contains interfaces for container runtime and command.
+// KubeGenericRuntime is a interface contains interfaces for container runtime and streaming runtime.
 type KubeGenericRuntime interface {
 	kubecontainer.Runtime
 	kubecontainer.StreamingRuntime
-	kubecontainer.CommandRunner
 }
 
 // NewKubeGenericRuntimeManager creates a new kubeGenericRuntimeManager
@@ -261,8 +260,6 @@ func NewKubeGenericRuntimeManager(
 ) (KubeGenericRuntime, []images.PostImageGCHook, error) {
 	logger := klog.FromContext(ctx)
 
-	runtimeService = newInstrumentedRuntimeService(runtimeService)
-	imageService = newInstrumentedImageManagerService(imageService)
 	tracer := tracerProvider.Tracer(instrumentationScope)
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:                     recorder,
@@ -368,7 +365,7 @@ func NewKubeGenericRuntimeManager(
 		imagePullQPS,
 		imagePullBurst,
 		podPullingTimeRecorder)
-	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(insecureContainerLifecycleHTTPClient, kubeRuntimeManager, kubeRuntimeManager, recorder)
+	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(insecureContainerLifecycleHTTPClient, kubecontainer.NewCommandRunner(runtimeService), kubeRuntimeManager, recorder)
 	kubeRuntimeManager.containerGC = newContainerGC(runtimeService, podStateProvider, kubeRuntimeManager, tracer)
 	kubeRuntimeManager.podStateProvider = podStateProvider
 
