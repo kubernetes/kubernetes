@@ -17,6 +17,7 @@ limitations under the License.
 package podgroup
 
 import (
+	"fmt"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -147,31 +148,35 @@ func TestPodGroupSchedulingWithPodAntiAffinity(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload: true,
+		for _, cpgEnabled := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s (CPG enabled: %v)", tt.name, cpgEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.GenericWorkload:                 true,
+					features.TopologyAwareWorkloadScheduling: cpgEnabled,
+					features.CompositePodGroup:               cpgEnabled,
+				})
+
+				testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-anti-affinity",
+					// disable backoff
+					scheduler.WithPodMaxBackoffSeconds(0),
+					scheduler.WithPodInitialBackoffSeconds(0))
+				ns := testCtx.NS.Name
+
+				commonSteps := []stepsframework.Step{
+					{
+						Name:        "Create Nodes",
+						CreateNodes: tt.nodes,
+					},
+					{
+						Name:            "Create workloads",
+						CreateWorkloads: []*schedulingapi.Workload{workload},
+					},
+				}
+
+				if err := stepsframework.RunSteps(testCtx, t, ns, append(commonSteps, tt.steps...)); err != nil {
+					t.Fatal(err)
+				}
 			})
-
-			testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-anti-affinity",
-				// disable backoff
-				scheduler.WithPodMaxBackoffSeconds(0),
-				scheduler.WithPodInitialBackoffSeconds(0))
-			ns := testCtx.NS.Name
-
-			commonSteps := []stepsframework.Step{
-				{
-					Name:        "Create Nodes",
-					CreateNodes: tt.nodes,
-				},
-				{
-					Name:            "Create workloads",
-					CreateWorkloads: []*schedulingapi.Workload{workload},
-				},
-			}
-
-			if err := stepsframework.RunSteps(testCtx, t, ns, append(commonSteps, tt.steps...)); err != nil {
-				t.Fatal(err)
-			}
-		})
+		}
 	}
 }

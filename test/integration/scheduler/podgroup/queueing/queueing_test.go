@@ -833,68 +833,72 @@ func TestPodGroupQueueing(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload: true,
-			})
-
-			var testCtx *testutils.TestContext
-			if tt.podInjector != nil || tt.bindingFailing != nil {
-				var piPlugin *podInjectorPlugin
-				var bfPlugin *bindingFailingPlugin
-				registry := frameworkruntime.Registry{
-					"PodInjectorPlugin": func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
-						piPlugin = newPodInjectorPlugin(handle, tt.podInjector.watchPod, tt.podInjector.podToInject)
-						return piPlugin, nil
-					},
-					"BindingFailingPlugin": func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
-						bfPlugin = newBindingFailingPlugin(tt.bindingFailing.watchPod)
-						return bfPlugin, nil
-					},
-				}
-				var plugins configv1.Plugins
-				if tt.podInjector != nil {
-					plugins.PreFilter = configv1.PluginSet{
-						Enabled: []configv1.Plugin{{Name: piPlugin.Name()}},
-					}
-				}
-				if tt.bindingFailing != nil {
-					plugins.PreBind = configv1.PluginSet{
-						Enabled: []configv1.Plugin{{Name: bfPlugin.Name()}},
-					}
-				}
-				cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
-					Profiles: []configv1.KubeSchedulerProfile{{
-						SchedulerName: ptr.To(v1.DefaultSchedulerName),
-						Plugins:       &plugins,
-					}},
+		for _, cpgEnabled := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s (CPG enabled: %v)", tt.name, cpgEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.GenericWorkload:                 true,
+					features.TopologyAwareWorkloadScheduling: cpgEnabled,
+					features.CompositePodGroup:               cpgEnabled,
 				})
-				testCtx = testutils.InitTestSchedulerWithNS(t, "podgroup-queueing",
-					scheduler.WithFrameworkOutOfTreeRegistry(registry),
-					scheduler.WithProfiles(cfg.Profiles...),
-					scheduler.WithPodMaxBackoffSeconds(0),
-					scheduler.WithPodInitialBackoffSeconds(0))
-				if piPlugin != nil {
-					piPlugin.schedulingQueue = testCtx.Scheduler.SchedulingQueue
+
+				var testCtx *testutils.TestContext
+				if tt.podInjector != nil || tt.bindingFailing != nil {
+					var piPlugin *podInjectorPlugin
+					var bfPlugin *bindingFailingPlugin
+					registry := frameworkruntime.Registry{
+						"PodInjectorPlugin": func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
+							piPlugin = newPodInjectorPlugin(handle, tt.podInjector.watchPod, tt.podInjector.podToInject)
+							return piPlugin, nil
+						},
+						"BindingFailingPlugin": func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
+							bfPlugin = newBindingFailingPlugin(tt.bindingFailing.watchPod)
+							return bfPlugin, nil
+						},
+					}
+					var plugins configv1.Plugins
+					if tt.podInjector != nil {
+						plugins.PreFilter = configv1.PluginSet{
+							Enabled: []configv1.Plugin{{Name: piPlugin.Name()}},
+						}
+					}
+					if tt.bindingFailing != nil {
+						plugins.PreBind = configv1.PluginSet{
+							Enabled: []configv1.Plugin{{Name: bfPlugin.Name()}},
+						}
+					}
+					cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+						Profiles: []configv1.KubeSchedulerProfile{{
+							SchedulerName: ptr.To(v1.DefaultSchedulerName),
+							Plugins:       &plugins,
+						}},
+					})
+					testCtx = testutils.InitTestSchedulerWithNS(t, "podgroup-queueing",
+						scheduler.WithFrameworkOutOfTreeRegistry(registry),
+						scheduler.WithProfiles(cfg.Profiles...),
+						scheduler.WithPodMaxBackoffSeconds(0),
+						scheduler.WithPodInitialBackoffSeconds(0))
+					if piPlugin != nil {
+						piPlugin.schedulingQueue = testCtx.Scheduler.SchedulingQueue
+					}
+				} else {
+					testCtx = testutils.InitTestSchedulerWithNS(t, "podgroup-queueing",
+						scheduler.WithPodMaxBackoffSeconds(0),
+						scheduler.WithPodInitialBackoffSeconds(0))
 				}
-			} else {
-				testCtx = testutils.InitTestSchedulerWithNS(t, "podgroup-queueing",
-					scheduler.WithPodMaxBackoffSeconds(0),
-					scheduler.WithPodInitialBackoffSeconds(0))
-			}
-			ns := testCtx.NS.Name
+				ns := testCtx.NS.Name
 
-			steps := append([]stepsframework.Step{
-				{
-					Name:        "Create initial node",
-					CreateNodes: []*v1.Node{node},
-				},
-			}, tt.steps...)
+				steps := append([]stepsframework.Step{
+					{
+						Name:        "Create initial node",
+						CreateNodes: []*v1.Node{node},
+					},
+				}, tt.steps...)
 
-			if err := stepsframework.RunSteps(testCtx, t, ns, steps); err != nil {
-				t.Fatal(err)
-			}
-		})
+				if err := stepsframework.RunSteps(testCtx, t, ns, steps); err != nil {
+					t.Fatal(err)
+				}
+			})
+		}
 	}
 }
 
@@ -976,32 +980,36 @@ func TestPodGroupSequentialQueueing(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload: true,
+		for _, cpgEnabled := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s (CPG enabled: %v)", tt.name, cpgEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.GenericWorkload:                 true,
+					features.TopologyAwareWorkloadScheduling: cpgEnabled,
+					features.CompositePodGroup:               cpgEnabled,
+				})
+
+				testCtx := testutils.InitTestSchedulerWithOptions(
+					t,
+					testutils.InitTestAPIServer(t, "podgroup-queueing", nil),
+					0,
+					scheduler.WithPodInitialBackoffSeconds(0),
+					scheduler.WithPodMaxBackoffSeconds(0),
+				)
+				testutils.SyncSchedulerInformerFactory(testCtx)
+				ns := testCtx.NS.Name
+
+				steps := append([]stepsframework.Step{
+					{
+						Name:        "Create initial node",
+						CreateNodes: []*v1.Node{node},
+					},
+				}, tt.steps...)
+
+				if err := stepsframework.RunSteps(testCtx, t, ns, steps); err != nil {
+					t.Fatal(err)
+				}
 			})
-
-			testCtx := testutils.InitTestSchedulerWithOptions(
-				t,
-				testutils.InitTestAPIServer(t, "podgroup-queueing", nil),
-				0,
-				scheduler.WithPodInitialBackoffSeconds(0),
-				scheduler.WithPodMaxBackoffSeconds(0),
-			)
-			testutils.SyncSchedulerInformerFactory(testCtx)
-			ns := testCtx.NS.Name
-
-			steps := append([]stepsframework.Step{
-				{
-					Name:        "Create initial node",
-					CreateNodes: []*v1.Node{node},
-				},
-			}, tt.steps...)
-
-			if err := stepsframework.RunSteps(testCtx, t, ns, steps); err != nil {
-				t.Fatal(err)
-			}
-		})
+		}
 	}
 }
 
@@ -1202,59 +1210,66 @@ func TestPodGroupRequeueRemainingOnSchedulingSuccess(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
-			var piPlugin *podInjectorPlugin
-			var opts []scheduler.Option
-			if tt.podInjector != nil {
-				registry := frameworkruntime.Registry{
-					"PodInjectorPlugin": func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
-						piPlugin = newPodInjectorPlugin(handle, tt.podInjector.watchPod, tt.podInjector.podToInject)
-						return piPlugin, nil
-					},
-				}
-				plugins := configv1.Plugins{
-					PreFilter: configv1.PluginSet{
-						Enabled: []configv1.Plugin{{Name: "PodInjectorPlugin"}},
-					},
-				}
-				cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
-					Profiles: []configv1.KubeSchedulerProfile{{
-						SchedulerName: ptr.To(v1.DefaultSchedulerName),
-						Plugins:       &plugins,
-					}},
+		for _, cpgEnabled := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s (CPG enabled: %v)", tt.name, cpgEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.GenericWorkload:                 true,
+					features.TopologyAwareWorkloadScheduling: cpgEnabled,
+					features.CompositePodGroup:               cpgEnabled,
 				})
+
+				var piPlugin *podInjectorPlugin
+				var opts []scheduler.Option
+				if tt.podInjector != nil {
+					registry := frameworkruntime.Registry{
+						"PodInjectorPlugin": func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
+							piPlugin = newPodInjectorPlugin(handle, tt.podInjector.watchPod, tt.podInjector.podToInject)
+							return piPlugin, nil
+						},
+					}
+					plugins := configv1.Plugins{
+						PreFilter: configv1.PluginSet{
+							Enabled: []configv1.Plugin{{Name: "PodInjectorPlugin"}},
+						},
+					}
+					cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+						Profiles: []configv1.KubeSchedulerProfile{{
+							SchedulerName: ptr.To(v1.DefaultSchedulerName),
+							Plugins:       &plugins,
+						}},
+					})
+					opts = append(opts,
+						scheduler.WithFrameworkOutOfTreeRegistry(registry),
+						scheduler.WithProfiles(cfg.Profiles...),
+					)
+				}
 				opts = append(opts,
-					scheduler.WithFrameworkOutOfTreeRegistry(registry),
-					scheduler.WithProfiles(cfg.Profiles...),
+					scheduler.WithPodInitialBackoffSeconds(10),
+					scheduler.WithPodMaxBackoffSeconds(20),
 				)
-			}
-			opts = append(opts,
-				scheduler.WithPodInitialBackoffSeconds(10),
-				scheduler.WithPodMaxBackoffSeconds(20),
-			)
-			testCtx := testutils.InitTestSchedulerWithOptions(
-				t,
-				testutils.InitTestAPIServer(t, "podgroup-ordering", nil),
-				0,
-				opts...,
-			)
-			if piPlugin != nil {
-				piPlugin.schedulingQueue = testCtx.Scheduler.SchedulingQueue
-			}
-			testutils.SyncSchedulerInformerFactory(testCtx)
-			ns := testCtx.NS.Name
+				testCtx := testutils.InitTestSchedulerWithOptions(
+					t,
+					testutils.InitTestAPIServer(t, "podgroup-ordering", nil),
+					0,
+					opts...,
+				)
+				if piPlugin != nil {
+					piPlugin.schedulingQueue = testCtx.Scheduler.SchedulingQueue
+				}
+				testutils.SyncSchedulerInformerFactory(testCtx)
+				ns := testCtx.NS.Name
 
-			steps := append([]stepsframework.Step{
-				{
-					Name:        "Create initial node",
-					CreateNodes: []*v1.Node{node1},
-				},
-			}, tt.steps...)
+				steps := append([]stepsframework.Step{
+					{
+						Name:        "Create initial node",
+						CreateNodes: []*v1.Node{node1},
+					},
+				}, tt.steps...)
 
-			if err := stepsframework.RunSteps(testCtx, t, ns, steps); err != nil {
-				t.Fatal(err)
-			}
-		})
+				if err := stepsframework.RunSteps(testCtx, t, ns, steps); err != nil {
+					t.Fatal(err)
+				}
+			})
+		}
 	}
 }
