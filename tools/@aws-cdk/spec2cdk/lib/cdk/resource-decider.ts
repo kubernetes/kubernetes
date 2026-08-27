@@ -2,6 +2,7 @@ import type { Property, Resource, TagVariant } from '@aws-cdk/service-spec-types
 import { Deprecation, RichProperty } from '@aws-cdk/service-spec-types';
 import type { Expression, PropertySpec } from '@cdklabs/typewriter';
 import { $E, $T, $this, Type, expr } from '@cdklabs/typewriter';
+import { attributePropertyNames } from './attribute-name-conflict-resolutions';
 import { CDK_CORE } from './cdk';
 import type { PropertyMapping } from './cloudformation-mapping';
 import type { RelationshipDecider } from './relationship-decider';
@@ -9,7 +10,7 @@ import { ResolverBuilder } from './resolver-builder';
 import type { TaggabilityStyle } from './tagging';
 import { NON_RESOLVABLE_PROPERTY_NAMES, resourceTaggabilityStyle } from './tagging';
 import type { TypeConverter } from './type-converter';
-import { attributePropertyName, camelcasedResourceName, cloudFormationDocLink, propertyNameFromCloudFormation } from '../naming';
+import { camelcasedResourceName, cloudFormationDocLink, propertyNameFromCloudFormation } from '../naming';
 import { splitDocumentation } from '../util';
 import { ResourceReference } from './reference-props';
 
@@ -29,6 +30,8 @@ export class ResourceDecider {
   private readonly taggability?: TaggabilityStyle;
   private readonly resolverBuilder: ResolverBuilder;
 
+  private readonly attributePropertyNames: Map<string, string>;
+
   public readonly resourceReference: ResourceReference;
   public readonly propsProperties = new Array<PropsProperty>();
   public readonly classProperties = new Array<ClassProperty>();
@@ -43,6 +46,7 @@ export class ResourceDecider {
     this.camelResourceName = camelcasedResourceName(resource);
     this.taggability = resourceTaggabilityStyle(this.resource);
     this.resolverBuilder = new ResolverBuilder(this.converter, this.relationshipDecider, this.converter.module);
+    this.attributePropertyNames = attributePropertyNames(resource.cloudFormationType, Object.keys(resource.attributes));
 
     this.convertProperties();
     this.convertAttributes();
@@ -303,7 +307,7 @@ export class ResourceDecider {
 
       this.classAttributeProperties.push({
         propertySpec: {
-          name: attributePropertyName(attrName),
+          name: this.attributePropertyNames.get(attrName)!,
           type,
           immutable: true,
           docs: {
