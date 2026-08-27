@@ -28,6 +28,7 @@ import (
 
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
+	"k8s.io/kubernetes/test/utils/ktesting"
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/mount-utils"
@@ -41,8 +42,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/klog/v2/ktesting"
-	_ "k8s.io/klog/v2/ktesting/init"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
@@ -71,7 +70,7 @@ func hasAddedPods() bool { return true }
 // Calls Run()
 // Verifies there are no calls to attach, detach, mount, unmount, etc.
 func Test_Run_Positive_DoNothing(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
@@ -102,7 +101,7 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 		kubeletPodsDir)
 
 	// Act
-	runReconciler(ctx, reconciler)
+	runReconciler(tCtx, reconciler)
 
 	// Assert
 	assert.NoError(t, volumetesting.VerifyZeroAttachCalls(fakePlugin))
@@ -1113,6 +1112,7 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 }
 
 func Test_GenerateMapVolumeFunc_Plugin_Not_Found(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	testCases := map[string]struct {
 		volumePlugins  []volume.VolumePlugin
 		expectErr      bool
@@ -1153,7 +1153,7 @@ func Test_GenerateMapVolumeFunc_Plugin_Not_Found(t *testing.T) {
 			volumeToMount := operationexecutor.VolumeToMount{
 				Pod:        pod,
 				VolumeSpec: tmpSpec}
-			err := oex.MountVolume(waitForAttachTimeout, volumeToMount, asw, false)
+			err := oex.MountVolume(tCtx, waitForAttachTimeout, volumeToMount, asw, false)
 			// Assert
 			if assert.Error(t, err) {
 				assert.ErrorContains(t, err, tc.expectedErrMsg)

@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -80,7 +81,7 @@ func (plugin *testPlugins) CanSupport(spec *Spec) bool {
 	return true
 }
 
-func (plugin *testPlugins) RequiresRemount(spec *Spec) bool {
+func (plugin *testPlugins) RequiresRemount(logger klog.Logger, spec *Spec) bool {
 	return false
 }
 
@@ -88,7 +89,7 @@ func (plugin *testPlugins) SupportsMountOption() bool {
 	return false
 }
 
-func (plugin *testPlugins) SupportsSELinuxContextMount(spec *Spec) (bool, error) {
+func (plugin *testPlugins) SupportsSELinuxContextMount(logger klog.Logger, spec *Spec) (bool, error) {
 	return false, nil
 }
 

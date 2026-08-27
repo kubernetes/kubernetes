@@ -359,7 +359,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 	mountRequestTime := time.Now()
 	var outerVolumeSpecNames []string
 	if ok {
-		if !volumePlugin.RequiresRemount(volumeSpec) {
+		if !volumePlugin.RequiresRemount(logger, volumeSpec) {
 			mountRequestTime = oldPodMount.mountRequestTime
 		}
 		outerVolumeSpecNames = oldPodMount.outerVolumeSpecNames

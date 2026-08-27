@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
@@ -176,7 +177,9 @@ func IsSELinuxLabelTranslationError(err error) bool {
 func SupportsSELinuxContextMount(volumeSpec *volume.Spec, volumePluginMgr *volume.VolumePluginMgr) (bool, error) {
 	plugin, _ := volumePluginMgr.FindPluginBySpec(volumeSpec)
 	if plugin != nil {
-		return plugin.SupportsSELinuxContextMount(volumeSpec)
+		// Use klog.TODO() because we currently do not have a proper logger to pass in.
+		// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
+		return plugin.SupportsSELinuxContextMount(klog.TODO(), volumeSpec)
 	}
 
 	return false, nil

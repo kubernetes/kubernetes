@@ -467,12 +467,12 @@ func (vm *volumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod)
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
 			for _, volumeToMount := range unattachedVolumeMounts {
-				attachablePlugin, findErr := vm.volumePluginMgr.FindAttachablePluginBySpec(volumeToMount.VolumeSpec)
+				attachablePlugin, findErr := vm.volumePluginMgr.FindAttachablePluginBySpec(logger, volumeToMount.VolumeSpec)
 				if findErr != nil || attachablePlugin == nil {
 					// This volume type doesn't support the attachable interface, so we can skip our check.
 					continue
 				}
-				if attachablePlugin.VerifyExhaustedResource(volumeToMount.VolumeSpec) {
+				if attachablePlugin.VerifyExhaustedResource(logger, volumeToMount.VolumeSpec) {
 					// Return error to the kubelet, which will then trigger the pod termination logic.
 					return &VolumeAttachLimitExceededError{
 						UnmountedVolumes:  unmountedVolumes,

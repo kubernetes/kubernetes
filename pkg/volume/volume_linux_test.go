@@ -19,6 +19,7 @@ limitations under the License.
 package volume
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -45,11 +46,11 @@ func (l *localFakeMounter) GetAttributes() Attributes {
 	return l.attributes
 }
 
-func (l *localFakeMounter) SetUp(mounterArgs MounterArgs) error {
+func (l *localFakeMounter) SetUp(ctx context.Context, mounterArgs MounterArgs) error {
 	return nil
 }
 
-func (l *localFakeMounter) SetUpAt(dir string, mounterArgs MounterArgs) error {
+func (l *localFakeMounter) SetUpAt(ctx context.Context, dir string, mounterArgs MounterArgs) error {
 	return nil
 }
 

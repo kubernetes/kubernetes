@@ -45,7 +45,7 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 	// attach if kubelet is responsible for attaching volumes.
 	// If underlying PVC was resized while in-use then this function also handles volume
 	// resizing.
-	rc.mountOrAttachVolumes(logger)
+	rc.mountOrAttachVolumes(ctx)
 
 	// Unmount volumes only when DSW and ASW are fully populated to prevent unmounting a volume
 	// that is still needed, but it did not reach DSW yet.
