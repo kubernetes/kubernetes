@@ -9,18 +9,6 @@ All notable changes to this project will be documented in this file. See [standa
 
 * **kinesisfirehose:** After this change, specifying an unsupported `timeZone` on the Firehose `S3Bucket` destination now throws a `ValidationError` during synthesis instead of failing at CloudFormation deployment. Affected values: 3-letter IANA abbreviations (e.g. `EST`), `Etc/UTC`, `Etc/GMT`, `Factory`, and strings containing characters outside `[a-zA-Z/_]+`. Use a supported standard IANA identifier (e.g. `America/New_York`) or `UTC` for synth to pass.
 
-### Describe any new or updated permissions being added
-
-N/A
-
-
-### Description of how you validated changes
-
-Validated with unit-tests and integration test
-
-### Checklist
-- [x] My code adheres to the [CONTRIBUTING GUIDE](https://github.com/aws/aws-cdk/blob/main/CONTRIBUTING.md) and [DESIGN GUIDELINES](https://github.com/aws/aws-cdk/blob/main/docs/DESIGN_GUIDELINES.md)
-
 ### Features
 
 * **backup:** add indexActions prop to BackupPlanRule ([#34051](https://github.com/aws/aws-cdk/issues/34051)) ([b8be853](https://github.com/aws/aws-cdk/commit/b8be853177df0d959662825c0c007bfc54f26171)), closes [#34050](https://github.com/aws/aws-cdk/issues/34050)
@@ -47,7 +35,6 @@ Validated with unit-tests and integration test
 * **ec2:** `NatInstanceProvider` and `NatInstanceProviderV2` always trigger the keyName deprecation warning ([#38347](https://github.com/aws/aws-cdk/issues/38347)) ([47f2151](https://github.com/aws/aws-cdk/commit/47f215178314d7383fa8c4de0178ffe7e7c507cf)), closes [#30806](https://github.com/aws/aws-cdk/issues/30806)
 * **kinesisfirehose:** add validation for customTimeZone in S3BucketProps ([#38514](https://github.com/aws/aws-cdk/issues/38514)) ([8cf9f90](https://github.com/aws/aws-cdk/commit/8cf9f90806febef5a31e272832b9af21de443842)), closes [#36089](https://github.com/aws/aws-cdk/issues/36089)
 * **lambda:** allow SnapStart for container image functions ([#38680](https://github.com/aws/aws-cdk/issues/38680)) ([a5adc00](https://github.com/aws/aws-cdk/commit/a5adc00abb30f6a48516c15615efda1b1b698ebf)), closes [#38281](https://github.com/aws/aws-cdk/issues/38281) [#38281](https://github.com/aws/aws-cdk/issues/38281) [#38265](https://github.com/aws/aws-cdk/issues/38265)
-* **lambda-python:** escape Docker bundling command arguments ([#38583](https://github.com/aws/aws-cdk/issues/38583)) ([f7ce07b](https://github.com/aws/aws-cdk/commit/f7ce07beb41b7fd0214a647b5a009f8706339105))
 * **rds:** serverlessV2 capacity props reject tokens at synth time ([#38044](https://github.com/aws/aws-cdk/issues/38044)) ([b7880de](https://github.com/aws/aws-cdk/commit/b7880de25ab26db3e37bf6b2aaf8d4b2dbe5d745)), closes [#38043](https://github.com/aws/aws-cdk/issues/38043) [#9044](https://github.com/aws/aws-cdk/issues/9044) [#31810](https://github.com/aws/aws-cdk/issues/31810) [#32905](https://github.com/aws/aws-cdk/issues/32905)
 * **s3-deployment:** increase default memory limit from 128MB to 1024MB ([#35501](https://github.com/aws/aws-cdk/issues/35501)) ([7a04f32](https://github.com/aws/aws-cdk/commit/7a04f32d9498069012b825171dbed85dd861767a)), closes [#35487](https://github.com/aws/aws-cdk/issues/35487)
 * **stepfunctions-tasks:** resolve EvaluateExpression paths via a values lookup ([#38682](https://github.com/aws/aws-cdk/issues/38682)) ([02301ea](https://github.com/aws/aws-cdk/commit/02301eaeac9764af6040d7892f684e7728ab01d2))
