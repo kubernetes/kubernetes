@@ -107,7 +107,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups(logger klog.Logger
 	if len(cm.cgroupRoot) > 0 {
 		go func() {
 			for {
-				err := cm.cgroupManager.Update(logger, cgroupConfig)
+				err := cm.updateNodeAllocatableCgroup(logger, cgroupConfig)
 				if err == nil {
 					cm.recorder.Event(nodeRef, v1.EventTypeNormal, events.SuccessfulNodeAllocatableEnforcement, "Updated Node Allocatable limit across pods")
 					return
@@ -158,6 +158,23 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups(logger klog.Logger
 		cm.recorder.Eventf(nodeRef, v1.EventTypeNormal, events.SuccessfulNodeAllocatableEnforcement, "Updated limits on kube reserved cgroup %v", nc.KubeReservedCgroupName)
 	}
 	return nil
+}
+
+// updateNodeAllocatableCgroup avoids lowering a cgroup v2 memory limit below
+// current usage. cgroup v2 may reclaim memory and invoke the memcg OOM killer
+// when memory.max is lowered below usage instead of rejecting the update.
+// The check is best-effort because usage may change before the cgroup update.
+func (cm *containerManagerImpl) updateNodeAllocatableCgroup(logger klog.Logger, config *CgroupConfig) error {
+	if cm.cgroupManager.Version() == 2 && config.ResourceParameters != nil && config.ResourceParameters.Memory != nil {
+		usage, err := cm.cgroupManager.MemoryUsage(config.Name)
+		if err != nil {
+			return fmt.Errorf("failed to read current Node Allocatable memory usage for cgroup %q: %w", config.Name, err)
+		}
+		if usage > *config.ResourceParameters.Memory {
+			return fmt.Errorf("current memory usage %d exceeds requested limit %d", usage, *config.ResourceParameters.Memory)
+		}
+	}
+	return cm.cgroupManager.Update(logger, config)
 }
 
 // enforceExistingCgroup updates the limits `rl` on existing cgroup `cName` using `cgroupManager` interface.
