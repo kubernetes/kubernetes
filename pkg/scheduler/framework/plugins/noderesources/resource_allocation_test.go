@@ -31,6 +31,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
@@ -610,19 +611,21 @@ func newTestDRAManager(tCtx ktesting.TContext, objects ...apiruntime.Object) *dy
 		resourceSliceTracker,
 		informerFactory)
 
+	logger := tCtx.Logger()
+	handlerOptions := cache.HandlerOptions{Logger: &logger}
 	cache := draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
-	handle, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(cache)
+	handle, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandlerWithOptions(cache, handlerOptions)
 	tCtx.ExpectNoError(err, "add device class informer event handler")
 	tCtx.Cleanup(func() {
 		_ = informerFactory.Resource().V1().DeviceClasses().Informer().RemoveEventHandler(handle)
 	})
 
-	informerFactory.Start(tCtx.Done())
+	informerFactory.StartWithContext(tCtx)
 	tCtx.Cleanup(func() {
 		// Now we can wait for all goroutines to stop.
 		informerFactory.Shutdown()
 	})
-	informerFactory.WaitForCacheSync(tCtx.Done())
+	informerFactory.WaitForCacheSyncWithContext(tCtx)
 
 	// Wait for full initialization of manager, including
 	// processing of all informer events.
