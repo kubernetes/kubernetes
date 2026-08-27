@@ -321,14 +321,14 @@ func Validate_Struct(
 			// lists with map semantics require unique keys
 			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 				func(a *MixedPtrKeyStruct, b *MixedPtrKeyStruct) bool {
-					return ((a.StringPtrKey == nil && b.StringPtrKey == nil) || (a.StringPtrKey != nil && b.StringPtrKey != nil && *a.StringPtrKey == *b.StringPtrKey)) && a.StringKey == b.StringKey
+					return a.StringKey == b.StringKey && ((a.StringPtrKey == nil && b.StringPtrKey == nil) || (a.StringPtrKey != nil && b.StringPtrKey != nil && *a.StringPtrKey == *b.StringPtrKey))
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			func() { // cohort = "{"stringPtrKey": "target-ptr", "stringKey": "target"}"
 				if e := validate.ValSliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *MixedPtrKeyStruct) bool {
-						return item.StringPtrKey != nil && *item.StringPtrKey == "target-ptr" && item.StringKey == "target"
+						return item.StringKey == "target" && item.StringPtrKey != nil && *item.StringPtrKey == "target-ptr"
 					}, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MixedPtrKeyStruct) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item ListMixedPtrKeyField")

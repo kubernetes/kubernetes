@@ -202,6 +202,62 @@ func Validate_DiscriminatorDisabled(
 	return errs
 }
 
+// Validate_IndependentFeatureDiscriminator validates an instance of IndependentFeatureDiscriminator according
+// to declarative validation rules in the API schema.
+func Validate_IndependentFeatureDiscriminator(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *IndependentFeatureDiscriminator) (errs field.ErrorList) {
+
+	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "sharedField",
+		func(obj *IndependentFeatureDiscriminator) *string { return obj.SharedField },
+		func(obj *IndependentFeatureDiscriminator) string { return obj.Discriminator }, validate.DirectEqual,
+		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+			errs := field.ErrorList{}
+			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
+			return errs
+		},
+		[]validate.DiscriminatedRule[*string, string]{
+
+			{
+				Value: "A",
+				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+					errs := field.ErrorList{}
+					earlyReturn := false
+					if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "FeatureA", true, validate.RequiredPointer); len(e) != 0 {
+						errs = append(errs, e...)
+						earlyReturn = true
+					}
+					if earlyReturn {
+						return errs
+					}
+					return errs
+				},
+			},
+
+			{
+				Value: "B",
+				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+					errs := field.ErrorList{}
+					earlyReturn := false
+					if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "FeatureB", true, validate.RequiredPointer); len(e) != 0 {
+						errs = append(errs, e...)
+						earlyReturn = true
+					}
+					if earlyReturn {
+						return errs
+					}
+					return errs
+				},
+			},
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	// field IndependentFeatureDiscriminator.Discriminator has no validation
+	// field IndependentFeatureDiscriminator.SharedField has no validation
+	return errs
+}
+
 // Validate_Struct validates an instance of Struct according
 // to declarative validation rules in the API schema.
 func Validate_Struct(
@@ -252,6 +308,28 @@ func Validate_Struct(
 				return &oldObj.DiscriminatorFieldDisabled
 			})
 		errs = append(errs, fn(fldPath.Child("discriminatorFieldDisabled"), &obj.DiscriminatorFieldDisabled, oldVal, oldObj != nil)...)
+	}
+
+	{ // field Struct.IndependentDiscriminator
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *IndependentFeatureDiscriminator,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_IndependentFeatureDiscriminator(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *IndependentFeatureDiscriminator {
+				return &oldObj.IndependentDiscriminator
+			})
+		errs = append(errs, fn(fldPath.Child("independentDiscriminator"), &obj.IndependentDiscriminator, oldVal, oldObj != nil)...)
 	}
 
 	return errs

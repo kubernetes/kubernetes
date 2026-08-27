@@ -66,20 +66,20 @@ var (
 	uuidValidator                       = types.Name{Package: libValidationPkg, Name: "UUID"}
 )
 
-func (formatTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (formatTagValidator) GetFieldValidation(context Context, _ SchemaMetadata, tag codetags.Tag) (ValidationGroup, error) {
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
 	if t := util.NonPointer(util.NativeType(context.Type)); t != types.String {
-		return Validations{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
+		return ValidationGroup{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
 	}
 
 	var result Validations
 	if formatFunction, err := getFormatValidationFunction(tag.Value); err != nil {
-		return result, err
+		return ValidationGroup{}, err
 	} else {
 		result.AddFunction(formatFunction)
 	}
-	return result, nil
+	return ValidationGroup{Validations: result}, nil
 }
 
 func getFormatValidationFunction(format string) (FunctionGen, error) {

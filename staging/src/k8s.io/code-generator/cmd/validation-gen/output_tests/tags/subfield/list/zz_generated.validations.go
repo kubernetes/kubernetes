@@ -77,18 +77,6 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "labels"
-				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "labels",
-					func(o *v1.ObjectMeta) map[string]string { return o.Labels }, validate.SemanticDeepEqual,
-					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj map[string]string) field.ErrorList {
-						return validate.EachMapKey(ctx, op, fldPath, obj, oldObj,
-							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-								return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "labels key error")
-							})
-					}); len(e) != 0 {
-					errs = append(errs, e...)
-				}
-			}()
 			func() { // cohort = "ownerReferences"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "ownerReferences",
 					func(o *v1.ObjectMeta) []v1.OwnerReference { return o.OwnerReferences }, validate.SemanticDeepEqual,
@@ -104,6 +92,18 @@ func Validate_Struct(
 					func(o *v1.ObjectMeta) []string { return o.Finalizers }, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []string) field.ErrorList {
 						return validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual)
+					}); len(e) != 0 {
+					errs = append(errs, e...)
+				}
+			}()
+			func() { // cohort = "labels"
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "labels",
+					func(o *v1.ObjectMeta) map[string]string { return o.Labels }, validate.SemanticDeepEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj map[string]string) field.ErrorList {
+						return validate.EachMapKey(ctx, op, fldPath, obj, oldObj,
+							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+								return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "labels key error")
+							})
 					}); len(e) != 0 {
 					errs = append(errs, e...)
 				}

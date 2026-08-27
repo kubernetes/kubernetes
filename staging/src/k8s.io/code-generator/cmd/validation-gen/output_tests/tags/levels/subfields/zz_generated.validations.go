@@ -25,7 +25,6 @@ import (
 	context "context"
 	fmt "fmt"
 
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -63,6 +62,28 @@ var zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tes
 func Validate_Struct(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *Struct) (errs field.ErrorList) {
+
+	func() { // cohort = "unionField"
+		if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "unionField",
+			func(o *Struct) *SubUnion { return &o.UnionField }, validate.SemanticDeepEqual,
+			func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SubUnion) field.ErrorList {
+				return validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_levels_subfields_Struct_unionField_,
+					func(obj *SubUnion) bool {
+						if obj == nil {
+							return false
+						}
+						return obj.Z1 != nil
+					},
+					func(obj *SubUnion) bool {
+						if obj == nil {
+							return false
+						}
+						return obj.Z2 != nil
+					}).MarkAlpha()
+			}); len(e) != 0 {
+			errs = append(errs, e...)
+		}
+	}()
 
 	// field Struct.TypeMeta has no validation
 
@@ -126,41 +147,6 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("subfieldBeta"), &obj.SubfieldBeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.UnionField
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *SubUnion,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call field-attached validations
-			if e := validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_levels_subfields_Struct_unionField_,
-				func(obj *SubUnion) bool {
-					if obj == nil {
-						return false
-					}
-					return obj.Z1 != nil
-				},
-				func(obj *SubUnion) bool {
-					if obj == nil {
-						return false
-					}
-					return obj.Z2 != nil
-				}).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *Struct) *SubUnion {
-				return &oldObj.UnionField
-			})
-		errs = append(errs, fn(fldPath.Child("unionField"), &obj.UnionField, oldVal, oldObj != nil)...)
-	}
-
+	// field Struct.UnionField has no validation
 	return errs
 }
