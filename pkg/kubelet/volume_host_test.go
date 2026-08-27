@@ -22,6 +22,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubelet/podcertificate"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -32,6 +33,9 @@ type recordingPodCertificateManager struct {
 	PodUID      string
 	VolumeName  string
 	SourceIndex int
+
+	TrackedPods   []types.UID
+	ForgottenPods []types.UID
 }
 
 func (f *recordingPodCertificateManager) GetPodCertificateCredentialBundle(ctx context.Context, namespace, podName, podUID, volumeName string, sourceIndex int) ([]byte, []byte, error) {
@@ -44,9 +48,13 @@ func (f *recordingPodCertificateManager) GetPodCertificateCredentialBundle(ctx c
 	return nil, nil, nil
 }
 
-func (f *recordingPodCertificateManager) TrackPod(ctx context.Context, pod *corev1.Pod) {}
+func (f *recordingPodCertificateManager) TrackPod(ctx context.Context, pod *corev1.Pod) {
+	f.TrackedPods = append(f.TrackedPods, pod.UID)
+}
 
-func (f *recordingPodCertificateManager) ForgetPod(ctx context.Context, pod *corev1.Pod) {}
+func (f *recordingPodCertificateManager) ForgetPod(ctx context.Context, pod *corev1.Pod) {
+	f.ForgottenPods = append(f.ForgottenPods, pod.UID)
+}
 
 func (f *recordingPodCertificateManager) MetricReport() *podcertificate.MetricReport {
 	return &podcertificate.MetricReport{}
