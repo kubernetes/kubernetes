@@ -51,6 +51,8 @@ func init() {
 	registerMetrics()
 }
 
+var k8sNamespaceRegex = regexp.MustCompile(`(^|\.)(kubernetes|k8s)\.io/`)
+
 // labelReconcileInfo lists Node labels to reconcile, and how to reconcile them.
 // primaryKey and secondaryKey are keys of labels to reconcile.
 //   - If both keys exist, but their values don't match. Use the value from the
@@ -290,6 +292,10 @@ func (cnc *CloudNodeController) UpdateNodeStatus(ctx context.Context) error {
 		}
 
 		cnc.updateNodeAddress(ctx, node, instanceMetadata)
+
+		if err := cnc.reconcileAdditionalLabels(node, instanceMetadata); err != nil {
+			klog.Errorf("Error reconciling additional labels for node %q: %v", node.Name, err)
+		}
 	}
 
 	workqueue.ParallelizeUntil(ctx, int(cnc.statusUpdateWorkerCount), len(nodes), updateNodeFunc)
@@ -353,6 +359,50 @@ func (cnc *CloudNodeController) reconcileNodeLabels(nodeName string) error {
 
 	if !cloudnodeutil.AddOrUpdateLabelsOnNode(cnc.kubeClient, labelsToUpdate, node) {
 		return fmt.Errorf("failed update labels for node %+v", node)
+	}
+
+	return nil
+}
+
+// reconcileAdditionalLabels adds or updates labels returned by the cloud provider.
+func (cnc *CloudNodeController) reconcileAdditionalLabels(
+	node *v1.Node,
+	instanceMetadata *cloudprovider.InstanceMetadata,
+) error {
+	if instanceMetadata == nil || len(instanceMetadata.AdditionalLabels) == 0 {
+		return nil
+	}
+
+	labelsToUpdate := map[string]string{}
+	for key, value := range instanceMetadata.AdditionalLabels {
+		// Cloud providers should not use label namespaces reserved by Kubernetes.
+		if k8sNamespaceRegex.MatchString(key) {
+			klog.Warningf(
+				"Discarding node label %s with kubernetes namespace",
+				key,
+			)
+			continue
+		}
+
+		currentValue, exists := node.Labels[key]
+		if !exists || currentValue != value {
+			labelsToUpdate[key] = value
+		}
+	}
+
+	if len(labelsToUpdate) == 0 {
+		return nil
+	}
+
+	if !cloudnodeutil.AddOrUpdateLabelsOnNode(
+		cnc.kubeClient,
+		labelsToUpdate,
+		node,
+	) {
+		return fmt.Errorf(
+			"failed to update additional labels for node %q",
+			node.Name,
+		)
 	}
 
 	return nil
@@ -553,7 +603,6 @@ func (cnc *CloudNodeController) getNodeModifiersFromCloudProvider(
 				n.Labels = map[string]string{}
 			}
 
-			k8sNamespaceRegex := regexp.MustCompile(`(^|\.)(kubernetes|k8s)\.io/`)
 			for k, v := range instanceMeta.AdditionalLabels {
 				// Cloud provider should not be using kubernetes namespaces in labels
 				if isK8sNamespace := k8sNamespaceRegex.MatchString(k); isK8sNamespace {
