@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/code-generator/cmd/validation-gen/validators"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
@@ -324,7 +325,8 @@ func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
 			return "", nil
 		}
 
-		// Skip non-pointer structs (and aliases to them) as they don't support requiredness tags.
+		// Skip non-pointer structs (and aliases to them): their requiredness is
+		// handled by nonPointerStructRequiredness.
 		underlying := t
 		for underlying.Kind == types.Alias {
 			underlying = underlying.Underlying
@@ -370,10 +372,84 @@ func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
 	}
 }
 
+// isImplicitlyRequired returns true if a struct has a member tagged
+// +k8s:required or +k8s:unionMember, directly or in a struct it contains by
+// value. Such a struct rejects its own zero value, which makes a non-pointer
+// field of that type required in effect.
+func isImplicitlyRequired(extractor validators.ValidationExtractor, t *types.Type) (bool, error) {
+	st := util.NativeType(t)
+	if st.Kind != types.Struct {
+		return false, nil
+	}
+	for _, m := range st.Members {
+		mTags, err := extractor.ExtractTags(validators.Context{Scope: validators.ScopeField, Type: m.Type}, m.CommentLines)
+		if err != nil {
+			return false, err
+		}
+		if hasTag(mTags, "k8s:required") || hasTag(mTags, "k8s:unionMember") {
+			return true, nil
+		}
+		// An opaque member's own validations are ignored.
+		if hasTag(mTags, "k8s:opaqueType") {
+			continue
+		}
+		// Only descend by value: an unset pointer, slice or map member is nil,
+		// so nothing inside it is validated. Go forbids value cycles, so this
+		// terminates without cycle detection.
+		if nested, err := isImplicitlyRequired(extractor, m.Type); err != nil || nested {
+			return nested, err
+		}
+	}
+	return false, nil
+}
+
+// nonPointerStructRequiredness enforces that +k8s:required and +k8s:optional on
+// a non-pointer struct field match the struct's implicit requiredness. Neither
+// tag emits a presence check there (an unset struct is indistinguishable from a
+// zero-valued one), so the field is required exactly when the struct is.
+func nonPointerStructRequiredness(extractor validators.ValidationExtractor) lintRule {
+	return func(container *types.Type, t *types.Type, tags []codetags.Tag) (string, error) {
+		// We only care about fields in a struct. Skip if linting the struct itself.
+		if container == nil || container.Kind != types.Struct || container == t {
+			return "", nil
+		}
+		if util.NativeType(t).Kind != types.Struct {
+			return "", nil
+		}
+
+		isRequired, isOptional := hasTag(tags, "k8s:required"), hasTag(tags, "k8s:optional")
+		if !isRequired && !isOptional {
+			return "", nil
+		}
+
+		// An opaque type's validations are ignored, so nothing inside it can
+		// make the field required.
+		if hasTag(tags, "k8s:opaqueType") {
+			if isRequired {
+				return fmt.Sprintf("+k8s:required on non-pointer opaque struct %s: its validations are ignored, so the field is effectively optional", t.Name), nil
+			}
+			return "", nil
+		}
+
+		implied, err := isImplicitlyRequired(extractor, t)
+		if err != nil {
+			return "", err
+		}
+		switch {
+		case isRequired && !implied:
+			return fmt.Sprintf("+k8s:required on non-pointer struct %s: it has no required or union member, so the field is effectively optional", t.Name), nil
+		case isOptional && implied:
+			return fmt.Sprintf("+k8s:optional on non-pointer struct %s: it has a required or union member, so the field is effectively required", t.Name), nil
+		}
+		return "", nil
+	}
+}
+
 func lintRules(extractor validators.ValidationExtractor) []lintRule {
 	return []lintRule{
 		alphaBetaPrefix(),
 		validationStability(),
 		requiredAndOptional(extractor),
+		nonPointerStructRequiredness(extractor),
 	}
 }
