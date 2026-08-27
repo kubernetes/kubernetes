@@ -80,7 +80,19 @@ func MoreImportantVictim(vi1, vi2 Victim) bool {
 		return len(vi1.Pods()) > len(vi2.Pods())
 	}
 
-	return vi1.EarliestStartTime().Before(vi2.EarliestStartTime())
+	t1, t2 := vi1.EarliestStartTime(), vi2.EarliestStartTime()
+	if t1 != nil && t2 != nil && !t1.Equal(t2) {
+		return t1.Before(t2)
+	}
+
+	return podIdentityLess(vi1, vi2)
+}
+
+// podIdentityLess provides a deterministic, stable ordering of victims based on
+// the representative pod's UID. The first pod in a victim's list is stable once
+// the victim is constructed, so a direct comparison is sufficient.
+func podIdentityLess(vi1, vi2 Victim) bool {
+	return vi1.Pods()[0].GetPod().UID < vi2.Pods()[0].GetPod().UID
 }
 
 func victimRank(vi Victim) int {
