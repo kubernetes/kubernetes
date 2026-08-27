@@ -24,7 +24,7 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// LeaseCandidates returns a LeaseCandidateInformer.
+	// LeaseCandidates returns a TypedLeaseCandidateInformer.
 	LeaseCandidates() TypedLeaseCandidateInformer
 }
 

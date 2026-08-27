@@ -24,9 +24,9 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// FlowSchemas returns a FlowSchemaInformer.
+	// FlowSchemas returns a TypedFlowSchemaInformer.
 	FlowSchemas() TypedFlowSchemaInformer
-	// PriorityLevelConfigurations returns a PriorityLevelConfigurationInformer.
+	// PriorityLevelConfigurations returns a TypedPriorityLevelConfigurationInformer.
 	PriorityLevelConfigurations() TypedPriorityLevelConfigurationInformer
 }
 

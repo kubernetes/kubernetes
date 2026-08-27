@@ -24,9 +24,9 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// Evictions returns a EvictionInformer.
+	// Evictions returns a TypedEvictionInformer.
 	Evictions() TypedEvictionInformer
-	// EvictionRequests returns a EvictionRequestInformer.
+	// EvictionRequests returns a TypedEvictionRequestInformer.
 	EvictionRequests() TypedEvictionRequestInformer
 }
 

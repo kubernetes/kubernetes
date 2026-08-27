@@ -24,17 +24,17 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// CSIDrivers returns a CSIDriverInformer.
+	// CSIDrivers returns a TypedCSIDriverInformer.
 	CSIDrivers() TypedCSIDriverInformer
-	// CSINodes returns a CSINodeInformer.
+	// CSINodes returns a TypedCSINodeInformer.
 	CSINodes() TypedCSINodeInformer
-	// CSIStorageCapacities returns a CSIStorageCapacityInformer.
+	// CSIStorageCapacities returns a TypedCSIStorageCapacityInformer.
 	CSIStorageCapacities() TypedCSIStorageCapacityInformer
-	// StorageClasses returns a StorageClassInformer.
+	// StorageClasses returns a TypedStorageClassInformer.
 	StorageClasses() TypedStorageClassInformer
-	// VolumeAttachments returns a VolumeAttachmentInformer.
+	// VolumeAttachments returns a TypedVolumeAttachmentInformer.
 	VolumeAttachments() TypedVolumeAttachmentInformer
-	// VolumeAttributesClasses returns a VolumeAttributesClassInformer.
+	// VolumeAttributesClasses returns a TypedVolumeAttributesClassInformer.
 	VolumeAttributesClasses() TypedVolumeAttributesClassInformer
 }
 

@@ -24,13 +24,13 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// ClusterRoles returns a ClusterRoleInformer.
+	// ClusterRoles returns a TypedClusterRoleInformer.
 	ClusterRoles() TypedClusterRoleInformer
-	// ClusterRoleBindings returns a ClusterRoleBindingInformer.
+	// ClusterRoleBindings returns a TypedClusterRoleBindingInformer.
 	ClusterRoleBindings() TypedClusterRoleBindingInformer
-	// Roles returns a RoleInformer.
+	// Roles returns a TypedRoleInformer.
 	Roles() TypedRoleInformer
-	// RoleBindings returns a RoleBindingInformer.
+	// RoleBindings returns a TypedRoleBindingInformer.
 	RoleBindings() TypedRoleBindingInformer
 }
 
