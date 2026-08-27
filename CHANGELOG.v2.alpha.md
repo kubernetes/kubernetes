@@ -23,6 +23,7 @@ All notable changes to this project will be documented in this file. See [standa
 ### Bug Fixes
 
 * **glue-alpha:** validate that DATE partition projection interval is set when required ([#38594](https://github.com/aws/aws-cdk/issues/38594)) ([0e2b582](https://github.com/aws/aws-cdk/commit/0e2b582af1c5ac478e36cccc55523873302bf866))
+* **lambda-python-alpha:** escape Docker bundling command arguments ([#38583](https://github.com/aws/aws-cdk/issues/38583)) ([f7ce07b](https://github.com/aws/aws-cdk/commit/f7ce07beb41b7fd0214a647b5a009f8706339105))
 
 ## [2.266.0-alpha.0](https://github.com/aws/aws-cdk/compare/v2.265.0-alpha.0...v2.266.0-alpha.0) (2026-08-19)
 
