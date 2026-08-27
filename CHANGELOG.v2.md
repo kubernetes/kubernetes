@@ -2,6 +2,57 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [2.267.0](https://github.com/aws/aws-cdk/compare/v2.266.0...v2.267.0) (2026-08-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* **kinesisfirehose:** After this change, specifying an unsupported `timeZone` on the Firehose `S3Bucket` destination now throws a `ValidationError` during synthesis instead of failing at CloudFormation deployment. Affected values: 3-letter IANA abbreviations (e.g. `EST`), `Etc/UTC`, `Etc/GMT`, `Factory`, and strings containing characters outside `[a-zA-Z/_]+`. Use a supported standard IANA identifier (e.g. `America/New_York`) or `UTC` for synth to pass.
+
+### Describe any new or updated permissions being added
+
+N/A
+
+
+### Description of how you validated changes
+
+Validated with unit-tests and integration test
+
+### Checklist
+- [x] My code adheres to the [CONTRIBUTING GUIDE](https://github.com/aws/aws-cdk/blob/main/CONTRIBUTING.md) and [DESIGN GUIDELINES](https://github.com/aws/aws-cdk/blob/main/docs/DESIGN_GUIDELINES.md)
+
+### Features
+
+* **backup:** add indexActions prop to BackupPlanRule ([#34051](https://github.com/aws/aws-cdk/issues/34051)) ([b8be853](https://github.com/aws/aws-cdk/commit/b8be853177df0d959662825c0c007bfc54f26171)), closes [#34050](https://github.com/aws/aws-cdk/issues/34050)
+* **bedrockagentcore:** add manageDeliveryResourcePolicy opt-out for runtime observability ([#38372](https://github.com/aws/aws-cdk/issues/38372)) ([5fb086b](https://github.com/aws/aws-cdk/commit/5fb086b20d8b26a202141593fd5d17264239aaba)), closes [#38342](https://github.com/aws/aws-cdk/issues/38342)
+* **ci:** integration test deployment on maintainer approval ([#38519](https://github.com/aws/aws-cdk/issues/38519)) ([c5f6b4f](https://github.com/aws/aws-cdk/commit/c5f6b4f1040559dd96ef0930e129f51c18debfbf)), closes [#37333](https://github.com/aws/aws-cdk/issues/37333)
+* **core:** `Size` objects now properly stringify ([#38662](https://github.com/aws/aws-cdk/issues/38662)) ([90fe151](https://github.com/aws/aws-cdk/commit/90fe1519489592b23b9329c99a3870d5368e1a1f))
+* **sqs:** metricApproximateNumberOfMessagesOutstanding ([#38661](https://github.com/aws/aws-cdk/issues/38661)) ([f29b27b](https://github.com/aws/aws-cdk/commit/f29b27bc52913f6252050d91d56bf9c311471a3b))
+
+
+### Bug Fixes
+
+* **assets:** `SymlinkFollowMode.BLOCK_EXTERNAL` will throw errors while bundling ([#38506](https://github.com/aws/aws-cdk/issues/38506)) ([a11e451](https://github.com/aws/aws-cdk/commit/a11e451ba1af395bff88344eb4bec2ea730b1a80))
+* **bedrockagentcore:** least-privilege browser recording S3 grant ([#38604](https://github.com/aws/aws-cdk/issues/38604)) ([7e11d11](https://github.com/aws/aws-cdk/commit/7e11d11e3a22ddbf8d82ed7cf7265c76ce63d868))
+* **ci:** add environment for Atmosphere variables access ([#38625](https://github.com/aws/aws-cdk/issues/38625)) ([785773e](https://github.com/aws/aws-cdk/commit/785773e65997a457ed52a3babbb2b18ee5a40319)), closes [#38519](https://github.com/aws/aws-cdk/issues/38519)
+* **cloudfront-origins:** readTimeout and keepaliveTimeout reject valid values ([#38432](https://github.com/aws/aws-cdk/issues/38432)) ([6251e1a](https://github.com/aws/aws-cdk/commit/6251e1ab798fbfd6b45de1d9a97672eef02aa9d9)), closes [#38433](https://github.com/aws/aws-cdk/issues/38433) [#18628](https://github.com/aws/aws-cdk/issues/18628)
+* **core:** performance counters use too much memory ([#38620](https://github.com/aws/aws-cdk/issues/38620)) ([d0ce23c](https://github.com/aws/aws-cdk/commit/d0ce23c77b0379fcc522dfa99675e7d44311aabd))
+* **core:** single file bundled output should be file ([#38548](https://github.com/aws/aws-cdk/issues/38548)) ([9e22774](https://github.com/aws/aws-cdk/commit/9e227740eb70d287158a7ea9382ff597281cf1ac))
+* **core:** stack.node.addDependency gets slower as stacks grow ([#38597](https://github.com/aws/aws-cdk/issues/38597)) ([2ab9be4](https://github.com/aws/aws-cdk/commit/2ab9be40f2b3245d2c73f2b897441af4b5fef96c)), closes [#38522](https://github.com/aws/aws-cdk/issues/38522)
+* **core:** symlinks in directory bundling output ([#38665](https://github.com/aws/aws-cdk/issues/38665)) ([8d8ae2c](https://github.com/aws/aws-cdk/commit/8d8ae2c68c0af4d7773017f18e50546ae1fca8ad))
+* **core:** validation plugin check adds too much overhead ([#38619](https://github.com/aws/aws-cdk/issues/38619)) ([df15b9f](https://github.com/aws/aws-cdk/commit/df15b9f37bb0b424b14e063d6f96b21ea2819740))
+* **dynamodb:** `TableV2.grants.*Data` does not include index resources ([#37892](https://github.com/aws/aws-cdk/issues/37892)) ([e48a97f](https://github.com/aws/aws-cdk/commit/e48a97f53d08e3cb3f5081dda189c9718dd86c01)), closes [#37569](https://github.com/aws/aws-cdk/issues/37569)
+* **dynamodb:** `TableV2MultiAccountReplica` rejects imported tables with tokenized ARNs ([#38365](https://github.com/aws/aws-cdk/issues/38365)) ([08f05e5](https://github.com/aws/aws-cdk/commit/08f05e514675273618a2549e328dd38efab828ec)), closes [#38354](https://github.com/aws/aws-cdk/issues/38354)
+* **dynamodb:** avoid TableGrantsProps deprecation warnings for TableV2 ([#38399](https://github.com/aws/aws-cdk/issues/38399)) ([fb5c25b](https://github.com/aws/aws-cdk/commit/fb5c25bfdb972d2a279ef09025c07f83e5191254)), closes [#37221](https://github.com/aws/aws-cdk/issues/37221)
+* **ec2:** `NatInstanceProvider` and `NatInstanceProviderV2` always trigger the keyName deprecation warning ([#38347](https://github.com/aws/aws-cdk/issues/38347)) ([47f2151](https://github.com/aws/aws-cdk/commit/47f215178314d7383fa8c4de0178ffe7e7c507cf)), closes [#30806](https://github.com/aws/aws-cdk/issues/30806)
+* **kinesisfirehose:** add validation for customTimeZone in S3BucketProps ([#38514](https://github.com/aws/aws-cdk/issues/38514)) ([8cf9f90](https://github.com/aws/aws-cdk/commit/8cf9f90806febef5a31e272832b9af21de443842)), closes [#36089](https://github.com/aws/aws-cdk/issues/36089)
+* **lambda:** allow SnapStart for container image functions ([#38680](https://github.com/aws/aws-cdk/issues/38680)) ([a5adc00](https://github.com/aws/aws-cdk/commit/a5adc00abb30f6a48516c15615efda1b1b698ebf)), closes [#38281](https://github.com/aws/aws-cdk/issues/38281) [#38281](https://github.com/aws/aws-cdk/issues/38281) [#38265](https://github.com/aws/aws-cdk/issues/38265)
+* **lambda-python:** escape Docker bundling command arguments ([#38583](https://github.com/aws/aws-cdk/issues/38583)) ([f7ce07b](https://github.com/aws/aws-cdk/commit/f7ce07beb41b7fd0214a647b5a009f8706339105))
+* **rds:** serverlessV2 capacity props reject tokens at synth time ([#38044](https://github.com/aws/aws-cdk/issues/38044)) ([b7880de](https://github.com/aws/aws-cdk/commit/b7880de25ab26db3e37bf6b2aaf8d4b2dbe5d745)), closes [#38043](https://github.com/aws/aws-cdk/issues/38043) [#9044](https://github.com/aws/aws-cdk/issues/9044) [#31810](https://github.com/aws/aws-cdk/issues/31810) [#32905](https://github.com/aws/aws-cdk/issues/32905)
+* **s3-deployment:** increase default memory limit from 128MB to 1024MB ([#35501](https://github.com/aws/aws-cdk/issues/35501)) ([7a04f32](https://github.com/aws/aws-cdk/commit/7a04f32d9498069012b825171dbed85dd861767a)), closes [#35487](https://github.com/aws/aws-cdk/issues/35487)
+* **stepfunctions-tasks:** resolve EvaluateExpression paths via a values lookup ([#38682](https://github.com/aws/aws-cdk/issues/38682)) ([02301ea](https://github.com/aws/aws-cdk/commit/02301eaeac9764af6040d7892f684e7728ab01d2))
+* stack.availabilityZones are not stable strings ([#38580](https://github.com/aws/aws-cdk/issues/38580)) ([f89474a](https://github.com/aws/aws-cdk/commit/f89474a338fe212886306e307d188190463c5824))
+
 ## [2.266.0](https://github.com/aws/aws-cdk/compare/v2.265.0...v2.266.0) (2026-08-19)
 
 
