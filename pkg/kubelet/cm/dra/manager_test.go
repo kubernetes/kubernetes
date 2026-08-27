@@ -3261,3 +3261,117 @@ func TestPrepareUnprepareResourcesSkipNodeOperations(t *testing.T) {
 		})
 	})
 }
+
+// TestInvalidatePreparedResources verifies that InvalidatePreparedResources
+// clears the prepared state of a pod's DRA claims so that the next
+// PrepareResources call re-invokes NodePrepareResources on the driver.
+//
+// This is a regression test for https://github.com/kubernetes/kubernetes/issues/141433
+// where a pod using DRA got permanently stuck in CreateContainerError after a
+// node reboot because kubelet never re-prepared claims whose CDI spec files
+// were lost.
+func TestInvalidatePreparedResources(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeKubeClient := fake.NewSimpleClientset()
+
+	draManager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
+	require.NoError(t, err)
+	defer draManager.Stop()
+
+	claimInfo := genTestClaimInfo(claimUID, []string{podUID}, true /* prepared */, nil)
+	draManager.cache.add(claimInfo)
+
+	info, exists := draManager.cache.get(claimName, namespace)
+	require.True(t, exists, "claim should exist in cache")
+	assert.True(t, info.isPrepared(), "claim should be prepared initially")
+
+	pod := genTestPod()
+
+	draManager.InvalidatePreparedResources(pod)
+
+	// Verify the claim is no longer prepared.
+	info, exists = draManager.cache.get(claimName, namespace)
+	require.True(t, exists, "claim should still exist in cache after invalidation")
+	assert.False(t, info.isPrepared(), "claim should NOT be prepared after InvalidatePreparedResources")
+}
+
+// TestInvalidatePreparedResourcesSkipsUnpreparing verifies that
+// InvalidatePreparedResources does not interfere with claims that are
+// currently being unprepared (to avoid race conditions).
+func TestInvalidatePreparedResourcesSkipsUnpreparing(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeKubeClient := fake.NewSimpleClientset()
+
+	draManager, err := NewManager(tCtx.Logger(), fakeKubeClient, t.TempDir())
+	require.NoError(t, err)
+	defer draManager.Stop()
+
+	// Pre-populate the cache with a prepared + unpreparing claim.
+	claimInfo := genTestClaimInfo(claimUID, []string{podUID}, true /* prepared */, nil)
+	claimInfo.setUnpreparing()
+	draManager.cache.add(claimInfo)
+
+	pod := genTestPod()
+
+	// Call InvalidatePreparedResources — should not clear prepared state
+	// because the claim is being torn down.
+	draManager.InvalidatePreparedResources(pod)
+
+	// Verify claim is still marked as prepared (untouched).
+	info, exists := draManager.cache.get(claimName, namespace)
+	require.True(t, exists)
+	assert.True(t, info.isPrepared(), "claim being unprepared should not have its prepared state cleared")
+}
+
+// TestInvalidatePreparedResourcesTriggersReprepare is an integration-style
+// test verifying that after InvalidatePreparedResources, calling
+// PrepareResources actually invokes NodePrepareResources on the driver
+// (instead of skipping due to the cached prepared state).
+func TestInvalidatePreparedResourcesTriggersReprepare(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, true)
+
+	fakeKubeClient := fake.NewClientset()
+	pod := genTestPod()
+	claim := genTestClaim(claimName, driverName, deviceName, podUID)
+	_, err := fakeKubeClient.ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	resp := genPrepareResourcesResponse(claimUID)
+	draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, false, nil, resp, nil, nil)
+	require.NoError(t, err)
+	defer draServerInfo.teardownFn()
+
+	draManager, err := NewManager(logger, fakeKubeClient, t.TempDir())
+	require.NoError(t, err)
+	defer draManager.Stop()
+	draManager.initDRAPluginManager(tCtx, getFakeNode, time.Second)
+
+	plg := draManager.GetWatcherHandler()
+	require.NoError(t, plg.RegisterPlugin(tCtx, driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil))
+
+	// First prepare: should call the driver.
+	err = draManager.PrepareResources(tCtx, pod)
+	require.NoError(t, err)
+	assert.Equal(t, uint32(1), draServerInfo.server.prepareResourceCalls.Load(),
+		"first PrepareResources should invoke NodePrepareResources")
+
+	info, exists := draManager.cache.get(claimName, namespace)
+	require.True(t, exists)
+	assert.True(t, info.isPrepared())
+
+	// Second prepare without invalidation: should skip (already prepared).
+	err = draManager.PrepareResources(tCtx, pod)
+	require.NoError(t, err)
+	assert.Equal(t, uint32(1), draServerInfo.server.prepareResourceCalls.Load(),
+		"second PrepareResources should skip because claim is already prepared")
+
+	draManager.InvalidatePreparedResources(pod)
+	assert.False(t, info.isPrepared(), "claim should not be prepared after invalidation")
+
+	// Third prepare after invalidation: should call the driver again.
+	err = draManager.PrepareResources(tCtx, pod)
+	require.NoError(t, err)
+	assert.Equal(t, uint32(2), draServerInfo.server.prepareResourceCalls.Load(),
+		"PrepareResources after invalidation should re-invoke NodePrepareResources")
+}
