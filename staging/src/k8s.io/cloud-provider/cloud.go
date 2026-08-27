@@ -329,7 +329,9 @@ type InstanceMetadata struct {
 	Region string
 
 	// AdditionalLabels is a map of additional labels provided by the cloud provider.
-	// When provided, they will be applied to the node and enable cloud providers
-	// to labels nodes with information that may be valuable to that provider.
+	// When provided, they are applied to the node and enable cloud providers to
+	// label nodes with information that may be valuable to that provider. Missing
+	// labels and changed values are periodically reconciled. Labels that are no
+	// longer returned by the cloud provider are not removed.
 	AdditionalLabels map[string]string
 }
