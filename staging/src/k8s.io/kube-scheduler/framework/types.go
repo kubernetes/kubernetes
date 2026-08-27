@@ -18,7 +18,6 @@ package framework
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -698,8 +697,8 @@ type PodGroupInfo interface {
 	GetNamespace() string
 	// GetType returns the type of the pod group.
 	GetType() EntityKeyType
-	// GetKey returns the key uniquely identifying the pod group.
-	GetKey() string
+	// GetKey returns the EntityKey that uniquely identifies the pod group.
+	GetKey() EntityKey
 	// GetPodGroup returns the PodGroup API object or nil if the group is a composite pod group.
 	GetPodGroup() *schedulingv1beta1.PodGroup
 	// GetCompositePodGroup returns the associated composite pod group or nil if the group is not a composite pod group.
@@ -746,37 +745,34 @@ type PodGroupAssignments struct {
 	ProposedAssignments []ProposedAssignment
 }
 
-// EntityKey uniquely identifies a specific instance of an entity (like PodGroup or CompositePodGroup).
+// EntityKey uniquely identifies a specific instance of an entity (Pod, PodGroup or CompositePodGroup).
 type EntityKey struct {
-	Type      EntityKeyType
-	Name      string
+	// Type represents the kind of entity identified by this key (e.g. Pod, PodGroup, CompositePodGroup).
+	Type EntityKeyType
+	// Name represents the name of the entity.
+	Name string
+	// Namespace represents the namespace of the entity.
 	Namespace string
 }
 
+// GetName returns the name of the entity.
 func (ek EntityKey) GetName() string {
 	return ek.Name
 }
 
+// GetNamespace returns the namespace of the entity.
 func (ek EntityKey) GetNamespace() string {
 	return ek.Namespace
 }
 
+// GetType returns the type of the entity.
 func (ek EntityKey) GetType() EntityKeyType {
 	return ek.Type
 }
 
+// String returns a string representation of the EntityKey in the form "Type/Namespace/Name".
 func (ek EntityKey) String() string {
 	return fmt.Sprintf("%s/%s/%s", ek.Type, ek.Namespace, ek.Name)
-}
-
-// MustParseEntityKey returns the entity key for a given key.
-// It should be only used in tests.
-func MustParseEntityKey(key string) EntityKey {
-	parts := strings.Split(key, "/")
-	if len(parts) != 3 {
-		return EntityKey{}
-	}
-	return EntityKey{Type: EntityKeyType(parts[0]), Namespace: parts[1], Name: parts[2]}
 }
 
 // PodKey returns the key for a pod.

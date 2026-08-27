@@ -1603,10 +1603,7 @@ func TestPodGroupEvaluator_Preempt(t *testing.T) {
 				return nil, fwk.NewStatus(fwk.Error)
 			}
 
-			pgInfo := &testPodGroupInfo{
-				pg:   tt.preemptorPodGroup,
-				pods: tt.preemptorPods,
-			}
+			pgInfo := newTestPodGroupInfo(tt.preemptorPodGroup, nil, tt.preemptorPods)
 
 			gotResult, gotStatus := pl.Preempt(ctx, pgInfo, mockSchedulingFunc)
 			if gotStatus.Code() != tt.expectedStatus.Code() || gotStatus.Message() != tt.expectedStatus.Message() {
@@ -1655,10 +1652,7 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 	nodeName := "node1"
 	preemptorPod := st.MakePod().Name("p1").UID("p1").Obj()
 	preemptor := newPodGroupPreemptor(
-		&testPodGroupInfo{
-			pg:   st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
-			pods: []*v1.Pod{preemptorPod},
-		},
+		newTestPodGroupInfo(st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(), nil, []*v1.Pod{preemptorPod}),
 		false,
 	)
 

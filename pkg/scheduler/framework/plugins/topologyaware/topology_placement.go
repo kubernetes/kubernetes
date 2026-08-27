@@ -137,7 +137,7 @@ func (pl *TopologyPlacement) getTopologyKey(pgi fwk.PodGroupInfo) (string, bool)
 func (pl *TopologyPlacement) getScheduledPods(podGroup fwk.PodGroupInfo) ([]*v1.Pod, error) {
 	if pl.fts.EnableCompositePodGroup {
 		var results []*v1.Pod
-		for podGroupState, err := range helper.GetPodGroupStates(pl.handle.SnapshotSharedLister(), fwk.MustParseEntityKey(podGroup.GetKey())) {
+		for podGroupState, err := range helper.GetPodGroupStates(pl.handle.SnapshotSharedLister(), podGroup.GetKey()) {
 			if err != nil {
 				return nil, err
 			}
