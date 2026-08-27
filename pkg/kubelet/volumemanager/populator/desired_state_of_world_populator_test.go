@@ -572,6 +572,25 @@ func TestFindAndRemoveNonattachableVolumes(t *testing.T) {
 
 	expectedVolumeName := v1.UniqueVolumeName(generatedVolumeName)
 
+	volumesToMount := fakesDSW.GetVolumesToMount()
+	if len(volumesToMount) != 1 {
+		t.Fatalf("Expected one volume in DSW, got %d", len(volumesToMount))
+	}
+
+	err := dswp.actualStateOfWorld.MarkVolumeAsAttached(
+		logger, expectedVolumeName, volumesToMount[0].VolumeSpec, "", "")
+	if err != nil {
+		t.Fatalf("Failed to add volume to ASW: %v", err)
+	}
+
+	attachedVolume, found := dswp.actualStateOfWorld.GetAttachedVolume(expectedVolumeName)
+	if !found {
+		t.Fatalf("Expected volume %q in ASW", expectedVolumeName)
+	}
+	if !attachedVolume.PluginIsAttachable {
+		t.Fatalf("Expected volume %q to be attachable in ASW", expectedVolumeName)
+	}
+
 	volumeExists := fakesDSW.VolumeExists(expectedVolumeName, "" /* SELinuxContext */)
 	if !volumeExists {
 		t.Fatalf(
@@ -589,7 +608,7 @@ func TestFindAndRemoveNonattachableVolumes(t *testing.T) {
 
 	dswp.findAndRemoveDeletedPods(logger)
 	// After the volume plugin changes to nonattachable, the corresponding volume attachable field should change.
-	volumesToMount := fakesDSW.GetVolumesToMount()
+	volumesToMount = fakesDSW.GetVolumesToMount()
 	for _, volume := range volumesToMount {
 		if volume.VolumeName == expectedVolumeName {
 			if volume.PluginIsAttachable {
@@ -598,6 +617,13 @@ func TestFindAndRemoveNonattachableVolumes(t *testing.T) {
 					expectedVolumeName)
 			}
 		}
+	}
+	attachedVolume, found = dswp.actualStateOfWorld.GetAttachedVolume(expectedVolumeName)
+	if !found {
+		t.Fatalf("Expected volume %q to remain in ASW", expectedVolumeName)
+	}
+	if attachedVolume.PluginIsAttachable {
+		t.Fatalf("Expected volume %q to become non-attachable in ASW", expectedVolumeName)
 	}
 }
 
