@@ -232,6 +232,45 @@ func TestStaticPolicyStart(t *testing.T) {
 	}
 }
 
+func TestStaticPolicyNUMANodesInitialization(t *testing.T) {
+	testCases := []struct {
+		description   string
+		topology      *topology.CPUTopology
+		expectedNUMAs []int
+	}{
+		{
+			description:   "single NUMA node",
+			topology:      topoSingleSocketHT,
+			expectedNUMAs: []int{0},
+		},
+		{
+			description:   "dual NUMA nodes",
+			topology:      topoDualSocketHT,
+			expectedNUMAs: []int{0, 1},
+		},
+		{
+			description:   "quad socket topology",
+			topology:      topoQuadSocketFourWayHT,
+			expectedNUMAs: []int{0, 1, 2, 3},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			policy, err := NewStaticPolicy(logger, tc.topology, 1, cpuset.New(0), topologymanager.NewFakeManagerWithHint(logger, nil), nil)
+			if err != nil {
+				t.Fatalf("NewStaticPolicy failed: %v", err)
+			}
+
+			p := policy.(*staticPolicy)
+			if !reflect.DeepEqual(p.numaNodes, tc.expectedNUMAs) {
+				t.Errorf("expected numaNodes %v, got %v", tc.expectedNUMAs, p.numaNodes)
+			}
+		})
+	}
+}
+
 func TestStaticPolicyAdd(t *testing.T) {
 	var largeTopoCPUids []int
 	var largeTopoSock0CPUids []int

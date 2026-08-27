@@ -127,6 +127,9 @@ type staticPolicy struct {
 	// we compute this value multiple time, and it's not supposed to change
 	// at runtime - the cpumanager can't deal with runtime topology changes anyway.
 	cpuGroupSize int
+	// sorted list of NUMA nodes known to the topology; computed once at initialization
+	// and reused for metric updates and deterministic topology hints generation.
+	numaNodes []int
 }
 
 // Ensure staticPolicy implements Policy interface
@@ -146,7 +149,8 @@ func NewStaticPolicy(logger klog.Logger, topology *topology.CPUTopology, numRese
 	}
 
 	cpuGroupSize := topology.CPUsPerCore()
-	logger.Info("created with configuration", "options", opts, "cpuGroupSize", cpuGroupSize)
+	numaNodes := topology.CPUDetails.NUMANodes().List()
+	logger.Info("created with configuration", "options", opts, "cpuGroupSize", cpuGroupSize, "numaNodes", numaNodes)
 
 	policy := &staticPolicy{
 		topology:     topology,
@@ -154,6 +158,7 @@ func NewStaticPolicy(logger klog.Logger, topology *topology.CPUTopology, numRese
 		cpusToReuse:  make(map[string]cpuset.CPUSet),
 		options:      opts,
 		cpuGroupSize: cpuGroupSize,
+		numaNodes:    numaNodes,
 	}
 
 	allCPUs := topology.CPUDetails.CPUs()
@@ -1027,11 +1032,11 @@ func (p *staticPolicy) getPodTopologyHintsForAdd(logger klog.Logger, s state.Sta
 // marking all others with 'Preferred: false'.
 func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reusableCPUs cpuset.CPUSet, request int) []topologymanager.TopologyHint {
 	// Initialize minAffinitySize to include all NUMA Nodes.
-	minAffinitySize := p.topology.CPUDetails.NUMANodes().Size()
+	minAffinitySize := len(p.numaNodes)
 
 	// Iterate through all combinations of numa nodes bitmask and build hints from them.
 	hints := []topologymanager.TopologyHint{}
-	bitmask.IterateBitMasks(p.topology.CPUDetails.NUMANodes().List(), func(mask bitmask.BitMask) {
+	bitmask.IterateBitMasks(p.numaNodes, func(mask bitmask.BitMask) {
 		// First, update minAffinitySize for the current request size.
 		cpusInMask := p.topology.CPUDetails.CPUsInNUMANodes(mask.GetBits()...).Size()
 		if cpusInMask >= request && mask.Count() < minAffinitySize {
@@ -1143,7 +1148,7 @@ func (p *staticPolicy) updateMetricsFromState(logger klog.Logger, s state.State)
 	metrics.CPUManagerSharedPoolSizeMilliCores.Set(float64(p.GetAvailableCPUs(s).Size() * 1000))
 	totalExclusiveCPUs := getTotalAssignedExclusiveCPUs(s)
 	metrics.CPUManagerExclusiveCPUsAllocationCount.Set(float64(totalExclusiveCPUs.Size()))
-	updateAllocationPerNUMAMetric(logger, p.topology, totalExclusiveCPUs)
+	updateAllocationPerNUMAMetric(logger, p.topology, totalExclusiveCPUs, p.numaNodes)
 }
 
 func (p *staticPolicy) updateMetricsOnAllocate(logger klog.Logger, s state.State, cpuAlloc topology.Allocation) {
@@ -1171,7 +1176,7 @@ func getTotalAssignedExclusiveCPUs(s state.State) cpuset.CPUSet {
 	return totalAssignedCPUs
 }
 
-func updateAllocationPerNUMAMetric(logger klog.Logger, topo *topology.CPUTopology, allocatedCPUs cpuset.CPUSet) {
+func updateAllocationPerNUMAMetric(logger klog.Logger, topo *topology.CPUTopology, allocatedCPUs cpuset.CPUSet, numaNodes []int) {
 	numaCount := make(map[int]int)
 
 	// Count CPUs allocated per NUMA node
@@ -1189,7 +1194,7 @@ func updateAllocationPerNUMAMetric(logger klog.Logger, topo *topology.CPUTopolog
 	// node with no allocated CPUs must be explicitly reset to zero, or the
 	// gauge would keep reporting the last non-zero value after all the CPUs
 	// of that node went back to the shared pool.
-	for _, numaNode := range topo.CPUDetails.NUMANodes().UnsortedList() {
+	for _, numaNode := range numaNodes {
 		metrics.CPUManagerAllocationPerNUMA.WithLabelValues(strconv.Itoa(numaNode)).Set(float64(numaCount[numaNode]))
 	}
 }
