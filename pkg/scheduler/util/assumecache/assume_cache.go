@@ -32,7 +32,7 @@ import (
 
 // Informer is the subset of [cache.SharedInformer] that NewAssumeCache depends upon.
 type Informer interface {
-	AddEventHandler(handler cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error)
+	AddEventHandlerWithOptions(handler cache.ResourceEventHandler, options cache.HandlerOptions) (cache.ResourceEventHandlerRegistration, error)
 }
 
 // AddTestObject adds an object to the assume cache.
@@ -212,12 +212,13 @@ func NewAssumeCache(logger klog.Logger, informer Informer, description, indexNam
 	// Unit tests don't use informers
 	if informer != nil {
 		// Cannot fail in practice?! No-one bothers checking the error.
-		c.handlerRegistration, _ = informer.AddEventHandler(
+		c.handlerRegistration, _ = informer.AddEventHandlerWithOptions(
 			cache.ResourceEventHandlerFuncs{
 				AddFunc:    c.add,
 				UpdateFunc: c.update,
 				DeleteFunc: c.delete,
 			},
+			cache.HandlerOptions{Logger: &logger},
 		)
 	}
 	return c
@@ -557,7 +558,7 @@ func (c *AssumeCache) emitEvents() {
 			return
 		}
 		func() {
-			defer utilruntime.HandleCrash()
+			defer utilruntime.HandleCrashWithLogger(c.logger)
 			deliver()
 		}()
 	}
