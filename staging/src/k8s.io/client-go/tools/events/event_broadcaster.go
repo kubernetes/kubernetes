@@ -71,6 +71,11 @@ type eventBroadcasterImpl struct {
 	eventCache    map[eventKey]*eventsv1.Event
 	sleepDuration time.Duration
 	sink          EventSink
+
+	// startMu guards started and cancel.
+	startMu sync.Mutex
+	started bool
+	cancel  func()
 }
 
 // EventSinkImpl wraps EventsV1Interface to implement EventSink.
@@ -112,7 +117,7 @@ func NewBroadcaster(sink EventSink) EventBroadcaster {
 // NewBroadcasterForTest Creates a new event broadcaster for test purposes.
 func newBroadcaster(sink EventSink, sleepDuration time.Duration, eventCache map[eventKey]*eventsv1.Event) EventBroadcaster {
 	return &eventBroadcasterImpl{
-		Broadcaster:   watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
+		Broadcaster:   watch.NewLongQueueBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
 		eventCache:    eventCache,
 		sleepDuration: sleepDuration,
 		sink:          sink,
@@ -121,6 +126,13 @@ func newBroadcaster(sink EventSink, sleepDuration time.Duration, eventCache map[
 
 func (e *eventBroadcasterImpl) Shutdown() {
 	e.Broadcaster.Shutdown()
+	e.startMu.Lock()
+	cancel := e.cancel
+	e.cancel = nil
+	e.startMu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
 }
 
 // refreshExistingEventSeries refresh events TTL
@@ -170,39 +182,37 @@ func (e *eventBroadcasterImpl) NewRecorder(scheme *runtime.Scheme, reportingCont
 func (e *eventBroadcasterImpl) recordToSink(ctx context.Context, event *eventsv1.Event, clock clock.Clock) {
 	// Make a copy before modification, because there could be multiple listeners.
 	eventCopy := event.DeepCopy()
-	go func() {
-		evToRecord := func() *eventsv1.Event {
-			e.mu.Lock()
-			defer e.mu.Unlock()
-			eventKey := getKey(eventCopy)
-			isomorphicEvent, isIsomorphic := e.eventCache[eventKey]
-			if isIsomorphic {
-				if isomorphicEvent.Series != nil {
-					isomorphicEvent.Series.Count++
-					isomorphicEvent.Series.LastObservedTime = metav1.MicroTime{Time: clock.Now()}
-					return nil
-				}
-				isomorphicEvent.Series = &eventsv1.EventSeries{
-					Count:            2,
-					LastObservedTime: metav1.MicroTime{Time: clock.Now()},
-				}
-				// Make a copy of the Event to make sure that recording it
-				// doesn't mess with the object stored in cache.
-				return isomorphicEvent.DeepCopy()
+	evToRecord := func() *eventsv1.Event {
+		e.mu.Lock()
+		defer e.mu.Unlock()
+		eventKey := getKey(eventCopy)
+		isomorphicEvent, isIsomorphic := e.eventCache[eventKey]
+		if isIsomorphic {
+			if isomorphicEvent.Series != nil {
+				isomorphicEvent.Series.Count++
+				isomorphicEvent.Series.LastObservedTime = metav1.MicroTime{Time: clock.Now()}
+				return nil
 			}
-			e.eventCache[eventKey] = eventCopy
-			// Make a copy of the Event to make sure that recording it doesn't
-			// mess with the object stored in cache.
-			return eventCopy.DeepCopy()
-		}()
-		if evToRecord != nil {
-			// TODO: Add a metric counting the number of recording attempts
-			e.attemptRecording(ctx, evToRecord)
-			// We don't want the new recorded Event to be reflected in the
-			// client's cache because server-side mutations could mess with the
-			// aggregation mechanism used by the client.
+			isomorphicEvent.Series = &eventsv1.EventSeries{
+				Count:            2,
+				LastObservedTime: metav1.MicroTime{Time: clock.Now()},
+			}
+			// Make a copy of the Event to make sure that recording it
+			// doesn't mess with the object stored in cache.
+			return isomorphicEvent.DeepCopy()
 		}
+		e.eventCache[eventKey] = eventCopy
+		// Make a copy of the Event to make sure that recording it doesn't
+		// mess with the object stored in cache.
+		return eventCopy.DeepCopy()
 	}()
+	if evToRecord != nil {
+		// TODO: Add a metric counting the number of recording attempts
+		e.attemptRecording(ctx, evToRecord)
+		// We don't want the new recorded Event to be reflected in the
+		// client's cache because server-side mutations could mess with the
+		// aggregation mechanism used by the client.
+	}
 }
 
 func (e *eventBroadcasterImpl) attemptRecording(ctx context.Context, event *eventsv1.Event) {
@@ -394,9 +404,24 @@ func (e *eventBroadcasterImpl) StartRecordingToSink(stopCh <-chan struct{}) {
 
 // StartRecordingToSinkWithContext starts sending events received from the specified eventBroadcaster to the given sink.
 func (e *eventBroadcasterImpl) StartRecordingToSinkWithContext(ctx context.Context) error {
+	e.startMu.Lock()
+	defer e.startMu.Unlock()
+	if e.started {
+		return fmt.Errorf("event broadcaster already started")
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	e.started = true
+	e.cancel = cancel
+	if err := e.startRecordingEvents(ctx); err != nil {
+		e.started = false
+		e.cancel = nil
+		cancel()
+		return err
+	}
 	go wait.UntilWithContext(ctx, e.refreshExistingEventSeries, refreshTime)
 	go wait.UntilWithContext(ctx, e.finishSeries, finishTime)
-	return e.startRecordingEvents(ctx)
+	return nil
 }
 
 type eventBroadcasterAdapterImpl struct {
