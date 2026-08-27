@@ -81,11 +81,10 @@ type containerBoundWorker struct {
 	lastResult results.Result
 	resultRun  int
 
-	proberResultsSuccessfulMetricLabels  metrics.Labels
-	proberResultsFailedMetricLabels      metrics.Labels
-	proberResultsUnknownMetricLabels     metrics.Labels
-	proberDurationSuccessfulMetricLabels metrics.Labels
-	proberDurationUnknownMetricLabels    metrics.Labels
+	proberResultsSuccessfulMetricLabels metrics.Labels
+	proberResultsFailedMetricLabels     metrics.Labels
+	proberResultsUnknownMetricLabels    metrics.Labels
+	proberDurationMetricLabels          metrics.Labels
 }
 
 // newContainerBoundWorker creates a probe worker bound to target. ctx should outlive
@@ -135,8 +134,7 @@ func newContainerBoundWorker(ctx context.Context, opts containerBoundWorkerOptio
 	w.proberResultsUnknownMetricLabels = deepCopyPrometheusLabels(basicMetricLabels)
 	w.proberResultsUnknownMetricLabels["result"] = probeResultUnknown
 
-	w.proberDurationSuccessfulMetricLabels = deepCopyPrometheusLabels(proberDurationLabels)
-	w.proberDurationUnknownMetricLabels = deepCopyPrometheusLabels(proberDurationLabels)
+	w.proberDurationMetricLabels = deepCopyPrometheusLabels(proberDurationLabels)
 
 	return w
 }
@@ -217,12 +215,12 @@ func (w *containerBoundWorker) doProbe() (keepGoing bool) {
 	switch result {
 	case results.Success:
 		ProberResults.With(w.proberResultsSuccessfulMetricLabels).Inc()
-		ProberDuration.With(w.proberDurationSuccessfulMetricLabels).Observe(time.Since(startTime).Seconds())
+		ProberDuration.With(w.proberDurationMetricLabels).Observe(time.Since(startTime).Seconds())
 	case results.Failure:
 		ProberResults.With(w.proberResultsFailedMetricLabels).Inc()
 	default:
 		ProberResults.With(w.proberResultsUnknownMetricLabels).Inc()
-		ProberDuration.With(w.proberDurationUnknownMetricLabels).Observe(time.Since(startTime).Seconds())
+		ProberDuration.With(w.proberDurationMetricLabels).Observe(time.Since(startTime).Seconds())
 	}
 
 	if w.lastResult == result {
@@ -256,14 +254,4 @@ func (w *containerBoundWorker) doProbe() (keepGoing bool) {
 	}
 
 	return true
-}
-
-// deleteMetrics drops worker metric label sets during pod-scoped teardown to
-// preserve metric series across container restarts.
-func (w *containerBoundWorker) deleteMetrics() {
-	ProberResults.Delete(w.proberResultsSuccessfulMetricLabels)
-	ProberResults.Delete(w.proberResultsFailedMetricLabels)
-	ProberResults.Delete(w.proberResultsUnknownMetricLabels)
-	ProberDuration.Delete(w.proberDurationSuccessfulMetricLabels)
-	ProberDuration.Delete(w.proberDurationUnknownMetricLabels)
 }
