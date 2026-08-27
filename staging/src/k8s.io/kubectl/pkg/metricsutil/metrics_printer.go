@@ -262,13 +262,15 @@ func printSingleMissingResource(out io.Writer) {
 }
 
 func (printer *TopCmdPrinter) printPodResourcesSum(out io.Writer, total v1.ResourceList, columnWidth int, measuredResources []v1.ResourceName) {
-	for i := 0; i < columnWidth-2; i++ {
+	nameColumns := columnWidth - len(measuredResources)
+	for range nameColumns {
 		printValue(out, "")
 	}
-	printValue(out, "________")
-	printValue(out, "________")
+	for range measuredResources {
+		printValue(out, "________")
+	}
 	fmt.Fprintf(out, "\n")
-	for i := 0; i < columnWidth-3; i++ {
+	for i := 0; i < nameColumns-1; i++ {
 		printValue(out, "")
 	}
 	printer.printMetricsLine(out, &ResourceMetricsInfo{

@@ -148,6 +148,7 @@ func TestPrintPodMetrics(t *testing.T) {
 		noHeader        bool
 		sortBy          string
 		sum             bool
+		showSwap        bool
 		expectedErr     error
 		expectedOutput  string
 	}{
@@ -519,6 +520,87 @@ ns-2   test-1   200m       2048Mi
                            200m       1024Mi     
 `,
 		},
+		{
+			name: "Multiple Pods - Sum with Swap",
+			podMetric: []metricsapi.PodMetrics{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test",
+						Namespace: "default",
+					},
+					Timestamp: metav1.Time{Time: time.Now()},
+					Window:    metav1.Duration{Duration: time.Minute},
+					Containers: []metricsapi.ContainerMetrics{
+						{
+							Name: "container1",
+							Usage: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("0.2"),
+								v1.ResourceMemory: resource.MustParse("1Gi"),
+								ResourceSwap:      resource.MustParse("512Mi"),
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-1",
+						Namespace: "default",
+					},
+					Timestamp: metav1.Time{Time: time.Now()},
+					Window:    metav1.Duration{Duration: time.Minute},
+					Containers: []metricsapi.ContainerMetrics{
+						{
+							Name: "container1",
+							Usage: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("0.2"),
+								v1.ResourceMemory: resource.MustParse("2Gi"),
+								ResourceSwap:      resource.MustParse("256Mi"),
+							},
+						},
+					},
+				},
+			},
+			sum:      true,
+			showSwap: true,
+			expectedOutput: `NAME     CPU(cores)   MEMORY(bytes)   SWAP(bytes)   
+test     200m         1024Mi          512Mi         
+test-1   200m         2048Mi          256Mi         
+         ________     ________        ________      
+         400m         3072Mi          768Mi         
+`,
+		},
+		{
+			name: "Multiple Pods - Sum with Swap, Namespace and Containers",
+			podMetric: []metricsapi.PodMetrics{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test",
+						Namespace: "ns-1",
+					},
+					Timestamp: metav1.Time{Time: time.Now()},
+					Window:    metav1.Duration{Duration: time.Minute},
+					Containers: []metricsapi.ContainerMetrics{
+						{
+							Name: "container1",
+							Usage: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("0.2"),
+								v1.ResourceMemory: resource.MustParse("1Gi"),
+								ResourceSwap:      resource.MustParse("512Mi"),
+							},
+						},
+					},
+				},
+			},
+			withNamespace:   true,
+			printContainers: true,
+			noHeader:        true,
+			sum:             true,
+			showSwap:        true,
+			expectedOutput: `ns-1   test   container1   200m       1024Mi     512Mi      
+                           ________   ________   ________   
+                           200m       1024Mi     512Mi      
+`,
+		},
 	}
 
 	for _, test := range tests {
@@ -526,7 +608,7 @@ ns-2   test-1   200m       2048Mi
 			// Create a new TopCmdPrinter with a test writer.
 			_, _, out, _ := genericiooptions.NewTestIOStreams()
 
-			top := NewTopCmdPrinter(out, false)
+			top := NewTopCmdPrinter(out, test.showSwap)
 			err := top.PrintPodMetrics(test.podMetric, test.printContainers,
 				test.withNamespace, test.noHeader, test.sortBy, test.sum)
 			assert.Equal(t, test.expectedErr, err)
