@@ -1,5 +1,5 @@
 {
-  "version": "48.0.0",
+  "version": "54.0.0",
   "testCases": {
     "EvaluateExpressionNodejs22/DefaultTest": {
       "stacks": [
@@ -9,5 +9,6 @@
       "assertionStackName": "EvaluateExpressionNodejs22DefaultTestDeployAssert27FE8CA6"
     }
   },
-  "minimumCliVersion": "2.1027.0"
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
 }

@@ -1,0 +1,139 @@
+{
+  "/EvaluateExpressionExecutionTest/DefaultTest/DeployAssert": [
+    {
+      "type": "aws:cdk:warning",
+      "data": "No cross-stack-reference strength configured, defaulting to \"strong\". We recommend you set feature flag \"@aws-cdk/core:defaultCrossStackReferences\" to \"both\", then deploy everywhere, then set it to \"weak\". Alternatively, set it to \"strong\" explicitly to lock in the current producer-protecting behavior. (See: https://github.com/aws/aws-cdk/blob/main/packages/aws-cdk-lib/README.md#reference-strength) [ack: @aws-cdk/core:crossStackReferencesDefaultStrong]",
+      "trace": [
+        "Annotations.addMessage (/local/home/abidhsn/repository/aws-cdk-pr426/packages/aws-cdk-lib/core/lib/annotations.js:244:29)",
+        "Annotations.addWarningV2 (/local/home/abidhsn/repository/aws-cdk-pr426/packages/aws-cdk-lib/core/lib/annotations.js:113:18)",
+        "resolveValue (/local/home/abidhsn/repository/aws-cdk-pr426/packages/aws-cdk-lib/core/lib/private/refs.js:204:54)",
+        "resolveReferences (/local/home/abidhsn/repository/aws-cdk-pr426/packages/aws-cdk-lib/core/lib/private/refs.js:128:30)",
+        "prepareApp (/local/home/abidhsn/repository/aws-cdk-pr426/packages/aws-cdk-lib/core/lib/private/prepare-app.js:35:36)",
+        "synthesize (/local/home/abidhsn/repository/aws-cdk-pr426/packages/aws-cdk-lib/core/lib/private/synthesis.js:72:36)",
+        "App.synth (/local/home/abidhsn/repository/aws-cdk-pr426/packages/aws-cdk-lib/core/lib/stage.js:230:96)",
+        "App.synth (/local/home/abidhsn/repository/aws-cdk-pr426/packages/aws-cdk-lib/core/lib/app.js:216:27)",
+        "process.<anonymous> (/local/home/abidhsn/repository/aws-cdk-pr426/packages/aws-cdk-lib/core/lib/app.js:163:51)",
+        "Object.onceWrapper (node:events:634:26)",
+        "process.emit (node:events:519:28)"
+      ]
+    }
+  ],
+  "/EvaluateExpressionExecutionTest/DefaultTest/DeployAssert/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/EvaluateExpressionExecutionTest/DefaultTest/DeployAssert/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/EvaluateExpressionExecutionTest/DefaultTest/DeployAssert/AwsApiCallStepFunctionsstartExecution20d38684dd4429d3acf8d0f55da9f19d/Default": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": "*"
+    }
+  ],
+  "/EvaluateExpressionExecutionTest/DefaultTest/DeployAssert/SingletonFunction1488541a7b23466481b69b4408076b81/Role": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction1488541a7b23466481b69b4408076b81Role37ABCE73"
+    }
+  ],
+  "/EvaluateExpressionExecutionTest/DefaultTest/DeployAssert/SingletonFunction1488541a7b23466481b69b4408076b81/Handler": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction1488541a7b23466481b69b4408076b81HandlerCD40AE9F"
+    }
+  ],
+  "/EvaluateExpressionExecutionTest/DefaultTest/DeployAssert/AwsApiCallStepFunctionsdescribeExecution2235f9cac49ebe499418a51ac3910f9f/Default": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": "*"
+    }
+  ],
+  "/EvaluateExpressionExecutionTest/DefaultTest/DeployAssert/AwsApiCallStepFunctionsdescribeExecution2235f9cac49ebe499418a51ac3910f9f/AssertionResults": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AssertionResultsAwsApiCallStepFunctionsdescribeExecution2235f9cac49ebe499418a51ac3910f9f"
+    }
+  ],
+  "/EvaluateExpressionExecutionTest/DefaultTest/DeployAssert/SingletonFunction76b3e830a873425f8453eddd85c86925/Role": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction76b3e830a873425f8453eddd85c86925Role918961BB"
+    }
+  ],
+  "/EvaluateExpressionExecutionTest/DefaultTest/DeployAssert/SingletonFunction76b3e830a873425f8453eddd85c86925/Handler": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction76b3e830a873425f8453eddd85c86925Handler81461ECE"
+    }
+  ],
+  "/EvaluateExpressionExecutionTest/DefaultTest/DeployAssert/SingletonFunction5c1898e096fb4e3e95d5f6c67f3ce41a/Role": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction5c1898e096fb4e3e95d5f6c67f3ce41aRoleB84BD8CE"
+    }
+  ],
+  "/EvaluateExpressionExecutionTest/DefaultTest/DeployAssert/SingletonFunction5c1898e096fb4e3e95d5f6c67f3ce41a/Handler": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SingletonFunction5c1898e096fb4e3e95d5f6c67f3ce41aHandlerADF3E6EA"
+    }
+  ],
+  "/EvaluateExpressionExecutionTest/DefaultTest/DeployAssert/AwsApiCallStepFunctionsstartExecution20d38684dd4429d3acf8d0f55da9f19d/Default/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AwsApiCallStepFunctionsstartExecution20d38684dd4429d3acf8d0f55da9f19d"
+    }
+  ],
+  "/EvaluateExpressionExecutionTest/DefaultTest/DeployAssert/AwsApiCallStepFunctionsdescribeExecution2235f9cac49ebe499418a51ac3910f9f/Default/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AwsApiCallStepFunctionsdescribeExecution2235f9cac49ebe499418a51ac3910f9f"
+    }
+  ],
+  "/EvaluateExpressionExecutionTest/DefaultTest/DeployAssert/AwsApiCallStepFunctionsdescribeExecution2235f9cac49ebe499418a51ac3910f9f/WaitFor/Role": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AwsApiCallStepFunctionsdescribeExecution2235f9cac49ebe499418a51ac3910f9fWaitForRole5B621C20"
+    }
+  ],
+  "/EvaluateExpressionExecutionTest/DefaultTest/DeployAssert/AwsApiCallStepFunctionsdescribeExecution2235f9cac49ebe499418a51ac3910f9f/WaitFor/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AwsApiCallStepFunctionsdescribeExecution2235f9cac49ebe499418a51ac3910f9fWaitFor5C4F4627"
+    }
+  ],
+  "/EvaluateExpressionExecutionTest/DefaultTest/DeployAssert/AwsApiCallStepFunctionsdescribeExecution2235f9cac49ebe499418a51ac3910f9f/WaitFor/IsCompleteProvider/Invoke": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AwsApiCallStepFunctionsdescribeExecution2235f9cac49ebe499418a51ac3910f9fWaitForIsCompleteProviderInvokeC96C41E4"
+    }
+  ],
+  "/EvaluateExpressionExecutionTest/DefaultTest/DeployAssert/AwsApiCallStepFunctionsdescribeExecution2235f9cac49ebe499418a51ac3910f9f/WaitFor/TimeoutProvider/Invoke": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AwsApiCallStepFunctionsdescribeExecution2235f9cac49ebe499418a51ac3910f9fWaitForTimeoutProviderInvoke10A14F34"
+    }
+  ]
+}

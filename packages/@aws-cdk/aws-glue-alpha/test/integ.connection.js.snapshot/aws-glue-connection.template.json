@@ -438,6 +438,38 @@
      }
     }
    }
+  },
+  "NetworkConnectionFromVpc96D9DA5B": {
+   "Type": "AWS::Glue::Connection",
+   "Properties": {
+    "CatalogId": {
+     "Ref": "AWS::AccountId"
+    },
+    "ConnectionInput": {
+     "ConnectionType": "NETWORK",
+     "PhysicalConnectionRequirements": {
+      "AvailabilityZone": {
+       "Fn::Select": [
+        0,
+        {
+         "Fn::GetAZs": ""
+        }
+       ]
+      },
+      "SecurityGroupIdList": [
+       {
+        "Fn::GetAtt": [
+         "SecurityGroupDD263621",
+         "GroupId"
+        ]
+       }
+      ],
+      "SubnetId": {
+       "Ref": "VpcPrivateSubnet1Subnet536B997A"
+      }
+     }
+    }
+   }
   }
  },
  "Parameters": {

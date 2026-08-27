@@ -1,7 +1,7 @@
 import { Match, Template } from '../../assertions';
 import * as events from '../../aws-events';
 import { App, CfnParameter, Duration, Lazy, Stack, TimeZone } from '../../core';
-import { BackupPlan, BackupPlanRule, BackupVault } from '../lib';
+import { BackupPlan, IndexActionResourceType, BackupPlanRule, BackupVault } from '../lib';
 
 let stack: Stack;
 beforeEach(() => {
@@ -373,6 +373,105 @@ test('create a plan and add rule with recoveryPointTags', () => {
       ],
     },
   });
+});
+
+test('create a plan and add rule with indexActions', () => {
+  // WHEN
+  new BackupPlan(stack, 'Plan', {
+    backupPlanRules: [
+      new BackupPlanRule({
+        indexActions: [{ resourceTypes: [IndexActionResourceType.S3] }],
+      }),
+    ],
+  });
+
+  // THEN
+  Template.fromStack(stack).hasResourceProperties('AWS::Backup::BackupPlan', {
+    BackupPlan: {
+      BackupPlanName: 'Plan',
+      BackupPlanRule: [
+        {
+          RuleName: 'PlanRule0',
+          TargetBackupVault: {
+            'Fn::GetAtt': [
+              'PlanVault0284B0C2',
+              'BackupVaultName',
+            ],
+          },
+          IndexActions: [
+            {
+              ResourceTypes: [
+                'S3',
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  });
+});
+
+test('create a plan and add rule with EBS indexActions', () => {
+  // WHEN
+  new BackupPlan(stack, 'Plan', {
+    backupPlanRules: [
+      new BackupPlanRule({
+        indexActions: [{ resourceTypes: [IndexActionResourceType.EBS] }],
+      }),
+    ],
+  });
+
+  // THEN
+  Template.fromStack(stack).hasResourceProperties('AWS::Backup::BackupPlan', {
+    BackupPlan: {
+      BackupPlanRule: [
+        Match.objectLike({
+          IndexActions: [
+            {
+              ResourceTypes: [
+                'EBS',
+              ],
+            },
+          ],
+        }),
+      ],
+    },
+  });
+});
+
+test('supports a custom index action resource type not yet in CDK', () => {
+  // WHEN
+  new BackupPlan(stack, 'Plan', {
+    backupPlanRules: [
+      new BackupPlanRule({
+        indexActions: [{ resourceTypes: [new IndexActionResourceType('EFS')] }],
+      }),
+    ],
+  });
+
+  // THEN
+  Template.fromStack(stack).hasResourceProperties('AWS::Backup::BackupPlan', {
+    BackupPlan: {
+      BackupPlanRule: [
+        Match.objectLike({
+          IndexActions: [
+            {
+              ResourceTypes: [
+                'EFS',
+              ],
+            },
+          ],
+        }),
+      ],
+    },
+  });
+});
+
+test.each([
+  [IndexActionResourceType.S3, 'S3'],
+  [IndexActionResourceType.EBS, 'EBS'],
+])('IndexActionResourceType %s has the expected value', (resourceType, expected) => {
+  expect(resourceType.value).toEqual(expected);
 });
 
 test('throws when deleteAfter is not greater than moveToColdStorageAfter', () => {

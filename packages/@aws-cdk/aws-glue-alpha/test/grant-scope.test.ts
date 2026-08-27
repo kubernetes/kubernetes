@@ -19,7 +19,7 @@ function newTable(stack: cdk.Stack, props: Partial<glue.S3TableProps> = {}): glu
 test('warns when granting on a user-provided bucket with an empty s3Prefix', () => {
   const stack = new cdk.Stack();
   const bucket = new s3.Bucket(stack, 'DataBucket');
-  const table = newTable(stack, { bucket });
+  const table = newTable(stack, { storage: glue.S3TableStorage.fromBucket(bucket) });
 
   table.grantRead(new iam.Role(stack, 'Role', { assumedBy: new iam.ServicePrincipal('glue.amazonaws.com') }));
 
@@ -29,7 +29,7 @@ test('warns when granting on a user-provided bucket with an empty s3Prefix', () 
 test('does not warn when a user-provided bucket is scoped with an s3Prefix', () => {
   const stack = new cdk.Stack();
   const bucket = new s3.Bucket(stack, 'DataBucket');
-  const table = newTable(stack, { bucket, s3Prefix: 'data/' });
+  const table = newTable(stack, { storage: glue.S3TableStorage.fromBucket(bucket), s3Prefix: 'data/' });
 
   table.grantRead(new iam.Role(stack, 'Role', { assumedBy: new iam.ServicePrincipal('glue.amazonaws.com') }));
 

@@ -1,0 +1,33 @@
+{
+  "version": "54.0.0",
+  "files": {
+    "6ffc47b88143a52aa50e26c31da776854b28dff0e45b1a97d7c1e530d59590ad": {
+      "source": {
+        "path": "asset.6ffc47b88143a52aa50e26c31da776854b28dff0e45b1a97d7c1e530d59590ad.bundle",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "current_account-current_region-b943d42c": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "6ffc47b88143a52aa50e26c31da776854b28dff0e45b1a97d7c1e530d59590ad.zip",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    },
+    "e1dbba4f7529665aeb7cddabb0c0a3c985460892207635b95eafc65639d484d6": {
+      "displayName": "SqsMetricsTestDefaultTestDeployAssert25483520 Template",
+      "source": {
+        "path": "SqsMetricsTestDefaultTestDeployAssert25483520.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-current_region-ffbbd837": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "e1dbba4f7529665aeb7cddabb0c0a3c985460892207635b95eafc65639d484d6.json",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

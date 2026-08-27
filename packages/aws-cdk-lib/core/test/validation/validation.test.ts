@@ -402,7 +402,7 @@ describe('validations', () => {
     new FailResource(stack, 'DefaultResource');
     expect(() => {
       app.synth();
-    }).toThrow(/Illegal operation: validation plugin 'rogue-plugin' modified the cloud assembly/);
+    }).toThrow(/rogue-plugin.*modified the cloud assembly/);
   });
 
   test('plugin that writes new files to assembly is allowed', () => {
@@ -446,7 +446,7 @@ describe('validations', () => {
       type: 'Test::Resource::Fake',
       properties: { result: 'success' },
     });
-    expect(() => app.synth()).toThrow(/Illegal operation: validation plugin 'deleter-plugin' modified the cloud assembly/);
+    expect(() => app.synth()).toThrow(/deleter-plugin.*modified the cloud assembly/);
   });
 
   test('failSynthOnValidationErrors=false writes JSON but does not print or fail', () => {

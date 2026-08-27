@@ -1,0 +1,115 @@
+{
+ "Resources": {
+  "Queue4A7E3555": {
+   "Type": "AWS::SQS::Queue",
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "OutstandingMessages1A7D645F": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+    "EvaluationPeriods": 3,
+    "Metrics": [
+     {
+      "Expression": "visible + notVisible",
+      "Id": "expr_1",
+      "Label": "Approximate number of messages outstanding",
+      "ReturnData": true
+     },
+     {
+      "Id": "visible",
+      "MetricStat": {
+       "Metric": {
+        "Dimensions": [
+         {
+          "Name": "QueueName",
+          "Value": {
+           "Fn::GetAtt": [
+            "Queue4A7E3555",
+            "QueueName"
+           ]
+          }
+         }
+        ],
+        "MetricName": "ApproximateNumberOfMessagesVisible",
+        "Namespace": "AWS/SQS"
+       },
+       "Period": 60,
+       "Stat": "Maximum"
+      },
+      "ReturnData": false
+     },
+     {
+      "Id": "notVisible",
+      "MetricStat": {
+       "Metric": {
+        "Dimensions": [
+         {
+          "Name": "QueueName",
+          "Value": {
+           "Fn::GetAtt": [
+            "Queue4A7E3555",
+            "QueueName"
+           ]
+          }
+         }
+        ],
+        "MetricName": "ApproximateNumberOfMessagesNotVisible",
+        "Namespace": "AWS/SQS"
+       },
+       "Period": 60,
+       "Stat": "Maximum"
+      },
+      "ReturnData": false
+     }
+    ],
+    "Threshold": 100
+   }
+  }
+ },
+ "Outputs": {
+  "ExportsOutputRefOutstandingMessages1A7D645F140C34BA": {
+   "Value": {
+    "Ref": "OutstandingMessages1A7D645F"
+   },
+   "Export": {
+    "Name": "aws-cdk-sqs-metrics:ExportsOutputRefOutstandingMessages1A7D645F140C34BA"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

@@ -18,7 +18,19 @@ test('unpartitioned JSON table', () => {
     }],
     dataFormat: glue.DataFormat.JSON,
   });
-  expect(table.encryption).toEqual(glue.TableEncryption.S3_MANAGED);
+  expect(table.bucket?.encryptionKey).toEqual(undefined);
+
+  Template.fromStack(tableStack).hasResourceProperties('AWS::S3::Bucket', {
+    BucketEncryption: {
+      ServerSideEncryptionConfiguration: [
+        {
+          ServerSideEncryptionByDefault: {
+            SSEAlgorithm: 'AES256',
+          },
+        },
+      ],
+    },
+  });
 
   Template.fromStack(tableStack).hasResource('AWS::S3::Bucket', {
     Type: 'AWS::S3::Bucket',
@@ -90,8 +102,6 @@ test('partitioned JSON table', () => {
     }],
     dataFormat: glue.DataFormat.JSON,
   });
-  expect(table.encryption).toEqual(glue.TableEncryption.S3_MANAGED);
-  expect(table.encryptionKey).toEqual(undefined);
   expect(table.bucket).not.toEqual(undefined);
   expect(table.bucket?.encryptionKey).toEqual(undefined);
 
@@ -160,7 +170,6 @@ test('compressed table', () => {
     compressed: true,
     dataFormat: glue.DataFormat.JSON,
   });
-  expect(table.encryptionKey).toEqual(undefined);
   expect(table.bucket?.encryptionKey).toEqual(undefined);
 
   Template.fromStack(stack).hasResourceProperties('AWS::Glue::Table', {

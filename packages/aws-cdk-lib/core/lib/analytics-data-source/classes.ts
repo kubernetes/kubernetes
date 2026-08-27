@@ -1746,6 +1746,7 @@ export const AWS_CDK_CONSTRUCTOR_PROPS: { [key: string]: any } = {
       'connectionName': '*',
       'description': '*',
       'properties': '*',
+      'secret': '*',
       'matchCriteria': '*',
       'securityGroups': {
         'securityGroupId': '*',
@@ -1773,6 +1774,51 @@ export const AWS_CDK_CONSTRUCTOR_PROPS: { [key: string]: any } = {
         'env': {
           'account': '*',
           'region': '*'
+        }
+      },
+      'vpc': {
+        'vpcId': '*',
+        'vpcArn': '*',
+        'vpcCidrBlock': '*',
+        'publicSubnets': {
+          'availabilityZone': '*',
+          'subnetId': '*',
+          'internetConnectivityEstablished': '*',
+          'ipv4CidrBlock': '*',
+          'routeTable': {
+            'routeTableId': '*'
+          },
+          'stack': '*',
+          'node': '*',
+          'env': {
+            'account': '*',
+            'region': '*'
+          }
+        },
+        'availabilityZones': '*',
+        'vpnGatewayId': '*'
+      },
+      'vpcSubnets': {
+        'subnetType': 'SubnetType',
+        'availabilityZones': '*',
+        'subnetGroupName': '*',
+        'subnetName': '*',
+        'onePerAz': 'boolean',
+        'subnetFilters': '*',
+        'subnets': {
+          'availabilityZone': '*',
+          'subnetId': '*',
+          'internetConnectivityEstablished': '*',
+          'ipv4CidrBlock': '*',
+          'routeTable': {
+            'routeTableId': '*'
+          },
+          'stack': '*',
+          'node': '*',
+          'env': {
+            'account': '*',
+            'region': '*'
+          }
         }
       },
       'addProperty': [
@@ -1839,18 +1885,12 @@ export const AWS_CDK_CONSTRUCTOR_PROPS: { [key: string]: any } = {
       },
       'columns': {
         'name': '*',
-        'type': {
-          'isPrimitive': 'boolean',
-          'inputString': '*'
-        },
+        'type': '*',
         'comment': '*'
       },
       'partitionKeys': {
         'name': '*',
-        'type': {
-          'isPrimitive': 'boolean',
-          'inputString': '*'
-        },
+        'type': '*',
         'comment': '*'
       },
       'partitionIndexes': {
@@ -1894,40 +1934,9 @@ export const AWS_CDK_CONSTRUCTOR_PROPS: { [key: string]: any } = {
       ]
     },
     'S3Table': {
-      'bucket': {
-        'bucketArn': '*',
-        'bucketName': '*',
-        'bucketWebsiteUrl': '*',
-        'bucketWebsiteDomainName': '*',
-        'bucketDomainName': '*',
-        'bucketDualStackDomainName': '*',
-        'bucketRegionalDomainName': '*',
-        'isWebsite': 'boolean',
-        'encryptionKey': {
-          'keyArn': '*',
-          'keyId': '*',
-          'stack': '*',
-          'node': '*',
-          'env': {
-            'account': '*',
-            'region': '*'
-          }
-        },
-        'policy': '*',
-        'replicationRoleArn': '*'
-      },
+      'storage': '*',
       's3Prefix': '*',
-      'encryption': 'TableEncryption',
-      'encryptionKey': {
-        'keyArn': '*',
-        'keyId': '*',
-        'stack': '*',
-        'node': '*',
-        'env': {
-          'account': '*',
-          'region': '*'
-        }
-      },
+      'clientSideEncryption': '*',
       'tableName': '*',
       'description': '*',
       'database': {
@@ -1948,18 +1957,12 @@ export const AWS_CDK_CONSTRUCTOR_PROPS: { [key: string]: any } = {
       },
       'columns': {
         'name': '*',
-        'type': {
-          'isPrimitive': 'boolean',
-          'inputString': '*'
-        },
+        'type': '*',
         'comment': '*'
       },
       'partitionKeys': {
         'name': '*',
-        'type': {
-          'isPrimitive': 'boolean',
-          'inputString': '*'
-        },
+        'type': '*',
         'comment': '*'
       },
       'partitionIndexes': {
@@ -2008,8 +2011,7 @@ export const AWS_CDK_CONSTRUCTOR_PROPS: { [key: string]: any } = {
       'jobBookmarksEncryption': '*',
       's3Encryption': '*',
       'removalPolicy': 'RemovalPolicy'
-    },
-    'Table': {}
+    }
   },
   '@aws-cdk.aws-imagebuilder-alpha': {
     'Component': {
@@ -5167,7 +5169,8 @@ export const AWS_CDK_CONSTRUCTOR_PROPS: { [key: string]: any } = {
         }
       },
       'removalPolicy': 'RemovalPolicy',
-      'requestMetricsStatus': 'RequestMetricsStatus'
+      'requestMetricsStatus': 'RequestMetricsStatus',
+      'storageClass': 'StorageClass'
     },
     'TablePolicy': {
       'table': {
@@ -5248,7 +5251,8 @@ export const AWS_CDK_CONSTRUCTOR_PROPS: { [key: string]: any } = {
         'status': 'Status'
       },
       'removalPolicy': 'RemovalPolicy',
-      'withoutMetadata': 'boolean'
+      'withoutMetadata': 'boolean',
+      'storageClass': 'StorageClass'
     }
   },
   '@aws-cdk.aws-sagemaker-alpha': {
@@ -27333,6 +27337,7 @@ export const AWS_CDK_CONSTRUCTOR_PROPS: { [key: string]: any } = {
         'logType': '*',
         'destination': '*'
       },
+      'manageDeliveryResourcePolicy': 'boolean',
       'addEndpoint': [
         '*',
         {

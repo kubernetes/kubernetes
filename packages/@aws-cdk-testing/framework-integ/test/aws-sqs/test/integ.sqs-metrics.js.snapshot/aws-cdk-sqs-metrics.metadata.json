@@ -1,0 +1,58 @@
+{
+  "/aws-cdk-sqs-metrics/Queue": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-sqs-metrics/OutstandingMessages": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "metric": {
+          "warnings": "*",
+          "warningsV2": "*"
+        },
+        "alarmName": "*",
+        "alarmDescription": "*",
+        "comparisonOperator": "*",
+        "datapointsToAlarm": "*",
+        "threshold": "*",
+        "evaluationPeriods": "*",
+        "evaluateLowSampleCountPercentile": "*",
+        "treatMissingData": "*",
+        "actionsEnabled": "*"
+      }
+    }
+  ],
+  "/aws-cdk-sqs-metrics/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/aws-cdk-sqs-metrics/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/aws-cdk-sqs-metrics/Queue/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Queue4A7E3555"
+    }
+  ],
+  "/aws-cdk-sqs-metrics/OutstandingMessages/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "OutstandingMessages1A7D645F"
+    }
+  ],
+  "/aws-cdk-sqs-metrics/Exports/Output{\"Ref\":\"OutstandingMessages1A7D645F\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefOutstandingMessages1A7D645F140C34BA"
+    }
+  ]
+}

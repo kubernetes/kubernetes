@@ -112,6 +112,20 @@ describe('size', () => {
     expect(lazySize.isUnresolved()).toEqual(true);
     expect(Size.mebibytes(10).isUnresolved()).toEqual(false);
   });
+
+  test('stringification of Size objects', () => {
+    expect(Size.bytes(123).toHumanString()).toEqual('123 bytes');
+    expect(Size.bytes(1000000).toHumanString()).toEqual('976.56 KiB');
+    expect(Size.bytes(1024 * 1024 * 1024).toHumanString()).toEqual('1 GiB');
+    expect(Size.gibibytes(1).toHumanString()).toEqual('1 GiB');
+  });
+
+  test('stringification of Size objects', () => {
+    expect(String(Size.bytes(123))).toEqual('Size.bytes(123)');
+    expect(String(Size.bytes(1000000))).toEqual('Size.bytes(1000000)');
+    expect(String(Size.bytes(1024 * 1024 * 1024))).toEqual('Size.bytes(1073741824)');
+    expect(String(Size.gibibytes(1))).toEqual('Size.gibibytes(1)');
+  });
 });
 
 function floatEqual(actual: number, expected: number) {

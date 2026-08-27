@@ -588,6 +588,7 @@
       "Ref": "DeploySchemaAwsCliLayerD0D0BA6E"
      }
     ],
+    "MemorySize": 1024,
     "Role": {
      "Fn::GetAtt": [
       "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRole89A01265",

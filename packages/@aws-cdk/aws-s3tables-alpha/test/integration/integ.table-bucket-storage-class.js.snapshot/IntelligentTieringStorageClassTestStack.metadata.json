@@ -1,0 +1,26 @@
+{
+  "/IntelligentTieringStorageClassTestStack/IntelligentTieringBucket": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/IntelligentTieringStorageClassTestStack/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/IntelligentTieringStorageClassTestStack/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/IntelligentTieringStorageClassTestStack/IntelligentTieringBucket/IntelligentTieringBucket": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "IntelligentTieringBucket60A4421E"
+    }
+  ]
+}

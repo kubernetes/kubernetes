@@ -1,3 +1,4 @@
+import { Lazy } from 'aws-cdk-lib';
 import { Schema } from '../lib';
 
 test('boolean type', () => {
@@ -237,3 +238,42 @@ test('struct type', () => {
     'struct<primitive:string,with_comment:string,array:array<string>,map:map<string,string>,nested_struct:struct<nested:string>>',
   );
 });
+
+test('custom type', () => {
+  const type = Schema.custom('interval_day_to_second');
+  expect(type.inputString).toEqual('interval_day_to_second');
+  expect(type.isPrimitive).toEqual(true);
+});
+
+test('custom non-primitive type', () => {
+  const type = Schema.custom('uniontype<int,string>', false);
+  expect(type.inputString).toEqual('uniontype<int,string>');
+  expect(type.isPrimitive).toEqual(false);
+});
+
+test('decimal rejects precision out of range', () => {
+  expect(() => Schema.decimal(0)).toThrow(/decimal precision must be a positive integer between 1 and 38/);
+  expect(() => Schema.decimal(39)).toThrow(/decimal precision must be a positive integer between 1 and 38/);
+});
+
+test('decimal allows scale greater than precision (only bounded by 38)', () => {
+  expect(Schema.decimal(5, 10).inputString).toEqual('decimal(5,10)');
+});
+
+test('decimal rejects scale greater than 38', () => {
+  expect(() => Schema.decimal(38, 39)).toThrow(/decimal scale must be an integer between 0 and 38/);
+});
+
+test('decimal rejects non-integer precision or scale', () => {
+  expect(() => Schema.decimal(5.5)).toThrow(/.../);
+  expect(() => Schema.decimal(10, 2.5)).toThrow(/.../);
+});
+
+test('unresolved values are not validated', () => {
+  expect(() => Schema.decimal(Lazy.number({ produce: () => 5.5 }))).not.toThrow();
+  expect(() => Schema.decimal(
+    Lazy.number({ produce: () => 10 }),
+    Lazy.number({ produce: () => 2.5 })),
+  ).not.toThrow();
+});
+

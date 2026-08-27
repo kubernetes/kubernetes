@@ -1,0 +1,20 @@
+{
+  "version": "52.0.0",
+  "files": {
+    "bc7bcbf3e9a62e31ce381a90ef8b7d1bba1363166312538f09bdaa85bcab34a0": {
+      "displayName": "IntelligentTieringStorageClassTestStack Template",
+      "source": {
+        "path": "IntelligentTieringStorageClassTestStack.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-current_region-2bde3287": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "bc7bcbf3e9a62e31ce381a90ef8b7d1bba1363166312538f09bdaa85bcab34a0.json",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

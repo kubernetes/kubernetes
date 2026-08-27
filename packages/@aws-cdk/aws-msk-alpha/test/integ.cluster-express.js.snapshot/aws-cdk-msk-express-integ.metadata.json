@@ -1,18 +1,10 @@
 {
-  "/aws-cdk-msk-express-integ": [
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:32:15)",
-        "...node internals..."
-      ]
-    }
-  ],
   "/aws-cdk-msk-express-integ/VPC": [
     {
       "type": "aws:cdk:analytics:construct",
       "data": {
         "maxAzs": "*",
+        "natGateways": "*",
         "restrictDefaultSecurityGroup": false
       }
     }
@@ -52,72 +44,24 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "ExpressBootstrapBrokers"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new ExpressMskStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:23:9)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:32:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/BootstrapVersion": [
     {
       "type": "aws:cdk:logicalId",
       "data": "BootstrapVersion"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "addBootstrapVersionRule (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:261:19)",
-        "DefaultStackSynthesizer.addBootstrapVersionRule (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:161:9)",
-        "DefaultStackSynthesizer.synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/default-synthesizer.js:302:18)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:410: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:410:3)",
-        "visit (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:467:9)",
-        "visit (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:464:9)",
-        "synthesizeTree (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:403:5)",
-        "synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:54:5)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stage.js:179:96)",
-        "process.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/app.js:93:51)"
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/CheckBootstrapVersion": [
     {
       "type": "aws:cdk:logicalId",
       "data": "CheckBootstrapVersion"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "addBootstrapVersionRule (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:269:5)",
-        "DefaultStackSynthesizer.addBootstrapVersionRule (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:161:9)",
-        "DefaultStackSynthesizer.synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/default-synthesizer.js:302:18)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:410: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:410:3)",
-        "visit (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:467:9)",
-        "visit (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:464:9)",
-        "synthesizeTree (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:403:5)",
-        "synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:54:5)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stage.js:179:96)",
-        "process.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/app.js:93:51)"
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCB9E5F0B4"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:770:29)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new ExpressMskStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:11:21)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:32:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PublicSubnet1": [
@@ -182,14 +126,6 @@
     {
       "type": "aws:cdk:analytics:method",
       "data": {}
-    },
-    {
-      "type": "aws:cdk:analytics:method",
-      "data": {
-        "addNatGateway": [
-          "*"
-        ]
-      }
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PublicSubnet3": [
@@ -218,14 +154,6 @@
     {
       "type": "aws:cdk:analytics:method",
       "data": {}
-    },
-    {
-      "type": "aws:cdk:analytics:method",
-      "data": {
-        "addNatGateway": [
-          "*"
-        ]
-      }
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PrivateSubnet1": [
@@ -316,32 +244,12 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCIGWB7E252D3"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:825:29)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new ExpressMskStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:11:21)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:32:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/VPCGW": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCVPCGW99B986DC"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:828:29)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new ExpressMskStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:11:21)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:32:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/ExpressCluster/SecurityGroup": [
@@ -357,16 +265,6 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "ExpressClusterEA601CE7"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/lib/cluster.js:453:30)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new ExpressMskStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:15:32)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:32:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/AWS679f53fac002430cb0da5b7982bd2287/ServiceRole": [
@@ -397,21 +295,6 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "AWS679f53fac002430cb0da5b7982bd22872D164C4C"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/function.js:691:29)",
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "AwsCustomResourceSingletonFunction.ensureLambda (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/singleton-lambda.js:272:20)",
-        "new SingletonFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/singleton-lambda.js:135:40)",
-        "new SingletonFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new AwsCustomResourceSingletonFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resource-handlers/dist/custom-resources/aws-custom-resource-provider.generated.js:9:9)",
-        "new AwsCustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resources/lib/aws-custom-resource/aws-custom-resource.js:263:30)",
-        "new AwsCustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "WrappedClass._bootstrapBrokers (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/lib/cluster.js:556:49)",
-        "get bootstrapBrokersTls (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/lib/cluster.js:592:25)"
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/AWS679f53fac002430cb0da5b7982bd2287/LogGroup": [
@@ -426,640 +309,162 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPublicSubnet1SubnetB4246D30"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1264:28)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1533:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PublicSubnet1/RouteTable": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPublicSubnet1RouteTableFEE4B781"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1284:27)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1533:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PublicSubnet1/RouteTableAssociation": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPublicSubnet1RouteTableAssociation0B0896DC"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1289:32)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1533:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PublicSubnet1/DefaultRoute": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPublicSubnet1DefaultRoute91CEF279"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "WrappedClass.addDefaultInternetRoute (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1304:27)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:835: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:835:3)",
-        "Array.forEach (:)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:832:36)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new ExpressMskStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:11:21)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:32:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PublicSubnet1/EIP": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPublicSubnet1EIP6AD938E8"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "WrappedClass.addNatGateway (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1556:50)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "NatGatewayProvider.configureNat (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/nat.js:155:33)",
-        "WrappedClass.createNatGateways (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:928:22)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:845:26)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new ExpressMskStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:11:21)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:32:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PublicSubnet1/NATGateway": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPublicSubnet1NATGatewayE0556630"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "WrappedClass.addNatGateway (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1554:25)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "NatGatewayProvider.configureNat (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/nat.js:155:33)",
-        "WrappedClass.createNatGateways (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:928:22)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:845:26)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new ExpressMskStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:11:21)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:32:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PublicSubnet2/Subnet": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPublicSubnet2Subnet74179F39"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1264:28)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1533:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PublicSubnet2/RouteTable": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPublicSubnet2RouteTable6F1A15F1"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1284:27)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1533:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PublicSubnet2/RouteTableAssociation": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPublicSubnet2RouteTableAssociation5A808732"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1289:32)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1533:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PublicSubnet2/DefaultRoute": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPublicSubnet2DefaultRouteB7481BBA"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "WrappedClass.addDefaultInternetRoute (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1304:27)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:835: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:835:3)",
-        "Array.forEach (:)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:832:36)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new ExpressMskStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:11:21)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:32:15)",
-        "...node internals..."
-      ]
-    }
-  ],
-  "/aws-cdk-msk-express-integ/VPC/PublicSubnet2/EIP": [
-    {
-      "type": "aws:cdk:logicalId",
-      "data": "VPCPublicSubnet2EIP4947BC00"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "WrappedClass.addNatGateway (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1556:50)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "NatGatewayProvider.configureNat (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/nat.js:155:33)",
-        "WrappedClass.createNatGateways (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:928:22)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:845:26)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new ExpressMskStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:11:21)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:32:15)",
-        "...node internals..."
-      ]
-    }
-  ],
-  "/aws-cdk-msk-express-integ/VPC/PublicSubnet2/NATGateway": [
-    {
-      "type": "aws:cdk:logicalId",
-      "data": "VPCPublicSubnet2NATGateway3C070193"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "WrappedClass.addNatGateway (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1554:25)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "NatGatewayProvider.configureNat (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/nat.js:155:33)",
-        "WrappedClass.createNatGateways (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:928:22)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:845:26)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new ExpressMskStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:11:21)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:32:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PublicSubnet3/Subnet": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPublicSubnet3Subnet631C5E25"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1264:28)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1533:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PublicSubnet3/RouteTable": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPublicSubnet3RouteTable98AE0E14"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1284:27)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1533:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PublicSubnet3/RouteTableAssociation": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPublicSubnet3RouteTableAssociation427FE0C6"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1289:32)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1533:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PublicSubnet3/DefaultRoute": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPublicSubnet3DefaultRouteA0D29D46"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "WrappedClass.addDefaultInternetRoute (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1304:27)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:835: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:835:3)",
-        "Array.forEach (:)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:832:36)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new ExpressMskStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:11:21)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:32:15)",
-        "...node internals..."
-      ]
-    }
-  ],
-  "/aws-cdk-msk-express-integ/VPC/PublicSubnet3/EIP": [
-    {
-      "type": "aws:cdk:logicalId",
-      "data": "VPCPublicSubnet3EIPAD4BC883"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "WrappedClass.addNatGateway (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1556:50)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "NatGatewayProvider.configureNat (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/nat.js:155:33)",
-        "WrappedClass.createNatGateways (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:928:22)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:845:26)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new ExpressMskStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:11:21)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:32:15)",
-        "...node internals..."
-      ]
-    }
-  ],
-  "/aws-cdk-msk-express-integ/VPC/PublicSubnet3/NATGateway": [
-    {
-      "type": "aws:cdk:logicalId",
-      "data": "VPCPublicSubnet3NATGatewayD3048F5C"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "WrappedClass.addNatGateway (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1554:25)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "NatGatewayProvider.configureNat (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/nat.js:155:33)",
-        "WrappedClass.createNatGateways (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:928:22)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:845:26)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new ExpressMskStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:11:21)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:32:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PrivateSubnet1/Subnet": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPrivateSubnet1Subnet8BCA10E0"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1264:28)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1606:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PrivateSubnet1/RouteTable": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPrivateSubnet1RouteTableBE8A6027"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1284:27)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1606:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PrivateSubnet1/RouteTableAssociation": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPrivateSubnet1RouteTableAssociation347902D1"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1289:32)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1606:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PrivateSubnet1/DefaultRoute": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPrivateSubnet1DefaultRouteAE1D6490"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "WrappedClass.addRoute (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1393:27)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "NatGatewayProvider.configureSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/nat.js:176:16)",
-        "NatGatewayProvider.configureNat (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/nat.js:161:18)",
-        "WrappedClass.createNatGateways (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:928:22)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:845:26)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new ExpressMskStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:11:21)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:32:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PrivateSubnet2/Subnet": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPrivateSubnet2SubnetCFCDAA7A"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1264:28)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1606:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PrivateSubnet2/RouteTable": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPrivateSubnet2RouteTable0A19E10E"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1284:27)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1606:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PrivateSubnet2/RouteTableAssociation": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPrivateSubnet2RouteTableAssociation0C73D413"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1289:32)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1606:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PrivateSubnet2/DefaultRoute": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPrivateSubnet2DefaultRouteF4F5CFD2"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "WrappedClass.addRoute (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1393:27)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "NatGatewayProvider.configureSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/nat.js:176:16)",
-        "NatGatewayProvider.configureNat (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/nat.js:161:18)",
-        "WrappedClass.createNatGateways (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:928:22)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:845:26)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new ExpressMskStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:11:21)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:32:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PrivateSubnet3/Subnet": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPrivateSubnet3Subnet3EDCD457"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1264:28)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1606:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PrivateSubnet3/RouteTable": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPrivateSubnet3RouteTable192186F8"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1284:27)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1606:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PrivateSubnet3/RouteTableAssociation": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPrivateSubnet3RouteTableAssociationC28D144E"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1289:32)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1606:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/VPC/PrivateSubnet3/DefaultRoute": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VPCPrivateSubnet3DefaultRoute27F311AE"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "WrappedClass.addRoute (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1393:27)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "NatGatewayProvider.configureSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/nat.js:176:16)",
-        "NatGatewayProvider.configureNat (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/nat.js:161:18)",
-        "WrappedClass.createNatGateways (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:928:22)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:845:26)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new ExpressMskStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:11:21)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:32:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/ExpressCluster/SecurityGroup/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "ExpressClusterSecurityGroupEA6DCAF0"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new SecurityGroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/security-group.js:420:34)",
-        "new SecurityGroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new SecurityGroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/lib/cluster.js:264:21)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new ExpressMskStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:15:32)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:32:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/ExpressCluster/BootstrapBrokersBootstrapBrokerStringTls/Provider": [
@@ -1149,21 +554,6 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "AWS679f53fac002430cb0da5b7982bd2287ServiceRoleC1EA0FF2"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/role.js:450:34)",
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/function.js:606:39)",
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "AwsCustomResourceSingletonFunction.ensureLambda (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/singleton-lambda.js:272:20)",
-        "new SingletonFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/singleton-lambda.js:135:40)",
-        "new SingletonFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new AwsCustomResourceSingletonFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resource-handlers/dist/custom-resources/aws-custom-resource-provider.generated.js:9:9)",
-        "new AwsCustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resources/lib/aws-custom-resource/aws-custom-resource.js:263:30)",
-        "new AwsCustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)"
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/AWS679f53fac002430cb0da5b7982bd2287/Code/AssetBucket": [
@@ -1176,63 +566,18 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "AWS679f53fac002430cb0da5b7982bd2287LogGroup449FB7C2"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new LogGroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-logs/lib/log-group.js:537:29)",
-        "new LogGroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/function.js:773:34)",
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "AwsCustomResourceSingletonFunction.ensureLambda (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/singleton-lambda.js:272:20)",
-        "new SingletonFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/singleton-lambda.js:135:40)",
-        "new SingletonFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new AwsCustomResourceSingletonFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resource-handlers/dist/custom-resources/aws-custom-resource-provider.generated.js:9:9)",
-        "new AwsCustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resources/lib/aws-custom-resource/aws-custom-resource.js:263:30)",
-        "new AwsCustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)"
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/ExpressCluster/BootstrapBrokersBootstrapBrokerStringTls/Resource/Default": [
     {
       "type": "aws:cdk:logicalId",
       "data": "ExpressClusterBootstrapBrokersBootstrapBrokerStringTlsFF6BD10D"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new CustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/custom-resource.js:141:29)",
-        "new CustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new CustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new AwsCustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resources/lib/aws-custom-resource/aws-custom-resource.js:290:35)",
-        "new AwsCustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "WrappedClass._bootstrapBrokers (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/lib/cluster.js:556:49)",
-        "get bootstrapBrokersTls (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/lib/cluster.js:592:25)",
-        "new ExpressMskStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:24:35)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:32:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-msk-express-integ/ExpressCluster/BootstrapBrokersBootstrapBrokerStringTls/CustomResourcePolicy/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "ExpressClusterBootstrapBrokersBootstrapBrokerStringTlsCustomResourcePolicyD30A9D7E"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Policy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/policy.js:158:30)",
-        "new Policy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Policy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new AwsCustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resources/lib/aws-custom-resource/aws-custom-resource.js:331:32)",
-        "new AwsCustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "WrappedClass._bootstrapBrokers (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/lib/cluster.js:556:49)",
-        "get bootstrapBrokersTls (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/lib/cluster.js:592:25)",
-        "new ExpressMskStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:24:35)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk/aws-msk-alpha/test/integ.cluster-express.js:32:15)",
-        "...node internals..."
-      ]
     }
   ]
 }

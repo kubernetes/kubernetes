@@ -262,51 +262,27 @@
      "Statement": [
       {
        "Action": [
-        "s3:Abort*",
-        "s3:DeleteObject*",
-        "s3:GetBucket*",
-        "s3:GetObject*",
-        "s3:List*",
-        "s3:PutObject",
-        "s3:PutObjectLegalHold",
-        "s3:PutObjectRetention",
-        "s3:PutObjectTagging",
-        "s3:PutObjectVersionTagging"
+        "s3:AbortMultipartUpload",
+        "s3:ListMultipartUploadParts",
+        "s3:PutObject"
        ],
        "Effect": "Allow",
-       "Resource": [
-        {
-         "Fn::Join": [
-          "",
-          [
-           "arn:",
-           {
-            "Ref": "AWS::Partition"
-           },
-           ":s3:::",
-           {
-            "Ref": "RecordingBucket03AEF6D2"
-           },
-           "/*"
-          ]
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          "arn:",
+          {
+           "Ref": "AWS::Partition"
+          },
+          ":s3:::",
+          {
+           "Ref": "RecordingBucket03AEF6D2"
+          },
+          "/browser-recordings/*"
          ]
-        },
-        {
-         "Fn::Join": [
-          "",
-          [
-           "arn:",
-           {
-            "Ref": "AWS::Partition"
-           },
-           ":s3:::",
-           {
-            "Ref": "RecordingBucket03AEF6D2"
-           }
-          ]
-         ]
-        }
-       ]
+        ]
+       }
       }
      ],
      "Version": "2012-10-17"

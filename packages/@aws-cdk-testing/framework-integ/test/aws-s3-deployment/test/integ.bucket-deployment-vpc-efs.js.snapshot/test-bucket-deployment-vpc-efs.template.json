@@ -820,7 +820,8 @@
        "Ref": "EfsVpcIsolatedSubnet2SubnetFBB16F91"
       }
      ]
-    }
+    },
+    "MemorySize": 1024
    },
    "DependsOn": [
     "BucketDeploymentEFSVPCc8614d1bafb9e3d8a3bca3e6b823500bbebba9024fEfsMountTargetIsolatedSubnet1B0BA6CF5",

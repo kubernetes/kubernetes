@@ -265,7 +265,8 @@
      ]
     },
     "Runtime": "python3.13",
-    "Timeout": 900
+    "Timeout": 900,
+    "MemorySize": 1024
    },
    "DependsOn": [
     "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRoleDefaultPolicy88902FDF",

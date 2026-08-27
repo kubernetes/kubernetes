@@ -65,6 +65,18 @@ export const BROWSER_USE_PERMS = [
   'bedrock-agentcore:StopBrowserSession',
 ];
 
+/**
+ * Least-privilege S3 permissions the browser execution role needs to write
+ * session recordings. Recording is a write-only, multipart-upload workload, so
+ * only these write actions are required (no read, list-bucket, or delete).
+ * See https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/browser-resource-session-management.html
+ */
+export const BROWSER_RECORDING_S3_PERMS = [
+  's3:PutObject',
+  's3:ListMultipartUploadParts',
+  's3:AbortMultipartUpload',
+];
+
 /******************************************************************************
  *                               CODE INTERPRETER
  *****************************************************************************/

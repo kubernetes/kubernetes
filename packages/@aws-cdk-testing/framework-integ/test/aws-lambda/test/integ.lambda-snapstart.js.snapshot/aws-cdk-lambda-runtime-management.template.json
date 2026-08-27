@@ -217,6 +217,86 @@
    "DependsOn": [
     "DotnetSnapstartLambdaServiceRole222A9244"
    ]
+  },
+  "ContainerImageSnapstartLambdaServiceRole7968B8AF": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ]
+   }
+  },
+  "ContainerImageSnapstartLambdaA1A8D795": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "ImageUri": {
+      "Fn::Sub": "${AWS::AccountId}.dkr.ecr.${AWS::Region}.${AWS::URLSuffix}/cdk-hnb659fds-container-assets-${AWS::AccountId}-${AWS::Region}:d2ffcbc233baebd6a975fb7302082cc87d83fb3ce30189fc4bb9ebe7cfbe9205"
+     }
+    },
+    "PackageType": "Image",
+    "Role": {
+     "Fn::GetAtt": [
+      "ContainerImageSnapstartLambdaServiceRole7968B8AF",
+      "Arn"
+     ]
+    },
+    "SnapStart": {
+     "ApplyOn": "PublishedVersions"
+    }
+   },
+   "DependsOn": [
+    "ContainerImageSnapstartLambdaServiceRole7968B8AF"
+   ]
+  },
+  "ContainerImageSnapstartLambdaCurrentVersion1F4901A42c47590495224991c3816c51ffc8ea8d": {
+   "Type": "AWS::Lambda::Version",
+   "Properties": {
+    "FunctionName": {
+     "Ref": "ContainerImageSnapstartLambdaA1A8D795"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:do-not-refactor": true
+   }
+  },
+  "ContainerImageSnapstartAliasF4D42E37": {
+   "Type": "AWS::Lambda::Alias",
+   "Properties": {
+    "FunctionName": {
+     "Ref": "ContainerImageSnapstartLambdaA1A8D795"
+    },
+    "FunctionVersion": {
+     "Fn::GetAtt": [
+      "ContainerImageSnapstartLambdaCurrentVersion1F4901A42c47590495224991c3816c51ffc8ea8d",
+      "Version"
+     ]
+    },
+    "Name": "live"
+   }
   }
  },
  "Parameters": {

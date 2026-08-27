@@ -20,7 +20,13 @@ export function shouldFollow(mode: SymlinkFollowMode, sourceRoot: string, realPa
     case SymlinkFollowMode.EXTERNAL:
       return !_isInternal() && fs.existsSync(realPath);
     case SymlinkFollowMode.BLOCK_EXTERNAL:
-      return _isInternal() && fs.existsSync(realPath);
+      if (_isInternal()) {
+        return fs.existsSync(realPath);
+      } else {
+        throw new UnscopedValidationError(lit`BundlingFileSymlinkForbidden`,
+          `The file ${realPath} is an external symbolic link which is forbidden due to follow mode ${mode}. Set \`follow\` to a mode that will follow symlinks (ALWAYS or EXTERNAL) or emit a regular file`,
+        );
+      }
     case SymlinkFollowMode.NEVER:
       return false;
     default:
@@ -34,4 +40,10 @@ export function shouldFollow(mode: SymlinkFollowMode, sourceRoot: string, realPa
 
 export function isInternalPath(rootPath: string, targetPath: string): boolean {
   return rootPath === targetPath || targetPath.startsWith(rootPath + path.sep);
+}
+
+export function resolveLinkTarget(realPath: string, linkTarget: string): string {
+  return path.isAbsolute(linkTarget)
+    ? path.resolve(linkTarget)
+    : path.resolve(path.dirname(realPath), linkTarget);
 }

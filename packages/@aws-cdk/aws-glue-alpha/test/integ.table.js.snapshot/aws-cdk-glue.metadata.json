@@ -2,9 +2,7 @@
   "/aws-cdk-glue/DataBucket": [
     {
       "type": "aws:cdk:analytics:construct",
-      "data": {
-        "removalPolicy": "destroy"
-      }
+      "data": "*"
     }
   ],
   "/aws-cdk-glue/MyDatabase": [
@@ -21,6 +19,26 @@
     {
       "type": "aws:cdk:analytics:method",
       "data": "*"
+    },
+    {
+      "type": "aws:cdk:warning",
+      "data": "granting access to the entire data bucket because `s3Prefix` is empty and a shared bucket was provided; set `s3Prefix` to scope grants to this table's data and avoid granting access to other tables sharing the bucket. [ack: @aws-cdk/aws-glue-alpha:grantScopedToWholeBucket]",
+      "trace": [
+        "Annotations.addMessage (/Users/otaviom/projects/aws-cdk/packages/aws-cdk-lib/core/lib/annotations.js:234:29)",
+        "Annotations.addWarningV2 (/Users/otaviom/projects/aws-cdk/packages/aws-cdk-lib/core/lib/annotations.js:103:18)",
+        "WrappedClass.generateS3PrefixForGrant (/Users/otaviom/projects/aws-cdk/packages/@aws-cdk/aws-glue-alpha/lib/s3-table.js:385:52)",
+        "WrappedClass.grantReadWrite (/Users/otaviom/projects/aws-cdk/packages/@aws-cdk/aws-glue-alpha/lib/s3-table.js:376:54)",
+        "WrappedClass.<anonymous> (/Users/otaviom/projects/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
+        "Object.<anonymous> (/Users/otaviom/projects/aws-cdk/packages/@aws-cdk/aws-glue-alpha/test/integ.table.js:162:11)",
+        "Module._compile (node:internal/modules/cjs/loader:1730:14)",
+        "Object..js (node:internal/modules/cjs/loader:1895:10)",
+        "Module.load (node:internal/modules/cjs/loader:1465:32)",
+        "Function._load (node:internal/modules/cjs/loader:1282:12)",
+        "TracingChannel.traceSync (node:diagnostics_channel:322:14)",
+        "wrapModuleLoad (node:internal/modules/cjs/loader:235:24)",
+        "Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)",
+        "node:internal/main/run_main_module:36:49"
+      ]
     }
   ],
   "/aws-cdk-glue/@aws-cdk.aws-glue-alpha.AccountCatalog": [
@@ -37,6 +55,26 @@
     {
       "type": "aws:cdk:analytics:method",
       "data": "*"
+    },
+    {
+      "type": "aws:cdk:warning",
+      "data": "granting access to the entire data bucket because `s3Prefix` is empty and a shared bucket was provided; set `s3Prefix` to scope grants to this table's data and avoid granting access to other tables sharing the bucket. [ack: @aws-cdk/aws-glue-alpha:grantScopedToWholeBucket]",
+      "trace": [
+        "Annotations.addMessage (/Users/otaviom/projects/aws-cdk/packages/aws-cdk-lib/core/lib/annotations.js:234:29)",
+        "Annotations.addWarningV2 (/Users/otaviom/projects/aws-cdk/packages/aws-cdk-lib/core/lib/annotations.js:103:18)",
+        "WrappedClass.generateS3PrefixForGrant (/Users/otaviom/projects/aws-cdk/packages/@aws-cdk/aws-glue-alpha/lib/s3-table.js:385:52)",
+        "WrappedClass.grantReadWrite (/Users/otaviom/projects/aws-cdk/packages/@aws-cdk/aws-glue-alpha/lib/s3-table.js:376:54)",
+        "WrappedClass.<anonymous> (/Users/otaviom/projects/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
+        "Object.<anonymous> (/Users/otaviom/projects/aws-cdk/packages/@aws-cdk/aws-glue-alpha/test/integ.table.js:159:10)",
+        "Module._compile (node:internal/modules/cjs/loader:1730:14)",
+        "Object..js (node:internal/modules/cjs/loader:1895:10)",
+        "Module.load (node:internal/modules/cjs/loader:1465:32)",
+        "Function._load (node:internal/modules/cjs/loader:1282:12)",
+        "TracingChannel.traceSync (node:diagnostics_channel:322:14)",
+        "wrapModuleLoad (node:internal/modules/cjs/loader:235:24)",
+        "Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)",
+        "node:internal/main/run_main_module:36:49"
+      ]
     }
   ],
   "/aws-cdk-glue/JSONTable": [
@@ -47,6 +85,26 @@
     {
       "type": "aws:cdk:analytics:method",
       "data": "*"
+    },
+    {
+      "type": "aws:cdk:warning",
+      "data": "granting access to the entire data bucket because `s3Prefix` is empty and a shared bucket was provided; set `s3Prefix` to scope grants to this table's data and avoid granting access to other tables sharing the bucket. [ack: @aws-cdk/aws-glue-alpha:grantScopedToWholeBucket]",
+      "trace": [
+        "Annotations.addMessage (/Users/otaviom/projects/aws-cdk/packages/aws-cdk-lib/core/lib/annotations.js:234:29)",
+        "Annotations.addWarningV2 (/Users/otaviom/projects/aws-cdk/packages/aws-cdk-lib/core/lib/annotations.js:103:18)",
+        "WrappedClass.generateS3PrefixForGrant (/Users/otaviom/projects/aws-cdk/packages/@aws-cdk/aws-glue-alpha/lib/s3-table.js:385:52)",
+        "WrappedClass.grantReadWrite (/Users/otaviom/projects/aws-cdk/packages/@aws-cdk/aws-glue-alpha/lib/s3-table.js:376:54)",
+        "WrappedClass.<anonymous> (/Users/otaviom/projects/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
+        "Object.<anonymous> (/Users/otaviom/projects/aws-cdk/packages/@aws-cdk/aws-glue-alpha/test/integ.table.js:163:11)",
+        "Module._compile (node:internal/modules/cjs/loader:1730:14)",
+        "Object..js (node:internal/modules/cjs/loader:1895:10)",
+        "Module.load (node:internal/modules/cjs/loader:1465:32)",
+        "Function._load (node:internal/modules/cjs/loader:1282:12)",
+        "TracingChannel.traceSync (node:diagnostics_channel:322:14)",
+        "wrapModuleLoad (node:internal/modules/cjs/loader:235:24)",
+        "Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)",
+        "node:internal/main/run_main_module:36:49"
+      ]
     }
   ],
   "/aws-cdk-glue/ParquetTable": [
@@ -57,14 +115,32 @@
     {
       "type": "aws:cdk:analytics:method",
       "data": "*"
+    },
+    {
+      "type": "aws:cdk:warning",
+      "data": "granting access to the entire data bucket because `s3Prefix` is empty and a shared bucket was provided; set `s3Prefix` to scope grants to this table's data and avoid granting access to other tables sharing the bucket. [ack: @aws-cdk/aws-glue-alpha:grantScopedToWholeBucket]",
+      "trace": [
+        "Annotations.addMessage (/Users/otaviom/projects/aws-cdk/packages/aws-cdk-lib/core/lib/annotations.js:234:29)",
+        "Annotations.addWarningV2 (/Users/otaviom/projects/aws-cdk/packages/aws-cdk-lib/core/lib/annotations.js:103:18)",
+        "WrappedClass.generateS3PrefixForGrant (/Users/otaviom/projects/aws-cdk/packages/@aws-cdk/aws-glue-alpha/lib/s3-table.js:385:52)",
+        "WrappedClass.grantReadWrite (/Users/otaviom/projects/aws-cdk/packages/@aws-cdk/aws-glue-alpha/lib/s3-table.js:376:54)",
+        "WrappedClass.<anonymous> (/Users/otaviom/projects/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
+        "Object.<anonymous> (/Users/otaviom/projects/aws-cdk/packages/@aws-cdk/aws-glue-alpha/test/integ.table.js:164:14)",
+        "Module._compile (node:internal/modules/cjs/loader:1730:14)",
+        "Object..js (node:internal/modules/cjs/loader:1895:10)",
+        "Module.load (node:internal/modules/cjs/loader:1465:32)",
+        "Function._load (node:internal/modules/cjs/loader:1282:12)",
+        "TracingChannel.traceSync (node:diagnostics_channel:322:14)",
+        "wrapModuleLoad (node:internal/modules/cjs/loader:235:24)",
+        "Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)",
+        "node:internal/main/run_main_module:36:49"
+      ]
     }
   ],
   "/aws-cdk-glue/MyKey": [
     {
       "type": "aws:cdk:analytics:construct",
-      "data": {
-        "removalPolicy": "destroy"
-      }
+      "data": "*"
     }
   ],
   "/aws-cdk-glue/MyEncryptedTable": [
@@ -101,12 +177,6 @@
       "data": "*"
     }
   ],
-  "/aws-cdk-glue/MyDeprecatedTable": [
-    {
-      "type": "aws:cdk:analytics:construct",
-      "data": "*"
-    }
-  ],
   "/aws-cdk-glue/MyUser": [
     {
       "type": "aws:cdk:analytics:construct",
@@ -114,51 +184,27 @@
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "addToPrincipalPolicy": [
-          {}
-        ]
-      }
+      "data": "*"
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "attachInlinePolicy": [
-          "*"
-        ]
-      }
+      "data": "*"
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "addToPrincipalPolicy": [
-          {}
-        ]
-      }
+      "data": "*"
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "addToPrincipalPolicy": [
-          {}
-        ]
-      }
+      "data": "*"
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "addToPrincipalPolicy": [
-          {}
-        ]
-      }
+      "data": "*"
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "addToPrincipalPolicy": [
-          {}
-        ]
-      }
+      "data": "*"
     }
   ],
   "/aws-cdk-glue/AnotherUser": [
@@ -168,59 +214,31 @@
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "addToPrincipalPolicy": [
-          {}
-        ]
-      }
+      "data": "*"
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "attachInlinePolicy": [
-          "*"
-        ]
-      }
+      "data": "*"
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "addToPrincipalPolicy": [
-          {}
-        ]
-      }
+      "data": "*"
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "addToPrincipalPolicy": [
-          {}
-        ]
-      }
+      "data": "*"
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "addToPrincipalPolicy": [
-          {}
-        ]
-      }
+      "data": "*"
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "addToPrincipalPolicy": [
-          {}
-        ]
-      }
+      "data": "*"
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "addToPrincipalPolicy": [
-          {}
-        ]
-      }
+      "data": "*"
     }
   ],
   "/aws-cdk-glue/BootstrapVersion": [
@@ -280,11 +298,7 @@
   "/aws-cdk-glue/MyEncryptedTable/Bucket": [
     {
       "type": "aws:cdk:analytics:construct",
-      "data": {
-        "encryption": "KMS",
-        "encryptionKey": "*",
-        "enforceSSL": true
-      }
+      "data": "*"
     }
   ],
   "/aws-cdk-glue/MyEncryptedTable/Table": [
@@ -317,12 +331,6 @@
       "data": "MyTableWithParametersTable39568AB8"
     }
   ],
-  "/aws-cdk-glue/MyDeprecatedTable/Table": [
-    {
-      "type": "aws:cdk:logicalId",
-      "data": "MyDeprecatedTableAA0364FD"
-    }
-  ],
   "/aws-cdk-glue/MyUser/Resource": [
     {
       "type": "aws:cdk:logicalId",
@@ -336,59 +344,31 @@
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "attachToUser": [
-          "*"
-        ]
-      }
+      "data": "*"
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "attachToUser": [
-          "*"
-        ]
-      }
+      "data": "*"
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "addStatements": [
-          {}
-        ]
-      }
+      "data": "*"
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "addStatements": [
-          {}
-        ]
-      }
+      "data": "*"
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "addStatements": [
-          {}
-        ]
-      }
+      "data": "*"
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "addStatements": [
-          {}
-        ]
-      }
+      "data": "*"
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "addStatements": [
-          {}
-        ]
-      }
+      "data": "*"
     }
   ],
   "/aws-cdk-glue/AnotherUser/Resource": [
@@ -404,67 +384,35 @@
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "attachToUser": [
-          "*"
-        ]
-      }
+      "data": "*"
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "attachToUser": [
-          "*"
-        ]
-      }
+      "data": "*"
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "addStatements": [
-          {}
-        ]
-      }
+      "data": "*"
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "addStatements": [
-          {}
-        ]
-      }
+      "data": "*"
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "addStatements": [
-          {}
-        ]
-      }
+      "data": "*"
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "addStatements": [
-          {}
-        ]
-      }
+      "data": "*"
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "addStatements": [
-          {}
-        ]
-      }
+      "data": "*"
     },
     {
       "type": "aws:cdk:analytics:method",
-      "data": {
-        "addStatements": [
-          {}
-        ]
-      }
+      "data": "*"
     }
   ],
   "/aws-cdk-glue/MyEncryptedTable/Bucket/Resource": [
@@ -476,9 +424,7 @@
   "/aws-cdk-glue/MyEncryptedTable/Bucket/Policy": [
     {
       "type": "aws:cdk:analytics:construct",
-      "data": {
-        "bucket": "*"
-      }
+      "data": "*"
     }
   ],
   "/aws-cdk-glue/MyUser/DefaultPolicy/Resource": [

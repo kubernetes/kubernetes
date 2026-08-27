@@ -1,0 +1,50 @@
+{
+  "/TableStorageClassOverrideTestStack/TableStorageClassBucket": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/TableStorageClassOverrideTestStack/StorageClassNamespace": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/TableStorageClassOverrideTestStack/IntelligentTieringTable": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/TableStorageClassOverrideTestStack/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/TableStorageClassOverrideTestStack/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/TableStorageClassOverrideTestStack/TableStorageClassBucket/TableStorageClassBucket": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "TableStorageClassBucket508378C1"
+    }
+  ],
+  "/TableStorageClassOverrideTestStack/StorageClassNamespace/StorageClassNamespace": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "StorageClassNamespace149BDE96"
+    }
+  ],
+  "/TableStorageClassOverrideTestStack/IntelligentTieringTable/IntelligentTieringTable": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "IntelligentTieringTableEF975CF0"
+    }
+  ]
+}

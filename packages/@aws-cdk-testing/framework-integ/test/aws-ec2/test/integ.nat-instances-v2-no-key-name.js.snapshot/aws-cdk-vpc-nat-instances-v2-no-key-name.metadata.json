@@ -1,0 +1,218 @@
+{
+  "/aws-cdk-vpc-nat-instances-v2-no-key-name/MyVpc": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "natGatewayProvider": "*",
+        "natGateways": "*",
+        "maxAzs": "*"
+      }
+    }
+  ],
+  "/aws-cdk-vpc-nat-instances-v2-no-key-name/SsmParameterValue:--aws--service--ami-amazon-linux-latest--al2023-ami-kernel-6.1-x86_64:C96584B6-F00A-464E-AD19-53AFF4B05118.Parameter": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SsmParameterValueawsserviceamiamazonlinuxlatestal2023amikernel61x8664C96584B6F00A464EAD1953AFF4B05118Parameter"
+    }
+  ],
+  "/aws-cdk-vpc-nat-instances-v2-no-key-name/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/aws-cdk-vpc-nat-instances-v2-no-key-name/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/aws-cdk-vpc-nat-instances-v2-no-key-name/MyVpc/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyVpcF9F0CA6F"
+    }
+  ],
+  "/aws-cdk-vpc-nat-instances-v2-no-key-name/MyVpc/PublicSubnet1": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "availabilityZone": "*",
+        "vpcId": "*",
+        "cidrBlock": "*",
+        "mapPublicIpOnLaunch": true,
+        "ipv6CidrBlock": "*",
+        "assignIpv6AddressOnCreation": "*"
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "availabilityZone": "*",
+        "vpcId": "*",
+        "cidrBlock": "*",
+        "mapPublicIpOnLaunch": true,
+        "ipv6CidrBlock": "*",
+        "assignIpv6AddressOnCreation": "*"
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {}
+    }
+  ],
+  "/aws-cdk-vpc-nat-instances-v2-no-key-name/MyVpc/PrivateSubnet1": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "availabilityZone": "*",
+        "vpcId": "*",
+        "cidrBlock": "*",
+        "mapPublicIpOnLaunch": false,
+        "ipv6CidrBlock": "*",
+        "assignIpv6AddressOnCreation": "*"
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "availabilityZone": "*",
+        "vpcId": "*",
+        "cidrBlock": "*",
+        "mapPublicIpOnLaunch": false,
+        "ipv6CidrBlock": "*",
+        "assignIpv6AddressOnCreation": "*"
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {}
+    }
+  ],
+  "/aws-cdk-vpc-nat-instances-v2-no-key-name/MyVpc/IGW": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyVpcIGW5C4A4F63"
+    }
+  ],
+  "/aws-cdk-vpc-nat-instances-v2-no-key-name/MyVpc/VPCGW": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyVpcVPCGW488ACE0D"
+    }
+  ],
+  "/aws-cdk-vpc-nat-instances-v2-no-key-name/MyVpc/NatSecurityGroup": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "vpc": "*",
+        "description": "*",
+        "allowAllOutbound": true
+      }
+    }
+  ],
+  "/aws-cdk-vpc-nat-instances-v2-no-key-name/MyVpc/PublicSubnet1/Subnet": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyVpcPublicSubnet1SubnetF6608456"
+    }
+  ],
+  "/aws-cdk-vpc-nat-instances-v2-no-key-name/MyVpc/PublicSubnet1/RouteTable": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyVpcPublicSubnet1RouteTableC46AB2F4"
+    }
+  ],
+  "/aws-cdk-vpc-nat-instances-v2-no-key-name/MyVpc/PublicSubnet1/RouteTableAssociation": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyVpcPublicSubnet1RouteTableAssociation2ECEE1CB"
+    }
+  ],
+  "/aws-cdk-vpc-nat-instances-v2-no-key-name/MyVpc/PublicSubnet1/DefaultRoute": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyVpcPublicSubnet1DefaultRoute95FDF9EB"
+    }
+  ],
+  "/aws-cdk-vpc-nat-instances-v2-no-key-name/MyVpc/PublicSubnet1/NatInstance": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "instanceType": "*",
+        "machineImage": "*",
+        "sourceDestCheck": false,
+        "vpc": "*",
+        "vpcSubnets": {
+          "subnets": [
+            "*"
+          ]
+        },
+        "associatePublicIpAddress": "*",
+        "securityGroup": "*",
+        "keyPair": "*",
+        "creditSpecification": "*",
+        "userData": "*"
+      }
+    }
+  ],
+  "/aws-cdk-vpc-nat-instances-v2-no-key-name/MyVpc/PrivateSubnet1/Subnet": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyVpcPrivateSubnet1Subnet5057CF7E"
+    }
+  ],
+  "/aws-cdk-vpc-nat-instances-v2-no-key-name/MyVpc/PrivateSubnet1/RouteTable": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyVpcPrivateSubnet1RouteTable8819E6E2"
+    }
+  ],
+  "/aws-cdk-vpc-nat-instances-v2-no-key-name/MyVpc/PrivateSubnet1/RouteTableAssociation": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyVpcPrivateSubnet1RouteTableAssociation56D38C7E"
+    }
+  ],
+  "/aws-cdk-vpc-nat-instances-v2-no-key-name/MyVpc/PrivateSubnet1/DefaultRoute": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyVpcPrivateSubnet1DefaultRouteA8CDE2FA"
+    }
+  ],
+  "/aws-cdk-vpc-nat-instances-v2-no-key-name/MyVpc/NatSecurityGroup/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyVpcNatSecurityGroupAA76397E"
+    }
+  ],
+  "/aws-cdk-vpc-nat-instances-v2-no-key-name/MyVpc/PublicSubnet1/NatInstance/InstanceRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        }
+      }
+    }
+  ],
+  "/aws-cdk-vpc-nat-instances-v2-no-key-name/MyVpc/PublicSubnet1/NatInstance/InstanceProfile": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyVpcPublicSubnet1NatInstanceInstanceProfile2FD934CB"
+    }
+  ],
+  "/aws-cdk-vpc-nat-instances-v2-no-key-name/MyVpc/PublicSubnet1/NatInstance/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyVpcPublicSubnet1NatInstance8E94E5F7"
+    }
+  ],
+  "/aws-cdk-vpc-nat-instances-v2-no-key-name/MyVpc/PublicSubnet1/NatInstance/InstanceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MyVpcPublicSubnet1NatInstanceInstanceRole394B648D"
+    }
+  ]
+}

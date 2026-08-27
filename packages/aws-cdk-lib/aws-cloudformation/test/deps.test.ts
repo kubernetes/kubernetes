@@ -190,9 +190,9 @@ describe('stack dependencies', () => {
     const nested2 = new NestedStack(nested1, 'Nested2');
 
     // THEN
-    expect(() => nested1.addStackDependency(root)).toThrow(/Nested stack 'Default\/Nested1' cannot depend on a parent stack 'Default'/);
-    expect(() => nested2.addStackDependency(nested1)).toThrow(/Nested stack 'Default\/Nested1\/Nested2' cannot depend on a parent stack 'Default\/Nested1'/);
-    expect(() => nested2.addStackDependency(root)).toThrow(/Nested stack 'Default\/Nested1\/Nested2' cannot depend on a parent stack 'Default'/);
+    expect(() => nested1.addStackDependency(root)).toThrow(/'Default\/Nested1' cannot depend on parent stack 'Default'/);
+    expect(() => nested2.addStackDependency(nested1)).toThrow(/'Default\/Nested1\/Nested2' cannot depend on parent nested-stack 'Default\/Nested1'/);
+    expect(() => nested2.addStackDependency(root)).toThrow(/'Default\/Nested1\/Nested2' cannot depend on parent stack 'Default'/);
   });
 
   testDeprecated('any parent stack is by definition dependent on the nested stack so dependency is ignored', () => {

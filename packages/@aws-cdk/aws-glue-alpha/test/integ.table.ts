@@ -47,7 +47,7 @@ const partitionKeys = [{
 
 const avroTable = new glue.S3Table(stack, 'AVROTable', {
   database,
-  bucket,
+  storage: glue.S3TableStorage.fromBucket(bucket),
   tableName: 'avro_table',
   columns,
   partitionKeys,
@@ -56,7 +56,7 @@ const avroTable = new glue.S3Table(stack, 'AVROTable', {
 
 const csvTable = new glue.S3Table(stack, 'CSVTable', {
   database,
-  bucket,
+  storage: glue.S3TableStorage.fromBucket(bucket),
   tableName: 'csv_table',
   columns,
   partitionKeys,
@@ -65,7 +65,7 @@ const csvTable = new glue.S3Table(stack, 'CSVTable', {
 
 const jsonTable = new glue.S3Table(stack, 'JSONTable', {
   database,
-  bucket,
+  storage: glue.S3TableStorage.fromBucket(bucket),
   tableName: 'json_table',
   columns,
   partitionKeys,
@@ -74,7 +74,7 @@ const jsonTable = new glue.S3Table(stack, 'JSONTable', {
 
 const parquetTable = new glue.S3Table(stack, 'ParquetTable', {
   database,
-  bucket,
+  storage: glue.S3TableStorage.fromBucket(bucket),
   tableName: 'parquet_table',
   columns,
   partitionKeys,
@@ -87,15 +87,14 @@ const encryptedTable = new glue.S3Table(stack, 'MyEncryptedTable', {
   columns,
   partitionKeys,
   dataFormat: glue.DataFormat.JSON,
-  encryption: glue.TableEncryption.KMS,
-  encryptionKey: new kms.Key(stack, 'MyKey', {
+  storage: glue.S3TableStorage.managedBucket(glue.S3TableEncryption.kms(new kms.Key(stack, 'MyKey', {
     removalPolicy: cdk.RemovalPolicy.DESTROY,
-  }),
+  }))),
 });
 
 new glue.S3Table(stack, 'MyPartitionFilteredTable', {
   database,
-  bucket,
+  storage: glue.S3TableStorage.fromBucket(bucket),
   tableName: 'partition_filtered_table',
   columns,
   dataFormat: glue.DataFormat.JSON,
@@ -104,7 +103,7 @@ new glue.S3Table(stack, 'MyPartitionFilteredTable', {
 
 new glue.S3Table(stack, 'MyTableWithConnection', {
   database,
-  bucket,
+  storage: glue.S3TableStorage.fromBucket(bucket),
   tableName: 'connection_table',
   columns,
   dataFormat: glue.DataFormat.JSON,
@@ -112,7 +111,7 @@ new glue.S3Table(stack, 'MyTableWithConnection', {
 
 new glue.S3Table(stack, 'MyTableWithStorageDescriptorParameters', {
   database,
-  bucket,
+  storage: glue.S3TableStorage.fromBucket(bucket),
   tableName: 'table_with_storage_descriptor_parameters',
   columns,
   dataFormat: glue.DataFormat.JSON,
@@ -127,7 +126,7 @@ new glue.S3Table(stack, 'MyTableWithStorageDescriptorParameters', {
 
 new glue.S3Table(stack, 'MyTableWithParameters', {
   database,
-  bucket,
+  storage: glue.S3TableStorage.fromBucket(bucket),
   tableName: 'table_with_parameters',
   columns,
   dataFormat: glue.DataFormat.JSON,
@@ -135,14 +134,6 @@ new glue.S3Table(stack, 'MyTableWithParameters', {
     key1: 'val1',
     key2: 'val2',
   },
-});
-
-new glue.Table(stack, 'MyDeprecatedTable', {
-  database,
-  bucket,
-  tableName: 'deprecated_table',
-  columns,
-  dataFormat: glue.DataFormat.JSON,
 });
 
 const user = new iam.User(stack, 'MyUser');

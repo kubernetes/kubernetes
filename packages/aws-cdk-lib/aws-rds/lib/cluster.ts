@@ -1149,7 +1149,10 @@ abstract class DatabaseClusterNew extends DatabaseClusterBase {
   private validateReaderInstance(writer: IAuroraClusterInstance, reader: IAuroraClusterInstance): void {
     if (writer.type === InstanceType.PROVISIONED) {
       if (reader.type === InstanceType.SERVERLESS_V2) {
-        if (!instanceSizeSupportedByServerlessV2(writer.instanceSize!, this.serverlessV2MaxCapacity)) {
+        if (
+          !Token.isUnresolved(this.serverlessV2MaxCapacity) &&
+          !instanceSizeSupportedByServerlessV2(writer.instanceSize!, this.serverlessV2MaxCapacity)
+        ) {
           Annotations.of(this).addWarningV2('@aws-cdk/aws-rds:serverlessInstanceCantScaleWithWriter',
             'For high availability any serverless instances in promotion tiers 0-1 '+
             'should be able to scale to match the provisioned instance capacity.\n'+
@@ -1207,22 +1210,28 @@ abstract class DatabaseClusterNew extends DatabaseClusterBase {
   }
 
   private validateServerlessScalingConfig(config: ClusterEngineConfig): void {
-    if (this.serverlessV2MaxCapacity > 256 || this.serverlessV2MaxCapacity < 1) {
+    const maxCapacityIsResolved = !Token.isUnresolved(this.serverlessV2MaxCapacity);
+    const minCapacityIsResolved = !Token.isUnresolved(this.serverlessV2MinCapacity);
+
+    if (maxCapacityIsResolved && (this.serverlessV2MaxCapacity > 256 || this.serverlessV2MaxCapacity < 1)) {
       throw new ValidationError(lit`InvalidServerlessV2MaxCapacity`, 'serverlessV2MaxCapacity must be >= 1 & <= 256', this);
     }
 
-    if (this.serverlessV2MinCapacity > 256 || this.serverlessV2MinCapacity < 0) {
+    if (minCapacityIsResolved && (this.serverlessV2MinCapacity > 256 || this.serverlessV2MinCapacity < 0)) {
       throw new ValidationError(lit`InvalidServerlessV2MinCapacity`, 'serverlessV2MinCapacity must be >= 0 & <= 256', this);
     }
 
-    if (this.serverlessV2MaxCapacity < this.serverlessV2MinCapacity) {
+    if (maxCapacityIsResolved && minCapacityIsResolved && this.serverlessV2MaxCapacity < this.serverlessV2MinCapacity) {
       throw new ValidationError(lit`ServerlessV2MaxCapacityTooLow`, 'serverlessV2MaxCapacity must be greater than serverlessV2MinCapacity', this);
     }
 
     const regexp = new RegExp(/^[0-9]+\.?5?$/);
-    if (!regexp.test(this.serverlessV2MaxCapacity.toString()) || !regexp.test(this.serverlessV2MinCapacity.toString())) {
+    if (
+      (maxCapacityIsResolved && !regexp.test(this.serverlessV2MaxCapacity.toString())) ||
+      (minCapacityIsResolved && !regexp.test(this.serverlessV2MinCapacity.toString()))
+    ) {
       throw new ValidationError(lit`InvalidServerlessV2CapacityIncrement`, 'serverlessV2MinCapacity & serverlessV2MaxCapacity must be in 0.5 step increments, received '+
-      `min: ${this.serverlessV2MaxCapacity}, max: ${this.serverlessV2MaxCapacity}`, this);
+      `min: ${this.serverlessV2MinCapacity}, max: ${this.serverlessV2MaxCapacity}`, this);
     }
 
     if (this.serverlessV2AutoPauseDuration) {

@@ -1,0 +1,56 @@
+{
+  "/lambda-runtime-management/DefaultTest/DeployAssert": [
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new DeployAssert (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk/integ-tests-alpha/lib/assertions/private/deploy-assert.js:39:38)",
+        "new IntegTestCase (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk/integ-tests-alpha/lib/test-case.js:39:24)",
+        "new IntegTest (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk/integ-tests-alpha/lib/test-case.js:132:33)",
+        "<anonymous> (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/@aws-cdk-testing/framework-integ/test/aws-lambda/test/integ.lambda-snapstart.js:81:1)",
+        "...node internals..."
+      ]
+    }
+  ],
+  "/lambda-runtime-management/DefaultTest/DeployAssert/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "addBootstrapVersionRule (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:302:19)",
+        "DefaultStackSynthesizer.addBootstrapVersionRule (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:202:9)",
+        "DefaultStackSynthesizer.synthesize (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/stack-synthesizers/default-synthesizer.js:343:18)",
+        "/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:474: (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:474:3)",
+        "visit (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:531:9)",
+        "visit (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:528:9)",
+        "visit (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:528:9)",
+        "visit (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:528:9)",
+        "synthesizeTree (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:467:5)",
+        "synthesize (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:95:5)"
+      ]
+    }
+  ],
+  "/lambda-runtime-management/DefaultTest/DeployAssert/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "addBootstrapVersionRule (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:310:5)",
+        "DefaultStackSynthesizer.addBootstrapVersionRule (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:202:9)",
+        "DefaultStackSynthesizer.synthesize (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/stack-synthesizers/default-synthesizer.js:343:18)",
+        "/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:474: (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:474:3)",
+        "visit (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:531:9)",
+        "visit (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:528:9)",
+        "visit (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:528:9)",
+        "visit (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:528:9)",
+        "synthesizeTree (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:467:5)",
+        "synthesize (/Users/ckawl/workspace/snapstart-oci/aws-cdk-private/packages/aws-cdk-lib/core/lib/private/synthesis.js:95:5)"
+      ]
+    }
+  ]
+}

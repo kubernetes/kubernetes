@@ -1,13 +1,4 @@
 {
-  "/aws-cdk-sfn-evaluate-expression-arm64-integ": [
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-stepfunctions-tasks/test/integ.evaluate-expression-arm64.js:10:15)",
-        "...node internals..."
-      ]
-    }
-  ],
   "/aws-cdk-sfn-evaluate-expression-arm64-integ/Evalbe6d8ca19d2c4db3aeebf6f27f3f2f10": [
     {
       "type": "aws:cdk:analytics:construct",
@@ -48,55 +39,18 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "stateMachineArn"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-stepfunctions-tasks/test/integ.evaluate-expression-arm64.js:19:1)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-sfn-evaluate-expression-arm64-integ/BootstrapVersion": [
     {
       "type": "aws:cdk:logicalId",
       "data": "BootstrapVersion"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "addBootstrapVersionRule (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:261:19)",
-        "DefaultStackSynthesizer.addBootstrapVersionRule (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:161:9)",
-        "DefaultStackSynthesizer.synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/default-synthesizer.js:302:18)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:433: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:433:3)",
-        "visit (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:490:9)",
-        "visit (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:487:9)",
-        "synthesizeTree (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:426:5)",
-        "synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:54:5)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stage.js:179:96)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/app.js:167:27)"
-      ]
     }
   ],
   "/aws-cdk-sfn-evaluate-expression-arm64-integ/CheckBootstrapVersion": [
     {
       "type": "aws:cdk:logicalId",
       "data": "CheckBootstrapVersion"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "addBootstrapVersionRule (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:269:5)",
-        "DefaultStackSynthesizer.addBootstrapVersionRule (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:161:9)",
-        "DefaultStackSynthesizer.synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/default-synthesizer.js:302:18)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:433: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:433:3)",
-        "visit (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:490:9)",
-        "visit (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:487:9)",
-        "synthesizeTree (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:426:5)",
-        "synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:54:5)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stage.js:179:96)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/app.js:167:27)"
-      ]
     }
   ],
   "/aws-cdk-sfn-evaluate-expression-arm64-integ/EvaluateExpression/EvalFunction": [
@@ -150,21 +104,6 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "Evalbe6d8ca19d2c4db3aeebf6f27f3f2f1028726088"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/function.js:691:29)",
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "EvalNodejsSingletonFunction.ensureLambda (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/singleton-lambda.js:272:20)",
-        "new SingletonFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/singleton-lambda.js:135:40)",
-        "new SingletonFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EvalNodejsSingletonFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resource-handlers/dist/aws-stepfunctions-tasks/eval-nodejs-provider.generated.js:9:9)",
-        "createEvalFn (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-stepfunctions-tasks/lib/evaluate-expression.js:100:12)",
-        "new EvaluateExpression (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-stepfunctions-tasks/lib/evaluate-expression.js:36:23)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-stepfunctions-tasks/test/integ.evaluate-expression-arm64.js:11:28)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-sfn-evaluate-expression-arm64-integ/Evalbe6d8ca19d2c4db3aeebf6f27f3f2f10/LogGroup": [
@@ -214,36 +153,12 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "StateMachine2E01A3A5"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new StateMachine (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-stepfunctions/lib/state-machine.js:447:30)",
-        "new StateMachine (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-stepfunctions-tasks/test/integ.evaluate-expression-arm64.js:15:12)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-sfn-evaluate-expression-arm64-integ/Evalbe6d8ca19d2c4db3aeebf6f27f3f2f10/ServiceRole/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "Evalbe6d8ca19d2c4db3aeebf6f27f3f2f10ServiceRole037E5D29"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/role.js:450:34)",
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/function.js:606:39)",
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "EvalNodejsSingletonFunction.ensureLambda (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/singleton-lambda.js:272:20)",
-        "new SingletonFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/singleton-lambda.js:135:40)",
-        "new SingletonFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EvalNodejsSingletonFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resource-handlers/dist/aws-stepfunctions-tasks/eval-nodejs-provider.generated.js:9:9)",
-        "createEvalFn (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-stepfunctions-tasks/lib/evaluate-expression.js:100:12)",
-        "new EvaluateExpression (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-stepfunctions-tasks/lib/evaluate-expression.js:36:23)"
-      ]
     }
   ],
   "/aws-cdk-sfn-evaluate-expression-arm64-integ/Evalbe6d8ca19d2c4db3aeebf6f27f3f2f10/Code/AssetBucket": [
@@ -256,38 +171,12 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "Evalbe6d8ca19d2c4db3aeebf6f27f3f2f10LogGroup29F31548"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new LogGroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-logs/lib/log-group.js:537:29)",
-        "new LogGroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/function.js:773:34)",
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "EvalNodejsSingletonFunction.ensureLambda (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/singleton-lambda.js:272:20)",
-        "new SingletonFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/singleton-lambda.js:135:40)",
-        "new SingletonFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EvalNodejsSingletonFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resource-handlers/dist/aws-stepfunctions-tasks/eval-nodejs-provider.generated.js:9:9)",
-        "createEvalFn (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-stepfunctions-tasks/lib/evaluate-expression.js:100:12)",
-        "new EvaluateExpression (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-stepfunctions-tasks/lib/evaluate-expression.js:36:23)"
-      ]
     }
   ],
   "/aws-cdk-sfn-evaluate-expression-arm64-integ/StateMachine/Role/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "StateMachineRoleB840431D"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/role.js:450:34)",
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new StateMachine (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-stepfunctions/lib/state-machine.js:392:39)",
-        "new StateMachine (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-stepfunctions-tasks/test/integ.evaluate-expression-arm64.js:15:12)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-sfn-evaluate-expression-arm64-integ/StateMachine/Role/DefaultPolicy": [
@@ -324,21 +213,6 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "StateMachineRoleDefaultPolicyDF1E6607"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Policy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/policy.js:158:30)",
-        "new Policy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Policy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "WrappedClass.addToPrincipalPolicy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/role.js:511:42)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "WrappedClass.addToRolePolicy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-stepfunctions/lib/state-machine.js:484:23)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "new StateMachine (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-stepfunctions/lib/state-machine.js:402:26)",
-        "new StateMachine (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-stepfunctions-tasks/test/integ.evaluate-expression-arm64.js:15:12)"
-      ]
     }
   ]
 }

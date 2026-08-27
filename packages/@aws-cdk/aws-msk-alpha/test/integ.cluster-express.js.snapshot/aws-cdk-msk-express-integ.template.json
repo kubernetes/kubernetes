@@ -181,42 +181,6 @@
     "VPCVPCGW99B986DC"
    ]
   },
-  "VPCPublicSubnet2EIP4947BC00": {
-   "Type": "AWS::EC2::EIP",
-   "Properties": {
-    "Domain": "vpc",
-    "Tags": [
-     {
-      "Key": "Name",
-      "Value": "aws-cdk-msk-express-integ/VPC/PublicSubnet2"
-     }
-    ]
-   }
-  },
-  "VPCPublicSubnet2NATGateway3C070193": {
-   "Type": "AWS::EC2::NatGateway",
-   "Properties": {
-    "AllocationId": {
-     "Fn::GetAtt": [
-      "VPCPublicSubnet2EIP4947BC00",
-      "AllocationId"
-     ]
-    },
-    "SubnetId": {
-     "Ref": "VPCPublicSubnet2Subnet74179F39"
-    },
-    "Tags": [
-     {
-      "Key": "Name",
-      "Value": "aws-cdk-msk-express-integ/VPC/PublicSubnet2"
-     }
-    ]
-   },
-   "DependsOn": [
-    "VPCPublicSubnet2DefaultRouteB7481BBA",
-    "VPCPublicSubnet2RouteTableAssociation5A808732"
-   ]
-  },
   "VPCPublicSubnet3Subnet631C5E25": {
    "Type": "AWS::EC2::Subnet",
    "Properties": {
@@ -280,42 +244,6 @@
    },
    "DependsOn": [
     "VPCVPCGW99B986DC"
-   ]
-  },
-  "VPCPublicSubnet3EIPAD4BC883": {
-   "Type": "AWS::EC2::EIP",
-   "Properties": {
-    "Domain": "vpc",
-    "Tags": [
-     {
-      "Key": "Name",
-      "Value": "aws-cdk-msk-express-integ/VPC/PublicSubnet3"
-     }
-    ]
-   }
-  },
-  "VPCPublicSubnet3NATGatewayD3048F5C": {
-   "Type": "AWS::EC2::NatGateway",
-   "Properties": {
-    "AllocationId": {
-     "Fn::GetAtt": [
-      "VPCPublicSubnet3EIPAD4BC883",
-      "AllocationId"
-     ]
-    },
-    "SubnetId": {
-     "Ref": "VPCPublicSubnet3Subnet631C5E25"
-    },
-    "Tags": [
-     {
-      "Key": "Name",
-      "Value": "aws-cdk-msk-express-integ/VPC/PublicSubnet3"
-     }
-    ]
-   },
-   "DependsOn": [
-    "VPCPublicSubnet3DefaultRouteA0D29D46",
-    "VPCPublicSubnet3RouteTableAssociation427FE0C6"
    ]
   },
   "VPCPrivateSubnet1Subnet8BCA10E0": {
@@ -435,7 +363,7 @@
    "Properties": {
     "DestinationCidrBlock": "0.0.0.0/0",
     "NatGatewayId": {
-     "Ref": "VPCPublicSubnet2NATGateway3C070193"
+     "Ref": "VPCPublicSubnet1NATGatewayE0556630"
     },
     "RouteTableId": {
      "Ref": "VPCPrivateSubnet2RouteTable0A19E10E"
@@ -497,7 +425,7 @@
    "Properties": {
     "DestinationCidrBlock": "0.0.0.0/0",
     "NatGatewayId": {
-     "Ref": "VPCPublicSubnet3NATGatewayD3048F5C"
+     "Ref": "VPCPublicSubnet1NATGatewayE0556630"
     },
     "RouteTableId": {
      "Ref": "VPCPrivateSubnet3RouteTable192186F8"
@@ -574,7 +502,7 @@
       "InCluster": true
      }
     },
-    "KafkaVersion": "3.8.x",
+    "KafkaVersion": "4.2.x.kraft",
     "NumberOfBrokerNodes": 3
    },
    "UpdateReplacePolicy": "Delete",
@@ -680,7 +608,7 @@
    "Properties": {
     "Code": {
      "S3Bucket": "cdk-hnb659fds-assets-12345678-test-region",
-     "S3Key": "cacbae65717103d06f41c1e2d810143b3469d00294d9bbef4b39a6bce1660214.zip"
+     "S3Key": "9b8fce7ae7f25ef82fdbaf6b72523b99d0875c0c9c826642819fb51f11d9b125.zip"
     },
     "Handler": "index.handler",
     "Role": {

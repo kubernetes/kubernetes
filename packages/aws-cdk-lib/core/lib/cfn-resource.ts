@@ -7,7 +7,7 @@ import { CfnRefElement } from './cfn-element';
 import type { CfnCreationPolicy, CfnUpdatePolicy } from './cfn-resource-policy';
 import { CfnDeletionPolicy } from './cfn-resource-policy';
 import type { Construct, Node } from 'constructs';
-import { addDependency, obtainDependencies, removeDependency } from './deps';
+import { dispatchDependencyOperation } from './private/deps';
 import { CfnReference } from './private/cfn-reference';
 import type { Reference } from './reference';
 import type { RemovalPolicyOptions } from './removal-policy';
@@ -24,6 +24,8 @@ import { deepMerge } from './private/deep-merge';
 import type { ResourceEnvironment } from './environment';
 import { lit } from './private/literal-string';
 import { captureStackTrace } from './private/stack-trace';
+import { Stack } from './stack';
+import { isCfnResource, STACK_TYPE } from './private/core-construct-finders';
 
 export interface CfnResourceProps {
   /**
@@ -47,7 +49,7 @@ export class CfnResource extends CfnRefElement {
    * Check whether the given object is a CfnResource
    */
   public static isCfnResource(this: void, x: any): x is CfnResource {
-    return x !== null && typeof (x) === 'object' && x.cfnResourceType !== undefined;
+    return isCfnResource(x);
   }
 
   // MAINTAINERS NOTE: this class serves as the base class for the generated L1
@@ -332,6 +334,9 @@ export class CfnResource extends CfnRefElement {
    * Indicates that this resource depends on another resource and cannot be
    * provisioned unless the other resource has been successfully provisioned.
    *
+   * This can be used for resources across stacks (or nested stack) boundaries
+   * and the dependency will automatically be transferred to the relevant scope.
+   *
    * This method has been renamed to `addResourceDependency`, which makes it
    * more clear that this method operates at a different level from the
    * construct-level `construct.node.addDependency()` mechanism.
@@ -359,7 +364,12 @@ export class CfnResource extends CfnRefElement {
       return;
     }
 
-    addDependency(this, target, reason ?? `{${this.node.path}}.addDependency({${target.node.path}})`);
+    dispatchDependencyOperation({
+      kind: 'add',
+      source: this,
+      target,
+      reason: reason ?? `<${this.node.path}>.addResourceDependency(<${target.node.path}>)`,
+    });
   }
 
   /**
@@ -388,7 +398,11 @@ export class CfnResource extends CfnRefElement {
       return;
     }
 
-    removeDependency(this, target);
+    dispatchDependencyOperation({
+      kind: 'remove',
+      source: this,
+      target,
+    });
   }
 
   /**
@@ -404,13 +418,23 @@ export class CfnResource extends CfnRefElement {
   }
 
   /**
-   * Retrieves an array of resources this resource depends on.
+   * Retrieves an array of resources and stacks this resource depends on.
    *
-   * This assembles dependencies on resources across stacks (including nested stacks)
-   * automatically.
+   * For resources depended on directly, returns the `CfnResource` object. For
+   * dependencies on other stacks, returns the `Stack` object. The order of the
+   * array is not guaranteed.
    */
-  public obtainDependencies() {
-    return obtainDependencies(this);
+  public obtainDependencies(): Array<CfnResource | Stack> {
+    const ret: Array<CfnResource | Stack> = [];
+    ret.push(...this._directResourceDependencies());
+
+    let stack: Stack | undefined = Stack.of(this);
+    while (stack) {
+      ret.push(...stack._stackDependenciesCausedBy(this).filter((x) => STACK_TYPE.isMarked(x) || CfnResource.isCfnResource(x)));
+      stack = stack.nestedStackParent;
+    }
+
+    return ret;
   }
 
   /**
@@ -463,12 +487,9 @@ export class CfnResource extends CfnRefElement {
   }
 
   /**
-   * Called by the `addResourceDependency` helper function in order to realize a direct
-   * dependency between two resources that are directly defined in the same
-   * stacks.
+   * Called by `dispatchDependencyOperation` to realize a dependency between two resources.
    *
-   * Use `resource.addResourceDependency` to define the dependency between two resources,
-   * which also takes stack boundaries into account.
+   * All validation for appropriate scope has already been done, cycle detection has not been done yet.
    *
    * @internal
    */
@@ -477,6 +498,11 @@ export class CfnResource extends CfnRefElement {
       this.dependsOn = new Set();
     }
     this.dependsOn.add(target);
+
+    if (process.env.CDK_DEBUG_DEPS) {
+      // eslint-disable-next-line no-console
+      console.error(`[CDK_DEBUG_DEPS] resource "${this.node.path}" depends on "${target.node.path}"`);
+    }
   }
 
   /**
@@ -485,18 +511,24 @@ export class CfnResource extends CfnRefElement {
    *
    * @internal
    */
-  public _obtainResourceDependencies() {
+  public _directResourceDependencies() {
     return Array.from(this.dependsOn?.values() ?? []);
   }
 
   /**
-   * Remove a dependency between this resource and other resources in the same
-   * stack.
+   * Called by `dispatchDependencyOperation` to remove a dependency between two resources.
+   *
+   * All validation for appropriateness has already been done.
    *
    * @internal
    */
   public _removeResourceDependency(target: CfnResource) {
     this.dependsOn?.delete(target);
+
+    if (process.env.CDK_DEBUG_DEPS) {
+      // eslint-disable-next-line no-console
+      console.error(`[CDK_DEBUG_DEPS] resource "${this.node.path}" no longer depends on "${target.node.path}"`);
+    }
   }
 
   /**
@@ -565,6 +597,7 @@ export class CfnResource extends CfnRefElement {
 
       return Array
         .from(dependsOn)
+        .filter((r) => r.shouldSynthesize())
         .sort((x, y) => x.node.path.localeCompare(y.node.path))
         .map(r => r.logicalId);
     }

@@ -1,0 +1,488 @@
+{
+ "Resources": {
+  "RuntimeLogGroup3BAFA9F3": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "RetentionInDays": 731
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "ObservabilityRuntimeNoPolicyExecutionRole529056AB": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Condition": {
+        "StringEquals": {
+         "aws:SourceAccount": {
+          "Ref": "AWS::AccountId"
+         }
+        },
+        "ArnLike": {
+         "aws:SourceArn": {
+          "Fn::Join": [
+           "",
+           [
+            "arn:",
+            {
+             "Ref": "AWS::Partition"
+            },
+            ":bedrock-agentcore:",
+            {
+             "Ref": "AWS::Region"
+            },
+            ":",
+            {
+             "Ref": "AWS::AccountId"
+            },
+            ":runtime/integ_observability_no_policy_runtime*"
+           ]
+          ]
+         }
+        }
+       },
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "bedrock-agentcore.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Description": "Execution role for Bedrock Agent Core Runtime",
+    "MaxSessionDuration": 28800
+   }
+  },
+  "ObservabilityRuntimeNoPolicyExecutionRoleDefaultPolicyC62B1E8E": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "logs:CreateLogGroup",
+        "logs:DescribeLogStreams"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          "arn:",
+          {
+           "Ref": "AWS::Partition"
+          },
+          ":logs:",
+          {
+           "Ref": "AWS::Region"
+          },
+          ":",
+          {
+           "Ref": "AWS::AccountId"
+          },
+          ":log-group:/aws/bedrock-agentcore/runtimes/*"
+         ]
+        ]
+       },
+       "Sid": "LogGroupAccess"
+      },
+      {
+       "Action": "logs:DescribeLogGroups",
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          "arn:",
+          {
+           "Ref": "AWS::Partition"
+          },
+          ":logs:",
+          {
+           "Ref": "AWS::Region"
+          },
+          ":",
+          {
+           "Ref": "AWS::AccountId"
+          },
+          ":log-group:*"
+         ]
+        ]
+       },
+       "Sid": "DescribeLogGroups"
+      },
+      {
+       "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          "arn:",
+          {
+           "Ref": "AWS::Partition"
+          },
+          ":logs:",
+          {
+           "Ref": "AWS::Region"
+          },
+          ":",
+          {
+           "Ref": "AWS::AccountId"
+          },
+          ":log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*"
+         ]
+        ]
+       },
+       "Sid": "LogStreamAccess"
+      },
+      {
+       "Action": [
+        "xray:GetSamplingRules",
+        "xray:GetSamplingTargets",
+        "xray:PutTelemetryRecords",
+        "xray:PutTraceSegments"
+       ],
+       "Effect": "Allow",
+       "Resource": "*",
+       "Sid": "XRayAccess"
+      },
+      {
+       "Action": "cloudwatch:PutMetricData",
+       "Condition": {
+        "StringEquals": {
+         "cloudwatch:namespace": "bedrock-agentcore"
+        }
+       },
+       "Effect": "Allow",
+       "Resource": "*",
+       "Sid": "CloudWatchMetrics"
+      },
+      {
+       "Action": [
+        "bedrock-agentcore:GetWorkloadAccessToken",
+        "bedrock-agentcore:GetWorkloadAccessTokenForJWT",
+        "bedrock-agentcore:GetWorkloadAccessTokenForUserId"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::Join": [
+          "",
+          [
+           "arn:",
+           {
+            "Ref": "AWS::Partition"
+           },
+           ":bedrock-agentcore:",
+           {
+            "Ref": "AWS::Region"
+           },
+           ":",
+           {
+            "Ref": "AWS::AccountId"
+           },
+           ":workload-identity-directory/default"
+          ]
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           "arn:",
+           {
+            "Ref": "AWS::Partition"
+           },
+           ":bedrock-agentcore:",
+           {
+            "Ref": "AWS::Region"
+           },
+           ":",
+           {
+            "Ref": "AWS::AccountId"
+           },
+           ":workload-identity-directory/default/workload-identity/*"
+          ]
+         ]
+        }
+       ],
+       "Sid": "GetAgentAccessToken"
+      },
+      {
+       "Action": [
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:BatchGetImage",
+        "ecr:GetDownloadUrlForLayer"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          "arn:",
+          {
+           "Ref": "AWS::Partition"
+          },
+          ":ecr:",
+          {
+           "Ref": "AWS::Region"
+          },
+          ":",
+          {
+           "Ref": "AWS::AccountId"
+          },
+          ":repository/",
+          {
+           "Fn::Sub": "cdk-hnb659fds-container-assets-${AWS::AccountId}-${AWS::Region}"
+          }
+         ]
+        ]
+       }
+      },
+      {
+       "Action": "ecr:GetAuthorizationToken",
+       "Effect": "Allow",
+       "Resource": "*"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "ObservabilityRuntimeNoPolicyExecutionRoleDefaultPolicyC62B1E8E",
+    "Roles": [
+     {
+      "Ref": "ObservabilityRuntimeNoPolicyExecutionRole529056AB"
+     }
+    ]
+   }
+  },
+  "ObservabilityRuntimeNoPolicyEA9B2CAF": {
+   "Type": "AWS::BedrockAgentCore::Runtime",
+   "Properties": {
+    "AgentRuntimeArtifact": {
+     "ContainerConfiguration": {
+      "ContainerUri": {
+       "Fn::Sub": "${AWS::AccountId}.dkr.ecr.${AWS::Region}.${AWS::URLSuffix}/cdk-hnb659fds-container-assets-${AWS::AccountId}-${AWS::Region}:b6d4881a712ede895f5aebcfee7fc9dae93030a6ba5c86797d788b8e24265925"
+      }
+     }
+    },
+    "AgentRuntimeName": "integ_observability_no_policy_runtime",
+    "Description": "Runtime with observability but no resource policy management",
+    "LifecycleConfiguration": {},
+    "NetworkConfiguration": {
+     "NetworkMode": "PUBLIC"
+    },
+    "ProtocolConfiguration": "HTTP",
+    "RoleArn": {
+     "Fn::GetAtt": [
+      "ObservabilityRuntimeNoPolicyExecutionRole529056AB",
+      "Arn"
+     ]
+    },
+    "Tags": {
+     "TestCase": "ObservabilityNoResourcePolicy"
+    }
+   },
+   "DependsOn": [
+    "ObservabilityRuntimeNoPolicyExecutionRoleDefaultPolicyC62B1E8E",
+    "ObservabilityRuntimeNoPolicyExecutionRole529056AB"
+   ]
+  },
+  "ObservabilityRuntimeNoPolicyTracesDeliverySourceE1976D96": {
+   "Type": "AWS::Logs::DeliverySource",
+   "Properties": {
+    "LogType": "TRACES",
+    "Name": "awscdkbedrockagentcoreruntPolicyTracesDeliverySourceC904D36D",
+    "ResourceArn": {
+     "Fn::GetAtt": [
+      "ObservabilityRuntimeNoPolicyEA9B2CAF",
+      "AgentRuntimeArn"
+     ]
+    }
+   }
+  },
+  "ObservabilityRuntimeNoPolicyTracesDeliveryDest06885372": {
+   "Type": "AWS::Logs::DeliveryDestination",
+   "Properties": {
+    "DeliveryDestinationType": "XRAY",
+    "Name": "awscdkbedrockagentcoreruntNoPolicyTracesDeliveryDest11A8D489"
+   }
+  },
+  "ObservabilityRuntimeNoPolicyTracesDeliveryD236ED2F": {
+   "Type": "AWS::Logs::Delivery",
+   "Properties": {
+    "DeliveryDestinationArn": {
+     "Fn::GetAtt": [
+      "ObservabilityRuntimeNoPolicyTracesDeliveryDest06885372",
+      "Arn"
+     ]
+    },
+    "DeliverySourceName": {
+     "Ref": "ObservabilityRuntimeNoPolicyTracesDeliverySourceE1976D96"
+    }
+   },
+   "DependsOn": [
+    "ObservabilityRuntimeNoPolicyTracesDeliveryDest06885372",
+    "ObservabilityRuntimeNoPolicyTracesDeliverySourceE1976D96"
+   ]
+  },
+  "ObservabilityRuntimeNoPolicyApplicationLogsDeliverySource402C9557": {
+   "Type": "AWS::Logs::DeliverySource",
+   "Properties": {
+    "LogType": "APPLICATION_LOGS",
+    "Name": "awscdkbedrockagentcoreruntlicationLogsDeliverySource694369D0",
+    "ResourceArn": {
+     "Fn::GetAtt": [
+      "ObservabilityRuntimeNoPolicyEA9B2CAF",
+      "AgentRuntimeArn"
+     ]
+    }
+   }
+  },
+  "ObservabilityRuntimeNoPolicyApplicationLogsDest71947A96": {
+   "Type": "AWS::Logs::DeliveryDestination",
+   "Properties": {
+    "DeliveryDestinationType": "CWL",
+    "DestinationResourceArn": {
+     "Fn::GetAtt": [
+      "RuntimeLogGroup3BAFA9F3",
+      "Arn"
+     ]
+    },
+    "Name": "awscdkbedrockagentcoreruntoPolicyApplicationLogsDestE64F050D"
+   }
+  },
+  "ObservabilityRuntimeNoPolicyApplicationLogsDeliveryA9B8393C": {
+   "Type": "AWS::Logs::Delivery",
+   "Properties": {
+    "DeliveryDestinationArn": {
+     "Fn::GetAtt": [
+      "ObservabilityRuntimeNoPolicyApplicationLogsDest71947A96",
+      "Arn"
+     ]
+    },
+    "DeliverySourceName": {
+     "Ref": "ObservabilityRuntimeNoPolicyApplicationLogsDeliverySource402C9557"
+    }
+   },
+   "DependsOn": [
+    "ObservabilityRuntimeNoPolicyApplicationLogsDeliverySource402C9557",
+    "ObservabilityRuntimeNoPolicyApplicationLogsDest71947A96"
+   ]
+  },
+  "ObservabilityRuntimeNoPolicyUsageLogsDeliverySource5A857F5F": {
+   "Type": "AWS::Logs::DeliverySource",
+   "Properties": {
+    "LogType": "USAGE_LOGS",
+    "Name": "awscdkbedrockagentcorerunticyUsageLogsDeliverySource5034EDAC",
+    "ResourceArn": {
+     "Fn::GetAtt": [
+      "ObservabilityRuntimeNoPolicyEA9B2CAF",
+      "AgentRuntimeArn"
+     ]
+    }
+   }
+  },
+  "ObservabilityRuntimeNoPolicyUsageLogsDest44C87539": {
+   "Type": "AWS::Logs::DeliveryDestination",
+   "Properties": {
+    "DeliveryDestinationType": "CWL",
+    "DestinationResourceArn": {
+     "Fn::GetAtt": [
+      "RuntimeLogGroup3BAFA9F3",
+      "Arn"
+     ]
+    },
+    "Name": "awscdkbedrockagentcoreruntntimeNoPolicyUsageLogsDest51397185"
+   }
+  },
+  "ObservabilityRuntimeNoPolicyUsageLogsDeliveryA6515DFB": {
+   "Type": "AWS::Logs::Delivery",
+   "Properties": {
+    "DeliveryDestinationArn": {
+     "Fn::GetAtt": [
+      "ObservabilityRuntimeNoPolicyUsageLogsDest44C87539",
+      "Arn"
+     ]
+    },
+    "DeliverySourceName": {
+     "Ref": "ObservabilityRuntimeNoPolicyUsageLogsDeliverySource5A857F5F"
+    }
+   },
+   "DependsOn": [
+    "ObservabilityRuntimeNoPolicyApplicationLogsDeliveryA9B8393C",
+    "ObservabilityRuntimeNoPolicyUsageLogsDeliverySource5A857F5F",
+    "ObservabilityRuntimeNoPolicyUsageLogsDest44C87539"
+   ]
+  }
+ },
+ "Outputs": {
+  "RuntimeId": {
+   "Description": "Runtime ID",
+   "Value": {
+    "Fn::GetAtt": [
+     "ObservabilityRuntimeNoPolicyEA9B2CAF",
+     "AgentRuntimeId"
+    ]
+   }
+  },
+  "RuntimeArn": {
+   "Description": "Runtime ARN",
+   "Value": {
+    "Fn::GetAtt": [
+     "ObservabilityRuntimeNoPolicyEA9B2CAF",
+     "AgentRuntimeArn"
+    ]
+   }
+  },
+  "LogGroupArn": {
+   "Description": "Log group ARN",
+   "Value": {
+    "Fn::GetAtt": [
+     "RuntimeLogGroup3BAFA9F3",
+     "Arn"
+    ]
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

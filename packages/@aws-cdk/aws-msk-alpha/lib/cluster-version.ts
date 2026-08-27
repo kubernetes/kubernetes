@@ -240,6 +240,15 @@ export class KafkaVersion {
   public static readonly V4_1_X_KRAFT = KafkaVersion.of('4.1.x.kraft', { tieredStorage: true });
 
   /**
+   * Kafka version 4.2.x with KRaft (Apache Kafka Raft) metadata mode support
+   *
+   * Currently only supported on MSK Express brokers.
+   *
+   * @see https://docs.aws.amazon.com/msk/latest/developerguide/metadata-management.html#kraft-intro
+   */
+  public static readonly V4_2_X_KRAFT = KafkaVersion.of('4.2.x.kraft', { tieredStorage: true });
+
+  /**
    * Custom cluster version
    * @param version custom version number
    */

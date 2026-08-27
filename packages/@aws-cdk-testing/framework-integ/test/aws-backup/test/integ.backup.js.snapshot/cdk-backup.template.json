@@ -132,6 +132,13 @@
          }
         }
        ],
+       "IndexActions": [
+        {
+         "ResourceTypes": [
+          "S3"
+         ]
+        }
+       ],
        "RecoveryPointTags": {
         "stage": "prod"
        },

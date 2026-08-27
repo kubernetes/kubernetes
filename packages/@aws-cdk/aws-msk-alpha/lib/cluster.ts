@@ -531,7 +531,7 @@ export class Cluster extends ClusterBase {
     if (isExpress) {
       // Validate Kafka version compatibility
       // express broker documentation for supported versions https://docs.aws.amazon.com/msk/latest/developerguide/msk-broker-types-express.html#msk-broker-types-express-notes
-      const supportedVersions = ['3.6', '3.8', '3.9'];
+      const supportedVersions = ['3.6', '3.8', '3.9', '4.2'];
       const kafkaVersionString = props.kafkaVersion.version;
       const isCompatibleVersion = supportedVersions.some(version => kafkaVersionString.includes(version));
       if (!isCompatibleVersion) {

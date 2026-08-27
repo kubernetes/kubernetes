@@ -1,0 +1,18 @@
+{
+  "version": "52.0.0",
+  "testCases": {
+    "TableBucketStorageClassIntegTest/DefaultTest": {
+      "stacks": [
+        "StandardStorageClassTestStack",
+        "IntelligentTieringStorageClassTestStack",
+        "TableStorageClassOverrideTestStack",
+        "TableStorageClassInheritanceTestStack",
+        "TableStorageClassReverseOverrideTestStack",
+        "DefaultStorageClassTestStack"
+      ],
+      "assertionStack": "TableBucketStorageClassIntegTest/DefaultTest/DeployAssert",
+      "assertionStackName": "TableBucketStorageClassIntegTestDefaultTestDeployAssert07EDFE22"
+    }
+  },
+  "minimumCliVersion": "2.1107.0"
+}

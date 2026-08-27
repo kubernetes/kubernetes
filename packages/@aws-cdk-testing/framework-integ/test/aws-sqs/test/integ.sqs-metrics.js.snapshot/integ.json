@@ -1,0 +1,14 @@
+{
+  "version": "54.0.0",
+  "testCases": {
+    "SqsMetricsTest/DefaultTest": {
+      "stacks": [
+        "aws-cdk-sqs-metrics"
+      ],
+      "assertionStack": "SqsMetricsTest/DefaultTest/DeployAssert",
+      "assertionStackName": "SqsMetricsTestDefaultTestDeployAssert25483520"
+    }
+  },
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
+}

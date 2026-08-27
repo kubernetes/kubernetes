@@ -35,7 +35,7 @@ const partitionKeys = [{
 
 const csvTable = new glue.S3Table(stack, 'CSVTable', {
   database,
-  bucket,
+  storage: glue.S3TableStorage.fromBucket(bucket),
   tableName: 'csv_table',
   columns,
   partitionKeys,
@@ -58,7 +58,7 @@ csvTable.addPartitionIndex({
 
 const jsonTable = new glue.S3Table(stack, 'JSONTable', {
   database,
-  bucket,
+  storage: glue.S3TableStorage.fromBucket(bucket),
   tableName: 'json_table',
   columns,
   partitionKeys,

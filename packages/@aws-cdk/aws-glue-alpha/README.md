@@ -445,18 +445,21 @@ A `Connection` allows Glue jobs, crawlers and development endpoints to access
 certain types of data stores.
 
 * **Secrets Management**
-    You must specify JDBC connection credentials in Secrets Manager and
-    provide the Secrets Manager Key name as a property to the job connection.
+    Manage JDBC connection credentials in Secrets Manager and pass the secret
+    to the connection via the `secret` property (see the example below), rather
+    than embedding credentials in `properties`.
 
 * **Networking - the CDK determines the best fit subnet for Glue connection
 configuration**
-    The prior version of the glue-alpha-module requires the developer to
-    specify the subnet of the Connection when it’s defined. Now, you can still
-    specify the specific subnet you want to use, but are no longer required
-    to. You are only required to provide a VPC and either a public or private
-    subnet selection. Without a specific subnet provided, the L2 leverages the
-    existing [EC2 Subnet Selection](https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_ec2/SubnetSelection.html)
-    library to make the best choice selection for the subnet.
+    You can specify the exact subnet of the Connection when it's defined, but
+    you are not required to. Instead, you can provide a `vpc` and, optionally, a
+    `vpcSubnets` selection, and the L2 leverages the existing
+    [EC2 Subnet Selection](https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_ec2/SubnetSelection.html)
+    library to make the best choice selection for the subnet. A Glue connection
+    targets a single subnet, so the first subnet of the selection is used.
+    `subnet` and `vpc` are mutually exclusive.
+
+Pin the connection to a specific subnet:
 
 ```ts
 declare const securityGroup: ec2.SecurityGroup;
@@ -470,7 +473,21 @@ new glue.Connection(this, 'MyConnection', {
 });
 ```
 
-For RDS `Connection` by JDBC, it is recommended to manage credentials using AWS Secrets Manager. To use Secret, specify `SECRET_ID` in `properties` like the following code. Note that in this case, the subnet must have a route to the AWS Secrets Manager VPC endpoint or to the AWS Secrets Manager endpoint through a NAT gateway.
+Or let the CDK select a subnet from a VPC:
+
+```ts
+declare const securityGroup: ec2.SecurityGroup;
+declare const vpc: ec2.Vpc;
+new glue.Connection(this, 'MyConnection', {
+  type: glue.ConnectionType.NETWORK,
+  securityGroups: [securityGroup],
+  vpc,
+  // Optional - defaults to private subnets
+  vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+});
+```
+
+For RDS `Connection` by JDBC, it is recommended to manage credentials using AWS Secrets Manager. Pass the secret via the `secret` property: Glue reads the credentials at runtime through the connection's `SECRET_ID`, so the secret value never enters the template. Note that in this case, the subnet must have a route to the AWS Secrets Manager VPC endpoint or to the AWS Secrets Manager endpoint through a NAT gateway.
 
 ```ts
 declare const securityGroup: ec2.SecurityGroup;
@@ -480,18 +497,18 @@ new glue.Connection(this, "RdsConnection", {
   type: glue.ConnectionType.JDBC,
   securityGroups: [securityGroup],
   subnet,
+  secret: db.secret,
   properties: {
     JDBC_CONNECTION_URL: `jdbc:mysql://${db.clusterEndpoint.socketAddress}/databasename`,
     JDBC_ENFORCE_SSL: "false",
-    SECRET_ID: db.secret!.secretName,
   },
 });
 ```
 
-Connection `properties` are emitted verbatim into the CloudFormation template, so
-any credential placed there in plaintext is stored in plaintext in the template,
-`cdk.out`, and source control. Reference a Secrets Manager secret through
-`SECRET_ID` (as above) instead. If a property key looks like a credential (for
+Prefer the `secret` property over placing credentials in `properties`. Connection
+`properties` are emitted verbatim into the CloudFormation template, so any
+credential placed there in plaintext is stored in plaintext in the template,
+`cdk.out`, and source control. If a property key looks like a credential (for
 example `PASSWORD`, `SECRET`, or `TOKEN`) and holds a plaintext literal, the
 construct emits a synthesis-time warning.
 
@@ -724,13 +741,13 @@ new glue.S3Table(this, 'MyTable', {
 });
 ```
 
-By default, a S3 bucket will be created to store the table's data but you can manually pass the `bucket` and `s3Prefix`:
+By default, a S3 bucket will be created to store the table's data but you can bring your own with `S3TableStorage.fromBucket` and set an `s3Prefix`:
 
 ```ts
 declare const myBucket: s3.Bucket;
 declare const myDatabase: glue.Database;
 new glue.S3Table(this, 'MyTable', {
-  bucket: myBucket,
+  storage: glue.S3TableStorage.fromBucket(myBucket),
   s3Prefix: 'my-table/',
   // ...
   database: myDatabase,
@@ -1095,16 +1112,17 @@ full rule syntax.
 
 ## [Encryption](https://docs.aws.amazon.com/athena/latest/ug/encryption.html)
 
-When the table creates its own S3 bucket (i.e. you do not pass an explicit `bucket`), that bucket enforces SSL: a bucket policy denies any request made over plain HTTP. If you provide your own bucket, enabling `enforceSSL` on it is your responsibility.
+When the table creates its own S3 bucket (`S3TableStorage.managedBucket`, the default), that bucket enforces SSL: a bucket policy denies any request made over plain HTTP. If you bring your own bucket with `S3TableStorage.fromBucket`, enabling `enforceSSL` on it is your responsibility.
 
-You can enable encryption on a Table's data:
+Server-side encryption applies only to a bucket the table manages. Choose it with
+`storage: glue.S3TableStorage.managedBucket(...)`:
 
 * [S3Managed](https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingServerSideEncryption.html) - (default) Server side encryption (`SSE-S3`) with an Amazon S3-managed key.
 
 ```ts
 declare const myDatabase: glue.Database;
 new glue.S3Table(this, 'MyTable', {
-  encryption: glue.TableEncryption.S3_MANAGED,
+  storage: glue.S3TableStorage.managedBucket(glue.S3TableEncryption.s3Managed()),
   // ...
   database: myDatabase,
   columns: [{
@@ -1121,7 +1139,7 @@ new glue.S3Table(this, 'MyTable', {
 declare const myDatabase: glue.Database;
 // KMS key is created automatically
 new glue.S3Table(this, 'MyTable', {
-  encryption: glue.TableEncryption.KMS,
+  storage: glue.S3TableStorage.managedBucket(glue.S3TableEncryption.kms()),
   // ...
   database: myDatabase,
   columns: [{
@@ -1133,8 +1151,7 @@ new glue.S3Table(this, 'MyTable', {
 
 // with an explicit KMS key
 new glue.S3Table(this, 'MyTable', {
-  encryption: glue.TableEncryption.KMS,
-  encryptionKey: new kms.Key(this, 'MyKey'),
+  storage: glue.S3TableStorage.managedBucket(glue.S3TableEncryption.kms(new kms.Key(this, 'MyKey'))),
   // ...
   database: myDatabase,
   columns: [{
@@ -1150,7 +1167,7 @@ new glue.S3Table(this, 'MyTable', {
 ```ts
 declare const myDatabase: glue.Database;
 new glue.S3Table(this, 'MyTable', {
-  encryption: glue.TableEncryption.KMS_MANAGED,
+  storage: glue.S3TableStorage.managedBucket(glue.S3TableEncryption.kmsManaged()),
   // ...
   database: myDatabase,
   columns: [{
@@ -1161,13 +1178,13 @@ new glue.S3Table(this, 'MyTable', {
 });
 ```
 
-* [ClientSideKms](https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingClientSideEncryption.html#client-side-encryption-kms-managed-master-key-intro) - Client-side encryption (`CSE-KMS`) with an AWS KMS Key managed by the account owner.
+Client-side encryption ([CSE-KMS](https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingClientSideEncryption.html#client-side-encryption-kms-managed-master-key-intro)) is independent of the bucket's server-side encryption and works with either a managed or an existing bucket. Configure it with `clientSideEncryption`:
 
 ```ts
 declare const myDatabase: glue.Database;
 // KMS key is created automatically
 new glue.S3Table(this, 'MyTable', {
-  encryption: glue.TableEncryption.CLIENT_SIDE_KMS, 
+  clientSideEncryption: glue.TableClientSideEncryption.kms(),
   // ...
   database: myDatabase,
   columns: [{
@@ -1179,8 +1196,7 @@ new glue.S3Table(this, 'MyTable', {
 
 // with an explicit KMS key
 new glue.S3Table(this, 'MyTable', {
-  encryption: glue.TableEncryption.CLIENT_SIDE_KMS,
-  encryptionKey: new kms.Key(this, 'MyKey'),
+  clientSideEncryption: glue.TableClientSideEncryption.kms(new kms.Key(this, 'MyKey')),
   // ...
   database: myDatabase,
   columns: [{
@@ -1191,7 +1207,7 @@ new glue.S3Table(this, 'MyTable', {
 });
 ```
 
-*Note: you cannot provide a `Bucket` when creating the `S3Table` if you wish to use server-side encryption (`KMS`, `KMS_MANAGED` or `S3_MANAGED`)*.
+To store the table's data in an existing bucket, use `glue.S3TableStorage.fromBucket(bucket)`. CDK does not manage that bucket's server-side encryption, so an encryption choice can never be paired with a provided bucket — but client-side encryption still applies.
 
 ### Marking table data as encrypted
 
@@ -1249,6 +1265,8 @@ new glue.S3Table(this, 'MyTable', {
   dataFormat: glue.DataFormat.JSON,
 });  
 ```
+
+For a type the `Schema` factories don't model, use `glue.Schema.custom('...')`, which takes the raw Glue input string.
 
 ## Public FAQ
 

@@ -5,7 +5,7 @@
    "Properties": {
     "Name": "MyParameter",
     "Type": "String",
-    "Value": "🌧️"
+    "Value": "\ud83c\udf27\ufe0f"
    }
   },
   "StateMachineRoleB840431D": {
@@ -57,7 +57,7 @@
        {
         "Ref": "AWS::Partition"
        },
-       ":states:::aws-sdk:ssm:putParameter\",\"Parameters\":{\"Name\":\"MyParameter\",\"Value\":\"🌈\",\"Type\":\"String\",\"Overwrite\":true}}}}"
+       ":states:::aws-sdk:ssm:putParameter\",\"Parameters\":{\"Name\":\"MyParameter\",\"Value\":\"\ud83c\udf08\",\"Type\":\"String\",\"Overwrite\":true}}}}"
       ]
      ]
     },
@@ -418,7 +418,8 @@
      ]
     },
     "Runtime": "python3.13",
-    "Timeout": 900
+    "Timeout": 900,
+    "MemorySize": 1024
    },
    "DependsOn": [
     "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756CServiceRoleDefaultPolicy88902FDF",

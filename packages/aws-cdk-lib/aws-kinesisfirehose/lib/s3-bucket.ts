@@ -5,7 +5,7 @@ import type { DestinationBindOptions, DestinationConfig, IDestination } from './
 import type { IInputFormat, IOutputFormat, SchemaConfiguration } from './record-format';
 import * as iam from '../../aws-iam';
 import type * as s3 from '../../aws-s3';
-import { createBackupConfig, createBufferingHints, createDynamicPartitioningConfiguration, createEncryptionConfig, createLoggingOptions, createProcessingConfig, ERROR_OUTPUT_TYPE, PARTITION_KEY_LAMBDA, PARTITION_KEY_QUERY } from './private/helpers';
+import { createBackupConfig, createBufferingHints, createDynamicPartitioningConfiguration, createEncryptionConfig, createLoggingOptions, createProcessingConfig, createTimezoneName, ERROR_OUTPUT_TYPE, PARTITION_KEY_LAMBDA, PARTITION_KEY_QUERY } from './private/helpers';
 import * as cdk from '../../core';
 import { lit } from '../../core/lib/private/literal-string';
 
@@ -27,8 +27,9 @@ export interface S3BucketProps extends CommonDestinationS3Props, CommonDestinati
   /**
    * The time zone you prefer.
    *
-   * @see https://docs.aws.amazon.com/firehose/latest/dev/s3-prefixes.html#timestamp-namespace
+   * AWS Kinesis Data Firehose supports standard IANA time zone identifiers (e.g., 'America/New_York', 'Europe/London', 'Asia/Tokyo').
    *
+   * @see https://docs.aws.amazon.com/firehose/latest/dev/s3-object-name.html
    * @default - UTC
    */
   readonly timeZone?: cdk.TimeZone;
@@ -181,7 +182,7 @@ export class S3Bucket implements IDestination {
         errorOutputPrefix: this.props.errorOutputPrefix,
         prefix: this.props.dataOutputPrefix,
         fileExtension: this.props.fileExtension,
-        customTimeZone: this.props.timeZone?.timezoneName,
+        customTimeZone: createTimezoneName(scope, this.props.timeZone),
         dynamicPartitioningConfiguration: createDynamicPartitioningConfiguration(scope, this.props.dynamicPartitioning),
       },
       dependables: [bucketGrant, ...(loggingDependables ?? []), ...(backupDependables ?? [])],

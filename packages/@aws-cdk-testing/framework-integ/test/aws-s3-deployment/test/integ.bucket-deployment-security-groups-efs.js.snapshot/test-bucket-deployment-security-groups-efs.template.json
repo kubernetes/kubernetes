@@ -817,7 +817,8 @@
        "Ref": "TestVpcIsolatedSubnet2Subnet3A7015F1"
       }
      ]
-    }
+    },
+    "MemorySize": 1024
    },
    "DependsOn": [
     "BucketDeploymentEFSVPCc8608a2d6d0594dee62b7275392a155b2bd2f7fb32EfsMountTargetIsolatedSubnet1ADF71AE0",

@@ -1,0 +1,748 @@
+{
+ "Resources": {
+  "IntegVPC2FF1AB0E": {
+   "Type": "AWS::EC2::VPC",
+   "Properties": {
+    "CidrBlock": "10.0.0.0/16",
+    "EnableDnsHostnames": true,
+    "EnableDnsSupport": true,
+    "InstanceTenancy": "default",
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "integ-aurora-serverlessv2-cluster-capacity-token/Integ-VPC"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegVPCPublicSubnet1SubnetE05F7E7D": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": {
+     "Fn::Select": [
+      0,
+      {
+       "Fn::GetAZs": ""
+      }
+     ]
+    },
+    "CidrBlock": "10.0.0.0/18",
+    "MapPublicIpOnLaunch": true,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Public"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Public"
+     },
+     {
+      "Key": "Name",
+      "Value": "integ-aurora-serverlessv2-cluster-capacity-token/Integ-VPC/PublicSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "IntegVPC2FF1AB0E"
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegVPCPublicSubnet1RouteTable622895C7": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "integ-aurora-serverlessv2-cluster-capacity-token/Integ-VPC/PublicSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "IntegVPC2FF1AB0E"
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegVPCPublicSubnet1RouteTableAssociation0E84800B": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "IntegVPCPublicSubnet1RouteTable622895C7"
+    },
+    "SubnetId": {
+     "Ref": "IntegVPCPublicSubnet1SubnetE05F7E7D"
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegVPCPublicSubnet1DefaultRouteE885D95E": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "GatewayId": {
+     "Ref": "IntegVPCIGW02FC78B6"
+    },
+    "RouteTableId": {
+     "Ref": "IntegVPCPublicSubnet1RouteTable622895C7"
+    }
+   },
+   "DependsOn": [
+    "IntegVPCVPCGW4DD476C7"
+   ],
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegVPCPublicSubnet1EIP1AC057E9": {
+   "Type": "AWS::EC2::EIP",
+   "Properties": {
+    "Domain": "vpc",
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "integ-aurora-serverlessv2-cluster-capacity-token/Integ-VPC/PublicSubnet1"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegVPCPublicSubnet1NATGateway380AC0A0": {
+   "Type": "AWS::EC2::NatGateway",
+   "Properties": {
+    "AllocationId": {
+     "Fn::GetAtt": [
+      "IntegVPCPublicSubnet1EIP1AC057E9",
+      "AllocationId"
+     ]
+    },
+    "SubnetId": {
+     "Ref": "IntegVPCPublicSubnet1SubnetE05F7E7D"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "integ-aurora-serverlessv2-cluster-capacity-token/Integ-VPC/PublicSubnet1"
+     }
+    ]
+   },
+   "DependsOn": [
+    "IntegVPCPublicSubnet1DefaultRouteE885D95E",
+    "IntegVPCPublicSubnet1RouteTableAssociation0E84800B"
+   ],
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegVPCPublicSubnet2Subnet9648DE97": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": {
+     "Fn::Select": [
+      1,
+      {
+       "Fn::GetAZs": ""
+      }
+     ]
+    },
+    "CidrBlock": "10.0.64.0/18",
+    "MapPublicIpOnLaunch": true,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Public"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Public"
+     },
+     {
+      "Key": "Name",
+      "Value": "integ-aurora-serverlessv2-cluster-capacity-token/Integ-VPC/PublicSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "IntegVPC2FF1AB0E"
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegVPCPublicSubnet2RouteTableB79B3910": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "integ-aurora-serverlessv2-cluster-capacity-token/Integ-VPC/PublicSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "IntegVPC2FF1AB0E"
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegVPCPublicSubnet2RouteTableAssociation831EA0CC": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "IntegVPCPublicSubnet2RouteTableB79B3910"
+    },
+    "SubnetId": {
+     "Ref": "IntegVPCPublicSubnet2Subnet9648DE97"
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegVPCPublicSubnet2DefaultRoute2FC4B163": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "GatewayId": {
+     "Ref": "IntegVPCIGW02FC78B6"
+    },
+    "RouteTableId": {
+     "Ref": "IntegVPCPublicSubnet2RouteTableB79B3910"
+    }
+   },
+   "DependsOn": [
+    "IntegVPCVPCGW4DD476C7"
+   ],
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegVPCPublicSubnet2EIPEA07DF99": {
+   "Type": "AWS::EC2::EIP",
+   "Properties": {
+    "Domain": "vpc",
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "integ-aurora-serverlessv2-cluster-capacity-token/Integ-VPC/PublicSubnet2"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegVPCPublicSubnet2NATGateway912800A3": {
+   "Type": "AWS::EC2::NatGateway",
+   "Properties": {
+    "AllocationId": {
+     "Fn::GetAtt": [
+      "IntegVPCPublicSubnet2EIPEA07DF99",
+      "AllocationId"
+     ]
+    },
+    "SubnetId": {
+     "Ref": "IntegVPCPublicSubnet2Subnet9648DE97"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "integ-aurora-serverlessv2-cluster-capacity-token/Integ-VPC/PublicSubnet2"
+     }
+    ]
+   },
+   "DependsOn": [
+    "IntegVPCPublicSubnet2DefaultRoute2FC4B163",
+    "IntegVPCPublicSubnet2RouteTableAssociation831EA0CC"
+   ],
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegVPCPrivateSubnet1SubnetD5B61223": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": {
+     "Fn::Select": [
+      0,
+      {
+       "Fn::GetAZs": ""
+      }
+     ]
+    },
+    "CidrBlock": "10.0.128.0/18",
+    "MapPublicIpOnLaunch": false,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Private"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Private"
+     },
+     {
+      "Key": "Name",
+      "Value": "integ-aurora-serverlessv2-cluster-capacity-token/Integ-VPC/PrivateSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "IntegVPC2FF1AB0E"
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegVPCPrivateSubnet1RouteTableF2678D77": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "integ-aurora-serverlessv2-cluster-capacity-token/Integ-VPC/PrivateSubnet1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "IntegVPC2FF1AB0E"
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegVPCPrivateSubnet1RouteTableAssociationAD4B0EBF": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "IntegVPCPrivateSubnet1RouteTableF2678D77"
+    },
+    "SubnetId": {
+     "Ref": "IntegVPCPrivateSubnet1SubnetD5B61223"
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegVPCPrivateSubnet1DefaultRoute140D7A84": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "NatGatewayId": {
+     "Ref": "IntegVPCPublicSubnet1NATGateway380AC0A0"
+    },
+    "RouteTableId": {
+     "Ref": "IntegVPCPrivateSubnet1RouteTableF2678D77"
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegVPCPrivateSubnet2SubnetFCC4EF23": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": {
+     "Fn::Select": [
+      1,
+      {
+       "Fn::GetAZs": ""
+      }
+     ]
+    },
+    "CidrBlock": "10.0.192.0/18",
+    "MapPublicIpOnLaunch": false,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Private"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Private"
+     },
+     {
+      "Key": "Name",
+      "Value": "integ-aurora-serverlessv2-cluster-capacity-token/Integ-VPC/PrivateSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "IntegVPC2FF1AB0E"
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegVPCPrivateSubnet2RouteTable4132D373": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "integ-aurora-serverlessv2-cluster-capacity-token/Integ-VPC/PrivateSubnet2"
+     }
+    ],
+    "VpcId": {
+     "Ref": "IntegVPC2FF1AB0E"
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegVPCPrivateSubnet2RouteTableAssociation9A15DAD6": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "IntegVPCPrivateSubnet2RouteTable4132D373"
+    },
+    "SubnetId": {
+     "Ref": "IntegVPCPrivateSubnet2SubnetFCC4EF23"
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegVPCPrivateSubnet2DefaultRouteAE44E307": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "NatGatewayId": {
+     "Ref": "IntegVPCPublicSubnet2NATGateway912800A3"
+    },
+    "RouteTableId": {
+     "Ref": "IntegVPCPrivateSubnet2RouteTable4132D373"
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegVPCIGW02FC78B6": {
+   "Type": "AWS::EC2::InternetGateway",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "integ-aurora-serverlessv2-cluster-capacity-token/Integ-VPC"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegVPCVPCGW4DD476C7": {
+   "Type": "AWS::EC2::VPCGatewayAttachment",
+   "Properties": {
+    "InternetGatewayId": {
+     "Ref": "IntegVPCIGW02FC78B6"
+    },
+    "VpcId": {
+     "Ref": "IntegVPC2FF1AB0E"
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegVPCRestrictDefaultSecurityGroupCustomResource42DF8AB1": {
+   "Type": "Custom::VpcRestrictDefaultSG",
+   "Properties": {
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "CustomVpcRestrictDefaultSGCustomResourceProviderHandlerDC833E5E",
+      "Arn"
+     ]
+    },
+    "DefaultSecurityGroupId": {
+     "Fn::GetAtt": [
+      "IntegVPC2FF1AB0E",
+      "DefaultSecurityGroup"
+     ]
+    },
+    "Account": {
+     "Ref": "AWS::AccountId"
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Version": "2012-10-17",
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ]
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+     }
+    ],
+    "Policies": [
+     {
+      "PolicyName": "Inline",
+      "PolicyDocument": {
+       "Version": "2012-10-17",
+       "Statement": [
+        {
+         "Effect": "Allow",
+         "Action": [
+          "ec2:AuthorizeSecurityGroupIngress",
+          "ec2:AuthorizeSecurityGroupEgress",
+          "ec2:RevokeSecurityGroupIngress",
+          "ec2:RevokeSecurityGroupEgress"
+         ],
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "arn:",
+             {
+              "Ref": "AWS::Partition"
+             },
+             ":ec2:",
+             {
+              "Ref": "AWS::Region"
+             },
+             ":",
+             {
+              "Ref": "AWS::AccountId"
+             },
+             ":security-group/",
+             {
+              "Fn::GetAtt": [
+               "IntegVPC2FF1AB0E",
+               "DefaultSecurityGroup"
+              ]
+             }
+            ]
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "CustomVpcRestrictDefaultSGCustomResourceProviderHandlerDC833E5E": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": {
+      "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
+     },
+     "S3Key": "bea78ce725e22a5e0d82378f6b49028c09ba86499286d6945a0506e820854e92.zip"
+    },
+    "Timeout": 900,
+    "MemorySize": 128,
+    "Handler": "__entrypoint__.handler",
+    "Role": {
+     "Fn::GetAtt": [
+      "CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs24.x",
+    "Description": "Lambda function for removing all inbound/outbound rules from the VPC default security group"
+   },
+   "DependsOn": [
+    "CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0"
+   ],
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegClusterSubnets629F72ED": {
+   "Type": "AWS::RDS::DBSubnetGroup",
+   "Properties": {
+    "DBSubnetGroupDescription": "Subnets for Integ-Cluster database",
+    "SubnetIds": [
+     {
+      "Ref": "IntegVPCPrivateSubnet1SubnetD5B61223"
+     },
+     {
+      "Ref": "IntegVPCPrivateSubnet2SubnetFCC4EF23"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegClusterSecurityGroupECB0A218": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "RDS security group",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "VpcId": {
+     "Ref": "IntegVPC2FF1AB0E"
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegClusterSecret898E5E06": {
+   "Type": "AWS::SecretsManager::Secret",
+   "Properties": {
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "Generated by the CDK for stack: ",
+       {
+        "Ref": "AWS::StackName"
+       }
+      ]
+     ]
+    },
+    "GenerateSecretString": {
+     "ExcludeCharacters": " %+~`#$&*()|[]{}:;<>?!'/@\"\\",
+     "GenerateStringKey": "password",
+     "PasswordLength": 30,
+     "SecretStringTemplate": "{\"username\":\"admin\"}"
+    }
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegClusterSecretAttachmentC627C903": {
+   "Type": "AWS::SecretsManager::SecretTargetAttachment",
+   "Properties": {
+    "SecretId": {
+     "Ref": "IntegClusterSecret898E5E06"
+    },
+    "TargetId": {
+     "Ref": "IntegCluster4261F36F"
+    },
+    "TargetType": "AWS::RDS::DBCluster"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegCluster4261F36F": {
+   "Type": "AWS::RDS::DBCluster",
+   "Properties": {
+    "CopyTagsToSnapshot": true,
+    "DBClusterParameterGroupName": "default.aurora-mysql8.0",
+    "DBSubnetGroupName": {
+     "Ref": "IntegClusterSubnets629F72ED"
+    },
+    "Engine": "aurora-mysql",
+    "EngineVersion": "8.0.mysql_aurora.3.12.0",
+    "MasterUserPassword": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:secretsmanager:",
+       {
+        "Ref": "IntegClusterSecret898E5E06"
+       },
+       ":SecretString:password::}}"
+      ]
+     ]
+    },
+    "MasterUsername": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:secretsmanager:",
+       {
+        "Ref": "IntegClusterSecret898E5E06"
+       },
+       ":SecretString:username::}}"
+      ]
+     ]
+    },
+    "ServerlessV2ScalingConfiguration": {
+     "MaxCapacity": {
+      "Ref": "MaxCapacity"
+     },
+     "MinCapacity": {
+      "Ref": "MinCapacity"
+     }
+    },
+    "VpcSecurityGroupIds": [
+     {
+      "Fn::GetAtt": [
+       "IntegClusterSecurityGroupECB0A218",
+       "GroupId"
+      ]
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "IntegClusterwriter03032C94": {
+   "Type": "AWS::RDS::DBInstance",
+   "Properties": {
+    "DBClusterIdentifier": {
+     "Ref": "IntegCluster4261F36F"
+    },
+    "DBInstanceClass": "db.serverless",
+    "Engine": "aurora-mysql",
+    "PromotionTier": 0
+   },
+   "DependsOn": [
+    "IntegVPCPrivateSubnet1DefaultRoute140D7A84",
+    "IntegVPCPrivateSubnet1RouteTableAssociationAD4B0EBF",
+    "IntegVPCPrivateSubnet2DefaultRouteAE44E307",
+    "IntegVPCPrivateSubnet2RouteTableAssociation9A15DAD6"
+   ],
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  }
+ },
+ "Parameters": {
+  "MaxCapacity": {
+   "Type": "Number",
+   "Default": 4
+  },
+  "MinCapacity": {
+   "Type": "Number",
+   "Default": 0.5
+  },
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

@@ -224,6 +224,28 @@ test('resource interface with "<Resource>Arn"', () => {
   expect(rendered).toMatchSnapshot();
 });
 
+test('an unrecorded attribute name conflict fails codegen', () => {
+  // GIVEN
+  givenResource({
+    ...BASE_RESOURCE,
+    attributes: {
+      'FooBar': {
+        type: { type: 'string' },
+        documentation: 'The FooBar of the resource',
+      },
+      'Foo.Bar': {
+        type: { type: 'string' },
+        documentation: 'The Foo.Bar of the resource',
+      },
+    },
+  });
+
+  // THEN
+  expect(() => renderResource()).toThrow(
+    "Attribute name conflict on AWS::Some::Resource between 'FooBar' and 'Foo.Bar', which both become 'attrFooBar'. Add an entry in attribute-name-conflict-resolutions.ts",
+  );
+});
+
 test('resource interface with Arn as a property and not a primaryIdentifier', () => {
   // GIVEN
   const resource = db.allocate('resource', {

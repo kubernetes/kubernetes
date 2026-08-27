@@ -358,6 +358,21 @@
       "TSV"
     ]
   },
+  "aws-cdk/packages/@aws-cdk/aws-glue-alpha/lib/schema.ts": {
+    "Schema": [
+      "BOOLEAN",
+      "BINARY",
+      "BIG_INT",
+      "DOUBLE",
+      "FLOAT",
+      "INTEGER",
+      "SMALL_INT",
+      "TINY_INT",
+      "DATE",
+      "TIMESTAMP",
+      "STRING"
+    ]
+  },
   "aws-cdk/packages/@aws-cdk/aws-imagebuilder-alpha/lib/os-version.ts": {
     "OSVersion": [
       "LINUX",
@@ -588,7 +603,8 @@
       "V3_9_X",
       "V3_9_X_KRAFT",
       "V4_0_X_KRAFT",
-      "V4_1_X_KRAFT"
+      "V4_1_X_KRAFT",
+      "V4_2_X_KRAFT"
     ]
   },
   "aws-cdk/packages/@aws-cdk/aws-neptune-alpha/lib/cluster.ts": {
@@ -903,6 +919,12 @@
       "ALL",
       "LAUNCH_EVENTS",
       "TERMINATION_EVENTS"
+    ]
+  },
+  "aws-cdk/packages/aws-cdk-lib/aws-backup/lib/rule.ts": {
+    "IndexActionResourceType": [
+      "S3",
+      "EBS"
     ]
   },
   "aws-cdk/packages/aws-cdk-lib/aws-bedrock/lib/foundation-model.ts": {

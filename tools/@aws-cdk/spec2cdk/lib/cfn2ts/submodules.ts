@@ -6,6 +6,8 @@ import * as fs from 'fs-extra';
 import type { ModuleMap, ModuleMapEntry } from '../module-topology';
 import { writeJsiiRc } from '../util/submodule-files';
 
+export const CANNED_METRICS_SUFFIX = '-canned-metrics.generated.ts';
+
 /**
  * Make sure that a number of expected files exist for every service submodule
  *
@@ -43,6 +45,8 @@ async function ensureSubmodule(submodule: ModuleMapEntry, outPath: string) {
         // codegen returns paths relative to outpath
         return path.relative(sourcePath, path.join(outPath, f));
       })
+      // Canned metrics are consumed directly, not re-exported: their generic type is not jsii-compatible
+      .filter((f) => !f.endsWith(CANNED_METRICS_SUFFIX))
       .map((f) => `export * from './${f.replace('.ts', '')}';`));
     await fs.writeFile(path.join(sourcePath, 'index.ts'), lines.join('\n') + '\n');
   }

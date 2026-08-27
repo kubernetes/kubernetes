@@ -1,8 +1,9 @@
 import type { Resource } from '@aws-cdk/service-spec-types';
 import type { Expression, PropertySpec } from '@cdklabs/typewriter';
 import { $this, expr, Type } from '@cdklabs/typewriter';
-import { attributePropertyName, propertyNameFromCloudFormation, referencePropertyName } from '../naming';
+import { propertyNameFromCloudFormation, referencePropertyName } from '../naming';
 import { extractResourceVariablesFromArnFormat, findArnProperty, findNonIdentifierArnProperty } from './arn';
+import { attributePropertyNames } from './attribute-name-conflict-resolutions';
 import { CDK_CORE } from './cdk';
 
 export interface ReferenceProp {
@@ -60,11 +61,20 @@ export class ResourceReference {
   private _arnVariables: [string, string][] = [];
   private readonly _referenceProps = new FirstOccurrenceMap<string, ReferenceProp>();
 
+  /** Computed from the same pure function the resource class uses, so the two always agree. */
+  private readonly attributePropertyNames: Map<string, string>;
+
   public constructor(resource: Resource) {
     this.resource = resource;
+    this.attributePropertyNames = attributePropertyNames(resource.cloudFormationType, Object.keys(resource.attributes));
     this.arnPropertyName = this.findArnPropertyName();
     this._referenceProps = new FirstOccurrenceMap<string, ReferenceProp>();
     this.collectReferencesProps();
+  }
+
+  /** A renamed attribute's preferred name belongs to a different attribute, so never derive it here. */
+  private attributeGetter(attrName: string): Expression {
+    return $this[this.attributePropertyNames.get(attrName)!];
   }
 
   private findArnPropertyName(): string | undefined {
@@ -105,7 +115,7 @@ export class ResourceReference {
             summary: `The ARN of the ${this.resource.name} resource.`,
           },
         },
-        cfnValue: $this[attributePropertyName(arnProp)],
+        cfnValue: this.attributeGetter(arnProp),
       });
     }
 
@@ -143,7 +153,7 @@ export class ResourceReference {
     }
     // an attribute
     if (this.resource.attributes[name]) {
-      return $this[attributePropertyName(name)];
+      return this.attributeGetter(name);
     }
     // a required prop
     if (this.resource.properties[name]?.required) {
@@ -193,7 +203,7 @@ export class ResourceReference {
 
     // Is it an attr?
     if (this.resource.attributes[name]) {
-      return $this[attributePropertyName(name)];
+      return this.attributeGetter(name);
     }
 
     // A required prop?

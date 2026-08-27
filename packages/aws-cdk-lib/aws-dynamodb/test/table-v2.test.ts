@@ -3,7 +3,7 @@ import { ArnPrincipal, PolicyDocument, PolicyStatement } from '../../aws-iam';
 import * as iam from '../../aws-iam';
 import { Stream } from '../../aws-kinesis';
 import { Key } from '../../aws-kms';
-import { App, CfnDeletionPolicy, Fn, Lazy, RemovalPolicy, Stack, Tags } from '../../core';
+import { App, CfnDeletionPolicy, Fn, Lazy, RemovalPolicy, Stack, Tags, Token } from '../../core';
 import type {
   GlobalSecondaryIndexPropsV2,
   LocalSecondaryIndexProps,
@@ -1270,6 +1270,131 @@ describe('table', () => {
 });
 
 describe('grants', () => {
+  test('grants.readData includes index ARN when a GSI is added after construction', () => {
+    // GIVEN
+    const stack = new Stack();
+    const table = new TableV2(stack, 'Table', {
+      partitionKey: { name: 'pk', type: AttributeType.STRING },
+    });
+    const role = new iam.Role(stack, 'Role', { assumedBy: new iam.AccountRootPrincipal() });
+
+    // WHEN
+    table.addGlobalSecondaryIndex({
+      indexName: 'gsi1',
+      partitionKey: { name: 'gsiPk', type: AttributeType.STRING },
+    });
+    table.grants.readData(role);
+
+    // THEN
+    Template.fromStack(stack).hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Effect: 'Allow',
+            Resource: Match.arrayWith([
+              Match.objectLike({
+                'Fn::Join': ['', Match.arrayWith(['/index/*'])],
+              }),
+            ]),
+          }),
+        ]),
+      },
+    });
+  });
+
+  test('grants.readData includes index ARN when a GSI is provided via props', () => {
+    // GIVEN
+    const stack = new Stack();
+    const table = new TableV2(stack, 'Table', {
+      partitionKey: { name: 'pk', type: AttributeType.STRING },
+      globalSecondaryIndexes: [{
+        indexName: 'gsi1',
+        partitionKey: { name: 'gsiPk', type: AttributeType.STRING },
+      }],
+    });
+    const role = new iam.Role(stack, 'Role', { assumedBy: new iam.AccountRootPrincipal() });
+
+    // WHEN
+    table.grants.readData(role);
+
+    // THEN
+    Template.fromStack(stack).hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Effect: 'Allow',
+            Resource: Match.arrayWith([
+              Match.objectLike({
+                'Fn::Join': ['', Match.arrayWith(['/index/*'])],
+              }),
+            ]),
+          }),
+        ]),
+      },
+    });
+  });
+
+  test('grants.readData includes index ARN when an LSI is added after construction', () => {
+    // GIVEN
+    const stack = new Stack();
+    const table = new TableV2(stack, 'Table', {
+      partitionKey: { name: 'pk', type: AttributeType.STRING },
+      sortKey: { name: 'sk', type: AttributeType.STRING },
+    });
+    const role = new iam.Role(stack, 'Role', { assumedBy: new iam.AccountRootPrincipal() });
+
+    // WHEN
+    table.addLocalSecondaryIndex({
+      indexName: 'lsi1',
+      sortKey: { name: 'lsiSk', type: AttributeType.STRING },
+    });
+    table.grants.readData(role);
+
+    // THEN
+    Template.fromStack(stack).hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Effect: 'Allow',
+            Resource: Match.arrayWith([
+              Match.objectLike({
+                'Fn::Join': ['', Match.arrayWith(['/index/*'])],
+              }),
+            ]),
+          }),
+        ]),
+      },
+    });
+  });
+
+  test('grants.readData omits index ARN when the table has no indexes', () => {
+    // GIVEN
+    const stack = new Stack();
+    const table = new TableV2(stack, 'Table', {
+      partitionKey: { name: 'pk', type: AttributeType.STRING },
+    });
+    const role = new iam.Role(stack, 'Role', { assumedBy: new iam.AccountRootPrincipal() });
+
+    // WHEN
+    table.grants.readData(role);
+
+    // THEN
+    Template.fromStack(stack).hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Effect: 'Allow',
+            Resource: Match.not(Match.arrayWith([
+              Match.objectLike({
+                'Fn::Join': ['', Match.arrayWith(['/index/*'])],
+              }),
+            ])),
+          }),
+        ]),
+      },
+    });
+  });
+
   test('grantReadData with AccountRootPrincipal uses wildcard resources', () => {
     // GIVEN
     const stack = new Stack();
@@ -4114,6 +4239,100 @@ test('TableV2MultiAccountReplica on imported table does not throw', () => {
   const warnings = Annotations.fromStack(replicaStack).findWarning('*', Match.stringLikeRegexp('.*imported without a resource policy.*'));
   expect(warnings.length).toBe(1);
   expect(warnings[0].entry.data).toContain('manually configure multi-account replication permissions');
+});
+
+test('TableV2MultiAccountReplica on imported table with partially tokenized ARN does not throw', () => {
+  const app = new App();
+  const replicaStack = new Stack(app, 'ReplicaStack', { env: { account: '222222222222', region: 'us-east-1' } });
+
+  // Table name is a token, but account and region are concrete and different
+  // from the replica stack
+  const tableName = Token.asString({ Ref: 'SourceTableName' });
+  const importedTable = TableV2.fromTableArn(
+    replicaStack,
+    'ImportedTable',
+    `arn:aws:dynamodb:us-west-2:111111111111:table/${tableName}`,
+  );
+
+  expect(() => {
+    new TableV2MultiAccountReplica(replicaStack, 'ReplicaTable', {
+      replicaSourceTable: importedTable,
+    });
+  }).not.toThrow();
+});
+
+test('TableV2MultiAccountReplica on imported table with partially tokenized ARN still throws for same account', () => {
+  const app = new App();
+  const replicaStack = new Stack(app, 'ReplicaStack', { env: { account: '111111111111', region: 'us-east-1' } });
+
+  const tableName = Token.asString({ Ref: 'SourceTableName' });
+  const importedTable = TableV2.fromTableArn(
+    replicaStack,
+    'ImportedTable',
+    `arn:aws:dynamodb:us-west-2:111111111111:table/${tableName}`,
+  );
+
+  expect(() => {
+    new TableV2MultiAccountReplica(replicaStack, 'ReplicaTable', {
+      replicaSourceTable: importedTable,
+    });
+  }).toThrow('Multi-account replica must be in a different account than the source table. For same-account replication, use addReplica() instead.');
+});
+
+test('TableV2MultiAccountReplica on imported table with partially tokenized ARN still throws for same region', () => {
+  const app = new App();
+  const replicaStack = new Stack(app, 'ReplicaStack', { env: { account: '222222222222', region: 'us-west-2' } });
+
+  const tableName = Token.asString({ Ref: 'SourceTableName' });
+  const importedTable = TableV2.fromTableArn(
+    replicaStack,
+    'ImportedTable',
+    `arn:aws:dynamodb:us-west-2:111111111111:table/${tableName}`,
+  );
+
+  expect(() => {
+    new TableV2MultiAccountReplica(replicaStack, 'ReplicaTable', {
+      replicaSourceTable: importedTable,
+    });
+  }).toThrow('Multi-account replica must be in a different region than the source table.');
+});
+
+test('TableV2MultiAccountReplica on imported table with tokenized account component does not throw', () => {
+  const app = new App();
+  const replicaStack = new Stack(app, 'ReplicaStack', { env: { account: '222222222222', region: 'us-east-1' } });
+
+  // Account component is a token; the per-field check skips account validation
+  const account = Token.asString({ Ref: 'SourceAccount' });
+  const importedTable = TableV2.fromTableArn(
+    replicaStack,
+    'ImportedTable',
+    `arn:aws:dynamodb:us-west-2:${account}:table/SourceTable`,
+  );
+
+  expect(() => {
+    new TableV2MultiAccountReplica(replicaStack, 'ReplicaTable', {
+      replicaSourceTable: importedTable,
+    });
+  }).not.toThrow();
+});
+
+test('TableV2MultiAccountReplica on imported table with fully opaque token ARN does not throw', () => {
+  const app = new App();
+  const replicaStack = new Stack(app, 'ReplicaStack', { env: { account: '222222222222', region: 'us-east-1' } });
+
+  // The whole ARN is a single deploy-time token; every component resolves to a
+  // token and the per-field checks skip both validations
+  const importedTable = TableV2.fromTableArn(
+    replicaStack,
+    'ImportedTable',
+    Token.asString({ 'Fn::ImportValue': 'SharedTableArn' }),
+  );
+
+  expect(() => {
+    new TableV2MultiAccountReplica(replicaStack, 'ReplicaTable', {
+      replicaSourceTable: importedTable,
+    });
+  }).not.toThrow();
 });
 
 test('TableV2MultiAccountReplica works with fromTableArn without key schema', () => {

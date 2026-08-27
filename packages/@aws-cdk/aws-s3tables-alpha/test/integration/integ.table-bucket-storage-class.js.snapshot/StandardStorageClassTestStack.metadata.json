@@ -1,0 +1,26 @@
+{
+  "/StandardStorageClassTestStack/StandardStorageBucket": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/StandardStorageClassTestStack/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/StandardStorageClassTestStack/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/StandardStorageClassTestStack/StandardStorageBucket/StandardStorageBucket": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "StandardStorageBucket3F75348A"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "version": "54.0.0",
+  "files": {
+    "9679c1a2e20ef6661d7c4857a2d52eb63aec52c6facd483cbf7d652c327c95d0": {
+      "displayName": "aws-cdk-sqs-metrics Template",
+      "source": {
+        "path": "aws-cdk-sqs-metrics.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-current_region-7c6d4eda": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "9679c1a2e20ef6661d7c4857a2d52eb63aec52c6facd483cbf7d652c327c95d0.json",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

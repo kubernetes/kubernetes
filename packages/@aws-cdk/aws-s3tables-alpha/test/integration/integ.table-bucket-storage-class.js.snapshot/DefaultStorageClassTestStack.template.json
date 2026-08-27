@@ -1,0 +1,84 @@
+{
+ "Resources": {
+  "DefaultBucket62385A75": {
+   "Type": "AWS::S3Tables::TableBucket",
+   "Properties": {
+    "TableBucketName": "sc-default-integ-test",
+    "UnreferencedFileRemoval": {}
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "DefaultNamespaceD1A02467": {
+   "Type": "AWS::S3Tables::Namespace",
+   "Properties": {
+    "Namespace": "default_ns",
+    "TableBucketARN": {
+     "Fn::GetAtt": [
+      "DefaultBucket62385A75",
+      "TableBucketARN"
+     ]
+    }
+   },
+   "DependsOn": [
+    "DefaultBucket62385A75"
+   ],
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "DefaultTable0A5768B5": {
+   "Type": "AWS::S3Tables::Table",
+   "Properties": {
+    "Namespace": "default_ns",
+    "OpenTableFormat": "ICEBERG",
+    "TableBucketARN": {
+     "Fn::GetAtt": [
+      "DefaultBucket62385A75",
+      "TableBucketARN"
+     ]
+    },
+    "TableName": "default_table",
+    "WithoutMetadata": "Yes"
+   },
+   "DependsOn": [
+    "DefaultNamespaceD1A02467"
+   ],
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

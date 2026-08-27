@@ -1,3 +1,5 @@
+import type * as kms from 'aws-cdk-lib/aws-kms';
+
 /**
  * The compression type.
  *
@@ -404,10 +406,20 @@ export class StorageParameter {
   }
 
   /**
-   * You can specify an AWS Key Management Service key to enable Server–Side Encryption (SSE) for Amazon S3 objects.
+   * Enables server-side encryption (SSE-KMS) with the given AWS KMS key on the
+   * files Redshift Spectrum writes for this table (via `CREATE EXTERNAL TABLE AS`
+   * or `INSERT`).
+   *
+   * Redshift Spectrum accepts either the key's ARN or its bare key ID for the
+   * `write.kms.key.id` property, and encrypts the written objects with that key;
+   * this renders the ARN. To use the S3 bucket's default KMS key instead, set the
+   * literal value `auto` via `StorageParameter.custom('write.kms.key.id', 'auto')` —
+   * this typed factory cannot express `auto`.
+   *
+   * @see https://docs.aws.amazon.com/redshift/latest/dg/r_CREATE_EXTERNAL_TABLE.html
    */
-  public static writeKmsKeyId(value: string): StorageParameter {
-    return new StorageParameter('write.kms.key.id', value);
+  public static writeKmsKeyId(key: kms.IKeyRef): StorageParameter {
+    return new StorageParameter('write.kms.key.id', key.keyRef.keyArn);
   }
 
   /**
@@ -415,8 +427,8 @@ export class StorageParameter {
    * @param key - The key of the storage parameter.
    * @param value - The value of the storage parameter.
    */
-  public static custom(key: string, value: any): StorageParameter {
-    return new StorageParameter(key, value.toString());
+  public static custom(key: string, value: string): StorageParameter {
+    return new StorageParameter(key, value);
   }
 
   protected constructor(public readonly key: string, public readonly value: string) {}

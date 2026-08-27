@@ -1,0 +1,20 @@
+{
+  "version": "52.0.0",
+  "files": {
+    "005bfac2bd6ce394e1bb6099e70e2264454ca51bd0d4ec69631dd6287d55c7e0": {
+      "displayName": "StandardStorageClassTestStack Template",
+      "source": {
+        "path": "StandardStorageClassTestStack.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-current_region-a99dbb86": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "005bfac2bd6ce394e1bb6099e70e2264454ca51bd0d4ec69631dd6287d55c7e0.json",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

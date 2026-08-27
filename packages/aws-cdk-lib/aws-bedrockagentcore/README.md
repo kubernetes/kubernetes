@@ -150,6 +150,9 @@ to production by simply updating the endpoint to point to the newer version.
 | `tags` | `{ [key: string]: string }` | No | Tags for the agent runtime. A list of key:value pairs of tags to apply to this Runtime resource |
 | `lifecycleConfiguration` | LifecycleConfiguration | No | The life cycle configuration for the AgentCore Runtime. Defaults to 900 seconds (15 minutes) for idle, 28800 seconds (8 hours) for max life time |
 | `requestHeaderConfiguration` | RequestHeaderConfiguration | No | Configuration for HTTP request headers that will be passed through to the runtime. Defaults to no configuration |
+| `tracingEnabled` | `boolean` | No | Whether to enable X-Ray tracing for this runtime. When enabled, traces will be delivered to AWS X-Ray. Defaults to `false` |
+| `loggingConfigs` | `LoggingConfig[]` | No | Logging configuration for the runtime. Allows sending APPLICATION_LOGS and USAGE_LOGS to CloudWatch Logs, S3, or Kinesis Data Firehose. Defaults to no logging configured |
+| `manageDeliveryResourcePolicy` | `boolean` | No | Whether to create resource policies for log/trace delivery. When `false`, the `AWS::Logs::ResourcePolicy` and `AWS::XRay::ResourcePolicy` are not created. This is useful when deploying many runtimes per account/Region, as each resource policy consumes an account-level quota slot (CloudWatch Logs: 10, X-Ray: lower). For same-account `/aws/vendedlogs/` delivery, the log-delivery service-linked role provides the necessary write access without an explicit policy. Defaults to `true` |
 
 ### Runtime Endpoint Properties
 
@@ -803,8 +806,45 @@ You can configure:
 
 - tracingEnabled: Enable X-Ray tracing for the runtime
 - loggingConfigs: Send APPLICATION_LOGS (agent runtime invocations) and USAGE_LOGS (session-level resource consumption) to CloudWatch Logs, S3, or Kinesis Data Firehose
+- manageDeliveryResourcePolicy: Control whether resource policies are created for log/trace delivery. Defaults to `true`
 
 For additional information, please refer to the [Set up logging and tracing for AgentCore](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/observability.html).
+
+##### Opting out of resource policy management
+
+When deploying many AgentCore Runtime constructs per account/Region, the per-stack `AWS::Logs::ResourcePolicy` and `AWS::XRay::ResourcePolicy` created by the observability delivery consume account-level quota slots (CloudWatch Logs: 10, X-Ray: lower). Set `manageDeliveryResourcePolicy: false` to skip resource policy creation while still provisioning delivery sources, destinations, and deliveries.
+
+**Important**: Setting `false` means you own the delivery permission. There are two safe ways to use it:
+- Same-account delivery to a `/aws/vendedlogs/` log group, where the log-delivery service-linked role grants write access implicitly.
+- Attaching the delivery resource policy yourself.
+
+Otherwise delivery silently fails: synthesis and deploy succeed, but nothing is delivered. Per the [vended-logs delivery docs](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/AWS-logs-infrastructure-V2-CloudWatchLogs.html), a resource policy is required for CloudWatch Logs delivery outside the `/aws/vendedlogs/` same-account case.
+
+```typescript fixture=default
+const repository = new ecr.Repository(this, 'TestRepository', {
+  repositoryName: 'test-agent-runtime',
+});
+
+const agentRuntimeArtifact = agentcore.AgentRuntimeArtifact.fromEcrRepository(repository, 'v1.0.0');
+
+// Use a /aws/vendedlogs/ log group for same-account delivery without explicit resource policy
+const logGroup = new logs.LogGroup(this, 'RuntimeLogGroup', {
+  logGroupName: '/aws/vendedlogs/bedrock-agentcore/my-runtime',
+});
+
+new agentcore.Runtime(this, 'test-runtime', {
+  runtimeName: 'test_runtime',
+  agentRuntimeArtifact: agentRuntimeArtifact,
+  tracingEnabled: true,
+  loggingConfigs: [
+    {
+      logType: agentcore.LogType.APPLICATION_LOGS,
+      destination: agentcore.LoggingDestination.cloudWatchLogs(logGroup),
+    },
+  ],
+  manageDeliveryResourcePolicy: false,
+});
+```
 
 ```typescript fixture=default
 const repository = new ecr.Repository(this, 'TestRepository', {
@@ -1024,8 +1064,13 @@ const browser = new agentcore.BrowserCustom(this, "MyBrowser", {
   },
 });
 
-// The browser construct automatically grants S3 permissions to the execution role
-// when recording is enabled, so no additional IAM configuration is needed
+// When recording is enabled with an S3 location, the browser construct grants the
+// execution role least-privilege access to write recordings: s3:PutObject,
+// s3:ListMultipartUploadParts, and s3:AbortMultipartUpload, scoped to the recording
+// prefix objects (bucket/prefix/*). No additional IAM configuration is needed. If the
+// recording bucket is encrypted with a customer managed KMS key, grant the execution
+// role kms:GenerateDataKey and kms:Decrypt on that key separately, since the bucket is
+// imported by name.
 ```
 
 ### Browser with Browser signing

@@ -37,6 +37,7 @@ import {
   ArnFormat,
   FeatureFlags,
   PhysicalName,
+  Resource,
   Stack,
   TagManager,
   TagType,
@@ -873,11 +874,12 @@ export class TableV2 extends TableBaseV2 {
 
     props.replicas?.forEach(replica => this.addReplica(replica));
 
-    // Initialize grants with replica regions for multi-account permissions
+    // Initialize grants with replica regions for multi-account permissions.
+    // `hasIndex` deliberately omitted: `TableGrants` resolves `table.hasIndex` lazily at synth
+    // time, so indexes added after construction (`addGlobalSecondaryIndex`) are included.
     this.grants = new TableGrants({
       table: this,
       regions: Array.from(this.replicaTables.keys()),
-      hasIndex: this.hasIndex,
       encryptedResource: this.encryptionKey ? this : undefined,
       policyResource: this,
     });
@@ -1532,8 +1534,6 @@ export class TableV2MultiAccountReplica extends TableBaseV2 {
     this.grants = new TableGrants({
       table: this,
       regions: [],
-      encryptedResource: this.encryptionKey ? this : undefined,
-      policyResource: this,
     });
 
     this.grants.multiAccountReplicationFrom(props.replicaSourceTable.tableArn);
@@ -1603,8 +1603,16 @@ export class TableV2MultiAccountReplica extends TableBaseV2 {
     let sourceAccount = sourceStack.account;
     let sourceRegion = sourceStack.region;
 
-    // For imported tables, extract account/region from ARN instead of stack
-    if (!Token.isUnresolved(props.replicaSourceTable!.tableArn)) {
+    // For an owned table the construct's stack reflects its real environment,
+    // so the stack-based values above are authoritative (the table's own ARN is
+    // an opaque GetAtt token). For an imported table the construct's stack is
+    // the consuming stack, whose environment says nothing about where the table
+    // lives, so extract account/region from the imported ARN instead. splitArn
+    // handles concrete, partially tokenized, and fully opaque ARNs (the latter
+    // via a deploy-time Fn::Split); any component that is not statically known
+    // resolves to a token, which the per-field checks below skip rather than
+    // misvalidate against the consuming stack.
+    if (!Resource.isOwnedResource(props.replicaSourceTable!)) {
       const arnParts = this.stack.splitArn(props.replicaSourceTable!.tableArn, ArnFormat.SLASH_RESOURCE_NAME);
       if (arnParts.account) sourceAccount = arnParts.account;
       if (arnParts.region) sourceRegion = arnParts.region;

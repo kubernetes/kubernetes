@@ -581,7 +581,8 @@
        "Ref": "CustomVpcIsolatedSubnet2Subnet20136850"
       }
      ]
-    }
+    },
+    "MemorySize": 1024
    },
    "DependsOn": [
     "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756Cc8817f06013183c237ed0b132c5ed9667b8b62e275ServiceRoleDefaultPolicy053F54B4",

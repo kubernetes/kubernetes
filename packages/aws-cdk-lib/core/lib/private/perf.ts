@@ -1,12 +1,11 @@
-import type { PerformanceEntry } from 'perf_hooks';
 import { performance } from 'perf_hooks';
 import './dispose-polyfill';
 
 /**
  * Global state for this module.
  *
- * This is to safeguard against multiple loads of the same module, we don't
- * want them stepping over each other.
+ * This is to safeguard against multiple loads of the same module, we want
+ * them to share the same global state.
  */
 interface GlobalState {
   /**
@@ -18,31 +17,18 @@ interface GlobalState {
    * Global counter to keep track of nesting
    */
   nesting: number;
+
+  telemetryCounters: PerfCounters;
+
+  allCounters: PerfCounters;
 }
 
-const STATE: GlobalState = ((global as any)[Symbol.for('@aws-cdk/core:performanceProfilingState')] ??= {
+const STATE: GlobalState = ((globalThis as any)[Symbol.for('@aws-cdk/core:performanceProfilingState')] ??= {
   builtinsHooked: false,
   nesting: 0,
+  telemetryCounters: {},
+  allCounters: {},
 } satisfies GlobalState);
-
-/**
- * The field in `detail` that needs to be set to `true` in order to send this to telemetry.
- */
-export const TELEMETRY_FIELD = 'telemetry';
-
-/**
- * The field in `detail` that needs to be set to `true` in order to skip this for counting
- */
-export const SKIPCOUNT_FIELD = 'skipCount';
-
-/**
- * The field in `detail` that overrides the amount added to the counter.
- */
-export const COUNT_FIELD = 'count';
-
-interface PerformanceMeasureEntry extends PerformanceEntry {
-  detail?: Record<string, unknown>;
-}
 
 export interface ProfileOptions {
   /**
@@ -66,7 +52,7 @@ export interface ProfileOptions {
 /**
  * Make a decorator that will profile a given function.
  *
- * Emits a measurementto the performance timeline, potentially with `{ telemetry: true }` in
+ * Emits a measurement to the performance timeline, potentially with `{ telemetry: true }` in
  * the `detail` field.
  *
  * If a profiled function is called from another profiled function, only the
@@ -84,13 +70,10 @@ export function profileFn(key: string, options?: ProfileOptions) {
         STATE.nesting--;
 
         if (STATE.nesting === 0) {
-          performance.measure(key, {
-            start,
-            end,
-            detail: {
-              [TELEMETRY_FIELD]: !!options?.telemetry,
-              [SKIPCOUNT_FIELD]: !!options?.skipCount,
-            },
+          recordPerformanceEntry(key, {
+            durationMs: end - start,
+            count: options?.skipCount ? 0 : 1,
+            telemetry: !!options?.telemetry,
           });
         }
       }
@@ -116,30 +99,70 @@ export function profileSpan(key: string, options?: ProfileOptions): Disposable {
   const start = performance.now();
   return {
     [Symbol.dispose]() {
-      performance.measure(key, {
-        start,
-        detail: {
-          [TELEMETRY_FIELD]: !!options?.telemetry,
-          [SKIPCOUNT_FIELD]: !!options?.skipCount,
-        },
+      recordPerformanceEntry(key, {
+        durationMs: performance.now() - start,
+        count: options?.skipCount ? 0 : 1,
+        telemetry: !!options?.telemetry,
       });
     },
   };
 }
 
+export interface RecordPerformanceOptions extends Pick<ProfileOptions, 'telemetry'> {
+  /**
+   * How much time to add to the timer
+   *
+   * @default 0
+   */
+  readonly durationMs?: number;
+
+  /**
+   * How many occurrences of this timer we've missed
+   *
+   * @default 1
+   */
+  readonly count?: number;
+}
+
 /**
- * Add an arbitrary value to a performance counter without recording a duration.
+ * Record this performance timer/counter in the global state
+ *
+ * This *used* to be implemented as `performance.measure()`, but that would eat
+ * too much memory in case of a large application. In this function, instead we
+ * immediately aggregate into the smaller in-memory state.
+ *
+ * `durationMs` and `count` are allowed to be `0` in order record only times or
+ * counters, if desired.
  */
-export function recordCounter(key: string, count: number, options?: Pick<ProfileOptions, 'telemetry'>): void {
-  const now = performance.now();
-  performance.measure(key, {
-    start: now,
-    end: now,
-    detail: {
-      [TELEMETRY_FIELD]: !!options?.telemetry,
-      [COUNT_FIELD]: count,
-    },
-  });
+export function recordPerformanceEntry(key: string, options: RecordPerformanceOptions) {
+  bumpPerfCounter(STATE.allCounters, key, options?.durationMs, options?.count);
+  if (options?.telemetry) {
+    bumpPerfCounter(STATE.telemetryCounters, key, options?.durationMs, options?.count);
+  }
+}
+
+/**
+ * Reset all counters
+ */
+export function resetCounters() {
+  STATE.allCounters = {};
+  STATE.telemetryCounters = {};
+}
+
+/**
+ * Increase an entry in a single set of perf counters
+ */
+function bumpPerfCounter(counters: PerfCounters, key: string, durationMs?: number, count?: number) {
+  const ctr = counters[key];
+  if (ctr) {
+    ctr.count += count ?? 1;
+    ctr.total += durationMs ?? 0;
+  } else {
+    counters[key] = {
+      count: count ?? 1,
+      total: durationMs ?? 0,
+    };
+  }
 }
 
 /**
@@ -198,29 +221,9 @@ export interface ReadCountersOptions {
  * Returns an ordered map, with the counters with the highest durations first.
  */
 export function readPerfCounters(options?: ReadCountersOptions): PerfCounters {
-  // Do all perfs
-  const counters: PerfCounters = {};
-  for (const entry of performance.getEntriesByType('measure') as PerformanceMeasureEntry[]) {
-    if (options?.telemetry && !(entry.detail)?.[TELEMETRY_FIELD]) {
-      continue;
-    }
-
-    const recordedCount = entry.detail?.[COUNT_FIELD];
-    const count = typeof recordedCount === 'number'
-      ? recordedCount
-      : entry.detail?.[SKIPCOUNT_FIELD] ? 0 : 1;
-
-    const ctr = counters[entry.name];
-    if (ctr) {
-      ctr.count += count;
-      ctr.total += entry.duration;
-    } else {
-      counters[entry.name] = {
-        count,
-        total: entry.duration,
-      };
-    }
-  }
+  const counters: PerfCounters = options?.telemetry
+    ? STATE.telemetryCounters
+    : STATE.allCounters;
 
   let ret = Object.entries(counters)
     .map(([key, { count, total }]) => [key, { count, total: Math.floor(total) }] as const)

@@ -580,7 +580,8 @@
        "Ref": "TestVpcIsolatedSubnet2Subnet3A7015F1"
       }
      ]
-    }
+    },
+    "MemorySize": 1024
    },
    "DependsOn": [
     "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756Cc886f407fc188c7f2c075ec941763d8340d1a631c2c82719410d38c38562f47927831fb1d2e8d5f2e9f6ServiceRoleDefaultPolicy1B893B09",
