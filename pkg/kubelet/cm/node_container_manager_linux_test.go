@@ -19,13 +19,53 @@ limitations under the License.
 package cm
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	ktesting "k8s.io/klog/v2/ktesting"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
+
+func TestUpdateNodeAllocatableCgroup(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	limit := int64(100)
+	config := &CgroupConfig{
+		Name:               CgroupName{"kubepods"},
+		ResourceParameters: &ResourceConfig{Memory: &limit},
+	}
+
+	tests := []struct {
+		name       string
+		version    int
+		usage      int64
+		usageErr   error
+		wantUpdate bool
+		wantErr    bool
+	}{
+		{name: "v2 usage above limit", version: 2, usage: 101, wantErr: true},
+		{name: "v2 usage at limit", version: 2, usage: 100, wantUpdate: true},
+		{name: "v1 keeps existing update behavior", version: 1, usage: 101, wantUpdate: true},
+		{name: "usage read failure", version: 2, usageErr: errors.New("read failed"), wantErr: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			manager := &fakeCgroupManager{version: tc.version, usage: tc.usage, usageErr: tc.usageErr}
+			cm := &containerManagerImpl{cgroupManager: manager}
+			err := cm.updateNodeAllocatableCgroup(logger, config)
+			if tc.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tc.wantUpdate, len(manager.updates) == 1)
+		})
+	}
+}
 
 func TestNodeAllocatableReservationForScheduling(t *testing.T) {
 	memoryEvictionThreshold := resource.MustParse("100Mi")
