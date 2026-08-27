@@ -726,10 +726,13 @@ func TestQuantityString(t *testing.T) {
 		{decQuantity(5, 21, DecimalSI), "5e21", "5000E"},
 		{decQuantity(1, 24, DecimalSI), "1e24", "1000000E"},
 		// BinarySI has no suffix beyond "Ei" (2^60). A value whose canonical
-		// base-1024 exponent exceeds that (a multiple of 2^70 or larger) has no
-		// binary suffix, so it must fall back to decimal exponent notation
-		// instead of dropping the suffix, otherwise e.g. 2^70 would serialize
-		// to "1". These values round-trip through parse.
+		// base-1024 exponent exceeds that has no binary suffix, so it must
+		// fall back to an exact decimal representation instead of dropping
+		// the suffix, otherwise e.g. 2^70 would serialize to "1". Exponent
+		// notation is used when trailing decimal zeros allow it; a plain
+		// integer like 2^70 serializes as its full decimal digits (see
+		// TestBinarySIPastEiArithmeticRoundTrip). These values round-trip
+		// through parse.
 		{decQuantity(1, 70, BinarySI), "10e69", ""},
 		{decQuantity(2, 70, BinarySI), "20e69", ""},
 		{decQuantity(1, 72, BinarySI), "1e72", ""},
@@ -802,6 +805,39 @@ func TestQuantityString(t *testing.T) {
 	}
 }
 
+// A valid BinarySI quantity grown past Ei by arithmetic has no binary
+// suffix; before the fallback it serialized as "1", silently losing the
+// magnitude. 2^70 has no trailing decimal zeros, so the fallback emits the
+// exact base-10 integer rather than exponent notation.
+func TestBinarySIPastEiArithmeticRoundTrip(t *testing.T) {
+	q := MustParse("1Ei")
+	q.Mul(1024) // 2^70
+
+	if e, a := "1180591620717411303424", q.String(); e != a {
+		t.Errorf("String() = %q, want %q", a, e)
+	}
+
+	data, err := q.MarshalJSON()
+	if err != nil {
+		t.Fatalf("MarshalJSON: %v", err)
+	}
+	if e, a := `"1180591620717411303424"`, string(data); e != a {
+		t.Errorf("MarshalJSON = %s, want %s", a, e)
+	}
+
+	var back Quantity
+	if err := back.UnmarshalJSON(data); err != nil {
+		t.Fatalf("UnmarshalJSON: %v", err)
+	}
+	if q.Cmp(back) != 0 {
+		t.Errorf("JSON round trip changed the value: %s vs %s", q.String(), back.String())
+	}
+
+	reparsed := MustParse(q.String())
+	if q.Cmp(reparsed) != 0 {
+		t.Errorf("String round trip changed the value: %s vs %s", q.String(), reparsed.String())
+	}
+}
 func TestQuantityStringBelowNano(t *testing.T) {
 	// DecimalSI has no suffix below "n" (10^-9), so these values take the same
 	// exponent-notation fallback as the >"E" cases above. They are not reachable
