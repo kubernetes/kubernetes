@@ -242,7 +242,7 @@ func (c *Controller) processPVCsByNamespace(ctx context.Context) bool {
 			c.queue.Forget(pvcKey)
 		} else {
 			c.queue.AddRateLimited(pvcKey)
-			utilruntime.HandleError(fmt.Errorf("PVC %v/%v failed with: %w", pvcName, namespace, err))
+			utilruntime.HandleError(fmt.Errorf("PVC %v/%v failed with: %w", namespace, pvcName, err))
 		}
 		c.queue.Done(pvcKey)
 	}
