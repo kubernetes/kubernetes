@@ -3435,9 +3435,6 @@
           "x-kubernetes-list-type": "atomic"
         }
       },
-      "required": [
-        "verbs"
-      ],
       "type": "object"
     },
     "io.k8s.api.authorization.v1.ResourceAttributes": {
@@ -3518,9 +3515,6 @@
           "x-kubernetes-list-type": "atomic"
         }
       },
-      "required": [
-        "verbs"
-      ],
       "type": "object"
     },
     "io.k8s.api.authorization.v1.SelfSubjectAccessReview": {
@@ -3617,6 +3611,9 @@
           "type": "string"
         }
       },
+      "required": [
+        "namespace"
+      ],
       "type": "object"
     },
     "io.k8s.api.authorization.v1.SubjectAccessReview": {
@@ -3699,7 +3696,7 @@
       "description": "SubjectAccessReviewStatus",
       "properties": {
         "allowed": {
-          "description": "allowed is required. True if the action would be allowed, false otherwise.",
+          "description": "allowed is set to true if the action is allowed, and should be set to false otherwise.",
           "type": "boolean"
         },
         "denied": {
@@ -3715,9 +3712,6 @@
           "type": "string"
         }
       },
-      "required": [
-        "allowed"
-      ],
       "type": "object"
     },
     "io.k8s.api.authorization.v1.SubjectRulesReviewStatus": {
@@ -3748,11 +3742,6 @@
           "x-kubernetes-list-type": "atomic"
         }
       },
-      "required": [
-        "resourceRules",
-        "nonResourceRules",
-        "incomplete"
-      ],
       "type": "object"
     },
     "io.k8s.api.autoscaling.v1.CrossVersionObjectReference": {
