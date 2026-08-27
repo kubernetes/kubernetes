@@ -115,6 +115,10 @@ describe('Linux Lambda build image', () => {
     }).toThrow(/Invalid CodeBuild environment: Cannot specify timeout for Lambda compute/);
   });
 
+  test('AMAZON_LINUX_2023_NODE_24 has correct image id', () => {
+    expect(codebuild.LinuxLambdaBuildImage.AMAZON_LINUX_2023_NODE_24.imageId).toEqual('aws/codebuild/amazonlinux-x86_64-lambda-standard:nodejs24');
+  });
+
   test('cannot be used in conjunction with privileged property', () => {
     const stack = new cdk.Stack();
 

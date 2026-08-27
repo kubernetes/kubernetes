@@ -184,7 +184,20 @@ export class PullRequestLinterBase {
    * @returns Existing review, if present
    */
   private async findExistingPRLinterReviews(): Promise<Review[]> {
-    const reviews = await this.client.paginate(this.client.pulls.listReviews, this.prParams);
+    let reviews: Review[];
+    try {
+      reviews = await this.client.paginate(this.client.pulls.listReviews, this.prParams);
+    } catch (e: any) {
+      // If the GitHub API returns a 404 when listing reviews, there are
+      // effectively no reviews to dismiss. This can happen for cross-repo
+      // PRs or when the PROJEN_GITHUB_TOKEN doesn't have access to the
+      // source repository.
+      if (e.status === 404) {
+        console.log('Reviews endpoint returned 404, assuming no existing prlint reviews');
+        return [];
+      }
+      throw e;
+    }
     return reviews.filter((review) => review.user?.login === this.linterLogin && review.state !== 'DISMISSED');
   }
 
