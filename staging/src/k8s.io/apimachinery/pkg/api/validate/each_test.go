@@ -364,6 +364,179 @@ func testEachMapValRatcheting[K ~string, V any](t *testing.T, name string, old, 
 	})
 }
 
+func TestEachPtrMapVal(t *testing.T) {
+	testEachPtrMapVal(t, "valid", map[string]*int{"one": new(11), "two": new(12), "three": new(13)})
+	testEachPtrMapVal(t, "valid", map[string]*string{"A": new("a"), "B": new("b"), "C": new("c")})
+	testEachPtrMapVal(t, "valid", map[string]*TestStruct{"one": {11, "a"}, "two": {12, "b"}, "three": {13, "c"}})
+
+	testEachPtrMapVal(t, "empty", map[string]*int{})
+	testEachPtrMapVal(t, "empty", map[string]*string{})
+	testEachPtrMapVal(t, "empty", map[string]*TestStruct{})
+
+	testEachPtrMapVal[int](t, "nil", nil)
+	testEachPtrMapVal[string](t, "nil", nil)
+	testEachPtrMapVal[TestStruct](t, "nil", nil)
+
+	t.Run("nil element ignored", func(t *testing.T) {
+		calls := 0
+		vfn := func(ctx context.Context, op operation.Operation, fldPath *field.Path, newVal, oldVal *int) field.ErrorList {
+			calls++
+			return nil
+		}
+		input := map[string]*int{"a": new(1), "b": nil, "c": new(3)}
+		errs := EachPtrMapVal(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, nil, vfn)
+		if len(errs) != 0 {
+			t.Errorf("expected 0 errors, got %d: %v", len(errs), errs)
+		}
+		if calls != 2 {
+			t.Errorf("expected 2 calls, got %d", calls)
+		}
+	})
+}
+
+func testEachPtrMapVal[T any](t *testing.T, name string, input map[string]*T) {
+	t.Helper()
+	var zero T
+	t.Run(fmt.Sprintf("%s(*%T)", name, zero), func(t *testing.T) {
+		calls := 0
+		vfn := func(ctx context.Context, op operation.Operation, fldPath *field.Path, newVal, oldVal *T) field.ErrorList {
+			if oldVal != nil {
+				t.Errorf("expected nil oldVal, got %v", *oldVal)
+			}
+			calls++
+			return nil
+		}
+		errs := EachPtrMapVal(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, nil, vfn)
+		if len(errs) != 0 {
+			t.Errorf("expected 0 errors, got %d: %v", len(errs), errs)
+		}
+		if calls != len(input) {
+			t.Errorf("expected %d calls, got %d", len(input), calls)
+		}
+	})
+}
+
+func TestEachPtrMapValRatcheting(t *testing.T) {
+	testEachPtrMapValRatcheting(t, "primitive same data",
+		map[string]*int{"one": new(11), "two": new(12), "three": new(13)},
+		map[string]*int{"one": new(11), "three": new(13), "two": new(12)},
+		DirectEqual,
+		0,
+	)
+	testEachPtrMapValRatcheting(t, "primitive changed value, exists in old",
+		map[string]*int{"one": new(11), "two": new(12)}, // old
+		map[string]*int{"one": new(11), "two": new(99)}, // new
+		DirectEqual,
+		1,
+	)
+	testEachPtrMapValRatcheting(t, "primitive less data in new, exist in old",
+		map[string]*int{"one": new(11), "two": new(12), "three": new(13)},
+		map[string]*int{"one": new(11), "three": new(13)},
+		DirectEqual,
+		0,
+	)
+	testEachPtrMapValRatcheting(t, "primitive new data, not exist in old",
+		map[string]*int{"one": new(11), "two": new(12)},
+		map[string]*int{"one": new(11), "two": new(12), "three": new(13)},
+		DirectEqual,
+		1,
+	)
+	testEachPtrMapValRatcheting(t, "non comparable value, same data",
+		map[string]*NonComparableStruct{
+			"one":   {I: 11, S: []string{"a"}},
+			"two":   {I: 12, S: []string{"b"}},
+			"three": {I: 13, S: []string{"c"}},
+		},
+		map[string]*NonComparableStruct{
+			"one":   {I: 11, S: []string{"a"}},
+			"three": {I: 13, S: []string{"c"}},
+			"two":   {I: 12, S: []string{"b"}},
+		},
+		SemanticDeepEqual,
+		0,
+	)
+	testEachPtrMapValRatcheting(t, "non comparable value, less data in new, exist in old",
+		map[string]*NonComparableStruct{
+			"one":   {I: 11, S: []string{"a"}},
+			"two":   {I: 12, S: []string{"b"}},
+			"three": {I: 13, S: []string{"c"}},
+		},
+		map[string]*NonComparableStruct{
+			"one":   {I: 11, S: []string{"a"}},
+			"three": {I: 13, S: []string{"c"}},
+		},
+		SemanticDeepEqual,
+		0,
+	)
+	testEachPtrMapValRatcheting(t, "non comparable value, new data, not exist in old",
+		map[string]*NonComparableStruct{
+			"one":   {I: 11, S: []string{"a"}},
+			"two":   {I: 12, S: []string{"b"}},
+			"three": {I: 13, S: []string{"c"}},
+		},
+		map[string]*NonComparableStruct{
+			"one":   {I: 11, S: []string{"a"}},
+			"three": {I: 13, S: []string{"c"}},
+			"two":   {I: 12, S: []string{"b"}},
+			"four":  {I: 14, S: []string{"d"}},
+		},
+		SemanticDeepEqual,
+		1,
+	)
+	testEachPtrMapValRatcheting(t, "struct with pointer field, same value different pointer",
+		map[string]*NonComparableStructWithPtr{
+			"one": {I: 11, P: new(1)},
+			"two": {I: 12, P: new(2)},
+		},
+		map[string]*NonComparableStructWithPtr{
+			"one": {I: 11, P: new(1)},
+			"two": {I: 12, P: new(2)},
+		},
+		SemanticDeepEqual,
+		0,
+	)
+	testEachPtrMapValRatcheting(t, "nil map to empty map",
+		nil,
+		map[string]*int{},
+		DirectEqual,
+		0,
+	)
+	testEachPtrMapValRatcheting(t, "nil map to non-empty map",
+		nil,
+		map[string]*int{"one": new(1)},
+		DirectEqual,
+		1,
+	)
+	testEachPtrMapValRatcheting(t, "empty map to nil map",
+		map[string]*int{},
+		nil,
+		DirectEqual,
+		0,
+	)
+	testEachPtrMapValRatcheting(t, "non-empty map to nil map",
+		map[string]*int{"one": new(1)},
+		nil,
+		DirectEqual,
+		0,
+	)
+}
+
+func testEachPtrMapValRatcheting[K ~string, V any](t *testing.T, name string, old, new map[K]*V, equiv MatchFunc[*V], wantCalls int) {
+	t.Helper()
+	var zero V
+	t.Run(fmt.Sprintf("%s(*%T)", name, zero), func(t *testing.T) {
+		calls := 0
+		vfn := func(ctx context.Context, op operation.Operation, fldPath *field.Path, newVal, oldVal *V) field.ErrorList {
+			calls++
+			return nil
+		}
+		_ = EachPtrMapVal(context.Background(), operation.Operation{Type: operation.Update}, field.NewPath("test"), new, old, equiv, vfn)
+		if calls != wantCalls {
+			t.Errorf("expected %d calls, got %d", wantCalls, calls)
+		}
+	})
+}
+
 type StringType string
 
 func TestEachMapKey(t *testing.T) {
@@ -639,6 +812,33 @@ func TestPtrSliceNoNils(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			errs := PtrSliceNoNils(context.Background(), operation.Operation{}, field.NewPath("test"), tt.input, nil)
+			if len(errs) != tt.wantErrs {
+				t.Errorf("expected %d errors, got %d: %v", tt.wantErrs, len(errs), errs)
+			}
+			for _, err := range errs {
+				if err.Type != field.ErrorTypeRequired {
+					t.Errorf("expected Required error, got %v", err.Type)
+				}
+			}
+		})
+	}
+}
+
+func TestPtrMapNoNils(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    map[string]*int
+		wantErrs int
+	}{
+		{"nil", nil, 0},
+		{"empty", map[string]*int{}, 0},
+		{"no_nil", map[string]*int{"a": new(1), "b": new(2)}, 0},
+		{"has_nil", map[string]*int{"a": new(1), "b": nil, "c": new(3), "d": nil}, 2},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := PtrMapNoNils(context.Background(), operation.Operation{}, field.NewPath("test"), tt.input, nil)
 			if len(errs) != tt.wantErrs {
 				t.Errorf("expected %d errors, got %d: %v", tt.wantErrs, len(errs), errs)
 			}

@@ -163,5 +163,91 @@ func Validate_Struct(
 	}
 
 	// field Struct.UnvalidatedMapField has no validation
+
+	{ // field Struct.MapPtrField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj map[string]*OtherStruct,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.PtrMapNoNils[string, OtherStruct](ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapPtrField"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.EachPtrMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherStruct) field.ErrorList {
+					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapPtrField[*]")
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the map and call the value type's validation function
+			if e := validate.EachPtrMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, Validate_OtherStruct); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) map[string]*OtherStruct {
+				return oldObj.MapPtrField
+			})
+		errs = append(errs, fn(fldPath.Child("mapPtrField"), obj.MapPtrField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field Struct.MapPtrTypedefField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj map[string]*OtherTypedefStruct,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.PtrMapNoNils[string, OtherTypedefStruct](ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapPtrTypedefField"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.EachPtrMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherTypedefStruct) field.ErrorList {
+					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapPtrTypedefField[*]")
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the map and call the value type's validation function
+			if e := validate.EachPtrMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, Validate_OtherTypedefStruct); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) map[string]*OtherTypedefStruct {
+				return oldObj.MapPtrTypedefField
+			})
+		errs = append(errs, fn(fldPath.Child("mapPtrTypedefField"), obj.MapPtrTypedefField, oldVal, oldObj != nil)...)
+	}
+
+	// field Struct.UnvalidatedMapPtrField has no validation
 	return errs
 }

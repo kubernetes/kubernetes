@@ -163,6 +163,36 @@ func EachMapVal[K ~string, V any](ctx context.Context, op operation.Operation, f
 	return errs
 }
 
+// EachPtrMapVal validates each value in newMap (which is a map of pointers)
+// using the specified validation function, passing the corresponding old value
+// from oldMap if the key exists in oldMap.
+// For update operations, it implements validation ratcheting by skipping validation
+// when the old value exists and the equiv function confirms the values are equivalent.
+//
+// The equiv function will never be called with nil arguments.
+//
+// If equiv is nil, value-based ratcheting is disabled and all values will be validated.
+func EachPtrMapVal[K ~string, V any](ctx context.Context, op operation.Operation, fldPath *field.Path, newMap, oldMap map[K]*V,
+	equiv MatchFunc[*V], validator ValidateFunc[*V]) field.ErrorList {
+	var errs field.ErrorList
+	for key, val := range newMap {
+		if val == nil {
+			// Ignore nil items; they are supposed to have been checked by PtrMapNoNils.
+			continue
+		}
+
+		old := oldMap[key]
+
+		// If the operation is an update, for validation ratcheting, skip re-validating if the old
+		// value is found and the equiv function confirms the values are equivalent.
+		if op.Type == operation.Update && old != nil && equiv != nil && equiv(val, old) {
+			continue
+		}
+		errs = append(errs, validator(ctx, op, fldPath.Key(string(key)), val, old)...)
+	}
+	return errs
+}
+
 // EachMapKey validates each element of newMap with the specified
 // validation function.
 func EachMapKey[K ~string, T any](ctx context.Context, op operation.Operation, fldPath *field.Path, newMap, oldMap map[K]T,
@@ -286,6 +316,17 @@ func PtrSliceNoNils[T any](_ context.Context, _ operation.Operation, fldPath *fi
 	for i := range newSlice {
 		if newSlice[i] == nil {
 			errs = append(errs, field.Required(fldPath.Index(i), ""))
+		}
+	}
+	return
+}
+
+// PtrMapNoNils returns a Required error for each nil element in a map of
+// pointers.
+func PtrMapNoNils[K ~string, V any](_ context.Context, _ operation.Operation, fldPath *field.Path, newMap, _ map[K]*V) (errs field.ErrorList) {
+	for key, val := range newMap {
+		if val == nil {
+			errs = append(errs, field.Required(fldPath.Key(string(key)), ""))
 		}
 	}
 	return
