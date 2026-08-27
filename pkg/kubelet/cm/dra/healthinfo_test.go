@@ -85,6 +85,45 @@ func TestNewHealthInfoCache(t *testing.T) {
 	}
 }
 
+// TestNewHealthInfoCacheCorruptCheckpoint verifies that a checkpoint which
+// decodes to a nil map — at the top level or inside a driver entry — does not
+// leave the cache with a nil map. Without this guarantee, the first
+// updateHealthInfo call would panic in the health goroutine with
+// "assignment to entry in nil map".
+func TestNewHealthInfoCacheCorruptCheckpoint(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	tests := []struct {
+		description string
+		contents    string
+	}{
+		{description: "json null", contents: "null"},
+		{description: "nil driver devices", contents: fmt.Sprintf(`{"%s":{"Devices":null}}`, testDriver)},
+		{description: "torn write", contents: `{"driver": {"Devices`},
+		{description: "empty file", contents: ""},
+		{description: "garbage", contents: "not json"},
+	}
+	for _, test := range tests {
+		t.Run(test.description, func(t *testing.T) {
+			stateFile := path.Join(t.TempDir(), "health_checkpoint")
+			require.NoError(t, os.WriteFile(stateFile, []byte(test.contents), 0o600))
+
+			cache, err := newHealthInfoCache(logger, stateFile)
+			require.NoError(t, err)
+			require.NotNil(t, cache)
+			require.NotNil(t, cache.HealthInfo)
+			require.NotNil(t, *cache.HealthInfo, "top-level map must not be nil after loading a corrupt checkpoint")
+			for name, driver := range *cache.HealthInfo {
+				require.NotNil(t, driver.Devices, "Devices map for driver %q must not be nil after loading a corrupt checkpoint", name)
+			}
+
+			// A follow-up update must not panic on a nil map.
+			_, err = cache.updateHealthInfo(logger, testDriver, []state.DeviceHealth{testDeviceHealth})
+			require.NoError(t, err)
+			assert.Equal(t, state.DeviceHealthStatusHealthy, cache.getHealthInfo(testDriver, testPool, testDevice).Health)
+		})
+	}
+}
+
 // Helper function to compare DeviceHealth slices ignoring LastUpdated time
 func assertDeviceHealthElementsMatchIgnoreTime(t *testing.T, expected, actual []state.DeviceHealth) {
 	require.Len(t, actual, len(expected), "Number of changed devices mismatch")
