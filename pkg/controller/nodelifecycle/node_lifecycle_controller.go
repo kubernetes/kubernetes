@@ -844,7 +844,11 @@ func isNodeExcludedFromDisruptionChecks(node *v1.Node) bool {
 func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (time.Duration, v1.NodeCondition, *v1.NodeCondition, error) {
 	nodeHealth := nc.nodeHealthMap.getDeepCopy(node.Name)
 	defer func() {
-		nc.nodeHealthMap.set(node.Name, nodeHealth)
+		// Don't store an explicit nil for a Node that has no entry yet, e.g.
+		// when the short circuit below returns before health data is built.
+		if nodeHealth != nil {
+			nc.nodeHealthMap.set(node.Name, nodeHealth)
+		}
 	}()
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeControllerLeaseCircuitBreaker) {
@@ -1112,6 +1116,11 @@ func (nc *Controller) handleDisruption(ctx context.Context, zoneToNodeConditions
 			now := nc.now()
 			for i := range nodes {
 				v := nc.nodeHealthMap.getDeepCopy(nodes[i].Name)
+				if v == nil {
+					// No health data yet for this Node; it will be built on
+					// the next successful monitoring cycle.
+					continue
+				}
 				v.probeTimestamp = now
 				v.readyTransitionTimestamp = now
 				nc.nodeHealthMap.set(nodes[i].Name, v)
