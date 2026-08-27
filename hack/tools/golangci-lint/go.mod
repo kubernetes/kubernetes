@@ -220,3 +220,5 @@ require (
 	mvdan.cc/unparam v0.0.0-20260823230713-2fa3d841b0c8 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
+
+replace sigs.k8s.io/logtools => github.com/pohly/logtools v0.0.0-20260827112725-bf8a033b0764
