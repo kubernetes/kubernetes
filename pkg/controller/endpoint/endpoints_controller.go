@@ -458,8 +458,9 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 		}
 		currentEndpoints = &v1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:   service.Name,
-				Labels: service.Labels,
+				Name:      service.Name,
+				Namespace: service.Namespace,
+				Labels:    service.Labels,
 			},
 		}
 	} else if e.staleEndpointsTracker.IsStale(currentEndpoints) {
