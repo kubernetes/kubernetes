@@ -39,7 +39,13 @@ import (
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-// ExtractPodNodeAllocatableResourceClaimStatus returns the pod nodeAllocatable claim status stored in state
+// ExtractPodNodeAllocatableResourceClaimStatus returns a copy of the node-allocatable
+// claim status stored in state for the given node.
+//
+// A copy is required because assume() assigns the result onto the cached pod.
+// Sharing the cycle-state slice would make later in-place updates (replacing the
+// extended-resource placeholder claim name) silently mutate the scheduler cache
+// and would make the DeepEqual check in patchNodeAllocatableResourceClaimStatus a no-op.
 func ExtractPodNodeAllocatableResourceClaimStatus(logger klog.Logger, state fwk.CycleState, nodeName string) []v1.NodeAllocatableResourceClaimStatus {
 	s, err := state.Read(names.DynamicResources)
 	if err != nil {
@@ -54,10 +60,21 @@ func ExtractPodNodeAllocatableResourceClaimStatus(logger klog.Logger, state fwk.
 	}
 
 	if nodeAlloc, exists := draState.nodeAllocations[nodeName]; exists {
-		return nodeAlloc.nodeAllocatableResourceClaimStatuses
+		return cloneNodeAllocatableResourceClaimStatuses(nodeAlloc.nodeAllocatableResourceClaimStatuses)
 	}
 
 	return nil
+}
+
+func cloneNodeAllocatableResourceClaimStatuses(in []v1.NodeAllocatableResourceClaimStatus) []v1.NodeAllocatableResourceClaimStatus {
+	if in == nil {
+		return nil
+	}
+	out := make([]v1.NodeAllocatableResourceClaimStatus, len(in))
+	for i := range in {
+		in[i].DeepCopyInto(&out[i])
+	}
+	return out
 }
 
 // calculateAndCheckNodeAllocatableResources calculates the total node-allocatable resources (e.g., CPU, memory)
@@ -607,7 +624,27 @@ func (pl *DynamicResources) nodeFitsResources(nodeInfo fwk.NodeInfo, podRequest 
 	return nil
 }
 
-func (pl *DynamicResources) patchNodeAllocatableResourceClaimStatus(ctx context.Context, pod *v1.Pod, nodeAllocatableClaimStatus []v1.NodeAllocatableResourceClaimStatus) *fwk.Status {
+// replaceSpecialClaimNameInStatus rewrites the in-memory placeholder claim name
+// specialClaimInMemName ("<extended-resources>") in the given node-allocatable
+// statuses to the actual name of the extended-resource ResourceClaim created in
+// the API server during PreBind.
+//
+// It is a no-op when there is no extended-resource claim (extendedClaim == nil)
+// or the claim has not yet been created in the API server (its name is still a
+// special claim name). Statuses that do not carry the placeholder name are left
+// untouched. The statuses slice is mutated in place.
+func replaceSpecialClaimNameInStatus(extendedClaim *resourceapi.ResourceClaim, statuses []v1.NodeAllocatableResourceClaimStatus) {
+	if extendedClaim == nil || isSpecialClaimName(extendedClaim.Name) {
+		return
+	}
+	for i := range statuses {
+		if statuses[i].ResourceClaimName == specialClaimInMemName {
+			statuses[i].ResourceClaimName = extendedClaim.Name
+		}
+	}
+}
+
+func (pl *DynamicResources) patchNodeAllocatableResourceClaimStatus(ctx context.Context, pod *v1.Pod, nodeAllocatableClaimStatus []v1.NodeAllocatableResourceClaimStatus, extendedClaim *resourceapi.ResourceClaim) *fwk.Status {
 
 	if len(nodeAllocatableClaimStatus) == 0 {
 		return nil
@@ -623,6 +660,15 @@ func (pl *DynamicResources) patchNodeAllocatableResourceClaimStatus(ctx context.
 		logger.V(5).Info("NodeAllocatableResourceClaimStatuses difference: assumed pod status does not match calculated status", "pod", klog.KObj(pod))
 		return statusError(logger, errors.New("assumed pod status does not match calculated status to be patched"))
 	}
+
+	// After bindClaim, the in-memory placeholder "<extended-resources>" must be
+	// replaced with the real claim name before the status is persisted. This
+	// must run after the DeepEqual check: assume() copied the Filter-time
+	// status (still using the placeholder) onto the cached pod, so comparing
+	// after the rename would fail even when the assumed and calculated
+	// allocations match.
+	replaceSpecialClaimNameInStatus(extendedClaim, nodeAllocatableClaimStatus)
+
 	baseStatus.NodeAllocatableResourceClaimStatuses = nil
 
 	targetStatus := pod.Status.DeepCopy()
