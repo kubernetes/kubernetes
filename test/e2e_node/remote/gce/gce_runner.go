@@ -201,7 +201,8 @@ func (g *GCERunner) getGCEImage(imageRegex, imageFamily string, project string) 
 
 // gceImageListArgs returns the gcloud arguments to list candidate images.
 func gceImageListArgs(project, imageFamily string) []string {
-	args := []string{"compute", "images", "list", "--format=json", "--project=" + project}
+	// Print only the fields pickNewestImage reads, so the runner buffers less.
+	args := []string{"compute", "images", "list", "--format=json(name,family,creationTimestamp)", "--project=" + project}
 	if imageFamily != "" {
 		// Narrow to the family so gcloud does not return the whole project.
 		// For large projects that can take a long time and consume significant

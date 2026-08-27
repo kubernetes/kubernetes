@@ -17,6 +17,7 @@ limitations under the License.
 package gce
 
 import (
+	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
@@ -121,12 +122,12 @@ func TestGCEImageListArgs(t *testing.T) {
 			name:        "a family adds a server-side filter",
 			project:     "proj",
 			imageFamily: "fam",
-			want:        []string{"compute", "images", "list", "--format=json", "--project=proj", "--filter=family=fam"},
+			want:        []string{"compute", "images", "list", "--format=json(name,family,creationTimestamp)", "--project=proj", "--filter=family=fam"},
 		},
 		{
 			name:    "no family adds no filter",
 			project: "proj",
-			want:    []string{"compute", "images", "list", "--format=json", "--project=proj"},
+			want:    []string{"compute", "images", "list", "--format=json(name,family,creationTimestamp)", "--project=proj"},
 		},
 	}
 	for _, tc := range tests {
@@ -135,5 +136,22 @@ func TestGCEImageListArgs(t *testing.T) {
 				t.Errorf("gceImageListArgs() = %q, want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestProjectedGCEImageJSON(t *testing.T) {
+	// The --format keys in gceImageListArgs must match gceImage's json tags,
+	// or the runner would decode empty image data.
+	data := []byte(`[{"name":"ubuntu-x","family":"pipeline-1-34-amd64","creationTimestamp":"2026-08-27T00:00:00Z"}]`)
+	var images []gceImage
+	if err := json.Unmarshal(data, &images); err != nil {
+		t.Fatalf("json.Unmarshal() unexpected error: %v", err)
+	}
+	if len(images) != 1 {
+		t.Fatalf("decoded %d images, want 1", len(images))
+	}
+	got := images[0]
+	if got.Name != "ubuntu-x" || got.Family != "pipeline-1-34-amd64" || got.CreationTimestamp != "2026-08-27T00:00:00Z" {
+		t.Errorf("decoded %+v, want name, family, and creationTimestamp populated", got)
 	}
 }
