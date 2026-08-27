@@ -223,3 +223,5 @@ require (
 	sigs.k8s.io/logtools v0.10.1 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
+
+replace sigs.k8s.io/logtools => github.com/pohly/logtools v0.0.0-20260827112725-bf8a033b0764

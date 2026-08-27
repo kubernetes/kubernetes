@@ -321,6 +321,8 @@ github.com/pelletier/go-toml/v2 v2.2.4/go.mod h1:2gIqNv+qfxSVS7cM2xJQKtLSTLUE9V8
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRIccs7FGNTlIRMkT8wgtp5eCXdBlqhYGL6U=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
+github.com/pohly/logtools v0.0.0-20260827112725-bf8a033b0764 h1:wpplOg89COqLhYBMezBa33HwK5wbUA75MU3HnK60b5I=
+github.com/pohly/logtools v0.0.0-20260827112725-bf8a033b0764/go.mod h1:nkFoZEUa/k2zgFzO0CNNgl86ufV69OXqLbuWHpv0ZnA=
 github.com/prometheus/client_golang v1.23.2 h1:Je96obch5RDVy3FDMndoUsjAhG5Edi49h0RJWRi/o0o=
 github.com/prometheus/client_golang v1.23.2/go.mod h1:Tb1a6LWHB3/SPIzCoaDXI4I8UHKeFTEQ1YCr+0Gyqmg=
 github.com/prometheus/client_model v0.6.2 h1:oBsgwpGs7iVziMvrGhE53c/GrLUsZdHnqNwqPLxwZyk=
@@ -570,7 +572,5 @@ mvdan.cc/unparam v0.0.0-20251027182757-5beb8c8f8f15 h1:ssMzja7PDPJV8FStj7hq9IKiu
 mvdan.cc/unparam v0.0.0-20251027182757-5beb8c8f8f15/go.mod h1:4M5MMXl2kW6fivUT6yRGpLLPNfuGtU2Z0cPvFquGDYU=
 sigs.k8s.io/kube-api-linter v0.0.0-20260716143926-092fe0c72997 h1:u5/qbXZq7YIrurEE6HiJKtjQ9ILcFPJJSHNY0Q1ZRhU=
 sigs.k8s.io/kube-api-linter v0.0.0-20260716143926-092fe0c72997/go.mod h1:5mP60UakkCye+eOcZ5p98VnV2O49qreW1gq9TdsUf7Q=
-sigs.k8s.io/logtools v0.10.1 h1:uerGjWqOnlFXjNARkbrWjSYsjC6RSKDvhwcN2rEMdaM=
-sigs.k8s.io/logtools v0.10.1/go.mod h1:nkFoZEUa/k2zgFzO0CNNgl86ufV69OXqLbuWHpv0ZnA=
 sigs.k8s.io/yaml v1.4.0 h1:Mk1wCc2gy/F0THH0TAp1QYyJNzRm2KCLy3o5ASXVI5E=
 sigs.k8s.io/yaml v1.4.0/go.mod h1:Ejl7/uTz7PSA4eKMyQCUTnhZYNmLIl+5c2lQPGR2BPY=

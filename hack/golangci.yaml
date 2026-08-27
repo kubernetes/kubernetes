@@ -350,6 +350,13 @@ linters:
             # those packages that were migrated. This disables the check for other files.
             -structured .*
             
+            # If contextual logging is checked, then also check that calls accepting
+            # a logger through a config struct get that logger. Off by default because
+            # it could have false positives, but in Kubernetes it works okay.
+            # Still disabled in tests because several old tests don't use contextual logging.
+            logger-constructor .*
+            -logger-constructor .*_test.go
+            
             # Now enable it again for migrated packages.
             structured k8s.io/kubernetes/pkg/kubelet/.*
             structured k8s.io/kubernetes/pkg/proxy/.*
