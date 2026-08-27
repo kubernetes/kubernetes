@@ -34,6 +34,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	"k8s.io/klog/v2/ktesting"
@@ -379,7 +380,7 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 	client := fake.NewClientset(deviceClass1, podImplicit, podExplicit, podHybrid, podNilStatus, podInit)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	deviceclassmapping := extendedresourcecache.NewExtendedResourceCache(logger)
-	if _, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(deviceclassmapping); err != nil {
+	if _, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandlerWithOptions(deviceclassmapping, cache.HandlerOptions{Logger: &logger}); err != nil {
 		t.Fatal(err)
 	}
 	var otherOwnedClaims []*resourceapi.ResourceClaim
@@ -644,7 +645,7 @@ func TestResourceClaimEvaluatorMatchingResources(t *testing.T) {
 	client := fake.NewClientset(deviceClass1)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	deviceclassmapping := extendedresourcecache.NewExtendedResourceCache(logger)
-	if _, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(deviceclassmapping); err != nil {
+	if _, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandlerWithOptions(deviceclassmapping, cache.HandlerOptions{Logger: &logger}); err != nil {
 		logger.Error(err, "failed to add device class informer event handler")
 	}
 	evaluator := NewResourceClaimEvaluator(nil, deviceclassmapping, informerFactory.Core().V1().Pods().Lister(), nil)

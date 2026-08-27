@@ -54,6 +54,7 @@ const (
 // potential changes to resolved ResourceSlices asynchronously.
 type Tracker struct {
 	enableDeviceTaintRules bool
+	logger                 klog.Logger
 
 	resourceSliceLister   resourcelisters.ResourceSliceLister
 	resourceSlices        resourceinformers.ResourceSliceIndexInformer
@@ -127,6 +128,7 @@ func StartTracker(ctx context.Context, opts Options) (finalT *Tracker, finalErr 
 	if !opts.EnableDeviceTaintRules {
 		// Minimal wrapper. All public methods shortcut by calling the underlying informer.
 		return &Tracker{
+			logger:              klog.FromContext(ctx),
 			resourceSliceLister: opts.SliceInformer.Lister(),
 			resourceSlices:      opts.SliceInformer.TypedInformer(),
 		}, nil
@@ -152,6 +154,7 @@ func StartTracker(ctx context.Context, opts Options) (finalT *Tracker, finalErr 
 func newTracker(ctx context.Context, opts Options) (finalT *Tracker, finalErr error) {
 	t := &Tracker{
 		enableDeviceTaintRules: opts.EnableDeviceTaintRules,
+		logger:                 klog.FromContext(ctx),
 		resourceSliceLister:    opts.SliceInformer.Lister(),
 		resourceSlices:         opts.SliceInformer.TypedInformer(),
 		deviceTaints:           opts.TaintInformer.TypedInformer(),
@@ -293,7 +296,7 @@ func (t *Tracker) ListPatchedResourceSlices() ([]*resourceapi.ResourceSlice, err
 // before this method returns.
 func (t *Tracker) AddEventHandler(handler cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error) {
 	if !t.enableDeviceTaintRules {
-		return t.resourceSlices.AddEventHandler(handler)
+		return t.resourceSlices.AddEventHandlerWithOptions(handler, cache.HandlerOptions{Logger: &t.logger})
 	}
 
 	defer t.emitEvents()

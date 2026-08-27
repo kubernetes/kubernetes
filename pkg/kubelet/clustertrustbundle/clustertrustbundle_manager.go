@@ -165,7 +165,7 @@ func newInformerManager[T clusterTrustBundle](ctx context.Context, handlers clus
 	logger := klog.FromContext(ctx)
 	// Have the informer bust cache entries when it sees updates that could
 	// apply to them.
-	_, err := m.ctbInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := m.ctbInformer.AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			ctb, ok := obj.(*T)
 			if !ok {
@@ -197,7 +197,7 @@ func newInformerManager[T clusterTrustBundle](ctx context.Context, handlers clus
 			logger.Info("Dropping cache for ClusterTrustBundle", "signerName", m.ctbHandlers.GetSignerName(ctb))
 			m.dropCacheFor(ctb)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	if err != nil {
 		return nil, fmt.Errorf("while registering event handler on informer: %w", err)
 	}

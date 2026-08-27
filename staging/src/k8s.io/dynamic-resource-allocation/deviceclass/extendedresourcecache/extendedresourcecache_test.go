@@ -725,7 +725,7 @@ func setup(t *testing.T) (context.Context, *fake.Clientset, *ExtendedResourceCac
 	client := fake.NewClientset()
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	ec := NewExtendedResourceCache(logger)
-	handle, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(ec)
+	handle, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandlerWithOptions(ec, clientcache.HandlerOptions{Logger: &logger})
 	if err != nil {
 		t.Fatalf("failed to add device class informer event handler: %v", err)
 	}

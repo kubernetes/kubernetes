@@ -78,7 +78,10 @@ func NewCustomResourceController(
 		crdClient:  crdClient,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[metav1.GroupResource](),
-			workqueue.TypedRateLimitingQueueConfig[metav1.GroupResource]{Name: ResourceVersionControllerName},
+			workqueue.TypedRateLimitingQueueConfig[metav1.GroupResource]{
+				Logger: new(klog.FromContext(ctx)),
+				Name:   ResourceVersionControllerName,
+			},
 		),
 	}
 

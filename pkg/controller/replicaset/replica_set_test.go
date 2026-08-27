@@ -879,7 +879,7 @@ func TestControllerUpdateRequeue(t *testing.T) {
 	manager.podControl = &fakePodControl
 
 	// Enqueue once. Then process it. Disable rate-limiting for this.
-	manager.queue = workqueue.NewTypedRateLimitingQueue(workqueue.NewTypedMaxOfRateLimiter[string]())
+	manager.queue = workqueue.NewTypedRateLimitingQueue(workqueue.NewTypedMaxOfRateLimiter[string]()) //nolint:logcheck // Intentionally testing old API here.
 	manager.enqueueRS(rs)
 	manager.processNextWorkItem(ctx)
 	// It should have been requeued.

@@ -98,7 +98,7 @@ func runTestReflectorDataConsistencyDetector(t *testing.T, transformer Transform
 		},
 	}
 
-	r := NewReflector(lw, &v1.Pod{}, fifo, 0)
+	r := NewReflector(lw, &v1.Pod{}, fifo, 0) //nolint:logcheck // Intentionally testing old API here.
 
 	go func() {
 		_ = wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {

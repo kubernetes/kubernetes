@@ -39,6 +39,7 @@ import (
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controlplane/apiserver"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -66,13 +67,12 @@ func TestSingleLeaseCandidate(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			tCtx := ktesting.Init(t)
 
-			cletest := setupCLE(config, ctx, t)
+			cletest := setupCLE(config, tCtx, t)
 			defer cletest.cleanup()
-			go cletest.createAndRunFakeController("foo1", "default", "foo", "1.20.0", "1.20.0", tc.preferredStrategy)
-			cletest.pollForLease(ctx, "foo", "default", tc.expectedHolderIdentity)
+			go cletest.createAndRunFakeController(tCtx.Logger(), "foo1", "default", "foo", "1.20.0", "1.20.0", tc.preferredStrategy)
+			cletest.pollForLease(tCtx, "foo", "default", tc.expectedHolderIdentity)
 		})
 	}
 }
@@ -105,13 +105,12 @@ func TestSingleLeaseCandidateUsingThirdPartyStrategy(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			tCtx := ktesting.Init(t)
 
-			cletest := setupCLE(config, ctx, t)
+			cletest := setupCLE(config, tCtx, t)
 			defer cletest.cleanup()
-			go cletest.createAndRunFakeController("foo1", "default", "foo", "1.20.0", "1.20.0", tc.preferredStrategy)
-			cletest.pollForLease(ctx, "foo", "default", tc.expectedHolderIdentity)
+			go cletest.createAndRunFakeController(tCtx.Logger(), "foo1", "default", "foo", "1.20.0", "1.20.0", tc.preferredStrategy)
+			cletest.pollForLease(tCtx, "foo", "default", tc.expectedHolderIdentity)
 		})
 	}
 }
@@ -143,16 +142,15 @@ func TestMultipleLeaseCandidate(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			tCtx := ktesting.Init(t)
 
-			cletest := setupCLE(config, ctx, t)
+			cletest := setupCLE(config, tCtx, t)
 			defer cletest.cleanup()
-			go cletest.createAndRunFakeController("baz1", "default", "baz", "1.20.0", "1.20.0", tc.preferredStrategy)
-			go cletest.createAndRunFakeController("baz2", "default", "baz", "1.20.0", "1.19.0", tc.preferredStrategy)
-			go cletest.createAndRunFakeController("baz3", "default", "baz", "1.19.0", "1.19.0", tc.preferredStrategy)
-			go cletest.createAndRunFakeController("baz4", "default", "baz", "1.20.0", "1.19.0", tc.preferredStrategy)
-			cletest.pollForLease(ctx, "baz", "default", tc.expectedHolderIdentity)
+			go cletest.createAndRunFakeController(tCtx.Logger().WithName("baz1"), "baz1", "default", "baz", "1.20.0", "1.20.0", tc.preferredStrategy)
+			go cletest.createAndRunFakeController(tCtx.Logger().WithName("baz2"), "baz2", "default", "baz", "1.20.0", "1.19.0", tc.preferredStrategy)
+			go cletest.createAndRunFakeController(tCtx.Logger().WithName("baz3"), "baz3", "default", "baz", "1.19.0", "1.19.0", tc.preferredStrategy)
+			go cletest.createAndRunFakeController(tCtx.Logger().WithName("baz4"), "baz4", "default", "baz", "1.20.0", "1.19.0", tc.preferredStrategy)
+			cletest.pollForLease(tCtx, "baz", "default", tc.expectedHolderIdentity)
 		})
 	}
 }
@@ -186,22 +184,22 @@ func TestMultipleLeaseCandidateUsingThirdPartyStrategy(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			tCtx := ktesting.Init(t)
 
-			cletest := setupCLE(config, ctx, t)
+			cletest := setupCLE(config, tCtx, t)
 			defer cletest.cleanup()
-			go cletest.createAndRunFakeController("baz1", "default", "baz", "1.20.0", "1.20.0", tc.preferredStrategy)
-			go cletest.createAndRunFakeController("baz2", "default", "baz", "1.20.0", "1.19.0", tc.preferredStrategy)
-			go cletest.createAndRunFakeController("baz3", "default", "baz", "1.19.0", "1.19.0", tc.preferredStrategy)
-			go cletest.createAndRunFakeController("baz4", "default", "baz", "1.2.0", "1.19.0", tc.preferredStrategy)
-			go cletest.createAndRunFakeController("baz5", "default", "baz", "1.20.0", "1.19.0", tc.preferredStrategy)
-			cletest.pollForLease(ctx, "baz", "default", tc.expectedHolderIdentity)
+			go cletest.createAndRunFakeController(tCtx.Logger().WithName("baz1"), "baz1", "default", "baz", "1.20.0", "1.20.0", tc.preferredStrategy)
+			go cletest.createAndRunFakeController(tCtx.Logger().WithName("baz2"), "baz2", "default", "baz", "1.20.0", "1.19.0", tc.preferredStrategy)
+			go cletest.createAndRunFakeController(tCtx.Logger().WithName("baz3"), "baz3", "default", "baz", "1.19.0", "1.19.0", tc.preferredStrategy)
+			go cletest.createAndRunFakeController(tCtx.Logger().WithName("baz4"), "baz4", "default", "baz", "1.2.0", "1.19.0", tc.preferredStrategy)
+			go cletest.createAndRunFakeController(tCtx.Logger().WithName("baz5"), "baz5", "default", "baz", "1.20.0", "1.19.0", tc.preferredStrategy)
+			cletest.pollForLease(tCtx, "baz", "default", tc.expectedHolderIdentity)
 		})
 	}
 }
 
 func TestLeaseSwapIfBetterAvailable(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 
 	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
@@ -212,19 +210,18 @@ func TestLeaseSwapIfBetterAvailable(t *testing.T) {
 	defer server.TearDownFn()
 	config := server.ClientConfig
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	cletest := setupCLE(config, ctx, t)
+	cletest := setupCLE(config, tCtx, t)
 	defer cletest.cleanup()
 
-	go cletest.createAndRunFakeController("bar1", "default", "bar", "1.20.0", "1.20.0", v1.OldestEmulationVersion)
-	cletest.pollForLease(ctx, "bar", "default", ptr.To("bar1"))
-	go cletest.createAndRunFakeController("bar2", "default", "bar", "1.19.0", "1.19.0", v1.OldestEmulationVersion)
-	cletest.pollForLease(ctx, "bar", "default", ptr.To("bar2"))
+	go cletest.createAndRunFakeController(tCtx.Logger().WithName("bar1"), "bar1", "default", "bar", "1.20.0", "1.20.0", v1.OldestEmulationVersion)
+	cletest.pollForLease(tCtx, "bar", "default", new("bar1"))
+	go cletest.createAndRunFakeController(tCtx.Logger().WithName("bar2"), "bar2", "default", "bar", "1.19.0", "1.19.0", v1.OldestEmulationVersion)
+	cletest.pollForLease(tCtx, "bar", "default", new("bar2"))
 }
 
 // TestUpgradeSkew tests that a legacy client and a CLE aware client operating on the same lease do not cause errors
 func TestUpgradeSkew(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 
 	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
@@ -235,18 +232,16 @@ func TestUpgradeSkew(t *testing.T) {
 	defer server.TearDownFn()
 	config := server.ClientConfig
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	cletest := setupCLE(config, ctx, t)
+	cletest := setupCLE(config, tCtx, t)
 	defer cletest.cleanup()
 
 	go cletest.createAndRunFakeLegacyController("foo1-130", "default", "foobar")
-	cletest.pollForLease(ctx, "foobar", "default", ptr.To("foo1-130"))
-	go cletest.createAndRunFakeController("foo1-131", "default", "foobar", "1.31.0", "1.31.0", v1.OldestEmulationVersion)
+	cletest.pollForLease(tCtx, "foobar", "default", new("foo1-130"))
+	go cletest.createAndRunFakeController(tCtx.Logger().WithName("foo1-131"), "foo1-131", "default", "foobar", "1.31.0", "1.31.0", v1.OldestEmulationVersion)
 	// running a new controller should not kick off old leader
-	cletest.pollForLease(ctx, "foobar", "default", ptr.To("foo1-130"))
+	cletest.pollForLease(tCtx, "foobar", "default", new("foo1-130"))
 	cletest.cancelController("foo1-130", "default")
-	cletest.pollForLease(ctx, "foobar", "default", ptr.To("foo1-131"))
+	cletest.pollForLease(tCtx, "foobar", "default", new("foo1-131"))
 }
 
 func TestLeaseCandidateCleanup(t *testing.T) {
@@ -335,8 +330,8 @@ func (t *cleTest) createAndRunFakeLegacyController(name string, namespace string
 		})
 
 }
-func (t *cleTest) createAndRunFakeController(name string, namespace string, targetLease string, binaryVersion string, compatibilityVersion string, preferredStrategy v1.CoordinatedLeaseStrategy) {
-	identityLease, _, err := leaderelection.NewCandidate(
+func (t *cleTest) createAndRunFakeController(logger klog.Logger, name string, namespace string, targetLease string, binaryVersion string, compatibilityVersion string, preferredStrategy v1.CoordinatedLeaseStrategy) {
+	identityLease, _, err := leaderelection.NewCandidateWithConfig(
 		t.clientset,
 		namespace,
 		name,
@@ -344,12 +339,14 @@ func (t *cleTest) createAndRunFakeController(name string, namespace string, targ
 		binaryVersion,
 		compatibilityVersion,
 		preferredStrategy,
+		leaderelection.CandidateConfig{Logger: new(logger)},
 	)
 	if err != nil {
 		t.t.Error(err)
 	}
 
 	ctx, cancel := context.WithCancel(t.ctx)
+	ctx = klog.NewContext(ctx, logger)
 	t.mu.Lock()
 	t.ctxList[name+"/"+namespace] = ctxCancelPair{ctx, cancel}
 	t.mu.Unlock()

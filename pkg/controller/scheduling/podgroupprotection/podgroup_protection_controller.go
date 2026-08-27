@@ -80,7 +80,10 @@ func NewPodGroupProtectionController(
 		podSynced:      podInformer.Informer().HasSynced,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "podgroupprotection"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
+				Name:   "podgroupprotection",
+			},
 		),
 	}
 

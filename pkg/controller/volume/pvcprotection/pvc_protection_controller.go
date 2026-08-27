@@ -127,7 +127,10 @@ func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.Pe
 		client: cl,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "pvcprotection"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
+				Name:   "pvcprotection",
+			},
 		),
 		pvcProcessingStore: NewPVCProcessingStore(),
 	}

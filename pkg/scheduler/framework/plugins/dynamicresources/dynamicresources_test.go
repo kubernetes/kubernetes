@@ -4629,8 +4629,10 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 
 	tc.draManager = NewDRAManager(tCtx, claimsCache, resourceSliceTracker, tc.informerFactory)
 	if features.EnableDRAExtendedResource {
-		cache := tc.draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
-		deviceClassHandlerRegistration, err := tc.informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(cache)
+		logger := tCtx.Logger()
+		handlerOptions := cache.HandlerOptions{Logger: &logger}
+		deviceClassCache := tc.draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
+		deviceClassHandlerRegistration, err := tc.informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandlerWithOptions(deviceClassCache, handlerOptions)
 		require.NoError(tCtx, err, "failed to add device class informer event handler")
 		doneCheckers = append(doneCheckers, deviceClassHandlerRegistration.HasSyncedChecker())
 	}

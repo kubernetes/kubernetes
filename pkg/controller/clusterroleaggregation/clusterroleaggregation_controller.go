@@ -53,7 +53,7 @@ type ClusterRoleAggregationController struct {
 }
 
 // NewClusterRoleAggregation creates a new controller
-func NewClusterRoleAggregation(clusterRoleInformer rbacinformers.ClusterRoleInformer, clusterRoleClient rbacclient.ClusterRolesGetter) *ClusterRoleAggregationController {
+func NewClusterRoleAggregation(logger klog.Logger, clusterRoleInformer rbacinformers.ClusterRoleInformer, clusterRoleClient rbacclient.ClusterRolesGetter) *ClusterRoleAggregationController {
 	c := &ClusterRoleAggregationController{
 		clusterRoleClient:  clusterRoleClient,
 		clusterRoleLister:  clusterRoleInformer.Lister(),
@@ -62,13 +62,14 @@ func NewClusterRoleAggregation(clusterRoleInformer rbacinformers.ClusterRoleInfo
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: "ClusterRoleAggregator",
+				Logger: &logger,
+				Name:   "ClusterRoleAggregator",
 			},
 		),
 	}
 	c.syncHandler = c.syncClusterRole
 
-	clusterRoleInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = clusterRoleInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			c.enqueue()
 		},
@@ -78,7 +79,7 @@ func NewClusterRoleAggregation(clusterRoleInformer rbacinformers.ClusterRoleInfo
 		DeleteFunc: func(uncast interface{}) {
 			c.enqueue()
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	return c
 }
 

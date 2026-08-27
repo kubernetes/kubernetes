@@ -212,7 +212,7 @@ func (t *cleTest) createAndRunFakeLegacyController(name string, namespace string
 
 }
 func (t *cleTest) createAndRunFakeController(name string, namespace string, targetLease string, binaryVersion string, compatibilityVersion string, preferredStrategy coordinationv1.CoordinatedLeaseStrategy) {
-	identityLease, _, err := leaderelection.NewCandidate(
+	identityLease, _, err := leaderelection.NewCandidateWithConfig(
 		t.clientset,
 		namespace,
 		name,
@@ -220,6 +220,12 @@ func (t *cleTest) createAndRunFakeController(name string, namespace string, targ
 		binaryVersion,
 		compatibilityVersion,
 		preferredStrategy,
+		leaderelection.CandidateConfig{
+			// In E2E tests we don't need contextual logging.
+			// Including the name in the logger is useful
+			// because some tests run more than one controller.
+			Logger: new(klog.LoggerWithName(klog.Background(), name)),
+		},
 	)
 	framework.ExpectNoError(err)
 	ctx, cancel := context.WithCancel(t.ctx)

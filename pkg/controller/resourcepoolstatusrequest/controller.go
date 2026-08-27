@@ -116,7 +116,13 @@ func NewController(
 		requestSynced: requestInformer.Informer().HasSynced,
 		sliceSynced:   sliceInformer.Informer().HasSynced,
 		claimSynced:   claimInformer.Informer().HasSynced,
-		workqueue:     workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
+		workqueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
+				Name:   "resourcepoolstatusrequest",
+			},
+		),
 	}
 
 	// Only consume the DeviceTaintRule informer when the gate is enabled, so

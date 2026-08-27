@@ -353,7 +353,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		}
 
 		// Start lease candidate controller for coordinated leader election
-		leaseCandidate, waitForSync, err := leaderelection.NewCandidate(
+		leaseCandidate, waitForSync, err := leaderelection.NewCandidateWithConfig(
 			c.Client,
 			"kube-system",
 			id,
@@ -361,6 +361,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 			binaryVersion.FinalizeVersion(),
 			emulationVersion.FinalizeVersion(),
 			coordinationv1.OldestEmulationVersion,
+			leaderelection.CandidateConfig{Logger: &logger},
 		)
 		if err != nil {
 			return err

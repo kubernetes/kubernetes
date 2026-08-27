@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 )
 
 // TestFakeClient demonstrates how to use a fake client with SharedInformerFactory in tests.
@@ -59,13 +60,14 @@ func TestFakeClient(t *testing.T) {
 	pods := make(chan *v1.Pod, 1)
 	informers := informers.NewSharedInformerFactory(client, 0)
 	podInformer := informers.Core().V1().Pods().Informer()
-	podInformer.AddEventHandler(&cache.ResourceEventHandlerFuncs{
+	logger := klog.FromContext(ctx)
+	_, _ = podInformer.AddEventHandlerWithOptions(&cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			pod := obj.(*v1.Pod)
 			t.Logf("pod added: %s/%s", pod.Namespace, pod.Name)
 			pods <- pod
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 
 	// Make sure informers are running.
 	informers.Start(ctx.Done())

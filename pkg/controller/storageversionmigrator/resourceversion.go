@@ -86,7 +86,10 @@ func NewResourceVersionController(
 		mapper:          mapper,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: ResourceVersionControllerName},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: new(klog.FromContext(ctx)),
+				Name:   ResourceVersionControllerName,
+			},
 		),
 	}
 

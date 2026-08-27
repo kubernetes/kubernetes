@@ -90,7 +90,10 @@ func NewSVMController(
 		dependencyGraphBuilder: dependencyGraphBuilder,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			rateLimiter,
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: controllerName},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: new(klog.FromContext(ctx)),
+				Name:   controllerName,
+			},
 		),
 		rateLimiter: rateLimiter,
 	}

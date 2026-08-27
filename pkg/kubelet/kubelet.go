@@ -751,6 +751,7 @@ func NewMainKubelet(ctx context.Context,
 
 	// setup containerLogManager for CRI container runtime
 	containerLogManager, err := logs.NewContainerLogManager(
+		logger.WithName("ContainerLogManager"),
 		klet.runtimeService,
 		kubeDeps.OSInterface,
 		kubeCfg.ContainerLogMaxSize,

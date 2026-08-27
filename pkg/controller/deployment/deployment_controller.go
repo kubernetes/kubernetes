@@ -111,7 +111,8 @@ func NewDeploymentController(ctx context.Context, dInformer appsinformers.Deploy
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: "deployment",
+				Logger: &logger,
+				Name:   "deployment",
 			},
 		),
 	}
@@ -120,7 +121,7 @@ func NewDeploymentController(ctx context.Context, dInformer appsinformers.Deploy
 		Recorder:   dc.eventRecorder,
 	}
 
-	dInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = dInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			dc.addDeployment(logger, obj)
 		},
@@ -131,8 +132,8 @@ func NewDeploymentController(ctx context.Context, dInformer appsinformers.Deploy
 		DeleteFunc: func(obj interface{}) {
 			dc.deleteDeployment(logger, obj)
 		},
-	})
-	rsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	}, cache.HandlerOptions{Logger: &logger})
+	_, _ = rsInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			dc.addReplicaSet(logger, obj)
 		},
@@ -142,12 +143,12 @@ func NewDeploymentController(ctx context.Context, dInformer appsinformers.Deploy
 		DeleteFunc: func(obj interface{}) {
 			dc.deleteReplicaSet(logger, obj)
 		},
-	})
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	}, cache.HandlerOptions{Logger: &logger})
+	_, _ = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: func(obj interface{}) {
 			dc.deletePod(logger, obj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 
 	dc.syncHandler = dc.syncDeployment
 	dc.enqueueDeployment = dc.enqueue

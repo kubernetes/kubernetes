@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/clock"
@@ -652,7 +653,7 @@ func TestUnSupportWatchListSemantics(t *testing.T) {
 	defer cancel()
 	target := newSecretCache(context.TODO(), fakeClient, fakeClock, time.Minute)
 
-	ret := target.newReflectorLocked("ns", "obj")
+	ret := target.newReflectorLocked(klog.TODO(), "ns", "obj")
 	defer ret.stop()
 
 	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 3*time.Second, true, func(ctx context.Context) (bool, error) {
@@ -663,6 +664,7 @@ func TestUnSupportWatchListSemantics(t *testing.T) {
 }
 
 func TestWatchListSemanticsSimple(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -715,11 +717,11 @@ func TestWatchListSemanticsSimple(t *testing.T) {
 	}
 
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(tCtx, 5*time.Second)
 	defer cancel()
-	target := newSecretCache(context.TODO(), client, fakeClock, time.Second)
+	target := newSecretCache(tCtx, client, fakeClock, time.Second)
 
-	ret := target.newReflectorLocked("ns", "obj")
+	ret := target.newReflectorLocked(tCtx.Logger(), "ns", "obj")
 	defer ret.stop()
 
 	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 3*time.Second, true, func(ctx context.Context) (bool, error) {

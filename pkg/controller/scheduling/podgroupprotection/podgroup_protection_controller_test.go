@@ -260,7 +260,7 @@ func TestHandlePodChange(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			c := &Controller{
-				queue: workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
+				queue: workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()), //nolint:logcheck // Intentionally testing old API here.
 			}
 			defer c.queue.ShutDown()
 			c.handlePodChange(logger, tc.old, tc.new)
@@ -555,7 +555,7 @@ func TestHandlePodGroupUpdate(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			c := &Controller{
-				queue: workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
+				queue: workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()), //nolint:logcheck // Intentionally testing old API here.
 			}
 			defer c.queue.ShutDown()
 			c.handlePodGroupUpdate(logger, tc.pg)

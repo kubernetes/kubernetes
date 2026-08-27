@@ -31,6 +31,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestConfigMapCreation(t *testing.T) {
@@ -122,11 +123,12 @@ func TestConfigMapCreation(t *testing.T) {
 
 	for k, tc := range testcases {
 		t.Run(k, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			client := fake.NewSimpleClientset(caConfigMap, existNS)
 			informers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), controller.NoResyncPeriodFunc())
 			cmInformer := informers.Core().V1().ConfigMaps()
 			nsInformer := informers.Core().V1().Namespaces()
-			controller, err := NewPublisher(cmInformer, nsInformer, client, fakeRootCA)
+			controller, err := NewPublisher(tCtx.Logger(), cmInformer, nsInformer, client, fakeRootCA)
 			if err != nil {
 				t.Fatalf("error creating ServiceAccounts controller: %v", err)
 			}
@@ -155,9 +157,8 @@ func TestConfigMapCreation(t *testing.T) {
 				cmStore.Add(tc.UpdatedConfigMap)
 				controller.configMapUpdated(nil, tc.UpdatedConfigMap)
 			}
-			ctx := context.TODO()
 			for controller.queue.Len() != 0 {
-				controller.processNextWorkItem(ctx)
+				controller.processNextWorkItem(tCtx)
 			}
 
 			actions := client.Actions()

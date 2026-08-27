@@ -117,7 +117,8 @@ func NewController(
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig[cache.ObjectName](
 			workqueue.DefaultTypedControllerRateLimiter[cache.ObjectName](),
 			workqueue.TypedRateLimitingQueueConfig[cache.ObjectName]{
-				Name: "selinux_warning",
+				Logger: new(klog.FromContext(ctx)),
+				Name:   "selinux_warning",
 			},
 		),
 		labelCache: volumecache.NewVolumeLabelCache(seLinuxTranslator),

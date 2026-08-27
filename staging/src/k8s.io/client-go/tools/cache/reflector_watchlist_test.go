@@ -698,7 +698,7 @@ func testData(ctx context.Context) (*fakeListWatcher, Store, *Reflector, context
 			cancel(errors.New("time to stop"))
 		},
 	}
-	r := NewReflector(lw, &v1.Pod{}, s, 0)
+	r := NewReflector(lw, &v1.Pod{}, s, 0) //nolint:logcheck // Intentionally testing old API here.
 
 	return lw, s, r, ctx, cancel
 }

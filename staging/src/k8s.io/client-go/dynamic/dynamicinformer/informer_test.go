@@ -39,6 +39,7 @@ import (
 	clientfeaturestesting "k8s.io/client-go/features/testing"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 	"net/http"
 	"net/http/httptest"
 )
@@ -247,7 +248,8 @@ func TestFilteredDynamicSharedInformerFactory(t *testing.T) {
 
 			// act
 			informerListerForGvr := target.ForResource(ts.gvr)
-			informerListerForGvr.Informer().AddEventHandler(ts.handler(informerReciveObjectCh))
+			logger := klog.FromContext(ctx)
+			_, _ = informerListerForGvr.Informer().AddEventHandlerWithOptions(ts.handler(informerReciveObjectCh), cache.HandlerOptions{Logger: &logger})
 			target.Start(ctx.Done())
 			if synced := target.WaitForCacheSync(ctx.Done()); !synced[ts.gvr] {
 				t.Errorf("informer for %s hasn't synced", ts.gvr)
@@ -371,7 +373,8 @@ func TestDynamicSharedInformerFactory(t *testing.T) {
 
 			// act
 			informerListerForGvr := target.ForResource(ts.gvr)
-			informerListerForGvr.Informer().AddEventHandler(ts.handler(informerReciveObjectCh))
+			logger := klog.FromContext(ctx)
+			_, _ = informerListerForGvr.Informer().AddEventHandlerWithOptions(ts.handler(informerReciveObjectCh), cache.HandlerOptions{Logger: &logger})
 			target.Start(ctx.Done())
 			if synced := target.WaitForCacheSync(ctx.Done()); !synced[ts.gvr] {
 				t.Errorf("informer for %s hasn't synced", ts.gvr)

@@ -810,6 +810,7 @@ func (tc *Controller) Run(ctx context.Context, numWorkers int) error {
 	tc.workqueue = workqueue.NewTypedRateLimitingQueueWithConfig(
 		workqueue.DefaultTypedControllerRateLimiter[workItem](),
 		workqueue.TypedRateLimitingQueueConfig[workItem]{
+			Logger:        &logger,
 			Name:          tc.name,
 			DelayingQueue: delayingQueue,
 		},

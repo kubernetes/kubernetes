@@ -71,14 +71,15 @@ func NewCertificateController(
 				&workqueue.TypedBucketRateLimiter[string]{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
 			),
 			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: "certificate",
+				Logger: &logger,
+				Name:   "certificate",
 			},
 		),
 		handler: handler,
 	}
 
 	// Manage the addition/update of certificate requests
-	csrInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = csrInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			csr := obj.(*certificates.CertificateSigningRequest)
 			logger.V(4).Info("Adding certificate request", "csr", csr.Name)
@@ -106,7 +107,7 @@ func NewCertificateController(
 			logger.V(4).Info("Deleting certificate request", "csr", csr.Name)
 			cc.enqueueCertificateRequest(obj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	cc.csrLister = csrInformer.Lister()
 	cc.csrsSynced = csrInformer.Informer().HasSynced
 	return cc

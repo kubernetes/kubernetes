@@ -91,11 +91,17 @@ func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolu
 		createProvisionedPVInterval:   createProvisionedPVInterval,
 		claimQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "claims"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: new(klog.FromContext(ctx)),
+				Name:   "claims",
+			},
 		),
 		volumeQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "volumes"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: new(klog.FromContext(ctx)),
+				Name:   "volumes",
+			},
 		),
 		resyncPeriod:        p.SyncPeriod,
 		operationTimestamps: metrics.NewOperationStartTimeCache(),

@@ -111,7 +111,10 @@ func NewExpandController(
 		pvcsSynced: pvcInformer.Informer().HasSynced,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "volume_expand"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: new(klog.FromContext(ctx)),
+				Name:   "volume_expand",
+			},
 		),
 		translator:               translator,
 		csiMigratedPluginManager: csiMigratedPluginManager,

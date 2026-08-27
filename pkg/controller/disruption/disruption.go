@@ -183,6 +183,7 @@ func NewDisruptionControllerInternal(ctx context.Context,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
 				DelayingQueue: workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[string]{
 					Logger: &logger,
 					Clock:  clock,
@@ -198,6 +199,7 @@ func NewDisruptionControllerInternal(ctx context.Context,
 		stalePodDisruptionQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
 				DelayingQueue: workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[string]{
 					Logger: &logger,
 					Clock:  clock,
@@ -212,7 +214,7 @@ func NewDisruptionControllerInternal(ctx context.Context,
 
 	dc.getUpdater = func() updater { return dc.writePdbStatus }
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			dc.addPod(logger, obj)
 		},
@@ -222,11 +224,11 @@ func NewDisruptionControllerInternal(ctx context.Context,
 		DeleteFunc: func(obj interface{}) {
 			dc.deletePod(logger, obj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	dc.podLister = podInformer.Lister()
 	dc.podListerSynced = podInformer.Informer().HasSynced
 
-	pdbInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = pdbInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			dc.addDB(logger, obj)
 		},
@@ -236,7 +238,7 @@ func NewDisruptionControllerInternal(ctx context.Context,
 		DeleteFunc: func(obj interface{}) {
 			dc.removeDB(logger, obj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	dc.pdbLister = pdbInformer.Lister()
 	dc.pdbListerSynced = pdbInformer.Informer().HasSynced
 

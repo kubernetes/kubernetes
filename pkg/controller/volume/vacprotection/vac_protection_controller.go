@@ -108,7 +108,8 @@ func NewVACProtectionController(logger klog.Logger,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: "vacprotection",
+				Logger: &logger,
+				Name:   "vacprotection",
 			},
 		),
 	}

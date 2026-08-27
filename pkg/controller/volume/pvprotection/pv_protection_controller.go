@@ -55,7 +55,10 @@ func NewPVProtectionController(logger klog.Logger, pvInformer coreinformers.Pers
 		client: cl,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "pvprotection"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
+				Name:   "pvprotection",
+			},
 		),
 	}
 

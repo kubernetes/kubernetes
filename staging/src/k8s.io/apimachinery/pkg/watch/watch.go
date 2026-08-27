@@ -114,12 +114,12 @@ var _ Interface = &FakeWatcher{}
 
 // Contextual logging: NewFakeWithOptions and a logger in the FakeOptions should be used instead in code which supports contextual logging.
 func NewFake() *FakeWatcher {
-	return NewFakeWithOptions(FakeOptions{})
+	return NewFakeWithOptions(FakeOptions{}) //nolint:logcheck // Intentionally not providing Logger here.
 }
 
 // Contextual logging: NewFakeWithOptions and a logger in the FakeOptions should be used instead in code which supports contextual logging.
 func NewFakeWithChanSize(size int, blocking bool) *FakeWatcher {
-	return NewFakeWithOptions(FakeOptions{ChannelSize: size})
+	return NewFakeWithOptions(FakeOptions{ChannelSize: size}) //nolint:logcheck // Intentionally not providing Logger here.
 }
 
 func NewFakeWithOptions(options FakeOptions) *FakeWatcher {

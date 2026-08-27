@@ -25,7 +25,7 @@ import (
 
 func TestRateLimitingQueue(t *testing.T) {
 	limiter := NewItemExponentialFailureRateLimiter(1*time.Millisecond, 1*time.Second)
-	queue := NewRateLimitingQueue(limiter).(*rateLimitingType[any])
+	queue := NewRateLimitingQueue(limiter).(*rateLimitingType[any]) //nolint:logcheck // Intentionally testing old API here.
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	delayingQueue := &delayingType[any]{
 		TypedInterface:  New(),

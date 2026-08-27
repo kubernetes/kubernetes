@@ -85,11 +85,11 @@ func testListAndWatch(t *testing.T) {
 	})
 
 	var adds, updates, deletes int
-	handle, err := configMapInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	handle, err := configMapInformer.AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(_ any) { adds++ },
 		UpdateFunc: func(_, _ any) { updates++ },
 		DeleteFunc: func(_ any) { deletes++ },
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	if err != nil {
 		t.Fatalf("Unexpected error adding event handler: %v", err)
 	}

@@ -61,7 +61,7 @@ var nevererrc chan error
 
 func TestCloseWatchChannelOnError(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
-	r := NewReflector(&ListWatch{}, &v1.Pod{}, NewStore(MetaNamespaceKeyFunc), 0)
+	r := NewReflector(&ListWatch{}, &v1.Pod{}, NewStore(MetaNamespaceKeyFunc), 0) //nolint:logcheck // Intentionally testing old API here.
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
 	fw := watch.NewFake()
 	r.listerWatcher = &ListWatch{
@@ -89,7 +89,7 @@ func TestRunUntil(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancelCause(ctx)
 	store := NewStore(MetaNamespaceKeyFunc)
-	r := NewReflector(&ListWatch{}, &v1.Pod{}, store, 0)
+	r := NewReflector(&ListWatch{}, &v1.Pod{}, store, 0) //nolint:logcheck // Intentionally testing old API here.
 	fw := watch.NewFake()
 	r.listerWatcher = &ListWatch{
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
@@ -133,7 +133,7 @@ func TestRunUntil(t *testing.T) {
 
 func TestReflectorResyncChan(t *testing.T) {
 	s := NewStore(MetaNamespaceKeyFunc)
-	g := NewReflector(&ListWatch{}, &v1.Pod{}, s, time.Millisecond)
+	g := NewReflector(&ListWatch{}, &v1.Pod{}, s, time.Millisecond) //nolint:logcheck // Intentionally testing old API here.
 	a, _ := g.resyncChan()
 	b := time.After(wait.ForeverTestTimeout)
 	select {
@@ -162,7 +162,7 @@ func TestReflectorWatchStoppedBefore(t *testing.T) {
 			return nil, nil
 		},
 	}
-	target := NewReflector(lw, &v1.Pod{}, nil, 0)
+	target := NewReflector(lw, &v1.Pod{}, nil, 0) //nolint:logcheck // Intentionally testing old API here.
 
 	err := target.watch(ctx, nil, nil)
 	require.NoError(t, err)
@@ -193,7 +193,7 @@ func TestReflectorWatchStoppedAfter(t *testing.T) {
 			return w, nil
 		},
 	}
-	target := NewReflector(lw, &v1.Pod{}, nil, 0)
+	target := NewReflector(lw, &v1.Pod{}, nil, 0) //nolint:logcheck // Intentionally testing old API here.
 
 	err := target.watch(ctx, nil, nil)
 	require.NoError(t, err)
@@ -203,7 +203,7 @@ func TestReflectorWatchStoppedAfter(t *testing.T) {
 
 func BenchmarkReflectorResyncChanMany(b *testing.B) {
 	s := NewStore(MetaNamespaceKeyFunc)
-	g := NewReflector(&ListWatch{}, &v1.Pod{}, s, 25*time.Millisecond)
+	g := NewReflector(&ListWatch{}, &v1.Pod{}, s, 25*time.Millisecond) //nolint:logcheck // Intentionally testing old API here.
 	// The improvement to this (calling the timer's Stop() method) makes
 	// this benchmark about 40% faster.
 	for i := 0; i < b.N; i++ {
@@ -218,7 +218,7 @@ func BenchmarkReflectorResyncChanMany(b *testing.B) {
 // ResultChan and Stop are both called once.
 func TestReflectorHandleWatchStoppedBefore(t *testing.T) {
 	s := NewStore(MetaNamespaceKeyFunc)
-	g := NewReflector(&ListWatch{}, &v1.Pod{}, s, 0)
+	g := NewReflector(&ListWatch{}, &v1.Pod{}, s, 0) //nolint:logcheck // Intentionally testing old API here.
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancelCause(ctx)
 	// Simulate the context being canceled before the watchHandler is called
@@ -246,7 +246,7 @@ func TestReflectorHandleWatchStoppedBefore(t *testing.T) {
 // ResultChan and Stop are both called once.
 func TestReflectorHandleWatchStoppedAfter(t *testing.T) {
 	s := NewStore(MetaNamespaceKeyFunc)
-	g := NewReflector(&ListWatch{}, &v1.Pod{}, s, 0)
+	g := NewReflector(&ListWatch{}, &v1.Pod{}, s, 0) //nolint:logcheck // Intentionally testing old API here.
 	var calls []string
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancelCause(ctx)
@@ -279,7 +279,7 @@ func TestReflectorHandleWatchStoppedAfter(t *testing.T) {
 // It also ensures that ResultChan and Stop are both called once.
 func TestReflectorHandleWatchResultChanClosedBefore(t *testing.T) {
 	s := NewStore(MetaNamespaceKeyFunc)
-	g := NewReflector(&ListWatch{}, &v1.Pod{}, s, 0)
+	g := NewReflector(&ListWatch{}, &v1.Pod{}, s, 0) //nolint:logcheck // Intentionally testing old API here.
 	_, ctx := ktesting.NewTestContext(t)
 	var calls []string
 	resultCh := make(chan watch.Event)
@@ -305,7 +305,7 @@ func TestReflectorHandleWatchResultChanClosedBefore(t *testing.T) {
 // watching. It also ensures that ResultChan and Stop are both called once.
 func TestReflectorHandleWatchResultChanClosedAfter(t *testing.T) {
 	s := NewStore(MetaNamespaceKeyFunc)
-	g := NewReflector(&ListWatch{}, &v1.Pod{}, s, 0)
+	g := NewReflector(&ListWatch{}, &v1.Pod{}, s, 0) //nolint:logcheck // Intentionally testing old API here.
 	_, ctx := ktesting.NewTestContext(t)
 	var calls []string
 	resultCh := make(chan watch.Event)
@@ -333,7 +333,7 @@ func TestReflectorHandleWatchResultChanClosedAfter(t *testing.T) {
 
 func TestReflectorWatchHandler(t *testing.T) {
 	s := NewStore(MetaNamespaceKeyFunc)
-	g := NewReflector(&ListWatch{}, &v1.Pod{}, s, 0)
+	g := NewReflector(&ListWatch{}, &v1.Pod{}, s, 0) //nolint:logcheck // Intentionally testing old API here.
 	// Wrap setLastSyncResourceVersion so we can tell the watchHandler to stop
 	// watching after all the events have been consumed.
 	_, ctx := ktesting.NewTestContext(t)
@@ -393,7 +393,7 @@ func TestReflectorWatchHandler(t *testing.T) {
 
 func TestReflectorStopWatch(t *testing.T) {
 	s := NewStore(MetaNamespaceKeyFunc)
-	g := NewReflector(&ListWatch{}, &v1.Pod{}, s, 0)
+	g := NewReflector(&ListWatch{}, &v1.Pod{}, s, 0) //nolint:logcheck // Intentionally testing old API here.
 	fw := watch.NewFake()
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancelCause(ctx)
@@ -567,7 +567,7 @@ func TestReflectorListAndWatch(t *testing.T) {
 				},
 			}
 			s := NewFIFO(MetaNamespaceKeyFunc)
-			r := NewReflector(lw, &v1.Pod{}, s, 0)
+			r := NewReflector(lw, &v1.Pod{}, s, 0) //nolint:logcheck // Intentionally testing old API here.
 
 			// Start ListAndWatch in the background.
 			// When it returns, it will send an error or nil on the error
@@ -713,7 +713,7 @@ func TestReflectorListAndWatchWithErrors(t *testing.T) {
 				return item.list, item.listErr
 			},
 		})
-		r := NewReflector(lw, &v1.Pod{}, s, 0)
+		r := NewReflector(lw, &v1.Pod{}, s, 0) //nolint:logcheck // Intentionally testing old API here.
 		err := r.ListAndWatchWithContext(ctx)
 		if item.listErr != nil && !errors.Is(err, item.listErr) {
 			t.Errorf("unexpected ListAndWatch error: %v", err)
@@ -1085,7 +1085,7 @@ func TestReflectorResync(t *testing.T) {
 		},
 	})
 	resyncPeriod := 1 * time.Millisecond
-	r := NewReflector(lw, &v1.Pod{}, s, resyncPeriod)
+	r := NewReflector(lw, &v1.Pod{}, s, resyncPeriod) //nolint:logcheck // Intentionally testing old API here.
 	if err := r.ListAndWatchWithContext(ctx); err != nil {
 		// error from Resync is not propaged up to here.
 		t.Errorf("expected error %v", err)
@@ -1128,7 +1128,7 @@ func TestReflectorWatchListPageSize(t *testing.T) {
 			return nil, nil
 		},
 	})
-	r := NewReflector(lw, &v1.Pod{}, s, 0)
+	r := NewReflector(lw, &v1.Pod{}, s, 0) //nolint:logcheck // Intentionally testing old API here.
 	// Set resource version to test pagination also for not consistent reads.
 	r.setLastSyncResourceVersion("10")
 	// Set the reflector to paginate the list request in 4 item chunks.
@@ -1167,7 +1167,7 @@ func TestReflectorNotPaginatingNotConsistentReads(t *testing.T) {
 			return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}, Items: pods}, nil
 		},
 	})
-	r := NewReflector(lw, &v1.Pod{}, s, 0)
+	r := NewReflector(lw, &v1.Pod{}, s, 0) //nolint:logcheck // Intentionally testing old API here.
 	r.setLastSyncResourceVersion("10")
 	require.NoError(t, r.ListAndWatchWithContext(ctx))
 
@@ -1211,7 +1211,7 @@ func TestReflectorPaginatingNonConsistentReadsIfWatchCacheDisabled(t *testing.T)
 			return nil, nil
 		},
 	})
-	r := NewReflector(lw, &v1.Pod{}, s, 0)
+	r := NewReflector(lw, &v1.Pod{}, s, 0) //nolint:logcheck // Intentionally testing old API here.
 
 	// Initial list should initialize paginatedResult in the reflector.
 	var cancelCtx context.Context
@@ -1263,7 +1263,7 @@ func TestReflectorResyncWithResourceVersion(t *testing.T) {
 			return nil, nil
 		},
 	})
-	r := NewReflector(lw, &v1.Pod{}, s, 0)
+	r := NewReflector(lw, &v1.Pod{}, s, 0) //nolint:logcheck // Intentionally testing old API here.
 
 	// Initial list should use RV=0
 	require.NoError(t, r.ListAndWatchWithContext(cancelCtx))
@@ -1327,7 +1327,7 @@ func TestReflectorExpiredExactResourceVersion(t *testing.T) {
 			return nil, nil
 		},
 	})
-	r := NewReflector(lw, &v1.Pod{}, s, 0)
+	r := NewReflector(lw, &v1.Pod{}, s, 0) //nolint:logcheck // Intentionally testing old API here.
 
 	// Initial list should use RV=0
 	cancelCtx, cancel = context.WithCancelCause(ctx)
@@ -1396,7 +1396,7 @@ func TestReflectorFullListIfExpired(t *testing.T) {
 			}
 		},
 	})
-	r := NewReflector(lw, &v1.Pod{}, s, 0)
+	r := NewReflector(lw, &v1.Pod{}, s, 0) //nolint:logcheck // Intentionally testing old API here.
 	r.WatchListPageSize = 4
 
 	// Initial list should use RV=0
@@ -1473,7 +1473,7 @@ func TestReflectorFullListIfTooLarge(t *testing.T) {
 			}
 		},
 	})
-	r := NewReflector(lw, &v1.Pod{}, s, 0)
+	r := NewReflector(lw, &v1.Pod{}, s, 0) //nolint:logcheck // Intentionally testing old API here.
 
 	// Initial list should use RV=0
 	cancelCtx, cancel = context.WithCancelCause(ctx)
@@ -1673,7 +1673,7 @@ func TestReflectorResourceVersionUpdate(t *testing.T) {
 			return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}}, nil
 		},
 	})
-	r := NewReflector(lw, &v1.Pod{}, s, 0)
+	r := NewReflector(lw, &v1.Pod{}, s, 0) //nolint:logcheck // Intentionally testing old API here.
 
 	makePod := func(rv string) *v1.Pod {
 		return &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: rv}}
@@ -1940,7 +1940,7 @@ func TestReflectorListExtract(t *testing.T) {
 	})
 
 	lw := newPageTestLW(5)
-	reflector := NewReflector(lw, &v1.Pod{}, store, 0)
+	reflector := NewReflector(lw, &v1.Pod{}, store, 0) //nolint:logcheck // Intentionally testing old API here.
 	reflector.WatchListPageSize = fakeItemsNum
 
 	// execute list to fill store
@@ -2103,7 +2103,7 @@ func TestReflectorReplacesStoreOnUnsafeDelete(t *testing.T) {
 		},
 	})
 
-	r := NewReflector(lw, &v1.Pod{}, store, 0)
+	r := NewReflector(lw, &v1.Pod{}, store, 0) //nolint:logcheck // Intentionally testing old API here.
 	doneCh, stopCh := make(chan struct{}), make(chan struct{})
 	go func() {
 		defer close(doneCh)
@@ -2147,7 +2147,7 @@ func TestReflectorRespectStoreTransformer(t *testing.T) {
 	}{
 		"real-fifo": {
 			storeBuilder: func(counter *atomic.Int32) ReflectorStore {
-				return NewRealFIFO(MetaNamespaceKeyFunc, NewStore(MetaNamespaceKeyFunc), func(i interface{}) (interface{}, error) {
+				return NewRealFIFO(MetaNamespaceKeyFunc, NewStore(MetaNamespaceKeyFunc), func(i interface{}) (interface{}, error) { //nolint:logcheck // Intentionally testing old API here.
 					counter.Add(1)
 					cast := i.(*v1.Pod)
 					cast.Spec.Hostname = "transformed"
@@ -2237,7 +2237,7 @@ func TestReflectorRespectStoreTransformer(t *testing.T) {
 			}
 
 			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
-			r := NewReflector(lw, &v1.Pod{}, s, 0)
+			r := NewReflector(lw, &v1.Pod{}, s, 0) //nolint:logcheck // Intentionally testing old API here.
 			ctx, cancel := context.WithCancel(context.Background())
 			doneCh := make(chan struct{})
 			go func() {
@@ -2465,7 +2465,7 @@ func BenchmarkReflectorList(b *testing.B) {
 			_, ctx := ktesting.NewTestContext(b)
 
 			sample := tc.sample()
-			reflector := NewReflector(newPageTestLW(pageNum), &sample, store, 0)
+			reflector := NewReflector(newPageTestLW(pageNum), &sample, store, 0) //nolint:logcheck // Intentionally testing old API here.
 			reflector.WatchListPageSize = fakeItemsNum
 
 			b.ResetTimer()
