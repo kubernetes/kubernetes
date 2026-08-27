@@ -899,6 +899,26 @@ func TestReplicaCalcExternalPerPodMetric(t *testing.T) {
 			expectedUsage:     math.MaxInt64,
 		},
 		{
+			name: "statusReplicas zero does not overflow usage",
+			fixture: calcScenario{
+				currentReplicas: 0,
+				metric:          externalPerPodMetric(20000),
+			},
+			perPodTargetUsage: 5000,
+			expectedReplicas:  4,
+			expectedUsage:     0,
+		},
+		{
+			name: "statusReplicas zero and metric zero does not underflow",
+			fixture: calcScenario{
+				currentReplicas: 0,
+				metric:          externalPerPodMetric(0),
+			},
+			perPodTargetUsage: 5000,
+			expectedReplicas:  0,
+			expectedUsage:     0,
+		},
+		{
 			name: "scale up",
 			fixture: calcScenario{
 				currentReplicas: 3,
@@ -1168,6 +1188,16 @@ func TestReplicaCalcObjectPerPodMetric(t *testing.T) {
 
 	cases := []perPodMetricCase{
 		{
+			name: "usage overflow with huge target leaves replicas unchanged",
+			fixture: calcScenario{
+				currentReplicas: 1,
+				metric:          perPodMetric(math.MaxInt64),
+			},
+			perPodTargetUsage: math.MaxInt64,
+			expectedReplicas:  1,
+			expectedUsage:     math.MaxInt64,
+		},
+		{
 			name: "scale up",
 			fixture: calcScenario{
 				currentReplicas: 3,
@@ -1207,6 +1237,26 @@ func TestReplicaCalcObjectPerPodMetric(t *testing.T) {
 			perPodTargetUsage: 5000,
 			expectedReplicas:  5,
 			expectedUsage:     5052,
+		},
+		{
+			name: "statusReplicas zero does not overflow usage",
+			fixture: calcScenario{
+				currentReplicas: 0,
+				metric:          perPodMetric(20000),
+			},
+			perPodTargetUsage: 5000,
+			expectedReplicas:  4,
+			expectedUsage:     0,
+		},
+		{
+			name: "statusReplicas zero and metric zero does not underflow",
+			fixture: calcScenario{
+				currentReplicas: 0,
+				metric:          perPodMetric(0),
+			},
+			perPodTargetUsage: 5000,
+			expectedReplicas:  0,
+			expectedUsage:     0,
 		},
 	}
 
@@ -2366,4 +2416,39 @@ func TestCalculatePodRequestsFromContainers_NonExistentContainer(t *testing.T) {
 	expectedErr := "container non-existent-container not found in Pod test-pod"
 	assert.Equal(t, expectedErr, err.Error(), "error message should match expected format")
 	assert.Equal(t, int64(0), request, "request should be 0 when container does not exist")
+}
+
+// TestGetPerPodUsage tests the per-pod usage helper function.
+func TestGetPerPodUsage(t *testing.T) {
+	cases := []struct {
+		name           string
+		usage          int64
+		statusReplicas int32
+		expected       int64
+	}{
+		{
+			name:           "zero replicas returns zero",
+			usage:          20000,
+			statusReplicas: 0,
+			expected:       0,
+		},
+		{
+			name:           "normal division with ceiling",
+			usage:          1000,
+			statusReplicas: 3,
+			expected:       334,
+		},
+		{
+			name:           "overflow returns MaxInt64",
+			usage:          math.MaxInt64,
+			statusReplicas: 1,
+			expected:       math.MaxInt64,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := getPerPodUsage(tc.usage, tc.statusReplicas)
+			assert.Equal(t, tc.expected, actual, "unexpected usage value")
+		})
+	}
 }
