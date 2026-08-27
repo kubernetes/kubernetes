@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/emptydir"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 )
@@ -485,7 +486,7 @@ func doTestPlugin(t *testing.T, sc scenario) []error {
 	}
 
 	// Test setUp()
-	setUpErrs := doTestSetUp(sc, mounter)
+	setUpErrs := doTestSetUp(t, sc, mounter)
 	allErrs = append(allErrs, setUpErrs...)
 
 	if _, err := os.Stat(path); err != nil {
@@ -540,9 +541,11 @@ func doTestPlugin(t *testing.T, sc scenario) []error {
 	return allErrs
 }
 
-func doTestSetUp(sc scenario, mounter volume.Mounter) []error {
+func doTestSetUp(t *testing.T, sc scenario, mounter volume.Mounter) []error {
 	expecteds := sc.expecteds
 	allErrs := []error{}
+
+	tCtx := ktesting.Init(t)
 
 	// Construct combined outputs from expected commands
 	var fakeOutputs []fakeexec.FakeAction
@@ -589,7 +592,7 @@ func doTestSetUp(sc scenario, mounter volume.Mounter) []error {
 	g := mounter.(*gitRepoVolumeMounter)
 	g.exec = fake
 
-	err := g.SetUp(volume.MounterArgs{})
+	err := g.SetUp(tCtx, volume.MounterArgs{})
 	if err != nil {
 		allErrs = append(allErrs, err)
 	}

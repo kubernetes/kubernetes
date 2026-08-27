@@ -17,6 +17,7 @@ limitations under the License.
 package fc
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -89,7 +90,7 @@ func (plugin *fcPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.Volume != nil && spec.Volume.FC != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FC != nil)
 }
 
-func (plugin *fcPlugin) RequiresRemount(spec *volume.Spec) bool {
+func (plugin *fcPlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool {
 	return false
 }
 
@@ -97,7 +98,7 @@ func (plugin *fcPlugin) SupportsMountOption() bool {
 	return true
 }
 
-func (plugin *fcPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+func (plugin *fcPlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return true, nil
 }
 
@@ -392,11 +393,11 @@ func (b *fcDiskMounter) GetAttributes() volume.Attributes {
 	}
 }
 
-func (b *fcDiskMounter) SetUp(mounterArgs volume.MounterArgs) error {
-	return b.SetUpAt(b.GetPath(), mounterArgs)
+func (b *fcDiskMounter) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
+	return b.SetUpAt(ctx, b.GetPath(), mounterArgs)
 }
 
-func (b *fcDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (b *fcDiskMounter) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
 	err := diskSetUp(b.manager, *b, dir, b.mounter, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
 	if err != nil {

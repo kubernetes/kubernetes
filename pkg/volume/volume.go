@@ -17,6 +17,7 @@ limitations under the License.
 package volume
 
 import (
+	"context"
 	"sync/atomic"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
@@ -172,7 +174,7 @@ type Mounter interface {
 	//   - TransientOperationFailure
 	//   - UncertainProgressError
 	//   - Error of any other type should be considered a final error
-	SetUp(mounterArgs MounterArgs) error
+	SetUp(ctx context.Context, mounterArgs MounterArgs) error
 
 	// SetUpAt prepares and mounts/unpacks the volume to the
 	// specified directory path, which may or may not exist yet.
@@ -180,7 +182,7 @@ type Mounter interface {
 	// 'fsGroup' so that it can be accessed by the pod. This may
 	// be called more than once, so implementations must be
 	// idempotent.
-	SetUpAt(dir string, mounterArgs MounterArgs) error
+	SetUpAt(ctx context.Context, dir string, mounterArgs MounterArgs) error
 	// GetAttributes returns the attributes of the mounter.
 	// This function is called after SetUp()/SetUpAt().
 	GetAttributes() Attributes
@@ -210,14 +212,14 @@ type CustomBlockVolumeMapper interface {
 	// will do necessary works.
 	// This may be called more than once, so implementations must be idempotent.
 	// SetUpDevice returns stagingPath if device setup was successful
-	SetUpDevice() (stagingPath string, err error)
+	SetUpDevice(logger klog.Logger) (stagingPath string, err error)
 
 	// MapPodDevice maps the block device to a path and return the path.
 	// Unique device path across kubelet node reboot is required to avoid
 	// unexpected block volume destruction.
 	// If empty string is returned, the path returned by attacher.Attach() and
 	// attacher.WaitForAttach() will be used.
-	MapPodDevice() (publishPath string, err error)
+	MapPodDevice(logger klog.Logger) (publishPath string, err error)
 
 	// GetStagingPath returns path that was used for staging the volume
 	// it is mainly used by CSI plugins
@@ -278,7 +280,7 @@ type Attacher interface {
 	// VolumesAreAttached checks whether the list of volumes still attached to the specified
 	// node. It returns a map which maps from the volume spec to the checking result.
 	// If an error is occurred during checking, the error will be returned
-	VolumesAreAttached(specs []*Spec, nodeName types.NodeName) (map[*Spec]bool, error)
+	VolumesAreAttached(logger klog.Logger, specs []*Spec, nodeName types.NodeName) (map[*Spec]bool, error)
 
 	// WaitForAttach blocks until the device is attached to this
 	// node. If it successfully attaches, the path to the device
@@ -307,7 +309,7 @@ type DeviceMounter interface {
 	//   - TransientOperationFailure
 	//   - UncertainProgressError
 	//   - Error of any other type should be considered a final error
-	MountDevice(spec *Spec, devicePath string, deviceMountPath string, deviceMounterArgs DeviceMounterArgs) error
+	MountDevice(logger klog.Logger, spec *Spec, devicePath string, deviceMountPath string, deviceMounterArgs DeviceMounterArgs) error
 }
 
 // Detacher can detach a volume from a node.
