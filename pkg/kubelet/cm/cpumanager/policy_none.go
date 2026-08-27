@@ -80,3 +80,7 @@ func (p *nonePolicy) AllocatePod(_ klog.Logger, s state.State, pod *v1.Pod, _ li
 func (p *nonePolicy) GetAllocatableCPUs(m state.State) cpuset.CPUSet {
 	return cpuset.New()
 }
+
+func (p *nonePolicy) CanAllocateExclusively() bool {
+	return false
+}

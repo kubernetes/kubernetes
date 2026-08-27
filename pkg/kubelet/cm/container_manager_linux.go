@@ -1161,3 +1161,11 @@ func (cm *containerManagerImpl) UpdateAllocatedResourcesStatus(logger klog.Logge
 func (cm *containerManagerImpl) Updates() <-chan resourceupdates.Update {
 	return cm.resourceUpdates
 }
+
+func (cm *containerManagerImpl) AllocationMode(res v1.ResourceName) (ResourceAllocationMode, bool) {
+	// run from the cheapest to the most expensive
+	if cm.cpuManager.CanAllocateExclusively(res) || cm.memoryManager.CanAllocateExclusively(res) || cm.deviceManager.CanAllocateExclusively(res) {
+		return ResourceAllocationModeExclusive, true
+	}
+	return ResourceAllocationModeShared, false
+}
