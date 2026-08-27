@@ -121,8 +121,8 @@ type CPUInfo struct {
 // KeepOnly returns a new CPUDetails object with only the supplied cpus.
 func (d CPUDetails) KeepOnly(cpus cpuset.CPUSet) CPUDetails {
 	result := CPUDetails{}
-	for cpu, info := range d {
-		if cpus.Contains(cpu) {
+	for _, cpu := range cpus.UnsortedList() {
+		if info, ok := d[cpu]; ok {
 			result[cpu] = info
 		}
 	}
