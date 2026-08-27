@@ -353,7 +353,7 @@ type CSIDriverSpec struct {
 	// This field is immutable.
 	//
 	// +optional
-	PodInfoOnMount *bool `json:"podInfoOnMount,omitempty" protobuf:"bytes,2,opt,name=podInfoOnMount"`
+	PodInfoOnMount *bool `json:"podInfoOnMount,omitempty" protobuf:"varint,2,opt,name=podInfoOnMount"`
 
 	// volumeLifecycleModes defines what kind of volumes this CSI volume driver supports.
 	// The default if the list is empty is "Persistent", which is the usage defined by the
@@ -392,7 +392,7 @@ type CSIDriverSpec struct {
 	// This field was immutable in Kubernetes <= 1.22 and now is mutable.
 	//
 	// +optional
-	StorageCapacity *bool `json:"storageCapacity,omitempty" protobuf:"bytes,4,opt,name=storageCapacity"`
+	StorageCapacity *bool `json:"storageCapacity,omitempty" protobuf:"varint,4,opt,name=storageCapacity"`
 
 	// fsGroupPolicy defines if the underlying volume supports changing ownership and
 	// permission of the volume before being mounted.

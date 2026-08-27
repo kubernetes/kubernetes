@@ -173,7 +173,7 @@ type NetworkPolicyPort struct {
 	// is not defined or if the port field is defined as a named (string) port.
 	// The endPort must be equal or greater than port.
 	// +optional
-	EndPort *int32 `json:"endPort,omitempty" protobuf:"bytes,3,opt,name=endPort"`
+	EndPort *int32 `json:"endPort,omitempty" protobuf:"varint,3,opt,name=endPort"`
 }
 
 // IPBlock describes a particular CIDR (Ex. "192.168.1.0/24","2001:db8::/64") that is allowed
@@ -551,7 +551,7 @@ type ServiceBackendPort struct {
 	// number is the numerical port number (e.g. 80) on the Service.
 	// This is a mutually exclusive setting with "Name".
 	// +optional
-	Number int32 `json:"number,omitempty" protobuf:"bytes,2,opt,name=number"`
+	Number int32 `json:"number,omitempty" protobuf:"varint,2,opt,name=number"`
 }
 
 // +genclient

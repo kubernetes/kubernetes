@@ -148,20 +148,20 @@ type EndpointConditions struct {
 	// unknown state as ready. For compatibility reasons, ready should never be
 	// "true" for terminating endpoints.
 	// +optional
-	Ready *bool `json:"ready,omitempty" protobuf:"bytes,1,name=ready"`
+	Ready *bool `json:"ready,omitempty" protobuf:"varint,1,name=ready"`
 
 	// serving is identical to ready except that it is set regardless of the
 	// terminating state of endpoints. This condition should be set to true for
 	// a ready endpoint that is terminating. If nil, consumers should defer to
 	// the ready condition.
 	// +optional
-	Serving *bool `json:"serving,omitempty" protobuf:"bytes,2,name=serving"`
+	Serving *bool `json:"serving,omitempty" protobuf:"varint,2,name=serving"`
 
 	// terminating indicates that this endpoint is terminating. A nil value
 	// indicates an unknown state. Consumers should interpret this unknown state
 	// to mean that the endpoint is not terminating.
 	// +optional
-	Terminating *bool `json:"terminating,omitempty" protobuf:"bytes,3,name=terminating"`
+	Terminating *bool `json:"terminating,omitempty" protobuf:"varint,3,name=terminating"`
 }
 
 // EndpointHints provides hints describing how an endpoint should be consumed.
@@ -208,7 +208,7 @@ type EndpointPort struct {
 	// port represents the port number of the endpoint.
 	// If this is not specified, ports are not restricted and must be
 	// interpreted in the context of the specific consumer.
-	Port *int32 `json:"port,omitempty" protobuf:"bytes,3,opt,name=port"`
+	Port *int32 `json:"port,omitempty" protobuf:"varint,3,opt,name=port"`
 
 	// appProtocol represents the application protocol for this port.
 	// This field follows standard Kubernetes label syntax.

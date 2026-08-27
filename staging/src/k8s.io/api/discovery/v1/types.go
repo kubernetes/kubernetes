@@ -150,7 +150,7 @@ type EndpointConditions struct {
 	// be overridden in some cases, such as when the associated Service has
 	// set the publishNotReadyAddresses flag.
 	// +optional
-	Ready *bool `json:"ready,omitempty" protobuf:"bytes,1,name=ready"`
+	Ready *bool `json:"ready,omitempty" protobuf:"varint,1,name=ready"`
 
 	// serving indicates that this endpoint is able to receive traffic,
 	// according to whatever system is managing the endpoint. For endpoints
@@ -158,12 +158,12 @@ type EndpointConditions struct {
 	// as serving if the pod's Ready condition is True. A nil value should be
 	// interpreted as "true".
 	// +optional
-	Serving *bool `json:"serving,omitempty" protobuf:"bytes,2,name=serving"`
+	Serving *bool `json:"serving,omitempty" protobuf:"varint,2,name=serving"`
 
 	// terminating indicates that this endpoint is terminating. A nil value
 	// should be interpreted as "false".
 	// +optional
-	Terminating *bool `json:"terminating,omitempty" protobuf:"bytes,3,name=terminating"`
+	Terminating *bool `json:"terminating,omitempty" protobuf:"varint,3,name=terminating"`
 }
 
 // EndpointHints provides hints describing how an endpoint should be consumed.
@@ -212,7 +212,7 @@ type EndpointPort struct {
 	// If the EndpointSlice is derived from a Kubernetes service, this must be set
 	// to the service's target port. EndpointSlices used for other purposes may have
 	// a nil port.
-	Port *int32 `json:"port,omitempty" protobuf:"bytes,3,opt,name=port"`
+	Port *int32 `json:"port,omitempty" protobuf:"varint,3,opt,name=port"`
 
 	// The application protocol for this port.
 	// This is used as a hint for implementations to offer richer behavior for protocols that they understand.
