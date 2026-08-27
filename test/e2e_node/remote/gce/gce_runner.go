@@ -185,10 +185,9 @@ type GCEImage struct {
 	Resources       Resources `json:"resources,omitempty"`
 }
 
-// Returns an image name based on regex and given GCE project.
+// getGCEImage returns the newest image matching imageRegex and imageFamily in project.
 func (g *GCERunner) getGCEImage(imageRegex, imageFamily string, project string) (string, error) {
-	data, err := runGCPCommandNoProject("compute", "images", "list",
-		"--format=json", "--project="+project)
+	data, err := runGCPCommandNoProject(gceImageListArgs(project, imageFamily)...)
 	if err != nil {
 		return "", fmt.Errorf("failed to list images in project %q: %w", project, err)
 	}
@@ -197,13 +196,31 @@ func (g *GCERunner) getGCEImage(imageRegex, imageFamily string, project string) 
 	if err != nil {
 		return "", fmt.Errorf("failed to parse images: %w", err)
 	}
+	return pickNewestImage(images, imageRegex, imageFamily, project)
+}
 
+// gceImageListArgs returns the gcloud arguments to list candidate images.
+func gceImageListArgs(project, imageFamily string) []string {
+	args := []string{"compute", "images", "list", "--format=json", "--project=" + project}
+	if imageFamily != "" {
+		// Narrow to the family so gcloud does not return the whole project.
+		// For large projects that can take a long time and consume significant
+		// amounts of RAM. It was the reason why the memory requirements of
+		// jobs using Ubuntu had to be raised (https://github.com/kubernetes/kubernetes/issues/141434).
+		args = append(args, "--filter=family="+imageFamily)
+	}
+	return args
+}
+
+// pickNewestImage returns the name of the newest image matching imageRegex and imageFamily.
+func pickNewestImage(images []gceImage, imageRegex, imageFamily, project string) (string, error) {
 	imageObjs := []imageObj{}
 	imageRe := regexp.MustCompile(imageRegex)
 	for _, instance := range images {
 		if imageRegex != "" && !imageRe.MatchString(instance.Name) {
 			continue
 		}
+		// gcloud's --filter=family is not guaranteed exact, so match here too.
 		if imageFamily != "" && instance.Family != imageFamily {
 			continue
 		}
