@@ -59,11 +59,9 @@ func (m *kubeGenericRuntimeManager) calculateSandboxResources(ctx context.Contex
 		cpuRequest = req.Cpu()
 	}
 
-	// If pod has exclusive cpu the sandbox will not have cfs quote enforced
-	disableCPUQuota := utilfeature.DefaultFeatureGate.Enabled(features.DisableCPUQuotaWithExclusiveCPUs) && m.containerManager.PodHasExclusiveCPUs(logger, pod)
-
-	logger.V(5).Info("Enforcing CFS quota", "pod", klog.KObj(pod), "unlimited", disableCPUQuota)
-	return m.calculateLinuxResources(cpuRequest, lim.Cpu(), lim.Memory(), disableCPUQuota)
+	// If pod has exclusive cpu the sandbox will not have cfs quota enforced
+	hasExclusiveCPUs := m.containerManager.PodHasExclusiveCPUs(logger, pod)
+	return m.calculateLinuxResources(cpuRequest, lim.Cpu(), lim.Memory(), hasExclusiveCPUs)
 }
 
 func (m *kubeGenericRuntimeManager) applySandboxResources(ctx context.Context, pod *v1.Pod, config *runtimeapi.PodSandboxConfig) error {
