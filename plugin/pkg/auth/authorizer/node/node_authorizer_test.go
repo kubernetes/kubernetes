@@ -37,6 +37,8 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	corev1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
@@ -921,8 +923,10 @@ func TestNodeAuthorizerSharedResources(t *testing.T) {
 	node2 := &user.DefaultInfo{Name: "system:node:node2", Groups: []string{"system:nodes"}}
 	node3 := &user.DefaultInfo{Name: "system:node:node3", Groups: []string{"system:nodes"}}
 
-	g.AddPod(&corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "pod1-node1", Namespace: "ns1"},
+	p := newTestGraphPopulator(g)
+
+	p.addPod(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod1-node1", Namespace: "ns1", UID: types.UID("uid1")},
 		Spec: corev1.PodSpec{
 			NodeName: "node1",
 			Volumes: []corev1.Volume{
@@ -932,8 +936,8 @@ func TestNodeAuthorizerSharedResources(t *testing.T) {
 			},
 		},
 	})
-	g.AddPod(&corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "pod2-node2", Namespace: "ns1"},
+	p.addPod(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod2-node2", Namespace: "ns1", UID: types.UID("uid2")},
 		Spec: corev1.PodSpec{
 			NodeName: "node2",
 			Volumes: []corev1.Volume{
@@ -944,7 +948,7 @@ func TestNodeAuthorizerSharedResources(t *testing.T) {
 	})
 
 	pod3 := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "pod3-node3", Namespace: "ns1"},
+		ObjectMeta: metav1.ObjectMeta{Name: "pod3-node3", Namespace: "ns1", UID: types.UID("uid3")},
 		Spec: corev1.PodSpec{
 			NodeName: "node3",
 			Volumes: []corev1.Volume{
@@ -952,7 +956,7 @@ func TestNodeAuthorizerSharedResources(t *testing.T) {
 			},
 		},
 	}
-	g.AddPod(pod3)
+	p.addPod(pod3)
 
 	testcases := []struct {
 		User      user.Info
@@ -1012,8 +1016,10 @@ func TestNodeAuthorizerSharedResources(t *testing.T) {
 		}
 
 		// should trigger recalculation of the shared secret index
-		pod3.Spec.Volumes = nil
-		g.AddPod(pod3)
+		newPod3 := pod3.DeepCopy()
+		newPod3.UID = types.UID("uid3-new")
+		newPod3.Spec.Volumes = nil
+		p.updatePod(pod3, newPod3)
 
 		decision, _, err = authz.Authorize(context.Background(), node3SharedSecretGet)
 		if err != nil {
@@ -1022,6 +1028,45 @@ func TestNodeAuthorizerSharedResources(t *testing.T) {
 		if decision == authorizer.DecisionAllow {
 			t.Errorf("unexpectedly allowed")
 		}
+	}
+}
+
+type testGraphPopulator struct {
+	*graphPopulator
+	indexer cache.Indexer
+}
+
+func newTestGraphPopulator(g *Graph) *testGraphPopulator {
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	return &testGraphPopulator{
+		graphPopulator: &graphPopulator{
+			graph:     g,
+			podQueue:  newRateLimitingQueue("test_node_authorizer_pod_populator"),
+			podLister: corev1listers.NewPodLister(indexer),
+		},
+		indexer: indexer,
+	}
+}
+
+func (p *testGraphPopulator) addPod(pod *corev1.Pod) {
+	if err := p.indexer.Add(pod); err != nil {
+		panic(err)
+	}
+	p.graphPopulator.addPod(pod)
+	p.drainQueue()
+}
+
+func (p *testGraphPopulator) updatePod(oldPod, newPod *corev1.Pod) {
+	if err := p.indexer.Add(newPod); err != nil {
+		panic(err)
+	}
+	p.graphPopulator.updatePod(oldPod, newPod)
+	p.drainQueue()
+}
+
+func (p *testGraphPopulator) drainQueue() {
+	for p.podQueue.Len() > 0 {
+		processNextWorkItem(p.podQueue, p.processPodKey)
 	}
 }
 
@@ -1085,8 +1130,7 @@ func TestNodeAuthorizerAddEphemeralContainers(t *testing.T) {
 			},
 		},
 	}
-	p := &graphPopulator{}
-	p.graph = g
+	p := newTestGraphPopulator(g)
 	p.addPod(pod)
 
 	testcases := []struct {
@@ -1185,8 +1229,7 @@ func TestNodeAuthorizerUpdateExtendedResourceClaim(t *testing.T) {
 		},
 	}
 
-	p := &graphPopulator{}
-	p.graph = g
+	p := newTestGraphPopulator(g)
 	p.addPod(pod)
 
 	// Before the scheduler swaps the synthesized claim name, extended-claim-1
@@ -1610,19 +1653,19 @@ func populate(graph *Graph, nodes []*corev1.Node, pods []*corev1.Pod, pvs []*cor
 	p := &graphPopulator{}
 	p.graph = graph
 	for _, pod := range pods {
-		p.addPod(pod)
+		p.processAddOrUpdatePod(pod)
 	}
 	for _, pv := range pvs {
-		p.addPV(pv)
+		p.processAddOrUpdatePV(pv)
 	}
 	for _, attachment := range attachments {
-		p.addVolumeAttachment(attachment)
+		p.processAddOrUpdateVolumeAttachment(attachment)
 	}
 	for _, slice := range slices {
-		p.addResourceSlice(slice)
+		p.processAddResourceSlice(slice)
 	}
 	for _, pcr := range pcrs {
-		p.addPCR(pcr)
+		p.processAddPCR(pcr)
 	}
 }
 
