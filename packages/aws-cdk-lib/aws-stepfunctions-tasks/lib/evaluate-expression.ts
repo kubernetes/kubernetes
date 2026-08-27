@@ -2,7 +2,8 @@ import type { Construct } from 'constructs';
 import * as iam from '../../aws-iam';
 import * as lambda from '../../aws-lambda';
 import * as sfn from '../../aws-stepfunctions';
-import { UnscopedValidationError } from '../../core';
+import { Token, UnscopedValidationError, ValidationError } from '../../core';
+import { PATH_PATTERN, pathsInsideStringLiterals } from './private/evaluate-expression-paths';
 import { lit } from '../../core/lib/private/literal-string';
 import { EvalNodejsSingletonFunction } from '../../custom-resource-handlers/dist/aws-stepfunctions-tasks/eval-nodejs-provider.generated';
 
@@ -13,6 +14,12 @@ import { EvalNodejsSingletonFunction } from '../../custom-resource-handlers/dist
 export interface EvaluateExpressionProps extends sfn.TaskStateBaseProps {
   /**
    * The expression to evaluate. The expression may contain state paths.
+   *
+   * A referenced path is only resolved where it is used as code (for example `$.a + $.b`, or
+   * a function argument). To build a string that contains a value, use a template literal
+   * interpolation (`${$.count}`); a path placed as literal text inside a plain string, or as
+   * bare text inside a template literal (for example `'items: $.count'`), is not resolved and
+   * is rejected at synth time.
    *
    * Example value: `'$.a + $.b'`
    */
@@ -69,6 +76,35 @@ export class EvaluateExpression extends sfn.TaskStateBase {
   constructor(scope: Construct, id: string, private readonly props: EvaluateExpressionProps) {
     super(scope, id, props);
 
+    // A path placed as literal text inside a plain string or template literal no longer
+    // resolves, so fail fast at synth instead of failing at runtime or silently evaluating
+    // to the wrong value.
+    // Skip when the expression is an unresolved token that can't be inspected at synth time.
+    if (!Token.isUnresolved(props.expression)) {
+      const pathsInLiterals = pathsInsideStringLiterals(props.expression);
+      const plainStringPaths = pathsInLiterals.filter((p) => p.context === 'plainString').map((p) => p.path);
+      const templateTextPaths = pathsInLiterals.filter((p) => p.context === 'templateText').map((p) => p.path);
+      if (plainStringPaths.length > 0) {
+        throw new ValidationError(
+          lit`ExpressionPathInStringLiteral`,
+          'state path(s) ' + JSON.stringify(plainStringPaths) +
+          ' are used as literal text inside a plain string in the EvaluateExpression \'expression\'; ' +
+          'a path inside a plain string used to be resolved but is no longer resolved - use a template literal with ' +
+          'interpolation instead, e.g. `...${' + plainStringPaths[0] + '}...`',
+          this,
+        );
+      }
+      if (templateTextPaths.length > 0) {
+        throw new ValidationError(
+          lit`ExpressionPathInStringLiteral`,
+          'state path(s) ' + JSON.stringify(templateTextPaths) +
+          ' are used as literal text inside a template literal in the EvaluateExpression \'expression\'; ' +
+          'a path in template text used to be resolved but is no longer resolved - reference it via interpolation like ${' + templateTextPaths[0] + '} instead',
+          this,
+        );
+      }
+    }
+
     this.evalFn = createEvalFn(this.props.runtime, this.props.architecture, this);
 
     this.taskPolicies = [
@@ -83,7 +119,7 @@ export class EvaluateExpression extends sfn.TaskStateBase {
    * @internal
    */
   protected _renderTask(): any {
-    const matches = this.props.expression.match(/\$[.\[][.a-zA-Z[\]0-9-_]+/g);
+    const matches = this.props.expression.match(PATH_PATTERN);
 
     let expressionAttributeValues = {};
     if (matches) {

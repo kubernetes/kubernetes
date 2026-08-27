@@ -1,5 +1,5 @@
 {
-  "version": "53.0.0",
+  "version": "54.0.0",
   "testCases": {
     "EvaluateExpressionArm64Test/DefaultTest": {
       "stacks": [
@@ -9,5 +9,6 @@
       "assertionStackName": "EvaluateExpressionArm64TestDefaultTestDeployAssertC985F24C"
     }
   },
-  "minimumCliVersion": "2.1123.0"
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
 }

@@ -1,0 +1,15 @@
+{
+  "version": "54.0.0",
+  "testCases": {
+    "EvaluateExpressionExecutionTest/DefaultTest": {
+      "stacks": [
+        "aws-cdk-sfn-evaluate-expression-execution-integ"
+      ],
+      "diffAssets": true,
+      "assertionStack": "EvaluateExpressionExecutionTest/DefaultTest/DeployAssert",
+      "assertionStackName": "EvaluateExpressionExecutionTestDefaultTestDeployAssertEA569BE6"
+    }
+  },
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
+}
