@@ -526,14 +526,6 @@
       "SECONDS"
     ]
   },
-  "aws-cdk/packages/@aws-cdk/aws-glue-alpha/lib/s3-table.ts": {
-    "TableEncryption": [
-      "SSE-S3",
-      "SSE-KMS",
-      "SSE-KMS-MANAGED",
-      "CSE-KMS"
-    ]
-  },
   "aws-cdk/packages/@aws-cdk/aws-glue-alpha/lib/security-configuration.ts": {
     "S3EncryptionMode": [
       "SSE-S3",
@@ -1379,6 +1371,10 @@
     "RequestMetricsStatus": [
       "Enabled",
       "Disabled"
+    ],
+    "StorageClass": [
+      "STANDARD",
+      "INTELLIGENT_TIERING"
     ],
     "TableBucketEncryption": [
       "aws:kms",
@@ -6613,12 +6609,6 @@
       "nodejs20.x",
       "nodejs22.x",
       "nodejs24.x"
-    ]
-  },
-  "aws-cdk/packages/aws-cdk-lib/core/lib/deps.ts": {
-    "DependencyOperation": [
-      0,
-      1
     ]
   },
   "aws-cdk/packages/aws-cdk-lib/core/lib/fs/options.ts": {
