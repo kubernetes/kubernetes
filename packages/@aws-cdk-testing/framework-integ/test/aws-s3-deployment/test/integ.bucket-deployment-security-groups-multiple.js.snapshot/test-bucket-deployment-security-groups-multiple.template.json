@@ -556,6 +556,9 @@
   "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756Cc87a409b7d9dd2258720adf509b7727165810e0611c8d032bce6f87bea726e997157fd20ebe07b3fd294c8dfd7e8d298db9b9285f880a2dc5e27fd73e6457cF4AB49C7": {
    "Type": "AWS::Lambda::Function",
    "Properties": {
+    "Architectures": [
+     "arm64"
+    ],
     "Code": {
      "S3Bucket": {
       "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"

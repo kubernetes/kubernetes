@@ -20,7 +20,7 @@ class LinuxLambdaImageTestStack extends Stack {
       }),
       environment: {
         computeType: ComputeType.LAMBDA_1GB,
-        buildImage: LinuxLambdaBuildImage.AMAZON_LINUX_2_NODE_18,
+        buildImage: LinuxLambdaBuildImage.AMAZON_LINUX_2023_NODE_24,
       },
     });
   }

@@ -26,6 +26,8 @@ export class LinuxLambdaBuildImage implements IBuildImage {
   public static readonly AMAZON_LINUX_2023_NODE_20 = LinuxLambdaBuildImage.fromCodeBuildImageId('aws/codebuild/amazonlinux-x86_64-lambda-standard:nodejs20');
   /** The `aws/codebuild/amazonlinux-x86_64-lambda-standard:nodejs22` build image. */
   public static readonly AMAZON_LINUX_2023_NODE_22 = LinuxLambdaBuildImage.fromCodeBuildImageId('aws/codebuild/amazonlinux-x86_64-lambda-standard:nodejs22');
+  /** The `aws/codebuild/amazonlinux-x86_64-lambda-standard:nodejs24` build image. */
+  public static readonly AMAZON_LINUX_2023_NODE_24 = LinuxLambdaBuildImage.fromCodeBuildImageId('aws/codebuild/amazonlinux-x86_64-lambda-standard:nodejs24');
   /** The `aws/codebuild/amazonlinux-x86_64-lambda-standard:python3.11` build image. */
   public static readonly AMAZON_LINUX_2_PYTHON_3_11 = LinuxLambdaBuildImage.fromCodeBuildImageId('aws/codebuild/amazonlinux-x86_64-lambda-standard:python3.11');
   /** The `aws/codebuild/amazonlinux-x86_64-lambda-standard:python3.12` build image. */

@@ -8,6 +8,39 @@ export interface LogsGenerateOptions extends Pick<Spec2CdkOptions<typeof LogsDel
   readonly packageBases: PackageBaseNames;
 }
 
+/**
+ * Services for which log delivery mixins are not generated.
+ *
+ * Keyed by service (module) name, e.g. `aws-logs`. Resources in these services may
+ * still declare `vendedLogs` in the service spec — listing the service here suppresses
+ * the generated mixin file, its `mixins.ts` barrel, and its `index.ts` export.
+ */
+const EXCLUDED_SERVICES = new Set([
+  'aws-apigateway',
+  'aws-aps',
+  'aws-b2bi',
+  'aws-backupgateway',
+  'aws-cleanrooms',
+  'aws-cognito',
+  'aws-connect',
+  'aws-iotfleetwise',
+  'aws-ivschat',
+  'aws-kafkaconnect',
+  'aws-logs',
+  'aws-m2',
+  'aws-msk',
+  'aws-osis',
+  'aws-pipes',
+  'aws-route53globalresolver',
+  'aws-route53profiles',
+  'aws-rum',
+  'aws-sagemaker',
+  'aws-stepfunctions',
+  'aws-transfer',
+  'aws-vpclattice',
+  'aws-wafv2',
+]);
+
 export async function generateAll(options: LogsGenerateOptions): Promise<GeneratorResult> {
   const db = await loadPatchedSpec();
   const services = await db.all('service');
@@ -18,7 +51,7 @@ export async function generateAll(options: LogsGenerateOptions): Promise<Generat
   const moduleRequests: GenerateModuleMap = {};
 
   for (const service of services) {
-    if (moduleMap[service.name]) {
+    if (moduleMap[service.name] && !EXCLUDED_SERVICES.has(service.name)) {
       moduleRequests[service.name] = {
         services: [{ namespace: service.cloudFormationNamespace }],
       };

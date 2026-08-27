@@ -136,7 +136,7 @@
     "EncryptionKey": "alias/aws/s3",
     "Environment": {
      "ComputeType": "BUILD_LAMBDA_1GB",
-     "Image": "aws/codebuild/amazonlinux-aarch64-lambda-standard:nodejs18",
+     "Image": "aws/codebuild/amazonlinux-aarch64-lambda-standard:nodejs24",
      "PrivilegedMode": false,
      "Type": "ARM_LAMBDA_CONTAINER"
     },

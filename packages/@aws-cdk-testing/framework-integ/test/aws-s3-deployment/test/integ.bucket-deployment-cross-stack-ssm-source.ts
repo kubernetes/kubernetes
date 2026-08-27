@@ -65,7 +65,7 @@ export class MainStack extends cdk.Stack {
 
     const ssmStack = new SsmStack(this, 'SsmStack');
     const s3Stack = new S3Stack(this, 'S3Stack');
-    s3Stack.addDependency(ssmStack);
+    s3Stack.addStackDependency(ssmStack);
 
     new cdk.CfnOutput(this, 'BucketName', {
       value: s3Stack.bucket.bucketName,

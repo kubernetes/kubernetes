@@ -825,6 +825,46 @@ test('default memory limit is 1024MB', () => {
   Template.fromStack(stack).hasResourceProperties('AWS::Lambda::Function', { MemorySize: 1024 });
 });
 
+test('deployment handler runs on ARM_64', () => {
+  // GIVEN
+  const stack = new cdk.Stack();
+  const bucket = new s3.Bucket(stack, 'Dest');
+
+  // WHEN
+  new s3deploy.BucketDeployment(stack, 'Deploy', {
+    sources: [s3deploy.Source.asset(path.join(__dirname, 'my-website'))],
+    destinationBucket: bucket,
+  });
+
+  // THEN
+  Template.fromStack(stack).hasResourceProperties('AWS::Lambda::Function', {
+    Architectures: ['arm64'],
+  });
+});
+
+test('the ARM_64 handler is still a singleton shared across deployments', () => {
+  // GIVEN
+  const stack = new cdk.Stack();
+  const bucket = new s3.Bucket(stack, 'Dest');
+
+  // WHEN
+  new s3deploy.BucketDeployment(stack, 'Deploy1', {
+    sources: [s3deploy.Source.asset(path.join(__dirname, 'my-website'))],
+    destinationBucket: bucket,
+  });
+  new s3deploy.BucketDeployment(stack, 'Deploy2', {
+    sources: [s3deploy.Source.asset(path.join(__dirname, 'my-website'))],
+    destinationBucket: bucket,
+  });
+
+  // THEN - a single handler, on arm64
+  const template = Template.fromStack(stack);
+  template.resourceCountIs('AWS::Lambda::Function', 1);
+  template.hasResourceProperties('AWS::Lambda::Function', {
+    Architectures: ['arm64'],
+  });
+});
+
 test('memoryLimit can be used to specify the memory limit for the deployment resource handler', () => {
   // GIVEN
   const stack = new cdk.Stack();
