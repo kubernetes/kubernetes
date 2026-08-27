@@ -347,7 +347,15 @@ func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claim *resourc
 
 	claimID := ClaimID{Name: claim.Name, UID: claim.UID}
 	if result, ok := ex.prepared[claimID]; ok {
-		// Idempotent call, nothing to do.
+		// Idempotent call: re-write CDI spec files to ensure they exist
+		// on disk (they may have been lost during a node/runtime restart),
+		// then return the cached result.
+		if err := ex.ensureCDISpecFiles(claim); err != nil {
+			logger.Error(err, "Failed to re-establish CDI spec files for already-prepared claim", "claim", claim.Name)
+			// Remove from prepared map so next call does full preparation.
+			delete(ex.prepared, claimID)
+			return nil, err
+		}
 		return result, nil
 	}
 
@@ -380,11 +388,6 @@ func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claim *resourc
 		claimReqName = regexp.MustCompile(`[^a-zA-Z0-9]`).ReplaceAllString(claimReqName, "_")
 		env[claimReqName] = "true"
 
-		deviceName := "claim-" + string(claim.UID) + "-" + baseRequestName
-		vendor := ex.driverName
-		class := "test"
-		cdiDeviceID := vendor + "/" + class + "=" + deviceName
-
 		// CDI wants env variables as set of strings.
 		envs := []string{}
 		for key, val := range env {
@@ -401,29 +404,9 @@ func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claim *resourc
 			continue
 		}
 
-		spec := &cdi.Spec{
-			Kind: vendor + "/" + class,
-			Devices: []cdi.Device{
-				{
-					Name: deviceName,
-					ContainerEdits: cdi.ContainerEdits{
-						Env: envs,
-					},
-				},
-			},
-		}
-		minVersion, err := cdi.MinimumRequiredVersion(spec)
+		cdiDeviceID, err := ex.writeCDISpecFile(claim.UID, baseRequestName, envs)
 		if err != nil {
-			return nil, fmt.Errorf("determine CDI spec version: %w", err)
-		}
-		spec.Version = minVersion
-		filePath := ex.getJSONFilePath(claim.UID, baseRequestName)
-		buffer, err := json.Marshal(spec)
-		if err != nil {
-			return nil, fmt.Errorf("marshal spec: %w", err)
-		}
-		if err := ex.fileOps.Create(filePath, buffer); err != nil {
-			return nil, fmt.Errorf("failed to write CDI file: %w", err)
+			return nil, err
 		}
 		device := kubeletplugin.Device{
 			PoolName:     result.Pool,
@@ -464,6 +447,85 @@ func extractParameters(parameters runtime.RawExtension, env *map[string]string, 
 	}
 	for key, value := range data {
 		(*env)[kind+"_"+key] = value
+	}
+	return nil
+}
+
+// writeCDISpecFile builds a CDI spec from the given environment variables and
+// writes it to the appropriate JSON file. This is the shared implementation
+// used by both the initial preparation path and the idempotent re-write path.
+func (ex *ExamplePlugin) writeCDISpecFile(claimUID types.UID, baseRequestName string, envs []string) (string, error) {
+	deviceName := "claim-" + string(claimUID) + "-" + baseRequestName
+	vendor := ex.driverName
+	class := "test"
+
+	spec := &cdi.Spec{
+		Kind: vendor + "/" + class,
+		Devices: []cdi.Device{
+			{
+				Name: deviceName,
+				ContainerEdits: cdi.ContainerEdits{
+					Env: envs,
+				},
+			},
+		},
+	}
+	minVersion, err := cdi.MinimumRequiredVersion(spec)
+	if err != nil {
+		return "", fmt.Errorf("determine CDI spec version: %w", err)
+	}
+	spec.Version = minVersion
+	filePath := ex.getJSONFilePath(claimUID, baseRequestName)
+	buffer, err := json.Marshal(spec)
+	if err != nil {
+		return "", fmt.Errorf("marshal spec: %w", err)
+	}
+	if err := ex.fileOps.Create(filePath, buffer); err != nil {
+		return "", fmt.Errorf("failed to write CDI file: %w", err)
+	}
+
+	cdiDeviceID := vendor + "/" + class + "=" + deviceName
+	return cdiDeviceID, nil
+}
+
+// ensureCDISpecFiles re-creates the CDI spec files for an already-prepared claim.
+// This handles the case where CDI spec files were lost during a node or runtime
+// restart, but the driver still considers the claim prepared (idempotent replay).
+func (ex *ExamplePlugin) ensureCDISpecFiles(claim *resourceapi.ResourceClaim) error {
+	for _, result := range claim.Status.Allocation.Devices.Results {
+		if ex.driverName != result.Driver {
+			continue
+		}
+
+		baseRequestName := resourceclaim.BaseRequestRef(result.Request)
+		configs := resourceclaim.ConfigForResult(claim.Status.Allocation.Devices.Config, result)
+		env := make(map[string]string)
+		for i, config := range configs {
+			if config.Opaque.Driver != ex.driverName {
+				continue
+			}
+			if err := extractParameters(config.Opaque.Parameters, &env, config.Source == resourceapi.AllocationConfigSourceClass); err != nil {
+				return fmt.Errorf("parameters in config #%d: %w", i, err)
+			}
+		}
+
+		claimReqName := "claim_" + claim.Name + "_" + baseRequestName
+		claimReqName = regexp.MustCompile(`[^a-zA-Z0-9]`).ReplaceAllString(claimReqName, "_")
+		env[claimReqName] = "true"
+
+		envs := []string{}
+		for key, val := range env {
+			envs = append(envs, key+"="+val)
+		}
+		sort.Strings(envs)
+
+		if len(envs) == 0 {
+			continue
+		}
+
+		if _, err := ex.writeCDISpecFile(claim.UID, baseRequestName, envs); err != nil {
+			return err
+		}
 	}
 	return nil
 }

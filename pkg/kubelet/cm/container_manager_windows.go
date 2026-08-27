@@ -388,6 +388,9 @@ func (cm *containerManagerImpl) UnprepareDynamicResources(ctx context.Context, p
 	return nil
 }
 
+func (cm *containerManagerImpl) InvalidatePreparedDynamicResources(pod *v1.Pod) {
+}
+
 func (cm *containerManagerImpl) PodMightNeedToUnprepareResources(UID types.UID) bool {
 	return false
 }

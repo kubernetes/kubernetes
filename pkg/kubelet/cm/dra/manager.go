@@ -602,6 +602,38 @@ func (m *Manager) GetResources(pod *v1.Pod, container *v1.Container) (*Container
 	return &ContainerInfo{CDIDevices: cdiDevices}, nil
 }
 
+// InvalidatePreparedResources clears the prepared state for all claims
+// referenced by the given pod. This causes the next PrepareResources call
+// to re-invoke NodePrepareResources on the DRA driver, giving the driver
+// a chance to re-establish any artifacts (e.g., CDI spec files) that may
+// have been lost during a node or runtime restart.
+//
+// This should be called when container creation fails due to CDI device
+// resolution errors, which indicates that the driver's preparation result
+// is no longer valid even though the kubelet believes it was prepared.
+func (m *Manager) InvalidatePreparedResources(pod *v1.Pod) {
+	logger := klog.Background().WithName("dra-manager")
+	m.cache.withLock(logger, func() error {
+		for i := range pod.Spec.ResourceClaims {
+			podClaim := &pod.Spec.ResourceClaims[i]
+			claimName, _, err := resourceclaim.Name(pod, podClaim)
+			if err != nil || claimName == nil {
+				continue
+			}
+			claimInfo, exists := m.cache.get(*claimName, pod.Namespace)
+			if !exists {
+				continue
+			}
+			if claimInfo.isPrepared() && !claimInfo.isUnpreparing() {
+				claimInfo.clearPrepared()
+				logger.V(3).Info("Invalidated prepared state for claim due to CDI failure",
+					"pod", klog.KObj(pod), "claim", *claimName)
+			}
+		}
+		return nil
+	})
+}
+
 // UnprepareResources calls a driver's NodeUnprepareResource API for each resource claim owned by a pod.
 // This function is idempotent and may be called multiple times against the same pod.
 // As such, calls to the underlying NodeUnprepareResource API are skipped for claims that have

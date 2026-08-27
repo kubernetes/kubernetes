@@ -194,6 +194,15 @@ func (info *ClaimInfo) setPrepared() {
 	info.prepared = true
 }
 
+// clearPrepared resets the prepared state so that the next
+// PrepareResources call will re-invoke NodePrepareResources.
+// This is used when container creation fails due to CDI device
+// resolution errors, indicating that the preparation result
+// (e.g., CDI spec files) may be stale or missing.
+func (info *ClaimInfo) clearPrepared() {
+	info.prepared = false
+}
+
 // isPrepared checks if claim info is prepared or not.
 func (info *ClaimInfo) isPrepared() bool {
 	return info.prepared

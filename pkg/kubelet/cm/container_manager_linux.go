@@ -1141,6 +1141,10 @@ func (cm *containerManagerImpl) UnprepareDynamicResources(ctx context.Context, p
 	return cm.draManager.UnprepareResources(ctx, pod)
 }
 
+func (cm *containerManagerImpl) InvalidatePreparedDynamicResources(pod *v1.Pod) {
+	cm.draManager.InvalidatePreparedResources(pod)
+}
+
 func (cm *containerManagerImpl) PodMightNeedToUnprepareResources(UID types.UID) bool {
 	return cm.draManager.PodMightNeedToUnprepareResources(UID)
 }
