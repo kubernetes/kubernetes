@@ -1946,7 +1946,7 @@ func TestToken(t *testing.T) {
 				"username": "jane",
 				"exp": %d
 			}`, valid.Unix()),
-			wantErr: `oidc: verify token: oidc: id token signed with unsupported algorithm, expected ["RS256"] got "PS256"`,
+			wantErr: `oidc: verify token: oidc: malformed jwt: unexpected signature algorithm "PS256"; expected ["RS256"]`,
 		},
 		{
 			name: "ps256",
@@ -4964,8 +4964,8 @@ func TestJWKSMetrics(t *testing.T) {
 	}
 	ts.setKeys(toKeySet(pubKeys))
 
-	// Try to authenticate with a new token (this will likely fail due to cancelled context,
-	// but we're testing that even if any HTTP request happens, metrics won't be updated)
+	// Try to authenticate with a new token
+	// (we're testing that even if any HTTP request happens, metrics won't be updated)
 	jws, err = signer.Sign([]byte(claims))
 	if err != nil {
 		t.Fatalf("sign claims: %v", err)
@@ -4974,10 +4974,10 @@ func TestJWKSMetrics(t *testing.T) {
 	if err != nil {
 		t.Fatalf("serialize token: %v", err)
 	}
-	// Authentication will likely fail with cancelled context, which is expected
+	// Provide a new, non-cancelled context so that key fetching can proceed as usual
 	_, _, err = a.AuthenticateToken(context.Background(), token)
-	if err == nil || !strings.Contains(err.Error(), "context canceled") {
-		t.Fatalf("expected context canceled error, got: %v", err)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
 	}
 
 	// Verify metrics did NOT change after context cancellation
