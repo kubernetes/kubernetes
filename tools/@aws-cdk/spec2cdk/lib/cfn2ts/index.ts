@@ -3,6 +3,7 @@ import type { ModuleMap, ModuleMapScope } from '../module-topology';
 import { readModuleMap } from '../module-topology';
 import * as naming from '../naming';
 import { jsii } from '../util';
+import { CANNED_METRICS_SUFFIX } from './submodules';
 import { getAllScopes } from '../util/db';
 
 /**
@@ -113,7 +114,7 @@ export async function generateAll(
         filePatterns: {
           resources: '%moduleName%/lib/%serviceShortName%.generated.ts',
           augmentations: '%moduleName%/lib/%serviceShortName%-augmentations.generated.ts',
-          cannedMetrics: '%moduleName%/lib/%serviceShortName%-canned-metrics.generated.ts',
+          cannedMetrics: `%moduleName%/lib/%serviceShortName%${CANNED_METRICS_SUFFIX}`,
           grants: `${isStable ? '%moduleName%/' : ''}lib/%serviceShortName%-grants.generated.ts`,
         },
       },
