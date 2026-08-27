@@ -21,6 +21,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/test/utils/harness"
 )
@@ -61,6 +62,8 @@ func TestMountDevice(tt *testing.T) {
 	t := harness.For(tt)
 	defer t.Close()
 
+	logger, _ := ktesting.NewTestContext(tt)
+
 	spec := fakeVolumeSpec()
 
 	plugin, rootDir := testPlugin(t)
@@ -70,10 +73,11 @@ func TestMountDevice(tt *testing.T) {
 	)
 
 	a, _ := plugin.NewAttacher()
-	a.MountDevice(spec, "/dev/sdx", rootDir+"/mount-dir", volume.DeviceMounterArgs{})
+	_ = a.MountDevice(logger, spec, "/dev/sdx", rootDir+"/mount-dir", volume.DeviceMounterArgs{})
 }
 
 func TestIsVolumeAttached(tt *testing.T) {
+	logger, _ := ktesting.NewTestContext(tt)
 	t := harness.For(tt)
 	defer t.Close()
 
@@ -85,5 +89,5 @@ func TestIsVolumeAttached(tt *testing.T) {
 	)
 	a, _ := plugin.NewAttacher()
 	specs := []*volume.Spec{spec}
-	a.VolumesAreAttached(specs, "localhost")
+	_, _ = a.VolumesAreAttached(logger, specs, "localhost")
 }

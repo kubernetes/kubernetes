@@ -19,6 +19,7 @@ limitations under the License.
 package emptydir
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -39,6 +40,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -216,8 +218,9 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		}
 	}
 
+	tCtx := ktesting.Init(t)
 	// Stat the directory and check the permission bits
-	testSetUp(mounter, metadataDir, volPath)
+	_ = testSetUp(tCtx, mounter, metadataDir, volPath)
 
 	log := physicalMounter.GetLog()
 	// Check the number of mounts performed during setup
@@ -268,8 +271,8 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 	physicalMounter.ResetLog()
 }
 
-func testSetUp(mounter volume.Mounter, metadataDir, volPath string) error {
-	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+func testSetUp(tCtx context.Context, mounter volume.Mounter, metadataDir, volPath string) error {
+	if err := mounter.SetUp(tCtx, volume.MounterArgs{}); err != nil {
 		return fmt.Errorf("expected success, got: %w", err)
 	}
 	// Stat the directory and check the permission bits
@@ -1352,6 +1355,8 @@ func TestResizeEphemeralVolume(t *testing.T) {
 func TestEmptyDirVolumeMode(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmptyDirVolumeMode, true)
 
+	tCtx := ktesting.Init(t)
+
 	testCases := []struct {
 		name         string
 		mode         *int32
@@ -1409,7 +1414,7 @@ func TestEmptyDirVolumeMode(t *testing.T) {
 				t.Fatalf("Failed to make a new Mounter: %v", err)
 			}
 
-			if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+			if err := mounter.SetUp(tCtx, volume.MounterArgs{}); err != nil {
 				t.Fatalf("SetUp failed: %v", err)
 			}
 
@@ -1434,6 +1439,8 @@ func TestEmptyDirVolumeMode(t *testing.T) {
 
 func TestEmptyDirVolumeModeFeatureGateDisabled(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmptyDirVolumeMode, false)
+
+	tCtx := ktesting.Init(t)
 
 	basePath, err := utiltesting.MkTmpdir("emptydir_mode_gate_test")
 	if err != nil {
@@ -1467,7 +1474,7 @@ func TestEmptyDirVolumeModeFeatureGateDisabled(t *testing.T) {
 		t.Fatalf("Failed to make a new Mounter: %v", err)
 	}
 
-	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+	if err := mounter.SetUp(tCtx, volume.MounterArgs{}); err != nil {
 		t.Fatalf("SetUp failed: %v", err)
 	}
 

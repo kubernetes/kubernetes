@@ -21,6 +21,7 @@ limitations under the License.
 package operationexecutor
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -70,11 +71,11 @@ type OperationExecutor interface {
 	// Note that this operation could be operated concurrently with other attach/detach operations.
 	// In theory (but very unlikely in practise), race condition among these operations might mark volume as detached
 	// even if it is attached. But reconciler can correct this in a short period of time.
-	VerifyVolumesAreAttachedPerNode(AttachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
+	VerifyVolumesAreAttachedPerNode(logger klog.Logger, AttachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
 
 	// VerifyVolumesAreAttached verifies volumes being used in entire cluster and if they are still attached to the node
 	// If any volume is not attached right now, it will update actual state of world to reflect that.
-	VerifyVolumesAreAttached(volumesToVerify map[types.NodeName][]AttachedVolume, actualStateOfWorld ActualStateOfWorldAttacherUpdater)
+	VerifyVolumesAreAttached(logger klog.Logger, volumesToVerify map[types.NodeName][]AttachedVolume, actualStateOfWorld ActualStateOfWorldAttacherUpdater)
 
 	// DetachVolume detaches the volume from the node specified in
 	// volumeToDetach, and updates the actual state of the world to reflect
@@ -105,7 +106,7 @@ type OperationExecutor interface {
 	// * Map volume to global map path using symbolic link.
 	// * Map the volume to the pod device map path using symbolic link.
 	// * Update actual state of world to reflect volume is mounted/mapped to the pod path.
-	MountVolume(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater, isRemount bool) error
+	MountVolume(ctx context.Context, waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater, isRemount bool) error
 
 	// If a volume has 'Filesystem' volumeMode, UnmountVolume unmounts the
 	// volume from the pod specified in volumeToUnmount and updates the actual
@@ -137,7 +138,7 @@ type OperationExecutor interface {
 	// If the volume is not found or there is an error (fetching the node
 	// object, for example) then an error is returned which triggers exponential
 	// back off on retries.
-	VerifyControllerAttachedVolume(logger klog.Logger, volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
+	VerifyControllerAttachedVolume(ctx context.Context, volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
 
 	// IsOperationPending returns true if an operation for the given volumeName
 	// and one of podName or nodeName is pending, otherwise it returns false
@@ -806,11 +807,12 @@ func (oe *operationExecutor) DetachVolume(
 }
 
 func (oe *operationExecutor) VerifyVolumesAreAttached(
+	logger klog.Logger,
 	attachedVolumes map[types.NodeName][]AttachedVolume,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) {
 
 	for node, nodeAttachedVolumes := range attachedVolumes {
-		nodeError := oe.VerifyVolumesAreAttachedPerNode(nodeAttachedVolumes, node, actualStateOfWorld)
+		nodeError := oe.VerifyVolumesAreAttachedPerNode(logger, nodeAttachedVolumes, node, actualStateOfWorld)
 		if nodeError != nil {
 			klog.Errorf("VerifyVolumesAreAttached failed for volumes %v, node %q with error %v", nodeAttachedVolumes, node, nodeError)
 		}
@@ -818,11 +820,12 @@ func (oe *operationExecutor) VerifyVolumesAreAttached(
 }
 
 func (oe *operationExecutor) VerifyVolumesAreAttachedPerNode(
+	logger klog.Logger,
 	attachedVolumes []AttachedVolume,
 	nodeName types.NodeName,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
 	generatedOperations, err :=
-		oe.operationGenerator.GenerateVolumesAreAttachedFunc(attachedVolumes, nodeName, actualStateOfWorld)
+		oe.operationGenerator.GenerateVolumesAreAttachedFunc(logger, attachedVolumes, nodeName, actualStateOfWorld)
 	if err != nil {
 		return err
 	}
@@ -832,6 +835,7 @@ func (oe *operationExecutor) VerifyVolumesAreAttachedPerNode(
 }
 
 func (oe *operationExecutor) MountVolume(
+	ctx context.Context,
 	waitForAttachTimeout time.Duration,
 	volumeToMount VolumeToMount,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater,
@@ -845,13 +849,13 @@ func (oe *operationExecutor) MountVolume(
 		// Filesystem volume case
 		// Mount/remount a volume when a volume is attached
 		generatedOperations = oe.operationGenerator.GenerateMountVolumeFunc(
-			waitForAttachTimeout, volumeToMount, actualStateOfWorld, isRemount)
+			ctx, waitForAttachTimeout, volumeToMount, actualStateOfWorld, isRemount)
 
 	} else {
 		// Block volume case
 		// Creates a map to device if a volume is attached
 		generatedOperations, err = oe.operationGenerator.GenerateMapVolumeFunc(
-			waitForAttachTimeout, volumeToMount, actualStateOfWorld)
+			ctx, waitForAttachTimeout, volumeToMount, actualStateOfWorld)
 	}
 	if err != nil {
 		return err
@@ -943,12 +947,12 @@ func (oe *operationExecutor) ExpandInUseVolume(volumeToMount VolumeToMount, actu
 }
 
 func (oe *operationExecutor) VerifyControllerAttachedVolume(
-	logger klog.Logger,
+	ctx context.Context,
 	volumeToMount VolumeToMount,
 	nodeName types.NodeName,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
 	generatedOperations, err :=
-		oe.operationGenerator.GenerateVerifyControllerAttachedVolumeFunc(logger, volumeToMount, nodeName, actualStateOfWorld)
+		oe.operationGenerator.GenerateVerifyControllerAttachedVolumeFunc(ctx, volumeToMount, nodeName, actualStateOfWorld)
 	if err != nil {
 		return err
 	}

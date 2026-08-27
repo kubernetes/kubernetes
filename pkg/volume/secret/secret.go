@@ -17,6 +17,7 @@ limitations under the License.
 package secret
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -46,7 +47,7 @@ const (
 // secretPlugin implements the VolumePlugin interface.
 type secretPlugin struct {
 	host      volume.VolumeHost
-	getSecret func(namespace, name string) (*v1.Secret, error)
+	getSecret func(ctx context.Context, namespace, name string) (*v1.Secret, error)
 }
 
 var _ volume.VolumePlugin = &secretPlugin{}
@@ -84,7 +85,7 @@ func (plugin *secretPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.Secret != nil
 }
 
-func (plugin *secretPlugin) RequiresRemount(spec *volume.Spec) bool {
+func (plugin *secretPlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool {
 	return true
 }
 
@@ -92,7 +93,7 @@ func (plugin *secretPlugin) SupportsMountOption() bool {
 	return false
 }
 
-func (plugin *secretPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+func (plugin *secretPlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return false, nil
 }
 
@@ -158,7 +159,7 @@ type secretVolumeMounter struct {
 
 	source    v1.SecretVolumeSource
 	pod       v1.Pod
-	getSecret func(namespace, name string) (*v1.Secret, error)
+	getSecret func(ctx context.Context, namespace, name string) (*v1.Secret, error)
 }
 
 var _ volume.Mounter = &secretVolumeMounter{}
@@ -171,21 +172,23 @@ func (sv *secretVolume) GetAttributes() volume.Attributes {
 	}
 }
 
-func (b *secretVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
-	return b.SetUpAt(b.GetPath(), mounterArgs)
+func (b *secretVolumeMounter) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
+	return b.SetUpAt(ctx, b.GetPath(), mounterArgs)
 }
 
-func (b *secretVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (b *secretVolumeMounter) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
+	logger := klog.FromContext(ctx)
 	klog.V(3).Infof("Setting up volume %v for pod %v at %v", b.volName, b.pod.UID, dir)
 
 	// Wrap EmptyDir, let it do the setup.
-	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec(), &b.pod)
+	wrapped, err := b.plugin.host.NewWrapperMounter(logger, b.volName, wrappedVolumeSpec(), &b.pod)
 	if err != nil {
 		return err
 	}
 
 	optional := b.source.Optional != nil && *b.source.Optional
-	secret, err := b.getSecret(b.pod.Namespace, b.source.SecretName)
+	// TODO: pass actual context to collectData once contextual migration is complete
+	secret, err := b.getSecret(context.TODO(), b.pod.Namespace, b.source.SecretName)
 	if err != nil {
 		if !(apierrors.IsNotFound(err) && optional) {
 			klog.Errorf("Couldn't get secret %v/%v: %v", b.pod.Namespace, b.source.SecretName, err)
@@ -212,7 +215,7 @@ func (b *secretVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs
 	}
 
 	setupSuccess := false
-	if err := wrapped.SetUpAt(dir, mounterArgs); err != nil {
+	if err := wrapped.SetUpAt(ctx, dir, mounterArgs); err != nil {
 		return err
 	}
 	if err := volumeutil.MakeNestedMountpoints(b.volName, dir, b.pod); err != nil {

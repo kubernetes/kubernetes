@@ -206,7 +206,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods(logger klog.L
 
 			// check if the attachability has changed for this volume
 			if volumeToMount.PluginIsAttachable {
-				attachableVolumePlugin, err := dswp.volumePluginMgr.FindAttachablePluginBySpec(volumeToMount.VolumeSpec)
+				attachableVolumePlugin, err := dswp.volumePluginMgr.FindAttachablePluginBySpec(logger, volumeToMount.VolumeSpec)
 				// only this means the plugin is truly non-attachable
 				if err == nil && attachableVolumePlugin == nil {
 					// It is not possible right now for a CSI plugin to be both attachable and non-deviceMountable

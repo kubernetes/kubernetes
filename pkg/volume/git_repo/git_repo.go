@@ -17,6 +17,7 @@ limitations under the License.
 package git_repo
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -79,7 +81,7 @@ func (plugin *gitRepoPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.GitRepo != nil
 }
 
-func (plugin *gitRepoPlugin) RequiresRemount(spec *volume.Spec) bool {
+func (plugin *gitRepoPlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool {
 	return false
 }
 
@@ -87,7 +89,7 @@ func (plugin *gitRepoPlugin) SupportsMountOption() bool {
 	return false
 }
 
-func (plugin *gitRepoPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+func (plugin *gitRepoPlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return false, nil
 }
 
@@ -170,26 +172,27 @@ func (b *gitRepoVolumeMounter) GetAttributes() volume.Attributes {
 }
 
 // SetUp creates new directory and clones a git repo.
-func (b *gitRepoVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
+func (b *gitRepoVolumeMounter) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.GitRepoVolumeDriver) {
 		return fmt.Errorf("git-repo volume plugin has been disabled; if necessary, it may be re-enabled by enabling the feature-gate `GitRepoVolumeDriver`")
 	}
 
-	return b.SetUpAt(b.GetPath(), mounterArgs)
+	return b.SetUpAt(ctx, b.GetPath(), mounterArgs)
 }
 
 // SetUpAt creates new directory and clones a git repo.
-func (b *gitRepoVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (b *gitRepoVolumeMounter) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
+	logger := klog.FromContext(ctx)
 	if volumeutil.IsReady(b.getMetaDir()) {
 		return nil
 	}
 
 	// Wrap EmptyDir, let it do the setup.
-	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec(), &b.pod)
+	wrapped, err := b.plugin.host.NewWrapperMounter(logger, b.volName, wrappedVolumeSpec(), &b.pod)
 	if err != nil {
 		return err
 	}
-	if err := wrapped.SetUpAt(dir, mounterArgs); err != nil {
+	if err := wrapped.SetUpAt(ctx, dir, mounterArgs); err != nil {
 		return err
 	}
 

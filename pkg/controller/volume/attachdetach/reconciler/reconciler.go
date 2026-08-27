@@ -125,23 +125,23 @@ func (rc *reconciler) reconciliationLoopFunc(ctx context.Context) func(context.C
 			logger.V(5).Info("Skipping reconciling attached volumes still attached since it is set to less than one second via the command line")
 		} else if time.Since(rc.timeOfLastSync) > rc.syncDuration {
 			logger.V(5).Info("Starting reconciling attached volumes still attached")
-			rc.sync()
+			rc.sync(logger)
 		}
 	}
 }
 
-func (rc *reconciler) sync() {
+func (rc *reconciler) sync(logger klog.Logger) {
 	defer rc.updateSyncTime()
-	rc.syncStates()
+	rc.syncStates(logger)
 }
 
 func (rc *reconciler) updateSyncTime() {
 	rc.timeOfLastSync = time.Now()
 }
 
-func (rc *reconciler) syncStates() {
+func (rc *reconciler) syncStates(logger klog.Logger) {
 	volumesPerNode := rc.actualStateOfWorld.GetAttachedVolumesPerNode()
-	rc.attacherDetacher.VerifyVolumesAreAttached(volumesPerNode, rc.actualStateOfWorld)
+	rc.attacherDetacher.VerifyVolumesAreAttached(logger, volumesPerNode, rc.actualStateOfWorld)
 }
 
 // hasOutOfServiceTaint returns true if the node has out-of-service taint present.

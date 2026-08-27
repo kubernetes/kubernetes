@@ -27,6 +27,7 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"k8s.io/klog/v2/ktesting"
 
 	api "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -203,6 +204,8 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
+	logger, _ := ktesting.NewTestContext(t)
+
 	csiMapper, _, pv, err := prepareBlockMapperTest(plug, "test-pv", t)
 	if err != nil {
 		t.Fatalf("Failed to make a new Mapper: %v", err)
@@ -222,7 +225,7 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 	}
 	t.Log("created attachment ", attachID)
 
-	stagingPath, err := csiMapper.SetUpDevice()
+	stagingPath, err := csiMapper.SetUpDevice(logger)
 	if err != nil {
 		t.Fatalf("mapper failed to SetupDevice: %v", err)
 	}
@@ -241,6 +244,8 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 func TestBlockMapperSetupDeviceError(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
+
+	logger, _ := ktesting.NewTestContext(t)
 
 	csiMapper, _, pv, err := prepareBlockMapperTest(plug, "test-pv", t)
 	if err != nil {
@@ -263,7 +268,7 @@ func TestBlockMapperSetupDeviceError(t *testing.T) {
 	}
 	t.Log("created attachment ", attachID)
 
-	stagingPath, err := csiMapper.SetUpDevice()
+	stagingPath, err := csiMapper.SetUpDevice(logger)
 	if err == nil {
 		t.Fatal("mapper unexpectedly succeeded")
 	}
@@ -288,6 +293,8 @@ func TestBlockMapperSetupDeviceNoClientError(t *testing.T) {
 	transientError := volumetypes.NewTransientOperationFailure("")
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
+
+	logger, _ := ktesting.NewTestContext(t)
 
 	csiMapper, _, pv, err := prepareBlockMapperTest(plug, "test-pv", t)
 	if err != nil {
@@ -315,7 +322,7 @@ func TestBlockMapperSetupDeviceNoClientError(t *testing.T) {
 	// Note that prepareBlockMapperTest above will create a driver with a name of "test-driver"
 	csiMapper.csiClientGetter.driverName = "unknown-driver"
 
-	_, err = csiMapper.SetUpDevice()
+	_, err = csiMapper.SetUpDevice(logger)
 	if err == nil {
 		t.Errorf("test should fail, but no error occurred")
 	} else if reflect.TypeOf(transientError) != reflect.TypeOf(err) {
@@ -326,6 +333,8 @@ func TestBlockMapperSetupDeviceNoClientError(t *testing.T) {
 func TestBlockMapperMapPodDevice(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
+
+	logger, _ := ktesting.NewTestContext(t)
 
 	csiMapper, _, pv, err := prepareBlockMapperTest(plug, "test-pv", t)
 	if err != nil {
@@ -347,7 +356,7 @@ func TestBlockMapperMapPodDevice(t *testing.T) {
 	t.Log("created attachment ", attachID)
 
 	// Map device to global and pod device map path
-	path, err := csiMapper.MapPodDevice()
+	path, err := csiMapper.MapPodDevice(logger)
 	if err != nil {
 		t.Fatalf("mapper failed to GetGlobalMapPath: %v", err)
 	}
@@ -369,6 +378,7 @@ func TestBlockMapperMapPodDevice(t *testing.T) {
 }
 
 func TestBlockMapperMapPodDeviceNotSupportAttach(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	fakeClient := fakeclient.NewSimpleClientset()
 	attachRequired := false
 	fakeDriver := &storagev1.CSIDriver{
@@ -397,7 +407,7 @@ func TestBlockMapperMapPodDeviceNotSupportAttach(t *testing.T) {
 	csiMapper.csiClient = setupClient(t, true)
 
 	// Map device to global and pod device map path
-	path, err := csiMapper.MapPodDevice()
+	path, err := csiMapper.MapPodDevice(logger)
 	if err != nil {
 		t.Fatalf("mapper failed to GetGlobalMapPath: %v", err)
 	}
@@ -408,6 +418,7 @@ func TestBlockMapperMapPodDeviceNotSupportAttach(t *testing.T) {
 }
 
 func TestBlockMapperMapPodDeviceWithPodInfo(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	fakeClient := fakeclient.NewSimpleClientset()
 	attachRequired := false
 	podInfo := true
@@ -438,7 +449,7 @@ func TestBlockMapperMapPodDeviceWithPodInfo(t *testing.T) {
 	csiMapper.csiClient = setupClient(t, true)
 
 	// Map device to global and pod device map path
-	_, err = csiMapper.MapPodDevice()
+	_, err = csiMapper.MapPodDevice(logger)
 	if err != nil {
 		t.Fatalf("mapper failed to GetGlobalMapPath: %v", err)
 	}
@@ -454,6 +465,7 @@ func TestBlockMapperMapPodDeviceWithPodInfo(t *testing.T) {
 }
 
 func TestBlockMapperMapPodDeviceNoClientError(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	transientError := volumetypes.NewTransientOperationFailure("")
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
@@ -484,7 +496,7 @@ func TestBlockMapperMapPodDeviceNoClientError(t *testing.T) {
 	// Note that prepareBlockMapperTest above will create a driver with a name of "test-driver"
 	csiMapper.csiClientGetter.driverName = "unknown-driver"
 
-	_, err = csiMapper.MapPodDevice()
+	_, err = csiMapper.MapPodDevice(logger)
 	if err == nil {
 		t.Errorf("test should fail, but no error occurred")
 	} else if reflect.TypeOf(transientError) != reflect.TypeOf(err) {
@@ -493,6 +505,7 @@ func TestBlockMapperMapPodDeviceNoClientError(t *testing.T) {
 }
 
 func TestBlockMapperMapPodDeviceGetStageSecretsError(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	transientError := volumetypes.NewTransientOperationFailure("")
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer func() {
@@ -524,7 +537,7 @@ func TestBlockMapperMapPodDeviceGetStageSecretsError(t *testing.T) {
 	}
 	t.Log("created attachment ", attachID)
 
-	_, err = csiMapper.MapPodDevice()
+	_, err = csiMapper.MapPodDevice(logger)
 	if err == nil {
 		t.Errorf("test should fail, but no error occurred")
 	} else if !errors.As(err, &transientError) {
@@ -650,6 +663,8 @@ func TestVolumeSetupTeardown(t *testing.T) {
 	// Follow volume setup + teardown sequences at top of cs_block.go and set up / clean up one CSI block device.
 	// Focus on testing that there were no leftover files present after the cleanup.
 
+	logger, _ := ktesting.NewTestContext(t)
+
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
@@ -672,7 +687,7 @@ func TestVolumeSetupTeardown(t *testing.T) {
 	}
 	t.Log("created attachment ", attachID)
 
-	stagingPath, err := csiMapper.SetUpDevice()
+	stagingPath, err := csiMapper.SetUpDevice(logger)
 	if err != nil {
 		t.Fatalf("mapper failed to SetupDevice: %v", err)
 	}
@@ -686,7 +701,7 @@ func TestVolumeSetupTeardown(t *testing.T) {
 		t.Errorf("csi server expected device path %s, got %s", stagingPath, svol.Path)
 	}
 
-	path, err := csiMapper.MapPodDevice()
+	path, err := csiMapper.MapPodDevice(logger)
 	if err != nil {
 		t.Fatalf("mapper failed to GetGlobalMapPath: %v", err)
 	}
@@ -764,6 +779,7 @@ func TestVolumeSetupTeardown(t *testing.T) {
 }
 
 func TestUnmapPodDeviceNoClientError(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	transientError := volumetypes.NewTransientOperationFailure("")
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
@@ -787,7 +803,7 @@ func TestUnmapPodDeviceNoClientError(t *testing.T) {
 	}
 	t.Log("created attachment ", attachID)
 
-	stagingPath, err := csiMapper.SetUpDevice()
+	stagingPath, err := csiMapper.SetUpDevice(logger)
 	if err != nil {
 		t.Fatalf("mapper failed to SetupDevice: %v", err)
 	}
@@ -801,7 +817,7 @@ func TestUnmapPodDeviceNoClientError(t *testing.T) {
 		t.Errorf("csi server expected device path %s, got %s", stagingPath, svol.Path)
 	}
 
-	path, err := csiMapper.MapPodDevice()
+	path, err := csiMapper.MapPodDevice(logger)
 	if err != nil {
 		t.Fatalf("mapper failed to GetGlobalMapPath: %v", err)
 	}

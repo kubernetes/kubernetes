@@ -17,10 +17,12 @@ limitations under the License.
 package image
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -80,15 +82,19 @@ func (o *imagePlugin) GetAttributes() volume.Attributes {
 	}
 }
 
-func (o *imagePlugin) GetPath() string                                             { return "" }
-func (o *imagePlugin) RequiresFSResize() bool                                      { return false }
-func (o *imagePlugin) RequiresRemount(spec *volume.Spec) bool                      { return false }
-func (o *imagePlugin) SetUp(mounterArgs volume.MounterArgs) error                  { return nil }
-func (o *imagePlugin) SetUpAt(dir string, mounterArgs volume.MounterArgs) error    { return nil }
-func (o *imagePlugin) SupportsMountOption() bool                                   { return false }
-func (o *imagePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) { return false, nil }
-func (o *imagePlugin) TearDown() error                                             { return nil }
-func (o *imagePlugin) TearDownAt(string) error                                     { return nil }
+func (o *imagePlugin) GetPath() string                                                 { return "" }
+func (o *imagePlugin) RequiresFSResize() bool                                          { return false }
+func (o *imagePlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool      { return false }
+func (o *imagePlugin) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error { return nil }
+func (o *imagePlugin) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
+	return nil
+}
+func (o *imagePlugin) SupportsMountOption() bool { return false }
+func (o *imagePlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
+	return false, nil
+}
+func (o *imagePlugin) TearDown() error         { return nil }
+func (o *imagePlugin) TearDownAt(string) error { return nil }
 
 func getVolumeSource(spec *volume.Spec) *v1.ImageVolumeSource {
 	if spec == nil || spec.Volume == nil {

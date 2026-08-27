@@ -392,7 +392,7 @@ func (asw *actualStateOfWorld) MarkVolumeAsAttached(
 	volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, _ types.NodeName, devicePath string) error {
 
 	pluginIsAttachable := volumeAttachabilityFalse
-	if attachablePlugin, err := asw.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec); err == nil && attachablePlugin != nil {
+	if attachablePlugin, err := asw.volumePluginMgr.FindAttachablePluginBySpec(logger, volumeSpec); err == nil && attachablePlugin != nil {
 		pluginIsAttachable = volumeAttachabilityTrue
 	}
 
@@ -894,7 +894,7 @@ func (asw *actualStateOfWorld) MarkRemountRequired(
 				continue
 			}
 
-			if volumePlugin.RequiresRemount(podObj.volumeSpec) {
+			if volumePlugin.RequiresRemount(logger, podObj.volumeSpec) {
 				podObj.remountRequired = true
 				asw.attachedVolumes[volumeName].mountedPods[podName] = podObj
 			}

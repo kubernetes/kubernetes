@@ -249,7 +249,7 @@ func getVolumesFromPodDir(logger klog.Logger, podDir string) ([]podVolume, error
 }
 
 // Reconstruct volume data structure by reading the pod's volume directories
-func (rc *reconciler) reconstructVolume(volume podVolume) (rvolume *reconstructedVolume, rerr error) {
+func (rc *reconciler) reconstructVolume(logger klog.Logger, volume podVolume) (rvolume *reconstructedVolume, rerr error) {
 	metrics.ReconstructVolumeOperationsTotal.Inc()
 	defer func() {
 		if rerr != nil {
@@ -312,7 +312,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (rvolume *reconstructe
 		// FindAttachablePluginBySpec for CSI volumes - it needs a connection to the API server,
 		// but it may not be available at this stage of kubelet startup.
 		// All CSI volumes are device-mountable, so they won't reach this code.
-		attachablePlugin, err := rc.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+		attachablePlugin, err := rc.volumePluginMgr.FindAttachablePluginBySpec(logger, volumeSpec)
 		if err != nil {
 			return nil, err
 		}
