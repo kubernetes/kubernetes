@@ -439,6 +439,17 @@ func (p *staticPolicy) allocatePodForAdd(logger klog.Logger, s state.State, pod 
 	// Store the pod-level allocation in the state.
 	s.SetPodCPUSet(podUID, podAllocation.CPUs)
 
+	// From this point on the pod owns the whole bubble: if the partitioning
+	// below fails, every CPU taken from the default CPU set must go back to
+	// it, or the CPUs would leak out of the shared pool with no pod able to
+	// ever use them again.
+	defer func() {
+		if rerr != nil {
+			p.releasePodAllocation(logger, s, podUID, podAllocation.CPUs)
+			logger.Error(rerr, "Incomplete pod-level CPU allocation rolled back, released pod CPUs", "podCPUSet", podAllocation.CPUs)
+		}
+	}()
+
 	// 5. Partition the pod's allocation, handling init container CPU reuse correctly.
 	exclusiveCPUs := make(map[string]cpuset.CPUSet)
 	sidecarCPUs := cpuset.New()
@@ -509,6 +520,19 @@ func (p *staticPolicy) allocatePodForAdd(logger klog.Logger, s state.State, pod 
 	}
 
 	return nil
+}
+
+// releasePodAllocation releases every CPU resource the pod holds in the
+// state: the container assignments are dropped and the whole pod-level CPU
+// set goes back to the default CPU set, so a failed pod admission never
+// leaks CPUs out of the shared pool.
+func (p *staticPolicy) releasePodAllocation(logger klog.Logger, s state.State, podUID string, podCPUSet cpuset.CPUSet) {
+	for containerName := range s.GetCPUAssignments()[podUID] {
+		s.Delete(podUID, containerName)
+	}
+	s.SetDefaultCPUSet(s.GetDefaultCPUSet().Union(podCPUSet))
+	s.DeletePod(podUID)
+	p.updateMetricsOnRelease(logger, s, podCPUSet)
 }
 
 func podCPUAllocationToString(alloc map[string]cpuset.CPUSet) string {
