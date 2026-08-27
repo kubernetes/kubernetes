@@ -124,7 +124,7 @@ func (i *objectCacheItem) startReflector() {
 	i.waitGroup.Wait()
 	i.waitGroup.Add(1)
 	defer i.waitGroup.Done()
-	i.reflector.Run(i.stopCh)
+	i.reflector.RunWithContext(wait.ContextForChannel(i.stopCh)) // TODO: use a real context with logger
 }
 
 // cacheStore is in order to rewrite Replace function to mark initialized flag
@@ -219,7 +219,7 @@ func (c *objectCache) newStore() *cacheStore {
 	return &cacheStore{store, sync.Mutex{}, false}
 }
 
-func (c *objectCache) newReflectorLocked(namespace, name string) *objectCacheItem {
+func (c *objectCache) newReflectorLocked(logger klog.Logger, namespace, name string) *objectCacheItem {
 	fieldSelector := fields.Set{"metadata.name": name}.AsSelector().String()
 	listFunc := func(options metav1.ListOptions) (runtime.Object, error) {
 		options.FieldSelector = fieldSelector
@@ -235,7 +235,8 @@ func (c *objectCache) newReflectorLocked(namespace, name string) *objectCacheIte
 		c.newObject(),
 		store,
 		cache.ReflectorOptions{
-			Name: fmt.Sprintf("object-%q/%q", namespace, name),
+			Logger: &logger,
+			Name:   fmt.Sprintf("object-%q/%q", namespace, name),
 			// Bump default 5m MinWatchTimeout to avoid recreating
 			// watches too often.
 			MinWatchTimeout: 30 * time.Minute,
@@ -268,7 +269,9 @@ func (c *objectCache) AddReference(namespace, name string, referencedFrom types.
 	defer c.lock.Unlock()
 	item, exists := c.items[key]
 	if !exists {
-		item = c.newReflectorLocked(namespace, name)
+		// TODO needs to be resolved together with replacing Run(i.stopCh)
+		// with RunWithContext - more conceptual work needed...
+		item = c.newReflectorLocked(klog.TODO(), namespace, name)
 		c.items[key] = item
 	}
 	item.refMap[referencedFrom]++
