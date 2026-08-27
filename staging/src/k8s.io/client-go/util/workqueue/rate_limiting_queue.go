@@ -74,6 +74,7 @@ type TypedRateLimitingQueueConfig[T comparable] struct {
 //
 // Deprecated: Use NewTypedRateLimitingQueue instead.
 func NewRateLimitingQueue(rateLimiter RateLimiter) RateLimitingInterface {
+	//nolint:logcheck // Cannot provide Logger here.
 	return NewRateLimitingQueueWithConfig(rateLimiter, RateLimitingQueueConfig{})
 }
 
@@ -82,6 +83,7 @@ func NewRateLimitingQueue(rateLimiter RateLimiter) RateLimitingInterface {
 // NewTypedRateLimitingQueue does not emit metrics. For use with a MetricsProvider, please use
 // NewTypedRateLimitingQueueWithConfig instead and specify a name.
 func NewTypedRateLimitingQueue[T comparable](rateLimiter TypedRateLimiter[T]) TypedRateLimitingInterface[T] {
+	//nolint:logcheck // Cannot provide Logger here.
 	return NewTypedRateLimitingQueueWithConfig(rateLimiter, TypedRateLimitingQueueConfig[T]{})
 }
 
@@ -121,6 +123,7 @@ func NewTypedRateLimitingQueueWithConfig[T comparable](rateLimiter TypedRateLimi
 //
 // Deprecated: Use NewRateLimitingQueueWithConfig instead.
 func NewNamedRateLimitingQueue(rateLimiter RateLimiter, name string) RateLimitingInterface {
+	//nolint:logcheck // Cannot provide Logger here.
 	return NewRateLimitingQueueWithConfig(rateLimiter, RateLimitingQueueConfig{
 		Name: name,
 	})
@@ -131,6 +134,7 @@ func NewNamedRateLimitingQueue(rateLimiter RateLimiter, name string) RateLimitin
 //
 // Deprecated: Use NewRateLimitingQueueWithConfig instead.
 func NewRateLimitingQueueWithDelayingInterface(di DelayingInterface, rateLimiter RateLimiter) RateLimitingInterface {
+	//nolint:logcheck // Cannot provide Logger here.
 	return NewRateLimitingQueueWithConfig(rateLimiter, RateLimitingQueueConfig{
 		DelayingQueue: di,
 	})

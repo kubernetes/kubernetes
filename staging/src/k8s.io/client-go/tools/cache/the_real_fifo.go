@@ -779,6 +779,7 @@ func (f *RealFIFO) Transformer() TransformFunc {
 //
 // Deprecated: Use NewRealFIFOWithOptions instead.
 func NewRealFIFO(keyFunc KeyFunc, knownObjects KeyListerGetter, transformer TransformFunc) *RealFIFO {
+	//nolint:logcheck // Cannot provide Logger here.
 	return NewRealFIFOWithOptions(RealFIFOOptions{
 		KeyFunction:  keyFunc,
 		KnownObjects: knownObjects,

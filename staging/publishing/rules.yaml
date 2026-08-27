@@ -29,6 +29,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: ktesting
+      branch: master
     - repository: streaming
       branch: master
     source:
@@ -67,6 +69,8 @@ rules:
   - name: master
     dependencies:
     - repository: apimachinery
+      branch: master
+    - repository: ktesting
       branch: master
     - repository: streaming
       branch: master
@@ -197,6 +201,8 @@ rules:
   - name: master
     dependencies:
     - repository: apimachinery
+      branch: master
+    - repository: ktesting
       branch: master
     - repository: streaming
       branch: master
@@ -1245,6 +1251,8 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: master
+    - repository: ktesting
+      branch: master
     - repository: streaming
       branch: master
     - repository: component-base
@@ -1467,6 +1475,8 @@ rules:
   - name: master
     dependencies:
     - repository: apimachinery
+      branch: master
+    - repository: ktesting
       branch: master
     - repository: streaming
       branch: master
@@ -1781,6 +1791,8 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: master
+    - repository: ktesting
+      branch: master
     - repository: streaming
       branch: master
     - repository: apiserver
@@ -1910,6 +1922,8 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: master
+    - repository: ktesting
+      branch: master
     - repository: streaming
       branch: master
     - repository: api
@@ -1970,6 +1984,8 @@ rules:
     - repository: api
       branch: master
     - repository: apimachinery
+      branch: master
+    - repository: ktesting
       branch: master
     - repository: streaming
       branch: master

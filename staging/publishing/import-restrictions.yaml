@@ -37,6 +37,7 @@
 - baseImportPath: "./staging/src/k8s.io/apimachinery"
   allowedImports:
   - k8s.io/apimachinery
+  - k8s.io/ktesting
   - k8s.io/kube-openapi
   - k8s.io/streaming
   - k8s.io/utils/clock

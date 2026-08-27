@@ -35,7 +35,7 @@ type testcase struct {
 }
 
 func TestLeaseCandidateCreation(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	tc := testcase{
 		candidateName:      "foo",
 		candidateNamespace: "default",
@@ -48,15 +48,16 @@ func TestLeaseCandidateCreation(t *testing.T) {
 	defer cancel()
 
 	client := fake.NewSimpleClientset()
-	candidate, _, err := NewCandidate(
-		client,
-		tc.candidateNamespace,
-		tc.candidateName,
-		tc.leaseName,
-		tc.binaryVersion,
-		tc.emulationVersion,
-		v1.OldestEmulationVersion,
-	)
+	candidate, _, err := NewCandidateWithConfig(CandidateConfig{
+		Clientset:          client,
+		CandidateNamespace: tc.candidateNamespace,
+		CandidateName:      tc.candidateName,
+		TargetLease:        tc.leaseName,
+		BinaryVersion:      tc.binaryVersion,
+		EmulationVersion:   tc.emulationVersion,
+		Strategy:           v1.OldestEmulationVersion,
+		Logger:             new(logger),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +70,7 @@ func TestLeaseCandidateCreation(t *testing.T) {
 }
 
 func TestLeaseCandidateAck(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 
 	tc := testcase{
 		candidateName:      "foo",
@@ -84,15 +85,16 @@ func TestLeaseCandidateAck(t *testing.T) {
 
 	client := fake.NewSimpleClientset()
 
-	candidate, _, err := NewCandidate(
-		client,
-		tc.candidateNamespace,
-		tc.candidateName,
-		tc.leaseName,
-		tc.binaryVersion,
-		tc.emulationVersion,
-		v1.OldestEmulationVersion,
-	)
+	candidate, _, err := NewCandidateWithConfig(CandidateConfig{
+		Clientset:          client,
+		CandidateNamespace: tc.candidateNamespace,
+		CandidateName:      tc.candidateName,
+		TargetLease:        tc.leaseName,
+		BinaryVersion:      tc.binaryVersion,
+		EmulationVersion:   tc.emulationVersion,
+		Strategy:           v1.OldestEmulationVersion,
+		Logger:             new(logger),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

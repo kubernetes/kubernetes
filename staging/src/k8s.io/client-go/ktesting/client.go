@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -98,8 +99,8 @@ func WithRESTConfig(tCtx ktesting.TContext, cfg *rest.Config) TContext {
 	data.restConfig = cfg
 	data.client = clientset.NewForConfigOrDie(cfg)
 	data.dynamic = dynamic.NewForConfigOrDie(cfg)
-	cachedDiscovery := memory.NewMemCacheClient(data.client.Discovery())
-	data.restMapper = restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscovery)
+	cachedDiscovery := memory.NewMemCacheClientWithContext(discovery.ToDiscoveryInterfaceWithContext(data.client.Discovery()))
+	data.restMapper = restmapper.NewDeferredDiscoveryRESTMapperWithContext(cachedDiscovery)
 	return set(tCtx, data)
 }
 

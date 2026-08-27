@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/testing"
+	"k8s.io/klog/v2"
 )
 
 func NewSimpleDynamicClient(scheme *runtime.Scheme, objects ...runtime.Object) *FakeDynamicClient {
@@ -104,7 +105,7 @@ func NewSimpleDynamicClientWithCustomListKinds(scheme *runtime.Scheme, gvrToList
 	}
 
 	codecs := serializer.NewCodecFactory(scheme)
-	o := testing.NewObjectTracker(scheme, codecs.UniversalDecoder())
+	o := testing.NewObjectTrackerWithLogger(klog.TODO() /* We need some way for the caller to pass a logger - see also NewSimpleMetadataClient. */, scheme, codecs.UniversalDecoder())
 	for _, obj := range objects {
 		if err := o.Add(obj); err != nil {
 			panic(err)

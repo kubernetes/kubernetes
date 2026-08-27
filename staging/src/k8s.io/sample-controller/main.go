@@ -72,8 +72,8 @@ func main() {
 
 	// notice that there is no need to run Start methods in a separate goroutine. (i.e. go kubeInformerFactory.Start(ctx.done())
 	// Start method is non-blocking and runs all registered informers in a dedicated goroutine.
-	kubeInformerFactory.Start(ctx.Done())
-	exampleInformerFactory.Start(ctx.Done())
+	kubeInformerFactory.StartWithContext(ctx)
+	exampleInformerFactory.StartWithContext(ctx)
 
 	if err = controller.Run(ctx, 2); err != nil {
 		logger.Error(err, "Error running controller")

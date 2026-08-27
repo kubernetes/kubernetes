@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/ktesting"
 )
 
 // stalledWatch is an upstream watch whose result channel stays open after Stop.
@@ -46,6 +47,7 @@ func (s *stalledWatch) ResultChan() <-chan watch.Event { return s.ch }
 // This is a regression test for a previous bug where using "break" instead of
 // "return" did not shut down properly.
 func TestWatchSomethingStopTerminatesRun(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	const queued = 5
 
 	upstream := &stalledWatch{ch: make(chan watch.Event, queued)}
@@ -65,7 +67,7 @@ func TestWatchSomethingStopTerminatesRun(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		w.run()
+		w.run(logger)
 	}()
 
 	// The consumer never reads from w.ResultChan. Wait until run has taken the
