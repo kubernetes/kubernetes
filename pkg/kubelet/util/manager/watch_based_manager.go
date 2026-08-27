@@ -124,7 +124,7 @@ func (i *objectCacheItem) startReflector() {
 	i.waitGroup.Wait()
 	i.waitGroup.Add(1)
 	defer i.waitGroup.Done()
-	i.reflector.Run(i.stopCh)
+	i.reflector.RunWithContext(wait.ContextForChannel(i.stopCh)) // TODO: use a real context with logger
 }
 
 // cacheStore is in order to rewrite Replace function to mark initialized flag
@@ -160,6 +160,8 @@ func (c *cacheStore) unsetInitialized() {
 // objectCache is a local cache of objects propagated via
 // individual watches.
 type objectCache struct {
+	// logger is used by background reflectors, which outlive any AddReference caller.
+	logger                                   klog.Logger
 	listObject                               listObjectFunc
 	watchObject                              watchObjectFunc
 	newObject                                newObjectFunc
@@ -193,6 +195,8 @@ func NewObjectCache(
 	}
 
 	store := &objectCache{
+		// TODO: NewObjectCache should be passed a context, not a stop channel, and let the caller choose the name.
+		logger:                                   klog.LoggerWithName(klog.TODO(), "objectCache"),
 		listObject:                               listObject,
 		watchObject:                              watchObject,
 		newObject:                                newObject,
@@ -230,12 +234,14 @@ func (c *objectCache) newReflectorLocked(namespace, name string) *objectCacheIte
 		return c.watchObject(namespace, options)
 	}
 	store := c.newStore()
+	reflectorName := fmt.Sprintf("object-%q/%q", namespace, name)
 	reflector := cache.NewReflectorWithOptions(
 		c.listWatcherWithWatchListSemanticsWrapper(&cache.ListWatch{ListFunc: listFunc, WatchFunc: watchFunc}),
 		c.newObject(),
 		store,
 		cache.ReflectorOptions{
-			Name: fmt.Sprintf("object-%q/%q", namespace, name),
+			Logger: new(klog.LoggerWithName(c.logger, reflectorName)),
+			Name:   reflectorName,
 			// Bump default 5m MinWatchTimeout to avoid recreating
 			// watches too often.
 			MinWatchTimeout: 30 * time.Minute,
@@ -408,7 +414,7 @@ func NewWatchBasedManager(
 	// We currently set it to 5 times.
 	maxIdleTime := resyncInterval * 5
 
-	// TODO propagate stopCh from the higher level.
+	// TODO: pass a context from the higher level.
 	objectStore := NewObjectCache(listObject, watchObject, newObject, isImmutable, listWatcherWithWatchListSemanticsWrapper, groupResource, clock.RealClock{}, maxIdleTime, wait.NeverStop)
 	return NewCacheBasedManager(objectStore, getReferencedObjects)
 }

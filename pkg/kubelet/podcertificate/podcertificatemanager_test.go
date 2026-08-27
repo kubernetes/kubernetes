@@ -42,6 +42,7 @@ import (
 	corelistersv1 "k8s.io/client-go/listers/core/v1"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
 	"k8s.io/kubernetes/test/utils/hermeticpodcertificatesigner"
 	testclock "k8s.io/utils/clock/testing"
@@ -386,6 +387,7 @@ func TestFullFlow(t *testing.T) {
 	}
 
 	node1PodCertificateManager := NewIssuingManager(
+		klog.FromContext(ctx),
 		kc,
 		node1PodManager,
 		nil,
@@ -395,7 +397,7 @@ func TestFullFlow(t *testing.T) {
 		clock,
 	)
 	// Start informers
-	informerFactory.Start(ctx.Done())
+	informerFactory.StartWithContext(ctx)
 
 	// wait until the informers' watches are actually registered,
 	const expectedWatches = 4 // Manager: Pods, Nodes, PodCertificateRequests. Signer: PodCertificateRequests.
