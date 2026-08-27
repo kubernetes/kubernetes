@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -35,15 +36,44 @@ import (
 // allProbeTypes is the iteration order for whole-container operations.
 var allProbeTypes = [...]probeType{liveness, readiness, startup}
 
+// containerKey uniquely identifies a container slot within a pod.
+type containerKey struct {
+	podUID        types.UID
+	containerName string
+}
+
+// probeMetricLabels contains metadata required to delete Prometheus metric series for a probe.
+type probeMetricLabels struct {
+	podUID        types.UID
+	podName       string
+	podNamespace  string
+	containerName string
+	probeType     probeType
+}
+
 // containerBoundManager manages probe workers bound to specific container instances.
 //
 // Each slot (pod, container, probe type) holds a worker tied to a single container
 // ID. Workers are driven by explicit lifecycle events, and stop operations match
 // against the target container ID so late or out-of-order events are safely no-ops.
 type containerBoundManager struct {
-	// mu guards workers.
-	mu      sync.Mutex
+	// mu guards workers, containers, and probedMetrics.
+	mu sync.Mutex
+
+	// workers tracks currently active probe worker goroutines. Workers exit upon
+	// completion (e.g. startup probe success or liveness probe failure), so a slot
+	// may be empty even while the container is running and healthy.
 	workers map[probeKey]*containerBoundWorker
+
+	// containers tracks the active container ID for each container slot. Unlike
+	// workers, this entry persists across the entire container lifetime so the
+	// manager can identify container replacements and evict cached results on restart
+	// or pod teardown even if all workers have already exited.
+	containers map[containerKey]kubecontainer.ContainerID
+
+	// probedMetrics tracks Prometheus metric label sets created for this pod so
+	// series can be deleted on pod removal without leaking metric series.
+	probedMetrics map[probeKey]probeMetricLabels
 
 	// ctx is the parent of every worker context. It deliberately outlives any
 	// pod sync context: the pod worker cancels its sync context when a pod
@@ -77,6 +107,8 @@ func NewContainerBoundManager(
 		ctx:              ctx,
 		prober:           newProber(runner, recorder),
 		workers:          make(map[probeKey]*containerBoundWorker),
+		containers:       make(map[containerKey]kubecontainer.ContainerID),
+		probedMetrics:    make(map[probeKey]probeMetricLabels),
 		readinessManager: readinessManager,
 		livenessManager:  livenessManager,
 		startupManager:   startupManager,
@@ -112,7 +144,8 @@ func (m *containerBoundManager) EnsureProbes(ctx context.Context, pod *v1.Pod, p
 		}
 
 		if m.tracksContainerLocked(pod.UID, container.Name, status.ID) {
-			// Already tracked: ensure any newly eligible probe workers are running.
+			// Already tracked: ensure desired probe workers are running; safely
+			// no-ops for active workers.
 			m.startProbesLocked(ctx, target, false /* adopted */)
 			continue
 		}
@@ -157,26 +190,22 @@ func (m *containerBoundManager) adoptLocked(ctx context.Context, target probeTar
 	m.startProbesLocked(ctx, target, true /* adopted */)
 }
 
-// tracksContainerLocked reports whether a container instance is already tracked
-// via an active worker or cached probe results (e.g., passed startup probes).
+// tracksContainerLocked reports whether a container instance is already tracked.
 func (m *containerBoundManager) tracksContainerLocked(podUID types.UID, containerName string, containerID kubecontainer.ContainerID) bool {
-	key := probeKey{podUID: podUID, containerName: containerName}
-	for _, probeType := range allProbeTypes {
-		key.probeType = probeType
-		if w, ok := m.workers[key]; ok && w.containerID == containerID {
-			return true
-		}
-		if _, ok := m.resultsManager(probeType).Get(containerID); ok {
-			return true
-		}
-	}
-	return false
+	ck := containerKey{podUID: podUID, containerName: containerName}
+	id, ok := m.containers[ck]
+	return ok && id == containerID
 }
 
 // stopContainerWorkersLocked stops every worker for one container of a pod,
 // whichever instance they are bound to, and forgets their results.
 func (m *containerBoundManager) stopContainerWorkersLocked(ctx context.Context, podUID types.UID, containerName string) {
-	stale := sets.New[kubecontainer.ContainerID]()
+	ck := containerKey{podUID: podUID, containerName: containerName}
+	if id, ok := m.containers[ck]; ok {
+		m.removeResults(id)
+		delete(m.containers, ck)
+	}
+
 	key := probeKey{podUID: podUID, containerName: containerName}
 	for _, probeType := range allProbeTypes {
 		key.probeType = probeType
@@ -187,10 +216,6 @@ func (m *containerBoundManager) stopContainerWorkersLocked(ctx context.Context, 
 		klog.FromContext(ctx).V(4).Info("Stopping probe worker for a container that is no longer running",
 			"probeType", probeType, "containerName", containerName, "containerID", w.containerID.String())
 		m.stopWorkerLocked(key, w)
-		stale.Insert(w.containerID)
-	}
-	for _, id := range stale.UnsortedList() {
-		m.removeResults(id)
 	}
 }
 
@@ -215,8 +240,15 @@ func (m *containerBoundManager) StartProbes(ctx context.Context, pod *v1.Pod, co
 // now, replacing any worker left over from an earlier instance of the same
 // container.
 func (m *containerBoundManager) startProbesLocked(ctx context.Context, target probeTarget, adopted bool) {
+	// Purge cached results and stop workers from any previous container instance.
+	ck := containerKey{podUID: target.pod.UID, containerName: target.container.Name}
+	if oldID, ok := m.containers[ck]; ok && oldID != target.containerID {
+		m.removeResults(oldID)
+	}
 	m.evictStaleWorkersLocked(ctx, target.pod.UID, target.container.Name, target.containerID)
 
+	// Record the active container instance and start its eligible probe workers.
+	m.containers[ck] = target.containerID
 	if target.container.StartupProbe != nil && !m.startupSucceeded(target.containerID) {
 		// Gate readiness and liveness workers on startup probe completion.
 		m.ensureWorkerLocked(ctx, startup, target, adopted)
@@ -273,6 +305,14 @@ func (m *containerBoundManager) ensureWorkerLocked(ctx context.Context, probeTyp
 		opts.onStartupSucceeded = m.onStartupSucceeded
 	}
 
+	m.probedMetrics[key] = probeMetricLabels{
+		podUID:        target.pod.UID,
+		podName:       target.pod.Name,
+		podNamespace:  target.pod.Namespace,
+		containerName: target.container.Name,
+		probeType:     probeType,
+	}
+
 	w := newContainerBoundWorker(m.ctx, opts)
 	m.workers[key] = w
 	klog.FromContext(ctx).V(4).Info("Starting probe worker", "probeType", probeType, "pod", klog.KObj(target.pod),
@@ -281,10 +321,8 @@ func (m *containerBoundManager) ensureWorkerLocked(ctx context.Context, probeTyp
 }
 
 // evictStaleWorkersLocked stops every worker for this container name that is
-// bound to some other container instance, and forgets the results those
-// instances produced.
+// bound to some other container instance.
 func (m *containerBoundManager) evictStaleWorkersLocked(ctx context.Context, podUID types.UID, containerName string, current kubecontainer.ContainerID) {
-	stale := sets.New[kubecontainer.ContainerID]()
 	key := probeKey{podUID: podUID, containerName: containerName}
 	for _, probeType := range allProbeTypes {
 		key.probeType = probeType
@@ -295,10 +333,6 @@ func (m *containerBoundManager) evictStaleWorkersLocked(ctx context.Context, pod
 		klog.FromContext(ctx).V(4).Info("Stopping probe worker for a replaced container", "probeType", probeType,
 			"containerName", containerName, "staleContainerID", w.containerID.String(), "containerID", current.String())
 		m.stopWorkerLocked(key, w)
-		stale.Insert(w.containerID)
-	}
-	for _, id := range stale.UnsortedList() {
-		m.removeResults(id)
 	}
 }
 
@@ -322,15 +356,6 @@ func (m *containerBoundManager) onStartupSucceeded(w *containerBoundWorker) {
 // StopProbes stops the specified probe types bound to this container instance.
 // When all probes are stopped, its cached results are also removed.
 func (m *containerBoundManager) StopProbes(containerID kubecontainer.ContainerID, probeTypes kubecontainer.ProbeType) {
-	m.stopWorkersForContainer(containerID, probeTypes)
-	if probeTypes&allProbes == allProbes {
-		m.removeResults(containerID)
-	}
-}
-
-// stopWorkersForContainer stops the specified probe types for a container instance,
-// ignoring workers bound to newer instances to avoid racing with replacements.
-func (m *containerBoundManager) stopWorkersForContainer(containerID kubecontainer.ContainerID, probeTypes probeType) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -339,6 +364,15 @@ func (m *containerBoundManager) stopWorkersForContainer(containerID kubecontaine
 			continue
 		}
 		m.stopWorkerLocked(key, w)
+	}
+
+	if probeTypes&allProbes == allProbes {
+		m.removeResults(containerID)
+		for ck, id := range m.containers {
+			if id == containerID {
+				delete(m.containers, ck)
+			}
+		}
 	}
 }
 
@@ -392,20 +426,54 @@ func (m *containerBoundManager) removePodWorkers(match func(types.UID) bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	stale := sets.New[kubecontainer.ContainerID]()
 	for key, w := range m.workers {
 		if !match(key.podUID) {
 			continue
 		}
 		m.stopWorkerLocked(key, w)
-		// Metric series are scoped by pod and container name rather than container instance.
-		// Delete them only when the pod is removed to preserve counters across container restarts.
-		w.deleteMetrics()
-		stale.Insert(w.containerID)
 	}
-	for _, id := range stale.UnsortedList() {
+
+	for ck, id := range m.containers {
+		if !match(ck.podUID) {
+			continue
+		}
 		m.removeResults(id)
+		delete(m.containers, ck)
 	}
+
+	// Metric series are scoped by pod and container name rather than container instance.
+	// Delete them only when the pod is removed to preserve counters across container restarts.
+	for key, labels := range m.probedMetrics {
+		if !match(key.podUID) {
+			continue
+		}
+		deleteMetricSeries(labels)
+		delete(m.probedMetrics, key)
+	}
+}
+
+func deleteMetricSeries(l probeMetricLabels) {
+	basicLabels := metrics.Labels{
+		"probe_type": l.probeType.String(),
+		"container":  l.containerName,
+		"pod":        l.podName,
+		"namespace":  l.podNamespace,
+		"pod_uid":    string(l.podUID),
+	}
+
+	proberDurationLabels := metrics.Labels{
+		"probe_type": l.probeType.String(),
+		"container":  l.containerName,
+		"pod":        l.podName,
+		"namespace":  l.podNamespace,
+	}
+
+	for _, result := range []string{probeResultSuccessful, probeResultFailed, probeResultUnknown} {
+		lbls := deepCopyPrometheusLabels(basicLabels)
+		lbls["result"] = result
+		ProberResults.Delete(lbls)
+	}
+	ProberDuration.Delete(proberDurationLabels)
 }
 
 // removeResults drops every cached probe result for a container instance.
