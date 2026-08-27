@@ -294,7 +294,6 @@ func TestCadvisorListPodStats(t *testing.T) {
 	pods, err := p.ListPodStats(ctx)
 	assert.NoError(t, err)
 
-	// Pod4 is filtered out because it is unknown to the PodManager.
 	assert.Len(t, pods, 4)
 	indexPods := make(map[statsapi.PodReference]statsapi.PodStats, len(pods))
 	for _, pod := range pods {
@@ -591,7 +590,6 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 	pods, err := p.ListPodCPUAndMemoryStats(ctx)
 	assert.NoError(t, err)
 
-	// Pod3 is filtered out because it is unknown to the PodManager.
 	assert.Len(t, pods, 3)
 	indexPods := make(map[statsapi.PodReference]statsapi.PodStats, len(pods))
 	for _, pod := range pods {
