@@ -215,7 +215,11 @@ func gceImageListArgs(project, imageFamily string) []string {
 // pickNewestImage returns the name of the newest image matching imageRegex and imageFamily.
 func pickNewestImage(images []gceImage, imageRegex, imageFamily, project string) (string, error) {
 	imageObjs := []imageObj{}
-	imageRe := regexp.MustCompile(imageRegex)
+	// Compile, not MustCompile: image_regex is user config and must not panic.
+	imageRe, err := regexp.Compile(imageRegex)
+	if err != nil {
+		return "", fmt.Errorf("failed to compile image_regex %q: %w", imageRegex, err)
+	}
 	for _, instance := range images {
 		if imageRegex != "" && !imageRe.MatchString(instance.Name) {
 			continue

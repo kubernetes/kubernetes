@@ -90,6 +90,14 @@ func TestPickNewestImage(t *testing.T) {
 			imageFamily: "fam",
 			wantErr:     "failed to parse instance creation timestamp",
 		},
+		{
+			name: "an invalid image_regex returns an error",
+			images: []gceImage{
+				img("img", "fam", "2026-08-01T10:00:00Z"),
+			},
+			imageRegex: "[",
+			wantErr:    "failed to compile image_regex",
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
