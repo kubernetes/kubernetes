@@ -197,6 +197,7 @@ message Condition {
   // +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`
   // +kubebuilder:validation:MaxLength=316
   // +k8s:alpha(since: "1.37")=+k8s:required
+  // +k8s:alpha(since: "1.37")=+k8s:format=k8s-label-key
   optional string type = 1;
 
   // status of the condition, one of True, False, Unknown.
@@ -235,7 +236,7 @@ message Condition {
   // +kubebuilder:validation:MinLength=1
   // +kubebuilder:validation:Pattern=`^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$`
   // +k8s:alpha(since: "1.37")=+k8s:required
-  // +k8s:alpha(since: "1.37")=+k8s:maxBytes=1024
+  // +k8s:alpha(since: "1.38")=+k8s:maxBytes=1024
   optional string reason = 5;
 
   // message is a human readable message indicating details about the transition.
