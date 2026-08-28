@@ -136,7 +136,7 @@
   },
   "devDependencies": {
     "@aws-cdk/aws-custom-resource-sdk-adapter": "0.0.0",
-    "@aws-cdk/aws-service-spec": "0.1.206",
+    "@aws-cdk/aws-service-spec": "0.1.207",
     "@aws-cdk/cdk-build-tools": "0.0.0",
     "@aws-cdk/check-peer-dependencies": "0.0.0",
     "@aws-cdk/custom-resource-handlers": "0.0.0",

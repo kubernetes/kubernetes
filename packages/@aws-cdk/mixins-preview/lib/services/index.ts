@@ -59,6 +59,7 @@ export * as aws_qldb from './aws-qldb';
 export * as aws_rds from './aws-rds';
 export * as aws_route53recoveryreadiness from './aws-route53recoveryreadiness';
 export * as aws_route53resolver from './aws-route53resolver';
+export * as aws_rtbfabric from './aws-rtbfabric';
 export * as aws_s3 from './aws-s3';
 export * as aws_sagemaker from './aws-sagemaker';
 export * as aws_securityhub from './aws-securityhub';
