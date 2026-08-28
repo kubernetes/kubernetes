@@ -17,7 +17,10 @@ limitations under the License.
 package resource
 
 import (
+	"math"
 	"testing"
+
+	inf "gopkg.in/inf.v0"
 )
 
 func TestInt64AmountAsInt64(t *testing.T) {
@@ -199,6 +202,31 @@ func TestInt64AmountAsScaledInt64(t *testing.T) {
 			}
 			if ok != test.ok {
 				t.Errorf("%v: expected ok: %t, got ok: %t", test.name, test.ok, ok)
+			}
+		})
+	}
+}
+
+func TestScaleInfScale(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		scale  Scale
+		result inf.Scale
+	}{
+		{"positive scale flips sign", 3, -3},
+		{"negative scale flips sign", -3, 3},
+		{"zero", 0, 0},
+		{"MinInt32+1 flips sign", math.MinInt32 + 1, math.MaxInt32},
+		// Scale is an int32, and infScale returns inf.Scale(-s). Negating
+		// math.MinInt32 does not fit in an int32, so the sign is not flipped
+		// and the value stays math.MinInt32. This is the same int-negation
+		// edge case as -mostNegative for int64. This asserts the current
+		// (unflipped) behavior; reachable via NewScaledQuantity(x, math.MinInt32).
+		{"MinInt32 does not flip sign", math.MinInt32, math.MinInt32},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := test.scale.infScale(); got != test.result {
+				t.Errorf("%s: Scale(%d).infScale() = %d, want %d", test.name, test.scale, got, test.result)
 			}
 		})
 	}
