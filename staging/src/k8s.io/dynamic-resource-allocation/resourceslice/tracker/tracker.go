@@ -380,7 +380,11 @@ func sliceDriverPoolDeviceIndexFunc(slice *resourceapi.ResourceSlice) ([]string,
 }
 
 func driverPoolDeviceIndexPatchKey(patch *resourceapi.DeviceTaintRule) string {
-	deviceSelector := ptr.Deref(patch.Spec.DeviceSelector, resourceapi.DeviceTaintSelector{})
+	deviceSelector := patch.Spec.DeviceSelector
+	if deviceSelector == nil {
+		// No selector matches no devices, so it matches no slices.
+		return ""
+	}
 	driverKey := ptr.Deref(deviceSelector.Driver, anyDriver)
 	poolKey := ptr.Deref(deviceSelector.Pool, anyPool)
 	deviceKey := ptr.Deref(deviceSelector.Device, anyDevice)
@@ -578,18 +582,20 @@ func (t *Tracker) applyPatches(ctx context.Context, slice *resourceapi.ResourceS
 		logger.V(6).Info("processing DeviceTaintRule")
 
 		deviceSelector := taintRule.Spec.DeviceSelector
-		var deviceName *string
-		if deviceSelector != nil {
-			if deviceSelector.Driver != nil && *deviceSelector.Driver != slice.Spec.Driver {
-				logger.V(7).Info("DeviceTaintRule does not apply, mismatched driver", "sliceDriver", slice.Spec.Driver, "taintDriver", *deviceSelector.Driver)
-				continue
-			}
-			if deviceSelector.Pool != nil && *deviceSelector.Pool != slice.Spec.Pool.Name {
-				logger.V(7).Info("DeviceTaintRule does not apply, mismatched pool", "slicePool", slice.Spec.Pool.Name, "taintPool", *deviceSelector.Pool)
-				continue
-			}
-			deviceName = deviceSelector.Device
+		if deviceSelector == nil {
+			// No selector matches no devices.
+			logger.V(7).Info("DeviceTaintRule does not apply, no selector")
+			continue
 		}
+		if deviceSelector.Driver != nil && *deviceSelector.Driver != slice.Spec.Driver {
+			logger.V(7).Info("DeviceTaintRule does not apply, mismatched driver", "sliceDriver", slice.Spec.Driver, "taintDriver", *deviceSelector.Driver)
+			continue
+		}
+		if deviceSelector.Pool != nil && *deviceSelector.Pool != slice.Spec.Pool.Name {
+			logger.V(7).Info("DeviceTaintRule does not apply, mismatched pool", "slicePool", slice.Spec.Pool.Name, "taintPool", *deviceSelector.Pool)
+			continue
+		}
+		deviceName := deviceSelector.Device
 		for dIndex, device := range slice.Spec.Devices {
 			deviceID := deviceID(slice.Spec.Driver, slice.Spec.Pool.Name, device.Name)
 			logger := logger.WithValues("device", deviceID)
