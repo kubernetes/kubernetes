@@ -74,6 +74,14 @@ const (
 	// Number of retries to hit a given set of endpoints. Needs to be high
 	// because we verify iptables statistical rr loadbalancing.
 	testTries = 30
+	// How long a strict dial (minTries == maxTries) tolerates reaching an
+	// endpoint that is no longer part of the Service before it gives up.
+	// Removing an endpoint is not atomic: kube-proxy reprograms the dataplane
+	// asynchronously and rate limits its resyncs (--iptables-min-sync-period
+	// defaults to 10s on some providers), so traffic can legitimately still
+	// reach a removed endpoint -- or whatever else now answers on the address
+	// it used to own -- for a while after the EndpointSlice has been updated.
+	dataplaneConvergenceTimeout = 60 * time.Second
 	// Maximum number of pods in a test, to make test work in large clusters.
 	maxNetProxyPodsCount = 10
 	// SessionAffinityChecks is number of checks to hit a given set of endpoints when enable session affinity.
@@ -330,7 +338,11 @@ func makeCURLDialCommand(ipPort, dialCmd, protocol, targetIP string, targetPort 
 //
 // maxTries == minTries will confirm that we see the expected endpoints and no
 // more for maxTries. Use this if you want to eg: fail a readiness check on a
-// pod and confirm it doesn't show up as an endpoint.
+// pod and confirm it doesn't show up as an endpoint. Because that is a steady
+// state assertion, it is only meaningful once the data plane has caught up with
+// the most recent Service/EndpointSlice change; unexpected responses seen
+// within dataplaneConvergenceTimeout cause all responses collected so far to
+// be discarded and the strict dial validation to restart from its first attempt.
 // Returns nil if no error, or error message if failed after trying maxTries.
 func (config *NetworkingTestConfig) DialFromContainer(ctx context.Context, protocol, dialCommand, containerIP, targetIP string, containerHTTPPort, targetPort, maxTries, minTries int, expectedResponses sets.String) error {
 	ipPort := net.JoinHostPort(containerIP, strconv.Itoa(containerHTTPPort))
@@ -339,7 +351,14 @@ func (config *NetworkingTestConfig) DialFromContainer(ctx context.Context, proto
 
 	responses := sets.NewString()
 
-	for i := range maxTries {
+	// In the minTries == maxTries case rely upon a steady data plane state.
+	// We allow up to dataplaneConvergenceTimeout for steady state.
+	var convergenceDeadline time.Time
+	if minTries == maxTries {
+		convergenceDeadline = time.Now().Add(dataplaneConvergenceTimeout)
+	}
+
+	for i := 0; i < maxTries; i++ {
 		resp, err := config.GetResponseFromContainer(ctx, protocol, dialCommand, containerIP, targetIP, containerHTTPPort, targetPort)
 		if err != nil {
 			// A failure to kubectl exec counts as a try, not a hard fail.
@@ -354,7 +373,18 @@ func (config *NetworkingTestConfig) DialFromContainer(ctx context.Context, proto
 				responses.Insert(trimmed)
 			}
 		}
-		if responses.Difference(expectedResponses).Len() > 0 {
+		if unexpected := responses.Difference(expectedResponses); unexpected.Len() > 0 {
+			if time.Now().Before(convergenceDeadline) {
+				// We discard responses if we are within the data plane
+				// convergence tolerance window. Setting i to -1 effectively
+				// restarts the loop to the beginning.
+				framework.Logf("dial to %v reached unexpected endpoints %v, waiting for the dataplane to converge", targetIP, unexpected.List())
+				responses = sets.NewString()
+				i = -1
+				// TODO: get rid of this delay #36281
+				time.Sleep(hitEndpointRetryDelay)
+				continue
+			}
 			returnMsg := fmt.Errorf("received unexpected responses... \nAttempt %d\nCommand %v\nretrieved %v\nexpected %v", i, cmd, responses, expectedResponses)
 			framework.Logf("encountered error during dial (%v)", returnMsg)
 			return returnMsg
