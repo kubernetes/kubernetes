@@ -29,7 +29,7 @@ type DynamicSharedInformerFactory interface {
 	// Start initializes all requested informers. They are handled in goroutines
 	// which run until the stop channel gets closed.
 	//
-	// Contextual logging: StartWithContext should be used instead of Start in code which supports contextual logging.
+	//logcheck:context // StartWithContext should be used instead of Start in code which supports contextual logging.
 	Start(stopCh <-chan struct{})
 
 	// StartWithContext initializes all requested informers. They are handled in goroutines

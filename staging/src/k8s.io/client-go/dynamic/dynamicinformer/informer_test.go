@@ -123,7 +123,7 @@ func TestWatchListSemanticsSimple(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	factory.Start(ctx.Done())
+	factory.StartWithContext(ctx)
 
 	if !cache.WaitForCacheSync(ctx.Done(), target.Informer().HasSynced) {
 		t.Fatalf("failed to wait for caches to sync")
@@ -144,7 +144,7 @@ func TestUnSupportWatchListSemantics(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	factory.Start(ctx.Done())
+	factory.StartWithContext(ctx)
 
 	if !cache.WaitForCacheSync(ctx.Done(), target.Informer().HasSynced) {
 		t.Fatalf("failed to wait for caches to sync")
@@ -250,7 +250,7 @@ func TestFilteredDynamicSharedInformerFactory(t *testing.T) {
 			informerListerForGvr := target.ForResource(ts.gvr)
 			logger := klog.FromContext(ctx)
 			_, _ = informerListerForGvr.Informer().AddEventHandlerWithOptions(ts.handler(informerReciveObjectCh), cache.HandlerOptions{Logger: &logger})
-			target.Start(ctx.Done())
+			target.StartWithContext(ctx)
 			if synced := target.WaitForCacheSync(ctx.Done()); !synced[ts.gvr] {
 				t.Errorf("informer for %s hasn't synced", ts.gvr)
 			}
@@ -375,7 +375,7 @@ func TestDynamicSharedInformerFactory(t *testing.T) {
 			informerListerForGvr := target.ForResource(ts.gvr)
 			logger := klog.FromContext(ctx)
 			_, _ = informerListerForGvr.Informer().AddEventHandlerWithOptions(ts.handler(informerReciveObjectCh), cache.HandlerOptions{Logger: &logger})
-			target.Start(ctx.Done())
+			target.StartWithContext(ctx)
 			if synced := target.WaitForCacheSync(ctx.Done()); !synced[ts.gvr] {
 				t.Errorf("informer for %s hasn't synced", ts.gvr)
 			}
