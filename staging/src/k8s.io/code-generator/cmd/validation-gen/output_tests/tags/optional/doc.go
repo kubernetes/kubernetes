@@ -60,7 +60,8 @@ type Struct struct {
 	// +k8s:validateFalse="field Struct.IntTypedefPtrField"
 	IntTypedefPtrField *IntType `json:"intTypedefPtrField"`
 
-	// non-pointer struct fields cannot be optional
+	// +k8s:optional
+	OtherStructField OtherStruct `json:"otherStructField"`
 
 	// +k8s:optional
 	// +k8s:validateFalse="field Struct.OtherStructPtrField"

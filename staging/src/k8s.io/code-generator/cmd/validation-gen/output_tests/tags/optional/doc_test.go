@@ -19,6 +19,7 @@ package optional
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 )
 
@@ -27,7 +28,9 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		// All zero-values.
-	}).ExpectValid()
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Invalid(field.NewPath("otherStructField"), nil, ""),
+	})
 
 	st.Value(&Struct{
 		StringField:           "abc",
@@ -38,6 +41,7 @@ func Test(t *testing.T) {
 		IntPtrField:           ptr.To(456),
 		IntTypedefField:       IntType(123),
 		IntTypedefPtrField:    ptr.To(IntType(456)),
+		OtherStructField:      OtherStruct{},
 		OtherStructPtrField:   &OtherStruct{},
 		SliceField:            []string{"a", "b"},
 		SliceTypedefField:     SliceType([]string{"a", "b"}),
@@ -52,6 +56,7 @@ func Test(t *testing.T) {
 		"intPtrField":           {"field Struct.IntPtrField"},
 		"intTypedefField":       {"field Struct.IntTypedefField", "type IntType"},
 		"intTypedefPtrField":    {"field Struct.IntTypedefPtrField", "type IntType"},
+		"otherStructField":      {"type OtherStruct"},
 		"otherStructPtrField":   {"type OtherStruct", "field Struct.OtherStructPtrField"},
 		"sliceField":            {"field Struct.SliceField"},
 		"sliceTypedefField":     {"field Struct.SliceTypedefField", "type SliceType"},
