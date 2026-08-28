@@ -462,7 +462,7 @@ type fakeCgroupManager struct {
 
 // Update() is the observation point for this test.
 // Capture the updated cgroup config so it can be validated.
-func (f *fakeCgroupManager) Update(logger klog.Logger, config *CgroupConfig) error {
+func (f *fakeCgroupManager) Update(_ klog.Logger, config *CgroupConfig) error {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
@@ -473,7 +473,7 @@ func (f *fakeCgroupManager) Update(logger klog.Logger, config *CgroupConfig) err
 
 // Create() must succeed for Start() to construct QoS cgroups.
 // We do not assert on Create() behavior in this test.
-func (f *fakeCgroupManager) Create(l klog.Logger, config *CgroupConfig) error {
+func (f *fakeCgroupManager) Create(_ klog.Logger, config *CgroupConfig) error {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
@@ -482,22 +482,22 @@ func (f *fakeCgroupManager) Create(l klog.Logger, config *CgroupConfig) error {
 	return nil
 }
 
-func (f *fakeCgroupManager) Destroy(l klog.Logger, config *CgroupConfig) error { return nil }
-func (f *fakeCgroupManager) Validate(name CgroupName) error                    { return nil }
-func (f *fakeCgroupManager) Exists(name CgroupName) bool                       { return false }
-func (f *fakeCgroupManager) Name(name CgroupName) string                       { return name.ToCgroupfs() }
+func (f *fakeCgroupManager) Destroy(_ klog.Logger, _ *CgroupConfig) error { return nil }
+func (f *fakeCgroupManager) Validate(_ CgroupName) error                  { return nil }
+func (f *fakeCgroupManager) Exists(_ CgroupName) bool                     { return false }
+func (f *fakeCgroupManager) Name(name CgroupName) string                  { return name.ToCgroupfs() }
 func (f *fakeCgroupManager) CgroupName(name string) CgroupName {
 	return ParseCgroupfsToCgroupName(name)
 }
-func (f *fakeCgroupManager) Pids(logger klog.Logger, name CgroupName) []int { return nil }
-func (f *fakeCgroupManager) ReduceCPULimits(logger klog.Logger, cgroupName CgroupName) error {
+func (f *fakeCgroupManager) Pids(_ klog.Logger, _ CgroupName) []int { return nil }
+func (f *fakeCgroupManager) ReduceCPULimits(_ klog.Logger, _ CgroupName) error {
 	return nil
 }
-func (f *fakeCgroupManager) MemoryUsage(name CgroupName) (int64, error) { return int64(0), nil }
-func (f *fakeCgroupManager) GetCgroupConfig(name CgroupName, resource v1.ResourceName) (*ResourceConfig, error) {
+func (f *fakeCgroupManager) MemoryUsage(_ CgroupName) (int64, error) { return int64(0), nil }
+func (f *fakeCgroupManager) GetCgroupConfig(_ CgroupName, _ v1.ResourceName) (*ResourceConfig, error) {
 	return nil, nil
 }
-func (f *fakeCgroupManager) SetCgroupConfig(logger klog.Logger, name CgroupName, resourceConfig *ResourceConfig) error {
+func (f *fakeCgroupManager) SetCgroupConfig(_ klog.Logger, _ CgroupName, _ *ResourceConfig) error {
 	return nil
 }
 func (f *fakeCgroupManager) Version() int { return 1 }

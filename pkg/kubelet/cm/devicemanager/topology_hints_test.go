@@ -39,7 +39,7 @@ type mockAffinityStore struct {
 	hint topologymanager.TopologyHint
 }
 
-func (m *mockAffinityStore) GetAffinity(_ klog.Logger, podUID string, containerName string) topologymanager.TopologyHint {
+func (m *mockAffinityStore) GetAffinity(_ klog.Logger, _ string, _ string) topologymanager.TopologyHint {
 	return m.hint
 }
 
