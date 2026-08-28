@@ -32,7 +32,8 @@ func (obj testType) GetObjectKind() schema.ObjectKind { return schema.EmptyObjec
 func (obj testType) DeepCopyObject() runtime.Object   { return obj }
 
 func TestFake(t *testing.T) {
-	f := NewFake()
+	logger, _ := ktesting.NewTestContext(t)
+	f := NewFakeWithOptions(FakeOptions{Logger: &logger})
 
 	table := []struct {
 		t EventType

@@ -85,7 +85,7 @@ func runTestReflectorDataConsistencyDetector(t *testing.T, transformer Transform
 			}, nil
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			w := watch.NewFake()
+			w := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 			go func() {
 				w.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", ResourceVersion: "1"}})
 				w.Action(watch.Bookmark, &v1.Pod{ObjectMeta: metav1.ObjectMeta{

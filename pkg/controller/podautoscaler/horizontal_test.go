@@ -6871,6 +6871,7 @@ func TestNoScaleDownOneMetricEmpty(t *testing.T) {
 }
 
 func TestMultipleHPAs(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	const hpaCount = 1000
 	const testNamespace = "dummy-namespace"
 
@@ -6879,8 +6880,8 @@ func TestMultipleHPAs(t *testing.T) {
 	testClient := &fake.Clientset{}
 	testScaleClient := &scalefake.FakeScaleClient{}
 	testMetricsClient := &metricsfake.Clientset{}
-	hpaWatcher := watch.NewFake()
-	podWatcher := watch.NewFake()
+	hpaWatcher := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
+	podWatcher := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 
 	testClient.AddWatchReactor("horizontalpodautoscalers", core.DefaultWatchReactor(hpaWatcher, nil))
 	testClient.AddWatchReactor("pods", core.DefaultWatchReactor(podWatcher, nil))

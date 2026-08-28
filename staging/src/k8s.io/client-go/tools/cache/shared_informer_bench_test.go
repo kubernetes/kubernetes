@@ -41,7 +41,8 @@ func BenchmarkSharedIndexInformer(b *testing.B) {
 			pods := createPods(podCount, benchmarkNamespace)
 			for _, readers := range []int{0, 1, 10, 20, 40, 80} {
 				b.Run(fmt.Sprintf("readers=%d", readers), func(b *testing.B) {
-					watcher := watch.NewFakeWithChanSize(1, false)
+					logger, _ := ktesting.NewTestContext(b)
+					watcher := watch.NewFakeWithOptions(watch.FakeOptions{ChannelSize: 1, Logger: &logger})
 					informer, stop := setupSharedIndexInformer(watcher, pods)
 					defer stop()
 					queuedEvents := 10

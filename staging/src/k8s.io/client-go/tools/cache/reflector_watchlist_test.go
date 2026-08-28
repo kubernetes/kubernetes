@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
@@ -592,14 +593,14 @@ func TestWatchList(t *testing.T) {
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
 			scenario := s // capture as local variable
-			_, ctx := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, !scenario.disableUseWatchList)
 			listWatcher, store, reflector, ctx, cancel := testData(ctx)
 			go func() {
 				for i, e := range scenario.watchEvents {
 					listWatcher.fakeWatcher.Action(e.Type, e.Object)
 					if i+1 == scenario.stopAfterWatchEvents {
-						listWatcher.StopAndRecreateWatch()
+						listWatcher.StopAndRecreateWatch(logger)
 						continue
 					}
 					if i+1 == scenario.closeAfterWatchEvents {
@@ -691,9 +692,10 @@ func makePod(name, rv string) *v1.Pod {
 
 func testData(ctx context.Context) (*fakeListWatcher, Store, *Reflector, context.Context, func(error)) {
 	ctx, cancel := context.WithCancelCause(ctx)
+	logger := klog.FromContext(ctx)
 	s := NewStore(MetaNamespaceKeyFunc)
 	lw := &fakeListWatcher{
-		fakeWatcher: watch.NewFake(),
+		fakeWatcher: watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger}),
 		stopFunc: func() {
 			cancel(errors.New("time to stop"))
 		},
@@ -746,11 +748,11 @@ func (lw *fakeListWatcher) Watch(options metav1.ListOptions) (watch.Interface, e
 	return lw.fakeWatcher, nil
 }
 
-func (lw *fakeListWatcher) StopAndRecreateWatch() {
+func (lw *fakeListWatcher) StopAndRecreateWatch(logger klog.Logger) {
 	lw.lock.Lock()
 	defer lw.lock.Unlock()
 	lw.fakeWatcher.Stop()
-	lw.fakeWatcher = watch.NewFake()
+	lw.fakeWatcher = watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 }
 
 func (lw *fakeListWatcher) Stop() {
