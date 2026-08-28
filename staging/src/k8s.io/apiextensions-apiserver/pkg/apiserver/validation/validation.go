@@ -196,7 +196,7 @@ func kubeOpenAPIResultToFieldErrors(fldPath *field.Path, result *validate.Result
 				}
 				allErrs = append(allErrs, field.TooLong(errPath, "" /*unused*/, int(max)))
 
-			case openapierrors.MaxItemsFailCode:
+			case openapierrors.MaxItemsFailCode, openapierrors.TooManyPropertiesCode:
 				actual := int64(-1)
 				if i, ok := err.Value.(int64); ok {
 					actual = i
@@ -207,16 +207,16 @@ func kubeOpenAPIResultToFieldErrors(fldPath *field.Path, result *validate.Result
 				}
 				allErrs = append(allErrs, field.TooMany(errPath, int(actual), int(max)))
 
-			case openapierrors.TooManyPropertiesCode:
+			case openapierrors.MinItemsFailCode, openapierrors.TooFewPropertiesCode:
 				actual := int64(-1)
 				if i, ok := err.Value.(int64); ok {
 					actual = i
 				}
-				max := int64(-1)
+				min := int64(-1)
 				if i, ok := err.Valid.(int64); ok {
-					max = i
+					min = i
 				}
-				allErrs = append(allErrs, field.TooMany(errPath, int(actual), int(max)))
+				allErrs = append(allErrs, field.TooFew(errPath, int(actual), int(min)))
 
 			case openapierrors.InvalidTypeCode:
 				value := interface{}("")

@@ -1121,10 +1121,17 @@ const (
 	// This is similar to ErrorTypeInvalid, but the error will not include the
 	// too-long value.  See TooLong().
 	CauseTypeTooLong CauseType = "FieldValueTooLong"
+	// CauseTypeTooShort is used to report that the given value is too short.
+	// This is similar to ErrorTypeInvalid. See TooShort().
+	CauseTypeTooShort CauseType = "FieldValueTooShort"
 	// CauseTypeTooMany is used to report "too many". This is used to
 	// report that a given list has too many items. This is similar to FieldValueTooLong,
 	// but the error indicates quantity instead of length.
 	CauseTypeTooMany CauseType = "FieldValueTooMany"
+	// CauseTypeTooFew is used to report "too few". This is used to
+	// report that a given list has too few items. This is similar to FieldValueTooLong,
+	// but the error indicates quantity instead of length.
+	CauseTypeTooFew CauseType = "FieldValueTooFew"
 	// CauseTypeInternal is used to report other errors that are not related
 	// to user input.  See InternalError().
 	CauseTypeInternal CauseType = "InternalError"
