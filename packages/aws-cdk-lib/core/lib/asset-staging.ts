@@ -8,7 +8,7 @@ import type { BundlingOptions } from './bundling';
 import { BundlingFileAccess, BundlingOutput, PERF_BUNDLING_SRC_SYM } from './bundling';
 import { AssumptionError, ValidationError } from './errors';
 import type { FingerprintOptions } from './fs';
-import { FileSystem, SymlinkFollowMode } from './fs';
+import { FileSystem, SymlinkFollowMode, IgnoreStrategy } from './fs';
 import { clearLargeFileFingerprintCache } from './fs/fingerprint';
 import { Names } from './names';
 import { AssetBundlingVolumeCopy, AssetBundlingBindMount } from './private/asset-staging';
@@ -182,9 +182,10 @@ export class AssetStaging extends Construct {
       throw new ValidationError(lit`CannotFindAsset`, `Cannot find asset at ${this.sourcePath}`, this);
     }
 
+    const ignoreStrategy = IgnoreStrategy.fromCopyOptions(props, this.sourcePath);
     // look for invalid (external) symlinks
     if (props.follow == SymlinkFollowMode.BLOCK_EXTERNAL && fs.statSync(this.sourcePath).isDirectory()) {
-      validateInternalSymlinks(this.sourcePath, scope, props.follow);
+      validateInternalSymlinks(this.sourcePath, scope, props.follow, ignoreStrategy);
     }
 
     this._sourceStats = fs.statSync(this.sourcePath);
@@ -207,7 +208,7 @@ export class AssetStaging extends Construct {
       // Check if we actually have to bundle for this stack
       skip = !stackOf(this).bundlingRequired;
       const bundling = props.bundling;
-      stageThisAsset = () => this.stageByBundling(bundling, skip, props.follow);
+      stageThisAsset = () => this.stageByBundling(bundling, skip, props);
     } else {
       stageThisAsset = () => this.stageByCopying();
     }
@@ -329,7 +330,7 @@ export class AssetStaging extends Construct {
    *
    * Optionally skip, in which case we pretend we did something but we don't really.
    */
-  private stageByBundling(bundling: BundlingOptions, skip: boolean, followMode?: SymlinkFollowMode): StagedAsset {
+  private stageByBundling(bundling: BundlingOptions, skip: boolean, props: AssetStagingProps): StagedAsset {
     if (!this.sourceStats.isDirectory()) {
       throw new ValidationError(lit`AssetExpectedDirectoryForBundling`, `Asset ${this.sourcePath} is expected to be a directory when bundling`, this);
     }
@@ -361,7 +362,8 @@ export class AssetStaging extends Construct {
 
     // Check bundling output content and determine if we will need to archive
     const bundlingOutputType = bundling.outputType ?? BundlingOutput.AUTO_DISCOVER;
-    const bundledAsset = determineBundledAsset(this, bundleDir, bundlingOutputType, followMode);
+    const ignore = IgnoreStrategy.fromCopyOptions(props, bundleDir);
+    const bundledAsset = determineBundledAsset(this, bundleDir, bundlingOutputType, ignore, props.follow);
 
     // Calculate assetHash afterwards if we still must
     assetHash = assetHash ?? this.calculateHash(this.hashType, bundling, bundledAsset.path);
@@ -584,15 +586,27 @@ function determineHashType(scope: Construct, assetHashType?: AssetHashType, cust
  * @param root true root of the directory
  * @param subRoot used for walking subdirectories
  */
-function validateInternalSymlinks(root: string, scope: Construct, followMode: SymlinkFollowMode, subRoot: string = root) {
+function validateInternalSymlinks(
+  root: string,
+  scope: Construct,
+  followMode: SymlinkFollowMode,
+  ignoreStrat: IgnoreStrategy,
+  subRoot: string = root,
+) {
   const entries = fs.readdirSync(subRoot, { withFileTypes: true });
   for (const entry of entries) {
     const childPath = path.join(subRoot, entry.name);
     if (entry.isDirectory()) {
-      validateInternalSymlinks(root, scope, followMode, childPath);
+      if (ignoreStrat.completelyIgnores(childPath)) {
+        continue;
+      }
+      validateInternalSymlinks(root, scope, followMode, ignoreStrat, childPath);
     } else if (!entry.isSymbolicLink()) {
       continue;
     } else { // we have a symlink
+      if (ignoreStrat.completelyIgnores(childPath)) {
+        continue;
+      }
       // check whether this is internal or external
       const linkPath = fs.readlinkSync(childPath);
       const resolvedPath = resolveLinkTarget(childPath, linkPath);
@@ -689,7 +703,13 @@ interface BundledAsset {
  * Returns the bundled asset to use based on the content of the bundle directory
  * and the type of output.
  */
-function determineBundledAsset(scope: Construct, bundleDir: string, outputType: BundlingOutput, followMode?: SymlinkFollowMode): BundledAsset {
+function determineBundledAsset(
+  scope: Construct,
+  bundleDir: string,
+  outputType: BundlingOutput,
+  ignore: IgnoreStrategy,
+  followMode?: SymlinkFollowMode,
+): BundledAsset {
   const archiveFile = findSingleFile(scope, bundleDir, outputType !== BundlingOutput.SINGLE_FILE);
 
   // auto-discover means that if there is an archive file, we take it as the
@@ -701,7 +721,7 @@ function determineBundledAsset(scope: Construct, bundleDir: string, outputType: 
   switch (outputType) {
     case BundlingOutput.NOT_ARCHIVED:
       if (followMode == SymlinkFollowMode.BLOCK_EXTERNAL) {
-        validateInternalSymlinks(bundleDir, scope, followMode);
+        validateInternalSymlinks(bundleDir, scope, followMode, ignore);
       }
       return { path: bundleDir, packaging: FileAssetPackaging.ZIP_DIRECTORY };
     case BundlingOutput.ARCHIVED:
