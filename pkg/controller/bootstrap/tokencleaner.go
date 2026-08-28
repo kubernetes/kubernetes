@@ -73,7 +73,7 @@ type TokenCleaner struct {
 }
 
 // NewTokenCleaner returns a new *NewTokenCleaner.
-func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.SecretInformer, options TokenCleanerOptions) (*TokenCleaner, error) {
+func NewTokenCleaner(logger klog.Logger, cl clientset.Interface, secrets coreinformers.SecretInformer, options TokenCleanerOptions) (*TokenCleaner, error) {
 	e := &TokenCleaner{
 		client:               cl,
 		secretLister:         secrets.Lister(),
@@ -87,31 +87,37 @@ func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.SecretInforme
 		),
 	}
 
-	secrets.Informer().AddEventHandlerWithResyncPeriod(
+	_, err := secrets.Informer().AddEventHandlerWithOptions(
 		cache.FilteringResourceEventHandler{
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
 				case *v1.Secret:
 					return t.Type == bootstrapapi.SecretTypeBootstrapToken && t.Namespace == e.tokenSecretNamespace
 				default:
-					utilruntime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", e, obj))
+					utilruntime.HandleErrorWithLogger(logger, nil, "Unexpected object type passed to TokenCleaner event handler", "type", fmt.Sprintf("%T", obj))
 					return false
 				}
 			},
 			Handler: cache.ResourceEventHandlerFuncs{
-				AddFunc:    e.enqueueSecrets,
-				UpdateFunc: func(oldSecret, newSecret interface{}) { e.enqueueSecrets(newSecret) },
+				AddFunc:    func(obj interface{}) { e.enqueueSecrets(logger, obj) },
+				UpdateFunc: func(oldSecret, newSecret interface{}) { e.enqueueSecrets(logger, newSecret) },
 			},
 		},
-		options.SecretResync,
+		cache.HandlerOptions{
+			Logger:       &logger,
+			ResyncPeriod: &options.SecretResync,
+		},
 	)
+	if err != nil {
+		return nil, fmt.Errorf("could not add Secret event handler: %w", err)
+	}
 
 	return e, nil
 }
 
 // Run runs controller loops and returns when they are done
 func (tc *TokenCleaner) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting token cleaner controller")
@@ -133,10 +139,10 @@ func (tc *TokenCleaner) Run(ctx context.Context) {
 	<-ctx.Done()
 }
 
-func (tc *TokenCleaner) enqueueSecrets(obj interface{}) {
+func (tc *TokenCleaner) enqueueSecrets(logger klog.Logger, obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(err)
+		utilruntime.HandleErrorWithLogger(logger, err, "Couldn't get key for object", "object", obj)
 		return
 	}
 	tc.queue.Add(key)
@@ -158,7 +164,7 @@ func (tc *TokenCleaner) processNextWorkItem(ctx context.Context) bool {
 
 	if err := tc.syncFunc(ctx, key); err != nil {
 		tc.queue.AddRateLimited(key)
-		utilruntime.HandleError(fmt.Errorf("Sync %v failed with : %v", key, err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Sync failed", "key", key)
 		return true
 	}
 
@@ -213,7 +219,7 @@ func (tc *TokenCleaner) evalSecret(ctx context.Context, o interface{}) {
 	} else if ttl > 0 {
 		key, err := controller.KeyFunc(o)
 		if err != nil {
-			utilruntime.HandleError(err)
+			utilruntime.HandleErrorWithLogger(logger, err, "Couldn't get key for object", "object", o)
 			return
 		}
 		tc.queue.AddAfter(key, ttl)
