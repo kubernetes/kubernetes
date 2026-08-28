@@ -1605,7 +1605,9 @@ func isFractionalQuantity(q apiresource.Quantity) bool {
 }
 
 func validateDeviceCounter(counter resource.Counter, fldPath *field.Path) field.ErrorList {
-	// Any parsed quantity is valid.
+	if counter.Value.Sign() < 0 {
+		return field.ErrorList{field.Invalid(fldPath.Child("value"), counter.Value.String(), apimachineryvalidation.IsNegativeErrorMsg)}
+	}
 	return nil
 }
 
