@@ -447,7 +447,7 @@ func verifyGroupKind(controllerRef *metav1.OwnerReference, expectedKind string, 
 }
 
 func (dc *DisruptionController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	// Start events processing pipeline.

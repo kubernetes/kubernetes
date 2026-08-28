@@ -204,11 +204,11 @@ func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC, O2P, O2, O2L, O2AC]) W
 	apis := newCall(t.c, func(currentAPI int32) (watch.Interface, error) {
 		switch currentAPI {
 		case useV1beta1API:
-			return watchWithConversion[NP, N, OP](func() (watch.Interface, error) {
+			return watchWithConversion[NP, N, OP](klog.FromContext(ctx), func() (watch.Interface, error) {
 				return t.v1beta1.Watch(ctx, opts)
 			})
 		case useV1beta2API:
-			return watchWithConversion[NP, N, O2P](func() (watch.Interface, error) {
+			return watchWithConversion[NP, N, O2P](klog.FromContext(ctx), func() (watch.Interface, error) {
 				return t.v1beta2.Watch(ctx, opts)
 			})
 		default:
@@ -295,7 +295,7 @@ func getWithConversion[N, O any](call func() (*O, error)) (*N, error) {
 	return value, nil
 }
 
-func watchWithConversion[NP objectPtr[N], N any, OP runtime.Object](call func() (watch.Interface, error)) (watch.Interface, error) {
+func watchWithConversion[NP objectPtr[N], N any, OP runtime.Object](logger klog.Logger, call func() (watch.Interface, error)) (watch.Interface, error) {
 	in, err := call()
 	if err != nil {
 		return nil, err
@@ -305,7 +305,7 @@ func watchWithConversion[NP objectPtr[N], N any, OP runtime.Object](call func() 
 		resultChan: make(chan watch.Event),
 		stopChan:   make(chan struct{}),
 	}
-	go out.run() // TODO: ctx
+	go out.run(logger)
 	return out, nil
 }
 
@@ -334,8 +334,8 @@ func (w *watchSomething[NP, N, OP]) ResultChan() <-chan watch.Event {
 	return w.resultChan
 }
 
-func (w *watchSomething[NP, N, OP]) run() {
-	defer utilruntime.HandleCrash()
+func (w *watchSomething[NP, N, OP]) run(logger klog.Logger) {
+	defer utilruntime.HandleCrashWithLogger(logger)
 	defer close(w.resultChan)
 	resultChan := w.upstream.ResultChan()
 	for {
@@ -347,8 +347,7 @@ func (w *watchSomething[NP, N, OP]) run() {
 		if in, ok := e.Object.(OP); ok {
 			out := new(N)
 			if err := scheme.Convert(in, out, nil); err != nil {
-				//nolint:logcheck // Shouldn't happen.
-				klog.Error(err, "convert ResourceSlice")
+				logger.Error(err, "convert ResourceSlice")
 			}
 			e = watch.Event{
 				Type:   e.Type,

@@ -102,7 +102,7 @@ type Publisher struct {
 
 // Run starts process
 func (c *Publisher) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting root CA cert publisher controller")

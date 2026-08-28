@@ -130,7 +130,7 @@ func (rv *ResourceVersionController) enqueue(svm *svmv1.StorageVersionMigration)
 }
 
 func (rv *ResourceVersionController) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting", "controller", ResourceVersionControllerName)

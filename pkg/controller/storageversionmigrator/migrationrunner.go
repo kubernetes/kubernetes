@@ -137,7 +137,7 @@ func (crc *MigrationRunnerController) enqueue(svm *svmv1.StorageVersionMigration
 }
 
 func (crc *MigrationRunnerController) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting", "controller", MigrationRunnerControllerName)

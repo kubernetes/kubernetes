@@ -329,7 +329,7 @@ func (t *Tracker) emitEvents() {
 			return
 		}
 		func() {
-			defer utilruntime.HandleCrash()
+			defer utilruntime.HandleCrashWithLogger(t.logger)
 			deliver()
 		}()
 	}

@@ -163,7 +163,7 @@ func NewSigner(logger klog.Logger, cl clientset.Interface, secrets informers.Sec
 
 // Run runs controller loops and returns when they are done
 func (e *Signer) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Starting")

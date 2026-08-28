@@ -115,7 +115,7 @@ func NewCertificateController(
 
 // Run the main goroutine responsible for watching and syncing jobs.
 func (cc *CertificateController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting certificate controller", "name", cc.name)
