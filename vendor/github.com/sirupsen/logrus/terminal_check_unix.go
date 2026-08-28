@@ -1,7 +1,4 @@
-//go:build (linux || aix || zos) && !js && !wasi
-// +build linux aix zos
-// +build !js
-// +build !wasi
+//go:build (linux || aix || zos) && !tinygo
 
 package logrus
 

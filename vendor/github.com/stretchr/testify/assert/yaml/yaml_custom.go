@@ -7,7 +7,7 @@
 //	go test -tags testify_yaml_custom
 //
 // This implementation can be used at build time to replace the default implementation
-// to avoid linking with [gopkg.in/yaml.v3].
+// to avoid linking with [go.yaml.in/yaml/v3].
 //
 // In your test package:
 //

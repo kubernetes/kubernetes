@@ -113,8 +113,6 @@
         "github.com/grpc-ecosystem/go-grpc-middleware/v2",
         "github.com/json-iterator/go",
         "github.com/prometheus/common",
-        "github.com/sirupsen/logrus",
-        "github.com/stretchr/testify",
         "go.etcd.io/bbolt",
         "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/client/pkg/v3",
@@ -148,7 +146,6 @@
         "github.com/coredns/caddy"
       ],
       "github.com/gogo/protobuf": [
-        "github.com/containerd/containerd/api",
         "k8s.io/code-generator"
       ],
       "github.com/golang/protobuf": [
@@ -194,7 +191,6 @@
         "github.com/grpc-ecosystem/go-grpc-middleware/v2"
       ],
       "gopkg.in/yaml.v3": [
-        "github.com/containerd/containerd/api",
         "github.com/coreos/go-semver",
         "github.com/cyphar/filepath-securejoin",
         "github.com/go-logr/zapr",
@@ -203,8 +199,6 @@
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
         "github.com/grpc-ecosystem/go-grpc-middleware/v2",
         "github.com/prometheus/common",
-        "github.com/sirupsen/logrus",
-        "github.com/stretchr/testify",
         "go.etcd.io/bbolt",
         "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/client/pkg/v3",
@@ -239,8 +233,7 @@
       "github.com/json-iterator/go",
       "github.com/modern-go/concurrent",
       "github.com/modern-go/reflect2",
-      "golang.org/x/exp",
-      "gopkg.in/yaml.v3"
+      "golang.org/x/exp"
     ]
   }
 }
