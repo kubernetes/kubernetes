@@ -182,13 +182,13 @@ func (c *KubernetesAPIApprovalPolicyConformantConditionController) sync(ctx cont
 }
 
 // Run starts the controller.
+//
+//logcheck:context // RunWithContext should be used instead of Run in code which supports contextual logging.
 func (c *KubernetesAPIApprovalPolicyConformantConditionController) Run(workers int, stopCh <-chan struct{}) {
 	c.RunWithContext(workers, wait.ContextForChannel(stopCh))
 }
 
 // RunWithContext starts the controller with a context.
-//
-//logcheck:context // RunWithContext should be used instead of Run in code which supports contextual logging.
 func (c *KubernetesAPIApprovalPolicyConformantConditionController) RunWithContext(workers int, ctx context.Context) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()

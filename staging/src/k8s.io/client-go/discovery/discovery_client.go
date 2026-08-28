@@ -76,7 +76,7 @@ var v2GVK = schema.GroupVersionKind{Group: "apidiscovery.k8s.io", Version: "v2",
 //
 // DiscoveryInterfaceWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use DiscoveryInterfaceWithContext instead.
+//logcheck:context // Use DiscoveryInterfaceWithContext instead of DiscoveryInterface in code which supports contextual logging.
 type DiscoveryInterface interface {
 	RESTClient() restclient.Interface
 	ServerGroupsInterface
@@ -90,7 +90,7 @@ type DiscoveryInterface interface {
 	//
 	// DiscoveryInterfaceWithContext.WithLegacyWithContext is a better alternative because it supports contextual logging and cancellation.
 	//
-	// Contextual logging: Use DiscoveryInterfaceWithContext.WithLegacyWithContext instead.
+	//logcheck:context // Use DiscoveryInterfaceWithContext.WithLegacyWithContext instead of WithLegacy in code which supports contextual logging.
 	WithLegacy() DiscoveryInterface
 }
 
@@ -155,13 +155,13 @@ func (i *discoveryInterfaceWrapper) WithLegacyWithContext(ctx context.Context) D
 //
 // AggregatedDiscoveryInterfaceWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use AggregatedDiscoveryInterfaceWithContext instead.
+//logcheck:context // Use AggregatedDiscoveryInterfaceWithContext instead of AggregatedDiscoveryInterface in code which supports contextual logging.
 type AggregatedDiscoveryInterface interface {
 	DiscoveryInterface
 
 	// AggregatedDiscoveryInterfaceWithContext.GroupsAndMaybeResourcesWithContext is a better alternative because it supports contextual logging and cancellation.
 	//
-	// Contextual logging: Use AggregatedDiscoveryInterfaceWithContext.GroupsAndMaybeResourcesWithContext instead.
+	//logcheck:context // Use AggregatedDiscoveryInterfaceWithContext.GroupsAndMaybeResourcesWithContext instead of GroupsAndMaybeResources in code which supports contextual logging.
 	GroupsAndMaybeResources() (*metav1.APIGroupList, map[schema.GroupVersion]*metav1.APIResourceList, map[schema.GroupVersion]error, error)
 }
 
@@ -203,7 +203,7 @@ func (i *aggregatedDiscoveryInterfaceWrapper) GroupsAndMaybeResourcesWithContext
 //
 // CachedDiscoveryInterfaceWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use CachedDiscoveryInterfaceWithContext instead.
+//logcheck:context // Use CachedDiscoveryInterfaceWithContext instead of CachedDiscoveryInterface in code which supports contextual logging.
 type CachedDiscoveryInterface interface {
 	DiscoveryInterface
 	// Fresh is supposed to tell the caller whether or not to retry if the cache
@@ -214,14 +214,14 @@ type CachedDiscoveryInterface interface {
 	//
 	// CachedDiscoveryInterfaceWithContext.FreshWithContext is a better alternative because it supports contextual logging and cancellation.
 	//
-	// Contextual logging: Use CachedDiscoveryInterfaceWithContext.FreshWithContext instead.
+	//logcheck:context // Use CachedDiscoveryInterfaceWithContext.FreshWithContext instead of Fresh in code which supports contextual logging.
 	Fresh() bool
 	// Invalidate enforces that no cached data that is older than the current time
 	// is used.
 	//
 	// CachedDiscoveryInterfaceWithContext.InvalidateWithContext is a better alternative because it supports contextual logging and cancellation.
 	//
-	// Contextual logging: Use CachedDiscoveryInterfaceWithContext.InvalidateWithContext instead.
+	//logcheck:context // Use CachedDiscoveryInterfaceWithContext.InvalidateWithContext instead of Invalidate in code which supports contextual logging.
 	Invalidate()
 }
 
@@ -272,14 +272,14 @@ func (i *cachedDiscoveryInterfaceWrapper) InvalidateWithContext(ctx context.Cont
 //
 // ServerGroupsInterfaceWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerGroupsInterfaceWithContext instead.
+//logcheck:context // Use ServerGroupsInterfaceWithContext instead of ServerGroupsInterface in code which supports contextual logging.
 type ServerGroupsInterface interface {
 	// ServerGroups returns the supported groups, with information like supported versions and the
 	// preferred version.
 	//
 	// ServerGroupsInterfaceWithContext.ServerGroups is a better alternative because it supports contextual logging and cancellation.
 	//
-	// Contextual logging: Use ServerGroupsInterfaceWithContext.ServerGroups instead.
+	//logcheck:context // Use ServerGroupsInterfaceWithContext.ServerGroupsWithContext instead of ServerGroups in code which supports contextual logging.
 	ServerGroups() (*metav1.APIGroupList, error)
 }
 
@@ -314,13 +314,13 @@ func (i *serverGroupsInterfaceWrapper) ServerGroupsWithContext(ctx context.Conte
 //
 // ServerGroupsAndResourcesWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerGroupsAndResourcesWithContext instead.
+//logcheck:context // Use ServerResourcesInterfaceWithContext instead of ServerResourcesInterface in code which supports contextual logging.
 type ServerResourcesInterface interface {
 	// ServerResourcesForGroupVersion returns the supported resources for a group and version.
 	//
 	// ServerResourcesInterfaceWithContext.ServerResourcesForGroupVersionWithContext is a better alternative because it supports contextual logging and cancellation.
 	//
-	// Contextual logging: Use ServerGroupsAndResourcesWithContext.ServerResourcesForGroupVersionWithContext instead.
+	//logcheck:context // Use ServerResourcesInterfaceWithContext.ServerResourcesForGroupVersionWithContext instead of ServerResourcesForGroupVersion in code which supports contextual logging.
 	ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error)
 	// ServerGroupsAndResources returns the supported groups and resources for all groups and versions.
 	//
@@ -329,7 +329,7 @@ type ServerResourcesInterface interface {
 	//
 	// ServerResourcesInterfaceWithContext.ServerGroupsAndResourcesWithContext is a better alternative because it supports contextual logging and cancellation.
 	//
-	// Contextual logging: Use ServerGroupsAndResourcesWithContext.ServerGroupsAndResourcesWithContext instead.
+	//logcheck:context // Use ServerResourcesInterfaceWithContext.ServerGroupsAndResourcesWithContext instead of ServerGroupsAndResources in code which supports contextual logging.
 	ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error)
 	// ServerPreferredResources returns the supported resources with the version preferred by the
 	// server.
@@ -339,7 +339,7 @@ type ServerResourcesInterface interface {
 	//
 	// ServerResourcesInterfaceWithContext.ServerPreferredResourcesWithContext is a better alternative because it supports contextual logging and cancellation.
 	//
-	// Contextual logging: Use ServerResourcesInterfaceWithContext.ServerPreferredResourcesWithContext instead.
+	//logcheck:context // Use ServerResourcesInterfaceWithContext.ServerPreferredResourcesWithContext instead of ServerPreferredResources in code which supports contextual logging.
 	ServerPreferredResources() ([]*metav1.APIResourceList, error)
 	// ServerPreferredNamespacedResources returns the supported namespaced resources with the
 	// version preferred by the server.
@@ -349,7 +349,7 @@ type ServerResourcesInterface interface {
 	//
 	// ServerResourcesInterfaceWithContext.ServerPreferredNamespacedResourcesWithContext is a better alternative because it supports contextual logging and cancellation.
 	//
-	// Contextual logging: Use ServerResourcesInterfaceWithContext.ServerPreferredNamespacedResourcesWithContext instead.
+	//logcheck:context // Use ServerResourcesInterfaceWithContext.ServerPreferredNamespacedResourcesWithContext instead of ServerPreferredNamespacedResources in code which supports contextual logging.
 	ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error)
 }
 
@@ -412,13 +412,13 @@ func (i *serverResourcesInterfaceWrapper) ServerPreferredNamespacedResourcesWith
 //
 // ServerVersionInterfaceWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerVersionInterfaceWithContext instead.
+//logcheck:context // Use ServerVersionInterfaceWithContext instead of ServerVersionInterface in code which supports contextual logging.
 type ServerVersionInterface interface {
 	// ServerVersion retrieves and parses the server's version (git version).
 	//
 	// ServerVersionInterfaceWithContext.ServerVersionWithContext is a better alternative because it supports contextual logging and cancellation.
 	//
-	// Contextual logging: Use ServerVersionInterfaceWithContext.ServerVersionWithContext instead.
+	//logcheck:context // Use ServerVersionInterfaceWithContext.ServerVersionWithContext instead of ServerVersion in code which supports contextual logging.
 	ServerVersion() (*version.Info, error)
 }
 
@@ -452,13 +452,13 @@ func (i *serverVersionInterfaceWrapper) ServerVersionWithContext(ctx context.Con
 //
 // OpenAPISchemaInterfaceWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use OpenAPISchemaInterfaceWithContext instead.
+//logcheck:context // Use OpenAPISchemaInterfaceWithContext instead of OpenAPISchemaInterface in code which supports contextual logging.
 type OpenAPISchemaInterface interface {
 	// OpenAPISchema retrieves and parses the swagger API schema the server supports.
 	//
 	// OpenAPISchemaInterfaceWithContext.OpenAPISchemaWithContext is a better alternative because it supports contextual logging and cancellation.
 	//
-	// Contextual logging: Use OpenAPISchemaInterfaceWithContext.OpenAPISchemaWithContext instead.
+	//logcheck:context // Use OpenAPISchemaInterfaceWithContext.OpenAPISchemaWithContext instead of OpenAPISchema in code which supports contextual logging.
 	OpenAPISchema() (*openapi_v2.Document, error)
 }
 
@@ -490,11 +490,11 @@ func (i *openAPISchemaInterfaceWrapper) OpenAPISchemaWithContext(ctx context.Con
 
 // OpenAPIV3SchemaInterfaceWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use OpenAPIV3SchemaInterfaceWithContext instead.
+//logcheck:context // Use OpenAPIV3SchemaInterfaceWithContext instead of OpenAPIV3SchemaInterface in code which supports contextual logging.
 type OpenAPIV3SchemaInterface interface {
 	// OpenAPIV3SchemaInterfaceWithContext.OpenAPIV3WithContext is a better alternative because it supports contextual logging and cancellation.
 	//
-	// Contextual logging: Use OpenAPIV3SchemaInterfaceWithContext.OpenAPIV3WithContext instead.
+	//logcheck:context // Use OpenAPIV3SchemaInterfaceWithContext.OpenAPIV3WithContext instead of OpenAPIV3 in code which supports contextual logging.
 	OpenAPIV3() openapi.Client
 }
 
@@ -592,7 +592,7 @@ func apiVersionsToAPIGroup(apiVersions *metav1.APIVersions) (apiGroup metav1.API
 //
 // GroupsAndMaybeResourcesWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use GroupsAndMaybeResourcesWithContext instead.
+//logcheck:context // Use GroupsAndMaybeResourcesWithContext instead of GroupsAndMaybeResources in code which supports contextual logging.
 func (d *DiscoveryClient) GroupsAndMaybeResources() (
 	*metav1.APIGroupList,
 	map[schema.GroupVersion]*metav1.APIResourceList,
@@ -787,7 +787,7 @@ func ContentTypeIsGVK(contentType string, gvk schema.GroupVersionKind) (bool, er
 //
 // ServerGroupsWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerGroupsWithContext instead.
+//logcheck:context // Use ServerGroupsWithContext instead of ServerGroups in code which supports contextual logging.
 func (d *DiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
 	return d.ServerGroupsWithContext(context.Background())
 }
@@ -806,7 +806,7 @@ func (d *DiscoveryClient) ServerGroupsWithContext(ctx context.Context) (*metav1.
 //
 // ServerResourcesForGroupVersionWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerResourcesForGroupVersionWithContext instead.
+//logcheck:context // Use ServerResourcesForGroupVersionWithContext instead of ServerResourcesForGroupVersion in code which supports contextual logging.
 func (d *DiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (resources *metav1.APIResourceList, err error) {
 	return d.ServerResourcesForGroupVersionWithContext(context.Background(), groupVersion)
 }
@@ -891,7 +891,7 @@ func GroupDiscoveryFailedErrorGroups(err error) (map[schema.GroupVersion]error, 
 
 // ServerGroupsAndResourcesWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerGroupsAndResourcesWithContext instead.
+//logcheck:context // Use ServerGroupsAndResourcesWithContext instead of ServerGroupsAndResources in code which supports contextual logging.
 func ServerGroupsAndResources(d DiscoveryInterface) ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
 	return ServerGroupsAndResourcesWithContext(context.Background(), ToDiscoveryInterfaceWithContext(d))
 }
@@ -967,7 +967,7 @@ func ServerGroupsAndResourcesWithContext(ctx context.Context, d DiscoveryInterfa
 //
 // ServerPreferredResourcesWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerPreferredResourcesWithContext instead.
+//logcheck:context // Use ServerPreferredResourcesWithContext instead of ServerPreferredResources in code which supports contextual logging.
 func ServerPreferredResources(d DiscoveryInterface) ([]*metav1.APIResourceList, error) {
 	return ServerPreferredResourcesWithContext(context.Background(), ToDiscoveryInterfaceWithContext(d))
 }
@@ -1100,7 +1100,7 @@ func fetchGroupVersionResources(ctx context.Context, d DiscoveryInterfaceWithCon
 //
 // ServerPreferredResourcesWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerPreferredResourcesWithContext instead.
+//logcheck:context // Use ServerPreferredResourcesWithContext instead of ServerPreferredResources in code which supports contextual logging.
 func (d *DiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	ctx := context.Background()
 	_, rs, err := withRetries(ctx, defaultRetries, func() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
@@ -1125,7 +1125,7 @@ func (d *DiscoveryClient) ServerPreferredResourcesWithContext(ctx context.Contex
 //
 // ServerPreferredNamespacedResourcesWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerPreferredNamespacedResourcesWithContext instead.
+//logcheck:context // Use ServerPreferredNamespacedResourcesWithContext instead of ServerPreferredNamespacedResources in code which supports contextual logging.
 func (d *DiscoveryClient) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
 	return ServerPreferredNamespacedResources(d)
 }
@@ -1140,7 +1140,7 @@ func (d *DiscoveryClient) ServerPreferredNamespacedResourcesWithContext(ctx cont
 //
 // ServerPreferredNamespacedResourcesWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerPreferredNamespacedResourcesWithContext instead.
+//logcheck:context // Use ServerPreferredNamespacedResourcesWithContext instead of ServerPreferredNamespacedResources in code which supports contextual logging.
 func ServerPreferredNamespacedResources(d DiscoveryInterface) ([]*metav1.APIResourceList, error) {
 	return ServerPreferredNamespacedResourcesWithContext(context.Background(), ToDiscoveryInterfaceWithContext(d))
 }
@@ -1193,7 +1193,7 @@ func (d *DiscoveryClient) OpenAPISchemaWithContext(ctx context.Context) (*openap
 
 // OpenAPIV3WithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use OpenAPIV3WithContext instead.
+//logcheck:context // Use OpenAPIV3WithContext instead of OpenAPIV3 in code which supports contextual logging.
 func (d *DiscoveryClient) OpenAPIV3() openapi.Client {
 	return openapi.NewClient(d.restClient) //nolint:logcheck // This method itself is deprecated in favor of OpenAPIV3WithContext.
 }
@@ -1207,7 +1207,7 @@ func (d *DiscoveryClient) OpenAPIV3WithContext(ctx context.Context) openapi.Clie
 //
 // WithLegacyWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use WithLegacyWithContext instead.
+//logcheck:context // Use WithLegacyWithContext instead of WithLegacy in code which supports contextual logging.
 func (d *DiscoveryClient) WithLegacy() DiscoveryInterface {
 	client := *d
 	client.UseLegacyDiscovery = true

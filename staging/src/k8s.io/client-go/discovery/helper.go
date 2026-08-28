@@ -31,6 +31,8 @@ import (
 // This is particularly helpful when writing a controller or an e2e test that requires a particular resource to function.
 //
 // IsResourceEnabledWithContext is a better alternative because it supports contextual logging and cancellation.
+//
+//logcheck:context // Use IsResourceEnabledWithContext instead of IsResourceEnabled in code which supports contextual logging.
 func IsResourceEnabled(client DiscoveryInterface, resourceToCheck schema.GroupVersionResource) (bool, error) {
 	return IsResourceEnabledWithContext(context.Background(), ToDiscoveryInterfaceWithContext(client), resourceToCheck)
 }
@@ -60,6 +62,8 @@ func IsResourceEnabledWithContext(ctx context.Context, client DiscoveryInterface
 // if it failed to contact the server or if the versions are not an exact match.
 //
 // MatchesServerVersionWithContext is a better alternative because it supports contextual logging and cancellation.
+//
+//logcheck:context // Use MatchesServerVersionWithContext instead of MatchesServerVersion in code which supports contextual logging.
 func MatchesServerVersion(clientVersion apimachineryversion.Info, client DiscoveryInterface) error {
 	return MatchesServerVersionWithContext(context.Background(), clientVersion, ToDiscoveryInterfaceWithContext(client))
 }
@@ -83,6 +87,8 @@ func MatchesServerVersionWithContext(ctx context.Context, clientVersion apimachi
 // ServerSupportsVersion returns an error if the server doesn't have the required version
 //
 // ServerSupportsVersionWithContext is a better alternative because it supports contextual logging and cancellation.
+//
+//logcheck:context // Use ServerSupportsVersionWithContext instead of ServerSupportsVersion in code which supports contextual logging.
 func ServerSupportsVersion(client DiscoveryInterface, requiredGV schema.GroupVersion) error {
 	return ServerSupportsVersionWithContext(context.Background(), ToDiscoveryInterfaceWithContext(client), requiredGV)
 }

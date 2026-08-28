@@ -123,7 +123,7 @@ func (f *dynamicSharedInformerFactory) ForResource(gvr schema.GroupVersionResour
 
 // Start initializes all requested informers.
 //
-// Contextual logging: StartWithContext should be used instead of Start in code which supports contextual logging.
+//logcheck:context // StartWithContext should be used instead of Start in code which supports contextual logging.
 func (f *dynamicSharedInformerFactory) Start(stopCh <-chan struct{}) {
 	f.StartWithContext(wait.ContextForChannel(stopCh))
 }

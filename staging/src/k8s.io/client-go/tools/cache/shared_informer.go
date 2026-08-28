@@ -152,7 +152,7 @@ type SharedInformer interface {
 	// remove the handler again, or to tell if the handler is synced (has
 	// seen every item in the initial list).
 	//
-	// Contextual logging: AddEventHandlerWithOptions together with a logger in the options should be used instead of AddEventHandler in code which supports contextual logging.
+	//logcheck:context // AddEventHandlerWithOptions together with a logger in the options should be used instead of AddEventHandler in code which supports contextual logging.
 	AddEventHandler(handler ResourceEventHandler) (ResourceEventHandlerRegistration, error)
 	// AddEventHandlerWithResyncPeriod adds an event handler to the
 	// shared informer with the requested resync period; zero means
@@ -171,7 +171,7 @@ type SharedInformer interface {
 	// It returns a registration handle for the handler that can be used to remove
 	// the handler again and an error if the handler cannot be added.
 	//
-	// Contextual logging: AddEventHandlerWithOptions together with a logger in the options should be used instead of AddEventHandlerWithResyncPeriod in code which supports contextual logging.
+	//logcheck:context // AddEventHandlerWithOptions together with a logger in the options should be used instead of AddEventHandlerWithResyncPeriod in code which supports contextual logging.
 	AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) (ResourceEventHandlerRegistration, error)
 	// AddEventHandlerWithOptions is a variant of AddEventHandlerWithResyncPeriod where
 	// all optional parameters are passed in a struct.
@@ -196,7 +196,7 @@ type SharedInformer interface {
 	// Run starts and runs the shared informer, returning after it stops.
 	// The informer will be stopped when stopCh is closed.
 	//
-	// Contextual logging: RunWithContext should be used instead of Run in code which uses contextual logging.
+	//logcheck:context // RunWithContext should be used instead of Run in code which uses contextual logging.
 	Run(stopCh <-chan struct{})
 	// RunWithContext starts and runs the shared informer, returning after it stops.
 	// The informer will be stopped when the context is canceled.
@@ -236,7 +236,7 @@ type SharedInformer interface {
 	// The handler should return quickly - any expensive processing should be
 	// offloaded.
 	//
-	// Contextual logging: SetWatchErrorHandlerWithContext should be used instead of SetWatchErrorHandler in code which supports contextual logging.
+	//logcheck:context // SetWatchErrorHandlerWithContext should be used instead of SetWatchErrorHandler in code which supports contextual logging.
 	SetWatchErrorHandler(handler WatchErrorHandler) error
 
 	// SetWatchErrorHandlerWithContext is a variant of SetWatchErrorHandler where
@@ -509,7 +509,7 @@ const (
 // indicating that the caller identified by name is waiting for syncs, followed by
 // either a successful or failed sync.
 //
-// Contextual logging: WaitForNamedCacheSyncWithContext should be used instead of WaitForNamedCacheSync in code which supports contextual logging.
+//logcheck:context // WaitForNamedCacheSyncWithContext should be used instead of WaitForNamedCacheSync in code which supports contextual logging.
 func WaitForNamedCacheSync(controllerName string, stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool {
 	klog.Background().Info("Waiting for caches to sync", "controller", controllerName)
 

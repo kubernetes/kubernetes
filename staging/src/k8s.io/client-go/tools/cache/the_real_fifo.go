@@ -778,6 +778,8 @@ func (f *RealFIFO) Transformer() TransformFunc {
 // process.
 //
 // Deprecated: Use NewRealFIFOWithOptions instead.
+//
+//logcheck:context // NewRealFIFOWithOptions and logger should be used instead of NewRealFIFO in code which supports contextual logging.
 func NewRealFIFO(keyFunc KeyFunc, knownObjects KeyListerGetter, transformer TransformFunc) *RealFIFO {
 	//nolint:logcheck // Cannot provide Logger here.
 	return NewRealFIFOWithOptions(RealFIFOOptions{

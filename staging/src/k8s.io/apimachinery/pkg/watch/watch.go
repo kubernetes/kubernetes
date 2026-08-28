@@ -112,12 +112,12 @@ type FakeWatcher struct {
 
 var _ Interface = &FakeWatcher{}
 
-// Contextual logging: NewFakeWithOptions and a logger in the FakeOptions should be used instead in code which supports contextual logging.
+//logcheck:context // NewFakeWithOptions and a logger in the FakeOptions should be used instead in code which supports contextual logging.
 func NewFake() *FakeWatcher {
 	return NewFakeWithOptions(FakeOptions{}) //nolint:logcheck // Intentionally not providing Logger here.
 }
 
-// Contextual logging: NewFakeWithOptions and a logger in the FakeOptions should be used instead in code which supports contextual logging.
+//logcheck:context // NewFakeWithOptions and a logger in the FakeOptions should be used instead in code which supports contextual logging.
 func NewFakeWithChanSize(size int, blocking bool) *FakeWatcher {
 	return NewFakeWithOptions(FakeOptions{ChannelSize: size}) //nolint:logcheck // Intentionally not providing Logger here.
 }
@@ -198,7 +198,7 @@ type RaceFreeFakeWatcher struct {
 
 var _ Interface = &RaceFreeFakeWatcher{}
 
-// Contextual logging: RaceFreeFakeWatcherWithLogger should be used instead of NewRaceFreeFake in code which supports contextual logging.
+//logcheck:context // RaceFreeFakeWatcherWithLogger should be used instead of NewRaceFreeFake in code which supports contextual logging.
 func NewRaceFreeFake() *RaceFreeFakeWatcher {
 	return NewRaceFreeFakeWithLogger(klog.Background())
 }

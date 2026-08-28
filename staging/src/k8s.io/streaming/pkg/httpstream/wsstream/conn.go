@@ -127,7 +127,7 @@ func IsWebSocketRequestWithTunnelingProtocol(req *http.Request) bool {
 // IgnoreReceives reads from a WebSocket until it is closed, then returns. If timeout is set, the
 // read and write deadlines are pushed every time a new message is received.
 //
-// Contextual logging: IgnoreReceivesWithLogger should be used instead of IgnoreReceives in code which uses contextual logging.
+//logcheck:context // IgnoreReceivesWithLogger should be used instead of IgnoreReceives in code which uses contextual logging.
 func IgnoreReceives(ws *websocket.Conn, timeout time.Duration) {
 	IgnoreReceivesWithLogger(klog.Background(), ws, timeout)
 }
