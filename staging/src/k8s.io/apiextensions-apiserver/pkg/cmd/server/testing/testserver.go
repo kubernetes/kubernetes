@@ -241,7 +241,12 @@ func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []strin
 		return status == 200, nil
 	})
 	if err != nil {
-		return result, fmt.Errorf("failed to wait for /healthz to return ok: %w (last status %d, last error %v, last body %.512q)", err, lastStatus, lastErr, lastBody)
+		// A probe that got a response leaves lastErr nil, which is the common
+		// case here, so only mention the error when there is one to report.
+		if lastErr != nil {
+			return result, fmt.Errorf("failed to wait for /healthz to return ok: %w (last status %d, last body %.512q, last error %w)", err, lastStatus, lastBody, lastErr)
+		}
+		return result, fmt.Errorf("failed to wait for /healthz to return ok: %w (last status %d, last body %.512q)", err, lastStatus, lastBody)
 	}
 
 	// from here the caller must call tearDown
