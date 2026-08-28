@@ -1,0 +1,13 @@
+{
+  "targets": {
+    "java": {
+      "package": "software.amazon.awscdk.services.opensearch"
+    },
+    "dotnet": {
+      "namespace": "Amazon.CDK.AWS.OpenSearch"
+    },
+    "python": {
+      "module": "aws_cdk.aws_opensearch"
+    }
+  }
+}

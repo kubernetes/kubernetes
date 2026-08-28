@@ -1,0 +1,13 @@
+{
+  "targets": {
+    "java": {
+      "package": "software.amazon.awscdk.services.iotsecuretunneling"
+    },
+    "dotnet": {
+      "namespace": "Amazon.CDK.AWS.IoTSecureTunneling"
+    },
+    "python": {
+      "module": "aws_cdk.aws_iotsecuretunneling"
+    }
+  }
+}

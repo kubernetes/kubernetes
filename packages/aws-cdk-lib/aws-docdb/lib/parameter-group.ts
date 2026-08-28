@@ -29,7 +29,7 @@ abstract class ClusterParameterGroupBase extends Resource implements IClusterPar
 
       public get dbClusterParameterGroupRef(): DBClusterParameterGroupReference {
         return {
-          dbClusterParameterGroupId: this.parameterGroupName,
+          dbClusterParameterGroupName: this.parameterGroupName,
         };
       }
     }
@@ -46,7 +46,7 @@ abstract class ClusterParameterGroupBase extends Resource implements IClusterPar
    */
   public get dbClusterParameterGroupRef(): DBClusterParameterGroupReference {
     return {
-      dbClusterParameterGroupId: this.parameterGroupName,
+      dbClusterParameterGroupName: this.parameterGroupName,
     };
   }
 }

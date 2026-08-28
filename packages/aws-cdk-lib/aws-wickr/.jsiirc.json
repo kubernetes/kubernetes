@@ -1,0 +1,13 @@
+{
+  "targets": {
+    "java": {
+      "package": "software.amazon.awscdk.services.wickr"
+    },
+    "dotnet": {
+      "namespace": "Amazon.CDK.AWS.Wickr"
+    },
+    "python": {
+      "module": "aws_cdk.aws_wickr"
+    }
+  }
+}

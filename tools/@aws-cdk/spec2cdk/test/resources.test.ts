@@ -246,6 +246,40 @@ test('an unrecorded attribute name conflict fails codegen', () => {
   );
 });
 
+test('the reference interface reads a renamed attribute through its replacement getter', () => {
+  // GIVEN - the renamed attribute is what identifies the resource, so the Ref must read its getter.
+  // The identifier shape is constructed for this test, not real EKS's.
+  givenResource({
+    ...BASE_RESOURCE,
+    name: 'Cluster',
+    cloudFormationType: 'AWS::EKS::Cluster',
+    primaryIdentifier: ['Id', 'CertificateAuthority.Data'],
+    cfnRefIdentifier: ['Id'],
+    attributes: {
+      'CertificateAuthorityData': {
+        type: { type: 'string' },
+        documentation: 'The CertificateAuthorityData of the resource',
+      },
+      'CertificateAuthority.Data': {
+        type: { type: 'string' },
+        documentation: 'The CertificateAuthority.Data of the resource',
+      },
+    },
+  });
+
+  // WHEN
+  const rendered = renderResource('AWS::EKS::Cluster');
+
+  // THEN - not attrCertificateAuthorityData, which is a different attribute
+  expect(rendered.resources).toContainCode(
+    `public get clusterRef(): ClusterReference {
+      return {
+        clusterId: this.ref,
+        certificateAuthorityData: this.attrCertificateAuthorityCertificateData
+      };
+    }`);
+});
+
 test('resource interface with Arn as a property and not a primaryIdentifier', () => {
   // GIVEN
   const resource = db.allocate('resource', {

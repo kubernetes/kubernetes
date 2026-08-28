@@ -77,6 +77,7 @@ test('a data quality ruleset with tags', () => {
 test('removalPolicy can be overridden to DESTROY', () => {
   const stack = new cdk.Stack();
   new glue.DataQualityRuleset(stack, 'DataQualityRuleset', {
+    rulesetName: 'ruleset_name',
     dqdl: glue.Dqdl.fromString('ruleset_dqdl'),
     targetTable: new glue.DataQualityTargetTable('database_name', 'table_name'),
     removalPolicy: cdk.RemovalPolicy.DESTROY,

@@ -1,0 +1,13 @@
+{
+  "targets": {
+    "java": {
+      "package": "software.amazon.awscdk.services.drs"
+    },
+    "dotnet": {
+      "namespace": "Amazon.CDK.AWS.DRS"
+    },
+    "python": {
+      "module": "aws_cdk.aws_drs"
+    }
+  }
+}

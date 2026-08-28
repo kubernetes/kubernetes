@@ -311,4 +311,48 @@ describe('parameter group', () => {
     // THEN - should only have 1 resource, not 2
     Template.fromStack(stack).resourceCountIs('AWS::RDS::DBClusterParameterGroup', 1);
   });
+
+  test('dbParameterGroupRef of an imported group formats a colon-separated parameter group ARN', () => {
+    // GIVEN
+    const stack = new cdk.Stack(undefined, 'Stack', { env: { account: '123456789012', region: 'us-east-1' } });
+
+    // WHEN
+    const parameterGroup = ParameterGroup.fromParameterGroupName(stack, 'Params', 'my-group');
+
+    // THEN
+    expect(stack.resolve(parameterGroup.dbParameterGroupRef.dbParameterGroupArn)).toEqual({
+      'Fn::Join': ['', ['arn:', { Ref: 'AWS::Partition' }, ':rds:us-east-1:123456789012:pg:my-group']],
+    });
+  });
+
+  test('fails to read dbParameterGroupArn of a group not bound to a DB instance', () => {
+    // GIVEN
+    const stack = new cdk.Stack();
+    const parameterGroup = new ParameterGroup(stack, 'Params', {
+      engine: DatabaseClusterEngine.AURORA_MYSQL,
+    });
+
+    // THEN
+    expect(() => parameterGroup.dbParameterGroupRef.dbParameterGroupArn).toThrow(
+      'this ParameterGroup is not bound to a DB instance, so it has no DB parameter group ARN - bind it with bindToInstance() or create it with ParameterGroup.forInstance()',
+    );
+  });
+
+  test('dbParameterGroupRef read before binding still resolves once the group is bound', () => {
+    // GIVEN
+    const stack = new cdk.Stack();
+    const parameterGroup = new ParameterGroup(stack, 'Params', {
+      engine: DatabaseClusterEngine.AURORA_MYSQL,
+    });
+    const ref = parameterGroup.dbParameterGroupRef;
+
+    // WHEN
+    parameterGroup.bindToInstance({});
+
+    // THEN
+    expect(stack.resolve(ref.dbParameterGroupArn)).toEqual({
+      'Fn::GetAtt': ['ParamsA8366201', 'DBParameterGroupArn'],
+    });
+    expect(stack.resolve(ref.dbParameterGroupName)).toEqual({ Ref: 'ParamsA8366201' });
+  });
 });

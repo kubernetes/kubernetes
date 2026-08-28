@@ -1,0 +1,13 @@
+{
+  "targets": {
+    "java": {
+      "package": "software.amazon.awscdk.services.translate"
+    },
+    "dotnet": {
+      "namespace": "Amazon.CDK.AWS.Translate"
+    },
+    "python": {
+      "module": "aws_cdk.aws_translate"
+    }
+  }
+}

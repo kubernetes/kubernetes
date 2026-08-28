@@ -1,0 +1,13 @@
+{
+  "targets": {
+    "java": {
+      "package": "software.amazon.awscdk.services.agentregistry"
+    },
+    "dotnet": {
+      "namespace": "Amazon.CDK.AWS.AgentRegistry"
+    },
+    "python": {
+      "module": "aws_cdk.aws_agentregistry"
+    }
+  }
+}

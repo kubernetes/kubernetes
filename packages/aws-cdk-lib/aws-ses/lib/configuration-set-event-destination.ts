@@ -266,6 +266,21 @@ export interface FirehoseDeliveryStreamDestination {
 }
 
 /**
+ * Properties of a reference to an existing configuration set event destination.
+ */
+export interface ConfigurationSetEventDestinationAttributes {
+  /**
+   * The configuration set that the event destination belongs to.
+   */
+  readonly configurationSet: IConfigurationSetRef;
+
+  /**
+   * The ID of the configuration set event destination.
+   */
+  readonly configurationSetEventDestinationId: string;
+}
+
+/**
  * A configuration set event destination
  */
 @propertyInjectable
@@ -274,7 +289,11 @@ export class ConfigurationSetEventDestination extends Resource implements IConfi
   public static readonly PROPERTY_INJECTION_ID: string = 'aws-cdk-lib.aws-ses.ConfigurationSetEventDestination';
 
   /**
-   * Use an existing configuration set
+   * Import an existing event destination by its ID.
+   *
+   * An ID alone does not identify the configuration set the destination belongs to, so
+   * `configurationSetName` is not available on the returned reference. Use
+   * `fromConfigurationSetEventDestinationAttributes()` if you need it.
    */
   public static fromConfigurationSetEventDestinationId(
     scope: Construct,
@@ -284,8 +303,33 @@ export class ConfigurationSetEventDestination extends Resource implements IConfi
       public readonly configurationSetEventDestinationId = configurationSetEventDestinationId;
 
       public get configurationSetEventDestinationRef(): ConfigurationSetEventDestinationReference {
+        const self = this;
         return {
-          configurationSetEventDestinationId: this.configurationSetEventDestinationId,
+          configurationSetEventDestinationId,
+          get configurationSetName(): string {
+            throw new ValidationError(lit`CannotAccessConfigurationSetNameOfImportedEventDestination`,
+              'configurationSetName is not available on a ConfigurationSetEventDestination imported by id; use ConfigurationSetEventDestination.fromConfigurationSetEventDestinationAttributes() to get a complete reference', self);
+          },
+        };
+      }
+    }
+    return new Import(scope, id);
+  }
+
+  /**
+   * Import an existing event destination from its attributes.
+   */
+  public static fromConfigurationSetEventDestinationAttributes(
+    scope: Construct,
+    id: string,
+    attrs: ConfigurationSetEventDestinationAttributes): IConfigurationSetEventDestination {
+    class Import extends Resource implements IConfigurationSetEventDestination {
+      public readonly configurationSetEventDestinationId = attrs.configurationSetEventDestinationId;
+
+      public get configurationSetEventDestinationRef(): ConfigurationSetEventDestinationReference {
+        return {
+          configurationSetEventDestinationId: attrs.configurationSetEventDestinationId,
+          configurationSetName: attrs.configurationSet.configurationSetRef.configurationSetName,
         };
       }
     }
@@ -293,10 +337,12 @@ export class ConfigurationSetEventDestination extends Resource implements IConfi
   }
 
   public readonly configurationSetEventDestinationId: string;
+  private readonly configurationSetName: string;
 
   public get configurationSetEventDestinationRef(): ConfigurationSetEventDestinationReference {
     return {
       configurationSetEventDestinationId: this.configurationSetEventDestinationId,
+      configurationSetName: this.configurationSetName,
     };
   }
 
@@ -306,6 +352,8 @@ export class ConfigurationSetEventDestination extends Resource implements IConfi
     });
     // Enhanced CDK Analytics Telemetry
     addConstructMetadata(this, props);
+
+    this.configurationSetName = props.configurationSet.configurationSetRef.configurationSetName;
 
     if (
       props.destination.bus &&
@@ -331,7 +379,7 @@ export class ConfigurationSetEventDestination extends Resource implements IConfi
               'AWS:SourceArn': Stack.of(scope).formatArn({
                 service: 'ses',
                 resource: 'configuration-set',
-                resourceName: props.configurationSet.configurationSetRef.configurationSetName,
+                resourceName: this.configurationSetName,
               }),
             },
           },
@@ -353,7 +401,7 @@ export class ConfigurationSetEventDestination extends Resource implements IConfi
     }
 
     const configurationSet = new CfnConfigurationSetEventDestination(this, 'Resource', {
-      configurationSetName: props.configurationSet.configurationSetRef.configurationSetName,
+      configurationSetName: this.configurationSetName,
       eventDestination: {
         name: this.physicalName,
         enabled: props.enabled ?? true,
@@ -388,7 +436,7 @@ export class ConfigurationSetEventDestination extends Resource implements IConfi
         conditions: {
           StringEquals: {
             'AWS:SourceAccount': this.env.account,
-            'AWS:SourceArn': `arn:${Aws.PARTITION}:ses:${this.env.region}:${this.env.account}:configuration-set/${props.configurationSet.configurationSetRef.configurationSetName}`,
+            'AWS:SourceArn': `arn:${Aws.PARTITION}:ses:${this.env.region}:${this.env.account}:configuration-set/${this.configurationSetName}`,
           },
         },
       }));

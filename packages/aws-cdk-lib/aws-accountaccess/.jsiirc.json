@@ -1,0 +1,13 @@
+{
+  "targets": {
+    "java": {
+      "package": "software.amazon.awscdk.services.accountaccess"
+    },
+    "dotnet": {
+      "namespace": "Amazon.CDK.AWS.AccountAccess"
+    },
+    "python": {
+      "module": "aws_cdk.aws_accountaccess"
+    }
+  }
+}

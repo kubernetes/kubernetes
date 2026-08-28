@@ -1,0 +1,13 @@
+{
+  "targets": {
+    "java": {
+      "package": "software.amazon.awscdk.services.serverlessrepo"
+    },
+    "dotnet": {
+      "namespace": "Amazon.CDK.AWS.ServerlessRepo"
+    },
+    "python": {
+      "module": "aws_cdk.aws_serverlessrepo"
+    }
+  }
+}

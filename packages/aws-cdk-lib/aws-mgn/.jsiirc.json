@@ -1,0 +1,13 @@
+{
+  "targets": {
+    "java": {
+      "package": "software.amazon.awscdk.services.mgn"
+    },
+    "dotnet": {
+      "namespace": "Amazon.CDK.AWS.MGN"
+    },
+    "python": {
+      "module": "aws_cdk.aws_mgn"
+    }
+  }
+}

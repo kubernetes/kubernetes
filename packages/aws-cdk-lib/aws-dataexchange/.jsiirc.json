@@ -1,0 +1,13 @@
+{
+  "targets": {
+    "java": {
+      "package": "software.amazon.awscdk.services.dataexchange"
+    },
+    "dotnet": {
+      "namespace": "Amazon.CDK.AWS.DataExchange"
+    },
+    "python": {
+      "module": "aws_cdk.aws_dataexchange"
+    }
+  }
+}

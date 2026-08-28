@@ -77,9 +77,8 @@ export interface IDataQualityRuleset extends IResource {
 export interface DataQualityRulesetProps {
   /**
    * The name of the ruleset
-   * @default cloudformation generated name
    */
-  readonly rulesetName?: string;
+  readonly rulesetName: string;
 
   /**
    * The client token of the ruleset

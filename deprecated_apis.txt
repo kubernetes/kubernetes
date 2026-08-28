@@ -349,6 +349,7 @@ aws-cdk-lib.aws_appmesh.Protocol#GRPC
 aws-cdk-lib.aws_appmesh.Protocol#HTTP
 aws-cdk-lib.aws_appmesh.Protocol#HTTP2
 aws-cdk-lib.aws_appmesh.Protocol#TCP
+aws-cdk-lib.aws_artifact
 aws-cdk-lib.aws_autoscaling.BlockDevice#mappingEnabled
 aws-cdk-lib.aws_autoscaling.CommonAutoScalingGroupProps#notificationsTopic
 aws-cdk-lib.aws_autoscaling.CommonAutoScalingGroupProps#replacingUpdateMinSuccessfulInstancesPercent
@@ -368,6 +369,7 @@ aws-cdk-lib.aws_autoscaling.UpdateType
 aws-cdk-lib.aws_autoscaling.UpdateType#NONE
 aws-cdk-lib.aws_autoscaling.UpdateType#REPLACING_UPDATE
 aws-cdk-lib.aws_autoscaling.UpdateType#ROLLING_UPDATE
+aws-cdk-lib.aws_backupsearch
 aws-cdk-lib.aws_certificatemanager.CertificateProps#validationDomains
 aws-cdk-lib.aws_certificatemanager.CertificateProps#validationMethod
 aws-cdk-lib.aws_cloudformation.CloudFormationCapabilities
@@ -457,6 +459,8 @@ aws-cdk-lib.aws_codepipeline_actions.CloudFormationDeleteStackActionProps#capabi
 aws-cdk-lib.aws_cognito.StandardAttributes#emailVerified
 aws-cdk-lib.aws_cognito.StandardAttributes#phoneNumberVerified
 aws-cdk-lib.aws_cognito.UserPoolProps#emailSettings
+aws-cdk-lib.aws_cognitosync
+aws-cdk-lib.aws_controlcatalog
 aws-cdk-lib.aws_dynamodb.ITable#metricSystemErrors
 aws-cdk-lib.aws_dynamodb.Table#grantListStreams
 aws-cdk-lib.aws_dynamodb.Table#metricSystemErrors
@@ -738,6 +742,7 @@ aws-cdk-lib.aws_ses.WhiteListReceiptFilterProps
 aws-cdk-lib.aws_sns.NumericConditions#whitelist
 aws-cdk-lib.aws_sns.StringConditions#blacklist
 aws-cdk-lib.aws_sns.StringConditions#whitelist
+aws-cdk-lib.aws_states
 aws-cdk-lib.aws_stepfunctions.Context
 aws-cdk-lib.aws_stepfunctions.Context#entireContext
 aws-cdk-lib.aws_stepfunctions.Context#numberAt
@@ -866,6 +871,8 @@ aws-cdk-lib.aws_stepfunctions_tasks.StartExecutionProps
 aws-cdk-lib.aws_stepfunctions_tasks.StartExecutionProps#input
 aws-cdk-lib.aws_stepfunctions_tasks.StartExecutionProps#integrationPattern
 aws-cdk-lib.aws_stepfunctions_tasks.StartExecutionProps#name
+aws-cdk-lib.aws_thinclient
+aws-cdk-lib.aws_usernotifications
 aws-cdk-lib.cloud_assembly_schema.ContainerImageAssetMetadataEntry#imageNameParameter
 aws-cdk-lib.cloud_assembly_schema.Manifest#load
 aws-cdk-lib.cloud_assembly_schema.Manifest#save
@@ -880,6 +887,13 @@ aws-cdk-lib.cx_api.MissingContext#key
 aws-cdk-lib.cx_api.MissingContext#props
 aws-cdk-lib.cx_api.MissingContext#provider
 aws-cdk-lib.cx_api.RuntimeInfo
+aws-cdk-lib.interfaces.aws_artifact
+aws-cdk-lib.interfaces.aws_backupsearch
+aws-cdk-lib.interfaces.aws_cognitosync
+aws-cdk-lib.interfaces.aws_controlcatalog
+aws-cdk-lib.interfaces.aws_states
+aws-cdk-lib.interfaces.aws_thinclient
+aws-cdk-lib.interfaces.aws_usernotifications
 aws-cdk-lib.pipelines.AddManualApprovalOptions
 aws-cdk-lib.pipelines.AddManualApprovalOptions#actionName
 aws-cdk-lib.pipelines.AddManualApprovalOptions#runOrder

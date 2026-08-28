@@ -6,6 +6,7 @@ export * as aws_appsync from './aws-appsync';
 export * as aws_autoscaling from './aws-autoscaling';
 export * as aws_bedrock from './aws-bedrock';
 export * as aws_cloudfront from './aws-cloudfront';
+export * as aws_cloudhsm from './aws-cloudhsm';
 export * as aws_cloudwatch from './aws-cloudwatch';
 export * as aws_codebuild from './aws-codebuild';
 export * as aws_codepipeline from './aws-codepipeline';

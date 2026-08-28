@@ -101,6 +101,35 @@ describe('receipt rule', () => {
     });
   });
 
+  test('fails to read ruleSetName of a rule imported by name', () => {
+    // GIVEN
+    const stack = new Stack();
+
+    // WHEN
+    const rule = ReceiptRule.fromReceiptRuleName(stack, 'Rule', 'MyRule');
+
+    // THEN
+    expect(() => rule.receiptRuleRef.ruleSetName).toThrow(
+      'ruleSetName is not available on a ReceiptRule imported by rule name; use ReceiptRule.fromReceiptRuleAttributes() to get a complete reference',
+    );
+  });
+
+  test('receiptRuleRef of a rule imported by attributes is fully readable', () => {
+    // GIVEN
+    const stack = new Stack();
+    const ruleSet = ReceiptRuleSet.fromReceiptRuleSetName(stack, 'RuleSet', 'MyRuleSet');
+
+    // WHEN
+    const rule = ReceiptRule.fromReceiptRuleAttributes(stack, 'Rule', {
+      ruleSet,
+      receiptRuleName: 'MyRule',
+    });
+
+    // THEN
+    expect(rule.receiptRuleRef.ruleName).toEqual('MyRule');
+    expect(rule.receiptRuleRef.ruleSetName).toEqual('MyRuleSet');
+  });
+
   test('can add actions in rule props', () => {
     // GIVEN
     const stack = new Stack();
