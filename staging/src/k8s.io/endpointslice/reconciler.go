@@ -385,12 +385,17 @@ func NewReconciler(client clientset.Interface, nodeLister corelisters.NodeLister
 // placeholderSliceCompare is a conversion func for comparing two placeholder endpoint slices.
 // It only compares the specific fields we care about.
 var placeholderSliceCompare = conversion.EqualitiesOrDie(
-	func(a, b metav1.OwnerReference) bool {
-		return a.String() == b.String()
-	},
 	func(a, b metav1.ObjectMeta) bool {
 		if a.Namespace != b.Namespace {
 			return false
+		}
+		if len(a.OwnerReferences) != len(b.OwnerReferences) {
+			return false
+		}
+		for i := range a.OwnerReferences {
+			if a.OwnerReferences[i].UID != b.OwnerReferences[i].UID {
+				return false
+			}
 		}
 		for k, v := range a.Labels {
 			if b.Labels[k] != v {
