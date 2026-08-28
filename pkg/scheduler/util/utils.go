@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -40,7 +41,7 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
-var maxPodStartTime = metav1.NewTime(time.Date(9999, time.December, 31, 23, 59, 59, 0, time.UTC))
+var maxPodStartTime = metav1.NewTime(time.Unix(0, math.MaxInt64).UTC())
 
 // GetPodFullName returns a name that uniquely identifies a pod.
 func GetPodFullName(pod *v1.Pod) string {
