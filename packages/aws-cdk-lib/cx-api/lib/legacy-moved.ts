@@ -189,7 +189,7 @@ export declare class CloudAssembly implements cxschema.ICloudAssembly {
    * ```js
    * module.exports = {
    *   // ...
-   *   setupFilesAfterEnv: ['aws-cdk-lib/testhelpers/jest-cleanup'],
+   *   setupFilesAfterEnv: ['aws-cdk-lib/testhelpers/jest-autoclean'],
    * };
    * ```
    */

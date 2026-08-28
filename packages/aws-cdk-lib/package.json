@@ -40,6 +40,7 @@
       "ts-node ./scripts/verify-imports-resolve-same.ts",
       "ts-node ./scripts/verify-imports-shielded.ts",
       "ts-node ./scripts/verify-exports-exist.ts",
+      "ts-node ./scripts/verify-doc-examples-resolve.ts",
       "ts-node ./cx-api/build-tools/flag-report.ts",
       "check-peer-dependencies .",
       "env QUIET=1 lazify ."
