@@ -18,6 +18,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -945,6 +946,162 @@ func TestLintRequiredness(t *testing.T) {
 			}
 			if gotError != tt.wantError {
 				t.Errorf("lintRequiredness() error = %q, want %q", gotError, tt.wantError)
+			}
+		})
+	}
+}
+
+func TestLintNonPointerStructRequiredness(t *testing.T) {
+	const requiredErr = "field Foo: +k8s:required on non-pointer struct %s: it has no required or union member, so the field is effectively optional"
+	const optionalErr = "field Foo: +k8s:optional on non-pointer struct %s: it has a required or union member, so the field is effectively required"
+	const opaqueErr = "field Foo: +k8s:required on non-pointer opaque struct %s: its validations are ignored, so the field is effectively optional"
+
+	// All-optional struct: its zero value is valid.
+	optionalOnly := func() *types.Type {
+		return testStruct("Inner", []types.Member{
+			testField("Bar", testPtr(testType("string")), "+k8s:optional", "+k8s:minLength=1"),
+		})
+	}
+	// Struct with a required member: its zero value is rejected.
+	withRequired := func() *types.Type {
+		return testStruct("Inner", []types.Member{
+			testField("Bar", testPtr(testType("string")), "+k8s:required"),
+		})
+	}
+
+	tests := []struct {
+		name       string
+		typeToLint *types.Type
+		wantError  string
+	}{
+		{
+			name: "non-pointer struct field without requiredness - no error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", optionalOnly()),
+			}),
+			wantError: "",
+		},
+		{
+			name: "pointer struct field with +k8s:required - rule does not apply",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testPtr(optionalOnly()), "+k8s:required"),
+			}),
+			wantError: "",
+		},
+		{
+			name: "+k8s:required on struct with a required member - no error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", withRequired(), "+k8s:required"),
+			}),
+			wantError: "",
+		},
+		{
+			name: "+k8s:required on all-optional struct - error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", optionalOnly(), "+k8s:required"),
+			}),
+			wantError: fmt.Sprintf(requiredErr, "pkg.Inner"),
+		},
+		{
+			name: "+k8s:optional on all-optional struct - no error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", optionalOnly(), "+k8s:optional"),
+			}),
+			wantError: "",
+		},
+		{
+			name: "+k8s:optional on struct with a required member - error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", withRequired(), "+k8s:optional"),
+			}),
+			wantError: fmt.Sprintf(optionalErr, "pkg.Inner"),
+		},
+		{
+			name: "+k8s:required on union struct - no error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testStruct("Inner", []types.Member{
+					testField("A", testPtr(testType("string")), "+k8s:optional", "+k8s:unionMember"),
+					testField("B", testPtr(testType("string")), "+k8s:optional", "+k8s:unionMember"),
+				}), "+k8s:required"),
+			}),
+			wantError: "",
+		},
+		{
+			name: "+k8s:required on zero-or-one-of struct - error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testStruct("Inner", []types.Member{
+					testField("A", testPtr(testType("string")), "+k8s:optional", "+k8s:zeroOrOneOfMember"),
+					testField("B", testPtr(testType("string")), "+k8s:optional", "+k8s:zeroOrOneOfMember"),
+				}), "+k8s:required"),
+			}),
+			wantError: fmt.Sprintf(requiredErr, "pkg.Inner"),
+		},
+		{
+			name: "+k8s:required on alias to all-optional struct - error names the alias",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testAlias("MyAlias", optionalOnly()), "+k8s:required"),
+			}),
+			wantError: fmt.Sprintf(requiredErr, "pkg.MyAlias"),
+		},
+		{
+			name: "+k8s:required on struct whose non-pointer struct member has a required member - no error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testStruct("Outer", []types.Member{
+					testField("Nested", withRequired()),
+				}), "+k8s:required"),
+			}),
+			wantError: "",
+		},
+		{
+			name: "+k8s:required on struct whose optional pointer struct member has a required member - error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testStruct("Outer", []types.Member{
+					testField("Nested", testPtr(withRequired()), "+k8s:optional"),
+				}), "+k8s:required"),
+			}),
+			wantError: fmt.Sprintf(requiredErr, "pkg.Outer"),
+		},
+		{
+			name: "+k8s:required on opaque struct with a required member - error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", withRequired(), "+k8s:required", "+k8s:opaqueType"),
+			}),
+			wantError: fmt.Sprintf(opaqueErr, "pkg.Inner"),
+		},
+		{
+			name: "+k8s:optional on opaque struct with a required member - no error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", withRequired(), "+k8s:optional", "+k8s:opaqueType"),
+			}),
+			wantError: "",
+		},
+		{
+			name: "+k8s:required on struct whose opaque member has a required member - error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testStruct("Outer", []types.Member{
+					testField("Nested", withRequired(), "+k8s:opaqueType"),
+				}), "+k8s:required"),
+			}),
+			wantError: fmt.Sprintf(requiredErr, "pkg.Outer"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			l := newLinter(nonPointerStructRequiredness(validator))
+			if err := l.lintType(tt.typeToLint); err != nil {
+				t.Fatalf("lintType() unexpected error: %v", err)
+			}
+			errs := l.lintErrors[tt.typeToLint]
+			if len(errs) > 1 {
+				t.Fatalf("got %d errors, but expected 0 or 1 error: %v", len(errs), errs)
+			}
+			var gotError string
+			if len(errs) == 1 {
+				gotError = errs[0].Error()
+			}
+			if gotError != tt.wantError {
+				t.Errorf("lintNonPointerStructRequiredness() error = %q, want %q", gotError, tt.wantError)
 			}
 		})
 	}
