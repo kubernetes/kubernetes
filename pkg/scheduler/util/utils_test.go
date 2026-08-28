@@ -167,11 +167,11 @@ func TestMoreImportantPod(t *testing.T) {
 	}
 }
 
-func TestMoreImportantPodCreationTimestamp(t *testing.T) {
+func TestMoreImportantPodWithoutStartTime(t *testing.T) {
 	var priority int32 = 1
 	baseTime := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 
-	newPod := func(name string, creationTimestamp time.Time) *v1.Pod {
+	newPod := func(name string, creationTimestamp time.Time, startTime *metav1.Time) *v1.Pod {
 		return &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:              name,
@@ -180,12 +180,14 @@ func TestMoreImportantPodCreationTimestamp(t *testing.T) {
 			Spec: v1.PodSpec{
 				Priority: &priority,
 			},
+			Status: v1.PodStatus{StartTime: startTime},
 		}
 	}
 
-	olderPod := newPod("older-pod", baseTime)
-	newerPod := newPod("newer-pod", baseTime.Add(time.Second))
-	sameTimePod := newPod("same-time-pod", baseTime)
+	startedAt := metav1.NewTime(baseTime.Add(time.Hour))
+	startedPod := newPod("started-pod", baseTime.Add(time.Hour), &startedAt)
+	unstartedOlderPod := newPod("unstarted-older-pod", baseTime, nil)
+	unstartedNewerPod := newPod("unstarted-newer-pod", baseTime.Add(2*time.Hour), nil)
 
 	tests := []struct {
 		name     string
@@ -194,21 +196,21 @@ func TestMoreImportantPodCreationTimestamp(t *testing.T) {
 		expected bool
 	}{
 		{
-			name:     "older creation timestamp is more important",
-			pod1:     olderPod,
-			pod2:     newerPod,
+			name:     "started pod is more important than unstarted pod",
+			pod1:     startedPod,
+			pod2:     unstartedOlderPod,
 			expected: true,
 		},
 		{
-			name:     "newer creation timestamp is less important",
-			pod1:     newerPod,
-			pod2:     olderPod,
+			name:     "unstarted pod is less important than started pod",
+			pod1:     unstartedOlderPod,
+			pod2:     startedPod,
 			expected: false,
 		},
 		{
-			name:     "same creation timestamp does not order pods",
-			pod1:     olderPod,
-			pod2:     sameTimePod,
+			name:     "creation timestamp does not order unstarted pods",
+			pod1:     unstartedOlderPod,
+			pod2:     unstartedNewerPod,
 			expected: false,
 		},
 	}
@@ -225,21 +227,14 @@ func TestMoreImportantPodCreationTimestamp(t *testing.T) {
 
 func BenchmarkMoreImportantPodWithoutStartTime(b *testing.B) {
 	var priority int32 = 1
-	baseTime := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	pod1 := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "pod1",
-			CreationTimestamp: metav1.NewTime(baseTime),
-		},
+		ObjectMeta: metav1.ObjectMeta{Name: "pod1"},
 		Spec: v1.PodSpec{
 			Priority: &priority,
 		},
 	}
 	pod2 := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "pod2",
-			CreationTimestamp: metav1.NewTime(baseTime.Add(time.Second)),
-		},
+		ObjectMeta: metav1.ObjectMeta{Name: "pod2"},
 		Spec: v1.PodSpec{
 			Priority: &priority,
 		},
