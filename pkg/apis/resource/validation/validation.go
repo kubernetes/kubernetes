@@ -1073,7 +1073,13 @@ func validateDevice(device resource.Device, oldDevice *resource.Device, fldPath 
 		allErrs = append(allErrs, field.Invalid(fldPath, numAttributeValues, fmt.Sprintf("the total number of attribute values must not exceed %d", resource.ResourceSliceMaxAttributeValuesPerDevice)))
 	}
 
-	allErrs = append(allErrs, validateMap(device.Attributes, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateDeviceAttribute, fldPath.Child("attributes"))...)
+	// If the entire set of attributes is the same as before then validation can
+	// be skipped. This ratchets the key format: a slice which already stores a
+	// key that today's validation rejects can still be updated, as long as the
+	// attributes themselves are left alone.
+	if oldDevice == nil || !apiequality.Semantic.DeepEqual(oldDevice.Attributes, device.Attributes) {
+		allErrs = append(allErrs, validateMap(device.Attributes, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateDeviceAttribute, fldPath.Child("attributes"))...)
+	}
 	// If the entire capacity is the same as before then validation can be skipped.
 	// We could also do the DeepEqual on the entire spec, but here it is a bit cheaper.
 	if oldDevice == nil || !apiequality.Semantic.DeepEqual(oldDevice.Capacity, device.Capacity) {
@@ -1626,17 +1632,8 @@ func validateQualifiedName(name resource.QualifiedName, fldPath *field.Path) fie
 		} else {
 			allErrs = append(allErrs, validateCIdentifier(parts[1], fldPath)...)
 		}
-		// TODO: This validation is incomplete. It should reject qualified names
-		// that contain more than one slash. Currently, names like "a/b/c" are not
-		// handled and are implicitly accepted.
-		//
-		// This needs to be fixed in two places:
-		// 1. Here in this function.
-		// 2. In the corresponding declarative validation utility `resourcesQualifiedName`
-		//    in `staging/src/k8s.io/apimachinery/pkg/api/validate/strfmt.go`.
-		//
-		// The fix should be introduced carefully, possibly using ratcheting to avoid
-		// breaking existing, non-compliant objects.
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath, string(name), "must not contain more than one slash"))
 	}
 
 	return allErrs

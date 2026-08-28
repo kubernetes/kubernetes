@@ -797,6 +797,18 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 		},
+		"bad-attribute-extra-slash": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes"), "x.example.com/y/z", "must not contain more than one slash"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, 2)
+				slice.Spec.Devices[1].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName("x.example.com/y/z"): {StringValue: ptr.To("z")},
+				}
+				return slice
+			}(),
+		},
 		"combined-attributes-capacity-length": {
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "devices").Index(3), resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice+1, fmt.Sprintf("the total number of attributes and capacities must not exceed %d", resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)),
@@ -2076,6 +2088,36 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 				return slice
 			},
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "name"), name+"-update", "field is immutable")},
+		},
+		"valid-update-keeps-stored-attribute-name-with-extra-slash": {
+			// A slice stored before the key format was enforced keeps working
+			// as long as its attributes are not touched.
+			oldResourceSlice: func() *resourceapi.ResourceSlice {
+				slice := validResourceSlice.DeepCopy()
+				slice.Spec.Devices[0].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName("x.example.com/y/z"): {StringValue: ptr.To("v")},
+				}
+				return slice
+			}(),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice { return slice },
+		},
+		"invalid-update-touches-stored-attribute-name-with-extra-slash": {
+			// Rewriting the attributes re-validates them, so the stored key is
+			// reported.
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("attributes"), "x.example.com/y/z", "must not contain more than one slash"),
+			},
+			oldResourceSlice: func() *resourceapi.ResourceSlice {
+				slice := validResourceSlice.DeepCopy()
+				slice.Spec.Devices[0].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					resourceapi.QualifiedName("x.example.com/y/z"): {StringValue: ptr.To("v")},
+				}
+				return slice
+			}(),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+				slice.Spec.Devices[0].Attributes[resourceapi.QualifiedName("x.example.com/other")] = resourceapi.DeviceAttribute{StringValue: ptr.To("v")}
+				return slice
+			},
 		},
 		"invalid-update-nodename": {
 			wantFailures:     field.ErrorList{field.Invalid(field.NewPath("spec", "nodeName"), ptr.To(name+"-updated"), "field is immutable")},
