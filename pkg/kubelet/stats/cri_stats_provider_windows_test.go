@@ -574,3 +574,63 @@ func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
 	assert.Equal(t, *got.Logs.UsedBytes, logStatsUsed, "Logs.UsedBytes does not match expected value")
 	assert.Equal(t, *got.Logs.InodesUsed, logStatsInodesUsed, "Logs.InodesUsed does not match expected value")
 }
+
+func TestMakeWinContainerCPUAndMemoryStats(t *testing.T) {
+	containerStartTime := time.Unix(12345, 0)
+	cpuUsageTimestamp := int64(555555)
+	cpuUsageNanoSeconds := uint64(0x123456)
+	cpuUsageNanoCores := uint64(0x4000)
+	memoryUsageTimestamp := int64(666666)
+	memoryUsageWorkingSetBytes := uint64(0x11223344)
+	memoryUsageAvailableBytes := uint64(0x55667788)
+	memoryCommitBytes := uint64(0x99AABBCC)
+	memoryUsagePageFaults := uint64(200)
+
+	inputStats := &runtimeapi.WindowsContainerStats{
+		Attributes: &runtimeapi.ContainerAttributes{
+			Metadata: &runtimeapi.ContainerMetadata{
+				Name: "c0",
+			},
+		},
+		Cpu: &runtimeapi.WindowsCpuUsage{
+			Timestamp: cpuUsageTimestamp,
+			UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+				Value: cpuUsageNanoSeconds,
+			},
+			UsageNanoCores: &runtimeapi.UInt64Value{
+				Value: cpuUsageNanoCores,
+			},
+		},
+		Memory: &runtimeapi.WindowsMemoryUsage{
+			Timestamp:         memoryUsageTimestamp,
+			AvailableBytes:    &runtimeapi.UInt64Value{Value: memoryUsageAvailableBytes},
+			WorkingSetBytes:   &runtimeapi.UInt64Value{Value: memoryUsageWorkingSetBytes},
+			CommitMemoryBytes: &runtimeapi.UInt64Value{Value: memoryCommitBytes},
+			PageFaults:        &runtimeapi.UInt64Value{Value: memoryUsagePageFaults},
+		},
+	}
+
+	p := &criStatsProvider{}
+	got := p.makeWinContainerCPUAndMemoryStats(inputStats, containerStartTime)
+
+	expected := &statsapi.ContainerStats{
+		Name:      "c0",
+		StartTime: v1.NewTime(containerStartTime),
+		CPU: &statsapi.CPUStats{
+			Time:                 v1.NewTime(time.Unix(0, cpuUsageTimestamp)),
+			UsageCoreNanoSeconds: ptr.To[uint64](cpuUsageNanoSeconds),
+			UsageNanoCores:       ptr.To[uint64](cpuUsageNanoCores),
+		},
+		Memory: &statsapi.MemoryStats{
+			Time:            v1.NewTime(time.Unix(0, memoryUsageTimestamp)),
+			AvailableBytes:  ptr.To[uint64](memoryUsageAvailableBytes),
+			WorkingSetBytes: ptr.To[uint64](memoryUsageWorkingSetBytes),
+			UsageBytes:      ptr.To[uint64](memoryCommitBytes),
+			PageFaults:      ptr.To[uint64](memoryUsagePageFaults),
+		},
+	}
+
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("makeWinContainerCPUAndMemoryStats() = %v, want %v", got, expected)
+	}
+}
