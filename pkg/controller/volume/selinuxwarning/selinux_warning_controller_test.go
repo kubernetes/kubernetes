@@ -535,7 +535,7 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 
 			// Start the informers
 			fakeInformerFactory.StartWithContext(ctx)
-			fakeInformerFactory.WaitForCacheSync(ctx.Done())
+			fakeInformerFactory.WaitForCacheSyncWithContext(ctx)
 			// Start the controller
 			wg.Go(func() {
 				c.Run(ctx, 1)

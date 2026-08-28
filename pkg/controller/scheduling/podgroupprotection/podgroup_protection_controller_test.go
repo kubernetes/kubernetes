@@ -382,7 +382,7 @@ func TestPodGroupProtectionController(t *testing.T) {
 			}
 
 			informerFactory.StartWithContext(ctx)
-			informerFactory.WaitForCacheSync(ctx.Done())
+			informerFactory.WaitForCacheSyncWithContext(ctx)
 			go ctrl.Run(ctx, 1)
 
 			// In order to reduce test flakiness, make sure that the pod-to-delete is visible in the client set. Create a dummy pod to "warm up" the watch pipe.

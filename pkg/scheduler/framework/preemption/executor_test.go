@@ -754,7 +754,7 @@ func TestPrepareCandidate(t *testing.T) {
 						t.Fatal(err)
 					}
 					informerFactory.StartWithContext(ctx)
-					informerFactory.WaitForCacheSync(ctx.Done())
+					informerFactory.WaitForCacheSyncWithContext(ctx)
 					if asyncAPICallsEnabled {
 						cache := internalcache.New(ctx, apiDispatcher, false, false)
 						framework.SetAPICacher(apicache.New(nil, cache))
@@ -1281,7 +1281,7 @@ func TestAsyncPreemptionFailure(t *testing.T) {
 				t.Fatal(err)
 			}
 			informerFactory.StartWithContext(ctx)
-			informerFactory.WaitForCacheSync(ctx.Done())
+			informerFactory.WaitForCacheSyncWithContext(ctx)
 
 			executor := NewExecutor(fwk, feature.Features{EnableAsyncPreemption: true})
 

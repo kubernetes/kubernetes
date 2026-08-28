@@ -1249,7 +1249,7 @@ func TestVolumeBinding(t *testing.T) {
 			informerFactory.StartWithContext(ctx)
 
 			t.Log("Wait for all started informers' cache were synced")
-			informerFactory.WaitForCacheSync(ctx.Done())
+			informerFactory.WaitForCacheSyncWithContext(ctx)
 
 			t.Log("Verify")
 

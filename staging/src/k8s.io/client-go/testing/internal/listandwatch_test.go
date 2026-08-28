@@ -97,7 +97,7 @@ func testListAndWatch(t *testing.T) {
 
 	configMapStore := configMapInformer.GetStore()
 	f.StartWithContext(ctx)
-	f.WaitForCacheSync(stopCh)
+	f.WaitForCacheSyncWithContext(ctx)
 	logger.Info("Caches synced")
 
 	objs := configMapStore.List()

@@ -294,7 +294,7 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 		}
 
 		// Wait for all caches to sync before scheduling.
-		cc.InformerFactory.WaitForCacheSync(ctx.Done())
+		cc.InformerFactory.WaitForCacheSyncWithContext(ctx)
 		// DynInformerFactory can be nil in tests.
 		if cc.DynInformerFactory != nil {
 			cc.DynInformerFactory.WaitForCacheSync(ctx.Done())

@@ -396,7 +396,7 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 		// Now we can wait for all goroutines to stop.
 		informerFactory.Shutdown()
 	})
-	informerFactory.WaitForCacheSync(tCtx.Done())
+	informerFactory.WaitForCacheSyncWithContext(tCtx)
 
 	// wait for informer sync
 	time.Sleep(1 * time.Second)
@@ -657,7 +657,7 @@ func TestResourceClaimEvaluatorMatchingResources(t *testing.T) {
 		// Now we can wait for all goroutines to stop.
 		informerFactory.Shutdown()
 	})
-	informerFactory.WaitForCacheSync(tCtx.Done())
+	informerFactory.WaitForCacheSyncWithContext(tCtx)
 
 	// wait for informer sync
 	time.Sleep(1 * time.Second)

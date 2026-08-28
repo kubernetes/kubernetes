@@ -1300,7 +1300,7 @@ func TestFrameworkHandler_IterateOverWaitingPods(t *testing.T) {
 
 			// Run scheduler.
 			informerFactory.StartWithContext(tCtx)
-			informerFactory.WaitForCacheSync(tCtx.Done())
+			informerFactory.WaitForCacheSyncWithContext(tCtx)
 			go scheduler.Run(tCtx)
 
 			// Send pods to be scheduled.
@@ -1519,7 +1519,7 @@ func TestNewInformerFactoryTrim(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	informerFactory.StartWithContext(ctx)
-	informerFactory.WaitForCacheSync(ctx.Done())
+	informerFactory.WaitForCacheSyncWithContext(ctx)
 
 	p, err := lister.Pods("default").Get("test")
 	require.NoError(t, err)
@@ -1544,7 +1544,7 @@ func TestNewInformerFactoryMetrics(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	informerFactory.StartWithContext(ctx)
-	informerFactory.WaitForCacheSync(ctx.Done())
+	informerFactory.WaitForCacheSyncWithContext(ctx)
 
 	want := `
 # HELP informer_queued_items [ALPHA] Number of items currently queued in the FIFO.

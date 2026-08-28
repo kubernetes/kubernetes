@@ -736,7 +736,7 @@ func setup(t *testing.T) (context.Context, *fake.Clientset, *ExtendedResourceCac
 		// Now we can wait for all goroutines to stop.
 		informerFactory.Shutdown()
 	})
-	informerFactory.WaitForCacheSync(ctx.Done())
+	informerFactory.WaitForCacheSyncWithContext(ctx)
 	clientcache.WaitForNamedCacheSyncWithContext(ctx, handle.HasSynced)
 
 	// fake.Clientset suffers from a race condition related to informers:

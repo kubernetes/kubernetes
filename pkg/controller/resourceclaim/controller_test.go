@@ -229,7 +229,7 @@ func TestCreateClaimDoesNotMutateTemplate(t *testing.T) {
 				tCtx.Cancel("stopping informers")
 				informerFactory.Shutdown()
 			}()
-			informerFactory.WaitForCacheSync(tCtx.Done())
+			informerFactory.WaitForCacheSyncWithContext(tCtx)
 
 			// cachedTemplate is the object the controller reads from the shared informer
 			// cache; snapshot it so any in-place mutation is detectable.
@@ -1173,7 +1173,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 				informerFactory.Shutdown()
 			}
 			defer stopInformers()
-			informerFactory.WaitForCacheSync(tCtx.Done())
+			informerFactory.WaitForCacheSyncWithContext(tCtx)
 
 			// Add claims that only exist in the mutation cache.
 			for _, claim := range tc.claimsInCache {
@@ -1350,7 +1350,7 @@ func testClaimExists(tCtx ktesting.TContext) {
 				informerFactory.Shutdown()
 			}
 			defer stopInformers()
-			informerFactory.WaitForCacheSync(tCtx.Done())
+			informerFactory.WaitForCacheSyncWithContext(tCtx)
 
 			// Add claims that only exist in the mutation cache.
 			if claim := tc.claimInMutationCache; claim != nil {

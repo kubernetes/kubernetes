@@ -101,7 +101,7 @@ func Test_AttachDetachControllerStateOfWorldPopulators_Positive(t *testing.T) {
 
 	// Act
 	informerFactory.StartWithContext(tCtx)
-	informerFactory.WaitForCacheSync(tCtx.Done())
+	informerFactory.WaitForCacheSyncWithContext(tCtx)
 
 	err := adc.populateActualStateOfWorld(logger)
 	if err != nil {
@@ -210,7 +210,7 @@ func BenchmarkPopulateActualStateOfWorld(b *testing.B) {
 
 	// Act
 	informerFactory.StartWithContext(tCtx)
-	informerFactory.WaitForCacheSync(tCtx.Done())
+	informerFactory.WaitForCacheSyncWithContext(tCtx)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -230,7 +230,7 @@ func BenchmarkNodeUpdate(b *testing.B) {
 	adc := createADC(b, tCtx, fakeKubeClient, informerFactory, nil)
 
 	informerFactory.StartWithContext(tCtx)
-	informerFactory.WaitForCacheSync(tCtx.Done())
+	informerFactory.WaitForCacheSyncWithContext(tCtx)
 
 	err := adc.populateActualStateOfWorld(logger.V(2))
 	if err != nil {

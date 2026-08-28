@@ -125,8 +125,9 @@ func TestBanflunderAdmissionPlugin(t *testing.T) {
 
 			stop := make(chan struct{})
 			defer close(stop)
-			informersFactory.StartWithContext(wait.ContextForChannel(stop))
-			informersFactory.WaitForCacheSync(stop)
+			ctx := wait.ContextForChannel(stop)
+			informersFactory.StartWithContext(ctx)
+			informersFactory.WaitForCacheSyncWithContext(ctx)
 
 			// act
 			err = target.Admit(context.TODO(), admission.NewAttributesRecord(

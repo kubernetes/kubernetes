@@ -625,7 +625,7 @@ func newTestDRAManager(tCtx ktesting.TContext, objects ...apiruntime.Object) *dy
 		// Now we can wait for all goroutines to stop.
 		informerFactory.Shutdown()
 	})
-	informerFactory.WaitForCacheSync(tCtx.Done())
+	informerFactory.WaitForCacheSyncWithContext(tCtx)
 
 	// Wait for full initialization of manager, including
 	// processing of all informer events.

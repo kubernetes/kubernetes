@@ -189,7 +189,7 @@ func newFakeDisruptionControllerWithTime(ctx context.Context, now time.Time) (*d
 	dc.ssListerSynced = alwaysReady
 	dc.recorder = record.NewFakeRecorder(100)
 	informerFactory.StartWithContext(ctx)
-	informerFactory.WaitForCacheSync(ctx.Done())
+	informerFactory.WaitForCacheSyncWithContext(ctx)
 
 	return &disruptionController{
 		dc,

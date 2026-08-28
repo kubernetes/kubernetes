@@ -432,7 +432,7 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 		stopCh := make(chan struct{})
 		defer close(stopCh)
 		informers.StartWithContext(ctx)
-		informers.WaitForCacheSync(stopCh)
+		informers.WaitForCacheSyncWithContext(ctx)
 
 		t.Logf(" &test.revisionHistoryLimit: %d", test.revisionHistoryLimit)
 		d := newDeployment("foo", 1, &test.revisionHistoryLimit, nil, nil, map[string]string{"foo": "bar"})

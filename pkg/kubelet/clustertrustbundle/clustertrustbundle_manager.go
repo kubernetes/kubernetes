@@ -461,7 +461,7 @@ func (m *LazyInformerManager) ensureManagerSet(ctx context.Context) error {
 	timeoutContext, cancel := context.WithTimeout(m.contextWithLogger, 10*time.Second)
 	defer cancel()
 	m.logger.Info("Waiting for ClusterTrustBundle informer to sync")
-	for _, ok := range kubeInformers.WaitForCacheSync(timeoutContext.Done()) {
+	for _, ok := range kubeInformers.WaitForCacheSyncWithContext(timeoutContext).Synced {
 		synced = synced && ok
 	}
 	if synced {

@@ -153,7 +153,7 @@ func TestSyncHandler(t *testing.T) {
 
 			// Ensure informers are up-to-date.
 			informerFactory.StartWithContext(ctx)
-			informerFactory.WaitForCacheSync(ctx.Done())
+			informerFactory.WaitForCacheSyncWithContext(ctx)
 			cache.WaitForCacheSync(ctx.Done(), podInformer.Informer().HasSynced, pvcInformer.Informer().HasSynced)
 
 			err = ec.syncHandler(context.TODO(), tc.podKey)

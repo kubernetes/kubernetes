@@ -537,7 +537,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 
 			informerFactory.StartWithContext(ctx)
 			dynInformerFactory.StartWithContext(ctx)
-			staticInformers := informerFactory.WaitForCacheSync(testSched.StopEverything)
+			staticInformers := informerFactory.WaitForCacheSyncWithContext(ctx).Synced
 			dynamicInformers := dynInformerFactory.WaitForCacheSync(testSched.StopEverything)
 
 			expectedStaticInformers := make(map[reflect.Type]bool)
@@ -604,7 +604,7 @@ func TestAddAllEventHandlersPodEventResources(t *testing.T) {
 
 	informerFactory.StartWithContext(ctx)
 	dynInformerFactory.StartWithContext(ctx)
-	staticInformers := informerFactory.WaitForCacheSync(testSched.StopEverything)
+	staticInformers := informerFactory.WaitForCacheSyncWithContext(ctx).Synced
 	dynamicInformers := dynInformerFactory.WaitForCacheSync(testSched.StopEverything)
 
 	expectStaticInformers := map[reflect.Type]bool{

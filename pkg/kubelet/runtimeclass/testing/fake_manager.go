@@ -51,7 +51,7 @@ func NewPopulatedClient() clientset.Interface {
 func StartManagerSync(tCtx ktesting.TContext, m *runtimeclass.Manager) func() {
 	tCtx = tCtx.WithCancel()
 	m.StartWithContext(tCtx)
-	m.WaitForCacheSync(tCtx.Done())
+	m.WaitForCacheSyncWithContext(tCtx)
 	return func() {
 		tCtx.Cancel("stopping manager")
 	}

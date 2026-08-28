@@ -60,8 +60,16 @@ func (m *Manager) StartWithContext(ctx context.Context) {
 
 // WaitForCacheSync exposes the WaitForCacheSync method on the informer factory for testing
 // purposes.
+//
+//logcheck:context // WaitForCacheSyncWithContext should be used instead of WaitForCacheSync in code which supports contextual logging.
 func (m *Manager) WaitForCacheSync(stopCh <-chan struct{}) {
-	m.informerFactory.WaitForCacheSync(stopCh)
+	m.WaitForCacheSyncWithContext(wait.ContextForChannel(stopCh))
+}
+
+// WaitForCacheSyncWithContext exposes the WaitForCacheSyncWithContext method on the informer
+// factory for testing purposes.
+func (m *Manager) WaitForCacheSyncWithContext(ctx context.Context) {
+	m.informerFactory.WaitForCacheSyncWithContext(ctx)
 }
 
 // LookupRuntimeHandler returns the RuntimeHandler string associated with the given RuntimeClass

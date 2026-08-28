@@ -4693,7 +4693,7 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 		tc.informerFactory.Shutdown()
 	})
 
-	tc.informerFactory.WaitForCacheSync(tCtx.Done())
+	tc.informerFactory.WaitForCacheSyncWithContext(tCtx)
 	// The above does not tell us if the registered handlers (e.g. from NewAssumeCache)
 	// are synced, we need to wait until the event handlers confirm that they are synced.
 	// This ensures that the assume cache is in sync with the informer's

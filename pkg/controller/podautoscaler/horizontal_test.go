@@ -410,7 +410,7 @@ func newHorizontalSetup(t *testing.T, s *horizontalScenario, testClient *fake.Cl
 	}
 
 	informerFactory.StartWithContext(tCtx)
-	informerFactory.WaitForCacheSync(tCtx.Done())
+	informerFactory.WaitForCacheSyncWithContext(tCtx)
 
 	return &horizontalSetup{
 		controller:      hpaController,

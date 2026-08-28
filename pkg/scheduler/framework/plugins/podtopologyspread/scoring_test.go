@@ -103,7 +103,7 @@ func TestPreScoreSkip(t *testing.T) {
 				t.Fatalf("Failed creating plugin: %v", err)
 			}
 			informerFactory.StartWithContext(ctx)
-			informerFactory.WaitForCacheSync(ctx.Done())
+			informerFactory.WaitForCacheSyncWithContext(ctx)
 			p := pl.(*PodTopologySpread)
 			cs := framework.NewCycleState()
 			if s := p.PreScore(ctx, cs, tt.pod, tf.BuildNodeInfos(tt.nodes)); !s.IsSkip() {
@@ -602,7 +602,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				t.Fatalf("Failed creating plugin: %v", err)
 			}
 			informerFactory.StartWithContext(ctx)
-			informerFactory.WaitForCacheSync(ctx.Done())
+			informerFactory.WaitForCacheSyncWithContext(ctx)
 			p := pl.(*PodTopologySpread)
 			cs := framework.NewCycleState()
 			if s := p.PreScore(ctx, cs, tt.pod, tf.BuildNodeInfos(tt.nodes)); !s.IsSuccess() {
