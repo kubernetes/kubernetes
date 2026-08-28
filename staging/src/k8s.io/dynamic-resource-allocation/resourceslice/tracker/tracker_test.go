@@ -278,6 +278,15 @@ var (
 			Name: "rule",
 		},
 		Spec: resourceapi.DeviceTaintRuleSpec{
+			DeviceSelector: &resourceapi.DeviceTaintSelector{},
+			Taint:          deviceTaint(deviceTaint1),
+		},
+	}
+	taintNoSelectorRule = &resourceapi.DeviceTaintRule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "rule-no-selector",
+		},
+		Spec: resourceapi.DeviceTaintRuleSpec{
 			Taint: deviceTaint(deviceTaint1),
 		},
 	}
@@ -560,6 +569,21 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				{event: handlerEventUpdate, oldObj: sliceWithDevices(slice2, threeDevicesOneTainted), newObj: sliceWithDevices(slice2, taintedDevices)},
 			},
 		},
+		"nil-selector-matches-none": {
+			events: []any{
+				add(slice1),
+				add(slice2),
+				add(taintNoSelectorRule),
+			},
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+				slice1,
+				slice2,
+			},
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1},
+				{event: handlerEventAdd, newObj: slice2},
+			},
+		},
 	}
 
 	setup := func(t *testing.T) *testContext {
@@ -780,7 +804,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 						Name: "taintRule",
 					},
 					Spec: resourceapi.DeviceTaintRuleSpec{
-						DeviceSelector: nil, // all slices
+						DeviceSelector: &resourceapi.DeviceTaintSelector{}, // all slices
 						Taint: resourceapi.DeviceTaint{
 							Key:       "example.com/taint",
 							Value:     "tainted",
@@ -815,7 +839,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 						Name: "taintRule",
 					},
 					Spec: resourceapi.DeviceTaintRuleSpec{
-						DeviceSelector: nil, // all slices
+						DeviceSelector: &resourceapi.DeviceTaintSelector{}, // all slices
 						Taint: resourceapi.DeviceTaint{
 							Key:       "example.com/taint",
 							Value:     "tainted",
