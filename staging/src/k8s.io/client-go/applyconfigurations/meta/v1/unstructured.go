@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -56,7 +57,7 @@ type gvkParserCache struct {
 
 // regenerateGVKParser builds the parser from the raw OpenAPI schema.
 func regenerateGVKParser(dc discovery.DiscoveryInterface) (*managedfields.GvkParser, error) {
-	doc, err := dc.OpenAPISchema()
+	doc, err := discovery.ToDiscoveryInterfaceWithContext(dc).OpenAPISchemaWithContext(context.TODO())
 	if err != nil {
 		return nil, err
 	}

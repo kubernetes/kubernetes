@@ -30,7 +30,7 @@ import (
 //
 // CategoryExpanderWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use CategoryExpanderWithContext instead.
+//logcheck:context // Use CategoryExpanderWithContext instead of CategoryExpander in code which supports contextual logging.
 type CategoryExpander interface {
 	Expand(category string) ([]schema.GroupResource, bool)
 }
@@ -95,7 +95,7 @@ type discoveryCategoryExpander struct {
 //
 // NewDiscoveryCategoryExpanderWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use NewDiscoveryCategoryExpanderWithContext instead.
+//logcheck:context // Use NewDiscoveryCategoryExpanderWithContext instead of NewDiscoveryCategoryExpander in code which supports contextual logging.
 func NewDiscoveryCategoryExpander(client discovery.DiscoveryInterface) CategoryExpander {
 	return newDiscoveryCategoryExpander(discovery.ToDiscoveryInterfaceWithContext(client))
 }
@@ -118,7 +118,7 @@ func newDiscoveryCategoryExpander(client discovery.DiscoveryInterfaceWithContext
 //
 // ExpandWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ExpandWithContext instead.
+//logcheck:context // Use ExpandWithContext instead of Expand in code which supports contextual logging.
 func (e discoveryCategoryExpander) Expand(category string) ([]schema.GroupResource, bool) {
 	return e.ExpandWithContext(context.Background(), category)
 }
@@ -160,7 +160,7 @@ func (e discoveryCategoryExpander) ExpandWithContext(ctx context.Context, catego
 //
 // UnionCategoryExpanderWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use UnionCategoryExpanderWithContext instead.
+//logcheck:context // Use UnionCategoryExpanderWithContext instead of UnionCategoryExpander in code which supports contextual logging.
 type UnionCategoryExpander []CategoryExpander
 
 var _ CategoryExpander = UnionCategoryExpander{}

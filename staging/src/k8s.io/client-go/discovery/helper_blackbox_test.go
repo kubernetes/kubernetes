@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func objBody(object interface{}) io.ReadCloser {
@@ -44,6 +45,7 @@ func objBody(object interface{}) io.ReadCloser {
 }
 
 func TestServerSupportsVersion(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	tests := []struct {
 		name            string
 		requiredVersion schema.GroupVersion
@@ -101,7 +103,7 @@ func TestServerSupportsVersion(t *testing.T) {
 		})
 		c := discovery.NewDiscoveryClientForConfigOrDie(&restclient.Config{})
 		c.RESTClient().(*restclient.RESTClient).Client = fakeClient
-		err := discovery.ServerSupportsVersion(c, test.requiredVersion)
+		err := discovery.ServerSupportsVersionWithContext(ctx, discovery.ToDiscoveryInterfaceWithContext(c), test.requiredVersion)
 		if err == nil && test.expectErr != nil {
 			t.Errorf("expected error, got nil for [%s].", test.name)
 		}

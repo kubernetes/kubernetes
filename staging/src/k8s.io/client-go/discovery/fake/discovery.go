@@ -53,7 +53,7 @@ var (
 //
 // ServerResourcesForGroupVersionWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerResourcesForGroupVersionWithContext instead.
+//logcheck:context // Use ServerResourcesForGroupVersionWithContext instead of ServerResourcesForGroupVersion in code which supports contextual logging.
 func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
 	return c.ServerResourcesForGroupVersionWithContext(context.Background(), groupVersion)
 }
@@ -86,7 +86,7 @@ func (c *FakeDiscovery) ServerResourcesForGroupVersionWithContext(ctx context.Co
 //
 // ServerGroupsAndResourcesWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerGroupsAndResourcesWithContext instead.
+//logcheck:context // Use ServerGroupsAndResourcesWithContext instead of ServerGroupsAndResources in code which supports contextual logging.
 func (c *FakeDiscovery) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
 	return c.ServerGroupsAndResourcesWithContext(context.Background())
 }
@@ -117,7 +117,7 @@ func (c *FakeDiscovery) ServerGroupsAndResourcesWithContext(ctx context.Context)
 //
 // ServerPreferredResourcesWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerPreferredResourcesWithContext instead.
+//logcheck:context // Use ServerPreferredResourcesWithContext instead of ServerPreferredResources in code which supports contextual logging.
 func (c *FakeDiscovery) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	return c.ServerPreferredResourcesWithContext(context.Background())
 }
@@ -133,7 +133,7 @@ func (c *FakeDiscovery) ServerPreferredResourcesWithContext(ctx context.Context)
 //
 // ServerPreferredNamespacedResourcesWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerPreferredNamespacedResourcesWithContext instead.
+//logcheck:context // Use ServerPreferredNamespacedResourcesWithContext instead of ServerPreferredNamespacedResources in code which supports contextual logging.
 func (c *FakeDiscovery) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
 	return c.ServerPreferredNamespacedResourcesWithContext(context.Background())
 }
@@ -149,7 +149,7 @@ func (c *FakeDiscovery) ServerPreferredNamespacedResourcesWithContext(ctx contex
 //
 // ServerGroupsWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerGroupsWithContext instead.
+//logcheck:context // Use ServerGroupsWithContext instead of ServerGroups in code which supports contextual logging.
 func (c *FakeDiscovery) ServerGroups() (*metav1.APIGroupList, error) {
 	return c.ServerGroupsWithContext(context.Background())
 }
@@ -203,7 +203,7 @@ func (c *FakeDiscovery) ServerGroupsWithContext(ctx context.Context) (*metav1.AP
 //
 // ServerVersionWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ServerVersionWithContext instead.
+//logcheck:context // Use ServerVersionWithContext instead of ServerVersion in code which supports contextual logging.
 func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
 	return c.ServerVersionWithContext(context.Background())
 }
@@ -230,7 +230,7 @@ func (c *FakeDiscovery) ServerVersionWithContext(ctx context.Context) (*version.
 //
 // OpenAPISchemaWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use OpenAPISchemaWithContext instead.
+//logcheck:context // Use OpenAPISchemaWithContext instead of OpenAPISchema in code which supports contextual logging.
 func (c *FakeDiscovery) OpenAPISchema() (*openapi_v2.Document, error) {
 	return c.OpenAPISchemaWithContext(context.Background())
 }
@@ -242,7 +242,7 @@ func (c *FakeDiscovery) OpenAPISchemaWithContext(ctx context.Context) (*openapi_
 
 // OpenAPIV3WithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use OpenAPIV3WithContext instead.
+//logcheck:context // Use OpenAPIV3WithContext instead of OpenAPIV3 in code which supports contextual logging.
 func (c *FakeDiscovery) OpenAPIV3() openapi.Client {
 	panic("unimplemented")
 }
@@ -259,7 +259,7 @@ func (c *FakeDiscovery) RESTClient() restclient.Interface {
 
 // WithLegacyWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use WithLegacyWithContext instead.
+//logcheck:context // Use WithLegacyWithContext instead of WithLegacy in code which supports contextual logging.
 func (c *FakeDiscovery) WithLegacy() discovery.DiscoveryInterface {
 	panic("unimplemented")
 }

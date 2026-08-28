@@ -45,7 +45,7 @@ var _ meta.ResettableRESTMapperWithContext = shortcutExpander{}
 //
 // NewShortcutExpanderWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use NewShortcutExpanderWithContext instead.
+//logcheck:context // Use NewShortcutExpanderWithContext instead of NewShortcutExpander in code which supports contextual logging.
 func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface, warningHandler func(string)) meta.RESTMapper {
 	return newShortcutExpander(meta.ToRESTMapperWithContext(delegate), discovery.ToDiscoveryInterfaceWithContext(client), warningHandler)
 }
@@ -84,7 +84,7 @@ func (e shortcutExpander) KindForWithContext(ctx context.Context, resource schem
 //
 // KindsForWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use KindsForWithContext instead.
+//logcheck:context // Use KindsForWithContext instead of KindsFor in code which supports contextual logging.
 func (e shortcutExpander) KindsFor(resource schema.GroupVersionResource) ([]schema.GroupVersionKind, error) {
 	return e.KindsForWithContext(context.Background(), resource)
 }
@@ -98,7 +98,7 @@ func (e shortcutExpander) KindsForWithContext(ctx context.Context, resource sche
 //
 // ResourcesForWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ResourcesForWithContext instead.
+//logcheck:context // Use ResourcesForWithContext instead of ResourcesFor in code which supports contextual logging.
 func (e shortcutExpander) ResourcesFor(resource schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
 	return e.ResourcesForWithContext(context.Background(), resource)
 }
@@ -112,7 +112,7 @@ func (e shortcutExpander) ResourcesForWithContext(ctx context.Context, resource 
 //
 // ResourceForWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ResourceForWithContext instead.
+//logcheck:context // Use ResourceForWithContext instead of ResourceFor in code which supports contextual logging.
 func (e shortcutExpander) ResourceFor(resource schema.GroupVersionResource) (schema.GroupVersionResource, error) {
 	return e.ResourceForWithContext(context.Background(), resource)
 }
@@ -126,7 +126,7 @@ func (e shortcutExpander) ResourceForWithContext(ctx context.Context, resource s
 //
 // ResourceSingularizerWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ResourceSingularizerWithContext instead.
+//logcheck:context // Use ResourceSingularizerWithContext instead of ResourceSingularizer in code which supports contextual logging.
 func (e shortcutExpander) ResourceSingularizer(resource string) (string, error) {
 	return e.ResourceSingularizerWithContext(context.Background(), resource)
 }
@@ -140,7 +140,7 @@ func (e shortcutExpander) ResourceSingularizerWithContext(ctx context.Context, r
 //
 // RESTMappingWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use RESTMappingWithContext instead.
+//logcheck:context // Use RESTMappingWithContext instead of RESTMapping in code which supports contextual logging.
 func (e shortcutExpander) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
 	return e.RESTMappingWithContext(context.Background(), gk, versions...)
 }
@@ -154,7 +154,7 @@ func (e shortcutExpander) RESTMappingWithContext(ctx context.Context, gk schema.
 //
 // RESTMappingsWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use RESTMappingsWithContext instead.
+//logcheck:context // Use RESTMappingsWithContext instead of RESTMappings in code which supports contextual logging.
 func (e shortcutExpander) RESTMappings(gk schema.GroupKind, versions ...string) ([]*meta.RESTMapping, error) {
 	return e.RESTMappingsWithContext(context.Background(), gk, versions...)
 }
@@ -275,7 +275,7 @@ func (e shortcutExpander) expandResourceShortcut(ctx context.Context, resource s
 
 // ResetWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ResetWithContext instead.
+//logcheck:context // Use ResetWithContext instead of Reset in code which supports contextual logging.
 func (e shortcutExpander) Reset() {
 	e.ResetWithContext(context.Background())
 }

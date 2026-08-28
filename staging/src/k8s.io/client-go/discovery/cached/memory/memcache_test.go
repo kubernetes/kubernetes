@@ -147,36 +147,37 @@ func TestClient(t *testing.T) {
 }
 
 func testClient(t *testing.T, fake *fakeDiscovery, delegate discovery.DiscoveryInterface) {
-	c := NewMemCacheClient(delegate)
-	if c.Fresh() {
+	_, ctx := ktesting.NewTestContext(t)
+	c := NewMemCacheClientWithContext(discovery.ToDiscoveryInterfaceWithContext(delegate))
+	if c.FreshWithContext(ctx) {
 		t.Errorf("Expected not fresh.")
 	}
-	g, err := c.ServerGroups()
+	g, err := c.ServerGroupsWithContext(ctx)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	if e, a := fake.groupList, g; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected %#v, got %#v", e, a)
 	}
-	if !c.Fresh() {
+	if !c.FreshWithContext(ctx) {
 		t.Errorf("Expected fresh.")
 	}
-	c.Invalidate()
-	if c.Fresh() {
+	c.InvalidateWithContext(ctx)
+	if c.FreshWithContext(ctx) {
 		t.Errorf("Expected not fresh.")
 	}
 
-	g, err = c.ServerGroups()
+	g, err = c.ServerGroupsWithContext(ctx)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	if e, a := fake.groupList, g; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected %#v, got %#v", e, a)
 	}
-	if !c.Fresh() {
+	if !c.FreshWithContext(ctx) {
 		t.Errorf("Expected fresh.")
 	}
-	r, err := c.ServerResourcesForGroupVersion("astronomy/v8beta1")
+	r, err := c.ServerResourcesForGroupVersionWithContext(ctx, "astronomy/v8beta1")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -201,8 +202,8 @@ func testClient(t *testing.T, fake *fakeDiscovery, delegate discovery.DiscoveryI
 	}
 	fake.lock.Unlock()
 
-	c.Invalidate()
-	r, err = c.ServerResourcesForGroupVersion("astronomy/v8beta1")
+	c.InvalidateWithContext(ctx)
+	r, err = c.ServerResourcesForGroupVersionWithContext(ctx, "astronomy/v8beta1")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -295,28 +296,29 @@ func TestServerGroupsFails(t *testing.T) {
 		},
 	}
 
-	c := NewMemCacheClient(fake)
-	if c.Fresh() {
+	c := NewMemCacheClientWithContext(discovery.ToDiscoveryInterfaceWithContext(fake))
+	_, ctx := ktesting.NewTestContext(t)
+	if c.FreshWithContext(ctx) {
 		t.Errorf("Expected not fresh.")
 	}
-	_, err := c.ServerGroups()
+	_, err := c.ServerGroupsWithContext(ctx)
 	if err == nil {
 		t.Errorf("Expected error")
 	}
-	if c.Fresh() {
+	if c.FreshWithContext(ctx) {
 		t.Errorf("Expected not fresh.")
 	}
 	fake.lock.Lock()
 	fake.groupListErr = nil
 	fake.lock.Unlock()
-	r, err := c.ServerResourcesForGroupVersion("astronomy/v8beta1")
+	r, err := c.ServerResourcesForGroupVersionWithContext(ctx, "astronomy/v8beta1")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	if e, a := fake.resourceMap["astronomy/v8beta1"].list, r; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected %#v, got %#v", e, a)
 	}
-	if !c.Fresh() {
+	if !c.FreshWithContext(ctx) {
 		t.Errorf("Expected not fresh.")
 	}
 }
@@ -360,18 +362,19 @@ func TestPartialPermanentFailure(t *testing.T) {
 		},
 	}
 
-	c := NewMemCacheClient(fake)
-	if c.Fresh() {
+	c := NewMemCacheClientWithContext(discovery.ToDiscoveryInterfaceWithContext(fake))
+	_, ctx := ktesting.NewTestContext(t)
+	if c.FreshWithContext(ctx) {
 		t.Errorf("Expected not fresh.")
 	}
-	r, err := c.ServerResourcesForGroupVersion("astronomy2/v8beta1")
+	r, err := c.ServerResourcesForGroupVersionWithContext(ctx, "astronomy2/v8beta1")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	if e, a := fake.resourceMap["astronomy2/v8beta1"].list, r; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected %#v, got %#v", e, a)
 	}
-	_, err = c.ServerResourcesForGroupVersion("astronomy/v8beta1")
+	_, err = c.ServerResourcesForGroupVersionWithContext(ctx, "astronomy/v8beta1")
 	if err == nil {
 		t.Errorf("Expected error, got nil")
 	}
@@ -392,14 +395,14 @@ func TestPartialPermanentFailure(t *testing.T) {
 	}
 	fake.lock.Unlock()
 	// We don't retry permanent errors, so it should fail.
-	_, err = c.ServerResourcesForGroupVersion("astronomy/v8beta1")
+	_, err = c.ServerResourcesForGroupVersionWithContext(ctx, "astronomy/v8beta1")
 	if err == nil {
 		t.Errorf("Expected error, got nil")
 	}
-	c.Invalidate()
+	c.InvalidateWithContext(ctx)
 
 	// After Invalidate, we should retry.
-	r, err = c.ServerResourcesForGroupVersion("astronomy/v8beta1")
+	r, err = c.ServerResourcesForGroupVersionWithContext(ctx, "astronomy/v8beta1")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -453,18 +456,19 @@ func TestPartialRetryableFailure(t *testing.T) {
 		},
 	}
 
-	c := NewMemCacheClient(fake)
-	if c.Fresh() {
+	c := NewMemCacheClientWithContext(discovery.ToDiscoveryInterfaceWithContext(fake))
+	_, ctx := ktesting.NewTestContext(t)
+	if c.FreshWithContext(ctx) {
 		t.Errorf("Expected not fresh.")
 	}
-	r, err := c.ServerResourcesForGroupVersion("astronomy2/v8beta1")
+	r, err := c.ServerResourcesForGroupVersionWithContext(ctx, "astronomy2/v8beta1")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	if e, a := fake.resourceMap["astronomy2/v8beta1"].list, r; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected %#v, got %#v", e, a)
 	}
-	_, err = c.ServerResourcesForGroupVersion("astronomy/v8beta1")
+	_, err = c.ServerResourcesForGroupVersionWithContext(ctx, "astronomy/v8beta1")
 	if err == nil {
 		t.Errorf("Expected error, got nil")
 	}
@@ -486,7 +490,7 @@ func TestPartialRetryableFailure(t *testing.T) {
 	fake.lock.Unlock()
 	// We should retry retryable error even without Invalidate() being called,
 	// so no error is expected.
-	r, err = c.ServerResourcesForGroupVersion("astronomy/v8beta1")
+	r, err = c.ServerResourcesForGroupVersionWithContext(ctx, "astronomy/v8beta1")
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -498,7 +502,7 @@ func TestPartialRetryableFailure(t *testing.T) {
 	fake.lock.Lock()
 	fake.resourceMap["astronomy/v8beta1"].err = errors.New("some permanent error")
 	fake.lock.Unlock()
-	r, err = c.ServerResourcesForGroupVersion("astronomy/v8beta1")
+	r, err = c.ServerResourcesForGroupVersionWithContext(ctx, "astronomy/v8beta1")
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -510,20 +514,23 @@ func TestPartialRetryableFailure(t *testing.T) {
 // Tests that schema instances returned by openapi cached and returned after
 // successive calls
 func TestOpenAPIMemCache(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	fakeServer, err := testutil.NewFakeOpenAPIV3Server("../../testdata")
 	require.NoError(t, err)
 	defer fakeServer.HttpServer.Close()
 
 	require.NotEmpty(t, fakeServer.ServedDocuments)
 
-	client := NewMemCacheClient(
-		discovery.NewDiscoveryClientForConfigOrDie(
-			&rest.Config{Host: fakeServer.HttpServer.URL},
+	client := NewMemCacheClientWithContext(
+		discovery.ToDiscoveryInterfaceWithContext(
+			discovery.NewDiscoveryClientForConfigOrDie(
+				&rest.Config{Host: fakeServer.HttpServer.URL},
+			),
 		),
 	)
-	openapiClient := client.OpenAPIV3()
+	openapiClient := client.OpenAPIV3WithContext(ctx)
 
-	paths, err := openapiClient.Paths()
+	paths, err := openapiClient.PathsWithContext(ctx)
 	require.NoError(t, err)
 
 	contentTypes := []string{
@@ -533,19 +540,19 @@ func TestOpenAPIMemCache(t *testing.T) {
 	for _, contentType := range contentTypes {
 		t.Run(contentType, func(t *testing.T) {
 			for k, v := range paths {
-				original, err := v.Schema(contentType)
+				original, err := v.SchemaWithContext(ctx, contentType)
 				if !assert.NoError(t, err) {
 					continue
 				}
 
 				// This is the original OpenAPI client. It is not affected
 				// by client.Invalidate() below.
-				pathsAgain, err := openapiClient.Paths()
+				pathsAgain, err := openapiClient.PathsWithContext(ctx)
 				if !assert.NoError(t, err) {
 					continue
 				}
 
-				schemaAgain, err := pathsAgain[k].Schema(contentType)
+				schemaAgain, err := pathsAgain[k].SchemaWithContext(ctx, contentType)
 				if !assert.NoError(t, err) {
 					continue
 				}
@@ -555,14 +562,14 @@ func TestOpenAPIMemCache(t *testing.T) {
 				assert.Equal(t, reflect.ValueOf(original).Pointer(), reflect.ValueOf(schemaAgain).Pointer())
 
 				// Invalidate and try again. This time pointers should not be equal
-				client.Invalidate()
+				client.InvalidateWithContext(ctx)
 
-				pathsAgain, err = client.OpenAPIV3().Paths()
+				pathsAgain, err = client.OpenAPIV3WithContext(ctx).PathsWithContext(ctx)
 				if !assert.NoError(t, err) {
 					continue
 				}
 
-				schemaAgain, err = pathsAgain[k].Schema(contentType)
+				schemaAgain, err = pathsAgain[k].SchemaWithContext(ctx, contentType)
 				if !assert.NoError(t, err) {
 					continue
 				}
@@ -647,6 +654,7 @@ func TestOpenAPIMemCacheWithContext(t *testing.T) {
 
 // Tests function "GroupsAndMaybeResources" when the "unaggregated" discovery is returned.
 func TestMemCacheGroupsAndMaybeResources(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	tests := []struct {
 		name                  string
 		corev1                *metav1.APIVersions
@@ -778,14 +786,14 @@ func TestMemCacheGroupsAndMaybeResources(t *testing.T) {
 			delegate:               client,
 			groupToServerResources: map[string]*cacheEntry{},
 		}
-		assert.False(t, memClient.Fresh())
-		apiGroupList, resourcesMap, failedGVs, err := memClient.GroupsAndMaybeResources()
+		assert.False(t, memClient.FreshWithContext(ctx))
+		apiGroupList, resourcesMap, failedGVs, err := memClient.GroupsAndMaybeResourcesWithContext(ctx)
 		require.NoError(t, err)
 		// "Unaggregated" discovery always returns nil for resources.
 		assert.Nil(t, resourcesMap)
 		assert.Emptyf(t, failedGVs, "expected empty failed GroupVersions, got (%d)", len(failedGVs))
 		assert.False(t, memClient.receivedAggregatedDiscovery)
-		assert.True(t, memClient.Fresh())
+		assert.True(t, memClient.FreshWithContext(ctx))
 		// Test the expected groups are returned for the aggregated format.
 		expectedGroupNames := sets.NewString(test.expectedGroupNames...)
 		actualGroupNames := sets.NewString(groupNamesFromList(apiGroupList)...)
@@ -797,9 +805,9 @@ func TestMemCacheGroupsAndMaybeResources(t *testing.T) {
 		assert.True(t, expectedGroupVersions.Equal(actualGroupVersions),
 			"%s: Expected group/versions (%s), got (%s)", test.name, expectedGroupVersions.List(), actualGroupVersions.List())
 		// Invalidate the cache and retrieve the server groups and resources again.
-		memClient.Invalidate()
-		assert.False(t, memClient.Fresh())
-		apiGroupList, resourcesMap, _, err = memClient.GroupsAndMaybeResources()
+		memClient.InvalidateWithContext(ctx)
+		assert.False(t, memClient.FreshWithContext(ctx))
+		apiGroupList, resourcesMap, _, err = memClient.GroupsAndMaybeResourcesWithContext(ctx)
 		require.NoError(t, err)
 		assert.Nil(t, resourcesMap)
 		assert.False(t, memClient.receivedAggregatedDiscovery)
@@ -812,6 +820,7 @@ func TestMemCacheGroupsAndMaybeResources(t *testing.T) {
 
 // Tests function "GroupsAndMaybeResources" when the "aggregated" discovery is returned.
 func TestAggregatedMemCacheGroupsAndMaybeResources(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	tests := []struct {
 		name                  string
 		corev1                *apidiscovery.APIGroupDiscoveryList
@@ -1310,11 +1319,11 @@ func TestAggregatedMemCacheGroupsAndMaybeResources(t *testing.T) {
 			delegate:               client,
 			groupToServerResources: map[string]*cacheEntry{},
 		}
-		assert.False(t, memClient.Fresh())
-		apiGroupList, resourcesMap, failedGVs, err := memClient.GroupsAndMaybeResources()
+		assert.False(t, memClient.FreshWithContext(ctx))
+		apiGroupList, resourcesMap, failedGVs, err := memClient.GroupsAndMaybeResourcesWithContext(ctx)
 		require.NoError(t, err)
 		assert.True(t, memClient.receivedAggregatedDiscovery)
-		assert.True(t, memClient.Fresh())
+		assert.True(t, memClient.FreshWithContext(ctx))
 		// Test the expected groups are returned for the aggregated format.
 		expectedGroupNames := sets.NewString(test.expectedGroupNames...)
 		actualGroupNames := sets.NewString(groupNamesFromList(apiGroupList)...)
@@ -1340,9 +1349,9 @@ func TestAggregatedMemCacheGroupsAndMaybeResources(t *testing.T) {
 		assert.True(t, expectedFailedGVs.Equal(actualFailedGVs),
 			"%s: Expected Failed GroupVersions (%s), got (%s)", test.name, expectedFailedGVs.List(), actualFailedGVs.List())
 		// Invalidate the cache and retrieve the server groups again.
-		memClient.Invalidate()
-		assert.False(t, memClient.Fresh())
-		apiGroupList, _, _, err = memClient.GroupsAndMaybeResources()
+		memClient.InvalidateWithContext(ctx)
+		assert.False(t, memClient.FreshWithContext(ctx))
+		apiGroupList, _, _, err = memClient.GroupsAndMaybeResourcesWithContext(ctx)
 
 		require.NoError(t, err)
 		// Test the expected groups are returned for the aggregated format.
@@ -1354,6 +1363,7 @@ func TestAggregatedMemCacheGroupsAndMaybeResources(t *testing.T) {
 
 // Tests function "ServerGroups" when the "aggregated" discovery is returned.
 func TestMemCacheAggregatedServerGroups(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	tests := []struct {
 		name                      string
 		corev1                    *apidiscovery.APIGroupDiscoveryList
@@ -1607,11 +1617,11 @@ func TestMemCacheAggregatedServerGroups(t *testing.T) {
 		}))
 		defer server.Close()
 		client := discovery.NewDiscoveryClientForConfigOrDie(&rest.Config{Host: server.URL})
-		memCacheClient := NewMemCacheClient(client)
-		assert.False(t, memCacheClient.Fresh())
-		apiGroupList, err := memCacheClient.ServerGroups()
+		memCacheClient := NewMemCacheClientWithContext(discovery.ToDiscoveryInterfaceWithContext(client))
+		assert.False(t, memCacheClient.FreshWithContext(ctx))
+		apiGroupList, err := memCacheClient.ServerGroupsWithContext(ctx)
 		require.NoError(t, err)
-		assert.True(t, memCacheClient.Fresh())
+		assert.True(t, memCacheClient.FreshWithContext(ctx))
 		// Test the expected groups are returned for the aggregated format.
 		expectedGroupNames := sets.NewString(test.expectedGroupNames...)
 		actualGroupNames := sets.NewString(groupNamesFromList(apiGroupList)...)
@@ -1628,9 +1638,9 @@ func TestMemCacheAggregatedServerGroups(t *testing.T) {
 		assert.True(t, expectedPreferredVersions.Equal(actualPreferredVersions),
 			"%s: Expected preferred group/version (%s), got (%s)", test.name, expectedPreferredVersions.List(), actualPreferredVersions.List())
 		// Invalidate the cache and retrieve the server groups again.
-		memCacheClient.Invalidate()
-		assert.False(t, memCacheClient.Fresh())
-		apiGroupList, err = memCacheClient.ServerGroups()
+		memCacheClient.InvalidateWithContext(ctx)
+		assert.False(t, memCacheClient.FreshWithContext(ctx))
+		apiGroupList, err = memCacheClient.ServerGroupsWithContext(ctx)
 		require.NoError(t, err)
 		// Test the expected groups are returned for the aggregated format.
 		actualGroupNames = sets.NewString(groupNamesFromList(apiGroupList)...)

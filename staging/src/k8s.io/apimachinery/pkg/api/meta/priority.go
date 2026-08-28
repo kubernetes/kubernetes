@@ -41,7 +41,7 @@ var (
 //
 // PriorityRESTMapperWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use PriorityRESTMapperWithContext instead.
+//logcheck:context // Use PriorityRESTMapperWithContext instead of PriorityRESTMapper in code which supports contextual logging.
 type PriorityRESTMapper struct {
 	// Delegate is the RESTMapper to use to locate all the Kind and Resource matches
 	Delegate RESTMapper
@@ -98,7 +98,7 @@ func ToPriorityRESTMapperWithContext(m PriorityRESTMapper) PriorityRESTMapperWit
 //
 // PriorityRESTMapperWithContext.ResourceForWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use PriorityRESTMapperWithContext.ResourceForWithContext instead.
+//logcheck:context // Use PriorityRESTMapperWithContext.ResourceForWithContext instead of ResourceFor in code which supports contextual logging.
 func (m PriorityRESTMapper) ResourceFor(partiallySpecifiedResource schema.GroupVersionResource) (schema.GroupVersionResource, error) {
 	return ToPriorityRESTMapperWithContext(m).ResourceForWithContext(context.Background(), partiallySpecifiedResource)
 }
@@ -107,49 +107,49 @@ func (m PriorityRESTMapper) ResourceFor(partiallySpecifiedResource schema.GroupV
 //
 // PriorityRESTMapperWithContext.KindForWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use PriorityRESTMapperWithContext.KindForWithContext instead.
+//logcheck:context // Use PriorityRESTMapperWithContext.KindForWithContext instead of KindFor in code which supports contextual logging.
 func (m PriorityRESTMapper) KindFor(partiallySpecifiedResource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
 	return ToPriorityRESTMapperWithContext(m).KindForWithContext(context.Background(), partiallySpecifiedResource)
 }
 
 // PriorityRESTMapperWithContext.RESTMappingWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use PriorityRESTMapperWithContext.RESTMappingWithContext instead.
+//logcheck:context // Use PriorityRESTMapperWithContext.RESTMappingWithContext instead of RESTMapping in code which supports contextual logging.
 func (m PriorityRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (mapping *RESTMapping, err error) {
 	return ToPriorityRESTMapperWithContext(m).RESTMappingWithContext(context.Background(), gk, versions...)
 }
 
 // PriorityRESTMapperWithContext.RESTMappingsWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use PriorityRESTMapperWithContext.RESTMappingsWithContext instead.
+//logcheck:context // Use PriorityRESTMapperWithContext.RESTMappingsWithContext instead of RESTMappings in code which supports contextual logging.
 func (m PriorityRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string) ([]*RESTMapping, error) {
 	return m.Delegate.RESTMappings(gk, versions...)
 }
 
 // PriorityRESTMapperWithContext.ResourceSingularizerWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use PriorityRESTMapperWithContext.ResourceSingularizerWithContext instead.
+//logcheck:context // Use PriorityRESTMapperWithContext.ResourceSingularizerWithContext instead of ResourceSingularizer in code which supports contextual logging.
 func (m PriorityRESTMapper) ResourceSingularizer(resource string) (singular string, err error) {
 	return m.Delegate.ResourceSingularizer(resource)
 }
 
 // PriorityRESTMapperWithContext.ResourcesForWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use PriorityRESTMapperWithContext.ResourcesForWithContext instead.
+//logcheck:context // Use PriorityRESTMapperWithContext.ResourcesForWithContext instead of ResourcesFor in code which supports contextual logging.
 func (m PriorityRESTMapper) ResourcesFor(partiallySpecifiedResource schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
 	return m.Delegate.ResourcesFor(partiallySpecifiedResource)
 }
 
 // PriorityRESTMapperWithContext.KindsForWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use PriorityRESTMapperWithContext.KindsForWithContext instead.
+//logcheck:context // Use PriorityRESTMapperWithContext.KindsForWithContext instead of KindsFor in code which supports contextual logging.
 func (m PriorityRESTMapper) KindsFor(partiallySpecifiedResource schema.GroupVersionResource) (gvk []schema.GroupVersionKind, err error) {
 	return m.Delegate.KindsFor(partiallySpecifiedResource)
 }
 
 // PriorityRESTMapperWithContext.ResetWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use PriorityRESTMapperWithContext.ResetWithContext instead.
+//logcheck:context // Use PriorityRESTMapperWithContext.ResetWithContext instead of Reset in code which supports contextual logging.
 func (m PriorityRESTMapper) Reset() {
 	MaybeResetRESTMapper(m.Delegate)
 }

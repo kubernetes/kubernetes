@@ -912,7 +912,7 @@ func TestBackoffOnTooManyRequests(t *testing.T) {
 			case 0:
 				return nil, err
 			case 1:
-				w := watch.NewFakeWithChanSize(1, false)
+				w := watch.NewFakeWithOptions(watch.FakeOptions{ChannelSize: 1, Logger: &logger})
 				status := err.Status()
 				w.Error(&status)
 				return w, nil
@@ -1014,6 +1014,7 @@ func TestRetryInternalError(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		logger, _ := ktesting.NewTestContext(t)
 		err := apierrors.NewInternalError(fmt.Errorf("etcdserver: no leader"))
 		fakeClock := testingclock.NewFakeClock(time.Now())
 		fd := &fakeDelayFunc{}
@@ -1033,7 +1034,7 @@ func TestRetryInternalError(t *testing.T) {
 				}
 
 				fakeClock.Step(time.Second)
-				w := watch.NewFakeWithChanSize(1, false)
+				w := watch.NewFakeWithOptions(watch.FakeOptions{ChannelSize: 1, Logger: &logger})
 				status := err.Status()
 				w.Error(&status)
 				return w, nil

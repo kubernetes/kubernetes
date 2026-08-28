@@ -556,7 +556,7 @@ func (m *DefaultRESTMapper) RESTMappingsWithContext(_ context.Context, gk schema
 //
 // MaybeResetRESTMapperWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use MaybeResetRESTMapperWithContext instead.
+//logcheck:context // Use MaybeResetRESTMapperWithContext instead of MaybeResetRESTMapper in code which supports contextual logging.
 func MaybeResetRESTMapper(mapper RESTMapper) {
 	maybeReset(context.Background(), mapper)
 }
