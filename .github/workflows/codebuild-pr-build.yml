@@ -8,13 +8,6 @@ on:
       - main
       - v2-release
   pull_request: {}
-  pull_request_target:
-    branches:
-      - v2-release
-    types:
-      - opened
-      - synchronize
-      - reopened
 
 # For every PR, cancel any previous builds in progress
 # ... but for all other builds we keep them running
