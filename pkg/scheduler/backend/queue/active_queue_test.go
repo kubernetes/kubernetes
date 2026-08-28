@@ -172,3 +172,82 @@ func TestActiveQueue_InFlightPods(t *testing.T) {
 		})
 	}
 }
+
+func TestActiveQueue_AddEventIfAnyInFlight(t *testing.T) {
+	tests := []struct {
+		name               string
+		initialPods        []*v1.Pod
+		popCount           int
+		callDoneSchedCycle []types.UID
+		wantAdded          bool
+		wantInFlightEvents int
+	}{
+		{
+			name: "no pods in flight",
+			initialPods: []*v1.Pod{
+				st.MakePod().Namespace("ns").Name("p1").UID("p1").Obj(),
+			},
+			popCount:           0,
+			wantAdded:          false,
+			wantInFlightEvents: 0,
+		},
+		{
+			name: "pod in scheduling cycle (has eventsMarker)",
+			initialPods: []*v1.Pod{
+				st.MakePod().Namespace("ns").Name("p1").UID("p1").Obj(),
+			},
+			popCount:           1,
+			wantAdded:          true,
+			wantInFlightEvents: 2, // 1 marker + 1 cluster event
+		},
+		{
+			name: "pod in binding cycle (eventsMarker removed by doneSchedulingCycle)",
+			initialPods: []*v1.Pod{
+				st.MakePod().Namespace("ns").Name("p1").UID("p1").Obj(),
+			},
+			popCount:           1,
+			callDoneSchedCycle: []types.UID{"p1"},
+			wantAdded:          false,
+			wantInFlightEvents: 0,
+		},
+		{
+			name: "one pod binding and one pod scheduling",
+			initialPods: []*v1.Pod{
+				st.MakePod().Namespace("ns").Name("p1").UID("p1").Obj(),
+				st.MakePod().Namespace("ns").Name("p2").UID("p2").Obj(),
+			},
+			popCount:           2,
+			callDoneSchedCycle: []types.UID{"p1"},
+			wantAdded:          true,
+			wantInFlightEvents: 2, // p2 marker + 1 cluster event
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			rr := metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())
+			aq := newActiveQueue(heap.NewWithRecorder(queuedEntityKeyFunc, heap.LessFunc[framework.QueuedEntityInfo](convertLessFn(newDefaultQueueSort())), metrics.NewActiveEntitiesRecorder()), rr, nil)
+
+			for _, pod := range tt.initialPods {
+				aq.add(logger, &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: pod}}, framework.EventUnscheduledPodAdd.Label(), nil)
+			}
+			for i := 0; i < tt.popCount; i++ {
+				if _, err := aq.pop(logger); err != nil {
+					t.Fatalf("pop failed: %v", err)
+				}
+			}
+			for _, uid := range tt.callDoneSchedCycle {
+				aq.doneSchedulingCycle(uid)
+			}
+
+			gotAdded := aq.addEventIfAnyInFlight(nil, nil, nodeAdd)
+			if gotAdded != tt.wantAdded {
+				t.Fatalf("expected addEventIfAnyInFlight to return %v, got %v", tt.wantAdded, gotAdded)
+			}
+			if len(aq.listInFlightEvents()) != tt.wantInFlightEvents {
+				t.Fatalf("expected %d in-flight events, got %d", tt.wantInFlightEvents, len(aq.listInFlightEvents()))
+			}
+		})
+	}
+}

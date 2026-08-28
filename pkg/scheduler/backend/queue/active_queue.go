@@ -518,13 +518,13 @@ func (aq *activeQueue) addEventsIfPodInFlight(oldPod, newPod *v1.Pod, events []f
 	return aq.unlockedQueue.addEventsIfPodInFlight(oldPod, newPod, events)
 }
 
-// addEventIfAnyInFlight adds clusterEvent to inFlightEvents if any pod is in inFlightPods.
+// addEventIfAnyInFlight adds clusterEvent to inFlightEvents if any pod is in its scheduling cycle (with a non-nil eventsMarker).
 // It returns true if pushed the event to the inFlightEvents.
 func (aq *activeQueue) addEventIfAnyInFlight(oldObj, newObj interface{}, event fwk.ClusterEvent) bool {
 	aq.lock.Lock()
 	defer aq.lock.Unlock()
 
-	if len(aq.inFlightPods) != 0 {
+	if aq.hasInFlightSchedulingPods() {
 		aq.metricsRecorder.ObserveInFlightEventsAsync(event.Label(), 1, false)
 		aq.inFlightEvents.PushBack(&clusterEvent{
 			event:  event,
@@ -532,6 +532,15 @@ func (aq *activeQueue) addEventIfAnyInFlight(oldObj, newObj interface{}, event f
 			newObj: newObj,
 		})
 		return true
+	}
+	return false
+}
+
+func (aq *activeQueue) hasInFlightSchedulingPods() bool {
+	for _, entry := range aq.inFlightPods {
+		if entry.eventsMarker != nil {
+			return true
+		}
 	}
 	return false
 }
