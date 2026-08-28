@@ -24,6 +24,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/component-base/featuregate"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 )
 
 // TestKubeFeaturesRegistered tests that all kube features are registered.
@@ -33,6 +34,52 @@ func TestKubeFeaturesRegistered(t *testing.T) {
 	for featureName := range defaultVersionedKubernetesFeatureGates {
 		if _, ok := registeredFeatures[featureName]; !ok {
 			t.Errorf("The feature gate %q is not registered in the DefaultFeatureGate", featureName)
+		}
+	}
+}
+
+// TestSchedulerFeatureGatesCoherent tests that scheduler feature gates match
+// their definitions in the Kubernetes-wide feature gate registry.
+func TestSchedulerFeatureGatesCoherent(t *testing.T) {
+	knownFeatureGates := featuregate.NewFeatureGate()
+	if err := knownFeatureGates.AddVersioned(defaultVersionedKubernetesFeatureGates); err != nil {
+		t.Fatal(err)
+	}
+	registeredFeatures := knownFeatureGates.GetAllVersioned()
+	if err := schedulerfeatures.SetupCurrentKubernetesSpecificFeatureGates(knownFeatureGates); err != nil {
+		t.Fatalf("scheduler feature gates are inconsistent with the Kubernetes feature gates: %v", err)
+	}
+
+	for featureName := range knownFeatureGates.GetAllVersioned() {
+		if _, ok := registeredFeatures[featureName]; !ok {
+			t.Errorf("The scheduler feature gate %q is not in the Kubernetes feature gates", featureName)
+		}
+	}
+
+	schedulerGates := featuregate.NewFeatureGate()
+	builtinFeatures := schedulerGates.GetAllVersioned()
+	if err := schedulerfeatures.SetupCurrentKubernetesSpecificFeatureGates(schedulerGates); err != nil {
+		t.Fatal(err)
+	}
+	schedulerDependencies := schedulerGates.Dependencies()
+	for name := range schedulerGates.GetAllVersioned() {
+		if _, builtin := builtinFeatures[name]; builtin {
+			continue
+		}
+		got, ok := schedulerDependencies[name]
+		if !ok {
+			t.Errorf("scheduler feature %q has no dependency declaration", name)
+			continue
+		}
+		want, ok := defaultKubernetesFeatureGateDependencies[name]
+		if !ok {
+			t.Errorf("scheduler feature %q has no internal dependency declaration", name)
+			continue
+		}
+		want = slices.Clone(want)
+		slices.Sort(want)
+		if !slices.Equal(got, want) {
+			t.Errorf("scheduler feature %q dependencies = %v, want %v", name, got, want)
 		}
 	}
 }
