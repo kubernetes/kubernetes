@@ -2,9 +2,9 @@
 
 module k8s.io/apimachinery
 
-go 1.26.0
+go 1.27.0
 
-godebug default=go1.26
+godebug default=go1.27
 
 require (
 	github.com/fxamacker/cbor/v2 v2.9.1
