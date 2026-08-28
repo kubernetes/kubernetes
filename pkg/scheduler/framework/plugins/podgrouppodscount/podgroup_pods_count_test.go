@@ -381,7 +381,13 @@ func TestNormalizePlacementScore(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pl := &PodGroupPodsCount{}
-			pgInfo := &framework.PodGroupInfo{Name: "pg1", Type: fwk.PodGroupKeyType}
+			pgInfo := &framework.PodGroupInfo{
+				GenericPodGroup: framework.NewGenericPodGroup(&schedulingapi.PodGroup{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pg1",
+					},
+				}),
+			}
 			status := pl.NormalizePlacementScore(context.Background(), nil, pgInfo, tt.scores)
 			if tt.expectedError != "" {
 				if status.IsSuccess() {
@@ -406,19 +412,13 @@ func TestNormalizePlacementScore(t *testing.T) {
 
 func makePodGroupInfoFromPG(pg *schedulingapi.PodGroup) fwk.PodGroupInfo {
 	return &framework.PodGroupInfo{
-		Name:      pg.Name,
-		Namespace: pg.Namespace,
-		PodGroup:  pg,
-		Type:      fwk.PodGroupKeyType,
+		GenericPodGroup: framework.NewGenericPodGroup(pg),
 	}
 }
 
 func makePodGroupInfoFromCPG(cpg *schedulingv1alpha3.CompositePodGroup) fwk.PodGroupInfo {
 	return &framework.PodGroupInfo{
-		Name:              cpg.Name,
-		Namespace:         cpg.Namespace,
-		CompositePodGroup: cpg,
-		Type:              fwk.CompositePodGroupKeyType,
+		GenericPodGroup: framework.NewGenericCompositePodGroup(cpg),
 	}
 }
 
