@@ -26,6 +26,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 	kcmfeatures "k8s.io/controller-manager/pkg/features"
+	schedulerfeatures "k8s.io/kube-scheduler/pkg/features"
 )
 
 // Every feature gate should have an entry here following this template:
@@ -156,7 +157,7 @@ const (
 	// kep: https://kep.k8s.io/6012
 	//
 	// Enables support for CompositePodGroups.
-	CompositePodGroup featuregate.Feature = "CompositePodGroup"
+	CompositePodGroup featuregate.Feature = schedulerfeatures.CompositePodGroup
 
 	// owner: @adrianreber
 	// kep: https://kep.k8s.io/2008
@@ -195,19 +196,19 @@ const (
 	// Admin access is granted even if a device is already in use and,
 	// depending on the DRA driver, may enable additional permissions
 	// when a container uses the allocated device.
-	DRAAdminAccess featuregate.Feature = "DRAAdminAccess"
+	DRAAdminAccess featuregate.Feature = schedulerfeatures.DRAAdminAccess
 
 	// owner: @sunya-ch
 	// kep: https://kep.k8s.io/5075
 	//
 	// DRAConsumableCapacity
-	DRAConsumableCapacity featuregate.Feature = "DRAConsumableCapacity"
+	DRAConsumableCapacity featuregate.Feature = schedulerfeatures.DRAConsumableCapacity
 
 	// owner: @gauravkghildiyal
 	// kep: http://kep.k8s.io/6080
 	//
 	// Enables support for derived attributes in Dynamic Resource Allocation (DRA).
-	DRADerivedAttributes featuregate.Feature = "DRADerivedAttributes"
+	DRADerivedAttributes featuregate.Feature = schedulerfeatures.DRADerivedAttributes
 
 	// owner: @KobayashiD27
 	// kep: http://kep.k8s.io/5007
@@ -218,7 +219,7 @@ const (
 	//
 	// DRAResourceClaimDeviceStatus also needs to be
 	// enabled.
-	DRADeviceBindingConditions featuregate.Feature = "DRADeviceBindingConditions"
+	DRADeviceBindingConditions featuregate.Feature = schedulerfeatures.DRADeviceBindingConditions
 
 	// owner: @omeryahud
 	// kep: https://kep.k8s.io/5963
@@ -232,33 +233,33 @@ const (
 	//
 	// DRAPartitionableDevices also needs to be enabled, since the field lives
 	// on consumesCounters[] entries which only exist for partitionable devices.
-	DRADeviceCompatibilityGroups featuregate.Feature = "DRADeviceCompatibilityGroups"
+	DRADeviceCompatibilityGroups featuregate.Feature = schedulerfeatures.DRADeviceCompatibilityGroups
 
 	// owner: @pohly
 	// kep: http://kep.k8s.io/5055
 	//
 	// DeviceTaintRules allow administrators to add taints to devices.
-	DRADeviceTaintRules featuregate.Feature = "DRADeviceTaintRules"
+	DRADeviceTaintRules featuregate.Feature = schedulerfeatures.DRADeviceTaintRules
 
 	// owner: @pohly
 	// kep: http://kep.k8s.io/5055
 	//
 	// Marking devices as tainted can prevent using them for new pods and/or
 	// cause pods using them to stop. Users can decide to tolerate taints.
-	DRADeviceTaints featuregate.Feature = "DRADeviceTaints"
+	DRADeviceTaints featuregate.Feature = schedulerfeatures.DRADeviceTaints
 
 	// owner: @yliaog
 	// kep: http://kep.k8s.io/5004
 	//
 	// Enables support for providing extended resource requests backed by DRA.
-	DRAExtendedResource featuregate.Feature = "DRAExtendedResource"
+	DRAExtendedResource featuregate.Feature = schedulerfeatures.DRAExtendedResource
 
 	// owner: @sunya-ch
 	// kep: https://kep.k8s.io/5075
 	//
 	// Enables fractional (milli-unit) values in CapacityRequestPolicyRange
 	// min, max, and step fields.
-	DRAFractionalCapacityRange featuregate.Feature = "DRAFractionalCapacityRange"
+	DRAFractionalCapacityRange featuregate.Feature = schedulerfeatures.DRAFractionalCapacityRange
 
 	// owner: @everpeace
 	// kep: http://kep.k8s.io/5491
@@ -266,20 +267,20 @@ const (
 	// Enable list type attributes for DRA devices in ResourceSlice
 	// and extends ResourceClaim's matchAttribute/distinctAttribute
 	// semantics so that they can work with list type attributes.
-	DRAListTypeAttributes featuregate.Feature = "DRAListTypeAttributes"
+	DRAListTypeAttributes featuregate.Feature = schedulerfeatures.DRAListTypeAttributes
 
 	// owner: @pravk03
 	// kep: https://kep.k8s.io/5517
 	//
 	// Enables support for node allocatable resources backed by DRA.
-	DRANodeAllocatableResources featuregate.Feature = "DRANodeAllocatableResources"
+	DRANodeAllocatableResources featuregate.Feature = schedulerfeatures.DRANodeAllocatableResources
 
 	// owner: @troychiu
 	// kep: http://kep.k8s.io/5945
 	//
 	// Enables support for declaring that node-local operations (preparation and
 	// clean-up) are optional for devices.
-	DRAOptionalNodeOperations featuregate.Feature = "DRAOptionalNodeOperations"
+	DRAOptionalNodeOperations featuregate.Feature = schedulerfeatures.DRAOptionalNodeOperations
 
 	// owner: @mortent, @cici37
 	// kep: http://kep.k8s.io/4815
@@ -287,7 +288,7 @@ const (
 	// Enables support for dynamically partitioning devices based on
 	// which parts of them were allocated during scheduling.
 	//
-	DRAPartitionableDevices featuregate.Feature = "DRAPartitionableDevices"
+	DRAPartitionableDevices featuregate.Feature = schedulerfeatures.DRAPartitionableDevices
 
 	// owner: @nmn3m
 	// kep: http://kep.k8s.io/5677
@@ -305,14 +306,14 @@ const (
 	// Enables support for providing a prioritized list of requests
 	// for resources. The first entry that can be satisfied will
 	// be selected.
-	DRAPrioritizedList featuregate.Feature = "DRAPrioritizedList"
+	DRAPrioritizedList featuregate.Feature = schedulerfeatures.DRAPrioritizedList
 
 	// owner: @LionelJouin
 	// kep: http://kep.k8s.io/4817
 	//
 	// Enables support the ResourceClaim.status.devices field and for setting this
 	// status from DRA drivers.
-	DRAResourceClaimDeviceStatus featuregate.Feature = "DRAResourceClaimDeviceStatus"
+	DRAResourceClaimDeviceStatus featuregate.Feature = schedulerfeatures.DRAResourceClaimDeviceStatus
 
 	// owner: @aojea
 	// kep: http://kep.k8s.io/4817
@@ -337,13 +338,13 @@ const (
 	// Enables aborting the per-node Filter operation in the scheduler after
 	// a certain time (10 seconds by default, configurable in the DynamicResources
 	// scheduler plugin configuration).
-	DRASchedulerFilterTimeout featuregate.Feature = "DRASchedulerFilterTimeout"
+	DRASchedulerFilterTimeout featuregate.Feature = schedulerfeatures.DRASchedulerFilterTimeout
 
 	// owner: @nojnhuh
 	// kep: https://kep.k8s.io/5729
 	//
 	// Enables support for reserving and replicating templated ResourceClaims for an entire PodGroup.
-	DRAWorkloadResourceClaims featuregate.Feature = "DRAWorkloadResourceClaims"
+	DRAWorkloadResourceClaims featuregate.Feature = schedulerfeatures.DRAWorkloadResourceClaims
 
 	// owner: @VeraQin
 	// kep: https://kep.k8s.io/5996
@@ -392,7 +393,7 @@ const (
 	// Enables support for resources with custom parameters and a lifecycle
 	// that is independent of a Pod. Resource allocation is done by the scheduler
 	// based on "structured parameters".
-	DynamicResourceAllocation featuregate.Feature = "DynamicResourceAllocation"
+	DynamicResourceAllocation featuregate.Feature = schedulerfeatures.DynamicResourceAllocation
 
 	// owner: @nispriha
 	// kep: https://kep.k8s.io/5502
@@ -452,7 +453,7 @@ const (
 	// owner: @erictune @wojtek-t
 	//
 	// Enables support for generic Workload API.
-	GenericWorkload featuregate.Feature = "GenericWorkload"
+	GenericWorkload featuregate.Feature = schedulerfeatures.GenericWorkload
 
 	// owner: @vinayakankugoyal @thockin
 	//
@@ -534,13 +535,13 @@ const (
 	// kep: https://kep.k8s.io/5419
 	//
 	// Enables specifying resources at pod-level.
-	InPlacePodLevelResourcesVerticalScaling featuregate.Feature = "InPlacePodLevelResourcesVerticalScaling"
+	InPlacePodLevelResourcesVerticalScaling featuregate.Feature = schedulerfeatures.InPlacePodLevelResourcesVerticalScaling
 
 	// owner: @vinaykul,@tallclair
 	// kep: http://kep.k8s.io/1287
 	//
 	// Enables In-Place Pod Vertical Scaling
-	InPlacePodVerticalScaling featuregate.Feature = "InPlacePodVerticalScaling"
+	InPlacePodVerticalScaling featuregate.Feature = schedulerfeatures.InPlacePodVerticalScaling
 
 	// owner: @tallclair @esotsal
 	//
@@ -570,12 +571,12 @@ const (
 	// kep: https://kep.k8s.io/5836
 	//
 	// Enables scheduler-triggered preemption for deferred in-place pod vertical scaling pods.
-	InPlacePodVerticalScalingSchedulerPreemption featuregate.Feature = "InPlacePodVerticalScalingSchedulerPreemption"
+	InPlacePodVerticalScalingSchedulerPreemption featuregate.Feature = schedulerfeatures.InPlacePodVerticalScalingSchedulerPreemption
 
 	// owner: @tetianakh
 	//
 	// Enables the fast path for inter-pod affinity calculations when the topology key is kubernetes.io/hostname.
-	InterPodAffinityHostnameFastPath featuregate.Feature = "InterPodAffinityHostnameFastPath"
+	InterPodAffinityHostnameFastPath featuregate.Feature = schedulerfeatures.InterPodAffinityHostnameFastPath
 
 	// owner: @mimowo
 	// kep: https://kep.k8s.io/4368
@@ -719,7 +720,7 @@ const (
 	// kep: https://kep.k8s.io/3243
 	//
 	// Enable MatchLabelKeys in PodTopologySpread.
-	MatchLabelKeysInPodTopologySpread featuregate.Feature = "MatchLabelKeysInPodTopologySpread"
+	MatchLabelKeysInPodTopologySpread featuregate.Feature = schedulerfeatures.MatchLabelKeysInPodTopologySpread
 
 	// owner: @mochizuki875
 	// kep: https://kep.k8s.io/3243
@@ -792,14 +793,14 @@ const (
 	// kep: https://kep.k8s.io/5328
 	//
 	// Enables the DeclaredFeatures API in the NodeStatus, populated by the Kubelet. Also enables the scheduler filter using DeclaredFeatures.
-	NodeDeclaredFeatures featuregate.Feature = "NodeDeclaredFeatures"
+	NodeDeclaredFeatures featuregate.Feature = schedulerfeatures.NodeDeclaredFeatures
 
 	// owner: @kerthcet
 	// kep: https://kep.k8s.io/3094
 	//
 	// Allow users to specify whether to take nodeAffinity/nodeTaint into consideration when
 	// calculating pod topology spread skew.
-	NodeInclusionPolicyInPodTopologySpread featuregate.Feature = "NodeInclusionPolicyInPodTopologySpread"
+	NodeInclusionPolicyInPodTopologySpread featuregate.Feature = schedulerfeatures.NodeInclusionPolicyInPodTopologySpread
 
 	// owner: @rthallisey
 	// kep: https://kep.k8s.io/5683
@@ -828,13 +829,13 @@ const (
 	// to share pod placement intentions. This enables better coordination between
 	// components, prevents inappropriate node scale-downs, and helps the scheduler
 	// resume work after restarts.
-	NominatedNodeNameForExpectation featuregate.Feature = "NominatedNodeNameForExpectation"
+	NominatedNodeNameForExpectation featuregate.Feature = schedulerfeatures.NominatedNodeNameForExpectation
 
 	// owner: @bwsalmon
 	// kep: https://kep.k8s.io/5598
 	//
 	// Enables opportunistic batching in the scheduler.
-	OpportunisticBatching featuregate.Feature = "OpportunisticBatching"
+	OpportunisticBatching featuregate.Feature = schedulerfeatures.OpportunisticBatching
 
 	// owner: @tallclair
 	//
@@ -869,7 +870,7 @@ const (
 	// kep: https://kep.k8s.io/5710
 	//
 	// Enables specifying PreemptionPolicy at podgroup level.
-	PodGroupPreemptionPolicy featuregate.Feature = "PodGroupPreemptionPolicy"
+	PodGroupPreemptionPolicy featuregate.Feature = schedulerfeatures.PodGroupPreemptionPolicy
 
 	// owner: @KevinTMtz
 	// kep: https://kep.k8s.io/5526
@@ -882,7 +883,7 @@ const (
 	// key: https://kep.k8s.io/2837
 	//
 	// Enables specifying resources at pod-level.
-	PodLevelResources featuregate.Feature = "PodLevelResources"
+	PodLevelResources featuregate.Feature = schedulerfeatures.PodLevelResources
 
 	// owner: @ndixita
 	//
@@ -1064,27 +1065,27 @@ const (
 	// kep: http://kep.k8s.io/5229
 	//
 	// Makes all API calls during scheduling asynchronous, by introducing a new kube-scheduler-wide way of handling such calls.
-	SchedulerAsyncAPICalls featuregate.Feature = "SchedulerAsyncAPICalls"
+	SchedulerAsyncAPICalls featuregate.Feature = schedulerfeatures.SchedulerAsyncAPICalls
 
 	// owner: @sanposhiho
 	// kep: http://kep.k8s.io/4832
 	//
 	// Running some expensive operation within the scheduler's preemption asynchronously,
 	// which improves the scheduling latency when the preemption involves in.
-	SchedulerAsyncPreemption featuregate.Feature = "SchedulerAsyncPreemption"
+	SchedulerAsyncPreemption featuregate.Feature = schedulerfeatures.SchedulerAsyncPreemption
 
 	// owner: @macsko
 	// kep: http://kep.k8s.io/5142
 	//
 	// Improves scheduling queue behavior by popping pods from the backoffQ when the activeQ is empty.
 	// This allows to process potentially schedulable pods ASAP, eliminating a penalty effect of the backoff queue.
-	SchedulerPopFromBackoffQ featuregate.Feature = "SchedulerPopFromBackoffQ"
+	SchedulerPopFromBackoffQ featuregate.Feature = schedulerfeatures.SchedulerPopFromBackoffQ
 
 	// owner: @geetasg
 	// kep: https://kep.k8s.io/6132
 	//
 	// Enables PreQueueingHint extension point to narrow pod evaluation on events.
-	SchedulerPreQueueingHints featuregate.Feature = "SchedulerPreQueueingHints"
+	SchedulerPreQueueingHints featuregate.Feature = schedulerfeatures.SchedulerPreQueueingHints
 
 	// owner: @atosatto @yuanchen8911
 	// kep: http://kep.k8s.io/3902
@@ -1176,7 +1177,7 @@ const (
 	//
 	// Enables scoring nodes by available storage capacity with
 	// StorageCapacityScoring feature gate.
-	StorageCapacityScoring featuregate.Feature = "StorageCapacityScoring"
+	StorageCapacityScoring featuregate.Feature = schedulerfeatures.StorageCapacityScoring
 
 	// owner: @ahutsunshine
 	//
@@ -1215,14 +1216,14 @@ const (
 	// kep: https://kep.k8s.io/5471
 	//
 	// Enables numeric comparison operators (Lt, Gt) for tolerations to match taints with threshold-based values.
-	TaintTolerationComparisonOperators featuregate.Feature = "TaintTolerationComparisonOperators"
+	TaintTolerationComparisonOperators featuregate.Feature = schedulerfeatures.TaintTolerationComparisonOperators
 
 	// owner: @44past4
 	// kep: https://kep.k8s.io/5732
 	//
 	// Enables topology-aware workload scheduling feature in kube-scheduler and related PodGroup API fields.
 	// When enabled, scheduler will try various placements for a pod group and pick the best one.
-	TopologyAwareWorkloadScheduling featuregate.Feature = "TopologyAwareWorkloadScheduling"
+	TopologyAwareWorkloadScheduling featuregate.Feature = schedulerfeatures.TopologyAwareWorkloadScheduling
 
 	// owner: @PiotrProkop
 	// kep: https://kep.k8s.io/3545
@@ -1272,7 +1273,7 @@ const (
 	// kep: https://kep.k8s.io/3751
 	//
 	// Enables user specified volume attributes for persistent volumes, like iops and throughput.
-	VolumeAttributesClass featuregate.Feature = "VolumeAttributesClass"
+	VolumeAttributesClass featuregate.Feature = schedulerfeatures.VolumeAttributesClass
 
 	// owner: @nispriha
 	// kep: https://kep.k8s.io/5855
@@ -1287,7 +1288,7 @@ const (
 	//
 	// Enables volume limit scaling for CSI drivers. This allows scheduler to
 	// co-ordinate better with cluster-autoscaler for storage limits.
-	VolumeLimitScaling featuregate.Feature = "VolumeLimitScaling"
+	VolumeLimitScaling featuregate.Feature = schedulerfeatures.VolumeLimitScaling
 
 	// owner: @ksubrmnn
 	//
