@@ -10368,3 +10368,61 @@ func TestPriorityQueue_InFlightPods(t *testing.T) {
 		})
 	}
 }
+
+func TestPriorityQueue_MoveAllToActiveOrBackoffQueue_InFlight(t *testing.T) {
+	tests := []struct {
+		name               string
+		initialPods        []*v1.Pod
+		popCount           int
+		callDoneSchedCycle []types.UID
+		clusterEvent       fwk.ClusterEvent
+		wantInFlightEvents int
+	}{
+		{
+			name: "cluster event recorded when pod in scheduling cycle",
+			initialPods: []*v1.Pod{
+				st.MakePod().Namespace("ns").Name("p1").UID("p1").Obj(),
+			},
+			popCount:           1,
+			clusterEvent:       framework.EventUnschedulableTimeout,
+			wantInFlightEvents: 2, // 1 marker + 1 cluster event
+		},
+		{
+			name: "cluster event not recorded when pod in binding cycle (doneSchedulingCycle called)",
+			initialPods: []*v1.Pod{
+				st.MakePod().Namespace("ns").Name("p1").UID("p1").Obj(),
+			},
+			popCount:           1,
+			callDoneSchedCycle: []types.UID{"p1"},
+			clusterEvent:       framework.EventUnschedulableTimeout,
+			wantInFlightEvents: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			q := NewTestQueue(ctx, newDefaultQueueSort())
+			for _, pod := range tt.initialPods {
+				q.Add(ctx, pod)
+			}
+			for i := 0; i < tt.popCount; i++ {
+				if _, err := q.Pop(logger); err != nil {
+					t.Fatalf("Pop failed: %v", err)
+				}
+			}
+			for _, uid := range tt.callDoneSchedCycle {
+				q.DoneSchedulingCycle(uid)
+			}
+
+			q.MoveAllToActiveOrBackoffQueue(logger, tt.clusterEvent, nil, nil, nil)
+
+			if got := len(q.activeQ.listInFlightEvents()); got != tt.wantInFlightEvents {
+				t.Fatalf("expected %d in-flight events, got %d", tt.wantInFlightEvents, got)
+			}
+		})
+	}
+}
