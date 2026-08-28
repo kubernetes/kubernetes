@@ -287,7 +287,7 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 
 	startInformersAndWaitForSync := func(ctx context.Context) {
 		// Start all informers.
-		cc.InformerFactory.Start(ctx.Done())
+		cc.InformerFactory.StartWithContext(ctx)
 		// DynInformerFactory can be nil in tests.
 		if cc.DynInformerFactory != nil {
 			cc.DynInformerFactory.StartWithContext(ctx)

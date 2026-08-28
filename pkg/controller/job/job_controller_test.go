@@ -2838,7 +2838,7 @@ func TestPastDeadlineJobFinished(t *testing.T) {
 		controller.NewControllerExpectations(), true, func() {
 		},
 	}
-	sharedInformerFactory.Start(ctx.Done())
+	sharedInformerFactory.StartWithContext(ctx)
 	sharedInformerFactory.WaitForCacheSync(ctx.Done())
 
 	go manager.Run(ctx, 1)
@@ -6510,7 +6510,7 @@ func TestWatchJobs(t *testing.T) {
 	}
 	// Start only the job watcher and the workqueue, send a watch event,
 	// and make sure it hits the sync method.
-	sharedInformerFactory.Start(ctx.Done())
+	sharedInformerFactory.StartWithContext(ctx)
 	sharedInformerFactory.WaitForCacheSync(ctx.Done())
 	go manager.Run(ctx, 1)
 
@@ -7632,7 +7632,7 @@ func TestFinalizerCleanup(t *testing.T) {
 	manager.jobStoreSynced = alwaysReady
 
 	// Start the Pod and Job informers.
-	sharedInformers.Start(ctx.Done())
+	sharedInformers.StartWithContext(ctx)
 	sharedInformers.WaitForCacheSync(ctx.Done())
 	// Initialize the controller with 1 worker to make sure the
 	// pod finalizers are removed by the "syncJob" function.
@@ -8026,7 +8026,7 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 				return job, nil
 			}
 
-			sharedInformers.Start(ctx.Done())
+			sharedInformers.StartWithContext(ctx)
 			sharedInformers.WaitForCacheSync(ctx.Done())
 
 			if err := sharedInformers.Batch().V1().Jobs().Informer().GetIndexer().Add(tc.job); err != nil {

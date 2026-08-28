@@ -389,7 +389,7 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 	}
 	evaluatorWithDeviceMapping := NewResourceClaimEvaluator(nil, deviceclassmapping, informerFactory.Core().V1().Pods().Lister(), claimGetter)
 
-	informerFactory.Start(tCtx.Done())
+	informerFactory.StartWithContext(tCtx)
 	t.Cleanup(func() {
 		// Need to cancel before waiting for the shutdown.
 		tCancel()
@@ -650,7 +650,7 @@ func TestResourceClaimEvaluatorMatchingResources(t *testing.T) {
 	}
 	evaluator := NewResourceClaimEvaluator(nil, deviceclassmapping, informerFactory.Core().V1().Pods().Lister(), nil)
 
-	informerFactory.Start(tCtx.Done())
+	informerFactory.StartWithContext(tCtx)
 	t.Cleanup(func() {
 		// Need to cancel before waiting for the shutdown.
 		tCancel()

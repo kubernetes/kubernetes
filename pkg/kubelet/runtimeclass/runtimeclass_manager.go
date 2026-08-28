@@ -17,9 +17,11 @@ limitations under the License.
 package runtimeclass
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	nodev1 "k8s.io/client-go/listers/node/v1"
@@ -45,8 +47,15 @@ func NewManager(client clientset.Interface) *Manager {
 }
 
 // Start starts syncing the RuntimeClass cache with the apiserver.
+//
+//logcheck:context // StartWithContext should be used instead of Start in code which supports contextual logging.
 func (m *Manager) Start(stopCh <-chan struct{}) {
-	m.informerFactory.Start(stopCh)
+	m.StartWithContext(wait.ContextForChannel(stopCh))
+}
+
+// StartWithContext starts syncing the RuntimeClass cache with the apiserver.
+func (m *Manager) StartWithContext(ctx context.Context) {
+	m.informerFactory.StartWithContext(ctx)
 }
 
 // WaitForCacheSync exposes the WaitForCacheSync method on the informer factory for testing

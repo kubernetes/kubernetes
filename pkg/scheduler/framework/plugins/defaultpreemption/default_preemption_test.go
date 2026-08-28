@@ -2024,7 +2024,7 @@ func TestCustomSelection(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			informerFactory.Start(ctx.Done())
+			informerFactory.StartWithContext(ctx)
 			informerFactory.WaitForCacheSync(ctx.Done())
 			cache := internalcache.New(ctx, nil, tt.features.EnableGenericWorkload, tt.features.EnableCompositePodGroup)
 			for _, pg := range tt.podGroups {
@@ -2345,7 +2345,7 @@ func TestCustomOrdering(t *testing.T) {
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			_ = informerFactory.Scheduling().V1alpha3().PodGroups().Informer()
 			_ = informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer()
-			informerFactory.Start(ctx.Done())
+			informerFactory.StartWithContext(ctx)
 			informerFactory.WaitForCacheSync(ctx.Done())
 			snapshot := internalcache.NewTestSnapshotWithCompositePodGroups(tt.pods, nodes, tt.podGroups, tt.compositePodGroups)
 
@@ -2573,7 +2573,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			_ = informerFactory.Scheduling().V1alpha3().PodGroups().Informer()
 			_ = informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer()
-			informerFactory.Start(ctx.Done())
+			informerFactory.StartWithContext(ctx)
 			informerFactory.WaitForCacheSync(ctx.Done())
 			registeredPlugins := []tf.RegisterPluginFunc{
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
@@ -3476,7 +3476,7 @@ func TestSelectVictimsOnNode(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			informerFactory.Start(ctx.Done())
+			informerFactory.StartWithContext(ctx)
 			informerFactory.WaitForCacheSync(ctx.Done())
 
 			mainNodeInfo, err := snapshot.NodeInfos().Get(tt.mainNode)

@@ -53,7 +53,7 @@ func SetupPluginWithInformers(
 	if err != nil {
 		tb.Fatal(err)
 	}
-	informerFactory.Start(ctx.Done())
+	informerFactory.StartWithContext(ctx)
 	informerFactory.WaitForCacheSync(ctx.Done())
 	return p
 }

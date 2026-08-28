@@ -729,7 +729,7 @@ func setup(t *testing.T) (context.Context, *fake.Clientset, *ExtendedResourceCac
 	if err != nil {
 		t.Fatalf("failed to add device class informer event handler: %v", err)
 	}
-	informerFactory.Start(ctx.Done())
+	informerFactory.StartWithContext(ctx)
 	t.Cleanup(func() {
 		// Need to cancel before waiting for the shutdown.
 		cancel()

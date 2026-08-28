@@ -395,7 +395,7 @@ func TestFullFlow(t *testing.T) {
 		clock,
 	)
 	// Start informers
-	informerFactory.Start(ctx.Done())
+	informerFactory.StartWithContext(ctx)
 
 	// wait until the informers' watches are actually registered,
 	const expectedWatches = 4 // Manager: Pods, Nodes, PodCertificateRequests. Signer: PodCertificateRequests.

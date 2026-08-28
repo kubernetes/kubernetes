@@ -230,7 +230,7 @@ func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
 		t.Fatal(err)
 	}
 	stop := make(chan struct{})
-	sharedInformers.Start(stop)
+	sharedInformers.StartWithContext(ctx)
 	return garbageCollector{gc, stop}
 }
 

@@ -511,7 +511,7 @@ func NewMainKubelet(ctx context.Context,
 		nodeInformer = kubeInformers.Core().V1().Nodes()
 		nodeLister = nodeInformer.Lister()
 		nodeHasSynced = newNodeHasSyncedFunc(nodeLister, nodeName)
-		kubeInformers.Start(wait.NeverStop)
+		kubeInformers.StartWithContext(ctx)
 		logger.Info("Attempting to sync node with API server")
 	} else {
 		// we don't have a client to sync!
@@ -574,7 +574,7 @@ func NewMainKubelet(ctx context.Context,
 		}))
 		serviceLister = kubeInformers.Core().V1().Services().Lister()
 		serviceHasSynced = kubeInformers.Core().V1().Services().Informer().HasSynced
-		kubeInformers.Start(wait.NeverStop)
+		kubeInformers.StartWithContext(ctx)
 	} else {
 		serviceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 		serviceLister = corelisters.NewServiceLister(serviceIndexer)
@@ -1035,7 +1035,7 @@ func NewMainKubelet(ctx context.Context,
 			clock.RealClock{},
 		)
 		klet.podCertificateManager = podCertificateManager
-		kubeInformers.Start(ctx.Done())
+		kubeInformers.StartWithContext(ctx)
 		go podCertificateManager.Run(ctx)
 
 		metrics.RegisterCollectors(collectors.PodCertificateCollectorFor(podCertificateManager))
@@ -1988,7 +1988,7 @@ func (kl *Kubelet) Run(ctx context.Context, updates <-chan kubetypes.PodUpdate) 
 
 	// Start syncing RuntimeClasses if enabled.
 	if kl.runtimeClassManager != nil {
-		kl.runtimeClassManager.Start(wait.NeverStop)
+		kl.runtimeClassManager.StartWithContext(ctx)
 	}
 
 	// Start the pod lifecycle event generator.

@@ -189,7 +189,7 @@ func newTestBinder(t *testing.T, ctx context.Context) *testEnv {
 	}
 
 	// Wait for informers cache sync
-	informerFactory.Start(ctx.Done())
+	informerFactory.StartWithContext(ctx)
 	for v, synced := range informerFactory.WaitForCacheSync(ctx.Done()) {
 		if !synced {
 			logger.Error(nil, "Error syncing informer", "informer", v)

@@ -652,7 +652,7 @@ func TestCSILimits(t *testing.T) {
 				t.Error(err)
 			}
 			_, ctx := ktesting.NewTestContext(t)
-			informerFactory.Start(ctx.Done())
+			informerFactory.StartWithContext(ctx)
 			informerFactory.WaitForCacheSync(ctx.Done())
 			p := &CSILimits{
 				csiManager:           NewCSIManager(getFakeCSINodeLister(csiNode)),
@@ -1371,7 +1371,7 @@ func TestVolumeLimitScalingGate(t *testing.T) {
 				t.Error(err)
 			}
 			_, ctx := ktesting.NewTestContext(t)
-			informerFactory.Start(ctx.Done())
+			informerFactory.StartWithContext(ctx)
 			informerFactory.WaitForCacheSync(ctx.Done())
 
 			csiTranslator := csitrans.New()

@@ -640,7 +640,7 @@ func TestWatchControllers(t *testing.T) {
 		client,
 		BurstReplicas,
 	)
-	informers.Start(stopCh)
+	informers.StartWithContext(tCtx)
 	informers.WaitForCacheSync(stopCh)
 
 	var testRSSpec apps.ReplicaSet
@@ -1210,7 +1210,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		client,
 		100,
 	)
-	f.Start(stopCh)
+	f.StartWithContext(tCtx)
 	f.WaitForCacheSync(stopCh)
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl

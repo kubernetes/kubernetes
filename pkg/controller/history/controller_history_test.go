@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/ptr"
 )
 
@@ -58,7 +59,7 @@ func TestRealHistory_ListControllerRevisions(t *testing.T) {
 
 		stop := make(chan struct{})
 		defer close(stop)
-		informerFactory.Start(stop)
+		informerFactory.StartWithContext(wait.ContextForChannel(stop))
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		if err := AddControllerRevisionControllerIndexer(informer.Informer()); err != nil {
 			t.Fatalf("failed to add indexer: %v", err)
@@ -158,7 +159,7 @@ func TestFakeHistory_ListControllerRevisions(t *testing.T) {
 
 		stop := make(chan struct{})
 		defer close(stop)
-		informerFactory.Start(stop)
+		informerFactory.StartWithContext(wait.ContextForChannel(stop))
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		if err := AddControllerRevisionControllerIndexer(informer.Informer()); err != nil {
 			t.Fatalf("failed to add indexer: %v", err)
@@ -260,7 +261,7 @@ func TestRealHistory_CreateControllerRevision(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		stop := make(chan struct{})
 		defer close(stop)
-		informerFactory.Start(stop)
+		informerFactory.StartWithContext(wait.ContextForChannel(stop))
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		if err := AddControllerRevisionControllerIndexer(informer.Informer()); err != nil {
 			t.Fatalf("failed to add indexer: %v", err)
@@ -395,7 +396,7 @@ func TestFakeHistory_CreateControllerRevision(t *testing.T) {
 
 		stop := make(chan struct{})
 		defer close(stop)
-		informerFactory.Start(stop)
+		informerFactory.StartWithContext(wait.ContextForChannel(stop))
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		if err := AddControllerRevisionControllerIndexer(informer.Informer()); err != nil {
 			t.Fatalf("failed to add indexer: %v", err)
@@ -548,7 +549,7 @@ func TestRealHistory_UpdateControllerRevision(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		stop := make(chan struct{})
 		defer close(stop)
-		informerFactory.Start(stop)
+		informerFactory.StartWithContext(wait.ContextForChannel(stop))
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		if err := AddControllerRevisionControllerIndexer(informer.Informer()); err != nil {
 			t.Fatalf("failed to add indexer: %v", err)
@@ -678,7 +679,7 @@ func TestFakeHistory_UpdateControllerRevision(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		stop := make(chan struct{})
 		defer close(stop)
-		informerFactory.Start(stop)
+		informerFactory.StartWithContext(wait.ContextForChannel(stop))
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		if err := AddControllerRevisionControllerIndexer(informer.Informer()); err != nil {
 			t.Fatalf("failed to add indexer: %v", err)
@@ -769,7 +770,7 @@ func TestRealHistory_DeleteControllerRevision(t *testing.T) {
 
 		stop := make(chan struct{})
 		defer close(stop)
-		informerFactory.Start(stop)
+		informerFactory.StartWithContext(wait.ContextForChannel(stop))
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		if err := AddControllerRevisionControllerIndexer(informer.Informer()); err != nil {
 			t.Fatalf("failed to add indexer: %v", err)
@@ -875,7 +876,7 @@ func TestFakeHistory_DeleteControllerRevision(t *testing.T) {
 
 		stop := make(chan struct{})
 		defer close(stop)
-		informerFactory.Start(stop)
+		informerFactory.StartWithContext(wait.ContextForChannel(stop))
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		if err := AddControllerRevisionControllerIndexer(informer.Informer()); err != nil {
 			t.Fatalf("failed to add indexer: %v", err)
@@ -1015,7 +1016,7 @@ func TestRealHistory_AdoptControllerRevision(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		stop := make(chan struct{})
 		defer close(stop)
-		informerFactory.Start(stop)
+		informerFactory.StartWithContext(wait.ContextForChannel(stop))
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		if err := AddControllerRevisionControllerIndexer(informer.Informer()); err != nil {
 			t.Fatalf("failed to add indexer: %v", err)
@@ -1124,7 +1125,7 @@ func TestFakeHistory_AdoptControllerRevision(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		stop := make(chan struct{})
 		defer close(stop)
-		informerFactory.Start(stop)
+		informerFactory.StartWithContext(wait.ContextForChannel(stop))
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		if err := AddControllerRevisionControllerIndexer(informer.Informer()); err != nil {
 			t.Fatalf("failed to add indexer: %v", err)
@@ -1272,7 +1273,7 @@ func TestRealHistory_ReleaseControllerRevision(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		stop := make(chan struct{})
 		defer close(stop)
-		informerFactory.Start(stop)
+		informerFactory.StartWithContext(wait.ContextForChannel(stop))
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		if err := AddControllerRevisionControllerIndexer(informer.Informer()); err != nil {
 			t.Fatalf("failed to add indexer: %v", err)
@@ -1397,7 +1398,7 @@ func TestFakeHistory_ReleaseControllerRevision(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		stop := make(chan struct{})
 		defer close(stop)
-		informerFactory.Start(stop)
+		informerFactory.StartWithContext(wait.ContextForChannel(stop))
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		if err := AddControllerRevisionControllerIndexer(informer.Informer()); err != nil {
 			t.Fatalf("failed to add indexer: %v", err)

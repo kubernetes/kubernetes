@@ -1228,7 +1228,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			informerFactory.Start(ctx.Done())
+			informerFactory.StartWithContext(ctx)
 			informerFactory.WaitForCacheSync(ctx.Done())
 
 			// mockSchedulingFunc is used to simulate the scheduling of the preemptor pod group.
@@ -1383,7 +1383,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain_NominatedNodes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	informerFactory.Start(ctx.Done())
+	informerFactory.StartWithContext(ctx)
 	informerFactory.WaitForCacheSync(ctx.Done())
 
 	pgLister := &mockPodGroupLister{podGroups: make(map[string]*schedulingv1beta1.PodGroup)}
@@ -1582,7 +1582,7 @@ func TestPodGroupEvaluator_Preempt(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			informerFactory.Start(ctx.Done())
+			informerFactory.StartWithContext(ctx)
 			informerFactory.WaitForCacheSync(ctx.Done())
 
 			podGroups := make(map[string]*schedulingv1beta1.PodGroup)
@@ -1701,7 +1701,7 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			informerFactory.Start(ctx.Done())
+			informerFactory.StartWithContext(ctx)
 			informerFactory.WaitForCacheSync(ctx.Done())
 
 			pgLister := &mockPodGroupLister{podGroups: make(map[string]*schedulingv1beta1.PodGroup)}

@@ -845,7 +845,7 @@ func TestPodGroupCycle_UpdateSnapshotError(t *testing.T) {
 
 	client := clientsetfake.NewClientset(testPodGroup)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	informerFactory.Start(ctx.Done())
+	informerFactory.StartWithContext(ctx)
 	informerFactory.WaitForCacheSync(ctx.Done())
 
 	var failureHandlerCalled bool
@@ -918,7 +918,7 @@ func TestPodGroupCycle_FillsPodResultsOnFewerResults(t *testing.T) {
 	client := clientsetfake.NewSimpleClientset(testPodGroup, testNode)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-	informerFactory.Start(ctx.Done())
+	informerFactory.StartWithContext(ctx)
 	informerFactory.WaitForCacheSync(ctx.Done())
 	queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
 	snapshot := internalcache.NewEmptySnapshot()
@@ -1104,7 +1104,7 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset(testPodGroup, testNode)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-			informerFactory.Start(ctx.Done())
+			informerFactory.StartWithContext(ctx)
 			informerFactory.WaitForCacheSync(ctx.Done())
 			queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
 			snapshot := internalcache.NewEmptySnapshot()
@@ -1895,7 +1895,7 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 			cache.AddGenericPodGroup(apg)
 
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			informerFactory.Start(ctx.Done())
+			informerFactory.StartWithContext(ctx)
 			informerFactory.WaitForCacheSync(ctx.Done())
 
 			fakeClock := testingclock.NewFakeClock(time.Now())
@@ -2339,7 +2339,7 @@ func TestUpdatePodGroupCondition(t *testing.T) {
 			cache.AddGenericPodGroup(apg)
 
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			informerFactory.Start(ctx.Done())
+			informerFactory.StartWithContext(ctx)
 			informerFactory.WaitForCacheSync(ctx.Done())
 			sched := &Scheduler{client: client, Cache: cache}
 
@@ -4390,7 +4390,7 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 
 	client := clientsetfake.NewSimpleClientset(testPodGroup)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	informerFactory.Start(ctx.Done())
+	informerFactory.StartWithContext(ctx)
 	informerFactory.WaitForCacheSync(ctx.Done())
 
 	schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
@@ -4505,7 +4505,7 @@ func TestScheduleOnePodGroup_PodGroupNotFound(t *testing.T) {
 	cache := internalcache.New(ctx, nil, true, false /* CompositePodGroup */)
 	queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
 
-	informerFactory.Start(ctx.Done())
+	informerFactory.StartWithContext(ctx)
 	informerFactory.WaitForCacheSync(ctx.Done())
 
 	sched := &Scheduler{
@@ -4584,7 +4584,7 @@ func TestScheduleOnePodGroup_SchedulerNameMismatchUpdatesStatus(t *testing.T) {
 	cache.AddGenericPodGroup(apg)
 
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	informerFactory.Start(ctx.Done())
+	informerFactory.StartWithContext(ctx)
 	informerFactory.WaitForCacheSync(ctx.Done())
 	sched := &Scheduler{
 		Profiles:        profile.Map{"sched1": schedFwk1, "sched2": schedFwk2},
@@ -4784,7 +4784,7 @@ func TestScheduleOnePodGroup_PodGroupStateAvailability(t *testing.T) {
 			snapshot := internalcache.NewEmptySnapshot()
 			client := clientsetfake.NewClientset(testPodGroup)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			informerFactory.Start(ctx.Done())
+			informerFactory.StartWithContext(ctx)
 			informerFactory.WaitForCacheSync(ctx.Done())
 
 			cache := internalcache.New(ctx, nil, true, false /* CompositePodGroup */)
@@ -4969,7 +4969,7 @@ func TestCPGHierarchicalScheduling_ScheduleOnePodGroup(t *testing.T) {
 
 	client := clientsetfake.NewSimpleClientset(cpgRoot, pg1, pg2, pg3)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	informerFactory.Start(ctx.Done())
+	informerFactory.StartWithContext(ctx)
 	informerFactory.WaitForCacheSync(ctx.Done())
 
 	schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
@@ -5237,7 +5237,7 @@ func TestCPGHierarchicalScheduling_Internal(t *testing.T) {
 	client := clientsetfake.NewSimpleClientset(clientObjs...)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-	informerFactory.Start(ctx.Done())
+	informerFactory.StartWithContext(ctx)
 	informerFactory.WaitForCacheSync(ctx.Done())
 	queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
 	snapshot := internalcache.NewEmptySnapshot()
@@ -5253,7 +5253,7 @@ func TestCPGHierarchicalScheduling_Internal(t *testing.T) {
 		frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
 		frameworkruntime.WithPodGroupManager(cache),
 	)
-	informerFactory.Start(ctx.Done())
+	informerFactory.StartWithContext(ctx)
 	informerFactory.WaitForCacheSync(ctx.Done())
 	if err != nil {
 		t.Fatalf("Failed to create new framework: %v", err)
@@ -5478,7 +5478,7 @@ func TestCPGMinGroupCount_Internal(t *testing.T) {
 		frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
 		frameworkruntime.WithPodGroupManager(cache),
 	)
-	informerFactory.Start(ctx.Done())
+	informerFactory.StartWithContext(ctx)
 	informerFactory.WaitForCacheSync(ctx.Done())
 	if err != nil {
 		t.Fatalf("Failed to create new framework: %v", err)
@@ -5698,7 +5698,7 @@ func TestCPGBasicWithGangChildren_Internal(t *testing.T) {
 		frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
 		frameworkruntime.WithPodGroupManager(cache),
 	)
-	informerFactory.Start(ctx.Done())
+	informerFactory.StartWithContext(ctx)
 	informerFactory.WaitForCacheSync(ctx.Done())
 	if err != nil {
 		t.Fatalf("Failed to create new framework: %v", err)
@@ -7351,7 +7351,7 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 						return true, binding, nil
 					})
 
-					informerFactory.Start(ctx.Done())
+					informerFactory.StartWithContext(ctx)
 					informerFactory.WaitForCacheSync(ctx.Done())
 
 					if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {

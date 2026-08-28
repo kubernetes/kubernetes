@@ -66,7 +66,7 @@ func TestCertificateController(t *testing.T) {
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	informerFactory.Start(stopCh)
+	informerFactory.StartWithContext(ctx)
 	informerFactory.WaitForCacheSync(stopCh)
 	wait.PollUntil(10*time.Millisecond, func() (bool, error) {
 		return controller.queue.Len() >= 1, nil

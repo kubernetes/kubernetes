@@ -535,7 +535,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 				t.Fatalf("Add event handlers failed, error = %v", err)
 			}
 
-			informerFactory.Start(testSched.StopEverything)
+			informerFactory.StartWithContext(ctx)
 			dynInformerFactory.StartWithContext(ctx)
 			staticInformers := informerFactory.WaitForCacheSync(testSched.StopEverything)
 			dynamicInformers := dynInformerFactory.WaitForCacheSync(testSched.StopEverything)
@@ -602,7 +602,7 @@ func TestAddAllEventHandlersPodEventResources(t *testing.T) {
 		}
 	}
 
-	informerFactory.Start(testSched.StopEverything)
+	informerFactory.StartWithContext(ctx)
 	dynInformerFactory.StartWithContext(ctx)
 	staticInformers := informerFactory.WaitForCacheSync(testSched.StopEverything)
 	dynamicInformers := dynInformerFactory.WaitForCacheSync(testSched.StopEverything)

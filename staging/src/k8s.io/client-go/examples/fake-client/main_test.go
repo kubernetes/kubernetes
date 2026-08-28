@@ -70,7 +70,7 @@ func TestFakeClient(t *testing.T) {
 	}, cache.HandlerOptions{Logger: &logger})
 
 	// Make sure informers are running.
-	informers.Start(ctx.Done())
+	informers.StartWithContext(ctx)
 
 	// This is not required in tests, but it serves as a proof-of-concept by
 	// ensuring that the informer goroutine have warmed up and called List before

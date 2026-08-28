@@ -381,7 +381,7 @@ func TestPodGroupProtectionController(t *testing.T) {
 				t.Fatalf("unexpected error creating controller: %v", err)
 			}
 
-			informerFactory.Start(ctx.Done())
+			informerFactory.StartWithContext(ctx)
 			informerFactory.WaitForCacheSync(ctx.Done())
 			go ctrl.Run(ctx, 1)
 

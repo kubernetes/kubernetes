@@ -108,7 +108,7 @@ func TestWatchListSemanticsSimple(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	factory.Start(ctx.Done())
+	factory.StartWithContext(ctx)
 
 	if !cache.WaitForCacheSync(ctx.Done(), target.HasSynced) {
 		t.Fatalf("failed to wait for caches to sync")
@@ -127,7 +127,7 @@ func TestUnSupportWatchListSemantics(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	factory.Start(ctx.Done())
+	factory.StartWithContext(ctx)
 
 	if !cache.WaitForCacheSync(ctx.Done(), target.HasSynced) {
 		t.Fatalf("failed to wait for caches to sync")

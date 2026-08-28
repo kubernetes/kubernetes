@@ -816,7 +816,7 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 				})
 			}
 
-			sharedInformers.Start(ctx.Done())
+			sharedInformers.StartWithContext(ctx)
 			sharedInformers.WaitForCacheSync(ctx.Done())
 
 			_, pg, err := jm.ensureWorkloadAndPodGroup(ctx, tc.job, tc.pods)

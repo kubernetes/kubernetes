@@ -452,7 +452,7 @@ func (m *LazyInformerManager) ensureManagerSet(ctx context.Context) error {
 	}
 
 	m.manager = clusterTrustBundleManager
-	kubeInformers.Start(m.contextWithLogger.Done())
+	kubeInformers.StartWithContext(m.contextWithLogger)
 	m.logger.Info("Started ClusterTrustBundle informer", "apiGroup", foundGV)
 
 	// a cache fetch will likely follow right after, wait for the freshly started

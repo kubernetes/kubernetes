@@ -2924,7 +2924,7 @@ func TestPriorityQueue_NominatedPodDeleted(t *testing.T) {
 			q := NewPriorityQueue(newDefaultQueueSort(), informerFactory, WithPodLister(podLister))
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			informerFactory.Start(ctx.Done())
+			informerFactory.StartWithContext(ctx)
 			informerFactory.WaitForCacheSync(ctx.Done())
 
 			if tt.deletePod {
@@ -3004,7 +3004,7 @@ func TestPriorityQueue_NominatedNodeNameEmptyNodeKey(t *testing.T) {
 			q := NewPriorityQueue(newDefaultQueueSort(), informerFactory, WithPodLister(informerFactory.Core().V1().Pods().Lister()))
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			informerFactory.Start(ctx.Done())
+			informerFactory.StartWithContext(ctx)
 			informerFactory.WaitForCacheSync(ctx.Done())
 
 			if tt.initialNominatedNode != "" {

@@ -224,7 +224,7 @@ func TestCreateClaimDoesNotMutateTemplate(t *testing.T) {
 				tCtx.Fatalf("error creating controller: %v", err)
 			}
 
-			informerFactory.Start(tCtx.Done())
+			informerFactory.StartWithContext(tCtx)
 			defer func() {
 				tCtx.Cancel("stopping informers")
 				informerFactory.Shutdown()
@@ -1167,7 +1167,7 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			}
 
 			// Ensure informers are up-to-date.
-			informerFactory.Start(tCtx.Done())
+			informerFactory.StartWithContext(tCtx)
 			stopInformers := func() {
 				tCtx.Cancel("stopping informers")
 				informerFactory.Shutdown()
@@ -1344,7 +1344,7 @@ func testClaimExists(tCtx ktesting.TContext) {
 			tCtx.ExpectNoError(err, "creating controller")
 
 			// Ensure informers are up-to-date.
-			informerFactory.Start(tCtx.Done())
+			informerFactory.StartWithContext(tCtx)
 			stopInformers := func() {
 				tCtx.Cancel("stopping informers")
 				informerFactory.Shutdown()
@@ -1715,7 +1715,7 @@ func testEventHandlers(tCtx ktesting.TContext) {
 			tCtx.ExpectNoError(err, "creating ephemeral controller")
 			tCtx.Cleanup(ec.queue.ShutDown)
 
-			informerFactory.Start(tCtx.Done())
+			informerFactory.StartWithContext(tCtx)
 			stopInformers := func() {
 				tCtx.Cancel("stopping informers")
 				informerFactory.Shutdown()

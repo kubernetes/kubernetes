@@ -1299,7 +1299,7 @@ func TestFrameworkHandler_IterateOverWaitingPods(t *testing.T) {
 			defer stopFn()
 
 			// Run scheduler.
-			informerFactory.Start(tCtx.Done())
+			informerFactory.StartWithContext(tCtx)
 			informerFactory.WaitForCacheSync(tCtx.Done())
 			go scheduler.Run(tCtx)
 
@@ -1518,7 +1518,7 @@ func TestNewInformerFactoryTrim(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	informerFactory.Start(ctx.Done())
+	informerFactory.StartWithContext(ctx)
 	informerFactory.WaitForCacheSync(ctx.Done())
 
 	p, err := lister.Pods("default").Get("test")
@@ -1543,7 +1543,7 @@ func TestNewInformerFactoryMetrics(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	informerFactory.Start(ctx.Done())
+	informerFactory.StartWithContext(ctx)
 	informerFactory.WaitForCacheSync(ctx.Done())
 
 	want := `

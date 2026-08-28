@@ -47,6 +47,8 @@ import (
 func TestListAndWatch(t *testing.T) { synctest.Test(t, testListAndWatch) }
 func testListAndWatch(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	cm := &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "cm1",
@@ -54,8 +56,6 @@ func testListAndWatch(t *testing.T) {
 		},
 	}
 	client := fake.NewClientset(cm)
-	stopCh := make(chan struct{})
-	defer close(stopCh)
 	createDone := make(chan struct{})
 
 	f := informers.NewSharedInformerFactory(client, 0)
@@ -96,7 +96,7 @@ func testListAndWatch(t *testing.T) {
 	defer configMapInformer.RemoveEventHandler(handle)
 
 	configMapStore := configMapInformer.GetStore()
-	f.Start(stopCh)
+	f.StartWithContext(ctx)
 	f.WaitForCacheSync(stopCh)
 	logger.Info("Caches synced")
 

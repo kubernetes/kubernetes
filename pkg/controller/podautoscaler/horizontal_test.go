@@ -409,7 +409,7 @@ func newHorizontalSetup(t *testing.T, s *horizontalScenario, testClient *fake.Cl
 		hpaController.recommendations["test-namespace/test-hpa"] = s.recommendations
 	}
 
-	informerFactory.Start(tCtx.Done())
+	informerFactory.StartWithContext(tCtx)
 	informerFactory.WaitForCacheSync(tCtx.Done())
 
 	return &horizontalSetup{
@@ -1336,7 +1336,7 @@ func coolCPUCreationTime() metav1.Time {
 
 func (tc *testCase) runTestWithController(t *testing.T, hpaController *HorizontalController, informerFactory informers.SharedInformerFactory) {
 	ctx, cancel := context.WithCancel(context.Background())
-	informerFactory.Start(ctx.Done())
+	informerFactory.StartWithContext(ctx)
 
 	var wg sync.WaitGroup
 	wg.Go(func() {
@@ -7127,7 +7127,7 @@ func TestMultipleHPAs(t *testing.T) {
 	monitor.NumHorizontalPodAutoscalers.Set(0)
 	hpaController.monitor = monitor.New()
 
-	informerFactory.Start(tCtx.Done())
+	informerFactory.StartWithContext(tCtx)
 	go hpaController.Run(tCtx, 5)
 
 	timeoutTime := time.After(15 * time.Second)

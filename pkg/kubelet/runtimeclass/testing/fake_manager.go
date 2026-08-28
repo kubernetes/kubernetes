@@ -22,6 +22,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -46,13 +47,13 @@ func NewPopulatedClient() clientset.Interface {
 // StartManagerSync starts the manager, and waits for the informer cache to sync.
 // Returns a function to stop the manager, which should be called with a defer:
 //
-//	defer StartManagerSync(t, m)()
-func StartManagerSync(m *runtimeclass.Manager) func() {
-	stopCh := make(chan struct{})
-	m.Start(stopCh)
-	m.WaitForCacheSync(stopCh)
+//	defer StartManagerSync(tCtx, m)()
+func StartManagerSync(tCtx ktesting.TContext, m *runtimeclass.Manager) func() {
+	tCtx = tCtx.WithCancel()
+	m.StartWithContext(tCtx)
+	m.WaitForCacheSync(tCtx.Done())
 	return func() {
-		close(stopCh)
+		tCtx.Cancel("stopping manager")
 	}
 }
 

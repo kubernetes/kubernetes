@@ -145,7 +145,7 @@ func testGetTrustAnchorsByName[T clusterTrustBundle](tCtx ktesting.TContext, b t
 
 	ctbManager, _ := b.informerManagerConstructor(tCtx, informerFactory, 256, 5*time.Minute)
 
-	informerFactory.Start(tCtx.Done())
+	informerFactory.StartWithContext(tCtx)
 	ctbInformer := b.informerGetter(informerFactory)
 	if !cache.WaitForCacheSync(tCtx.Done(), ctbInformer.HasSynced) {
 		t.Fatalf("Timed out waiting for informer to sync")
@@ -203,7 +203,7 @@ func testGetTrustAnchorsByNameCaching[T clusterTrustBundle](tCtx ktesting.TConte
 
 	ctbManager, _ := b.informerManagerConstructor(tCtx, informerFactory, 256, 5*time.Minute)
 
-	informerFactory.Start(tCtx.Done())
+	informerFactory.StartWithContext(tCtx)
 	ctbInformer := b.informerGetter(informerFactory)
 	if !cache.WaitForCacheSync(tCtx.Done(), ctbInformer.HasSynced) {
 		t.Fatalf("Timed out waiting for informer to sync")
@@ -288,7 +288,7 @@ func testGetTrustAnchorsBySignerName[T clusterTrustBundle](tCtx ktesting.TContex
 
 	ctbManager, _ := b.informerManagerConstructor(tCtx, informerFactory, 256, 5*time.Minute)
 
-	informerFactory.Start(tCtx.Done())
+	informerFactory.StartWithContext(tCtx)
 	ctbInformer := b.informerGetter(informerFactory)
 	if !cache.WaitForCacheSync(tCtx.Done(), ctbInformer.HasSynced) {
 		t.Fatalf("Timed out waiting for informer to sync")
@@ -416,7 +416,7 @@ func testGetTrustAnchorsBySignerNameCaching[T clusterTrustBundle](tCtx ktesting.
 
 	ctbManager, _ := b.informerManagerConstructor(tCtx, informerFactory, 256, 5*time.Minute)
 
-	informerFactory.Start(tCtx.Done())
+	informerFactory.StartWithContext(tCtx)
 	ctbInformer := b.informerGetter(informerFactory)
 	if !cache.WaitForCacheSync(tCtx.Done(), ctbInformer.HasSynced) {
 		t.Fatalf("Timed out waiting for informer to sync")

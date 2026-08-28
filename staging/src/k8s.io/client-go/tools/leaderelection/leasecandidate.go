@@ -177,7 +177,7 @@ func (c *LeaseCandidate) Run(ctx context.Context) {
 		wg.Wait()
 	}()
 
-	c.informerFactory.Start(ctx.Done())
+	c.informerFactory.StartWithContext(ctx)
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.hasSynced) {
 		return
 	}

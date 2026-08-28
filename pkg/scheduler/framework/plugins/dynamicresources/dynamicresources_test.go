@@ -4685,7 +4685,7 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 		tCtx.ExpectNoError(err, "create pod group")
 	}
 
-	tc.informerFactory.Start(tCtx.Done())
+	tc.informerFactory.StartWithContext(tCtx)
 	tCtx.Cleanup(func() {
 		// Need to cancel before waiting for the shutdown.
 		tCtx.Cancel("test is done")
