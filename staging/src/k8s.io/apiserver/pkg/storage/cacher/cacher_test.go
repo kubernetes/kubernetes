@@ -44,6 +44,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
+	"k8s.io/apiserver/pkg/storage/testing/coverage"
 	"k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -259,6 +260,14 @@ func TestListPaging(t *testing.T) {
 }
 
 func TestLists(t *testing.T) {
+	var tracker *coverage.CoverageTracker
+	if coverage.IsEnabled() {
+		tracker = coverage.NewTracker()
+		t.Cleanup(func() {
+			t.Log(tracker.FormatScorecard(coverage.SectionList))
+		})
+	}
+
 	for _, listFromCacheSnapshot := range []bool{true, false} {
 		t.Run(fmt.Sprintf("ListFromCacheSnapshot=%v", listFromCacheSnapshot), func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, listFromCacheSnapshot)
@@ -266,21 +275,24 @@ func TestLists(t *testing.T) {
 				t.Parallel()
 				ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 				t.Cleanup(terminate)
-				storagetesting.RunTestList(ctx, t, cacher, compactStore(cacher, server.V3Client.Client), true, server.V3Client.Kubernetes.(*storagetesting.KubernetesRecorder))
+				wrappedStore := coverage.Wrap(cacher, tracker)
+				storagetesting.RunTestList(ctx, t, wrappedStore, compactStore(cacher, server.V3Client.Client), true, server.V3Client.Kubernetes.(*storagetesting.KubernetesRecorder))
 			})
 
 			t.Run("ConsistentList", func(t *testing.T) {
 				t.Parallel()
 				ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 				t.Cleanup(terminate)
-				storagetesting.RunTestConsistentList(ctx, t, cacher, increaseRVFunc(server.V3Client.Client), true, true, listFromCacheSnapshot)
+				wrappedStore := coverage.Wrap(cacher, tracker)
+				storagetesting.RunTestConsistentList(ctx, t, wrappedStore, increaseRVFunc(server.V3Client.Client), true, true, listFromCacheSnapshot)
 			})
 
 			t.Run("GetListNonRecursive", func(t *testing.T) {
 				t.Parallel()
 				ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 				t.Cleanup(terminate)
-				storagetesting.RunTestGetListNonRecursive(ctx, t, increaseRVFunc(server.V3Client.Client), cacher)
+				wrappedStore := coverage.Wrap(cacher, tracker)
+				storagetesting.RunTestGetListNonRecursive(ctx, t, increaseRVFunc(server.V3Client.Client), wrappedStore)
 			})
 		})
 	}
