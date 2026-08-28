@@ -61,6 +61,13 @@ type WatchCacheStorage struct {
 	snapshottingEnabled atomic.Bool
 }
 
+func (w *WatchCacheStorage) GetByKeyLatestSnapshot(key string) (interface{}, bool, error) {
+	if snap, ok := w.LatestSnapshot(); ok {
+		return snap.GetByKey(key)
+	}
+	return w.store.GetByKey(key)
+}
+
 func (w *WatchCacheStorage) SnapshottingEnabled() bool {
 	return w.snapshots != nil && w.snapshottingEnabled.Load()
 }
@@ -93,7 +100,7 @@ func (w *WatchCacheStorage) MarkConsistent(consistent bool) {
 	}
 }
 
-func (w *WatchCacheStorage) LatestSnapshotLocked() (Snapshot, bool) {
+func (w *WatchCacheStorage) LatestSnapshot() (Snapshot, bool) {
 	if w.SnapshottingEnabled() {
 		return w.snapshots.Latest()
 	}
@@ -101,7 +108,7 @@ func (w *WatchCacheStorage) LatestSnapshotLocked() (Snapshot, bool) {
 }
 
 func (w *WatchCacheStorage) GetLatestSnapshotOrBuildLocked(key, continueKey string) (Snapshot, error) {
-	if snap, ok := w.LatestSnapshotLocked(); ok {
+	if snap, ok := w.LatestSnapshot(); ok {
 		// Snapshots are added in order as we update store, so the
 		// latest snapshot match latest store state and latest revision.
 		return snap, nil

@@ -21,6 +21,7 @@ import (
 	"iter"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/third_party/forked/golang/btree"
@@ -420,6 +421,8 @@ type Snapshotter interface {
 }
 
 type storeSnapshotter struct {
+	latest atomic.Pointer[rvSnapshot]
+
 	mux       sync.RWMutex
 	snapshots *btree.BTree[rvSnapshot]
 }
@@ -433,6 +436,7 @@ func (s *storeSnapshotter) Reset() {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	s.snapshots.Clear(false)
+	s.latest.Store(nil)
 }
 
 func (s *storeSnapshotter) GetLessOrEqual(rv uint64) (Snapshot, bool) {
@@ -451,20 +455,21 @@ func (s *storeSnapshotter) GetLessOrEqual(rv uint64) (Snapshot, bool) {
 }
 
 func (s *storeSnapshotter) Latest() (Snapshot, bool) {
-	s.mux.RLock()
-	defer s.mux.RUnlock()
-
-	max, ok := s.snapshots.Max()
-	if !ok {
+	latest := s.latest.Load()
+	if latest == nil {
 		return nil, false
 	}
-	return max.snapshot, true
+	return latest.snapshot, true
 }
 
 func (s *storeSnapshotter) Add(rv uint64, snapshot Snapshot) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	s.snapshots.ReplaceOrInsert(rvSnapshot{resourceVersion: rv, snapshot: snapshot})
+	rvs := rvSnapshot{resourceVersion: rv, snapshot: snapshot}
+	s.snapshots.ReplaceOrInsert(rvs)
+	if latest := s.latest.Load(); latest == nil || latest.resourceVersion <= rv {
+		s.latest.Store(&rvs)
+	}
 }
 
 func (s *storeSnapshotter) RemoveLess(rv uint64) {
@@ -479,6 +484,9 @@ func (s *storeSnapshotter) RemoveLess(rv uint64) {
 			break
 		}
 		s.snapshots.DeleteMin()
+	}
+	if s.snapshots.Len() == 0 {
+		s.latest.Store(nil)
 	}
 }
 
