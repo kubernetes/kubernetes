@@ -35,6 +35,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/klog/v2/ktesting"
+	testclocks "k8s.io/utils/clock/testing"
 )
 
 type testEventSeriesSink struct {
@@ -415,5 +416,440 @@ func TestRefreshExistingEventSeries(t *testing.T) {
 		case <-time.After(wait.ForeverTestTimeout):
 			t.Fatalf("timeout after %v", wait.ForeverTestTimeout)
 		}
+	}
+}
+
+// newCachedSeriesEvent creates an Event with a Series and adds it to the
+// broadcaster's cache, returning the Event and its cache key.
+func newCachedSeriesEvent(t *testing.T, eventBroadcaster *eventBroadcasterImpl, lastObservedTime time.Time) (*eventsv1.Event, eventKey) {
+	t.Helper()
+	hostname, _ := os.Hostname()
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "baz",
+			UID:       "bar",
+		},
+	}
+	regarding, err := ref.GetPartialReference(scheme.Scheme, testPod, ".spec.containers[1]")
+	if err != nil {
+		t.Fatal(err)
+	}
+	related, err := ref.GetPartialReference(scheme.Scheme, testPod, ".spec.containers[0]")
+	if err != nil {
+		t.Fatal(err)
+	}
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, "k8s.io/kube-foo").(*recorderImplLogger)
+	cachedEvent := recorder.makeEvent(regarding, related, metav1.MicroTime{Time: time.Now()}, nil, v1.EventTypeNormal, "test", "some verbose message: 1", "eventTest", "eventTest-"+hostname, "started")
+	cachedEvent.Series = &eventsv1.EventSeries{
+		Count:            10,
+		LastObservedTime: metav1.MicroTime{Time: lastObservedTime},
+	}
+	key := getKey(cachedEvent)
+	eventBroadcaster.mu.Lock()
+	defer eventBroadcaster.mu.Unlock()
+	eventBroadcaster.eventCache[key] = cachedEvent
+	return cachedEvent, key
+}
+
+// TestRefreshExistingEventSeriesConcurrentCacheUpdate verifies that
+// refreshExistingEventSeries only updates a cache entry that still belongs to
+// the same series after the lock was released for the API call, and that it
+// keeps the most recent observations recorded while the call was in flight.
+func TestRefreshExistingEventSeriesConcurrentCacheUpdate(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	observedAgainTime := metav1.MicroTime{Time: time.Now().Add(time.Minute)}
+
+	table := []struct {
+		name string
+		// mutate runs while the API call is in flight, i.e. with the
+		// broadcaster's lock released, and simulates a concurrent recorder.
+		mutate func(e *eventBroadcasterImpl, key eventKey, original *eventsv1.Event)
+		verify func(t *testing.T, e *eventBroadcasterImpl, key eventKey, original *eventsv1.Event)
+	}{
+		{
+			name: "cache entry replaced by a new isomorphic series is not overwritten",
+			mutate: func(e *eventBroadcasterImpl, key eventKey, original *eventsv1.Event) {
+				replacement := original.DeepCopy()
+				replacement.Name = original.Name + "-replacement"
+				replacement.ResourceVersion = ""
+				replacement.Series = &eventsv1.EventSeries{Count: 2, LastObservedTime: observedAgainTime}
+				e.eventCache[key] = replacement
+			},
+			verify: func(t *testing.T, e *eventBroadcasterImpl, key eventKey, original *eventsv1.Event) {
+				cached, exists := e.eventCache[key]
+				if !exists {
+					t.Fatal("expected the replacement series to remain in the cache")
+				}
+				if cached.Name != original.Name+"-replacement" {
+					t.Errorf("expected cache to hold the replacement series %q, but got %q", original.Name+"-replacement", cached.Name)
+				}
+				if cached.ResourceVersion != "" {
+					t.Errorf("expected the replacement series to be untouched, but got ResourceVersion %q from the recorded event", cached.ResourceVersion)
+				}
+				if cached.Series == nil || cached.Series.Count != 2 {
+					t.Errorf("expected the replacement series to keep Count 2, but got %v", cached.Series)
+				}
+			},
+		},
+		{
+			name: "cache entry observed again keeps the most recent observations",
+			mutate: func(e *eventBroadcasterImpl, key eventKey, original *eventsv1.Event) {
+				e.eventCache[key].Series.Count = 11
+				e.eventCache[key].Series.LastObservedTime = observedAgainTime
+			},
+			verify: func(t *testing.T, e *eventBroadcasterImpl, key eventKey, original *eventsv1.Event) {
+				cached, exists := e.eventCache[key]
+				if !exists {
+					t.Fatal("expected the series to remain in the cache")
+				}
+				if cached.Name != original.Name {
+					t.Errorf("expected cache to hold series %q, but got %q", original.Name, cached.Name)
+				}
+				if cached.ResourceVersion != "recorded" {
+					t.Errorf("expected cache to be updated with the recorded event, but got ResourceVersion %q", cached.ResourceVersion)
+				}
+				if cached.Series == nil || cached.Series.Count != 11 {
+					t.Errorf("expected the refreshed series to keep Count 11, but got %v", cached.Series)
+				}
+				if cached.Series != nil && !cached.Series.LastObservedTime.Equal(&observedAgainTime) {
+					t.Errorf("expected the refreshed series to keep LastObservedTime %v, but got %v", observedAgainTime, cached.Series.LastObservedTime)
+				}
+			},
+		},
+		{
+			name: "cache entry finished while refreshing is not re-added",
+			mutate: func(e *eventBroadcasterImpl, key eventKey, original *eventsv1.Event) {
+				delete(e.eventCache, key)
+			},
+			verify: func(t *testing.T, e *eventBroadcasterImpl, key eventKey, original *eventsv1.Event) {
+				if cached, exists := e.eventCache[key]; exists {
+					t.Errorf("expected the finished series to stay out of the cache, but got %v", cached)
+				}
+			},
+		},
+		{
+			name: "cache entry replaced by a singleton event is not overwritten",
+			mutate: func(e *eventBroadcasterImpl, key eventKey, original *eventsv1.Event) {
+				replacement := original.DeepCopy()
+				replacement.Name = original.Name + "-singleton"
+				replacement.Series = nil
+				e.eventCache[key] = replacement
+			},
+			verify: func(t *testing.T, e *eventBroadcasterImpl, key eventKey, original *eventsv1.Event) {
+				cached, exists := e.eventCache[key]
+				if !exists {
+					t.Fatal("expected the singleton event to remain in the cache")
+				}
+				if cached.Name != original.Name+"-singleton" || cached.Series != nil {
+					t.Errorf("expected cache to hold the untouched singleton event, but got %v", cached)
+				}
+			},
+		},
+	}
+	for _, item := range table {
+		t.Run(item.name, func(t *testing.T) {
+			var eventBroadcaster *eventBroadcasterImpl
+			var original *eventsv1.Event
+			var key eventKey
+			patches := 0
+			testEvents := testEventSeriesSink{
+				OnPatch: func(event *eventsv1.Event, patch []byte) (*eventsv1.Event, error) {
+					patches++
+					if event.Name != original.Name {
+						t.Errorf("expected to patch series %q, but got %q", original.Name, event.Name)
+					}
+					eventBroadcaster.mu.Lock()
+					defer eventBroadcaster.mu.Unlock()
+					item.mutate(eventBroadcaster, key, original)
+					recorded := event.DeepCopy()
+					recorded.ResourceVersion = "recorded"
+					return recorded, nil
+				},
+			}
+			eventBroadcaster = newBroadcaster(&testEvents, 0, map[eventKey]*eventsv1.Event{}).(*eventBroadcasterImpl)
+			original, key = newCachedSeriesEvent(t, eventBroadcaster, time.Now())
+
+			eventBroadcaster.refreshExistingEventSeries(ctx)
+
+			if patches != 1 {
+				t.Errorf("expected exactly one patch request, but got %d", patches)
+			}
+			eventBroadcaster.mu.Lock()
+			defer eventBroadcaster.mu.Unlock()
+			if len(eventBroadcaster.eventCache) > 1 {
+				t.Errorf("expected at most one cache entry, but got %d", len(eventBroadcaster.eventCache))
+			}
+			item.verify(t, eventBroadcaster, key, original)
+		})
+	}
+}
+
+// TestFinishSeriesConcurrentCacheUpdate verifies that finishSeries only
+// deletes a cache entry that still belongs to the same series and was not
+// observed again after the lock was released for the API call.
+func TestFinishSeriesConcurrentCacheUpdate(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	observedAgainTime := metav1.MicroTime{Time: time.Now()}
+
+	table := []struct {
+		name string
+		// mutate runs while the API call is in flight, i.e. with the
+		// broadcaster's lock released, and simulates a concurrent recorder.
+		mutate func(e *eventBroadcasterImpl, key eventKey, original *eventsv1.Event)
+		verify func(t *testing.T, e *eventBroadcasterImpl, key eventKey, original *eventsv1.Event)
+	}{
+		{
+			name: "unchanged series is deleted",
+			mutate: func(e *eventBroadcasterImpl, key eventKey, original *eventsv1.Event) {
+			},
+			verify: func(t *testing.T, e *eventBroadcasterImpl, key eventKey, original *eventsv1.Event) {
+				if cached, exists := e.eventCache[key]; exists {
+					t.Errorf("expected the finished series to be deleted from the cache, but got %v", cached)
+				}
+			},
+		},
+		{
+			name: "cache entry replaced by a new isomorphic series is not deleted",
+			mutate: func(e *eventBroadcasterImpl, key eventKey, original *eventsv1.Event) {
+				replacement := original.DeepCopy()
+				replacement.Name = original.Name + "-replacement"
+				replacement.Series = &eventsv1.EventSeries{Count: 2, LastObservedTime: observedAgainTime}
+				e.eventCache[key] = replacement
+			},
+			verify: func(t *testing.T, e *eventBroadcasterImpl, key eventKey, original *eventsv1.Event) {
+				cached, exists := e.eventCache[key]
+				if !exists {
+					t.Fatal("expected the replacement series to remain in the cache")
+				}
+				if cached.Name != original.Name+"-replacement" {
+					t.Errorf("expected cache to hold the replacement series %q, but got %q", original.Name+"-replacement", cached.Name)
+				}
+				if cached.Series == nil || cached.Series.Count != 2 {
+					t.Errorf("expected the replacement series to keep Count 2, but got %v", cached.Series)
+				}
+			},
+		},
+		{
+			name: "cache entry observed again is not deleted",
+			mutate: func(e *eventBroadcasterImpl, key eventKey, original *eventsv1.Event) {
+				e.eventCache[key].Series.Count = 11
+				e.eventCache[key].Series.LastObservedTime = observedAgainTime
+			},
+			verify: func(t *testing.T, e *eventBroadcasterImpl, key eventKey, original *eventsv1.Event) {
+				cached, exists := e.eventCache[key]
+				if !exists {
+					t.Fatal("expected the series observed again to remain in the cache")
+				}
+				if cached.Name != original.Name {
+					t.Errorf("expected cache to hold series %q, but got %q", original.Name, cached.Name)
+				}
+				if cached.Series == nil || cached.Series.Count != 11 {
+					t.Errorf("expected the series to keep Count 11, but got %v", cached.Series)
+				}
+			},
+		},
+		{
+			name: "cache entry replaced by a singleton event is not deleted",
+			mutate: func(e *eventBroadcasterImpl, key eventKey, original *eventsv1.Event) {
+				replacement := original.DeepCopy()
+				replacement.Name = original.Name + "-singleton"
+				replacement.Series = nil
+				e.eventCache[key] = replacement
+			},
+			verify: func(t *testing.T, e *eventBroadcasterImpl, key eventKey, original *eventsv1.Event) {
+				cached, exists := e.eventCache[key]
+				if !exists {
+					t.Fatal("expected the singleton event to remain in the cache")
+				}
+				if cached.Name != original.Name+"-singleton" || cached.Series != nil {
+					t.Errorf("expected cache to hold the untouched singleton event, but got %v", cached)
+				}
+			},
+		},
+	}
+	for _, item := range table {
+		t.Run(item.name, func(t *testing.T) {
+			var eventBroadcaster *eventBroadcasterImpl
+			var original *eventsv1.Event
+			var key eventKey
+			patches := 0
+			testEvents := testEventSeriesSink{
+				OnPatch: func(event *eventsv1.Event, patch []byte) (*eventsv1.Event, error) {
+					patches++
+					if event.Name != original.Name {
+						t.Errorf("expected to patch series %q, but got %q", original.Name, event.Name)
+					}
+					if event.Series == nil || event.Series.Count != 10 {
+						t.Errorf("expected to record the final Count 10, but got %v", event.Series)
+					}
+					eventBroadcaster.mu.Lock()
+					defer eventBroadcaster.mu.Unlock()
+					item.mutate(eventBroadcaster, key, original)
+					return event, nil
+				},
+			}
+			eventBroadcaster = newBroadcaster(&testEvents, 0, map[eventKey]*eventsv1.Event{}).(*eventBroadcasterImpl)
+			original, key = newCachedSeriesEvent(t, eventBroadcaster, time.Now().Add(-finishTime-time.Minute))
+
+			eventBroadcaster.finishSeries(ctx)
+
+			if patches != 1 {
+				t.Errorf("expected exactly one patch request, but got %d", patches)
+			}
+			eventBroadcaster.mu.Lock()
+			defer eventBroadcaster.mu.Unlock()
+			if len(eventBroadcaster.eventCache) > 1 {
+				t.Errorf("expected at most one cache entry, but got %d", len(eventBroadcaster.eventCache))
+			}
+			item.verify(t, eventBroadcaster, key, original)
+		})
+	}
+}
+
+// TestSeriesHousekeepingWithConcurrentRecordToSink verifies that events
+// recorded through recordToSink while finishSeries or
+// refreshExistingEventSeries are in the middle of an API call are neither
+// blocked by that call nor lost: an isomorphic event increments the cached
+// series and prevents finishSeries from deleting it, and a non-isomorphic
+// event is recorded right away.
+func TestSeriesHousekeepingWithConcurrentRecordToSink(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	observedAgainTime := time.Now().Add(time.Minute)
+
+	table := []struct {
+		name             string
+		lastObservedTime time.Time
+		housekeeping     func(e *eventBroadcasterImpl, ctx context.Context)
+		verify           func(t *testing.T, e *eventBroadcasterImpl, key eventKey, original *eventsv1.Event)
+	}{
+		{
+			name:             "finishSeries does not delete a series observed while patching",
+			lastObservedTime: time.Now().Add(-finishTime - time.Minute),
+			housekeeping:     (*eventBroadcasterImpl).finishSeries,
+			verify: func(t *testing.T, e *eventBroadcasterImpl, key eventKey, original *eventsv1.Event) {
+				cached, exists := e.eventCache[key]
+				if !exists {
+					t.Fatal("expected the series observed while patching to remain in the cache")
+				}
+				if cached.Name != original.Name {
+					t.Errorf("expected cache to hold series %q, but got %q", original.Name, cached.Name)
+				}
+				if cached.Series == nil || cached.Series.Count != 11 {
+					t.Errorf("expected the series to have Count 11, but got %v", cached.Series)
+				}
+			},
+		},
+		{
+			name:             "refreshExistingEventSeries keeps observations recorded while patching",
+			lastObservedTime: time.Now(),
+			housekeeping:     (*eventBroadcasterImpl).refreshExistingEventSeries,
+			verify: func(t *testing.T, e *eventBroadcasterImpl, key eventKey, original *eventsv1.Event) {
+				cached, exists := e.eventCache[key]
+				if !exists {
+					t.Fatal("expected the series to remain in the cache")
+				}
+				if cached.Name != original.Name {
+					t.Errorf("expected cache to hold series %q, but got %q", original.Name, cached.Name)
+				}
+				if cached.ResourceVersion != "recorded" {
+					t.Errorf("expected cache to be updated with the recorded event, but got ResourceVersion %q", cached.ResourceVersion)
+				}
+				if cached.Series == nil || cached.Series.Count != 11 {
+					t.Errorf("expected the refreshed series to have Count 11, but got %v", cached.Series)
+				}
+				if cached.Series != nil && !cached.Series.LastObservedTime.Time.Equal(observedAgainTime) {
+					t.Errorf("expected the refreshed series to keep LastObservedTime %v, but got %v", observedAgainTime, cached.Series.LastObservedTime)
+				}
+			},
+		},
+	}
+	for _, item := range table {
+		t.Run(item.name, func(t *testing.T) {
+			patchStarted := make(chan struct{})
+			releasePatch := make(chan struct{})
+			createdEvent := make(chan *eventsv1.Event, 1)
+			patches := 0
+			testEvents := testEventSeriesSink{
+				OnCreate: func(event *eventsv1.Event) (*eventsv1.Event, error) {
+					createdEvent <- event
+					return event, nil
+				},
+				OnPatch: func(event *eventsv1.Event, patch []byte) (*eventsv1.Event, error) {
+					patches++
+					close(patchStarted)
+					<-releasePatch
+					recorded := event.DeepCopy()
+					recorded.ResourceVersion = "recorded"
+					return recorded, nil
+				},
+			}
+			eventBroadcaster := newBroadcaster(&testEvents, 0, map[eventKey]*eventsv1.Event{}).(*eventBroadcasterImpl)
+			original, key := newCachedSeriesEvent(t, eventBroadcaster, item.lastObservedTime)
+
+			housekeepingDone := make(chan struct{})
+			go func() {
+				defer close(housekeepingDone)
+				item.housekeeping(eventBroadcaster, ctx)
+			}()
+			select {
+			case <-patchStarted:
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Fatalf("timeout after %v waiting for the patch request", wait.ForeverTestTimeout)
+			}
+
+			// While the API call is in flight, record an isomorphic event and
+			// an unrelated event. Neither must wait for the API call to end.
+			isomorphicEvent := original.DeepCopy()
+			isomorphicEvent.Name = original.Name + "-isomorphic"
+			isomorphicEvent.Series = nil
+			otherEvent := original.DeepCopy()
+			otherEvent.Name = original.Name + "-other"
+			otherEvent.Reason = "other"
+			otherEvent.Series = nil
+			recordingDone := make(chan struct{})
+			go func() {
+				defer close(recordingDone)
+				eventBroadcaster.recordToSink(ctx, isomorphicEvent, testclocks.NewFakeClock(observedAgainTime))
+				eventBroadcaster.recordToSink(ctx, otherEvent, testclocks.NewFakeClock(observedAgainTime))
+			}()
+			select {
+			case <-recordingDone:
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Fatalf("timeout after %v: recordToSink was blocked by the in-flight API call", wait.ForeverTestTimeout)
+			}
+			select {
+			case created := <-createdEvent:
+				if created.Name != otherEvent.Name {
+					t.Errorf("expected the unrelated event %q to be created, but got %q", otherEvent.Name, created.Name)
+				}
+			default:
+				t.Error("expected the unrelated event to be created while the API call was in flight")
+			}
+
+			close(releasePatch)
+			select {
+			case <-housekeepingDone:
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Fatalf("timeout after %v waiting for housekeeping to finish", wait.ForeverTestTimeout)
+			}
+
+			eventBroadcaster.mu.Lock()
+			defer eventBroadcaster.mu.Unlock()
+			if patches != 1 {
+				t.Errorf("expected exactly one patch request, but got %d", patches)
+			}
+			if len(createdEvent) != 0 {
+				t.Errorf("expected exactly one create request, but got %d more", len(createdEvent))
+			}
+			if len(eventBroadcaster.eventCache) != 2 {
+				t.Errorf("expected the series and the unrelated event in the cache, but got %d entries", len(eventBroadcaster.eventCache))
+			}
+			otherCached, exists := eventBroadcaster.eventCache[getKey(otherEvent)]
+			if !exists || otherCached.Series != nil {
+				t.Errorf("expected the unrelated event to be cached as a singleton, but got %v", otherCached)
+			}
+			item.verify(t, eventBroadcaster, key, original)
+		})
 	}
 }
