@@ -18,6 +18,7 @@ package store
 
 import (
 	"fmt"
+	"iter"
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -73,9 +74,16 @@ type Indexer interface {
 	OrderedListPrefix(prefix, continueKey string) ([]interface{}, error)
 }
 
+// Snapshot is an immutable point-in-time view of the store.
 type Snapshot interface {
 	GetByKey(key string) (item interface{}, exists bool, err error)
 	OrderedListPrefix(prefix, continueKey string) ([]interface{}, error)
+	// RangePrefix iterates the elements with the given key prefix, in key
+	// order, starting from continueKey.
+	RangePrefix(prefix, continueKey string) iter.Seq2[*Element, error]
+	// Count returns the number of items RangePrefix(prefix, continueKey)
+	// would visit.
+	Count(prefix, continueKey string) (count int)
 }
 
 func NewIndexer(indexers *cache.Indexers) Indexer {

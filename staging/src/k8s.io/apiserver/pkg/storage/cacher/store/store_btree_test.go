@@ -17,6 +17,7 @@ limitations under the License.
 package store
 
 import (
+	"iter"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -166,6 +167,9 @@ func (f fakeIndexer) Replace([]interface{}, string) error {
 	return nil
 }
 func (f fakeIndexer) Count(prefixKey, continueKey string) int { return 0 }
+func (f fakeIndexer) RangePrefix(prefixKey, continueKey string) iter.Seq2[*Element, error] {
+	return func(yield func(*Element, error) bool) {}
+}
 
 type fakeSnapshotter struct {
 	getLessOrEqual func(rv uint64) (Snapshot, bool)
