@@ -598,7 +598,8 @@ type ParamRef struct {
 	// Allowed values are `Allow` or `Deny`
 	//
 	// Required
-	ParameterNotFoundAction *ParameterNotFoundActionType `json:"parameterNotFoundAction" protobuf:"bytes,4,rep,name=parameterNotFoundAction"`
+	// +required
+	ParameterNotFoundAction *ParameterNotFoundActionType `json:"parameterNotFoundAction,omitempty" protobuf:"bytes,4,rep,name=parameterNotFoundAction"`
 }
 
 // MatchResources decides whether to run the admission control policy on an object based
