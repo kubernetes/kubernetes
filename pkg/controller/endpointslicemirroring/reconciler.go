@@ -275,6 +275,9 @@ func (r *reconciler) finalize(ctx context.Context, endpoints *corev1.Endpoints, 
 	for _, endpointSlice := range slices.toDelete {
 		err := epsClient.Delete(ctx, endpointSlice.Name, metav1.DeleteOptions{})
 		if err != nil {
+			if errors.IsNotFound(err) {
+				continue
+			}
 			return fmt.Errorf("failed to delete %s EndpointSlice for Endpoints %s/%s: %v", endpointSlice.Name, endpoints.Namespace, endpoints.Name, err)
 		}
 		r.endpointSliceTracker.ExpectDeletion(endpointSlice)
@@ -291,7 +294,7 @@ func (r *reconciler) deleteEndpoints(ctx context.Context, namespace, name string
 	var errs []error
 	for _, endpointSlice := range endpointSlices {
 		err := r.client.DiscoveryV1().EndpointSlices(namespace).Delete(ctx, endpointSlice.Name, metav1.DeleteOptions{})
-		if err != nil {
+		if err != nil && !errors.IsNotFound(err) {
 			errs = append(errs, err)
 		}
 	}
