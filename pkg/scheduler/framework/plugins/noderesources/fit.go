@@ -233,15 +233,18 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 	}
 
 	pl := &Fit{
-		ignoredResources:                                   sets.New(args.IgnoredResources...),
-		ignoredResourceGroups:                              sets.New(args.IgnoredResourceGroups...),
-		enableInPlacePodVerticalScaling:                    fts.EnableInPlacePodVerticalScaling,
-		handle:                                             h,
-		enablePodLevelResources:                            fts.EnablePodLevelResources,
-		enableDRAExtendedResource:                          fts.EnableDRAExtendedResource,
-		enableInPlacePodLevelResourcesVerticalScaling:      fts.EnableInPlacePodLevelResourcesVerticalScaling,
+		ignoredResources:                sets.New(args.IgnoredResources...),
+		ignoredResourceGroups:           sets.New(args.IgnoredResourceGroups...),
+		enableInPlacePodVerticalScaling: fts.EnableInPlacePodVerticalScaling,
+		handle:                          h,
+		enablePodLevelResources:         fts.EnablePodLevelResources,
+		enableDRAExtendedResource:       fts.EnableDRAExtendedResource,
+
+		enableInPlacePodLevelResourcesVerticalScaling: fts.EnableInPlacePodLevelResourcesVerticalScaling,
+
 		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
-		resourceAllocationScorer:                           scorer,
+
+		resourceAllocationScorer: scorer,
 	}
 
 	if fts.EnableTopologyAwareWorkloadScheduling {
