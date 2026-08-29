@@ -27,7 +27,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/klog/v2/ktesting"
@@ -78,19 +77,6 @@ func TestDefaultBinder(t *testing.T) {
 				var gotBinding *v1.Binding
 				client := fake.NewClientset(testPod)
 
-				informerFactory := informers.NewSharedInformerFactory(client, 0)
-				nodeInformer := informerFactory.Core().V1().Nodes().Informer()
-
-				testNodeObj := &v1.Node{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: string(testNode),
-						UID:  "different-node-uid",
-					},
-				}
-
-				if err := nodeInformer.GetIndexer().Add(testNodeObj); err != nil {
-					t.Fatal(err)
-				}
 				client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
 					if action.GetSubresource() != "binding" {
 						return false, nil, nil
@@ -114,7 +100,6 @@ func TestDefaultBinder(t *testing.T) {
 					nil,
 					nil,
 					frameworkruntime.WithClientSet(client),
-					frameworkruntime.WithInformerFactory(informerFactory),
 					frameworkruntime.WithAPIDispatcher(apiDispatcher),
 				)
 				if err != nil {

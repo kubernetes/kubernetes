@@ -639,9 +639,6 @@ func TestSkipPodGroupPodSchedule(t *testing.T) {
 
 	logger, ctx := ktesting.NewTestContext(t)
 
-	client := clientsetfake.NewClientset()
-	informerFactory := informers.NewSharedInformerFactory(client, 0)
-
 	cache := internalcache.New(ctx, nil, true, true /* CompositePodGroup */)
 	registry := frameworkruntime.Registry{
 		queuesort.Name:     queuesort.New,
@@ -660,7 +657,6 @@ func TestSkipPodGroupPodSchedule(t *testing.T) {
 	}
 	schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
 		frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
-		frameworkruntime.WithInformerFactory(informerFactory),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create new framework: %v", err)
@@ -712,8 +708,6 @@ func TestScheduleOnePodGroup_FinishesAttemptWhenAllPoppedPodsAreAssumed(t *testi
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
-			client := clientsetfake.NewClientset()
-			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			podGroup := st.MakePodGroup().Name("pg").Namespace("default").Obj()
 			p1 := st.MakePod().Name("p1").Namespace("default").UID("p1").PodGroupName(podGroup.Name).SchedulerName("test-scheduler").Obj()
 			p2 := st.MakePod().Name("p2").Namespace("default").UID("p2").PodGroupName(podGroup.Name).SchedulerName("test-scheduler").Obj()
@@ -735,7 +729,6 @@ func TestScheduleOnePodGroup_FinishesAttemptWhenAllPoppedPodsAreAssumed(t *testi
 			}
 			schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
 				frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
-				frameworkruntime.WithInformerFactory(informerFactory),
 			)
 			if err != nil {
 				t.Fatalf("Failed to create new framework: %v", err)
