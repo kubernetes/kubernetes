@@ -17,12 +17,14 @@ limitations under the License.
 package testserver
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
 	"os"
 	"strconv"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -34,7 +36,8 @@ import (
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 )
 
-// getAvailablePort returns a TCP port that is available for binding.
+// getAvailablePorts returns a desired count of TCP ports
+// that are available for binding.
 func getAvailablePorts(count int) ([]int, error) {
 	ports := []int{}
 	for i := 0; i < count; i++ {
@@ -49,6 +52,28 @@ func getAvailablePorts(count int) ([]int, error) {
 	return ports, nil
 }
 
+// assignAvailablePorts assigns client and peer URLs to a cfg
+func assignAvailablePorts(cfg *embed.Config) error {
+	ports, err := getAvailablePorts(2)
+	if err != nil {
+		return err
+	}
+
+	// Only the port is replaced, so that a scheme or host the caller set before
+	// starting the server survives a retry.
+	setPort := func(urls []url.URL, port int) {
+		for i := range urls {
+			urls[i].Host = net.JoinHostPort(urls[i].Hostname(), strconv.Itoa(port))
+		}
+	}
+	setPort(cfg.ListenClientUrls, ports[0])
+	setPort(cfg.AdvertiseClientUrls, ports[0])
+	setPort(cfg.ListenPeerUrls, ports[1])
+	setPort(cfg.AdvertisePeerUrls, ports[1])
+	cfg.InitialCluster = cfg.InitialClusterFromName(cfg.Name)
+	return nil
+}
+
 // NewTestConfig returns a configuration for an embedded etcd server.
 // The configuration is based on embed.NewConfig(), with the following adjustments:
 //   - sets UnsafeNoFsync = true to improve test performance (only reasonable in a test-only
@@ -61,18 +86,9 @@ func NewTestConfig(t testing.TB) *embed.Config {
 
 	cfg.UnsafeNoFsync = true
 
-	ports, err := getAvailablePorts(2)
-	if err != nil {
+	if err := assignAvailablePorts(cfg); err != nil {
 		t.Fatal(err)
 	}
-	clientURL := url.URL{Scheme: "http", Host: net.JoinHostPort("localhost", strconv.Itoa(ports[0]))}
-	peerURL := url.URL{Scheme: "http", Host: net.JoinHostPort("localhost", strconv.Itoa(ports[1]))}
-
-	cfg.ListenPeerUrls = []url.URL{peerURL}
-	cfg.AdvertisePeerUrls = []url.URL{peerURL}
-	cfg.ListenClientUrls = []url.URL{clientURL}
-	cfg.AdvertiseClientUrls = []url.URL{clientURL}
-	cfg.InitialCluster = cfg.InitialClusterFromName(cfg.Name)
 
 	cfg.ZapLoggerBuilder = embed.NewZapLoggerBuilder(zaptest.NewLogger(t, zaptest.Level(zapcore.ErrorLevel)).Named("etcd-server"))
 	cfg.Dir = t.TempDir()
@@ -80,7 +96,39 @@ func NewTestConfig(t testing.TB) *embed.Config {
 	return cfg
 }
 
+// maxStartAttempts bounds how many times startEtcd retries with a fresh set of
+// ports before giving up.
+const maxStartAttempts = 3
+
 var autoPortLock sync.Mutex
+
+// startEtcd starts an embedded etcd server.
+// Port assignment is subject to a race condition
+// between assignment and binding, so we retry a few times.
+func startEtcd(t testing.TB, cfg *embed.Config) (*embed.Config, *embed.Etcd, error) {
+	t.Helper()
+
+	autoPortLock.Lock()
+	defer autoPortLock.Unlock()
+
+	if cfg == nil {
+		cfg = NewTestConfig(t)
+	}
+
+	for attempt := 1; ; attempt++ {
+		e, err := embed.StartEtcd(cfg)
+		if err == nil {
+			return cfg, e, nil
+		}
+		if attempt >= maxStartAttempts || !errors.Is(err, syscall.EADDRINUSE) {
+			return cfg, nil, err
+		}
+		t.Logf("etcd failed to bind on attempt %d of %d, retrying with new ports: %v", attempt, maxStartAttempts, err)
+		if err := assignAvailablePorts(cfg); err != nil {
+			return cfg, nil, err
+		}
+	}
+}
 
 // RunEtcd starts an embedded etcd server with the provided config
 // (or NewTestConfig(t) if nil), and returns a client connected to the server.
@@ -88,14 +136,7 @@ var autoPortLock sync.Mutex
 func RunEtcd(t testing.TB, cfg *embed.Config) *kubernetes.Client {
 	t.Helper()
 
-	if cfg == nil {
-		// if we have to autopick free ports, lock until we successfully start the server on the ports we chose
-		autoPortLock.Lock()
-		defer autoPortLock.Unlock()
-		cfg = NewTestConfig(t)
-	}
-
-	e, err := embed.StartEtcd(cfg)
+	cfg, e, err := startEtcd(t, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
