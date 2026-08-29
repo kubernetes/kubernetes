@@ -295,12 +295,6 @@ linters:
         # and it's just syntactic sugar.
         - any
         {{- if .Base }}
-        # Replace []byte(fmt.Sprintf) with fmt.Appendf.
-        #
-        # A useful hint for new code, but
-        # should only be updated in old code
-        # where it really matters.
-        - fmtappendf
         # Replace explicit loops over maps with calls to maps package.
         #
         # Completely disabled because the benefit
@@ -310,12 +304,23 @@ linters:
         #
         # A useful hint for new code.
         - minmax
-        # simplify code by using go1.26's new(expr)
-        # should only be updated in old code where it really matters.
+
+        # Disable things that should only be updated in old code where it really matters.
+
+        # go 1.26: can simplify with new(expr)
         - newexpr
-        # use iterators instead of Len/At-style APIs
-        # should only be updated in old code where it really matters.
+        # go 1.26: can use iterators instead of Len/At-style APIs
         - stditerators
+        # go 1.27: can declare embedded fields inline
+        - embedlit
+        # go 1.27: can simplify with reflect.TypeAssert
+        - reflecttypeassert
+        # go 1.27: can simplify atomic int assignment/access
+        - atomictypes
+        # go 1.27: can simplify with errors.AsType
+        - errorsastype
+        # go 1.27: can simplify with slices.Backward
+        - slicesbackward
         {{- end }}
         # Suggest replacing omitempty with omitzero for struct fields.
         #
@@ -370,7 +375,7 @@ linters:
         # Please enable when all supported Kubernetes versions
         # are on GoLang 1.25+
         {{- end }}
-        - waitgroup
+        - waitgroupgo
 
     revive:
       # Only these rules are enabled.
