@@ -28,11 +28,12 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
@@ -44,7 +45,6 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
 	"k8s.io/kubernetes/pkg/controller"
-	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 )
 
@@ -85,16 +85,15 @@ var (
 	pvBoundGeneric        = makeTestPV("pv-bound", "node1", "1G", "1", correctGenericPVC, waitClass)
 
 	// PVs for manual binding
-	pvNode1a                   = makeTestPV("pv-node1a", "node1", "5G", "1", nil, waitClass)
-	pvNode1b                   = makeTestPV("pv-node1b", "node1", "10G", "1", nil, waitClass)
-	pvNode1c                   = makeTestPV("pv-node1b", "node1", "5G", "1", nil, waitClass)
-	pvNode2                    = makeTestPV("pv-node2", "node2", "1G", "1", nil, waitClass)
-	pvBound                    = makeTestPV("pv-bound", "node1", "1G", "1", boundPVC, waitClass)
-	pvNode1aBound              = makeTestPV("pv-node1a", "node1", "5G", "1", unboundPVC, waitClass)
-	pvNode1bBound              = makeTestPV("pv-node1b", "node1", "10G", "1", unboundPVC2, waitClass)
-	pvNode1bBoundHigherVersion = makeTestPV("pv-node1b", "node1", "10G", "2", unboundPVC2, waitClass)
-	pvBoundImmediate           = makeTestPV("pv-bound-immediate", "node1", "1G", "1", immediateBoundPVC, immediateClass)
-	pvBoundImmediateNode2      = makeTestPV("pv-bound-immediate", "node2", "1G", "1", immediateBoundPVC, immediateClass)
+	pvNode1a              = makeTestPV("pv-node1a", "node1", "5G", "1", nil, waitClass)
+	pvNode1b              = makeTestPV("pv-node1b", "node1", "10G", "1", nil, waitClass)
+	pvNode1c              = makeTestPV("pv-node1b", "node1", "5G", "1", nil, waitClass)
+	pvNode2               = makeTestPV("pv-node2", "node2", "1G", "1", nil, waitClass)
+	pvBound               = makeTestPV("pv-bound", "node1", "1G", "1", boundPVC, waitClass)
+	pvNode1aBound         = makeTestPV("pv-node1a", "node1", "5G", "1", unboundPVC, waitClass)
+	pvNode1bBound         = makeTestPV("pv-node1b", "node1", "10G", "1", unboundPVC2, waitClass)
+	pvBoundImmediate      = makeTestPV("pv-bound-immediate", "node1", "1G", "1", immediateBoundPVC, immediateClass)
+	pvBoundImmediateNode2 = makeTestPV("pv-bound-immediate", "node2", "1G", "1", immediateBoundPVC, immediateClass)
 
 	// PVs for CSI migration
 	migrationPVBound             = makeTestPVForCSIMigration(zone1Labels, boundMigrationPVC, true)
@@ -133,7 +132,6 @@ var (
 
 type testEnv struct {
 	client                  clientset.Interface
-	reactor                 *pvtesting.VolumeReactor
 	binder                  SchedulerVolumeBinder
 	internalBinder          *volumeBinder
 	internalPodInformer     coreinformers.PodInformer
@@ -145,20 +143,14 @@ type testEnv struct {
 	internalCSIStorageCapacityInformer storageinformers.CSIStorageCapacityInformer
 }
 
+type apiUpdateError struct {
+	resource string
+	name     string
+}
+
 func newTestBinder(t *testing.T, ctx context.Context) *testEnv {
-	client := &fake.Clientset{}
+	client := fake.NewClientset()
 	logger := klog.FromContext(ctx)
-	reactor := pvtesting.NewVolumeReactor(ctx, client, nil, nil, nil)
-	// TODO refactor all tests to use real watch mechanism, see #72327
-	client.AddWatchReactor("*", func(action k8stesting.Action) (handled bool, ret watch.Interface, err error) {
-		gvr := action.GetResource()
-		ns := action.GetNamespace()
-		watch, err := reactor.Watch(gvr, ns)
-		if err != nil {
-			return false, nil, err
-		}
-		return true, watch, nil
-	})
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 
 	podInformer := informerFactory.Core().V1().Pods()
@@ -263,7 +255,6 @@ func newTestBinder(t *testing.T, ctx context.Context) *testEnv {
 
 	return &testEnv{
 		client:                  client,
-		reactor:                 reactor,
 		binder:                  binder,
 		internalBinder:          internalBinder,
 		internalPodInformer:     podInformer,
@@ -273,6 +264,33 @@ func newTestBinder(t *testing.T, ctx context.Context) *testEnv {
 		internalCSIDriverInformer:          csiDriverInformer,
 		internalCSIStorageCapacityInformer: csiStorageCapacityInformer,
 	}
+}
+
+func (env *testEnv) addAPIUpdateConflictReactor(t *testing.T, updateError *apiUpdateError) {
+	t.Helper()
+	if updateError == nil {
+		return
+	}
+
+	fakeClient, ok := env.client.(*fake.Clientset)
+	if !ok {
+		t.Fatalf("client is not a fake clientset")
+	}
+	fakeClient.PrependReactor("update", updateError.resource, func(action k8stesting.Action) (bool, runtime.Object, error) {
+		updateAction, ok := action.(k8stesting.UpdateAction)
+		if !ok {
+			return false, nil, nil
+		}
+		object, objectOK := updateAction.GetObject().(metav1.Object)
+		if !objectOK || object.GetName() != updateError.name {
+			return false, nil, nil
+		}
+		return true, nil, apierrors.NewConflict(
+			action.GetResource().GroupResource(),
+			updateError.name,
+			fmt.Errorf("simulated resource version conflict"),
+		)
+	})
 }
 
 func (env *testEnv) initNodes(cachedNodes []*v1.Node) {
@@ -302,30 +320,46 @@ func (env *testEnv) addCSIStorageCapacities(capacities []*storagev1.CSIStorageCa
 }
 
 func (env *testEnv) initClaims(t *testing.T, cachedPVCs []*v1.PersistentVolumeClaim, apiPVCs []*v1.PersistentVolumeClaim) {
+	// Seed the tracker directly so setup does not emit watch events before the test action.
+	fakeClient := env.client.(*fake.Clientset)
 	for _, pvc := range cachedPVCs {
 		if err := env.internalBinder.pvcCache.store.Add(pvc); err != nil {
 			t.Fatalf("error adding PVC %s/%s to cache: %v", pvc.Namespace, pvc.Name, err)
 		}
 		if apiPVCs == nil {
-			env.reactor.AddClaim(pvc)
+			err := fakeClient.Tracker().Add(pvc.DeepCopy())
+			if err != nil {
+				t.Fatalf("failed to add PVC %s/%s to fake client: %v", pvc.Namespace, pvc.Name, err)
+			}
 		}
 	}
 	for _, pvc := range apiPVCs {
-		env.reactor.AddClaim(pvc)
+		err := fakeClient.Tracker().Add(pvc.DeepCopy())
+		if err != nil {
+			t.Fatalf("failed to add PVC %s/%s to fake client: %v", pvc.Namespace, pvc.Name, err)
+		}
 	}
 }
 
 func (env *testEnv) initVolumes(t *testing.T, cachedPVs []*v1.PersistentVolume, apiPVs []*v1.PersistentVolume) {
+	// Seed the tracker directly so setup does not emit watch events before the test action.
+	fakeClient := env.client.(*fake.Clientset)
 	for _, pv := range cachedPVs {
 		if err := env.internalBinder.pvCache.store.Add(pv); err != nil {
 			t.Fatalf("error adding PV %s to cache: %v", pv.Name, err)
 		}
 		if apiPVs == nil {
-			env.reactor.AddVolume(pv)
+			err := fakeClient.Tracker().Add(pv.DeepCopy())
+			if err != nil {
+				t.Fatalf("failed to add PV %q to fake client: %v", pv.Name, err)
+			}
 		}
 	}
 	for _, pv := range apiPVs {
-		env.reactor.AddVolume(pv)
+		err := fakeClient.Tracker().Add(pv.DeepCopy())
+		if err != nil {
+			t.Fatalf("failed to add PV %q to fake client: %v", pv.Name, err)
+		}
 	}
 }
 
@@ -537,9 +571,37 @@ func (env *testEnv) validateBind(
 		}
 	}
 
-	// Check reactor for API updates
-	if err := env.reactor.CheckVolumes(expectedAPIPVs); err != nil {
-		t.Errorf("API reactor validation failed: %v", err)
+	// Check API objects updated by the binder.
+	apiPVs, err := env.client.CoreV1().PersistentVolumes().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Errorf("failed to list PersistentVolumes: %v", err)
+		return
+	}
+
+	expectedMap := make(map[string]*v1.PersistentVolume, len(expectedAPIPVs))
+	for _, pv := range expectedAPIPVs {
+		pv := pv.DeepCopy()
+		pv.ResourceVersion = ""
+		pv.ManagedFields = nil
+		if pv.Spec.ClaimRef != nil {
+			pv.Spec.ClaimRef.ResourceVersion = ""
+		}
+		expectedMap[pv.Name] = pv
+	}
+
+	gotMap := make(map[string]*v1.PersistentVolume, len(apiPVs.Items))
+	for i := range apiPVs.Items {
+		pv := apiPVs.Items[i].DeepCopy()
+		pv.ResourceVersion = ""
+		pv.ManagedFields = nil
+		if pv.Spec.ClaimRef != nil {
+			pv.Spec.ClaimRef.ResourceVersion = ""
+		}
+		gotMap[pv.Name] = pv
+	}
+
+	if diff := cmp.Diff(expectedMap, gotMap); diff != "" {
+		t.Errorf("API PersistentVolume check failed (-want, +got):\n%s", diff)
 	}
 }
 
@@ -564,9 +626,31 @@ func (env *testEnv) validateProvision(
 		}
 	}
 
-	// Check reactor for API updates
-	if err := env.reactor.CheckClaims(expectedAPIPVCs); err != nil {
-		t.Errorf("API reactor validation failed: %v", err)
+	// Check API objects updated by the binder.
+	apiPVCs, err := env.client.CoreV1().PersistentVolumeClaims(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Errorf("failed to list PersistentVolumeClaims: %v", err)
+		return
+	}
+
+	expectedMap := make(map[string]*v1.PersistentVolumeClaim, len(expectedAPIPVCs))
+	for _, pvc := range expectedAPIPVCs {
+		pvc := pvc.DeepCopy()
+		pvc.ResourceVersion = ""
+		pvc.ManagedFields = nil
+		expectedMap[getPVCName(pvc)] = pvc
+	}
+
+	gotMap := make(map[string]*v1.PersistentVolumeClaim, len(apiPVCs.Items))
+	for i := range apiPVCs.Items {
+		pvc := apiPVCs.Items[i].DeepCopy()
+		pvc.ResourceVersion = ""
+		pvc.ManagedFields = nil
+		gotMap[getPVCName(pvc)] = pvc
+	}
+
+	if diff := cmp.Diff(expectedMap, gotMap); diff != "" {
+		t.Errorf("API PersistentVolumeClaim check failed (-want, +got):\n%s", diff)
 	}
 }
 
@@ -1438,6 +1522,9 @@ func TestBindAPIUpdate(t *testing.T) {
 		// if nil, use cachedPVCs
 		apiPVCs []*v1.PersistentVolumeClaim
 
+		// API update error to inject, if any.
+		apiUpdateError *apiUpdateError
+
 		// Expected return values
 		shouldFail  bool
 		expectedPVs []*v1.PersistentVolume
@@ -1483,11 +1570,13 @@ func TestBindAPIUpdate(t *testing.T) {
 			provisionedPVCs: []*v1.PersistentVolumeClaim{},
 		},
 		"api-update-failed": {
+			apiUpdateError: &apiUpdateError{
+				resource: "persistentvolumes",
+				name:     "pv-node1b",
+			},
 			bindings:        []*BindingInfo{makeBinding(unboundPVC, pvNode1aBound), makeBinding(unboundPVC2, pvNode1bBound)},
 			cachedPVs:       []*v1.PersistentVolume{pvNode1a, pvNode1b},
-			apiPVs:          []*v1.PersistentVolume{pvNode1a, pvNode1bBoundHigherVersion},
 			expectedPVs:     []*v1.PersistentVolume{pvNode1aBound, pvNode1b},
-			expectedAPIPVs:  []*v1.PersistentVolume{pvNode1aBound, pvNode1bBoundHigherVersion},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{},
 			shouldFail:      true,
 		},
@@ -1498,23 +1587,27 @@ func TestBindAPIUpdate(t *testing.T) {
 			expectedPVCs:    []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVC)},
 		},
 		"provision-api-update-failed": {
+			apiUpdateError: &apiUpdateError{
+				resource: "persistentvolumeclaims",
+				name:     "provisioned-pvc2",
+			},
 			bindings:        []*BindingInfo{},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVC), addProvisionAnn(provisionedPVC2)},
 			cachedPVCs:      []*v1.PersistentVolumeClaim{provisionedPVC, provisionedPVC2},
-			apiPVCs:         []*v1.PersistentVolumeClaim{provisionedPVC, provisionedPVCHigherVersion},
 			expectedPVCs:    []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVC), provisionedPVC2},
-			expectedAPIPVCs: []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVC), provisionedPVCHigherVersion},
 			shouldFail:      true,
 		},
 		"binding-succeed, provision-api-update-failed": {
+			apiUpdateError: &apiUpdateError{
+				resource: "persistentvolumeclaims",
+				name:     "provisioned-pvc2",
+			},
 			bindings:        []*BindingInfo{makeBinding(unboundPVC, pvNode1aBound)},
 			cachedPVs:       []*v1.PersistentVolume{pvNode1a},
 			expectedPVs:     []*v1.PersistentVolume{pvNode1aBound},
 			provisionedPVCs: []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVC), addProvisionAnn(provisionedPVC2)},
 			cachedPVCs:      []*v1.PersistentVolumeClaim{provisionedPVC, provisionedPVC2},
-			apiPVCs:         []*v1.PersistentVolumeClaim{provisionedPVC, provisionedPVCHigherVersion},
 			expectedPVCs:    []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVC), provisionedPVC2},
-			expectedAPIPVCs: []*v1.PersistentVolumeClaim{addProvisionAnn(provisionedPVC), provisionedPVCHigherVersion},
 			shouldFail:      true,
 		},
 	}
@@ -1538,6 +1631,7 @@ func TestBindAPIUpdate(t *testing.T) {
 		testEnv.initVolumes(t, scenario.cachedPVs, scenario.apiPVs)
 		testEnv.initClaims(t, scenario.cachedPVCs, scenario.apiPVCs)
 		testEnv.assumeVolumes(t, "node1", pod, scenario.bindings, scenario.provisionedPVCs)
+		testEnv.addAPIUpdateConflictReactor(t, scenario.apiUpdateError)
 
 		// Execute
 		err := testEnv.internalBinder.bindAPIUpdate(ctx, pod, scenario.bindings, scenario.provisionedPVCs)
@@ -1910,6 +2004,8 @@ func TestBindPodVolumes(t *testing.T) {
 		apiPV  *v1.PersistentVolume
 		apiPVC *v1.PersistentVolumeClaim
 
+		apiUpdateError *apiUpdateError
+
 		// This function runs with a delay of 5 seconds
 		delayFunc func(t *testing.T, ctx context.Context, testEnv *testEnv, pod *v1.Pod, pvs []*v1.PersistentVolume, pvcs []*v1.PersistentVolumeClaim)
 
@@ -1969,11 +2065,15 @@ func TestBindPodVolumes(t *testing.T) {
 			},
 		},
 		"bound-by-pv-controller-before-bind": {
-			initPVs:    []*v1.PersistentVolume{pvNode1a},
-			initPVCs:   []*v1.PersistentVolumeClaim{unboundPVC},
-			binding:    makeBinding(unboundPVC, pvNode1aBound),
-			apiPV:      pvNode1aBound,
-			apiPVC:     boundPVCNode1a,
+			initPVs:  []*v1.PersistentVolume{pvNode1a},
+			initPVCs: []*v1.PersistentVolumeClaim{unboundPVC},
+			binding:  makeBinding(unboundPVC, pvNode1aBound),
+			apiPV:    pvNode1aBound,
+			apiPVC:   boundPVCNode1a,
+			apiUpdateError: &apiUpdateError{
+				resource: "persistentvolumes",
+				name:     pvNode1a.Name,
+			},
 			shouldFail: true, // bindAPIUpdate will fail because API conflict
 		},
 		"pod-deleted-after-time": {
@@ -2076,6 +2176,7 @@ func TestBindPodVolumes(t *testing.T) {
 				t.Fatalf("failed to update PVC %q", getPVCName(scenario.apiPVC))
 			}
 		}
+		testEnv.addAPIUpdateConflictReactor(t, scenario.apiUpdateError)
 
 		if scenario.delayFunc != nil {
 			go func(scenario scenarioType) {
