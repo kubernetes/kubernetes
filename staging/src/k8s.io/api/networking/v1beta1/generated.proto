@@ -200,6 +200,7 @@ message IngressClassParametersReference {
 
   // scope represents if this refers to a cluster or namespace scoped resource.
   // This may be set to "Cluster" (default) or "Namespace".
+  // +k8s:alpha(since: "1.37")=+k8s:required
   optional string scope = 4;
 
   // namespace is the namespace of the resource being referenced. This field is
