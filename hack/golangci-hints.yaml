@@ -573,7 +573,7 @@ linters:
         # Makes wait.Group obsolete.
         # Please enable when all supported Kubernetes versions
         # are on GoLang 1.25+
-        - waitgroup
+        - waitgroupgo
 
     revive:
       # Only these rules are enabled.
