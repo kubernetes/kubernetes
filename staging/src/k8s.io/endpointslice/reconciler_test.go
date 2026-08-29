@@ -1210,21 +1210,21 @@ func TestReconcilerDeleteEndpointSlice(t *testing.T) {
 					}
 					expectTrackedGeneration(t, r.endpointSliceTracker, cachedSlice, expectedGeneration)
 
-				//nolint:staticcheck // intentionally asserting the deprecated metric during the deprecation period
-				deleted, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChanges.WithLabelValues("delete"))
-				if err != nil {
-					t.Fatalf("Failed to get EndpointSlice deletion metric: %v", err)
-				}
-				if deleted != testCase.wantDeleteMetric {
-					t.Errorf("Expected EndpointSlice deletion metric %v, got %v", testCase.wantDeleteMetric, deleted)
-				}
-				deletedTotal, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChangesTotal.WithLabelValues("delete"))
-				if err != nil {
-					t.Fatalf("Failed to get EndpointSlice deletion total metric: %v", err)
-				}
-				if deletedTotal != testCase.wantDeleteMetric {
-					t.Errorf("Expected EndpointSlice deletion total metric %v, got %v", testCase.wantDeleteMetric, deletedTotal)
-				}
+					//nolint:staticcheck // intentionally asserting the deprecated metric during the deprecation period
+					deleted, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChanges.WithLabelValues("delete"))
+					if err != nil {
+						t.Fatalf("Failed to get EndpointSlice deletion metric: %v", err)
+					}
+					if deleted != testCase.wantDeleteMetric {
+						t.Errorf("Expected EndpointSlice deletion metric %v, got %v", testCase.wantDeleteMetric, deleted)
+					}
+					deletedTotal, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChangesTotal.WithLabelValues("delete"))
+					if err != nil {
+						t.Fatalf("Failed to get EndpointSlice deletion total metric: %v", err)
+					}
+					if deletedTotal != testCase.wantDeleteMetric {
+						t.Errorf("Expected EndpointSlice deletion total metric %v, got %v", testCase.wantDeleteMetric, deletedTotal)
+					}
 					if deletePath.name == "finalize" {
 						changed, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("Disabled", ""))
 						if err != nil {
