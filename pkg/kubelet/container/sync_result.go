@@ -27,7 +27,7 @@ import (
 // BackoffError should be used whenever an error needs to specify a particular backoff duration
 // to the Kubelet.
 type BackoffError struct {
-	error
+	error       error
 	backoffTime time.Time
 }
 
@@ -36,6 +36,13 @@ func NewBackoffError(err error, backoffTime time.Time) *BackoffError {
 		error:       err,
 		backoffTime: backoffTime,
 	}
+}
+
+func (b *BackoffError) Error() string {
+	return b.error.Error()
+}
+func (b *BackoffError) Unwrap() error {
+	return b.error
 }
 
 // BackoffTime returns the expected expiration time of the backoff.
