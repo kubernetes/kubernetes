@@ -88,6 +88,9 @@ type EditOptions struct {
 	FieldManager string
 
 	Subresource string
+
+	ServerSideApply bool
+	ForceConflicts  bool
 }
 
 // NewEditOptions returns an initialized EditOptions instance
@@ -222,11 +225,19 @@ func (o *EditOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Comm
 	o.CmdNamespace = cmdNamespace
 	o.f = f
 
+	if cmd.Flags().Lookup("server-side") != nil {
+		o.ServerSideApply = cmdutil.GetServerSideApplyFlag(cmd)
+		o.ForceConflicts = cmdutil.GetForceConflictsFlag(cmd)
+	}
+
 	return nil
 }
 
 // Validate checks the EditOptions to see if there is sufficient information to run the command.
 func (o *EditOptions) Validate() error {
+	if o.ForceConflicts && !o.ServerSideApply {
+		return fmt.Errorf("--force-conflicts only works with --server-side")
+	}
 	return nil
 }
 
@@ -360,11 +371,13 @@ func (o *EditOptions) Run() error {
 			updatedVisitor := resource.InfoListVisitor(updatedInfos)
 
 			// we need to add back managedFields to both updated and original object
-			if err := o.restoreManagedFields(updatedInfos); err != nil {
-				return preservedFile(err, file, o.ErrOut)
-			}
-			if err := o.restoreManagedFields(infos); err != nil {
-				return preservedFile(err, file, o.ErrOut)
+			if !o.ServerSideApply {
+				if err := o.restoreManagedFields(updatedInfos); err != nil {
+					return preservedFile(err, file, o.ErrOut)
+				}
+				if err := o.restoreManagedFields(infos); err != nil {
+					return preservedFile(err, file, o.ErrOut)
+				}
 			}
 
 			// need to make sure the original namespace wasn't changed while editing
@@ -393,11 +406,15 @@ func (o *EditOptions) Run() error {
 
 			// Handle all possible errors
 			//
-			// 1. retryable: propose kubectl replace -f
+			// 1. retryable: preserve the edited file and provide mode-appropriate recovery instructions
 			// 2. notfound: indicate the location of the saved configuration of the deleted resource
 			// 3. invalid: retry those on the spot by looping ie. reloading the editor
 			if results.retryable > 0 {
-				fmt.Fprintf(o.ErrOut, "You can run `%s replace -f %s` to try this update again.\n", filepath.Base(os.Args[0]), file)
+				if o.ServerSideApply {
+					fmt.Fprintf(o.ErrOut, "Your changes have been saved to %q.\n", file)
+				} else {
+					fmt.Fprintf(o.ErrOut, "You can run `%s replace -f %s` to try this update again.\n", filepath.Base(os.Args[0]), file)
+				}
 				return cmdutil.ErrExit
 			}
 			if results.notfound > 0 {
@@ -658,65 +675,99 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 			return printer.PrintObj(info.Object, o.Out)
 		}
 
-		preconditions := []mergepatch.PreconditionFunc{
-			mergepatch.RequireKeyUnchanged("apiVersion"),
-			mergepatch.RequireKeyUnchanged("kind"),
-			mergepatch.RequireMetadataKeyUnchanged("name"),
-			mergepatch.RequireKeyUnchanged("managedFields"),
-		}
+		var patched runtime.Object
+		if o.ServerSideApply {
+			applyObject := info.Object.DeepCopyObject()
+			// SSA requests must not include managedFields in the body - server manages them.
+			// Ensure managedFields are cleared (they may have been extracted in Run(),
+			// but this is defensive for cases where visitToPatch is called directly).
+			if _, _, err := clearManagedFields(applyObject); err != nil {
+				return err
+			}
+			data, err := runtime.Encode(unstructured.UnstructuredJSONScheme, applyObject)
+			if err != nil {
+				return err
+			}
+			if o.OutputPatch {
+				fmt.Fprintf(o.Out, "Patch: %s\n", string(data))
+			}
 
-		// Create the versioned struct from the type defined in the mapping
-		// (which is the API version we'll be submitting the patch to)
-		versionedObject, err := scheme.Scheme.New(info.Mapping.GroupVersionKind)
-		var patchType types.PatchType
-		var patch []byte
-		switch {
-		case runtime.IsNotRegisteredError(err):
-			// fall back to generic JSON merge patch
-			patchType = types.MergePatchType
-			patch, err = jsonpatch.CreateMergePatch(originalJS, editedJS)
+			options := metav1.PatchOptions{Force: &o.ForceConflicts}
+
+			patched, err = resource.NewHelper(info.Client, info.Mapping).
+				WithFieldManager(o.FieldManager).
+				WithFieldValidation(o.ValidationDirective).
+				WithSubresource(o.Subresource).
+				Patch(info.Namespace, info.Name, types.ApplyPatchType, data, &options)
 			if err != nil {
-				klog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
-				return err
+				if apierrors.HasStatusCause(err, metav1.CauseTypeFieldManagerConflict) {
+					err = fmt.Errorf(`%w
+If you intend to take ownership of the conflicting fields, re-run the edit command with the `+"`--force-conflicts`"+` flag.`, err)
+				}
+				fmt.Fprintln(o.ErrOut, results.addError(err, info))
+				return nil
 			}
-			var patchMap map[string]interface{}
-			err = json.Unmarshal(patch, &patchMap)
-			if err != nil {
-				klog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
-				return err
+		} else {
+			preconditions := []mergepatch.PreconditionFunc{
+				mergepatch.RequireKeyUnchanged("apiVersion"),
+				mergepatch.RequireKeyUnchanged("kind"),
+				mergepatch.RequireMetadataKeyUnchanged("name"),
+				mergepatch.RequireKeyUnchanged("managedFields"),
 			}
-			for _, precondition := range preconditions {
-				if !precondition(patchMap) {
+
+			// Create the versioned struct from the type defined in the mapping
+			// (which is the API version we'll be submitting the patch to)
+			versionedObject, err := scheme.Scheme.New(info.Mapping.GroupVersionKind)
+			var patchType types.PatchType
+			var patch []byte
+			switch {
+			case runtime.IsNotRegisteredError(err):
+				// fall back to generic JSON merge patch
+				patchType = types.MergePatchType
+				patch, err = jsonpatch.CreateMergePatch(originalJS, editedJS)
+				if err != nil {
 					klog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
-					return fmt.Errorf("%s", "At least one of apiVersion, kind and name was changed")
+					return err
 				}
-			}
-		case err != nil:
-			return err
-		default:
-			patchType = types.StrategicMergePatchType
-			patch, err = strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, versionedObject, preconditions...)
-			if err != nil {
-				klog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
-				if mergepatch.IsPreconditionFailed(err) {
-					return fmt.Errorf("%s", "At least one of apiVersion, kind and name was changed")
+				var patchMap map[string]interface{}
+				err = json.Unmarshal(patch, &patchMap)
+				if err != nil {
+					klog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
+					return err
 				}
+				for _, precondition := range preconditions {
+					if !precondition(patchMap) {
+						klog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
+						return fmt.Errorf("%s", "At least one of apiVersion, kind and name was changed")
+					}
+				}
+			case err != nil:
 				return err
+			default:
+				patchType = types.StrategicMergePatchType
+				patch, err = strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, versionedObject, preconditions...)
+				if err != nil {
+					klog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
+					if mergepatch.IsPreconditionFailed(err) {
+						return fmt.Errorf("%s", "At least one of apiVersion, kind and name was changed")
+					}
+					return err
+				}
 			}
-		}
 
-		if o.OutputPatch {
-			fmt.Fprintf(o.Out, "Patch: %s\n", string(patch))
-		}
+			if o.OutputPatch {
+				fmt.Fprintf(o.Out, "Patch: %s\n", string(patch))
+			}
 
-		patched, err := resource.NewHelper(info.Client, info.Mapping).
-			WithFieldManager(o.FieldManager).
-			WithFieldValidation(o.ValidationDirective).
-			WithSubresource(o.Subresource).
-			Patch(info.Namespace, info.Name, patchType, patch, nil)
-		if err != nil {
-			fmt.Fprintln(o.ErrOut, results.addError(err, info))
-			return nil
+			patched, err = resource.NewHelper(info.Client, info.Mapping).
+				WithFieldManager(o.FieldManager).
+				WithFieldValidation(o.ValidationDirective).
+				WithSubresource(o.Subresource).
+				Patch(info.Namespace, info.Name, patchType, patch, nil)
+			if err != nil {
+				fmt.Fprintln(o.ErrOut, results.addError(err, info))
+				return nil
+			}
 		}
 		info.Refresh(patched, true)
 		printer, err := o.ToPrinter("edited")
@@ -761,7 +812,6 @@ func (o *EditOptions) visitAnnotation(annotationVisitor resource.Visitor) error 
 		}
 
 		return nil
-
 	})
 	return err
 }

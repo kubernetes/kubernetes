@@ -53,6 +53,8 @@ type EditTestCase struct {
 	SaveConfig       string   `yaml:"saveConfig"`
 	Subresource      string   `yaml:"subresource"`
 	Namespace        string   `yaml:"namespace"`
+	ServerSide       string   `yaml:"serverSide"`
+	ForceConflicts   string   `yaml:"forceConflicts"`
 	ExpectedStdout   []string `yaml:"expectedStdout"`
 	ExpectedStderr   []string `yaml:"expectedStderr"`
 	ExpectedExitCode int      `yaml:"expectedExitCode"`
@@ -254,6 +256,12 @@ func TestEdit(t *testing.T) {
 			}
 			if len(testcase.Subresource) > 0 {
 				cmd.Flags().Set("subresource", testcase.Subresource)
+			}
+			if len(testcase.ServerSide) > 0 {
+				cmd.Flags().Set("server-side", testcase.ServerSide)
+			}
+			if len(testcase.ForceConflicts) > 0 {
+				cmd.Flags().Set("force-conflicts", testcase.ForceConflicts)
 			}
 
 			cmdutil.BehaviorOnFatal(func(str string, code int) {
