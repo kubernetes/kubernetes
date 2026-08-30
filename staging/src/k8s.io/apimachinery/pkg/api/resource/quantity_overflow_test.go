@@ -29,8 +29,6 @@ import (
 // split by assertion shape, not one fix per row (a row may carry TODOs from
 // several fixes):
 //   - accessorCases: a quantity read through every accessor.
-//   - mutationCases: Neg/Sub of MinInt64, checked by value (Cmp/String); the
-//     accessor overflow of the result belongs to two-to-63-parsed.
 //   - parseErrorCases: input that parses today but should be rejected.
 //   - archSplitCases: ToDec rows whose int64 accessors are arch-dependent
 //     (golang/go#45588: MinInt64 amd64, MaxInt64 arm64), so they are guarded.
@@ -423,47 +421,6 @@ func quantityAccessorCases() []accessorCase {
 	}
 }
 
-// mutationCase pins the wrong Quantity that Neg/Sub of MinInt64 produce today.
-// -MinInt64 overflows int64 back to MinInt64, so the result stays negative. We
-// check by value (Cmp/String), not accessor; the accessor overflow of the fixed
-// +2^63 is two-to-63-parsed's job.
-type mutationCase struct {
-	name       string
-	load       func() Quantity
-	wantEqual  string // what the result Cmp-equals today
-	wantSign   int
-	wantString string
-	fixedEqual string // what a fixed operation should equal
-	issue      string
-}
-
-func quantityMutationCases() []mutationCase {
-	return []mutationCase{
-		{
-			name:       "neg-of-min-int64",
-			load:       func() Quantity { q := NewQuantity(math.MinInt64, DecimalSI); q.Neg(); return *q },
-			wantEqual:  "-9223372036854775808",
-			wantSign:   -1,
-			wantString: "-9223372036854775808",
-			fixedEqual: "9223372036854775808",
-			issue:      "Neg of MinInt64 overflows int64 back to MinInt64 instead of +2^63 (#141166)",
-		},
-		{
-			name: "zero-sub-min-int64",
-			load: func() Quantity {
-				q := NewQuantity(0, DecimalSI)
-				q.Sub(*NewQuantity(math.MinInt64, DecimalSI))
-				return *q
-			},
-			wantEqual:  "-9223372036854775808",
-			wantSign:   -1,
-			wantString: "-9223372036854775808",
-			fixedEqual: "9223372036854775808",
-			issue:      "0 - MinInt64 overflows int64 back to MinInt64 instead of +2^63 (#141166)",
-		},
-	}
-}
-
 // parseErrorCase covers input ParseQuantity accepts today but should reject.
 type parseErrorCase struct {
 	name  string
@@ -570,24 +527,6 @@ func assertAccessors(t *testing.T, tc accessorCase) {
 func TestQuantityAccessorBaseline(t *testing.T) {
 	for _, tc := range quantityAccessorCases() {
 		assertAccessors(t, tc)
-	}
-}
-
-func TestQuantityMutationBaseline(t *testing.T) {
-	for _, tc := range quantityMutationCases() {
-		t.Run(tc.name, func(t *testing.T) {
-			q := tc.load()
-			cur := MustParse(tc.wantEqual)
-			if c := q.Cmp(cur); c != 0 {
-				t.Errorf("Cmp(%s) = %d, want 0 (pinned to today's wrong result; the fixed operation should equal %s: %s)", tc.wantEqual, c, tc.fixedEqual, tc.issue)
-			}
-			if got := q.Sign(); got != tc.wantSign {
-				t.Errorf("Sign() = %d, want %d (pinned to today; %s)", got, tc.wantSign, tc.issue)
-			}
-			if got := q.String(); got != tc.wantString {
-				t.Errorf("String() = %q, want %q (pinned to today; fixed operation gives %q)", got, tc.wantString, tc.fixedEqual)
-			}
-		})
 	}
 }
 

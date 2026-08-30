@@ -1165,6 +1165,222 @@ func TestNeg(t *testing.T) {
 	}
 }
 
+func TestNegAndSubAtMostNegative(t *testing.T) {
+	// -mostNegative is 2^63, which doesn't fit in an int64, so Neg and Sub have to
+	// switch to inf.Dec instead of wrapping back to mostNegative.
+	want := MustParse("9223372036854775808") // 2^63
+
+	check := func(name string, got Quantity) {
+		t.Helper()
+		// AsInt64 must run before Cmp: Cmp promotes got to the Dec backend in place
+		// (via AsDec), after which AsInt64 always returns ok=false and can no longer
+		// catch a result the fix should have moved off the int64 backend.
+		if v, ok := got.AsInt64(); ok {
+			t.Errorf("%s: AsInt64() = (%d, true), want ok=false because 2^63 does not fit int64", name, v)
+		}
+		if got.Sign() != 1 {
+			t.Errorf("%s: Sign() = %d, want 1", name, got.Sign())
+		}
+		if got.String() != "9223372036854775808" {
+			t.Errorf("%s: String() = %q, want 9223372036854775808", name, got.String())
+		}
+		if got.Cmp(want) != 0 {
+			t.Errorf("%s = %s, want 9223372036854775808", name, got.String())
+		}
+	}
+
+	neg := intQuantity(mostNegative, 0, DecimalSI)
+	neg.Neg()
+	check("intQuantity(mostNegative).Neg()", neg)
+
+	sub := Quantity{Format: DecimalSI} // zero
+	sub.Sub(intQuantity(mostNegative, 0, DecimalSI))
+	check("zero.Sub(intQuantity(mostNegative))", sub)
+
+	// The zero minuend above hits Add's zero shortcut on the old code; a non-zero
+	// one hit its regular add path, so cover that too. 1 - mostNegative is 2^63+1.
+	oneSub := intQuantity(1, 0, DecimalSI)
+	oneSub.Sub(intQuantity(mostNegative, 0, DecimalSI))
+	// AsInt64 before Cmp again: 2^63+1 does not fit an int64, and on the old code the
+	// wrong int64-backed result reported otherwise.
+	if v, ok := oneSub.AsInt64(); ok {
+		t.Errorf("1 - mostNegative: AsInt64() = (%d, true), want ok=false because 2^63+1 does not fit int64", v)
+	}
+	if w := MustParse("9223372036854775809"); oneSub.Cmp(w) != 0 || oneSub.String() != "9223372036854775809" {
+		t.Errorf("1 - mostNegative = %s, want 9223372036854775809", oneSub.String())
+	}
+
+	// mostNegative+1 negates to mostPositive, which still fits an int64, so it must
+	// stay on the fast path rather than be promoted to inf.Dec.
+	neighbor := intQuantity(mostNegative+1, 0, DecimalSI)
+	neighbor.Neg()
+	if v, ok := neighbor.AsInt64(); !ok || v != mostPositive {
+		t.Errorf("intQuantity(mostNegative+1).Neg().AsInt64() = (%d, %t), want (%d, true)", v, ok, int64(mostPositive))
+	}
+
+	// The subtrahend boundary is symmetric: mostNegative+1 does not trip Sub's guard,
+	// so it stays on the int64 fast path. 0 - (mostNegative+1) is mostPositive, which
+	// fits, and must not be promoted to inf.Dec.
+	subNeighbor := Quantity{Format: DecimalSI}
+	subNeighbor.Sub(intQuantity(mostNegative+1, 0, DecimalSI))
+	if v, ok := subNeighbor.AsInt64(); !ok || v != mostPositive {
+		t.Errorf("zero.Sub(intQuantity(mostNegative+1)).AsInt64() = (%d, %t), want (%d, true)", v, ok, int64(mostPositive))
+	}
+
+	// Switching to inf.Dec has to keep the scale, not just the mantissa.
+	scaled := intQuantity(mostNegative, Milli, DecimalSI)
+	scaled.Neg()
+	if got := scaled.String(); got != "9223372036854775808m" {
+		t.Errorf("intQuantity(mostNegative, Milli).Neg() = %q, want 9223372036854775808m", got)
+	}
+
+	// Sub takes the same inf.Dec fallback for a scaled subtrahend and keeps the scale.
+	scaledSub := intQuantity(1, Milli, DecimalSI)
+	scaledSub.Sub(intQuantity(mostNegative, Milli, DecimalSI))
+	if got := scaledSub.String(); got != "9223372036854775809m" {
+		t.Errorf("intQuantity(1, Milli).Sub(intQuantity(mostNegative, Milli)) = %q, want 9223372036854775809m", got)
+	}
+
+	// A plain zero receiver takes the 0 - y == -y shortcut, so the scale comes from
+	// the subtrahend. AsInt64 is not asserted here: it returns ok=false on both the
+	// old code (negative scale) and the fixed code (Dec backend), so it can't tell
+	// them apart. String and Sign can.
+	zeroScaledSub := Quantity{Format: DecimalSI}
+	zeroScaledSub.Sub(*NewScaledQuantity(mostNegative, Milli))
+	if got := zeroScaledSub.String(); got != "9223372036854775808m" {
+		t.Errorf("zero.Sub(NewScaledQuantity(mostNegative, Milli)) = %q, want 9223372036854775808m", got)
+	}
+	if zeroScaledSub.Sign() != 1 {
+		t.Errorf("zero.Sub(NewScaledQuantity(mostNegative, Milli)): Sign() = %d, want 1", zeroScaledSub.Sign())
+	}
+}
+
+func TestMostNegativeAtUnrepresentableScaleStaysInt64(t *testing.T) {
+	// Scale(math.MinInt32) can't be negated into an inf.Scale, so Neg and Sub keep a
+	// mostNegative value on the int64 backend instead of promoting it; the decimal
+	// fallback would rescale that scale and panic. This only pins that the still-open
+	// boundary is not made worse, it does not claim the wrapped value is correct.
+	minScale := Scale(math.MinInt32)
+
+	t.Run("Neg", func(t *testing.T) {
+		q := intQuantity(mostNegative, minScale, DecimalSI)
+		q.Neg()
+		if q.d.Dec != nil {
+			t.Fatal("Neg promoted the unrepresentable scale to inf.Dec")
+		}
+		if q.i.value != mostNegative || q.i.scale != minScale {
+			t.Fatalf("Neg changed the int64 amount to {value:%d, scale:%d}", q.i.value, q.i.scale)
+		}
+	})
+
+	t.Run("zeroSub", func(t *testing.T) {
+		q := Quantity{Format: DecimalSI}
+		q.Sub(intQuantity(mostNegative, minScale, DecimalSI))
+		if q.d.Dec != nil {
+			t.Fatal("zero Sub promoted the unrepresentable scale to inf.Dec")
+		}
+		if q.i.value != mostNegative || q.i.scale != minScale {
+			t.Fatalf("zero Sub changed the int64 amount to {value:%d, scale:%d}", q.i.value, q.i.scale)
+		}
+	})
+
+	t.Run("nonZeroSub", func(t *testing.T) {
+		q := intQuantity(5, minScale, DecimalSI)
+		q.Sub(intQuantity(mostNegative, minScale, DecimalSI))
+		if q.d.Dec != nil {
+			t.Fatal("non-zero Sub promoted the unrepresentable scale to inf.Dec")
+		}
+		// The value and scale keep their existing wrapped int64 behavior, so this
+		// pins that the PR does not make the unresolved boundary worse rather than
+		// only checking that it did not promote.
+		if want := (int64Amount{value: mostNegative + 5, scale: minScale}); q.i != want {
+			t.Fatalf("non-zero Sub result = %#v, want %#v", q.i, want)
+		}
+	})
+
+	t.Run("receiverAtMinScaleMinusNormalMostNegative", func(t *testing.T) {
+		// The guard must look at the receiver's scale too. A mostNegative
+		// subtrahend at a normal scale would otherwise force the inf.Dec fallback,
+		// which promotes this MinInt32-scale receiver and panics in the rescale.
+		q := intQuantity(5, minScale, DecimalSI)
+		q.Sub(intQuantity(mostNegative, 0, DecimalSI))
+		if q.d.Dec != nil {
+			t.Fatal("Sub promoted a MinInt32-scale receiver to inf.Dec")
+		}
+	})
+
+	t.Run("unalignableScaleDeltaStaysInt64", func(t *testing.T) {
+		// Both scales are representable on their own, but their alignment delta
+		// (MaxInt32+1) is not. Forcing the inf.Dec fallback here would overflow
+		// the rescale exponent and panic, so this stays on the int64 path.
+		q := intQuantity(1, Scale(math.MaxInt32), DecimalSI)
+		q.Sub(intQuantity(mostNegative, -1, DecimalSI))
+		if q.d.Dec != nil {
+			t.Fatal("Sub promoted an unalignable scale pair to inf.Dec")
+		}
+	})
+}
+
+func TestZeroSubMostNegativePreservesScale(t *testing.T) {
+	// 0 - mostNegative at a large scale must not rescale: the shortcut negates a copy
+	// of the subtrahend, keeping its scale, so no 10^scale alignment is built. A scale
+	// of 100 is observable without a time or memory probe, a rescale to 0 would change
+	// the backend scale checked below.
+	q := Quantity{Format: DecimalSI}
+	q.Sub(*NewScaledQuantity(mostNegative, 100))
+
+	if q.d.Dec == nil {
+		t.Fatal("result stayed on the int64 backend, want inf.Dec")
+	}
+	if got, want := q.d.Dec.Scale(), inf.Scale(-100); got != want {
+		t.Fatalf("result scale = %d, want %d", got, want)
+	}
+	wantUnscaled := new(big.Int).Neg(big.NewInt(mostNegative)) // 2^63
+	if got := q.d.Dec.UnscaledBig(); got.Cmp(wantUnscaled) != 0 {
+		t.Fatalf("result unscaled = %s, want %s", got, wantUnscaled)
+	}
+}
+
+func TestSubMostNegativeCrossScale(t *testing.T) {
+	// A positive minuend at a higher scale reaches the inf.Dec fallback and must not
+	// wrap: 10 - mostNegative is 2^63+10. The existing same-scale cases don't cover
+	// the cross-scale add path.
+	q := intQuantity(1, 1, DecimalSI) // 10
+	q.Sub(intQuantity(mostNegative, 0, DecimalSI))
+
+	if got, want := q.String(), "9223372036854775818"; got != want {
+		t.Fatalf("10 - mostNegative = %s, want %s", got, want)
+	}
+	if v, ok := q.AsInt64(); ok {
+		t.Fatalf("AsInt64() = (%d, true), want ok=false because 2^63+10 does not fit int64", v)
+	}
+}
+
+func TestZeroSubMostNegativeInheritsFormat(t *testing.T) {
+	// The zero receiver adopts the subtrahend's format, and the result is still on the
+	// Dec backend, so pin both together. 2^63 is 8Ei in BinarySI. This asserts the
+	// canonical rendering only, not a round trip: ParseQuantity caps 8Ei back to
+	// MaxInt64, which is tracked separately in #140674.
+	q := Quantity{Format: DecimalSI}
+	q.Sub(intQuantity(mostNegative, 0, BinarySI))
+
+	if q.Format != BinarySI {
+		t.Fatalf("Format = %v, want BinarySI", q.Format)
+	}
+	if got, want := q.String(), "8Ei"; got != want {
+		t.Fatalf("String() = %s, want %s", got, want)
+	}
+	if v, ok := q.AsInt64(); ok {
+		t.Fatalf("AsInt64() = (%d, true), want ok=false", v)
+	}
+	// Pin the arithmetic value directly. "8Ei" is the canonical BinarySI spelling
+	// of 2^63 but does not round-trip (ParseQuantity caps it to MaxInt64, #140674),
+	// so the value, not that spelling, is what this test relies on for correctness.
+	if got := q.Cmp(MustParse("9223372036854775808")); got != 0 {
+		t.Fatalf("Cmp(2^63) = %d, want 0", got)
+	}
+}
+
 func TestAdd(t *testing.T) {
 	tests := []struct {
 		a        Quantity
