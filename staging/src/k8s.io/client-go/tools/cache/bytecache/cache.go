@@ -38,22 +38,22 @@ const (
 )
 
 // Enabled reports whether the experimental bytecache store is switched on.
-// Values: "1"/"reloc" (native relocation codec), "proto", "gob".
+// Values: "1"/"reloc" (native relocation codec), "proto", "gob", "0" (off).
+//
+// TEMPORARY (do not merge): defaults ON in proto mode so CI exercises the
+// store; the final default is off.
 func Enabled() bool {
-	v := os.Getenv("KUBE_BYTECACHE")
-	return v != "" && v != "0"
+	return os.Getenv("KUBE_BYTECACHE") != "0"
 }
 
 func kindFromEnv() codecKind {
 	switch os.Getenv("KUBE_BYTECACHE") {
 	case "1", "reloc":
 		return kindReloc
-	case "proto":
-		return kindProto
 	case "gob":
 		return kindGob
 	}
-	return kindReloc
+	return kindProto
 }
 
 func hotBudget() int {
