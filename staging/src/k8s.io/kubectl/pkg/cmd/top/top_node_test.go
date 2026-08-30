@@ -241,14 +241,14 @@ func runTopNodeTest(t *testing.T, opts runTopNodeOpts) string {
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
-	cmd := NewCmdTopNode(tf, nil, streams)
-	cmdOptions := &TopNodeOptions{
+	cmdFlags := &TopNodeFlags{
 		IOStreams: streams,
 		Selector:  opts.selector,
 		SortBy:    opts.sortBy,
 		ShowSwap:  opts.showSwap,
 	}
-	if err := cmdOptions.Complete(tf, cmd, opts.cmdArgs); err != nil {
+	cmdOptions, err := cmdFlags.ToOptions(tf, opts.cmdArgs)
+	if err != nil {
 		t.Fatal(err)
 	}
 	cmdOptions.MetricsClient = opts.fakeMetrics

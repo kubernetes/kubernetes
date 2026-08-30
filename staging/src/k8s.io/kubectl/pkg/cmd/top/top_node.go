@@ -19,6 +19,8 @@ package top
 import (
 	"context"
 	"errors"
+	"fmt"
+
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -38,15 +40,26 @@ import (
 	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
 )
 
-// TopNodeOptions contains all the options for running the top-node cli command.
-type TopNodeOptions struct {
-	ResourceName       string
+// TopNodeFlags directly reflect the information that CLI is gathering via flags.
+type TopNodeFlags struct {
 	Selector           string
 	SortBy             string
 	NoHeaders          bool
 	UseProtocolBuffers bool
 	ShowCapacity       bool
 	ShowSwap           bool
+
+	genericiooptions.IOStreams
+}
+
+// TopNodeOptions contains all the options for running the top-node cli command.
+type TopNodeOptions struct {
+	ResourceName string
+	Selector     string
+	SortBy       string
+	NoHeaders    bool
+	ShowCapacity bool
+	ShowSwap     bool
 
 	NodeClient      corev1client.CoreV1Interface
 	Printer         *metricsutil.TopCmdPrinter
@@ -70,12 +83,16 @@ var (
 		  kubectl top node NODE_NAME`))
 )
 
-func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericiooptions.IOStreams) *cobra.Command {
-	if o == nil {
-		o = &TopNodeOptions{
-			IOStreams:          streams,
-			UseProtocolBuffers: true,
-		}
+func NewTopNodeFlags(streams genericiooptions.IOStreams) *TopNodeFlags {
+	return &TopNodeFlags{
+		IOStreams:          streams,
+		UseProtocolBuffers: true,
+	}
+}
+
+func NewCmdTopNode(f cmdutil.Factory, flags *TopNodeFlags, streams genericiooptions.IOStreams) *cobra.Command {
+	if flags == nil {
+		flags = NewTopNodeFlags(streams)
 	}
 
 	cmd := &cobra.Command{
@@ -86,52 +103,68 @@ func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericiooption
 		Example:               topNodeExample,
 		ValidArgsFunction:     completion.ResourceNameCompletionFunc(f, "node"),
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			o, err := flags.ToOptions(f, args)
+			cmdutil.CheckErr(err)
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunTopNode())
 		},
 		Aliases: []string{"nodes", "no"},
 	}
-	cmdutil.AddLabelSelectorFlagVar(cmd, &o.Selector)
-	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.SortBy, "If non-empty, sort nodes list using specified field. The field can be either 'cpu' or 'memory'.")
-	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "If present, print output without headers")
-	cmd.Flags().BoolVar(&o.UseProtocolBuffers, "use-protocol-buffers", o.UseProtocolBuffers, "Enables using protocol-buffers to access Metrics API.")
-	cmd.Flags().BoolVar(&o.ShowCapacity, "show-capacity", o.ShowCapacity, "Print node resources based on Capacity instead of Allocatable(default) of the nodes.")
-	cmd.Flags().BoolVar(&o.ShowSwap, "show-swap", o.ShowSwap, "Print node resources related to swap memory.")
+	flags.AddFlags(cmd)
 
 	return cmd
 }
 
-func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+// AddFlags registers flags for a cli
+func (flags *TopNodeFlags) AddFlags(cmd *cobra.Command) {
+	cmdutil.AddLabelSelectorFlagVar(cmd, &flags.Selector)
+	cmd.Flags().StringVar(&flags.SortBy, "sort-by", flags.SortBy, "If non-empty, sort nodes list using specified field. The field can be either 'cpu' or 'memory'.")
+	cmd.Flags().BoolVar(&flags.NoHeaders, "no-headers", flags.NoHeaders, "If present, print output without headers")
+	cmd.Flags().BoolVar(&flags.UseProtocolBuffers, "use-protocol-buffers", flags.UseProtocolBuffers, "Enables using protocol-buffers to access Metrics API.")
+	cmd.Flags().BoolVar(&flags.ShowCapacity, "show-capacity", flags.ShowCapacity, "Print node resources based on Capacity instead of Allocatable(default) of the nodes.")
+	cmd.Flags().BoolVar(&flags.ShowSwap, "show-swap", flags.ShowSwap, "Print node resources related to swap memory.")
+}
+
+// ToOptions converts from CLI inputs to runtime inputs
+func (flags *TopNodeFlags) ToOptions(f cmdutil.Factory, args []string) (*TopNodeOptions, error) {
+	o := &TopNodeOptions{
+		Selector:     flags.Selector,
+		SortBy:       flags.SortBy,
+		NoHeaders:    flags.NoHeaders,
+		ShowCapacity: flags.ShowCapacity,
+		ShowSwap:     flags.ShowSwap,
+		IOStreams:    flags.IOStreams,
+	}
+
 	if len(args) == 1 {
 		o.ResourceName = args[0]
 	} else if len(args) > 1 {
-		return cmdutil.UsageErrorf(cmd, "%s", cmd.Use)
+		return nil, fmt.Errorf("unexpected arguments: %v", args[1:])
 	}
 
 	clientset, err := f.KubernetesClientSet()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	o.DiscoveryClient = clientset.DiscoveryClient
 
 	config, err := f.ToRESTConfig()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if o.UseProtocolBuffers {
+	if flags.UseProtocolBuffers {
 		config.ContentType = "application/vnd.kubernetes.protobuf"
 	}
 	o.MetricsClient, err = metricsclientset.NewForConfig(config)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	o.NodeClient = clientset.CoreV1()
 
 	o.Printer = metricsutil.NewTopCmdPrinter(o.Out, o.ShowSwap)
-	return nil
+	return o, nil
 }
 
 func (o *TopNodeOptions) Validate() error {
