@@ -28,17 +28,17 @@ import (
 //
 // PriorityLevelConfigurationCondition defines the condition of priority level.
 type PriorityLevelConfigurationConditionApplyConfiguration struct {
-	// `type` is the type of the condition.
+	// type is the type of the condition.
 	// Required.
 	Type *flowcontrolv1.PriorityLevelConfigurationConditionType `json:"type,omitempty"`
-	// `status` is the status of the condition.
+	// status is the status of the condition.
 	// Should be specified and set to one of True, False, Unknown.
 	Status *flowcontrolv1.ConditionStatus `json:"status,omitempty"`
-	// `lastTransitionTime` is the last time the condition transitioned from one status to another.
+	// lastTransitionTime is the last time the condition transitioned from one status to another.
 	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
-	// `reason` is a unique, one-word, CamelCase reason for the condition's last transition.
+	// reason is a unique, one-word, CamelCase reason for the condition's last transition.
 	Reason *string `json:"reason,omitempty"`
-	// `message` is a human-readable message indicating details about last transition.
+	// message is a human-readable message indicating details about last transition.
 	Message *string `json:"message,omitempty"`
 }
 

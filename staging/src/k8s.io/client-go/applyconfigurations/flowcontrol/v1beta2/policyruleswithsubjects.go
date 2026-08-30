@@ -31,11 +31,11 @@ type PolicyRulesWithSubjectsApplyConfiguration struct {
 	// A slice that includes both the system:authenticated and system:unauthenticated user groups matches every request.
 	// Required.
 	Subjects []SubjectApplyConfiguration `json:"subjects,omitempty"`
-	// `resourceRules` is a slice of ResourcePolicyRules that identify matching requests according to their verb and the
+	// resourceRules is a slice of ResourcePolicyRules that identify matching requests according to their verb and the
 	// target resource.
 	// At least one of `resourceRules` and `nonResourceRules` has to be non-empty.
 	ResourceRules []ResourcePolicyRuleApplyConfiguration `json:"resourceRules,omitempty"`
-	// `nonResourceRules` is a list of NonResourcePolicyRules that identify matching requests according to their verb
+	// nonResourceRules is a list of NonResourcePolicyRules that identify matching requests according to their verb
 	// and the target non-resource URL.
 	NonResourceRules []NonResourcePolicyRuleApplyConfiguration `json:"nonResourceRules,omitempty"`
 }

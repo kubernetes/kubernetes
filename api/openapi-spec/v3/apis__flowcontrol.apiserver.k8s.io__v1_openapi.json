@@ -5,12 +5,12 @@
         "description": "ExemptPriorityLevelConfiguration describes the configurable aspects of the handling of exempt requests. In the mandatory exempt configuration object the values in the fields here can be modified by authorized users, unlike the rest of the `spec`.",
         "properties": {
           "lendablePercent": {
-            "description": "`lendablePercent` prescribes the fraction of the level's NominalCL that can be borrowed by other priority levels.  This value of this field must be between 0 and 100, inclusive, and it defaults to 0. The number of seats that other levels can borrow from this level, known as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.\n\nLendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )",
+            "description": "lendablePercent prescribes the fraction of the level's NominalCL that can be borrowed by other priority levels.  This value of this field must be between 0 and 100, inclusive, and it defaults to 0. The number of seats that other levels can borrow from this level, known as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.\n\nLendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )",
             "format": "int32",
             "type": "integer"
           },
           "nominalConcurrencyShares": {
-            "description": "`nominalConcurrencyShares` (NCS) contributes to the computation of the NominalConcurrencyLimit (NominalCL) of this level. This is the number of execution seats nominally reserved for this priority level. This DOES NOT limit the dispatching from this priority level but affects the other priority levels through the borrowing mechanism. The server's concurrency limit (ServerCL) is divided among all the priority levels in proportion to their NCS values:\n\nNominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs ) sum_ncs = sum[priority level k] NCS(k)\n\nBigger numbers mean a larger nominal concurrency limit, at the expense of every other priority level. This field has a default value of zero.",
+            "description": "nominalConcurrencyShares (NCS) contributes to the computation of the NominalConcurrencyLimit (NominalCL) of this level. This is the number of execution seats nominally reserved for this priority level. This DOES NOT limit the dispatching from this priority level but affects the other priority levels through the borrowing mechanism. The server's concurrency limit (ServerCL) is divided among all the priority levels in proportion to their NCS values:\n\nNominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs ) sum_ncs = sum[priority level k] NCS(k)\n\nBigger numbers mean a larger nominal concurrency limit, at the expense of every other priority level. This field has a default value of zero.",
             "format": "int32",
             "type": "integer"
           }
@@ -22,7 +22,7 @@
         "properties": {
           "type": {
             "default": "",
-            "description": "`type` is the type of flow distinguisher method The supported types are \"ByUser\" and \"ByNamespace\". Required.",
+            "description": "type is the type of flow distinguisher method The supported types are \"ByUser\" and \"ByNamespace\". Required.",
             "type": "string"
           }
         },
@@ -49,7 +49,7 @@
               }
             ],
             "default": {},
-            "description": "`metadata` is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+            "description": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
           "spec": {
             "allOf": [
@@ -58,7 +58,7 @@
               }
             ],
             "default": {},
-            "description": "`spec` is the specification of the desired behavior of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
+            "description": "spec is the specification of the desired behavior of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
           },
           "status": {
             "allOf": [
@@ -67,7 +67,7 @@
               }
             ],
             "default": {},
-            "description": "`status` is the current status of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
+            "description": "status is the current status of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
           }
         },
         "required": [
@@ -91,22 +91,22 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
               }
             ],
-            "description": "`lastTransitionTime` is the last time the condition transitioned from one status to another."
+            "description": "lastTransitionTime is the last time the condition transitioned from one status to another."
           },
           "message": {
-            "description": "`message` is a human-readable message indicating details about last transition.",
+            "description": "message is a human-readable message indicating details about last transition.",
             "type": "string"
           },
           "reason": {
-            "description": "`reason` is a unique, one-word, CamelCase reason for the condition's last transition.",
+            "description": "reason is a unique, one-word, CamelCase reason for the condition's last transition.",
             "type": "string"
           },
           "status": {
-            "description": "`status` is the status of the condition. Should be specified and set to one of True, False, Unknown.",
+            "description": "status is the status of the condition. Should be specified and set to one of True, False, Unknown.",
             "type": "string"
           },
           "type": {
-            "description": "`type` is the type of the condition. Required.",
+            "description": "type is the type of the condition. Required.",
             "type": "string"
           }
         },
@@ -164,11 +164,11 @@
                 "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1.FlowDistinguisherMethod"
               }
             ],
-            "description": "`distinguisherMethod` defines how to compute the flow distinguisher for requests that match this schema. `nil` specifies that the distinguisher is disabled and thus will always be the empty string."
+            "description": "distinguisherMethod defines how to compute the flow distinguisher for requests that match this schema. `nil` specifies that the distinguisher is disabled and thus will always be the empty string."
           },
           "matchingPrecedence": {
             "default": 0,
-            "description": "`matchingPrecedence` is used to choose among the FlowSchemas that match a given request. The chosen FlowSchema is among those with the numerically lowest (which we take to be logically highest) MatchingPrecedence.  Each MatchingPrecedence value must be ranged in [1,10000]. Note that if the precedence is not specified, it will be set to 1000 as default.",
+            "description": "matchingPrecedence is used to choose among the FlowSchemas that match a given request. The chosen FlowSchema is among those with the numerically lowest (which we take to be logically highest) MatchingPrecedence.  Each MatchingPrecedence value must be ranged in [1,10000]. Note that if the precedence is not specified, it will be set to 1000 as default.",
             "format": "int32",
             "type": "integer"
           },
@@ -179,10 +179,10 @@
               }
             ],
             "default": {},
-            "description": "`priorityLevelConfiguration` should reference a PriorityLevelConfiguration in the cluster. If the reference cannot be resolved, the FlowSchema will be ignored and marked as invalid in its status. Required."
+            "description": "priorityLevelConfiguration should reference a PriorityLevelConfiguration in the cluster. If the reference cannot be resolved, the FlowSchema will be ignored and marked as invalid in its status. Required."
           },
           "rules": {
-            "description": "`rules` describes which requests will match this flow schema. This FlowSchema matches a request if and only if at least one member of rules matches the request. if it is an empty slice, there will be no requests matching the FlowSchema.",
+            "description": "rules describes which requests will match this flow schema. This FlowSchema matches a request if and only if at least one member of rules matches the request. if it is an empty slice, there will be no requests matching the FlowSchema.",
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1.PolicyRulesWithSubjects"
             },
@@ -237,11 +237,11 @@
                 "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1.QueuingConfiguration"
               }
             ],
-            "description": "`queuing` holds the configuration parameters for queuing. This field may be non-empty only if `type` is `\"Queue\"`."
+            "description": "queuing holds the configuration parameters for queuing. This field may be non-empty only if `type` is `\"Queue\"`."
           },
           "type": {
             "default": "",
-            "description": "`type` is \"Queue\" or \"Reject\". \"Queue\" means that requests that can not be executed upon arrival are held in a queue until they can be executed or a queuing limit is reached. \"Reject\" means that requests that can not be executed upon arrival are rejected. Required.",
+            "description": "type is \"Queue\" or \"Reject\". \"Queue\" means that requests that can not be executed upon arrival are held in a queue until they can be executed or a queuing limit is reached. \"Reject\" means that requests that can not be executed upon arrival are rejected. Required.",
             "type": "string"
           }
         },
@@ -262,12 +262,12 @@
         "description": "LimitedPriorityLevelConfiguration specifies how to handle requests that are subject to limits. It addresses two issues:\n  - How are requests for this priority level limited?\n  - What should be done with requests that exceed the limit?",
         "properties": {
           "borrowingLimitPercent": {
-            "description": "`borrowingLimitPercent`, if present, configures a limit on how many seats this priority level can borrow from other priority levels. The limit is known as this level's BorrowingConcurrencyLimit (BorrowingCL) and is a limit on the total number of seats that this level may borrow at any one time. This field holds the ratio of that limit to the level's nominal concurrency limit. When this field is non-nil, it must hold a non-negative integer and the limit is calculated as follows.\n\nBorrowingCL(i) = round( NominalCL(i) * borrowingLimitPercent(i)/100.0 )\n\nThe value of this field can be more than 100, implying that this priority level can borrow a number of seats that is greater than its own nominal concurrency limit (NominalCL). When this field is left `nil`, the limit is effectively infinite.",
+            "description": "borrowingLimitPercent configures a limit on how many seats this priority level can borrow from other priority levels, if present. The limit is known as this level's BorrowingConcurrencyLimit (BorrowingCL) and is a limit on the total number of seats that this level may borrow at any one time. This field holds the ratio of that limit to the level's nominal concurrency limit. When this field is non-nil, it must hold a non-negative integer and the limit is calculated as follows.\n\nBorrowingCL(i) = round( NominalCL(i) * borrowingLimitPercent(i)/100.0 )\n\nThe value of this field can be more than 100, implying that this priority level can borrow a number of seats that is greater than its own nominal concurrency limit (NominalCL). When this field is left `nil`, the limit is effectively infinite.",
             "format": "int32",
             "type": "integer"
           },
           "lendablePercent": {
-            "description": "`lendablePercent` prescribes the fraction of the level's NominalCL that can be borrowed by other priority levels. The value of this field must be between 0 and 100, inclusive, and it defaults to 0. The number of seats that other levels can borrow from this level, known as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.\n\nLendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )",
+            "description": "lendablePercent prescribes the fraction of the level's NominalCL that can be borrowed by other priority levels. The value of this field must be between 0 and 100, inclusive, and it defaults to 0. The number of seats that other levels can borrow from this level, known as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.\n\nLendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )",
             "format": "int32",
             "type": "integer"
           },
@@ -278,10 +278,10 @@
               }
             ],
             "default": {},
-            "description": "`limitResponse` indicates what to do with requests that can not be executed right now"
+            "description": "limitResponse indicates what to do with requests that can not be executed right now"
           },
           "nominalConcurrencyShares": {
-            "description": "`nominalConcurrencyShares` (NCS) contributes to the computation of the NominalConcurrencyLimit (NominalCL) of this level. This is the number of execution seats available at this priority level. This is used both for requests dispatched from this priority level as well as requests dispatched from other priority levels borrowing seats from this level. The server's concurrency limit (ServerCL) is divided among the Limited priority levels in proportion to their NCS values:\n\nNominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs ) sum_ncs = sum[priority level k] NCS(k)\n\nBigger numbers mean a larger nominal concurrency limit, at the expense of every other priority level.\n\nIf not specified, this field defaults to a value of 30.\n\nSetting this field to zero supports the construction of a \"jail\" for this priority level that is used to hold some request(s)",
+            "description": "nominalConcurrencyShares (NCS) contributes to the computation of the NominalConcurrencyLimit (NominalCL) of this level. This is the number of execution seats available at this priority level. This is used both for requests dispatched from this priority level as well as requests dispatched from other priority levels borrowing seats from this level. The server's concurrency limit (ServerCL) is divided among the Limited priority levels in proportion to their NCS values:\n\nNominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs ) sum_ncs = sum[priority level k] NCS(k)\n\nBigger numbers mean a larger nominal concurrency limit, at the expense of every other priority level.\n\nIf not specified, this field defaults to a value of 30.\n\nSetting this field to zero supports the construction of a \"jail\" for this priority level that is used to hold some request(s)",
             "format": "int32",
             "type": "integer"
           }
@@ -295,7 +295,7 @@
         "description": "NonResourcePolicyRule is a predicate that matches non-resource requests according to their verb and the target non-resource URL. A NonResourcePolicyRule matches a request if and only if both (a) at least one member of verbs matches the request and (b) at least one member of nonResourceURLs matches the request.",
         "properties": {
           "nonResourceURLs": {
-            "description": "`nonResourceURLs` is a set of url prefixes that a user should have access to and may not be empty. For example:\n  - \"/healthz\" is legal\n  - \"/hea*\" is illegal\n  - \"/hea\" is legal but matches nothing\n  - \"/hea/*\" also matches nothing\n  - \"/healthz/*\" matches all per-component health checks.\n\"*\" matches all non-resource urls. if it is present, it must be the only entry. Required.",
+            "description": "nonResourceURLs is a set of url prefixes that a user should have access to and may not be empty. For example:\n  - \"/healthz\" is legal\n  - \"/hea*\" is illegal\n  - \"/hea\" is legal but matches nothing\n  - \"/hea/*\" also matches nothing\n  - \"/healthz/*\" matches all per-component health checks.\n\"*\" matches all non-resource urls. if it is present, it must be the only entry. Required.",
             "items": {
               "type": "string"
             },
@@ -303,7 +303,7 @@
             "x-kubernetes-list-type": "set"
           },
           "verbs": {
-            "description": "`verbs` is a list of matching verbs and may not be empty. \"*\" matches all verbs. If it is present, it must be the only entry. Required.",
+            "description": "verbs is a list of matching verbs and may not be empty. \"*\" matches all verbs. If it is present, it must be the only entry. Required.",
             "items": {
               "type": "string"
             },
@@ -321,7 +321,7 @@
         "description": "PolicyRulesWithSubjects prescribes a test that applies to a request to an apiserver. The test considers the subject making the request, the verb being requested, and the resource to be acted upon. This PolicyRulesWithSubjects matches a request if and only if both (a) at least one member of subjects matches the request and (b) at least one member of resourceRules or nonResourceRules matches the request.",
         "properties": {
           "nonResourceRules": {
-            "description": "`nonResourceRules` is a list of NonResourcePolicyRules that identify matching requests according to their verb and the target non-resource URL.",
+            "description": "nonResourceRules is a list of NonResourcePolicyRules that identify matching requests according to their verb and the target non-resource URL.",
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1.NonResourcePolicyRule"
             },
@@ -329,7 +329,7 @@
             "x-kubernetes-list-type": "atomic"
           },
           "resourceRules": {
-            "description": "`resourceRules` is a slice of ResourcePolicyRules that identify matching requests according to their verb and the target resource. At least one of `resourceRules` and `nonResourceRules` has to be non-empty.",
+            "description": "resourceRules is a slice of ResourcePolicyRules that identify matching requests according to their verb and the target resource. At least one of `resourceRules` and `nonResourceRules` has to be non-empty.",
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1.ResourcePolicyRule"
             },
@@ -368,7 +368,7 @@
               }
             ],
             "default": {},
-            "description": "`metadata` is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+            "description": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
           },
           "spec": {
             "allOf": [
@@ -377,7 +377,7 @@
               }
             ],
             "default": {},
-            "description": "`spec` is the specification of the desired behavior of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
+            "description": "spec is the specification of the desired behavior of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
           },
           "status": {
             "allOf": [
@@ -386,7 +386,7 @@
               }
             ],
             "default": {},
-            "description": "`status` is the current status of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
+            "description": "status is the current status of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
           }
         },
         "required": [
@@ -410,22 +410,22 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
               }
             ],
-            "description": "`lastTransitionTime` is the last time the condition transitioned from one status to another."
+            "description": "lastTransitionTime is the last time the condition transitioned from one status to another."
           },
           "message": {
-            "description": "`message` is a human-readable message indicating details about last transition.",
+            "description": "message is a human-readable message indicating details about last transition.",
             "type": "string"
           },
           "reason": {
-            "description": "`reason` is a unique, one-word, CamelCase reason for the condition's last transition.",
+            "description": "reason is a unique, one-word, CamelCase reason for the condition's last transition.",
             "type": "string"
           },
           "status": {
-            "description": "`status` is the status of the condition. Should be specified and set to one of True, False, Unknown.",
+            "description": "status is the status of the condition. Should be specified and set to one of True, False, Unknown.",
             "type": "string"
           },
           "type": {
-            "description": "`type` is the type of the condition. Required.",
+            "description": "type is the type of the condition. Required.",
             "type": "string"
           }
         },
@@ -479,7 +479,7 @@
         "properties": {
           "name": {
             "default": "",
-            "description": "`name` is the name of the priority level configuration being referenced Required.",
+            "description": "name is the name of the priority level configuration being referenced Required.",
             "type": "string"
           }
         },
@@ -497,7 +497,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1.ExemptPriorityLevelConfiguration"
               }
             ],
-            "description": "`exempt` specifies how requests are handled for an exempt priority level. This field MUST be empty if `type` is `\"Limited\"`. This field MAY be non-empty if `type` is `\"Exempt\"`. If empty and `type` is `\"Exempt\"` then the default values for `ExemptPriorityLevelConfiguration` apply."
+            "description": "exempt specifies how requests are handled for an exempt priority level. This field MUST be empty if `type` is `\"Limited\"`. This field MAY be non-empty if `type` is `\"Exempt\"`. If empty and `type` is `\"Exempt\"` then the default values for `ExemptPriorityLevelConfiguration` apply."
           },
           "limited": {
             "allOf": [
@@ -505,11 +505,11 @@
                 "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1.LimitedPriorityLevelConfiguration"
               }
             ],
-            "description": "`limited` specifies how requests are handled for a Limited priority level. This field must be non-empty if and only if `type` is `\"Limited\"`."
+            "description": "limited specifies how requests are handled for a Limited priority level. This field must be non-empty if and only if type is `\"Limited\"`."
           },
           "type": {
             "default": "",
-            "description": "`type` indicates whether this priority level is subject to limitation on request execution.  A value of `\"Exempt\"` means that requests of this priority level are not subject to a limit (and thus are never queued) and do not detract from the capacity made available to other priority levels.  A value of `\"Limited\"` means that (a) requests of this priority level _are_ subject to limits and (b) some of the server's limited capacity is made available exclusively to this priority level. Required.",
+            "description": "type indicates whether this priority level is subject to limitation on request execution.  A value of `\"Exempt\"` means that requests of this priority level are not subject to a limit (and thus are never queued) and do not detract from the capacity made available to other priority levels.  A value of `\"Limited\"` means that (a) requests of this priority level _are_ subject to limits and (b) some of the server's limited capacity is made available exclusively to this priority level. Required.",
             "type": "string"
           }
         },
@@ -551,19 +551,19 @@
         "properties": {
           "handSize": {
             "default": 0,
-            "description": "`handSize` is a small positive number that configures the shuffle sharding of requests into queues.  When enqueuing a request at this priority level the request's flow identifier (a string pair) is hashed and the hash value is used to shuffle the list of queues and deal a hand of the size specified here.  The request is put into one of the shortest queues in that hand. `handSize` must be no larger than `queues`, and should be significantly smaller (so that a few heavy flows do not saturate most of the queues).  See the user-facing documentation for more extensive guidance on setting this field.  This field has a default value of 8.",
+            "description": "handSize is a small positive number that configures the shuffle sharding of requests into queues.  When enqueuing a request at this priority level the request's flow identifier (a string pair) is hashed and the hash value is used to shuffle the list of queues and deal a hand of the size specified here.  The request is put into one of the shortest queues in that hand. `handSize` must be no larger than `queues`, and should be significantly smaller (so that a few heavy flows do not saturate most of the queues).  See the user-facing documentation for more extensive guidance on setting this field.  This field has a default value of 8.",
             "format": "int32",
             "type": "integer"
           },
           "queueLengthLimit": {
             "default": 0,
-            "description": "`queueLengthLimit` is the maximum number of requests allowed to be waiting in a given queue of this priority level at a time; excess requests are rejected.  This value must be positive.  If not specified, it will be defaulted to 50.",
+            "description": "queueLengthLimit is the maximum number of requests allowed to be waiting in a given queue of this priority level at a time; excess requests are rejected.  This value must be positive.  If not specified, it will be defaulted to 50.",
             "format": "int32",
             "type": "integer"
           },
           "queues": {
             "default": 0,
-            "description": "`queues` is the number of queues for this priority level. The queues exist independently at each apiserver. The value must be positive.  Setting it to 1 effectively precludes shufflesharding and thus makes the distinguisher method of associated flow schemas irrelevant.  This field has a default value of 64.",
+            "description": "queues is the number of queues for this priority level. The queues exist independently at each apiserver. The value must be positive.  Setting it to 1 effectively precludes shufflesharding and thus makes the distinguisher method of associated flow schemas irrelevant.  This field has a default value of 64.",
             "format": "int32",
             "type": "integer"
           }
@@ -574,7 +574,7 @@
         "description": "ResourcePolicyRule is a predicate that matches some resource requests, testing the request's verb and the target resource. A ResourcePolicyRule matches a resource request if and only if: (a) at least one member of verbs matches the request, (b) at least one member of apiGroups matches the request, (c) at least one member of resources matches the request, and (d) either (d1) the request does not specify a namespace (i.e., `Namespace==\"\"`) and clusterScope is true or (d2) the request specifies a namespace and least one member of namespaces matches the request's namespace.",
         "properties": {
           "apiGroups": {
-            "description": "`apiGroups` is a list of matching API groups and may not be empty. \"*\" matches all API groups and, if present, must be the only entry. Required.",
+            "description": "apiGroups is a list of matching API groups and may not be empty. \"*\" matches all API groups and, if present, must be the only entry. Required.",
             "items": {
               "type": "string"
             },
@@ -582,11 +582,11 @@
             "x-kubernetes-list-type": "set"
           },
           "clusterScope": {
-            "description": "`clusterScope` indicates whether to match requests that do not specify a namespace (which happens either because the resource is not namespaced or the request targets all namespaces). If this field is omitted or false then the `namespaces` field must contain a non-empty list.",
+            "description": "clusterScope indicates whether to match requests that do not specify a namespace (which happens either because the resource is not namespaced or the request targets all namespaces). If this field is omitted or false then the `namespaces` field must contain a non-empty list.",
             "type": "boolean"
           },
           "namespaces": {
-            "description": "`namespaces` is a list of target namespaces that restricts matches.  A request that specifies a target namespace matches only if either (a) this list contains that target namespace or (b) this list contains \"*\".  Note that \"*\" matches any specified namespace but does not match a request that _does not specify_ a namespace (see the `clusterScope` field for that). This list may be empty, but only if `clusterScope` is true.",
+            "description": "namespaces is a list of target namespaces that restricts matches.  A request that specifies a target namespace matches only if either (a) this list contains that target namespace or (b) this list contains \"*\".  Note that \"*\" matches any specified namespace but does not match a request that _does not specify_ a namespace (see the `clusterScope` field for that). This list may be empty, but only if `clusterScope` is true.",
             "items": {
               "type": "string"
             },
@@ -594,7 +594,7 @@
             "x-kubernetes-list-type": "set"
           },
           "resources": {
-            "description": "`resources` is a list of matching resources (i.e., lowercase and plural) with, if desired, subresource.  For example, [ \"services\", \"nodes/status\" ].  This list may not be empty. \"*\" matches all resources and, if present, must be the only entry. Required.",
+            "description": "resources is a list of matching resources (i.e., lowercase and plural) with, if desired, subresource.  For example, [ \"services\", \"nodes/status\" ].  This list may not be empty. \"*\" matches all resources and, if present, must be the only entry. Required.",
             "items": {
               "type": "string"
             },
@@ -602,7 +602,7 @@
             "x-kubernetes-list-type": "set"
           },
           "verbs": {
-            "description": "`verbs` is a list of matching verbs and may not be empty. \"*\" matches all verbs and, if present, must be the only entry. Required.",
+            "description": "verbs is a list of matching verbs and may not be empty. \"*\" matches all verbs and, if present, must be the only entry. Required.",
             "items": {
               "type": "string"
             },
@@ -622,12 +622,12 @@
         "properties": {
           "name": {
             "default": "",
-            "description": "`name` is the name of matching ServiceAccount objects, or \"*\" to match regardless of name. Required.",
+            "description": "name is the name of matching ServiceAccount objects, or \"*\" to match regardless of name. Required.",
             "type": "string"
           },
           "namespace": {
             "default": "",
-            "description": "`namespace` is the namespace of matching ServiceAccount objects. Required.",
+            "description": "namespace is the namespace of matching ServiceAccount objects. Required.",
             "type": "string"
           }
         },
@@ -646,11 +646,11 @@
                 "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1.GroupSubject"
               }
             ],
-            "description": "`group` matches based on user group name."
+            "description": "group matches based on user group name."
           },
           "kind": {
             "default": "",
-            "description": "`kind` indicates which one of the other fields is non-empty. Required",
+            "description": "kind indicates which one of the other fields is non-empty. Required",
             "type": "string"
           },
           "serviceAccount": {
@@ -659,7 +659,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1.ServiceAccountSubject"
               }
             ],
-            "description": "`serviceAccount` matches ServiceAccounts."
+            "description": "serviceAccount matches ServiceAccounts."
           },
           "user": {
             "allOf": [
@@ -667,7 +667,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1.UserSubject"
               }
             ],
-            "description": "`user` matches based on username."
+            "description": "user matches based on username."
           }
         },
         "required": [
@@ -690,7 +690,7 @@
         "properties": {
           "name": {
             "default": "",
-            "description": "`name` is the username that matches, or \"*\" to match all usernames. Required.",
+            "description": "name is the username that matches, or \"*\" to match all usernames. Required.",
             "type": "string"
           }
         },

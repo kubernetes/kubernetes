@@ -23,7 +23,7 @@ package v1beta1
 //
 // UserSubject holds detailed information for user-kind subject.
 type UserSubjectApplyConfiguration struct {
-	// `name` is the username that matches, or "*" to match all usernames.
+	// name is the username that matches, or "*" to match all usernames.
 	// Required.
 	Name *string `json:"name,omitempty"`
 }
