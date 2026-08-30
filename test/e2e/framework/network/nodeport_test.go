@@ -137,50 +137,20 @@ func TestStaticPortRangeGetUnusedPortsExhausted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getUnusedPorts(%d) returned an unexpected error: %v", s.length, err)
 	}
-	if !s.reservePorts(ports[:1]) {
-		t.Fatalf("reservePorts(%v) = false, want true", ports[:1])
+	if !s.reservePort(ports[0]) {
+		t.Fatalf("reservePort(%d) = false, want true", ports[0])
 	}
 	if _, err := s.getUnusedPorts(int(s.length)); err == nil {
 		t.Error("getUnusedPorts() returned no error with a port reserved, want an error")
 	}
 }
 
-func TestStaticPortRangeReservePorts(t *testing.T) {
-	s := newTestPortRange()
-	ports, err := s.getUnusedPorts(2)
-	if err != nil {
-		t.Fatalf("getUnusedPorts(2) returned an unexpected error: %v", err)
-	}
-
-	if !s.reservePorts(ports) {
-		t.Fatalf("reservePorts(%v) = false, want true", ports)
-	}
-	for _, port := range ports {
-		if s.reservePort(port) {
-			t.Errorf("reservePort(%d) = true, want false because it is already reserved", port)
-		}
-	}
-
-	s.releasePorts(ports)
-	for _, port := range ports {
-		if !s.reservePort(port) {
-			t.Errorf("reservePort(%d) = false after releasePorts, want true", port)
-		}
-	}
-}
-
-// reservePorts must not leave the ports it already took reserved when one of them fails.
-func TestStaticPortRangeReservePortsPartialFailure(t *testing.T) {
-	s := newTestPortRange()
-	taken := s.baseport + 1
-	if !s.reservePort(taken) {
-		t.Fatalf("reservePort(%d) = false, want true", taken)
-	}
-
-	if s.reservePorts([]int32{s.baseport, taken}) {
-		t.Error("reservePorts() = true with an already reserved port, want false")
-	}
-	if s.reservedPorts.Has(s.baseport) {
-		t.Errorf("reservePorts() left %d reserved after failing, want it released", s.baseport)
+func TestStaticPortRangeReservePortOffByOne(t *testing.T) {
+	s := newTestPortRange() // baseport: 30000, length: 4 (valid ports: 30000..30003)
+	// baseport + length is 30004, which is 1 past the upper boundary [30000, 30004)
+	outOfRangePort := s.baseport + s.length
+	if s.reservePort(outOfRangePort) {
+		t.Errorf("reservePort(%d) = true for baseport+length (outside range [%d, %d)), want false",
+			outOfRangePort, s.baseport, s.baseport+s.length)
 	}
 }

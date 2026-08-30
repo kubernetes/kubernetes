@@ -762,6 +762,13 @@ func (config *NetworkingTestConfig) createNodePortServiceSpec(svcName string, se
 		requireDual := v1.IPFamilyPolicyRequireDualStack
 		res.Spec.IPFamilyPolicy = &requireDual
 	}
+	if config.StaticNodePorts {
+		ports, err := staticPortAllocator.getUnusedPorts(len(res.Spec.Ports))
+		framework.ExpectNoError(err, "failed to find static nodeports for service %s", svcName)
+		for i := range res.Spec.Ports {
+			res.Spec.Ports[i].NodePort = ports[i]
+		}
+	}
 	return res
 }
 
@@ -771,56 +778,40 @@ func (config *NetworkingTestConfig) createNodePortServiceSpec(svcName string, se
 const staticNodePortRetries = 5
 
 func (config *NetworkingTestConfig) createNodePortService(ctx context.Context, selector map[string]string) {
-	spec := config.createNodePortServiceSpec(nodePortServiceName, selector, false)
+	retries := 1
 	if config.StaticNodePorts {
-		config.NodePortService = config.createServiceWithStaticNodePorts(ctx, spec)
-		return
+		retries = staticNodePortRetries
 	}
-	config.NodePortService = config.CreateService(ctx, spec)
-}
-
-// createServiceWithStaticNodePorts creates spec with its nodePorts taken from the static
-// portion of the NodePort range. The ports stay reserved until the test ends, so a
-// Service created by a parallel test can not get the same nodePort once this Service has
-// been deleted.
-func (config *NetworkingTestConfig) createServiceWithStaticNodePorts(ctx context.Context, spec *v1.Service) *v1.Service {
-	for range staticNodePortRetries {
-		ports, err := staticPortAllocator.getUnusedPorts(len(spec.Spec.Ports))
-		framework.ExpectNoError(err, "failed to find %d free node ports in the static range", len(spec.Spec.Ports))
-		for i := range spec.Spec.Ports {
-			spec.Spec.Ports[i].NodePort = ports[i]
-		}
-
-		_, err = config.getServiceClient().Create(ctx, spec, metav1.CreateOptions{})
+	for range retries {
+		spec := config.createNodePortServiceSpec(nodePortServiceName, selector, false)
+		_, err := config.getServiceClient().Create(ctx, spec, metav1.CreateOptions{})
 		if err != nil {
-			if apierrors.IsInvalid(err) {
-				framework.Logf("node ports %v are already allocated to another service, retrying: %v", ports, err)
+			if config.StaticNodePorts && apierrors.IsInvalid(err) {
+				framework.Logf("static node ports collision, retrying: %v", err)
 				continue
 			}
 			framework.Failf("Failed to create %s service: %v", spec.Name, err)
 		}
 
-		// Registered before the wait below so the service is removed and the ports
-		// released even if it times out. The service is deleted first because the
-		// apiserver keeps its nodePorts allocated until it is gone.
-		ginkgo.DeferCleanup(func(ctx context.Context) {
-			err := config.getServiceClient().Delete(ctx, spec.Name, metav1.DeleteOptions{})
-			if err != nil && !apierrors.IsNotFound(err) {
-				framework.ExpectNoError(err, "error while deleting service %s", spec.Name)
+		if config.StaticNodePorts {
+			// The service is using the ports now, so they can be reserved.
+			for _, port := range spec.Spec.Ports {
+				if !ReserveStaticNodePort(port.NodePort) {
+					framework.Failf("Failed to reserve node port %d", port.NodePort)
+				}
 			}
-			staticPortAllocator.releasePorts(ports)
-		})
-
-		// The service is using the ports now, so they can be reserved.
-		if !staticPortAllocator.reservePorts(ports) {
-			framework.Failf("Failed to reserve node ports %v of service %s", ports, spec.Name)
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				for _, port := range spec.Spec.Ports {
+					ReleaseStaticNodePort(port.NodePort)
+				}
+			})
 		}
 
-		return config.waitForCreatedService(ctx, spec.Name)
+		config.NodePortService = config.waitForCreatedService(ctx, spec.Name)
+		return
 	}
 
-	framework.Failf("Failed to create %s service with node ports from the static range after %d attempts", spec.Name, staticNodePortRetries)
-	return nil
+	framework.Failf("Failed to create %s service with node ports from the static range after %d attempts", nodePortServiceName, retries)
 }
 
 func (config *NetworkingTestConfig) createSessionAffinityService(ctx context.Context, selector map[string]string) {

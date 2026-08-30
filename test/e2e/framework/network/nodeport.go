@@ -60,7 +60,7 @@ func init() {
 func (s *staticPortRange) reservePort(port int32) bool {
 	s.Lock()
 	defer s.Unlock()
-	if port < s.baseport || port > s.baseport+s.length || s.reservedPorts.Has(port) {
+	if port < s.baseport || port >= s.baseport+s.length || s.reservedPorts.Has(port) {
 		return false
 	}
 	s.reservedPorts.Insert(port)
@@ -71,17 +71,11 @@ func (s *staticPortRange) reservePort(port int32) bool {
 // the port is not allocated so the consumer should allocate it explicitly calling allocatePort()
 // if none is available then it returns -1 and error
 func (s *staticPortRange) getUnusedPort() (int32, error) {
-	s.Lock()
-	defer s.Unlock()
-	// start in a random offset
-	start := rand.Int31n(s.length)
-	for i := int32(0); i < s.length; i++ {
-		port := s.baseport + (start+i)%(s.length)
-		if !s.reservedPorts.Has(port) {
-			return port, nil
-		}
+	ports, err := s.getUnusedPorts(1)
+	if err != nil {
+		return -1, err
 	}
-	return -1, fmt.Errorf("no free ports were found")
+	return ports[0], nil
 }
 
 // releasePort releases the port passed as an argument
@@ -92,8 +86,8 @@ func (s *staticPortRange) releasePort(port int32) {
 }
 
 // getUnusedPorts returns count distinct free ports from the range.
-// Like getUnusedPort the ports are not reserved, so the consumer should create the
-// service first and then reserve them explicitly calling reservePorts().
+// The ports are not reserved, so the consumer should create the service first and then
+// reserve them explicitly calling reservePort() on each one.
 // if there are not enough free ports then it returns nil and error
 func (s *staticPortRange) getUnusedPorts(count int) ([]int32, error) {
 	s.Lock()
@@ -111,27 +105,6 @@ func (s *staticPortRange) getUnusedPorts(count int) ([]int32, error) {
 		return nil, fmt.Errorf("only %d free ports were found, %d were requested", len(ports), count)
 	}
 	return ports, nil
-}
-
-// reservePorts reserves every port in ports. If any of them can not be reserved none of
-// them stays reserved and it returns false
-func (s *staticPortRange) reservePorts(ports []int32) bool {
-	reserved := make([]int32, 0, len(ports))
-	for _, port := range ports {
-		if !s.reservePort(port) {
-			s.releasePorts(reserved)
-			return false
-		}
-		reserved = append(reserved, port)
-	}
-	return true
-}
-
-// releasePorts releases every port in ports
-func (s *staticPortRange) releasePorts(ports []int32) {
-	for _, port := range ports {
-		s.releasePort(port)
-	}
 }
 
 // GetUnusedStaticNodePort returns a free port in static range and a nil value
