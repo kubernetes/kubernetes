@@ -50,6 +50,8 @@ type CertificateSigningRequest struct {
 	// spec contains the certificate request, and is immutable after creation.
 	// Only the request, signerName, expirationSeconds, and usages fields can be set on creation.
 	// Other fields are derived by Kubernetes and cannot be modified by users.
+	// +required
+	// +k8s:beta(since: "1.38")=+k8s:required
 	Spec CertificateSigningRequestSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// status contains information about whether the request is approved or denied,
@@ -124,6 +126,9 @@ type CertificateSigningRequestSpec struct {
 	//  "ipsec end system", "ipsec tunnel", "ipsec user",
 	//  "timestamping", "ocsp signing", "microsoft sgc", "netscape sgc"
 	// +listType=atomic
+	// +k8s:listType=atomic
+	// +required
+	// +k8s:beta(since: "1.38")=+k8s:required
 	Usages []KeyUsage `json:"usages,omitempty" protobuf:"bytes,5,opt,name=usages"`
 
 	// username contains the name of the user that created the CertificateSigningRequest.
@@ -289,6 +294,7 @@ type CertificateSigningRequestList struct {
 //	https://tools.ietf.org/html/rfc5280#section-4.2.1.12
 //
 // +enum
+// +k8s:beta(since: "1.38")=+k8s:enum
 type KeyUsage string
 
 // Valid key usages

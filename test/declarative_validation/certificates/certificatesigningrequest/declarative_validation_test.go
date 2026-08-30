@@ -23,9 +23,11 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"k8s.io/utils/ptr"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -34,8 +36,16 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	registry "k8s.io/kubernetes/pkg/registry/certificates/certificates"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
-	"k8s.io/utils/ptr"
 )
+
+var allValidUsages = sets.List(sets.New(
+	api.UsageAny, api.UsageCRLSign, api.UsageCertSign, api.UsageClientAuth, api.UsageCodeSigning,
+	api.UsageContentCommitment, api.UsageDataEncipherment, api.UsageDecipherOnly, api.UsageDigitalSignature,
+	api.UsageEmailProtection, api.UsageEncipherOnly, api.UsageIPsecEndSystem, api.UsageIPsecTunnel,
+	api.UsageIPsecUser, api.UsageKeyAgreement, api.UsageKeyEncipherment, api.UsageMicrosoftSGC,
+	api.UsageNetscapeSGC, api.UsageOCSPSigning, api.UsageSMIME, api.UsageServerAuth, api.UsageSigning,
+	api.UsageTimestamping,
+))
 
 func TestDeclarativeValidate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
@@ -84,6 +94,27 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			input: makeValidCSR(withDeniedCondition(), withApprovedCondition()),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("status", "conditions"), nil, "").WithOrigin("zeroOrOneOf").MarkBeta(),
+			},
+		},
+		"spec.usages: valid case": {
+			input: makeValidCSR(),
+		},
+		"spec.usages: nil = invalid": {
+			input: makeValidCSR(tweakUsages(nil)),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "usages"), "").MarkBeta(),
+			},
+		},
+		"spec.usages: empty = invalid": {
+			input: makeValidCSR(tweakUsages([]api.KeyUsage{})),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "usages"), "").MarkBeta(),
+			},
+		},
+		"spec.usages: unknown value = invalid": {
+			input: makeValidCSR(tweakUsages([]api.KeyUsage{"unknown"})),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(field.NewPath("spec", "usages").Index(0), api.KeyUsage("unknown"), allValidUsages).MarkBeta(),
 			},
 		},
 	}
@@ -183,6 +214,30 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			old:          makeValidCSR(withApprovedCondition(), withApprovedCondition(), withDeniedCondition(), withDeniedCondition()),
 			update:       makeValidCSR(withDeniedCondition(), withDeniedCondition(), withApprovedCondition(), withApprovedCondition()),
 			subresources: []string{"/status"},
+		},
+		"spec.usages: nil = invalid on update": {
+			old:    makeValidCSR(),
+			update: makeValidCSR(tweakUsages(nil)),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "usages"), "").MarkBeta(),
+			},
+			subresources: []string{"/"},
+		},
+		"spec.usages: empty = invalid on update": {
+			old:    makeValidCSR(),
+			update: makeValidCSR(tweakUsages([]api.KeyUsage{})),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "usages"), "").MarkBeta(),
+			},
+			subresources: []string{"/"},
+		},
+		"spec.usages: unknown value = invalid": {
+			old:    makeValidCSR(),
+			update: makeValidCSR(tweakUsages([]api.KeyUsage{"unknown"})),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(field.NewPath("spec", "usages").Index(0), api.KeyUsage("unknown"), allValidUsages).MarkBeta(),
+			},
+			subresources: []string{"/"},
 		},
 	}
 
@@ -301,5 +356,11 @@ func withFailedCondition() func(*api.CertificateSigningRequest) {
 			Type:   api.CertificateFailed,
 			Status: core.ConditionTrue,
 		})
+	}
+}
+
+func tweakUsages(usages []api.KeyUsage) func(*api.CertificateSigningRequest) {
+	return func(csr *api.CertificateSigningRequest) {
+		csr.Spec.Usages = usages
 	}
 }

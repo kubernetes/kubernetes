@@ -99,7 +99,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				field.Required(specPath.Child("usages"), ""),
+				field.Required(specPath.Child("usages"), "").MarkCoveredByDeclarative(),
 			},
 		},
 		"CSR with no signerName set should fail": {
@@ -347,7 +347,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				field.Required(specPath.Child("usages"), ""),
+				field.Required(specPath.Child("usages"), "").MarkCoveredByDeclarative(),
 			},
 		},
 		"unknown and duplicate usages": {
@@ -360,8 +360,8 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				field.NotSupported(specPath.Child("usages").Index(0), capi.KeyUsage("unknown"), allValidUsages.List()),
-				field.NotSupported(specPath.Child("usages").Index(1), capi.KeyUsage("unknown"), allValidUsages.List()),
+				field.NotSupported(specPath.Child("usages").Index(0), capi.KeyUsage("unknown"), allValidUsages.List()).MarkCoveredByDeclarative(),
+				field.NotSupported(specPath.Child("usages").Index(1), capi.KeyUsage("unknown"), allValidUsages.List()).MarkCoveredByDeclarative(),
 				field.Duplicate(specPath.Child("usages").Index(1), capi.KeyUsage("unknown")),
 			},
 		},

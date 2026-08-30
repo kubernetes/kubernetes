@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	sets "k8s.io/apimachinery/pkg/util/sets"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -118,7 +119,28 @@ func Validate_CertificateSigningRequest(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field certificatesv1.CertificateSigningRequest.Spec has no validation
+	{ // field certificatesv1.CertificateSigningRequest.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *certificatesv1.CertificateSigningRequestSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// +k8s:required on non-pointer struct fields is purely documentation
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_CertificateSigningRequestSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *certificatesv1.CertificateSigningRequest) *certificatesv1.CertificateSigningRequestSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
 
 	{ // field certificatesv1.CertificateSigningRequest.Status
 		fn := func(
@@ -142,6 +164,56 @@ func Validate_CertificateSigningRequest(
 		errs = append(errs, fn(fldPath.Child("status"), &obj.Status, oldVal, oldObj != nil)...)
 	}
 
+	return errs
+}
+
+// Validate_CertificateSigningRequestSpec validates an instance of CertificateSigningRequestSpec according
+// to declarative validation rules in the API schema.
+func Validate_CertificateSigningRequestSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *certificatesv1.CertificateSigningRequestSpec) (errs field.ErrorList) {
+
+	// field certificatesv1.CertificateSigningRequestSpec.Request has no validation
+	// field certificatesv1.CertificateSigningRequestSpec.SignerName has no validation
+	// field certificatesv1.CertificateSigningRequestSpec.ExpirationSeconds has no validation
+
+	{ // field certificatesv1.CertificateSigningRequestSpec.Usages
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []certificatesv1.KeyUsage,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_KeyUsage); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *certificatesv1.CertificateSigningRequestSpec) []certificatesv1.KeyUsage {
+				return oldObj.Usages
+			})
+		errs = append(errs, fn(fldPath.Child("usages"), obj.Usages, oldVal, oldObj != nil)...)
+	}
+
+	// field certificatesv1.CertificateSigningRequestSpec.Username has no validation
+	// field certificatesv1.CertificateSigningRequestSpec.UID has no validation
+	// field certificatesv1.CertificateSigningRequestSpec.Groups has no validation
+	// field certificatesv1.CertificateSigningRequestSpec.Extra has no validation
 	return errs
 }
 
@@ -299,6 +371,21 @@ func Validate_ClusterTrustBundleSpec(
 	}
 
 	// field certificatesv1.ClusterTrustBundleSpec.TrustBundle has no validation
+	return errs
+}
+
+var symbolsForKeyUsage = sets.New(certificatesv1.UsageAny, certificatesv1.UsageCRLSign, certificatesv1.UsageCertSign, certificatesv1.UsageClientAuth, certificatesv1.UsageCodeSigning, certificatesv1.UsageContentCommitment, certificatesv1.UsageDataEncipherment, certificatesv1.UsageDecipherOnly, certificatesv1.UsageDigitalSignature, certificatesv1.UsageEmailProtection, certificatesv1.UsageEncipherOnly, certificatesv1.UsageIPsecEndSystem, certificatesv1.UsageIPsecTunnel, certificatesv1.UsageIPsecUser, certificatesv1.UsageKeyAgreement, certificatesv1.UsageKeyEncipherment, certificatesv1.UsageMicrosoftSGC, certificatesv1.UsageNetscapeSGC, certificatesv1.UsageOCSPSigning, certificatesv1.UsageSMIME, certificatesv1.UsageServerAuth, certificatesv1.UsageSigning, certificatesv1.UsageTimestamping)
+
+// Validate_KeyUsage validates an instance of KeyUsage according
+// to declarative validation rules in the API schema.
+func Validate_KeyUsage(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *certificatesv1.KeyUsage) (errs field.ErrorList) {
+
+	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForKeyUsage, nil).MarkBeta(); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
 	return errs
 }
 
