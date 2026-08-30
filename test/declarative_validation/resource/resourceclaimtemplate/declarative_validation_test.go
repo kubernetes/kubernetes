@@ -402,10 +402,22 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec", "spec", "devices", "constraints").Index(0).Child("matchAttribute"), "", "").WithOrigin("format=k8s-resource-fully-qualified-name").MarkBeta(),
 			},
 		},
+		"match attribute with long name": {
+			input: mkValidResourceClaimTemplate(tweakMatchAttribute("domain/" + strings.Repeat("a", 33))),
+			expectedErrs: field.ErrorList{
+				field.TooLong(field.NewPath("spec", "spec", "devices", "constraints").Index(0).Child("matchAttribute"), "", 32).WithOrigin("format=k8s-resource-fully-qualified-name").MarkBeta(),
+			},
+		},
 		"invalid distinct attribute": {
 			input: mkValidResourceClaimTemplate(tweakDistinctAttribute("nodomain")),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "spec", "devices", "constraints").Index(0).Child("distinctAttribute"), "nodomain", "a fully qualified name must be a domain and a name separated by a slash").WithOrigin("format=k8s-resource-fully-qualified-name").MarkBeta(),
+			},
+		},
+		"distinct attribute with long name": {
+			input: mkValidResourceClaimTemplate(tweakDistinctAttribute("domain/" + strings.Repeat("a", 33))),
+			expectedErrs: field.ErrorList{
+				field.TooLong(field.NewPath("spec", "spec", "devices", "constraints").Index(0).Child("distinctAttribute"), "", 32).WithOrigin("format=k8s-resource-fully-qualified-name").MarkBeta(),
 			},
 		},
 
@@ -417,6 +429,13 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(0).Child("name"), "invalid name", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')").WithOrigin("format=k8s-resource-fully-qualified-name"),
 				field.Invalid(field.NewPath("spec", "spec", "devices", "constraints").Index(0).Child("matchAttribute"), "invalid name", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')").WithOrigin("format=k8s-resource-fully-qualified-name").MarkBeta(),
+			},
+		},
+		"invalid exactly derived attributes, long name": {
+			input: mkValidResourceClaimTemplate(tweakExactlyDerivedAttributeName("domain/" + strings.Repeat("a", 33))),
+			expectedErrs: field.ErrorList{
+				field.TooLong(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "derivedAttributes").Index(0).Child("name"), "", 32).WithOrigin("format=k8s-resource-fully-qualified-name"),
+				field.TooLong(field.NewPath("spec", "spec", "devices", "constraints").Index(0).Child("matchAttribute"), "", 32).WithOrigin("format=k8s-resource-fully-qualified-name").MarkBeta(),
 			},
 		},
 		"invalid exactly derived attributes, empty name": {
@@ -450,6 +469,13 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("derivedAttributes").Index(0).Child("name"), "invalid name", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')").WithOrigin("format=k8s-resource-fully-qualified-name"),
 				field.Invalid(field.NewPath("spec", "spec", "devices", "constraints").Index(0).Child("matchAttribute"), "invalid name", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')").WithOrigin("format=k8s-resource-fully-qualified-name").MarkBeta(),
+			},
+		},
+		"invalid firstAvailable derived attributes, long name": {
+			input: mkValidResourceClaimTemplate(tweakFirstAvailableDerivedAttributeName("domain/" + strings.Repeat("a", 33))),
+			expectedErrs: field.ErrorList{
+				field.TooLong(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("derivedAttributes").Index(0).Child("name"), "", 32).WithOrigin("format=k8s-resource-fully-qualified-name"),
+				field.TooLong(field.NewPath("spec", "spec", "devices", "constraints").Index(0).Child("matchAttribute"), "", 32).WithOrigin("format=k8s-resource-fully-qualified-name").MarkBeta(),
 			},
 		},
 		"invalid firstAvailable derived attributes, empty name": {

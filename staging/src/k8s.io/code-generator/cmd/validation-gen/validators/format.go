@@ -119,10 +119,18 @@ func getFormatValidationFunction(format string) (FunctionGen, error) {
 			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-prefixed-label-key", ""}), nil
 	case "k8s-resource-fully-qualified-name":
 		return Function(formatTagName, DefaultFlags, resourceFullyQualifiedNameValidator).
-			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-resource-fully-qualified-name", ""}), nil
+			WithEmits(
+				Emission{field.ErrorTypeInvalid, "format=k8s-resource-fully-qualified-name", ""},
+				// The domain and name parts carry their own length limits.
+				Emission{field.ErrorTypeTooLong, "format=k8s-resource-fully-qualified-name", ""},
+			), nil
 	case "k8s-resource-pool-name":
 		return Function(formatTagName, DefaultFlags, resourcePoolNameValidator).
-			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-resource-pool-name", ""}), nil
+			WithEmits(
+				Emission{field.ErrorTypeInvalid, "format=k8s-resource-pool-name", ""},
+				// The name as a whole is limited to 253 characters.
+				Emission{field.ErrorTypeTooLong, "format=k8s-resource-pool-name", ""},
+			), nil
 	case "k8s-short-name":
 		return Function(formatTagName, DefaultFlags, shortNameValidator).
 			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-short-name", ""}), nil

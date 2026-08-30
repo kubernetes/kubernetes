@@ -67,6 +67,7 @@ func init() {
 			"spec.defaultPartitionTypeAttribute": {
 				{ErrorType: "FieldValueForbidden"},
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-resource-fully-qualified-name"},
+				{ErrorType: "FieldValueTooLong", Origin: "format=k8s-resource-fully-qualified-name"},
 			},
 			"spec.driver": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name-caseless"},
@@ -79,6 +80,7 @@ func init() {
 			},
 			"spec.poolName": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-resource-pool-name"},
+				{ErrorType: "FieldValueTooLong", Origin: "format=k8s-resource-pool-name"},
 			},
 			"status.conditions": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
@@ -148,6 +150,7 @@ func init() {
 			"status.pools[*].poolName": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-resource-pool-name"},
 				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "format=k8s-resource-pool-name"},
 			},
 			"status.pools[*].resourceSliceCount": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
