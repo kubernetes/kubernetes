@@ -3840,6 +3840,18 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 		},
 		RestartPolicy: v1.RestartPolicyAlways,
 	}
+	desiredStateWithMultipleInitContainers := v1.PodSpec{
+		NodeName: "machine",
+		InitContainers: []v1.Container{
+			{Name: "init-0"},
+			{Name: "init-1"},
+			{Name: "init-2"},
+		},
+		Containers: []v1.Container{
+			{Name: "containerA"},
+		},
+		RestartPolicy: v1.RestartPolicyAlways,
+	}
 	now := metav1.Now()
 
 	tests := []struct {
@@ -4182,7 +4194,7 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 					Name: "sidecar-1",
 					State: v1.ContainerState{
 						Waiting: &v1.ContainerStateWaiting{
-							Reason:  "PodInitializing",
+							Reason:  "ContainerCreating",
 							Message: "",
 						},
 					},
@@ -4190,6 +4202,79 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 			},
 			hasInitContainers: true,
 			isInitContainer:   true,
+		},
+		{
+			name: "Multiple init containers at startup: active init container gets ContainerCreating, subsequent get PodInitializing",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "my-pod"},
+				Spec:       desiredStateWithMultipleInitContainers,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{},
+					ContainerStatuses:     []v1.ContainerStatus{},
+				},
+			},
+			currentStatus:     &kubecontainer.PodStatus{},
+			previousStatus:    []v1.ContainerStatus{},
+			containers:        desiredStateWithMultipleInitContainers.InitContainers,
+			hasInitContainers: true,
+			isInitContainer:   true,
+			expected: []v1.ContainerStatus{
+				{
+					Name:  "init-0",
+					State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: "ContainerCreating"}},
+				},
+				{
+					Name:  "init-1",
+					State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: "PodInitializing"}},
+				},
+				{
+					Name:  "init-2",
+					State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: "PodInitializing"}},
+				},
+			},
+		},
+		{
+			name: "Multiple init containers: init-0 completed, init-1 gets ContainerCreating, init-2 gets PodInitializing",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "my-pod"},
+				Spec:       desiredStateWithMultipleInitContainers,
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{},
+					ContainerStatuses:     []v1.ContainerStatus{},
+				},
+			},
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:        kubecontainer.ContainerID{ID: "init-0-id"},
+						Name:      "init-0",
+						State:     kubecontainer.ContainerStateExited,
+						ExitCode:  0,
+					},
+				},
+			},
+			previousStatus:    []v1.ContainerStatus{},
+			containers:        desiredStateWithMultipleInitContainers.InitContainers,
+			hasInitContainers: true,
+			isInitContainer:   true,
+			expected: []v1.ContainerStatus{
+				{
+					Name: "init-0",
+					State: v1.ContainerState{
+						Terminated: &v1.ContainerStateTerminated{
+							ExitCode: 0,
+						},
+					},
+				},
+				{
+					Name:  "init-1",
+					State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: "ContainerCreating"}},
+				},
+				{
+					Name:  "init-2",
+					State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: "PodInitializing"}},
+				},
+			},
 		},
 	}
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
