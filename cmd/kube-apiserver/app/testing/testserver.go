@@ -582,6 +582,9 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	t.Cleanup(func() {
 		tearDownOnce.Do(func() { tearDownAll(errors.New("test has completed")) })
 	})
+	t.Cleanup(func() {
+		time.Sleep(time.Second)
+	})
 
 	return result, nil
 }

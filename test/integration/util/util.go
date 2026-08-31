@@ -591,6 +591,7 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 
 	stopCtxPropagation()
 	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+		time.Sleep(time.Second)
 		CleanupTest(tCtx, testCtx)
 	})
 

@@ -323,6 +323,9 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 	t.Cleanup(func() {
 		tearDownFn(errors.New("test has completed"))
 	})
+	t.Cleanup(func() {
+		time.Sleep(time.Second)
+	})
 
 	// Swap the simple cancellation propagation with the more complete tear-down.
 	// This is not atomic, so tear-down has to be prepared for ctx to be canceled

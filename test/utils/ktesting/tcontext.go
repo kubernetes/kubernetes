@@ -216,6 +216,10 @@ func Init(tb TB, opts ...InitOption) TContext {
 	}
 	tCtx.perTestHeader = header
 
+	tCtx.Cleanup(func() {
+		time.Sleep(time.Second)
+	})
+
 	return tCtx
 }
 
