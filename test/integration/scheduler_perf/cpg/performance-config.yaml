@@ -1,0 +1,657 @@
+# The following labels are used in this file:
+#
+# - integration-test: test cases to run as the integration test.
+# - performance: test cases to run in the performance test.
+# - short: supplemental label for the above two labels (must not used alone), which literally means short execution time test cases.
+
+# ==============================================================================
+# Multi-level Workload Scheduling Benchmarks (CompositePodGroup)
+#
+# The following benchmarks measure scheduling throughput for multi-level
+# workload scheduling across:
+# 1. Multi-level Basic Scheduling Policy (CPGBasicScheduling)
+# 2. Multi-level Gang Scheduling Policy (CPGGangScheduling)
+# 3. Multi-level Preemption (CPGPreemptionBasic, CPGPreemptionCPG, CPGPreemptionAffinity)
+# 4. Multi-level Topology Aware Scheduling (CPGTopologyAwareScheduling)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Multi-level Basic Scheduling Policy
+#
+# CPGBasicScheduling benchmarks scheduling throughput when both CompositePodGroup
+# and its child PodGroups use basic policy (spec.schedulingPolicy.basic), allowing
+# pods and groups to be scheduled independently.
+# ------------------------------------------------------------------------------
+- name: CPGBasicScheduling
+  featureGates:
+    GenericWorkload: true
+    TopologyAwareWorkloadScheduling: true
+    CompositePodGroup: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: cpg-basic-ns
+    count: 1
+  - opcode: createCompositePodGroups
+    # Create composite pod groups with basic scheduling policy.
+    countParam: $initCPGs
+    namespace: cpg-basic-ns-0
+    templatePath: templates/cpg-basic.yaml
+  - opcode: createPodGroups
+    # Create child pod groups with basic scheduling policy referencing parent CPG.
+    countParam: $initPodGroups
+    namespace: cpg-basic-ns-0
+    templatePath: templates/podgroup-basic.yaml
+    templateParams:
+      groupsPerCPG: $groupsPerCPG
+  - opcode: createPods
+    # Create pods belonging to child pod groups according to their indices.
+    countParam: $initPodGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: cpg-basic-ns-0
+    podTemplatePath: templates/basic-pod.yaml
+    collectMetrics: true
+    templateParams:
+      podsPerGroup: $podsPerGroup
+  workloads:
+  - name: 10Nodes_3CPGs_6Groups_18Pods
+    labels: [integration-test, short]
+    params:
+      initNodes: 10
+      initCPGs: 3
+      initPodGroups: 6
+      groupsPerCPG: 2
+      podsPerGroup: 3
+  - name: 100Nodes_10CPGs_20Groups_60Pods
+    labels: [integration-test]
+    params:
+      initNodes: 100
+      initCPGs: 10
+      initPodGroups: 20
+      groupsPerCPG: 2
+      podsPerGroup: 3
+  - name: 5000Nodes_500CPGs_1000Groups_3000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initCPGs: 500
+      initPodGroups: 1000
+      groupsPerCPG: 2
+      podsPerGroup: 3
+  - name: 5000Nodes_1000CPGs_2000Groups_6000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initCPGs: 1000
+      initPodGroups: 2000
+      groupsPerCPG: 2
+      podsPerGroup: 3
+  - name: 5000Nodes_1500CPGs_3000Groups_9000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initCPGs: 1500
+      initPodGroups: 3000
+      groupsPerCPG: 2
+      podsPerGroup: 3
+  - name: 5000Nodes_3CPGs_6Groups_3000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initCPGs: 3
+      initPodGroups: 6
+      groupsPerCPG: 2
+      podsPerGroup: 500
+  - name: 5000Nodes_3CPGs_6Groups_6000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initCPGs: 3
+      initPodGroups: 6
+      groupsPerCPG: 2
+      podsPerGroup: 1000
+  - name: 5000Nodes_3CPGs_6Groups_9000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initCPGs: 3
+      initPodGroups: 6
+      groupsPerCPG: 2
+      podsPerGroup: 1500
+
+# ------------------------------------------------------------------------------
+# 2. Multi-level Gang Scheduling Policy
+#
+# CPGGangScheduling benchmarks all-or-nothing scheduling throughput of CompositePodGroups
+# where both the CPG (minGroupCount) and child PodGroups (minCount) enforce gang policies.
+# ------------------------------------------------------------------------------
+- name: CPGGangScheduling
+  featureGates:
+    GenericWorkload: true
+    TopologyAwareWorkloadScheduling: true
+    CompositePodGroup: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: cpg-gang-ns
+    count: 1
+  - opcode: createCompositePodGroups
+    # Create composite pod groups with gang scheduling policy and minGroupCount.
+    countParam: $initCPGs
+    namespace: cpg-gang-ns-0
+    templatePath: templates/cpg-gang.yaml
+    templateParams:
+      minGroupCount: $minGroupCount
+      priority: 1000
+  - opcode: createPodGroups
+    # Create child pod groups with gang scheduling policy, referencing parent CPG.
+    countParam: $initPodGroups
+    namespace: cpg-gang-ns-0
+    templatePath: templates/podgroup-gang.yaml
+    templateParams:
+      groupsPerCPG: $groupsPerCPG
+      minCount: $minCount
+      priority: 1000
+  - opcode: createPods
+    # Create pods with reference to the child pod groups according to their indices.
+    countParam: $initPodGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: cpg-gang-ns-0
+    podTemplatePath: templates/gang-pod.yaml
+    collectMetrics: true
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      priority: 1000
+      cpuRequest: 100m
+  workloads:
+  - name: 10Nodes_3CPGs_6Groups_18Pods
+    labels: [integration-test, short]
+    params:
+      initNodes: 10
+      initCPGs: 3
+      initPodGroups: 6
+      groupsPerCPG: 2
+      minGroupCount: 2
+      minCount: 3
+      podsPerGroup: 3
+  - name: 100Nodes_10CPGs_20Groups_60Pods
+    labels: [integration-test]
+    params:
+      initNodes: 100
+      initCPGs: 10
+      initPodGroups: 20
+      groupsPerCPG: 2
+      minGroupCount: 2
+      minCount: 3
+      podsPerGroup: 3
+  - name: 5000Nodes_500CPGs_1000Groups_3000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initCPGs: 500
+      initPodGroups: 1000
+      groupsPerCPG: 2
+      minGroupCount: 2
+      minCount: 3
+      podsPerGroup: 3
+  - name: 5000Nodes_1000CPGs_2000Groups_6000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initCPGs: 1000
+      initPodGroups: 2000
+      groupsPerCPG: 2
+      minGroupCount: 2
+      minCount: 3
+      podsPerGroup: 3
+  - name: 5000Nodes_1500CPGs_3000Groups_9000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initCPGs: 1500
+      initPodGroups: 3000
+      groupsPerCPG: 2
+      minGroupCount: 2
+      minCount: 3
+      podsPerGroup: 3
+  - name: 5000Nodes_3CPGs_6Groups_3000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initCPGs: 3
+      initPodGroups: 6
+      groupsPerCPG: 2
+      minGroupCount: 2
+      minCount: 500
+      podsPerGroup: 500
+  - name: 5000Nodes_3CPGs_6Groups_6000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initCPGs: 3
+      initPodGroups: 6
+      groupsPerCPG: 2
+      minGroupCount: 2
+      minCount: 1000
+      podsPerGroup: 1000
+  - name: 5000Nodes_3CPGs_6Groups_9000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initCPGs: 3
+      initPodGroups: 6
+      groupsPerCPG: 2
+      minGroupCount: 2
+      minCount: 1500
+      podsPerGroup: 1500
+
+# ------------------------------------------------------------------------------
+# 3. Multi-level Preemptions
+#
+# Benchmarks multi-level preemption performance across 3 distinct scenarios:
+#   3.1 CPGPreemptionBasic: High-priority CPG preempts un-grouped low-priority pods
+#   3.2 CPGPreemptionCPG: High-priority CPG preempts lower-priority CPGs and child groups
+#   3.3 CPGPreemptionAffinity: High-priority CPG preemption under pod affinity constraints
+# ------------------------------------------------------------------------------
+
+# 3.1 CPGPreemptionBasic: CPG and child PodGroups preempt standalone low-priority pods.
+- name: CPGPreemptionBasic
+  featureGates:
+    GenericWorkload: true
+    TopologyAwareWorkloadScheduling: true
+    CompositePodGroup: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: cpg-preempt
+    count: 2
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: templates/pod-low-priority.yaml
+    namespace: cpg-preempt-1
+    templateParams:
+      nodesCount: $initNodes
+      podsCount: $initPods
+  - opcode: createCompositePodGroups
+    countParam: $initCPGs
+    namespace: cpg-preempt-0
+    templatePath: templates/cpg-gang.yaml
+    templateParams:
+      priority: 1000
+      minGroupCount: $minGroupCount
+  - opcode: createPodGroups
+    countParam: $initPodGroups
+    namespace: cpg-preempt-0
+    templatePath: templates/podgroup-gang.yaml
+    templateParams:
+      groupsPerCPG: $groupsPerCPG
+      priority: 1000
+      minCount: $minCount
+  - opcode: createPods
+    collectMetrics: true
+    countParam: $initPodGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: cpg-preempt-0
+    podTemplatePath: templates/gang-pod.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      cpuRequest: $gangCpuRequest
+      priority: 1000
+  workloads:
+  - name: 2Nodes_1PreemptorCPG_2Groups_2Pods_Evicting_10InitPods
+    labels: [short, integration-test]
+    params:
+      initNodes: 2
+      initPods: 10
+      initCPGs: 1
+      initPodGroups: 2
+      groupsPerCPG: 2
+      minGroupCount: 2
+      minCount: 1
+      podsPerGroup: 1
+      gangCpuRequest: 3970m
+  - name: 100Nodes_1PreemptorCPG_10Groups_100Pods_Evicting_1000InitPods
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      initCPGs: 1
+      initPodGroups: 10
+      groupsPerCPG: 10
+      minGroupCount: 10
+      minCount: 10
+      podsPerGroup: 10
+      gangCpuRequest: 3970m
+  - name: 100Nodes_10PreemptorCPGs_20Groups_100Pods_Evicting_1000InitPods
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      initCPGs: 10
+      initPodGroups: 20
+      groupsPerCPG: 2
+      minGroupCount: 2
+      minCount: 5
+      podsPerGroup: 5
+      gangCpuRequest: 3970m
+
+# 3.2 CPGPreemptionCPG: High-priority CPG preempts lower-priority CPGs and child PodGroups.
+- name: CPGPreemptionCPG
+  featureGates:
+    GenericWorkload: true
+    TopologyAwareWorkloadScheduling: true
+    CompositePodGroup: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: cpg-preempt
+    count: 2
+  - opcode: createCompositePodGroups
+    countParam: $lowPriorityCPGs
+    namespace: cpg-preempt-1
+    templatePath: templates/cpg-gang.yaml
+    templateParams:
+      priority: 1000
+      minGroupCount: $minGroupCount
+  - opcode: createPodGroups
+    countParam: $lowPriorityGroups
+    namespace: cpg-preempt-1
+    templatePath: templates/podgroup-gang.yaml
+    templateParams:
+      groupsPerCPG: $groupsPerCPG
+      priority: 1000
+      minCount: $minCount
+  - opcode: createPods
+    countParam: $lowPriorityGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: cpg-preempt-1
+    podTemplatePath: templates/gang-pod.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      cpuRequest: $lowPriorityCpuRequest
+      hostPortBase: 8000
+      priority: 1000
+  - opcode: createCompositePodGroups
+    countParam: $highPriorityCPGs
+    namespace: cpg-preempt-0
+    templatePath: templates/cpg-gang.yaml
+    templateParams:
+      priority: 9999999
+      minGroupCount: $minGroupCount
+  - opcode: createPodGroups
+    countParam: $highPriorityGroups
+    namespace: cpg-preempt-0
+    templatePath: templates/podgroup-gang.yaml
+    templateParams:
+      groupsPerCPG: $groupsPerCPG
+      priority: 9999999
+      minCount: $minCount
+  - opcode: createPods
+    collectMetrics: true
+    countParam: $highPriorityGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: cpg-preempt-0
+    podTemplatePath: templates/gang-pod.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      cpuRequest: $highPriorityCpuRequest
+      hostPortBase: 9000
+      priority: 9999999
+  workloads:
+  - name: 2Nodes_1PreemptorCPG_2Groups_2Pods_Evicting_2LowPriorityCPGs
+    labels: [short, integration-test]
+    params:
+      initNodes: 2
+      lowPriorityCPGs: 2
+      lowPriorityGroups: 4
+      highPriorityCPGs: 1
+      highPriorityGroups: 2
+      groupsPerCPG: 2
+      minGroupCount: 2
+      minCount: 1
+      podsPerGroup: 1
+      lowPriorityCpuRequest: 600m
+      highPriorityCpuRequest: 3500m
+  - name: 100Nodes_1PreemptorCPG_10Groups_100Pods_Evicting_5LowPriorityCPGs
+    labels: [performance]
+    params:
+      initNodes: 100
+      lowPriorityCPGs: 5
+      lowPriorityGroups: 50
+      highPriorityCPGs: 1
+      highPriorityGroups: 10
+      groupsPerCPG: 10
+      minGroupCount: 10
+      minCount: 10
+      podsPerGroup: 10
+      lowPriorityCpuRequest: 600m
+      highPriorityCpuRequest: 3500m
+  - name: 100Nodes_10PreemptorCPGs_20Groups_100Pods_Evicting_50LowPriorityCPGs
+    labels: [performance]
+    params:
+      initNodes: 100
+      lowPriorityCPGs: 50
+      lowPriorityGroups: 100
+      highPriorityCPGs: 10
+      highPriorityGroups: 20
+      groupsPerCPG: 2
+      minGroupCount: 2
+      minCount: 5
+      podsPerGroup: 5
+      lowPriorityCpuRequest: 600m
+      highPriorityCpuRequest: 3500m
+
+# 3.3 CPGPreemptionAffinity: High-priority CPG preemption with pod affinity constraints.
+- name: CPGPreemptionAffinity
+  featureGates:
+    GenericWorkload: true
+    TopologyAwareWorkloadScheduling: true
+    CompositePodGroup: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: cpg-preempt
+    count: 3
+  # create high priority anchor pods
+  - opcode: createPods
+    countParam: $initNodes
+    podTemplatePath: templates/pod-anchor-high-priority.yaml
+    namespace: cpg-preempt-2
+    templateParams:
+      nodesCount: $initNodes
+      podsCount: $initNodes
+  # create low priority pods that will be preempted
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: templates/pod-low-priority.yaml
+    namespace: cpg-preempt-1
+    templateParams:
+      nodesCount: $initNodes
+      podsCount: $initPods
+  - opcode: createCompositePodGroups
+    countParam: $initCPGs
+    namespace: cpg-preempt-0
+    templatePath: templates/cpg-gang.yaml
+    templateParams:
+      priority: 8888888
+      minGroupCount: $minGroupCount
+  - opcode: createPodGroups
+    countParam: $initPodGroups
+    namespace: cpg-preempt-0
+    templatePath: templates/podgroup-gang.yaml
+    templateParams:
+      groupsPerCPG: $groupsPerCPG
+      priority: 8888888
+      minCount: $minCount
+  - opcode: createPods
+    collectMetrics: true
+    countParam: $initPodGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: cpg-preempt-0
+    podTemplatePath: templates/pod-gang-affinity.yaml
+    templateParams:
+      podsPerGroup: $podsPerGroup
+      priority: 8888888
+  workloads:
+  - name: 2Nodes_1PreemptorCPG_2Groups_2Pods_Evicting_10InitPods
+    labels: [short, integration-test]
+    params:
+      initNodes: 2
+      initPods: 10
+      initCPGs: 1
+      initPodGroups: 2
+      groupsPerCPG: 2
+      minGroupCount: 2
+      minCount: 1
+      podsPerGroup: 1
+  - name: 100Nodes_1PreemptorCPG_10Groups_100Pods_Evicting_1000InitPods
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      initCPGs: 1
+      initPodGroups: 10
+      groupsPerCPG: 10
+      minGroupCount: 10
+      minCount: 10
+      podsPerGroup: 10
+  - name: 100Nodes_10PreemptorCPGs_20Groups_100Pods_Evicting_1000InitPods
+    labels: [performance]
+    params:
+      initNodes: 100
+      initPods: 1000
+      initCPGs: 10
+      initPodGroups: 20
+      groupsPerCPG: 2
+      minGroupCount: 2
+      minCount: 5
+      podsPerGroup: 5
+
+# ------------------------------------------------------------------------------
+# 4. Multi-level Topology Aware Scheduling (TAS)
+#
+# CPGTopologyAwareScheduling benchmarks scheduling throughput of multi-level workloads
+# with hierarchical topology constraints (zone constraint on CPG, rack constraint on PodGroup).
+# ------------------------------------------------------------------------------
+- name: CPGTopologyAwareScheduling
+  featureGates:
+    GenericWorkload: true
+    TopologyAwareWorkloadScheduling: true
+    CompositePodGroup: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: templates/tas-node.yaml
+  - opcode: createNamespaces
+    prefix: cpg-tas-ns
+    count: 1
+  - opcode: createCompositePodGroups
+    # Create composite pod groups with zone topology constraint and gang scheduling policy.
+    countParam: $initCPGs
+    namespace: cpg-tas-ns-0
+    templatePath: templates/cpg-tas.yaml
+    templateParams:
+      minGroupCount: $minGroupCount
+  - opcode: createPodGroups
+    # Create child pod groups with rack topology constraint and gang scheduling policy, referencing parent CPG.
+    countParam: $initPodGroups
+    namespace: cpg-tas-ns-0
+    templatePath: templates/podgroup-tas.yaml
+    templateParams:
+      groupsPerCPG: $groupsPerCPG
+      minCount: $minCount
+  - opcode: createPods
+    # Create pods with reference to the child pod groups according to their indices.
+    countParam: $initPodGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: cpg-tas-ns-0
+    podTemplatePath: templates/tas-pod.yaml
+    collectMetrics: true
+    templateParams:
+      podsPerGroup: $podsPerGroup
+  workloads:
+  - name: 10Nodes_3CPGs_6Groups_18Pods
+    labels: [integration-test, short]
+    params:
+      initNodes: 10
+      initCPGs: 3
+      initPodGroups: 6
+      groupsPerCPG: 2
+      minGroupCount: 2
+      minCount: 3
+      podsPerGroup: 3
+  - name: 100Nodes_10CPGs_20Groups_60Pods
+    labels: [integration-test]
+    params:
+      initNodes: 100
+      initCPGs: 10
+      initPodGroups: 20
+      groupsPerCPG: 2
+      minGroupCount: 2
+      minCount: 3
+      podsPerGroup: 3
+  - name: 5000Nodes_500CPGs_1000Groups_4000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initCPGs: 500
+      initPodGroups: 1000
+      groupsPerCPG: 2
+      minGroupCount: 2
+      minCount: 4
+      podsPerGroup: 4
+  - name: 5000Nodes_1000CPGs_2000Groups_8000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initCPGs: 1000
+      initPodGroups: 2000
+      groupsPerCPG: 2
+      minGroupCount: 2
+      minCount: 4
+      podsPerGroup: 4
+  - name: 5000Nodes_1500CPGs_3000Groups_12000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initCPGs: 1500
+      initPodGroups: 3000
+      groupsPerCPG: 2
+      minGroupCount: 2
+      minCount: 4
+      podsPerGroup: 4
+  - name: 5000Nodes_3CPGs_6Groups_3000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initCPGs: 3
+      initPodGroups: 6
+      groupsPerCPG: 2
+      minGroupCount: 2
+      minCount: 500
+      podsPerGroup: 500
+  - name: 5000Nodes_3CPGs_6Groups_6000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initCPGs: 3
+      initPodGroups: 6
+      groupsPerCPG: 2
+      minGroupCount: 2
+      minCount: 1000
+      podsPerGroup: 1000
+  - name: 5000Nodes_3CPGs_6Groups_9000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initCPGs: 3
+      initPodGroups: 6
+      groupsPerCPG: 2
+      minGroupCount: 2
+      minCount: 1500
+      podsPerGroup: 1500

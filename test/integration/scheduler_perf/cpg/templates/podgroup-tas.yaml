@@ -1,0 +1,15 @@
+apiVersion: scheduling.k8s.io/v1beta1
+kind: PodGroup
+metadata:
+  name: gang-group-{{.Index}}
+spec:
+  parentCompositePodGroupName: cpg-{{DivideInt .Index .groupsPerCPG}}
+  workloadRef:
+    workloadName: test-wl-{{DivideInt .Index .groupsPerCPG}}
+    templateName: pg-template
+  schedulingPolicy:
+    gang:
+      minCount: {{.minCount}}
+  schedulingConstraints:
+    topology:
+    - key: topology.kubernetes.io/rack

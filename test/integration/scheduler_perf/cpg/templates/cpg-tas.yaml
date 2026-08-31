@@ -1,0 +1,14 @@
+apiVersion: scheduling.k8s.io/v1alpha3
+kind: CompositePodGroup
+metadata:
+  name: cpg-{{.Index}}
+spec:
+  workloadRef:
+    workloadName: test-wl-{{.Index}}
+    templateName: cpg-template
+  schedulingPolicy:
+    gang:
+      minGroupCount: {{.minGroupCount}}
+  schedulingConstraints:
+    topology:
+    - key: topology.kubernetes.io/zone
