@@ -1,0 +1,151 @@
+{
+  "/aws-cdk-medialive-multi-region-primary/MediaLiveRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        }
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-medialive-multi-region-primary/PrimaryGroup": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-multi-region-primary/PrimaryMpChannel": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-multi-region-primary/PrimaryEndpoint": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-multi-region-primary/Input": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-multi-region-primary/MultiRegionChannel": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-multi-region-primary/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-multi-region-primary/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-multi-region-primary/MediaLiveRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MediaLiveRole1149D189"
+    }
+  ],
+  "/aws-cdk-medialive-multi-region-primary/MediaLiveRole/DefaultPolicy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-medialive-multi-region-primary/PrimaryGroup/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "PrimaryGroup7B4E49D0"
+    }
+  ],
+  "/aws-cdk-medialive-multi-region-primary/PrimaryMpChannel/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "PrimaryMpChannel91E96122"
+    }
+  ],
+  "/aws-cdk-medialive-multi-region-primary/PrimaryEndpoint/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "PrimaryEndpoint36607FBB"
+    }
+  ],
+  "/aws-cdk-medialive-multi-region-primary/Input/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Input49F21B70"
+    }
+  ],
+  "/aws-cdk-medialive-multi-region-primary/MultiRegionChannel/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MultiRegionChannel2C438E15"
+    }
+  ],
+  "/aws-cdk-medialive-multi-region-primary/MediaLiveRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MediaLiveRoleDefaultPolicyE1F33973"
+    }
+  ]
+}

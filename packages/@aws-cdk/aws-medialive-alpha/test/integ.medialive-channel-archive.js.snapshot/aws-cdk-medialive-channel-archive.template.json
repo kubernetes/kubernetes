@@ -1,0 +1,408 @@
+{
+ "Resources": {
+  "ArchiveBucket9DECBF5D": {
+   "Type": "AWS::S3::Bucket",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "aws-cdk:auto-delete-objects",
+      "Value": "true"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "ArchiveBucketPolicyF1A75978": {
+   "Type": "AWS::S3::BucketPolicy",
+   "Properties": {
+    "Bucket": {
+     "Ref": "ArchiveBucket9DECBF5D"
+    },
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "s3:DeleteObject*",
+        "s3:GetBucket*",
+        "s3:List*",
+        "s3:PutBucketPolicy"
+       ],
+       "Effect": "Allow",
+       "Principal": {
+        "AWS": {
+         "Fn::GetAtt": [
+          "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
+          "Arn"
+         ]
+        }
+       },
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "ArchiveBucket9DECBF5D",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "ArchiveBucket9DECBF5D",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   }
+  },
+  "ArchiveBucketAutoDeleteObjectsCustomResource9EFE6D2E": {
+   "Type": "Custom::S3AutoDeleteObjects",
+   "Properties": {
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F",
+      "Arn"
+     ]
+    },
+    "BucketName": {
+     "Ref": "ArchiveBucket9DECBF5D"
+    }
+   },
+   "DependsOn": [
+    "ArchiveBucketPolicyF1A75978"
+   ],
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Version": "2012-10-17",
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ]
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+     }
+    ]
+   }
+  },
+  "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": {
+      "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
+     },
+     "S3Key": "44e9c4d7a5d3fd2d677e1a7e416b2b56f6b0104bd5eff9cac5557b4c65a9dc61.zip"
+    },
+    "Timeout": 900,
+    "MemorySize": 128,
+    "Handler": "index.handler",
+    "Role": {
+     "Fn::GetAtt": [
+      "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs24.x",
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "Lambda function for auto-deleting objects in ",
+       {
+        "Ref": "ArchiveBucket9DECBF5D"
+       },
+       " S3 bucket."
+      ]
+     ]
+    }
+   },
+   "DependsOn": [
+    "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092"
+   ]
+  },
+  "SrtInputC96BD065": {
+   "Type": "AWS::MediaLive::Input",
+   "Properties": {
+    "Name": "integ-srt-input",
+    "SrtSettings": {
+     "SrtCallerSources": [
+      {
+       "SrtListenerAddress": "203.0.113.100",
+       "SrtListenerPort": "9000"
+      }
+     ]
+    },
+    "Type": "SRT_CALLER"
+   }
+  },
+  "MediaLiveRole1149D189": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "medialive.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   }
+  },
+  "MediaLiveRoleDefaultPolicyE1F33973": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "s3:Abort*",
+        "s3:DeleteObject*",
+        "s3:GetBucket*",
+        "s3:GetObject*",
+        "s3:List*",
+        "s3:PutObject",
+        "s3:PutObjectLegalHold",
+        "s3:PutObjectRetention",
+        "s3:PutObjectTagging",
+        "s3:PutObjectVersionTagging"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "ArchiveBucket9DECBF5D",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "ArchiveBucket9DECBF5D",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "MediaLiveRoleDefaultPolicyE1F33973",
+    "Roles": [
+     {
+      "Ref": "MediaLiveRole1149D189"
+     }
+    ]
+   }
+  },
+  "ArchiveChannel019F5A6F": {
+   "Type": "AWS::MediaLive::Channel",
+   "Properties": {
+    "ChannelClass": "SINGLE_PIPELINE",
+    "Destinations": [
+     {
+      "Id": "archive-output",
+      "Settings": [
+       {
+        "Url": {
+         "Fn::Join": [
+          "",
+          [
+           "s3ssl://",
+           {
+            "Ref": "ArchiveBucket9DECBF5D"
+           },
+           "/archive"
+          ]
+         ]
+        }
+       }
+      ]
+     }
+    ],
+    "EncoderSettings": {
+     "AudioDescriptions": [
+      {
+       "AudioTypeControl": "FOLLOW_INPUT",
+       "CodecSettings": {
+        "AacSettings": {
+         "Bitrate": 192000,
+         "CodingMode": "CODING_MODE_2_0",
+         "InputType": "NORMAL",
+         "Profile": "LC",
+         "RateControlMode": "CBR",
+         "RawFormat": "NONE",
+         "SampleRate": 48000,
+         "Spec": "MPEG4"
+        }
+       },
+       "LanguageCodeControl": "FOLLOW_INPUT",
+       "Name": "aac-stereo"
+      }
+     ],
+     "OutputGroups": [
+      {
+       "Name": "archive-output",
+       "OutputGroupSettings": {
+        "ArchiveGroupSettings": {
+         "Destination": {
+          "DestinationRefId": "archive-output"
+         },
+         "RolloverInterval": 300
+        }
+       },
+       "Outputs": [
+        {
+         "AudioDescriptionNames": [
+          "aac-stereo"
+         ],
+         "OutputName": "archive_out",
+         "OutputSettings": {
+          "ArchiveOutputSettings": {
+           "ContainerSettings": {
+            "M2tsSettings": {}
+           }
+          }
+         },
+         "VideoDescriptionName": "hd-1080p"
+        }
+       ]
+      }
+     ],
+     "TimecodeConfig": {
+      "Source": "EMBEDDED"
+     },
+     "VideoDescriptions": [
+      {
+       "CodecSettings": {
+        "H264Settings": {
+         "AdaptiveQuantization": "AUTO",
+         "AfdSignaling": "NONE",
+         "Bitrate": 5000000,
+         "FlickerAq": "ENABLED",
+         "FramerateControl": "SPECIFIED",
+         "FramerateDenominator": 1001,
+         "FramerateNumerator": 30000,
+         "GopSize": 1,
+         "GopSizeUnits": "SECONDS",
+         "Level": "H264_LEVEL_AUTO",
+         "LookAheadRateControl": "HIGH",
+         "ParControl": "SPECIFIED",
+         "ParDenominator": 1,
+         "ParNumerator": 1,
+         "Profile": "MAIN",
+         "RateControlMode": "CBR",
+         "ScanType": "PROGRESSIVE",
+         "SceneChangeDetect": "ENABLED",
+         "SpatialAq": "ENABLED",
+         "Syntax": "DEFAULT",
+         "TemporalAq": "ENABLED"
+        }
+       },
+       "Height": 1080,
+       "Name": "hd-1080p",
+       "RespondToAfd": "NONE",
+       "ScalingBehavior": "DEFAULT",
+       "Sharpness": 50,
+       "Width": 1920
+      }
+     ]
+    },
+    "InputAttachments": [
+     {
+      "InputId": {
+       "Ref": "SrtInputC96BD065"
+      },
+      "InputSettings": {
+       "DeblockFilter": "DISABLED",
+       "DenoiseFilter": "DISABLED",
+       "FilterStrength": 1,
+       "InputFilter": "AUTO",
+       "Smpte2038DataPreference": "IGNORE",
+       "SourceEndBehavior": "CONTINUE"
+      }
+     }
+    ],
+    "InputSpecification": {
+     "Codec": "AVC",
+     "MaximumBitrate": "MAX_20_MBPS",
+     "Resolution": "HD"
+    },
+    "LogLevel": "DISABLED",
+    "Name": "integ-archive-channel",
+    "RoleArn": {
+     "Fn::GetAtt": [
+      "MediaLiveRole1149D189",
+      "Arn"
+     ]
+    }
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

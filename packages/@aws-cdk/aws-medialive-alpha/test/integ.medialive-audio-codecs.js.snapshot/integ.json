@@ -1,0 +1,14 @@
+{
+  "version": "54.0.0",
+  "testCases": {
+    "cdk-integ-medialive-audio-codecs/DefaultTest": {
+      "stacks": [
+        "aws-cdk-medialive-audio-codecs"
+      ],
+      "assertionStack": "cdk-integ-medialive-audio-codecs/DefaultTest/DeployAssert",
+      "assertionStackName": "cdkintegmedialiveaudiocodecsDefaultTestDeployAssertCFC0FCAC"
+    }
+  },
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
+}

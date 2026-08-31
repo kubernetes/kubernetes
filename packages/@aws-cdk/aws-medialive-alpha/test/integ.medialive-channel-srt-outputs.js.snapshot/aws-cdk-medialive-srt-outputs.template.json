@@ -1,0 +1,319 @@
+{
+ "Resources": {
+  "SrtPassphraseBD30D21E": {
+   "Type": "AWS::SecretsManager::Secret",
+   "Properties": {
+    "GenerateSecretString": {}
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "ChannelSg3255B89D": {
+   "Type": "AWS::MediaLive::InputSecurityGroup",
+   "Properties": {
+    "WhitelistRules": [
+     {
+      "Cidr": "203.0.113.0/24"
+     }
+    ]
+   }
+  },
+  "Input49F21B70": {
+   "Type": "AWS::MediaLive::Input",
+   "Properties": {
+    "Name": "srt-outputs-input",
+    "SrtSettings": {
+     "SrtCallerSources": [
+      {
+       "SrtListenerAddress": "203.0.113.100",
+       "SrtListenerPort": "5000"
+      }
+     ]
+    },
+    "Type": "SRT_CALLER"
+   }
+  },
+  "ChannelRole236C1F7D": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Condition": {
+        "StringEquals": {
+         "aws:SourceAccount": {
+          "Ref": "AWS::AccountId"
+         }
+        },
+        "ArnLike": {
+         "aws:SourceArn": {
+          "Fn::Join": [
+           "",
+           [
+            "arn:",
+            {
+             "Ref": "AWS::Partition"
+            },
+            ":medialive:",
+            {
+             "Ref": "AWS::Region"
+            },
+            ":",
+            {
+             "Ref": "AWS::AccountId"
+            },
+            ":channel:*"
+           ]
+          ]
+         }
+        }
+       },
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "medialive.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Description": "Role for MediaLive channel"
+   }
+  },
+  "ChannelRoleDefaultPolicy12D74268": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "secretsmanager:DescribeSecret",
+        "secretsmanager:GetSecretValue"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Ref": "SrtPassphraseBD30D21E"
+       }
+      },
+      {
+       "Action": "s3:PutObject",
+       "Effect": "Allow",
+       "Resource": "*"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "ChannelRoleDefaultPolicy12D74268",
+    "Roles": [
+     {
+      "Ref": "ChannelRole236C1F7D"
+     }
+    ]
+   }
+  },
+  "Channel4048F119": {
+   "Type": "AWS::MediaLive::Channel",
+   "Properties": {
+    "ChannelClass": "SINGLE_PIPELINE",
+    "ChannelSecurityGroups": [
+     {
+      "Ref": "ChannelSg3255B89D"
+     }
+    ],
+    "Destinations": [
+     {
+      "Id": "srt-listener",
+      "SrtSettings": [
+       {
+        "ConnectionMode": "LISTENER",
+        "EncryptionPassphraseSecretArn": {
+         "Ref": "SrtPassphraseBD30D21E"
+        },
+        "ListenerPort": 5000
+       }
+      ]
+     },
+     {
+      "Id": "srt-caller",
+      "SrtSettings": [
+       {
+        "ConnectionMode": "CALLER",
+        "EncryptionPassphraseSecretArn": {
+         "Ref": "SrtPassphraseBD30D21E"
+        },
+        "Url": "srt://203.0.113.20:5001"
+       }
+      ]
+     }
+    ],
+    "EncoderSettings": {
+     "AudioDescriptions": [
+      {
+       "AudioTypeControl": "FOLLOW_INPUT",
+       "CodecSettings": {
+        "AacSettings": {
+         "Bitrate": 192000,
+         "CodingMode": "CODING_MODE_2_0",
+         "InputType": "NORMAL",
+         "Profile": "LC",
+         "RateControlMode": "CBR",
+         "RawFormat": "NONE",
+         "SampleRate": 48000,
+         "Spec": "MPEG4"
+        }
+       },
+       "LanguageCodeControl": "FOLLOW_INPUT",
+       "Name": "aac-stereo"
+      }
+     ],
+     "OutputGroups": [
+      {
+       "Name": "srt",
+       "OutputGroupSettings": {
+        "SrtGroupSettings": {
+         "InputLossAction": "EMIT_PROGRAM"
+        }
+       },
+       "Outputs": [
+        {
+         "AudioDescriptionNames": [
+          "aac-stereo"
+         ],
+         "OutputName": "srt_listener",
+         "OutputSettings": {
+          "SrtOutputSettings": {
+           "ContainerSettings": {
+            "M2tsSettings": {}
+           },
+           "Destination": {
+            "DestinationRefId": "srt-listener"
+           }
+          }
+         },
+         "VideoDescriptionName": "h264-720p"
+        },
+        {
+         "AudioDescriptionNames": [
+          "aac-stereo"
+         ],
+         "OutputName": "srt_caller",
+         "OutputSettings": {
+          "SrtOutputSettings": {
+           "ContainerSettings": {
+            "M2tsSettings": {}
+           },
+           "Destination": {
+            "DestinationRefId": "srt-caller"
+           }
+          }
+         },
+         "VideoDescriptionName": "h264-720p"
+        }
+       ]
+      }
+     ],
+     "TimecodeConfig": {
+      "Source": "EMBEDDED"
+     },
+     "VideoDescriptions": [
+      {
+       "CodecSettings": {
+        "H264Settings": {
+         "AdaptiveQuantization": "AUTO",
+         "AfdSignaling": "NONE",
+         "Bitrate": 3000000,
+         "FlickerAq": "ENABLED",
+         "FramerateControl": "SPECIFIED",
+         "FramerateDenominator": 1001,
+         "FramerateNumerator": 30000,
+         "GopSize": 1,
+         "GopSizeUnits": "SECONDS",
+         "Level": "H264_LEVEL_AUTO",
+         "LookAheadRateControl": "HIGH",
+         "ParControl": "SPECIFIED",
+         "ParDenominator": 1,
+         "ParNumerator": 1,
+         "Profile": "MAIN",
+         "RateControlMode": "CBR",
+         "ScanType": "PROGRESSIVE",
+         "SceneChangeDetect": "ENABLED",
+         "SpatialAq": "ENABLED",
+         "Syntax": "DEFAULT",
+         "TemporalAq": "ENABLED"
+        }
+       },
+       "Height": 720,
+       "Name": "h264-720p",
+       "RespondToAfd": "NONE",
+       "ScalingBehavior": "DEFAULT",
+       "Sharpness": 50,
+       "Width": 1280
+      }
+     ]
+    },
+    "InputAttachments": [
+     {
+      "InputId": {
+       "Ref": "Input49F21B70"
+      },
+      "InputSettings": {
+       "DeblockFilter": "DISABLED",
+       "DenoiseFilter": "DISABLED",
+       "FilterStrength": 1,
+       "InputFilter": "AUTO",
+       "Smpte2038DataPreference": "IGNORE",
+       "SourceEndBehavior": "CONTINUE"
+      }
+     }
+    ],
+    "InputSpecification": {
+     "Codec": "AVC",
+     "MaximumBitrate": "MAX_20_MBPS",
+     "Resolution": "HD"
+    },
+    "LogLevel": "DISABLED",
+    "Name": "srt-outputs",
+    "RoleArn": {
+     "Fn::GetAtt": [
+      "ChannelRole236C1F7D",
+      "Arn"
+     ]
+    }
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

@@ -1,0 +1,26 @@
+{
+  "/aws-cdk-medialive-input-router-default-az/RouterInputDefaultAz": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-input-router-default-az/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-input-router-default-az/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-input-router-default-az/RouterInputDefaultAz/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "RouterInputDefaultAzC9B515E8"
+    }
+  ]
+}

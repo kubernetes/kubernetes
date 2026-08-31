@@ -1,0 +1,206 @@
+{
+  "/aws-cdk-medialive-multi-input/SlateBucket": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "removalPolicy": "destroy"
+      }
+    }
+  ],
+  "/aws-cdk-medialive-multi-input/OutputBucket": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "removalPolicy": "destroy"
+      }
+    }
+  ],
+  "/aws-cdk-medialive-multi-input/MainInput": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-multi-input/BackupInput": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-multi-input/SlateInput": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-multi-input/Channel": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-multi-input/ChannelArn": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ChannelArn"
+    }
+  ],
+  "/aws-cdk-medialive-multi-input/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-multi-input/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-multi-input/SlateBucket/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SlateBucket0DFA3E77"
+    }
+  ],
+  "/aws-cdk-medialive-multi-input/OutputBucket/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "OutputBucket7114EB27"
+    }
+  ],
+  "/aws-cdk-medialive-multi-input/MainInput/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MainInput6BAEAD1C"
+    }
+  ],
+  "/aws-cdk-medialive-multi-input/BackupInput/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BackupInput115C12EC"
+    }
+  ],
+  "/aws-cdk-medialive-multi-input/SlateInput/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SlateInput252DA7AE"
+    }
+  ],
+  "/aws-cdk-medialive-multi-input/Channel/Role": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        },
+        "description": "*"
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-medialive-multi-input/Channel/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Channel4048F119"
+    }
+  ],
+  "/aws-cdk-medialive-multi-input/Channel/Role/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ChannelRole236C1F7D"
+    }
+  ],
+  "/aws-cdk-medialive-multi-input/Channel/Role/DefaultPolicy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-medialive-multi-input/Channel/Role/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ChannelRoleDefaultPolicy12D74268"
+    }
+  ]
+}

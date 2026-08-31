@@ -1,0 +1,20 @@
+{
+  "version": "54.0.0",
+  "files": {
+    "45b76215ee3ebd56493bfb1d7306004132a8d8e168759937846b10297b80e096": {
+      "displayName": "aws-cdk-medialive-channel-ms-smooth Template",
+      "source": {
+        "path": "aws-cdk-medialive-channel-ms-smooth.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-current_region-81bf8f55": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "45b76215ee3ebd56493bfb1d7306004132a8d8e168759937846b10297b80e096.json",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

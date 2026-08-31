@@ -1,0 +1,191 @@
+{
+  "/aws-cdk-medialive-additional-destinations/MediaLiveRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        }
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-medialive-additional-destinations/Group": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-additional-destinations/PrimaryMpChannel": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-additional-destinations/PrimaryEndpoint": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-additional-destinations/BackupMpChannel": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-additional-destinations/BackupEndpoint": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-additional-destinations/Input": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-additional-destinations/Channel": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-additional-destinations/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-additional-destinations/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-additional-destinations/MediaLiveRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MediaLiveRole1149D189"
+    }
+  ],
+  "/aws-cdk-medialive-additional-destinations/MediaLiveRole/DefaultPolicy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-medialive-additional-destinations/Group/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "GroupC77FDACD"
+    }
+  ],
+  "/aws-cdk-medialive-additional-destinations/PrimaryMpChannel/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "PrimaryMpChannel91E96122"
+    }
+  ],
+  "/aws-cdk-medialive-additional-destinations/PrimaryEndpoint/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "PrimaryEndpoint36607FBB"
+    }
+  ],
+  "/aws-cdk-medialive-additional-destinations/BackupMpChannel/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BackupMpChannelE14F2FFC"
+    }
+  ],
+  "/aws-cdk-medialive-additional-destinations/BackupEndpoint/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BackupEndpoint29DD723F"
+    }
+  ],
+  "/aws-cdk-medialive-additional-destinations/Input/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Input49F21B70"
+    }
+  ],
+  "/aws-cdk-medialive-additional-destinations/Channel/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Channel4048F119"
+    }
+  ],
+  "/aws-cdk-medialive-additional-destinations/MediaLiveRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MediaLiveRoleDefaultPolicyE1F33973"
+    }
+  ]
+}

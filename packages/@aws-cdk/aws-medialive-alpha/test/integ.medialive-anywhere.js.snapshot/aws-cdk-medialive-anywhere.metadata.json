@@ -1,0 +1,229 @@
+{
+  "/aws-cdk-medialive-anywhere/NodeRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        }
+      }
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/AnywhereNetwork": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/AnywhereCluster": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/PlacementGroup": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/SrtInput": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/SdiSource": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/SdiInput": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/OnPremPushInput": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/MulticastInput": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/Smpte2110Input": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/AnywhereChannel": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/NodeRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "NodeRoleB5643E21"
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/AnywhereNetwork/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AnywhereNetwork74D01EAE"
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/AnywhereCluster/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AnywhereCluster496EB84E"
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/PlacementGroup/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "PlacementGroup68E91A0F"
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/SrtInput/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SrtInputC96BD065"
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/SdiSource/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SdiSourceD5FC3791"
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/SdiInput/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SdiInputF54812AB"
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/OnPremPushInput/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "OnPremPushInput8341416E"
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/MulticastInput/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MulticastInputB02B11AD"
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/Smpte2110Input/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Smpte2110InputEE8CE030"
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/AnywhereChannel/Role": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        },
+        "description": "*"
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/AnywhereChannel/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AnywhereChannel0346E87F"
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/AnywhereChannel/Role/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AnywhereChannelRole374E3EAC"
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/AnywhereChannel/Role/DefaultPolicy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-medialive-anywhere/AnywhereChannel/Role/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AnywhereChannelRoleDefaultPolicy87B5CFD1"
+    }
+  ]
+}

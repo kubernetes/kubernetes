@@ -1,0 +1,268 @@
+{
+  "/aws-cdk-medialive-mediaconnect-router/TransitSecret": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-mediaconnect-router/Input": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-mediaconnect-router/Channel": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-mediaconnect-router/RouterInputPipeline0": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-mediaconnect-router/RouterInputPipeline1": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-mediaconnect-router/ChannelArn": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ChannelArn"
+    }
+  ],
+  "/aws-cdk-medialive-mediaconnect-router/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-mediaconnect-router/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-mediaconnect-router/TransitSecret/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "TransitSecretCF30D961"
+    }
+  ],
+  "/aws-cdk-medialive-mediaconnect-router/Input/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Input49F21B70"
+    }
+  ],
+  "/aws-cdk-medialive-mediaconnect-router/Channel/Role": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        },
+        "description": "*"
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-medialive-mediaconnect-router/Channel/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Channel4048F119"
+    }
+  ],
+  "/aws-cdk-medialive-mediaconnect-router/RouterInputPipeline0/SourceTransitDecryptionRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        },
+        "description": "*"
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-medialive-mediaconnect-router/RouterInputPipeline0/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "RouterInputPipeline090F25E1D"
+    }
+  ],
+  "/aws-cdk-medialive-mediaconnect-router/RouterInputPipeline1/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "RouterInputPipeline124405F41"
+    }
+  ],
+  "/aws-cdk-medialive-mediaconnect-router/Channel/Role/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ChannelRole236C1F7D"
+    }
+  ],
+  "/aws-cdk-medialive-mediaconnect-router/Channel/Role/DefaultPolicy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-medialive-mediaconnect-router/RouterInputPipeline0/SourceTransitDecryptionRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "RouterInputPipeline0SourceTransitDecryptionRole53B9C7F5"
+    }
+  ],
+  "/aws-cdk-medialive-mediaconnect-router/RouterInputPipeline0/SourceTransitDecryptionRole/DefaultPolicy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-medialive-mediaconnect-router/Channel/Role/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ChannelRoleDefaultPolicy12D74268"
+    }
+  ],
+  "/aws-cdk-medialive-mediaconnect-router/RouterInputPipeline0/SourceTransitDecryptionRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "RouterInputPipeline0SourceTransitDecryptionRoleDefaultPolicyF9E75A34"
+    }
+  ]
+}

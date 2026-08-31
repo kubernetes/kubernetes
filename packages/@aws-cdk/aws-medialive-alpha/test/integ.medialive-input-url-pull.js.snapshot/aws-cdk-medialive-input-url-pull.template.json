@@ -1,0 +1,65 @@
+{
+ "Resources": {
+  "UrlPullInput9324FD6B": {
+   "Type": "AWS::MediaLive::Input",
+   "Properties": {
+    "Name": "integ-url-pull",
+    "Sources": [
+     {
+      "Url": "https://example.com/stream.m3u8"
+     }
+    ],
+    "Type": "URL_PULL"
+   }
+  },
+  "UrlPullRedundant519990A2": {
+   "Type": "AWS::MediaLive::Input",
+   "Properties": {
+    "Name": "integ-url-pull-redundant",
+    "Sources": [
+     {
+      "Url": "https://primary.example.com/stream.m3u8"
+     },
+     {
+      "Url": "https://backup.example.com/stream.m3u8"
+     }
+    ],
+    "Type": "URL_PULL"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

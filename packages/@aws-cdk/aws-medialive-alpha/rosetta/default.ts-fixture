@@ -1,0 +1,21 @@
+// Fixture with packages imported, but nothing else
+import { Construct } from 'constructs';
+import { Bitrate, Duration, Stack } from 'aws-cdk-lib';
+import * as ec2 from 'aws-cdk-lib/aws-ec2';
+import * as iam from 'aws-cdk-lib/aws-iam';
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
+import * as mediaconnect from 'aws-cdk-lib/aws-mediaconnect';
+import * as mediapackagev2 from '@aws-cdk/aws-mediapackagev2-alpha';
+import * as medialive from '@aws-cdk/aws-medialive-alpha';
+import { InputConfiguration, InputSecurityGroup, InputSource } from '@aws-cdk/aws-medialive-alpha';
+
+class Fixture extends Stack {
+  constructor(scope: Construct, id: string) {
+    super(scope, id);
+
+    const stack = this;
+
+    /// here
+  }
+}

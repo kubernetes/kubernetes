@@ -1,0 +1,26 @@
+{
+  "/aws-cdk-medialive-input-mc-router/McRouterInput": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-input-mc-router/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-input-mc-router/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-input-mc-router/McRouterInput/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "McRouterInput84694A90"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "version": "54.0.0",
+  "testCases": {
+    "cdk-integ-medialive-channel-srt-outputs/DefaultTest": {
+      "stacks": [
+        "aws-cdk-medialive-srt-outputs"
+      ],
+      "assertionStack": "cdk-integ-medialive-channel-srt-outputs/DefaultTest/DeployAssert",
+      "assertionStackName": "cdkintegmedialivechannelsrtoutputsDefaultTestDeployAssert01B44C71"
+    }
+  },
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
+}

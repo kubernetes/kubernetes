@@ -1,0 +1,14 @@
+{
+  "version": "54.0.0",
+  "testCases": {
+    "cdk-integ-medialive-input-mediaconnect-flow/DefaultTest": {
+      "stacks": [
+        "aws-cdk-medialive-input-mediaconnect-flow"
+      ],
+      "assertionStack": "cdk-integ-medialive-input-mediaconnect-flow/DefaultTest/DeployAssert",
+      "assertionStackName": "cdkintegmedialiveinputmediaconnectflowDefaultTestDeployAssert2503E041"
+    }
+  },
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
+}

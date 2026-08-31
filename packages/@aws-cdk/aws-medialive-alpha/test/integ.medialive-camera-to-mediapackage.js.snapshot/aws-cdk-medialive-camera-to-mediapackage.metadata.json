@@ -1,0 +1,151 @@
+{
+  "/aws-cdk-medialive-camera-to-mediapackage/MediaLiveRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        }
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addToPrincipalPolicy": [
+          {}
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachInlinePolicy": [
+          "*"
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-medialive-camera-to-mediapackage/Group": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-camera-to-mediapackage/MpChannel": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-camera-to-mediapackage/HlsEndpoint": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-camera-to-mediapackage/CameraInput": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-camera-to-mediapackage/LiveChannel": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-camera-to-mediapackage/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-camera-to-mediapackage/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-camera-to-mediapackage/MediaLiveRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MediaLiveRole1149D189"
+    }
+  ],
+  "/aws-cdk-medialive-camera-to-mediapackage/MediaLiveRole/DefaultPolicy": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "attachToRole": [
+          "*"
+        ]
+      }
+    },
+    {
+      "type": "aws:cdk:analytics:method",
+      "data": {
+        "addStatements": [
+          {}
+        ]
+      }
+    }
+  ],
+  "/aws-cdk-medialive-camera-to-mediapackage/Group/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "GroupC77FDACD"
+    }
+  ],
+  "/aws-cdk-medialive-camera-to-mediapackage/MpChannel/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MpChannelE46836B0"
+    }
+  ],
+  "/aws-cdk-medialive-camera-to-mediapackage/HlsEndpoint/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "HlsEndpointB1B8983D"
+    }
+  ],
+  "/aws-cdk-medialive-camera-to-mediapackage/CameraInput/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CameraInput38768C34"
+    }
+  ],
+  "/aws-cdk-medialive-camera-to-mediapackage/LiveChannel/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "LiveChannel5ABEA596"
+    }
+  ],
+  "/aws-cdk-medialive-camera-to-mediapackage/MediaLiveRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MediaLiveRoleDefaultPolicyE1F33973"
+    }
+  ]
+}

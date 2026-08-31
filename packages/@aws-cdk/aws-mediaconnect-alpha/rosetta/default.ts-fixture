@@ -3,8 +3,9 @@ import { Construct } from 'constructs';
 import { Bitrate, Duration, Stack } from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import { Secret } from 'aws-cdk-lib/aws-secretsmanager';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
-import * as medialive from 'aws-cdk-lib/aws-medialive';
+import * as medialive from '@aws-cdk/aws-medialive-alpha';
 import {
   Bridge,
   BridgeConfiguration,

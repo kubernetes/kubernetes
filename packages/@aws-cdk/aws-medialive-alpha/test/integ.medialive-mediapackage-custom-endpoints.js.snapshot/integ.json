@@ -1,0 +1,14 @@
+{
+  "version": "54.0.0",
+  "testCases": {
+    "cdk-integ-medialive-mediapackage-custom-endpoints/DefaultTest": {
+      "stacks": [
+        "aws-cdk-medialive-mediapackage-custom-endpoints"
+      ],
+      "assertionStack": "cdk-integ-medialive-mediapackage-custom-endpoints/DefaultTest/DeployAssert",
+      "assertionStackName": "cdkintegmedialivemediapackagecustomendpointsDefaultTestDeployAssertEC74E2A0"
+    }
+  },
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
+}

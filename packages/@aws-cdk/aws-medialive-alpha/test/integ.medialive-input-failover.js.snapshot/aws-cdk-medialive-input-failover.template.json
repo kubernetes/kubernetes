@@ -1,0 +1,457 @@
+{
+ "Resources": {
+  "OutputBucket7114EB27": {
+   "Type": "AWS::S3::Bucket",
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "PrimaryInput4B65CEAD": {
+   "Type": "AWS::MediaLive::Input",
+   "Properties": {
+    "Name": "primary-srt",
+    "SrtSettings": {
+     "SrtCallerSources": [
+      {
+       "SrtListenerAddress": "203.0.113.100",
+       "SrtListenerPort": "5000"
+      }
+     ]
+    },
+    "Type": "SRT_CALLER"
+   }
+  },
+  "SecondaryInputB504A75D": {
+   "Type": "AWS::MediaLive::Input",
+   "Properties": {
+    "Name": "secondary-srt",
+    "SrtSettings": {
+     "SrtCallerSources": [
+      {
+       "SrtListenerAddress": "203.0.113.101",
+       "SrtListenerPort": "5001"
+      }
+     ]
+    },
+    "Type": "SRT_CALLER"
+   }
+  },
+  "ChannelRole236C1F7D": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Condition": {
+        "StringEquals": {
+         "aws:SourceAccount": {
+          "Ref": "AWS::AccountId"
+         }
+        },
+        "ArnLike": {
+         "aws:SourceArn": {
+          "Fn::Join": [
+           "",
+           [
+            "arn:",
+            {
+             "Ref": "AWS::Partition"
+            },
+            ":medialive:",
+            {
+             "Ref": "AWS::Region"
+            },
+            ":",
+            {
+             "Ref": "AWS::AccountId"
+            },
+            ":channel:*"
+           ]
+          ]
+         }
+        }
+       },
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "medialive.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Description": "Role for MediaLive channel"
+   }
+  },
+  "ChannelRoleDefaultPolicy12D74268": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "s3:Abort*",
+        "s3:DeleteObject*",
+        "s3:GetBucket*",
+        "s3:GetObject*",
+        "s3:List*",
+        "s3:PutObject",
+        "s3:PutObjectLegalHold",
+        "s3:PutObjectRetention",
+        "s3:PutObjectTagging",
+        "s3:PutObjectVersionTagging"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "OutputBucket7114EB27",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "OutputBucket7114EB27",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": "s3:PutObject",
+       "Effect": "Allow",
+       "Resource": "*"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "ChannelRoleDefaultPolicy12D74268",
+    "Roles": [
+     {
+      "Ref": "ChannelRole236C1F7D"
+     }
+    ]
+   }
+  },
+  "Channel4048F119": {
+   "Type": "AWS::MediaLive::Channel",
+   "Properties": {
+    "ChannelClass": "SINGLE_PIPELINE",
+    "Destinations": [
+     {
+      "Id": "hls-to-s3",
+      "Settings": [
+       {
+        "Url": {
+         "Fn::Join": [
+          "",
+          [
+           "s3ssl://",
+           {
+            "Ref": "OutputBucket7114EB27"
+           },
+           "/live/stream"
+          ]
+         ]
+        }
+       }
+      ]
+     }
+    ],
+    "EncoderSettings": {
+     "AudioDescriptions": [
+      {
+       "AudioSelectorName": "english",
+       "AudioTypeControl": "FOLLOW_INPUT",
+       "CodecSettings": {
+        "AacSettings": {
+         "Bitrate": 192000,
+         "CodingMode": "CODING_MODE_2_0",
+         "InputType": "NORMAL",
+         "Profile": "LC",
+         "RateControlMode": "CBR",
+         "RawFormat": "NONE",
+         "SampleRate": 48000,
+         "Spec": "MPEG4"
+        }
+       },
+       "LanguageCodeControl": "FOLLOW_INPUT",
+       "Name": "audio"
+      }
+     ],
+     "OutputGroups": [
+      {
+       "Name": "hls-to-s3",
+       "OutputGroupSettings": {
+        "HlsGroupSettings": {
+         "ClientCache": "ENABLED",
+         "CodecSpecification": "RFC_4281",
+         "Destination": {
+          "DestinationRefId": "hls-to-s3"
+         },
+         "DirectoryStructure": "SINGLE_DIRECTORY",
+         "DiscontinuityTags": "INSERT",
+         "HlsId3SegmentTagging": "DISABLED",
+         "IFrameOnlyPlaylists": "DISABLED",
+         "IncompleteSegmentBehavior": "AUTO",
+         "IndexNSegments": 10,
+         "InputLossAction": "EMIT_OUTPUT",
+         "KeepSegments": 10,
+         "ManifestCompression": "NONE",
+         "ManifestDurationFormat": "FLOATING_POINT",
+         "Mode": "LIVE",
+         "OutputSelection": "MANIFESTS_AND_SEGMENTS",
+         "ProgramDateTime": "INCLUDE",
+         "ProgramDateTimeClock": "SYSTEM_CLOCK",
+         "ProgramDateTimePeriod": 600,
+         "RedundantManifest": "DISABLED",
+         "SegmentLength": 6,
+         "SegmentationMode": "USE_SEGMENT_DURATION",
+         "SegmentsPerSubdirectory": 10000,
+         "StreamInfResolution": "INCLUDE",
+         "TimedMetadataId3Frame": "PRIV",
+         "TimedMetadataId3Period": 10,
+         "TsFileMode": "SEGMENTED_FILES"
+        }
+       },
+       "Outputs": [
+        {
+         "AudioDescriptionNames": [
+          "audio"
+         ],
+         "OutputName": "hls_output",
+         "OutputSettings": {
+          "HlsOutputSettings": {
+           "HlsSettings": {
+            "StandardHlsSettings": {
+             "M3u8Settings": {}
+            }
+           }
+          }
+         },
+         "VideoDescriptionName": "video"
+        }
+       ]
+      }
+     ],
+     "TimecodeConfig": {
+      "Source": "EMBEDDED"
+     },
+     "VideoDescriptions": [
+      {
+       "CodecSettings": {
+        "H264Settings": {
+         "AdaptiveQuantization": "AUTO",
+         "AfdSignaling": "NONE",
+         "Bitrate": 5000000,
+         "FlickerAq": "ENABLED",
+         "FramerateControl": "SPECIFIED",
+         "FramerateDenominator": 1001,
+         "FramerateNumerator": 30000,
+         "GopSize": 1,
+         "GopSizeUnits": "SECONDS",
+         "Level": "H264_LEVEL_AUTO",
+         "LookAheadRateControl": "HIGH",
+         "ParControl": "SPECIFIED",
+         "ParDenominator": 1,
+         "ParNumerator": 1,
+         "Profile": "MAIN",
+         "RateControlMode": "CBR",
+         "ScanType": "PROGRESSIVE",
+         "SceneChangeDetect": "ENABLED",
+         "SpatialAq": "ENABLED",
+         "Syntax": "DEFAULT",
+         "TemporalAq": "ENABLED"
+        }
+       },
+       "Height": 1080,
+       "Name": "video",
+       "RespondToAfd": "NONE",
+       "ScalingBehavior": "DEFAULT",
+       "Sharpness": 50,
+       "Width": 1920
+      }
+     ]
+    },
+    "InputAttachments": [
+     {
+      "AutomaticInputFailoverSettings": {
+       "ErrorClearTimeMsec": 5000,
+       "FailoverConditions": [
+        {
+         "FailoverConditionSettings": {
+          "InputLossSettings": {
+           "InputLossThresholdMsec": 1500
+          }
+         }
+        },
+        {
+         "FailoverConditionSettings": {
+          "AudioSilenceSettings": {
+           "AudioSelectorName": "english",
+           "AudioSilenceThresholdMsec": 2000
+          }
+         }
+        },
+        {
+         "FailoverConditionSettings": {
+          "VideoBlackSettings": {
+           "BlackDetectThreshold": 0.1,
+           "VideoBlackThresholdMsec": 1000
+          }
+         }
+        }
+       ],
+       "InputPreference": "PRIMARY_INPUT_PREFERRED",
+       "SecondaryInputId": {
+        "Ref": "SecondaryInputB504A75D"
+       }
+      },
+      "InputAttachmentName": "primary",
+      "InputId": {
+       "Ref": "PrimaryInput4B65CEAD"
+      },
+      "InputSettings": {
+       "AudioSelectors": [
+        {
+         "Name": "english",
+         "SelectorSettings": {
+          "AudioLanguageSelection": {
+           "LanguageCode": "eng",
+           "LanguageSelectionPolicy": "LOOSE"
+          }
+         }
+        }
+       ],
+       "CaptionSelectors": [
+        {
+         "Name": "embedded",
+         "SelectorSettings": {
+          "EmbeddedSourceSettings": {
+           "Convert608To708": "UPCONVERT",
+           "Scte20Detection": "OFF"
+          }
+         }
+        }
+       ],
+       "DeblockFilter": "DISABLED",
+       "DenoiseFilter": "DISABLED",
+       "FilterStrength": 1,
+       "InputFilter": "AUTO",
+       "Smpte2038DataPreference": "IGNORE",
+       "SourceEndBehavior": "CONTINUE",
+       "VideoSelector": {
+        "ColorSpace": "REC_709",
+        "SelectorSettings": {
+         "VideoSelectorProgramId": {
+          "ProgramId": 1
+         }
+        }
+       }
+      }
+     },
+     {
+      "InputAttachmentName": "secondary",
+      "InputId": {
+       "Ref": "SecondaryInputB504A75D"
+      },
+      "InputSettings": {
+       "AudioSelectors": [
+        {
+         "Name": "english",
+         "SelectorSettings": {
+          "AudioLanguageSelection": {
+           "LanguageCode": "eng",
+           "LanguageSelectionPolicy": "LOOSE"
+          }
+         }
+        }
+       ],
+       "CaptionSelectors": [
+        {
+         "Name": "embedded",
+         "SelectorSettings": {
+          "EmbeddedSourceSettings": {
+           "Convert608To708": "UPCONVERT",
+           "Scte20Detection": "OFF"
+          }
+         }
+        }
+       ],
+       "DeblockFilter": "DISABLED",
+       "DenoiseFilter": "DISABLED",
+       "FilterStrength": 1,
+       "InputFilter": "AUTO",
+       "Smpte2038DataPreference": "IGNORE",
+       "SourceEndBehavior": "CONTINUE"
+      }
+     }
+    ],
+    "InputSpecification": {
+     "Codec": "AVC",
+     "MaximumBitrate": "MAX_20_MBPS",
+     "Resolution": "HD"
+    },
+    "LogLevel": "DISABLED",
+    "Name": "input-failover-channel",
+    "RoleArn": {
+     "Fn::GetAtt": [
+      "ChannelRole236C1F7D",
+      "Arn"
+     ]
+    }
+   }
+  }
+ },
+ "Outputs": {
+  "ChannelArn": {
+   "Value": {
+    "Fn::GetAtt": [
+     "Channel4048F119",
+     "Arn"
+    ]
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

@@ -1,0 +1,91 @@
+{
+  "/aws-cdk-medialive-router-roundtrip/RouterInput": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-router-roundtrip/RouterOutput": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-router-roundtrip/DestInterface": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-router-roundtrip/RouterDestInput": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-router-roundtrip/MediaLiveRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        }
+      }
+    }
+  ],
+  "/aws-cdk-medialive-router-roundtrip/LiveChannel": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-router-roundtrip/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-router-roundtrip/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-router-roundtrip/RouterInput/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "RouterInputEFD0F32D"
+    }
+  ],
+  "/aws-cdk-medialive-router-roundtrip/RouterOutput/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "RouterOutputD335589D"
+    }
+  ],
+  "/aws-cdk-medialive-router-roundtrip/DestInterface/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DestInterface7442BA49"
+    }
+  ],
+  "/aws-cdk-medialive-router-roundtrip/RouterDestInput/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "RouterDestInput93992F03"
+    }
+  ],
+  "/aws-cdk-medialive-router-roundtrip/MediaLiveRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MediaLiveRole1149D189"
+    }
+  ],
+  "/aws-cdk-medialive-router-roundtrip/LiveChannel/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "LiveChannel5ABEA596"
+    }
+  ]
+}

@@ -1,0 +1,435 @@
+{
+ "Resources": {
+  "NodeRoleB5643E21": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "medialive.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   }
+  },
+  "AnywhereNetwork74D01EAE": {
+   "Type": "AWS::MediaLive::Network",
+   "Properties": {
+    "IpPools": [
+     {
+      "Cidr": "10.0.0.0/16"
+     }
+    ],
+    "Name": "integ-anywhere-network",
+    "Routes": [
+     {
+      "Cidr": "0.0.0.0/0",
+      "Gateway": "10.0.0.1"
+     }
+    ]
+   }
+  },
+  "AnywhereCluster496EB84E": {
+   "Type": "AWS::MediaLive::Cluster",
+   "Properties": {
+    "ClusterType": "ON_PREMISES",
+    "InstanceRoleArn": {
+     "Fn::GetAtt": [
+      "NodeRoleB5643E21",
+      "Arn"
+     ]
+    },
+    "Name": "integ-anywhere-cluster",
+    "NetworkSettings": {
+     "DefaultRoute": "data",
+     "InterfaceMappings": [
+      {
+       "LogicalInterfaceName": "data",
+       "NetworkId": {
+        "Ref": "AnywhereNetwork74D01EAE"
+       }
+      }
+     ]
+    }
+   }
+  },
+  "PlacementGroup68E91A0F": {
+   "Type": "AWS::MediaLive::ChannelPlacementGroup",
+   "Properties": {
+    "ClusterId": {
+     "Ref": "AnywhereCluster496EB84E"
+    },
+    "Name": "integ-placement-group"
+   }
+  },
+  "SrtInputC96BD065": {
+   "Type": "AWS::MediaLive::Input",
+   "Properties": {
+    "Name": "integ-anywhere-input",
+    "SrtSettings": {
+     "SrtCallerSources": [
+      {
+       "SrtListenerAddress": "10.0.1.100",
+       "SrtListenerPort": "9000"
+      }
+     ]
+    },
+    "Type": "SRT_CALLER"
+   }
+  },
+  "SdiSourceD5FC3791": {
+   "Type": "AWS::MediaLive::SdiSource",
+   "Properties": {
+    "Name": "integ-anywhere-sdi-cam",
+    "Type": "SINGLE"
+   }
+  },
+  "SdiInputF54812AB": {
+   "Type": "AWS::MediaLive::Input",
+   "Properties": {
+    "InputNetworkLocation": "ON_PREMISES",
+    "Name": "integ-anywhere-sdi-input",
+    "SdiSources": [
+     {
+      "Ref": "SdiSourceD5FC3791"
+     }
+    ],
+    "Type": "SDI"
+   }
+  },
+  "OnPremPushInput8341416E": {
+   "Type": "AWS::MediaLive::Input",
+   "Properties": {
+    "Destinations": [
+     {
+      "Network": {
+       "Ref": "AnywhereNetwork74D01EAE"
+      },
+      "NetworkRoutes": [
+       {
+        "Cidr": "10.1.0.0/24",
+        "Gateway": "10.0.0.1"
+       }
+      ],
+      "StaticIpAddress": "10.0.2.50"
+     }
+    ],
+    "InputNetworkLocation": "ON_PREMISES",
+    "Name": "integ-anywhere-rtp-push",
+    "Type": "RTP_PUSH"
+   }
+  },
+  "MulticastInputB02B11AD": {
+   "Type": "AWS::MediaLive::Input",
+   "Properties": {
+    "MulticastSettings": {
+     "Sources": [
+      {
+       "Url": "rtp://239.1.1.1:5000"
+      }
+     ]
+    },
+    "Name": "integ-anywhere-multicast",
+    "Type": "MULTICAST"
+   }
+  },
+  "Smpte2110InputEE8CE030": {
+   "Type": "AWS::MediaLive::Input",
+   "Properties": {
+    "Name": "integ-anywhere-smpte2110",
+    "Smpte2110ReceiverGroupSettings": {
+     "Smpte2110ReceiverGroups": [
+      {
+       "SdpSettings": {
+        "AudioSdps": [
+         {
+          "SdpUrl": "http://10.0.1.50/audio.sdp"
+         }
+        ],
+        "VideoSdp": {
+         "SdpUrl": "http://10.0.1.50/video.sdp"
+        }
+       }
+      }
+     ]
+    },
+    "Type": "SMPTE_2110_RECEIVER_GROUP"
+   }
+  },
+  "AnywhereChannelRole374E3EAC": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Condition": {
+        "StringEquals": {
+         "aws:SourceAccount": {
+          "Ref": "AWS::AccountId"
+         }
+        },
+        "ArnLike": {
+         "aws:SourceArn": {
+          "Fn::Join": [
+           "",
+           [
+            "arn:",
+            {
+             "Ref": "AWS::Partition"
+            },
+            ":medialive:",
+            {
+             "Ref": "AWS::Region"
+            },
+            ":",
+            {
+             "Ref": "AWS::AccountId"
+            },
+            ":channel:*"
+           ]
+          ]
+         }
+        }
+       },
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "medialive.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Description": "Role for MediaLive channel"
+   }
+  },
+  "AnywhereChannelRoleDefaultPolicy87B5CFD1": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "s3:PutObject",
+       "Effect": "Allow",
+       "Resource": "*"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "AnywhereChannelRoleDefaultPolicy87B5CFD1",
+    "Roles": [
+     {
+      "Ref": "AnywhereChannelRole374E3EAC"
+     }
+    ]
+   }
+  },
+  "AnywhereChannel0346E87F": {
+   "Type": "AWS::MediaLive::Channel",
+   "Properties": {
+    "AnywhereSettings": {
+     "ChannelPlacementGroupId": {
+      "Fn::GetAtt": [
+       "PlacementGroup68E91A0F",
+       "Id"
+      ]
+     },
+     "ClusterId": {
+      "Ref": "AnywhereCluster496EB84E"
+     }
+    },
+    "ChannelClass": "SINGLE_PIPELINE",
+    "Destinations": [
+     {
+      "Id": "hls-output",
+      "Settings": [
+       {
+        "Url": "s3ssl://my-bucket/anywhere-live"
+       }
+      ]
+     }
+    ],
+    "EncoderSettings": {
+     "AudioDescriptions": [
+      {
+       "AudioTypeControl": "FOLLOW_INPUT",
+       "CodecSettings": {
+        "AacSettings": {
+         "Bitrate": 192000,
+         "CodingMode": "CODING_MODE_2_0",
+         "InputType": "NORMAL",
+         "Profile": "LC",
+         "RateControlMode": "CBR",
+         "RawFormat": "NONE",
+         "SampleRate": 48000,
+         "Spec": "MPEG4"
+        }
+       },
+       "LanguageCodeControl": "FOLLOW_INPUT",
+       "Name": "aac-stereo"
+      }
+     ],
+     "OutputGroups": [
+      {
+       "Name": "hls-output",
+       "OutputGroupSettings": {
+        "HlsGroupSettings": {
+         "ClientCache": "ENABLED",
+         "CodecSpecification": "RFC_4281",
+         "Destination": {
+          "DestinationRefId": "hls-output"
+         },
+         "DirectoryStructure": "SINGLE_DIRECTORY",
+         "DiscontinuityTags": "INSERT",
+         "HlsId3SegmentTagging": "DISABLED",
+         "IFrameOnlyPlaylists": "DISABLED",
+         "IncompleteSegmentBehavior": "AUTO",
+         "IndexNSegments": 10,
+         "InputLossAction": "EMIT_OUTPUT",
+         "KeepSegments": 21,
+         "ManifestCompression": "NONE",
+         "ManifestDurationFormat": "FLOATING_POINT",
+         "Mode": "LIVE",
+         "OutputSelection": "MANIFESTS_AND_SEGMENTS",
+         "ProgramDateTime": "INCLUDE",
+         "ProgramDateTimeClock": "SYSTEM_CLOCK",
+         "ProgramDateTimePeriod": 600,
+         "RedundantManifest": "DISABLED",
+         "SegmentLength": 2,
+         "SegmentationMode": "USE_SEGMENT_DURATION",
+         "SegmentsPerSubdirectory": 10000,
+         "StreamInfResolution": "INCLUDE",
+         "TimedMetadataId3Frame": "PRIV",
+         "TimedMetadataId3Period": 10,
+         "TsFileMode": "SEGMENTED_FILES"
+        }
+       },
+       "Outputs": [
+        {
+         "AudioDescriptionNames": [
+          "aac-stereo"
+         ],
+         "OutputName": "hd_output",
+         "OutputSettings": {
+          "HlsOutputSettings": {
+           "HlsSettings": {
+            "StandardHlsSettings": {
+             "M3u8Settings": {}
+            }
+           }
+          }
+         },
+         "VideoDescriptionName": "hd-1080p"
+        }
+       ]
+      }
+     ],
+     "TimecodeConfig": {
+      "Source": "EMBEDDED"
+     },
+     "VideoDescriptions": [
+      {
+       "CodecSettings": {
+        "H264Settings": {
+         "AdaptiveQuantization": "AUTO",
+         "AfdSignaling": "NONE",
+         "Bitrate": 5000000,
+         "FlickerAq": "ENABLED",
+         "FramerateControl": "INITIALIZE_FROM_SOURCE",
+         "GopSize": 1,
+         "GopSizeUnits": "SECONDS",
+         "Level": "H264_LEVEL_AUTO",
+         "LookAheadRateControl": "HIGH",
+         "ParControl": "INITIALIZE_FROM_SOURCE",
+         "Profile": "MAIN",
+         "RateControlMode": "CBR",
+         "ScanType": "PROGRESSIVE",
+         "SceneChangeDetect": "ENABLED",
+         "SpatialAq": "ENABLED",
+         "Syntax": "DEFAULT",
+         "TemporalAq": "ENABLED"
+        }
+       },
+       "Height": 1080,
+       "Name": "hd-1080p",
+       "RespondToAfd": "NONE",
+       "ScalingBehavior": "DEFAULT",
+       "Sharpness": 50,
+       "Width": 1920
+      }
+     ]
+    },
+    "InputAttachments": [
+     {
+      "InputId": {
+       "Ref": "SrtInputC96BD065"
+      },
+      "InputSettings": {
+       "DeblockFilter": "DISABLED",
+       "DenoiseFilter": "DISABLED",
+       "FilterStrength": 1,
+       "InputFilter": "AUTO",
+       "Smpte2038DataPreference": "IGNORE",
+       "SourceEndBehavior": "CONTINUE"
+      },
+      "LogicalInterfaceNames": [
+       "data"
+      ]
+     }
+    ],
+    "InputSpecification": {
+     "Codec": "AVC",
+     "MaximumBitrate": "MAX_20_MBPS",
+     "Resolution": "HD"
+    },
+    "LogLevel": "DISABLED",
+    "Name": "integ-anywhere-channel",
+    "RoleArn": {
+     "Fn::GetAtt": [
+      "AnywhereChannelRole374E3EAC",
+      "Arn"
+     ]
+    }
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

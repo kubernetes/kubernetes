@@ -1,0 +1,64 @@
+{
+  "/aws-cdk-medialive-input-srt/InputSG": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-input-srt/SrtSecret": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "secretName": "*"
+      }
+    }
+  ],
+  "/aws-cdk-medialive-input-srt/SrtCallerInput": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-input-srt/SrtListenerInput": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-input-srt/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-input-srt/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-input-srt/InputSG/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "InputSG7C36578A"
+    }
+  ],
+  "/aws-cdk-medialive-input-srt/SrtSecret/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SrtSecret4F4908EE"
+    }
+  ],
+  "/aws-cdk-medialive-input-srt/SrtCallerInput/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SrtCallerInputB21A3C94"
+    }
+  ],
+  "/aws-cdk-medialive-input-srt/SrtListenerInput/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SrtListenerInput99BFF7B2"
+    }
+  ]
+}

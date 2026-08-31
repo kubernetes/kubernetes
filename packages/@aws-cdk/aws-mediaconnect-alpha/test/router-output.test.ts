@@ -1,6 +1,7 @@
 import { App, ArnFormat, Bitrate, Duration, Lazy, Stack, Token } from 'aws-cdk-lib';
 import { Template, Match } from 'aws-cdk-lib/assertions';
 import { Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
+import * as medialive from 'aws-cdk-lib/aws-medialive';
 import { Secret } from 'aws-cdk-lib/aws-secretsmanager';
 
 import { Flow } from '../lib/flow';
@@ -220,14 +221,15 @@ describe('RouterOutput', () => {
   });
 
   test('creates router output with MediaLive input configuration (automatic encryption)', () => {
+    const mlInput = new medialive.CfnInput(stack, 'MlInput', { name: 'ml-in', type: 'MEDIACONNECT_ROUTER' });
     new RouterOutput(stack, 'routerOutput', {
       routerOutputName: 'test-medialive',
       maximumBitrate: Bitrate.mbps(20),
       routingScope: RoutingScope.GLOBAL,
       tier: RouterOutputTier.OUTPUT_100,
       configuration: RouterOutputConfiguration.mediaLiveInput({
-        mediaLiveInputArn: 'arn:aws:medialive:us-east-1:123456789012:input:1234567',
-        mediaLivePipelineId: MediaLivePipeline.PIPELINE_0,
+        input: mlInput,
+        pipeline: MediaLivePipeline.PIPELINE_0,
       }),
     });
 
@@ -236,7 +238,7 @@ describe('RouterOutput', () => {
       MaximumBitrate: 20000000,
       Configuration: {
         MediaLiveInput: {
-          MediaLiveInputArn: 'arn:aws:medialive:us-east-1:123456789012:input:1234567',
+          MediaLiveInputArn: { 'Fn::GetAtt': [Match.stringLikeRegexp('MlInput'), 'Arn'] },
           MediaLivePipelineId: 'PIPELINE_0',
           DestinationTransitEncryption: {
             EncryptionKeyType: 'AUTOMATIC',
@@ -254,6 +256,7 @@ describe('RouterOutput', () => {
       assumedBy: new ServicePrincipal('mediaconnect.amazonaws.com'),
     });
     const secret = new Secret(stack, 'TestSecret');
+    const mlInput = new medialive.CfnInput(stack, 'MlInput', { name: 'ml-in', type: 'MEDIACONNECT_ROUTER' });
 
     new RouterOutput(stack, 'routerOutput', {
       routerOutputName: 'test-medialive-encrypted',
@@ -261,8 +264,8 @@ describe('RouterOutput', () => {
       routingScope: RoutingScope.REGIONAL,
       tier: RouterOutputTier.OUTPUT_20,
       configuration: RouterOutputConfiguration.mediaLiveInput({
-        mediaLiveInputArn: 'arn:aws:medialive:us-east-1:123456789012:input:7654321',
-        mediaLivePipelineId: MediaLivePipeline.PIPELINE_1,
+        input: mlInput,
+        pipeline: MediaLivePipeline.PIPELINE_1,
         destinationTransitEncryption: ({ role, secret }),
       }),
     });
@@ -270,7 +273,7 @@ describe('RouterOutput', () => {
     Template.fromStack(stack).hasResourceProperties('AWS::MediaConnect::RouterOutput', {
       Configuration: {
         MediaLiveInput: {
-          MediaLiveInputArn: 'arn:aws:medialive:us-east-1:123456789012:input:7654321',
+          MediaLiveInputArn: { 'Fn::GetAtt': [Match.stringLikeRegexp('MlInput'), 'Arn'] },
           MediaLivePipelineId: 'PIPELINE_1',
           DestinationTransitEncryption: {
             EncryptionKeyType: 'SECRETS_MANAGER',
@@ -769,6 +772,7 @@ test('imported router output has undefined createdAt and updatedAt', () => {
 
 test('MediaLive input transit encryption auto-creates a role and orders its policy before the router output', () => {
   const secret = new Secret(stack, 'secret');
+  const mlInput = new medialive.CfnInput(stack, 'MlInput', { name: 'ml-in', type: 'MEDIACONNECT_ROUTER' });
 
   new RouterOutput(stack, 'routerOutput', {
     routerOutputName: 'transit-auto-role',
@@ -776,8 +780,8 @@ test('MediaLive input transit encryption auto-creates a role and orders its poli
     routingScope: RoutingScope.REGIONAL,
     tier: RouterOutputTier.OUTPUT_20,
     configuration: RouterOutputConfiguration.mediaLiveInput({
-      mediaLiveInputArn: 'arn:aws:medialive:us-east-1:123456789012:input:1234567',
-      mediaLivePipelineId: MediaLivePipeline.PIPELINE_0,
+      input: mlInput,
+      pipeline: MediaLivePipeline.PIPELINE_0,
       destinationTransitEncryption: { secret },
     }),
   });
@@ -822,14 +826,16 @@ test('SRT output encryption auto-creates a role and orders its policy before the
 });
 
 test('MediaLive input transit encryption defaults to AUTOMATIC and adds no role or dependency when no secret is given', () => {
+  const mlInput = new medialive.CfnInput(stack, 'MlInput', { name: 'ml-in', type: 'MEDIACONNECT_ROUTER' });
+
   new RouterOutput(stack, 'routerOutput', {
     routerOutputName: 'transit-automatic',
     maximumBitrate: Bitrate.mbps(5),
     routingScope: RoutingScope.REGIONAL,
     tier: RouterOutputTier.OUTPUT_20,
     configuration: RouterOutputConfiguration.mediaLiveInput({
-      mediaLiveInputArn: 'arn:aws:medialive:us-east-1:123456789012:input:1234567',
-      mediaLivePipelineId: MediaLivePipeline.PIPELINE_0,
+      input: mlInput,
+      pipeline: MediaLivePipeline.PIPELINE_0,
     }),
   });
 
@@ -853,6 +859,7 @@ test('MediaLive input transit encryption defaults to AUTOMATIC and adds no role 
 test('MediaLive input transit encryption with an explicit role does not auto-create a role', () => {
   const role = new Role(stack, 'role', { assumedBy: new ServicePrincipal('mediaconnect.amazonaws.com') });
   const secret = new Secret(stack, 'secret');
+  const mlInput = new medialive.CfnInput(stack, 'MlInput', { name: 'ml-in', type: 'MEDIACONNECT_ROUTER' });
 
   new RouterOutput(stack, 'routerOutput', {
     routerOutputName: 'transit-explicit-role',
@@ -860,8 +867,8 @@ test('MediaLive input transit encryption with an explicit role does not auto-cre
     routingScope: RoutingScope.REGIONAL,
     tier: RouterOutputTier.OUTPUT_20,
     configuration: RouterOutputConfiguration.mediaLiveInput({
-      mediaLiveInputArn: 'arn:aws:medialive:us-east-1:123456789012:input:1234567',
-      mediaLivePipelineId: MediaLivePipeline.PIPELINE_0,
+      input: mlInput,
+      pipeline: MediaLivePipeline.PIPELINE_0,
       destinationTransitEncryption: { role, secret },
     }),
   });

@@ -1,0 +1,479 @@
+{
+ "Resources": {
+  "TransitSecretCF30D961": {
+   "Type": "AWS::SecretsManager::Secret",
+   "Properties": {
+    "GenerateSecretString": {}
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "Input49F21B70": {
+   "Type": "AWS::MediaLive::Input",
+   "Properties": {
+    "Name": "mcr-srt-input",
+    "SrtSettings": {
+     "SrtCallerSources": [
+      {
+       "SrtListenerAddress": "203.0.113.100",
+       "SrtListenerPort": "5000"
+      },
+      {
+       "SrtListenerAddress": "203.0.113.101",
+       "SrtListenerPort": "5000"
+      }
+     ]
+    },
+    "Type": "SRT_CALLER"
+   }
+  },
+  "ChannelRole236C1F7D": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Condition": {
+        "StringEquals": {
+         "aws:SourceAccount": {
+          "Ref": "AWS::AccountId"
+         }
+        },
+        "ArnLike": {
+         "aws:SourceArn": {
+          "Fn::Join": [
+           "",
+           [
+            "arn:",
+            {
+             "Ref": "AWS::Partition"
+            },
+            ":medialive:",
+            {
+             "Ref": "AWS::Region"
+            },
+            ":",
+            {
+             "Ref": "AWS::AccountId"
+            },
+            ":channel:*"
+           ]
+          ]
+         }
+        }
+       },
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "medialive.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Description": "Role for MediaLive channel"
+   }
+  },
+  "ChannelRoleDefaultPolicy12D74268": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "secretsmanager:DescribeSecret",
+        "secretsmanager:GetSecretValue"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Ref": "TransitSecretCF30D961"
+       }
+      },
+      {
+       "Action": "s3:PutObject",
+       "Effect": "Allow",
+       "Resource": "*"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "ChannelRoleDefaultPolicy12D74268",
+    "Roles": [
+     {
+      "Ref": "ChannelRole236C1F7D"
+     }
+    ]
+   }
+  },
+  "Channel4048F119": {
+   "Type": "AWS::MediaLive::Channel",
+   "Properties": {
+    "ChannelClass": "STANDARD",
+    "Destinations": [
+     {
+      "Id": "router-out",
+      "MediaConnectRouterSettings": [
+       {
+        "EncryptionType": "SECRETS_MANAGER",
+        "SecretArn": {
+         "Ref": "TransitSecretCF30D961"
+        }
+       },
+       {
+        "EncryptionType": "AUTOMATIC"
+       }
+      ]
+     }
+    ],
+    "EncoderSettings": {
+     "AudioDescriptions": [
+      {
+       "AudioTypeControl": "FOLLOW_INPUT",
+       "CodecSettings": {
+        "AacSettings": {
+         "Bitrate": 192000,
+         "CodingMode": "CODING_MODE_2_0",
+         "InputType": "NORMAL",
+         "Profile": "LC",
+         "RateControlMode": "CBR",
+         "RawFormat": "NONE",
+         "SampleRate": 48000,
+         "Spec": "MPEG4"
+        }
+       },
+       "LanguageCodeControl": "FOLLOW_INPUT",
+       "Name": "aac-stereo"
+      }
+     ],
+     "OutputGroups": [
+      {
+       "Name": "router-out",
+       "OutputGroupSettings": {
+        "MediaConnectRouterGroupSettings": {
+         "AvailabilityZones": [
+          {
+           "Fn::Select": [
+            0,
+            {
+             "Fn::GetAZs": ""
+            }
+           ]
+          },
+          {
+           "Fn::Select": [
+            1,
+            {
+             "Fn::GetAZs": ""
+            }
+           ]
+          }
+         ]
+        }
+       },
+       "Outputs": [
+        {
+         "AudioDescriptionNames": [
+          "aac-stereo"
+         ],
+         "OutputName": "router-ts",
+         "OutputSettings": {
+          "MediaConnectRouterOutputSettings": {
+           "ContainerSettings": {
+            "M2tsSettings": {}
+           },
+           "Destination": {
+            "DestinationRefId": "router-out"
+           }
+          }
+         },
+         "VideoDescriptionName": "h264-1080p"
+        }
+       ]
+      }
+     ],
+     "TimecodeConfig": {
+      "Source": "EMBEDDED"
+     },
+     "VideoDescriptions": [
+      {
+       "CodecSettings": {
+        "H264Settings": {
+         "AdaptiveQuantization": "AUTO",
+         "AfdSignaling": "NONE",
+         "Bitrate": 5000000,
+         "FlickerAq": "ENABLED",
+         "FramerateControl": "SPECIFIED",
+         "FramerateDenominator": 1001,
+         "FramerateNumerator": 30000,
+         "GopSize": 1,
+         "GopSizeUnits": "SECONDS",
+         "Level": "H264_LEVEL_AUTO",
+         "LookAheadRateControl": "HIGH",
+         "ParControl": "SPECIFIED",
+         "ParDenominator": 1,
+         "ParNumerator": 1,
+         "Profile": "MAIN",
+         "RateControlMode": "CBR",
+         "ScanType": "PROGRESSIVE",
+         "SceneChangeDetect": "ENABLED",
+         "SpatialAq": "ENABLED",
+         "Syntax": "DEFAULT",
+         "TemporalAq": "ENABLED"
+        }
+       },
+       "Height": 1080,
+       "Name": "h264-1080p",
+       "RespondToAfd": "NONE",
+       "ScalingBehavior": "DEFAULT",
+       "Sharpness": 50,
+       "Width": 1920
+      }
+     ]
+    },
+    "InputAttachments": [
+     {
+      "InputId": {
+       "Ref": "Input49F21B70"
+      },
+      "InputSettings": {
+       "DeblockFilter": "DISABLED",
+       "DenoiseFilter": "DISABLED",
+       "FilterStrength": 1,
+       "InputFilter": "AUTO",
+       "Smpte2038DataPreference": "IGNORE",
+       "SourceEndBehavior": "CONTINUE"
+      }
+     }
+    ],
+    "InputSpecification": {
+     "Codec": "AVC",
+     "MaximumBitrate": "MAX_20_MBPS",
+     "Resolution": "HD"
+    },
+    "LogLevel": "DISABLED",
+    "Name": "mcr-channel",
+    "RoleArn": {
+     "Fn::GetAtt": [
+      "ChannelRole236C1F7D",
+      "Arn"
+     ]
+    }
+   }
+  },
+  "RouterInputPipeline0SourceTransitDecryptionRole53B9C7F5": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Condition": {
+        "StringEquals": {
+         "aws:SourceAccount": {
+          "Ref": "AWS::AccountId"
+         }
+        },
+        "ArnLike": {
+         "aws:SourceArn": {
+          "Fn::Join": [
+           "",
+           [
+            "arn:",
+            {
+             "Ref": "AWS::Partition"
+            },
+            ":mediaconnect:",
+            {
+             "Ref": "AWS::Region"
+            },
+            ":",
+            {
+             "Ref": "AWS::AccountId"
+            },
+            ":routerInput:*"
+           ]
+          ]
+         }
+        }
+       },
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "mediaconnect.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Description": "Auto-generated MediaConnect role for accessing the encryption secret"
+   }
+  },
+  "RouterInputPipeline0SourceTransitDecryptionRoleDefaultPolicyF9E75A34": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "secretsmanager:DescribeSecret",
+        "secretsmanager:GetSecretValue"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Ref": "TransitSecretCF30D961"
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetResourcePolicy",
+        "secretsmanager:ListSecretVersionIds"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Ref": "TransitSecretCF30D961"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "RouterInputPipeline0SourceTransitDecryptionRoleDefaultPolicyF9E75A34",
+    "Roles": [
+     {
+      "Ref": "RouterInputPipeline0SourceTransitDecryptionRole53B9C7F5"
+     }
+    ]
+   }
+  },
+  "RouterInputPipeline090F25E1D": {
+   "Type": "AWS::MediaConnect::RouterInput",
+   "Properties": {
+    "Configuration": {
+     "MediaLiveChannel": {
+      "MediaLiveChannelArn": {
+       "Fn::GetAtt": [
+        "Channel4048F119",
+        "Arn"
+       ]
+      },
+      "MediaLiveChannelOutputName": "router-ts",
+      "MediaLivePipelineId": "PIPELINE_0",
+      "SourceTransitDecryption": {
+       "EncryptionKeyConfiguration": {
+        "SecretsManager": {
+         "RoleArn": {
+          "Fn::GetAtt": [
+           "RouterInputPipeline0SourceTransitDecryptionRole53B9C7F5",
+           "Arn"
+          ]
+         },
+         "SecretArn": {
+          "Ref": "TransitSecretCF30D961"
+         }
+        }
+       },
+       "EncryptionKeyType": "SECRETS_MANAGER"
+      }
+     }
+    },
+    "MaintenanceConfiguration": {
+     "Default": {}
+    },
+    "MaximumBitrate": 10000000,
+    "Name": "mcr-router-input-p0",
+    "RegionName": {
+     "Ref": "AWS::Region"
+    },
+    "RoutingScope": "REGIONAL",
+    "Tier": "INPUT_50",
+    "TransitEncryption": {
+     "EncryptionKeyConfiguration": {
+      "Automatic": {}
+     },
+     "EncryptionKeyType": "AUTOMATIC"
+    }
+   }
+  },
+  "RouterInputPipeline124405F41": {
+   "Type": "AWS::MediaConnect::RouterInput",
+   "Properties": {
+    "Configuration": {
+     "MediaLiveChannel": {
+      "MediaLiveChannelArn": {
+       "Fn::GetAtt": [
+        "Channel4048F119",
+        "Arn"
+       ]
+      },
+      "MediaLiveChannelOutputName": "router-ts",
+      "MediaLivePipelineId": "PIPELINE_1",
+      "SourceTransitDecryption": {
+       "EncryptionKeyConfiguration": {
+        "Automatic": {}
+       },
+       "EncryptionKeyType": "AUTOMATIC"
+      }
+     }
+    },
+    "MaintenanceConfiguration": {
+     "Default": {}
+    },
+    "MaximumBitrate": 10000000,
+    "Name": "mcr-router-input-p1",
+    "RegionName": {
+     "Ref": "AWS::Region"
+    },
+    "RoutingScope": "REGIONAL",
+    "Tier": "INPUT_50",
+    "TransitEncryption": {
+     "EncryptionKeyConfiguration": {
+      "Automatic": {}
+     },
+     "EncryptionKeyType": "AUTOMATIC"
+    }
+   }
+  }
+ },
+ "Outputs": {
+  "ChannelArn": {
+   "Value": {
+    "Fn::GetAtt": [
+     "Channel4048F119",
+     "Arn"
+    ]
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

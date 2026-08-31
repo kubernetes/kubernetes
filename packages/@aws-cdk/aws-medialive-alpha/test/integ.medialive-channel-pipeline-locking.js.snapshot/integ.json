@@ -1,0 +1,14 @@
+{
+  "version": "54.0.0",
+  "testCases": {
+    "cdk-integ-medialive-pipeline-locking/DefaultTest": {
+      "stacks": [
+        "aws-cdk-medialive-pipeline-locking"
+      ],
+      "assertionStack": "cdk-integ-medialive-pipeline-locking/DefaultTest/DeployAssert",
+      "assertionStackName": "cdkintegmedialivepipelinelockingDefaultTestDeployAssert2FACAE6C"
+    }
+  },
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
+}

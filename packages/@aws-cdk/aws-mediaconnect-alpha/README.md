@@ -73,7 +73,7 @@ Here's a complete example showing how to connect an SRT source through a router 
 
 ```ts
 declare const stack: Stack;
-declare const mediaLiveInput: medialive.CfnInput;
+declare const mediaLiveInput: medialive.IInput;
 
 // 1. A public network interface for the SRT input
 const networkInterface = new RouterNetworkInterface(stack, 'NetworkInterface', {
@@ -105,8 +105,8 @@ const output = new RouterOutput(stack, 'Output', {
   routingScope: RoutingScope.REGIONAL,
   tier: RouterOutputTier.OUTPUT_20,
   configuration: RouterOutputConfiguration.mediaLiveInput({
-    mediaLiveInputArn: mediaLiveInput.attrArn,
-    mediaLivePipelineId: MediaLivePipeline.PIPELINE_0,
+    input: mediaLiveInput,
+    pipeline: MediaLivePipeline.PIPELINE_0,
   }),
 });
 ```
@@ -198,6 +198,65 @@ const input = new RouterInput(stack, 'FailoverInput', {
 });
 ```
 
+#### MediaLive Channel Input
+
+Connect a router input to a MediaLive channel. The `outputName` must match the name of an output configured in the channel's MediaConnect Router output group.
+
+```ts
+declare const stack: Stack;
+declare const mediaLiveChannel: medialive.IChannel;
+
+const input = new RouterInput(stack, 'ChannelInput', {
+  routerInputName: 'channel-input',
+  maximumBitrate: Bitrate.mbps(20),
+  routingScope: RoutingScope.REGIONAL,
+  tier: RouterInputTier.INPUT_50,
+  configuration: RouterInputConfiguration.mediaLiveChannel({
+    channel: mediaLiveChannel,
+    outputName: 'router-ts',
+    pipeline: MediaLivePipeline.PIPELINE_0,
+  }),
+});
+```
+
+> **Tip:** For full examples of wiring a MediaLive channel to a MediaConnect Router (including
+> transit encryption), see the [MediaLive L2 README — MediaConnect Router section](./../aws-medialive-alpha/README.md#aws-elemental-mediaconnect-router).
+
+```ts
+declare const stack: Stack;
+declare const mediaLiveChannel: medialive.IChannel;
+declare const transitSecret: Secret; // must hold the same value as the channel's MediaConnectRouterSettings.shared() secret
+
+const input = new RouterInput(stack, 'ChannelInput', {
+  routerInputName: 'channel-input',
+  maximumBitrate: Bitrate.mbps(20),
+  routingScope: RoutingScope.REGIONAL,
+  tier: RouterInputTier.INPUT_50,
+  configuration: RouterInputConfiguration.mediaLiveChannel({
+    channel: mediaLiveChannel,
+    outputName: 'router-ts',
+    pipeline: MediaLivePipeline.PIPELINE_0,
+    sourceTransitDecryption: { secret: transitSecret },
+  }),
+});
+```
+
+Or prepare a router input for a MediaLive connection without specifying the channel (requires explicit availability zone):
+
+```ts
+declare const stack: Stack;
+
+const input = new RouterInput(stack, 'ChannelInputNoConnection', {
+  routerInputName: 'channel-input-no-connection',
+  maximumBitrate: Bitrate.mbps(20),
+  routingScope: RoutingScope.REGIONAL,
+  tier: RouterInputTier.INPUT_50,
+  configuration: RouterInputConfiguration.mediaLiveChannelWithoutConnection({
+    availabilityZone: 'us-east-1a',
+  }),
+});
+```
+
 #### MediaConnect Flow Input
 
 Connect a router input to an existing MediaConnect flow:
@@ -264,13 +323,11 @@ const output = new RouterOutput(stack, 'SrtOutput', {
 
 #### MediaLive Output
 
-Note (breaking change in the future): MediaLive configuration is currently passed in as `mediaLiveInputArn` but when L2 construct available, this will be updated to use the construct instead.
-
-Connect a router output to an existing MediaLive input:
+Connect a router output to a MediaLive input (the input must be a MediaConnect Router type):
 
 ```ts
 declare const stack: Stack;
-declare const mediaLiveInput: medialive.CfnInput;
+declare const mediaLiveInput: medialive.IInput;
 
 const output = new RouterOutput(stack, 'MediaLiveOutput', {
   routerOutputName: 'medialive-output',
@@ -278,8 +335,8 @@ const output = new RouterOutput(stack, 'MediaLiveOutput', {
   routingScope: RoutingScope.GLOBAL,
   tier: RouterOutputTier.OUTPUT_50,
   configuration: RouterOutputConfiguration.mediaLiveInput({
-    mediaLiveInputArn: mediaLiveInput.attrArn,
-    mediaLivePipelineId: MediaLivePipeline.PIPELINE_0,
+    input: mediaLiveInput,
+    pipeline: MediaLivePipeline.PIPELINE_0,
   }),
 });
 ```
@@ -384,8 +441,6 @@ const flow = new Flow(stack, 'MyFlow', {
 ### Flow Sources
 
 MediaConnect supports multiple source types for ingesting content into a flow. The examples below use `NetworkConfiguration.publicNetwork()` for simplicity, but all protocol-based sources can also use `NetworkConfiguration.vpc()` with a VPC interface for private connectivity.
-
-> The source's `flowSourceName` and `description` are set on the `SourceConfiguration`, not on `FlowSourceProps`. This is because the same `SourceConfiguration` is used both for a flow's inline primary source (`FlowProps.source`, which has no separate props object) and for additional sources added via `FlowSource`. Keeping the name on the configuration lets both be described identically.
 
 #### SRT Listener Source
 

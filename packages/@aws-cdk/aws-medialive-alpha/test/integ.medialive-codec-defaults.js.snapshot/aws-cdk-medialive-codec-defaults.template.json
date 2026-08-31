@@ -1,0 +1,386 @@
+{
+ "Resources": {
+  "Input12F3409E2": {
+   "Type": "AWS::MediaLive::Input",
+   "Properties": {
+    "Name": "codec-defaults-input-h264",
+    "SrtSettings": {
+     "SrtCallerSources": [
+      {
+       "SrtListenerAddress": "203.0.113.100",
+       "SrtListenerPort": "9000"
+      }
+     ]
+    },
+    "Type": "SRT_CALLER"
+   }
+  },
+  "Input21F3A4BCF": {
+   "Type": "AWS::MediaLive::Input",
+   "Properties": {
+    "Name": "codec-defaults-input-h265",
+    "SrtSettings": {
+     "SrtCallerSources": [
+      {
+       "SrtListenerAddress": "203.0.113.101",
+       "SrtListenerPort": "9000"
+      }
+     ]
+    },
+    "Type": "SRT_CALLER"
+   }
+  },
+  "Role1ABCC5F0": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "medialive.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   }
+  },
+  "H264Channel904D09DF": {
+   "Type": "AWS::MediaLive::Channel",
+   "Properties": {
+    "ChannelClass": "SINGLE_PIPELINE",
+    "Destinations": [
+     {
+      "Id": "hls",
+      "Settings": [
+       {
+        "Url": "s3ssl://my-bucket/h264"
+       }
+      ]
+     }
+    ],
+    "EncoderSettings": {
+     "AudioDescriptions": [
+      {
+       "AudioTypeControl": "FOLLOW_INPUT",
+       "CodecSettings": {
+        "AacSettings": {
+         "Bitrate": 192000,
+         "CodingMode": "CODING_MODE_2_0",
+         "InputType": "NORMAL",
+         "Profile": "LC",
+         "RateControlMode": "CBR",
+         "RawFormat": "NONE",
+         "SampleRate": 48000,
+         "Spec": "MPEG4"
+        }
+       },
+       "LanguageCodeControl": "FOLLOW_INPUT",
+       "Name": "aac"
+      }
+     ],
+     "OutputGroups": [
+      {
+       "Name": "hls",
+       "OutputGroupSettings": {
+        "HlsGroupSettings": {
+         "ClientCache": "ENABLED",
+         "CodecSpecification": "RFC_4281",
+         "Destination": {
+          "DestinationRefId": "hls"
+         },
+         "DirectoryStructure": "SINGLE_DIRECTORY",
+         "DiscontinuityTags": "INSERT",
+         "HlsId3SegmentTagging": "DISABLED",
+         "IFrameOnlyPlaylists": "DISABLED",
+         "IncompleteSegmentBehavior": "AUTO",
+         "IndexNSegments": 10,
+         "InputLossAction": "EMIT_OUTPUT",
+         "KeepSegments": 21,
+         "ManifestCompression": "NONE",
+         "ManifestDurationFormat": "FLOATING_POINT",
+         "Mode": "LIVE",
+         "OutputSelection": "MANIFESTS_AND_SEGMENTS",
+         "ProgramDateTime": "INCLUDE",
+         "ProgramDateTimeClock": "SYSTEM_CLOCK",
+         "ProgramDateTimePeriod": 600,
+         "RedundantManifest": "DISABLED",
+         "SegmentLength": 2,
+         "SegmentationMode": "USE_SEGMENT_DURATION",
+         "SegmentsPerSubdirectory": 10000,
+         "StreamInfResolution": "INCLUDE",
+         "TimedMetadataId3Frame": "PRIV",
+         "TimedMetadataId3Period": 10,
+         "TsFileMode": "SEGMENTED_FILES"
+        }
+       },
+       "Outputs": [
+        {
+         "AudioDescriptionNames": [
+          "aac"
+         ],
+         "OutputName": "out",
+         "OutputSettings": {
+          "HlsOutputSettings": {
+           "HlsSettings": {
+            "StandardHlsSettings": {
+             "M3u8Settings": {}
+            }
+           }
+          }
+         },
+         "VideoDescriptionName": "h264"
+        }
+       ]
+      }
+     ],
+     "TimecodeConfig": {
+      "Source": "EMBEDDED"
+     },
+     "VideoDescriptions": [
+      {
+       "CodecSettings": {
+        "H264Settings": {
+         "AdaptiveQuantization": "AUTO",
+         "AfdSignaling": "NONE",
+         "FlickerAq": "ENABLED",
+         "FramerateControl": "INITIALIZE_FROM_SOURCE",
+         "GopSize": 1,
+         "GopSizeUnits": "SECONDS",
+         "Level": "H264_LEVEL_AUTO",
+         "LookAheadRateControl": "HIGH",
+         "ParControl": "INITIALIZE_FROM_SOURCE",
+         "Profile": "MAIN",
+         "ScanType": "PROGRESSIVE",
+         "SceneChangeDetect": "ENABLED",
+         "SpatialAq": "ENABLED",
+         "Syntax": "DEFAULT",
+         "TemporalAq": "ENABLED"
+        }
+       },
+       "Height": 1080,
+       "Name": "h264",
+       "RespondToAfd": "NONE",
+       "ScalingBehavior": "DEFAULT",
+       "Sharpness": 50,
+       "Width": 1920
+      }
+     ]
+    },
+    "InputAttachments": [
+     {
+      "InputId": {
+       "Ref": "Input12F3409E2"
+      },
+      "InputSettings": {
+       "DeblockFilter": "DISABLED",
+       "DenoiseFilter": "DISABLED",
+       "FilterStrength": 1,
+       "InputFilter": "AUTO",
+       "Smpte2038DataPreference": "IGNORE",
+       "SourceEndBehavior": "CONTINUE"
+      }
+     }
+    ],
+    "InputSpecification": {
+     "Codec": "AVC",
+     "MaximumBitrate": "MAX_20_MBPS",
+     "Resolution": "HD"
+    },
+    "LogLevel": "DISABLED",
+    "Name": "codec-defaults-h264",
+    "RoleArn": {
+     "Fn::GetAtt": [
+      "Role1ABCC5F0",
+      "Arn"
+     ]
+    }
+   }
+  },
+  "H265Channel54392912": {
+   "Type": "AWS::MediaLive::Channel",
+   "Properties": {
+    "ChannelClass": "SINGLE_PIPELINE",
+    "Destinations": [
+     {
+      "Id": "hls",
+      "Settings": [
+       {
+        "Url": "s3ssl://my-bucket/h265"
+       }
+      ]
+     }
+    ],
+    "EncoderSettings": {
+     "AudioDescriptions": [
+      {
+       "AudioTypeControl": "FOLLOW_INPUT",
+       "CodecSettings": {
+        "AacSettings": {
+         "Bitrate": 192000,
+         "CodingMode": "CODING_MODE_2_0",
+         "InputType": "NORMAL",
+         "Profile": "LC",
+         "RateControlMode": "CBR",
+         "RawFormat": "NONE",
+         "SampleRate": 48000,
+         "Spec": "MPEG4"
+        }
+       },
+       "LanguageCodeControl": "FOLLOW_INPUT",
+       "Name": "aac"
+      }
+     ],
+     "OutputGroups": [
+      {
+       "Name": "hls",
+       "OutputGroupSettings": {
+        "HlsGroupSettings": {
+         "ClientCache": "ENABLED",
+         "CodecSpecification": "RFC_4281",
+         "Destination": {
+          "DestinationRefId": "hls"
+         },
+         "DirectoryStructure": "SINGLE_DIRECTORY",
+         "DiscontinuityTags": "INSERT",
+         "HlsId3SegmentTagging": "DISABLED",
+         "IFrameOnlyPlaylists": "DISABLED",
+         "IncompleteSegmentBehavior": "AUTO",
+         "IndexNSegments": 10,
+         "InputLossAction": "EMIT_OUTPUT",
+         "KeepSegments": 21,
+         "ManifestCompression": "NONE",
+         "ManifestDurationFormat": "FLOATING_POINT",
+         "Mode": "LIVE",
+         "OutputSelection": "MANIFESTS_AND_SEGMENTS",
+         "ProgramDateTime": "INCLUDE",
+         "ProgramDateTimeClock": "SYSTEM_CLOCK",
+         "ProgramDateTimePeriod": 600,
+         "RedundantManifest": "DISABLED",
+         "SegmentLength": 2,
+         "SegmentationMode": "USE_SEGMENT_DURATION",
+         "SegmentsPerSubdirectory": 10000,
+         "StreamInfResolution": "INCLUDE",
+         "TimedMetadataId3Frame": "PRIV",
+         "TimedMetadataId3Period": 10,
+         "TsFileMode": "SEGMENTED_FILES"
+        }
+       },
+       "Outputs": [
+        {
+         "AudioDescriptionNames": [
+          "aac"
+         ],
+         "OutputName": "out",
+         "OutputSettings": {
+          "HlsOutputSettings": {
+           "HlsSettings": {
+            "StandardHlsSettings": {
+             "M3u8Settings": {}
+            }
+           }
+          }
+         },
+         "VideoDescriptionName": "h265"
+        }
+       ]
+      }
+     ],
+     "TimecodeConfig": {
+      "Source": "EMBEDDED"
+     },
+     "VideoDescriptions": [
+      {
+       "CodecSettings": {
+        "H265Settings": {
+         "AdaptiveQuantization": "AUTO",
+         "AfdSignaling": "NONE",
+         "FramerateDenominator": 1001,
+         "FramerateNumerator": 30000,
+         "GopSize": 1,
+         "GopSizeUnits": "SECONDS",
+         "ParDenominator": 1,
+         "ParNumerator": 1,
+         "Profile": "MAIN",
+         "ScanType": "PROGRESSIVE",
+         "SceneChangeDetect": "ENABLED",
+         "Tier": "MAIN"
+        }
+       },
+       "Height": 1080,
+       "Name": "h265",
+       "RespondToAfd": "NONE",
+       "ScalingBehavior": "DEFAULT",
+       "Sharpness": 50,
+       "Width": 1920
+      }
+     ]
+    },
+    "InputAttachments": [
+     {
+      "InputId": {
+       "Ref": "Input21F3A4BCF"
+      },
+      "InputSettings": {
+       "DeblockFilter": "DISABLED",
+       "DenoiseFilter": "DISABLED",
+       "FilterStrength": 1,
+       "InputFilter": "AUTO",
+       "Smpte2038DataPreference": "IGNORE",
+       "SourceEndBehavior": "CONTINUE"
+      }
+     }
+    ],
+    "InputSpecification": {
+     "Codec": "AVC",
+     "MaximumBitrate": "MAX_20_MBPS",
+     "Resolution": "HD"
+    },
+    "LogLevel": "DISABLED",
+    "Name": "codec-defaults-h265",
+    "RoleArn": {
+     "Fn::GetAtt": [
+      "Role1ABCC5F0",
+      "Arn"
+     ]
+    }
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

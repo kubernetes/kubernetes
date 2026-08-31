@@ -1,0 +1,20 @@
+{
+  "version": "54.0.0",
+  "files": {
+    "a976415d2886890a2b948a189c1560aa0c08d7f8f683c3e16e519636b9f74868": {
+      "displayName": "aws-cdk-medialive-input-mc-router Template",
+      "source": {
+        "path": "aws-cdk-medialive-input-mc-router.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-current_region-291142c8": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "a976415d2886890a2b948a189c1560aa0c08d7f8f683c3e16e519636b9f74868.json",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

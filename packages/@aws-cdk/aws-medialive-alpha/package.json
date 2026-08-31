@@ -1,0 +1,135 @@
+{
+  "name": "@aws-cdk/aws-medialive-alpha",
+  "private": false,
+  "version": "0.0.0",
+  "description": "The CDK construct library for MediaLive",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "jsii": {
+    "outdir": "dist",
+    "targets": {
+      "java": {
+        "package": "software.amazon.awscdk.services.medialive.alpha",
+        "maven": {
+          "groupId": "software.amazon.awscdk",
+          "artifactId": "medialive-alpha"
+        }
+      },
+      "dotnet": {
+        "namespace": "Amazon.CDK.AWS.MediaLive.Alpha",
+        "packageId": "Amazon.CDK.AWS.MediaLive.Alpha",
+        "iconUrl": "https://raw.githubusercontent.com/aws/aws-cdk/main/logo/default-256-dark.png"
+      },
+      "python": {
+        "distName": "aws-cdk.aws-medialive-alpha",
+        "module": "aws_cdk.aws_medialive_alpha",
+        "classifiers": [
+          "Framework :: AWS CDK",
+          "Framework :: AWS CDK :: 2"
+        ]
+      },
+      "go": {
+        "moduleName": "github.com/aws/aws-cdk-go",
+        "packageName": "awsmedialivealpha"
+      }
+    },
+    "metadata": {
+      "jsii": {
+        "rosetta": {
+          "strict": true
+        }
+      }
+    },
+    "tsconfig": "tsconfig.json",
+    "validateTsconfig": "minimal"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aws/aws-cdk.git",
+    "directory": "packages/@aws-cdk/aws-medialive-alpha"
+  },
+  "scripts": {
+    "gen": "gen-cdk",
+    "build": "cdk-build",
+    "watch": "cdk-watch",
+    "lint": "cdk-lint",
+    "test": "cdk-test",
+    "integ": "integ-runner --unstable=toolkit-lib-engine --language javascript",
+    "pkglint": "pkglint -f",
+    "package": "cdk-package",
+    "awslint": "cdk-awslint",
+    "build+test": "yarn build && yarn test",
+    "build+test+package": "yarn build+test && yarn package",
+    "compat": "cdk-compat",
+    "rosetta:extract": "yarn --silent jsii-rosetta extract",
+    "build+extract": "yarn build && yarn rosetta:extract",
+    "build+test+extract": "yarn build+test && yarn rosetta:extract"
+  },
+  "keywords": [
+    "aws",
+    "cdk",
+    "constructs",
+    "AWS::MediaLive",
+    "aws-medialive"
+  ],
+  "author": {
+    "name": "Amazon Web Services",
+    "url": "https://aws.amazon.com",
+    "organization": true
+  },
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@aws-cdk/aws-mediaconnect-alpha": "^0.0.0",
+    "@aws-cdk/aws-mediapackagev2-alpha": "^0.0.0",
+    "@aws-cdk/cdk-build-tools": "0.0.0",
+    "@aws-cdk/integ-runner": "^2.202.3",
+    "@aws-cdk/integ-tests-alpha": "^0.0.0",
+    "@aws-cdk/pkglint": "0.0.0",
+    "@types/jest": "^29.5.14",
+    "aws-cdk-lib": "0.0.0",
+    "jest": "^29.7.0"
+  },
+  "homepage": "https://github.com/aws/aws-cdk",
+  "peerDependencies": {
+    "@aws-cdk/aws-mediapackagev2-alpha": "^0.0.0",
+    "aws-cdk-lib": "^0.0.0",
+    "constructs": "^10.5.0"
+  },
+  "separate-module": false,
+  "engines": {
+    "node": ">= 20.0.0"
+  },
+  "stability": "experimental",
+  "maturity": "experimental",
+  "awscdkio": {
+    "announce": false
+  },
+  "cdk-build": {
+    "env": {
+      "AWSLINT_BASE_CONSTRUCT": true
+    }
+  },
+  "publishConfig": {
+    "tag": "latest"
+  },
+  "pkglint": {
+    "exclude": [
+      "naming/package-matches-directory",
+      "assert/assert-dependency"
+    ]
+  },
+  "awslint": {
+    "exclude": [
+      "no-unused-type:@aws-cdk/aws-medialive-alpha.InputType",
+      "no-unused-type:@aws-cdk/aws-medialive-alpha.AudioCodecType",
+      "no-unused-type:@aws-cdk/aws-medialive-alpha.VideoCodecType",
+      "props-no-arn-refs:@aws-cdk/aws-medialive-alpha.ChannelProps.inferenceFeedArn",
+      "props-physical-name:@aws-cdk/aws-medialive-alpha.InputSecurityGroupProps",
+      "prefer-ref-interface:aws-cdk-lib.aws_ec2.ISubnet.associateNetworkAcl.acl",
+      "duration-prop-type:@aws-cdk/aws-medialive-alpha.HlsSegmentationMode.USE_SEGMENT_DURATION",
+      "duration-prop-type:@aws-cdk/aws-medialive-alpha.M2tsPcrControl.CONFIGURED_PCR_PERIOD",
+      "duration-prop-type:@aws-cdk/aws-medialive-alpha.M3u8PcrControl.CONFIGURED_PCR_PERIOD",
+      "duration-prop-type:@aws-cdk/aws-medialive-alpha.MsSmoothSegmentationMode.USE_SEGMENT_DURATION"
+    ]
+  }
+}

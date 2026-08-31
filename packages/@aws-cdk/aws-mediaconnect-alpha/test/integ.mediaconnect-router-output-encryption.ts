@@ -101,8 +101,8 @@ const mediaLiveEncrypted = new RouterOutput(stack, 'mediaLiveEncrypted', {
   routingScope: RoutingScope.REGIONAL,
   tier: RouterOutputTier.OUTPUT_100,
   configuration: RouterOutputConfiguration.mediaLiveInput({
-    mediaLiveInputArn: mediaLiveInput.attrArn,
-    mediaLivePipelineId: MediaLivePipeline.PIPELINE_1,
+    input: mediaLiveInput,
+    pipeline: MediaLivePipeline.PIPELINE_1,
     destinationTransitEncryption: {
       role: mediaConnectRole,
       secret: transitSecret,

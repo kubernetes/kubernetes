@@ -1,0 +1,748 @@
+{
+ "Resources": {
+  "Input49F21B70": {
+   "Type": "AWS::MediaLive::Input",
+   "Properties": {
+    "Name": "overrides-srt-input",
+    "SrtSettings": {
+     "SrtCallerSources": [
+      {
+       "SrtListenerAddress": "203.0.113.100",
+       "SrtListenerPort": "5000"
+      }
+     ]
+    },
+    "Type": "SRT_CALLER"
+   }
+  },
+  "ThumbnailBucket3BC05C46": {
+   "Type": "AWS::S3::Bucket",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "aws-cdk:auto-delete-objects",
+      "Value": "true"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "ThumbnailBucketPolicy3724CC1A": {
+   "Type": "AWS::S3::BucketPolicy",
+   "Properties": {
+    "Bucket": {
+     "Ref": "ThumbnailBucket3BC05C46"
+    },
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "s3:DeleteObject*",
+        "s3:GetBucket*",
+        "s3:List*",
+        "s3:PutBucketPolicy"
+       ],
+       "Effect": "Allow",
+       "Principal": {
+        "AWS": {
+         "Fn::GetAtt": [
+          "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
+          "Arn"
+         ]
+        }
+       },
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "ThumbnailBucket3BC05C46",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "ThumbnailBucket3BC05C46",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   }
+  },
+  "ThumbnailBucketAutoDeleteObjectsCustomResourceF9037F38": {
+   "Type": "Custom::S3AutoDeleteObjects",
+   "Properties": {
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F",
+      "Arn"
+     ]
+    },
+    "BucketName": {
+     "Ref": "ThumbnailBucket3BC05C46"
+    }
+   },
+   "DependsOn": [
+    "ThumbnailBucketPolicy3724CC1A"
+   ],
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Version": "2012-10-17",
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ]
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+     }
+    ]
+   }
+  },
+  "CustomS3AutoDeleteObjectsCustomResourceProviderHandler9D90184F": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": {
+      "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
+     },
+     "S3Key": "44e9c4d7a5d3fd2d677e1a7e416b2b56f6b0104bd5eff9cac5557b4c65a9dc61.zip"
+    },
+    "Timeout": 900,
+    "MemorySize": 128,
+    "Handler": "index.handler",
+    "Role": {
+     "Fn::GetAtt": [
+      "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs24.x",
+    "Description": {
+     "Fn::Join": [
+      "",
+      [
+       "Lambda function for auto-deleting objects in ",
+       {
+        "Ref": "ThumbnailBucket3BC05C46"
+       },
+       " S3 bucket."
+      ]
+     ]
+    }
+   },
+   "DependsOn": [
+    "CustomS3AutoDeleteObjectsCustomResourceProviderRole3B1BD092"
+   ]
+  },
+  "ChannelRole236C1F7D": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Condition": {
+        "StringEquals": {
+         "aws:SourceAccount": {
+          "Ref": "AWS::AccountId"
+         }
+        },
+        "ArnLike": {
+         "aws:SourceArn": {
+          "Fn::Join": [
+           "",
+           [
+            "arn:",
+            {
+             "Ref": "AWS::Partition"
+            },
+            ":medialive:",
+            {
+             "Ref": "AWS::Region"
+            },
+            ":",
+            {
+             "Ref": "AWS::AccountId"
+            },
+            ":channel:*"
+           ]
+          ]
+         }
+        }
+       },
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "medialive.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Description": "Role for MediaLive channel"
+   }
+  },
+  "ChannelRoleDefaultPolicy12D74268": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "s3:Abort*",
+        "s3:DeleteObject*",
+        "s3:GetBucket*",
+        "s3:GetObject*",
+        "s3:List*",
+        "s3:PutObject",
+        "s3:PutObjectLegalHold",
+        "s3:PutObjectRetention",
+        "s3:PutObjectTagging",
+        "s3:PutObjectVersionTagging"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "ThumbnailBucket3BC05C46",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "ThumbnailBucket3BC05C46",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": "s3:PutObject",
+       "Effect": "Allow",
+       "Resource": "*"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "ChannelRoleDefaultPolicy12D74268",
+    "Roles": [
+     {
+      "Ref": "ChannelRole236C1F7D"
+     }
+    ]
+   }
+  },
+  "Channel4048F119": {
+   "Type": "AWS::MediaLive::Channel",
+   "Properties": {
+    "ChannelClass": "SINGLE_PIPELINE",
+    "Destinations": [
+     {
+      "Id": "cmaf",
+      "Settings": [
+       {
+        "Url": "https://ingest.example.com/v1/channel/"
+       }
+      ]
+     },
+     {
+      "Id": "thumbnails",
+      "Settings": [
+       {
+        "Url": {
+         "Fn::Join": [
+          "",
+          [
+           "s3ssl://",
+           {
+            "Ref": "ThumbnailBucket3BC05C46"
+           },
+           "/thumbs"
+          ]
+         ]
+        }
+       }
+      ]
+     }
+    ],
+    "EncoderSettings": {
+     "AudioDescriptions": [
+      {
+       "AudioDashRoles": [
+        "ALTERNATE",
+        "COMMENTARY"
+       ],
+       "AudioType": "VISUAL_IMPAIRED_COMMENTARY",
+       "AudioTypeControl": "USE_CONFIGURED",
+       "CodecSettings": {
+        "AacSettings": {
+         "Bitrate": 192000,
+         "CodingMode": "CODING_MODE_2_0",
+         "InputType": "NORMAL",
+         "Profile": "LC",
+         "RateControlMode": "CBR",
+         "RawFormat": "NONE",
+         "SampleRate": 48000,
+         "Spec": "MPEG4"
+        }
+       },
+       "DvbDashAccessibility": "DVBDASH_1_VISUALLY_IMPAIRED",
+       "LanguageCode": "eng",
+       "LanguageCodeControl": "USE_CONFIGURED",
+       "Name": "aac-accessible",
+       "RemixSettings": {
+        "ChannelMappings": [
+         {
+          "InputChannelLevels": [
+           {
+            "Gain": -3,
+            "InputChannel": 1
+           }
+          ],
+          "OutputChannel": 0
+         },
+         {
+          "InputChannelLevels": [
+           {
+            "Gain": -3,
+            "InputChannel": 0
+           }
+          ],
+          "OutputChannel": 1
+         }
+        ],
+        "ChannelsIn": 2,
+        "ChannelsOut": 2
+       },
+       "StreamName": "English (described)"
+      },
+      {
+       "AudioNormalizationSettings": {
+        "Algorithm": "ITU_1770_1",
+        "AlgorithmControl": "CORRECT_AUDIO",
+        "TargetLkfs": -24
+       },
+       "AudioType": "CLEAN_EFFECTS",
+       "AudioTypeControl": "USE_CONFIGURED",
+       "CodecSettings": {
+        "Ac3Settings": {
+         "Bitrate": 384000,
+         "BitstreamMode": "COMPLETE_MAIN",
+         "CodingMode": "CODING_MODE_3_2_LFE",
+         "Dialnorm": 24,
+         "LfeFilter": "DISABLED"
+        }
+       },
+       "LanguageCodeControl": "FOLLOW_INPUT",
+       "Name": "ac3-main"
+      },
+      {
+       "AudioTypeControl": "FOLLOW_INPUT",
+       "CodecSettings": {
+        "Eac3Settings": {
+         "AttenuationControl": "NONE",
+         "BitstreamMode": "COMPLETE_MAIN",
+         "CodingMode": "CODING_MODE_3_2"
+        }
+       },
+       "LanguageCode": "spa",
+       "LanguageCodeControl": "USE_CONFIGURED",
+       "Name": "eac3-main",
+       "StreamName": "Espanol"
+      },
+      {
+       "AudioTypeControl": "FOLLOW_INPUT",
+       "AudioWatermarkingSettings": {
+        "NielsenWatermarksSettings": {
+         "NielsenDistributionType": "PROGRAM_CONTENT",
+         "NielsenNaesIiNwSettings": {
+          "CheckDigitString": "CD",
+          "Sid": 123
+         }
+        }
+       },
+       "CodecSettings": {
+        "Eac3AtmosSettings": {
+         "CodingMode": "CODING_MODE_5_1_4"
+        }
+       },
+       "LanguageCodeControl": "FOLLOW_INPUT",
+       "Name": "eac3-atmos"
+      }
+     ],
+     "OutputGroups": [
+      {
+       "Name": "cmaf",
+       "OutputGroupSettings": {
+        "CmafIngestGroupSettings": {
+         "Destination": {
+          "DestinationRefId": "cmaf"
+         },
+         "Id3Behavior": "DISABLED",
+         "KlvBehavior": "NO_PASSTHROUGH",
+         "NielsenId3Behavior": "NO_PASSTHROUGH",
+         "Scte35Type": "SCTE_35_WITHOUT_SEGMENTATION",
+         "SegmentLength": 1,
+         "SegmentLengthUnits": "SECONDS",
+         "TimedMetadataId3Frame": "NONE",
+         "TimedMetadataId3Period": 10,
+         "TimedMetadataPassthrough": "DISABLED"
+        }
+       },
+       "Outputs": [
+        {
+         "OutputName": "h264",
+         "OutputSettings": {
+          "CmafIngestOutputSettings": {
+           "NameModifier": "_h264"
+          }
+         },
+         "VideoDescriptionName": "h264-overrides"
+        },
+        {
+         "OutputName": "h264-high422",
+         "OutputSettings": {
+          "CmafIngestOutputSettings": {
+           "NameModifier": "_h264_422"
+          }
+         },
+         "VideoDescriptionName": "h264-high422"
+        },
+        {
+         "OutputName": "h265",
+         "OutputSettings": {
+          "CmafIngestOutputSettings": {
+           "NameModifier": "_h265"
+          }
+         },
+         "VideoDescriptionName": "h265-overrides"
+        },
+        {
+         "OutputName": "av1",
+         "OutputSettings": {
+          "CmafIngestOutputSettings": {
+           "NameModifier": "_av1"
+          }
+         },
+         "VideoDescriptionName": "av1-overrides"
+        },
+        {
+         "AudioDescriptionNames": [
+          "aac-accessible"
+         ],
+         "OutputName": "aac",
+         "OutputSettings": {
+          "CmafIngestOutputSettings": {
+           "NameModifier": "_aac"
+          }
+         }
+        },
+        {
+         "AudioDescriptionNames": [
+          "ac3-main"
+         ],
+         "OutputName": "ac3",
+         "OutputSettings": {
+          "CmafIngestOutputSettings": {
+           "NameModifier": "_ac3"
+          }
+         }
+        },
+        {
+         "AudioDescriptionNames": [
+          "eac3-main"
+         ],
+         "OutputName": "eac3",
+         "OutputSettings": {
+          "CmafIngestOutputSettings": {
+           "NameModifier": "_eac3"
+          }
+         }
+        },
+        {
+         "AudioDescriptionNames": [
+          "eac3-atmos"
+         ],
+         "OutputName": "eac3-atmos",
+         "OutputSettings": {
+          "CmafIngestOutputSettings": {
+           "NameModifier": "_atmos"
+          }
+         }
+        }
+       ]
+      },
+      {
+       "Name": "thumbnails",
+       "OutputGroupSettings": {
+        "FrameCaptureGroupSettings": {
+         "Destination": {
+          "DestinationRefId": "thumbnails"
+         }
+        }
+       },
+       "Outputs": [
+        {
+         "OutputName": "thumbnail",
+         "OutputSettings": {
+          "FrameCaptureOutputSettings": {
+           "NameModifier": "_thumb"
+          }
+         },
+         "VideoDescriptionName": "thumbnails"
+        }
+       ]
+      }
+     ],
+     "TimecodeConfig": {
+      "Source": "EMBEDDED"
+     },
+     "VideoDescriptions": [
+      {
+       "CodecSettings": {
+        "H264Settings": {
+         "AdaptiveQuantization": "AUTO",
+         "AfdSignaling": "NONE",
+         "Bitrate": 3000000,
+         "FlickerAq": "ENABLED",
+         "FramerateControl": "SPECIFIED",
+         "FramerateDenominator": 1001,
+         "FramerateNumerator": 30000,
+         "GopSize": 1,
+         "GopSizeUnits": "SECONDS",
+         "Level": "H264_LEVEL_AUTO",
+         "LookAheadRateControl": "HIGH",
+         "ParControl": "SPECIFIED",
+         "ParDenominator": 1,
+         "ParNumerator": 1,
+         "Profile": "HIGH",
+         "RateControlMode": "CBR",
+         "ScanType": "PROGRESSIVE",
+         "SceneChangeDetect": "DISABLED",
+         "SpatialAq": "DISABLED",
+         "SubgopLength": "FIXED",
+         "Syntax": "DEFAULT",
+         "TemporalAq": "DISABLED"
+        }
+       },
+       "Height": 720,
+       "Name": "h264-overrides",
+       "RespondToAfd": "NONE",
+       "ScalingBehavior": "DEFAULT",
+       "Sharpness": 50,
+       "Width": 1280
+      },
+      {
+       "CodecSettings": {
+        "H264Settings": {
+         "AdaptiveQuantization": "AUTO",
+         "AfdSignaling": "NONE",
+         "Bitrate": 3000000,
+         "FlickerAq": "ENABLED",
+         "FramerateControl": "SPECIFIED",
+         "FramerateDenominator": 1001,
+         "FramerateNumerator": 30000,
+         "GopSize": 1,
+         "GopSizeUnits": "SECONDS",
+         "Level": "H264_LEVEL_AUTO",
+         "LookAheadRateControl": "HIGH",
+         "ParControl": "SPECIFIED",
+         "ParDenominator": 1,
+         "ParNumerator": 1,
+         "Profile": "HIGH_422",
+         "RateControlMode": "CBR",
+         "ScanType": "PROGRESSIVE",
+         "SceneChangeDetect": "ENABLED",
+         "SpatialAq": "ENABLED",
+         "Syntax": "DEFAULT",
+         "TemporalAq": "ENABLED"
+        }
+       },
+       "Height": 720,
+       "Name": "h264-high422",
+       "RespondToAfd": "NONE",
+       "ScalingBehavior": "DEFAULT",
+       "Sharpness": 50,
+       "Width": 1280
+      },
+      {
+       "CodecSettings": {
+        "H265Settings": {
+         "AdaptiveQuantization": "AUTO",
+         "AfdSignaling": "NONE",
+         "Bitrate": 3000000,
+         "ColorSpaceSettings": {
+          "Hlg2020Settings": {}
+         },
+         "FramerateDenominator": 1001,
+         "FramerateNumerator": 30000,
+         "GopSize": 1,
+         "GopSizeUnits": "SECONDS",
+         "ParDenominator": 1,
+         "ParNumerator": 1,
+         "Profile": "MAIN_10BIT",
+         "RateControlMode": "CBR",
+         "ScanType": "PROGRESSIVE",
+         "SceneChangeDetect": "DISABLED",
+         "Tier": "MAIN"
+        }
+       },
+       "Height": 720,
+       "Name": "h265-overrides",
+       "RespondToAfd": "NONE",
+       "ScalingBehavior": "DEFAULT",
+       "Sharpness": 50,
+       "Width": 1280
+      },
+      {
+       "CodecSettings": {
+        "Av1Settings": {
+         "AfdSignaling": "NONE",
+         "BitDepth": "DEPTH_10",
+         "ColorSpaceSettings": {
+          "Hlg2020Settings": {}
+         },
+         "FramerateDenominator": 1001,
+         "FramerateNumerator": 30000,
+         "GopSize": 1,
+         "GopSizeUnits": "SECONDS",
+         "Level": "AV1_LEVEL_AUTO",
+         "LookAheadRateControl": "HIGH",
+         "MaxBitrate": 3000000,
+         "QvbrQualityLevel": 7,
+         "RateControlMode": "QVBR",
+         "SceneChangeDetect": "DISABLED",
+         "SpatialAq": "ENABLED",
+         "TemporalAq": "ENABLED",
+         "TimecodeInsertion": "METADATA_OBU"
+        }
+       },
+       "Height": 720,
+       "Name": "av1-overrides",
+       "RespondToAfd": "NONE",
+       "ScalingBehavior": "DEFAULT",
+       "Sharpness": 50,
+       "Width": 1280
+      },
+      {
+       "CodecSettings": {
+        "FrameCaptureSettings": {
+         "CaptureInterval": 500,
+         "CaptureIntervalUnits": "MILLISECONDS"
+        }
+       },
+       "Height": 720,
+       "Name": "thumbnails",
+       "RespondToAfd": "NONE",
+       "ScalingBehavior": "DEFAULT",
+       "Sharpness": 50,
+       "Width": 1280
+      }
+     ]
+    },
+    "InputAttachments": [
+     {
+      "InputId": {
+       "Ref": "Input49F21B70"
+      },
+      "InputSettings": {
+       "DeblockFilter": "DISABLED",
+       "DenoiseFilter": "DISABLED",
+       "FilterStrength": 1,
+       "InputFilter": "AUTO",
+       "Smpte2038DataPreference": "IGNORE",
+       "SourceEndBehavior": "CONTINUE"
+      }
+     }
+    ],
+    "InputSpecification": {
+     "Codec": "AVC",
+     "MaximumBitrate": "MAX_20_MBPS",
+     "Resolution": "HD"
+    },
+    "LogLevel": "DISABLED",
+    "Name": "encode-overrides",
+    "RoleArn": {
+     "Fn::GetAtt": [
+      "ChannelRole236C1F7D",
+      "Arn"
+     ]
+    }
+   }
+  }
+ },
+ "Outputs": {
+  "ChannelArn": {
+   "Value": {
+    "Fn::GetAtt": [
+     "Channel4048F119",
+     "Arn"
+    ]
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

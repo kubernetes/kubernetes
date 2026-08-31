@@ -1,0 +1,345 @@
+{
+ "Resources": {
+  "MediaLiveRole1149D189": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "medialive.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   }
+  },
+  "MediaLiveRoleDefaultPolicyE1F33973": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "mediapackagev2:GetChannel",
+        "mediapackagev2:PutObject"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "MpChannelE46836B0",
+         "Arn"
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "MediaLiveRoleDefaultPolicyE1F33973",
+    "Roles": [
+     {
+      "Ref": "MediaLiveRole1149D189"
+     }
+    ]
+   }
+  },
+  "GroupC77FDACD": {
+   "Type": "AWS::MediaPackageV2::ChannelGroup",
+   "Properties": {
+    "ChannelGroupName": "awscdkmedialivecameratomediapackageGroupD6E9406B"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "MpChannelE46836B0": {
+   "Type": "AWS::MediaPackageV2::Channel",
+   "Properties": {
+    "ChannelGroupName": "awscdkmedialivecameratomediapackageGroupD6E9406B",
+    "ChannelName": "camera-channel",
+    "InputType": "CMAF"
+   },
+   "DependsOn": [
+    "GroupC77FDACD"
+   ],
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "HlsEndpointB1B8983D": {
+   "Type": "AWS::MediaPackageV2::OriginEndpoint",
+   "Properties": {
+    "ChannelGroupName": "awscdkmedialivecameratomediapackageGroupD6E9406B",
+    "ChannelName": "camera-channel",
+    "ContainerType": "CMAF",
+    "HlsManifests": [
+     {
+      "ManifestName": "index"
+     }
+    ],
+    "OriginEndpointName": "hls-endpoint",
+    "Segment": {}
+   },
+   "DependsOn": [
+    "GroupC77FDACD",
+    "MpChannelE46836B0"
+   ],
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "CameraInput38768C34": {
+   "Type": "AWS::MediaLive::Input",
+   "Properties": {
+    "Name": "camera-feed",
+    "SrtSettings": {
+     "SrtCallerSources": [
+      {
+       "SrtListenerAddress": "203.0.113.100",
+       "SrtListenerPort": "5000"
+      }
+     ]
+    },
+    "Type": "SRT_CALLER"
+   }
+  },
+  "LiveChannel5ABEA596": {
+   "Type": "AWS::MediaLive::Channel",
+   "Properties": {
+    "ChannelClass": "SINGLE_PIPELINE",
+    "Destinations": [
+     {
+      "Id": "to-mediapackage",
+      "MediaPackageSettings": [
+       {
+        "ChannelEndpointId": "ENDPOINT_1",
+        "ChannelGroup": "awscdkmedialivecameratomediapackageGroupD6E9406B",
+        "ChannelName": "camera-channel",
+        "MediaPackageRegionName": {
+         "Ref": "AWS::Region"
+        }
+       }
+      ]
+     }
+    ],
+    "EncoderSettings": {
+     "AudioDescriptions": [
+      {
+       "AudioTypeControl": "FOLLOW_INPUT",
+       "CodecSettings": {
+        "AacSettings": {
+         "Bitrate": 192000,
+         "CodingMode": "CODING_MODE_2_0",
+         "InputType": "NORMAL",
+         "Profile": "LC",
+         "RateControlMode": "CBR",
+         "RawFormat": "NONE",
+         "SampleRate": 48000,
+         "Spec": "MPEG4"
+        }
+       },
+       "LanguageCodeControl": "FOLLOW_INPUT",
+       "Name": "audio"
+      }
+     ],
+     "OutputGroups": [
+      {
+       "Name": "to-mediapackage",
+       "OutputGroupSettings": {
+        "MediaPackageGroupSettings": {
+         "Destination": {
+          "DestinationRefId": "to-mediapackage"
+         },
+         "MediapackageV2GroupSettings": {
+          "Id3Behavior": "DISABLED",
+          "KlvBehavior": "NO_PASSTHROUGH",
+          "NielsenId3Behavior": "NO_PASSTHROUGH",
+          "Scte35Type": "SCTE_35_WITHOUT_SEGMENTATION",
+          "SegmentLength": 1,
+          "SegmentLengthUnits": "SECONDS",
+          "TimedMetadataId3Frame": "NONE",
+          "TimedMetadataId3Period": 10,
+          "TimedMetadataPassthrough": "DISABLED"
+         }
+        }
+       },
+       "Outputs": [
+        {
+         "OutputName": "hd",
+         "OutputSettings": {
+          "MediaPackageOutputSettings": {
+           "MediaPackageV2DestinationSettings": {
+            "HlsAutoSelect": "OMIT",
+            "HlsDefault": "OMIT"
+           }
+          }
+         },
+         "VideoDescriptionName": "hd"
+        },
+        {
+         "OutputName": "sd",
+         "OutputSettings": {
+          "MediaPackageOutputSettings": {
+           "MediaPackageV2DestinationSettings": {
+            "HlsAutoSelect": "OMIT",
+            "HlsDefault": "OMIT"
+           }
+          }
+         },
+         "VideoDescriptionName": "sd"
+        },
+        {
+         "AudioDescriptionNames": [
+          "audio"
+         ],
+         "OutputName": "audio",
+         "OutputSettings": {
+          "MediaPackageOutputSettings": {
+           "MediaPackageV2DestinationSettings": {
+            "HlsAutoSelect": "OMIT",
+            "HlsDefault": "OMIT"
+           }
+          }
+         }
+        }
+       ]
+      }
+     ],
+     "TimecodeConfig": {
+      "Source": "EMBEDDED"
+     },
+     "VideoDescriptions": [
+      {
+       "CodecSettings": {
+        "H264Settings": {
+         "AdaptiveQuantization": "AUTO",
+         "AfdSignaling": "NONE",
+         "Bitrate": 5000000,
+         "FlickerAq": "ENABLED",
+         "FramerateControl": "SPECIFIED",
+         "FramerateDenominator": 1001,
+         "FramerateNumerator": 30000,
+         "GopSize": 1,
+         "GopSizeUnits": "SECONDS",
+         "Level": "H264_LEVEL_AUTO",
+         "LookAheadRateControl": "HIGH",
+         "ParControl": "SPECIFIED",
+         "ParDenominator": 1,
+         "ParNumerator": 1,
+         "Profile": "MAIN",
+         "RateControlMode": "CBR",
+         "ScanType": "PROGRESSIVE",
+         "SceneChangeDetect": "ENABLED",
+         "SpatialAq": "ENABLED",
+         "Syntax": "DEFAULT",
+         "TemporalAq": "ENABLED"
+        }
+       },
+       "Height": 1080,
+       "Name": "hd",
+       "RespondToAfd": "NONE",
+       "ScalingBehavior": "DEFAULT",
+       "Sharpness": 50,
+       "Width": 1920
+      },
+      {
+       "CodecSettings": {
+        "H264Settings": {
+         "AdaptiveQuantization": "AUTO",
+         "AfdSignaling": "NONE",
+         "Bitrate": 2000000,
+         "FlickerAq": "ENABLED",
+         "FramerateControl": "SPECIFIED",
+         "FramerateDenominator": 1001,
+         "FramerateNumerator": 30000,
+         "GopSize": 1,
+         "GopSizeUnits": "SECONDS",
+         "Level": "H264_LEVEL_AUTO",
+         "LookAheadRateControl": "HIGH",
+         "ParControl": "SPECIFIED",
+         "ParDenominator": 1,
+         "ParNumerator": 1,
+         "Profile": "MAIN",
+         "RateControlMode": "CBR",
+         "ScanType": "PROGRESSIVE",
+         "SceneChangeDetect": "ENABLED",
+         "SpatialAq": "ENABLED",
+         "Syntax": "DEFAULT",
+         "TemporalAq": "ENABLED"
+        }
+       },
+       "Height": 720,
+       "Name": "sd",
+       "RespondToAfd": "NONE",
+       "ScalingBehavior": "DEFAULT",
+       "Sharpness": 50,
+       "Width": 1280
+      }
+     ]
+    },
+    "InputAttachments": [
+     {
+      "InputId": {
+       "Ref": "CameraInput38768C34"
+      },
+      "InputSettings": {
+       "DeblockFilter": "DISABLED",
+       "DenoiseFilter": "DISABLED",
+       "FilterStrength": 1,
+       "InputFilter": "AUTO",
+       "Smpte2038DataPreference": "IGNORE",
+       "SourceEndBehavior": "CONTINUE"
+      }
+     }
+    ],
+    "InputSpecification": {
+     "Codec": "AVC",
+     "MaximumBitrate": "MAX_20_MBPS",
+     "Resolution": "HD"
+    },
+    "LogLevel": "DISABLED",
+    "Name": "camera-to-clients",
+    "RoleArn": {
+     "Fn::GetAtt": [
+      "MediaLiveRole1149D189",
+      "Arn"
+     ]
+    }
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

@@ -1,0 +1,29 @@
+# Don't include original .ts files when doing `npm pack`
+*.ts
+!*.d.ts
+coverage
+.nyc_output
+*.tgz
+
+dist
+.LAST_PACKAGE
+.LAST_BUILD
+!*.js
+
+# Include .jsii
+!.jsii
+
+*.snk
+
+*.tsbuildinfo
+
+tsconfig.json
+eslint.config.mjs
+jest.config.js
+
+# exclude cdk artifacts
+**/cdk.out
+junit.xml
+!*.lit.ts
+**/*.snapshot
+test/

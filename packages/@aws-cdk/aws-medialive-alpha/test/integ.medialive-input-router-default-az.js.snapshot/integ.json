@@ -1,0 +1,14 @@
+{
+  "version": "54.0.0",
+  "testCases": {
+    "cdk-integ-medialive-input-router-default-az/DefaultTest": {
+      "stacks": [
+        "aws-cdk-medialive-input-router-default-az"
+      ],
+      "assertionStack": "cdk-integ-medialive-input-router-default-az/DefaultTest/DeployAssert",
+      "assertionStackName": "cdkintegmedialiveinputrouterdefaultazDefaultTestDeployAssertC8E88A7C"
+    }
+  },
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
+}

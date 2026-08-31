@@ -1,0 +1,27 @@
+{
+  "resources": {
+    "Channel": {
+      "hasResourcePolicy": false,
+      "grants": {
+        "start": {
+          "actions": [
+            "medialive:StartChannel"
+          ],
+          "docSummary": "Grant permissions to start this channel"
+        },
+        "stop": {
+          "actions": [
+            "medialive:StopChannel"
+          ],
+          "docSummary": "Grant permissions to stop this channel"
+        },
+        "updateSchedule": {
+          "actions": [
+            "medialive:BatchUpdateSchedule"
+          ],
+          "docSummary": "Grant permissions to update the schedule of this channel"
+        }
+      }
+    }
+  }
+}

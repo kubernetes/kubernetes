@@ -1,0 +1,38 @@
+{
+  "/aws-cdk-medialive-input-url-pull/UrlPullInput": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-input-url-pull/UrlPullRedundant": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-input-url-pull/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-input-url-pull/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-input-url-pull/UrlPullInput/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "UrlPullInput9324FD6B"
+    }
+  ],
+  "/aws-cdk-medialive-input-url-pull/UrlPullRedundant/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "UrlPullRedundant519990A2"
+    }
+  ]
+}

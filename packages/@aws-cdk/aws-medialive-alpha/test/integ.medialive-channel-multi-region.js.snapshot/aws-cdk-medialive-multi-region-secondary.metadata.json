@@ -1,0 +1,50 @@
+{
+  "/aws-cdk-medialive-multi-region-secondary/SecondaryGroup": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-multi-region-secondary/SecondaryMpChannel": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-multi-region-secondary/SecondaryEndpoint": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-multi-region-secondary/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-multi-region-secondary/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-multi-region-secondary/SecondaryGroup/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SecondaryGroupD7E7AB38"
+    }
+  ],
+  "/aws-cdk-medialive-multi-region-secondary/SecondaryMpChannel/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SecondaryMpChannelC832E274"
+    }
+  ],
+  "/aws-cdk-medialive-multi-region-secondary/SecondaryEndpoint/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SecondaryEndpoint53AB2FD0"
+    }
+  ]
+}

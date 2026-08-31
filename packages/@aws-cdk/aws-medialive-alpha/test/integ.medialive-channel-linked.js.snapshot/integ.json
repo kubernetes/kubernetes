@@ -1,0 +1,14 @@
+{
+  "version": "54.0.0",
+  "testCases": {
+    "cdk-integ-medialive-channel-linked/DefaultTest": {
+      "stacks": [
+        "aws-cdk-medialive-channel-linked"
+      ],
+      "assertionStack": "cdk-integ-medialive-channel-linked/DefaultTest/DeployAssert",
+      "assertionStackName": "cdkintegmedialivechannellinkedDefaultTestDeployAssertCD6F679A"
+    }
+  },
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
+}

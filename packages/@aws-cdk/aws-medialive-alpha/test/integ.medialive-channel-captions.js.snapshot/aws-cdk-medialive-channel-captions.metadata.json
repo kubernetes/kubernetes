@@ -1,0 +1,91 @@
+{
+  "/aws-cdk-medialive-channel-captions/EmpGroup": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-channel-captions/EmpChannel": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-channel-captions/HlsEndpoint": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-channel-captions/SrtInput": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-channel-captions/MediaLiveRole": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {
+        "assumedBy": {
+          "principalAccount": "*",
+          "assumeRoleAction": "*"
+        }
+      }
+    }
+  ],
+  "/aws-cdk-medialive-channel-captions/CaptionChannel": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": "*"
+    }
+  ],
+  "/aws-cdk-medialive-channel-captions/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-channel-captions/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/aws-cdk-medialive-channel-captions/EmpGroup/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "EmpGroupC5CC4626"
+    }
+  ],
+  "/aws-cdk-medialive-channel-captions/EmpChannel/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "EmpChannel894EADAC"
+    }
+  ],
+  "/aws-cdk-medialive-channel-captions/HlsEndpoint/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "HlsEndpointB1B8983D"
+    }
+  ],
+  "/aws-cdk-medialive-channel-captions/SrtInput/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SrtInputC96BD065"
+    }
+  ],
+  "/aws-cdk-medialive-channel-captions/MediaLiveRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MediaLiveRole1149D189"
+    }
+  ],
+  "/aws-cdk-medialive-channel-captions/CaptionChannel/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CaptionChannel260E3C21"
+    }
+  ]
+}

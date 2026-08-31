@@ -1,0 +1,393 @@
+{
+ "Resources": {
+  "EmpGroupC5CC4626": {
+   "Type": "AWS::MediaPackageV2::ChannelGroup",
+   "Properties": {
+    "ChannelGroupName": "integ-group"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "EmpChannel894EADAC": {
+   "Type": "AWS::MediaPackageV2::Channel",
+   "Properties": {
+    "ChannelGroupName": "integ-group",
+    "ChannelName": "integ-channel",
+    "InputType": "CMAF"
+   },
+   "DependsOn": [
+    "EmpGroupC5CC4626"
+   ],
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "HlsEndpointB1B8983D": {
+   "Type": "AWS::MediaPackageV2::OriginEndpoint",
+   "Properties": {
+    "ChannelGroupName": "integ-group",
+    "ChannelName": "integ-channel",
+    "ContainerType": "CMAF",
+    "HlsManifests": [
+     {
+      "ManifestName": "index"
+     }
+    ],
+    "OriginEndpointName": "integ-hls-endpoint",
+    "Segment": {}
+   },
+   "DependsOn": [
+    "EmpChannel894EADAC",
+    "EmpGroupC5CC4626"
+   ],
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "RouterInputEFD0F32D": {
+   "Type": "AWS::MediaLive::Input",
+   "Properties": {
+    "Name": "integ-router-input",
+    "RouterSettings": {
+     "Destinations": [
+      {
+       "AvailabilityZoneName": {
+        "Fn::Select": [
+         0,
+         {
+          "Fn::GetAZs": ""
+         }
+        ]
+       }
+      }
+     ],
+     "EncryptionType": "AUTOMATIC"
+    },
+    "Type": "MEDIACONNECT_ROUTER"
+   }
+  },
+  "RouterOutputD335589D": {
+   "Type": "AWS::MediaConnect::RouterOutput",
+   "Properties": {
+    "Configuration": {
+     "MediaLiveInput": {
+      "DestinationTransitEncryption": {
+       "EncryptionKeyConfiguration": {
+        "Automatic": {}
+       },
+       "EncryptionKeyType": "AUTOMATIC"
+      },
+      "MediaLiveInputArn": {
+       "Fn::GetAtt": [
+        "RouterInputEFD0F32D",
+        "Arn"
+       ]
+      },
+      "MediaLivePipelineId": "PIPELINE_0"
+     }
+    },
+    "MaintenanceConfiguration": {
+     "Default": {}
+    },
+    "MaximumBitrate": 20000000,
+    "Name": "to-medialive",
+    "RegionName": {
+     "Ref": "AWS::Region"
+    },
+    "RoutingScope": "REGIONAL",
+    "Tier": "OUTPUT_100"
+   }
+  },
+  "MediaLiveRole1149D189": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "medialive.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   }
+  },
+  "LiveChannel5ABEA596": {
+   "Type": "AWS::MediaLive::Channel",
+   "Properties": {
+    "ChannelClass": "SINGLE_PIPELINE",
+    "Destinations": [
+     {
+      "Id": "emp-output",
+      "MediaPackageSettings": [
+       {
+        "ChannelEndpointId": "ENDPOINT_1",
+        "ChannelGroup": "integ-group",
+        "ChannelName": "integ-channel",
+        "MediaPackageRegionName": {
+         "Ref": "AWS::Region"
+        }
+       }
+      ]
+     }
+    ],
+    "EncoderSettings": {
+     "AudioDescriptions": [
+      {
+       "AudioTypeControl": "FOLLOW_INPUT",
+       "CodecSettings": {
+        "AacSettings": {
+         "Bitrate": 192000,
+         "CodingMode": "CODING_MODE_2_0",
+         "InputType": "NORMAL",
+         "Profile": "LC",
+         "RateControlMode": "CBR",
+         "RawFormat": "NONE",
+         "SampleRate": 48000,
+         "Spec": "MPEG4"
+        }
+       },
+       "LanguageCodeControl": "FOLLOW_INPUT",
+       "Name": "aac-stereo"
+      }
+     ],
+     "OutputGroups": [
+      {
+       "Name": "emp-output",
+       "OutputGroupSettings": {
+        "MediaPackageGroupSettings": {
+         "Destination": {
+          "DestinationRefId": "emp-output"
+         },
+         "MediapackageV2GroupSettings": {
+          "Id3Behavior": "DISABLED",
+          "KlvBehavior": "NO_PASSTHROUGH",
+          "NielsenId3Behavior": "NO_PASSTHROUGH",
+          "Scte35Type": "SCTE_35_WITHOUT_SEGMENTATION",
+          "SegmentLength": 1,
+          "SegmentLengthUnits": "SECONDS",
+          "TimedMetadataId3Frame": "NONE",
+          "TimedMetadataId3Period": 10,
+          "TimedMetadataPassthrough": "DISABLED"
+         }
+        }
+       },
+       "Outputs": [
+        {
+         "OutputName": "hd_output",
+         "OutputSettings": {
+          "MediaPackageOutputSettings": {
+           "MediaPackageV2DestinationSettings": {
+            "HlsAutoSelect": "OMIT",
+            "HlsDefault": "OMIT"
+           }
+          }
+         },
+         "VideoDescriptionName": "hd-1080p"
+        },
+        {
+         "OutputName": "sd_output",
+         "OutputSettings": {
+          "MediaPackageOutputSettings": {
+           "MediaPackageV2DestinationSettings": {
+            "HlsAutoSelect": "OMIT",
+            "HlsDefault": "OMIT"
+           }
+          }
+         },
+         "VideoDescriptionName": "sd-720p"
+        },
+        {
+         "OutputName": "av1_output",
+         "OutputSettings": {
+          "MediaPackageOutputSettings": {
+           "MediaPackageV2DestinationSettings": {
+            "HlsAutoSelect": "OMIT",
+            "HlsDefault": "OMIT"
+           }
+          }
+         },
+         "VideoDescriptionName": "av1-720p"
+        },
+        {
+         "AudioDescriptionNames": [
+          "aac-stereo"
+         ],
+         "OutputName": "audio_output",
+         "OutputSettings": {
+          "MediaPackageOutputSettings": {
+           "MediaPackageV2DestinationSettings": {
+            "HlsAutoSelect": "OMIT",
+            "HlsDefault": "OMIT"
+           }
+          }
+         }
+        }
+       ]
+      }
+     ],
+     "TimecodeConfig": {
+      "Source": "EMBEDDED"
+     },
+     "VideoDescriptions": [
+      {
+       "CodecSettings": {
+        "H264Settings": {
+         "AdaptiveQuantization": "AUTO",
+         "AfdSignaling": "NONE",
+         "FlickerAq": "ENABLED",
+         "FramerateControl": "SPECIFIED",
+         "FramerateDenominator": 1001,
+         "FramerateNumerator": 30000,
+         "GopSize": 1,
+         "GopSizeUnits": "SECONDS",
+         "Level": "H264_LEVEL_AUTO",
+         "LookAheadRateControl": "HIGH",
+         "MaxBitrate": 8000000,
+         "ParControl": "SPECIFIED",
+         "ParDenominator": 1,
+         "ParNumerator": 1,
+         "Profile": "HIGH",
+         "QvbrQualityLevel": 8,
+         "RateControlMode": "QVBR",
+         "ScanType": "PROGRESSIVE",
+         "SceneChangeDetect": "ENABLED",
+         "SpatialAq": "ENABLED",
+         "Syntax": "DEFAULT",
+         "TemporalAq": "ENABLED"
+        }
+       },
+       "Height": 1080,
+       "Name": "hd-1080p",
+       "RespondToAfd": "NONE",
+       "ScalingBehavior": "DEFAULT",
+       "Sharpness": 50,
+       "Width": 1920
+      },
+      {
+       "CodecSettings": {
+        "H264Settings": {
+         "AdaptiveQuantization": "AUTO",
+         "AfdSignaling": "NONE",
+         "Bitrate": 2000000,
+         "FlickerAq": "ENABLED",
+         "FramerateControl": "SPECIFIED",
+         "FramerateDenominator": 1001,
+         "FramerateNumerator": 30000,
+         "GopSize": 1,
+         "GopSizeUnits": "SECONDS",
+         "Level": "H264_LEVEL_AUTO",
+         "LookAheadRateControl": "HIGH",
+         "ParControl": "SPECIFIED",
+         "ParDenominator": 1,
+         "ParNumerator": 1,
+         "Profile": "MAIN",
+         "RateControlMode": "CBR",
+         "ScanType": "PROGRESSIVE",
+         "SceneChangeDetect": "ENABLED",
+         "SpatialAq": "ENABLED",
+         "Syntax": "DEFAULT",
+         "TemporalAq": "ENABLED"
+        }
+       },
+       "Height": 720,
+       "Name": "sd-720p",
+       "RespondToAfd": "NONE",
+       "ScalingBehavior": "DEFAULT",
+       "Sharpness": 50,
+       "Width": 1280
+      },
+      {
+       "CodecSettings": {
+        "Av1Settings": {
+         "AfdSignaling": "NONE",
+         "FramerateDenominator": 1001,
+         "FramerateNumerator": 30000,
+         "GopSize": 1,
+         "GopSizeUnits": "SECONDS",
+         "Level": "AV1_LEVEL_AUTO",
+         "LookAheadRateControl": "HIGH",
+         "MaxBitrate": 3000000,
+         "RateControlMode": "QVBR",
+         "SceneChangeDetect": "ENABLED",
+         "SpatialAq": "ENABLED",
+         "TemporalAq": "ENABLED"
+        }
+       },
+       "Height": 720,
+       "Name": "av1-720p",
+       "RespondToAfd": "NONE",
+       "ScalingBehavior": "DEFAULT",
+       "Sharpness": 50,
+       "Width": 1280
+      }
+     ]
+    },
+    "InputAttachments": [
+     {
+      "InputAttachmentName": "router-feed",
+      "InputId": {
+       "Ref": "RouterInputEFD0F32D"
+      },
+      "InputSettings": {
+       "DeblockFilter": "DISABLED",
+       "DenoiseFilter": "DISABLED",
+       "FilterStrength": 1,
+       "InputFilter": "AUTO",
+       "Smpte2038DataPreference": "IGNORE",
+       "SourceEndBehavior": "CONTINUE"
+      }
+     }
+    ],
+    "InputSpecification": {
+     "Codec": "AVC",
+     "MaximumBitrate": "MAX_20_MBPS",
+     "Resolution": "HD"
+    },
+    "LogLevel": "DISABLED",
+    "Name": "integ-live-channel",
+    "RoleArn": {
+     "Fn::GetAtt": [
+      "MediaLiveRole1149D189",
+      "Arn"
+     ]
+    }
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

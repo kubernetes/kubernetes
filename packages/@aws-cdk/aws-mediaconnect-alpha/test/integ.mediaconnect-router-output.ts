@@ -80,8 +80,8 @@ new RouterOutput(stack, 'mediaLiveOutput', {
   routingScope: RoutingScope.GLOBAL,
   tier: RouterOutputTier.OUTPUT_20,
   configuration: RouterOutputConfiguration.mediaLiveInput({
-    mediaLiveInputArn: mediaLiveInput.attrArn, // needs updating when MediaLive has an L2
-    mediaLivePipelineId: MediaLivePipeline.PIPELINE_0,
+    input: mediaLiveInput,
+    pipeline: MediaLivePipeline.PIPELINE_0,
   }),
 });
 

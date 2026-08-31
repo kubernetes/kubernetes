@@ -1,0 +1,97 @@
+{
+ "Resources": {
+  "InputSG7C36578A": {
+   "Type": "AWS::MediaLive::InputSecurityGroup",
+   "Properties": {
+    "WhitelistRules": [
+     {
+      "Cidr": "203.0.113.0/24"
+     }
+    ]
+   }
+  },
+  "SrtSecret4F4908EE": {
+   "Type": "AWS::SecretsManager::Secret",
+   "Properties": {
+    "GenerateSecretString": {},
+    "Name": "integ-srt-passphrase"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete"
+  },
+  "SrtCallerInputB21A3C94": {
+   "Type": "AWS::MediaLive::Input",
+   "Properties": {
+    "Name": "integ-srt-caller",
+    "SrtSettings": {
+     "SrtCallerSources": [
+      {
+       "MinimumLatency": 1000,
+       "SrtListenerAddress": "203.0.113.100",
+       "SrtListenerPort": "9000"
+      }
+     ]
+    },
+    "Type": "SRT_CALLER"
+   }
+  },
+  "SrtListenerInput99BFF7B2": {
+   "Type": "AWS::MediaLive::Input",
+   "Properties": {
+    "InputSecurityGroups": [
+     {
+      "Ref": "InputSG7C36578A"
+     }
+    ],
+    "Name": "integ-srt-listener",
+    "SrtSettings": {
+     "SrtListenerSettings": {
+      "Decryption": {
+       "Algorithm": "AES256",
+       "PassphraseSecretArn": {
+        "Ref": "SrtSecret4F4908EE"
+       }
+      },
+      "MinimumLatency": 500,
+      "StreamId": "integ-stream-id"
+     }
+    },
+    "Type": "SRT_LISTENER"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

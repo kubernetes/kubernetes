@@ -1,0 +1,14 @@
+{
+  "version": "54.0.0",
+  "testCases": {
+    "cdk-integ-medialive-s3-to-s3/DefaultTest": {
+      "stacks": [
+        "aws-cdk-medialive-s3-to-s3"
+      ],
+      "assertionStack": "cdk-integ-medialive-s3-to-s3/DefaultTest/DeployAssert",
+      "assertionStackName": "cdkintegmedialives3tos3DefaultTestDeployAssert4DAA29F5"
+    }
+  },
+  "enableLookups": true,
+  "minimumCliVersion": "2.1131.0"
+}

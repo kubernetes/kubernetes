@@ -1,0 +1,20 @@
+{
+  "version": "54.0.0",
+  "files": {
+    "451f44a68aecdf4d5281bf37671a5a8c821b7108503273130eb13e174ecae9f6": {
+      "displayName": "aws-cdk-medialive-mediaconnect-router Template",
+      "source": {
+        "path": "aws-cdk-medialive-mediaconnect-router.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-current_region-cc2f8b32": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "451f44a68aecdf4d5281bf37671a5a8c821b7108503273130eb13e174ecae9f6.json",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}
