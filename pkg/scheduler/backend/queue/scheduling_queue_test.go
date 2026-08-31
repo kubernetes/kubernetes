@@ -5416,17 +5416,21 @@ func TestMoveAllToActiveOrBackoffQueue_PreEnqueueChecks(t *testing.T) {
 			want:     sets.New("p0", "p1", "p2", "p3", "p4"),
 		},
 		{
-			name:            "move Pods with priority greater than 2",
-			podInfos:        podInfos,
-			event:           framework.EventUnschedulableTimeout,
-			preEnqueueCheck: func(pod *v1.Pod) bool { return *pod.Spec.Priority >= 2 },
-			want:            sets.New("p2", "p3", "p4"),
+			name:     "move Pods with priority greater than 2",
+			podInfos: podInfos,
+			event:    framework.EventUnschedulableTimeout,
+			preEnqueueCheck: func(entity framework.QueuedEntityInfo) bool {
+				pod := entity.(*framework.QueuedPodInfo).Pod
+				return *pod.Spec.Priority >= 2
+			},
+			want: sets.New("p2", "p3", "p4"),
 		},
 		{
 			name:     "move Pods with even priority and greater than 2",
 			podInfos: podInfos,
 			event:    framework.EventUnschedulableTimeout,
-			preEnqueueCheck: func(pod *v1.Pod) bool {
+			preEnqueueCheck: func(entity framework.QueuedEntityInfo) bool {
+				pod := entity.(*framework.QueuedPodInfo).Pod
 				return *pod.Spec.Priority%2 == 0 && *pod.Spec.Priority >= 2
 			},
 			want: sets.New("p2", "p4"),
@@ -5435,7 +5439,8 @@ func TestMoveAllToActiveOrBackoffQueue_PreEnqueueChecks(t *testing.T) {
 			name:     "move Pods with even and negative priority",
 			podInfos: podInfos,
 			event:    framework.EventUnschedulableTimeout,
-			preEnqueueCheck: func(pod *v1.Pod) bool {
+			preEnqueueCheck: func(entity framework.QueuedEntityInfo) bool {
+				pod := entity.(*framework.QueuedPodInfo).Pod
 				return *pod.Spec.Priority%2 == 0 && *pod.Spec.Priority < 0
 			},
 		},
@@ -5443,7 +5448,7 @@ func TestMoveAllToActiveOrBackoffQueue_PreEnqueueChecks(t *testing.T) {
 			name:     "preCheck isn't called if the event is not interested by any plugins",
 			podInfos: podInfos,
 			event:    pvAdd, // No plugin is interested in this event.
-			preEnqueueCheck: func(pod *v1.Pod) bool {
+			preEnqueueCheck: func(entity framework.QueuedEntityInfo) bool {
 				panic("preCheck shouldn't be called")
 			},
 		},
@@ -7361,6 +7366,28 @@ func TestMoveAllToActiveOrBackoffQueuePodGroupMember(t *testing.T) {
 			event:             fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add},
 			expectedInActiveQ: true,
 			expectedGroupSize: 2,
+		},
+		{
+			name:         "event of interest moves ungated pod group from unschedulableEntities to activeQ, with preCheck",
+			initialPods:  []*v1.Pod{p1, p2},
+			initialState: stateUnschedulable,
+			event:        fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add},
+			preCheck: func(_ framework.QueuedEntityInfo) bool {
+				return true
+			},
+			expectedInActiveQ: true,
+			expectedGroupSize: 2,
+		},
+		{
+			name:         "event of interest would move ungated pod group from unschedulableEntities to activeQ, but preCheck filtered it",
+			initialPods:  []*v1.Pod{p1, p2},
+			initialState: stateUnschedulable,
+			event:        fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add},
+			preCheck: func(_ framework.QueuedEntityInfo) bool {
+				return false
+			},
+			expectedInUnschedulable: true,
+			expectedGroupSize:       2,
 		},
 		{
 			name:                    "event not of interest keeps pod group in unschedulableEntities",
@@ -10071,65 +10098,6 @@ func TestPreQueueingHint_ErrorFallback(t *testing.T) {
 	}
 }
 
-func TestPreQueueingHint_PodGroupPreCheck(t *testing.T) {
-	// Verify that preCheck is applied to PodGroup entities in the narrowed path.
-	// When preCheck rejects all member pods, the PodGroup entity should not be moved.
-	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.SchedulerPreQueueingHints: true,
-		features.GenericWorkload:           true,
-	})
-	logger, ctx := ktesting.NewTestContext(t)
-
-	pgName := "test-pg"
-	pod1 := st.MakePod().Name("pgpod1").Namespace("ns1").UID("pgpod1").Label("block", "").PodGroupName(pgName).Obj()
-	pod2 := st.MakePod().Name("pgpod2").Namespace("ns1").UID("pgpod2").Label("block", "").PodGroupName(pgName).Obj()
-	podGroup := &schedulingv1beta1.PodGroup{
-		ObjectMeta: metav1.ObjectMeta{Name: pgName, Namespace: "ns1", UID: "pg-uid"},
-		Spec:       schedulingv1beta1.PodGroupSpec{},
-	}
-
-	preQueueingHintFn := func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
-		return fwk.PreQueueingHintResult{
-			Pods: []types.NamespacedName{{Name: "pgpod1", Namespace: "ns1"}},
-		}, nil
-	}
-
-	m := makeEmptyQueueingHintMapPerProfile()
-	m[""][nodeAdd] = []*QueueingHintFunction{
-		{
-			PluginName:        "testPlugin",
-			QueueingHintFn:    queueHintReturnQueue,
-			PreQueueingHintFn: preQueueingHintFn,
-		},
-	}
-
-	q := NewTestQueue(ctx, newDefaultQueueSort(), WithQueueingHintMapPerProfile(m))
-
-	// Set up pod group in unschedulable state.
-	setupInitialPodGroupState(t, ctx, q, []*v1.Pod{pod1, pod2}, stateUnschedulable, podGroup)
-
-	pgLookup := newQueuedPodGroupInfoForLookup("ns1", pgName, fwk.PodGroupKeyType)
-	entity := q.unschedulableEntities.get(pgLookup)
-	if entity == nil {
-		t.Fatal("pod group not found in unschedulable entities")
-	}
-	entity.(*framework.QueuedPodGroupInfo).UnschedulablePlugins = sets.New[string]("testPlugin")
-
-	// preCheck rejects pods with label "block"
-	preCheck := func(pod *v1.Pod) bool {
-		_, hasBlock := pod.Labels["block"]
-		return !hasBlock
-	}
-
-	// Trigger event with preCheck that blocks all PodGroup member pods.
-	q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, st.MakeNode().Name("node1").Obj(), preCheck)
-
-	// PodGroup should remain in unschedulable because preCheck rejected all members.
-	if q.unschedulableEntities.get(pgLookup) == nil {
-		t.Errorf("pod group should remain in unschedulable when preCheck rejects all members")
-	}
-}
-
 func TestPreQueueingHint_CPGDisablesNarrowing(t *testing.T) {
 	// When CompositePodGroup feature gate is enabled, PreQueueingHint
 	// narrowing is disabled to avoid missing CPG entities.
@@ -10303,19 +10271,3 @@ func TestPreQueueingHint_PerPluginNarrowing(t *testing.T) {
 		t.Errorf("pluginB QueueingHintFn should be called for pod2, called for: %v", pluginBQueueingHintCalled)
 	}
 }
-
-/*
-Copyright 2017 The Kubernetes Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/

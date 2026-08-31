@@ -391,10 +391,10 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 	}
 }
 
-// getLEPriorityPreCheck is a PreEnqueueCheck function that selects only lower or equal priority pods.
+// getLEPriorityPreCheck is a PreEnqueueCheck function that selects only lower or equal priority entities.
 func getLEPriorityPreCheck(priority int32) queue.PreEnqueueCheck {
-	return func(pod *v1.Pod) bool {
-		return corev1helpers.PodPriority(pod) <= priority
+	return func(entity framework.QueuedEntityInfo) bool {
+		return entity.GetPriority() <= priority
 	}
 }
 
