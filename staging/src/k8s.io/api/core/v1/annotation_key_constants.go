@@ -157,8 +157,8 @@ const (
 	// is not a requirement.
 	AnnotationTopologyMode = "service.kubernetes.io/topology-mode"
 
-	// BetaStorageClassAnnotation can be used for a persisent volume claim and
-	// a persisent volume to specify the name of the storage class. This annotation has
+	// BetaStorageClassAnnotation can be used for a persistent volume claim and
+	// a persistent volume to specify the name of the storage class. This annotation has
 	// been deprecated in favor of the `storageClassName` field in the PVC and PV spec.
 	//
 	// Please note that it's currently still used and will be held for backwards compatibility.
@@ -166,7 +166,7 @@ const (
 	// It might be removed in a future release, see kubernetes/kubernetes#116336 for tracking.
 	BetaStorageClassAnnotation = "volume.beta.kubernetes.io/storage-class"
 
-	// MountOptionAnnotation can be used for a persisent volume to define mount options.
+	// MountOptionAnnotation can be used for a persistent volume to define mount options.
 	// This annotation has been deprecated in favor of the `mountOptions` field in the PV spec.
 	//
 	// Please note that it's currently still used and will be held for backwards compatibility.

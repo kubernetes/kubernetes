@@ -2289,13 +2289,9 @@ func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName stri
 func ValidatePersistentVolume(pv *core.PersistentVolume, opts PersistentVolumeSpecValidationOptions) field.ErrorList {
 	metaPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMeta(&pv.ObjectMeta, false, ValidatePersistentVolumeName, metaPath)
-	allErrs = append(allErrs, ValidatePersistentVolumeAnnotations(pv)...)
+	allErrs = append(allErrs, ValidateMountOptionInPersistentVolumeAnnotations(pv)...)
 	allErrs = append(allErrs, ValidatePersistentVolumeSpec(&pv.Spec, pv.ObjectMeta.Name, false, field.NewPath("spec"), opts)...)
 	return allErrs
-}
-
-func ValidatePersistentVolumeAnnotations(pv *core.PersistentVolume) field.ErrorList {
-	return ValidateMountOptionInPersistentVolumeAnnotations(pv)
 }
 
 func ValidateMountOptionInPersistentVolumeAnnotations(pv *core.PersistentVolume) field.ErrorList {
