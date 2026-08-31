@@ -577,12 +577,6 @@ const (
 	// Enables the fast path for inter-pod affinity calculations when the topology key is kubernetes.io/hostname.
 	InterPodAffinityHostnameFastPath featuregate.Feature = "InterPodAffinityHostnameFastPath"
 
-	// owner: @mimowo
-	// kep: https://kep.k8s.io/4368
-	//
-	// Allows to delegate reconciliation of a Job object to an external controller.
-	JobManagedBy featuregate.Feature = "JobManagedBy"
-
 	// owner: @adrianmoisey @danwinship
 	// kep: https://kep.k8s.io/5495
 	//
@@ -1720,12 +1714,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
-	JobManagedBy: {
-		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.38
-	},
-
 	KubeProxyIPVS: {
 		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.GA},
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Deprecated},
@@ -2679,8 +2667,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	InPlacePodVerticalScalingSchedulerPreemption: {InPlacePodVerticalScaling},
 
 	InterPodAffinityHostnameFastPath: {},
-
-	JobManagedBy: {},
 
 	KubeProxyIPVS: {},
 
