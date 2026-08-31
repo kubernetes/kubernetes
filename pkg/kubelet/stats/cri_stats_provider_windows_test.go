@@ -18,6 +18,7 @@ package stats
 
 import (
 	"reflect"
+	"runtime"
 	"testing"
 	"time"
 
@@ -573,4 +574,134 @@ func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
 	// Log stats contain pointers to calculated resource values so we cannot use DeepEqual here
 	assert.Equal(t, *got.Logs.UsedBytes, logStatsUsed, "Logs.UsedBytes does not match expected value")
 	assert.Equal(t, *got.Logs.InodesUsed, logStatsInodesUsed, "Logs.InodesUsed does not match expected value")
+}
+
+func Test_maxWindowsUsageNanoCores(t *testing.T) {
+	want := uint64(runtime.NumCPU()) * uint64(time.Second/time.Nanosecond)
+	if got := maxWindowsUsageNanoCores(); got != want {
+		t.Errorf("maxWindowsUsageNanoCores() = %d, want %d", got, want)
+	}
+}
+
+func Test_capWindowsUsageNanoCores(t *testing.T) {
+	capacity := maxWindowsUsageNanoCores()
+	under := uint64(1)               // 1 nanocore, well below capacity
+	over := capacity + 1_000_000_000 // one whole core worth of impossible usage
+
+	tests := []struct {
+		name string
+		in   *uint64
+		want *uint64
+	}{
+		{name: "nil input is returned unchanged", in: nil, want: nil},
+		{name: "usage under capacity is untouched", in: ptr.To(under), want: ptr.To(under)},
+		{name: "usage exactly at capacity is untouched", in: ptr.To(capacity), want: ptr.To(capacity)},
+		{name: "usage above capacity is capped to node capacity", in: ptr.To(over), want: ptr.To(capacity)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := capWindowsUsageNanoCores(tt.in)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("capWindowsUsageNanoCores(%v) = %v, want %v", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+// Test_criStatsProvider_makeWinContainerStats_capsUsageNanoCores verifies that an
+// implausible usageNanoCores reported by the CRI runtime (larger than the node's total
+// CPU capacity) is clamped before it reaches /stats/summary. See
+// https://github.com/kubernetes/kubernetes/issues/134253.
+func Test_criStatsProvider_makeWinContainerStats_capsUsageNanoCores(t *testing.T) {
+	fakeOS := &kubecontainertest.FakeOS{}
+	fakeHostStatsProvider := NewFakeHostStatsProviderWithData(map[string]*volume.Metrics{}, fakeOS)
+	p := &criStatsProvider{
+		clock:             testingclock.NewFakeClock(time.Time{}),
+		hostStatsProvider: fakeHostStatsProvider,
+	}
+
+	capacity := maxWindowsUsageNanoCores()
+	over := capacity + 1_000_000_000
+
+	inputStats := &runtimeapi.WindowsContainerStats{
+		Attributes: &runtimeapi.ContainerAttributes{
+			Metadata: &runtimeapi.ContainerMetadata{Name: "c0"},
+		},
+		Cpu: &runtimeapi.WindowsCpuUsage{
+			UsageNanoCores: &runtimeapi.UInt64Value{Value: over},
+		},
+		Memory: &runtimeapi.WindowsMemoryUsage{},
+	}
+	inputContainer := &runtimeapi.Container{
+		CreatedAt: time.Now().Unix(),
+		Metadata:  &runtimeapi.ContainerMetadata{Name: "c0"},
+	}
+	inputPodSandboxMetadata := &runtimeapi.PodSandboxMetadata{
+		Namespace: "sb0-ns",
+		Name:      "sb0-name",
+		Uid:       "sb0-uid",
+	}
+
+	logger, _ := ktesting.NewTestContext(t)
+	got, err := p.makeWinContainerStats(logger, inputStats, inputContainer, &cadvisorapi.FsInfo{}, make(map[string]*cadvisorapi.FsInfo), inputPodSandboxMetadata)
+	if err != nil {
+		t.Fatalf("makeWinContainerStats() error = %v, expected no error", err)
+	}
+	if got.CPU == nil || got.CPU.UsageNanoCores == nil {
+		t.Fatalf("makeWinContainerStats() CPU.UsageNanoCores = nil, expected capped value")
+	}
+	if want := capacity; *got.CPU.UsageNanoCores != want {
+		t.Errorf("makeWinContainerStats() CPU.UsageNanoCores = %d, want capped to %d", *got.CPU.UsageNanoCores, want)
+	}
+}
+
+// Test_criStatsProvider_makeWinContainerCPUAndMemoryStats_capsUsageNanoCores verifies
+// that the lightweight resource-metrics path also clamps an implausible
+// usageNanoCores reported by the CRI runtime. See
+// https://github.com/kubernetes/kubernetes/issues/134253.
+func Test_criStatsProvider_makeWinContainerCPUAndMemoryStats_capsUsageNanoCores(t *testing.T) {
+	capacity := maxWindowsUsageNanoCores()
+	over := capacity + 1_000_000_000
+	cs := &runtimeapi.WindowsContainerStats{
+		Attributes: &runtimeapi.ContainerAttributes{
+			Metadata: &runtimeapi.ContainerMetadata{Name: "c0"},
+		},
+		Cpu: &runtimeapi.WindowsCpuUsage{
+			Timestamp:            int64(100),
+			UsageCoreNanoSeconds: &runtimeapi.UInt64Value{Value: uint64(1000)},
+			UsageNanoCores:       &runtimeapi.UInt64Value{Value: over},
+		},
+		Memory: &runtimeapi.WindowsMemoryUsage{},
+	}
+	got := (&criStatsProvider{clock: testingclock.NewFakeClock(time.Time{})}).makeWinContainerCPUAndMemoryStats(cs, time.Unix(0, 0))
+	if got.CPU == nil || got.CPU.UsageNanoCores == nil {
+		t.Fatalf("makeWinContainerCPUAndMemoryStats() CPU.UsageNanoCores = nil, expected capped value")
+	}
+	if *got.CPU.UsageNanoCores != capacity {
+		t.Errorf("makeWinContainerCPUAndMemoryStats() CPU.UsageNanoCores = %d, want %d", *got.CPU.UsageNanoCores, capacity)
+	}
+}
+
+// Test_criStatsProvider_addCRIPodCPUStats_capsUsageNanoCores verifies that pod-level CPU
+// stats produced from the CRI pod sandbox stats also clamp an implausible
+// usageNanoCores. See https://github.com/kubernetes/kubernetes/issues/134253.
+func Test_criStatsProvider_addCRIPodCPUStats_capsUsageNanoCores(t *testing.T) {
+	capacity := maxWindowsUsageNanoCores()
+	over := capacity + 1_000_000_000
+	criPodStat := &runtimeapi.PodSandboxStats{
+		Windows: &runtimeapi.WindowsPodSandboxStats{
+			Cpu: &runtimeapi.WindowsCpuUsage{
+				Timestamp:      int64(100),
+				UsageNanoCores: &runtimeapi.UInt64Value{Value: over},
+			},
+		},
+	}
+	ps := &statsapi.PodStats{}
+	addCRIPodCPUStats(ps, criPodStat)
+	if ps.CPU == nil || ps.CPU.UsageNanoCores == nil {
+		t.Fatalf("addCRIPodCPUStats() CPU.UsageNanoCores = nil, expected capped value")
+	}
+	if *ps.CPU.UsageNanoCores != capacity {
+		t.Errorf("addCRIPodCPUStats() CPU.UsageNanoCores = %d, want %d", *ps.CPU.UsageNanoCores, capacity)
+	}
 }

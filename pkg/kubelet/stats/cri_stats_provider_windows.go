@@ -20,6 +20,7 @@ package stats
 
 import (
 	"fmt"
+	"runtime"
 	"time"
 
 	"github.com/Microsoft/hnslib"
@@ -48,6 +49,44 @@ func (s networkStats) HNSListEndpointRequest() ([]hnslib.HNSEndpoint, error) {
 
 func (s networkStats) GetHNSEndpointStats(endpointName string) (*hnslib.HNSEndpointStats, error) {
 	return hnslib.GetHNSEndpointStats(endpointName)
+}
+
+// maxWindowsUsageNanoCores returns the theoretical maximum number of nanocores that
+// any single workload can report on this node during a full utilization interval,
+// i.e. the total CPU capacity of the node expressed in nanocores (100% utilization
+// of every logical processor for the whole interval).
+//
+// usageNanoCores is defined as a ratio of consumed CPU time over wall-clock time,
+// so a single workload can physically never exceed this bound: fully saturating all
+// logical processors for the whole interval would equal the node's CPU count. On
+// Windows, containers with high CPU utilization occasionally report a value larger
+// than this capacity (see https://github.com/kubernetes/kubernetes/issues/134253),
+// which is a measurement artifact of the underlying CRI runtime rather than real
+// utilization. Because consumers such as the Horizontal Pod Autoscaler and cluster
+// autoscalers scale off of this metric, such artifacts must not propagate to
+// /stats/summary. The underlying computation is fixed in the runtime; this guard
+// only prevents physically impossible values from leaking into the summary API.
+func maxWindowsUsageNanoCores() uint64 {
+	// runtime.NumCPU on Windows returns the number of logical processors visible to
+	// this process (the host count for process-isolated containers and the guest
+	// count for Hyper-V isolated ones). Either is a valid upper bound because real
+	// CPU-busy time cannot exceed the physical cores available in the partition.
+	return uint64(runtime.NumCPU()) * uint64(time.Second/time.Nanosecond)
+}
+
+// capWindowsUsageNanoCores clamps a reported usageNanoCores value so that it can never
+// exceed the node's total CPU capacity. Values above the capacity are a runtime
+// measurement artifact (see maxWindowsUsageNanoCores) and are dropped rather than
+// being surfaced to consumers. A nil value is returned unchanged.
+func capWindowsUsageNanoCores(usageNanoCores *uint64) *uint64 {
+	if usageNanoCores == nil {
+		return nil
+	}
+	if max := maxWindowsUsageNanoCores(); *usageNanoCores > max {
+		capped := max
+		return &capped
+	}
+	return usageNanoCores
 }
 
 // listContainerNetworkStats returns the network stats of all the running containers.
@@ -127,7 +166,7 @@ func (p *criStatsProvider) makeWinContainerStats(
 			result.CPU.UsageCoreNanoSeconds = &stats.Cpu.UsageCoreNanoSeconds.Value
 		}
 		if stats.Cpu.UsageNanoCores != nil {
-			result.CPU.UsageNanoCores = &stats.Cpu.UsageNanoCores.Value
+			result.CPU.UsageNanoCores = capWindowsUsageNanoCores(&stats.Cpu.UsageNanoCores.Value)
 		}
 	} else {
 		result.CPU.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
@@ -223,7 +262,7 @@ func addCRIPodCPUStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandboxS
 	criCPU := criPodStat.Windows.Cpu
 	ps.CPU = &statsapi.CPUStats{
 		Time:                 metav1.NewTime(time.Unix(0, criCPU.Timestamp)),
-		UsageNanoCores:       valueOfUInt64Value(criCPU.UsageNanoCores),
+		UsageNanoCores:       capWindowsUsageNanoCores(valueOfUInt64Value(criCPU.UsageNanoCores)),
 		UsageCoreNanoSeconds: valueOfUInt64Value(criCPU.UsageCoreNanoSeconds),
 	}
 }
@@ -311,7 +350,7 @@ func (p *criStatsProvider) makeWinContainerCPUAndMemoryStats(
 		result.CPU = &statsapi.CPUStats{
 			Time:                 metav1.NewTime(time.Unix(0, stats.Cpu.Timestamp)),
 			UsageCoreNanoSeconds: ptr.To(stats.Cpu.UsageCoreNanoSeconds.GetValue()),
-			UsageNanoCores:       ptr.To(stats.Cpu.UsageNanoCores.GetValue()),
+			UsageNanoCores:       capWindowsUsageNanoCores(ptr.To(stats.Cpu.UsageNanoCores.GetValue())),
 		}
 	} else {
 		result.CPU = &statsapi.CPUStats{
