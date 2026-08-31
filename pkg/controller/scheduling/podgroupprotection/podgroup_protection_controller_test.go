@@ -260,7 +260,7 @@ func TestHandlePodChange(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			c := &Controller{
-				queue: workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
+				queue: workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()), //nolint:logcheck // Intentionally testing old API here.
 			}
 			defer c.queue.ShutDown()
 			c.handlePodChange(logger, tc.old, tc.new)
@@ -381,8 +381,8 @@ func TestPodGroupProtectionController(t *testing.T) {
 				t.Fatalf("unexpected error creating controller: %v", err)
 			}
 
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
 			go ctrl.Run(ctx, 1)
 
 			// In order to reduce test flakiness, make sure that the pod-to-delete is visible in the client set. Create a dummy pod to "warm up" the watch pipe.
@@ -555,7 +555,7 @@ func TestHandlePodGroupUpdate(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			c := &Controller{
-				queue: workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
+				queue: workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()), //nolint:logcheck // Intentionally testing old API here.
 			}
 			defer c.queue.ShutDown()
 			c.handlePodGroupUpdate(logger, tc.pg)

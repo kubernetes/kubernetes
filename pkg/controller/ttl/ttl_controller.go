@@ -79,15 +79,18 @@ type Controller struct {
 
 // NewTTLController creates a new TTLController
 func NewTTLController(ctx context.Context, nodeInformer informers.NodeInformer, kubeClient clientset.Interface) *Controller {
+	logger := klog.FromContext(ctx)
 	ttlc := &Controller{
 		kubeClient: kubeClient,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "ttlcontroller"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
+				Name:   "ttlcontroller",
+			},
 		),
 	}
-	logger := klog.FromContext(ctx)
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = nodeInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			ttlc.addNode(logger, obj)
 		},
@@ -97,6 +100,8 @@ func NewTTLController(ctx context.Context, nodeInformer informers.NodeInformer, 
 		DeleteFunc: func(obj interface{}) {
 			ttlc.deleteNode(logger, obj)
 		},
+	}, cache.HandlerOptions{
+		Logger: &logger,
 	})
 
 	ttlc.nodeStore = listers.NewNodeLister(nodeInformer.Informer().GetIndexer())
@@ -123,7 +128,7 @@ var (
 
 // Run begins watching and syncing.
 func (ttlc *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting TTL controller")

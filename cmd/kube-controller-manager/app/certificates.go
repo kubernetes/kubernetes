@@ -273,6 +273,7 @@ func newRootCACertificatePublisherController(ctx context.Context, controllerCont
 	}
 
 	sac, err := rootcacertpublisher.NewPublisher(
+		klog.FromContext(ctx),
 		controllerContext.InformerFactory.Core().V1().ConfigMaps(),
 		controllerContext.InformerFactory.Core().V1().Namespaces(),
 		client,
@@ -295,7 +296,7 @@ func newKubeAPIServerSignerClusterTrustBundledPublisherDescriptor() *ControllerD
 	}
 }
 
-type controllerConstructor func(string, dynamiccertificates.CAContentProvider, kubernetes.Interface) (ctbpublisher.PublisherRunner, error)
+type controllerConstructor func(klog.Logger, string, dynamiccertificates.CAContentProvider, kubernetes.Interface) (ctbpublisher.PublisherRunner, error)
 
 func newKubeAPIServerSignerClusterTrustBundledPublisherController(
 	ctx context.Context, controllerContext ControllerContext, controllerName string,
@@ -340,6 +341,7 @@ func newKubeAPIServerSignerClusterTrustBundledPublisherController(
 		}
 
 		runner, err = schemaControllerMapping[gv](
+			klog.FromContext(ctx),
 			"kubernetes.io/kube-apiserver-serving",
 			servingSigners,
 			apiserverSignerClient,

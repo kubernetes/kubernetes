@@ -228,7 +228,7 @@ func newReplicaCalcSetup(t *testing.T, f *calcScenario) *replicaCalcSetup {
 	calc := NewReplicaCalculator(metricsClient, informer.Lister(),
 		defaultTestingCPUInitializationPeriod, defaultTestingDelayOfInitialReadinessStatus)
 
-	informerFactory.Start(tCtx.Done())
+	informerFactory.StartWithContext(tCtx)
 
 	syncCtx, cancel := context.WithTimeout(tCtx, 10*time.Second)
 	defer cancel()

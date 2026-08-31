@@ -91,11 +91,17 @@ func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolu
 		createProvisionedPVInterval:   createProvisionedPVInterval,
 		claimQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "claims"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: new(klog.FromContext(ctx)),
+				Name:   "claims",
+			},
 		),
 		volumeQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "volumes"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: new(klog.FromContext(ctx)),
+				Name:   "volumes",
+			},
 		),
 		resyncPeriod:        p.SyncPeriod,
 		operationTimestamps: metrics.NewOperationStartTimeCache(),
@@ -322,7 +328,7 @@ func (ctrl *PersistentVolumeController) deleteClaim(ctx context.Context, claim *
 
 // Run starts all of this controller's control loops
 func (ctrl *PersistentVolumeController) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	ctrl.eventBroadcaster.StartStructuredLogging(3)

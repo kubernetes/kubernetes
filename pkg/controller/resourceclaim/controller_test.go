@@ -224,12 +224,12 @@ func TestCreateClaimDoesNotMutateTemplate(t *testing.T) {
 				tCtx.Fatalf("error creating controller: %v", err)
 			}
 
-			informerFactory.Start(tCtx.Done())
+			informerFactory.StartWithContext(tCtx)
 			defer func() {
 				tCtx.Cancel("stopping informers")
 				informerFactory.Shutdown()
 			}()
-			informerFactory.WaitForCacheSync(tCtx.Done())
+			informerFactory.WaitForCacheSyncWithContext(tCtx)
 
 			// cachedTemplate is the object the controller reads from the shared informer
 			// cache; snapshot it so any in-place mutation is detectable.
@@ -1167,13 +1167,13 @@ func testSyncHandler(tCtx ktesting.TContext) {
 			}
 
 			// Ensure informers are up-to-date.
-			informerFactory.Start(tCtx.Done())
+			informerFactory.StartWithContext(tCtx)
 			stopInformers := func() {
 				tCtx.Cancel("stopping informers")
 				informerFactory.Shutdown()
 			}
 			defer stopInformers()
-			informerFactory.WaitForCacheSync(tCtx.Done())
+			informerFactory.WaitForCacheSyncWithContext(tCtx)
 
 			// Add claims that only exist in the mutation cache.
 			for _, claim := range tc.claimsInCache {
@@ -1344,13 +1344,13 @@ func testClaimExists(tCtx ktesting.TContext) {
 			tCtx.ExpectNoError(err, "creating controller")
 
 			// Ensure informers are up-to-date.
-			informerFactory.Start(tCtx.Done())
+			informerFactory.StartWithContext(tCtx)
 			stopInformers := func() {
 				tCtx.Cancel("stopping informers")
 				informerFactory.Shutdown()
 			}
 			defer stopInformers()
-			informerFactory.WaitForCacheSync(tCtx.Done())
+			informerFactory.WaitForCacheSyncWithContext(tCtx)
 
 			// Add claims that only exist in the mutation cache.
 			if claim := tc.claimInMutationCache; claim != nil {
@@ -1715,7 +1715,7 @@ func testEventHandlers(tCtx ktesting.TContext) {
 			tCtx.ExpectNoError(err, "creating ephemeral controller")
 			tCtx.Cleanup(ec.queue.ShutDown)
 
-			informerFactory.Start(tCtx.Done())
+			informerFactory.StartWithContext(tCtx)
 			stopInformers := func() {
 				tCtx.Cancel("stopping informers")
 				informerFactory.Shutdown()

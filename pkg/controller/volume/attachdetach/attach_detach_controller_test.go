@@ -100,8 +100,8 @@ func Test_AttachDetachControllerStateOfWorldPopulators_Positive(t *testing.T) {
 	adc := createADC(t, tCtx, fakeKubeClient, informerFactory, plugins)
 
 	// Act
-	informerFactory.Start(tCtx.Done())
-	informerFactory.WaitForCacheSync(tCtx.Done())
+	informerFactory.StartWithContext(tCtx)
+	informerFactory.WaitForCacheSyncWithContext(tCtx)
 
 	err := adc.populateActualStateOfWorld(logger)
 	if err != nil {
@@ -209,8 +209,8 @@ func BenchmarkPopulateActualStateOfWorld(b *testing.B) {
 	adc := createADC(b, tCtx, fakeKubeClient, informerFactory, nil)
 
 	// Act
-	informerFactory.Start(tCtx.Done())
-	informerFactory.WaitForCacheSync(tCtx.Done())
+	informerFactory.StartWithContext(tCtx)
+	informerFactory.WaitForCacheSyncWithContext(tCtx)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -229,8 +229,8 @@ func BenchmarkNodeUpdate(b *testing.B) {
 	logger := tCtx.Logger()
 	adc := createADC(b, tCtx, fakeKubeClient, informerFactory, nil)
 
-	informerFactory.Start(tCtx.Done())
-	informerFactory.WaitForCacheSync(tCtx.Done())
+	informerFactory.StartWithContext(tCtx)
+	informerFactory.WaitForCacheSyncWithContext(tCtx)
 
 	err := adc.populateActualStateOfWorld(logger.V(2))
 	if err != nil {
@@ -351,7 +351,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		_ = csiNodeInformer.GetIndexer().Add(&csiNode)
 	}
 
-	informerFactory.Start(tCtx.Done())
+	informerFactory.StartWithContext(tCtx)
 
 	if !kcache.WaitForNamedCacheSyncWithContext(tCtx,
 		informerFactory.Core().V1().Pods().Informer().HasSynced,
@@ -661,7 +661,7 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 	}
 
 	// Makesure the informer cache is synced
-	informerFactory.Start(tCtx.Done())
+	informerFactory.StartWithContext(tCtx)
 
 	if !kcache.WaitForNamedCacheSyncWithContext(tCtx,
 		informerFactory.Core().V1().Pods().Informer().HasSynced,

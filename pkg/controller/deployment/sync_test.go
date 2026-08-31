@@ -431,8 +431,8 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 
 		stopCh := make(chan struct{})
 		defer close(stopCh)
-		informers.Start(stopCh)
-		informers.WaitForCacheSync(stopCh)
+		informers.StartWithContext(ctx)
+		informers.WaitForCacheSyncWithContext(ctx)
 
 		t.Logf(" &test.revisionHistoryLimit: %d", test.revisionHistoryLimit)
 		d := newDeployment("foo", 1, &test.revisionHistoryLimit, nil, nil, map[string]string{"foo": "bar"})
@@ -567,7 +567,7 @@ func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
 
 		stopCh := make(chan struct{})
 		defer close(stopCh)
-		informers.Start(stopCh)
+		informers.StartWithContext(ctx)
 
 		d := newDeployment("foo", 1, &test.revisionHistoryLimit, nil, nil, map[string]string{"foo": "bar"})
 		controller.cleanupDeployment(ctx, test.oldRSs, d)
@@ -635,7 +635,7 @@ func TestDeploymentController_generateReplicaSetName(t *testing.T) {
 
 		stopCh := make(chan struct{})
 		defer close(stopCh)
-		informers.Start(stopCh)
+		informers.StartWithContext(ctx)
 
 		d := newDeployment(test.deploymentName, 1, nil, nil, nil, map[string]string{"foo": "bar"})
 

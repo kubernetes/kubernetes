@@ -257,10 +257,18 @@ func newControllerWithClock(ctx context.Context, kubeClient clientset.Interface,
 			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
 			OnWrite:    podWriteCallback,
 		},
-		expectations:            controller.NewControllerExpectations(),
-		finalizerExpectations:   newUIDTrackingExpectations(),
-		queue:                   workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.NewTypedItemExponentialFailureRateLimiter[string](DefaultJobApiBackOff, MaxJobApiBackOff), workqueue.TypedRateLimitingQueueConfig[string]{Name: "job", Clock: clock}),
-		orphanQueue:             workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.NewTypedItemExponentialFailureRateLimiter[orphanPodKey](DefaultJobApiBackOff, MaxJobApiBackOff), workqueue.TypedRateLimitingQueueConfig[orphanPodKey]{Name: "job_orphan_pod", Clock: clock}),
+		expectations:          controller.NewControllerExpectations(),
+		finalizerExpectations: newUIDTrackingExpectations(),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.NewTypedItemExponentialFailureRateLimiter[string](DefaultJobApiBackOff, MaxJobApiBackOff), workqueue.TypedRateLimitingQueueConfig[string]{
+			Logger: new(klog.FromContext(ctx)),
+			Name:   "job",
+			Clock:  clock,
+		}),
+		orphanQueue: workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.NewTypedItemExponentialFailureRateLimiter[orphanPodKey](DefaultJobApiBackOff, MaxJobApiBackOff), workqueue.TypedRateLimitingQueueConfig[orphanPodKey]{
+			Logger: new(klog.FromContext(ctx)),
+			Name:   "job_orphan_pod",
+			Clock:  clock,
+		}),
 		broadcaster:             eventBroadcaster,
 		recorder:                eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
 		clock:                   clock,
@@ -269,7 +277,7 @@ func newControllerWithClock(ctx context.Context, kubeClient clientset.Interface,
 		consistencyStore:        consistencyStore,
 	}
 
-	if _, err := jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if _, err := jobInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			jm.addJob(logger, obj)
 		},
@@ -279,13 +287,13 @@ func newControllerWithClock(ctx context.Context, kubeClient clientset.Interface,
 		DeleteFunc: func(obj interface{}) {
 			jm.deleteJob(logger, obj)
 		},
-	}); err != nil {
+	}, cache.HandlerOptions{Logger: &logger}); err != nil {
 		return nil, fmt.Errorf("adding Job event handler: %w", err)
 	}
 	jm.jobLister = jobInformer.Lister()
 	jm.jobStoreSynced = jobInformer.Informer().HasSynced
 
-	if _, err := podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if _, err := podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			jm.addPod(logger, obj)
 		},
@@ -295,7 +303,7 @@ func newControllerWithClock(ctx context.Context, kubeClient clientset.Interface,
 		DeleteFunc: func(obj interface{}) {
 			jm.deletePod(logger, obj, true)
 		},
-	}); err != nil {
+	}, cache.HandlerOptions{Logger: &logger}); err != nil {
 		return nil, fmt.Errorf("adding Pod event handler: %w", err)
 	}
 	jm.podStore = podInformer.Lister()
@@ -323,7 +331,7 @@ func newControllerWithClock(ctx context.Context, kubeClient clientset.Interface,
 
 // Run the main goroutine responsible for watching and syncing jobs.
 func (jm *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	jm.broadcaster.StartStructuredLogging(3)

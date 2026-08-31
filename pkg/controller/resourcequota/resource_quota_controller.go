@@ -104,6 +104,8 @@ type Controller struct {
 
 // NewController creates a quota controller with specified options
 func NewController(ctx context.Context, options *ControllerOptions) (*Controller, error) {
+	logger := klog.FromContext(ctx)
+
 	// build the resource quota controller
 	rq := &Controller{
 		rqClient:            options.QuotaClient,
@@ -111,11 +113,17 @@ func NewController(ctx context.Context, options *ControllerOptions) (*Controller
 		informerSyncedFuncs: []cache.InformerSynced{options.ResourceQuotaInformer.Informer().HasSynced},
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "resourcequota_primary"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
+				Name:   "resourcequota_primary",
+			},
 		),
 		missingUsageQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "resourcequota_priority"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
+				Name:   "resourcequota_priority",
+			},
 		),
 		resyncPeriod: options.ResyncPeriod,
 		registry:     options.Registry,
@@ -123,9 +131,8 @@ func NewController(ctx context.Context, options *ControllerOptions) (*Controller
 	// set the synchronization handler
 	rq.syncHandler = rq.syncResourceQuotaFromKey
 
-	logger := klog.FromContext(ctx)
-
-	options.ResourceQuotaInformer.Informer().AddEventHandlerWithResyncPeriod(
+	resyncPeriod := rq.resyncPeriod()
+	_, _ = options.ResourceQuotaInformer.Informer().AddEventHandlerWithOptions(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				rq.addQuota(logger, obj)
@@ -153,11 +160,15 @@ func NewController(ctx context.Context, options *ControllerOptions) (*Controller
 				rq.enqueueResourceQuota(logger, obj)
 			},
 		},
-		rq.resyncPeriod(),
+		cache.HandlerOptions{
+			Logger:       &logger,
+			ResyncPeriod: &resyncPeriod,
+		},
 	)
 
 	if options.DiscoveryFunc != nil {
 		qm := NewMonitor(
+			logger,
 			options.InformersStarted,
 			options.InformerFactory,
 			options.IgnoredResourcesFunc(),
