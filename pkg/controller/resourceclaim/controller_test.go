@@ -1717,7 +1717,6 @@ func testEventHandlers(tCtx ktesting.TContext) {
 
 			informerFactory.Start(tCtx.Done())
 			stopInformers := func() {
-				tCtx.Cancel("stopping informers")
 				informerFactory.Shutdown()
 			}
 			tCtx.Cleanup(stopInformers)

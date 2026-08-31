@@ -36,6 +36,52 @@ func (c canceledError) Is(target error) bool {
 	return target == context.Canceled
 }
 
+// testContext returns the context associated with tb, as implemented by
+// [testing.T], [testing.B] and [testing.F] via their Context method. It
+// returns nil when tb doesn't support that, for example for Ginkgo.
+//
+// That context gets canceled by the "testing" package itself as soon as the
+// test function returns, before its Cleanup-registered functions run.
+func testContext(tb TB) context.Context {
+	if withCtx, ok := tb.(interface{ Context() context.Context }); ok {
+		return withCtx.Context()
+	}
+	return nil
+}
+
+// cancelWhenDone arranges for cancel to be invoked as soon as possible once
+// the test represented by tb is done, ideally already before its
+// Cleanup-registered functions run. This is possible when tb's own test
+// context can be observed (see [testContext]) because that one gets
+// canceled at exactly that point. A final tb.Cleanup callback guarantees
+// that cancel really does get called (also for TB implementations without
+// their own context) and, if done is non-nil, waits for it to be closed so
+// that callers can be sure that cancel has completed running.
+func cancelWhenDone(tb TB, cancel func(), done <-chan struct{}) {
+	var stopAfterFunc func() bool
+	if tbCtx := testContext(tb); tbCtx != nil {
+		stopAfterFunc = context.AfterFunc(tbCtx, cancel)
+	}
+	tb.Cleanup(func() {
+		if stopAfterFunc != nil {
+			// Deregister, it's not needed anymore because we call
+			// cancel below anyway. This also avoids leaking the
+			// registration in tb's context for the rest of its
+			// lifetime (relevant when it outlives this call, as is
+			// the case for the top-level *testing.T of a test with
+			// sub-tests).
+			stopAfterFunc()
+		}
+		cancel()
+		if done != nil {
+			// Wait for goroutine termination. This is important because
+			// otherwise the goroutine might log through tb *after* the
+			// test has already finished, which causes a panic.
+			<-done
+		}
+	})
+}
+
 // withTimeout corresponds to [context.WithTimeout]. In contrast to
 // [context.WithTimeout], it automatically cancels during test cleanup, provides
 // the given cause when the deadline is reached, and its cancel function
@@ -49,14 +95,10 @@ func withTimeout(ctx context.Context, tb TB, timeout time.Duration, timeoutCause
 	after := time.NewTimer(timeout)
 	stopCtx, stop := context.WithCancel(ctx) // Only used internally, doesn't need a cause.
 	done := make(chan struct{})
-	tb.Cleanup(func() {
+	cancelWhenDone(tb, func() {
 		cancel(cleanupErr(tb.Name()))
 		stop()
-		// Wait for goroutine termination. This is important because
-		// otherwise the goroutine might log through tb *after* the
-		// test has already finished, which causes a panic.
-		<-done
-	})
+	}, done)
 	go func() {
 		defer close(done)
 		select {

@@ -225,7 +225,6 @@ func createRandomCustomResourceDefinition(
 
 type testContext struct {
 	logger             klog.Logger
-	tearDown           func()
 	gc                 *garbagecollector.GarbageCollector
 	clientSet          clientset.Interface
 	apiExtensionClient apiextensionsclientset.Interface
@@ -289,10 +288,10 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 		t.Fatalf("failed to create garbage collector: %v", err)
 	}
 
-	tearDown := func() {
-		tCtx.Cancel("tearing down")
-		result.TearDownFn()
-	}
+	// The garbage collector runs with tCtx, so tCtx must get canceled
+	// before the server shuts down, to avoid it logging errors while (or
+	// after) the test binary considers the test done.
+	tCtx.Cleanup(result.TearDownFn)
 	syncPeriod := 5 * time.Second
 	startGC := func(workers int) {
 		go wait.Until(func() {
@@ -311,7 +310,6 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 
 	return &testContext{
 		logger:             logger,
-		tearDown:           tearDown,
 		gc:                 gc,
 		clientSet:          clientSet,
 		apiExtensionClient: apiExtensionClient,
@@ -420,7 +418,6 @@ func testCrossNamespaceReferences(t *testing.T, watchCache bool) {
 
 	// start GC with existing objects in place to simulate controller-manager restart
 	ctx := setupWithServer(t, testServer, workers)
-	defer ctx.tearDown()
 	testServer = nil
 
 	// Wait for the invalid children to be garbage collected
@@ -485,7 +482,6 @@ func testCrossNamespaceReferences(t *testing.T, watchCache bool) {
 // This test simulates the cascading deletion.
 func TestCascadingDeletion(t *testing.T) {
 	ctx := setup(t, 5)
-	defer ctx.tearDown()
 
 	gc, clientSet := ctx.gc, ctx.clientSet
 
@@ -572,7 +568,6 @@ func TestCascadingDeletion(t *testing.T) {
 // doesn't exist. It verifies the GC will delete such an object.
 func TestCreateWithNonExistentOwner(t *testing.T) {
 	ctx := setup(t, 5)
-	defer ctx.tearDown()
 
 	clientSet := ctx.clientSet
 
@@ -694,7 +689,6 @@ func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespa
 // e2e tests that put more stress.
 func TestStressingCascadingDeletion(t *testing.T) {
 	ctx := setup(t, 5)
-	defer ctx.tearDown()
 
 	gc, clientSet := ctx.gc, ctx.clientSet
 
@@ -758,7 +752,6 @@ func TestStressingCascadingDeletion(t *testing.T) {
 
 func TestOrphaning(t *testing.T) {
 	ctx := setup(t, 5)
-	defer ctx.tearDown()
 
 	gc, clientSet := ctx.gc, ctx.clientSet
 
@@ -838,7 +831,6 @@ func TestOrphaning(t *testing.T) {
 
 func TestSolidOwnerDoesNotBlockWaitingOwner(t *testing.T) {
 	ctx := setup(t, 5)
-	defer ctx.tearDown()
 
 	clientSet := ctx.clientSet
 
@@ -898,7 +890,6 @@ func TestSolidOwnerDoesNotBlockWaitingOwner(t *testing.T) {
 
 func TestNonBlockingOwnerRefDoesNotBlock(t *testing.T) {
 	ctx := setup(t, 5)
-	defer ctx.tearDown()
 
 	clientSet := ctx.clientSet
 
@@ -965,7 +956,6 @@ func TestNonBlockingOwnerRefDoesNotBlock(t *testing.T) {
 func TestDoubleDeletionWithFinalizer(t *testing.T) {
 	// test setup
 	ctx := setup(t, 5)
-	defer ctx.tearDown()
 	clientSet := ctx.clientSet
 	ns := createNamespaceOrDie("gc-double-foreground", clientSet, t)
 	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
@@ -1027,7 +1017,6 @@ func TestDoubleDeletionWithFinalizer(t *testing.T) {
 
 func TestBlockingOwnerRefDoesBlock(t *testing.T) {
 	ctx := setup(t, 0)
-	defer ctx.tearDown()
 	gc, clientSet := ctx.gc, ctx.clientSet
 
 	ns := createNamespaceOrDie("foo", clientSet, t)
@@ -1087,7 +1076,6 @@ func TestBlockingOwnerRefDoesBlock(t *testing.T) {
 // behavior supports custom resources.
 func TestCustomResourceCascadingDeletion(t *testing.T) {
 	ctx := setup(t, 5)
-	defer ctx.tearDown()
 
 	clientSet, apiExtensionClient, dynamicClient := ctx.clientSet, ctx.apiExtensionClient, ctx.dynamicClient
 
@@ -1147,7 +1135,6 @@ func TestCustomResourceCascadingDeletion(t *testing.T) {
 // specific node in the before graph with certain delete options).
 func TestMixedRelationships(t *testing.T) {
 	ctx := setup(t, 5)
-	defer ctx.tearDown()
 
 	clientSet, apiExtensionClient, dynamicClient := ctx.clientSet, ctx.apiExtensionClient, ctx.dynamicClient
 
@@ -1245,7 +1232,6 @@ func TestMixedRelationships(t *testing.T) {
 // definition with an instance that owns a core resource.
 func TestCRDDeletionCascading(t *testing.T) {
 	ctx := setup(t, 5)
-	defer ctx.tearDown()
 
 	clientSet, apiExtensionClient, dynamicClient := ctx.clientSet, ctx.apiExtensionClient, ctx.dynamicClient
 
@@ -1315,7 +1301,6 @@ func testCRDDeletion(t *testing.T, ctx *testContext, ns *v1.Namespace, definitio
 // a CRD, updates the storage version with a bad conversion webhook and then runs a simple cascading delete test.
 func TestCascadingDeleteOnCRDConversionFailure(t *testing.T) {
 	ctx := setup(t, 0)
-	defer ctx.tearDown()
 	gc, apiExtensionClient, dynamicClient, clientSet := ctx.gc, ctx.apiExtensionClient, ctx.dynamicClient, ctx.clientSet
 
 	ns := createNamespaceOrDie("gc-cache-sync-fail", clientSet, t)

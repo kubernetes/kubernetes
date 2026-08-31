@@ -196,9 +196,9 @@ func Init(tb TB, opts ...InitOption) TContext {
 		tCtx.cancel = cancelTimeout
 	} else {
 		tCtx = tCtx.WithCancel()
-		tCtx.Cleanup(func() {
+		cancelWhenDone(tb, func() {
 			tCtx.Cancel(cleanupErr(tCtx.Name()).Error())
-		})
+		}, nil)
 	}
 	tCtx.perTestHeader = header
 
@@ -246,6 +246,10 @@ func newLogger(tb TB, bufferLogs bool) klog.Logger {
 	return logger
 }
 
+// InitOption is an alias for the options provided through the [initoption] package.
+//
+// They are in a separate package to separate the main API from the less
+// commonly used configuration and to simplify auto-completion.
 type InitOption = initoption.InitOption
 
 // InitCtx is a variant of [Init] which uses an already existing context and
@@ -287,6 +291,12 @@ func (tCtx TContext) withTB(tb TB) TContext {
 	if tCtx.perTestHeader != nil {
 		logger := newLogger(tb, false /* don't buffer logs in sub-test */)
 		tCtx.Context = klog.NewContext(tCtx.Context, logger)
+	}
+	if !tCtx.isSyncTest {
+		// Sub-tests don't go through Init, so without this call they
+		// wouldn't show up in the "Currently running" list of a
+		// progress report.
+		defaultProgressReporter.trackRunningTest(tb)
 	}
 	return tCtx.WithCancel()
 }
@@ -355,7 +365,7 @@ func (tCtx TContext) WithContext(ctx context.Context) TContext {
 
 // WithValue wraps [context.WithValue] such that the result is again a TContext.
 func (tCtx TContext) WithValue(key, val any) TContext {
-	ctx := context.WithValue(tCtx, key, val)
+	ctx := context.WithValue(tCtx.Context, key, val)
 	return tCtx.WithContext(ctx)
 }
 
@@ -415,7 +425,7 @@ type TContext struct {
 	// for Cancel
 	cancel func(cause string)
 
-	// steps is a concatenation ("step1: step2: step3: ") of steps passed to WithStep.
+	// steps is a concatenation ("step1/step2/step3: ") of steps passed to WithStep.
 	// It's empty if there are no steps.
 	steps string
 
@@ -515,7 +525,7 @@ func (tCtx TContext) CleanupCtx(cb func(TContext)) {
 		// context then has *no* deadline. In the code path above for
 		// Ginkgo, Ginkgo is more sophisticated and also applies
 		// timeouts to cleanup calls which accept a context.
-		childCtx := tCtx.WithContext(context.WithoutCancel(tCtx))
+		childCtx := tCtx.WithContext(context.WithoutCancel(tCtx.Context))
 		cb(childCtx)
 	})
 }

@@ -93,6 +93,8 @@ func NewDefaultTestServerOptions() *TestServerInstanceOptions {
 // and its backing store.
 func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
 	tCtx := ktesting.Init(t)
+	var runCtx context.Context = tCtx
+	cancelRun := func(error) {}
 
 	if instanceOptions == nil {
 		instanceOptions = NewDefaultTestServerOptions()
@@ -107,7 +109,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	tearDown := func() {
 		// Cancel is stopping apiserver and cleaning up
 		// after itself, including shutting down its storage layer.
-		tCtx.Cancel("tearing down")
+		cancelRun(fmt.Errorf("tearing down"))
 
 		// If the apiserver was started, let's wait for it to
 		// shutdown clearly.
@@ -194,13 +196,19 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		return result, fmt.Errorf("failed to create server chain: %w", err)
 	}
 
+	runCtx, cancelRun = context.WithCancelCause(tCtx)
+	defer func() {
+		if result.TearDownFn == nil {
+			cancelRun(fmt.Errorf("startup failed"))
+		}
+	}()
 	errCh = make(chan error)
 	go func() {
 		defer close(errCh)
 		prepared, err := s.PrepareRun()
 		if err != nil {
 			errCh <- err
-		} else if err := prepared.Run(tCtx); err != nil {
+		} else if err := prepared.Run(runCtx); err != nil {
 			errCh <- err
 		}
 	}()

@@ -16,18 +16,35 @@ limitations under the License.
 
 package ktesting
 
+import (
+	"strings"
+
+	"k8s.io/klog/v2"
+)
+
 // WithStep creates a context where a prefix is added to all errors and log
 // messages, similar to how errors are wrapped. This can be nested, leaving a
 // trail of "bread crumbs" that help figure out where in a test some problem
 // occurred or why some log output gets written:
 //
-//	ERROR: bake cake: set heat for baking: oven not found
+//	ERROR: bake cake/set heat for baking: oven not found
 //
 // The string should describe the operation that is about to happen ("starting
 // the controller", "list items") or what is being operated on ("HTTP server").
-// Multiple different prefixes get concatenated with a colon.
+// Multiple different prefixes get concatenated with a slash, the same
+// separator klog uses for logger names (see below).
+//
+// The context's logger (as retrieved through [TContext.Logger] or
+// [klog.FromContext]) also gets updated by adding the step as name via
+// logr.Logger.WithName.
 func (tCtx TContext) WithStep(step string) TContext {
-	tCtx.steps += step + ": "
+	if tCtx.steps == "" {
+		tCtx.steps = step + ": "
+	} else {
+		tCtx.steps = strings.TrimSuffix(tCtx.steps, ": ") + "/" + step + ": "
+	}
+	logger := klog.FromContext(tCtx.Context).WithName(step)
+	tCtx.Context = klog.NewContext(tCtx.Context, logger)
 	return tCtx
 }
 
@@ -50,13 +67,16 @@ func (tCtx TContext) Step(step string, cb func(tCtx TContext)) {
 }
 
 // Value intercepts a search for the special "GINKGO_SPEC_CONTEXT" and
-// wraps the underlying reporter so that the steps are visible in the report.
+// wraps the underlying reporter so that the recorded steps and the name of
+// the running test are visible in the progress report.
 func (tCtx TContext) Value(key any) any {
-	if tCtx.steps != "" {
-		if s, ok := key.(string); ok && s == ginkgoSpecContextKey {
-			if reporter, ok := tCtx.Context.Value(key).(ginkgoReporter); ok {
-				return ginkgoReporter(&stepReporter{reporter: reporter, steps: tCtx.steps})
-			}
+	if s, ok := key.(string); ok && s == ginkgoSpecContextKey {
+		// When we construct a new TContext, we have to be careful to not wrap
+		// our own TContext instance. Otherwise this tCtx.Context.Value call
+		// here will call TContext.Value once more and wrap a ginkgoReporter inside
+		// a ginkgoReporter recursively.
+		if reporter, ok := tCtx.Context.Value(key).(ginkgoReporter); ok {
+			return ginkgoReporter(&stepReporter{reporter: reporter, testName: tCtx.Name(), steps: tCtx.steps})
 		}
 	}
 	return tCtx.Context.Value(key)
@@ -64,6 +84,7 @@ func (tCtx TContext) Value(key any) any {
 
 type stepReporter struct {
 	reporter ginkgoReporter
+	testName string
 	steps    string
 }
 
@@ -71,7 +92,7 @@ var _ ginkgoReporter = &stepReporter{}
 
 func (s *stepReporter) AttachProgressReporter(reporter func() string) func() {
 	return s.reporter.AttachProgressReporter(func() string {
-		report := reporter()
-		return s.steps + report
+		report := s.steps + reporter()
+		return s.testName + ":\n" + indent(report, true)
 	})
 }

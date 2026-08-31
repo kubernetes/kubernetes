@@ -106,7 +106,6 @@ func setupWithResources(t *testing.T, groupVersions []schema.GroupVersion, resou
 	})
 
 	newTeardown := func() {
-		tCtx.Cancel("tearing down apiserver")
 		teardown()
 	}
 

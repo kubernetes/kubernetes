@@ -249,13 +249,8 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 		t.Fatal(err)
 	}
 
-	cleanup := func() {
-		// Cancel stopping apiserver and cleaning up
-		// after itself, including shutting down its storage layer.
-		tCtx.Cancel("cleaning up")
-
-		// If the apiserver was started, let's wait for it to
-		// shutdown clearly.
+	tCtx.Cleanup(func() {
+		// Wait for the apiserver to shut down after the test context gets canceled.
 		err, ok := <-errCh
 		if ok && err != nil {
 			t.Error(err)
@@ -264,7 +259,7 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 		if err := os.RemoveAll(certDir); err != nil {
 			t.Log(err)
 		}
-	}
+	})
 
 	return &APIServer{
 		Client:    kubeClient,
@@ -273,12 +268,10 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 		KV:        kvClient,
 		Mapper:    restMapper,
 		Resources: GetResources(t, serverResources),
-		Cleanup:   cleanup,
 	}
 }
 
-// APIServer represents a running API server that is ready for use
-// The Cleanup func must be deferred to prevent resource leaks
+// APIServer represents a running API server that is ready for use.
 type APIServer struct {
 	Client    clientset.Interface
 	Dynamic   dynamic.Interface
