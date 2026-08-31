@@ -250,6 +250,32 @@ func DefaultNameSystem() string {
 	return "public"
 }
 
+// mapReadOnlyPkgs points each read-only types package at the package which
+// holds its validations. A read-only package never overrides a mapping made
+// for a package this run generates for. Among read-only packages, one which
+// names its input package is preferred over a types package standing for
+// itself, so that passing both a types package and the package holding its
+// validations works whichever order they are passed in.
+func mapReadOnlyPkgs(readOnlyPkgs []string, readOnlyInput map[string]string, inputToCanonicalPkg map[string]string) {
+	for _, extra := range readOnlyPkgs {
+		inputPath := readOnlyInput[extra]
+		if inputPath == extra {
+			continue
+		}
+		if _, ok := inputToCanonicalPkg[inputPath]; !ok {
+			inputToCanonicalPkg[inputPath] = extra
+		}
+	}
+	for _, extra := range readOnlyPkgs {
+		if readOnlyInput[extra] != extra {
+			continue
+		}
+		if _, ok := inputToCanonicalPkg[extra]; !ok {
+			inputToCanonicalPkg[extra] = extra
+		}
+	}
+}
+
 func GetTargets(context *generator.Context, args *Args) []generator.Target {
 	boilerplate, err := gengo.GoBoilerplate(args.GoHeaderFile, gengo.StdBuildTag, gengo.StdGeneratedBy)
 	if err != nil {
@@ -317,14 +343,37 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 	} else {
 		readOnlyPkgs = expanded // now in fully canonical form
 	}
-	for _, extra := range readOnlyPkgs {
-		inputPkgs = append(inputPkgs, extra)
-		pkgToInput[extra] = extra
-		// Don't let a read-only package override a generation mapping.
-		if _, ok := inputToCanonicalPkg[extra]; !ok {
-			inputToCanonicalPkg[extra] = extra
+	// FindPackages only canonicalizes paths, so the read-only packages must be
+	// loaded before their doc.go comments can be read below.
+	if len(readOnlyPkgs) > 0 {
+		if _, err := context.LoadPackages(readOnlyPkgs...); err != nil {
+			klog.Fatalf("cannot load read-only packages: %v", err)
 		}
 	}
+	// A read-only package may itself carry +k8s:validation-gen-input, naming
+	// the types package whose validators it holds. Honor that, as for
+	// generated inputs, so cross-package references to those types resolve to
+	// the package which actually holds the functions. Lint rules are not
+	// applied here: they govern the packages this run generates for.
+	readOnlyInput := make(map[string]string, len(readOnlyPkgs))
+	for _, extra := range readOnlyPkgs {
+		inputPath := extra
+		if pkg := context.Universe[extra]; pkg != nil {
+			info, err := apidefinitions.Identify(pkg, apidefinitions.Validation)
+			if err != nil {
+				klog.Fatal(err)
+			}
+			inputPath = info.ExternalTypes()
+		}
+		readOnlyInput[extra] = inputPath
+		inputPkgs = append(inputPkgs, extra)
+		pkgToInput[extra] = inputPath
+		if inputPath != extra {
+			klog.V(4).Infof("  read-only input pkg %v", inputPath)
+			inputPkgs = append(inputPkgs, inputPath)
+		}
+	}
+	mapReadOnlyPkgs(readOnlyPkgs, readOnlyInput, inputToCanonicalPkg)
 
 	if len(inputPkgs) > 0 {
 		if _, err := context.LoadPackages(inputPkgs...); err != nil {
