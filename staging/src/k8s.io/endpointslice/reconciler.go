@@ -165,6 +165,7 @@ func (r *Reconciler) deleteEndpointSlice(service *corev1.Service, endpointSlice 
 
 	r.endpointSliceTracker.ExpectDeletion(endpointSlice)
 	metrics.EndpointSliceChanges.WithLabelValues("delete").Inc()
+	metrics.EndpointSliceChangesTotal.WithLabelValues("delete").Inc()
 	return nil
 }
 
@@ -461,6 +462,7 @@ func (r *Reconciler) finalize(
 			}
 			r.endpointSliceTracker.Update(createdSlice)
 			metrics.EndpointSliceChanges.WithLabelValues("create").Inc()
+			metrics.EndpointSliceChangesTotal.WithLabelValues("create").Inc()
 		}
 	}
 
@@ -472,6 +474,7 @@ func (r *Reconciler) finalize(
 		}
 		r.endpointSliceTracker.Update(updatedSlice)
 		metrics.EndpointSliceChanges.WithLabelValues("update").Inc()
+		metrics.EndpointSliceChangesTotal.WithLabelValues("update").Inc()
 	}
 
 	for _, endpointSlice := range slicesToDelete {

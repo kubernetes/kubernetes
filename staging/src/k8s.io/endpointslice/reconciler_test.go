@@ -1239,12 +1239,20 @@ func TestReconcilerDeleteEndpointSlice(t *testing.T) {
 					}
 					expectTrackedGeneration(t, r.endpointSliceTracker, cachedSlice, expectedGeneration)
 
+					//nolint:staticcheck // intentionally asserting the deprecated metric during the deprecation period
 					deleted, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChanges.WithLabelValues("delete"))
 					if err != nil {
 						t.Fatalf("Failed to get EndpointSlice deletion metric: %v", err)
 					}
 					if deleted != testCase.wantDeleteMetric {
 						t.Errorf("Expected EndpointSlice deletion metric %v, got %v", testCase.wantDeleteMetric, deleted)
+					}
+					deletedTotal, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChangesTotal.WithLabelValues("delete"))
+					if err != nil {
+						t.Fatalf("Failed to get EndpointSlice deletion total metric: %v", err)
+					}
+					if deletedTotal != testCase.wantDeleteMetric {
+						t.Errorf("Expected EndpointSlice deletion total metric %v, got %v", testCase.wantDeleteMetric, deletedTotal)
 					}
 					if deletePath.name == "finalize" {
 						changed, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("Disabled", ""))
@@ -2721,17 +2729,32 @@ func expectMetrics(t *testing.T, em expectedMetrics) {
 	if actualCreated != float64(em.numCreated) {
 		t.Errorf("Expected endpointSliceChangesCreated to be %d, got %v", em.numCreated, actualCreated)
 	}
+	actualCreatedTotal, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChangesTotal.WithLabelValues("create"))
+	handleErr(t, err, "endpointSliceChangesTotalCreated")
+	if actualCreatedTotal != float64(em.numCreated) {
+		t.Errorf("Expected endpointSliceChangesTotalCreated to be %d, got %v", em.numCreated, actualCreatedTotal)
+	}
 
 	actualUpdated, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChanges.WithLabelValues("update"))
 	handleErr(t, err, "endpointSliceChangesUpdated")
 	if actualUpdated != float64(em.numUpdated) {
 		t.Errorf("Expected endpointSliceChangesUpdated to be %d, got %v", em.numUpdated, actualUpdated)
 	}
+	actualUpdatedTotal, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChangesTotal.WithLabelValues("update"))
+	handleErr(t, err, "endpointSliceChangesTotalUpdated")
+	if actualUpdatedTotal != float64(em.numUpdated) {
+		t.Errorf("Expected endpointSliceChangesTotalUpdated to be %d, got %v", em.numUpdated, actualUpdatedTotal)
+	}
 
 	actualDeleted, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChanges.WithLabelValues("delete"))
 	handleErr(t, err, "desiredEndpointSlices")
 	if actualDeleted != float64(em.numDeleted) {
 		t.Errorf("Expected endpointSliceChangesDeleted to be %d, got %v", em.numDeleted, actualDeleted)
+	}
+	actualDeletedTotal, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChangesTotal.WithLabelValues("delete"))
+	handleErr(t, err, "endpointSliceChangesTotalDeleted")
+	if actualDeletedTotal != float64(em.numDeleted) {
+		t.Errorf("Expected endpointSliceChangesTotalDeleted to be %d, got %v", em.numDeleted, actualDeletedTotal)
 	}
 
 	actualSlicesChangedPerSync, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("Disabled", ""))
@@ -2800,6 +2823,7 @@ func resetMetrics() {
 	metrics.EndpointsAddedPerSync.Reset()
 	metrics.EndpointsRemovedPerSync.Reset()
 	metrics.EndpointSliceChanges.Reset()
+	metrics.EndpointSliceChangesTotal.Reset()
 	metrics.EndpointSlicesChangedPerSync.Reset()
 	metrics.EndpointSliceSyncs.Reset()
 	metrics.ServicesCountByTrafficDistribution.Reset()
