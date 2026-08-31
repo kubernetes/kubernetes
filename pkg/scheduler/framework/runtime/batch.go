@@ -41,9 +41,10 @@ type batchHandle interface {
 // OpportunisticBatching caches results from filtering and scoring when possible to optimize
 // scheduling of common pods.
 type OpportunisticBatch struct {
-	state     *batchState
-	lastCycle schedulingCycle
-	handle    batchHandle
+	state       *batchState
+	lastCycle   schedulingCycle
+	handle      batchHandle
+	maxBatchAge time.Duration
 
 	// Used primarily for tests, count the total pods we
 	// have successfully batched.
@@ -65,7 +66,8 @@ type schedulingCycle struct {
 }
 
 const (
-	maxBatchAge = 500 * time.Millisecond
+	// DefaultMaxBatchAge defines the default maximum duration a batch state is considered valid.
+	DefaultMaxBatchAge = 500 * time.Millisecond
 )
 
 // GetNodeHint provides a hint for the pod based on filtering a scoring results of previous cycles. Caching works only for consecutive pods
@@ -213,7 +215,7 @@ func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, pod *v1.P
 	// If the state is too old, throw the state away. This is to avoid
 	// cases where we either have huge numbers of compatible pods in a
 	// row or we have a long wait between pods.
-	if time.Now().After((b.state.creationTime.Add(maxBatchAge))) {
+	if time.Now().After(b.state.creationTime.Add(b.maxBatchAge)) {
 		b.logUnusableState(logger, cycleCount, metrics.BatchFlushExpired)
 		return false
 	}
@@ -319,9 +321,10 @@ func (b *OpportunisticBatch) stateEmpty() bool {
 	return b.state == nil || b.state.sortedNodes == nil || b.state.sortedNodes.Len() == 0
 }
 
-func newOpportunisticBatch(h batchHandle, genericWorkloadEnabled bool) *OpportunisticBatch {
+func newOpportunisticBatch(h batchHandle, genericWorkloadEnabled bool, maxBatchAge time.Duration) *OpportunisticBatch {
 	return &OpportunisticBatch{
 		handle:                 h,
 		genericWorkloadEnabled: genericWorkloadEnabled,
+		maxBatchAge:            maxBatchAge,
 	}
 }

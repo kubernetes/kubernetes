@@ -18,7 +18,6 @@ package batch
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
@@ -26,21 +25,15 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/informers"
-	restclient "k8s.io/client-go/rest"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
-	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
-	"k8s.io/kubernetes/test/integration/framework"
-
-	"k8s.io/kubernetes/pkg/scheduler"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutil "k8s.io/kubernetes/test/integration/util"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 type podDef struct {
@@ -395,20 +388,77 @@ func TestBatchScenarios(t *testing.T) {
 
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
-			finalPods, batched := runScenario(t, tt, true)
+			profiles, registry := initSchedulerProfiles(t)
+			testCtx := testutil.InitTestSchedulerWithNS(t, "batch",
+				scheduler.WithProfiles(profiles...),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry),
+				scheduler.WithMaxBatchAge(time.Minute),
+			)
+
+			getter, ok := testCtx.Scheduler.Profiles["default-scheduler"].(interface {
+				TotalBatchedPods() int64
+			})
+			if !ok {
+				t.Fatal("Profile default-scheduler does not implement batchGetter")
+			}
+			cs := testCtx.ClientSet
+
+			for _, n := range tt.nodes {
+				_, err := testutil.CreateNode(cs, newNode(&n))
+				if err != nil {
+					t.Fatal("Failed adding node", "node", n, err)
+				}
+			}
+
+			finalPods := []*v1.Pod{}
+			batched := []bool{}
+			for _, pd := range tt.pods {
+				prevBatched := getter.TotalBatchedPods()
+
+				p := newPod(&pd, testCtx.NS.Name)
+				createdPod, err := cs.CoreV1().Pods(p.Namespace).Create(testCtx.Ctx, p, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("Failed to create pod %s/%s, error: %v",
+						p.Namespace, p.Name, err)
+				}
+
+				if err := testutil.WaitForPodToScheduleWithTimeout(testCtx.Ctx, cs, createdPod, 5*time.Second); err != nil {
+					if !pd.expectUnschedulable {
+						t.Errorf("Failed to schedule pod %s/%s on the node, err: %v",
+							p.Namespace, p.Name, err)
+					} else {
+						break
+					}
+				}
+
+				if pd.expectUnschedulable {
+					t.Fatalf("Expected pod to be unschedulable but it was scheduled")
+				}
+
+				finalPod, err := cs.CoreV1().Pods(p.Namespace).Get(testCtx.Ctx, p.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("Failed to get pod %v", err)
+				}
+				finalPods = append(finalPods, finalPod)
+
+				currBatched := getter.TotalBatchedPods()
+
+				batched = append(batched, currBatched > prevBatched)
+			}
+
 			for i, p := range finalPods {
 				if p.Spec.NodeName != tt.pods[i].expectedNode {
-					t.Fatalf("Invalid node '%s' for pod '%s'. Expected '%s'", p.Spec.NodeName, p.Name, tt.pods[i].expectedNode)
+					t.Fatalf("Invalid node %q for pod %q. Expected %q", p.Spec.NodeName, p.Name, tt.pods[i].expectedNode)
 				}
 				if batched[i] != tt.pods[i].expectBatched {
-					t.Fatalf("Expected pod %s batched %t, actually %t", p.Name, tt.pods[i].expectBatched, batched[i])
+					t.Fatalf("Expected pod %q batched %t, actually %t", p.Name, tt.pods[i].expectBatched, batched[i])
 				}
 			}
 		})
 	}
 }
 
-func newPod(d *podDef) *v1.Pod {
+func newPod(d *podDef, ns string) *v1.Pod {
 	aff := &v1.NodeAffinity{}
 	if len(d.nodeAffinity) > 0 {
 		for i, node := range d.nodeAffinity {
@@ -431,7 +481,7 @@ func newPod(d *podDef) *v1.Pod {
 	ret := testutil.InitPausePod(&testutil.PausePodConfig{
 		Name:      d.name,
 		Affinity:  &v1.Affinity{NodeAffinity: aff},
-		Namespace: "default",
+		Namespace: ns,
 		Resources: &v1.ResourceRequirements{
 			Requests: v1.ResourceList{
 				v1.ResourceCPU:    *(resource.NewQuantity(10, resource.DecimalSI)),
@@ -509,7 +559,7 @@ var _ fwk.FilterPlugin = &testPluginEmptySign{}
 var _ fwk.SignPlugin = &testPluginEmptySign{}
 
 func (pl *testPluginEmptySign) Name() string {
-	return "nosign"
+	return "emptysign"
 }
 
 func (pl *testPluginEmptySign) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
@@ -524,17 +574,10 @@ func newEmptySignPlugin(_ context.Context, injArgs runtime.Object, f fwk.Handle)
 	return &testPluginEmptySign{}, nil
 }
 
-// To access the test-only field in the framework
-type batchGetter interface {
-	TotalBatchedPods() int64
-}
-
-func runScenario(t *testing.T, tt *scenario, batch bool) ([]*v1.Pod, []bool) {
-	tCtx := ktesting.Init(t)
-
+func initSchedulerProfiles(t *testing.T) ([]config.KubeSchedulerProfile, frameworkruntime.Registry) {
 	cfg, err := newDefaultComponentConfig()
 	if err != nil {
-		tCtx.Fatalf("Error creating default component config: %v", err)
+		t.Fatalf("Error creating default component config: %v", err)
 	}
 
 	newProfile := cfg.Profiles[0].DeepCopy()
@@ -551,125 +594,10 @@ func runScenario(t *testing.T, tt *scenario, batch bool) ([]*v1.Pod, []bool) {
 	newProfile.Plugins.Filter.Enabled = append(newProfile.Plugins.Filter.Enabled, config.Plugin{Name: "emptysign"})
 	cfg.Profiles = append(cfg.Profiles, *newProfile)
 
-	scheduler, _, testCtx := mustSetupCluster(tCtx, cfg, frameworkruntime.Registry{
+	registry := frameworkruntime.Registry{
 		"nosign":    newNoSignPlugin,
 		"emptysign": newEmptySignPlugin,
-	})
-
-	getter := scheduler.Profiles["default-scheduler"].(batchGetter)
-
-	cs := testCtx.Client()
-
-	// Add nodes.
-	for _, n := range tt.nodes {
-		_, err := testutil.CreateNode(cs, newNode(&n))
-		if err != nil {
-			t.Fatal("Failed adding node", "node", n, err)
-		}
 	}
 
-	finalPods := []*v1.Pod{}
-	batched := []bool{}
-	for _, pd := range tt.pods {
-		prevBatched := getter.TotalBatchedPods()
-
-		p := newPod(&pd)
-		createdPod, err := cs.CoreV1().Pods(p.Namespace).Create(testCtx, p, metav1.CreateOptions{})
-		if err != nil {
-			t.Fatalf("Failed to create pod %s/%s, error: %v",
-				p.Namespace, p.Name, err)
-		}
-
-		if err := testutil.WaitForPodToScheduleWithTimeout(testCtx, cs, createdPod, 5*time.Second); err != nil {
-			if !pd.expectUnschedulable {
-				t.Errorf("Failed to schedule pod %s/%s on the node, err: %v",
-					p.Namespace, p.Name, err)
-			} else {
-				break
-			}
-		}
-
-		if pd.expectUnschedulable {
-			t.Fatalf("Expected pod to be unschedulable but it was scheduled")
-		}
-
-		finalPod, err := cs.CoreV1().Pods(p.Namespace).Get(testCtx, p.Name, metav1.GetOptions{})
-		if err != nil {
-			t.Fatalf("Failed to get pod %v", err)
-		}
-		finalPods = append(finalPods, finalPod)
-
-		currBatched := getter.TotalBatchedPods()
-
-		batched = append(batched, currBatched > prevBatched)
-	}
-
-	return finalPods, batched
-}
-
-// mustSetupCluster starts the following components:
-// - k8s api server
-// - scheduler
-// - some of the kube-controller-manager controllers
-//
-// It returns regular and dynamic clients, and destroyFunc which should be used to
-// remove resources after finished.
-// Notes on rate limiter:
-//   - client rate limit is set to 5000.
-func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfiguration, outOfTreePluginRegistry frameworkruntime.Registry) (*scheduler.Scheduler, informers.SharedInformerFactory, ktesting.TContext) {
-	var runtimeConfig []string
-	customFlags := []string{
-		// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-		"--disable-admission-plugins=ServiceAccount,TaintNodesByCondition,Priority",
-		"--runtime-config=" + strings.Join(runtimeConfig, ","),
-	}
-	serverOpts := apiservertesting.NewDefaultTestServerOptions()
-	// Timeout sufficiently long to handle deleting pods of the largest test cases.
-	serverOpts.RequestTimeout = 10 * time.Minute
-	server, err := apiservertesting.StartTestServer(tCtx, serverOpts, customFlags, framework.SharedEtcd())
-	if err != nil {
-		tCtx.Fatalf("start apiserver: %v", err)
-	}
-	// Cleanup will be in reverse order: first the clients by canceling the
-	// child context, then the server.
-	tCtx.Cleanup(server.TearDownFn)
-	tCtx = tCtx.WithCancel()
-	tCtx.Cleanup(func() {
-		tCtx.Cancel("test is done")
-	})
-
-	// TODO: client connection configuration, such as QPS or Burst is configurable in theory, this could be derived from the `config`, need to
-	// support this when there is any testcase that depends on such configuration.
-	cfg := restclient.CopyConfig(server.ClientConfig)
-	cfg.QPS = 5000.0
-	cfg.Burst = 5000
-
-	// use default component config if config here is nil
-	if config == nil {
-		var err error
-		config, err = newDefaultComponentConfig()
-		if err != nil {
-			tCtx.Fatalf("Error creating default component config: %v", err)
-		}
-	}
-
-	tCtx = tCtx.WithRESTConfig(cfg)
-
-	// Not all config options will be effective but only those mostly related with scheduler performance will
-	// be applied to start a scheduler, most of them are defined in `scheduler.schedulerOptions`.
-	scheduler, informerFactory := testutil.StartScheduler(tCtx, config, outOfTreePluginRegistry)
-	testutil.StartFakePVController(tCtx, tCtx.Client(), informerFactory)
-	runGC := testutil.CreateGCController(tCtx, tCtx, *cfg, informerFactory)
-	runNS := testutil.CreateNamespaceController(tCtx, tCtx, *cfg, informerFactory)
-
-	runResourceClaimController := func() {}
-
-	informerFactory.Start(tCtx.Done())
-	informerFactory.WaitForCacheSync(tCtx.Done())
-	go runGC()
-	go runNS()
-	go runResourceClaimController()
-
-	return scheduler, informerFactory, tCtx
-
+	return cfg.Profiles, registry
 }
