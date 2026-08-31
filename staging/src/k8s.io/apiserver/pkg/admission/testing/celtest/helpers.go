@@ -80,6 +80,10 @@ func buildEvaluationInputs(input *AdmissionInput) (*evaluationInputs, error) {
 	if params != nil {
 		paramsRuntime = params
 	}
+	operationOptions, err := resolveOperationOptions(input.request)
+	if err != nil {
+		return nil, fmt.Errorf("decoding request options: %w", err)
+	}
 
 	name, namespace := resolveNameAndNamespace(input.request, object, oldObject)
 	attr := admission.NewAttributesRecord(
@@ -91,7 +95,7 @@ func buildEvaluationInputs(input *AdmissionInput) (*evaluationInputs, error) {
 		requestGVR,
 		resolveSubresource(input.request),
 		resolveOperation(input.request, object, oldObject),
-		resolveOperationOptions(input.request),
+		operationOptions,
 		resolveDryRun(input.request),
 		resolveUserInfo(input.request),
 	)
@@ -262,11 +266,24 @@ func resolveOperation(request *admissionv1.AdmissionRequest, object, oldObject r
 	}
 }
 
-func resolveOperationOptions(request *admissionv1.AdmissionRequest) runtime.Object {
+func resolveOperationOptions(request *admissionv1.AdmissionRequest) (runtime.Object, error) {
 	if request == nil {
-		return nil
+		return nil, nil
 	}
-	return request.Options.Object
+	decoded, err := decodeRawExtension(request.Options)
+	if err != nil {
+		return nil, err
+	}
+	switch options := decoded.(type) {
+	case nil:
+		return nil, nil
+	case runtime.Object:
+		return options, nil
+	case map[string]interface{}:
+		return &unstructured.Unstructured{Object: options}, nil
+	default:
+		return nil, fmt.Errorf("unsupported options type %T", decoded)
+	}
 }
 
 func resolveDryRun(request *admissionv1.AdmissionRequest) bool {

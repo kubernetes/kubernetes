@@ -214,37 +214,54 @@ func TestFormatViolations(t *testing.T) {
 }
 
 func TestWithVersion(t *testing.T) {
-	// Version 1.28 should NOT have CEL sets library (added in 1.29).
+	expression := "sets.contains([1, 2, 3], [1])"
+	policy := &AdmissionPolicy{
+		validations: []validation{
+			{Path: "validations[0]", Expression: expression},
+		},
+	}
+	tests := []struct {
+		name string
+		run  func(*Evaluator) error
+	}{
+		{
+			name: "CompileCheck",
+			run:  func(e *Evaluator) error { return e.CompileCheck(expression) },
+		},
+		{
+			name: "EvalExpression",
+			run: func(e *Evaluator) error {
+				_, err := e.EvalExpression(expression, &AdmissionInput{})
+				return err
+			},
+		},
+		{
+			name: "EvalValidations",
+			run: func(e *Evaluator) error {
+				_, err := e.EvalValidations(policy, &AdmissionInput{})
+				return err
+			},
+		},
+	}
+
 	eOld, err := NewEvaluator(WithVersion(1, 28))
 	if err != nil {
 		t.Fatalf("NewEvaluator(1.28) error: %v", err)
 	}
-	err = eOld.CompileCheck("sets.contains([1, 2, 3], [1])")
-	if err == nil {
-		t.Error("expected compilation error for sets library at version 1.28")
-	}
-
-	policy := &AdmissionPolicy{
-		validations: []validation{
-			{Path: "validations[0]", Expression: "sets.contains([1, 2, 3], [1])"},
-		},
-	}
-	result, err := eOld.EvalValidations(policy, &AdmissionInput{})
-	if err != nil {
-		t.Fatalf("EvalValidations should use stored expression compatibility, got error: %v", err)
-	}
-	if !result.Allowed {
-		t.Fatalf("EvalValidations with stored expression compatibility should allow, got: %s", result.FormatViolations())
-	}
-
-	// Version 1.29+ should have sets library.
 	eNew, err := NewEvaluator(WithVersion(1, 29))
 	if err != nil {
 		t.Fatalf("NewEvaluator(1.29) error: %v", err)
 	}
-	err = eNew.CompileCheck("sets.contains([1, 2, 3], [1])")
-	if err != nil {
-		t.Errorf("compileCheck with sets at v1.29 should succeed, got: %v", err)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.run(eOld); err == nil {
+				t.Error("version 1.28 expected compilation error for sets library introduced in version 1.29")
+			}
+			if err := tt.run(eNew); err != nil {
+				t.Errorf("version 1.29 unexpected error: %v", err)
+			}
+		})
 	}
 }
 

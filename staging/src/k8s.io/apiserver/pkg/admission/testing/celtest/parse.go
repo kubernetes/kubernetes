@@ -26,10 +26,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utiljson "k8s.io/apimachinery/pkg/util/json"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	sigsyaml "sigs.k8s.io/yaml"
 )
+
+var strictClientGoCodecs = serializer.NewCodecFactory(clientgoscheme.Scheme, serializer.EnableStrict)
 
 // policyMeta extracts the Kind to dispatch parsing. Not a real K8s type
 // because flat-format policies have no TypeMeta.
@@ -331,15 +334,15 @@ func parseAdmissionInput(data []byte) (*AdmissionInput, error) {
 	if namespace == nil {
 		namespace = file.NamespaceObject
 	}
-	object, err := decodeAdmissionInputResource(file.Object)
+	object, err := decodeRawExtension(file.Object)
 	if err != nil {
 		return nil, fmt.Errorf("parsing admission input object: %w", err)
 	}
-	oldObject, err := decodeAdmissionInputResource(file.OldObject)
+	oldObject, err := decodeRawExtension(file.OldObject)
 	if err != nil {
 		return nil, fmt.Errorf("parsing admission input oldObject: %w", err)
 	}
-	params, err := decodeAdmissionInputResource(file.Params)
+	params, err := decodeRawExtension(file.Params)
 	if err != nil {
 		return nil, fmt.Errorf("parsing admission input params: %w", err)
 	}
@@ -353,7 +356,10 @@ func parseAdmissionInput(data []byte) (*AdmissionInput, error) {
 	}, nil
 }
 
-func decodeAdmissionInputResource(raw runtime.RawExtension) (interface{}, error) {
+func decodeRawExtension(raw runtime.RawExtension) (interface{}, error) {
+	if raw.Object != nil {
+		return raw.Object, nil
+	}
 	if len(raw.Raw) == 0 {
 		return nil, nil
 	}
@@ -365,7 +371,7 @@ func decodeAdmissionInputResource(raw runtime.RawExtension) (interface{}, error)
 	if typeMeta.APIVersion != "" && typeMeta.Kind != "" {
 		gvk := schema.FromAPIVersionAndKind(typeMeta.APIVersion, typeMeta.Kind)
 		if clientgoscheme.Scheme.Recognizes(gvk) {
-			object, _, err := clientgoscheme.Codecs.UniversalDeserializer().Decode(raw.Raw, &gvk, nil)
+			object, _, err := strictClientGoCodecs.UniversalDeserializer().Decode(raw.Raw, &gvk, nil)
 			if err != nil {
 				return nil, err
 			}

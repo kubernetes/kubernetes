@@ -286,6 +286,17 @@ func TestParseAdmissionInputFile(t *testing.T) {
 		if input.request == nil || input.request.Operation != admissionv1.Create {
 			t.Fatalf("request.operation = %v, want CREATE", input.request)
 		}
+		evaluator, err := NewEvaluator()
+		if err != nil {
+			t.Fatalf("NewEvaluator() error: %v", err)
+		}
+		value, err := evaluator.EvalExpression("request.options.fieldManager == 'celtest'", input)
+		if err != nil {
+			t.Fatalf("EvalExpression() error: %v", err)
+		}
+		if value != true {
+			t.Errorf("request.options expression = %v, want true", value)
+		}
 		if input.namespace == nil || input.namespace.Name != "default" {
 			t.Fatalf("namespace.name = %v, want default", input.namespace)
 		}
@@ -378,6 +389,25 @@ namespaceObject:
 	}
 	if !result.Allowed {
 		t.Errorf("expected Allowed=true, got violations: %s", result.FormatViolations())
+	}
+}
+
+func TestParseAdmissionInput_StrictRegisteredResourceDecoding(t *testing.T) {
+	yaml := `
+object:
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    name: test-pod
+  spec:
+    restartPolciy: Always
+`
+	_, err := ParseAdmissionInput(yaml)
+	if err == nil {
+		t.Fatal("ParseAdmissionInput() expected strict decoding error")
+	}
+	if !strings.Contains(err.Error(), `unknown field "spec.restartPolciy"`) {
+		t.Fatalf("ParseAdmissionInput() error = %q, want unknown field error", err)
 	}
 }
 

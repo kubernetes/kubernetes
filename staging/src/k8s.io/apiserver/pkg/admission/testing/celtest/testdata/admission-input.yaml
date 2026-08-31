@@ -19,6 +19,10 @@ request:
   resource:
     version: v1
     resource: pods
+  options:
+    apiVersion: v1
+    kind: CreateOptions
+    fieldManager: celtest
 namespaceObject:
   apiVersion: v1
   kind: Namespace

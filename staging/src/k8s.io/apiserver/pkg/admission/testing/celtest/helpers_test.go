@@ -131,6 +131,58 @@ func TestResolveOperation(t *testing.T) {
 	}
 }
 
+func TestResolveOperationOptions(t *testing.T) {
+	t.Run("nil request", func(t *testing.T) {
+		options, err := resolveOperationOptions(nil)
+		if err != nil {
+			t.Fatalf("resolveOperationOptions() error: %v", err)
+		}
+		if options != nil {
+			t.Fatalf("resolveOperationOptions() = %T, want nil", options)
+		}
+	})
+
+	t.Run("prefer decoded object", func(t *testing.T) {
+		want := &metav1.CreateOptions{FieldManager: "object-manager"}
+		request := &admissionv1.AdmissionRequest{
+			Options: runtime.RawExtension{Object: want, Raw: []byte("{")},
+		}
+		options, err := resolveOperationOptions(request)
+		if err != nil {
+			t.Fatalf("resolveOperationOptions() error: %v", err)
+		}
+		if options != want {
+			t.Fatalf("resolveOperationOptions() = %T, want original object", options)
+		}
+	})
+
+	t.Run("decode raw", func(t *testing.T) {
+		request := &admissionv1.AdmissionRequest{
+			Options: runtime.RawExtension{Raw: []byte(`{"apiVersion":"v1","kind":"CreateOptions","fieldManager":"raw-manager"}`)},
+		}
+		options, err := resolveOperationOptions(request)
+		if err != nil {
+			t.Fatalf("resolveOperationOptions() error: %v", err)
+		}
+		createOptions, ok := options.(*metav1.CreateOptions)
+		if !ok {
+			t.Fatalf("resolveOperationOptions() type = %T, want *metav1.CreateOptions", options)
+		}
+		if createOptions.FieldManager != "raw-manager" {
+			t.Errorf("fieldManager = %q, want %q", createOptions.FieldManager, "raw-manager")
+		}
+	})
+
+	t.Run("invalid raw", func(t *testing.T) {
+		request := &admissionv1.AdmissionRequest{
+			Options: runtime.RawExtension{Raw: []byte("{")},
+		}
+		if _, err := resolveOperationOptions(request); err == nil {
+			t.Fatal("resolveOperationOptions() expected error")
+		}
+	})
+}
+
 func TestDeepCopyMap(t *testing.T) {
 	original := map[string]interface{}{
 		"metadata": map[string]interface{}{

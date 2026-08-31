@@ -351,7 +351,7 @@ func (e *Evaluator) preparePolicyEvaluation(policy *AdmissionPolicy, input *Admi
 	if err != nil {
 		return nil, err
 	}
-	if err := e.compileVariableList(compiler, decls, policy.variables, "variable", e.evaluationMode()); err != nil {
+	if err := e.compileVariableList(compiler, decls, policy.variables, "variable", e.expressionMode()); err != nil {
 		return nil, err
 	}
 
@@ -367,11 +367,11 @@ func (e *Evaluator) preparePolicyEvaluation(policy *AdmissionPolicy, input *Admi
 // admission environment without evaluating it. It does not use an AdmissionPolicy,
 // so optional variables such as params use the evaluator's default declaration shape.
 func (e *Evaluator) CompileCheck(expr string) error {
-	compiler, decls, err := e.newCompilerWithMode(nil, e.compileCheckMode())
+	compiler, decls, err := e.newCompilerWithMode(nil, e.expressionMode())
 	if err != nil {
 		return err
 	}
-	evaluator := compiler.CompileMutatingEvaluator(&validatingpolicy.Variable{Expression: expr}, decls, e.compileCheckMode())
+	evaluator := compiler.CompileMutatingEvaluator(&validatingpolicy.Variable{Expression: expr}, decls, e.expressionMode())
 	return compilationErrors(evaluator.CompilationErrors())
 }
 
@@ -404,7 +404,7 @@ func (e *Evaluator) EvalValidations(policy *AdmissionPolicy, input *AdmissionInp
 	for _, validation := range policy.validations {
 		accessors = append(accessors, &validatingpolicy.ValidationCondition{Expression: validation.Expression, Message: validation.Message})
 	}
-	conditionEvaluator := state.compiler.CompileCondition(accessors, state.decls, e.evaluationMode())
+	conditionEvaluator := state.compiler.CompileCondition(accessors, state.decls, e.expressionMode())
 	if err := compilationErrors(conditionEvaluator.CompilationErrors()); err != nil {
 		return nil, err
 	}
@@ -474,7 +474,7 @@ func (e *Evaluator) EvalMutation(policy *AdmissionPolicy, input *AdmissionInput)
 		if err != nil {
 			return nil, err
 		}
-		evaluator := state.compiler.CompileMutatingEvaluator(accessor, mutationDecls, e.evaluationMode())
+		evaluator := state.compiler.CompileMutatingEvaluator(accessor, mutationDecls, e.expressionMode())
 		if err := compilationErrors(evaluator.CompilationErrors()); err != nil {
 			return nil, fmt.Errorf("mutation %q: %w", mutation.Path, err)
 		}
@@ -517,7 +517,7 @@ func (e *Evaluator) EvalVariable(policy *AdmissionPolicy, variableName string, i
 
 	found := false
 	for _, variable := range policy.variables {
-		result := compiler.CompileAndStoreVariable(&validatingpolicy.Variable{Name: variable.Name, Expression: variable.Expression}, decls, e.evaluationMode())
+		result := compiler.CompileAndStoreVariable(&validatingpolicy.Variable{Name: variable.Name, Expression: variable.Expression}, decls, e.expressionMode())
 		if result.Error != nil {
 			return nil, fmt.Errorf("variable %q: %w", variable.Name, result.Error)
 		}
@@ -566,7 +566,7 @@ func (e *Evaluator) evalMatchConditionsWithInputs(compiler *admissioncel.Composi
 	for _, condition := range policy.matchConditions {
 		accessors = append(accessors, &matchconditions.MatchCondition{Name: condition.Name, Expression: condition.Expression})
 	}
-	conditionEvaluator := compiler.CompileCondition(accessors, decls, e.evaluationMode())
+	conditionEvaluator := compiler.CompileCondition(accessors, decls, e.expressionMode())
 	if err := compilationErrors(conditionEvaluator.CompilationErrors()); err != nil {
 		return nil, err
 	}
@@ -609,7 +609,7 @@ func (e *Evaluator) evalAuditAnnotationsWithInputs(compiler *admissioncel.Compos
 	for _, annotation := range policy.auditAnnotations {
 		accessors = append(accessors, &validatingpolicy.AuditAnnotationCondition{Key: annotation.Key, ValueExpression: annotation.ValueExpression})
 	}
-	conditionEvaluator := compiler.CompileCondition(accessors, decls, e.evaluationMode())
+	conditionEvaluator := compiler.CompileCondition(accessors, decls, e.expressionMode())
 	if err := compilationErrors(conditionEvaluator.CompilationErrors()); err != nil {
 		return nil, err
 	}
@@ -659,7 +659,7 @@ func (e *Evaluator) evalMessageExpressions(state *policyEvaluationState, validat
 		return nil, remainingBudget, nil
 	}
 
-	messageEvaluator := state.compiler.CompileCondition(accessors, messageExpressionDeclarations(state.decls), e.evaluationMode())
+	messageEvaluator := state.compiler.CompileCondition(accessors, messageExpressionDeclarations(state.decls), e.expressionMode())
 	messageResults, remaining, err := messageEvaluator.ForInput(context.Background(), state.inputs.versionedAttr, state.inputs.request, messageExpressionOptionalBindings(state.inputs), state.inputs.namespace, remainingBudget)
 	return messageResults, remaining, err
 }
@@ -695,7 +695,7 @@ func validationMessage(validation validation, messageResult *admissioncel.Evalua
 }
 
 func (e *Evaluator) newCompiler(policy *AdmissionPolicy) (*admissioncel.CompositedCompiler, admissioncel.OptionalVariableDeclarations, error) {
-	return e.newCompilerWithMode(policy, e.evaluationMode())
+	return e.newCompilerWithMode(policy, e.expressionMode())
 }
 
 func (e *Evaluator) newCompilerWithMode(policy *AdmissionPolicy, envType environment.Type) (*admissioncel.CompositedCompiler, admissioncel.OptionalVariableDeclarations, error) {
@@ -729,7 +729,7 @@ func (e *Evaluator) evaluateMutatingWithBindings(compiler *admissioncel.Composit
 }
 
 func (e *Evaluator) evaluateMutatingWithBindingsAndNamespace(compiler *admissioncel.CompositedCompiler, decls admissioncel.OptionalVariableDeclarations, accessor admissioncel.ExpressionAccessor, evalInputs *evaluationInputs, optionalVars admissioncel.OptionalVariableBindings, namespace *corev1.Namespace, budget int64) (interface{}, int64, error) {
-	evaluator := compiler.CompileMutatingEvaluator(accessor, decls, e.evaluationMode())
+	evaluator := compiler.CompileMutatingEvaluator(accessor, decls, e.expressionMode())
 	if err := compilationErrors(evaluator.CompilationErrors()); err != nil {
 		return nil, budget, err
 	}
@@ -788,12 +788,10 @@ func (e *Evaluator) mutationDeclarations(policy *AdmissionPolicy) admissioncel.O
 	return decls
 }
 
-func (e *Evaluator) compileCheckMode() environment.Type {
+// expressionMode treats caller-supplied expressions as new expressions because
+// celtest has no separate API write validation phase before evaluation.
+func (e *Evaluator) expressionMode() environment.Type {
 	return environment.NewExpressions
-}
-
-func (e *Evaluator) evaluationMode() environment.Type {
-	return environment.StoredExpressions
 }
 
 func (e *Evaluator) runtimeCELCostBudget() int64 {
@@ -855,7 +853,7 @@ func ParseAdmissionPolicyFile(path string) (*AdmissionPolicy, error) {
 
 // ParseAdmissionInput parses a YAML string into an AdmissionInput. The YAML may
 // include object, oldObject, params, request, namespace, and namespaceObject
-// fields. Registered Kubernetes resources are decoded using the client-go
+// fields. Registered Kubernetes resources are strictly decoded using the client-go
 // scheme; unknown resources remain unstructured. No OpenAPI schema validation,
 // conversion, or defaulting is applied.
 func ParseAdmissionInput(yamlContent string) (*AdmissionInput, error) {
