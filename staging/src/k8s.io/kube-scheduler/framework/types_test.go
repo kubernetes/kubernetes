@@ -22,6 +22,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -277,6 +279,38 @@ func TestGetNamespacesFromPodAffinityTerm(t *testing.T) {
 			}, test.term)
 			if diff := cmp.Diff(test.want, got); diff != "" {
 				t.Errorf("Unexpected namespaces (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestGenericPodGroup_GetKind(t *testing.T) {
+	tests := []struct {
+		name string
+		gpg  *GenericPodGroup
+		want string
+	}{
+		{
+			name: "nil GenericPodGroup",
+			gpg:  nil,
+			want: "",
+		},
+		{
+			name: "PodGroup returns pod group kind",
+			gpg:  NewGenericPodGroup(&schedulingv1beta1.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"}}),
+			want: "pod group",
+		},
+		{
+			name: "CompositePodGroup returns composite pod group kind",
+			gpg:  NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{ObjectMeta: metav1.ObjectMeta{Name: "cpg", Namespace: "default"}}),
+			want: "composite pod group",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.gpg.GetKind(); got != tt.want {
+				t.Errorf("GetKind() = %v, want %v", got, tt.want)
 			}
 		})
 	}
