@@ -43,8 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
-	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
-	preemptionframework "k8s.io/kubernetes/pkg/scheduler/framework/preemption"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testfwk "k8s.io/kubernetes/test/integration/framework"
@@ -1634,6 +1632,73 @@ func TestAsyncPreemption(t *testing.T) {
 			},
 		},
 		{
+			// Victim deletion events that arrive while the preemptor is gated are consumed
+			// without activating it. Completing preemption then produces no new deletion event
+			// (victims are already gone), so the executor must activate the preemptor itself.
+			// Two victims are required: with a single victim, lastVictimsPendingPreemption is
+			// populated before PreemptPod blocks, so deleting that victim would ungate the
+			// preemptor via PreEnqueue and the test would pass even without Activate.
+			Name: "preemptor is activated when async preemption produces no deletion event",
+			Steps: []asyncframework.Step{
+				{
+					Name:       "create Node",
+					CreateNode: "node",
+				},
+				{
+					Name: "create first victim",
+					CreatePod: &asyncframework.CreatePod{
+						Pod: st.MakePod().Name("victim-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Node("node").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+					},
+				},
+				{
+					Name: "create second victim",
+					CreatePod: &asyncframework.CreatePod{
+						Pod: st.MakePod().Name("victim-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Node("node").Container("image").ZeroTerminationGracePeriod().Priority(1).Obj(),
+					},
+				},
+				{
+					Name: "create a preemptor Pod",
+					CreatePod: &asyncframework.CreatePod{
+						Pod: st.MakePod().Name("preemptor").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj(),
+					},
+				},
+				{
+					Name: "schedule the preemptor Pod",
+					SchedulePod: &asyncframework.SchedulePod{
+						PodName:             "preemptor",
+						ExpectUnschedulable: true,
+					},
+				},
+				{
+					Name:            "check the preemptor Pod is gated",
+					PodGatedInQueue: "preemptor",
+				},
+				{
+					Name:                 "check the preemptor Pod making the preemption API calls",
+					PodRunningPreemption: new(2),
+				},
+				{
+					Name:      "delete first victim while preemption is in flight",
+					DeletePod: "victim-1",
+				},
+				{
+					Name:      "delete second victim while preemption is in flight",
+					DeletePod: "victim-2",
+				},
+				{
+					Name:               "complete the preemption; executor must activate the preemptor",
+					CompletePreemption: "preemptor",
+				},
+				{
+					Name: "schedule the preemptor Pod after victims were deleted externally",
+					SchedulePod: &asyncframework.SchedulePod{
+						PodName:       "preemptor",
+						ExpectSuccess: true,
+					},
+				},
+			},
+		},
+		{
 			Name: "gated preemptor is eventually scheduled even if victim deletion doesn't raise queue hints",
 			Steps: []asyncframework.Step{
 				{
@@ -1902,132 +1967,6 @@ func TestAsyncPreemption(t *testing.T) {
 			}
 			asyncframework.RunAsyncPreemptionSteps(testCtx, t, test.Steps, config)
 		})
-	}
-}
-
-func TestAsyncPreemptionRequeuesAfterDeletionEventConsumedInFlight(t *testing.T) {
-	preemptionDoneChannels := &sync.Map{}
-	blockBindingChannel := make(chan struct{})
-	defer close(blockBindingChannel)
-
-	testCtx, preemptionPlugin, cs := asyncframework.InitTestForAsyncPreemption(t, asyncframework.AsyncPreemptionTestConfig{
-		PreemptionDoneChannels: preemptionDoneChannels,
-		BlockBindingChannel:    blockBindingChannel,
-	})
-	logger, _ := ktesting.NewTestContext(t)
-	if testCtx.Scheduler.APIDispatcher != nil {
-		testCtx.Scheduler.APIDispatcher.Run(logger)
-		defer testCtx.Scheduler.APIDispatcher.Close()
-	}
-	testCtx.Scheduler.SchedulingQueue.Run(logger)
-	defer testCtx.Scheduler.SchedulingQueue.Close()
-
-	node := st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
-	if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("Failed to create Node %q: %v", node.Name, err)
-	}
-	if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, 1); err != nil {
-		t.Fatal(err)
-	}
-
-	victim := st.MakePod().Name("victim").Namespace(testCtx.NS.Name).Node(node.Name).
-		Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").ZeroTerminationGracePeriod().Priority(1).Obj()
-	victim, err := cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, victim, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("Failed to create victim Pod: %v", err)
-	}
-	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, wait.ForeverTestTimeout, false, func(context.Context) (bool, error) {
-		_, err := testCtx.Scheduler.Cache.GetPod(victim)
-		return err == nil, nil
-	}); err != nil {
-		t.Fatalf("Victim Pod did not reach the scheduler cache: %v", err)
-	}
-
-	preemptor := st.MakePod().Name("preemptor").Namespace(testCtx.NS.Name).
-		Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Priority(100).Obj()
-	preemptor, err = cs.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, preemptor, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("Failed to create preemptor Pod: %v", err)
-	}
-	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, wait.ForeverTestTimeout, false, func(context.Context) (bool, error) {
-		for _, pod := range testCtx.Scheduler.SchedulingQueue.PodsInActiveQ() {
-			if pod.UID == preemptor.UID {
-				return true, nil
-			}
-		}
-		return false, nil
-	}); err != nil {
-		t.Fatalf("Preemptor Pod did not reach the active queue: %v", err)
-	}
-
-	preemptPodStarted := make(chan struct{})
-	allowPreemptPodToFinish := make(chan struct{})
-	var preemptPodStartedOnce sync.Once
-	preemptionPlugin.Executor.PreemptPod = func(_ context.Context, _ preemptionframework.Candidate, _ preemptionframework.ExecutorPreemptor, _ *v1.Pod, _ string) (bool, error) {
-		preemptPodStartedOnce.Do(func() { close(preemptPodStarted) })
-		<-allowPreemptPodToFinish
-		// Simulate the redundant preemption finding that the victim was already deleted.
-		return false, nil
-	}
-
-	failureHandlerStarted := make(chan struct{})
-	allowFailureHandlerToFinish := make(chan struct{})
-	var failureHandlerStartedOnce sync.Once
-	originalFailureHandler := testCtx.Scheduler.FailureHandler
-	testCtx.Scheduler.FailureHandler = func(ctx context.Context, f schedulerframework.Framework, podInfo *schedulerframework.QueuedPodInfo, status *fwk.Status, nominatingInfo *fwk.NominatingInfo, start time.Time) {
-		failureHandlerStartedOnce.Do(func() { close(failureHandlerStarted) })
-		<-allowFailureHandlerToFinish
-		originalFailureHandler(ctx, f, podInfo, status, nominatingInfo, start)
-	}
-
-	var releasePreemptionOnce sync.Once
-	releasePreemption := func() { releasePreemptionOnce.Do(func() { close(allowPreemptPodToFinish) }) }
-	defer releasePreemption()
-	var releaseFailureHandlerOnce sync.Once
-	releaseFailureHandler := func() { releaseFailureHandlerOnce.Do(func() { close(allowFailureHandlerToFinish) }) }
-	defer releaseFailureHandler()
-
-	schedulingCycleDone := make(chan struct{})
-	go func() {
-		defer close(schedulingCycleDone)
-		testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
-	}()
-
-	for name, ch := range map[string]<-chan struct{}{
-		"async preemption": preemptPodStarted,
-		"failure handling": failureHandlerStarted,
-	} {
-		select {
-		case <-ch:
-		case <-time.After(wait.ForeverTestTimeout):
-			t.Fatalf("Timed out waiting for %s to start", name)
-		}
-	}
-
-	// Record the earlier victim deletion while this retry cycle is in flight. The failure handler then
-	// consumes that event while async preemption is still pending, so PreEnqueue gates the preemptor.
-	testCtx.Scheduler.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, schedulerframework.EventAssignedPodDelete, victim, nil, nil)
-	releaseFailureHandler()
-	select {
-	case <-schedulingCycleDone:
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Fatal("Timed out waiting for the scheduling cycle to finish")
-	}
-	if !asyncframework.PodInUnschedulablePodPool(t, testCtx.Scheduler.SchedulingQueue, preemptor.Name) {
-		t.Fatal("Expected the preemptor to be gated in the unschedulable pool while async preemption is pending")
-	}
-
-	// No new deletion event follows the redundant preemption. Completion itself must activate the preemptor.
-	releasePreemption()
-	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, wait.ForeverTestTimeout, false, func(context.Context) (bool, error) {
-		for _, pod := range testCtx.Scheduler.SchedulingQueue.PodsInActiveQ() {
-			if pod.UID == preemptor.UID {
-				return true, nil
-			}
-		}
-		return false, nil
-	}); err != nil {
-		t.Fatalf("Preemptor was not activated after no-op async preemption completed: %v", err)
 	}
 }
 

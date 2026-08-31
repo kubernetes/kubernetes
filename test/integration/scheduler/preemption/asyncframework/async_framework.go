@@ -150,6 +150,8 @@ type Step struct {
 	// WaitForPodsDeleted waits for the specified pods to be deleted from the cluster.
 	// The value is the array of Pod indexes representing the order of Pod creation.
 	WaitForPodsDeleted []int
+	// DeletePod deletes a Pod by name and waits until it is gone from the API and informer.
+	DeletePod string
 }
 
 // AsyncPreemptionStepRunnerConfig is a configuration for running async preemption test steps.
@@ -193,6 +195,8 @@ func RunAsyncPreemptionSteps(testCtx *testutils.TestContext, t *testing.T, steps
 			testCtx.Scheduler.SchedulingQueue.MoveAllToActiveOrBackoffQueue(config.Logger, framework.EventUnschedulableTimeout, nil, nil, nil)
 		case len(step.WaitForPodsDeleted) != 0:
 			waitForPodsDeleted(testCtx, t, step.WaitForPodsDeleted, config.CreatedPods, config.ClientSet)
+		case step.DeletePod != "":
+			deletePod(testCtx, t, step.DeletePod, config.ClientSet)
 		}
 	}
 }
@@ -352,6 +356,41 @@ func registerDelayedPreemptionPlugin(registry *frameworkruntime.Registry, preemp
 		return preemptionPlugin, nil
 	})
 	return delayedPreemptionPluginName, func() *defaultpreemption.DefaultPreemption { return preemptionPlugin }, err
+}
+
+func deletePod(testCtx *testutils.TestContext, t *testing.T, podName string, cs kubernetes.Interface) {
+	gracePeriod := int64(0)
+	if err := cs.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, podName, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod}); err != nil && !apierrors.IsNotFound(err) {
+		t.Fatalf("Failed to delete Pod %q: %v", podName, err)
+	}
+	// Wait until the Pod is fully gone from the API so a later PreemptPod call observes NotFound
+	// and reports that it will not produce a deletion event.
+	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+		_, err := cs.CoreV1().Pods(testCtx.NS.Name).Get(ctx, podName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		return false, nil
+	}); err != nil {
+		t.Fatalf("Failed to wait for pod %s to be deleted: %v", podName, err)
+	}
+	// Wait for the informer as well so AssignedPodDelete has been delivered to the scheduling queue
+	// while the preemptor is still gated.
+	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, wait.ForeverTestTimeout, false, func(_ context.Context) (bool, error) {
+		_, err := testCtx.InformerFactory.Core().V1().Pods().Lister().Pods(testCtx.NS.Name).Get(podName)
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		return false, nil
+	}); err != nil {
+		t.Fatalf("Failed to wait for pod %s deletion to propagate to the informer: %v", podName, err)
+	}
 }
 
 func waitForPodsDeleted(testCtx *testutils.TestContext, t *testing.T, podIndexes []int, createdPods []*v1.Pod, cs kubernetes.Interface) {
