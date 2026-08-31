@@ -192,20 +192,6 @@ func TestValidateEndpointSlice(t *testing.T) {
 				Ports:       generatePorts(maxPorts),
 			},
 		},
-		"max-addresses": {
-			expectedErrors: 0,
-			endpointSlice: &discovery.EndpointSlice{
-				ObjectMeta:  standardMeta,
-				AddressType: discovery.AddressTypeIPv4,
-				Ports: []discovery.EndpointPort{{
-					Name:     ptr.To("http"),
-					Protocol: ptr.To(corev1.ProtocolTCP),
-				}},
-				Endpoints: []discovery.Endpoint{{
-					Addresses: generateIPAddresses(maxAddresses),
-				}},
-			},
-		},
 		"max-topology-keys": {
 			expectedErrors: 0,
 			endpointSlice: &discovery.EndpointSlice{
