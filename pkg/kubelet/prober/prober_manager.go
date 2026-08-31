@@ -172,16 +172,6 @@ func (t probeType) String() string {
 	}
 }
 
-func getRestartableInitContainers(pod *v1.Pod) []v1.Container {
-	var restartableInitContainers []v1.Container
-	for _, c := range pod.Spec.InitContainers {
-		if podutil.IsRestartableInitContainer(&c) {
-			restartableInitContainers = append(restartableInitContainers, c)
-		}
-	}
-	return restartableInitContainers
-}
-
 func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 	m.workerLock.Lock()
 	defer m.workerLock.Unlock()
@@ -200,7 +190,10 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 	// cancelled by stop(), not the pod sync context, which cancels too early.
 	ctx = context.WithoutCancel(ctx)
 	key := probeKey{podUID: pod.UID}
-	for _, c := range append(pod.Spec.Containers, getRestartableInitContainers(pod)...) {
+	for c, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+		if containerType == podutil.InitContainers && !podutil.IsRestartableInitContainer(c) {
+			continue
+		}
 		key.containerName = c.Name
 
 		if c.StartupProbe != nil {
@@ -210,7 +203,7 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				continue
 			}
-			w := newWorker(m, startup, pod, c)
+			w := newWorker(m, startup, pod, *c)
 			m.workers[key] = w
 			go w.run(ctx)
 		}
@@ -222,7 +215,7 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				continue
 			}
-			w := newWorker(m, readiness, pod, c)
+			w := newWorker(m, readiness, pod, *c)
 			m.workers[key] = w
 			go w.run(ctx)
 		}
@@ -234,7 +227,7 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				continue
 			}
-			w := newWorker(m, liveness, pod, c)
+			w := newWorker(m, liveness, pod, *c)
 			m.workers[key] = w
 			go w.run(ctx)
 		}
@@ -262,7 +255,10 @@ func (m *manager) RemovePod(pod *v1.Pod) {
 	defer m.workerLock.RUnlock()
 
 	key := probeKey{podUID: pod.UID}
-	for _, c := range append(pod.Spec.Containers, getRestartableInitContainers(pod)...) {
+	for c, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+		if containerType == podutil.InitContainers && !podutil.IsRestartableInitContainer(c) {
+			continue
+		}
 		key.containerName = c.Name
 		for _, probeType := range [...]probeType{readiness, liveness, startup} {
 			key.probeType = probeType

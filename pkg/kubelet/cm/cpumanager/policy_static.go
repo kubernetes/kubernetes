@@ -427,7 +427,11 @@ func (p *staticPolicy) allocatePodForAdd(logger klog.Logger, s state.State, pod 
 	}
 
 	// 4. Allocate the entire CPU "bubble" for the pod using the hint from the Topology Manager.
-	hint := p.affinity.GetAffinity(logger, podUID, append(pod.Spec.InitContainers, pod.Spec.Containers...)[0].Name)
+	firstContainerName := pod.Spec.Containers[0].Name
+	if len(pod.Spec.InitContainers) > 0 {
+		firstContainerName = pod.Spec.InitContainers[0].Name
+	}
+	hint := p.affinity.GetAffinity(logger, podUID, firstContainerName)
 	podAllocation, err := p.allocateCPUs(logger, s, totalPodCPUs, hint.NUMANodeAffinity, cpuset.New())
 	if err != nil {
 		logger.Error(err, "Unable to allocate CPUs for pod", "totalPodCPUs", totalPodCPUs)
@@ -497,7 +501,7 @@ func (p *staticPolicy) allocatePodForAdd(logger klog.Logger, s state.State, pod 
 	logger.V(4).Info("Partitioned pod-level CPU allocation", "exclusiveCPUs", podCPUAllocationToString(exclusiveCPUs), "podSharedPool", podSharedPool)
 
 	// 6. Save all container assignments to the state.
-	for _, c := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+	for c := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 		if cset, isExclusive := exclusiveCPUs[c.Name]; isExclusive {
 			s.SetCPUSet(podUID, c.Name, cset)
 		} else {
@@ -945,10 +949,10 @@ func (p *staticPolicy) getPodTopologyHintsForAdd(logger klog.Logger, s state.Sta
 	}
 
 	assignedCPUs := cpuset.New()
-	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+	for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 		logger_ := klog.LoggerWithValues(logger, "containerName", container.Name)
 
-		requestedByContainer := p.guaranteedCPUs(logger, pod, &container)
+		requestedByContainer := p.guaranteedCPUs(logger, pod, container)
 		// Short circuit to regenerate the same hints if there are already
 		// guaranteed CPUs allocated to the Container. This might happen after a
 		// kubelet restart, for example.
