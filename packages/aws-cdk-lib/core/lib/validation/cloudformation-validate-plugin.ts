@@ -267,11 +267,6 @@ const IGNORE_RULES = new Set([
   // https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/intrinsic-function-reference-split.html
   'E1018',
 
-  // WHAT: Circular dependency detection
-  // WHY: Something seems fishy about it
-  // Remove after <https://github.com/aws-cloudformation/cloudformation-validate/issues/53>.
-  'F3004',
-
   // WHAT: Hardcoded ARNs
   // WHY: Hardcoding an ARN is part of the behavior of some constructs (e.g., setting up multi-account DynamoDB table replicas)
   'W9002',

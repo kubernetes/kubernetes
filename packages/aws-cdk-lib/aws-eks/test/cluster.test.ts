@@ -3962,6 +3962,12 @@ describe('cluster', () => {
     test('user provided removal policy applies to kubectl lambda', () => {
       // GIVEN
       const { stack } = testFixtureNoVpc();
+
+      cdk.Validations.of(stack).acknowledge({
+        id: 'CloudFormation-Validate::F3004',
+        reason: 'Something with circular deps',
+      });
+
       const userVpc = new ec2.Vpc(stack, 'UserVpc');
       const userRole = new iam.Role(stack, 'UserRole', {
         assumedBy: new iam.ServicePrincipal('eks.amazonaws.com'),
