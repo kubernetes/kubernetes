@@ -287,9 +287,13 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 	// fsnotify has different behavior for symlinks in different platform,
 	// for example it follows symlink on Linux, but not on Windows,
 	// so we explicitly resolve symlinks before reading the logs.
-	// There shouldn't be security issue because the container log
+	// There shouldn't be a security issue because the container log
 	// path is owned by kubelet and the container runtime.
-	evaluated, err := filepath.EvalSymlinks(path)
+	// On Windows, resolution is best-effort because filepath.EvalSymlinks
+	// cannot traverse volume-mount points (e.g. when the log root C:\var is a
+	// mount point onto a secondary disk), so the log file may be accessible
+	// even if it cannot be resolved.
+	evaluated, err := evalSymlinks(path)
 	if err != nil {
 		return fmt.Errorf("failed to try resolving symlinks in path %q: %v", path, err)
 	}
