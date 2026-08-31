@@ -72,11 +72,6 @@ type Manager interface {
 	// The mapping used to remove the CPU allocation during the container removal
 	AddContainer(logger klog.Logger, p *v1.Pod, c *v1.Container, containerID string)
 
-	// RemoveContainer is called after Kubelet decides to kill or delete a
-	// container. After this call, the CPU manager stops trying to reconcile
-	// that container and any CPUs dedicated to the container are freed.
-	RemoveContainer(logger klog.Logger, containerID string) error
-
 	// State returns a read-only interface to the internal CPU manager state.
 	State() state.Reader
 
@@ -314,34 +309,6 @@ func (m *manager) AddContainer(logger klog.Logger, pod *v1.Pod, container *v1.Co
 	logger.V(4).Info("Added Container", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "containerID", containerID)
 }
 
-func (m *manager) RemoveContainer(logger klog.Logger, containerID string) error {
-	m.Lock()
-	defer m.Unlock()
-
-	err := m.policyRemoveContainerByID(logger, containerID)
-	if err != nil {
-		logger.Error(err, "RemoveContainer error")
-		return err
-	}
-
-	return nil
-}
-
-func (m *manager) policyRemoveContainerByID(logger klog.Logger, containerID string) error {
-	podUID, containerName, err := m.containerMap.GetContainerRef(containerID)
-	if err != nil {
-		return nil
-	}
-
-	err = m.policy.RemoveContainer(logger, m.state, podUID, containerName)
-	if err == nil {
-		m.lastUpdateState.Delete(podUID, containerName)
-		m.containerMap.RemoveByContainerID(containerID)
-	}
-
-	return err
-}
-
 func (m *manager) policyRemoveContainerByRef(logger klog.Logger, podUID string, containerName string) error {
 	err := m.policy.RemoveContainer(logger, m.state, podUID, containerName)
 	if err == nil {
@@ -490,8 +457,8 @@ func (m *manager) reconcileState(ctx context.Context) (success []reconciledConta
 
 			m.Lock()
 			if cstatus.State.Terminated != nil {
-				// The container is terminated but we can't call m.RemoveContainer()
-				// here because it could remove the allocated cpuset for the container
+				// The container is terminated but we can't remove it here
+				// because that could remove the allocated cpuset for the container
 				// which may be in the process of being restarted.  That would result
 				// in the container losing any exclusively-allocated CPUs that it
 				// was allocated.

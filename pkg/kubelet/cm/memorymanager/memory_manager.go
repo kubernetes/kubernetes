@@ -72,10 +72,6 @@ type Manager interface {
 	// This must be called at some point prior to the AddContainer() call for a container, e.g. at pod admission time.
 	Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) error
 
-	// RemoveContainer is called after Kubelet decides to kill or delete a
-	// container. After this call, any memory allocated to the container is freed.
-	RemoveContainer(logger klog.Logger, containerID string) error
-
 	// State returns a read-only interface to the internal memory manager state.
 	State() state.Reader
 
@@ -309,25 +305,6 @@ func (m *manager) AllocatePod(logger klog.Logger, pod *v1.Pod, operation lifecyc
 		logger.Error(err, "AllocatePod error", "pod", klog.KObj(pod))
 		return err
 	}
-	return nil
-}
-
-// RemoveContainer removes the container from the state
-func (m *manager) RemoveContainer(logger klog.Logger, containerID string) error {
-	logger = klog.LoggerWithValues(logger, "containerID", containerID)
-
-	m.Lock()
-	defer m.Unlock()
-
-	// if error appears it means container entry already does not exist under the container map
-	podUID, containerName, err := m.containerMap.GetContainerRef(containerID)
-	if err != nil {
-		logger.Error(err, "Failed to get container from container map")
-		return nil
-	}
-
-	m.policyRemoveContainerByRef(logger, podUID, containerName)
-
 	return nil
 }
 

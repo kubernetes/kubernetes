@@ -61,11 +61,6 @@ func (m *fakeManager) GetMemoryNUMANodes(logger klog.Logger, pod *v1.Pod, contai
 	return nil
 }
 
-func (m *fakeManager) RemoveContainer(logger klog.Logger, containerID string) error {
-	logger.Info("RemoveContainer", "containerID", containerID)
-	return nil
-}
-
 func (m *fakeManager) GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	logger.Info("GetTopologyHints", "pod", klog.KObj(pod), "containerName", container.Name, "operation", operation)
 	return map[string][]topologymanager.TopologyHint{}

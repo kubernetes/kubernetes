@@ -845,55 +845,6 @@ func TestCPUManagerGenerate(t *testing.T) {
 	}
 }
 
-func TestCPUManagerRemove(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
-	}
-
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, false)
-	containerID := "fakeID"
-	containerMap := containermap.NewContainerMap()
-
-	logger, _ := ktesting.NewTestContext(t)
-	mgr := &manager{
-		policy: &mockPolicy{
-			err: nil,
-		},
-		state: &mockState{
-			assignments:   state.ContainerCPUAssignments{},
-			defaultCPUSet: cpuset.New(),
-		},
-		lastUpdateState:   state.NewMemoryState(logger),
-		containerRuntime:  mockRuntimeService{},
-		containerMap:      containerMap,
-		activePods:        func() []*v1.Pod { return nil },
-		podStatusProvider: mockPodStatusProvider{},
-	}
-
-	containerMap.Add("", "", containerID)
-	err := mgr.RemoveContainer(logger, containerID)
-	if err != nil {
-		t.Errorf("CPU Manager RemoveContainer() error. expected error to be nil but got: %v", err)
-	}
-
-	mgr = &manager{
-		policy: &mockPolicy{
-			err: fmt.Errorf("fake error"),
-		},
-		state:             state.NewMemoryState(logger),
-		containerRuntime:  mockRuntimeService{},
-		containerMap:      containerMap,
-		activePods:        func() []*v1.Pod { return nil },
-		podStatusProvider: mockPodStatusProvider{},
-	}
-
-	containerMap.Add("", "", containerID)
-	err = mgr.RemoveContainer(logger, containerID)
-	if !reflect.DeepEqual(err, fmt.Errorf("fake error")) {
-		t.Errorf("CPU Manager RemoveContainer() error. expected error: fake error but got: %v", err)
-	}
-}
-
 func TestReconcileState(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
