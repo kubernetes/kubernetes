@@ -224,18 +224,18 @@ run_resource_aliasing_tests() {
 
   create_and_use_new_namespace
   kube::log::status "Testing resource aliasing"
-  kubectl create -f test/e2e/testing-manifests/statefulset/cassandra/controller.yaml "${kube_flags[@]}"
-  kubectl create -f test/e2e/testing-manifests/statefulset/cassandra/service.yaml "${kube_flags[@]}"
+  kubectl create -f test/fixtures/pkg/kubectl/discovery/rc.yaml "${kube_flags[@]}"
+  kubectl create -f test/fixtures/pkg/kubectl/discovery/service.yaml "${kube_flags[@]}"
 
-  object="all -l app=cassandra"
+  object="all -l app=discovery-fixture"
   request="{{range.items}}{{range .metadata.labels}}{{.}}:{{end}}{{end}}"
 
-  # all 4 cassandra's might not be in the request immediately...
+  # RC + Service (and optionally pods) may not all appear immediately...
   # :? suffix is for possible service.kubernetes.io/headless
   # label with "" value
-  kube::test::get_object_assert "$object" "$request" '(cassandra:){2}(cassandra:(cassandra::?)?)?'
+  kube::test::get_object_assert "$object" "$request" '(discovery-fixture:){2}(discovery-fixture:(discovery-fixture::?)?)?'
 
-  kubectl delete all -l app=cassandra "${kube_flags[@]}"
+  kubectl delete all -l app=discovery-fixture "${kube_flags[@]}"
 
   set +o nounset
   set +o errexit
