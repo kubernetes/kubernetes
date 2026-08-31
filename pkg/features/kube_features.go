@@ -690,12 +690,6 @@ const (
 	// is being pulled to the credential provider plugin.
 	KubeletServiceAccountTokenForCredentialProviders featuregate.Feature = "KubeletServiceAccountTokenForCredentialProviders"
 
-	// owner: @sallyom
-	// kep: https://kep.k8s.io/2832
-	//
-	// Add support for distributed tracing in the kubelet
-	KubeletTracing featuregate.Feature = "KubeletTracing"
-
 	// owner: @RobertKrawitz
 	//
 	// Allow use of filesystems for ephemeral storage monitoring.
@@ -1792,12 +1786,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	KubeletTracing: {
-		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37
-	},
-
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {
 		{Version: version.MustParse("1.15"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
@@ -2697,8 +2685,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	KubeletSeparateDiskGC: {},
 
 	KubeletServiceAccountTokenForCredentialProviders: {},
-
-	KubeletTracing: {},
 
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {},
 
