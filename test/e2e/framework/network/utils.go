@@ -50,23 +50,24 @@ import (
 )
 
 const (
-	// EndpointHTTPPort is the default endpoint HTTP port for testing. Code
-	// operating on a NetworkingTestConfig should read config.EndpointHTTPPort
-	// instead, which accounts for host network endpoints.
-	EndpointHTTPPort = 8083
-	// EndpointUDPPort is the default endpoint UDP port for testing. See
-	// EndpointHTTPPort.
-	EndpointUDPPort = 8081
-	// EndpointSCTPPort is the default endpoint SCTP port for testing. See
-	// EndpointHTTPPort.
-	EndpointSCTPPort = 8082
-	// hostNetworkEndpointHTTPPort, hostNetworkEndpointUDPPort and
-	// hostNetworkEndpointSCTPPort are the endpoint ports used when the endpoint
-	// pods run with HostNetwork=true. They must not overlap with the pod network
-	// endpoint ports above; see setEndpointPorts for why.
-	hostNetworkEndpointHTTPPort = 8093
-	hostNetworkEndpointUDPPort  = 8091
-	hostNetworkEndpointSCTPPort = 8092
+	// endpointHTTPPort is the HTTP port of pod network endpoint pods. Code
+	// operating on a NetworkingTestConfig must read config.EndpointHTTPPort
+	// rather than this constant, because host network endpoints listen
+	// somewhere else; see setEndpointPorts.
+	endpointHTTPPort = 8083
+	// endpointUDPPort is the UDP port of pod network endpoint pods. See endpointHTTPPort.
+	endpointUDPPort = 8081
+	// endpointSCTPPort is the SCTP port of pod network endpoint pods. See endpointHTTPPort.
+	endpointSCTPPort = 8082
+	// hostNetworkEndpointPortBase is the first port of the range reserved for
+	// host network endpoint pods, which need a set of ports per concurrently
+	// running test config; see setEndpointPorts. The range sits above the ports
+	// the node components bind and below the NodePort and ephemeral ranges, so
+	// nothing else on the node claims it.
+	hostNetworkEndpointPortBase = 11000
+	// hostNetworkEndpointPortRange is how many ports (http, udp, sctp) each
+	// host network test config reserves.
+	hostNetworkEndpointPortRange = 3
 	// testContainerHTTPPort is the test container http port.
 	testContainerHTTPPort = 9080
 	// ClusterHTTPPort is a cluster HTTP port for testing.
@@ -216,8 +217,8 @@ type NetworkingTestConfig struct {
 	// SecondaryNodeIP it's an ExternalIP of the secondary IP family if the node has one,
 	// or an InternalIP if not, for usein nodePort testing.
 	SecondaryNodeIP string
-	// The http/udp/sctp ports the endpoint pods listen on. These differ between
-	// pod network and host network endpoints; see setEndpointPorts.
+	// The http/udp/sctp ports the endpoint pods listen on. Host network
+	// endpoints get a set of ports of their own; see setEndpointPorts.
 	EndpointHTTPPort int
 	EndpointUDPPort  int
 	EndpointSCTPPort int
@@ -825,15 +826,29 @@ func (config *NetworkingTestConfig) CreateService(ctx context.Context, serviceSp
 	return createdService
 }
 
+// hostNetworkEndpointPorts returns the http, udp and sctp ports reserved for the
+// host network endpoint pods of the config running on the given ginkgo parallel
+// process, which is 1-indexed.
+func hostNetworkEndpointPorts(parallelProcess int) (int, int, int) {
+	base := hostNetworkEndpointPortBase + hostNetworkEndpointPortRange*(parallelProcess-1)
+	return base, base + 1, base + 2
+}
+
 // setEndpointPorts selects the ports the endpoint pods listen on.
+//
+// Pod network endpoints listen inside a network namespace of their own, so every
+// test config can reuse the same well-known ports without reaching any other
+// config.
+//
+// Host network endpoints need unique ports for each parallel process
+// to avoid colliding with other parallel test processes.
 func (config *NetworkingTestConfig) setEndpointPorts() {
-	config.EndpointHTTPPort = EndpointHTTPPort
-	config.EndpointUDPPort = EndpointUDPPort
-	config.EndpointSCTPPort = EndpointSCTPPort
 	if config.EndpointsHostNetwork {
-		config.EndpointHTTPPort = hostNetworkEndpointHTTPPort
-		config.EndpointUDPPort = hostNetworkEndpointUDPPort
-		config.EndpointSCTPPort = hostNetworkEndpointSCTPPort
+		config.EndpointHTTPPort, config.EndpointUDPPort, config.EndpointSCTPPort = hostNetworkEndpointPorts(ginkgo.GinkgoParallelProcess())
+	} else { // pod network endpoints case
+		config.EndpointHTTPPort = endpointHTTPPort
+		config.EndpointUDPPort = endpointUDPPort
+		config.EndpointSCTPPort = endpointSCTPPort
 	}
 }
 
