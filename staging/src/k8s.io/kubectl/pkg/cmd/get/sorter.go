@@ -317,6 +317,7 @@ func (r *RuntimeSort) Less(i, j int) bool {
 
 	iMissing := len(iValues) == 0 || len(iValues[0]) == 0
 	jMissing := len(jValues) == 0 || len(jValues[0]) == 0
+	// Two missing values are equal; returning true would violate sort.Interface.
 	if iMissing && jMissing {
 		return false
 	}
@@ -367,6 +368,7 @@ func (t *TableSorter) Less(i, j int) bool {
 
 	iMissing := len(iValues) == 0 || len(iValues[0]) == 0
 	jMissing := len(jValues) == 0 || len(jValues[0]) == 0
+	// Two missing values are equal; returning true would violate sort.Interface.
 	if iMissing && jMissing {
 		return false
 	}
