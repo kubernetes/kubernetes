@@ -21,9 +21,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,6 +35,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
+	klogtesting "k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -277,6 +281,52 @@ func TestProbe(t *testing.T) {
 			}
 		}
 	}
+}
+
+type fakeSuccessHTTPProber struct{}
+
+func (fakeSuccessHTTPProber) Probe(_ *http.Request, _ time.Duration) (probe.Result, string, error) {
+	return probe.Success, "", nil
+}
+
+func (fakeSuccessHTTPProber) ProbeH2C(_ *http.Request, _ time.Duration) (probe.Result, string, error) {
+	return probe.Success, "", nil
+}
+
+func TestRunProbeDoesNotLogHTTPHeaderValues(t *testing.T) {
+	const secretValue = "Bearer kubelet-probe-secret-token"
+
+	logger := klogtesting.NewLogger(t, klogtesting.NewConfig(klogtesting.BufferLogs(true), klogtesting.Verbosity(4)))
+	ctx := klog.NewContext(context.Background(), logger)
+	pb := &prober{http: fakeSuccessHTTPProber{}}
+	p := &v1.Probe{
+		ProbeHandler: v1.ProbeHandler{
+			HTTPGet: &v1.HTTPGetAction{
+				Path: "/healthz",
+				Port: intstr.FromInt32(8080),
+				HTTPHeaders: []v1.HTTPHeader{
+					{Name: "Authorization", Value: secretValue},
+				},
+			},
+		},
+	}
+
+	_, _, err := pb.runProbe(
+		ctx,
+		liveness,
+		p,
+		&v1.Pod{},
+		v1.PodStatus{PodIP: "127.0.0.1"},
+		v1.Container{Name: "app"},
+		kubecontainer.ContainerID{Type: "test", ID: "container"},
+	)
+	require.NoError(t, err)
+
+	underlier, ok := logger.GetSink().(klogtesting.Underlier)
+	require.True(t, ok, "expected ktesting log sink, got %T", logger.GetSink())
+	logs := underlier.GetBuffer().String()
+	require.Contains(t, logs, "HTTP-Probe", "expected HTTP probe debug log")
+	require.NotContains(t, logs, secretValue, "HTTP probe log must not contain header values")
 }
 
 func TestNewExecInContainer(t *testing.T) {
