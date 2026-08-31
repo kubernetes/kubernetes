@@ -944,3 +944,14 @@ func (gpg *GenericPodGroup) HasDisruptionModeAll() bool {
 	}
 	return false
 }
+
+// GetKind returns the human-readable kind of the wrapped group ("pod group" or "composite pod group").
+func (gpg *GenericPodGroup) GetKind() string {
+	if gpg == nil {
+		return ""
+	}
+	if gpg.PodGroup != nil {
+		return "pod group"
+	}
+	return "composite pod group"
+}
