@@ -15,7 +15,6 @@
 OS ?= linux
 ARCH ?= amd64
 TARGET ?= $(CURDIR)
-GOLANG_VERSION ?= latest
 SRC_DIR = $(notdir $(shell pwd))
 KUBE_CROSS_VERSION ?= $(shell cat ../../../build/build-image/cross/VERSION)
 export
