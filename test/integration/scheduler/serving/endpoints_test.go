@@ -28,9 +28,11 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/util/wait"
 	apiserverfeat "k8s.io/apiserver/pkg/features"
 	flagzv1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
 	flagzv1beta1 "k8s.io/apiserver/pkg/server/flagz/api/v1beta1"
@@ -48,6 +50,20 @@ import (
 	kubeschedulertesting "k8s.io/kubernetes/cmd/kube-scheduler/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
+
+const (
+	// handlerSyncPollInterval governs how often to poll for retry.
+	handlerSyncPollInterval = 100 * time.Millisecond
+	// handlerSyncTimeout is how long to wait for the scheduler to become ready.
+	handlerSyncTimeout = 5 * time.Second
+)
+
+// handlerSyncBackoff gives the scheduler time to report ready.
+var handlerSyncBackoff = wait.Backoff{
+	Duration: handlerSyncPollInterval,
+	Factor:   1.0,
+	Steps:    int(handlerSyncTimeout / handlerSyncPollInterval),
+}
 
 func TestEndpointHandlers(t *testing.T) {
 	server, configStr, _, err := startTestAPIServer(t)
@@ -166,7 +182,7 @@ func TestEndpointHandlers(t *testing.T) {
 			}
 
 			err = retry.OnError(
-				retry.DefaultBackoff,
+				handlerSyncBackoff,
 				func(err error) bool {
 					// the endpoint /readyz/sched-handler-sync needs some time to finish
 					// the initialization, so we need to retry
