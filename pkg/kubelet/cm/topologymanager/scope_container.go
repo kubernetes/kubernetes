@@ -23,6 +23,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
@@ -52,8 +53,8 @@ func NewContainerScope(policy Policy) Scope {
 func (s *containerScope) Admit(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation) lifecycle.PodAdmitResult {
 	logger := klog.FromContext(ctx)
 
-	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		bestHint, admit := s.calculateAffinity(logger, pod, &container, operation)
+	for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+		bestHint, admit := s.calculateAffinity(logger, pod, container, operation)
 		logger.Info("Best TopologyHint", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name, "operation", operation)
 
 		if !admit {
@@ -69,7 +70,7 @@ func (s *containerScope) Admit(ctx context.Context, pod *v1.Pod, operation lifec
 		logger.Info("Topology Affinity", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name, "operation", operation)
 		s.setTopologyHints(string(pod.UID), container.Name, bestHint)
 
-		err := s.allocateAlignedResources(ctx, pod, &container, operation)
+		err := s.allocateAlignedResources(ctx, pod, container, operation)
 		if err != nil {
 			metrics.TopologyManagerAdmissionErrorsTotal.Inc()
 			return admission.GetPodAdmitResult(err)
