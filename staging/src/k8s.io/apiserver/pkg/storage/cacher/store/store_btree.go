@@ -106,6 +106,12 @@ func (si *threadedStoreIndexer) OrderedListPrefix(prefix, continueKey string) ([
 	return si.store.OrderedListPrefix(prefix, continueKey)
 }
 
+func (si *threadedStoreIndexer) ProcessPrefix(req ListRequest) (ListResult, error) {
+	si.lock.RLock()
+	defer si.lock.RUnlock()
+	return si.store.ProcessPrefix(req)
+}
+
 func (si *threadedStoreIndexer) ListKeys() []string {
 	si.lock.RLock()
 	defer si.lock.RUnlock()
@@ -269,6 +275,60 @@ func (s *btreeStore) OrderedListPrefix(prefix, continueKey string) ([]interface{
 		return true
 	})
 	return result, nil
+}
+
+func (s *btreeStore) ProcessPrefix(req ListRequest) (ListResult, error) {
+	startKey := req.ContinueKey
+	if startKey == "" {
+		startKey = req.Prefix
+	}
+	var res ListResult
+	var procErr error
+
+	s.tree.AscendGreaterOrEqual(&Element{Key: startKey}, func(item *Element) bool {
+		if !strings.HasPrefix(item.Key, req.Prefix) {
+			return false
+		}
+		res.NumFetched++
+
+		if req.ComputeTotalCount {
+			res.TotalCount++
+		}
+
+		if req.Limit > 0 && int64(res.NumMatched) >= req.Limit {
+			res.HasMore = true
+			if !req.ComputeTotalCount {
+				return false
+			}
+			return true
+		}
+
+		if req.Filter != nil {
+			matches, err := req.Filter(item)
+			if err != nil {
+				procErr = err
+				return false
+			}
+			if !matches {
+				return true
+			}
+		}
+
+		res.NumMatched++
+		res.LastSelectedObjectKey = item.Key
+		if req.Consume != nil {
+			if err := req.Consume(item); err != nil {
+				procErr = err
+				return false
+			}
+		}
+		return true
+	})
+
+	if procErr != nil {
+		return ListResult{}, procErr
+	}
+	return res, nil
 }
 
 func (s *btreeStore) Count(prefix, continueKey string) (count int) {

@@ -144,6 +144,50 @@ func (o orderedListSnapshot) OrderedListPrefix(prefix, continueKey string) ([]in
 	return o.Items, nil
 }
 
+func (o orderedListSnapshot) ProcessPrefix(req ListRequest) (ListResult, error) {
+	var res ListResult
+	for _, item := range o.Items {
+		elem, ok := item.(*Element)
+		if !ok {
+			return ListResult{}, fmt.Errorf("non *Element returned from storage: %v", item)
+		}
+		if len(req.ContinueKey) > 0 && req.ContinueKey >= elem.Key {
+			continue
+		}
+		if !key.HasPathPrefix(elem.Key, req.Prefix) {
+			continue
+		}
+		res.NumFetched++
+		if req.ComputeTotalCount {
+			res.TotalCount++
+		}
+		if req.Limit > 0 && int64(res.NumMatched) >= req.Limit {
+			res.HasMore = true
+			if !req.ComputeTotalCount {
+				break
+			}
+			continue
+		}
+		if req.Filter != nil {
+			matches, err := req.Filter(elem)
+			if err != nil {
+				return ListResult{}, err
+			}
+			if !matches {
+				continue
+			}
+		}
+		res.NumMatched++
+		res.LastSelectedObjectKey = elem.Key
+		if req.Consume != nil {
+			if err := req.Consume(elem); err != nil {
+				return ListResult{}, err
+			}
+		}
+	}
+	return res, nil
+}
+
 type listSnapshot struct {
 	Items []interface{}
 }
@@ -177,6 +221,48 @@ func (l listSnapshot) OrderedListPrefix(prefix string, continueKey string) ([]in
 	}
 	sort.Sort(sortableStoreElements(result))
 	return result, nil
+}
+
+func (l listSnapshot) ProcessPrefix(req ListRequest) (ListResult, error) {
+	items, err := l.OrderedListPrefix(req.Prefix, req.ContinueKey)
+	if err != nil {
+		return ListResult{}, err
+	}
+	var res ListResult
+	for _, item := range items {
+		elem, ok := item.(*Element)
+		if !ok {
+			return ListResult{}, fmt.Errorf("non *Element returned from storage: %v", item)
+		}
+		res.NumFetched++
+		if req.ComputeTotalCount {
+			res.TotalCount++
+		}
+		if req.Limit > 0 && int64(res.NumMatched) >= req.Limit {
+			res.HasMore = true
+			if !req.ComputeTotalCount {
+				break
+			}
+			continue
+		}
+		if req.Filter != nil {
+			matches, err := req.Filter(elem)
+			if err != nil {
+				return ListResult{}, err
+			}
+			if !matches {
+				continue
+			}
+		}
+		res.NumMatched++
+		res.LastSelectedObjectKey = elem.Key
+		if req.Consume != nil {
+			if err := req.Consume(elem); err != nil {
+				return ListResult{}, err
+			}
+		}
+	}
+	return res, nil
 }
 
 type sortableStoreElements []interface{}

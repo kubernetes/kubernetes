@@ -112,6 +112,18 @@ func (w *testWatchCache) getCacheIntervalForEvents(resourceVersion uint64, opts 
 	return w.getAllEventsSinceLocked(resourceVersion, "", opts)
 }
 
+func (w *testWatchCache) waitUntilFreshAndGetList(ctx context.Context, key string, opts storage.ListOptions) (resp listResp, items []interface{}, index string, err error) {
+	req := store.ListRequest{
+		Prefix: key,
+		Consume: func(elem *store.Element) error {
+			items = append(items, elem)
+			return nil
+		},
+	}
+	resp, index, err = w.WaitUntilFreshAndGetList(ctx, key, opts, req)
+	return resp, items, index, err
+}
+
 // newTestWatchCache just adds a fake clock.
 func newTestWatchCache(capacity int, eventFreshDuration time.Duration, indexers *cache.Indexers) *testWatchCache {
 	keyFunc := func(obj runtime.Object) (string, error) {
@@ -471,14 +483,14 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 	}()
 
 	// list by empty MatchValues.
-	resp, indexUsed, err := store.WaitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.Everything})
+	resp, items, indexUsed, err := store.waitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if resp.ResourceVersion != 5 {
 		t.Errorf("unexpected resourceVersion: %v, expected: 5", resp.ResourceVersion)
 	}
-	if len(resp.Items) != 3 {
+	if len(items) != 3 {
 		t.Errorf("unexpected list returned: %#v", resp)
 	}
 	if indexUsed != "" {
@@ -486,7 +498,7 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 	}
 
 	// list by label index.
-	resp, indexUsed, err = store.WaitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.SelectionPredicate{
+	resp, items, indexUsed, err = store.waitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.SelectionPredicate{
 		Label: labels.SelectorFromSet(map[string]string{
 			"label": "value1",
 		}),
@@ -501,7 +513,7 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 	if resp.ResourceVersion != 5 {
 		t.Errorf("unexpected resourceVersion: %v, expected: 5", resp.ResourceVersion)
 	}
-	if len(resp.Items) != 2 {
+	if len(items) != 2 {
 		t.Errorf("unexpected list returned: %#v", resp)
 	}
 	if indexUsed != "l:label" {
@@ -509,7 +521,7 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 	}
 
 	// list with spec.nodeName index.
-	resp, indexUsed, err = store.WaitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.SelectionPredicate{
+	resp, items, indexUsed, err = store.waitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.SelectionPredicate{
 		Label: labels.SelectorFromSet(map[string]string{
 			"not-exist-label": "whatever",
 		}),
@@ -524,7 +536,7 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 	if resp.ResourceVersion != 5 {
 		t.Errorf("unexpected resourceVersion: %v, expected: 5", resp.ResourceVersion)
 	}
-	if len(resp.Items) != 1 {
+	if len(items) != 1 {
 		t.Errorf("unexpected list returned: %#v", resp)
 	}
 	if indexUsed != "f:spec.nodeName" {
@@ -532,7 +544,7 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 	}
 
 	// list with index not exists.
-	resp, indexUsed, err = store.WaitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.SelectionPredicate{
+	resp, items, indexUsed, err = store.waitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.SelectionPredicate{
 		Label: labels.SelectorFromSet(map[string]string{
 			"not-exist-label": "whatever",
 		}),
@@ -545,7 +557,7 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 	if resp.ResourceVersion != 5 {
 		t.Errorf("unexpected resourceVersion: %v, expected: 5", resp.ResourceVersion)
 	}
-	if len(resp.Items) != 3 {
+	if len(items) != 3 {
 		t.Errorf("unexpected list returned: %#v", resp)
 	}
 	if indexUsed != "" {
@@ -565,14 +577,14 @@ func TestWaitUntilFreshAndListFromCache(t *testing.T) {
 	}()
 
 	// list from future revision. Requires watch cache to request bookmark to get it.
-	resp, indexUsed, err := store.WaitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "3", Recursive: true, Predicate: storage.Everything})
+	resp, items, indexUsed, err := store.waitUntilFreshAndGetList(ctx, "/prefix/", storage.ListOptions{ResourceVersion: "3", Recursive: true, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if resp.ResourceVersion != 3 {
 		t.Errorf("unexpected resourceVersion: %v, expected: 6", resp.ResourceVersion)
 	}
-	if len(resp.Items) != 1 {
+	if len(items) != 1 {
 		t.Errorf("unexpected list returned: %#v", resp)
 	}
 	if indexUsed != "" {
@@ -629,7 +641,7 @@ func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 		store.Add(makeTestPod("bar", 4))
 	}()
 
-	_, _, err := store.WaitUntilFreshAndGetList(ctx, "", storage.ListOptions{ResourceVersion: "4", Predicate: storage.Everything})
+	_, _, _, err := store.waitUntilFreshAndGetList(ctx, "", storage.ListOptions{ResourceVersion: "4", Predicate: storage.Everything})
 	if !errors.IsTimeout(err) {
 		t.Errorf("expected timeout error but got: %v", err)
 	}
@@ -656,7 +668,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 	defer store.Stop()
 
 	{
-		resp, _, err := store.WaitUntilFreshAndGetList(ctx, "", storage.ListOptions{ResourceVersion: "", Recursive: true, Predicate: storage.Everything})
+		resp, _, _, err := store.waitUntilFreshAndGetList(ctx, "", storage.ListOptions{ResourceVersion: "", Recursive: true, Predicate: storage.Everything})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -679,7 +691,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 	r.ListAndWatch(wait.NeverStop)
 
 	{
-		resp, _, err := store.WaitUntilFreshAndGetList(ctx, "", storage.ListOptions{ResourceVersion: "10", Recursive: true, Predicate: storage.Everything})
+		resp, _, _, err := store.waitUntilFreshAndGetList(ctx, "", storage.ListOptions{ResourceVersion: "10", Recursive: true, Predicate: storage.Everything})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -1388,14 +1400,14 @@ func testWatchCacheSnapshotConcurrency(t *testing.T, s *testWatchCache, resource
 			opts.ResourceVersion = strconv.FormatUint(targetRV, 10)
 		}
 
-		resp, _, err := s.WaitUntilFreshAndGetList(ctx, "/prefix/", opts)
+		resp, items, _, err := s.waitUntilFreshAndGetList(ctx, "/prefix/", opts)
 		require.NoError(t, err)
 
 		if expectExactResourceVersion && resp.ResourceVersion != targetRV {
 			t.Errorf("Expected list ResourceVersion %d, got %d", targetRV, resp.ResourceVersion)
 		}
 		if expectItemRVLessOrEqualListRV {
-			maxItemRV := getMaxItemRV(t, s.config.versioner, resp.Items)
+			maxItemRV := getMaxItemRV(t, s.config.versioner, items)
 			if maxItemRV > resp.ResourceVersion {
 				t.Errorf("Violated consistency: max item resource version %d is greater than list resource version %d", maxItemRV, resp.ResourceVersion)
 			}

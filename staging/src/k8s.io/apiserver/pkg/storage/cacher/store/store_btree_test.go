@@ -166,6 +166,9 @@ func (f fakeIndexer) Replace([]interface{}, string) error {
 	return nil
 }
 func (f fakeIndexer) Count(prefixKey, continueKey string) int { return 0 }
+func (f fakeIndexer) ProcessPrefix(req ListRequest) (ListResult, error) {
+	return ListResult{}, nil
+}
 
 type fakeSnapshotter struct {
 	getLessOrEqual func(rv uint64) (Snapshot, bool)

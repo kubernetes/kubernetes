@@ -361,14 +361,14 @@ func (w *watchCache) waitUntilFreshLocked(ctx context.Context, consistentReadSup
 	return nil
 }
 
-func (c *watchCache) WaitUntilFreshAndGetList(ctx context.Context, key string, opts storage.ListOptions) (listResp, string, error) {
+func (c *watchCache) WaitUntilFreshAndGetList(ctx context.Context, key string, opts storage.ListOptions, req store.ListRequest) (listResp, string, error) {
 	if opts.Recursive {
-		return c.waitUntilFreshAndList(ctx, key, opts)
+		return c.waitUntilFreshAndList(ctx, key, opts, req)
 	}
-	return c.waitUntilFreshAndGetList(ctx, key, opts)
+	return c.waitUntilFreshAndGetList(ctx, key, opts, req)
 }
 
-func (c *watchCache) waitUntilFreshAndGetList(ctx context.Context, key string, opts storage.ListOptions) (listResp, string, error) {
+func (c *watchCache) waitUntilFreshAndGetList(ctx context.Context, key string, opts storage.ListOptions, req store.ListRequest) (listResp, string, error) {
 	var listRV uint64
 	var err error
 	if opts.ResourceVersionMatch == "" && opts.ResourceVersion == "" {
@@ -388,7 +388,30 @@ func (c *watchCache) waitUntilFreshAndGetList(ctx context.Context, key string, o
 		return listResp{}, "", err
 	}
 	if exists {
-		return listResp{Items: []interface{}{obj}, ResourceVersion: readResourceVersion}, "", nil
+		elem, ok := obj.(*store.Element)
+		if !ok {
+			return listResp{}, "", fmt.Errorf("non *store.Element returned from storage: %v", obj)
+		}
+		var res store.ListResult
+		res.NumFetched = 1
+		res.TotalCount = 1
+		matches := true
+		if req.Filter != nil {
+			matches, err = req.Filter(elem)
+			if err != nil {
+				return listResp{}, "", err
+			}
+		}
+		if matches {
+			res.NumMatched = 1
+			res.LastSelectedObjectKey = elem.Key
+			if req.Consume != nil {
+				if err := req.Consume(elem); err != nil {
+					return listResp{}, "", err
+				}
+			}
+		}
+		return listResp{Result: res, ResourceVersion: readResourceVersion}, "", nil
 	}
 	return listResp{ResourceVersion: readResourceVersion}, "", nil
 }
@@ -413,14 +436,14 @@ func (w *watchCache) WaitUntilFreshAndGetKeys(ctx context.Context, resourceVersi
 
 // NOTICE: Structure follows the shouldDelegateList function in
 // staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
-func (w *watchCache) waitUntilFreshAndList(ctx context.Context, key string, opts storage.ListOptions) (resp listResp, index string, err error) {
+func (w *watchCache) waitUntilFreshAndList(ctx context.Context, key string, opts storage.ListOptions, req store.ListRequest) (resp listResp, index string, err error) {
 	listRV, err := w.config.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
 		return listResp{}, "", err
 	}
 	switch opts.ResourceVersionMatch {
 	case metav1.ResourceVersionMatchExact:
-		return w.waitAndListExactRV(ctx, key, "", listRV)
+		return w.waitAndListExactRV(ctx, key, req, listRV)
 	case metav1.ResourceVersionMatchNotOlderThan:
 	case "":
 		// Continue
@@ -429,32 +452,33 @@ func (w *watchCache) waitUntilFreshAndList(ctx context.Context, key string, opts
 			if err != nil {
 				return listResp{}, "", errors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
 			}
+			req.ContinueKey = continueKey
 			if continueRV > 0 {
-				return w.waitAndListExactRV(ctx, key, continueKey, uint64(continueRV))
+				return w.waitAndListExactRV(ctx, key, req, uint64(continueRV))
 			} else {
 				// Don't pass matchValues as they don't support continueKey
-				return w.waitAndListConsistent(ctx, key, continueKey, nil)
+				return w.waitAndListConsistent(ctx, key, req, nil)
 			}
 		}
 		// Legacy exact match
 		if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
-			return w.waitAndListExactRV(ctx, key, "", listRV)
+			return w.waitAndListExactRV(ctx, key, req, listRV)
 		}
 		if opts.ResourceVersion == "" {
-			return w.waitAndListConsistent(ctx, key, "", opts.Predicate.MatcherIndex(ctx))
+			return w.waitAndListConsistent(ctx, key, req, opts.Predicate.MatcherIndex(ctx))
 		}
 	}
-	return w.waitAndListLatestRV(ctx, listRV, key, "", opts.Predicate.MatcherIndex(ctx))
+	return w.waitAndListLatestRV(ctx, listRV, key, req, opts.Predicate.MatcherIndex(ctx))
 }
 
-func (w *watchCache) waitAndListExactRV(ctx context.Context, key, continueKey string, resourceVersion uint64) (resp listResp, index string, err error) {
-	store, err := w.waitAndGetExactSnapshot(ctx, resourceVersion)
+func (w *watchCache) waitAndListExactRV(ctx context.Context, key string, req store.ListRequest, resourceVersion uint64) (resp listResp, index string, err error) {
+	snap, err := w.waitAndGetExactSnapshot(ctx, resourceVersion)
 	if err != nil {
 		return listResp{}, "", err
 	}
-	items, err := store.OrderedListPrefix(key, continueKey)
+	res, err := snap.ProcessPrefix(req)
 	return listResp{
-		Items:           items,
+		Result:          res,
 		ResourceVersion: resourceVersion,
 	}, "", err
 }
@@ -480,27 +504,27 @@ func (w *watchCache) waitAndGetExactSnapshot(ctx context.Context, resourceVersio
 	return store, nil
 }
 
-func (w *watchCache) waitAndListConsistent(ctx context.Context, key, continueKey string, matchValues []storage.MatchValue) (resp listResp, index string, err error) {
+func (w *watchCache) waitAndListConsistent(ctx context.Context, key string, req store.ListRequest, matchValues []storage.MatchValue) (resp listResp, index string, err error) {
 	span := tracing.SpanFromContext(ctx)
 	resourceVersion, err := w.config.getCurrentRV(ctx)
 	if err != nil {
 		return listResp{}, "", err
 	}
 	span.AddEvent("getCurrentRV success")
-	return w.waitAndListLatestRV(ctx, resourceVersion, key, continueKey, matchValues)
+	return w.waitAndListLatestRV(ctx, resourceVersion, key, req, matchValues)
 }
 
-func (w *watchCache) waitAndListLatestRV(ctx context.Context, minResourceVersion uint64, key, continueKey string, matchValues []storage.MatchValue) (resp listResp, index string, err error) {
-	snap, resourceVersion, index, err := w.waitAndGetLatestSnapshot(ctx, minResourceVersion, key, continueKey, matchValues)
+func (w *watchCache) waitAndListLatestRV(ctx context.Context, minResourceVersion uint64, key string, req store.ListRequest, matchValues []storage.MatchValue) (resp listResp, index string, err error) {
+	snap, resourceVersion, index, err := w.waitAndGetLatestSnapshot(ctx, minResourceVersion, key, req.ContinueKey, matchValues)
 	if err != nil {
 		return listResp{}, "", err
 	}
-	items, err := snap.OrderedListPrefix(key, continueKey)
+	res, err := snap.ProcessPrefix(req)
 	if err != nil {
 		return listResp{}, "", err
 	}
 	return listResp{
-		Items:           items,
+		Result:          res,
 		ResourceVersion: resourceVersion,
 	}, index, nil
 }

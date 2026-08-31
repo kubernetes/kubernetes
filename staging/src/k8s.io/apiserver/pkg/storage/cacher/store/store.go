@@ -71,11 +71,38 @@ type Indexer interface {
 	Count(prefix, continueKey string) (count int)
 	Clone() Snapshot
 	OrderedListPrefix(prefix, continueKey string) ([]interface{}, error)
+	ProcessPrefix(req ListRequest) (ListResult, error)
 }
 
 type Snapshot interface {
 	GetByKey(key string) (item interface{}, exists bool, err error)
 	OrderedListPrefix(prefix, continueKey string) ([]interface{}, error)
+	ProcessPrefix(req ListRequest) (ListResult, error)
+}
+
+// ElementFilter is a predicate function evaluated on an Element during prefix processing.
+type ElementFilter func(elem *Element) (bool, error)
+
+// ElementConsumer is a callback function called for each matching Element.
+type ElementConsumer func(elem *Element) error
+
+// ListRequest specifies parameters for listing elements from a store or snapshot.
+type ListRequest struct {
+	Prefix            string
+	ContinueKey       string
+	Limit             int64
+	Filter            ElementFilter
+	Consume           ElementConsumer
+	ComputeTotalCount bool
+}
+
+// ListResult holds the result of a ListRequest processing operation.
+type ListResult struct {
+	NumFetched            int
+	NumMatched            int
+	HasMore               bool
+	LastSelectedObjectKey string
+	TotalCount            int64
 }
 
 func NewIndexer(indexers *cache.Indexers) Indexer {

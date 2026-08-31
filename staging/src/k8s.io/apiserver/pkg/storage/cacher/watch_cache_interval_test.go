@@ -542,6 +542,11 @@ func (s *countingSnapshot) OrderedListPrefix(_, _ string) ([]interface{}, error)
 	return s.items, nil
 }
 
+func (s *countingSnapshot) ProcessPrefix(req store.ListRequest) (store.ListResult, error) {
+	s.orderedListPrefixCalls++
+	return store.ListResult{}, nil
+}
+
 // TestLazySnapshotCacheIntervalSourceEmpty checks that on an empty snapshot Next() returns
 // no events, and that repeated calls still read the snapshot only once.
 func TestLazySnapshotCacheIntervalSourceEmpty(t *testing.T) {
