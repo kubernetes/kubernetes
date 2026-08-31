@@ -1019,12 +1019,12 @@ func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
 		nim := NewNodeInfoManager(types.NodeName(nodeName), host, nil)
 
 		// Act
-		_, err = nim.CreateCSINode()
+		_, err = nim.CreateCSINode(t.Context())
 		if err != nil {
 			t.Errorf("expected no error from creating CSINodeinfo but got: %v", err)
 			continue
 		}
-		err = nim.InstallCSIDriver(driverName, nodeID, 0 /* maxVolumeLimit */, nil) // TODO test maxVolumeLimit
+		err = nim.InstallCSIDriver(t.Context(), driverName, nodeID, 0 /* maxVolumeLimit */, nil) // TODO test maxVolumeLimit
 		if err != nil {
 			t.Errorf("expected no error from InstallCSIDriver call but got: %v", err)
 			continue
@@ -1079,11 +1079,11 @@ func test(t *testing.T, addNodeInfo bool, testcases []testcase) {
 		nim := NewNodeInfoManager(types.NodeName(nodeName), host, tc.migratedPlugins)
 
 		//// Act
-		nim.CreateCSINode()
+		_, _ = nim.CreateCSINode(t.Context())
 		if addNodeInfo {
-			err = nim.InstallCSIDriver(tc.driverName, tc.inputNodeID, tc.inputVolumeLimit, tc.inputTopology)
+			err = nim.InstallCSIDriver(t.Context(), tc.driverName, tc.inputNodeID, tc.inputVolumeLimit, tc.inputTopology)
 		} else {
-			err = nim.UninstallCSIDriver(tc.driverName)
+			err = nim.UninstallCSIDriver(t.Context(), tc.driverName)
 		}
 
 		//// Assert
@@ -1419,7 +1419,7 @@ func TestUpdateCSINodeStorageHealth(t *testing.T) {
 			nim.nodeID = existingNode.UID
 
 			actionsBefore := len(client.Actions())
-			err = nim.UpdateCSINodeStorageHealth(tc.driverName, tc.conditions)
+			err = nim.UpdateCSINodeStorageHealth(t.Context(), tc.driverName, tc.conditions)
 			if err != nil {
 				t.Fatalf("UpdateCSINodeStorageHealth returned error: %v", err)
 			}
