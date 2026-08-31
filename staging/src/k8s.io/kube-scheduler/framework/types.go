@@ -893,3 +893,11 @@ func (gpg *GenericPodGroup) GetCreationTimestamp() time.Time {
 	}
 	return gpg.CompositePodGroup.CreationTimestamp.Time
 }
+
+// GetUID returns the UID of the wrapped object.
+func (gpg *GenericPodGroup) GetUID() types.UID {
+	if gpg.PodGroup != nil {
+		return gpg.PodGroup.UID
+	}
+	return gpg.CompositePodGroup.UID
+}

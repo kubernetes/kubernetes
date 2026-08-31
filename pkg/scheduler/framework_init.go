@@ -37,6 +37,7 @@ import (
 	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/gangscheduling"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -66,6 +67,10 @@ type FrameworkComponents struct {
 	resourceClaimCache   *assumecache.AssumeCache
 	resourceSliceTracker *resourceslicetracker.Tracker
 	draManager           fwk.SharedDRAManager
+
+	// podGroupHierarchyTracker tracks ready children counts across pod group hierarchies.
+	// Nil unless CompositePodGroup feature gate is enabled.
+	podGroupHierarchyTracker fwk.PodGroupHierarchyTracker
 
 	client          clientset.Interface
 	informerFactory informers.SharedInformerFactory
@@ -145,20 +150,26 @@ func newFrameworkComponents(ctx context.Context,
 		apiDispatcher = apidispatcher.New(client, int(options.parallelism), apicalls.Relevances)
 	}
 
+	var podGroupHierarchyTracker fwk.PodGroupHierarchyTracker
+	if feature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		podGroupHierarchyTracker = gangscheduling.NewHierarchyTracker()
+	}
+
 	schedulerCache := internalcache.New(ctx, apiDispatcher, feature.DefaultFeatureGate.Enabled(features.GenericWorkload), feature.DefaultFeatureGate.Enabled(features.CompositePodGroup))
 
 	return &FrameworkComponents{
 		cache: schedulerCache,
 
-		extenders:            extenders,
-		apiDispatcher:        apiDispatcher,
-		metricsRecorder:      metricsRecorder,
-		resourceClaimCache:   resourceClaimCache,
-		resourceSliceTracker: resourceSliceTracker,
-		draManager:           draManager,
-		client:               client,
-		informerFactory:      informerFactory,
-		options:              options,
+		extenders:                extenders,
+		apiDispatcher:            apiDispatcher,
+		metricsRecorder:          metricsRecorder,
+		resourceClaimCache:       resourceClaimCache,
+		resourceSliceTracker:     resourceSliceTracker,
+		draManager:               draManager,
+		podGroupHierarchyTracker: podGroupHierarchyTracker,
+		client:                   client,
+		informerFactory:          informerFactory,
+		options:                  options,
 	}, nil
 }
 
@@ -190,6 +201,7 @@ func NewFrameworkMap(ctx context.Context, c *FrameworkComponents, recorderFactor
 		frameworkruntime.WithKubeConfig(c.options.kubeConfig),
 		frameworkruntime.WithInformerFactory(c.informerFactory),
 		frameworkruntime.WithSharedDRAManager(c.draManager),
+		frameworkruntime.WithSharedPodGroupHierarchyTracker(c.podGroupHierarchyTracker),
 		frameworkruntime.WithSnapshotSharedLister(snapshot),
 		frameworkruntime.WithMutableSnapshotLister(snapshot),
 		frameworkruntime.WithCaptureProfile(frameworkruntime.CaptureProfile(c.options.frameworkCapturer)),
