@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -61,6 +62,7 @@ func getArbitraryResource(s schema.GroupVersionResource, name, namespace string)
 }
 
 func TestWatchCallNonNamespace(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	testResource := schema.GroupVersionResource{Group: "", Version: "test_version", Resource: "test_kind"}
 	testObj := getArbitraryResource(testResource, "test_name", "test_namespace")
 	accessor, err := meta.Accessor(testObj)
@@ -70,7 +72,7 @@ func TestWatchCallNonNamespace(t *testing.T) {
 	ns := accessor.GetNamespace()
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
-	o := NewObjectTracker(scheme, codecs.UniversalDecoder())
+	o := NewObjectTrackerWithLogger(logger, scheme, codecs.UniversalDecoder())
 	watch, err := o.Watch(testResource, ns)
 	if err != nil {
 		t.Fatalf("test resource watch failed in %s: %v ", ns, err)
@@ -86,6 +88,7 @@ func TestWatchCallNonNamespace(t *testing.T) {
 }
 
 func TestWatchCallAllNamespace(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	testResource := schema.GroupVersionResource{Group: "", Version: "test_version", Resource: "test_kind"}
 	testObj := getArbitraryResource(testResource, "test_name", "test_namespace")
 	accessor, err := meta.Accessor(testObj)
@@ -95,7 +98,7 @@ func TestWatchCallAllNamespace(t *testing.T) {
 	ns := accessor.GetNamespace()
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
-	o := NewObjectTracker(scheme, codecs.UniversalDecoder())
+	o := NewObjectTrackerWithLogger(logger, scheme, codecs.UniversalDecoder())
 	w, err := o.Watch(testResource, "test_namespace")
 	if err != nil {
 		t.Fatalf("test resource watch failed in test_namespace: %v", err)
@@ -137,6 +140,7 @@ func TestWatchCallAllNamespace(t *testing.T) {
 }
 
 func TestWatchCallMultipleInvocation(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	cases := []struct {
 		name string
 		op   watch.EventType
@@ -188,7 +192,7 @@ func TestWatchCallMultipleInvocation(t *testing.T) {
 	codecs := serializer.NewCodecFactory(scheme)
 	testResource := schema.GroupVersionResource{Group: "", Version: "test_version", Resource: "test_kind"}
 
-	o := NewObjectTracker(scheme, codecs.UniversalDecoder())
+	o := NewObjectTrackerWithLogger(logger, scheme, codecs.UniversalDecoder())
 	watchNamespaces := []string{
 		"",
 		"",
@@ -239,6 +243,7 @@ func TestWatchCallMultipleInvocation(t *testing.T) {
 }
 
 func TestWatchAddAfterStop(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	testResource := schema.GroupVersionResource{Group: "", Version: "test_version", Resource: "test_kind"}
 	testObj := getArbitraryResource(testResource, "test_name", "test_namespace")
 	accessor, err := meta.Accessor(testObj)
@@ -249,7 +254,7 @@ func TestWatchAddAfterStop(t *testing.T) {
 	ns := accessor.GetNamespace()
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
-	o := NewObjectTracker(scheme, codecs.UniversalDecoder())
+	o := NewObjectTrackerWithLogger(logger, scheme, codecs.UniversalDecoder())
 	watch, err := o.Watch(testResource, ns)
 	if err != nil {
 		t.Errorf("watch creation failed: %v", err)
@@ -270,11 +275,12 @@ func TestWatchAddAfterStop(t *testing.T) {
 }
 
 func TestPatchWithMissingObject(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	nodesResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "nodes"}
 
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
-	o := NewObjectTracker(scheme, codecs.UniversalDecoder())
+	o := NewObjectTrackerWithLogger(logger, scheme, codecs.UniversalDecoder())
 	reaction := ObjectReaction(o)
 	action := NewRootPatchSubresourceAction(nodesResource, "node-1", types.StrategicMergePatchType, []byte(`{}`))
 	handled, node, err := reaction(action)
@@ -284,11 +290,12 @@ func TestPatchWithMissingObject(t *testing.T) {
 }
 
 func TestApplyCreate(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	cmResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configMaps"}
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypes(cmResource.GroupVersion(), &v1.ConfigMap{})
 	codecs := serializer.NewCodecFactory(scheme)
-	o := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), configMapTypeConverter(scheme))
+	o := NewFieldManagedObjectTrackerWithLogger(logger, scheme, codecs.UniversalDecoder(), configMapTypeConverter(scheme))
 
 	reaction := ObjectReaction(o)
 	patch := []byte(`{"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "cm-1"}, "data": {"k": "v"}}`)
@@ -304,11 +311,12 @@ func TestApplyCreate(t *testing.T) {
 }
 
 func TestApplyNoMeta(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	cmResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configMaps"}
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypes(cmResource.GroupVersion(), &v1.ConfigMap{})
 	codecs := serializer.NewCodecFactory(scheme)
-	o := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), configMapTypeConverter(scheme))
+	o := NewFieldManagedObjectTrackerWithLogger(logger, scheme, codecs.UniversalDecoder(), configMapTypeConverter(scheme))
 
 	reaction := ObjectReaction(o)
 	patch := []byte(`{"apiVersion": "v1", "kind": "ConfigMap", "data": {"k": "v"}}`)
@@ -325,11 +333,12 @@ func TestApplyNoMeta(t *testing.T) {
 }
 
 func TestApplyUpdateMultipleFieldManagers(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	cmResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configMaps"}
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypes(cmResource.GroupVersion(), &v1.ConfigMap{})
 	codecs := serializer.NewCodecFactory(scheme)
-	o := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), configMapTypeConverter(scheme))
+	o := NewFieldManagedObjectTrackerWithLogger(logger, scheme, codecs.UniversalDecoder(), configMapTypeConverter(scheme))
 
 	reaction := ObjectReaction(o)
 	action := NewCreateAction(cmResource, "default", &v1.ConfigMap{
@@ -436,6 +445,7 @@ func TestApplyUpdateMultipleFieldManagers(t *testing.T) {
 }
 
 func TestGetWithExactMatch(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
 
@@ -449,7 +459,7 @@ func TestGetWithExactMatch(t *testing.T) {
 
 	var err error
 	// Object with empty namespace
-	o := NewObjectTracker(scheme, codecs.UniversalDecoder())
+	o := NewObjectTrackerWithLogger(logger, scheme, codecs.UniversalDecoder())
 	nodeResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "node"}
 	node, gvr := constructObject(nodeResource, "node", "")
 
@@ -466,7 +476,7 @@ func TestGetWithExactMatch(t *testing.T) {
 	assert.EqualError(t, err, errNotFound.Error())
 
 	// Object with non-empty namespace
-	o = NewObjectTracker(scheme, codecs.UniversalDecoder())
+	o = NewObjectTrackerWithLogger(logger, scheme, codecs.UniversalDecoder())
 	podResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pod"}
 	pod, gvr := constructObject(podResource, "pod", "default")
 	assert.NoError(t, o.Add(pod))
@@ -666,12 +676,13 @@ var configMapTypedSchema = typed.YAMLObject(`types:
 `)
 
 func TestManagedFieldsObjectTrackerReloadsScheme(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	cmResource := schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
 
 	// Create tracker without registered ConfigMap type
-	tracker := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), configMapTypeConverter(scheme))
+	tracker := NewFieldManagedObjectTrackerWithLogger(logger, scheme, codecs.UniversalDecoder(), configMapTypeConverter(scheme))
 
 	cm := &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -688,13 +699,14 @@ func TestManagedFieldsObjectTrackerReloadsScheme(t *testing.T) {
 }
 
 func TestManagedFielsdObjectTrackerWithUnstructured(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	cmResource := schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
 	cmGVK := schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypeWithName(cmGVK, &unstructured.Unstructured{})
 	codecs := serializer.NewCodecFactory(scheme)
 
-	tracker := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), managedfields.NewDeducedTypeConverter())
+	tracker := NewFieldManagedObjectTrackerWithLogger(logger, scheme, codecs.UniversalDecoder(), managedfields.NewDeducedTypeConverter())
 
 	cm := &unstructured.Unstructured{}
 	cm.SetAPIVersion("v1")
@@ -743,10 +755,11 @@ func TestManagedFielsdObjectTrackerWithUnstructured(t *testing.T) {
 }
 
 func TestDoesClientSupportWatchListSemantics(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
 
-	target := NewObjectTracker(scheme, codecs.UniversalDecoder())
+	target := NewObjectTrackerWithLogger(logger, scheme, codecs.UniversalDecoder())
 
 	if !watchlist.DoesClientNotSupportWatchListSemantics(target) {
 		t.Fatalf("ObjectTracker should NOT support WatchList semantics")
