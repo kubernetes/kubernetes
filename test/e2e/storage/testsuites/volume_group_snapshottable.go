@@ -49,6 +49,7 @@ type volumeGroupSnapshottableTest struct {
 	volumeResources []*storageframework.VolumeResource
 	snapshots       []*storageframework.VolumeGroupSnapshotResource
 	numReplicas     int
+	claimSize       string
 }
 
 // VolumeGroupSnapshottableTestSuite represents a test suite for testing volume group snapshot functionality.
@@ -122,12 +123,18 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 				cs = f.ClientSet
 				config := driver.PrepareTest(ctx, f)
 
+				testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
+				driverVolumeSizeRange := driver.GetDriverInfo().SupportedSizeRange
+				claimSize, err := utils.GetSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
+				framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
+
 				groupTest = &volumeGroupSnapshottableTest{
 					config:          config,
 					volumeResources: []*storageframework.VolumeResource{},
 					snapshots:       []*storageframework.VolumeGroupSnapshotResource{},
 					pods:            []*v1.Pod{},
 					numReplicas:     3,
+					claimSize:       claimSize,
 				}
 			}
 
@@ -192,7 +199,7 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 									},
 									Resources: v1.VolumeResourceRequirements{
 										Requests: v1.ResourceList{
-											v1.ResourceStorage: resource.MustParse(s.GetTestSuiteInfo().SupportedSizeRange.Min),
+											v1.ResourceStorage: resource.MustParse(groupTest.claimSize),
 										},
 									},
 									StorageClassName: &volumeResource.Sc.Name,
@@ -303,7 +310,7 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 					gomega.Expect(volumeSnapshotInfoList).ShouldNot(gomega.BeNil(), "failed to get group snapshot handle list")
 					gomega.Expect(volumeSnapshotInfoList).Should(gomega.HaveLen(groupTest.numReplicas), "failed to verify snapshot handle list length")
 				}
-				claimSize := s.GetTestSuiteInfo().SupportedSizeRange.Min
+				claimSize := groupTest.claimSize
 
 				ginkgo.By("creating restored PVCs from snapshots")
 				restoredPVCs := []*v1.PersistentVolumeClaim{}
