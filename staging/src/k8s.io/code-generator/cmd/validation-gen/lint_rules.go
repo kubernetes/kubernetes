@@ -274,8 +274,13 @@ func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
 		case types.Pointer:
 			hasVal, cycleBroken, err = hasTransitiveValidation(t.Elem, op)
 		case types.Struct:
-			for _, m := range t.Members {
-				mTags, err := extractor.ExtractTags(validators.Context{Scope: validators.ScopeField, Type: m.Type}, m.CommentLines)
+			for i := range t.Members {
+				m := &t.Members[i]
+				// A ScopeField context carries the struct member it describes.
+				// Validators such as requiredness read it to find the field's
+				// +default tag.
+				mCtx := validators.Context{Scope: validators.ScopeField, Type: m.Type, Member: m}
+				mTags, err := extractor.ExtractTags(mCtx, m.CommentLines)
 				if err != nil {
 					return false, false, err
 				}
@@ -283,10 +288,7 @@ func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
 					hasVal = true
 					break
 				}
-				fieldVals, err := extractor.ExtractValidations(
-					validators.Context{Scope: validators.ScopeField, Type: m.Type},
-					filterTags(mTags)...,
-				)
+				fieldVals, err := extractor.ExtractValidations(mCtx, filterTags(mTags)...)
 				if err != nil {
 					return false, false, err
 				}

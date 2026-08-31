@@ -928,6 +928,29 @@ func TestLintRequiredness(t *testing.T) {
 			}),
 			wantError: "field Bar: field with validation must have +k8s:optional, +k8s:required or +k8s:forbidden",
 		},
+		{
+			name: "transitive struct member with only +k8s:optional - no error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testPtr(
+					testStruct("Inner", []types.Member{
+						testField("Bar", testType("int"), "+k8s:optional"),
+					}),
+				)),
+			}),
+			wantError: "",
+		},
+		{
+			name: "transitive struct member with +k8s:optional and a non-zero default - error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testPtr(
+					testStruct("Inner", []types.Member{
+						testField("Bar", testType("int"), "+k8s:optional", "+default=1"),
+						testField("Baz", testType("int"), "+k8s:minimum=0"),
+					}),
+				)),
+			}),
+			wantError: "field Foo: field with validation must have +k8s:optional, +k8s:required or +k8s:forbidden",
+		},
 	}
 
 	for _, tt := range tests {
