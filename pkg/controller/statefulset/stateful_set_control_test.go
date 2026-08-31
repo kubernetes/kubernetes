@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
@@ -994,7 +995,7 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 
 				stop := make(chan struct{})
 				defer close(stop)
-				informerFactory.Start(stop)
+				informerFactory.StartWithContext(wait.ContextForChannel(stop))
 				cache.WaitForCacheSync(
 					stop,
 					informerFactory.Apps().V1().StatefulSets().Informer().HasSynced,

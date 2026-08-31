@@ -153,7 +153,7 @@ func newTestBinder(t *testing.T, ctx context.Context) *testEnv {
 	client.AddWatchReactor("*", func(action k8stesting.Action) (handled bool, ret watch.Interface, err error) {
 		gvr := action.GetResource()
 		ns := action.GetNamespace()
-		watch, err := reactor.Watch(gvr, ns)
+		watch, err := reactor.Watch(logger, gvr, ns)
 		if err != nil {
 			return false, nil, err
 		}

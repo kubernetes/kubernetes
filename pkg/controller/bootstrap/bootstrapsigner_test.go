@@ -30,17 +30,19 @@ import (
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const testTokenID = "abc123"
 
-func newSigner() (*Signer, *fake.Clientset, coreinformers.SecretInformer, coreinformers.ConfigMapInformer, error) {
+func newSigner(t *testing.T) (*Signer, *fake.Clientset, coreinformers.SecretInformer, coreinformers.ConfigMapInformer, error) {
+	tCtx := ktesting.Init(t)
 	options := DefaultSignerOptions()
 	cl := fake.NewSimpleClientset()
 	informers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), controller.NoResyncPeriodFunc())
 	secrets := informers.Core().V1().Secrets()
 	configMaps := informers.Core().V1().ConfigMaps()
-	bsc, err := NewSigner(cl, secrets, configMaps, options)
+	bsc, err := NewSigner(tCtx.Logger(), cl, secrets, configMaps, options)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -65,7 +67,7 @@ func newConfigMap(tokenID, signature string) *v1.ConfigMap {
 }
 
 func TestNoConfigMap(t *testing.T) {
-	signer, cl, _, _, err := newSigner()
+	signer, cl, _, _, err := newSigner(t)
 	if err != nil {
 		t.Fatalf("error creating Signer: %v", err)
 	}
@@ -74,7 +76,7 @@ func TestNoConfigMap(t *testing.T) {
 }
 
 func TestSimpleSign(t *testing.T) {
-	signer, cl, secrets, configMaps, err := newSigner()
+	signer, cl, secrets, configMaps, err := newSigner(t)
 	if err != nil {
 		t.Fatalf("error creating Signer: %v", err)
 	}
@@ -98,7 +100,7 @@ func TestSimpleSign(t *testing.T) {
 }
 
 func TestNoSignNeeded(t *testing.T) {
-	signer, cl, secrets, configMaps, err := newSigner()
+	signer, cl, secrets, configMaps, err := newSigner(t)
 	if err != nil {
 		t.Fatalf("error creating Signer: %v", err)
 	}
@@ -116,7 +118,7 @@ func TestNoSignNeeded(t *testing.T) {
 }
 
 func TestUpdateSignature(t *testing.T) {
-	signer, cl, secrets, configMaps, err := newSigner()
+	signer, cl, secrets, configMaps, err := newSigner(t)
 	if err != nil {
 		t.Fatalf("error creating Signer: %v", err)
 	}
@@ -140,7 +142,7 @@ func TestUpdateSignature(t *testing.T) {
 }
 
 func TestRemoveSignature(t *testing.T) {
-	signer, cl, _, configMaps, err := newSigner()
+	signer, cl, _, configMaps, err := newSigner(t)
 	if err != nil {
 		t.Fatalf("error creating Signer: %v", err)
 	}

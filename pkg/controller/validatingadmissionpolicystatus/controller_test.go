@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/generated/openapi"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestTypeChecking(t *testing.T) {
@@ -95,8 +96,7 @@ func TestTypeChecking(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-			defer cancel()
+			tCtx := ktesting.Init(t).WithTimeout(time.Minute, "test timed out")
 			policy := tc.policy.DeepCopy()
 			policy.ObjectMeta.Generation = 1 // fake storage does not do this automatically
 			client := fake.NewSimpleClientset(policy)
@@ -106,6 +106,7 @@ func TestTypeChecking(t *testing.T) {
 				RestMapper:     testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme),
 			}
 			controller, err := NewController(
+				tCtx.Logger(),
 				informerFactory.Admissionregistration().V1().ValidatingAdmissionPolicies(),
 				client.AdmissionregistrationV1().ValidatingAdmissionPolicies(),
 				typeChecker,
@@ -113,10 +114,10 @@ func TestTypeChecking(t *testing.T) {
 			if err != nil {
 				t.Fatalf("cannot create controller: %v", err)
 			}
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
-			go controller.Run(ctx, 1)
-			err = wait.PollUntilContextCancel(ctx, time.Second, false, func(ctx context.Context) (done bool, err error) {
+			informerFactory.StartWithContext(tCtx)
+			informerFactory.WaitForCacheSyncWithContext(tCtx)
+			go controller.Run(tCtx, 1)
+			err = wait.PollUntilContextCancel(tCtx, time.Second, false, func(ctx context.Context) (done bool, err error) {
 				name := policy.Name
 				// wait until the typeChecking is set, which means the type checking
 				// is complete.

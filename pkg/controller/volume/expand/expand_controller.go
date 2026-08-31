@@ -111,7 +111,10 @@ func NewExpandController(
 		pvcsSynced: pvcInformer.Informer().HasSynced,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "volume_expand"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: new(klog.FromContext(ctx)),
+				Name:   "volume_expand",
+			},
 		),
 		translator:               translator,
 		csiMigratedPluginManager: csiMigratedPluginManager,
@@ -326,7 +329,7 @@ func (expc *expandController) expand(logger klog.Logger, pvc *v1.PersistentVolum
 
 // TODO make concurrency configurable (workers argument). previously, nestedpendingoperations spawned unlimited goroutines
 func (expc *expandController) Run(ctx context.Context) {
-	defer runtime.HandleCrash()
+	defer runtime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting expand controller")

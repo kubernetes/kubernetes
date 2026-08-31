@@ -86,7 +86,10 @@ func NewResourceVersionController(
 		mapper:          mapper,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: ResourceVersionControllerName},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: new(klog.FromContext(ctx)),
+				Name:   ResourceVersionControllerName,
+			},
 		),
 	}
 
@@ -127,7 +130,7 @@ func (rv *ResourceVersionController) enqueue(svm *svmv1.StorageVersionMigration)
 }
 
 func (rv *ResourceVersionController) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting", "controller", ResourceVersionControllerName)

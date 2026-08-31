@@ -73,7 +73,7 @@ type TokenCleaner struct {
 }
 
 // NewTokenCleaner returns a new *NewTokenCleaner.
-func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.SecretInformer, options TokenCleanerOptions) (*TokenCleaner, error) {
+func NewTokenCleaner(logger klog.Logger, cl clientset.Interface, secrets coreinformers.SecretInformer, options TokenCleanerOptions) (*TokenCleaner, error) {
 	e := &TokenCleaner{
 		client:               cl,
 		secretLister:         secrets.Lister(),
@@ -82,12 +82,13 @@ func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.SecretInforme
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: "token_cleaner",
+				Logger: &logger,
+				Name:   "token_cleaner",
 			},
 		),
 	}
 
-	secrets.Informer().AddEventHandlerWithResyncPeriod(
+	_, _ = secrets.Informer().AddEventHandlerWithOptions(
 		cache.FilteringResourceEventHandler{
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
@@ -103,7 +104,10 @@ func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.SecretInforme
 				UpdateFunc: func(oldSecret, newSecret interface{}) { e.enqueueSecrets(newSecret) },
 			},
 		},
-		options.SecretResync,
+		cache.HandlerOptions{
+			Logger:       &logger,
+			ResyncPeriod: &options.SecretResync,
+		},
 	)
 
 	return e, nil
@@ -111,7 +115,7 @@ func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.SecretInforme
 
 // Run runs controller loops and returns when they are done
 func (tc *TokenCleaner) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting token cleaner controller")

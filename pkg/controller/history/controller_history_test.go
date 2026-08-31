@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/ptr"
 )
 
@@ -58,12 +59,13 @@ func TestRealHistory_ListControllerRevisions(t *testing.T) {
 
 		stop := make(chan struct{})
 		defer close(stop)
-		informerFactory.Start(stop)
+		ctx := wait.ContextForChannel(stop)
+		informerFactory.StartWithContext(ctx)
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		if err := AddControllerRevisionControllerIndexer(informer.Informer()); err != nil {
 			t.Fatalf("failed to add indexer: %v", err)
 		}
-		informerFactory.WaitForCacheSync(stop)
+		informerFactory.WaitForCacheSyncWithContext(ctx)
 		for i := range test.revisions {
 			informer.Informer().GetIndexer().Add(test.revisions[i])
 		}
@@ -158,12 +160,13 @@ func TestFakeHistory_ListControllerRevisions(t *testing.T) {
 
 		stop := make(chan struct{})
 		defer close(stop)
-		informerFactory.Start(stop)
+		ctx := wait.ContextForChannel(stop)
+		informerFactory.StartWithContext(ctx)
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		if err := AddControllerRevisionControllerIndexer(informer.Informer()); err != nil {
 			t.Fatalf("failed to add indexer: %v", err)
 		}
-		informerFactory.WaitForCacheSync(stop)
+		informerFactory.WaitForCacheSyncWithContext(ctx)
 		for i := range test.revisions {
 			informer.Informer().GetIndexer().Add(test.revisions[i])
 		}
@@ -260,12 +263,13 @@ func TestRealHistory_CreateControllerRevision(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		stop := make(chan struct{})
 		defer close(stop)
-		informerFactory.Start(stop)
+		ctx := wait.ContextForChannel(stop)
+		informerFactory.StartWithContext(ctx)
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		if err := AddControllerRevisionControllerIndexer(informer.Informer()); err != nil {
 			t.Fatalf("failed to add indexer: %v", err)
 		}
-		informerFactory.WaitForCacheSync(stop)
+		informerFactory.WaitForCacheSyncWithContext(ctx)
 		history := NewHistory(client, informer.Lister(), informer.Informer().GetIndexer())
 
 		var collisionCount int32
@@ -395,12 +399,13 @@ func TestFakeHistory_CreateControllerRevision(t *testing.T) {
 
 		stop := make(chan struct{})
 		defer close(stop)
-		informerFactory.Start(stop)
+		ctx := wait.ContextForChannel(stop)
+		informerFactory.StartWithContext(ctx)
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		if err := AddControllerRevisionControllerIndexer(informer.Informer()); err != nil {
 			t.Fatalf("failed to add indexer: %v", err)
 		}
-		informerFactory.WaitForCacheSync(stop)
+		informerFactory.WaitForCacheSyncWithContext(ctx)
 		history := NewFakeHistory(informer)
 
 		var collisionCount int32
@@ -548,12 +553,13 @@ func TestRealHistory_UpdateControllerRevision(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		stop := make(chan struct{})
 		defer close(stop)
-		informerFactory.Start(stop)
+		ctx := wait.ContextForChannel(stop)
+		informerFactory.StartWithContext(ctx)
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		if err := AddControllerRevisionControllerIndexer(informer.Informer()); err != nil {
 			t.Fatalf("failed to add indexer: %v", err)
 		}
-		informerFactory.WaitForCacheSync(stop)
+		informerFactory.WaitForCacheSyncWithContext(ctx)
 		history := NewHistory(client, informer.Lister(), informer.Informer().GetIndexer())
 		var collisionCount int32
 		for i := range test.existing {
@@ -678,12 +684,13 @@ func TestFakeHistory_UpdateControllerRevision(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		stop := make(chan struct{})
 		defer close(stop)
-		informerFactory.Start(stop)
+		ctx := wait.ContextForChannel(stop)
+		informerFactory.StartWithContext(ctx)
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		if err := AddControllerRevisionControllerIndexer(informer.Informer()); err != nil {
 			t.Fatalf("failed to add indexer: %v", err)
 		}
-		informerFactory.WaitForCacheSync(stop)
+		informerFactory.WaitForCacheSyncWithContext(ctx)
 		history := NewFakeHistory(informer)
 		var collisionCount int32
 		for i := range test.existing {
@@ -769,12 +776,13 @@ func TestRealHistory_DeleteControllerRevision(t *testing.T) {
 
 		stop := make(chan struct{})
 		defer close(stop)
-		informerFactory.Start(stop)
+		ctx := wait.ContextForChannel(stop)
+		informerFactory.StartWithContext(ctx)
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		if err := AddControllerRevisionControllerIndexer(informer.Informer()); err != nil {
 			t.Fatalf("failed to add indexer: %v", err)
 		}
-		informerFactory.WaitForCacheSync(stop)
+		informerFactory.WaitForCacheSyncWithContext(ctx)
 		history := NewHistory(client, informer.Lister(), informer.Informer().GetIndexer())
 		var collisionCount int32
 		for i := range test.existing {
@@ -875,12 +883,13 @@ func TestFakeHistory_DeleteControllerRevision(t *testing.T) {
 
 		stop := make(chan struct{})
 		defer close(stop)
-		informerFactory.Start(stop)
+		ctx := wait.ContextForChannel(stop)
+		informerFactory.StartWithContext(ctx)
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		if err := AddControllerRevisionControllerIndexer(informer.Informer()); err != nil {
 			t.Fatalf("failed to add indexer: %v", err)
 		}
-		informerFactory.WaitForCacheSync(stop)
+		informerFactory.WaitForCacheSyncWithContext(ctx)
 		history := NewFakeHistory(informer)
 		var collisionCount int32
 		for i := range test.existing {
@@ -1015,12 +1024,13 @@ func TestRealHistory_AdoptControllerRevision(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		stop := make(chan struct{})
 		defer close(stop)
-		informerFactory.Start(stop)
+		ctx := wait.ContextForChannel(stop)
+		informerFactory.StartWithContext(ctx)
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		if err := AddControllerRevisionControllerIndexer(informer.Informer()); err != nil {
 			t.Fatalf("failed to add indexer: %v", err)
 		}
-		informerFactory.WaitForCacheSync(stop)
+		informerFactory.WaitForCacheSyncWithContext(ctx)
 
 		history := NewHistory(client, informer.Lister(), informer.Informer().GetIndexer())
 		var collisionCount int32
@@ -1124,12 +1134,13 @@ func TestFakeHistory_AdoptControllerRevision(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		stop := make(chan struct{})
 		defer close(stop)
-		informerFactory.Start(stop)
+		ctx := wait.ContextForChannel(stop)
+		informerFactory.StartWithContext(ctx)
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		if err := AddControllerRevisionControllerIndexer(informer.Informer()); err != nil {
 			t.Fatalf("failed to add indexer: %v", err)
 		}
-		informerFactory.WaitForCacheSync(stop)
+		informerFactory.WaitForCacheSyncWithContext(ctx)
 
 		history := NewFakeHistory(informer)
 		var collisionCount int32
@@ -1272,12 +1283,13 @@ func TestRealHistory_ReleaseControllerRevision(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		stop := make(chan struct{})
 		defer close(stop)
-		informerFactory.Start(stop)
+		ctx := wait.ContextForChannel(stop)
+		informerFactory.StartWithContext(ctx)
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		if err := AddControllerRevisionControllerIndexer(informer.Informer()); err != nil {
 			t.Fatalf("failed to add indexer: %v", err)
 		}
-		informerFactory.WaitForCacheSync(stop)
+		informerFactory.WaitForCacheSyncWithContext(ctx)
 
 		history := NewHistory(client, informer.Lister(), informer.Informer().GetIndexer())
 		var collisionCount int32
@@ -1397,12 +1409,13 @@ func TestFakeHistory_ReleaseControllerRevision(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		stop := make(chan struct{})
 		defer close(stop)
-		informerFactory.Start(stop)
+		ctx := wait.ContextForChannel(stop)
+		informerFactory.StartWithContext(ctx)
 		informer := informerFactory.Apps().V1().ControllerRevisions()
 		if err := AddControllerRevisionControllerIndexer(informer.Informer()); err != nil {
 			t.Fatalf("failed to add indexer: %v", err)
 		}
-		informerFactory.WaitForCacheSync(stop)
+		informerFactory.WaitForCacheSyncWithContext(ctx)
 		history := NewFakeHistory(informer)
 		var collisionCount int32
 		for i := range test.existing {

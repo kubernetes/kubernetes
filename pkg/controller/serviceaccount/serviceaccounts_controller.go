@@ -68,22 +68,31 @@ func NewServiceAccountsController(logger klog.Logger, saInformer coreinformers.S
 		serviceAccountsToEnsure: options.ServiceAccounts,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "serviceaccount"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
+				Name:   "serviceaccount",
+			},
 		),
 	}
 
-	saHandler, _ := saInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
+	saHandler, _ := saInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: func(obj interface{}) {
 			e.serviceAccountDeleted(logger, obj)
 		},
-	}, options.ServiceAccountResync)
+	}, cache.HandlerOptions{
+		Logger:       &logger,
+		ResyncPeriod: &options.ServiceAccountResync,
+	})
 	e.saLister = saInformer.Lister()
 	e.saListerSynced = saHandler.HasSynced
 
-	nsHandler, _ := nsInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
+	nsHandler, _ := nsInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    e.namespaceAdded,
 		UpdateFunc: e.namespaceUpdated,
-	}, options.NamespaceResync)
+	}, cache.HandlerOptions{
+		Logger:       &logger,
+		ResyncPeriod: &options.NamespaceResync,
+	})
 	e.nsLister = nsInformer.Lister()
 	e.nsListerSynced = nsHandler.HasSynced
 

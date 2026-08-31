@@ -133,7 +133,7 @@ type monitor struct {
 // Run is intended to be called in a goroutine. Multiple calls of this is an
 // error.
 func (m *monitor) Run() {
-	m.controller.Run(m.stopCh)
+	m.controller.RunWithContext(wait.ContextForChannel(m.stopCh))
 }
 
 type monitors map[schema.GroupVersionResource]*monitor
@@ -151,13 +151,15 @@ func NewDependencyGraphBuilder(
 	attemptToDelete := workqueue.NewTypedRateLimitingQueueWithConfig(
 		workqueue.DefaultTypedControllerRateLimiter[*node](),
 		workqueue.TypedRateLimitingQueueConfig[*node]{
-			Name: "garbage_collector_attempt_to_delete",
+			Logger: new(klog.FromContext(ctx)),
+			Name:   "garbage_collector_attempt_to_delete",
 		},
 	)
 	attemptToOrphan := workqueue.NewTypedRateLimitingQueueWithConfig(
 		workqueue.DefaultTypedControllerRateLimiter[*node](),
 		workqueue.TypedRateLimitingQueueConfig[*node]{
-			Name: "garbage_collector_attempt_to_orphan",
+			Logger: new(klog.FromContext(ctx)),
+			Name:   "garbage_collector_attempt_to_orphan",
 		},
 	)
 	absentOwnerCache := NewReferenceCache(500)
@@ -170,7 +172,8 @@ func NewDependencyGraphBuilder(
 		graphChanges: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[*event](),
 			workqueue.TypedRateLimitingQueueConfig[*event]{
-				Name: "garbage_collector_graph_changes",
+				Logger: new(klog.FromContext(ctx)),
+				Name:   "garbage_collector_graph_changes",
 			},
 		),
 		uidToNode: &concurrentUIDToNode{
@@ -229,7 +232,13 @@ func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupV
 	}
 	logger.V(4).Info("using a shared informer", "resource", resource, "kind", kind)
 	// need to clone because it's from a shared cache
-	shared.Informer().AddEventHandlerWithResyncPeriod(handlers, ResourceResyncTime)
+	resyncPeriod := ResourceResyncTime
+	if _, err := shared.Informer().AddEventHandlerWithOptions(handlers, cache.HandlerOptions{
+		Logger:       &logger,
+		ResyncPeriod: &resyncPeriod,
+	}); err != nil {
+		return nil, nil, err
+	}
 	return shared.Informer().GetController(), shared.Informer().GetStore(), nil
 }
 

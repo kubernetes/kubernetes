@@ -488,6 +488,7 @@ type testRESTMapper struct {
 }
 
 func (m *testRESTMapper) Reset() {
+	//nolint:logcheck // Reset() has a fixed signature from meta.ResettableRESTMapper and cannot accept a context.
 	meta.MaybeResetRESTMapper(m.RESTMapper)
 }
 

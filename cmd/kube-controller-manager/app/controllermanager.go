@@ -353,15 +353,16 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		}
 
 		// Start lease candidate controller for coordinated leader election
-		leaseCandidate, waitForSync, err := leaderelection.NewCandidate(
-			c.Client,
-			"kube-system",
-			id,
-			kubeControllerManager,
-			binaryVersion.FinalizeVersion(),
-			emulationVersion.FinalizeVersion(),
-			coordinationv1.OldestEmulationVersion,
-		)
+		leaseCandidate, waitForSync, err := leaderelection.NewCandidateWithConfig(leaderelection.CandidateConfig{
+			Logger:             &logger,
+			Clientset:          c.Client,
+			CandidateNamespace: "kube-system",
+			CandidateName:      id,
+			TargetLease:        kubeControllerManager,
+			BinaryVersion:      binaryVersion.FinalizeVersion(),
+			EmulationVersion:   emulationVersion.FinalizeVersion(),
+			Strategy:           coordinationv1.OldestEmulationVersion,
+		})
 		if err != nil {
 			return err
 		}

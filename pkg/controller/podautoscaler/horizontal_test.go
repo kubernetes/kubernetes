@@ -416,8 +416,8 @@ func newHorizontalSetup(t *testing.T, s *horizontalScenario, testClient *fake.Cl
 		hpaController.recommendations["test-namespace/test-hpa"] = s.recommendations
 	}
 
-	informerFactory.Start(tCtx.Done())
-	informerFactory.WaitForCacheSync(tCtx.Done())
+	informerFactory.StartWithContext(tCtx)
+	informerFactory.WaitForCacheSyncWithContext(tCtx)
 
 	return &horizontalSetup{
 		controller:      hpaController,
@@ -6244,6 +6244,7 @@ func TestOneMetricEmptyExternalError(t *testing.T) {
 }
 
 func TestMultipleHPAs(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	const hpaCount = 1000
 	const testNamespace = "dummy-namespace"
 
@@ -6252,8 +6253,8 @@ func TestMultipleHPAs(t *testing.T) {
 	testClient := &fake.Clientset{}
 	testScaleClient := &scalefake.FakeScaleClient{}
 	testMetricsClient := &metricsfake.Clientset{}
-	hpaWatcher := watch.NewFake()
-	podWatcher := watch.NewFake()
+	hpaWatcher := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
+	podWatcher := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 
 	testClient.AddWatchReactor("horizontalpodautoscalers", core.DefaultWatchReactor(hpaWatcher, nil))
 	testClient.AddWatchReactor("pods", core.DefaultWatchReactor(podWatcher, nil))
@@ -6500,7 +6501,7 @@ func TestMultipleHPAs(t *testing.T) {
 	monitor.NumHorizontalPodAutoscalers.Set(0)
 	hpaController.monitor = monitor.New()
 
-	informerFactory.Start(tCtx.Done())
+	informerFactory.StartWithContext(tCtx)
 	go hpaController.Run(tCtx, 5)
 
 	timeoutTime := time.After(15 * time.Second)

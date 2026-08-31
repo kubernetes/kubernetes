@@ -348,7 +348,7 @@ func TestCustomResourceController_Sync(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 			var initialSVMs []runtime.Object
 			for _, svm := range tc.svms {
 				initialSVMs = append(initialSVMs, svm)
@@ -370,7 +370,7 @@ func TestCustomResourceController_Sync(t *testing.T) {
 
 			crdScheme := runtime.NewScheme()
 			_ = apiextensionsv1.AddToScheme(crdScheme)
-			crdTracker := k8stesting.NewObjectTracker(crdScheme, serializer.NewCodecFactory(crdScheme).UniversalDecoder())
+			crdTracker := k8stesting.NewObjectTrackerWithLogger(logger, crdScheme, serializer.NewCodecFactory(crdScheme).UniversalDecoder())
 
 			for _, obj := range initialCRDs {
 				_ = crdTracker.Add(obj)
