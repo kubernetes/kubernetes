@@ -208,6 +208,10 @@ const (
 	operationList             operation = "list"
 	// assume a default estimate for finalizers to complete when found on items pending deletion.
 	finalizerEstimateSeconds = int64(15)
+	// remaining items with no finalizers are typically still draining from storage
+	// after a background DeleteCollection. Requeue quickly instead of treating
+	// this as a hard failure (which hits the workqueue rate limiter).
+	storageDrainEstimateSeconds = int64(2)
 )
 
 // operationKey is an entry in a cache.
@@ -481,11 +485,15 @@ func (d *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(
 		}, nil
 	}
 
-	// nothing reported a finalizer, so something was unexpected as it should have been deleted.
+	// Remaining items with no finalizers are typically still draining from
+	// storage after DeleteCollection (background/async). Treat as an estimated
+	// wait so the controller requeues with AddAfter instead of exponential
+	// backoff via AddRateLimited.
+	logger.V(5).Info("Namespace controller - items remaining without finalizers", "namespace", namespace, "resource", gvr, "items", len(unstructuredList.Items))
 	return gvrDeletionMetadata{
-		finalizerEstimateSeconds: estimate,
+		finalizerEstimateSeconds: storageDrainEstimateSeconds,
 		numRemaining:             len(unstructuredList.Items),
-	}, fmt.Errorf("unexpected items still remain in namespace: %s for gvr: %v", namespace, gvr)
+	}, nil
 }
 
 type allGVRDeletionMetadata struct {

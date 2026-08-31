@@ -465,3 +465,81 @@ func TestDeleteEncounters404(t *testing.T) {
 		t.Error("ns2: expected delete-collection -> list to verify 0 items")
 	}
 }
+
+func TestDeleteRemainingItems(t *testing.T) {
+	tests := []struct {
+		name         string
+		finalizers   []string
+		wantEstimate int64
+	}{
+		{
+			name:         "no finalizers, still listed after delete",
+			finalizers:   nil,
+			wantEstimate: storageDrainEstimateSeconds,
+		},
+		{
+			name:         "finalizers remaining",
+			finalizers:   []string{"example.com/cleanup"},
+			wantEstimate: finalizerEstimateSeconds,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			now := metav1.Now()
+			nsName := "test"
+			ns := &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: nsName, ResourceVersion: "1", DeletionTimestamp: &now},
+				Spec:       v1.NamespaceSpec{Finalizers: []v1.FinalizerName{"kubernetes"}},
+				Status:     v1.NamespaceStatus{Phase: v1.NamespaceTerminating},
+			}
+			mockClient := fake.NewSimpleClientset(ns)
+			mockMetadataClient := metadatafake.NewSimpleMetadataClient(metadatafake.NewTestScheme())
+			mockMetadataClient.PrependReactor("list", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
+				return true, &metav1.List{
+					Items: []runtime.RawExtension{{
+						Object: &metav1.PartialObjectMetadata{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:       "lingering",
+								Namespace:  nsName,
+								Finalizers: tc.finalizers,
+							},
+						},
+					}},
+				}, nil
+			})
+			resourcesFn := func() ([]*metav1.APIResourceList, error) {
+				return []*metav1.APIResourceList{{
+					GroupVersion: "v1",
+					APIResources: []metav1.APIResource{{
+						Name:       "configmaps",
+						Namespaced: true,
+						Kind:       "ConfigMap",
+						Verbs:      []string{"get", "list", "delete", "deletecollection", "create", "update"},
+					}},
+				}}, nil
+			}
+			_, ctx := ktesting.NewTestContext(t)
+			d := NewNamespacedResourcesDeleter(ctx, mockClient.CoreV1().Namespaces(), mockMetadataClient, mockClient.CoreV1(), resourcesFn, v1.FinalizerKubernetes)
+
+			err := d.Delete(ctx, nsName)
+			remaining, ok := err.(*ResourcesRemainingError)
+			if !ok {
+				t.Fatalf("Delete() error = %v (%T), want ResourcesRemainingError", err, err)
+			}
+			if remaining.Estimate != tc.wantEstimate {
+				t.Errorf("Estimate = %d, want %d", remaining.Estimate, tc.wantEstimate)
+			}
+
+			got, getErr := mockClient.CoreV1().Namespaces().Get(ctx, nsName, metav1.GetOptions{})
+			if getErr != nil {
+				t.Fatalf("Get namespace: %v", getErr)
+			}
+			if len(got.Spec.Finalizers) == 0 {
+				t.Fatal("namespace was finalized while content remained")
+			}
+			if cond := getCondition(got.Status.Conditions, v1.NamespaceDeletionContentFailure); cond != nil && cond.Status == v1.ConditionTrue {
+				t.Errorf("NamespaceDeletionContentFailure = True (%q), want not a content-deletion failure", cond.Message)
+			}
+		})
+	}
+}
