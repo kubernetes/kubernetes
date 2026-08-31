@@ -61,23 +61,24 @@ import (
 type operationCode string
 
 const (
-	allocResourceClaimsOpcode    operationCode = "allocResourceClaims"
-	createAnyOpcode              operationCode = "createAny"
-	createNodesOpcode            operationCode = "createNodes"
-	createNamespacesOpcode       operationCode = "createNamespaces"
-	createPodsOpcode             operationCode = "createPods"
-	createPodSetsOpcode          operationCode = "createPodSets"
-	deletePodsOpcode             operationCode = "deletePods"
-	createResourceClaimsOpcode   operationCode = "createResourceClaims"
-	churnOpcode                  operationCode = "churn"
-	updateAnyOpcode              operationCode = "updateAny"
-	barrierOpcode                operationCode = "barrier"
-	sleepOpcode                  operationCode = "sleep"
-	startCollectingMetricsOpcode operationCode = "startCollectingMetrics"
-	stopCollectingMetricsOpcode  operationCode = "stopCollectingMetrics"
-	createPodGroupsOpcode        operationCode = "createPodGroups"
-	startCollectingProfileOpcode operationCode = "startCollectingProfile"
-	stopCollectingProfileOpcode  operationCode = "stopCollectingProfile"
+	allocResourceClaimsOpcode      operationCode = "allocResourceClaims"
+	createAnyOpcode                operationCode = "createAny"
+	createNodesOpcode              operationCode = "createNodes"
+	createNamespacesOpcode         operationCode = "createNamespaces"
+	createPodsOpcode               operationCode = "createPods"
+	createPodSetsOpcode            operationCode = "createPodSets"
+	deletePodsOpcode               operationCode = "deletePods"
+	createResourceClaimsOpcode     operationCode = "createResourceClaims"
+	churnOpcode                    operationCode = "churn"
+	updateAnyOpcode                operationCode = "updateAny"
+	barrierOpcode                  operationCode = "barrier"
+	sleepOpcode                    operationCode = "sleep"
+	startCollectingMetricsOpcode   operationCode = "startCollectingMetrics"
+	stopCollectingMetricsOpcode    operationCode = "stopCollectingMetrics"
+	createPodGroupsOpcode          operationCode = "createPodGroups"
+	createCompositePodGroupsOpcode operationCode = "createCompositePodGroups"
+	startCollectingProfileOpcode   operationCode = "startCollectingProfile"
+	stopCollectingProfileOpcode    operationCode = "stopCollectingProfile"
 )
 
 const (
@@ -514,23 +515,24 @@ type op struct {
 // which op we're decoding at runtime.
 func (op *op) UnmarshalJSON(b []byte) error {
 	possibleOps := map[operationCode]realOp{
-		allocResourceClaimsOpcode:    &allocResourceClaimsOp{},
-		createAnyOpcode:              &createAny{},
-		createNodesOpcode:            &createNodesOp{},
-		createNamespacesOpcode:       &createNamespacesOp{},
-		createPodsOpcode:             &createPodsOp{},
-		createPodSetsOpcode:          &createPodSetsOp{},
-		deletePodsOpcode:             &deletePodsOp{},
-		createResourceClaimsOpcode:   &createResourceClaimsOp{},
-		churnOpcode:                  &churnOp{},
-		updateAnyOpcode:              &updateAny{},
-		barrierOpcode:                &barrierOp{},
-		sleepOpcode:                  &sleepOp{},
-		startCollectingMetricsOpcode: &startCollectingMetricsOp{},
-		stopCollectingMetricsOpcode:  &stopCollectingMetricsOp{},
-		createPodGroupsOpcode:        &createPodGroups{},
-		startCollectingProfileOpcode: &startCollectingProfileOp{},
-		stopCollectingProfileOpcode:  &stopCollectingProfileOp{},
+		allocResourceClaimsOpcode:      &allocResourceClaimsOp{},
+		createAnyOpcode:                &createAny{},
+		createNodesOpcode:              &createNodesOp{},
+		createNamespacesOpcode:         &createNamespacesOp{},
+		createPodsOpcode:               &createPodsOp{},
+		createPodSetsOpcode:            &createPodSetsOp{},
+		deletePodsOpcode:               &deletePodsOp{},
+		createResourceClaimsOpcode:     &createResourceClaimsOp{},
+		churnOpcode:                    &churnOp{},
+		updateAnyOpcode:                &updateAny{},
+		barrierOpcode:                  &barrierOp{},
+		sleepOpcode:                    &sleepOp{},
+		startCollectingMetricsOpcode:   &startCollectingMetricsOp{},
+		stopCollectingMetricsOpcode:    &stopCollectingMetricsOp{},
+		createPodGroupsOpcode:          &createPodGroups{},
+		createCompositePodGroupsOpcode: &createCompositePodGroups{},
+		startCollectingProfileOpcode:   &startCollectingProfileOp{},
+		stopCollectingProfileOpcode:    &stopCollectingProfileOp{},
 		// TODO(#94601): add a delete nodes op to simulate scaling behaviour?
 	}
 	// First determine the opcode using lenient decoding (= ignore extra fields).
@@ -1130,6 +1132,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *Workload, topicName st
 		numPodsScheduledPerNamespace: make(map[string]int),
 		podInformer:                  podInformer,
 		podGroupInformer:             informerFactory.Scheduling().V1beta1().PodGroups(),
+		compositePodGroupInformer:    informerFactory.Scheduling().V1alpha3().CompositePodGroups(),
 		throughputErrorMargin:        throughputErrorMargin,
 		testCase:                     tc,
 		workload:                     w,

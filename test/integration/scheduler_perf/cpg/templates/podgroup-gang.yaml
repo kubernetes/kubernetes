@@ -1,0 +1,13 @@
+apiVersion: scheduling.k8s.io/v1beta1
+kind: PodGroup
+metadata:
+  name: gang-group-{{.Index}}
+spec:
+  parentCompositePodGroupName: {{.parentPrefix}}-{{DivideInt .Index .podGroupsPerCompositePodGroup}}
+  workloadRef:
+    workloadName: cpg-workload
+    templateName: pg-template
+  priority: {{.priority}}
+  schedulingPolicy:
+    gang:
+      minCount: {{.minCount}}
