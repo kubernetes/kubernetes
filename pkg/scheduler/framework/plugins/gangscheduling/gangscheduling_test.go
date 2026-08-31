@@ -702,7 +702,7 @@ func TestPreEnqueue(t *testing.T) {
 			pod:                        p1,
 			initialPods:                []*v1.Pod{p2, p3, p4, p5},
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{},
-			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `waiting for pods's pod group "pg1" to appear in scheduling queue`),
+			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `waiting for pod's pod group "pg1" to appear in scheduling queue`),
 		},
 		{
 			name:                       "gang pod fails PreEnqueue when pod group is not yet created",
@@ -710,7 +710,7 @@ func TestPreEnqueue(t *testing.T) {
 			pod:                        p1,
 			initialPods:                []*v1.Pod{p2, p3, p4, p5},
 			initialPodGroups:           []*schedulingv1beta1.PodGroup{},
-			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "failed to build hierarchy snapshot: pod group object not found in state for podgroup/ns1/pg1"),
+			wantPreEnqueueStatus:       fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `waiting for pod's pod group "pg1" to appear in scheduling queue`),
 		},
 		{
 			name:                       "gang pod fails PreEnqueue when quorum is not met",
@@ -820,12 +820,14 @@ func TestPreEnqueue(t *testing.T) {
 				}
 				fakeActivator := &podActivatorMock{}
 				snapshot := internalcache.NewEmptySnapshot()
+				ht := NewHierarchyTracker()
 				fh, err := frameworkruntime.NewFramework(ctx, nil, nil,
 					frameworkruntime.WithInformerFactory(informerFactory),
 					frameworkruntime.WithPodGroupManager(cache),
 					frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
 					frameworkruntime.WithPodActivator(fakeActivator),
 					frameworkruntime.WithSnapshotSharedLister(snapshot),
+					frameworkruntime.WithSharedHierarchyTracker(ht),
 				)
 				if err != nil {
 					t.Fatalf("Failed to create framework: %v", err)
@@ -838,6 +840,7 @@ func TestPreEnqueue(t *testing.T) {
 						t.Fatalf("Failed to add podGroup %s to store: %v", pg.Name, err)
 					}
 					cache.AddGenericPodGroup(schedulerframework.NewGenericPodGroup(pg))
+					ht.OnPodGroupAdd(pg)
 				}
 				if isCPGEnabled {
 					for _, cpg := range tt.initialCompositePodGroups {
@@ -846,13 +849,22 @@ func TestPreEnqueue(t *testing.T) {
 							t.Fatalf("Failed to add podGroup %s to store: %v", cpg.Name, err)
 						}
 						cache.AddGenericPodGroup(schedulerframework.NewGenericCompositePodGroup(cpg))
+						ht.OnCompositePodGroupAdd(cpg)
 					}
 				}
 
 				for _, p := range tt.initialPods {
+					if err := informerFactory.Core().V1().Pods().Informer().GetStore().Add(p); err != nil {
+						t.Fatalf("Failed to add pod %s to store: %v", p.Name, err)
+					}
 					cache.AddPodGroupMember(p)
+					ht.OnPodAdd(p)
+				}
+				if err := informerFactory.Core().V1().Pods().Informer().GetStore().Add(tt.pod); err != nil {
+					t.Fatalf("Failed to add pod %s to store: %v", tt.pod.Name, err)
 				}
 				cache.AddPodGroupMember(tt.pod)
+				ht.OnPodAdd(tt.pod)
 
 				p, err := New(ctx, nil, fh, feature.Features{EnableGenericWorkload: true, EnableCompositePodGroup: isCPGEnabled})
 				if err != nil {
@@ -1128,5 +1140,31 @@ func (m *mockPodGroupManager) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityK
 		default:
 			return currentKey, true, nil
 		}
+	}
+}
+
+func (m *mockPodGroupManager) GetRootGroup(key fwk.EntityKey) (fwk.RootGroup, bool, error) {
+	rootKey, ok, err := m.GetRootKeyForGroup(key)
+	if err != nil {
+		return fwk.RootGroup{}, false, err
+	}
+	if !ok {
+		return fwk.RootGroup{}, false, nil
+	}
+	switch rootKey.Type {
+	case fwk.PodGroupKeyType:
+		pg, ok := m.pgs[rootKey.Name]
+		if !ok {
+			return fwk.RootGroup{Key: rootKey}, true, nil
+		}
+		return fwk.RootGroup{Key: rootKey, PodGroup: pg}, true, nil
+	case fwk.CompositePodGroupKeyType:
+		cpg, ok := m.cpgs[rootKey.Name]
+		if !ok {
+			return fwk.RootGroup{Key: rootKey}, true, nil
+		}
+		return fwk.RootGroup{Key: rootKey, CompositePodGroup: cpg}, true, nil
+	default:
+		return fwk.RootGroup{Key: rootKey}, true, nil
 	}
 }

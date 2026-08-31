@@ -224,6 +224,27 @@ type PodGroupManager interface {
 	BuildHierarchySnapshotFromPod(pod *v1.Pod) (PodGroupManager, error)
 	// GetRootKeyForGroup returns the root key of the given EntityKey.
 	GetRootKeyForGroup(key EntityKey) (EntityKey, bool, error)
+	// GetRootGroup traverses parent links from key to locate the top-most root entity in the hierarchy.
+	// It returns a RootGroup containing the root's EntityKey alongside its authoritative API object and cache state,
+	// and a bool indicating whether the root group was found.
+	GetRootGroup(key EntityKey) (RootGroup, bool, error)
+}
+
+// RootGroup represents the apex of a scheduling hierarchy for a given entity (Pod, PodGroup, or CompositePodGroup).
+// In a nested gang-scheduling tree, the root is the top-most ancestor with no parent CompositePodGroup.
+// A hierarchy may be rooted at either a standalone PodGroup or a CompositePodGroup. Exactly one pair of
+// (PodGroup, PodGroupState) or (CompositePodGroup, CompositePodGroupState) will be populated based on Key.Type.
+type RootGroup struct {
+	// Key identifies the root entity of the hierarchy (either a PodGroupKeyType or CompositePodGroupKeyType).
+	Key EntityKey
+	// PodGroup is populated when the hierarchy root is a standalone PodGroup (i.e. Key.Type == PodGroupKeyType).
+	PodGroup *schedulingapi.PodGroup
+	// PodGroupState holds the scheduler cache state corresponding to PodGroup when the root is a PodGroup.
+	PodGroupState PodGroupState
+	// CompositePodGroup is populated when the hierarchy root is a CompositePodGroup (i.e. Key.Type == CompositePodGroupKeyType).
+	CompositePodGroup *schedulingv1alpha3.CompositePodGroup
+	// CompositePodGroupState holds the scheduler cache state corresponding to CompositePodGroup when the root is a CompositePodGroup.
+	CompositePodGroupState CompositePodGroupState
 }
 
 // PodGroupState provides an interface to view the state of a single pod group.
@@ -251,4 +272,21 @@ type PodGroupState interface {
 type CompositePodGroupState interface {
 	// GetChildren returns the keys of child groups.
 	GetChildren() []EntityKey
+}
+
+// HierarchyTracker incrementally tracks readiness quorum counts across CompositePodGroup hierarchies.
+type HierarchyTracker interface {
+	ReadyChildrenCount(key EntityKey) int
+
+	OnPodAdd(pod *v1.Pod)
+	OnPodUpdate(oldPod, newPod *v1.Pod)
+	OnPodDelete(pod *v1.Pod)
+
+	OnPodGroupAdd(pg *schedulingapi.PodGroup)
+	OnPodGroupUpdate(oldPG, newPG *schedulingapi.PodGroup)
+	OnPodGroupDelete(pg *schedulingapi.PodGroup)
+
+	OnCompositePodGroupAdd(cpg *schedulingv1alpha3.CompositePodGroup)
+	OnCompositePodGroupUpdate(oldCPG, newCPG *schedulingv1alpha3.CompositePodGroup)
+	OnCompositePodGroupDelete(cpg *schedulingv1alpha3.CompositePodGroup)
 }

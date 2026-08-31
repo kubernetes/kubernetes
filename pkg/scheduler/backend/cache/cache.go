@@ -1325,12 +1325,10 @@ func (cache *cacheImpl) buildPodGroupStateSnapshotTree(key fwk.EntityKey, snapsh
 	return nil
 }
 
-// GetRootKeyForGroup returns the root key of the given EntityKey.
+// getRootKeyForGroup returns the root key of the given EntityKey.
 // The key must be of PodGroupKey or CompositePodGroupKey type.
-func (cache *cacheImpl) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bool, error) {
-	cache.mu.RLock()
-	defer cache.mu.RUnlock()
-
+// Assumes that the cache lock is already held.
+func (cache *cacheImpl) getRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bool, error) {
 	currentKey := key
 	visited := sets.New[fwk.EntityKey]()
 	for {
@@ -1369,5 +1367,55 @@ func (cache *cacheImpl) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bo
 		case fwk.PodKeyType:
 			return fwk.EntityKey{}, false, fmt.Errorf("pod key type not supported in GetRootKeyForGroup for %s", currentKey.String())
 		}
+	}
+}
+
+// GetRootKeyForGroup returns the root key of the given EntityKey.
+// The key must be of PodGroupKey or CompositePodGroupKey type.
+func (cache *cacheImpl) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bool, error) {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+
+	return cache.getRootKeyForGroup(key)
+}
+
+// GetRootGroup returns the RootGroup containing the root key, PodGroup/PodGroupState (if root is a PodGroup),
+// or CompositePodGroup/CompositePodGroupState (if root is a CompositePodGroup) for the given EntityKey,
+// and a bool indicating whether the root group was found.
+func (cache *cacheImpl) GetRootGroup(key fwk.EntityKey) (fwk.RootGroup, bool, error) {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+
+	rootKey, exists, err := cache.getRootKeyForGroup(key)
+	if err != nil {
+		return fwk.RootGroup{}, false, err
+	}
+	if !exists {
+		return fwk.RootGroup{}, false, nil
+	}
+
+	switch rootKey.Type {
+	case fwk.PodGroupKeyType:
+		pgs, ok := cache.podGroupStates[rootKey]
+		if !ok || pgs.podGroup == nil {
+			return fwk.RootGroup{}, false, nil
+		}
+		return fwk.RootGroup{
+			Key:           rootKey,
+			PodGroup:      pgs.podGroup,
+			PodGroupState: pgs,
+		}, true, nil
+	case fwk.CompositePodGroupKeyType:
+		cpgs, ok := cache.compositePodGroupStates[rootKey]
+		if !ok || cpgs.compositePodGroup == nil {
+			return fwk.RootGroup{}, false, nil
+		}
+		return fwk.RootGroup{
+			Key:                    rootKey,
+			CompositePodGroup:      cpgs.compositePodGroup,
+			CompositePodGroupState: cpgs,
+		}, true, nil
+	default:
+		return fwk.RootGroup{}, false, fmt.Errorf("unsupported root key type %s for %s", rootKey.Type, key.String())
 	}
 }
