@@ -296,9 +296,6 @@ func TestControllerSyncJob(t *testing.T) {
 		expectedConditions     []batch.JobCondition
 		expectedCreatedIndexes sets.Set[int]
 		expectedPodPatches     int
-
-		// features
-		jobManagedBy bool
 	}{
 		"job start": {
 			parallelism:         2,
@@ -1293,8 +1290,7 @@ func TestControllerSyncJob(t *testing.T) {
 				},
 			},
 		},
-		"backoff limit exceeded; JobManagedBy enabled": {
-			jobManagedBy:   true,
+		"backoff limit exceeded": {
 			parallelism:    2,
 			completions:    3,
 			backoffLimit:   0,
@@ -1325,13 +1321,6 @@ func TestControllerSyncJob(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			if !tc.jobManagedBy {
-				// TODO: this will be removed in 1.38.
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.33"))
-			}
-			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.JobManagedBy: tc.jobManagedBy,
-			})
 			// job manager setup
 			clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 
@@ -1659,9 +1648,6 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 		wantStatusUpdates       []batch.JobStatus
 		wantSucceededPodsMetric int
 		wantFailedPodsMetric    int
-
-		// features
-		enableJobManagedBy bool
 	}{
 		"no updates": {},
 		"new active": {
@@ -2262,8 +2248,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			},
 			wantFailedPodsMetric: 1,
 		},
-		"pod is terminating; counted as failed, but the JobFailed condition is delayed; JobManagedBy enabled": {
-			enableJobManagedBy: true,
+		"pod is terminating; counted as failed, JobFailed condition is not delayed": {
 			job: batch.Job{
 				Spec: batch.JobSpec{
 					Completions: ptr.To[int32](1),
@@ -2289,33 +2274,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			},
 			wantFailedPodsMetric: 1,
 		},
-		"pod is terminating; counted as failed, JobFailed condition is not delayed; JobManagedBy disabled": {
-			job: batch.Job{
-				Spec: batch.JobSpec{
-					Completions: ptr.To[int32](1),
-					Parallelism: ptr.To[int32](1),
-				},
-				Status: batch.JobStatus{
-					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
-						Failed: []types.UID{"a"},
-					},
-					Conditions: []batch.JobCondition{*failureTargetCond},
-				},
-			},
-			pods: []*v1.Pod{
-				buildPod().uid("a").phase(v1.PodRunning).deletionTimestamp().Pod,
-			},
-			finishedCond: failedCond,
-			wantStatusUpdates: []batch.JobStatus{
-				{
-					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
-					Failed:                  1,
-					Conditions:              []batch.JobCondition{*failureTargetCond},
-				},
-			},
-			wantFailedPodsMetric: 1,
-		},
-		"pod is terminating; JobSuccessCriteriaMet, but JobComplete condition is delayed; JobManagedBy disabled": {
+		"pod is terminating; JobSuccessCriteriaMet, but JobComplete condition is delayed": {
 			job: batch.Job{
 				Spec: batch.JobSpec{
 					Completions: ptr.To[int32](1),
@@ -2344,37 +2303,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			wantFailedPodsMetric:    1,
 			wantSucceededPodsMetric: 1,
 		},
-		"pod is terminating; JobSuccessCriteriaMet, but JobComplete condition is delayed; JobManagedBy enabled": {
-			enableJobManagedBy: true,
-			job: batch.Job{
-				Spec: batch.JobSpec{
-					Completions: ptr.To[int32](1),
-					Parallelism: ptr.To[int32](1),
-				},
-				Status: batch.JobStatus{
-					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
-						Failed:    []types.UID{"a"},
-						Succeeded: []types.UID{"b"},
-					},
-					Conditions: []batch.JobCondition{*succeededCond},
-				},
-			},
-			pods: []*v1.Pod{
-				buildPod().uid("a").phase(v1.PodRunning).deletionTimestamp().Pod,
-			},
-			finishedCond: completedCond,
-			wantStatusUpdates: []batch.JobStatus{
-				{
-					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
-					Succeeded:               1,
-					Failed:                  1,
-					Conditions:              []batch.JobCondition{*succeededCond},
-				},
-			},
-			wantFailedPodsMetric:    1,
-			wantSucceededPodsMetric: 1,
-		},
-		"pod is terminating; JobSuccessCriteriaMet, JobComplete condition is not delayed; JobManagedBy disabled": {
+		"pod is terminating; JobSuccessCriteriaMet, JobComplete condition is not delayed": {
 			job: batch.Job{
 				Spec: batch.JobSpec{
 					Completions: ptr.To[int32](1),
@@ -2485,14 +2414,6 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			if !tc.enableJobManagedBy {
-				// TODO: this will be removed in 1.38
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
-			}
-			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.JobManagedBy: tc.enableJobManagedBy,
-			})
-
 			clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 			manager, _ := newControllerFromClientWithClock(ctx, t, clientSet, controller.NoResyncPeriodFunc, fakeClock)
 			fakePodControl := controller.FakePodControl{Err: tc.podControlErr}
@@ -2580,9 +2501,6 @@ func TestSyncJobPastDeadline(t *testing.T) {
 		expectedSucceeded  int32
 		expectedFailed     int32
 		expectedConditions []batch.JobCondition
-
-		// features
-		enableJobManagedBy bool
 	}{
 		"activeDeadlineSeconds less than single pod execution": {
 			parallelism:           1,
@@ -2701,31 +2619,7 @@ func TestSyncJobPastDeadline(t *testing.T) {
 				},
 			},
 		},
-		"activeDeadlineSeconds exceeded; JobManagedBy enabled": {
-			enableJobManagedBy: true,
-
-			parallelism:           1,
-			completions:           2,
-			activeDeadlineSeconds: 10,
-			startTime:             15,
-			backoffLimit:          6,
-			activePods:            1,
-			succeededPods:         1,
-			expectedDeletions:     1,
-			expectedSucceeded:     1,
-			expectedFailed:        1,
-			expectedConditions: []batch.JobCondition{
-				{
-					Type:    batch.JobFailureTarget,
-					Status:  v1.ConditionTrue,
-					Reason:  batch.JobReasonDeadlineExceeded,
-					Message: "Job was active longer than specified deadline",
-				},
-			},
-		},
-		"activeDeadlineSeconds exceeded and backofflimit reached; JobManagedBy enabled": {
-			enableJobManagedBy: true,
-
+		"activeDeadlineSeconds exceeded and backofflimit reached": {
 			parallelism:           1,
 			completions:           1,
 			activeDeadlineSeconds: 1,
@@ -2751,13 +2645,6 @@ func TestSyncJobPastDeadline(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			if !tc.enableJobManagedBy {
-				// TODO: this will be removed in 1.38.
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.34"))
-			}
-			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.JobManagedBy: tc.enableJobManagedBy,
-			})
 			// job manager setup
 			clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 			manager, sharedInformerFactory := newControllerFromClient(ctx, t, clientSet, controller.NoResyncPeriodFunc)
@@ -2803,7 +2690,7 @@ func TestSyncJobPastDeadline(t *testing.T) {
 			if actual.Status.Failed != tc.expectedFailed {
 				t.Errorf("Unexpected number of failed pods.  Expected %d, saw %d\n", tc.expectedFailed, actual.Status.Failed)
 			}
-			if actual.Status.StartTime == nil {
+			if actual.Status.StartTime == nil && (job.Spec.Suspend == nil || !*job.Spec.Suspend) {
 				t.Error("Missing .status.startTime")
 			}
 			// validate conditions
@@ -3029,12 +2916,10 @@ func TestSyncJobWhenManagedBy(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		enableJobManagedBy bool
-		job                batch.Job
-		wantStatus         batch.JobStatus
+		job        batch.Job
+		wantStatus batch.JobStatus
 	}{
-		"job with custom value of managedBy; feature enabled; the status is unchanged": {
-			enableJobManagedBy: true,
+		"job with custom value of managedBy; the status is unchanged": {
 			job: func() batch.Job {
 				job := baseJob.DeepCopy()
 				job.Spec.ManagedBy = ptr.To("custom-managed-by")
@@ -3042,8 +2927,7 @@ func TestSyncJobWhenManagedBy(t *testing.T) {
 			}(),
 			wantStatus: baseJob.Status,
 		},
-		"job with well known value of the managedBy; feature enabled; the status is updated": {
-			enableJobManagedBy: true,
+		"job with well known value of the managedBy; the status is updated": {
 			job: func() batch.Job {
 				job := baseJob.DeepCopy()
 				job.Spec.ManagedBy = ptr.To(batch.JobControllerName)
@@ -3057,23 +2941,8 @@ func TestSyncJobWhenManagedBy(t *testing.T) {
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 			},
 		},
-		"job with custom value of managedBy; feature disabled; the status is updated": {
-			job: func() batch.Job {
-				job := baseJob.DeepCopy()
-				job.Spec.ManagedBy = ptr.To("custom-managed-by")
-				return *job
-			}(),
-			wantStatus: batch.JobStatus{
-				Active:                  2,
-				Ready:                   ptr.To[int32](0),
-				StartTime:               &now,
-				Terminating:             ptr.To[int32](0),
-				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
-			},
-		},
-		"job without the managedBy; feature enabled; the status is updated": {
-			enableJobManagedBy: true,
-			job:                baseJob,
+		"job without the managedBy; the status is updated": {
+			job: baseJob,
 			wantStatus: batch.JobStatus{
 				Active:                  2,
 				Ready:                   ptr.To[int32](0),
@@ -3085,10 +2954,6 @@ func TestSyncJobWhenManagedBy(t *testing.T) {
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			// TODO: this will be removed in 1.38.
-			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.34"))
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, tc.enableJobManagedBy)
-
 			clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 			manager, sharedInformerFactory := newControllerFromClient(ctx, t, clientset, controller.NoResyncPeriodFunc)
 			fakePodControl := controller.FakePodControl{}
@@ -3160,7 +3025,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		enableJobManagedBy    bool
 		job                   batch.Job
 		pods                  []v1.Pod
 		wantConditions        []batch.JobCondition
@@ -3489,8 +3353,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusTerminating: ptr.To[int32](1),
 			wantStatusSucceeded:   0,
 		},
-		"fail job with multiple pods; JobManagedBy enabled delays setting terminal condition": {
-			enableJobManagedBy: true,
+		"fail job with multiple pods; delays setting terminal condition": {
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
@@ -3885,8 +3748,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusFailed:    1,
 			wantStatusSucceeded: 0,
 		},
-		"default job based on OnExitCodes; JobManagedBy enabled triggers adding interim condition": {
-			enableJobManagedBy: true,
+		"default job based on OnExitCodes; triggers adding interim condition": {
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
@@ -4233,14 +4095,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			if !tc.enableJobManagedBy {
-				// TODO: this will be removed in 1.38.
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.33"))
-			}
-			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.JobManagedBy: tc.enableJobManagedBy,
-			})
-
 			if tc.job.Spec.PodReplacementPolicy == nil {
 				tc.job.Spec.PodReplacementPolicy = podReplacementPolicy(batch.Failed)
 			}
@@ -4319,10 +4173,9 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		enableJobManagedBy bool
-		job                batch.Job
-		pods               []v1.Pod
-		wantStatus         batch.JobStatus
+		job        batch.Job
+		pods       []v1.Pod
+		wantStatus batch.JobStatus
 	}{
 		"job with successPolicy; job has SuccessCriteriaMet condition if job meets to successPolicy and some indexes fail": {
 			job: batch.Job{
@@ -4515,61 +4368,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 		},
 		// REF: https://github.com/kubernetes/kubernetes/issues/123775
 		"job with successPolicy; job has SuccessCriteriaMet condition when job meets to successPolicy and some pods still are running": {
-			job: batch.Job{
-				TypeMeta:   validTypeMeta,
-				ObjectMeta: validObjectMeta,
-				Spec: batch.JobSpec{
-					Selector:             validSelector,
-					Template:             validTemplate,
-					CompletionMode:       ptr.To(batch.IndexedCompletion),
-					Parallelism:          ptr.To[int32](3),
-					Completions:          ptr.To[int32](3),
-					BackoffLimit:         ptr.To[int32](math.MaxInt32),
-					BackoffLimitPerIndex: ptr.To[int32](3),
-					SuccessPolicy: &batch.SuccessPolicy{
-						Rules: []batch.SuccessPolicyRule{{
-							SucceededIndexes: ptr.To("0,1"),
-							SucceededCount:   ptr.To[int32](1),
-						}},
-					},
-				},
-				Status: batch.JobStatus{
-					Conditions: []batch.JobCondition{
-						{
-							Type:    batch.JobSuccessCriteriaMet,
-							Status:  v1.ConditionTrue,
-							Reason:  batch.JobReasonSuccessPolicy,
-							Message: "Matched rules at index 0",
-						},
-					},
-				},
-			},
-			pods: []v1.Pod{
-				*buildPod().uid("a1").index("0").phase(v1.PodFailed).trackingFinalizer().Pod,
-				*buildPod().uid("a2").index("1").phase(v1.PodRunning).trackingFinalizer().Pod,
-				*buildPod().uid("b").index("1").phase(v1.PodSucceeded).trackingFinalizer().Pod,
-				*buildPod().uid("c").index("2").phase(v1.PodRunning).trackingFinalizer().Pod,
-			},
-			wantStatus: batch.JobStatus{
-				Failed:                  1,
-				Succeeded:               1,
-				Terminating:             ptr.To[int32](2),
-				FailedIndexes:           ptr.To(""),
-				CompletedIndexes:        "1",
-				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
-				Conditions: []batch.JobCondition{
-					{
-						Type:    batch.JobSuccessCriteriaMet,
-						Status:  v1.ConditionTrue,
-						Reason:  batch.JobReasonSuccessPolicy,
-						Message: "Matched rules at index 0",
-					},
-				},
-			},
-		},
-		// REF: https://github.com/kubernetes/kubernetes/issues/123775
-		"job with successPolicy; JobManagedBy feature enabled; job has SuccessCriteriaMet condition when job meets to successPolicy and some pods still are running": {
-			enableJobManagedBy: true,
 			job: batch.Job{
 				TypeMeta:   validTypeMeta,
 				ObjectMeta: validObjectMeta,
@@ -5041,7 +4839,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 			},
 		},
 		"job without successPolicy; job got SuccessCriteriaMet and Completion with CompletionsReached reason conditions": {
-			enableJobManagedBy: true,
 			job: batch.Job{
 				TypeMeta:   validTypeMeta,
 				ObjectMeta: validObjectMeta,
@@ -5082,14 +4879,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			if !tc.enableJobManagedBy {
-				// TODO: this will be remove in 1.38
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.34"))
-			}
-			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.JobManagedBy: tc.enableJobManagedBy,
-			})
-
 			clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 			fakeClock := clocktesting.NewFakeClock(now)
 			_, ctx := ktesting.NewTestContext(t)
@@ -5155,10 +4944,9 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		enableJobManagedBy bool
-		job                batch.Job
-		pods               []v1.Pod
-		wantStatus         batch.JobStatus
+		job        batch.Job
+		pods       []v1.Pod
+		wantStatus batch.JobStatus
 	}{
 		"successful job after a single failure within index": {
 			job: batch.Job{
@@ -5597,176 +5385,9 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				},
 			},
 		},
-		"job failed due to failed indexes; JobManagedBy disabled": {
-			job: batch.Job{
-				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
-				ObjectMeta: validObjectMeta,
-				Spec: batch.JobSpec{
-					Selector:             validSelector,
-					Template:             validTemplate,
-					Parallelism:          ptr.To[int32](2),
-					Completions:          ptr.To[int32](2),
-					BackoffLimit:         ptr.To[int32](math.MaxInt32),
-					CompletionMode:       ptr.To(batch.IndexedCompletion),
-					BackoffLimitPerIndex: ptr.To[int32](1),
-				},
-			},
-			pods: []v1.Pod{
-				*buildPod().uid("a").index("0").phase(v1.PodFailed).indexFailureCount("1").trackingFinalizer().Pod,
-				*buildPod().uid("b").index("1").phase(v1.PodSucceeded).indexFailureCount("0").trackingFinalizer().Pod,
-			},
-			wantStatus: batch.JobStatus{
-				Failed:                  1,
-				Terminating:             ptr.To[int32](0),
-				Succeeded:               1,
-				FailedIndexes:           ptr.To("0"),
-				CompletedIndexes:        "1",
-				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
-				Conditions: []batch.JobCondition{
-					{
-						Type:    batch.JobFailureTarget,
-						Status:  v1.ConditionTrue,
-						Reason:  batch.JobReasonFailedIndexes,
-						Message: "Job has failed indexes",
-					},
-					{
-						Type:    batch.JobFailed,
-						Status:  v1.ConditionTrue,
-						Reason:  batch.JobReasonFailedIndexes,
-						Message: "Job has failed indexes",
-					},
-				},
-			},
-		},
-		"job failed due to failed indexes; JobManagedBy enabled": {
-			enableJobManagedBy: true,
-			job: batch.Job{
-				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
-				ObjectMeta: validObjectMeta,
-				Spec: batch.JobSpec{
-					Selector:             validSelector,
-					Template:             validTemplate,
-					Parallelism:          ptr.To[int32](2),
-					Completions:          ptr.To[int32](2),
-					BackoffLimit:         ptr.To[int32](math.MaxInt32),
-					CompletionMode:       ptr.To(batch.IndexedCompletion),
-					BackoffLimitPerIndex: ptr.To[int32](1),
-				},
-			},
-			pods: []v1.Pod{
-				*buildPod().uid("a").index("0").phase(v1.PodFailed).indexFailureCount("1").trackingFinalizer().Pod,
-				*buildPod().uid("b").index("1").phase(v1.PodSucceeded).indexFailureCount("0").trackingFinalizer().Pod,
-			},
-			wantStatus: batch.JobStatus{
-				Failed:                  1,
-				Terminating:             ptr.To[int32](0),
-				Succeeded:               1,
-				FailedIndexes:           ptr.To("0"),
-				CompletedIndexes:        "1",
-				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
-				Conditions: []batch.JobCondition{
-					{
-						Type:    batch.JobFailureTarget,
-						Status:  v1.ConditionTrue,
-						Reason:  batch.JobReasonFailedIndexes,
-						Message: "Job has failed indexes",
-					},
-					{
-						Type:    batch.JobFailed,
-						Status:  v1.ConditionTrue,
-						Reason:  batch.JobReasonFailedIndexes,
-						Message: "Job has failed indexes",
-					},
-				},
-			},
-		},
-		"job failed due to exceeding max failed indexes; JobManagedBy disabled": {
-			job: batch.Job{
-				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
-				ObjectMeta: validObjectMeta,
-				Spec: batch.JobSpec{
-					Selector:             validSelector,
-					Template:             validTemplate,
-					Parallelism:          ptr.To[int32](4),
-					Completions:          ptr.To[int32](4),
-					BackoffLimit:         ptr.To[int32](math.MaxInt32),
-					CompletionMode:       ptr.To(batch.IndexedCompletion),
-					BackoffLimitPerIndex: ptr.To[int32](1),
-					MaxFailedIndexes:     ptr.To[int32](1),
-				},
-			},
-			pods: []v1.Pod{
-				*buildPod().uid("a").index("0").phase(v1.PodFailed).indexFailureCount("1").trackingFinalizer().Pod,
-				*buildPod().uid("b").index("1").phase(v1.PodSucceeded).indexFailureCount("0").trackingFinalizer().Pod,
-				*buildPod().uid("c").index("2").phase(v1.PodFailed).indexFailureCount("1").trackingFinalizer().Pod,
-				*buildPod().uid("d").index("3").phase(v1.PodRunning).indexFailureCount("0").trackingFinalizer().Pod,
-			},
-			wantStatus: batch.JobStatus{
-				Failed:                  3,
-				Terminating:             ptr.To[int32](1),
-				Succeeded:               1,
-				FailedIndexes:           ptr.To("0,2"),
-				CompletedIndexes:        "1",
-				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
-				Conditions: []batch.JobCondition{
-					{
-						Type:    batch.JobFailureTarget,
-						Status:  v1.ConditionTrue,
-						Reason:  batch.JobReasonMaxFailedIndexesExceeded,
-						Message: "Job has exceeded the specified maximal number of failed indexes",
-					},
-				},
-			},
-		},
-		"job failed due to exceeding max failed indexes; JobManagedBy enabled": {
-			enableJobManagedBy: true,
-			job: batch.Job{
-				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
-				ObjectMeta: validObjectMeta,
-				Spec: batch.JobSpec{
-					Selector:             validSelector,
-					Template:             validTemplate,
-					Parallelism:          ptr.To[int32](4),
-					Completions:          ptr.To[int32](4),
-					BackoffLimit:         ptr.To[int32](math.MaxInt32),
-					CompletionMode:       ptr.To(batch.IndexedCompletion),
-					BackoffLimitPerIndex: ptr.To[int32](1),
-					MaxFailedIndexes:     ptr.To[int32](1),
-				},
-			},
-			pods: []v1.Pod{
-				*buildPod().uid("a").index("0").phase(v1.PodFailed).indexFailureCount("1").trackingFinalizer().Pod,
-				*buildPod().uid("b").index("1").phase(v1.PodSucceeded).indexFailureCount("0").trackingFinalizer().Pod,
-				*buildPod().uid("c").index("2").phase(v1.PodFailed).indexFailureCount("1").trackingFinalizer().Pod,
-				*buildPod().uid("d").index("3").phase(v1.PodRunning).indexFailureCount("0").trackingFinalizer().Pod,
-			},
-			wantStatus: batch.JobStatus{
-				Failed:                  3,
-				Terminating:             ptr.To[int32](1),
-				Succeeded:               1,
-				FailedIndexes:           ptr.To("0,2"),
-				CompletedIndexes:        "1",
-				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
-				Conditions: []batch.JobCondition{
-					{
-						Type:    batch.JobFailureTarget,
-						Status:  v1.ConditionTrue,
-						Reason:  batch.JobReasonMaxFailedIndexesExceeded,
-						Message: "Job has exceeded the specified maximal number of failed indexes",
-					},
-				},
-			},
-		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			if !tc.enableJobManagedBy {
-				// TODO: this will be removed in 1.38.
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.34"))
-			}
-			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.JobManagedBy: tc.enableJobManagedBy,
-			})
 			clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 			fakeClock := clocktesting.NewFakeClock(now)
 			manager, sharedInformerFactory := newControllerFromClientWithClock(ctx, t, clientset, controller.NoResyncPeriodFunc, fakeClock)
@@ -6971,9 +6592,6 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 		expectedSucceeded  int32
 		expectedFailed     int32
 		expectedConditions []batch.JobCondition
-
-		// features
-		enableJobManagedBy bool
 	}{
 		"backoffLimit 0 should have 1 pod active": {
 			parallelism:        1,
@@ -7150,55 +6768,7 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 				},
 			},
 		},
-		"finished job; JobManagedBy enabled": {
-			enableJobManagedBy: true,
-
-			parallelism:       2,
-			completions:       4,
-			backoffLimit:      6,
-			suspend:           true,
-			restartCounts:     []int32{1, 1, 2, 0},
-			podPhase:          v1.PodSucceeded,
-			expectedActive:    0,
-			expectedSucceeded: 4,
-			expectedFailed:    0,
-			expectedConditions: []batch.JobCondition{
-				{
-					Type:    batch.JobSuccessCriteriaMet,
-					Status:  v1.ConditionTrue,
-					Reason:  batch.JobReasonCompletionsReached,
-					Message: "Reached expected number of succeeded pods",
-				},
-				{
-					Type:    batch.JobComplete,
-					Status:  v1.ConditionTrue,
-					Reason:  batch.JobReasonCompletionsReached,
-					Message: "Reached expected number of succeeded pods",
-				},
-			},
-		},
 		"too many job failures with podRunning - multiple pods": {
-			parallelism:       2,
-			completions:       5,
-			backoffLimit:      2,
-			suspend:           false,
-			restartCounts:     []int32{1, 1},
-			podPhase:          v1.PodRunning,
-			expectedActive:    0,
-			expectedSucceeded: 0,
-			expectedFailed:    2,
-			expectedConditions: []batch.JobCondition{
-				{
-					Type:    batch.JobFailureTarget,
-					Status:  v1.ConditionTrue,
-					Reason:  batch.JobReasonBackoffLimitExceeded,
-					Message: "Job has reached the specified backoff limit",
-				},
-			},
-		},
-		"too many job failures with podRunning - multiple pods; JobManagedBy enabled": {
-			enableJobManagedBy: true,
-
 			parallelism:       2,
 			completions:       5,
 			backoffLimit:      2,
@@ -7221,13 +6791,6 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			if !tc.enableJobManagedBy {
-				// TODO: this will be removed in 1.38.
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.34"))
-			}
-			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.JobManagedBy: tc.enableJobManagedBy,
-			})
 			// job manager setup
 			clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 			manager, sharedInformerFactory := newControllerFromClient(ctx, t, clientset, controller.NoResyncPeriodFunc)
