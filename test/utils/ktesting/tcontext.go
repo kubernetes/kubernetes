@@ -181,7 +181,7 @@ func Init(tb TB, opts ...InitOption) TContext {
 		gracePeriod = DefaultCleanupGracePeriod
 	}
 
-	var cancelTimeout func(cause string)
+	var cancelTimeout func(cause error)
 	if deadline != nil {
 		timeLeft := time.Until(*deadline)
 		timeLeft -= gracePeriod
@@ -413,7 +413,7 @@ type TContext struct {
 	perTestHeader func() string
 
 	// for Cancel
-	cancel func(cause string)
+	cancel func(cause error)
 
 	// steps is a concatenation ("step1: step2: step3: ") of steps passed to WithStep.
 	// It's empty if there are no steps.
@@ -477,6 +477,20 @@ func (tCtx TContext) Parallel() {
 // to context.Canceled. context.Cause will return that error for the
 // context.
 func (tCtx TContext) Cancel(cause string) {
+	if tCtx.cancel != nil {
+		var cancelCause error
+		if cause != "" {
+			cancelCause = canceledError(cause)
+		}
+		// nil is okay here, context.Canceled will be used instead.
+		tCtx.cancel(cancelCause)
+	}
+}
+
+// CancelBecause is like Cancel except that it directly uses
+// the provided error. It is up to the caller whether that
+// error is a context.Canceled error.
+func (tCtx TContext) CancelBecause(cause error) {
 	if tCtx.cancel != nil {
 		tCtx.cancel(cause)
 	}

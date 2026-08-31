@@ -40,7 +40,7 @@ func (c canceledError) Is(target error) bool {
 // [context.WithTimeout], it automatically cancels during test cleanup, provides
 // the given cause when the deadline is reached, and its cancel function
 // requires a cause.
-func withTimeout(ctx context.Context, tb TB, timeout time.Duration, timeoutCause string) (context.Context, func(cause string)) {
+func withTimeout(ctx context.Context, tb TB, timeout time.Duration, timeoutCause string) (context.Context, func(cause error)) {
 	tb.Helper()
 
 	now := time.Now()
@@ -86,13 +86,7 @@ func withTimeout(ctx context.Context, tb TB, timeout time.Duration, timeoutCause
 	}
 
 	// We always have a deadline.
-	return deadlineContext{Context: cancelCtx, deadline: deadline}, func(cause string) {
-		var cancelCause error
-		if cause != "" {
-			cancelCause = canceledError(cause)
-		}
-		cancel(cancelCause)
-	}
+	return deadlineContext{Context: cancelCtx, deadline: deadline}, cancel
 }
 
 type deadlineContext struct {

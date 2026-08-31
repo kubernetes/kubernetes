@@ -30,13 +30,7 @@ func (tCtx TContext) WithCancel() TContext {
 	ctx, cancel := context.WithCancelCause(tCtx)
 
 	tCtx.Context = ctx
-	tCtx.cancel = func(cause string) {
-		var cancelCause error
-		if cause != "" {
-			cancelCause = canceledError(cause)
-		}
-		cancel(cancelCause)
-	}
+	tCtx.cancel = cancel
 	return tCtx
 }
 
