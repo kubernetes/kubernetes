@@ -320,7 +320,8 @@ func (env *testEnv) addCSIStorageCapacities(capacities []*storagev1.CSIStorageCa
 }
 
 func (env *testEnv) initClaims(t *testing.T, cachedPVCs []*v1.PersistentVolumeClaim, apiPVCs []*v1.PersistentVolumeClaim) {
-	// Seed the tracker directly so setup does not emit watch events before the test action.
+	// Seed API state in the tracker. Because the informer is already running,
+	// tracker changes are delivered asynchronously through its watch.
 	fakeClient := env.client.(*fake.Clientset)
 	for _, pvc := range cachedPVCs {
 		if err := env.internalBinder.pvcCache.store.Add(pvc); err != nil {
@@ -342,7 +343,8 @@ func (env *testEnv) initClaims(t *testing.T, cachedPVCs []*v1.PersistentVolumeCl
 }
 
 func (env *testEnv) initVolumes(t *testing.T, cachedPVs []*v1.PersistentVolume, apiPVs []*v1.PersistentVolume) {
-	// Seed the tracker directly so setup does not emit watch events before the test action.
+	// Seed API state in the tracker. Because the informer is already running,
+	// tracker changes are delivered asynchronously through its watch.
 	fakeClient := env.client.(*fake.Clientset)
 	for _, pv := range cachedPVs {
 		if err := env.internalBinder.pvCache.store.Add(pv); err != nil {
@@ -407,18 +409,36 @@ func (env *testEnv) updateClaims(ctx context.Context, pvcs []*v1.PersistentVolum
 	})
 }
 
-func (env *testEnv) deleteVolumes(t *testing.T, pvs []*v1.PersistentVolume) {
+func (env *testEnv) deleteVolumes(t *testing.T, ctx context.Context, pvs []*v1.PersistentVolume) {
 	for _, pv := range pvs {
-		if err := env.internalBinder.pvCache.store.Delete(pv); err != nil {
-			t.Fatalf("Error deleting PV %s: %v", pv.Name, err)
+		if err := env.client.CoreV1().PersistentVolumes().Delete(ctx, pv.Name, metav1.DeleteOptions{}); err != nil {
+			t.Fatalf("failed to delete PV %q: %v", pv.Name, err)
+		}
+		if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, cacheUpdateTimeout, true, func(ctx context.Context) (bool, error) {
+			_, err := env.internalBinder.pvCache.GetAPIObj(pv.Name)
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, err
+		}); err != nil {
+			t.Fatalf("failed waiting for PV %q deletion to reach informer cache: %v", pv.Name, err)
 		}
 	}
 }
 
-func (env *testEnv) deleteClaims(t *testing.T, pvcs []*v1.PersistentVolumeClaim) {
+func (env *testEnv) deleteClaims(t *testing.T, ctx context.Context, pvcs []*v1.PersistentVolumeClaim) {
 	for _, pvc := range pvcs {
-		if err := env.internalBinder.pvcCache.store.Delete(pvc); err != nil {
-			t.Fatalf("Error deleting PVC %s/%s: %v", pvc.Namespace, pvc.Name, err)
+		if err := env.client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(ctx, pvc.Name, metav1.DeleteOptions{}); err != nil {
+			t.Fatalf("failed to delete PVC %q: %v", getPVCName(pvc), err)
+		}
+		if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, cacheUpdateTimeout, true, func(ctx context.Context) (bool, error) {
+			_, err := env.internalBinder.pvcCache.GetAPIObj(getPVCName(pvc))
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, err
+		}); err != nil {
+			t.Fatalf("failed waiting for PVC %q deletion to reach informer cache: %v", getPVCName(pvc), err)
 		}
 	}
 }
@@ -1829,14 +1849,14 @@ func TestCheckBindings(t *testing.T) {
 
 		// Before execute
 		if scenario.deletePVs {
-			testEnv.deleteVolumes(t, scenario.initPVs)
+			testEnv.deleteVolumes(t, ctx, scenario.initPVs)
 		} else {
 			if err := testEnv.updateVolumes(ctx, scenario.apiPVs); err != nil {
 				t.Errorf("Failed to update PVs: %v", err)
 			}
 		}
 		if scenario.deletePVCs {
-			testEnv.deleteClaims(t, scenario.initPVCs)
+			testEnv.deleteClaims(t, ctx, scenario.initPVCs)
 		} else {
 			if err := testEnv.updateClaims(ctx, scenario.apiPVCs); err != nil {
 				t.Errorf("Failed to update PVCs: %v", err)
