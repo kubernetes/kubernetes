@@ -83,6 +83,18 @@ func TestCPUAccumulatorFreeSockets(t *testing.T) {
 			[]int{},
 		},
 		{
+			"dual socket, non-uniform CPUs per socket, HT, 1 socket free",
+			topoDualSocketMultiNumaPerSocketMixedChips,
+			mustParseCPUSet(t, "4-47,52-95"),
+			[]int{1},
+		},
+		{
+			"dual socket, non-uniform CPUs per socket, HT, 0 socket free",
+			topoDualSocketMultiNumaPerSocketMixedChips,
+			mustParseCPUSet(t, "4-15,17-47,52-63,65-95"),
+			[]int{},
+		},
+		{
 			"dual numa, multi socket per per socket, HT, 4 sockets free",
 			fakeTopoMultiSocketDualSocketPerNumaHT,
 			mustParseCPUSet(t, "0-79"),
@@ -317,6 +329,18 @@ func TestCPUAccumulatorFreeCores(t *testing.T) {
 			topoSingleSocketHT,
 			cpuset.New(0, 1, 2, 3),
 			[]int{},
+		},
+		{
+			"single socket, 7 HT cores free (1 partially consumed) + 4 ST cores free",
+			topoSingleSocketSingleNumaPerSocketPCoreHTECoreST,
+			mustParseCPUSet(t, "1-15,24-27"),
+			[]int{40, 41, 42, 43, 4, 8, 12, 16, 20, 24, 28},
+		},
+		{
+			"single socket, 0 HT cores free (8 partially consumed) + 12 ST cores free",
+			topoSingleSocketSingleNumaPerSocketPCoreHTECoreST,
+			mustParseCPUSet(t, "0,2,4,6,8,10,12,14,16-27"),
+			[]int{32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43},
 		},
 		{
 			"dual socket HT, 6 cores free",
@@ -675,6 +699,15 @@ func TestTakeByTopologyNUMAPacked(t *testing.T) {
 			64,
 			"",
 			mustParseCPUSet(t, "0-29,40-69,30,31,70,71"),
+		},
+		{
+			"allocate 2 cpus from non-uniform topology with 1 cpu reserved",
+			topoSingleSocketSingleNumaPerSocketPCoreHTECoreST,
+			StaticPolicyOptions{},
+			mustParseCPUSet(t, "1-27"), // 0 is reserved
+			2,
+			"",
+			mustParseCPUSet(t, "16-17"),
 		},
 		// Test cases for PreferAlignByUncoreCache
 		{
