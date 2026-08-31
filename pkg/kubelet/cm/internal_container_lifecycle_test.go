@@ -17,7 +17,7 @@ limitations under the License.
 package cm
 
 import (
-	"fmt"
+	"errors"
 	"testing"
 
 	"k8s.io/klog/v2"
@@ -48,8 +48,9 @@ func (memoryManager *mockMemoryManager) AddContainer(klog.Logger, *v1.Pod, *v1.C
 }
 
 type mockTopologyManager struct {
-	called    bool
-	removeErr error
+	called             bool
+	removeErr          error
+	removedContainerID string
 	topologymanager.Manager
 }
 
@@ -57,8 +58,9 @@ func (topologyManager *mockTopologyManager) AddContainer(klog.Logger, *v1.Pod, *
 	topologyManager.called = true
 }
 
-func (topologyManager *mockTopologyManager) RemoveContainer(klog.Logger, string) error {
+func (topologyManager *mockTopologyManager) RemoveContainer(_ klog.Logger, containerID string) error {
 	topologyManager.called = true
+	topologyManager.removedContainerID = containerID
 	return topologyManager.removeErr
 }
 
@@ -118,26 +120,28 @@ func TestPreStartContainer(t *testing.T) {
 func TestPostStopContainer(t *testing.T) {
 	containerID := "42"
 
+	sentinelError := errors.New("remove container failed")
+
 	tests := []struct {
 		name          string
 		lifecycle     internalContainerLifecycleImpl
-		expectedError bool
+		expectedError error
 	}{
 		{
 			name: "TopologyManager RemoveContainer is called and succeeds",
 			lifecycle: internalContainerLifecycleImpl{
 				topologyManager: &mockTopologyManager{},
 			},
-			expectedError: false,
+			expectedError: nil,
 		},
 		{
 			name: "TopologyManager RemoveContainer error is propagated",
 			lifecycle: internalContainerLifecycleImpl{
 				topologyManager: &mockTopologyManager{
-					removeErr: fmt.Errorf("remove container failed"),
+					removeErr: sentinelError,
 				},
 			},
-			expectedError: true,
+			expectedError: sentinelError,
 		},
 	}
 
@@ -146,16 +150,19 @@ func TestPostStopContainer(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			err := test.lifecycle.PostStopContainer(logger, containerID)
 
-			tManager := test.lifecycle.topologyManager
-			if !tManager.(*mockTopologyManager).called {
+			mock := test.lifecycle.topologyManager.(*mockTopologyManager)
+			if !mock.called {
 				t.Errorf("TopologyManager's RemoveContainer method must be called during container stop")
 			}
-
-			if test.expectedError && err == nil {
-				t.Errorf("expected an error from PostStopContainer, got nil")
+			if mock.removedContainerID != containerID {
+				t.Errorf("expected RemoveContainer to be called with containerID %q, got %q", containerID, mock.removedContainerID)
 			}
-			if !test.expectedError && err != nil {
+
+			if test.expectedError == nil && err != nil {
 				t.Errorf("expected no error from PostStopContainer, got: %v", err)
+			}
+			if test.expectedError != nil && !errors.Is(err, test.expectedError) {
+				t.Errorf("expected error from PostStopContainer to wrap %v, got: %v", test.expectedError, err)
 			}
 		})
 	}
