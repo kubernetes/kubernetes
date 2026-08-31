@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/validate/content"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -197,6 +198,20 @@ func UUID[T ~string](_ context.Context, op operation.Operation, fldPath *field.P
 				return field.ErrorList{field.Invalid(fldPath, val, uuidErrorMessage).WithOrigin("format=k8s-uuid")}
 			}
 		}
+	}
+	return nil
+}
+
+// IPSloppy verifies that the specified value is a valid IP address (IPv4 or IPv6),
+// allowing legacy/sloppy format.
+//   - must be a valid IPv4 address (e.g. "192.168.1.1") or IPv6 address (e.g. "2001:db8::1")
+//   - IPv4 octets are allowed to have leading zeros (e.g. "192.168.01.1")
+func IPSloppy[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	if netutils.ParseIPSloppy((string)(*value)) == nil {
+		return field.ErrorList{field.Invalid(fldPath, *value, "must be a valid IP address").WithOrigin("format=k8s-ip")}
 	}
 	return nil
 }
