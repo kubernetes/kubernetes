@@ -50,6 +50,13 @@ new ec2.LaunchTemplate(stack, 'LTWithPlacementGroup', {
   placementGroup: pg,
 });
 
+new ec2.LaunchTemplate(stack, 'LTWithCpuOptions', {
+  cpuOptions: {
+    coreCount: 1,
+    threadsPerCore: 1,
+  },
+});
+
 new integ.IntegTest(app, 'LambdaTest', {
   testCases: [stack],
   diffAssets: true,

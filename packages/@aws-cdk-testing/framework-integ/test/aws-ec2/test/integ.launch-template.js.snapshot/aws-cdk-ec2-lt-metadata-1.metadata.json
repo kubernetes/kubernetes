@@ -1,13 +1,4 @@
 {
-  "/aws-cdk-ec2-lt-metadata-1": [
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-ec2/test/integ.launch-template.js:40:15)",
-        "...node internals..."
-      ]
-    }
-  ],
   "/aws-cdk-ec2-lt-metadata-1/MyVpc": [
     {
       "type": "aws:cdk:analytics:construct",
@@ -79,19 +70,6 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "SsmParameterValueawsserviceamiamazonlinuxlatestamzn2amikernel510hvmx8664gp2C96584B6F00A464EAD1953AFF4B05118Parameter"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "StringParameter.fromStringParameterAttributes (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ssm/lib/parameter.js:370:31)",
-        "StringParameter.valueForTypedStringParameterV2 (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ssm/lib/parameter.js:468:25)",
-        "lookupImage (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/machine-image/utils.js:49:33)",
-        "AmazonLinux2ImageSsmParameter.getImage (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/machine-image/common.js:26:51)",
-        "new LaunchTemplate (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/launch-template.js:403:53)",
-        "new LaunchTemplate (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-ec2/test/integ.launch-template.js:68:1)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-ec2-lt-metadata-1/pg": [
@@ -108,61 +86,28 @@
       }
     }
   ],
+  "/aws-cdk-ec2-lt-metadata-1/LTWithCpuOptions": [
+    {
+      "type": "aws:cdk:analytics:construct",
+      "data": {}
+    }
+  ],
   "/aws-cdk-ec2-lt-metadata-1/BootstrapVersion": [
     {
       "type": "aws:cdk:logicalId",
       "data": "BootstrapVersion"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "addBootstrapVersionRule (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:302:19)",
-        "DefaultStackSynthesizer.addBootstrapVersionRule (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:202:9)",
-        "DefaultStackSynthesizer.synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/default-synthesizer.js:343:18)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:474: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:474:3)",
-        "visit (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:531:9)",
-        "visit (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:528:9)",
-        "synthesizeTree (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:467:5)",
-        "synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:95:5)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stage.js:220:96)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/app.js:208:27)"
-      ]
     }
   ],
   "/aws-cdk-ec2-lt-metadata-1/CheckBootstrapVersion": [
     {
       "type": "aws:cdk:logicalId",
       "data": "CheckBootstrapVersion"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "addBootstrapVersionRule (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:310:5)",
-        "DefaultStackSynthesizer.addBootstrapVersionRule (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:202:9)",
-        "DefaultStackSynthesizer.synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/default-synthesizer.js:343:18)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:474: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:474:3)",
-        "visit (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:531:9)",
-        "visit (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:528:9)",
-        "synthesizeTree (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:467:5)",
-        "synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:95:5)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stage.js:220:96)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/app.js:208:27)"
-      ]
     }
   ],
   "/aws-cdk-ec2-lt-metadata-1/MyVpc/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "MyVpcF9F0CA6F"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:811:29)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-ec2/test/integ.launch-template.js:41:13)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-ec2-lt-metadata-1/MyVpc/RestrictDefaultSecurityGroupCustomResource": [
@@ -175,149 +120,60 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new CustomResourceProviderBase (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/custom-resource-provider/custom-resource-provider-base.js:131:25)",
-        "new RestrictDefaultSgProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resource-handlers/dist/aws-ec2/restrict-default-sg-provider.generated.js:57:9)",
-        "RestrictDefaultSgProvider.getOrCreateProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resource-handlers/dist/aws-ec2/restrict-default-sg-provider.generated.js:54:28)",
-        "WrappedClass.restrictDefaultSecurityGroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1113:99)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:935:22)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-ec2/test/integ.launch-template.js:41:13)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-ec2-lt-metadata-1/Custom::VpcRestrictDefaultSGCustomResourceProvider/Handler": [
     {
       "type": "aws:cdk:logicalId",
       "data": "CustomVpcRestrictDefaultSGCustomResourceProviderHandlerDC833E5E"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new CustomResourceProviderBase (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/custom-resource-provider/custom-resource-provider-base.js:153:24)",
-        "new RestrictDefaultSgProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resource-handlers/dist/aws-ec2/restrict-default-sg-provider.generated.js:57:9)",
-        "RestrictDefaultSgProvider.getOrCreateProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resource-handlers/dist/aws-ec2/restrict-default-sg-provider.generated.js:54:28)",
-        "WrappedClass.restrictDefaultSecurityGroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1113:99)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:935:22)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-ec2/test/integ.launch-template.js:41:13)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-ec2-lt-metadata-1/sg1/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "sg15CEFF4E3"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new SecurityGroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/security-group.js:461:34)",
-        "new SecurityGroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new SecurityGroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-ec2/test/integ.launch-template.js:45:13)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-ec2-lt-metadata-1/LT/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "LTC4631592"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new LaunchTemplate (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/launch-template.js:498:30)",
-        "new LaunchTemplate (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-ec2/test/integ.launch-template.js:48:12)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-ec2-lt-metadata-1/sg2/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "sg2860DD91F"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new SecurityGroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/security-group.js:461:34)",
-        "new SecurityGroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new SecurityGroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-ec2/test/integ.launch-template.js:64:13)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-ec2-lt-metadata-1/LTWithMachineImage/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "LTWithMachineImageAAC227A5"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new LaunchTemplate (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/launch-template.js:498:30)",
-        "new LaunchTemplate (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-ec2/test/integ.launch-template.js:68:1)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-ec2-lt-metadata-1/pg/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "pg749EE6ED"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new PlacementGroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/placement-group.js:190:29)",
-        "new PlacementGroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-ec2/test/integ.launch-template.js:71:12)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-ec2-lt-metadata-1/LTWithPlacementGroup/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "LTWithPlacementGroup4B40027C"
-    },
+    }
+  ],
+  "/aws-cdk-ec2-lt-metadata-1/LTWithCpuOptions/Resource": [
     {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new LaunchTemplate (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/launch-template.js:498:30)",
-        "new LaunchTemplate (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-ec2/test/integ.launch-template.js:74:1)",
-        "...node internals..."
-      ]
+      "type": "aws:cdk:logicalId",
+      "data": "LTWithCpuOptions9F54A4F3"
     }
   ],
   "/aws-cdk-ec2-lt-metadata-1/MyVpc/RestrictDefaultSecurityGroupCustomResource/Default": [
     {
       "type": "aws:cdk:logicalId",
       "data": "MyVpcRestrictDefaultSecurityGroupCustomResourceA4FCCD62"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new CustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/custom-resource.js:141:29)",
-        "new CustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new CustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "WrappedClass.restrictDefaultSecurityGroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1132:13)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:935:22)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-ec2/test/integ.launch-template.js:41:13)",
-        "...node internals..."
-      ]
     }
   ]
 }

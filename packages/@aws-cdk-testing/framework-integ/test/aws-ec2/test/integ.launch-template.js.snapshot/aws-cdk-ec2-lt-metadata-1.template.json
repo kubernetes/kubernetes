@@ -328,6 +328,48 @@
      }
     ]
    }
+  },
+  "LTWithCpuOptions9F54A4F3": {
+   "Type": "AWS::EC2::LaunchTemplate",
+   "Properties": {
+    "LaunchTemplateData": {
+     "CpuOptions": {
+      "CoreCount": 1,
+      "ThreadsPerCore": 1
+     },
+     "TagSpecifications": [
+      {
+       "ResourceType": "instance",
+       "Tags": [
+        {
+         "Key": "Name",
+         "Value": "aws-cdk-ec2-lt-metadata-1/LTWithCpuOptions"
+        }
+       ]
+      },
+      {
+       "ResourceType": "volume",
+       "Tags": [
+        {
+         "Key": "Name",
+         "Value": "aws-cdk-ec2-lt-metadata-1/LTWithCpuOptions"
+        }
+       ]
+      }
+     ]
+    },
+    "TagSpecifications": [
+     {
+      "ResourceType": "launch-template",
+      "Tags": [
+       {
+        "Key": "Name",
+        "Value": "aws-cdk-ec2-lt-metadata-1/LTWithCpuOptions"
+       }
+      ]
+     }
+    ]
+   }
   }
  },
  "Parameters": {

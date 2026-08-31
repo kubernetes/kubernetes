@@ -2650,7 +2650,23 @@ const launchTemplate = new ec2.LaunchTemplate(this, 'LaunchTemplate', {
     },
   ],
 });
+```
 
+### CPU Options
+
+Specify `cpuOptions` to configure the CPU options for the instances launched with the template.
+This is useful, for example, to enable [nested virtualization](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-optimize-cpu.html)
+or to customize the number of CPU cores and threads per core:
+
+```ts
+new ec2.LaunchTemplate(this, 'LaunchTemplate', {
+  machineImage: ec2.MachineImage.latestAmazonLinux2023(),
+  cpuOptions: {
+    coreCount: 4,
+    threadsPerCore: 1,
+    nestedVirtualization: true,
+  },
+});
 ```
 
 ### Placement Group
