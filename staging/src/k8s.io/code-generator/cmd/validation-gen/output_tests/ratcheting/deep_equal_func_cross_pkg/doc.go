@@ -1,5 +1,5 @@
 /*
-Copyright The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,39 +16,25 @@ limitations under the License.
 
 // +k8s:validation-gen=TypesWithField=TypeMeta
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
-// +k8s:validation-gen-deep-equal-func=CustomDeepEqual
+// +k8s:validation-gen-deep-equal-func=k8s.io/code-generator/cmd/validation-gen/output_tests/_codegenignore/other.DeepEqual
 
-// This is a test package.
+// This is a test package.  Unlike the deep_equal_func package, which names a
+// function in this package, this one names a function in another package, so
+// the generated code has to emit an import for it.
 // +k8s:validation-gen-nolint
-package deepequalfunc
+package deepequalfunccrosspkg
 
 import (
-	"reflect"
-
 	"k8s.io/code-generator/cmd/validation-gen/testscheme"
 )
 
 var localSchemeBuilder = testscheme.New()
-
-var CustomDeepEqualCalls int
-
-func CustomDeepEqual[T any](a, b T) bool {
-	CustomDeepEqualCalls++
-	return reflect.DeepEqual(a, b)
-}
 
 type Struct struct {
 	TypeMeta int
 
 	// +k8s:validateFalse="field Struct.NonComparableField"
 	NonComparableField NonComparableStruct `json:"nonComparableField"`
-
-	// +k8s:eachVal=+k8s:validateFalse="field Struct.MapField[*]"
-	MapField map[string]NonComparableStruct `json:"mapField"`
-
-	// +k8s:listType=set
-	// +k8s:eachVal=+k8s:validateFalse="field Struct.SetField[*]"
-	SetField []NonComparableStruct `json:"setField"`
 }
 
 // +k8s:validateFalse="type NonComparableStruct"

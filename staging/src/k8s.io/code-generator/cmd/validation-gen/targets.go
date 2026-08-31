@@ -54,8 +54,12 @@ const (
 	// (e.g. in tests), or set to "nil" to disable scheme registration for this
 	// package.
 	schemeRegistryTagName = "k8s:validation-gen-scheme-registry"
-	// Defines the deep-equal function used for equivalence and ratcheting checks.
-	// Defaults to "k8s.io/apimachinery/pkg/api/equality.Semantic.DeepEqual".
+	// Defines the deep-equal function used wherever generated code needs
+	// value equality.  The value names a function which must be generic
+	// over a single type parameter, e.g:
+	//     func Equal[T any](a, b T) bool
+	// An unqualified name refers to the package being generated into.
+	// Defaults to "k8s.io/apimachinery/pkg/api/validate.SemanticDeepEqual".
 	deepEqualFuncTagName = "k8s:validation-gen-deep-equal-func"
 	// If set, generate go test files for test fixtures.  Supported values: "validateFalse".
 	testFixtureTagName = "k8s:validation-gen-test-fixture"
@@ -74,7 +78,7 @@ const (
 var (
 	runtimePkg           = "k8s.io/apimachinery/pkg/runtime"
 	schemeType           = types.Name{Package: runtimePkg, Name: "Scheme"}
-	defaultDeepEqualFunc = types.Name{Package: "k8s.io/apimachinery/pkg/api/equality", Name: "Semantic.DeepEqual"}
+	defaultDeepEqualFunc = types.Name{Package: "k8s.io/apimachinery/pkg/api/validate", Name: "SemanticDeepEqual"}
 	metav1Pkg            = "k8s.io/apimachinery/pkg/apis/meta/v1"
 	listMetaType         = types.Name{Package: metav1Pkg, Name: "ListMeta"}
 )
@@ -178,29 +182,7 @@ func deepEqualFuncTag(pkg *types.Package) types.Name {
 	if val == "" {
 		return defaultDeepEqualFunc
 	}
-	return parseDeepEqualFunc(val)
-}
-
-func parseDeepEqualFunc(val string) types.Name {
-	lastSlash := strings.LastIndex(val, "/")
-	if lastSlash == -1 {
-		pkg, sym, found := strings.Cut(val, ".")
-		if !found {
-			return types.Name{Name: val}
-		}
-		return types.Name{
-			Package: pkg,
-			Name:    sym,
-		}
-	}
-	dot := lastSlash + strings.Index(val[lastSlash:], ".")
-	if dot == lastSlash {
-		return types.Name{Package: val}
-	}
-	return types.Name{
-		Package: val[:dot],
-		Name:    val[dot+1:],
-	}
+	return types.ParseFullyQualifiedName(val)
 }
 
 func isSubresourceTag(t *types.Type) (string, bool) {

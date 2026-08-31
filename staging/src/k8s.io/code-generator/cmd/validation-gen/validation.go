@@ -70,7 +70,6 @@ type genValidations struct {
 	schemeRegistry      types.Name
 	emitRegisterFunc    bool
 	deepEqualFunc       types.Name
-	usedDeepEqualImpl   bool
 }
 
 // NewGenValidations creates a new generator for the specified package.
@@ -89,6 +88,17 @@ func NewGenValidations(outputFilename, outputPackage, inputPackage string, rootT
 		emitRegisterFunc:    emitRegisterFunc,
 		deepEqualFunc:       deepEqualFunc,
 	}
+}
+
+// emitDeepEqualFunc emits a reference to this package's deep-equal function.
+// An unqualified tag value names a function in the package being generated
+// into, which must be emitted as-is rather than through the raw namer.
+func (g *genValidations) emitDeepEqualFunc(sw *generator.SnippetWriter, c *generator.Context) {
+	if g.deepEqualFunc.Package == "" {
+		sw.Do("$.$", g.deepEqualFunc.Name)
+		return
+	}
+	sw.Do("$.|raw$", c.Universe.Type(g.deepEqualFunc))
 }
 
 // resolveFunc maps a validator reference to the package it should be called
@@ -166,26 +176,6 @@ func (g *genValidations) GenerateType(c *generator.Context, t *types.Type, w io.
 	g.emitValidationFunction(c, t, sw)
 	if err := sw.Error(); err != nil {
 		return err
-	}
-	return nil
-}
-
-func (g *genValidations) Finalize(c *generator.Context, w io.Writer) error {
-	if g.usedDeepEqualImpl {
-		sw := generator.NewSnippetWriter(w, c, "$", "$")
-		sw.Do("\n", nil)
-		sw.Do("// deepEqualImpl_ is a validate.MatchFunc which allows the implementation of deep-equality to be defined at codegen time.\n", nil)
-		sw.Do("func deepEqualImpl_[T any](a, b T) bool {\n", nil)
-		if g.deepEqualFunc.Package == "" {
-			sw.Do("	return $.$(a, b)\n", g.deepEqualFunc.Name)
-		} else {
-			targs := generator.Args{
-				"deepEqualFunc": c.Universe.Type(g.deepEqualFunc),
-			}
-			sw.Do("	return $.deepEqualFunc|raw$(a, b)\n", targs)
-		}
-		sw.Do("}\n", nil)
-		return sw.Error()
 	}
 	return nil
 }
@@ -1493,12 +1483,9 @@ func (g *genValidations) emitRatchetingCheck(c *generator.Context, t *types.Type
 		// - *obj == *oldObj : compare values
 		sw.Do("  if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {\n", targs)
 	} else {
-		if g.deepEqualFunc.Package == "" {
-			sw.Do("  if $.$(obj, oldObj) {\n", g.deepEqualFunc.Name)
-		} else {
-			targs["deepEqualFunc"] = c.Universe.Type(g.deepEqualFunc)
-			sw.Do("  if $.deepEqualFunc|raw$(obj, oldObj) {\n", targs)
-		}
+		sw.Do("  if ", nil)
+		g.emitDeepEqualFunc(sw, c)
+		sw.Do("(obj, oldObj) {\n", nil)
 	}
 	sw.Do("    return nil\n", nil)
 	sw.Do("  }\n", nil)
@@ -1785,23 +1772,11 @@ func (g *genValidations) toGolangSourceDataLiteral(sw *generator.SnippetWriter, 
 	case *types.Member:
 		sw.Do("obj."+v.Name, nil)
 	case validators.Identifier:
-		if types.Name(v) == validators.DeepEqualImpl {
-			g.usedDeepEqualImpl = true
-		}
-		if v.Package == "" {
-			sw.Do(v.Name, nil)
-		} else {
-			sw.Do("$.|raw$", c.Universe.Type(types.Name(v)))
-		}
+		sw.Do("$.|raw$", c.Universe.Type(types.Name(v)))
 	case *validators.Identifier:
-		if types.Name(*v) == validators.DeepEqualImpl {
-			g.usedDeepEqualImpl = true
-		}
-		if v.Package == "" {
-			sw.Do(v.Name, nil)
-		} else {
-			sw.Do("$.|raw$", c.Universe.Type(types.Name(*v)))
-		}
+		sw.Do("$.|raw$", c.Universe.Type(types.Name(*v)))
+	case validators.DeepEqualFunc:
+		g.emitDeepEqualFunc(sw, c)
 	case validators.PrivateVar:
 		sw.Do("$.|private$", c.Universe.Type(types.Name(v)))
 	case *validators.PrivateVar:

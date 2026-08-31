@@ -422,7 +422,7 @@ func generateMemberFieldValidation(structType *types.Type, group *discriminatorG
 	if util.IsDirectComparable(util.NonPointer(util.NativeType(fieldType))) {
 		equivArg = Identifier(validateDirectEqual)
 	} else {
-		equivArg = Identifier(validateSemanticDeepEqual)
+		equivArg = DeepEqualFunc{}
 	}
 
 	fn := Function(modeDiscriminatorTagName, DefaultFlags, discriminatedValidator,

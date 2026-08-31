@@ -283,7 +283,7 @@ func generateSliceValidation(listByPath map[string]*listMetadata, context Contex
 			if util.IsDirectComparable(util.NonPointer(util.NativeType(elem))) {
 				matchArg = Identifier(validateDirectEqual)
 			} else {
-				matchArg = Identifier(validateSemanticDeepEqual)
+				matchArg = DeepEqualFunc{}
 			}
 		default:
 			return Validations{}, fmt.Errorf("+k8s:update=NoAddItem/+k8s:update=NoRemoveItem require listType=set, listType=map, unique=set, or unique=map to define item identity")
@@ -342,7 +342,7 @@ func emitScalarUpdate(context Context, constraints []validate.UpdateConstraint) 
 				Body:       "return a == b",
 			}
 		} else {
-			matchArg = Identifier(validateSemanticDeepEqual)
+			matchArg = DeepEqualFunc{}
 		}
 		args = append([]any{matchArg}, constraintIdentifierArgs(constraints)...)
 	}
