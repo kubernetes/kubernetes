@@ -359,3 +359,152 @@ func TestGenericPodGroup_HasDisruptionModeAll(t *testing.T) {
 		})
 	}
 }
+
+func TestGenericPodGroup_IsGang(t *testing.T) {
+	tests := []struct {
+		name string
+		gpg  *GenericPodGroup
+		want bool
+	}{
+		{
+			name: "PodGroup with Gang policy returns true",
+			gpg: NewGenericPodGroup(&schedulingv1beta1.PodGroup{
+				Spec: schedulingv1beta1.PodGroupSpec{
+					SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{
+						Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 4},
+					},
+				},
+			}),
+			want: true,
+		},
+		{
+			name: "PodGroup with Basic policy returns false",
+			gpg: NewGenericPodGroup(&schedulingv1beta1.PodGroup{
+				Spec: schedulingv1beta1.PodGroupSpec{
+					SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{
+						Basic: &schedulingv1beta1.BasicSchedulingPolicy{},
+					},
+				},
+			}),
+			want: false,
+		},
+		{
+			name: "CompositePodGroup with Gang policy returns true",
+			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
+				Spec: schedulingv1alpha3.CompositePodGroupSpec{
+					SchedulingPolicy: schedulingv1alpha3.CompositePodGroupSchedulingPolicy{
+						Gang: &schedulingv1alpha3.CompositeGangSchedulingPolicy{MinGroupCount: 3},
+					},
+				},
+			}),
+			want: true,
+		},
+		{
+			name: "CompositePodGroup with Basic policy returns false",
+			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
+				Spec: schedulingv1alpha3.CompositePodGroupSpec{
+					SchedulingPolicy: schedulingv1alpha3.CompositePodGroupSchedulingPolicy{
+						Basic: &schedulingv1alpha3.CompositeBasicSchedulingPolicy{},
+					},
+				},
+			}),
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.gpg.IsGang(); got != tt.want {
+				t.Errorf("IsGang() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGenericPodGroup_GetMinCount(t *testing.T) {
+	tests := []struct {
+		name string
+		gpg  *GenericPodGroup
+		want int
+	}{
+		{
+			name: "PodGroup with Gang policy returns minCount",
+			gpg: NewGenericPodGroup(&schedulingv1beta1.PodGroup{
+				Spec: schedulingv1beta1.PodGroupSpec{
+					SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{
+						Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 4},
+					},
+				},
+			}),
+			want: 4,
+		},
+		{
+			name: "PodGroup with Basic policy returns 1",
+			gpg: NewGenericPodGroup(&schedulingv1beta1.PodGroup{
+				Spec: schedulingv1beta1.PodGroupSpec{
+					SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{
+						Basic: &schedulingv1beta1.BasicSchedulingPolicy{},
+					},
+				},
+			}),
+			want: 1,
+		},
+		{
+			name: "CompositePodGroup with Gang policy returns minGroupCount",
+			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
+				Spec: schedulingv1alpha3.CompositePodGroupSpec{
+					SchedulingPolicy: schedulingv1alpha3.CompositePodGroupSchedulingPolicy{
+						Gang: &schedulingv1alpha3.CompositeGangSchedulingPolicy{MinGroupCount: 3},
+					},
+				},
+			}),
+			want: 3,
+		},
+		{
+			name: "CompositePodGroup with Basic policy returns 1",
+			gpg: NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{
+				Spec: schedulingv1alpha3.CompositePodGroupSpec{
+					SchedulingPolicy: schedulingv1alpha3.CompositePodGroupSchedulingPolicy{
+						Basic: &schedulingv1alpha3.CompositeBasicSchedulingPolicy{},
+					},
+				},
+			}),
+			want: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.gpg.GetMinCount(); got != tt.want {
+				t.Errorf("GetMinCount() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGenericPodGroup_GetMinCountFieldName(t *testing.T) {
+	tests := []struct {
+		name string
+		gpg  *GenericPodGroup
+		want string
+	}{
+		{
+			name: "PodGroup returns minCount",
+			gpg:  NewGenericPodGroup(&schedulingv1beta1.PodGroup{}),
+			want: "minCount",
+		},
+		{
+			name: "CompositePodGroup returns minGroupCount",
+			gpg:  NewGenericCompositePodGroup(&schedulingv1alpha3.CompositePodGroup{}),
+			want: "minGroupCount",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.gpg.GetMinCountFieldName(); got != tt.want {
+				t.Errorf("GetMinCountFieldName() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
