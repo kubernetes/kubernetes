@@ -941,9 +941,9 @@ func (c *Cacher) dispatchEvents() {
 			// checking if resourceVersion here has changed.
 			if event.Type != watch.Bookmark {
 				c.dispatchEvent(&event)
+				metrics.EventsCounter.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Inc()
 			}
 			lastProcessedResourceVersion = event.ResourceVersion
-			metrics.EventsCounter.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Inc()
 		case <-bookmarkTimer.C():
 			bookmarkTimer.Reset(wait.Jitter(time.Second, 0.25))
 			bookmarkEvent := &watchCacheEvent{
