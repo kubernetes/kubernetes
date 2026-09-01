@@ -942,12 +942,6 @@ const (
 	// Enables PortForward to be proxied with a websocket client
 	PortForwardWebsockets featuregate.Feature = "PortForwardWebsockets"
 
-	// owner: @danwinship
-	// kep: https://kep.k8s.io/3015
-	//
-	// Enables PreferSameZone and PreferSameNode values for trafficDistribution
-	PreferSameTrafficDistribution featuregate.Feature = "PreferSameTrafficDistribution"
-
 	// owner: @jessfraz
 	//
 	// Enables control over ProcMountType for containers.
@@ -1994,12 +1988,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	PreferSameTrafficDistribution: {
-		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
-
 	ProcMountType: {
 		{Version: version.MustParse("1.12"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
@@ -2775,8 +2763,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	PodsAPI: {},
 
 	PortForwardWebsockets: {},
-
-	PreferSameTrafficDistribution: {},
 
 	ProcMountType: {UserNamespacesSupport},
 

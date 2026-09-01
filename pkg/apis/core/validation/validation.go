@@ -7328,6 +7328,12 @@ func validateServiceInternalTrafficFieldsValue(service *core.Service) field.Erro
 	return allErrs
 }
 
+var supportedTrafficDistribution = []string{
+	v1.ServiceTrafficDistributionPreferClose,
+	v1.ServiceTrafficDistributionPreferSameZone,
+	v1.ServiceTrafficDistributionPreferSameNode,
+}
+
 // validateServiceTrafficDistribution validates the values for the
 // trafficDistribution field.
 func validateServiceTrafficDistribution(service *core.Service) field.ErrorList {
@@ -7335,19 +7341,6 @@ func validateServiceTrafficDistribution(service *core.Service) field.ErrorList {
 
 	if service.Spec.TrafficDistribution == nil {
 		return allErrs
-	}
-
-	var supportedTrafficDistribution []string
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution) {
-		supportedTrafficDistribution = []string{
-			v1.ServiceTrafficDistributionPreferClose,
-		}
-	} else {
-		supportedTrafficDistribution = []string{
-			v1.ServiceTrafficDistributionPreferClose,
-			v1.ServiceTrafficDistributionPreferSameZone,
-			v1.ServiceTrafficDistributionPreferSameNode,
-		}
 	}
 
 	if !slices.Contains(supportedTrafficDistribution, *service.Spec.TrafficDistribution) {
