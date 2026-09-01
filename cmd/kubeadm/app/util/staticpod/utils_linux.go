@@ -74,7 +74,7 @@ func RunComponentAsNonRoot(componentName string, pod *v1.Pod, usersAndGroups *us
 			cfg,
 		)
 	}
-	return errors.New(fmt.Sprintf("component name %q is not valid", componentName))
+	return fmt.Errorf("component name %q is not valid", componentName)
 }
 
 // runKubeAPIServerAsNonRoot updates the pod manifest and the hostVolume permissions to run kube-apiserver as non root.
