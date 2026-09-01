@@ -24,6 +24,7 @@ import (
 	"slices"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -7634,6 +7635,110 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestSyncOrphanPodsBySelectorRetryOnFailure(t *testing.T) {
+	const podsCount = 3
+
+	_, ctx := ktesting.NewTestContext(t)
+	clientset := fake.NewClientset()
+	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
+	manager, err := NewController(ctx, clientset, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), sharedInformers.Scheduling().V1beta1().Workloads(), sharedInformers.Scheduling().V1beta1().PodGroups())
+	if err != nil {
+		t.Fatalf("Error creating Job controller: %v", err)
+	}
+	manager.podStoreSynced = alwaysReady
+	manager.jobStoreSynced = alwaysReady
+	manager.podControl = &controller.FakePodControl{}
+
+	podInformer := sharedInformers.Core().V1().Pods().Informer()
+	go podInformer.RunWithContext(ctx)
+	cache.WaitForCacheSync(ctx.Done(), podInformer.HasSynced)
+
+	selector := &metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			"app": "test",
+		},
+	}
+	selectorString, err := metav1.LabelSelectorAsSelector(selector)
+	if err != nil {
+		t.Fatalf("Error parsing pod label selector: %v", err)
+	}
+
+	var pods []*v1.Pod
+	for i := range podsCount {
+		pod := buildPod().name(fmt.Sprintf("pod%d", i+1)).ns("default").labels(selector.MatchLabels).deletionTimestamp().trackingFinalizer().Pod
+		pods = append(pods, pod)
+	}
+
+	podIndexer := podInformer.GetIndexer()
+	for _, pod := range pods {
+		if err := podIndexer.Add(pod); err != nil {
+			t.Fatalf("Failed to add pod to indexer: %v", err)
+		}
+	}
+
+	for _, pod := range pods {
+		_, err = clientset.CoreV1().Pods("default").Create(ctx, pod, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Creating pod: %v", err)
+		}
+	}
+
+	orphanKey := orphanPodKey{
+		kind:      OrphanPodKeyKindSelector,
+		namespace: "default",
+		value:     selectorString.String(),
+	}
+
+	fakePodControl := manager.podControl.(*controller.FakePodControl)
+	fakePodControl.Err = errors.New("server temporarily unavailable")
+
+	err = manager.syncOrphanPod(ctx, orphanKey)
+	if err != nil {
+		t.Fatalf("syncOrphanPod should not return error even if some pods fail: %v", err)
+	}
+
+	if len(fakePodControl.Patches) != podsCount {
+		t.Errorf("Expected %d patch attempts (one for each pod), got %d", podsCount, len(fakePodControl.Patches))
+	}
+
+	fakePodControl.Patches = nil
+	fakePodControl.Err = nil
+
+	// Wait for the rate limiter backoff delay to expire before retrying.
+	// The default rate limiter uses exponential backoff with initial base delay of 5ms,
+	// but after multiple failures the backoff can extend to seconds. This sleep ensures
+	// that when we drain the queue below, the items are actually processable and not
+	// still blocked by When() returning a future time.
+	time.Sleep(2 * time.Second)
+
+	for range podsCount {
+		key, quit := manager.orphanQueue.Get()
+		if quit {
+			t.Fatalf("Queue unexpectedly empty")
+		}
+		if key.kind != OrphanPodKeyKindName {
+			t.Errorf("Expected requeued key kind to be %v, got %v", OrphanPodKeyKindName, key.kind)
+		}
+		manager.orphanQueue.Done(key)
+
+		err := manager.syncOrphanPod(ctx, key)
+		if err != nil {
+			t.Fatalf("syncOrphanPod failed on retry: %v", err)
+		}
+	}
+
+	if len(fakePodControl.Patches) != podsCount {
+		t.Errorf("Expected %d patch attempts on retry, got %d", podsCount, len(fakePodControl.Patches))
+	}
+
+	for i, patch := range fakePodControl.Patches {
+		patchStr := string(patch)
+		if !strings.Contains(patchStr, "$deleteFromPrimitiveList/finalizers") || !strings.Contains(patchStr, batch.JobTrackingFinalizer) {
+			t.Errorf("Patch %d: expected finalizer removal patch, got %s", i, patchStr)
+		}
 	}
 }
 
