@@ -555,6 +555,7 @@ type PersistentVolumeClaimSpec struct {
 	// +listType=atomic
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
 	// selector is a label query over volumes to consider for binding.
+	// A null or empty selector matches all volumes. This selector is ignored when volumeName is set.
 	// +optional
 	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,4,opt,name=selector"`
 	// resources represents the minimum resources the volume should have.

@@ -1557,7 +1557,7 @@ func (PersistentVolumeClaimList) SwaggerDoc() map[string]string {
 var map_PersistentVolumeClaimSpec = map[string]string{
 	"":                          "PersistentVolumeClaimSpec describes the common attributes of storage devices and allows a Source for provider-specific attributes",
 	"accessModes":               "accessModes contains the desired access modes the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1",
-	"selector":                  "selector is a label query over volumes to consider for binding.",
+	"selector":                  "selector is a label query over volumes to consider for binding. A null or empty selector matches all volumes. This selector is ignored when volumeName is set.",
 	"resources":                 "resources represents the minimum resources the volume should have. Users are allowed to specify resource requirements that are lower than previous value but must still be higher than capacity recorded in the status field of the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources",
 	"volumeName":                "volumeName is the binding reference to the PersistentVolume backing this claim.",
 	"storageClassName":          "storageClassName is the name of the StorageClass required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1",

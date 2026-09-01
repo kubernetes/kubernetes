@@ -2556,7 +2556,7 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
               }
             ],
-            "description": "selector is a label query over volumes to consider for binding."
+            "description": "selector is a label query over volumes to consider for binding. A null or empty selector matches all volumes. This selector is ignored when volumeName is set."
           },
           "storageClassName": {
             "description": "storageClassName is the name of the StorageClass required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1",

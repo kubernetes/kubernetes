@@ -26921,7 +26921,7 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimSpec(ref common.ReferenceCall
 					},
 					"selector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "selector is a label query over volumes to consider for binding.",
+							Description: "selector is a label query over volumes to consider for binding. A null or empty selector matches all volumes. This selector is ignored when volumeName is set.",
 							Ref:         ref(metav1.LabelSelector{}.OpenAPIModelName()),
 						},
 					},
