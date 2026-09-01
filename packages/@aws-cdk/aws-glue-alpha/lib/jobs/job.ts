@@ -417,7 +417,7 @@ export interface JobProps {
    * Glue Version
    * The version of Glue to use to execute this job
    *
-   * @default 3.0 for ETL
+   * @default - determined by the job type: 4.0 for ETL and Streaming, 5.0 for Flex, 3.0 for Python Shell
    */
   readonly glueVersion?: GlueVersion;
 

@@ -16,10 +16,11 @@ import { SparkJob } from './spark-job';
  * The flexible execution class is appropriate for non-urgent jobs such as
  * pre-production jobs, testing, and one-time data loads.
  * Flexible job runs are supported for jobs using AWS Glue version 3.0 or later and G.1X or
- * G.2X worker types but will default to the latest version of Glue (currently Glue 3.0.)
+ * G.2X worker types but will default to the latest version of Glue (currently Glue 5.0.)
  *
- * Similar to ETL, we’ll enable these features: —enable-metrics, —enable-spark-ui,
- * —enable-continuous-cloudwatch-log
+ * Similar to ETL, we’ll enable these features: --enable-metrics,
+ * --enable-continuous-cloudwatch-log. The Spark UI (--enable-spark-ui) is off by
+ * default; enable it by setting the `sparkUI` prop.
  *
  */
 export interface ScalaSparkFlexEtlJobProps extends SparkJobProps {
@@ -67,11 +68,12 @@ export interface ScalaSparkFlexEtlJobProps extends SparkJobProps {
  * Spark ETL Jobs class
  *
  * ETL jobs support pySpark and Scala languages, for which there are separate
- * but similar constructors. ETL jobs default to the G2 worker type, but you
+ * but similar constructors. ETL jobs default to the G1 worker type, but you
  * can override this default with other supported worker type values
  * (G1, G2, G4 and G8). ETL jobs defaults to Glue version 4.0, which you can
  * override to 3.0. The following ETL features are enabled by default:
- * —enable-metrics, —enable-spark-ui, —enable-continuous-cloudwatch-log.
+ * --enable-metrics, --enable-continuous-cloudwatch-log. The Spark UI
+ * (--enable-spark-ui) is off by default; enable it by setting the `sparkUI` prop.
  * You can find more details about version, worker type and other features
  * in Glue's public documentation.
  */

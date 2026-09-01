@@ -71,7 +71,7 @@ for more granular details.
 #### ETL Jobs
 
 ETL jobs support pySpark and Scala languages, for which there are separate but
-similar constructors. ETL jobs default to the G2 worker type, but you can
+similar constructors. ETL jobs default to the G1 worker type, but you can
 override this default with other supported worker type values (G1, G2, G4
 and G8). ETL jobs defaults to Glue version 4.0, which you can override to 3.0.
 The following ETL features are enabled by default:
@@ -140,7 +140,7 @@ Streaming jobs are similar to ETL jobs, except that they perform ETL on data
 streams using the Apache Spark Structured Streaming framework. Some Spark
 job features are not available to Streaming ETL jobs. They support Scala
 and pySpark languages. PySpark streaming jobs run on Python 3. It
-defaults to the G2 worker type and Glue 4.0, both of which you can override.
+defaults to the G1 worker type and Glue 4.0, both of which you can override.
 The following best practice features are enabled by default:
 `—enable-metrics, —enable-continuous-cloudwatch-log`.
 The Spark UI (`—enable-spark-ui`) is off by default; enable it by setting the
@@ -197,7 +197,7 @@ new glue.PySparkStreamingJob(stack, 'PySparkStreamingJob', {
 
 The flexible execution class is appropriate for non-urgent jobs such as
 pre-production jobs, testing, and one-time data loads. Flexible jobs default
-to Glue version 5.0 and worker type `G_2X`. The following best practice
+to Glue version 5.0 and worker type `G_1X`. The following best practice
 features are enabled by default:
 `—enable-metrics, —enable-continuous-cloudwatch-log`
 The Spark UI (`—enable-spark-ui`) is off by default; enable it by setting the

@@ -82,7 +82,7 @@ export interface Predicate {
   /**
    * The logical operator to be applied to the conditions.
    *
-   * @default - ConditionLogical.AND if multiple conditions are provided, no logical operator if only one condition
+   * @default - PredicateLogical.AND if multiple conditions are provided, no logical operator if only one condition
    */
   readonly logical?: PredicateLogical;
 
