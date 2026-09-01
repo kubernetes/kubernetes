@@ -850,14 +850,11 @@ func TestScaleCPU(t *testing.T) {
 			switch tt.fixture.resource.kind {
 			case "ReplicationController":
 				AddGetScaleReactor(fakeScaleClient, "replicationcontrollers", &tt.fixture)
-				AddGetScaleReactor(fakeScaleClient, "replicationcontrollers", &tt.fixture)
 				AddUpdateScaleReactor(fakeScaleClient, "replicationcontrollers")
 			case "ReplicaSet":
 				AddGetScaleReactor(fakeScaleClient, "replicasets", &tt.fixture)
-				AddGetScaleReactor(fakeScaleClient, "replicasets", &tt.fixture)
 				AddUpdateScaleReactor(fakeScaleClient, "replicasets")
 			case "Deployment":
-				AddGetScaleReactor(fakeScaleClient, "deployments", &tt.fixture)
 				AddGetScaleReactor(fakeScaleClient, "deployments", &tt.fixture)
 				AddUpdateScaleReactor(fakeScaleClient, "deployments")
 			}
@@ -4792,7 +4789,6 @@ func TestScaleTimingBehavior(t *testing.T) {
 
 			fakeScaleClient := &scalefake.FakeScaleClient{}
 			AddGetScaleReactor(fakeScaleClient, "replicationcontrollers", &tt.fixture)
-			AddGetScaleReactor(fakeScaleClient, "replicationcontrollers", &tt.fixture)
 			AddUpdateScaleReactor(fakeScaleClient, "replicationcontrollers")
 
 			fakeMetricsClient := &metricsfake.Clientset{}
@@ -6158,7 +6154,6 @@ func TestOneMetricEmptyExternalError(t *testing.T) {
 			AddUpdateAutoscalingReactor(testClient)
 
 			fakeScaleClient := &scalefake.FakeScaleClient{}
-			AddGetScaleReactor(fakeScaleClient, "replicationcontrollers", &tt.fixture)
 			AddGetScaleReactor(fakeScaleClient, "replicationcontrollers", &tt.fixture)
 			AddUpdateScaleReactor(fakeScaleClient, "replicationcontrollers")
 
