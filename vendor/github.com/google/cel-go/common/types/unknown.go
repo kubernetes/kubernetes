@@ -16,6 +16,7 @@ package types
 
 import (
 	"fmt"
+	"maps"
 	"math"
 	"reflect"
 	"sort"
@@ -297,9 +298,7 @@ func MergeUnknowns(unk1, unk2 *Unknown) *Unknown {
 	out := &Unknown{
 		attributeTrails: make(map[int64][]*AttributeTrail, len(unk1.attributeTrails)+len(unk2.attributeTrails)),
 	}
-	for id, ats := range unk1.attributeTrails {
-		out.attributeTrails[id] = ats
-	}
+	maps.Copy(out.attributeTrails, unk1.attributeTrails)
 	for id, ats := range unk2.attributeTrails {
 		existing, found := out.attributeTrails[id]
 		if !found {

@@ -15,6 +15,8 @@
 package interpreter
 
 import (
+	"fmt"
+
 	"github.com/google/cel-go/common/overloads"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
@@ -167,6 +169,77 @@ func decRegexOptimizer(regexOptimizations ...*RegexOptimization) InterpretableDe
 		}
 		return matcher.Factory(call, string(pattern))
 	}
+}
+
+func decRegexProgramSizeLimit(limit int) InterpretableDecoratorV2 {
+	return func(i InterpretableV2) (InterpretableV2, error) {
+		if limit <= 0 {
+			return i, nil
+		}
+		call, ok := i.(InterpretableCall)
+		if !ok {
+			return i, nil
+		}
+		if !isRegexFunction(call.Function(), call.OverloadID()) || len(call.Args()) < 2 {
+			return i, nil
+		}
+		regexArg := call.Args()[1]
+		if constVal, isConst := regexArg.(InterpretableConst); isConst {
+			if pattern, ok := constVal.Value().(types.String); ok {
+				sz, err := types.RegexProgramSize(string(pattern))
+				if err != nil {
+					return i, nil
+				}
+				if sz > limit {
+					return nil, fmt.Errorf("regex program size %d exceeds limit of %d", sz, limit)
+				}
+			}
+			return i, nil
+		}
+		return &regexLimitCall{InterpretableCall: call, limit: limit}, nil
+	}
+}
+
+func isRegexFunction(fn, overload string) bool {
+	switch fn {
+	case overloads.Matches, "regex.extract", "regex.extractAll", "regex.replace":
+		return true
+	}
+	switch overload {
+	case overloads.Matches, overloads.MatchesString,
+		"regex_extract_string_string", "regex_extractAll_string_string",
+		"regex_replace_string_string_string", "regex_replace_string_string_string_int":
+		return true
+	}
+	return false
+}
+
+type regexLimitCall struct {
+	InterpretableCall
+	limit int
+}
+
+func (r *regexLimitCall) Exec(frame *ExecutionFrame) ref.Val {
+	args := r.Args()
+	if len(args) >= 2 {
+		patternVal := args[1].Exec(frame)
+		if types.IsError(patternVal) {
+			return patternVal
+		}
+		if types.IsUnknown(patternVal) {
+			return patternVal
+		}
+		if pat, ok := patternVal.(types.String); ok {
+			sz, err := types.RegexProgramSize(string(pat))
+			if err != nil {
+				return types.WrapErr(err)
+			}
+			if sz > r.limit {
+				return types.WrapErr(fmt.Errorf("regex program size %d exceeds limit of %d", sz, r.limit))
+			}
+		}
+	}
+	return r.InterpretableCall.Exec(frame)
 }
 
 func maybeOptimizeConstUnary(i InterpretableV2, call InterpretableCall) (InterpretableV2, error) {

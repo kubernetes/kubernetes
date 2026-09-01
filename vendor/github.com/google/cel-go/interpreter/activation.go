@@ -134,6 +134,19 @@ func (a *hierarchicalActivation) Unwrap() Activation {
 	return a.parent
 }
 
+// IsLocalVariable reports whether the variable name is locally bound in the hierarchical activation.
+func (a *hierarchicalActivation) IsLocalVariable(name string) bool {
+	if holder, ok := a.child.(localVariableHolder); ok {
+		if holder.IsLocalVariable(name) {
+			return true
+		}
+	}
+	if holder, ok := a.parent.(localVariableHolder); ok {
+		return holder.IsLocalVariable(name)
+	}
+	return false
+}
+
 // AsPartialActivation checks the child first via direct type assertion (to
 // avoid recursion through the folder → frame → hierarchicalActivation cycle),
 // then walks the parent hierarchy via the free function.

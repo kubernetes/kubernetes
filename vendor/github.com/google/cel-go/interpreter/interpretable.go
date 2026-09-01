@@ -438,12 +438,18 @@ func (eq *evalEq) ID() int64 {
 // Exec implements the InterpretableV2 interface method.
 func (eq *evalEq) Exec(frame *ExecutionFrame) ref.Val {
 	lVal := eq.lhs.Exec(frame)
-	rVal := eq.rhs.Exec(frame)
-	if types.IsUnknownOrError(lVal) {
+	if types.IsError(lVal) {
 		return lVal
 	}
-	if types.IsUnknownOrError(rVal) {
+	rVal := eq.rhs.Exec(frame)
+	if types.IsError(rVal) {
 		return rVal
+	}
+	var unk *types.Unknown
+	unk, _ = types.MaybeMergeUnknowns(lVal, unk)
+	unk, _ = types.MaybeMergeUnknowns(rVal, unk)
+	if unk != nil {
+		return unk
 	}
 	return types.Equal(lVal, rVal)
 }
@@ -482,12 +488,18 @@ func (ne *evalNe) ID() int64 {
 // Exec implements the InterpretableV2 interface method.
 func (ne *evalNe) Exec(frame *ExecutionFrame) ref.Val {
 	lVal := ne.lhs.Exec(frame)
-	rVal := ne.rhs.Exec(frame)
-	if types.IsUnknownOrError(lVal) {
+	if types.IsError(lVal) {
 		return lVal
 	}
-	if types.IsUnknownOrError(rVal) {
+	rVal := ne.rhs.Exec(frame)
+	if types.IsError(rVal) {
 		return rVal
+	}
+	var unk *types.Unknown
+	unk, _ = types.MaybeMergeUnknowns(lVal, unk)
+	unk, _ = types.MaybeMergeUnknowns(rVal, unk)
+	if unk != nil {
+		return unk
 	}
 	return types.Bool(types.Equal(lVal, rVal) != types.True)
 }
@@ -624,15 +636,20 @@ func (bin *evalBinary) ID() int64 {
 // Exec implements the InterpretableV2 interface method.
 func (bin *evalBinary) Exec(frame *ExecutionFrame) ref.Val {
 	lVal := bin.lhs.Exec(frame)
-	rVal := bin.rhs.Exec(frame)
-	// Early return if any argument to the function is unknown or error.
 	strict := !bin.nonStrict
+	if strict && types.IsError(lVal) {
+		return lVal
+	}
+	rVal := bin.rhs.Exec(frame)
+	if strict && types.IsError(rVal) {
+		return rVal
+	}
 	if strict {
-		if types.IsUnknownOrError(lVal) {
-			return lVal
-		}
-		if types.IsUnknownOrError(rVal) {
-			return rVal
+		var unk *types.Unknown
+		unk, _ = types.MaybeMergeUnknowns(lVal, unk)
+		unk, _ = types.MaybeMergeUnknowns(rVal, unk)
+		if unk != nil {
+			return unk
 		}
 	}
 	// If the implementation is bound and the argument value has the right traits required to
@@ -697,13 +714,19 @@ func (fn *evalVarArgs) ID() int64 {
 // Exec implements the InterpretableV2 interface method.
 func (fn *evalVarArgs) Exec(frame *ExecutionFrame) ref.Val {
 	argVals := make([]ref.Val, len(fn.args))
-	// Early return if any argument to the function is unknown or error.
 	strict := !fn.nonStrict
+	var unk *types.Unknown
 	for i, arg := range fn.args {
 		argVals[i] = arg.Exec(frame)
-		if strict && types.IsUnknownOrError(argVals[i]) {
-			return argVals[i]
+		if strict {
+			if types.IsError(argVals[i]) {
+				return argVals[i]
+			}
+			unk, _ = types.MaybeMergeUnknowns(argVals[i], unk)
 		}
+	}
+	if strict && unk != nil {
+		return unk
 	}
 	// If the implementation is bound and the argument value has the right traits required to
 	// invoke it, then call the implementation.
@@ -755,23 +778,31 @@ func (l *evalList) ID() int64 {
 // Exec implements the InterpretableV2 interface method.
 func (l *evalList) Exec(frame *ExecutionFrame) ref.Val {
 	elemVals := make([]ref.Val, 0, len(l.elems))
-	// If any argument is unknown or error early terminate.
+	var unk *types.Unknown
 	for i, elem := range l.elems {
 		elemVal := elem.Exec(frame)
-		if types.IsUnknownOrError(elemVal) {
+		if types.IsError(elemVal) {
 			return elemVal
 		}
+		unk, _ = types.MaybeMergeUnknowns(elemVal, unk)
 		if l.hasOptionals && l.optionals[i] {
-			optVal, ok := elemVal.(*types.Optional)
-			if !ok {
-				return types.LabelErrNode(l.id, invalidOptionalElementInit(elemVal))
+			if types.IsUnknown(elemVal) {
+				// skip optional checks for unknown values as they aren't fully resolved yet.
+			} else {
+				optVal, ok := elemVal.(*types.Optional)
+				if !ok {
+					return types.LabelErrNode(l.id, invalidOptionalElementInit(elemVal))
+				}
+				if !optVal.HasValue() {
+					continue
+				}
+				elemVal = optVal.GetValue()
 			}
-			if !optVal.HasValue() {
-				continue
-			}
-			elemVal = optVal.GetValue()
 		}
 		elemVals = append(elemVals, elemVal)
+	}
+	if unk != nil {
+		return unk
 	}
 	return types.NewRefValList(l.adapter, elemVals)
 }
@@ -806,17 +837,21 @@ func (m *evalMap) ID() int64 {
 // Exec implements the InterpretableV2 interface method.
 func (m *evalMap) Exec(frame *ExecutionFrame) ref.Val {
 	entries := make(map[ref.Val]ref.Val, len(m.keys))
-	// If any argument is unknown or error early terminate.
+	var unk *types.Unknown
 	for i, key := range m.keys {
 		keyVal := key.Exec(frame)
-		if types.IsUnknownOrError(keyVal) {
+		if types.IsError(keyVal) {
 			return keyVal
 		}
+		unk, _ = types.MaybeMergeUnknowns(keyVal, unk)
+
 		valVal := m.vals[i].Exec(frame)
-		if types.IsUnknownOrError(valVal) {
+		if types.IsError(valVal) {
 			return valVal
 		}
-		if m.hasOptionals && m.optionals[i] {
+		unk, _ = types.MaybeMergeUnknowns(valVal, unk)
+
+		if m.hasOptionals && m.optionals[i] && !types.IsUnknown(valVal) {
 			optVal, ok := valVal.(*types.Optional)
 			if !ok {
 				return types.LabelErrNode(m.id, invalidOptionalEntryInit(keyVal, valVal))
@@ -828,6 +863,9 @@ func (m *evalMap) Exec(frame *ExecutionFrame) ref.Val {
 			valVal = optVal.GetValue()
 		}
 		entries[keyVal] = valVal
+	}
+	if unk != nil {
+		return unk
 	}
 	return types.NewRefValMap(m.adapter, entries)
 }
@@ -875,13 +913,14 @@ func (o *evalObj) ID() int64 {
 // Exec implements the InterpretableV2 interface method.
 func (o *evalObj) Exec(frame *ExecutionFrame) ref.Val {
 	fieldVals := make(map[string]ref.Val, len(o.fields))
-	// If any argument is unknown or error early terminate.
+	var unk *types.Unknown
 	for i, field := range o.fields {
 		val := o.vals[i].Exec(frame)
-		if types.IsUnknownOrError(val) {
+		if types.IsError(val) {
 			return val
 		}
-		if o.hasOptionals && o.optionals[i] {
+		unk, _ = types.MaybeMergeUnknowns(val, unk)
+		if o.hasOptionals && o.optionals[i] && !types.IsUnknown(val) {
 			optVal, ok := val.(*types.Optional)
 			if !ok {
 				return types.LabelErrNode(o.id, invalidOptionalEntryInit(field, val))
@@ -893,6 +932,9 @@ func (o *evalObj) Exec(frame *ExecutionFrame) ref.Val {
 			val = optVal.GetValue()
 		}
 		fieldVals[field] = val
+	}
+	if unk != nil {
+		return unk
 	}
 	return types.LabelErrNode(o.id, o.provider.NewValue(o.typeName, fieldVals))
 }
@@ -1600,6 +1642,26 @@ func (f *folder) Parent() Activation {
 // Unwrap returns the parent activation, thus omitting access to local state
 func (f *folder) Unwrap() Activation {
 	return f.frame.parent
+}
+
+// IsLocalVariable reports whether the variable name is locally bound by the folder scope.
+func (f *folder) IsLocalVariable(name string) bool {
+	if name == f.accuVar {
+		return true
+	}
+	if !f.computeResult && (name == f.iterVar || name == f.iterVar2) {
+		return true
+	}
+	parent := f.Parent()
+	if parent == nil {
+		return false
+	}
+	if varHolder, ok := parent.(localVariableHolder); ok {
+		if varHolder.IsLocalVariable(name) {
+			return true
+		}
+	}
+	return false
 }
 
 // UnknownAttributePatterns implements the PartialActivation interface returning the unknown patterns

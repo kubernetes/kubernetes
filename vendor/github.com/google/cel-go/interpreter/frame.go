@@ -21,6 +21,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/google/cel-go/common/functions"
+	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 )
 
@@ -52,6 +54,15 @@ type evalContext struct {
 
 	// cancel cancels the context when the evaluation is finished.
 	cancel context.CancelFunc
+
+	// asyncCalls tracks the state of async call invocations across re-evaluations.
+	asyncCalls *asyncCallStateTracker
+
+	// gate coordinates async call admission control and completion signaling.
+	gate *asyncGate
+
+	// observer for monitoring async calls.
+	observer AsyncObserver
 }
 
 // ExecutionFrame provides the context for a single evaluation of an expression.
@@ -93,6 +104,8 @@ func (f *ExecutionFrame) SetContext(ctx context.Context, interruptCheckFrequency
 	}
 	f.ctx = evalContextPool.Get().(*evalContext)
 	f.ctx.ctx, f.ctx.cancel = context.WithCancel(ctx)
+	f.ctx.asyncCalls = asyncCallStateTrackerPool.create()
+	f.ctx.gate = &asyncGate{}
 	f.ctx.interrupt = ctx.Done()
 	f.ctx.interruptCheckFrequency = interruptCheckFrequency
 	f.ctx.interruptCheckCount.Store(0)
@@ -108,6 +121,10 @@ func (f *ExecutionFrame) Close() {
 			f.ctx.cancel = nil
 		}
 		f.ctx.ctx = nil
+		f.ctx.gate = nil
+		asyncCallStateTrackerPool.release(f.ctx.asyncCalls)
+		f.ctx.asyncCalls = nil
+		f.ctx.observer = nil
 		f.ctx.interrupt = nil
 		f.ctx.state = nil
 		f.ctx.costs = nil
@@ -118,17 +135,19 @@ func (f *ExecutionFrame) Close() {
 	}
 	f.ctx = nil
 	f.parent = nil
-	switch a := f.Activation.(type) {
-	case *hierarchicalActivation:
-		if child, ok := a.child.(*inputActivation); ok {
-			activationInput.release(child)
+	if f.Activation != nil {
+		switch a := f.Activation.(type) {
+		case *hierarchicalActivation:
+			if child, ok := a.child.(*inputActivation); ok {
+				activationInput.release(child)
+			}
+			activationStack.release(a)
+		case *inputActivation:
+			activationInput.release(a)
 		}
-		activationStack.release(a)
-	case *inputActivation:
-		activationInput.release(a)
+		f.Activation = nil
+		frameStack.Put(f)
 	}
-	f.Activation = nil
-	frameStack.Put(f)
 }
 
 // Push pushes the given activation onto the activation stack and returns the new frame.
@@ -177,6 +196,20 @@ func (f *ExecutionFrame) Unwrap() Activation {
 	return f.Activation
 }
 
+// IsLocalVariable reports whether the variable name is locally bound in the frame.
+func (f *ExecutionFrame) IsLocalVariable(name string) bool {
+	if holder, ok := f.Activation.(localVariableHolder); ok {
+		if holder.IsLocalVariable(name) {
+			return true
+		}
+	}
+	// Search parent scopes
+	if f.parent != nil {
+		return f.parent.IsLocalVariable(name)
+	}
+	return false
+}
+
 // CheckInterrupt returns whether the evaluation has been interrupted.
 func (f *ExecutionFrame) CheckInterrupt() bool {
 	if f.ctx == nil {
@@ -196,6 +229,91 @@ func (f *ExecutionFrame) CheckInterrupt() bool {
 		}
 	}
 	return false
+}
+
+// ComputeResult tracks and computes the result of the given asynchronous function.
+//
+// The first invocation for a given (node id, args) tuple registers the call state and returns an
+// Unknown which references the call's unique callID. Subsequent invocations return the cached
+// result once the call has completed. Launching background execution is deferred to post-execution
+// dispatch via DispatchPendingAsyncCalls.
+func (f *ExecutionFrame) ComputeResult(id int64, function, overload string, impl functions.AsyncOp, argVals []ref.Val) ref.Val {
+	if f.ctx == nil || f.ctx.asyncCalls == nil {
+		return types.NewErrWithNodeID(id, "asynchronous function calls require concurrent evaluation and cannot be resolved by a synchronous Eval")
+	}
+	t := f.ctx.asyncCalls
+	acs := t.getOrCreate(id, function, overload, argVals, impl, f.ctx.gate)
+	if res := acs.ResultOrUnknown(); res != nil {
+		return res
+	}
+	return types.NewUnknown(acs.callID, nil)
+}
+
+// DispatchPendingAsyncCalls launches pending asynchronous calls for the specified required call IDs.
+func (f *ExecutionFrame) DispatchPendingAsyncCalls(callIDs []int64) {
+	if f.ctx == nil || f.ctx.asyncCalls == nil {
+		return
+	}
+	t := f.ctx.asyncCalls
+	for _, callID := range callIDs {
+		if acs := t.getByID(callID); acs != nil {
+			t.launch(f.ctx.ctx, acs, f.ctx.observer)
+		}
+	}
+}
+
+// ActiveAsyncCalls returns the number of async function calls that have been launched
+// but whose completions have not yet been drained.
+func (f *ExecutionFrame) ActiveAsyncCalls() int {
+	if f.ctx == nil || f.ctx.gate == nil {
+		return 0
+	}
+	return f.ctx.gate.ActiveCalls()
+}
+
+// AsyncCall returns the state of an async call by its callID, or nil if not found.
+func (f *ExecutionFrame) AsyncCall(callID int64) AsyncCall {
+	if f.ctx == nil || f.ctx.asyncCalls == nil {
+		return nil
+	}
+	acs := f.ctx.asyncCalls.getByID(callID)
+	if acs == nil {
+		return nil
+	}
+	return acs
+}
+
+// SetCompletions configures a channel to receive callIDs when asynchronous evaluations finish.
+func (f *ExecutionFrame) SetCompletions(ch chan<- int64) error {
+	if f.ctx == nil {
+		return errors.New("asynchronous evaluation options require the execution frame to have a context configured")
+	}
+	f.ctx.gate.completions = ch
+	return nil
+}
+
+// SetAsyncObserver sets the observer for monitoring asynchronous function calls.
+func (f *ExecutionFrame) SetAsyncObserver(observer AsyncObserver) error {
+	if f.ctx == nil {
+		return errors.New("asynchronous evaluation options require the execution frame to have a context configured")
+	}
+	f.ctx.observer = observer
+	return nil
+}
+
+// SetAsyncMaxConcurrency sets the maximum concurrency for asynchronous function calls.
+//
+// A non-positive value indicates that concurrency is unbounded.
+func (f *ExecutionFrame) SetAsyncMaxConcurrency(n int) error {
+	if f.ctx == nil {
+		return errors.New("asynchronous evaluation options require the execution frame to have a context configured")
+	}
+	if n > 0 {
+		f.ctx.gate.semaphore = make(chan struct{}, n)
+	} else {
+		f.ctx.gate.semaphore = nil
+	}
+	return nil
 }
 
 // frameStack provides a synchronized pool of ExecutionFrames.
