@@ -56,7 +56,7 @@ export class DataCatalogEncryptionAtRest {
    * @param key the KMS key to use. If omitted, an AWS-managed key is used and
    * the key is not exposed as a grantable resource.
    */
-  public static kms(key?: kms.IKey): DataCatalogEncryptionAtRest {
+  public static kms(key?: kms.IKeyRef): DataCatalogEncryptionAtRest {
     return new DataCatalogEncryptionAtRest(CatalogEncryptionMode.SSE_KMS, key);
   }
 
@@ -71,7 +71,7 @@ export class DataCatalogEncryptionAtRest {
    * @param key the KMS key to use. If omitted, an AWS-managed key is used and
    * the key is not exposed as a grantable resource.
    */
-  public static kmsWithServiceRole(role: iam.IRole, key?: kms.IKey): DataCatalogEncryptionAtRest {
+  public static kmsWithServiceRole(role: iam.IRole, key?: kms.IKeyRef): DataCatalogEncryptionAtRest {
     return new DataCatalogEncryptionAtRest(CatalogEncryptionMode.SSE_KMS_WITH_SERVICE_ROLE, key, role);
   }
 

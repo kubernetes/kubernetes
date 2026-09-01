@@ -45,7 +45,10 @@ export class S3TableEncryption {
   /** @internal */
   public readonly _bucketEncryption: s3.BucketEncryption;
 
-  /** @internal */
+  /**
+   * @internal
+   * Typed `kms.IKey` (not `IKeyRef`) because it is forwarded to `s3.Bucket`, whose `encryptionKey` prop requires `IKey`.
+   */
   public readonly _kmsKey?: kms.IKey;
 
   private constructor(bucketEncryption: s3.BucketEncryption, kmsKey?: kms.IKey) {
@@ -115,14 +118,14 @@ export class TableClientSideEncryption {
    *
    * @param key the KMS key used to encrypt the data. A key is created if one is not provided.
    */
-  public static kms(key?: kms.IKey): TableClientSideEncryption {
+  public static kms(key?: kms.IKeyRef): TableClientSideEncryption {
     return new TableClientSideEncryption(key);
   }
 
   /** @internal */
-  public readonly _kmsKey?: kms.IKey;
+  public readonly _kmsKey?: kms.IKeyRef;
 
-  private constructor(kmsKey?: kms.IKey) {
+  private constructor(kmsKey?: kms.IKeyRef) {
     this._kmsKey = kmsKey;
   }
 }
@@ -185,7 +188,7 @@ export class S3Table extends TableBase {
    *
    * For server-side (bucket) encryption, read `bucket.encryptionKey` instead.
    */
-  public readonly clientSideEncryptionKey?: kms.IKey;
+  public readonly clientSideEncryptionKey?: kms.IKeyRef;
 
   /**
    * This table's partition indexes.
@@ -297,7 +300,7 @@ export class S3Table extends TableBase {
   @MethodMetadata()
   public grantRead(grantee: iam.IGrantable): iam.Grant {
     const ret = this.grant(grantee, readPermissions);
-    if (this.clientSideEncryptionKey) { this.clientSideEncryptionKey.grantDecrypt(grantee); }
+    if (this.clientSideEncryptionKey) { kms.KeyGrants.fromKey(this.clientSideEncryptionKey).decrypt(grantee); }
     this.bucket.grantRead(grantee, this.generateS3PrefixForGrant());
     return ret;
   }
@@ -311,7 +314,7 @@ export class S3Table extends TableBase {
   @MethodMetadata()
   public grantWrite(grantee: iam.IGrantable): iam.Grant {
     const ret = this.grant(grantee, writePermissions);
-    if (this.clientSideEncryptionKey) { this.clientSideEncryptionKey.grantEncrypt(grantee); }
+    if (this.clientSideEncryptionKey) { kms.KeyGrants.fromKey(this.clientSideEncryptionKey).encrypt(grantee); }
     this.bucket.grantWrite(grantee, this.generateS3PrefixForGrant());
     return ret;
   }
@@ -325,7 +328,7 @@ export class S3Table extends TableBase {
   @MethodMetadata()
   public grantReadWrite(grantee: iam.IGrantable): iam.Grant {
     const ret = this.grant(grantee, [...readPermissions, ...writePermissions]);
-    if (this.clientSideEncryptionKey) { this.clientSideEncryptionKey.grantEncryptDecrypt(grantee); }
+    if (this.clientSideEncryptionKey) { kms.KeyGrants.fromKey(this.clientSideEncryptionKey).encryptDecrypt(grantee); }
     this.bucket.grantReadWrite(grantee, this.generateS3PrefixForGrant());
     return ret;
   }
