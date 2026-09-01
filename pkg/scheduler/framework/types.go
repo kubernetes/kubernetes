@@ -564,6 +564,8 @@ type QueuedEntityInfo interface {
 	GetFlushTimestamp() time.Time
 	// SetFlushTimestamp sets the FlushTimestamp in QueueingParams.
 	SetFlushTimestamp(t time.Time)
+	// HasPodsWithPendingPlugins returns true if any pod in the entity has pending plugins.
+	HasPodsWithPendingPlugins() bool
 }
 
 // QueueingParams holds parameters related to the queueing status and history of an entity
@@ -778,6 +780,10 @@ func (pqi *QueuedPodInfo) SetFlushTimestamp(t time.Time) {
 	pqi.FlushTimestamp = t
 }
 
+func (pqi *QueuedPodInfo) HasPodsWithPendingPlugins() bool {
+	return pqi.PendingPlugins.Len() > 0
+}
+
 // QueuedPodGroupInfo is a PodGroupInfo wrapper with additional information related to
 // the pod group's status in the scheduling queue and stores all queued pods from that pod group.
 type QueuedPodGroupInfo struct {
@@ -787,7 +793,13 @@ type QueuedPodGroupInfo struct {
 	// This map is keyed by pod group keys in the same format as framework.PodGroupKey function.
 	// Its values are slices of corresponding leaf pod group's queued pods.
 	// The order of the pods in the slice is deterministic and based on the priority and timestamp.
+	//
+	// Note: QueuedPodGroupInfo manages QueuedPodInfos' metadata in podsWithPendingPlugins.
+	// Any mutation to QueuedPodGroupInfo should not be done directly,
+	// but through AddPod, Update and RemovePod methods.
 	QueuedPodInfos map[fwk.EntityKey][]*QueuedPodInfo
+	// podsWithPendingPlugins stores pod names for pods in this pod group that have pending plugins.
+	podsWithPendingPlugins sets.Set[string]
 }
 
 func (pgqi *QueuedPodGroupInfo) Type() fwk.EntityKeyType {
@@ -811,6 +823,13 @@ func (pgqi *QueuedPodGroupInfo) AddPod(pInfo *QueuedPodInfo) {
 
 	pgqi.QueuedPodInfos[key] = slices.Insert(pgqi.QueuedPodInfos[key], index, pInfo)
 	leafPG.UnscheduledPods = slices.Insert(leafPG.UnscheduledPods, index, pInfo.Pod)
+
+	if pInfo.PendingPlugins.Len() > 0 {
+		if pgqi.podsWithPendingPlugins == nil {
+			pgqi.podsWithPendingPlugins = sets.New[string]()
+		}
+		pgqi.podsWithPendingPlugins.Insert(pInfo.Pod.Name)
+	}
 }
 
 // RemovePod removes a pod from the queued pod group info, if the pod belongs to the pod group.
@@ -834,6 +853,10 @@ func (pgqi *QueuedPodGroupInfo) RemovePod(pod *v1.Pod) *QueuedPodInfo {
 		}
 	}
 
+	if removed != nil {
+		pgqi.removePodPendingPlugins(removed)
+	}
+
 	// Remove from leaf UnscheduledPods
 	leafPG, _ := findNodeAndParent(pgqi.PodGroupInfo, nil, *pod.Spec.SchedulingGroup.PodGroupName)
 	if leafPG == nil {
@@ -848,6 +871,19 @@ func (pgqi *QueuedPodGroupInfo) RemovePod(pod *v1.Pod) *QueuedPodInfo {
 	}
 
 	return removed
+}
+
+func (pgqi *QueuedPodGroupInfo) removePodPendingPlugins(pInfo *QueuedPodInfo) {
+	if pInfo.PendingPlugins.Len() > 0 {
+		pgqi.podsWithPendingPlugins.Delete(pInfo.Pod.Name)
+		if len(pgqi.podsWithPendingPlugins) == 0 {
+			pgqi.podsWithPendingPlugins = nil
+		}
+	}
+}
+
+func (pgqi *QueuedPodGroupInfo) HasPodsWithPendingPlugins() bool {
+	return pgqi.podsWithPendingPlugins.Len() > 0
 }
 
 func (pgqi *QueuedPodGroupInfo) HasQueuedPodInfos() bool {
@@ -1068,6 +1104,9 @@ func (pgqi *QueuedPodGroupInfo) deleteSubtreePods(curr *PodGroupInfo) []*QueuedP
 		key := fwk.PodGroupKey(curr.GetNamespace(), curr.GetName())
 		if pods, ok := pgqi.QueuedPodInfos[key]; ok {
 			removedPods = append(removedPods, pods...)
+			for _, pInfo := range pods {
+				pgqi.removePodPendingPlugins(pInfo)
+			}
 			delete(pgqi.QueuedPodInfos, key)
 		}
 		return removedPods

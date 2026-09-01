@@ -5854,6 +5854,454 @@ func Test_isPodWorthRequeuing(t *testing.T) {
 	}
 }
 
+func makeQueuedPodGroup(namespace, pgName string, podInfos ...*framework.QueuedPodInfo) *framework.QueuedPodGroupInfo {
+	pg := st.MakePodGroup().Namespace(namespace).Name(pgName).Obj()
+	pgqi := &framework.QueuedPodGroupInfo{
+		PodGroupInfo: &framework.PodGroupInfo{
+			GenericPodGroup: framework.NewGenericPodGroup(pg),
+			Children:        make([]*framework.PodGroupInfo, 0),
+		},
+		QueuedPodInfos: make(map[fwk.EntityKey][]*framework.QueuedPodInfo),
+	}
+	for _, pInfo := range podInfos {
+		pgqi.AddPod(pInfo)
+	}
+	return pgqi
+}
+
+func Test_isEntityWorthRequeuing(t *testing.T) {
+	var evaluatedPods []string
+	queueHintReturnQueue := func(_ klog.Logger, pod *v1.Pod, _, _ any) (fwk.QueueingHint, error) {
+		evaluatedPods = append(evaluatedPods, pod.Name)
+		return fwk.Queue, nil
+	}
+	queueHintReturnSkip := func(_ klog.Logger, pod *v1.Pod, _, _ any) (fwk.QueueingHint, error) {
+		evaluatedPods = append(evaluatedPods, pod.Name)
+		return fwk.QueueSkip, nil
+	}
+
+	tests := []struct {
+		name                  string
+		queueingHintMap       QueueingHintMapPerProfile
+		entity                framework.QueuedEntityInfo
+		event                 fwk.ClusterEvent
+		newObj                any
+		expectedStrategy      queueingStrategy
+		expectedEvaluatedPods []string
+	}{
+		{
+			name: "single pod with unschedulable plugin returns queueAfterBackoff",
+			queueingHintMap: QueueingHintMapPerProfile{
+				"": {
+					nodeAdd: {
+						{PluginName: "pluginA", QueueingHintFn: queueHintReturnQueue},
+					},
+				},
+			},
+			entity: &framework.QueuedPodInfo{
+				QueueingParams: framework.QueueingParams{
+					UnschedulablePlugins: sets.New("pluginA"),
+				},
+				PodInfo: mustNewPodInfo(st.MakePod().Name("p1").Namespace("ns1").Obj()),
+			},
+			event:                 nodeAdd,
+			newObj:                st.MakeNode().Obj(),
+			expectedStrategy:      queueAfterBackoff,
+			expectedEvaluatedPods: []string{"p1"},
+		},
+		{
+			name: "single pod with pending plugin returns queueImmediately",
+			queueingHintMap: QueueingHintMapPerProfile{
+				"": {
+					nodeAdd: {
+						{PluginName: "pluginPending", QueueingHintFn: queueHintReturnQueue},
+					},
+				},
+			},
+			entity: &framework.QueuedPodInfo{
+				QueueingParams: framework.QueueingParams{
+					PendingPlugins: sets.New("pluginPending"),
+				},
+				PodInfo: mustNewPodInfo(st.MakePod().Name("p1").Namespace("ns1").Obj()),
+			},
+			event:                 nodeAdd,
+			newObj:                st.MakeNode().Obj(),
+			expectedStrategy:      queueImmediately,
+			expectedEvaluatedPods: []string{"p1"},
+		},
+		{
+			name: "single pod with unschedulable plugin returns queueSkip when hint returns Skip",
+			queueingHintMap: QueueingHintMapPerProfile{
+				"": {
+					nodeAdd: {
+						{PluginName: "pluginA", QueueingHintFn: queueHintReturnSkip},
+					},
+				},
+			},
+			entity: &framework.QueuedPodInfo{
+				QueueingParams: framework.QueueingParams{
+					UnschedulablePlugins: sets.New("pluginA"),
+				},
+				PodInfo: mustNewPodInfo(st.MakePod().Name("p1").Namespace("ns1").Obj()),
+			},
+			event:                 nodeAdd,
+			newObj:                st.MakeNode().Obj(),
+			expectedStrategy:      queueSkip,
+			expectedEvaluatedPods: []string{"p1"},
+		},
+		{
+			name: "single pod with pending plugin returns queueSkip when hint returns Skip",
+			queueingHintMap: QueueingHintMapPerProfile{
+				"": {
+					nodeAdd: {
+						{PluginName: "pluginPending", QueueingHintFn: queueHintReturnSkip},
+					},
+				},
+			},
+			entity: &framework.QueuedPodInfo{
+				QueueingParams: framework.QueueingParams{
+					PendingPlugins: sets.New("pluginPending"),
+				},
+				PodInfo: mustNewPodInfo(st.MakePod().Name("p1").Namespace("ns1").Obj()),
+			},
+			event:                 nodeAdd,
+			newObj:                st.MakeNode().Obj(),
+			expectedStrategy:      queueSkip,
+			expectedEvaluatedPods: []string{"p1"},
+		},
+		{
+			name: "pod group without pending plugins: first pod returns queueAfterBackoff, returns without evaluating remaining pods",
+			queueingHintMap: QueueingHintMapPerProfile{
+				"": {
+					nodeAdd: {
+						{PluginName: "pluginA", QueueingHintFn: queueHintReturnQueue},
+					},
+				},
+			},
+			entity: makeQueuedPodGroup("ns1", "pg1",
+				&framework.QueuedPodInfo{
+					PodInfo: mustNewPodInfo(st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()),
+					QueueingParams: framework.QueueingParams{
+						UnschedulablePlugins: sets.New("pluginA"),
+					},
+				},
+				&framework.QueuedPodInfo{
+					PodInfo: mustNewPodInfo(st.MakePod().Name("p2").Namespace("ns1").PodGroupName("pg1").Obj()),
+					QueueingParams: framework.QueueingParams{
+						UnschedulablePlugins: sets.New("pluginA"),
+					},
+				},
+			),
+			event:                 nodeAdd,
+			newObj:                st.MakeNode().Obj(),
+			expectedStrategy:      queueAfterBackoff,
+			expectedEvaluatedPods: []string{"p1"},
+		},
+		{
+			name: "pod group without pending plugins: first pod returns skip, second returns queueAfterBackoff, third is not evaluated",
+			queueingHintMap: QueueingHintMapPerProfile{
+				"": {
+					nodeAdd: {
+						{PluginName: "pluginSkip", QueueingHintFn: queueHintReturnSkip},
+						{PluginName: "pluginQueue", QueueingHintFn: queueHintReturnQueue},
+					},
+				},
+			},
+			entity: makeQueuedPodGroup("ns1", "pg1",
+				&framework.QueuedPodInfo{
+					PodInfo: mustNewPodInfo(st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()),
+					QueueingParams: framework.QueueingParams{
+						UnschedulablePlugins: sets.New("pluginSkip"),
+					},
+				},
+				&framework.QueuedPodInfo{
+					PodInfo: mustNewPodInfo(st.MakePod().Name("p2").Namespace("ns1").PodGroupName("pg1").Obj()),
+					QueueingParams: framework.QueueingParams{
+						UnschedulablePlugins: sets.New("pluginQueue"),
+					},
+				},
+				&framework.QueuedPodInfo{
+					PodInfo: mustNewPodInfo(st.MakePod().Name("p3").Namespace("ns1").PodGroupName("pg1").Obj()),
+					QueueingParams: framework.QueueingParams{
+						UnschedulablePlugins: sets.New("pluginQueue"),
+					},
+				},
+			),
+			event:                 nodeAdd,
+			newObj:                st.MakeNode().Obj(),
+			expectedStrategy:      queueAfterBackoff,
+			expectedEvaluatedPods: []string{"p1", "p2"},
+		},
+		{
+			name: "pod group without pending plugins: all pods return queueSkip",
+			queueingHintMap: QueueingHintMapPerProfile{
+				"": {
+					nodeAdd: {
+						{PluginName: "pluginSkip", QueueingHintFn: queueHintReturnSkip},
+					},
+				},
+			},
+			entity: makeQueuedPodGroup("ns1", "pg1",
+				&framework.QueuedPodInfo{
+					PodInfo: mustNewPodInfo(st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()),
+					QueueingParams: framework.QueueingParams{
+						UnschedulablePlugins: sets.New("pluginSkip"),
+					},
+				},
+				&framework.QueuedPodInfo{
+					PodInfo: mustNewPodInfo(st.MakePod().Name("p2").Namespace("ns1").PodGroupName("pg1").Obj()),
+					QueueingParams: framework.QueueingParams{
+						UnschedulablePlugins: sets.New("pluginSkip"),
+					},
+				},
+			),
+			event:                 nodeAdd,
+			newObj:                st.MakeNode().Obj(),
+			expectedStrategy:      queueSkip,
+			expectedEvaluatedPods: []string{"p1", "p2"},
+		},
+		{
+			name: "pod group with pending plugins: first pod returns queueAfterBackoff, does NOT return immediately, second pod returns queueImmediately",
+			queueingHintMap: QueueingHintMapPerProfile{
+				"": {
+					nodeAdd: {
+						{PluginName: "pluginUnsched", QueueingHintFn: queueHintReturnQueue},
+						{PluginName: "pluginPending", QueueingHintFn: queueHintReturnQueue},
+					},
+				},
+			},
+			entity: makeQueuedPodGroup("ns1", "pg1",
+				&framework.QueuedPodInfo{
+					PodInfo: mustNewPodInfo(st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()),
+					QueueingParams: framework.QueueingParams{
+						UnschedulablePlugins: sets.New("pluginUnsched"),
+					},
+				},
+				&framework.QueuedPodInfo{
+					PodInfo: mustNewPodInfo(st.MakePod().Name("p2").Namespace("ns1").PodGroupName("pg1").Obj()),
+					QueueingParams: framework.QueueingParams{
+						PendingPlugins: sets.New("pluginPending"),
+					},
+				},
+			),
+			event:                 nodeAdd,
+			newObj:                st.MakeNode().Obj(),
+			expectedStrategy:      queueImmediately,
+			expectedEvaluatedPods: []string{"p1", "p2"},
+		},
+		{
+			name: "pod group with pending plugins: first pod returns queueAfterBackoff, second pod returns queueSkip, returns queueAfterBackoff",
+			queueingHintMap: QueueingHintMapPerProfile{
+				"": {
+					nodeAdd: {
+						{PluginName: "pluginUnsched", QueueingHintFn: queueHintReturnQueue},
+						{PluginName: "pluginPending", QueueingHintFn: queueHintReturnSkip},
+					},
+				},
+			},
+			entity: makeQueuedPodGroup("ns1", "pg1",
+				&framework.QueuedPodInfo{
+					PodInfo: mustNewPodInfo(st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()),
+					QueueingParams: framework.QueueingParams{
+						UnschedulablePlugins: sets.New("pluginUnsched"),
+					},
+				},
+				&framework.QueuedPodInfo{
+					PodInfo: mustNewPodInfo(st.MakePod().Name("p2").Namespace("ns1").PodGroupName("pg1").Obj()),
+					QueueingParams: framework.QueueingParams{
+						PendingPlugins: sets.New("pluginPending"),
+					},
+				},
+			),
+			event:                 nodeAdd,
+			newObj:                st.MakeNode().Obj(),
+			expectedStrategy:      queueAfterBackoff,
+			expectedEvaluatedPods: []string{"p1", "p2"},
+		},
+		{
+			name: "pod group with pending plugins: first pod returns queueImmediately, returns immediately",
+			queueingHintMap: QueueingHintMapPerProfile{
+				"": {
+					nodeAdd: {
+						{PluginName: "pluginPending", QueueingHintFn: queueHintReturnQueue},
+					},
+				},
+			},
+			entity: makeQueuedPodGroup("ns1", "pg1",
+				&framework.QueuedPodInfo{
+					PodInfo: mustNewPodInfo(st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()),
+					QueueingParams: framework.QueueingParams{
+						PendingPlugins: sets.New("pluginPending"),
+					},
+				},
+				&framework.QueuedPodInfo{
+					PodInfo: mustNewPodInfo(st.MakePod().Name("p2").Namespace("ns1").PodGroupName("pg1").Obj()),
+					QueueingParams: framework.QueueingParams{
+						PendingPlugins: sets.New("pluginPending"),
+					},
+				},
+			),
+			event:                 nodeAdd,
+			newObj:                st.MakeNode().Obj(),
+			expectedStrategy:      queueImmediately,
+			expectedEvaluatedPods: []string{"p1"},
+		},
+		{
+			name: "pod group with pending plugins: all pods return queueSkip",
+			queueingHintMap: QueueingHintMapPerProfile{
+				"": {
+					nodeAdd: {
+						{PluginName: "pluginSkip", QueueingHintFn: queueHintReturnSkip},
+					},
+				},
+			},
+			entity: makeQueuedPodGroup("ns1", "pg1",
+				&framework.QueuedPodInfo{
+					PodInfo: mustNewPodInfo(st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()),
+					QueueingParams: framework.QueueingParams{
+						PendingPlugins: sets.New("pluginSkip"),
+					},
+				},
+				&framework.QueuedPodInfo{
+					PodInfo: mustNewPodInfo(st.MakePod().Name("p2").Namespace("ns1").PodGroupName("pg1").Obj()),
+					QueueingParams: framework.QueueingParams{
+						PendingPlugins: sets.New("pluginSkip"),
+					},
+				},
+			),
+			event:                 nodeAdd,
+			newObj:                st.MakeNode().Obj(),
+			expectedStrategy:      queueSkip,
+			expectedEvaluatedPods: []string{"p1", "p2"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			evaluatedPods = nil // reset evaluated pods every time
+			logger, ctx := ktesting.NewTestContext(t)
+			q := NewTestQueue(ctx, newDefaultQueueSort(), WithQueueingHintMapPerProfile(tt.queueingHintMap))
+
+			gotStrategy := q.isEntityWorthRequeuing(logger, tt.entity, tt.event, nil, tt.newObj, nil)
+			if gotStrategy != tt.expectedStrategy {
+				t.Errorf("Unexpected isEntityWorthRequeuing result, want: %v, got: %v", tt.expectedStrategy, gotStrategy)
+			}
+			if diff := cmp.Diff(tt.expectedEvaluatedPods, evaluatedPods); diff != "" {
+				t.Errorf("Unexpected evaluatedPods (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+type gatingPreEnqueuePlugin struct {
+	gatePods      sets.Set[string]
+	evaluatedPods []string
+}
+
+func (pl *gatingPreEnqueuePlugin) Name() string {
+	return "gatingPlugin"
+}
+
+func (pl *gatingPreEnqueuePlugin) PreEnqueue(_ context.Context, p *v1.Pod) *fwk.Status {
+	pl.evaluatedPods = append(pl.evaluatedPods, p.Name)
+	if pl.gatePods != nil && pl.gatePods.Has(p.Name) {
+		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "pod is gated")
+	}
+	return nil
+}
+
+var _ fwk.PreEnqueuePlugin = &gatingPreEnqueuePlugin{}
+
+func TestPriorityQueue_runPreEnqueuePlugins_PodGroup(t *testing.T) {
+	tests := []struct {
+		name                  string
+		gatePods              sets.Set[string]
+		expectedEvaluatedPods []string
+		expectedGatingPlugin  string
+		expectedGatedPods     map[string]bool
+	}{
+		{
+			name:                  "first pod is gated: returns and does not evaluate remaining pods",
+			gatePods:              sets.New("pod1", "pod2"),
+			expectedEvaluatedPods: []string{"pod1"},
+			expectedGatingPlugin:  "gatingPlugin",
+			expectedGatedPods: map[string]bool{
+				"pod1": true,
+				"pod2": false,
+				"pod3": false,
+			},
+		},
+		{
+			name:                  "second pod is gated: evaluates first two pods, returns before third",
+			gatePods:              sets.New("pod2"),
+			expectedEvaluatedPods: []string{"pod1", "pod2"},
+			expectedGatingPlugin:  "gatingPlugin",
+			expectedGatedPods: map[string]bool{
+				"pod1": false,
+				"pod2": true,
+				"pod3": false,
+			},
+		},
+		{
+			name:                  "no pods are gated: evaluates all pods",
+			gatePods:              sets.New[string](),
+			expectedEvaluatedPods: []string{"pod1", "pod2", "pod3"},
+			expectedGatingPlugin:  "",
+			expectedGatedPods: map[string]bool{
+				"pod1": false,
+				"pod2": false,
+				"pod3": false,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			plugin := &gatingPreEnqueuePlugin{
+				gatePods: tt.gatePods,
+			}
+			preEnqMap := map[string]map[string]fwk.PreEnqueuePlugin{
+				"": {
+					"gatingPlugin": plugin,
+				},
+			}
+			q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(preEnqMap))
+
+			pInfo1 := q.newQueuedPodInfo(ctx, st.MakePod().Name("pod1").Namespace("ns1").PodGroupName("pg1").Obj())
+			pInfo2 := q.newQueuedPodInfo(ctx, st.MakePod().Name("pod2").Namespace("ns1").PodGroupName("pg1").Obj())
+			pInfo3 := q.newQueuedPodInfo(ctx, st.MakePod().Name("pod3").Namespace("ns1").PodGroupName("pg1").Obj())
+
+			pg := st.MakePodGroup().Namespace("ns1").Name("pg1").Obj()
+			pgqi := &framework.QueuedPodGroupInfo{
+				PodGroupInfo: &framework.PodGroupInfo{
+					GenericPodGroup: framework.NewGenericPodGroup(pg),
+					Children:        make([]*framework.PodGroupInfo, 0),
+				},
+				QueuedPodInfos: make(map[fwk.EntityKey][]*framework.QueuedPodInfo),
+			}
+			pgqi.AddPod(pInfo1)
+			pgqi.AddPod(pInfo2)
+			pgqi.AddPod(pInfo3)
+
+			q.runPreEnqueuePlugins(ctx, pgqi)
+
+			if diff := cmp.Diff(tt.expectedEvaluatedPods, plugin.evaluatedPods); diff != "" {
+				t.Errorf("Unexpected evaluatedPods (-want,+got):\n%s", diff)
+			}
+			if pgqi.GetGatingPlugin() != tt.expectedGatingPlugin {
+				t.Errorf("Unexpected gatingPlugin: %s, want %s", pgqi.GetGatingPlugin(), tt.expectedGatingPlugin)
+			}
+			pgqi.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+				if wantGated := tt.expectedGatedPods[pInfo.Pod.Name]; pInfo.Gated() != wantGated {
+					t.Errorf("Unexpected gated state for pod %s, got: %v, want: %v", pInfo.Pod.Name, pInfo.Gated(), wantGated)
+				}
+				return true
+			})
+		})
+	}
+}
+
 func Test_queuedPodInfo_gatedSetUponCreationAndUnsetUponUpdate(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	plugin, _ := schedulinggates.New(ctx, nil, nil, plfeature.Features{})

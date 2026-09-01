@@ -298,48 +298,21 @@ func (sched *Scheduler) frameworkForPodGroup(podGroupInfo *framework.QueuedPodGr
 // This can happen when the pod is already being deleted (i.e., when its deletionTimestamp is set)
 // or when the pod has already been assumed.
 func (sched *Scheduler) skipPodGroupPodSchedule(ctx context.Context, schedFwk framework.Framework, podGroupInfo *framework.QueuedPodGroupInfo) {
-	queuedPodInfosToUpdate := map[fwk.EntityKey][]*framework.QueuedPodInfo{}
-	for pgKey, pInfos := range podGroupInfo.QueuedPodInfos {
-		filteredQueuedPodInfos := make([]*framework.QueuedPodInfo, 0, len(pInfos))
-		for _, podInfo := range pInfos {
-			if sched.skipPodSchedule(ctx, schedFwk, podInfo.Pod) {
-				// We don't put this Pod back to the queue, but we have to cleanup the in-flight pods/events.
-				sched.SchedulingQueue.Done(podInfo.Pod.UID)
-				continue
-			}
-			filteredQueuedPodInfos = append(filteredQueuedPodInfos, podInfo)
+	var podsToRemove []*v1.Pod
+	podGroupInfo.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+		if sched.skipPodSchedule(ctx, schedFwk, pInfo.Pod) {
+			// We don't put this Pod back to the queue, but we have to cleanup the in-flight pods/events.
+			sched.SchedulingQueue.Done(pInfo.Pod.UID)
+			podsToRemove = append(podsToRemove, pInfo.Pod)
 		}
-		if len(filteredQueuedPodInfos) != len(pInfos) {
-			podGroupInfo.QueuedPodInfos[pgKey] = filteredQueuedPodInfos
-			if len(filteredQueuedPodInfos) == 0 {
-				delete(podGroupInfo.QueuedPodInfos, pgKey)
-			}
-			queuedPodInfosToUpdate[pgKey] = filteredQueuedPodInfos
-		}
-	}
-	sched.updateUnscheduledPods(podGroupInfo.PodGroupInfo, queuedPodInfosToUpdate)
-}
-
-// updateUnscheduledPods synchronizes the list of unscheduled pods in the pod group hierarchy
-// after filtering out pods that are deleted or already assumed. It recursively traverses the
-// group hierarchy to update each leaf pod group's list of unscheduled pods.
-func (sched *Scheduler) updateUnscheduledPods(pgi *framework.PodGroupInfo, queuedPodInfosToUpdate map[fwk.EntityKey][]*framework.QueuedPodInfo) {
-	if len(queuedPodInfosToUpdate) == 0 {
-		return
-	}
-	if pgi.CompositePodGroup != nil {
-		for _, child := range pgi.GetChildGroups() {
-			sched.updateUnscheduledPods(child, queuedPodInfosToUpdate)
-		}
-		return
-	}
-	key := pgi.GetKey()
-	if podInfos, ok := queuedPodInfosToUpdate[key]; ok {
-		pgi.UnscheduledPods = make([]*v1.Pod, 0, len(podInfos))
-		for _, pInfo := range podInfos {
-			pgi.UnscheduledPods = append(pgi.UnscheduledPods, pInfo.Pod)
-		}
-		delete(queuedPodInfosToUpdate, key)
+		return true
+	})
+	// The following code removes each pod from the QueuedPodGroupInfo object individually.
+	// This simplified approach may result in O(n^2) complexity. However, since
+	// it is unlikely that any given pod will be filtered out using skipPodGroupPodSchedule,
+	// such complexity is acceptable.
+	for _, pod := range podsToRemove {
+		podGroupInfo.RemovePod(pod)
 	}
 }
 
