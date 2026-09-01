@@ -4732,6 +4732,9 @@
           "description": "Current status of a job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
         }
       },
+      "required": [
+        "spec"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -4769,10 +4772,6 @@
           "type": "string"
         }
       },
-      "required": [
-        "type",
-        "status"
-      ],
       "type": "object"
     },
     "io.k8s.api.batch.v1.JobList": {
@@ -4998,6 +4997,9 @@
           "description": "Specification of the desired behavior of the job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
         }
       },
+      "required": [
+        "spec"
+      ],
       "type": "object"
     },
     "io.k8s.api.batch.v1.PodFailurePolicy": {
@@ -5012,9 +5014,6 @@
           "x-kubernetes-list-type": "atomic"
         }
       },
-      "required": [
-        "rules"
-      ],
       "type": "object"
     },
     "io.k8s.api.batch.v1.PodFailurePolicyOnExitCodesRequirement": {
