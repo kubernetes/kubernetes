@@ -148,14 +148,22 @@ func IsDeleted(ctx context.Context, info *resource.Info, o *WaitOptions) (runtim
 		}
 		return err
 	})
-	forbiddenLock.Lock()
-	stoppedByForbidden := forbiddenErr
-	forbiddenLock.Unlock()
-	if stoppedByForbidden != nil {
-		// Report the denial rather than the context cancellation it triggered.
-		return gottenObj, false, stoppedByForbidden
-	}
 	if err != nil {
+		// A recorded denial is the reason the wait stopped, so report it rather
+		// than the context cancellation it triggered. Only consult it once the
+		// wait has failed: if deletion was confirmed first, the confirmation stands.
+		forbiddenLock.Lock()
+		stoppedByForbidden := forbiddenErr
+		forbiddenLock.Unlock()
+		if stoppedByForbidden != nil {
+			// Cancelling the wait may have pre-empted a precondition that was
+			// about to be satisfied, so confirm through the get that already
+			// succeeded above before reporting the denial.
+			if _, getErr := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Get(ctx, info.Name, metav1.GetOptions{}); apierrors.IsNotFound(getErr) {
+				return info.Object, true, nil
+			}
+			return gottenObj, false, stoppedByForbidden
+		}
 		if wait.Interrupted(err) { // nolint:staticcheck // SA1019
 			return gottenObj, false, errWaitTimeoutWithName
 		}
