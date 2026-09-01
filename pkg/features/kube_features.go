@@ -364,22 +364,6 @@ const (
 	// both allocators. This feature gate disables the dual write on the new Cluster IP allocators.
 	DisableAllocatorDualWrite featuregate.Feature = "DisableAllocatorDualWrite"
 
-	// owner: @ffromani
-	// beta: v1.33
-	//
-	// Disables CPU Quota for containers which have exclusive CPUs allocated.
-	// Disables pod-Level CPU Quota for pods containing at least one container with exclusive CPUs allocated
-	// Exclusive CPUs for a container (init, application, sidecar) are allocated when:
-	// (1) cpumanager policy is static,
-	// (2) the pod has QoS Guaranteed,
-	// (3) the container has integer cpu request.
-	// The expected behavior is that CPU Quota for containers having exclusive CPUs allocated is disabled.
-	// Because this fix changes a long-established (but incorrect) behavior, users observing
-	// any regressions can use the DisableCPUQuotaWithExclusiveCPUs feature gate (default on) to
-	// restore the old behavior. Please file issues if you hit issues and have to use this Feature Gate.
-	// The Feature Gate will be locked to true and then removed in +2 releases (1.35) if there are no bug reported
-	DisableCPUQuotaWithExclusiveCPUs featuregate.Feature = "DisableCPUQuotaWithExclusiveCPUs"
-
 	// owner: @HirazawaUi
 	// kep: http://kep.k8s.io/4004
 	//
@@ -1550,12 +1534,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove after MultiCIDRServiceAllocator is GA
 	},
 
-	DisableCPUQuotaWithExclusiveCPUs: {
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Deprecated},
-		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Deprecated, LockToDefault: true}, // remove in 1.38
-	},
-
 	DisableNodeKubeProxyVersion: {
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Deprecated},
@@ -2601,8 +2579,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DeploymentReplicaSetTerminatingReplicas: {},
 
 	DisableAllocatorDualWrite: {MultiCIDRServiceAllocator},
-
-	DisableCPUQuotaWithExclusiveCPUs: {},
 
 	DisableNodeKubeProxyVersion: {},
 
