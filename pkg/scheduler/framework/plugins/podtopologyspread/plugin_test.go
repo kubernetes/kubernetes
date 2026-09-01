@@ -367,12 +367,11 @@ func Test_isSchedulableAfterAssignedPodChange(t *testing.T) {
 
 func Test_isSchedulableAfterTargetPodChange(t *testing.T) {
 	testcases := []struct {
-		name                                         string
-		pod                                          *v1.Pod
-		oldPod, newPod                               *v1.Pod
-		expectedHint                                 fwk.QueueingHint
-		expectedErr                                  bool
-		enableNodeInclusionPolicyInPodTopologySpread bool
+		name           string
+		pod            *v1.Pod
+		oldPod, newPod *v1.Pod
+		expectedHint   fwk.QueueingHint
+		expectedErr    bool
 	}{
 		{
 			name: "the unschedulable Pod has topologySpreadConstraint with NodeTaintsPolicy:Honor and has got a new toleration",
@@ -383,7 +382,6 @@ func Test_isSchedulableAfterTargetPodChange(t *testing.T) {
 			oldPod:       st.MakePod().UID("p").Name("p").Label("foo", "").Obj(),
 			newPod:       st.MakePod().UID("p").Name("p").Label("foo", "").Toleration(v1.TaintNodeUnschedulable).Obj(),
 			expectedHint: fwk.Queue,
-			enableNodeInclusionPolicyInPodTopologySpread: true,
 		},
 		{
 			name: "the unschedulable Pod has topologySpreadConstraint without NodeTaintsPolicy:Honor and has got a new toleration",
@@ -422,7 +420,6 @@ func Test_isSchedulableAfterTargetPodChange(t *testing.T) {
 			snapshot := cache.NewSnapshot(nil, nil)
 			pl := plugintesting.SetupPlugin(ctx, t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
 			p := pl.(*PodTopologySpread)
-			p.enableNodeInclusionPolicyInPodTopologySpread = tc.enableNodeInclusionPolicyInPodTopologySpread
 
 			actualHint, err := p.isSchedulableAfterTargetPodChange(logger, tc.pod, tc.oldPod, tc.newPod)
 			if tc.expectedErr {
