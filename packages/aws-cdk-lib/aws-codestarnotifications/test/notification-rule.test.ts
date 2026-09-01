@@ -228,13 +228,13 @@ describe('NotificationRule from imported', () => {
 
   test('from notification rule ARN', () => {
     const imported = notifications.NotificationRule.fromNotificationRuleArn(stack, 'MyNotificationRule',
-      'arn:aws:codestar-notifications::1234567890:notificationrule/1234567890abcdef');
-    expect(imported.notificationRuleArn).toEqual('arn:aws:codestar-notifications::1234567890:notificationrule/1234567890abcdef');
+      'arn:aws:codestar-notifications::123456789012:notificationrule/1234567890abcdef');
+    expect(imported.notificationRuleArn).toEqual('arn:aws:codestar-notifications::123456789012:notificationrule/1234567890abcdef');
   });
 
   test('will not effect and return false when added targets if notification from imported', () => {
     const imported = notifications.NotificationRule.fromNotificationRuleArn(stack, 'MyNotificationRule',
-      'arn:aws:codestar-notifications::1234567890:notificationrule/1234567890abcdef');
+      'arn:aws:codestar-notifications::123456789012:notificationrule/1234567890abcdef');
     const slack = new FakeSlackTarget();
     expect(imported.addTarget(slack)).toEqual(false);
   });

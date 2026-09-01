@@ -239,7 +239,7 @@ describe('EventBus grants', () => {
 
       test('creates identity-based policy for imported event bus from ARN without warnings', () => {
         // GIVEN
-        const importedEventBus = EventBus.fromEventBusArn(stack, 'ImportedBus', 'arn:aws:events:region:account-id:event-bus/event-bus-name');
+        const importedEventBus = EventBus.fromEventBusArn(stack, 'ImportedBus', 'arn:aws:events:us-east-1:123456789012:event-bus/event-bus-name');
         const role = new iam.Role(stack, 'Role', {
           assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
         });
@@ -248,7 +248,7 @@ describe('EventBus grants', () => {
         const grant = importedEventBus.grantPutEventsTo(role);
 
         // THEN
-        assertIdentityBasedPolicy(stack, 'arn:aws:events:region:account-id:event-bus/event-bus-name');
+        assertIdentityBasedPolicy(stack, 'arn:aws:events:us-east-1:123456789012:event-bus/event-bus-name');
         assertOnlyIdentityPolicy(stack, grant);
         assertNoWarnings(stack);
         expect(grant.success).toBeTruthy();

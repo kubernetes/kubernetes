@@ -692,7 +692,7 @@ test('Role.fromRoleName with no options ', () => {
 function somePolicyStatement() {
   return new PolicyStatement({
     actions: ['s3:*'],
-    resources: ['xyz'],
+    resources: ['arn:aws:s3:::my-bucket'],
   });
 }
 
@@ -730,7 +730,7 @@ function _assertStackContainsPolicyResource(stack: Stack, roleNames: any[], name
         {
           Action: 's3:*',
           Effect: 'Allow',
-          Resource: 'xyz',
+          Resource: 'arn:aws:s3:::my-bucket',
         },
       ],
     },

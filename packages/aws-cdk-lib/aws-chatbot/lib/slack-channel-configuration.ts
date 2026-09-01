@@ -228,7 +228,7 @@ export class SlackChannelConfiguration extends SlackChannelConfigurationBase {
    * Import an existing Slack channel configuration provided an ARN
    * @param scope The parent creating construct
    * @param id The construct's name
-   * @param slackChannelConfigurationArn configuration ARN (i.e. arn:aws:chatbot::1234567890:chat-configuration/slack-channel/my-slack)
+   * @param slackChannelConfigurationArn configuration ARN (i.e. arn:aws:chatbot::123456789012:chat-configuration/slack-channel/my-slack)
    *
    * @returns a reference to the existing Slack channel configuration
    */
@@ -252,7 +252,7 @@ export class SlackChannelConfiguration extends SlackChannelConfigurationBase {
        * Returns a name of Slack channel configuration
        *
        * NOTE:
-       * For example: arn:aws:chatbot::1234567890:chat-configuration/slack-channel/my-slack
+       * For example: arn:aws:chatbot::123456789012:chat-configuration/slack-channel/my-slack
        * The ArnComponents API will return `slack-channel/my-slack`
        * It need to handle that to gets a correct name.`my-slack`
        */

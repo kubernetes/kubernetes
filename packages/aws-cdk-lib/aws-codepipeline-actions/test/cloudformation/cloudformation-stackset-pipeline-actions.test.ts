@@ -14,7 +14,7 @@ beforeEach(() => {
       region: 'us-east-1',
     },
   });
-  importedAdminRole = iam.Role.fromRoleArn(stack, 'ChangeSetRole', 'arn:aws:iam::1234:role/ImportedAdminRole');
+  importedAdminRole = iam.Role.fromRoleArn(stack, 'ChangeSetRole', 'arn:aws:iam::123456789012:role/ImportedAdminRole');
 });
 
 describe('StackSetAction', () => {
@@ -160,7 +160,7 @@ describe('StackSetAction', () => {
             {
               'Action': 'iam:PassRole',
               'Effect': 'Allow',
-              'Resource': 'arn:aws:iam::1234:role/ImportedAdminRole',
+              'Resource': 'arn:aws:iam::123456789012:role/ImportedAdminRole',
             },
             {
               'Action': [
@@ -241,7 +241,7 @@ describe('StackSetAction', () => {
     stack.deployStage.addAction(new cpactions.CloudFormationDeployStackSetAction({
       ...defaultOpts(),
       stackInstances: cpactions.StackInstances.inAccounts(
-        ['11111111111', '22222222222'],
+        ['111111111111', '222222222222'],
         ['us-east-1', 'us-west-1', 'ca-central-1'],
       ),
       deploymentModel: cpactions.StackSetDeploymentModel.selfManaged({
@@ -264,7 +264,7 @@ describe('StackSetAction', () => {
                 'TemplatePath': 'SourceArtifact::template.yaml',
                 'Parameters': 'SourceArtifact::parameters.json',
                 'Capabilities': 'CAPABILITY_NAMED_IAM',
-                'DeploymentTargets': '11111111111,22222222222',
+                'DeploymentTargets': '111111111111,222222222222',
                 'FailureTolerancePercentage': 50,
                 'MaxConcurrentPercentage': 25,
                 'Regions': 'us-east-1,us-west-1,ca-central-1',

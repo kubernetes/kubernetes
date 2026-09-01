@@ -10,7 +10,7 @@ import { lit } from '../../../core/lib/private/literal-string';
 import { assemblyBuilderOf } from '../../lib/private/construct-internals';
 
 export const PIPELINE_ENV: Environment = {
-  account: '123pipeline',
+  account: '123456789012',
   region: 'us-pipeline',
 };
 

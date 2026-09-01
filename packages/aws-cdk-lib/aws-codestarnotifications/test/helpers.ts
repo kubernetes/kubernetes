@@ -1,7 +1,7 @@
 import type * as notifications from '../lib';
 
 export class FakeCodeBuild implements notifications.INotificationRuleSource {
-  readonly projectArn = 'arn:aws:codebuild::1234567890:project/MyCodebuildProject';
+  readonly projectArn = 'arn:aws:codebuild::123456789012:project/MyCodebuildProject';
   readonly projectName = 'test-project';
 
   bindAsNotificationRuleSource(): notifications.NotificationRuleSourceConfig {
@@ -12,7 +12,7 @@ export class FakeCodeBuild implements notifications.INotificationRuleSource {
 }
 
 export class FakeCodePipeline implements notifications.INotificationRuleSource {
-  readonly pipelineArn = 'arn:aws:codepipeline::1234567890:MyCodepipelineProject';
+  readonly pipelineArn = 'arn:aws:codepipeline::123456789012:MyCodepipelineProject';
   readonly pipelineName = 'test-pipeline';
 
   bindAsNotificationRuleSource(): notifications.NotificationRuleSourceConfig {
@@ -23,7 +23,7 @@ export class FakeCodePipeline implements notifications.INotificationRuleSource {
 }
 
 export class FakeCodeCommit implements notifications.INotificationRuleSource {
-  readonly repositoryArn = 'arn:aws:codecommit::1234567890:MyCodecommitProject';
+  readonly repositoryArn = 'arn:aws:codecommit::123456789012:MyCodecommitProject';
   readonly repositoryName = 'test-repository';
 
   bindAsNotificationRuleSource(): notifications.NotificationRuleSourceConfig {
@@ -34,7 +34,7 @@ export class FakeCodeCommit implements notifications.INotificationRuleSource {
 }
 
 export class FakeSnsTopicTarget implements notifications.INotificationRuleTarget {
-  readonly topicArn = 'arn:aws:sns::1234567890:MyTopic';
+  readonly topicArn = 'arn:aws:sns::123456789012:MyTopic';
 
   bindAsNotificationRuleTarget(): notifications.NotificationRuleTargetConfig {
     return {
@@ -45,7 +45,7 @@ export class FakeSnsTopicTarget implements notifications.INotificationRuleTarget
 }
 
 export class FakeSlackTarget implements notifications.INotificationRuleTarget {
-  readonly slackChannelConfigurationArn = 'arn:aws:chatbot::1234567890:chat-configuration/slack-channel/MySlackChannel';
+  readonly slackChannelConfigurationArn = 'arn:aws:chatbot::123456789012:chat-configuration/slack-channel/MySlackChannel';
 
   bindAsNotificationRuleTarget(): notifications.NotificationRuleTargetConfig {
     return {

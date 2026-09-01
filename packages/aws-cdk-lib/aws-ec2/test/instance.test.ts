@@ -243,6 +243,11 @@ describe('instance', () => {
   });
   describe('blockDeviceMappings', () => {
     test('can set blockDeviceMappings', () => {
+      Validations.of(stack).acknowledge({
+        id: 'CloudFormation-Validate::F3014',
+        reason: 'test violates this',
+      });
+
       // WHEN
       const kmsKey = new Key(stack, 'EbsKey');
       new Instance(stack, 'Instance', {

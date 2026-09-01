@@ -2508,7 +2508,7 @@ describe('container definition', () => {
     const stack = new cdk.Stack();
     acknowledgeTestValidationRules(stack);
     const taskDefinition = new ecs.Ec2TaskDefinition(stack, 'TaskDef');
-    const mySecretArn = 'arn:aws:secretsmanager:region:1234567890:secret:MyRepoSecret-6f8hj3';
+    const mySecretArn = 'arn:aws:secretsmanager:region:123456789012:secret:MyRepoSecret-6f8hj3';
 
     const repoCreds = secretsmanager.Secret.fromSecretCompleteArn(stack, 'MyRepoSecret', mySecretArn);
 

@@ -130,7 +130,7 @@ test('Can use EC2 taskdef as EventRule target with dead letter queue', () => {
 test('Throws error for lacking of taskRole ' +
     'when importing from an EC2 task definition just from a task definition arn as EventRule target', () => {
   // GIVEN
-  const taskDefinition = ecs.Ec2TaskDefinition.fromEc2TaskDefinitionArn(stack, 'TaskDef', 'importedTaskDefArn');
+  const taskDefinition = ecs.Ec2TaskDefinition.fromEc2TaskDefinitionArn(stack, 'TaskDef', 'arn:aws:ecs:us-east-1:123456789012:task-definition/TaskDef');
 
   const rule = new events.Rule(stack, 'Rule', {
     schedule: events.Schedule.expression('rate(1 min)'),
@@ -154,7 +154,7 @@ test('Throws error for lacking of taskRole ' +
 test('Can import an EC2 task definition from task definition attributes as EventRule target', () => {
   // GIVEN
   const taskDefinition = ecs.Ec2TaskDefinition.fromEc2TaskDefinitionAttributes(stack, 'TaskDef', {
-    taskDefinitionArn: 'importedTaskDefArn',
+    taskDefinitionArn: 'arn:aws:ecs:us-east-1:123456789012:task-definition/TaskDef',
     networkMode: ecs.NetworkMode.BRIDGE,
     taskRole: new iam.Role(stack, 'TaskRole', {
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
@@ -183,7 +183,7 @@ test('Can import an EC2 task definition from task definition attributes as Event
         Arn: { 'Fn::GetAtt': ['EcsCluster97242B84', 'Arn'] },
         EcsParameters: {
           TaskCount: 1,
-          TaskDefinitionArn: 'importedTaskDefArn',
+          TaskDefinitionArn: 'arn:aws:ecs:us-east-1:123456789012:task-definition/TaskDef',
         },
         InputTransformer: {
           InputPathsMap: {
@@ -225,7 +225,7 @@ test('Throws error for lacking of taskRole ' +
 test('Can import a Fargate task definition from task definition attributes as EventRule target', () => {
   // GIVEN
   const taskDefinition = ecs.FargateTaskDefinition.fromFargateTaskDefinitionAttributes(stack, 'TaskDef', {
-    taskDefinitionArn: 'importedTaskDefArn',
+    taskDefinitionArn: 'arn:aws:ecs:us-east-1:123456789012:task-definition/TaskDef',
     networkMode: ecs.NetworkMode.AWS_VPC,
     taskRole: new iam.Role(stack, 'TaskRole', {
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
@@ -254,7 +254,7 @@ test('Can import a Fargate task definition from task definition attributes as Ev
         Arn: { 'Fn::GetAtt': ['EcsCluster97242B84', 'Arn'] },
         EcsParameters: {
           TaskCount: 1,
-          TaskDefinitionArn: 'importedTaskDefArn',
+          TaskDefinitionArn: 'arn:aws:ecs:us-east-1:123456789012:task-definition/TaskDef',
         },
         InputTransformer: {
           InputPathsMap: {
@@ -296,7 +296,7 @@ test('Throws error for lacking of taskRole ' +
 test('Can import a Task definition from task definition attributes as EventRule target', () => {
   // GIVEN
   const taskDefinition = ecs.FargateTaskDefinition.fromFargateTaskDefinitionAttributes(stack, 'TaskDef', {
-    taskDefinitionArn: 'importedTaskDefArn',
+    taskDefinitionArn: 'arn:aws:ecs:us-east-1:123456789012:task-definition/TaskDef',
     networkMode: ecs.NetworkMode.AWS_VPC,
     taskRole: new iam.Role(stack, 'TaskRole', {
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
@@ -325,7 +325,7 @@ test('Can import a Task definition from task definition attributes as EventRule 
         Arn: { 'Fn::GetAtt': ['EcsCluster97242B84', 'Arn'] },
         EcsParameters: {
           TaskCount: 1,
-          TaskDefinitionArn: 'importedTaskDefArn',
+          TaskDefinitionArn: 'arn:aws:ecs:us-east-1:123456789012:task-definition/TaskDef',
         },
         InputTransformer: {
           InputPathsMap: {

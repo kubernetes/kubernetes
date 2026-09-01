@@ -170,7 +170,7 @@ describe('vpc from lookup', () => {
 
     test('AZ in dummy lookup VPC matches AZ in Stack', () => {
       // GIVEN
-      const stack = new Stack(undefined, 'MyTestStack', { env: { account: '1234567890', region: 'dummy' } });
+      const stack = new Stack(undefined, 'MyTestStack', { env: { account: '123456789012', region: 'dummy' } });
       const vpc = Vpc.fromLookup(stack, 'vpc', { isDefault: true });
 
       // WHEN
@@ -184,7 +184,7 @@ describe('vpc from lookup', () => {
 
     test('don\'t crash when using subnetgroup name in lookup VPC', () => {
       // GIVEN
-      const stack = new Stack(undefined, 'MyTestStack', { env: { account: '1234567890', region: 'dummy' } });
+      const stack = new Stack(undefined, 'MyTestStack', { env: { account: '123456789012', region: 'dummy' } });
       const vpc = Vpc.fromLookup(stack, 'vpc', { isDefault: true });
 
       // WHEN

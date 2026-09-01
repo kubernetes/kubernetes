@@ -2928,7 +2928,7 @@ describe('function', () => {
         code: new lambda.InlineCode('foo'),
         handler: 'index.handler',
         runtime: lambda.Runtime.PYTHON_3_9,
-        profilingGroup: ProfilingGroup.fromProfilingGroupArn(stack, 'ProfilingGroup', 'arn:aws:codeguru-profiler:us-east-1:1234567890:profilingGroup/MyAwesomeProfilingGroup'),
+        profilingGroup: ProfilingGroup.fromProfilingGroupArn(stack, 'ProfilingGroup', 'arn:aws:codeguru-profiler:us-east-1:123456789012:profilingGroup/MyAwesomeProfilingGroup'),
       });
 
       Template.fromStack(stack).hasResourceProperties('AWS::IAM::Policy', {
@@ -2940,7 +2940,7 @@ describe('function', () => {
                 'codeguru-profiler:PostAgentProfile',
               ],
               Effect: 'Allow',
-              Resource: 'arn:aws:codeguru-profiler:us-east-1:1234567890:profilingGroup/MyAwesomeProfilingGroup',
+              Resource: 'arn:aws:codeguru-profiler:us-east-1:123456789012:profilingGroup/MyAwesomeProfilingGroup',
             },
           ],
           Version: '2012-10-17',
@@ -2957,7 +2957,7 @@ describe('function', () => {
         Environment: {
           Variables: {
             AWS_CODEGURU_PROFILER_GROUP_NAME: 'MyAwesomeProfilingGroup',
-            AWS_CODEGURU_PROFILER_GROUP_ARN: 'arn:aws:codeguru-profiler:us-east-1:1234567890:profilingGroup/MyAwesomeProfilingGroup',
+            AWS_CODEGURU_PROFILER_GROUP_ARN: 'arn:aws:codeguru-profiler:us-east-1:123456789012:profilingGroup/MyAwesomeProfilingGroup',
             AWS_CODEGURU_PROFILER_TARGET_REGION: 'us-east-1',
           },
         },
@@ -5334,7 +5334,7 @@ describe('telemetry metadata', () => {
       runtime: lambda.Runtime.NODEJS_LATEST,
     });
 
-    fn.addEnvironment('foo', '1234567890', {
+    fn.addEnvironment('foo', '123456789012', {
       removeInEdge: true,
     });
 

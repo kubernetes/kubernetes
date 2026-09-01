@@ -31,7 +31,7 @@ test('can add additional statements Boundary', () => {
     additionalStatements: [
       new iam.PolicyStatement({
         actions: ['a:a'],
-        resources: ['b'],
+        resources: ['arn:aws:s3:::my-bucket/my-object'],
       }),
     ],
   }));
@@ -42,7 +42,7 @@ test('can add additional statements Boundary', () => {
       Statement: Match.arrayWith([{
         Effect: 'Allow',
         Action: 'a:a',
-        Resource: 'b',
+        Resource: 'arn:aws:s3:::my-bucket/my-object',
       }]),
     },
   });

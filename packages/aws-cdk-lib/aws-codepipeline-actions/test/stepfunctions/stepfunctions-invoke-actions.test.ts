@@ -122,7 +122,7 @@ describe('StepFunctions Invoke Action', () => {
   });
 
   test('Allows the pipeline to describe this stepfunction execution (across accounts & regions)', () => {
-    const stack = new Stack(undefined, undefined, { env: { account: '11111111111', region: 'us-east-1' } });
+    const stack = new Stack(undefined, undefined, { env: { account: '111111111111', region: 'us-east-1' } });
 
     minimalPipeline(stack, '999999999999', 'bermuda-triangle-1337');
 

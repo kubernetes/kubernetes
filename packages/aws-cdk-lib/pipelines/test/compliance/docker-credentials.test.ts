@@ -8,9 +8,9 @@ import { CodeBuildStep } from '../../lib';
 import { CDKP_DEFAULT_CODEBUILD_IMAGE } from '../../lib/private/default-codebuild-image';
 import { PIPELINE_ENV, TestApp, ModernTestGitHubNpmPipeline, DockerAssetApp, stringLike } from '../testhelpers';
 
-const secretSynthArn = 'arn:aws:secretsmanager:eu-west-1:0123456789012:secret:synth-012345';
-const secretUpdateArn = 'arn:aws:secretsmanager:eu-west-1:0123456789012:secret:update-012345';
-const secretPublishArn = 'arn:aws:secretsmanager:eu-west-1:0123456789012:secret:publish-012345';
+const secretSynthArn = 'arn:aws:secretsmanager:eu-west-1:012345678912:secret:synth-012345';
+const secretUpdateArn = 'arn:aws:secretsmanager:eu-west-1:012345678912:secret:update-012345';
+const secretPublishArn = 'arn:aws:secretsmanager:eu-west-1:012345678912:secret:publish-012345';
 
 let app: TestApp;
 let pipelineStack: Stack;

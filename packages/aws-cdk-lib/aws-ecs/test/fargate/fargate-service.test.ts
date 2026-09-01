@@ -1311,7 +1311,7 @@ describe('fargate service', () => {
         memoryLimitMiB: 512,
       });
 
-      const myAlarm = cloudwatch.Alarm.fromAlarmArn(stack, 'myAlarm', 'arn:aws:cloudwatch:us-east-1:1234567890:alarm:alarm1');
+      const myAlarm = cloudwatch.Alarm.fromAlarmArn(stack, 'myAlarm', 'arn:aws:cloudwatch:us-east-1:123456789012:alarm:alarm1');
 
       new ecs.FargateService(stack, 'ExternalService', {
         cluster,

@@ -62,18 +62,18 @@ describe('CodePipeline support stack reuse', () => {
 
     const supportStackATemplate = Template.fromJSON(supportStackAArtifact.template);
     supportStackATemplate.hasResourceProperties('AWS::S3::Bucket', {
-      BucketName: 'pipelinestacka-support-useplicationbucket80db3753a0ebbf052279',
+      BucketName: 'pipelinestacka-support-useplicationbucket80db37539447715cac4f',
     });
     supportStackATemplate.hasResourceProperties('AWS::KMS::Alias', {
-      AliasName: 'alias/pport-ustencryptionalias5cad45754e1ff088476b',
+      AliasName: 'alias/pport-ustencryptionalias5cad4575e12193eb33f2',
     });
 
     const supportStackBTemplate = Template.fromJSON(supportStackBArtifact.template);
     supportStackBTemplate.hasResourceProperties('AWS::S3::Bucket', {
-      BucketName: 'pipelinestackb-support-useplicationbucket1d556ec7f959b336abf8',
+      BucketName: 'pipelinestackb-support-useplicationbucket1d556ec771e60c10c683',
     });
     supportStackBTemplate.hasResourceProperties('AWS::KMS::Alias', {
-      AliasName: 'alias/pport-ustencryptionalias668c7ffd0de17c9867b0',
+      AliasName: 'alias/pport-ustencryptionalias668c7ffd2deea6ebc8a4',
     });
   });
 });
@@ -122,7 +122,7 @@ test('Policy sizes do not exceed the maximum size', () => {
   for (let i = 0; i < 70; i++) {
     pipeline.addStage(new FileAssetApp(pipelineStack, `App${i}`, {
       env: {
-        account: `account${i}`,
+        account: `${i}`.padStart(12, '0'),
         region: regions[i % regions.length],
       },
     }), {

@@ -1803,7 +1803,7 @@ describe('User Pool', () => {
     const stack = new Stack(undefined, undefined, {
       env: {
         region: 'us-east-1',
-        account: '11111111111',
+        account: '111111111111',
       },
     });
 
@@ -1831,7 +1831,7 @@ describe('User Pool', () => {
               {
                 Ref: 'AWS::Partition',
               },
-              ':ses:us-east-1:11111111111:identity/mycustomemail@example.com',
+              ':ses:us-east-1:111111111111:identity/mycustomemail@example.com',
             ],
           ],
         },
@@ -1844,7 +1844,7 @@ describe('User Pool', () => {
     const stack = new Stack(undefined, undefined, {
       env: {
         region: 'us-east-1',
-        account: '11111111111',
+        account: '111111111111',
       },
     });
 
@@ -1873,7 +1873,7 @@ describe('User Pool', () => {
               {
                 Ref: 'AWS::Partition',
               },
-              ':ses:us-east-1:11111111111:identity/mycustomemail@example.com',
+              ':ses:us-east-1:111111111111:identity/mycustomemail@example.com',
             ],
           ],
         },
@@ -1886,7 +1886,7 @@ describe('User Pool', () => {
     const stack = new Stack(undefined, undefined, {
       env: {
         region: 'us-east-1',
-        account: '11111111111',
+        account: '111111111111',
       },
     });
 
@@ -1911,7 +1911,7 @@ describe('User Pool', () => {
               {
                 Ref: 'AWS::Partition',
               },
-              ':ses:us-east-1:11111111111:identity/mycustomemail@example.com',
+              ':ses:us-east-1:111111111111:identity/mycustomemail@example.com',
             ],
           ],
         },
@@ -1924,7 +1924,7 @@ describe('User Pool', () => {
     const stack = new Stack(undefined, undefined, {
       env: {
         region: 'us-east-1',
-        account: '11111111111',
+        account: '111111111111',
       },
     });
 
@@ -1949,7 +1949,7 @@ describe('User Pool', () => {
               {
                 Ref: 'AWS::Partition',
               },
-              ':ses:us-east-1:11111111111:identity/mycustomemail@example.com',
+              ':ses:us-east-1:111111111111:identity/mycustomemail@example.com',
             ],
           ],
         },
@@ -1962,7 +1962,7 @@ describe('User Pool', () => {
     const stack = new Stack(undefined, undefined, {
       env: {
         region: 'us-east-1',
-        account: '11111111111',
+        account: '111111111111',
       },
     });
 
@@ -1987,7 +1987,7 @@ describe('User Pool', () => {
               {
                 Ref: 'AWS::Partition',
               },
-              ':ses:us-east-1:11111111111:identity/mycustomemail@example.com',
+              ':ses:us-east-1:111111111111:identity/mycustomemail@example.com',
             ],
           ],
         },
@@ -2000,7 +2000,7 @@ describe('User Pool', () => {
     const stack = new Stack(undefined, undefined, {
       env: {
         region: 'us-east-1',
-        account: '11111111111',
+        account: '111111111111',
       },
     });
 
@@ -2025,7 +2025,7 @@ describe('User Pool', () => {
               {
                 Ref: 'AWS::Partition',
               },
-              ':ses:us-east-1:11111111111:identity/mycustomemail@example.com',
+              ':ses:us-east-1:111111111111:identity/mycustomemail@example.com',
             ],
           ],
         },
@@ -2038,7 +2038,7 @@ describe('User Pool', () => {
     const stack = new Stack(undefined, undefined, {
       env: {
         region: 'us-east-2',
-        account: '11111111111',
+        account: '111111111111',
       },
     });
 
@@ -2068,7 +2068,7 @@ describe('User Pool', () => {
               {
                 Ref: 'AWS::Partition',
               },
-              ':ses:us-east-1:11111111111:identity/mycustomemail@example.com',
+              ':ses:us-east-1:111111111111:identity/mycustomemail@example.com',
             ],
           ],
         },
@@ -2081,7 +2081,7 @@ describe('User Pool', () => {
     const stack = new Stack(undefined, undefined, {
       env: {
         region: 'us-east-2',
-        account: '11111111111',
+        account: '111111111111',
       },
     });
 
@@ -2112,7 +2112,7 @@ describe('User Pool', () => {
               {
                 Ref: 'AWS::Partition',
               },
-              ':ses:us-east-1:11111111111:identity/example.com',
+              ':ses:us-east-1:111111111111:identity/example.com',
             ],
           ],
         },
@@ -2125,7 +2125,7 @@ describe('User Pool', () => {
     const stack = new Stack(undefined, undefined, {
       env: {
         region: 'us-east-2',
-        account: '11111111111',
+        account: '111111111111',
       },
     });
 

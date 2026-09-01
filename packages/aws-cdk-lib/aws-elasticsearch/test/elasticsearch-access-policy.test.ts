@@ -16,12 +16,12 @@ beforeEach(() => {
 test('minimal example renders correctly', () => {
   new ElasticsearchAccessPolicy(stack, 'ElasticsearchAccessPolicy', {
     domainName: 'TestDomain',
-    domainArn: 'test:arn',
+    domainArn: 'arn:aws:es:us-east-1:123456789012:domain/test-domain',
     accessPolicies: [new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       actions: ['es:ESHttp*'],
       principals: [new iam.AnyPrincipal()],
-      resources: ['test:arn'],
+      resources: ['arn:aws:es:us-east-1:123456789012:domain/test-domain'],
 
     })],
   });
@@ -38,7 +38,7 @@ test('minimal example renders correctly', () => {
       service: 'ES',
       parameters: {
         DomainName: 'TestDomain',
-        AccessPolicies: '{"Statement":[{"Action":"es:ESHttp*","Effect":"Allow","Principal":{"AWS":"*"},"Resource":"test:arn"}],"Version":"2012-10-17"}',
+        AccessPolicies: '{"Statement":[{"Action":"es:ESHttp*","Effect":"Allow","Principal":{"AWS":"*"},"Resource":"arn:aws:es:us-east-1:123456789012:domain/test-domain"}],"Version":"2012-10-17"}',
       },
       outputPaths: ['DomainConfig.ElasticsearchClusterConfig.AccessPolicies'],
       physicalResourceId: { id: 'TestDomainAccessPolicy' },
@@ -48,7 +48,7 @@ test('minimal example renders correctly', () => {
       service: 'ES',
       parameters: {
         DomainName: 'TestDomain',
-        AccessPolicies: '{"Statement":[{"Action":"es:ESHttp*","Effect":"Allow","Principal":{"AWS":"*"},"Resource":"test:arn"}],"Version":"2012-10-17"}',
+        AccessPolicies: '{"Statement":[{"Action":"es:ESHttp*","Effect":"Allow","Principal":{"AWS":"*"},"Resource":"arn:aws:es:us-east-1:123456789012:domain/test-domain"}],"Version":"2012-10-17"}',
       },
       outputPaths: ['DomainConfig.ElasticsearchClusterConfig.AccessPolicies'],
       physicalResourceId: { id: 'TestDomainAccessPolicy' },
@@ -59,13 +59,13 @@ test('minimal example renders correctly', () => {
 test('support access policy added inline and later', () => {
   const elasticsearchAccessPolicy = new ElasticsearchAccessPolicy(stack, 'ElasticsearchAccessPolicy', {
     domainName: 'TestDomain',
-    domainArn: 'test:arn',
+    domainArn: 'arn:aws:es:us-east-1:123456789012:domain/test-domain',
     accessPolicies: [
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
         actions: ['es:ESHttp*'],
         principals: [new iam.AnyPrincipal()],
-        resources: ['test:arn'],
+        resources: ['arn:aws:es:us-east-1:123456789012:domain/test-domain'],
       }),
     ],
   });
@@ -74,7 +74,7 @@ test('support access policy added inline and later', () => {
       effect: iam.Effect.ALLOW,
       actions: ['*'],
       principals: [new iam.AnyPrincipal()],
-      resources: ['test:arn'],
+      resources: ['arn:aws:es:us-east-1:123456789012:domain/test-domain'],
     }),
   );
 
@@ -90,7 +90,7 @@ test('support access policy added inline and later', () => {
       service: 'ES',
       parameters: {
         DomainName: 'TestDomain',
-        AccessPolicies: '{"Statement":[{"Action":"es:ESHttp*","Effect":"Allow","Principal":{"AWS":"*"},"Resource":"test:arn"},{"Action":"*","Effect":"Allow","Principal":{"AWS":"*"},"Resource":"test:arn"}],"Version":"2012-10-17"}',
+        AccessPolicies: '{"Statement":[{"Action":"es:ESHttp*","Effect":"Allow","Principal":{"AWS":"*"},"Resource":"arn:aws:es:us-east-1:123456789012:domain/test-domain"},{"Action":"*","Effect":"Allow","Principal":{"AWS":"*"},"Resource":"arn:aws:es:us-east-1:123456789012:domain/test-domain"}],"Version":"2012-10-17"}',
       },
       outputPaths: ['DomainConfig.ElasticsearchClusterConfig.AccessPolicies'],
       physicalResourceId: { id: 'TestDomainAccessPolicy' },
@@ -100,7 +100,7 @@ test('support access policy added inline and later', () => {
       service: 'ES',
       parameters: {
         DomainName: 'TestDomain',
-        AccessPolicies: '{"Statement":[{"Action":"es:ESHttp*","Effect":"Allow","Principal":{"AWS":"*"},"Resource":"test:arn"},{"Action":"*","Effect":"Allow","Principal":{"AWS":"*"},"Resource":"test:arn"}],"Version":"2012-10-17"}',
+        AccessPolicies: '{"Statement":[{"Action":"es:ESHttp*","Effect":"Allow","Principal":{"AWS":"*"},"Resource":"arn:aws:es:us-east-1:123456789012:domain/test-domain"},{"Action":"*","Effect":"Allow","Principal":{"AWS":"*"},"Resource":"arn:aws:es:us-east-1:123456789012:domain/test-domain"}],"Version":"2012-10-17"}',
       },
       outputPaths: ['DomainConfig.ElasticsearchClusterConfig.AccessPolicies'],
       physicalResourceId: { id: 'TestDomainAccessPolicy' },

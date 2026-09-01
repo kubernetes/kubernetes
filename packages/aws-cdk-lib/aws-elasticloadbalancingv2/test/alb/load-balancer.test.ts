@@ -1342,7 +1342,7 @@ describe('tests', () => {
       Template.fromStack(stack).resourceCountIs('AWS::ElasticLoadBalancingV2::ApplicationLoadBalancer', 0);
       expect(loadBalancer.loadBalancerArn).toEqual('arn:aws:elasticloadbalancing:us-west-2:123456789012:loadbalancer/application/my-load-balancer/50dc6c495c0c9188');
       expect(loadBalancer.loadBalancerCanonicalHostedZoneId).toEqual('Z3DZXE0EXAMPLE');
-      expect(loadBalancer.loadBalancerDnsName).toEqual('my-load-balancer-1234567890.us-west-2.elb.amazonaws.com');
+      expect(loadBalancer.loadBalancerDnsName).toEqual('my-load-balancer-123456789012.us-west-2.elb.amazonaws.com');
       expect(loadBalancer.ipAddressType).toEqual(elbv2.IpAddressType.DUAL_STACK);
       expect(loadBalancer.connections.securityGroups[0].securityGroupId).toEqual('sg-12345678');
       expect(loadBalancer.env.region).toEqual('us-west-2');

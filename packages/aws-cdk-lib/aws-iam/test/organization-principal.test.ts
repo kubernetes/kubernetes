@@ -6,7 +6,7 @@ describe('OrganizationPrincipal', () => {
   test('accepts valid organization ID', () => {
     // WHEN / THEN
     expect(() => {
-      new iam.OrganizationPrincipal('o-1234567890');
+      new iam.OrganizationPrincipal('o-123456789012');
     }).not.toThrow();
   });
 
@@ -37,7 +37,7 @@ describe('OrganizationPrincipal', () => {
     const stack = new Stack();
 
     // WHEN
-    const principal = new iam.OrganizationPrincipal('o-1234567890');
+    const principal = new iam.OrganizationPrincipal('o-123456789012');
 
     // THEN
     expect(stack.resolve(principal.policyFragment.principalJson)).toEqual({
@@ -46,7 +46,7 @@ describe('OrganizationPrincipal', () => {
 
     expect(stack.resolve(principal.policyFragment.conditions)).toEqual({
       StringEquals: {
-        'aws:PrincipalOrgID': 'o-1234567890',
+        'aws:PrincipalOrgID': 'o-123456789012',
       },
     });
   });

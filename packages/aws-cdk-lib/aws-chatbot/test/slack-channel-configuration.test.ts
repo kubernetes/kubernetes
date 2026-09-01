@@ -251,7 +251,7 @@ describe('SlackChannelConfiguration', () => {
   });
 
   test('added a iam policy to a from slack channel configuration ARN will nothing to do', () => {
-    const imported = chatbot.SlackChannelConfiguration.fromSlackChannelConfigurationArn(stack, 'MySlackChannel', 'arn:aws:chatbot::1234567890:chat-configuration/slack-channel/my-slack');
+    const imported = chatbot.SlackChannelConfiguration.fromSlackChannelConfigurationArn(stack, 'MySlackChannel', 'arn:aws:chatbot::123456789012:chat-configuration/slack-channel/my-slack');
 
     (imported as chatbot.SlackChannelConfiguration).addToRolePolicy(new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
@@ -266,22 +266,22 @@ describe('SlackChannelConfiguration', () => {
   });
 
   test('should throw error if ARN invalid', () => {
-    expect(() => chatbot.SlackChannelConfiguration.fromSlackChannelConfigurationArn(stack, 'MySlackChannel', 'arn:aws:chatbot::1234567890:chat-configuration/my-slack')).toThrow(
+    expect(() => chatbot.SlackChannelConfiguration.fromSlackChannelConfigurationArn(stack, 'MySlackChannel', 'arn:aws:chatbot::123456789012:chat-configuration/my-slack')).toThrow(
       /The ARN of a Slack integration must be in the form: arn:<partition>:chatbot:<region>:<account>:chat-configuration\/slack-channel\/<slackChannelName>/,
     );
   });
 
   test('from slack channel configuration ARN', () => {
-    const imported = chatbot.SlackChannelConfiguration.fromSlackChannelConfigurationArn(stack, 'MySlackChannel', 'arn:aws:chatbot::1234567890:chat-configuration/slack-channel/my-slack');
+    const imported = chatbot.SlackChannelConfiguration.fromSlackChannelConfigurationArn(stack, 'MySlackChannel', 'arn:aws:chatbot::123456789012:chat-configuration/slack-channel/my-slack');
 
     expect(imported.slackChannelConfigurationName).toEqual('my-slack');
-    expect(imported.slackChannelConfigurationArn).toEqual('arn:aws:chatbot::1234567890:chat-configuration/slack-channel/my-slack');
+    expect(imported.slackChannelConfigurationArn).toEqual('arn:aws:chatbot::123456789012:chat-configuration/slack-channel/my-slack');
   });
 
   test('skip validation for tokenized values', () => {
     // invalid ARN because of underscores, no error because tokenized value
     expect(() => chatbot.SlackChannelConfiguration.fromSlackChannelConfigurationArn(stack, 'MySlackChannel',
-      cdk.Lazy.string({ produce: () => 'arn:aws:chatbot::1234567890:chat-configuration/slack_channel/my_slack' }))).not.toThrow();
+      cdk.Lazy.string({ produce: () => 'arn:aws:chatbot::123456789012:chat-configuration/slack_channel/my_slack' }))).not.toThrow();
   });
 
   test('test name and ARN from slack channel configuration ARN', () => {

@@ -511,14 +511,14 @@ describe('IAM role', () => {
     // add a policy to the role
     const after = new Stack();
     const afterRole = new Role(after, 'MyRole', { assumedBy: new ServicePrincipal('sns.amazonaws.com') });
-    afterRole.addToPolicy(new PolicyStatement({ resources: ['myresource'], actions: ['service:myaction'] }));
+    afterRole.addToPolicy(new PolicyStatement({ resources: ['arn:aws:s3:::BucketName'], actions: ['service:myaction'] }));
     Template.fromStack(after).hasResourceProperties('AWS::IAM::Policy', {
       PolicyDocument: {
         Statement: [
           {
             Action: 'service:myaction',
             Effect: 'Allow',
-            Resource: 'myresource',
+            Resource: 'arn:aws:s3:::BucketName',
           },
         ],
         Version: '2012-10-17',
@@ -719,7 +719,7 @@ describe('IAM role', () => {
     new Role(stack, 'MyRole', {
       assumedBy: new CompositePrincipal(
         new ServicePrincipal('boom.amazonaws.test'),
-        new ArnPrincipal('1111111'),
+        new ArnPrincipal('111111111111'),
       ),
     });
 
@@ -737,7 +737,7 @@ describe('IAM role', () => {
             Action: 'sts:AssumeRole',
             Effect: 'Allow',
             Principal: {
-              AWS: '1111111',
+              AWS: '111111111111',
             },
           },
         ],

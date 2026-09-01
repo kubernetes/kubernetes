@@ -259,6 +259,11 @@ describe('CDK Include', () => {
   test('can ingest a template with the short form !Split function that uses both brackets and hyphens', () => {
     includeTestTemplate(stack, 'short-form-split.yaml');
 
+    core.Validations.of(stack).acknowledge({
+      id: 'CloudFormation-Validate::E3019',
+      reason: 'BucketNames collide (and are invalid type tbh) on purpose',
+    });
+
     Template.fromStack(stack).templateMatches({
       "Resources": {
         "Bucket1": {

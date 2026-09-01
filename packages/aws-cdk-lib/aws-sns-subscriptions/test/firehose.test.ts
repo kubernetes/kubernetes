@@ -221,8 +221,8 @@ describe('Amazon Data Firehose delivery stream subscription cross-stack', () => 
   test('creates cross-region configuration', () => {
     // GIVEN
     const app = new App();
-    const topicStack = new Stack(app, 'TopicStack', { env: { account: '11111111111', region: 'us-east-1' } });
-    const firehoseStack = new Stack(app, 'FirehoseStack', { env: { account: '11111111111', region: 'us-east-2' } });
+    const topicStack = new Stack(app, 'TopicStack', { env: { account: '111111111111', region: 'us-east-1' } });
+    const firehoseStack = new Stack(app, 'FirehoseStack', { env: { account: '111111111111', region: 'us-east-2' } });
 
     const topic = new sns.Topic(topicStack, 'Topic', {
       displayName: 'displayName',
@@ -247,7 +247,7 @@ describe('Amazon Data Firehose delivery stream subscription cross-stack', () => 
       Protocol: 'firehose',
       Region: 'us-east-1',
       SubscriptionRoleArn: { 'Fn::GetAtt': ['DeliveryStreamTopicSubscriptionRole4964AFE6', 'Arn'] },
-      TopicArn: { 'Fn::Join': ['', ['arn:', { Ref: 'AWS::Partition' }, ':sns:us-east-1:11111111111:topicName']] },
+      TopicArn: { 'Fn::Join': ['', ['arn:', { Ref: 'AWS::Partition' }, ':sns:us-east-1:111111111111:topicName']] },
     });
     Template.fromStack(firehoseStack).hasResourceProperties('AWS::IAM::Role', {
       AssumeRolePolicyDocument: {

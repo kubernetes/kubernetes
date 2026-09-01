@@ -84,7 +84,7 @@ describe('k8s manifest', () => {
     // GIVEN
     const cluster = Cluster.fromClusterAttributes(stack, 'MyCluster', {
       clusterName: 'my-cluster-name',
-      kubectlRoleArn: 'arn:aws:iam::1111111:role/iam-role-that-has-masters-access',
+      kubectlRoleArn: 'arn:aws:iam::111111111111:role/iam-role-that-has-masters-access',
     });
 
     // WHEN
@@ -95,12 +95,12 @@ describe('k8s manifest', () => {
     Template.fromStack(stack).hasResourceProperties(KubernetesManifest.RESOURCE_TYPE, {
       Manifest: '[{"bar":2334}]',
       ClusterName: 'my-cluster-name',
-      RoleArn: 'arn:aws:iam::1111111:role/iam-role-that-has-masters-access',
+      RoleArn: 'arn:aws:iam::111111111111:role/iam-role-that-has-masters-access',
     });
 
     Template.fromStack(stack).hasResourceProperties(HelmChart.RESOURCE_TYPE, {
       ClusterName: 'my-cluster-name',
-      RoleArn: 'arn:aws:iam::1111111:role/iam-role-that-has-masters-access',
+      RoleArn: 'arn:aws:iam::111111111111:role/iam-role-that-has-masters-access',
       Release: 'stackmyclustercharthelmb653160c',
       Chart: 'hello-world',
       Namespace: 'default',
@@ -111,7 +111,7 @@ describe('k8s manifest', () => {
   test('default child is a CfnResource', () => {
     const cluster = Cluster.fromClusterAttributes(stack, 'MyCluster', {
       clusterName: 'my-cluster-name',
-      kubectlRoleArn: 'arn:aws:iam::1111111:role/iam-role-that-has-masters-access',
+      kubectlRoleArn: 'arn:aws:iam::111111111111:role/iam-role-that-has-masters-access',
     });
 
     const manifest = cluster.addManifest('foo', { bar: 2334 });

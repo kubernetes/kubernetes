@@ -558,13 +558,13 @@ describe('event bus', () => {
     const app = new App();
     const stack1 = new Stack(app, 'Stack1', {
       env: {
-        account: '11111111111',
+        account: '111111111111',
         region: 'us-east-1',
       },
     });
     const stack2 = new Stack(app, 'Stack2', {
       env: {
-        account: '22222222222',
+        account: '222222222222',
         region: 'us-east-1',
       },
     });
@@ -578,7 +578,7 @@ describe('event bus', () => {
 
     // THEN
     Template.fromStack(stack1).hasResourceProperties('AWS::Events::EventBus', {
-      Name: 'stack1stack1busca19bdf8ab2e51b62a5a',
+      Name: 'stack1stack1busca19bdf823d8f39f1c0f',
     });
   });
 
@@ -591,7 +591,7 @@ describe('event bus', () => {
     // WHEN
     bus.addToResourcePolicy(new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
-      principals: [new iam.AccountPrincipal('111111111111111')],
+      principals: [new iam.AccountPrincipal('111111111111')],
       actions: ['events:PutEvents'],
       sid: '123',
       resources: [bus.eventBusArn],
@@ -615,7 +615,7 @@ describe('event bus', () => {
                 {
                   Ref: 'AWS::Partition',
                 },
-                ':iam::111111111111111:root',
+                ':iam::111111111111:root',
               ],
             ],
           },

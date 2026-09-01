@@ -16,7 +16,7 @@ describe('State Machine Resources', () => {
           resourceArn: 'resource',
           policyStatements: [new iam.PolicyStatement({
             actions: ['resource:Everything'],
-            resources: ['resource'],
+            resources: ['arn:aws:s3:::my-bucket/my-object'],
           })],
         }),
       },
@@ -35,7 +35,7 @@ describe('State Machine Resources', () => {
           {
             Action: 'resource:Everything',
             Effect: 'Allow',
-            Resource: 'resource',
+            Resource: 'arn:aws:s3:::my-bucket/my-object',
           },
         ],
       },
@@ -49,7 +49,7 @@ describe('State Machine Resources', () => {
       policies: [
         new iam.PolicyStatement({
           actions: ['resource:Everything'],
-          resources: ['resource'],
+          resources: ['arn:aws:s3:::my-bucket/my-object'],
         }),
       ],
     });
@@ -70,7 +70,7 @@ describe('State Machine Resources', () => {
           {
             Action: 'resource:Everything',
             Effect: 'Allow',
-            Resource: 'resource',
+            Resource: 'arn:aws:s3:::my-bucket/my-object',
           },
         ],
       },
@@ -980,7 +980,7 @@ describe('State Machine Resources', () => {
     const task = new FakeTask(stack, 'Task', {
       policies: [
         new iam.PolicyStatement({
-          resources: ['resource'],
+          resources: ['arn:aws:s3:::my-bucket/my-object'],
           actions: ['lambda:InvokeFunction'],
         }),
       ],

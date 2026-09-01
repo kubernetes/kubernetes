@@ -358,6 +358,11 @@ describe('CDK Include', () => {
   });
 
   test('dehydrated resources retain all attributes', () => {
+    Validations.of(stack).acknowledge(...['F0018', 'F3016', 'E3001', 'E3055'].map(id => ({
+      id: `CloudFormation-Validate::${id}`,
+      reason: 'This test is purposely creating invalid templates',
+    })));
+
     includeTestTemplate(stack, 'resource-all-attributes.json', {
       dehydratedResources: ['Foo'],
     });

@@ -100,10 +100,10 @@ describe('extension', () => {
       handler: 'index.handler',
     });
     Object.defineProperty(func1, 'functionArn', {
-      value: 'arn:lambda:us-east-1:123456789012:function:my-function',
+      value: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
     });
     Object.defineProperty(func2, 'functionArn', {
-      value: 'arn:lambda:us-east-1:123456789012:function:my-diff-function',
+      value: 'arn:aws:lambda:us-east-1:123456789012:function:my-diff-function',
     });
     new Extension(stack, 'MyExtension', {
       actions: [
@@ -129,14 +129,14 @@ describe('extension', () => {
           {
             Name: 'MyExtension-0',
             RoleArn: { 'Fn::GetAtt': ['MyExtensionRole467D6FCDEEFA5', 'Arn'] },
-            Uri: 'arn:lambda:us-east-1:123456789012:function:my-function',
+            Uri: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
           },
         ],
         ON_DEPLOYMENT_ROLLED_BACK: [
           {
             Name: 'MyExtension-1',
             RoleArn: { 'Fn::GetAtt': ['MyExtensionRoleBE614F182C70A', 'Arn'] },
-            Uri: 'arn:lambda:us-east-1:123456789012:function:my-diff-function',
+            Uri: 'arn:aws:lambda:us-east-1:123456789012:function:my-diff-function',
           },
         ],
       },
@@ -148,7 +148,7 @@ describe('extension', () => {
             Statement: [
               {
                 Effect: Effect.ALLOW,
-                Resource: 'arn:lambda:us-east-1:123456789012:function:my-function',
+                Resource: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
                 Action: [
                   'lambda:InvokeFunction',
                   'lambda:InvokeAsync',
@@ -167,7 +167,7 @@ describe('extension', () => {
             Statement: [
               {
                 Effect: Effect.ALLOW,
-                Resource: 'arn:lambda:us-east-1:123456789012:function:my-diff-function',
+                Resource: 'arn:aws:lambda:us-east-1:123456789012:function:my-diff-function',
                 Action: [
                   'lambda:InvokeFunction',
                   'lambda:InvokeAsync',
@@ -189,7 +189,7 @@ describe('extension', () => {
       handler: 'index.handler',
     });
     Object.defineProperty(func, 'functionArn', {
-      value: 'arn:lambda:us-east-1:123456789012:function:my-function',
+      value: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
     });
     const appconfig = new Application(stack, 'MyApplication', {
       applicationName: 'MyApplication',
@@ -220,7 +220,7 @@ describe('extension', () => {
           {
             Name: 'TestExtension-0',
             RoleArn: { 'Fn::GetAtt': ['MyExtensionRoleCA98491716207', 'Arn'] },
-            Uri: 'arn:lambda:us-east-1:123456789012:function:my-function',
+            Uri: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
           },
         ],
       },
@@ -264,7 +264,7 @@ describe('extension', () => {
             Statement: [
               {
                 Effect: Effect.ALLOW,
-                Resource: 'arn:lambda:us-east-1:123456789012:function:my-function',
+                Resource: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
                 Action: [
                   'lambda:InvokeFunction',
                   'lambda:InvokeAsync',
@@ -282,7 +282,7 @@ describe('extension', () => {
     const stack = new cdk.Stack();
     const queue = new Queue(stack, 'MyQueue');
     Object.defineProperty(queue, 'queueArn', {
-      value: 'arn:sqs:us-east-1:123456789012:my-queue',
+      value: 'arn:aws:sqs:us-east-1:123456789012:my-queue',
     });
     new Extension(stack, 'MyExtension', {
       actions: [
@@ -305,7 +305,7 @@ describe('extension', () => {
             Description: 'This is my action description',
             Name: 'ActionTestName',
             RoleArn: { 'Fn::GetAtt': ['MyExtensionRole76B022BC4F2BC', 'Arn'] },
-            Uri: 'arn:sqs:us-east-1:123456789012:my-queue',
+            Uri: 'arn:aws:sqs:us-east-1:123456789012:my-queue',
           },
         ],
       },
@@ -317,7 +317,7 @@ describe('extension', () => {
             Statement: [
               {
                 Effect: Effect.ALLOW,
-                Resource: 'arn:sqs:us-east-1:123456789012:my-queue',
+                Resource: 'arn:aws:sqs:us-east-1:123456789012:my-queue',
                 Action: 'sqs:SendMessage',
               },
             ],
@@ -332,7 +332,7 @@ describe('extension', () => {
     const stack = new cdk.Stack();
     const topic = new Topic(stack, 'MyTopic');
     Object.defineProperty(topic, 'topicArn', {
-      value: 'arn:sns:us-east-1:123456789012:my-topic',
+      value: 'arn:aws:sns:us-east-1:123456789012:my-topic',
     });
     new Extension(stack, 'MyExtension', {
       actions: [
@@ -352,7 +352,7 @@ describe('extension', () => {
           {
             Name: 'MyExtension-0',
             RoleArn: { 'Fn::GetAtt': ['MyExtensionRole467D6FCDEEFA5', 'Arn'] },
-            Uri: 'arn:sns:us-east-1:123456789012:my-topic',
+            Uri: 'arn:aws:sns:us-east-1:123456789012:my-topic',
           },
         ],
       },
@@ -364,7 +364,7 @@ describe('extension', () => {
             Statement: [
               {
                 Effect: Effect.ALLOW,
-                Resource: 'arn:sns:us-east-1:123456789012:my-topic',
+                Resource: 'arn:aws:sns:us-east-1:123456789012:my-topic',
                 Action: 'sns:Publish',
               },
             ],
@@ -414,7 +414,7 @@ describe('extension', () => {
       handler: 'index.handler',
     });
     Object.defineProperty(func, 'functionArn', {
-      value: 'arn:lambda:us-east-1:123456789012:function:my-function',
+      value: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
     });
     const app = new Application(stack, 'MyApplication');
     const env = app.addEnvironment('MyEnvironment');
@@ -437,7 +437,7 @@ describe('extension', () => {
           {
             Name: 'MyExtension-0',
             RoleArn: { 'Fn::GetAtt': ['MyExtensionRole467D6FCDEEFA5', 'Arn'] },
-            Uri: 'arn:lambda:us-east-1:123456789012:function:my-function',
+            Uri: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
           },
         ],
       },
@@ -474,7 +474,7 @@ describe('extension', () => {
             Statement: [
               {
                 Effect: Effect.ALLOW,
-                Resource: 'arn:lambda:us-east-1:123456789012:function:my-function',
+                Resource: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
                 Action: [
                   'lambda:InvokeFunction',
                   'lambda:InvokeAsync',
@@ -496,7 +496,7 @@ describe('extension', () => {
       handler: 'index.handler',
     });
     Object.defineProperty(func, 'functionArn', {
-      value: 'arn:lambda:us-east-1:123456789012:function:my-function',
+      value: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
     });
     const app = new Application(stack, 'MyApplication');
     const configProfile = new HostedConfiguration(stack, 'MyConfiguration', {
@@ -522,7 +522,7 @@ describe('extension', () => {
           {
             Name: 'MyExtension-0',
             RoleArn: { 'Fn::GetAtt': ['MyExtensionRole467D6FCDEEFA5', 'Arn'] },
-            Uri: 'arn:lambda:us-east-1:123456789012:function:my-function',
+            Uri: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
           },
         ],
       },
@@ -559,7 +559,7 @@ describe('extension', () => {
             Statement: [
               {
                 Effect: Effect.ALLOW,
-                Resource: 'arn:lambda:us-east-1:123456789012:function:my-function',
+                Resource: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
                 Action: [
                   'lambda:InvokeFunction',
                   'lambda:InvokeAsync',
@@ -581,7 +581,7 @@ describe('extension', () => {
       handler: 'index.handler',
     });
     Object.defineProperty(func, 'functionArn', {
-      value: 'arn:lambda:us-east-1:123456789012:function:my-function',
+      value: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
     });
     const role = new Role(stack, 'MyRole', {
       assumedBy: new ServicePrincipal('appconfig.amazonaws.com'),
@@ -608,7 +608,7 @@ describe('extension', () => {
           {
             Name: 'MyExtension-0',
             RoleArn: 'arn:iam::123456789012:role/my-role',
-            Uri: 'arn:lambda:us-east-1:123456789012:function:my-function',
+            Uri: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
           },
         ],
       },

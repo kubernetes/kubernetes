@@ -580,7 +580,7 @@ describe('CodeCommit Source Action', () => {
         artifactBucket: s3.Bucket.fromBucketAttributes(pipelineStack, 'PipelineBucket', {
           bucketName: 'pipeline-bucket',
           encryptionKey: kms.Key.fromKeyArn(pipelineStack, 'PipelineKey',
-            'arn:aws:kms:us-east-1:456:key/my-key'),
+            'arn:aws:kms:us-east-1:123456789012:key/my-key'),
         }),
         stages: [
           {

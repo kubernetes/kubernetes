@@ -18,14 +18,14 @@ describe('Kinesis stream consumer', () => {
 
     beforeEach(() => {
       consumer = StreamConsumer.fromStreamConsumerAttributes(stack, 'MyConsumer', {
-        streamConsumerArn: 'arn:aws:kinesis:region:account-id:stream/stream-name/consumer/consumer-name:123456',
+        streamConsumerArn: 'arn:aws:kinesis:us-east-1:123456789012:stream/stream-name/consumer/consumer-name:123456',
       });
     });
 
     test('has expected properties', () => {
-      expect(consumer.streamConsumerArn).toEqual('arn:aws:kinesis:region:account-id:stream/stream-name/consumer/consumer-name:123456');
+      expect(consumer.streamConsumerArn).toEqual('arn:aws:kinesis:us-east-1:123456789012:stream/stream-name/consumer/consumer-name:123456');
       expect(consumer.streamConsumerName).toEqual('consumer-name');
-      expect(consumer.stream.streamArn).toEqual('arn:aws:kinesis:region:account-id:stream/stream-name');
+      expect(consumer.stream.streamArn).toEqual('arn:aws:kinesis:us-east-1:123456789012:stream/stream-name');
     });
 
     test('addToResourcePolicy is a no-op', () => {
@@ -59,7 +59,7 @@ describe('Kinesis stream consumer', () => {
                 'kinesis:DescribeStreamConsumer',
               ],
               Effect: 'Allow',
-              Resource: 'arn:aws:kinesis:region:account-id:stream/stream-name',
+              Resource: 'arn:aws:kinesis:us-east-1:123456789012:stream/stream-name',
             },
             // consumer read permissions
             {
@@ -68,7 +68,7 @@ describe('Kinesis stream consumer', () => {
                 'kinesis:SubscribeToShard',
               ],
               Effect: 'Allow',
-              Resource: 'arn:aws:kinesis:region:account-id:stream/stream-name/consumer/consumer-name:123456',
+              Resource: 'arn:aws:kinesis:us-east-1:123456789012:stream/stream-name/consumer/consumer-name:123456',
             },
           ]),
         },

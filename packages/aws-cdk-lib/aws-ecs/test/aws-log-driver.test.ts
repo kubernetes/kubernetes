@@ -187,7 +187,7 @@ describe('aws log driver', () => {
     // GIVEN
     const logGroupRegion = 'asghard';
     const logGroup = logs.LogGroup.fromLogGroupArn(stack, 'LogGroup',
-      `arn:aws:logs:${logGroupRegion}:1234:log-group:my_log_group`);
+      `arn:aws:logs:${logGroupRegion}:123456789012:log-group:my_log_group`);
 
     // WHEN
     td.addContainer('Container', {

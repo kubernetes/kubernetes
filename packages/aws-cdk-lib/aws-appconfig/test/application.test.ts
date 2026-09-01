@@ -182,7 +182,7 @@ describe('appconfig', () => {
       code: Code.fromInline('# this is my code'),
     });
     Object.defineProperty(func, 'functionArn', {
-      value: 'arn:lambda:us-east-1:123456789012:function:my-function',
+      value: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
     });
     appconfig.preStartDeployment(new LambdaDestination(func));
 
@@ -193,7 +193,7 @@ describe('appconfig', () => {
           {
             Name: 'MyAppConfig-Extension-0',
             RoleArn: { 'Fn::GetAtt': ['MyAppConfigExtensionF845ERole0D30970E5A7E5', 'Arn'] },
-            Uri: 'arn:lambda:us-east-1:123456789012:function:my-function',
+            Uri: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
           },
         ],
       },
@@ -235,7 +235,7 @@ describe('appconfig', () => {
       code: Code.fromInline('# this is my code'),
     });
     Object.defineProperty(func, 'functionArn', {
-      value: 'arn:lambda:us-east-1:123456789012:function:my-function',
+      value: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
     });
     appconfig.onDeploymentStart(new LambdaDestination(func));
 
@@ -246,7 +246,7 @@ describe('appconfig', () => {
           {
             Name: 'MyAppConfig-Extension-0',
             RoleArn: { 'Fn::GetAtt': ['MyAppConfigExtensionF845ERole0D30970E5A7E5', 'Arn'] },
-            Uri: 'arn:lambda:us-east-1:123456789012:function:my-function',
+            Uri: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
           },
         ],
       },
@@ -285,7 +285,7 @@ describe('appconfig', () => {
       code: Code.fromInline('# this is my code'),
     });
     Object.defineProperty(func, 'functionArn', {
-      value: 'arn:lambda:us-east-1:123456789012:function:my-function',
+      value: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
     });
     appconfig.onDeploymentStep(new LambdaDestination(func));
 
@@ -296,7 +296,7 @@ describe('appconfig', () => {
           {
             Name: 'MyAppConfig-Extension-0',
             RoleArn: { 'Fn::GetAtt': ['MyAppConfigExtensionF845ERole0D30970E5A7E5', 'Arn'] },
-            Uri: 'arn:lambda:us-east-1:123456789012:function:my-function',
+            Uri: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
           },
         ],
       },
@@ -335,7 +335,7 @@ describe('appconfig', () => {
       code: Code.fromInline('# this is my code'),
     });
     Object.defineProperty(func, 'functionArn', {
-      value: 'arn:lambda:us-east-1:123456789012:function:my-function',
+      value: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
     });
     appconfig.onDeploymentComplete(new LambdaDestination(func));
 
@@ -346,7 +346,7 @@ describe('appconfig', () => {
           {
             Name: 'MyAppConfig-Extension-0',
             RoleArn: { 'Fn::GetAtt': ['MyAppConfigExtensionF845ERole0D30970E5A7E5', 'Arn'] },
-            Uri: 'arn:lambda:us-east-1:123456789012:function:my-function',
+            Uri: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
           },
         ],
       },
@@ -385,7 +385,7 @@ describe('appconfig', () => {
       code: Code.fromInline('# this is my code'),
     });
     Object.defineProperty(func, 'functionArn', {
-      value: 'arn:lambda:us-east-1:123456789012:function:my-function',
+      value: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
     });
     appconfig.onDeploymentBaking(new LambdaDestination(func));
 
@@ -396,7 +396,7 @@ describe('appconfig', () => {
           {
             Name: 'MyAppConfig-Extension-0',
             RoleArn: { 'Fn::GetAtt': ['MyAppConfigExtensionF845ERole0D30970E5A7E5', 'Arn'] },
-            Uri: 'arn:lambda:us-east-1:123456789012:function:my-function',
+            Uri: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
           },
         ],
       },
@@ -435,7 +435,7 @@ describe('appconfig', () => {
       code: Code.fromInline('# this is my code'),
     });
     Object.defineProperty(func, 'functionArn', {
-      value: 'arn:lambda:us-east-1:123456789012:function:my-function',
+      value: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
     });
     appconfig.onDeploymentRolledBack(new LambdaDestination(func));
 
@@ -446,7 +446,7 @@ describe('appconfig', () => {
           {
             Name: 'MyAppConfig-Extension-0',
             RoleArn: { 'Fn::GetAtt': ['MyAppConfigExtensionF845ERole0D30970E5A7E5', 'Arn'] },
-            Uri: 'arn:lambda:us-east-1:123456789012:function:my-function',
+            Uri: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
           },
         ],
       },
@@ -485,7 +485,7 @@ describe('appconfig', () => {
       code: Code.fromInline('# this is my code'),
     });
     Object.defineProperty(func, 'functionArn', {
-      value: 'arn:lambda:us-east-1:123456789012:function:my-function',
+      value: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
     });
     appconfig.atDeploymentTick(new LambdaDestination(func));
 
@@ -496,7 +496,7 @@ describe('appconfig', () => {
           {
             Name: 'MyAppConfig-Extension-0',
             RoleArn: { 'Fn::GetAtt': ['MyAppConfigExtensionF845ERole0D30970E5A7E5', 'Arn'] },
-            Uri: 'arn:lambda:us-east-1:123456789012:function:my-function',
+            Uri: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
           },
         ],
       },
@@ -535,7 +535,7 @@ describe('appconfig', () => {
       code: Code.fromInline('# this is my code'),
     });
     Object.defineProperty(func, 'functionArn', {
-      value: 'arn:lambda:us-east-1:123456789012:function:my-function',
+      value: 'arn:aws:lambda:us-east-1:123456789012:function:my-function',
     });
     appconfig.preStartDeployment(new LambdaDestination(func));
 

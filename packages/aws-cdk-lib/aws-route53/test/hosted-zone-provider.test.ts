@@ -17,7 +17,7 @@ describe('hosted zone provider', () => {
       const missing = assembly.assembly.manifest.missing!;
       expect(missing && missing.length === 1).toEqual(true);
 
-      const fakeZoneId = '11111111111111';
+      const fakeZoneId = '111111111111';
       const fakeZone = {
         Id: `/hostedzone/${fakeZoneId}`,
         Name: 'example.com.',
@@ -55,7 +55,7 @@ describe('hosted zone provider', () => {
       const missing = assembly.assembly.manifest.missing!;
       expect(missing && missing.length === 1).toEqual(true);
 
-      const fakeZoneId = '11111111111111';
+      const fakeZoneId = '111111111111';
       const fakeZone = {
         Id: `/hostedzone/${fakeZoneId}`,
         Name: 'example.com.',

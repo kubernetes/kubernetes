@@ -2887,7 +2887,7 @@ describe('cluster', () => {
       });
       const cluster = eks.Cluster.fromClusterAttributes(stack, 'Imported', {
         clusterName,
-        kubectlRoleArn: 'arn:aws:iam::1111111:role/iam-role-that-has-masters-access',
+        kubectlRoleArn: 'arn:aws:iam::111111111111:role/iam-role-that-has-masters-access',
         kubectlLambdaRole: kubectlLambdaRole,
       });
 
@@ -2904,7 +2904,7 @@ describe('cluster', () => {
       });
       Template.fromStack(stack).hasResourceProperties(HelmChart.RESOURCE_TYPE, {
         ClusterName: clusterName,
-        RoleArn: 'arn:aws:iam::1111111:role/iam-role-that-has-masters-access',
+        RoleArn: 'arn:aws:iam::111111111111:role/iam-role-that-has-masters-access',
         Release: 'importedcharttestchartf3acd6e5',
         Chart: chart,
         Namespace: 'default',

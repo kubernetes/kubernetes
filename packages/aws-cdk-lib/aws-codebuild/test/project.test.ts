@@ -524,7 +524,7 @@ test('if a role is shared between projects in a VPC, the VPC Policy is only atta
 test('can use an imported Role for a Project within a VPC', () => {
   const stack = new cdk.Stack();
 
-  const importedRole = iam.Role.fromRoleArn(stack, 'Role', 'arn:aws:iam::1234567890:role/service-role/codebuild-bruiser-service-role');
+  const importedRole = iam.Role.fromRoleArn(stack, 'Role', 'arn:aws:iam::123456789012:role/service-role/codebuild-bruiser-service-role');
   const vpc = new ec2.Vpc(stack, 'Vpc');
 
   new codebuild.Project(stack, 'Project', {
@@ -544,7 +544,7 @@ test('can use an imported Role with mutable = false for a Project within a VPC',
   const stack = new cdk.Stack();
 
   const importedRole = iam.Role.fromRoleArn(stack, 'Role',
-    'arn:aws:iam::1234567890:role/service-role/codebuild-bruiser-service-role', {
+    'arn:aws:iam::123456789012:role/service-role/codebuild-bruiser-service-role', {
       mutable: false,
     });
   const vpc = new ec2.Vpc(stack, 'Vpc');

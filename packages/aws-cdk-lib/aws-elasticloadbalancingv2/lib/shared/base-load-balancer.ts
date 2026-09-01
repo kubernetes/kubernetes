@@ -242,7 +242,7 @@ export abstract class BaseLoadBalancer extends Resource {
         // eslint-disable-next-line @cdklabs/no-literal-partition
         loadBalancerArn: `arn:aws:elasticloadbalancing:us-west-2:123456789012:loadbalancer/${options.loadBalancerType}/my-load-balancer/50dc6c495c0c9188`,
         loadBalancerCanonicalHostedZoneId: 'Z3DZXE0EXAMPLE',
-        loadBalancerDnsName: 'my-load-balancer-1234567890.us-west-2.elb.amazonaws.com',
+        loadBalancerDnsName: 'my-load-balancer-123456789012.us-west-2.elb.amazonaws.com',
         securityGroupIds: ['sg-1234'],
         vpcId: 'vpc-12345',
       } as cxapi.LoadBalancerContextResponse,

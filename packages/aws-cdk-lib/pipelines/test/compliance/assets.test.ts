@@ -296,13 +296,13 @@ describe('basic pipeline', () => {
       pipeline.addStage(new FileAssetApp(app, 'App1'));
       pipeline.addStage(new FileAssetApp(app, 'App2', {
         env: {
-          account: '0123456789012',
+          account: '012345678901',
           region: 'eu-west-1',
         },
       }));
 
       Template.fromStack(pipelineStack).hasResourceProperties('AWS::IAM::Policy',
-        expectedAssetRolePolicy([FILE_PUBLISHING_ROLE, 'arn:${AWS::Partition}:iam::0123456789012:role/cdk-hnb659fds-file-publishing-role-0123456789012-eu-west-1'],
+        expectedAssetRolePolicy([FILE_PUBLISHING_ROLE, 'arn:${AWS::Partition}:iam::012345678901:role/cdk-hnb659fds-file-publishing-role-012345678901-eu-west-1'],
           'CdkAssetsFileRole6BE17A07'));
     },
     );
@@ -505,7 +505,7 @@ test('adding environment variable to assets job adds SecretsManager permissions'
             'Fn::Join': ['', [
               'arn:',
               { Ref: 'AWS::Partition' },
-              ':secretsmanager:us-pipeline:123pipeline:secret:FoobarSecret-??????',
+              ':secretsmanager:us-pipeline:123456789012:secret:FoobarSecret-??????',
             ]],
           },
         }),
@@ -569,7 +569,7 @@ describe('pipeline with single asset publisher', () => {
               [
                 'arn:',
                 { Ref: 'AWS::Partition' },
-                ':secretsmanager:us-pipeline:123pipeline:secret:FoobarSecret-??????',
+                ':secretsmanager:us-pipeline:123456789012:secret:FoobarSecret-??????',
               ],
             ],
           },

@@ -14,6 +14,7 @@ import {
   Size,
   Stack,
   Tags,
+  Validations,
 } from '../../core';
 import * as cxapi from '../../cx-api';
 import type { BlockDevice } from '../lib';
@@ -305,6 +306,10 @@ describe('LaunchTemplate', () => {
 
   test('Given blockDeviceMapping', () => {
     // GIVEN
+    Validations.of(stack).acknowledge({
+      id: 'CloudFormation-Validate::F3014',
+      reason: 'test violates this',
+    });
     const kmsKey = new Key(stack, 'EbsKey');
     const blockDevices: BlockDevice[] = [
       {

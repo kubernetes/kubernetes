@@ -928,7 +928,7 @@ export class Project extends ProjectBase {
             service: 'ssm',
             resource: 'parameter',
             // If the parameter name starts with / the resource name is not separated with a double '/'
-            // arn:aws:ssm:region:1111111111:parameter/PARAM_NAME
+            // arn:aws:ssm:region:111111111111:parameter/PARAM_NAME
             resourceName: envVariableValue.startsWith('/')
               ? envVariableValue.slice(1)
               : envVariableValue,

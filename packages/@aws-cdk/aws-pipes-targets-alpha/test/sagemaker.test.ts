@@ -31,7 +31,7 @@ describe('SageMaker', () => {
 
     // ASSERT
     template.hasResourceProperties('AWS::Pipes::Pipe', {
-      Target: pipeline.pipelineName,
+      Target: pipeline.pipelineArn,
       TargetParameters: {},
     });
   });
@@ -120,7 +120,7 @@ class FakePipeline extends Resource implements IPipeline {
   public readonly pipelineName;
   constructor(scope: Stack, id: string, props: FakePipelineProps) {
     super(scope, id);
-    this.pipelineArn = props.pipelineName;
+    this.pipelineArn = `arn:aws:sagemaker:us-east-1:111111111111:pipeline/${props.pipelineName}`;
     this.pipelineName = props.pipelineName;
   }
 

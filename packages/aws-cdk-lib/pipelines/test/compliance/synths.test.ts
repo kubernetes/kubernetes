@@ -580,7 +580,7 @@ test('CodeBuild: Can specify additional policy statements', () => {
       rolePolicyStatements: [
         new iam.PolicyStatement({
           actions: ['codeartifact:*', 'sts:GetServiceBearerToken'],
-          resources: ['arn:my:arn'],
+          resources: ['arn:aws:codeartifact:us-east-1:123456789012:repository/my-domain/my-repo'],
         }),
       ],
     }),
@@ -593,7 +593,7 @@ test('CodeBuild: Can specify additional policy statements', () => {
           'codeartifact:*',
           'sts:GetServiceBearerToken',
         ],
-        Resource: 'arn:my:arn',
+        Resource: 'arn:aws:codeartifact:us-east-1:123456789012:repository/my-domain/my-repo',
       })]),
     },
   });

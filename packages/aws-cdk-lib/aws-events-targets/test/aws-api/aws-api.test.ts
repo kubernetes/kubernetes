@@ -214,7 +214,7 @@ test('with policy statement', () => {
     action: 'action',
     policyStatement: new iam.PolicyStatement({
       actions: ['s3:GetObject'],
-      resources: ['resource'],
+      resources: ['arn:aws:s3:::my-bucket/my-object'],
     }),
   }));
 
@@ -243,7 +243,7 @@ test('with policy statement', () => {
         {
           Action: 's3:GetObject',
           Effect: 'Allow',
-          Resource: 'resource',
+          Resource: 'arn:aws:s3:::my-bucket/my-object',
         },
       ],
       Version: '2012-10-17',
@@ -262,7 +262,7 @@ test('with service not in AWS SDK', () => {
     action: 'no-such-action',
     policyStatement: new iam.PolicyStatement({
       actions: ['s3:GetObject'],
-      resources: ['resource'],
+      resources: ['arn:aws:s3:::my-bucket/my-object'],
     }),
   });
 

@@ -6,6 +6,8 @@ import { CodeStarConnectionsSourceAction } from '../../aws-codepipeline-actions'
 import * as cdk from '../../core';
 import * as codepipeline from '../lib';
 
+const connectionArn = 'arn:aws:codestar-connections:us-east-1:111111111111:connection/ConnectionId';
+
 describe('triggers', () => {
   let stack: cdk.Stack;
   let sourceArtifact: codepipeline.Artifact;
@@ -18,7 +20,7 @@ describe('triggers', () => {
     sourceAction = new CodeStarConnectionsSourceAction({
       actionName: 'CodeStarConnectionsSourceAction',
       output: sourceArtifact,
-      connectionArn: 'connection',
+      connectionArn,
       owner: 'owner',
       repo: 'repo',
     });
@@ -255,7 +257,7 @@ describe('triggers', () => {
     const sourceAction2 = new CodeStarConnectionsSourceAction({
       actionName: 'CodeStarConnectionsSourceAction2',
       output: sourceArtifact2,
-      connectionArn: 'connection',
+      connectionArn: 'arn:aws:codestar-connections:us-east-1:111111111111:connection/ConnectionId2',
       owner: 'owner',
       repo: 'repo',
     });

@@ -2,10 +2,10 @@ import { App, Lazy, Stack } from '../../core';
 import * as iam from '../lib';
 import { PolicyStatement } from '../lib';
 
-const PRINCIPAL_ARN1 = 'arn:aws:iam::111111111:user/user-name';
+const PRINCIPAL_ARN1 = 'arn:aws:iam::111111111111:user/user-name';
 const principal1 = new iam.ArnPrincipal(PRINCIPAL_ARN1);
 
-const PRINCIPAL_ARN2 = 'arn:aws:iam::111111111:role/role-name';
+const PRINCIPAL_ARN2 = 'arn:aws:iam::111111111111:role/role-name';
 const principal2 = new iam.ArnPrincipal(PRINCIPAL_ARN2);
 
 // Check that 'resource' statements are merged, and that 'notResource' statements are not,

@@ -42,7 +42,7 @@ describe('SageMaker Integration', () => {
 });
 
 class FakeEndpoint extends cdk.Resource implements sagemaker.IEndpoint {
-  public readonly endpointArn = 'endpointArn';
+  public readonly endpointArn = 'arn:aws:sagemaker:us-east-1:123456789012:endpoint/my-endpoint';
 
   public readonly endpointName = 'endpointName';
 

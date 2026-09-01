@@ -31,7 +31,7 @@ exports[`SageMaker should grant pipe role push access 2`] = `
           {
             "Action": "sagemaker:StartPipelineExecution",
             "Effect": "Allow",
-            "Resource": "MyPipeline",
+            "Resource": "arn:aws:sagemaker:us-east-1:111111111111:pipeline/MyPipeline",
           },
         ],
         "Version": "2012-10-17",

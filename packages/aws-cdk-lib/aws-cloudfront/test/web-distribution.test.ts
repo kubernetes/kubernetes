@@ -1063,7 +1063,7 @@ added the ellipsis so a user would know there was more to r...`,
         const sourceBucket = new s3.Bucket(stack, 'Bucket');
 
         const certificate = certificatemanager.Certificate.fromCertificateArn(
-          stack, 'cert', 'arn:aws:acm:us-east-1:1111111:certificate/11-3336f1-44483d-adc7-9cd375c5169d',
+          stack, 'cert', 'arn:aws:acm:us-east-1:111111111111:certificate/11-3336f1-44483d-adc7-9cd375c5169d',
         );
 
         new CloudFrontWebDistribution(stack, 'AnAmazingWebsiteProbably', {
@@ -1078,7 +1078,7 @@ added the ellipsis so a user would know there was more to r...`,
           'DistributionConfig': {
             'Aliases': [],
             'ViewerCertificate': {
-              'AcmCertificateArn': 'arn:aws:acm:us-east-1:1111111:certificate/11-3336f1-44483d-adc7-9cd375c5169d',
+              'AcmCertificateArn': 'arn:aws:acm:us-east-1:111111111111:certificate/11-3336f1-44483d-adc7-9cd375c5169d',
               'SslSupportMethod': 'sni-only',
             },
           },
@@ -1252,7 +1252,7 @@ added the ellipsis so a user would know there was more to r...`,
         const sourceBucket = new s3.Bucket(stack, 'Bucket');
 
         const certificate = certificatemanager.Certificate.fromCertificateArn(
-          stack, 'cert', 'arn:aws:acm:eu-west-3:1111111:certificate/11-3336f1-44483d-adc7-9cd375c5169d',
+          stack, 'cert', 'arn:aws:acm:eu-west-3:111111111111:certificate/11-3336f1-44483d-adc7-9cd375c5169d',
         );
 
         new CloudFrontWebDistribution(stack, 'AnAmazingWebsiteProbably', {
@@ -1267,7 +1267,7 @@ added the ellipsis so a user would know there was more to r...`,
           'DistributionConfig': {
             'Aliases': [],
             'ViewerCertificate': {
-              'AcmCertificateArn': 'arn:aws:acm:eu-west-3:1111111:certificate/11-3336f1-44483d-adc7-9cd375c5169d',
+              'AcmCertificateArn': 'arn:aws:acm:eu-west-3:111111111111:certificate/11-3336f1-44483d-adc7-9cd375c5169d',
               'SslSupportMethod': 'sni-only',
             },
           },
