@@ -354,7 +354,7 @@ func (c *fakeCsiDriverClient) NodeGetVolumeHealth(ctx context.Context, volID, st
 	if err != nil {
 		return nil, err
 	}
-	return mapVolumeHealthConditions(resp.GetVolumeHealth()), nil
+	return mapVolumeHealthConditions(resp.GetVolumeHealth())
 }
 
 func (c *fakeCsiDriverClient) NodeGetStorageHealth(ctx context.Context, secrets map[string]string) ([]storagev1.StorageHealthCondition, error) {
@@ -1383,5 +1383,50 @@ func TestMapStorageBackendHealthLimit(t *testing.T) {
 
 	if _, err := mapStorageBackendHealth(entries); err == nil {
 		t.Fatalf("mapStorageBackendHealth() expected an error for %d conditions", len(entries))
+	}
+}
+
+func TestMapVolumeHealthConditions(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     *csipbv1.VolumeHealth
+		want      []api.VolumeHealthCondition
+		expectErr bool
+	}{
+		{"nil input", nil, nil, false},
+		{"empty entries", &csipbv1.VolumeHealth{}, nil, false},
+		{
+			"recognized status",
+			&csipbv1.VolumeHealth{HealthStatuses: []*csipbv1.VolumeHealth_VolumeHealthEntry{{Status: csipbv1.VolumeHealthErrorType_DEGRADED}}},
+			[]api.VolumeHealthCondition{{Status: api.VolumeHealthDegraded}},
+			false,
+		},
+		{
+			"mixed recognized and unrecognized",
+			&csipbv1.VolumeHealth{HealthStatuses: []*csipbv1.VolumeHealth_VolumeHealthEntry{
+				{Status: csipbv1.VolumeHealthErrorType_DEGRADED},
+				{Status: csipbv1.VolumeHealthErrorType(9999)},
+			}},
+			[]api.VolumeHealthCondition{{Status: api.VolumeHealthDegraded}},
+			false,
+		},
+		{
+			"all unrecognized returns error",
+			&csipbv1.VolumeHealth{HealthStatuses: []*csipbv1.VolumeHealth_VolumeHealthEntry{{Status: csipbv1.VolumeHealthErrorType(9999)}}},
+			nil,
+			true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := mapVolumeHealthConditions(tc.input)
+			if (err != nil) != tc.expectErr {
+				t.Fatalf("mapVolumeHealthConditions() err = %v, expectErr %v", err, tc.expectErr)
+			}
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("mapVolumeHealthConditions() = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }

@@ -706,7 +706,7 @@ func (c *csiDriverClient) NodeGetVolumeHealth(ctx context.Context, volID, stagin
 	if err != nil {
 		return nil, err
 	}
-	return mapVolumeHealthConditions(resp.GetVolumeHealth()), nil
+	return mapVolumeHealthConditions(resp.GetVolumeHealth())
 }
 
 func (c *csiDriverClient) NodeGetStorageHealth(ctx context.Context, secrets map[string]string) ([]storagev1.StorageHealthCondition, error) {
@@ -733,16 +733,22 @@ func (c *csiDriverClient) NodeGetStorageHealth(ctx context.Context, secrets map[
 	if err != nil {
 		return nil, err
 	}
-	return mapStorageBackendHealth(resp.GetBackendHealth())
+	conditions, err := mapStorageBackendHealth(resp.GetBackendHealth())
+	if err != nil {
+		return nil, err
+	}
+
+	return conditions, nil
+
 }
 
-func mapVolumeHealthConditions(vh *csipbv1.VolumeHealth) []api.VolumeHealthCondition {
+func mapVolumeHealthConditions(vh *csipbv1.VolumeHealth) ([]api.VolumeHealthCondition, error) {
 	if vh == nil {
-		return nil
+		return nil, nil
 	}
 	entries := vh.GetHealthStatuses()
 	if len(entries) == 0 {
-		return nil
+		return nil, nil
 	}
 	out := make([]api.VolumeHealthCondition, 0, len(entries))
 	for _, entry := range entries {
@@ -751,15 +757,20 @@ func mapVolumeHealthConditions(vh *csipbv1.VolumeHealth) []api.VolumeHealthCondi
 		}
 		status, ok := mapVolumeHealthStatus(entry.GetStatus())
 		if !ok {
+			klog.V(4).InfoS("Unknown volume health status code received from CSI driver; dropping entry", "rawStatus", entry.GetStatus())
 			continue
 		}
+
 		out = append(out, api.VolumeHealthCondition{
 			Status:  status,
 			Reason:  entry.GetReason(),
 			Message: entry.GetMessage(),
 		})
 	}
-	return out
+	if len(entries) > 0 && len(out) == 0 {
+		return nil, fmt.Errorf("CSI driver reported volume health conditions, but none were recognized by Kubelet")
+	}
+	return out, nil
 }
 
 func mapVolumeHealthStatus(status csipbv1.VolumeHealthErrorType) (api.VolumeHealthStatusType, bool) {
