@@ -528,13 +528,13 @@ func (tc *Controller) handlePodUpdate(ctx context.Context, podUpdate podUpdateIt
 		return
 	}
 
-	// Revalidate only when the cached state would cause immediate eviction.
-	allTolerated, _ := v1helper.GetMatchingTolerations(
+	// Revalidate live taints if cached state would trigger eviction (immediate or scheduled).
+	allTolerated, usedTolerations := v1helper.GetMatchingTolerations(
 		logger,
 		taints,
 		pod.Spec.Tolerations,
 	)
-	if !allTolerated {
+	if !allTolerated || getMinTolerationTime(usedTolerations) >= 0 {
 		node, err := tc.client.CoreV1().Nodes().Get(
 			ctx,
 			nodeName,

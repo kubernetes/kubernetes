@@ -1202,3 +1202,114 @@ func TestNoExecuteTaintManagerRaceConditionWithFiniteTolerations(t *testing.T) {
 		t.Errorf("Expected pod to NOT be deleted immediately, but got error: %v", err)
 	}
 }
+
+func TestNoExecuteTaintManagerRaceConditionWithZeroTolerationSeconds(t *testing.T) {
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	fakeClientset := fake.NewSimpleClientset()
+	controller, _, _ := setupNewController(ctx, fakeClientset)
+	controller.recorder = testutil.NewFakeRecorder()
+
+	wg.Go(func() {
+		controller.Run(ctx)
+	})
+
+	now := metav1.Now()
+
+	// 1. Create a node with Taint A and Taint B.
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node1",
+		},
+		Spec: corev1.NodeSpec{
+			Taints: []corev1.Taint{
+				{
+					Key:       "taint-a",
+					Value:     "true",
+					Effect:    corev1.TaintEffectNoExecute,
+					TimeAdded: &now,
+				},
+				{
+					Key:       "taint-b",
+					Value:     "true",
+					Effect:    corev1.TaintEffectNoExecute,
+					TimeAdded: &now,
+				},
+			},
+		},
+	}
+	_, err := fakeClientset.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create node: %v", err)
+	}
+
+	// 2. Create a pod tolerating Taint A with TolerationSeconds=0 and Taint B with TolerationSeconds=300.
+	zero := int64(0)
+	threeHundred := int64(300)
+	pod := testutil.NewPod("pod1", "node1")
+	pod.Spec.Tolerations = []corev1.Toleration{
+		{
+			Key:               "taint-a",
+			Operator:          corev1.TolerationOpEqual,
+			Value:             "true",
+			Effect:            corev1.TaintEffectNoExecute,
+			TolerationSeconds: &zero,
+		},
+		{
+			Key:               "taint-b",
+			Operator:          corev1.TolerationOpEqual,
+			Value:             "true",
+			Effect:            corev1.TaintEffectNoExecute,
+			TolerationSeconds: &threeHundred,
+		},
+	}
+	_, err = fakeClientset.CoreV1().Pods("default").Create(ctx, pod, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create pod: %v", err)
+	}
+
+	// 3. Populate taintedNodes with both taints (stale cache state).
+	controller.taintedNodes["node1"] = []corev1.Taint{
+		{
+			Key:       "taint-a",
+			Value:     "true",
+			Effect:    corev1.TaintEffectNoExecute,
+			TimeAdded: &now,
+		},
+		{
+			Key:       "taint-b",
+			Value:     "true",
+			Effect:    corev1.TaintEffectNoExecute,
+			TimeAdded: &now,
+		},
+	}
+
+	// 4. Simulate removing Taint A in the live API server (leaving only Taint B).
+	node.Spec.Taints = []corev1.Taint{
+		{
+			Key:       "taint-b",
+			Value:     "true",
+			Effect:    corev1.TaintEffectNoExecute,
+			TimeAdded: &now,
+		},
+	}
+	_, err = fakeClientset.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update node: %v", err)
+	}
+
+	// 5. Trigger PodUpdated with stale node state.
+	controller.PodUpdated(pod, nil)
+
+	// Wait for controller to process the pod update.
+	time.Sleep(timeForControllerToProgressForSanityCheck)
+
+	// 6. Verify that pod1 was NOT deleted immediately because live revalidation found Taint A was removed.
+	_, err = fakeClientset.CoreV1().Pods("default").Get(ctx, "pod1", metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Expected pod to NOT be deleted immediately, but got error: %v", err)
+	}
+}
