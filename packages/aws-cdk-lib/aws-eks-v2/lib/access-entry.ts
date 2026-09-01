@@ -1,7 +1,6 @@
 import type { Construct } from 'constructs';
 import type { ICluster } from './cluster';
-import type { AccessEntryReference, IAccessEntryRef } from '../../aws-eks';
-import { CfnAccessEntry } from '../../aws-eks';
+import { CfnAccessEntry } from './eks.generated';
 import type { IResource, RemovalPolicy } from '../../core';
 import { Resource, Aws, ValidationError, Token } from '../../core';
 import type { IArrayBox } from '../../core/lib/helpers-internal';
@@ -10,6 +9,7 @@ import { MethodMetadata, addConstructMetadata } from '../../core/lib/metadata-re
 import { noBoxStackTraces } from '../../core/lib/no-box-stack-traces';
 import { lit } from '../../core/lib/private/literal-string';
 import { propertyInjectable } from '../../core/lib/prop-injectable';
+import type { AccessEntryReference, IAccessEntryRef } from '../../interfaces/generated/aws-eks-interfaces.generated';
 
 /**
  * Represents an access entry in an Amazon EKS cluster.

@@ -1,5 +1,5 @@
 {
-  "version": "53.0.0",
+  "version": "54.0.0",
   "artifacts": {
     "EksClusterV2RemovalPolicyStack.assets": {
       "type": "cdk:asset-manifest",
@@ -18,7 +18,7 @@
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-deploy-role-${AWS::AccountId}-${AWS::Region}",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-cfn-exec-role-${AWS::AccountId}-${AWS::Region}",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}/c366c9b0b7b4f2e7b0ec2e48f32fd62f973918cb1e8db8323ebc97bd511c068f.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}/904734d7965606b1dd069c343b585fd72e08a4aed29e6139fb3783ccb036f416.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
@@ -369,7 +369,7 @@
             "explanation": "When enabled, nodegroupName attribute of the provisioned EKS NodeGroup will not have the cluster name prefix."
           },
           "@aws-cdk/aws-eks:useNativeOidcProvider": {
-            "userValue": false,
+            "userValue": true,
             "recommendedValue": true,
             "explanation": "When enabled, EKS V2 clusters will use the native OIDC provider resource AWS::IAM::OIDCProvider instead of creating the OIDCProvider with a custom resource (iam.OpenIDConnectProvider)."
           },
@@ -572,10 +572,12 @@
             "explanation": "Use the `Distribution` resource instead of `CloudFrontWebDistribution`"
           },
           "@aws-cdk/aws-cloudfront:defaultFunctionRuntimeV2_0": {
+            "userValue": true,
             "recommendedValue": true,
             "explanation": "Use cloudfront-js-2.0 as the default runtime for CloudFront Functions"
           },
           "@aws-cdk/aws-elasticloadbalancingv2:usePostQuantumTlsPolicy": {
+            "userValue": true,
             "recommendedValue": true,
             "explanation": "When enabled, HTTPS/TLS listeners use post-quantum TLS policy by default"
           },
@@ -587,23 +589,32 @@
             }
           },
           "@aws-cdk/aws-batch:defaultToAL2023": {
+            "userValue": true,
             "recommendedValue": true,
             "explanation": "Use AL2023 as the default imageType for EC2 Batch compute environments instead of the deprecated AL2"
+          },
+          "@aws-cdk/aws-eks:defaultToAL2023": {
+            "recommendedValue": true,
+            "explanation": "Use AL2023 as the default AMI type for EKS managed node groups using non-GPU instance types instead of the deprecated AL2"
           },
           "@aws-cdk/core:annotationsInValidationReport": {
             "recommendedValue": true,
             "explanation": "Include construct annotations (warnings and errors) in the policy validation report"
           },
           "@aws-cdk/core:defaultCrossStackReferences": {
-            "recommendedValue": "strong",
+            "recommendedValue": "weak",
             "explanation": "Controls whether cross-region stack references are strong, weak, or both",
             "unconfiguredBehavesLike": {
               "v2": "strong"
             }
+          },
+          "@aws-cdk/core:validateAgainstDefaultRules": {
+            "recommendedValue": true,
+            "explanation": "Treat CloudFormation Validate findings as errors"
           }
         }
       }
     }
   },
-  "minimumCliVersion": "2.1108.0"
+  "minimumCliVersion": "2.1131.0"
 }

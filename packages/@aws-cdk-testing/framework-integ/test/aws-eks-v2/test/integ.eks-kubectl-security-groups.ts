@@ -91,7 +91,7 @@ class EksKubectlSecurityGroupsStack extends Stack {
     });
 
     // ========================================================================
-    // Test Case 2: Single security group (securityGroup - backwards compatibility)
+    // Test Case 2: Single security group via securityGroups array
     // ========================================================================
 
     const kubectlSg3 = new ec2.SecurityGroup(this, 'KubectlSG3', {
@@ -109,7 +109,7 @@ class EksKubectlSecurityGroupsStack extends Stack {
       kubectlProviderOptions: {
         kubectlLayer: new KubectlV34Layer(this, 'KubectlLayer2'),
         privateSubnets,
-        securityGroups: [kubectlSg3],
+        securityGroups: [kubectlSg3], // Single SG passed via securityGroups array
       },
       removalPolicy: RemovalPolicy.DESTROY,
     });

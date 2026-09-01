@@ -1,13 +1,4 @@
 {
-  "/aws-cdk-eks-cluster-inference-nodegroup": [
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
-    }
-  ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Vpc": [
     {
       "type": "aws:cdk:analytics:construct",
@@ -81,12 +72,6 @@
       }
     }
   ],
-  "/aws-cdk-eks-cluster-inference-nodegroup/Custom::AWSCDKOpenIdConnectProviderCustomResourceProvider": [
-    {
-      "type": "aws:cdk:is-custom-resource-handler-customResourceProvider",
-      "data": true
-    }
-  ],
   "/aws-cdk-eks-cluster-inference-nodegroup/AWSCDKCfnUtilsProviderCustomResourceProvider": [
     {
       "type": "aws:cdk:is-custom-resource-handler-customResourceProvider",
@@ -97,58 +82,18 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "BootstrapVersion"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "addBootstrapVersionRule (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:261:19)",
-        "DefaultStackSynthesizer.addBootstrapVersionRule (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:161:9)",
-        "DefaultStackSynthesizer.synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/default-synthesizer.js:302:18)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:433: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:433:3)",
-        "visit (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:490:9)",
-        "visit (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:487:9)",
-        "synthesizeTree (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:426:5)",
-        "synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:54:5)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stage.js:179:96)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/app.js:167:27)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/CheckBootstrapVersion": [
     {
       "type": "aws:cdk:logicalId",
       "data": "CheckBootstrapVersion"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "addBootstrapVersionRule (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:269:5)",
-        "DefaultStackSynthesizer.addBootstrapVersionRule (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/stack-synthesizer.js:161:9)",
-        "DefaultStackSynthesizer.synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stack-synthesizers/default-synthesizer.js:302:18)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:433: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:433:3)",
-        "visit (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:490:9)",
-        "visit (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:487:9)",
-        "synthesizeTree (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:426:5)",
-        "synthesize (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/synthesis.js:54:5)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/stage.js:179:96)",
-        "App.synth (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/app.js:167:27)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Vpc/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "Vpc8378EB38"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:770:29)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:14:21)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Vpc/PublicSubnet1": [
@@ -275,49 +220,18 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "VpcIGWD7BA715C"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:825:29)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:14:21)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Vpc/VPCGW": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VpcVPCGWBF912B6E"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:828:29)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:14:21)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/kubectlLayer/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "kubectlLayer44321E08"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new LayerVersion (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/layers.js:164:30)",
-        "new LayerVersion (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "...new KubectlV32Layer in @aws-cdk/lambda-layer-kubectl-v32...",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:19:31)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/Role": [
@@ -349,32 +263,12 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "ClusterEB0386A7"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:706:46)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:15:25)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/KubectlReadyBarrier": [
     {
       "type": "aws:cdk:logicalId",
       "data": "ClusterKubectlReadyBarrier200052AF"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:793:41)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:15:25)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/ClusterAdminRoleAccess": [
@@ -395,7 +289,7 @@
       }
     }
   ],
-  "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/OpenIdConnectProvider": [
+  "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/OidcProviderNative": [
     {
       "type": "aws:cdk:analytics:construct",
       "data": {
@@ -439,462 +333,124 @@
       }
     }
   ],
-  "/aws-cdk-eks-cluster-inference-nodegroup/Custom::AWSCDKOpenIdConnectProviderCustomResourceProvider/Role": [
-    {
-      "type": "aws:cdk:logicalId",
-      "data": "CustomAWSCDKOpenIdConnectProviderCustomResourceProviderRole517FED65"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new CustomResourceProviderBase (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/custom-resource-provider/custom-resource-provider-base.js:98:25)",
-        "new OidcProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resource-handlers/dist/aws-iam/oidc-provider.generated.js:24:9)",
-        "OidcProvider.getOrCreateProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resource-handlers/dist/aws-iam/oidc-provider.generated.js:21:28)",
-        "WrappedClass.getOrCreateProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/oidc-provider.js:185:61)",
-        "new OpenIdConnectProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/oidc-provider.js:147:35)",
-        "new OpenIdConnectProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new OpenIdConnectProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/oidc-provider.js:107:13)",
-        "new OpenIdConnectProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "get openIdConnectProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:1097:51)",
-        "new ServiceAccount (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/service-account.js:89:33)"
-      ]
-    }
-  ],
-  "/aws-cdk-eks-cluster-inference-nodegroup/Custom::AWSCDKOpenIdConnectProviderCustomResourceProvider/Handler": [
-    {
-      "type": "aws:cdk:logicalId",
-      "data": "CustomAWSCDKOpenIdConnectProviderCustomResourceProviderHandlerF2C543E0"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new CustomResourceProviderBase (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/custom-resource-provider/custom-resource-provider-base.js:120:24)",
-        "new OidcProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resource-handlers/dist/aws-iam/oidc-provider.generated.js:24:9)",
-        "OidcProvider.getOrCreateProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resource-handlers/dist/aws-iam/oidc-provider.generated.js:21:28)",
-        "WrappedClass.getOrCreateProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/oidc-provider.js:185:61)",
-        "new OpenIdConnectProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/oidc-provider.js:147:35)",
-        "new OpenIdConnectProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new OpenIdConnectProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/oidc-provider.js:107:13)",
-        "new OpenIdConnectProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "get openIdConnectProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:1097:51)",
-        "new ServiceAccount (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/service-account.js:89:33)"
-      ]
-    }
-  ],
   "/aws-cdk-eks-cluster-inference-nodegroup/AWSCDKCfnUtilsProviderCustomResourceProvider/Role": [
     {
       "type": "aws:cdk:logicalId",
       "data": "AWSCDKCfnUtilsProviderCustomResourceProviderRoleFE0EE867"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new CustomResourceProviderBase (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/custom-resource-provider/custom-resource-provider-base.js:98:25)",
-        "new CfnUtilsProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/dist/core/cfn-utils-provider.generated.js:24:9)",
-        "CfnUtilsProvider.getOrCreateProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/dist/core/cfn-utils-provider.generated.js:21:28)",
-        "CfnUtilsProvider.getOrCreate (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/dist/core/cfn-utils-provider.generated.js:12:21)",
-        "CfnUtilsProvider.getOrCreate (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/cfn-utils-provider.js:13:66)",
-        "new CfnJson (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/cfn-json.js:51:67)",
-        "new ServiceAccount (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/service-account.js:87:32)",
-        "new AlbController (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/alb-controller.js:353:32)",
-        "AlbController.create (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/alb-controller.js:336:16)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:850:71)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/AWSCDKCfnUtilsProviderCustomResourceProvider/Handler": [
     {
       "type": "aws:cdk:logicalId",
       "data": "AWSCDKCfnUtilsProviderCustomResourceProviderHandlerCF82AA57"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new CustomResourceProviderBase (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/custom-resource-provider/custom-resource-provider-base.js:120:24)",
-        "new CfnUtilsProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/dist/core/cfn-utils-provider.generated.js:24:9)",
-        "CfnUtilsProvider.getOrCreateProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/dist/core/cfn-utils-provider.generated.js:21:28)",
-        "CfnUtilsProvider.getOrCreate (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/dist/core/cfn-utils-provider.generated.js:12:21)",
-        "CfnUtilsProvider.getOrCreate (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/private/cfn-utils-provider.js:13:66)",
-        "new CfnJson (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/cfn-json.js:51:67)",
-        "new ServiceAccount (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/service-account.js:87:32)",
-        "new AlbController (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/alb-controller.js:353:32)",
-        "AlbController.create (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/alb-controller.js:336:16)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:850:71)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Vpc/PublicSubnet1/Subnet": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VpcPublicSubnet1Subnet5C2D37C4"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1264:28)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1533:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Vpc/PublicSubnet1/RouteTable": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VpcPublicSubnet1RouteTable6C95E38E"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1284:27)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1533:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Vpc/PublicSubnet1/RouteTableAssociation": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VpcPublicSubnet1RouteTableAssociation97140677"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1289:32)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1533:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Vpc/PublicSubnet1/DefaultRoute": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VpcPublicSubnet1DefaultRoute3DA9E72A"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "WrappedClass.addDefaultInternetRoute (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1304:27)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:835: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:835:3)",
-        "Array.forEach (:)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:832:36)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:14:21)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Vpc/PublicSubnet1/EIP": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VpcPublicSubnet1EIPD7E02669"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "WrappedClass.addNatGateway (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1556:50)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "NatGatewayProvider.configureNat (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/nat.js:155:33)",
-        "WrappedClass.createNatGateways (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:928:22)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:845:26)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:14:21)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Vpc/PublicSubnet1/NATGateway": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VpcPublicSubnet1NATGateway4D7517AA"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "WrappedClass.addNatGateway (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1554:25)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "NatGatewayProvider.configureNat (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/nat.js:155:33)",
-        "WrappedClass.createNatGateways (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:928:22)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:845:26)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:14:21)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Vpc/PublicSubnet2/Subnet": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VpcPublicSubnet2Subnet691E08A3"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1264:28)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1533:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Vpc/PublicSubnet2/RouteTable": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VpcPublicSubnet2RouteTable94F7E489"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1284:27)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1533:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Vpc/PublicSubnet2/RouteTableAssociation": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VpcPublicSubnet2RouteTableAssociationDD5762D8"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1289:32)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1533:13)",
-        "new PublicSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1044:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Vpc/PublicSubnet2/DefaultRoute": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VpcPublicSubnet2DefaultRoute97F91067"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "WrappedClass.addDefaultInternetRoute (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1304:27)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:835: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:835:3)",
-        "Array.forEach (:)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:832:36)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:14:21)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Vpc/PrivateSubnet1/Subnet": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VpcPrivateSubnet1Subnet536B997A"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1264:28)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1606:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Vpc/PrivateSubnet1/RouteTable": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VpcPrivateSubnet1RouteTableB2C5B500"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1284:27)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1606:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Vpc/PrivateSubnet1/RouteTableAssociation": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VpcPrivateSubnet1RouteTableAssociation70C59FA6"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1289:32)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1606:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Vpc/PrivateSubnet1/DefaultRoute": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VpcPrivateSubnet1DefaultRouteBE02A9ED"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "WrappedClass.addRoute (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1393:27)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "NatGatewayProvider.configureSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/nat.js:176:16)",
-        "NatGatewayProvider.configureNat (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/nat.js:161:18)",
-        "WrappedClass.createNatGateways (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:928:22)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:845:26)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:14:21)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Vpc/PrivateSubnet2/Subnet": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VpcPrivateSubnet2Subnet3788AAA1"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1264:28)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1606:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Vpc/PrivateSubnet2/RouteTable": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VpcPrivateSubnet2RouteTableA678073B"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1284:27)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1606:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Vpc/PrivateSubnet2/RouteTableAssociation": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VpcPrivateSubnet2RouteTableAssociationA89CAD56"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1289:32)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Subnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1606:13)",
-        "new PrivateSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051: (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1051:4)",
-        "Array.forEach (:)",
-        "WrappedClass.createSubnetResources (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1015:30)",
-        "WrappedClass.createSubnets (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:974:18)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:820:18)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Vpc/PrivateSubnet2/DefaultRoute": [
     {
       "type": "aws:cdk:logicalId",
       "data": "VpcPrivateSubnet2DefaultRoute060D2087"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "WrappedClass.addRoute (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:1393:27)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "NatGatewayProvider.configureSubnet (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/nat.js:176:16)",
-        "NatGatewayProvider.configureNat (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/nat.js:161:18)",
-        "WrappedClass.createNatGateways (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:928:22)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/vpc.js:845:26)",
-        "new Vpc (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:14:21)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/kubectlLayer/Code/AssetBucket": [
@@ -907,37 +463,12 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "ClusterRoleFA261979"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/role.js:450:34)",
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:640:39)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:15:25)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/ControlPlaneSecurityGroup/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "ClusterControlPlaneSecurityGroupD274242C"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new SecurityGroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-ec2/lib/security-group.js:420:34)",
-        "new SecurityGroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new SecurityGroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:671:58)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:15:25)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/KubectlProvider/Handler": [
@@ -1000,27 +531,12 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "ClusterClusterAdminRoleAccessF2BFF759"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new AccessEntry (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/access-entry.js:338:29)",
-        "new AccessEntry (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new AccessEntry (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "WrappedClass.grantClusterAdmin (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:929:30)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:835:49)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:15:25)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
     }
   ],
-  "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/OpenIdConnectProvider/Resource": [
+  "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/OidcProviderNative/Resource": [
     {
-      "type": "aws:cdk:analytics:construct",
-      "data": "*"
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterOidcProviderNativeBAC9C7E2"
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/NodegroupDefaultCapacity/NodeGroupRole": [
@@ -1068,20 +584,6 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "ClusterNodegroupDefaultCapacityDA0920A3"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Nodegroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/managed-nodegroup.js:338:29)",
-        "new Nodegroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "WrappedClass.addNodegroupCapacity (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:1067:20)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:866:54)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:15:25)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/manifest-NeuronDevicePlugin/Resource": [
@@ -1135,18 +637,6 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "ClusterNodegroupInferenceInstances3C846611"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Nodegroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/managed-nodegroup.js:338:29)",
-        "new Nodegroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "WrappedClass.addNodegroupCapacity (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:1067:20)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:26:17)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/NodegroupInference2Instances/NodeGroupRole": [
@@ -1194,18 +684,6 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "ClusterNodegroupInference2InstancesEE502FE8"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Nodegroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/managed-nodegroup.js:338:29)",
-        "new Nodegroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "WrappedClass.addNodegroupCapacity (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:1067:20)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:29:17)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/awscdkeksclusterinferencenodegroupCluster4FEA031E-AlbController/alb-sa/Role": [
@@ -1444,57 +922,18 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "ClusterKubectlProviderHandler2E05C68A"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/function.js:691:29)",
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new KubectlProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/kubectl-provider.js:104:25)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:820:41)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:15:25)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/KubectlProvider/Handler/HasEcrPublic": [
     {
       "type": "aws:cdk:logicalId",
       "data": "ClusterKubectlProviderHandlerHasEcrPublic69E09706"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new KubectlProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/kubectl-provider.js:141:39)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:820:41)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:15:25)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/KubectlProvider/AwsCliLayer/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "ClusterKubectlProviderAwsCliLayer24064B0B"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new LayerVersion (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/layers.js:164:30)",
-        "new LayerVersion (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new AwsCliLayer (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/lambda-layer-awscli/lib/awscli-layer.js:77:13)",
-        "new AwsCliLayer (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new KubectlProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/kubectl-provider.js:123:48)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:820:41)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:15:25)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/KubectlProvider/Provider/framework-onEvent": [
@@ -1534,107 +973,28 @@
       }
     }
   ],
-  "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/OpenIdConnectProvider/Resource/Default": [
-    {
-      "type": "aws:cdk:logicalId",
-      "data": "ClusterOpenIdConnectProviderE7EB0530"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new CustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/custom-resource.js:141:29)",
-        "new CustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new CustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new OpenIdConnectProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/oidc-provider.js:148:29)",
-        "new OpenIdConnectProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new OpenIdConnectProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/oidc-provider.js:107:13)",
-        "new OpenIdConnectProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "get openIdConnectProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:1097:51)",
-        "new ServiceAccount (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/service-account.js:89:33)",
-        "new AlbController (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/alb-controller.js:353:32)"
-      ]
-    }
-  ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/NodegroupDefaultCapacity/NodeGroupRole/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "ClusterNodegroupDefaultCapacityNodeGroupRole55953B04"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/role.js:450:34)",
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new Nodegroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/managed-nodegroup.js:314:32)",
-        "new Nodegroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "WrappedClass.addNodegroupCapacity (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:1067:20)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:866:54)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:15:25)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/manifest-NeuronDevicePlugin/Resource/Default": [
     {
       "type": "aws:cdk:logicalId",
       "data": "ClustermanifestNeuronDevicePlugin0B3E0D17"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new CustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/custom-resource.js:141:29)",
-        "new CustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new CustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new KubernetesManifest (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/k8s-manifest.js:49:32)",
-        "WrappedClass.addManifest (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:314:16)",
-        "WrappedClass.addNeuronDevicePlugin (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:1338:49)",
-        "WrappedClass.addNodegroupCapacity (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:1065:22)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:26:17)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/NodegroupInferenceInstances/NodeGroupRole/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "ClusterNodegroupInferenceInstancesNodeGroupRole80013868"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/role.js:450:34)",
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new Nodegroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/managed-nodegroup.js:314:32)",
-        "new Nodegroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "WrappedClass.addNodegroupCapacity (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:1067:20)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:26:17)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/NodegroupInference2Instances/NodeGroupRole/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "ClusterNodegroupInference2InstancesNodeGroupRole3A8C7FF7"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/role.js:450:34)",
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new Nodegroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/managed-nodegroup.js:314:32)",
-        "new Nodegroup (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "WrappedClass.addNodegroupCapacity (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:1067:20)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:29:17)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/awscdkeksclusterinferencenodegroupCluster4FEA031E-AlbController/alb-sa/ConditionJson/Resource": [
@@ -1651,21 +1011,6 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "awscdkeksclusterinferencenodegroupCluster4FEA031EAlbControlleralbsaRoleCBC0A7F6"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/role.js:450:34)",
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new ServiceAccount (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/service-account.js:107:22)",
-        "new AlbController (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/alb-controller.js:353:32)",
-        "AlbController.create (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/alb-controller.js:336:16)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:850:71)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:15:25)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/awscdkeksclusterinferencenodegroupCluster4FEA031E-AlbController/alb-sa/Role/DefaultPolicy": [
@@ -1828,42 +1173,12 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "awscdkeksclusterinferencenodegroupCluster4FEA031EAlbController48A52771"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new CustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/custom-resource.js:141:29)",
-        "new CustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new CustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new HelmChart (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/helm-chart.js:82:32)",
-        "new AlbController (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/alb-controller.js:373:23)",
-        "AlbController.create (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/alb-controller.js:336:16)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:850:71)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:15:25)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/KubectlProvider/Handler/ServiceRole/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "ClusterKubectlProviderHandlerServiceRoleB460AA6D"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/role.js:450:34)",
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/function.js:606:39)",
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new KubectlProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/kubectl-provider.js:104:25)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:820:41)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:15:25)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)",
-        "...node internals..."
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/KubectlProvider/Handler/ServiceRole/DefaultPolicy": [
@@ -1971,21 +1286,6 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "ClusterKubectlProviderframeworkonEvent68E0CF80"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/function.js:691:29)",
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "WrappedClass.createFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resources/lib/provider-framework/provider.js:193:24)",
-        "new Provider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resources/lib/provider-framework/provider.js:148:42)",
-        "new Provider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new KubectlProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/kubectl-provider.js:146:26)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:820:41)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:15:25)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/KubectlProvider/Provider/framework-onEvent/inlinePolicyAddedToExecutionRole-0": [
@@ -2024,105 +1324,30 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "awscdkeksclusterinferencenodegroupCluster4FEA031EAlbControlleralbsaConditionJsonD4837132"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new CustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/custom-resource.js:141:29)",
-        "new CustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new CustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new CfnJson (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/cfn-json.js:50:26)",
-        "new ServiceAccount (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/service-account.js:87:32)",
-        "new AlbController (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/alb-controller.js:353:32)",
-        "AlbController.create (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/alb-controller.js:336:16)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:850:71)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:15:25)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/awscdkeksclusterinferencenodegroupCluster4FEA031E-AlbController/alb-sa/Role/DefaultPolicy/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "awscdkeksclusterinferencenodegroupCluster4FEA031EAlbControlleralbsaRoleDefaultPolicyD6B360F4"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Policy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/policy.js:158:30)",
-        "new Policy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Policy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "WrappedClass.addToPrincipalPolicy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/role.js:511:42)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "ServiceAccount.addToPrincipalPolicy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/service-account.js:185:26)",
-        "new AlbController (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/alb-controller.js:370:28)",
-        "AlbController.create (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/alb-controller.js:336:16)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:850:71)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/awscdkeksclusterinferencenodegroupCluster4FEA031E-AlbController/alb-sa/manifest-alb-saServiceAccountResource/Resource/Default": [
     {
       "type": "aws:cdk:logicalId",
       "data": "awscdkeksclusterinferencenodegroupCluster4FEA031EAlbControlleralbsamanifestalbsaServiceAccountResource4D0C3E45"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new CustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/custom-resource.js:141:29)",
-        "new CustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new CustomResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new KubernetesManifest (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/k8s-manifest.js:49:32)",
-        "new ServiceAccount (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/service-account.js:135:9)",
-        "new AlbController (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/alb-controller.js:353:32)",
-        "AlbController.create (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/alb-controller.js:336:16)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:850:71)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:15:25)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/KubectlProvider/Handler/ServiceRole/DefaultPolicy/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "ClusterKubectlProviderHandlerServiceRoleDefaultPolicy77317198"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Policy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/policy.js:158:30)",
-        "new Policy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Policy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "WrappedClass.addToPrincipalPolicy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/role.js:511:42)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "new KubectlProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/kubectl-provider.js:126:21)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:820:41)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new EksClusterInferenceStack (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:15:25)",
-        "<anonymous> (/workplace/gudipatg/aws-cdk/packages/@aws-cdk-testing/framework-integ/test/aws-eks-v2/test/integ.eks-inference-nodegroup.js:42:15)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/KubectlProvider/Provider/framework-onEvent/ServiceRole/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "ClusterKubectlProviderframeworkonEventServiceRoleFD0BA8C5"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/role.js:450:34)",
-        "new Role (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/function.js:606:39)",
-        "new Function (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "WrappedClass.createFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resources/lib/provider-framework/provider.js:193:24)",
-        "new Provider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resources/lib/provider-framework/provider.js:148:42)",
-        "new Provider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new KubectlProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/kubectl-provider.js:146:26)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:820:41)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/KubectlProvider/Provider/framework-onEvent/ServiceRole/DefaultPolicy": [
@@ -2165,42 +1390,12 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "ClusterKubectlProviderframeworkonEventinlinePolicyAddedToExecutionRole081AD342A"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Policy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/policy.js:158:30)",
-        "new Policy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Policy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "WrappedClass.addToRolePolicy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/function-base.js:206:33)",
-        "WrappedClass.addPermissions (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resources/lib/provider-framework/provider.js:184:29)",
-        "WrappedClass.createFunction (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resources/lib/provider-framework/provider.js:216:18)",
-        "new Provider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resources/lib/provider-framework/provider.js:148:42)",
-        "new Provider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "new KubectlProvider (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/kubectl-provider.js:146:26)",
-        "new Cluster (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-eks-v2/lib/cluster.js:820:41)"
-      ]
     }
   ],
   "/aws-cdk-eks-cluster-inference-nodegroup/Cluster/KubectlProvider/Provider/framework-onEvent/ServiceRole/DefaultPolicy/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "ClusterKubectlProviderframeworkonEventServiceRoleDefaultPolicyA4F24629"
-    },
-    {
-      "type": "aws:cdk:creationStack",
-      "data": [
-        "new Policy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/policy.js:158:30)",
-        "new Policy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/no-box-stack-traces.js:43:17)",
-        "new Policy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/prop-injectable.js:32:13)",
-        "WrappedClass.addToPrincipalPolicy (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/role.js:511:42)",
-        "WrappedClass.<anonymous> (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/core/lib/metadata-resource.js:67:35)",
-        "Grant.addToPrincipal (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/grant.js:161:65)",
-        "Grant.addToPrincipalOrResource (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-iam/lib/grant.js:46:30)",
-        "WrappedClass.grant (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/function-base.js:483:35)",
-        "WrappedClass.grantInvoke (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/aws-lambda/lib/function-base.js:287:26)",
-        "WrappedClass.addPermissions (/workplace/gudipatg/aws-cdk/packages/aws-cdk-lib/custom-resources/lib/provider-framework/provider.js:179:38)"
-      ]
     }
   ]
 }

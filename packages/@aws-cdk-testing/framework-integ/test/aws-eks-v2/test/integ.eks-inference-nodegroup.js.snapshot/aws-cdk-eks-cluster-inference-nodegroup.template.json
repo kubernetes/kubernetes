@@ -725,7 +725,7 @@
      "S3Bucket": {
       "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
      },
-     "S3Key": "e2659170a0721541efa761a8d5d04d5e36cbbf691c4b15a9053002b7c825055d.zip"
+     "S3Key": "a72522445441e9b66c2f16956c54d4786af8c61c156b80c48a6e7c32fcc49023.zip"
     },
     "Description": "/opt/awscli/aws"
    }
@@ -834,7 +834,7 @@
      "S3Bucket": {
       "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
      },
-     "S3Key": "d14e70c8c1d5d6c32025ea07c4b9ed67be449820cf578659c9deb07160688c0e.zip"
+     "S3Key": "775803ec04ddcc7cbb5479b0d84ac848097d215c16587dc92070925fac5cbf3e.zip"
     },
     "Description": "AWS CDK resource provider framework - onEvent (aws-cdk-eks-cluster-inference-nodegroup/Cluster/KubectlProvider/Provider)",
     "Environment": {
@@ -953,16 +953,10 @@
     }
    }
   },
-  "ClusterOpenIdConnectProviderE7EB0530": {
-   "Type": "Custom::AWSCDKOpenIdConnectProvider",
+  "ClusterOidcProviderNativeBAC9C7E2": {
+   "Type": "AWS::IAM::OIDCProvider",
    "Properties": {
-    "ServiceToken": {
-     "Fn::GetAtt": [
-      "CustomAWSCDKOpenIdConnectProviderCustomResourceProviderHandlerF2C543E0",
-      "Arn"
-     ]
-    },
-    "ClientIDList": [
+    "ClientIdList": [
      "sts.amazonaws.com"
     ],
     "Url": {
@@ -970,12 +964,8 @@
       "ClusterEB0386A7",
       "OpenIdConnectIssuerUrl"
      ]
-    },
-    "RejectUnauthorized": false,
-    "CodeHash": "8be22d8be71ebe9e2ddfe3ec85cf2145bb8a6c967f2678a983b4fede3cfe7ab8"
-   },
-   "UpdateReplacePolicy": "Delete",
-   "DeletionPolicy": "Delete"
+    }
+   }
   },
   "ClusterNodegroupDefaultCapacityNodeGroupRole55953B04": {
    "Type": "AWS::IAM::Role",
@@ -1280,7 +1270,7 @@
           "Fn::Split": [
            ":oidc-provider/",
            {
-            "Ref": "ClusterOpenIdConnectProviderE7EB0530"
+            "Ref": "ClusterOidcProviderNativeBAC9C7E2"
            }
           ]
          }
@@ -1294,7 +1284,7 @@
           "Fn::Split": [
            ":oidc-provider/",
            {
-            "Ref": "ClusterOpenIdConnectProviderE7EB0530"
+            "Ref": "ClusterOidcProviderNativeBAC9C7E2"
            }
           ]
          }
@@ -1334,7 +1324,7 @@
        "Effect": "Allow",
        "Principal": {
         "Federated": {
-         "Ref": "ClusterOpenIdConnectProviderE7EB0530"
+         "Ref": "ClusterOidcProviderNativeBAC9C7E2"
         }
        }
       }
@@ -1802,77 +1792,10 @@
     "ClusterNodegroupInference2InstancesEE502FE8",
     "ClusterNodegroupInferenceInstancesNodeGroupRole80013868",
     "ClusterNodegroupInferenceInstances3C846611",
-    "ClusterOpenIdConnectProviderE7EB0530"
+    "ClusterOidcProviderNativeBAC9C7E2"
    ],
    "UpdateReplacePolicy": "Delete",
    "DeletionPolicy": "Delete"
-  },
-  "CustomAWSCDKOpenIdConnectProviderCustomResourceProviderRole517FED65": {
-   "Type": "AWS::IAM::Role",
-   "Properties": {
-    "AssumeRolePolicyDocument": {
-     "Version": "2012-10-17",
-     "Statement": [
-      {
-       "Action": "sts:AssumeRole",
-       "Effect": "Allow",
-       "Principal": {
-        "Service": "lambda.amazonaws.com"
-       }
-      }
-     ]
-    },
-    "ManagedPolicyArns": [
-     {
-      "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-     }
-    ],
-    "Policies": [
-     {
-      "PolicyName": "Inline",
-      "PolicyDocument": {
-       "Version": "2012-10-17",
-       "Statement": [
-        {
-         "Effect": "Allow",
-         "Resource": "*",
-         "Action": [
-          "iam:CreateOpenIDConnectProvider",
-          "iam:DeleteOpenIDConnectProvider",
-          "iam:UpdateOpenIDConnectProviderThumbprint",
-          "iam:AddClientIDToOpenIDConnectProvider",
-          "iam:RemoveClientIDFromOpenIDConnectProvider"
-         ]
-        }
-       ]
-      }
-     }
-    ]
-   }
-  },
-  "CustomAWSCDKOpenIdConnectProviderCustomResourceProviderHandlerF2C543E0": {
-   "Type": "AWS::Lambda::Function",
-   "Properties": {
-    "Code": {
-     "S3Bucket": {
-      "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
-     },
-     "S3Key": "8be22d8be71ebe9e2ddfe3ec85cf2145bb8a6c967f2678a983b4fede3cfe7ab8.zip"
-    },
-    "Timeout": 900,
-    "MemorySize": 128,
-    "Handler": "__entrypoint__.handler",
-    "Role": {
-     "Fn::GetAtt": [
-      "CustomAWSCDKOpenIdConnectProviderCustomResourceProviderRole517FED65",
-      "Arn"
-     ]
-    },
-    "Runtime": "nodejs24.x"
-   },
-   "DependsOn": [
-    "CustomAWSCDKOpenIdConnectProviderCustomResourceProviderRole517FED65"
-   ]
   },
   "AWSCDKCfnUtilsProviderCustomResourceProviderRoleFE0EE867": {
    "Type": "AWS::IAM::Role",
@@ -1903,7 +1826,7 @@
      "S3Bucket": {
       "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
      },
-     "S3Key": "fe5389ebbb8870ff584c1c39f7a2d0be1aaf1cd5965c37fd4b4ce98eebd89a0d.zip"
+     "S3Key": "85c6e40ff0a55dc4cc75dffdac4b4413e7fea1300b27094da3bed536f3f8c173.zip"
     },
     "Timeout": 900,
     "MemorySize": 128,

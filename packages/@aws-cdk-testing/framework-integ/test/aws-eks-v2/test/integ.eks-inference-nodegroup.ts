@@ -1,4 +1,3 @@
-/// !cdk-integ pragma:disable-update-workflow
 import * as integ from '@aws-cdk/integ-tests-alpha';
 import { KubectlV32Layer } from '@aws-cdk/lambda-layer-kubectl-v32';
 import { App, Stack } from 'aws-cdk-lib';
@@ -38,7 +37,7 @@ class EksClusterInferenceStack extends Stack {
 const app = new App({
   postCliContext: {
     [IAM_OIDC_REJECT_UNAUTHORIZED_CONNECTIONS]: false,
-    [EKS_USE_NATIVE_OIDC_PROVIDER]: false,
+    [EKS_USE_NATIVE_OIDC_PROVIDER]: true,
     '@aws-cdk/aws-lambda:createNewPoliciesWithAddToRolePolicy': true,
     '@aws-cdk/aws-lambda:useCdkManagedLogGroup': false,
   },

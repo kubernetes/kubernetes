@@ -9,6 +9,7 @@ import type { IAddon } from './addon';
 import { Addon } from './addon';
 import type { AlbControllerOptions } from './alb-controller';
 import { AlbController } from './alb-controller';
+import { CfnCluster } from './eks.generated';
 import type { FargateProfileOptions } from './fargate-profile';
 import { FargateProfile } from './fargate-profile';
 import type { HelmChartOptions } from './helm-chart';
@@ -29,8 +30,6 @@ import { ServiceAccount } from './service-account';
 import { renderAmazonLinuxUserData, renderBottlerocketUserData } from './user-data';
 import * as autoscaling from '../../aws-autoscaling';
 import * as ec2 from '../../aws-ec2';
-import { CfnCluster } from '../../aws-eks';
-import type { ClusterReference, IClusterRef } from '../../aws-eks';
 import * as iam from '../../aws-iam';
 import type * as kms from '../../aws-kms';
 import * as ssm from '../../aws-ssm';
@@ -42,6 +41,7 @@ import { MethodMetadata, addConstructMetadata } from '../../core/lib/metadata-re
 import { lit } from '../../core/lib/private/literal-string';
 import { propertyInjectable } from '../../core/lib/prop-injectable';
 import { EKS_USE_NATIVE_OIDC_PROVIDER } from '../../cx-api';
+import type { ClusterReference, IClusterRef } from '../../interfaces/generated/aws-eks-interfaces.generated';
 
 // defaults are based on https://eksctl.io
 const DEFAULT_CAPACITY_COUNT = 2;

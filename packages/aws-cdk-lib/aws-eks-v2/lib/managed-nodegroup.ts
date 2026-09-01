@@ -2,20 +2,20 @@ import type { Construct } from 'constructs';
 import { Node } from 'constructs';
 import type { ICluster } from './cluster';
 import { Cluster, IpFamily } from './cluster';
-import type { ISecurityGroup, SubnetSelection } from '../../aws-ec2';
+import { CfnNodegroup } from './eks.generated';
 import { InstanceType, InstanceArchitecture, InstanceClass, InstanceSize } from '../../aws-ec2';
-import type { INodegroupRef, NodegroupReference } from '../../aws-eks';
-import { CfnNodegroup } from '../../aws-eks';
+import type { ISecurityGroup, SubnetSelection } from '../../aws-ec2';
 import type { IRole } from '../../aws-iam';
 import { ManagedPolicy, PolicyStatement, Role, ServicePrincipal } from '../../aws-iam';
 import type { IResource, RemovalPolicy } from '../../core';
 import { Resource, Annotations, withResolved, FeatureFlags, ValidationError, RemovalPolicies, UnscopedValidationError } from '../../core';
-import { memoizedGetter } from '../../core/lib/helpers-internal';
-import { addConstructMetadata } from '../../core/lib/metadata-resource';
 import { propertyInjectable } from '../../core/lib/prop-injectable';
 import * as cxapi from '../../cx-api';
 import { isGpuInstanceType } from './private/nodegroup';
+import { memoizedGetter } from '../../core/lib/helpers-internal';
+import { addConstructMetadata } from '../../core/lib/metadata-resource';
 import { lit } from '../../core/lib/private/literal-string';
+import type { INodegroupRef, NodegroupReference } from '../../interfaces/generated/aws-eks-interfaces.generated';
 
 /**
  * NodeGroup interface

@@ -750,6 +750,24 @@
       }
     ]
   },
+  "aws-eks-v2": {
+    "scopes": [
+      {
+        "namespace": "AWS::EKS"
+      }
+    ],
+    "targets": {
+      "java": {
+        "package": "software.amazon.awscdk.services.eks_v2"
+      },
+      "dotnet": {
+        "namespace": "Amazon.CDK.AWS.EKSv2"
+      },
+      "python": {
+        "module": "aws_cdk.aws_eks_v2"
+      }
+    }
+  },
   "aws-elasticache": {
     "scopes": [
       {

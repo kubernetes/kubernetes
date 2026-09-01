@@ -12,3 +12,4 @@ export * from './oidc-provider';
 export * from './alb-controller';
 export * from './access-entry';
 export * from './addon';
+export * from './eks.generated';

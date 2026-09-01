@@ -1,7 +1,7 @@
 import { Construct } from 'constructs';
 import type { Cluster } from './cluster';
+import { CfnFargateProfile } from './eks.generated';
 import * as ec2 from '../../aws-ec2';
-import { CfnFargateProfile } from '../../aws-eks';
 import * as iam from '../../aws-iam';
 import type { ITaggable, RemovalPolicy } from '../../core';
 import { Annotations, RemovalPolicies, TagManager, TagType, ValidationError } from '../../core';

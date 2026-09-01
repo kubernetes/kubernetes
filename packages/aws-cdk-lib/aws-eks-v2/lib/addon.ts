@@ -1,12 +1,12 @@
 import type { Construct } from 'constructs';
 import type { ICluster } from './cluster';
-import type { AddonReference, IAddonRef } from '../../aws-eks';
-import { CfnAddon } from '../../aws-eks';
+import { CfnAddon } from './eks.generated';
 import type { IResource, RemovalPolicy } from '../../core';
 import { ArnFormat, Resource, Stack, Fn } from '../../core';
 import { memoizedGetter } from '../../core/lib/helpers-internal';
 import { addConstructMetadata } from '../../core/lib/metadata-resource';
 import { propertyInjectable } from '../../core/lib/prop-injectable';
+import type { AddonReference, IAddonRef } from '../../interfaces/generated/aws-eks-interfaces.generated';
 
 /**
  * Represents an Amazon EKS Add-On.
