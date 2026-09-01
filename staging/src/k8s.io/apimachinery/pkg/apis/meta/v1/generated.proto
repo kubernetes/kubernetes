@@ -897,6 +897,9 @@ message ObjectMeta {
   // queryable and should be preserved when modifying objects.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations
   // +optional
+  // +mapType=granular
+  // +validationRule="self.all(k, !format.qualifiedName().validate(k.lowerAscii()).hasValue())"
+  // +validationRule="self.map(k, size(k) + size(self[k])).sum() <= 262144"
   map<string, string> annotations = 12;
 
   // List of objects depended by this object. If ALL objects in the list have

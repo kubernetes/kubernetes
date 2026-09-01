@@ -256,6 +256,9 @@ type ObjectMeta struct {
 	// queryable and should be preserved when modifying objects.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations
 	// +optional
+	// +mapType=granular
+	// +validationRule="self.all(k, !format.qualifiedName().validate(k.lowerAscii()).hasValue())"
+	// +validationRule="self.map(k, size(k) + size(self[k])).sum() <= 262144"
 	Annotations map[string]string `json:"annotations,omitempty" protobuf:"bytes,12,rep,name=annotations"`
 
 	// List of objects depended by this object. If ALL objects in the list have
