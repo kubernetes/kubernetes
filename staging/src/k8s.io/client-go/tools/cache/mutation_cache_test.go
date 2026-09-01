@@ -245,3 +245,46 @@ func TestMutationCacheOnDeleteClearsStaleMutation(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, items, "OnDelete must clear the mutation; ByIndex must return nothing")
 }
+
+func TestMutationCacheByIndexConcurrentDelete(t *testing.T) {
+	const indexName = "by-name"
+	indexer := &deleteOnGetIndexer{
+		Indexer: NewIndexer(MetaNamespaceKeyFunc, Indexers{
+			indexName: func(obj interface{}) ([]string, error) {
+				return []string{obj.(*v1.Pod).Name}, nil
+			},
+		}),
+	}
+	oldPod := makeMutationTestPod("pod", "uid-1", "1")
+	replacementPod := makeMutationTestPod("pod", "uid-2", "2")
+	require.NoError(t, indexer.Add(oldPod))
+
+	mc := NewIntegerResourceVersionMutationCache(klog.Background(), indexer, indexer, time.Minute, true)
+	mc.Mutation(replacementPod)
+	indexer.deleteOnGet = true
+
+	items, err := mc.ByIndex(indexName, "pod")
+	require.NoError(t, err)
+	require.Equal(t, []interface{}{replacementPod}, items)
+}
+
+// deleteOnGetIndexer makes the narrow race between IndexKeys and GetByKey
+// deterministic.
+type deleteOnGetIndexer struct {
+	Indexer
+	deleteOnGet bool
+}
+
+func (i *deleteOnGetIndexer) GetByKey(key string) (interface{}, bool, error) {
+	if i.deleteOnGet {
+		i.deleteOnGet = false
+		obj, exists, err := i.Indexer.GetByKey(key)
+		if err != nil || !exists {
+			return nil, false, err
+		}
+		if err := i.Indexer.Delete(obj); err != nil {
+			return nil, false, err
+		}
+	}
+	return i.Indexer.GetByKey(key)
+}
