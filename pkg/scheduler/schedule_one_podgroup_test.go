@@ -617,9 +617,9 @@ func TestValidatePodGroup(t *testing.T) {
 }
 
 func TestSkipPodGroupPodSchedule(t *testing.T) {
-	p1 := st.MakePod().Name("p1").UID("p1").PodGroupName("pg").Obj()
-	p2 := st.MakePod().Name("p2").UID("p2").PodGroupName("pg").Terminating().Obj()
-	p3 := st.MakePod().Name("p3").UID("p3").PodGroupName("pg").Obj()
+	p1 := st.MakePod().Name("p1").Namespace("default").UID("p1").PodGroupName("pg").Obj()
+	p2 := st.MakePod().Name("p2").Namespace("default").UID("p2").PodGroupName("pg").Terminating().Obj()
+	p3 := st.MakePod().Name("p3").Namespace("default").UID("p3").PodGroupName("pg").Obj()
 
 	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}}
 	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}}
