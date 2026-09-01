@@ -890,6 +890,9 @@ message ObjectMeta {
   // and services.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels
   // +optional
+  // +mapType=granular
+  // +validationRule="self.all(k, !format.qualifiedName().validate(k).hasValue())"
+  // +validationRule="self.all(k, !format.labelValue().validate(self[k]).hasValue())"
   map<string, string> labels = 11;
 
   // Annotations is an unstructured key value map stored with a resource that may be

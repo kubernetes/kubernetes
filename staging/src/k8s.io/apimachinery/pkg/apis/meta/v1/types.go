@@ -249,6 +249,9 @@ type ObjectMeta struct {
 	// and services.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels
 	// +optional
+	// +mapType=granular
+	// +validationRule="self.all(k, !format.qualifiedName().validate(k).hasValue())"
+	// +validationRule="self.all(k, !format.labelValue().validate(self[k]).hasValue())"
 	Labels map[string]string `json:"labels,omitempty" protobuf:"bytes,11,rep,name=labels"`
 
 	// Annotations is an unstructured key value map stored with a resource that may be

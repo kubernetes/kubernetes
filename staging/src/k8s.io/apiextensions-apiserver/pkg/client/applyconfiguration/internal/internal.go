@@ -1171,6 +1171,7 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             scalar: string
+          elementRelationship: separable
     - name: managedFields
       type:
         list:
