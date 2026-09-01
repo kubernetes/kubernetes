@@ -37463,14 +37463,14 @@ func schema_k8sio_api_flowcontrol_v1_ExemptPriorityLevelConfiguration(ref common
 				Properties: map[string]spec.Schema{
 					"nominalConcurrencyShares": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`nominalConcurrencyShares` (NCS) contributes to the computation of the NominalConcurrencyLimit (NominalCL) of this level. This is the number of execution seats nominally reserved for this priority level. This DOES NOT limit the dispatching from this priority level but affects the other priority levels through the borrowing mechanism. The server's concurrency limit (ServerCL) is divided among all the priority levels in proportion to their NCS values:\n\nNominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs ) sum_ncs = sum[priority level k] NCS(k)\n\nBigger numbers mean a larger nominal concurrency limit, at the expense of every other priority level. This field has a default value of zero.",
+							Description: "nominalConcurrencyShares (NCS) contributes to the computation of the NominalConcurrencyLimit (NominalCL) of this level. This is the number of execution seats nominally reserved for this priority level. This DOES NOT limit the dispatching from this priority level but affects the other priority levels through the borrowing mechanism. The server's concurrency limit (ServerCL) is divided among all the priority levels in proportion to their NCS values:\n\nNominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs ) sum_ncs = sum[priority level k] NCS(k)\n\nBigger numbers mean a larger nominal concurrency limit, at the expense of every other priority level. This field has a default value of zero.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"lendablePercent": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`lendablePercent` prescribes the fraction of the level's NominalCL that can be borrowed by other priority levels.  This value of this field must be between 0 and 100, inclusive, and it defaults to 0. The number of seats that other levels can borrow from this level, known as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.\n\nLendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )",
+							Description: "lendablePercent prescribes the fraction of the level's NominalCL that can be borrowed by other priority levels.  This value of this field must be between 0 and 100, inclusive, and it defaults to 0. The number of seats that other levels can borrow from this level, known as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.\n\nLendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -37490,7 +37490,7 @@ func schema_k8sio_api_flowcontrol_v1_FlowDistinguisherMethod(ref common.Referenc
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`type` is the type of flow distinguisher method The supported types are \"ByUser\" and \"ByNamespace\". Required.",
+							Description: "type is the type of flow distinguisher method The supported types are \"ByUser\" and \"ByNamespace\". Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -37526,21 +37526,21 @@ func schema_k8sio_api_flowcontrol_v1_FlowSchema(ref common.ReferenceCallback) co
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`metadata` is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`spec` is the specification of the desired behavior of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "spec is the specification of the desired behavior of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref(flowcontrolv1.FlowSchemaSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`status` is the current status of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "status is the current status of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref(flowcontrolv1.FlowSchemaStatus{}.OpenAPIModelName()),
 						},
@@ -37563,34 +37563,34 @@ func schema_k8sio_api_flowcontrol_v1_FlowSchemaCondition(ref common.ReferenceCal
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`type` is the type of the condition. Required.",
+							Description: "type is the type of the condition. Required.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`status` is the status of the condition. Should be specified and set to one of True, False, Unknown.",
+							Description: "status is the status of the condition. Should be specified and set to one of True, False, Unknown.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"lastTransitionTime": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`lastTransitionTime` is the last time the condition transitioned from one status to another.",
+							Description: "lastTransitionTime is the last time the condition transitioned from one status to another.",
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`reason` is a unique, one-word, CamelCase reason for the condition's last transition.",
+							Description: "reason is a unique, one-word, CamelCase reason for the condition's last transition.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"message": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`message` is a human-readable message indicating details about last transition.",
+							Description: "message is a human-readable message indicating details about last transition.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -37663,14 +37663,14 @@ func schema_k8sio_api_flowcontrol_v1_FlowSchemaSpec(ref common.ReferenceCallback
 				Properties: map[string]spec.Schema{
 					"priorityLevelConfiguration": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`priorityLevelConfiguration` should reference a PriorityLevelConfiguration in the cluster. If the reference cannot be resolved, the FlowSchema will be ignored and marked as invalid in its status. Required.",
+							Description: "priorityLevelConfiguration should reference a PriorityLevelConfiguration in the cluster. If the reference cannot be resolved, the FlowSchema will be ignored and marked as invalid in its status. Required.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(flowcontrolv1.PriorityLevelConfigurationReference{}.OpenAPIModelName()),
 						},
 					},
 					"matchingPrecedence": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`matchingPrecedence` is used to choose among the FlowSchemas that match a given request. The chosen FlowSchema is among those with the numerically lowest (which we take to be logically highest) MatchingPrecedence.  Each MatchingPrecedence value must be ranged in [1,10000]. Note that if the precedence is not specified, it will be set to 1000 as default.",
+							Description: "matchingPrecedence is used to choose among the FlowSchemas that match a given request. The chosen FlowSchema is among those with the numerically lowest (which we take to be logically highest) MatchingPrecedence.  Each MatchingPrecedence value must be ranged in [1,10000]. Note that if the precedence is not specified, it will be set to 1000 as default.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -37678,7 +37678,7 @@ func schema_k8sio_api_flowcontrol_v1_FlowSchemaSpec(ref common.ReferenceCallback
 					},
 					"distinguisherMethod": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`distinguisherMethod` defines how to compute the flow distinguisher for requests that match this schema. `nil` specifies that the distinguisher is disabled and thus will always be the empty string.",
+							Description: "distinguisherMethod defines how to compute the flow distinguisher for requests that match this schema. `nil` specifies that the distinguisher is disabled and thus will always be the empty string.",
 							Ref:         ref(flowcontrolv1.FlowDistinguisherMethod{}.OpenAPIModelName()),
 						},
 					},
@@ -37689,7 +37689,7 @@ func schema_k8sio_api_flowcontrol_v1_FlowSchemaSpec(ref common.ReferenceCallback
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`rules` describes which requests will match this flow schema. This FlowSchema matches a request if and only if at least one member of rules matches the request. if it is an empty slice, there will be no requests matching the FlowSchema.",
+							Description: "rules describes which requests will match this flow schema. This FlowSchema matches a request if and only if at least one member of rules matches the request. if it is an empty slice, there will be no requests matching the FlowSchema.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -37778,7 +37778,7 @@ func schema_k8sio_api_flowcontrol_v1_LimitResponse(ref common.ReferenceCallback)
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`type` is \"Queue\" or \"Reject\". \"Queue\" means that requests that can not be executed upon arrival are held in a queue until they can be executed or a queuing limit is reached. \"Reject\" means that requests that can not be executed upon arrival are rejected. Required.",
+							Description: "type is \"Queue\" or \"Reject\". \"Queue\" means that requests that can not be executed upon arrival are held in a queue until they can be executed or a queuing limit is reached. \"Reject\" means that requests that can not be executed upon arrival are rejected. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -37786,7 +37786,7 @@ func schema_k8sio_api_flowcontrol_v1_LimitResponse(ref common.ReferenceCallback)
 					},
 					"queuing": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`queuing` holds the configuration parameters for queuing. This field may be non-empty only if `type` is `\"Queue\"`.",
+							Description: "queuing holds the configuration parameters for queuing. This field may be non-empty only if `type` is `\"Queue\"`.",
 							Ref:         ref(flowcontrolv1.QueuingConfiguration{}.OpenAPIModelName()),
 						},
 					},
@@ -37820,28 +37820,28 @@ func schema_k8sio_api_flowcontrol_v1_LimitedPriorityLevelConfiguration(ref commo
 				Properties: map[string]spec.Schema{
 					"nominalConcurrencyShares": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`nominalConcurrencyShares` (NCS) contributes to the computation of the NominalConcurrencyLimit (NominalCL) of this level. This is the number of execution seats available at this priority level. This is used both for requests dispatched from this priority level as well as requests dispatched from other priority levels borrowing seats from this level. The server's concurrency limit (ServerCL) is divided among the Limited priority levels in proportion to their NCS values:\n\nNominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs ) sum_ncs = sum[priority level k] NCS(k)\n\nBigger numbers mean a larger nominal concurrency limit, at the expense of every other priority level.\n\nIf not specified, this field defaults to a value of 30.\n\nSetting this field to zero supports the construction of a \"jail\" for this priority level that is used to hold some request(s)",
+							Description: "nominalConcurrencyShares (NCS) contributes to the computation of the NominalConcurrencyLimit (NominalCL) of this level. This is the number of execution seats available at this priority level. This is used both for requests dispatched from this priority level as well as requests dispatched from other priority levels borrowing seats from this level. The server's concurrency limit (ServerCL) is divided among the Limited priority levels in proportion to their NCS values:\n\nNominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs ) sum_ncs = sum[priority level k] NCS(k)\n\nBigger numbers mean a larger nominal concurrency limit, at the expense of every other priority level.\n\nIf not specified, this field defaults to a value of 30.\n\nSetting this field to zero supports the construction of a \"jail\" for this priority level that is used to hold some request(s)",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"limitResponse": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`limitResponse` indicates what to do with requests that can not be executed right now",
+							Description: "limitResponse indicates what to do with requests that can not be executed right now",
 							Default:     map[string]interface{}{},
 							Ref:         ref(flowcontrolv1.LimitResponse{}.OpenAPIModelName()),
 						},
 					},
 					"lendablePercent": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`lendablePercent` prescribes the fraction of the level's NominalCL that can be borrowed by other priority levels. The value of this field must be between 0 and 100, inclusive, and it defaults to 0. The number of seats that other levels can borrow from this level, known as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.\n\nLendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )",
+							Description: "lendablePercent prescribes the fraction of the level's NominalCL that can be borrowed by other priority levels. The value of this field must be between 0 and 100, inclusive, and it defaults to 0. The number of seats that other levels can borrow from this level, known as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.\n\nLendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"borrowingLimitPercent": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`borrowingLimitPercent`, if present, configures a limit on how many seats this priority level can borrow from other priority levels. The limit is known as this level's BorrowingConcurrencyLimit (BorrowingCL) and is a limit on the total number of seats that this level may borrow at any one time. This field holds the ratio of that limit to the level's nominal concurrency limit. When this field is non-nil, it must hold a non-negative integer and the limit is calculated as follows.\n\nBorrowingCL(i) = round( NominalCL(i) * borrowingLimitPercent(i)/100.0 )\n\nThe value of this field can be more than 100, implying that this priority level can borrow a number of seats that is greater than its own nominal concurrency limit (NominalCL). When this field is left `nil`, the limit is effectively infinite.",
+							Description: "borrowingLimitPercent configures a limit on how many seats this priority level can borrow from other priority levels, if present. The limit is known as this level's BorrowingConcurrencyLimit (BorrowingCL) and is a limit on the total number of seats that this level may borrow at any one time. This field holds the ratio of that limit to the level's nominal concurrency limit. When this field is non-nil, it must hold a non-negative integer and the limit is calculated as follows.\n\nBorrowingCL(i) = round( NominalCL(i) * borrowingLimitPercent(i)/100.0 )\n\nThe value of this field can be more than 100, implying that this priority level can borrow a number of seats that is greater than its own nominal concurrency limit (NominalCL). When this field is left `nil`, the limit is effectively infinite.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -37869,7 +37869,7 @@ func schema_k8sio_api_flowcontrol_v1_NonResourcePolicyRule(ref common.ReferenceC
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`verbs` is a list of matching verbs and may not be empty. \"*\" matches all verbs. If it is present, it must be the only entry. Required.",
+							Description: "verbs is a list of matching verbs and may not be empty. \"*\" matches all verbs. If it is present, it must be the only entry. Required.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -37888,7 +37888,7 @@ func schema_k8sio_api_flowcontrol_v1_NonResourcePolicyRule(ref common.ReferenceC
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`nonResourceURLs` is a set of url prefixes that a user should have access to and may not be empty. For example:\n  - \"/healthz\" is legal\n  - \"/hea*\" is illegal\n  - \"/hea\" is legal but matches nothing\n  - \"/hea/*\" also matches nothing\n  - \"/healthz/*\" matches all per-component health checks.\n\"*\" matches all non-resource urls. if it is present, it must be the only entry. Required.",
+							Description: "nonResourceURLs is a set of url prefixes that a user should have access to and may not be empty. For example:\n  - \"/healthz\" is legal\n  - \"/hea*\" is illegal\n  - \"/hea\" is legal but matches nothing\n  - \"/hea/*\" also matches nothing\n  - \"/healthz/*\" matches all per-component health checks.\n\"*\" matches all non-resource urls. if it is present, it must be the only entry. Required.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -37939,7 +37939,7 @@ func schema_k8sio_api_flowcontrol_v1_PolicyRulesWithSubjects(ref common.Referenc
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`resourceRules` is a slice of ResourcePolicyRules that identify matching requests according to their verb and the target resource. At least one of `resourceRules` and `nonResourceRules` has to be non-empty.",
+							Description: "resourceRules is a slice of ResourcePolicyRules that identify matching requests according to their verb and the target resource. At least one of `resourceRules` and `nonResourceRules` has to be non-empty.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -37957,7 +37957,7 @@ func schema_k8sio_api_flowcontrol_v1_PolicyRulesWithSubjects(ref common.Referenc
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`nonResourceRules` is a list of NonResourcePolicyRules that identify matching requests according to their verb and the target non-resource URL.",
+							Description: "nonResourceRules is a list of NonResourcePolicyRules that identify matching requests according to their verb and the target non-resource URL.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -38000,21 +38000,21 @@ func schema_k8sio_api_flowcontrol_v1_PriorityLevelConfiguration(ref common.Refer
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`metadata` is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`spec` is the specification of the desired behavior of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "spec is the specification of the desired behavior of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref(flowcontrolv1.PriorityLevelConfigurationSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`status` is the current status of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "status is the current status of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref(flowcontrolv1.PriorityLevelConfigurationStatus{}.OpenAPIModelName()),
 						},
@@ -38037,34 +38037,34 @@ func schema_k8sio_api_flowcontrol_v1_PriorityLevelConfigurationCondition(ref com
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`type` is the type of the condition. Required.",
+							Description: "type is the type of the condition. Required.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`status` is the status of the condition. Should be specified and set to one of True, False, Unknown.",
+							Description: "status is the status of the condition. Should be specified and set to one of True, False, Unknown.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"lastTransitionTime": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`lastTransitionTime` is the last time the condition transitioned from one status to another.",
+							Description: "lastTransitionTime is the last time the condition transitioned from one status to another.",
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`reason` is a unique, one-word, CamelCase reason for the condition's last transition.",
+							Description: "reason is a unique, one-word, CamelCase reason for the condition's last transition.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"message": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`message` is a human-readable message indicating details about last transition.",
+							Description: "message is a human-readable message indicating details about last transition.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -38137,7 +38137,7 @@ func schema_k8sio_api_flowcontrol_v1_PriorityLevelConfigurationReference(ref com
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`name` is the name of the priority level configuration being referenced Required.",
+							Description: "name is the name of the priority level configuration being referenced Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -38159,7 +38159,7 @@ func schema_k8sio_api_flowcontrol_v1_PriorityLevelConfigurationSpec(ref common.R
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`type` indicates whether this priority level is subject to limitation on request execution.  A value of `\"Exempt\"` means that requests of this priority level are not subject to a limit (and thus are never queued) and do not detract from the capacity made available to other priority levels.  A value of `\"Limited\"` means that (a) requests of this priority level _are_ subject to limits and (b) some of the server's limited capacity is made available exclusively to this priority level. Required.",
+							Description: "type indicates whether this priority level is subject to limitation on request execution.  A value of `\"Exempt\"` means that requests of this priority level are not subject to a limit (and thus are never queued) and do not detract from the capacity made available to other priority levels.  A value of `\"Limited\"` means that (a) requests of this priority level _are_ subject to limits and (b) some of the server's limited capacity is made available exclusively to this priority level. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -38167,13 +38167,13 @@ func schema_k8sio_api_flowcontrol_v1_PriorityLevelConfigurationSpec(ref common.R
 					},
 					"limited": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`limited` specifies how requests are handled for a Limited priority level. This field must be non-empty if and only if `type` is `\"Limited\"`.",
+							Description: "limited specifies how requests are handled for a Limited priority level. This field must be non-empty if and only if type is `\"Limited\"`.",
 							Ref:         ref(flowcontrolv1.LimitedPriorityLevelConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"exempt": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`exempt` specifies how requests are handled for an exempt priority level. This field MUST be empty if `type` is `\"Limited\"`. This field MAY be non-empty if `type` is `\"Exempt\"`. If empty and `type` is `\"Exempt\"` then the default values for `ExemptPriorityLevelConfiguration` apply.",
+							Description: "exempt specifies how requests are handled for an exempt priority level. This field MUST be empty if `type` is `\"Limited\"`. This field MAY be non-empty if `type` is `\"Exempt\"`. If empty and `type` is `\"Exempt\"` then the default values for `ExemptPriorityLevelConfiguration` apply.",
 							Ref:         ref(flowcontrolv1.ExemptPriorityLevelConfiguration{}.OpenAPIModelName()),
 						},
 					},
@@ -38246,7 +38246,7 @@ func schema_k8sio_api_flowcontrol_v1_QueuingConfiguration(ref common.ReferenceCa
 				Properties: map[string]spec.Schema{
 					"queues": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`queues` is the number of queues for this priority level. The queues exist independently at each apiserver. The value must be positive.  Setting it to 1 effectively precludes shufflesharding and thus makes the distinguisher method of associated flow schemas irrelevant.  This field has a default value of 64.",
+							Description: "queues is the number of queues for this priority level. The queues exist independently at each apiserver. The value must be positive.  Setting it to 1 effectively precludes shufflesharding and thus makes the distinguisher method of associated flow schemas irrelevant.  This field has a default value of 64.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -38254,7 +38254,7 @@ func schema_k8sio_api_flowcontrol_v1_QueuingConfiguration(ref common.ReferenceCa
 					},
 					"handSize": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`handSize` is a small positive number that configures the shuffle sharding of requests into queues.  When enqueuing a request at this priority level the request's flow identifier (a string pair) is hashed and the hash value is used to shuffle the list of queues and deal a hand of the size specified here.  The request is put into one of the shortest queues in that hand. `handSize` must be no larger than `queues`, and should be significantly smaller (so that a few heavy flows do not saturate most of the queues).  See the user-facing documentation for more extensive guidance on setting this field.  This field has a default value of 8.",
+							Description: "handSize is a small positive number that configures the shuffle sharding of requests into queues.  When enqueuing a request at this priority level the request's flow identifier (a string pair) is hashed and the hash value is used to shuffle the list of queues and deal a hand of the size specified here.  The request is put into one of the shortest queues in that hand. `handSize` must be no larger than `queues`, and should be significantly smaller (so that a few heavy flows do not saturate most of the queues).  See the user-facing documentation for more extensive guidance on setting this field.  This field has a default value of 8.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -38262,7 +38262,7 @@ func schema_k8sio_api_flowcontrol_v1_QueuingConfiguration(ref common.ReferenceCa
 					},
 					"queueLengthLimit": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`queueLengthLimit` is the maximum number of requests allowed to be waiting in a given queue of this priority level at a time; excess requests are rejected.  This value must be positive.  If not specified, it will be defaulted to 50.",
+							Description: "queueLengthLimit is the maximum number of requests allowed to be waiting in a given queue of this priority level at a time; excess requests are rejected.  This value must be positive.  If not specified, it will be defaulted to 50.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -38288,7 +38288,7 @@ func schema_k8sio_api_flowcontrol_v1_ResourcePolicyRule(ref common.ReferenceCall
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`verbs` is a list of matching verbs and may not be empty. \"*\" matches all verbs and, if present, must be the only entry. Required.",
+							Description: "verbs is a list of matching verbs and may not be empty. \"*\" matches all verbs and, if present, must be the only entry. Required.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -38307,7 +38307,7 @@ func schema_k8sio_api_flowcontrol_v1_ResourcePolicyRule(ref common.ReferenceCall
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`apiGroups` is a list of matching API groups and may not be empty. \"*\" matches all API groups and, if present, must be the only entry. Required.",
+							Description: "apiGroups is a list of matching API groups and may not be empty. \"*\" matches all API groups and, if present, must be the only entry. Required.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -38326,7 +38326,7 @@ func schema_k8sio_api_flowcontrol_v1_ResourcePolicyRule(ref common.ReferenceCall
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`resources` is a list of matching resources (i.e., lowercase and plural) with, if desired, subresource.  For example, [ \"services\", \"nodes/status\" ].  This list may not be empty. \"*\" matches all resources and, if present, must be the only entry. Required.",
+							Description: "resources is a list of matching resources (i.e., lowercase and plural) with, if desired, subresource.  For example, [ \"services\", \"nodes/status\" ].  This list may not be empty. \"*\" matches all resources and, if present, must be the only entry. Required.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -38340,7 +38340,7 @@ func schema_k8sio_api_flowcontrol_v1_ResourcePolicyRule(ref common.ReferenceCall
 					},
 					"clusterScope": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`clusterScope` indicates whether to match requests that do not specify a namespace (which happens either because the resource is not namespaced or the request targets all namespaces). If this field is omitted or false then the `namespaces` field must contain a non-empty list.",
+							Description: "clusterScope indicates whether to match requests that do not specify a namespace (which happens either because the resource is not namespaced or the request targets all namespaces). If this field is omitted or false then the `namespaces` field must contain a non-empty list.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -38352,7 +38352,7 @@ func schema_k8sio_api_flowcontrol_v1_ResourcePolicyRule(ref common.ReferenceCall
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`namespaces` is a list of target namespaces that restricts matches.  A request that specifies a target namespace matches only if either (a) this list contains that target namespace or (b) this list contains \"*\".  Note that \"*\" matches any specified namespace but does not match a request that _does not specify_ a namespace (see the `clusterScope` field for that). This list may be empty, but only if `clusterScope` is true.",
+							Description: "namespaces is a list of target namespaces that restricts matches.  A request that specifies a target namespace matches only if either (a) this list contains that target namespace or (b) this list contains \"*\".  Note that \"*\" matches any specified namespace but does not match a request that _does not specify_ a namespace (see the `clusterScope` field for that). This list may be empty, but only if `clusterScope` is true.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -38380,7 +38380,7 @@ func schema_k8sio_api_flowcontrol_v1_ServiceAccountSubject(ref common.ReferenceC
 				Properties: map[string]spec.Schema{
 					"namespace": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`namespace` is the namespace of matching ServiceAccount objects. Required.",
+							Description: "namespace is the namespace of matching ServiceAccount objects. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -38388,7 +38388,7 @@ func schema_k8sio_api_flowcontrol_v1_ServiceAccountSubject(ref common.ReferenceC
 					},
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`name` is the name of matching ServiceAccount objects, or \"*\" to match regardless of name. Required.",
+							Description: "name is the name of matching ServiceAccount objects, or \"*\" to match regardless of name. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -38410,7 +38410,7 @@ func schema_k8sio_api_flowcontrol_v1_Subject(ref common.ReferenceCallback) commo
 				Properties: map[string]spec.Schema{
 					"kind": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`kind` indicates which one of the other fields is non-empty. Required",
+							Description: "kind indicates which one of the other fields is non-empty. Required",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -38418,19 +38418,19 @@ func schema_k8sio_api_flowcontrol_v1_Subject(ref common.ReferenceCallback) commo
 					},
 					"user": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`user` matches based on username.",
+							Description: "user matches based on username.",
 							Ref:         ref(flowcontrolv1.UserSubject{}.OpenAPIModelName()),
 						},
 					},
 					"group": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`group` matches based on user group name.",
+							Description: "group matches based on user group name.",
 							Ref:         ref(flowcontrolv1.GroupSubject{}.OpenAPIModelName()),
 						},
 					},
 					"serviceAccount": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`serviceAccount` matches ServiceAccounts.",
+							Description: "serviceAccount matches ServiceAccounts.",
 							Ref:         ref(flowcontrolv1.ServiceAccountSubject{}.OpenAPIModelName()),
 						},
 					},
@@ -38466,7 +38466,7 @@ func schema_k8sio_api_flowcontrol_v1_UserSubject(ref common.ReferenceCallback) c
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`name` is the username that matches, or \"*\" to match all usernames. Required.",
+							Description: "name is the username that matches, or \"*\" to match all usernames. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -38488,14 +38488,14 @@ func schema_k8sio_api_flowcontrol_v1beta1_ExemptPriorityLevelConfiguration(ref c
 				Properties: map[string]spec.Schema{
 					"nominalConcurrencyShares": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`nominalConcurrencyShares` (NCS) contributes to the computation of the NominalConcurrencyLimit (NominalCL) of this level. This is the number of execution seats nominally reserved for this priority level. This DOES NOT limit the dispatching from this priority level but affects the other priority levels through the borrowing mechanism. The server's concurrency limit (ServerCL) is divided among all the priority levels in proportion to their NCS values:\n\nNominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs ) sum_ncs = sum[priority level k] NCS(k)\n\nBigger numbers mean a larger nominal concurrency limit, at the expense of every other priority level. This field has a default value of zero.",
+							Description: "nominalConcurrencyShares (NCS) contributes to the computation of the NominalConcurrencyLimit (NominalCL) of this level. This is the number of execution seats nominally reserved for this priority level. This DOES NOT limit the dispatching from this priority level but affects the other priority levels through the borrowing mechanism. The server's concurrency limit (ServerCL) is divided among all the priority levels in proportion to their NCS values:\n\nNominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs ) sum_ncs = sum[priority level k] NCS(k)\n\nBigger numbers mean a larger nominal concurrency limit, at the expense of every other priority level. This field has a default value of zero.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"lendablePercent": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`lendablePercent` prescribes the fraction of the level's NominalCL that can be borrowed by other priority levels.  This value of this field must be between 0 and 100, inclusive, and it defaults to 0. The number of seats that other levels can borrow from this level, known as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.\n\nLendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )",
+							Description: "lendablePercent prescribes the fraction of the level's NominalCL that can be borrowed by other priority levels.  This value of this field must be between 0 and 100, inclusive, and it defaults to 0. The number of seats that other levels can borrow from this level, known as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.\n\nLendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -38515,7 +38515,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_FlowDistinguisherMethod(ref common.Ref
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`type` is the type of flow distinguisher method The supported types are \"ByUser\" and \"ByNamespace\". Required.",
+							Description: "type is the type of flow distinguisher method The supported types are \"ByUser\" and \"ByNamespace\". Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -38551,21 +38551,21 @@ func schema_k8sio_api_flowcontrol_v1beta1_FlowSchema(ref common.ReferenceCallbac
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`metadata` is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`spec` is the specification of the desired behavior of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "spec is the specification of the desired behavior of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref(flowcontrolv1beta1.FlowSchemaSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`status` is the current status of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "status is the current status of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref(flowcontrolv1beta1.FlowSchemaStatus{}.OpenAPIModelName()),
 						},
@@ -38588,34 +38588,34 @@ func schema_k8sio_api_flowcontrol_v1beta1_FlowSchemaCondition(ref common.Referen
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`type` is the type of the condition. Required.",
+							Description: "type is the type of the condition. Required.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`status` is the status of the condition. Should be specified and set to one of True, False, Unknown.",
+							Description: "status is the status of the condition. Should be specified and set to one of True, False, Unknown.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"lastTransitionTime": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`lastTransitionTime` is the last time the condition transitioned from one status to another.",
+							Description: "lastTransitionTime is the last time the condition transitioned from one status to another.",
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`reason` is a unique, one-word, CamelCase reason for the condition's last transition.",
+							Description: "reason is a unique, one-word, CamelCase reason for the condition's last transition.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"message": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`message` is a human-readable message indicating details about last transition.",
+							Description: "message is a human-readable message indicating details about last transition.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -38688,14 +38688,14 @@ func schema_k8sio_api_flowcontrol_v1beta1_FlowSchemaSpec(ref common.ReferenceCal
 				Properties: map[string]spec.Schema{
 					"priorityLevelConfiguration": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`priorityLevelConfiguration` should reference a PriorityLevelConfiguration in the cluster. If the reference cannot be resolved, the FlowSchema will be ignored and marked as invalid in its status. Required.",
+							Description: "priorityLevelConfiguration should reference a PriorityLevelConfiguration in the cluster. If the reference cannot be resolved, the FlowSchema will be ignored and marked as invalid in its status. Required.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(flowcontrolv1beta1.PriorityLevelConfigurationReference{}.OpenAPIModelName()),
 						},
 					},
 					"matchingPrecedence": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`matchingPrecedence` is used to choose among the FlowSchemas that match a given request. The chosen FlowSchema is among those with the numerically lowest (which we take to be logically highest) MatchingPrecedence.  Each MatchingPrecedence value must be ranged in [1,10000]. Note that if the precedence is not specified, it will be set to 1000 as default.",
+							Description: "matchingPrecedence is used to choose among the FlowSchemas that match a given request. The chosen FlowSchema is among those with the numerically lowest (which we take to be logically highest) MatchingPrecedence.  Each MatchingPrecedence value must be ranged in [1,10000]. Note that if the precedence is not specified, it will be set to 1000 as default.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -38703,7 +38703,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_FlowSchemaSpec(ref common.ReferenceCal
 					},
 					"distinguisherMethod": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`distinguisherMethod` defines how to compute the flow distinguisher for requests that match this schema. `nil` specifies that the distinguisher is disabled and thus will always be the empty string.",
+							Description: "distinguisherMethod defines how to compute the flow distinguisher for requests that match this schema. `nil` specifies that the distinguisher is disabled and thus will always be the empty string.",
 							Ref:         ref(flowcontrolv1beta1.FlowDistinguisherMethod{}.OpenAPIModelName()),
 						},
 					},
@@ -38714,7 +38714,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_FlowSchemaSpec(ref common.ReferenceCal
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`rules` describes which requests will match this flow schema. This FlowSchema matches a request if and only if at least one member of rules matches the request. if it is an empty slice, there will be no requests matching the FlowSchema.",
+							Description: "rules describes which requests will match this flow schema. This FlowSchema matches a request if and only if at least one member of rules matches the request. if it is an empty slice, there will be no requests matching the FlowSchema.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -38801,7 +38801,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_LimitResponse(ref common.ReferenceCall
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`type` is \"Queue\" or \"Reject\". \"Queue\" means that requests that can not be executed upon arrival are held in a queue until they can be executed or a queuing limit is reached. \"Reject\" means that requests that can not be executed upon arrival are rejected. Required.",
+							Description: "type is \"Queue\" or \"Reject\". \"Queue\" means that requests that can not be executed upon arrival are held in a queue until they can be executed or a queuing limit is reached. \"Reject\" means that requests that can not be executed upon arrival are rejected. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -38809,7 +38809,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_LimitResponse(ref common.ReferenceCall
 					},
 					"queuing": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`queuing` holds the configuration parameters for queuing. This field may be non-empty only if `type` is `\"Queue\"`.",
+							Description: "queuing holds the configuration parameters for queuing. This field may be non-empty only if type is \"Queue\".",
 							Ref:         ref(flowcontrolv1beta1.QueuingConfiguration{}.OpenAPIModelName()),
 						},
 					},
@@ -38843,7 +38843,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_LimitedPriorityLevelConfiguration(ref 
 				Properties: map[string]spec.Schema{
 					"assuredConcurrencyShares": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`assuredConcurrencyShares` (ACS) configures the execution limit, which is a limit on the number of requests of this priority level that may be executing at a given time.  ACS must be a positive number. The server's concurrency limit (SCL) is divided among the concurrency-controlled priority levels in proportion to their assured concurrency shares. This produces the assured concurrency value (ACV) --- the number of requests that may be executing at a time --- for each such priority level:\n\n            ACV(l) = ceil( SCL * ACS(l) / ( sum[priority levels k] ACS(k) ) )\n\nbigger numbers of ACS mean more reserved concurrent requests (at the expense of every other PL). This field has a default value of 30.",
+							Description: "assuredConcurrencyShares (ACS) configures the execution limit, which is a limit on the number of requests of this priority level that may be executing at a given time.  ACS must be a positive number. The server's concurrency limit (SCL) is divided among the concurrency-controlled priority levels in proportion to their assured concurrency shares. This produces the assured concurrency value (ACV) --- the number of requests that may be executing at a time --- for each such priority level:\n\n            ACV(l) = ceil( SCL * ACS(l) / ( sum[priority levels k] ACS(k) ) )\n\nbigger numbers of ACS mean more reserved concurrent requests (at the expense of every other PL). This field has a default value of 30.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -38851,21 +38851,21 @@ func schema_k8sio_api_flowcontrol_v1beta1_LimitedPriorityLevelConfiguration(ref 
 					},
 					"limitResponse": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`limitResponse` indicates what to do with requests that can not be executed right now",
+							Description: "limitResponse indicates what to do with requests that can not be executed right now",
 							Default:     map[string]interface{}{},
 							Ref:         ref(flowcontrolv1beta1.LimitResponse{}.OpenAPIModelName()),
 						},
 					},
 					"lendablePercent": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`lendablePercent` prescribes the fraction of the level's NominalCL that can be borrowed by other priority levels. The value of this field must be between 0 and 100, inclusive, and it defaults to 0. The number of seats that other levels can borrow from this level, known as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.\n\nLendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )",
+							Description: "lendablePercent prescribes the fraction of the level's NominalCL that can be borrowed by other priority levels. The value of this field must be between 0 and 100, inclusive, and it defaults to 0. The number of seats that other levels can borrow from this level, known as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.\n\nLendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"borrowingLimitPercent": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`borrowingLimitPercent`, if present, configures a limit on how many seats this priority level can borrow from other priority levels. The limit is known as this level's BorrowingConcurrencyLimit (BorrowingCL) and is a limit on the total number of seats that this level may borrow at any one time. This field holds the ratio of that limit to the level's nominal concurrency limit. When this field is non-nil, it must hold a non-negative integer and the limit is calculated as follows.\n\nBorrowingCL(i) = round( NominalCL(i) * borrowingLimitPercent(i)/100.0 )\n\nThe value of this field can be more than 100, implying that this priority level can borrow a number of seats that is greater than its own nominal concurrency limit (NominalCL). When this field is left `nil`, the limit is effectively infinite.",
+							Description: "borrowingLimitPercent configures a limit on how many seats this priority level can borrow from other priority levels, if present. The limit is known as this level's BorrowingConcurrencyLimit (BorrowingCL) and is a limit on the total number of seats that this level may borrow at any one time. This field holds the ratio of that limit to the level's nominal concurrency limit. When this field is non-nil, it must hold a non-negative integer and the limit is calculated as follows.\n\nBorrowingCL(i) = round( NominalCL(i) * borrowingLimitPercent(i)/100.0 )\n\nThe value of this field can be more than 100, implying that this priority level can borrow a number of seats that is greater than its own nominal concurrency limit (NominalCL). When this field is left `nil`, the limit is effectively infinite.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -38893,7 +38893,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_NonResourcePolicyRule(ref common.Refer
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`verbs` is a list of matching verbs and may not be empty. \"*\" matches all verbs. If it is present, it must be the only entry. Required.",
+							Description: "verbs is a list of matching verbs and may not be empty. \"*\" matches all verbs. If it is present, it must be the only entry. Required.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -38912,7 +38912,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_NonResourcePolicyRule(ref common.Refer
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`nonResourceURLs` is a set of url prefixes that a user should have access to and may not be empty. For example:\n  - \"/healthz\" is legal\n  - \"/hea*\" is illegal\n  - \"/hea\" is legal but matches nothing\n  - \"/hea/*\" also matches nothing\n  - \"/healthz/*\" matches all per-component health checks.\n\"*\" matches all non-resource urls. if it is present, it must be the only entry. Required.",
+							Description: "nonResourceURLs is a set of url prefixes that a user should have access to and may not be empty. For example:\n  - \"/healthz\" is legal\n  - \"/hea*\" is illegal\n  - \"/hea\" is legal but matches nothing\n  - \"/hea/*\" also matches nothing\n  - \"/healthz/*\" matches all per-component health checks.\n\"*\" matches all non-resource urls. if it is present, it must be the only entry. Required.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -38963,7 +38963,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_PolicyRulesWithSubjects(ref common.Ref
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`resourceRules` is a slice of ResourcePolicyRules that identify matching requests according to their verb and the target resource. At least one of `resourceRules` and `nonResourceRules` has to be non-empty.",
+							Description: "resourceRules is a slice of ResourcePolicyRules that identify matching requests according to their verb and the target resource. At least one of `resourceRules` and `nonResourceRules` has to be non-empty.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -38981,7 +38981,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_PolicyRulesWithSubjects(ref common.Ref
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`nonResourceRules` is a list of NonResourcePolicyRules that identify matching requests according to their verb and the target non-resource URL.",
+							Description: "nonResourceRules is a list of NonResourcePolicyRules that identify matching requests according to their verb and the target non-resource URL.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -39024,21 +39024,21 @@ func schema_k8sio_api_flowcontrol_v1beta1_PriorityLevelConfiguration(ref common.
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`metadata` is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`spec` is the specification of the desired behavior of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "spec is the specification of the desired behavior of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref(flowcontrolv1beta1.PriorityLevelConfigurationSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`status` is the current status of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "status is the current status of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref(flowcontrolv1beta1.PriorityLevelConfigurationStatus{}.OpenAPIModelName()),
 						},
@@ -39061,34 +39061,34 @@ func schema_k8sio_api_flowcontrol_v1beta1_PriorityLevelConfigurationCondition(re
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`type` is the type of the condition. Required.",
+							Description: "type is the type of the condition. Required.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`status` is the status of the condition. Should be specified and set to one of True, False, Unknown.",
+							Description: "status is the status of the condition. Should be specified and set to one of True, False, Unknown.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"lastTransitionTime": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`lastTransitionTime` is the last time the condition transitioned from one status to another.",
+							Description: "lastTransitionTime is the last time the condition transitioned from one status to another.",
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`reason` is a unique, one-word, CamelCase reason for the condition's last transition.",
+							Description: "reason is a unique, one-word, CamelCase reason for the condition's last transition.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"message": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`message` is a human-readable message indicating details about last transition.",
+							Description: "message is a human-readable message indicating details about last transition.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -39161,7 +39161,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_PriorityLevelConfigurationReference(re
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`name` is the name of the priority level configuration being referenced Required.",
+							Description: "name is the name of the priority level configuration being referenced Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -39183,7 +39183,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_PriorityLevelConfigurationSpec(ref com
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`type` indicates whether this priority level is subject to limitation on request execution.  A value of `\"Exempt\"` means that requests of this priority level are not subject to a limit (and thus are never queued) and do not detract from the capacity made available to other priority levels.  A value of `\"Limited\"` means that (a) requests of this priority level _are_ subject to limits and (b) some of the server's limited capacity is made available exclusively to this priority level. Required.",
+							Description: "type indicates whether this priority level is subject to limitation on request execution.  A value of `\"Exempt\"` means that requests of this priority level are not subject to a limit (and thus are never queued) and do not detract from the capacity made available to other priority levels.  A value of `\"Limited\"` means that (a) requests of this priority level _are_ subject to limits and (b) some of the server's limited capacity is made available exclusively to this priority level. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -39191,13 +39191,13 @@ func schema_k8sio_api_flowcontrol_v1beta1_PriorityLevelConfigurationSpec(ref com
 					},
 					"limited": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`limited` specifies how requests are handled for a Limited priority level. This field must be non-empty if and only if `type` is `\"Limited\"`.",
+							Description: "limited specifies how requests are handled for a Limited priority level. This field must be non-empty if and only if `type` is `\"Limited\"`.",
 							Ref:         ref(flowcontrolv1beta1.LimitedPriorityLevelConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"exempt": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`exempt` specifies how requests are handled for an exempt priority level. This field MUST be empty if `type` is `\"Limited\"`. This field MAY be non-empty if `type` is `\"Exempt\"`. If empty and `type` is `\"Exempt\"` then the default values for `ExemptPriorityLevelConfiguration` apply.",
+							Description: "exempt specifies how requests are handled for an exempt priority level. This field MUST be empty if `type` is `\"Limited\"`. This field MAY be non-empty if `type` is `\"Exempt\"`. If empty and `type` is `\"Exempt\"` then the default values for `ExemptPriorityLevelConfiguration` apply.",
 							Ref:         ref(flowcontrolv1beta1.ExemptPriorityLevelConfiguration{}.OpenAPIModelName()),
 						},
 					},
@@ -39268,7 +39268,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_QueuingConfiguration(ref common.Refere
 				Properties: map[string]spec.Schema{
 					"queues": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`queues` is the number of queues for this priority level. The queues exist independently at each apiserver. The value must be positive.  Setting it to 1 effectively precludes shufflesharding and thus makes the distinguisher method of associated flow schemas irrelevant.  This field has a default value of 64.",
+							Description: "queues is the number of queues for this priority level. The queues exist independently at each apiserver. The value must be positive.  Setting it to 1 effectively precludes shufflesharding and thus makes the distinguisher method of associated flow schemas irrelevant.  This field has a default value of 64.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -39276,7 +39276,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_QueuingConfiguration(ref common.Refere
 					},
 					"handSize": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`handSize` is a small positive number that configures the shuffle sharding of requests into queues.  When enqueuing a request at this priority level the request's flow identifier (a string pair) is hashed and the hash value is used to shuffle the list of queues and deal a hand of the size specified here.  The request is put into one of the shortest queues in that hand. `handSize` must be no larger than `queues`, and should be significantly smaller (so that a few heavy flows do not saturate most of the queues).  See the user-facing documentation for more extensive guidance on setting this field.  This field has a default value of 8.",
+							Description: "handSize is a small positive number that configures the shuffle sharding of requests into queues.  When enqueuing a request at this priority level the request's flow identifier (a string pair) is hashed and the hash value is used to shuffle the list of queues and deal a hand of the size specified here.  The request is put into one of the shortest queues in that hand. `handSize` must be no larger than `queues`, and should be significantly smaller (so that a few heavy flows do not saturate most of the queues).  See the user-facing documentation for more extensive guidance on setting this field.  This field has a default value of 8.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -39284,7 +39284,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_QueuingConfiguration(ref common.Refere
 					},
 					"queueLengthLimit": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`queueLengthLimit` is the maximum number of requests allowed to be waiting in a given queue of this priority level at a time; excess requests are rejected.  This value must be positive.  If not specified, it will be defaulted to 50.",
+							Description: "queueLengthLimit is the maximum number of requests allowed to be waiting in a given queue of this priority level at a time; excess requests are rejected.  This value must be positive.  If not specified, it will be defaulted to 50.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -39310,7 +39310,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_ResourcePolicyRule(ref common.Referenc
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`verbs` is a list of matching verbs and may not be empty. \"*\" matches all verbs and, if present, must be the only entry. Required.",
+							Description: "verbs is a list of matching verbs and may not be empty. \"*\" matches all verbs and, if present, must be the only entry. Required.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -39329,7 +39329,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_ResourcePolicyRule(ref common.Referenc
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`apiGroups` is a list of matching API groups and may not be empty. \"*\" matches all API groups and, if present, must be the only entry. Required.",
+							Description: "apiGroups is a list of matching API groups and may not be empty. \"*\" matches all API groups and, if present, must be the only entry. Required.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -39348,7 +39348,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_ResourcePolicyRule(ref common.Referenc
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`resources` is a list of matching resources (i.e., lowercase and plural) with, if desired, subresource.  For example, [ \"services\", \"nodes/status\" ].  This list may not be empty. \"*\" matches all resources and, if present, must be the only entry. Required.",
+							Description: "resources is a list of matching resources (i.e., lowercase and plural) with, if desired, subresource.  For example, [ \"services\", \"nodes/status\" ].  This list may not be empty. \"*\" matches all resources and, if present, must be the only entry. Required.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -39362,7 +39362,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_ResourcePolicyRule(ref common.Referenc
 					},
 					"clusterScope": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`clusterScope` indicates whether to match requests that do not specify a namespace (which happens either because the resource is not namespaced or the request targets all namespaces). If this field is omitted or false then the `namespaces` field must contain a non-empty list.",
+							Description: "clusterScope indicates whether to match requests that do not specify a namespace (which happens either because the resource is not namespaced or the request targets all namespaces). If this field is omitted or false then the `namespaces` field must contain a non-empty list.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -39374,7 +39374,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_ResourcePolicyRule(ref common.Referenc
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`namespaces` is a list of target namespaces that restricts matches.  A request that specifies a target namespace matches only if either (a) this list contains that target namespace or (b) this list contains \"*\".  Note that \"*\" matches any specified namespace but does not match a request that _does not specify_ a namespace (see the `clusterScope` field for that). This list may be empty, but only if `clusterScope` is true.",
+							Description: "namespaces is a list of target namespaces that restricts matches.  A request that specifies a target namespace matches only if either (a) this list contains that target namespace or (b) this list contains \"*\".  Note that \"*\" matches any specified namespace but does not match a request that _does not specify_ a namespace (see the `clusterScope` field for that). This list may be empty, but only if `clusterScope` is true.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -39402,7 +39402,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_ServiceAccountSubject(ref common.Refer
 				Properties: map[string]spec.Schema{
 					"namespace": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`namespace` is the namespace of matching ServiceAccount objects. Required.",
+							Description: "namespace is the namespace of matching ServiceAccount objects. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -39410,7 +39410,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_ServiceAccountSubject(ref common.Refer
 					},
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`name` is the name of matching ServiceAccount objects, or \"*\" to match regardless of name. Required.",
+							Description: "name is the name of matching ServiceAccount objects, or \"*\" to match regardless of name. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -39432,7 +39432,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_Subject(ref common.ReferenceCallback) 
 				Properties: map[string]spec.Schema{
 					"kind": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`kind` indicates which one of the other fields is non-empty. Required",
+							Description: "kind indicates which one of the other fields is non-empty. Required",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -39440,19 +39440,19 @@ func schema_k8sio_api_flowcontrol_v1beta1_Subject(ref common.ReferenceCallback) 
 					},
 					"user": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`user` matches based on username.",
+							Description: "user matches based on username.",
 							Ref:         ref(flowcontrolv1beta1.UserSubject{}.OpenAPIModelName()),
 						},
 					},
 					"group": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`group` matches based on user group name.",
+							Description: "group matches based on user group name.",
 							Ref:         ref(flowcontrolv1beta1.GroupSubject{}.OpenAPIModelName()),
 						},
 					},
 					"serviceAccount": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`serviceAccount` matches ServiceAccounts.",
+							Description: "serviceAccount matches ServiceAccounts.",
 							Ref:         ref(flowcontrolv1beta1.ServiceAccountSubject{}.OpenAPIModelName()),
 						},
 					},
@@ -39488,7 +39488,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_UserSubject(ref common.ReferenceCallba
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`name` is the username that matches, or \"*\" to match all usernames. Required.",
+							Description: "name is the username that matches, or \"*\" to match all usernames. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -39510,14 +39510,14 @@ func schema_k8sio_api_flowcontrol_v1beta2_ExemptPriorityLevelConfiguration(ref c
 				Properties: map[string]spec.Schema{
 					"nominalConcurrencyShares": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`nominalConcurrencyShares` (NCS) contributes to the computation of the NominalConcurrencyLimit (NominalCL) of this level. This is the number of execution seats nominally reserved for this priority level. This DOES NOT limit the dispatching from this priority level but affects the other priority levels through the borrowing mechanism. The server's concurrency limit (ServerCL) is divided among all the priority levels in proportion to their NCS values:\n\nNominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs ) sum_ncs = sum[priority level k] NCS(k)\n\nBigger numbers mean a larger nominal concurrency limit, at the expense of every other priority level. This field has a default value of zero.",
+							Description: "nominalConcurrencyShares (NCS) contributes to the computation of the NominalConcurrencyLimit (NominalCL) of this level. This is the number of execution seats nominally reserved for this priority level. This DOES NOT limit the dispatching from this priority level but affects the other priority levels through the borrowing mechanism. The server's concurrency limit (ServerCL) is divided among all the priority levels in proportion to their NCS values:\n\nNominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs ) sum_ncs = sum[priority level k] NCS(k)\n\nBigger numbers mean a larger nominal concurrency limit, at the expense of every other priority level. This field has a default value of zero.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"lendablePercent": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`lendablePercent` prescribes the fraction of the level's NominalCL that can be borrowed by other priority levels.  This value of this field must be between 0 and 100, inclusive, and it defaults to 0. The number of seats that other levels can borrow from this level, known as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.\n\nLendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )",
+							Description: "lendablePercent prescribes the fraction of the level's NominalCL that can be borrowed by other priority levels.  This value of this field must be between 0 and 100, inclusive, and it defaults to 0. The number of seats that other levels can borrow from this level, known as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.\n\nLendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -39537,7 +39537,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_FlowDistinguisherMethod(ref common.Ref
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`type` is the type of flow distinguisher method The supported types are \"ByUser\" and \"ByNamespace\". Required.",
+							Description: "type is the type of flow distinguisher method The supported types are \"ByUser\" and \"ByNamespace\". Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -39573,21 +39573,21 @@ func schema_k8sio_api_flowcontrol_v1beta2_FlowSchema(ref common.ReferenceCallbac
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`metadata` is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`spec` is the specification of the desired behavior of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "spec is the specification of the desired behavior of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref(flowcontrolv1beta2.FlowSchemaSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`status` is the current status of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "status is the current status of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref(flowcontrolv1beta2.FlowSchemaStatus{}.OpenAPIModelName()),
 						},
@@ -39610,34 +39610,34 @@ func schema_k8sio_api_flowcontrol_v1beta2_FlowSchemaCondition(ref common.Referen
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`type` is the type of the condition. Required.",
+							Description: "type is the type of the condition. Required.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`status` is the status of the condition. Should be specified and set to one of True, False, Unknown.",
+							Description: "status is the status of the condition. Should be specified and set to one of True, False, Unknown.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"lastTransitionTime": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`lastTransitionTime` is the last time the condition transitioned from one status to another.",
+							Description: "lastTransitionTime is the last time the condition transitioned from one status to another.",
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`reason` is a unique, one-word, CamelCase reason for the condition's last transition.",
+							Description: "reason is a unique, one-word, CamelCase reason for the condition's last transition.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"message": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`message` is a human-readable message indicating details about last transition.",
+							Description: "message is a human-readable message indicating details about last transition.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -39710,14 +39710,14 @@ func schema_k8sio_api_flowcontrol_v1beta2_FlowSchemaSpec(ref common.ReferenceCal
 				Properties: map[string]spec.Schema{
 					"priorityLevelConfiguration": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`priorityLevelConfiguration` should reference a PriorityLevelConfiguration in the cluster. If the reference cannot be resolved, the FlowSchema will be ignored and marked as invalid in its status. Required.",
+							Description: "priorityLevelConfiguration should reference a PriorityLevelConfiguration in the cluster. If the reference cannot be resolved, the FlowSchema will be ignored and marked as invalid in its status. Required.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(flowcontrolv1beta2.PriorityLevelConfigurationReference{}.OpenAPIModelName()),
 						},
 					},
 					"matchingPrecedence": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`matchingPrecedence` is used to choose among the FlowSchemas that match a given request. The chosen FlowSchema is among those with the numerically lowest (which we take to be logically highest) MatchingPrecedence.  Each MatchingPrecedence value must be ranged in [1,10000]. Note that if the precedence is not specified, it will be set to 1000 as default.",
+							Description: "matchingPrecedence is used to choose among the FlowSchemas that match a given request. The chosen FlowSchema is among those with the numerically lowest (which we take to be logically highest) MatchingPrecedence.  Each MatchingPrecedence value must be ranged in [1,10000]. Note that if the precedence is not specified, it will be set to 1000 as default.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -39725,7 +39725,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_FlowSchemaSpec(ref common.ReferenceCal
 					},
 					"distinguisherMethod": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`distinguisherMethod` defines how to compute the flow distinguisher for requests that match this schema. `nil` specifies that the distinguisher is disabled and thus will always be the empty string.",
+							Description: "distinguisherMethod defines how to compute the flow distinguisher for requests that match this schema. `nil` specifies that the distinguisher is disabled and thus will always be the empty string.",
 							Ref:         ref(flowcontrolv1beta2.FlowDistinguisherMethod{}.OpenAPIModelName()),
 						},
 					},
@@ -39736,7 +39736,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_FlowSchemaSpec(ref common.ReferenceCal
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`rules` describes which requests will match this flow schema. This FlowSchema matches a request if and only if at least one member of rules matches the request. if it is an empty slice, there will be no requests matching the FlowSchema.",
+							Description: "rules describes which requests will match this flow schema. This FlowSchema matches a request if and only if at least one member of rules matches the request. if it is an empty slice, there will be no requests matching the FlowSchema.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -39823,7 +39823,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_LimitResponse(ref common.ReferenceCall
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`type` is \"Queue\" or \"Reject\". \"Queue\" means that requests that can not be executed upon arrival are held in a queue until they can be executed or a queuing limit is reached. \"Reject\" means that requests that can not be executed upon arrival are rejected. Required.",
+							Description: "type is \"Queue\" or \"Reject\". \"Queue\" means that requests that can not be executed upon arrival are held in a queue until they can be executed or a queuing limit is reached. \"Reject\" means that requests that can not be executed upon arrival are rejected. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -39831,7 +39831,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_LimitResponse(ref common.ReferenceCall
 					},
 					"queuing": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`queuing` holds the configuration parameters for queuing. This field may be non-empty only if `type` is `\"Queue\"`.",
+							Description: "queuing holds the configuration parameters for queuing. This field may be non-empty only if `type` is `\"Queue\"`.",
 							Ref:         ref(flowcontrolv1beta2.QueuingConfiguration{}.OpenAPIModelName()),
 						},
 					},
@@ -39865,7 +39865,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_LimitedPriorityLevelConfiguration(ref 
 				Properties: map[string]spec.Schema{
 					"assuredConcurrencyShares": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`assuredConcurrencyShares` (ACS) configures the execution limit, which is a limit on the number of requests of this priority level that may be executing at a given time.  ACS must be a positive number. The server's concurrency limit (SCL) is divided among the concurrency-controlled priority levels in proportion to their assured concurrency shares. This produces the assured concurrency value (ACV) --- the number of requests that may be executing at a time --- for each such priority level:\n\n            ACV(l) = ceil( SCL * ACS(l) / ( sum[priority levels k] ACS(k) ) )\n\nbigger numbers of ACS mean more reserved concurrent requests (at the expense of every other PL). This field has a default value of 30.",
+							Description: "assuredConcurrencyShares (ACS) configures the execution limit, which is a limit on the number of requests of this priority level that may be executing at a given time.  ACS must be a positive number. The server's concurrency limit (SCL) is divided among the concurrency-controlled priority levels in proportion to their assured concurrency shares. This produces the assured concurrency value (ACV) --- the number of requests that may be executing at a time --- for each such priority level:\n\n            ACV(l) = ceil( SCL * ACS(l) / ( sum[priority levels k] ACS(k) ) )\n\nbigger numbers of ACS mean more reserved concurrent requests (at the expense of every other PL). This field has a default value of 30.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -39873,21 +39873,21 @@ func schema_k8sio_api_flowcontrol_v1beta2_LimitedPriorityLevelConfiguration(ref 
 					},
 					"limitResponse": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`limitResponse` indicates what to do with requests that can not be executed right now",
+							Description: "limitResponse indicates what to do with requests that can not be executed right now",
 							Default:     map[string]interface{}{},
 							Ref:         ref(flowcontrolv1beta2.LimitResponse{}.OpenAPIModelName()),
 						},
 					},
 					"lendablePercent": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`lendablePercent` prescribes the fraction of the level's NominalCL that can be borrowed by other priority levels. The value of this field must be between 0 and 100, inclusive, and it defaults to 0. The number of seats that other levels can borrow from this level, known as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.\n\nLendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )",
+							Description: "lendablePercent prescribes the fraction of the level's NominalCL that can be borrowed by other priority levels. The value of this field must be between 0 and 100, inclusive, and it defaults to 0. The number of seats that other levels can borrow from this level, known as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.\n\nLendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"borrowingLimitPercent": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`borrowingLimitPercent`, if present, configures a limit on how many seats this priority level can borrow from other priority levels. The limit is known as this level's BorrowingConcurrencyLimit (BorrowingCL) and is a limit on the total number of seats that this level may borrow at any one time. This field holds the ratio of that limit to the level's nominal concurrency limit. When this field is non-nil, it must hold a non-negative integer and the limit is calculated as follows.\n\nBorrowingCL(i) = round( NominalCL(i) * borrowingLimitPercent(i)/100.0 )\n\nThe value of this field can be more than 100, implying that this priority level can borrow a number of seats that is greater than its own nominal concurrency limit (NominalCL). When this field is left `nil`, the limit is effectively infinite.",
+							Description: "borrowingLimitPercent configures a limit on how many seats this priority level can borrow from other priority levels, if present. The limit is known as this level's BorrowingConcurrencyLimit (BorrowingCL) and is a limit on the total number of seats that this level may borrow at any one time. This field holds the ratio of that limit to the level's nominal concurrency limit. When this field is non-nil, it must hold a non-negative integer and the limit is calculated as follows.\n\nBorrowingCL(i) = round( NominalCL(i) * borrowingLimitPercent(i)/100.0 )\n\nThe value of this field can be more than 100, implying that this priority level can borrow a number of seats that is greater than its own nominal concurrency limit (NominalCL). When this field is left `nil`, the limit is effectively infinite.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -39915,7 +39915,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_NonResourcePolicyRule(ref common.Refer
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`verbs` is a list of matching verbs and may not be empty. \"*\" matches all verbs. If it is present, it must be the only entry. Required.",
+							Description: "verbs is a list of matching verbs and may not be empty. \"*\" matches all verbs. If it is present, it must be the only entry. Required.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -39934,7 +39934,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_NonResourcePolicyRule(ref common.Refer
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`nonResourceURLs` is a set of url prefixes that a user should have access to and may not be empty. For example:\n  - \"/healthz\" is legal\n  - \"/hea*\" is illegal\n  - \"/hea\" is legal but matches nothing\n  - \"/hea/*\" also matches nothing\n  - \"/healthz/*\" matches all per-component health checks.\n\"*\" matches all non-resource urls. if it is present, it must be the only entry. Required.",
+							Description: "nonResourceURLs is a set of url prefixes that a user should have access to and may not be empty. For example:\n  - \"/healthz\" is legal\n  - \"/hea*\" is illegal\n  - \"/hea\" is legal but matches nothing\n  - \"/hea/*\" also matches nothing\n  - \"/healthz/*\" matches all per-component health checks.\n\"*\" matches all non-resource urls. if it is present, it must be the only entry. Required.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -39985,7 +39985,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_PolicyRulesWithSubjects(ref common.Ref
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`resourceRules` is a slice of ResourcePolicyRules that identify matching requests according to their verb and the target resource. At least one of `resourceRules` and `nonResourceRules` has to be non-empty.",
+							Description: "resourceRules is a slice of ResourcePolicyRules that identify matching requests according to their verb and the target resource. At least one of `resourceRules` and `nonResourceRules` has to be non-empty.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -40003,7 +40003,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_PolicyRulesWithSubjects(ref common.Ref
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`nonResourceRules` is a list of NonResourcePolicyRules that identify matching requests according to their verb and the target non-resource URL.",
+							Description: "nonResourceRules is a list of NonResourcePolicyRules that identify matching requests according to their verb and the target non-resource URL.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -40046,21 +40046,21 @@ func schema_k8sio_api_flowcontrol_v1beta2_PriorityLevelConfiguration(ref common.
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`metadata` is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`spec` is the specification of the desired behavior of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "spec is the specification of the desired behavior of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref(flowcontrolv1beta2.PriorityLevelConfigurationSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`status` is the current status of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "status is the current status of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref(flowcontrolv1beta2.PriorityLevelConfigurationStatus{}.OpenAPIModelName()),
 						},
@@ -40083,34 +40083,34 @@ func schema_k8sio_api_flowcontrol_v1beta2_PriorityLevelConfigurationCondition(re
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`type` is the type of the condition. Required.",
+							Description: "type is the type of the condition. Required.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`status` is the status of the condition. Should be specified and set to one of True, False, Unknown.",
+							Description: "status is the status of the condition. Should be specified and set to one of True, False, Unknown.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"lastTransitionTime": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`lastTransitionTime` is the last time the condition transitioned from one status to another.",
+							Description: "lastTransitionTime is the last time the condition transitioned from one status to another.",
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`reason` is a unique, one-word, CamelCase reason for the condition's last transition.",
+							Description: "reason is a unique, one-word, CamelCase reason for the condition's last transition.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"message": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`message` is a human-readable message indicating details about last transition.",
+							Description: "message is a human-readable message indicating details about last transition.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -40183,7 +40183,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_PriorityLevelConfigurationReference(re
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`name` is the name of the priority level configuration being referenced Required.",
+							Description: "name is the name of the priority level configuration being referenced Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -40205,7 +40205,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_PriorityLevelConfigurationSpec(ref com
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`type` indicates whether this priority level is subject to limitation on request execution.  A value of `\"Exempt\"` means that requests of this priority level are not subject to a limit (and thus are never queued) and do not detract from the capacity made available to other priority levels.  A value of `\"Limited\"` means that (a) requests of this priority level _are_ subject to limits and (b) some of the server's limited capacity is made available exclusively to this priority level. Required.",
+							Description: "type indicates whether this priority level is subject to limitation on request execution.  A value of `\"Exempt\"` means that requests of this priority level are not subject to a limit (and thus are never queued) and do not detract from the capacity made available to other priority levels.  A value of `\"Limited\"` means that (a) requests of this priority level _are_ subject to limits and (b) some of the server's limited capacity is made available exclusively to this priority level. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -40213,13 +40213,13 @@ func schema_k8sio_api_flowcontrol_v1beta2_PriorityLevelConfigurationSpec(ref com
 					},
 					"limited": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`limited` specifies how requests are handled for a Limited priority level. This field must be non-empty if and only if `type` is `\"Limited\"`.",
+							Description: "limited specifies how requests are handled for a Limited priority level. This field must be non-empty if and only if type is `\"Limited\"`.",
 							Ref:         ref(flowcontrolv1beta2.LimitedPriorityLevelConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"exempt": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`exempt` specifies how requests are handled for an exempt priority level. This field MUST be empty if `type` is `\"Limited\"`. This field MAY be non-empty if `type` is `\"Exempt\"`. If empty and `type` is `\"Exempt\"` then the default values for `ExemptPriorityLevelConfiguration` apply.",
+							Description: "exempt specifies how requests are handled for an exempt priority level. This field MUST be empty if `type` is `\"Limited\"`. This field MAY be non-empty if `type` is `\"Exempt\"`. If empty and `type` is `\"Exempt\"` then the default values for `ExemptPriorityLevelConfiguration` apply.",
 							Ref:         ref(flowcontrolv1beta2.ExemptPriorityLevelConfiguration{}.OpenAPIModelName()),
 						},
 					},
@@ -40290,7 +40290,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_QueuingConfiguration(ref common.Refere
 				Properties: map[string]spec.Schema{
 					"queues": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`queues` is the number of queues for this priority level. The queues exist independently at each apiserver. The value must be positive.  Setting it to 1 effectively precludes shufflesharding and thus makes the distinguisher method of associated flow schemas irrelevant.  This field has a default value of 64.",
+							Description: "queues is the number of queues for this priority level. The queues exist independently at each apiserver. The value must be positive.  Setting it to 1 effectively precludes shufflesharding and thus makes the distinguisher method of associated flow schemas irrelevant.  This field has a default value of 64.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -40298,7 +40298,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_QueuingConfiguration(ref common.Refere
 					},
 					"handSize": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`handSize` is a small positive number that configures the shuffle sharding of requests into queues.  When enqueuing a request at this priority level the request's flow identifier (a string pair) is hashed and the hash value is used to shuffle the list of queues and deal a hand of the size specified here.  The request is put into one of the shortest queues in that hand. `handSize` must be no larger than `queues`, and should be significantly smaller (so that a few heavy flows do not saturate most of the queues).  See the user-facing documentation for more extensive guidance on setting this field.  This field has a default value of 8.",
+							Description: "handSize is a small positive number that configures the shuffle sharding of requests into queues.  When enqueuing a request at this priority level the request's flow identifier (a string pair) is hashed and the hash value is used to shuffle the list of queues and deal a hand of the size specified here.  The request is put into one of the shortest queues in that hand. `handSize` must be no larger than `queues`, and should be significantly smaller (so that a few heavy flows do not saturate most of the queues).  See the user-facing documentation for more extensive guidance on setting this field.  This field has a default value of 8.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -40306,7 +40306,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_QueuingConfiguration(ref common.Refere
 					},
 					"queueLengthLimit": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`queueLengthLimit` is the maximum number of requests allowed to be waiting in a given queue of this priority level at a time; excess requests are rejected.  This value must be positive.  If not specified, it will be defaulted to 50.",
+							Description: "queueLengthLimit is the maximum number of requests allowed to be waiting in a given queue of this priority level at a time; excess requests are rejected.  This value must be positive.  If not specified, it will be defaulted to 50.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -40332,7 +40332,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_ResourcePolicyRule(ref common.Referenc
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`verbs` is a list of matching verbs and may not be empty. \"*\" matches all verbs and, if present, must be the only entry. Required.",
+							Description: "verbs is a list of matching verbs and may not be empty. \"*\" matches all verbs and, if present, must be the only entry. Required.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -40351,7 +40351,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_ResourcePolicyRule(ref common.Referenc
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`apiGroups` is a list of matching API groups and may not be empty. \"*\" matches all API groups and, if present, must be the only entry. Required.",
+							Description: "apiGroups is a list of matching API groups and may not be empty. \"*\" matches all API groups and, if present, must be the only entry. Required.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -40370,7 +40370,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_ResourcePolicyRule(ref common.Referenc
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`resources` is a list of matching resources (i.e., lowercase and plural) with, if desired, subresource.  For example, [ \"services\", \"nodes/status\" ].  This list may not be empty. \"*\" matches all resources and, if present, must be the only entry. Required.",
+							Description: "resources is a list of matching resources (i.e., lowercase and plural) with, if desired, subresource.  For example, [ \"services\", \"nodes/status\" ].  This list may not be empty. \"*\" matches all resources and, if present, must be the only entry. Required.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -40384,7 +40384,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_ResourcePolicyRule(ref common.Referenc
 					},
 					"clusterScope": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`clusterScope` indicates whether to match requests that do not specify a namespace (which happens either because the resource is not namespaced or the request targets all namespaces). If this field is omitted or false then the `namespaces` field must contain a non-empty list.",
+							Description: "clusterScope indicates whether to match requests that do not specify a namespace (which happens either because the resource is not namespaced or the request targets all namespaces). If this field is omitted or false then the `namespaces` field must contain a non-empty list.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -40396,7 +40396,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_ResourcePolicyRule(ref common.Referenc
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`namespaces` is a list of target namespaces that restricts matches.  A request that specifies a target namespace matches only if either (a) this list contains that target namespace or (b) this list contains \"*\".  Note that \"*\" matches any specified namespace but does not match a request that _does not specify_ a namespace (see the `clusterScope` field for that). This list may be empty, but only if `clusterScope` is true.",
+							Description: "namespaces is a list of target namespaces that restricts matches.  A request that specifies a target namespace matches only if either (a) this list contains that target namespace or (b) this list contains \"*\".  Note that \"*\" matches any specified namespace but does not match a request that _does not specify_ a namespace (see the `clusterScope` field for that). This list may be empty, but only if `clusterScope` is true.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -40424,7 +40424,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_ServiceAccountSubject(ref common.Refer
 				Properties: map[string]spec.Schema{
 					"namespace": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`namespace` is the namespace of matching ServiceAccount objects. Required.",
+							Description: "namespace is the namespace of matching ServiceAccount objects. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -40432,7 +40432,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_ServiceAccountSubject(ref common.Refer
 					},
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`name` is the name of matching ServiceAccount objects, or \"*\" to match regardless of name. Required.",
+							Description: "name is the name of matching ServiceAccount objects, or \"*\" to match regardless of name. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -40454,7 +40454,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_Subject(ref common.ReferenceCallback) 
 				Properties: map[string]spec.Schema{
 					"kind": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`kind` indicates which one of the other fields is non-empty. Required",
+							Description: "kind indicates which one of the other fields is non-empty. Required",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -40462,19 +40462,19 @@ func schema_k8sio_api_flowcontrol_v1beta2_Subject(ref common.ReferenceCallback) 
 					},
 					"user": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`user` matches based on username.",
+							Description: "user matches based on username.",
 							Ref:         ref(flowcontrolv1beta2.UserSubject{}.OpenAPIModelName()),
 						},
 					},
 					"group": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`group` matches based on user group name.",
+							Description: "group matches based on user group name.",
 							Ref:         ref(flowcontrolv1beta2.GroupSubject{}.OpenAPIModelName()),
 						},
 					},
 					"serviceAccount": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`serviceAccount` matches ServiceAccounts.",
+							Description: "serviceAccount matches ServiceAccounts.",
 							Ref:         ref(flowcontrolv1beta2.ServiceAccountSubject{}.OpenAPIModelName()),
 						},
 					},
@@ -40510,7 +40510,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_UserSubject(ref common.ReferenceCallba
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`name` is the username that matches, or \"*\" to match all usernames. Required.",
+							Description: "name is the username that matches, or \"*\" to match all usernames. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -40532,14 +40532,14 @@ func schema_k8sio_api_flowcontrol_v1beta3_ExemptPriorityLevelConfiguration(ref c
 				Properties: map[string]spec.Schema{
 					"nominalConcurrencyShares": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`nominalConcurrencyShares` (NCS) contributes to the computation of the NominalConcurrencyLimit (NominalCL) of this level. This is the number of execution seats nominally reserved for this priority level. This DOES NOT limit the dispatching from this priority level but affects the other priority levels through the borrowing mechanism. The server's concurrency limit (ServerCL) is divided among all the priority levels in proportion to their NCS values:\n\nNominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs ) sum_ncs = sum[priority level k] NCS(k)\n\nBigger numbers mean a larger nominal concurrency limit, at the expense of every other priority level. This field has a default value of zero.",
+							Description: "nominalConcurrencyShares (NCS) contributes to the computation of the NominalConcurrencyLimit (NominalCL) of this level. This is the number of execution seats nominally reserved for this priority level. This DOES NOT limit the dispatching from this priority level but affects the other priority levels through the borrowing mechanism. The server's concurrency limit (ServerCL) is divided among all the priority levels in proportion to their NCS values:\n\nNominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs ) sum_ncs = sum[priority level k] NCS(k)\n\nBigger numbers mean a larger nominal concurrency limit, at the expense of every other priority level. This field has a default value of zero.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"lendablePercent": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`lendablePercent` prescribes the fraction of the level's NominalCL that can be borrowed by other priority levels.  This value of this field must be between 0 and 100, inclusive, and it defaults to 0. The number of seats that other levels can borrow from this level, known as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.\n\nLendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )",
+							Description: "lendablePercent prescribes the fraction of the level's NominalCL that can be borrowed by other priority levels.  This value of this field must be between 0 and 100, inclusive, and it defaults to 0. The number of seats that other levels can borrow from this level, known as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.\n\nLendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -40559,7 +40559,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_FlowDistinguisherMethod(ref common.Ref
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`type` is the type of flow distinguisher method The supported types are \"ByUser\" and \"ByNamespace\". Required.",
+							Description: "type is the type of flow distinguisher method The supported types are \"ByUser\" and \"ByNamespace\". Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -40595,21 +40595,21 @@ func schema_k8sio_api_flowcontrol_v1beta3_FlowSchema(ref common.ReferenceCallbac
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`metadata` is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`spec` is the specification of the desired behavior of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "spec is the specification of the desired behavior of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref(v1beta3.FlowSchemaSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`status` is the current status of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "status is the current status of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref(v1beta3.FlowSchemaStatus{}.OpenAPIModelName()),
 						},
@@ -40632,34 +40632,34 @@ func schema_k8sio_api_flowcontrol_v1beta3_FlowSchemaCondition(ref common.Referen
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`type` is the type of the condition. Required.",
+							Description: "type is the type of the condition. Required.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`status` is the status of the condition. Should be specified and set to one of True, False, Unknown.",
+							Description: "status is the status of the condition. Should be specified and set to one of True, False, Unknown.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"lastTransitionTime": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`lastTransitionTime` is the last time the condition transitioned from one status to another.",
+							Description: "lastTransitionTime is the last time the condition transitioned from one status to another.",
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`reason` is a unique, one-word, CamelCase reason for the condition's last transition.",
+							Description: "reason is a unique, one-word, CamelCase reason for the condition's last transition.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"message": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`message` is a human-readable message indicating details about last transition.",
+							Description: "message is a human-readable message indicating details about last transition.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -40732,14 +40732,14 @@ func schema_k8sio_api_flowcontrol_v1beta3_FlowSchemaSpec(ref common.ReferenceCal
 				Properties: map[string]spec.Schema{
 					"priorityLevelConfiguration": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`priorityLevelConfiguration` should reference a PriorityLevelConfiguration in the cluster. If the reference cannot be resolved, the FlowSchema will be ignored and marked as invalid in its status. Required.",
+							Description: "priorityLevelConfiguration should reference a PriorityLevelConfiguration in the cluster. If the reference cannot be resolved, the FlowSchema will be ignored and marked as invalid in its status. Required.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(v1beta3.PriorityLevelConfigurationReference{}.OpenAPIModelName()),
 						},
 					},
 					"matchingPrecedence": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`matchingPrecedence` is used to choose among the FlowSchemas that match a given request. The chosen FlowSchema is among those with the numerically lowest (which we take to be logically highest) MatchingPrecedence.  Each MatchingPrecedence value must be ranged in [1,10000]. Note that if the precedence is not specified, it will be set to 1000 as default.",
+							Description: "matchingPrecedence is used to choose among the FlowSchemas that match a given request. The chosen FlowSchema is among those with the numerically lowest (which we take to be logically highest) MatchingPrecedence.  Each MatchingPrecedence value must be ranged in [1,10000]. Note that if the precedence is not specified, it will be set to 1000 as default.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -40747,7 +40747,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_FlowSchemaSpec(ref common.ReferenceCal
 					},
 					"distinguisherMethod": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`distinguisherMethod` defines how to compute the flow distinguisher for requests that match this schema. `nil` specifies that the distinguisher is disabled and thus will always be the empty string.",
+							Description: "distinguisherMethod defines how to compute the flow distinguisher for requests that match this schema. `nil` specifies that the distinguisher is disabled and thus will always be the empty string.",
 							Ref:         ref(v1beta3.FlowDistinguisherMethod{}.OpenAPIModelName()),
 						},
 					},
@@ -40758,7 +40758,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_FlowSchemaSpec(ref common.ReferenceCal
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`rules` describes which requests will match this flow schema. This FlowSchema matches a request if and only if at least one member of rules matches the request. if it is an empty slice, there will be no requests matching the FlowSchema.",
+							Description: "rules describes which requests will match this flow schema. This FlowSchema matches a request if and only if at least one member of rules matches the request. if it is an empty slice, there will be no requests matching the FlowSchema.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -40847,7 +40847,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_LimitResponse(ref common.ReferenceCall
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`type` is \"Queue\" or \"Reject\". \"Queue\" means that requests that can not be executed upon arrival are held in a queue until they can be executed or a queuing limit is reached. \"Reject\" means that requests that can not be executed upon arrival are rejected. Required.",
+							Description: "type is \"Queue\" or \"Reject\". \"Queue\" means that requests that can not be executed upon arrival are held in a queue until they can be executed or a queuing limit is reached. \"Reject\" means that requests that can not be executed upon arrival are rejected. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -40855,7 +40855,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_LimitResponse(ref common.ReferenceCall
 					},
 					"queuing": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`queuing` holds the configuration parameters for queuing. This field may be non-empty only if `type` is `\"Queue\"`.",
+							Description: "queuing holds the configuration parameters for queuing. This field may be non-empty only if `type` is `\"Queue\"`.",
 							Ref:         ref(v1beta3.QueuingConfiguration{}.OpenAPIModelName()),
 						},
 					},
@@ -40889,7 +40889,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_LimitedPriorityLevelConfiguration(ref 
 				Properties: map[string]spec.Schema{
 					"nominalConcurrencyShares": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`nominalConcurrencyShares` (NCS) contributes to the computation of the NominalConcurrencyLimit (NominalCL) of this level. This is the number of execution seats available at this priority level. This is used both for requests dispatched from this priority level as well as requests dispatched from other priority levels borrowing seats from this level. The server's concurrency limit (ServerCL) is divided among the Limited priority levels in proportion to their NCS values:\n\nNominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs ) sum_ncs = sum[priority level k] NCS(k)\n\nBigger numbers mean a larger nominal concurrency limit, at the expense of every other priority level. This field has a default value of 30.",
+							Description: "nominalConcurrencyShares (NCS) contributes to the computation of the NominalConcurrencyLimit (NominalCL) of this level. This is the number of execution seats available at this priority level. This is used both for requests dispatched from this priority level as well as requests dispatched from other priority levels borrowing seats from this level. The server's concurrency limit (ServerCL) is divided among the Limited priority levels in proportion to their NCS values:\n\nNominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs ) sum_ncs = sum[priority level k] NCS(k)\n\nBigger numbers mean a larger nominal concurrency limit, at the expense of every other priority level. This field has a default value of 30.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -40897,21 +40897,21 @@ func schema_k8sio_api_flowcontrol_v1beta3_LimitedPriorityLevelConfiguration(ref 
 					},
 					"limitResponse": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`limitResponse` indicates what to do with requests that can not be executed right now",
+							Description: "limitResponse indicates what to do with requests that can not be executed right now",
 							Default:     map[string]interface{}{},
 							Ref:         ref(v1beta3.LimitResponse{}.OpenAPIModelName()),
 						},
 					},
 					"lendablePercent": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`lendablePercent` prescribes the fraction of the level's NominalCL that can be borrowed by other priority levels. The value of this field must be between 0 and 100, inclusive, and it defaults to 0. The number of seats that other levels can borrow from this level, known as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.\n\nLendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )",
+							Description: "lendablePercent prescribes the fraction of the level's NominalCL that can be borrowed by other priority levels. The value of this field must be between 0 and 100, inclusive, and it defaults to 0. The number of seats that other levels can borrow from this level, known as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.\n\nLendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"borrowingLimitPercent": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`borrowingLimitPercent`, if present, configures a limit on how many seats this priority level can borrow from other priority levels. The limit is known as this level's BorrowingConcurrencyLimit (BorrowingCL) and is a limit on the total number of seats that this level may borrow at any one time. This field holds the ratio of that limit to the level's nominal concurrency limit. When this field is non-nil, it must hold a non-negative integer and the limit is calculated as follows.\n\nBorrowingCL(i) = round( NominalCL(i) * borrowingLimitPercent(i)/100.0 )\n\nThe value of this field can be more than 100, implying that this priority level can borrow a number of seats that is greater than its own nominal concurrency limit (NominalCL). When this field is left `nil`, the limit is effectively infinite.",
+							Description: "borrowingLimitPercent configures a limit on how many seats this priority level can borrow from other priority levels, if present. The limit is known as this level's BorrowingConcurrencyLimit (BorrowingCL) and is a limit on the total number of seats that this level may borrow at any one time. This field holds the ratio of that limit to the level's nominal concurrency limit. When this field is non-nil, it must hold a non-negative integer and the limit is calculated as follows.\n\nBorrowingCL(i) = round( NominalCL(i) * borrowingLimitPercent(i)/100.0 )\n\nThe value of this field can be more than 100, implying that this priority level can borrow a number of seats that is greater than its own nominal concurrency limit (NominalCL). When this field is left `nil`, the limit is effectively infinite.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -40939,7 +40939,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_NonResourcePolicyRule(ref common.Refer
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`verbs` is a list of matching verbs and may not be empty. \"*\" matches all verbs. If it is present, it must be the only entry. Required.",
+							Description: "verbs is a list of matching verbs and may not be empty. \"*\" matches all verbs. If it is present, it must be the only entry. Required.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -40958,7 +40958,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_NonResourcePolicyRule(ref common.Refer
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`nonResourceURLs` is a set of url prefixes that a user should have access to and may not be empty. For example:\n  - \"/healthz\" is legal\n  - \"/hea*\" is illegal\n  - \"/hea\" is legal but matches nothing\n  - \"/hea/*\" also matches nothing\n  - \"/healthz/*\" matches all per-component health checks.\n\"*\" matches all non-resource urls. if it is present, it must be the only entry. Required.",
+							Description: "nonResourceURLs is a set of url prefixes that a user should have access to and may not be empty. For example:\n  - \"/healthz\" is legal\n  - \"/hea*\" is illegal\n  - \"/hea\" is legal but matches nothing\n  - \"/hea/*\" also matches nothing\n  - \"/healthz/*\" matches all per-component health checks.\n\"*\" matches all non-resource urls. if it is present, it must be the only entry. Required.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -41009,7 +41009,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_PolicyRulesWithSubjects(ref common.Ref
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`resourceRules` is a slice of ResourcePolicyRules that identify matching requests according to their verb and the target resource. At least one of `resourceRules` and `nonResourceRules` has to be non-empty.",
+							Description: "resourceRules is a slice of ResourcePolicyRules that identify matching requests according to their verb and the target resource. At least one of `resourceRules` and `nonResourceRules` has to be non-empty.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -41027,7 +41027,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_PolicyRulesWithSubjects(ref common.Ref
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`nonResourceRules` is a list of NonResourcePolicyRules that identify matching requests according to their verb and the target non-resource URL.",
+							Description: "nonResourceRules is a list of NonResourcePolicyRules that identify matching requests according to their verb and the target non-resource URL.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -41070,21 +41070,21 @@ func schema_k8sio_api_flowcontrol_v1beta3_PriorityLevelConfiguration(ref common.
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`metadata` is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`spec` is the specification of the desired behavior of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "spec is the specification of the desired behavior of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref(v1beta3.PriorityLevelConfigurationSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`status` is the current status of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "status is the current status of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref(v1beta3.PriorityLevelConfigurationStatus{}.OpenAPIModelName()),
 						},
@@ -41107,34 +41107,34 @@ func schema_k8sio_api_flowcontrol_v1beta3_PriorityLevelConfigurationCondition(re
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`type` is the type of the condition. Required.",
+							Description: "type is the type of the condition. Required.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`status` is the status of the condition. Should be specified and set to one of True, False, Unknown.",
+							Description: "status is the status of the condition. Should be specified and set to one of True, False, Unknown.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"lastTransitionTime": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`lastTransitionTime` is the last time the condition transitioned from one status to another.",
+							Description: "lastTransitionTime is the last time the condition transitioned from one status to another.",
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`reason` is a unique, one-word, CamelCase reason for the condition's last transition.",
+							Description: "reason is a unique, one-word, CamelCase reason for the condition's last transition.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"message": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`message` is a human-readable message indicating details about last transition.",
+							Description: "message is a human-readable message indicating details about last transition.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -41207,7 +41207,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_PriorityLevelConfigurationReference(re
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`name` is the name of the priority level configuration being referenced Required.",
+							Description: "name is the name of the priority level configuration being referenced Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -41229,7 +41229,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_PriorityLevelConfigurationSpec(ref com
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`type` indicates whether this priority level is subject to limitation on request execution.  A value of `\"Exempt\"` means that requests of this priority level are not subject to a limit (and thus are never queued) and do not detract from the capacity made available to other priority levels.  A value of `\"Limited\"` means that (a) requests of this priority level _are_ subject to limits and (b) some of the server's limited capacity is made available exclusively to this priority level. Required.",
+							Description: "type indicates whether this priority level is subject to limitation on request execution.  A value of `\"Exempt\"` means that requests of this priority level are not subject to a limit (and thus are never queued) and do not detract from the capacity made available to other priority levels.  A value of `\"Limited\"` means that (a) requests of this priority level _are_ subject to limits and (b) some of the server's limited capacity is made available exclusively to this priority level. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -41237,13 +41237,13 @@ func schema_k8sio_api_flowcontrol_v1beta3_PriorityLevelConfigurationSpec(ref com
 					},
 					"limited": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`limited` specifies how requests are handled for a Limited priority level. This field must be non-empty if and only if `type` is `\"Limited\"`.",
+							Description: "limited specifies how requests are handled for a Limited priority level. This field must be non-empty if and only if `type` is `\"Limited\"`.",
 							Ref:         ref(v1beta3.LimitedPriorityLevelConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"exempt": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`exempt` specifies how requests are handled for an exempt priority level. This field MUST be empty if `type` is `\"Limited\"`. This field MAY be non-empty if `type` is `\"Exempt\"`. If empty and `type` is `\"Exempt\"` then the default values for `ExemptPriorityLevelConfiguration` apply.",
+							Description: "exempt specifies how requests are handled for an exempt priority level. This field MUST be empty if `type` is `\"Limited\"`. This field MAY be non-empty if `type` is `\"Exempt\"`. If empty and `type` is `\"Exempt\"` then the default values for `ExemptPriorityLevelConfiguration` apply.",
 							Ref:         ref(v1beta3.ExemptPriorityLevelConfiguration{}.OpenAPIModelName()),
 						},
 					},
@@ -41316,7 +41316,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_QueuingConfiguration(ref common.Refere
 				Properties: map[string]spec.Schema{
 					"queues": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`queues` is the number of queues for this priority level. The queues exist independently at each apiserver. The value must be positive.  Setting it to 1 effectively precludes shufflesharding and thus makes the distinguisher method of associated flow schemas irrelevant.  This field has a default value of 64.",
+							Description: "queues is the number of queues for this priority level. The queues exist independently at each apiserver. The value must be positive.  Setting it to 1 effectively precludes shufflesharding and thus makes the distinguisher method of associated flow schemas irrelevant.  This field has a default value of 64.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -41324,7 +41324,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_QueuingConfiguration(ref common.Refere
 					},
 					"handSize": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`handSize` is a small positive number that configures the shuffle sharding of requests into queues.  When enqueuing a request at this priority level the request's flow identifier (a string pair) is hashed and the hash value is used to shuffle the list of queues and deal a hand of the size specified here.  The request is put into one of the shortest queues in that hand. `handSize` must be no larger than `queues`, and should be significantly smaller (so that a few heavy flows do not saturate most of the queues).  See the user-facing documentation for more extensive guidance on setting this field.  This field has a default value of 8.",
+							Description: "handSize is a small positive number that configures the shuffle sharding of requests into queues.  When enqueuing a request at this priority level the request's flow identifier (a string pair) is hashed and the hash value is used to shuffle the list of queues and deal a hand of the size specified here.  The request is put into one of the shortest queues in that hand. `handSize` must be no larger than `queues`, and should be significantly smaller (so that a few heavy flows do not saturate most of the queues).  See the user-facing documentation for more extensive guidance on setting this field.  This field has a default value of 8.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -41332,7 +41332,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_QueuingConfiguration(ref common.Refere
 					},
 					"queueLengthLimit": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`queueLengthLimit` is the maximum number of requests allowed to be waiting in a given queue of this priority level at a time; excess requests are rejected.  This value must be positive.  If not specified, it will be defaulted to 50.",
+							Description: "queueLengthLimit is the maximum number of requests allowed to be waiting in a given queue of this priority level at a time; excess requests are rejected.  This value must be positive.  If not specified, it will be defaulted to 50.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -41358,7 +41358,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_ResourcePolicyRule(ref common.Referenc
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`verbs` is a list of matching verbs and may not be empty. \"*\" matches all verbs and, if present, must be the only entry. Required.",
+							Description: "verbs is a list of matching verbs and may not be empty. \"*\" matches all verbs and, if present, must be the only entry. Required.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -41377,7 +41377,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_ResourcePolicyRule(ref common.Referenc
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`apiGroups` is a list of matching API groups and may not be empty. \"*\" matches all API groups and, if present, must be the only entry. Required.",
+							Description: "apiGroups is a list of matching API groups and may not be empty. \"*\" matches all API groups and, if present, must be the only entry. Required.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -41396,7 +41396,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_ResourcePolicyRule(ref common.Referenc
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`resources` is a list of matching resources (i.e., lowercase and plural) with, if desired, subresource.  For example, [ \"services\", \"nodes/status\" ].  This list may not be empty. \"*\" matches all resources and, if present, must be the only entry. Required.",
+							Description: "resources is a list of matching resources (i.e., lowercase and plural) with, if desired, subresource.  For example, [ \"services\", \"nodes/status\" ].  This list may not be empty. \"*\" matches all resources and, if present, must be the only entry. Required.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -41410,7 +41410,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_ResourcePolicyRule(ref common.Referenc
 					},
 					"clusterScope": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`clusterScope` indicates whether to match requests that do not specify a namespace (which happens either because the resource is not namespaced or the request targets all namespaces). If this field is omitted or false then the `namespaces` field must contain a non-empty list.",
+							Description: "clusterScope indicates whether to match requests that do not specify a namespace (which happens either because the resource is not namespaced or the request targets all namespaces). If this field is omitted or false then the `namespaces` field must contain a non-empty list.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -41422,7 +41422,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_ResourcePolicyRule(ref common.Referenc
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "`namespaces` is a list of target namespaces that restricts matches.  A request that specifies a target namespace matches only if either (a) this list contains that target namespace or (b) this list contains \"*\".  Note that \"*\" matches any specified namespace but does not match a request that _does not specify_ a namespace (see the `clusterScope` field for that). This list may be empty, but only if `clusterScope` is true.",
+							Description: "namespaces is a list of target namespaces that restricts matches.  A request that specifies a target namespace matches only if either (a) this list contains that target namespace or (b) this list contains \"*\".  Note that \"*\" matches any specified namespace but does not match a request that _does not specify_ a namespace (see the `clusterScope` field for that). This list may be empty, but only if `clusterScope` is true.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -41450,7 +41450,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_ServiceAccountSubject(ref common.Refer
 				Properties: map[string]spec.Schema{
 					"namespace": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`namespace` is the namespace of matching ServiceAccount objects. Required.",
+							Description: "namespace is the namespace of matching ServiceAccount objects. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -41458,7 +41458,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_ServiceAccountSubject(ref common.Refer
 					},
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`name` is the name of matching ServiceAccount objects, or \"*\" to match regardless of name. Required.",
+							Description: "name is the name of matching ServiceAccount objects, or \"*\" to match regardless of name. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -41480,7 +41480,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_Subject(ref common.ReferenceCallback) 
 				Properties: map[string]spec.Schema{
 					"kind": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`kind` indicates which one of the other fields is non-empty. Required",
+							Description: "kind indicates which one of the other fields is non-empty. Required",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -41488,19 +41488,19 @@ func schema_k8sio_api_flowcontrol_v1beta3_Subject(ref common.ReferenceCallback) 
 					},
 					"user": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`user` matches based on username.",
+							Description: "user matches based on username.",
 							Ref:         ref(v1beta3.UserSubject{}.OpenAPIModelName()),
 						},
 					},
 					"group": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`group` matches based on user group name.",
+							Description: "group matches based on user group name.",
 							Ref:         ref(v1beta3.GroupSubject{}.OpenAPIModelName()),
 						},
 					},
 					"serviceAccount": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`serviceAccount` matches ServiceAccounts.",
+							Description: "serviceAccount matches ServiceAccounts.",
 							Ref:         ref(v1beta3.ServiceAccountSubject{}.OpenAPIModelName()),
 						},
 					},
@@ -41536,7 +41536,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_UserSubject(ref common.ReferenceCallba
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "`name` is the username that matches, or \"*\" to match all usernames. Required.",
+							Description: "name is the username that matches, or \"*\" to match all usernames. Required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
