@@ -105,8 +105,7 @@ This is implemented as follows:
   - We install a `reject` rule for ClusterIPs matching `@cluster-ips` set and a `drop`
     rule for ClusterIPs belonging to any of the ServiceCIDRs in `forward` and `output` hook, with a 
     higher (i.e. less urgent) priority than the DNAT chains making sure all valid
-    traffic directed for ClusterIPs is already DNATed. Drop rule will only
-    be installed if `MultiCIDRServiceAllocator` feature is enabled.
+    traffic directed for ClusterIPs is already DNATed.
 
 ## Integrating with kube-proxy's nftables mode
 

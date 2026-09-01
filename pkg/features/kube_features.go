@@ -357,13 +357,6 @@ const (
 	// Deployments and replica sets can now also track terminating pods via .status.terminatingReplicas.
 	DeploymentReplicaSetTerminatingReplicas featuregate.Feature = "DeploymentReplicaSetTerminatingReplicas"
 
-	// owner: @aojea
-	//
-	// The apiservers with the MultiCIDRServiceAllocator feature enable, in order to support live migration from the old bitmap ClusterIP
-	// allocators to the new IPAddress allocators introduced by the MultiCIDRServiceAllocator feature, performs a dual-write on
-	// both allocators. This feature gate disables the dual write on the new Cluster IP allocators.
-	DisableAllocatorDualWrite featuregate.Feature = "DisableAllocatorDualWrite"
-
 	// owner: @ffromani
 	// beta: v1.33
 	//
@@ -738,12 +731,6 @@ const (
 	//
 	// Enables kubelet to support memory QoS with cgroups v2.
 	MemoryQoS featuregate.Feature = "MemoryQoS"
-
-	// owner: @aojea
-	// kep: https://kep.k8s.io/1880
-	//
-	// Enables the dynamic configuration of Service IP ranges
-	MultiCIDRServiceAllocator featuregate.Feature = "MultiCIDRServiceAllocator"
 
 	// owner: torredil
 	// kep: https://kep.k8s.io/4876
@@ -1549,13 +1536,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	DisableAllocatorDualWrite: {
-		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA},
-		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove after MultiCIDRServiceAllocator is GA
-	},
-
 	DisableCPUQuotaWithExclusiveCPUs: {
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Deprecated},
@@ -1839,13 +1819,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	MemoryQoS: {
 		{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
-	},
-
-	MultiCIDRServiceAllocator: {
-		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA},
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37 (locked to default in 1.34)
 	},
 
 	MutableCSINodeAllocatableCount: {
@@ -2612,8 +2585,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	DeploymentReplicaSetTerminatingReplicas: {},
 
-	DisableAllocatorDualWrite: {MultiCIDRServiceAllocator},
-
 	DisableCPUQuotaWithExclusiveCPUs: {},
 
 	DisableNodeKubeProxyVersion: {},
@@ -2725,8 +2696,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	MaxUnavailableStatefulSet: {},
 
 	MemoryQoS: {},
-
-	MultiCIDRServiceAllocator: {},
 
 	MutableCSINodeAllocatableCount: {},
 
