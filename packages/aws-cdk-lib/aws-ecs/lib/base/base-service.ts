@@ -1015,7 +1015,7 @@ export abstract class BaseService extends Resource
 
     if (!props.circuitBreaker && this.isEcsDeploymentController) {
       // If we *could* use a circuit breaker, then let's recommend users to do so. It makes detecting errors sooo much faster.
-      Annotations.of(this).addWarningV2('@aws-cdk/aws-ecs:shouldUseCircuitBreaker', 'Enable the \'circuitBreaker\' property to trigger a quicker deployment failure if tasks are failing to come start (without this setting deployments may take up to 3 hours to fail).');
+      Annotations.of(this).addWarningV2('@aws-cdk/aws-ecs:shouldUseCircuitBreaker', 'Enable the \'circuitBreaker\' property to trigger a quicker deployment failure if tasks are failing to start up (without this setting deployments may take up to 3 hours to fail).');
     }
 
     if (props.deploymentAlarms && !this.isEcsDeploymentController) {
