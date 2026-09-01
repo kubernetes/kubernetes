@@ -6230,24 +6230,6 @@ func TestPreQueueingHint(t *testing.T) {
 			},
 			wantKeys: sets.New[string](), // no pod in indexer
 		},
-		"shared claim returns nil": {
-			newObj: &resourceapi.ResourceClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "shared-claim",
-					Namespace: "ns1",
-				},
-			},
-			wantKeys: sets.New[string](), // no pod in indexer
-		},
-		"claim with no matching pods returns empty set": {
-			newObj: &resourceapi.ResourceClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "claim-2",
-					Namespace: "ns1",
-				},
-			},
-			wantKeys: sets.New[string](), // no pod in indexer
-		},
 		"delete event uses oldObj": {
 			oldObj: &resourceapi.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
@@ -6298,8 +6280,8 @@ func TestPreQueueingHint(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			logger := klog.Background()
-			pl := &DynamicResources{podIndexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{podResourceClaimIndexPrefix + "-test": podResourceClaimIndexFunc}), podResourceClaimIndex: podResourceClaimIndexPrefix + "-test"}
+			logger := ktesting.Init(t).Logger()
+			pl := &DynamicResources{podIndexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{podResourceClaimIndex: podResourceClaimIndexFunc})}
 			got, err := pl.preQueueingHint(logger, tc.oldObj, tc.newObj)
 			if err != nil {
 				t.Fatalf("preQueueingHint returned unexpected error: %v", err)
@@ -6332,8 +6314,8 @@ func TestPreQueueingHint(t *testing.T) {
 func TestPreQueueingHint_WithPodInIndexer(t *testing.T) {
 	// Verify that when a pod referencing a claim exists in the indexer,
 	// preQueueingHint returns that pod's key.
-	logger := klog.Background()
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{podResourceClaimIndexPrefix + "-test": podResourceClaimIndexFunc})
+	logger := ktesting.Init(t).Logger()
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{podResourceClaimIndex: podResourceClaimIndexFunc})
 
 	// Add a pod that references "claim-x" in namespace "ns1".
 	pod := &v1.Pod{
@@ -6348,7 +6330,7 @@ func TestPreQueueingHint_WithPodInIndexer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pl := &DynamicResources{podIndexer: indexer, podResourceClaimIndex: podResourceClaimIndexPrefix + "-test"}
+	pl := &DynamicResources{podIndexer: indexer}
 
 	got, err := pl.preQueueingHint(logger, nil, &resourceapi.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: "claim-x", Namespace: "ns1"},
@@ -6367,8 +6349,8 @@ func TestPreQueueingHint_WithPodInIndexer(t *testing.T) {
 func TestPreQueueingHint_SharedClaimMultiplePods(t *testing.T) {
 	// Verify that for a shared claim referenced by multiple pods,
 	// preQueueingHint returns all referencing pods.
-	logger := klog.Background()
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{podResourceClaimIndexPrefix + "-test": podResourceClaimIndexFunc})
+	logger := ktesting.Init(t).Logger()
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{podResourceClaimIndex: podResourceClaimIndexFunc})
 
 	// Add multiple pods referencing the same shared claim.
 	for _, name := range []string{"pod-a", "pod-b", "pod-c"} {
@@ -6385,7 +6367,7 @@ func TestPreQueueingHint_SharedClaimMultiplePods(t *testing.T) {
 		}
 	}
 
-	pl := &DynamicResources{podIndexer: indexer, podResourceClaimIndex: podResourceClaimIndexPrefix + "-test"}
+	pl := &DynamicResources{podIndexer: indexer}
 
 	got, err := pl.preQueueingHint(logger, nil, &resourceapi.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: "shared-claim", Namespace: "ns1"},
@@ -6398,5 +6380,98 @@ func TestPreQueueingHint_SharedClaimMultiplePods(t *testing.T) {
 	}
 	if len(got.Pods) != 3 {
 		t.Errorf("expected 3 pods, got %d: %v", len(got.Pods), got.Pods)
+	}
+}
+
+// TestPreQueueingHint_DuplicateClaimRefs verifies that when a pod references the
+// same claim more than once, podResourceClaimIndexFunc returns duplicate keys (it
+// intentionally does not de-duplicate), yet the indexer and preQueueingHint still
+// return the pod exactly once.
+func TestPreQueueingHint_DuplicateClaimRefs(t *testing.T) {
+	logger := ktesting.Init(t).Logger()
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{podResourceClaimIndex: podResourceClaimIndexFunc})
+
+	// Two pod claims referencing the same shared ResourceClaim.
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-pod", Namespace: "ns1"},
+		Spec: v1.PodSpec{
+			ResourceClaims: []v1.PodResourceClaim{
+				{Name: "a", ResourceClaimName: new("shared-claim")},
+				{Name: "b", ResourceClaimName: new("shared-claim")},
+			},
+		},
+	}
+	if err := indexer.Add(pod); err != nil {
+		t.Fatal(err)
+	}
+
+	// The index function returns duplicate keys (de-dup intentionally removed).
+	keys, err := podResourceClaimIndexFunc(pod)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(keys) != 2 {
+		t.Errorf("expected 2 (duplicate) index keys, got %v", keys)
+	}
+
+	pl := &DynamicResources{podIndexer: indexer}
+	got, err := pl.preQueueingHint(logger, nil, &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "shared-claim", Namespace: "ns1"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.AllPods {
+		t.Fatal("expected AllPods=false, got true")
+	}
+	// Despite the duplicate index keys, the pod is returned exactly once.
+	if len(got.Pods) != 1 || got.Pods[0].Name != "my-pod" || got.Pods[0].Namespace != "ns1" {
+		t.Errorf("expected exactly [{my-pod ns1}], got %v", got.Pods)
+	}
+}
+
+// TestNew_PodResourceClaimIndex verifies that New adds the pod-by-claim index
+// and registers preQueueingHint only with SchedulerPreQueueingHints, and that
+// profiles sharing the pod informer share a single index.
+func TestNew_PodResourceClaimIndex(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("SchedulerPreQueueingHints=%v", enabled), func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(), 0)
+			podIndexer := informerFactory.Core().V1().Pods().Informer().GetIndexer()
+			indexersBefore := len(podIndexer.GetIndexers())
+			fts := feature.Features{EnableSchedulerPreQueueingHints: enabled}
+
+			for _, profile := range []string{"profile-1", "profile-2"} {
+				fh, err := runtime.NewFramework(tCtx, nil, &config.KubeSchedulerProfile{SchedulerName: profile}, runtime.WithInformerFactory(informerFactory))
+				tCtx.ExpectNoError(err, "create scheduler framework")
+				tCtx.Cleanup(func() { runtime.WaitForShutdown(fh) })
+				pl, err := New(tCtx, &config.DynamicResourcesArgs{}, fh, fts)
+				tCtx.ExpectNoError(err, "create plugin for %s", profile)
+
+				// Every profile needs the shared index, not just the one that added it.
+				if hasIndexer := pl.(*DynamicResources).podIndexer != nil; hasIndexer != enabled {
+					t.Errorf("%s: podIndexer set = %v, want %v", profile, hasIndexer, enabled)
+				}
+				events, err := pl.(*DynamicResources).EventsToRegister(tCtx)
+				tCtx.ExpectNoError(err, "EventsToRegister")
+				for _, event := range events {
+					if event.Event.Resource == fwk.ResourceClaim && (event.PreQueueingHintFn != nil) != enabled {
+						t.Errorf("%s: ResourceClaim PreQueueingHintFn registered = %v, want %v", profile, event.PreQueueingHintFn != nil, enabled)
+					}
+				}
+			}
+
+			wantIndexers := indexersBefore
+			if enabled {
+				wantIndexers++
+			}
+			if got := len(podIndexer.GetIndexers()); got != wantIndexers {
+				t.Errorf("pod informer has %d indexers, want %d", got, wantIndexers)
+			}
+			if _, exists := podIndexer.GetIndexers()[podResourceClaimIndex]; exists != enabled {
+				t.Errorf("%s index exists = %v, want %v", podResourceClaimIndex, exists, enabled)
+			}
+		})
 	}
 }
