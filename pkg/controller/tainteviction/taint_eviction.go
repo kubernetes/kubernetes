@@ -538,7 +538,7 @@ func (tc *Controller) processPodEvictionRetry(ctx context.Context, item podEvict
 		}
 		if deleted {
 			metrics.PodDeletionsTotal.Inc()
-			metrics.PodDeletionsLatency.Observe(float64(time.Since(item.fireAt) * time.Second))
+			metrics.PodDeletionsLatency.Observe(time.Since(item.fireAt).Seconds())
 		}
 		tc.forgetPodEvictionRetry(item)
 		return nil
