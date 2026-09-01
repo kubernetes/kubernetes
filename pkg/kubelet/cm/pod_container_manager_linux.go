@@ -81,7 +81,7 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 	alreadyExists := m.Exists(pod)
 	if !alreadyExists {
 		enforceCPULimits := m.enforceCPULimits
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DisableCPUQuotaWithExclusiveCPUs) && m.podContainerManager.PodHasExclusiveCPUs(logger, pod) {
+		if m.podContainerManager.PodHasExclusiveCPUs(logger, pod) {
 			logger.V(2).Info("Disabled CFS quota", "pod", klog.KObj(pod))
 			enforceCPULimits = false
 		}
