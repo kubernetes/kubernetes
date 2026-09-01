@@ -17,18 +17,61 @@ limitations under the License.
 package validation
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"k8s.io/utils/ptr"
 )
+
+func TestValidateCustomObjectMetaResourceVersion(t *testing.T) {
+	fldPath := field.NewPath("metadata")
+	tests := []struct {
+		name     string
+		op       operation.Type
+		value    *metav1.ObjectMeta
+		oldValue *metav1.ObjectMeta
+		want     field.ErrorList
+	}{
+		{
+			name:  "create with empty resourceVersion",
+			op:    operation.Create,
+			value: &metav1.ObjectMeta{},
+		},
+		{
+			name:     "update with resourceVersion",
+			op:       operation.Update,
+			value:    &metav1.ObjectMeta{ResourceVersion: "2"},
+			oldValue: &metav1.ObjectMeta{ResourceVersion: "1"},
+		},
+		{
+			name:     "update clears resourceVersion",
+			op:       operation.Update,
+			value:    &metav1.ObjectMeta{},
+			oldValue: &metav1.ObjectMeta{ResourceVersion: "1"},
+			want: field.ErrorList{
+				field.Invalid(fldPath.Child("resourceVersion"), "", "must be specified for an update").WithOrigin("update"),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := ValidateCustom_ObjectMeta(context.Background(), operation.Operation{Type: test.op}, fldPath, test.value, test.oldValue)
+			if diff := cmp.Diff(test.want, got); diff != "" {
+				t.Errorf("unexpected errors (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
 
 func TestValidateLabels(t *testing.T) {
 	successCases := []map[string]string{

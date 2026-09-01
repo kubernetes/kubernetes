@@ -278,6 +278,11 @@ func Validate_ObjectMeta(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *v1.ObjectMeta) (errs field.ErrorList) {
 
+	// custom validation
+	if e := ValidateCustom_ObjectMeta(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
 	// field v1.ObjectMeta.Name has no validation
 	// field v1.ObjectMeta.GenerateName has no validation
 	// field v1.ObjectMeta.Namespace has no validation
