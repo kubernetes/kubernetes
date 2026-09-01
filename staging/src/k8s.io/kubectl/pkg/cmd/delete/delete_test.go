@@ -24,15 +24,22 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
+	fakedynamic "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/rest/fake"
+	clienttesting "k8s.io/client-go/testing"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -299,6 +306,75 @@ func TestDeleteObject(t *testing.T) {
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
+	if buf.String() != "replicationcontroller/redis-master\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+// TestDeleteObjectWaitForbidden verifies the end to end behaviour of the fix for
+// kubernetes/kubectl#1411: a caller allowed to delete a resource but not to list
+// or watch it must see delete succeed rather than hang. The wait cannot confirm
+// the removal, but the deletion itself was accepted.
+func TestDeleteObjectWaitForbidden(t *testing.T) {
+	cmdtesting.InitTestErrorHandler(t)
+	_, _, rc := cmdtesting.TestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	gvr := schema.GroupVersionResource{Version: "v1", Resource: "replicationcontrollers"}
+	forbidden := errors.NewForbidden(gvr.GroupResource(), "redis-master",
+		fmt.Errorf("not allowed to list replicationcontrollers"))
+
+	fakeDynamic := fakedynamic.NewSimpleDynamicClientWithCustomListKinds(
+		scheme.Scheme, map[schema.GroupVersionResource]string{gvr: "ReplicationControllerList"})
+	// The object is still present, as it would be while graceful deletion or a
+	// finalizer is in progress, so the wait has something to wait for.
+	fakeDynamic.PrependReactor("get", "replicationcontrollers", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		return true, &unstructured.Unstructured{Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "ReplicationController",
+			"metadata":   map[string]interface{}{"namespace": "test", "name": "redis-master"},
+		}}, nil
+	})
+	fakeDynamic.PrependReactor("list", "replicationcontrollers", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		return true, nil, forbidden
+	})
+	fakeDynamic.PrependWatchReactor("replicationcontrollers", func(action clienttesting.Action) (bool, watch.Interface, error) {
+		return true, nil, forbidden
+	})
+	tf.FakeDynamicClient = fakeDynamic
+
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdDelete(tf, streams)
+	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
+	cmd.Flags().Set("cascade", "false")
+	cmd.Flags().Set("output", "name")
+	cmd.Flags().Set("wait", "true")
+
+	start := time.Now()
+	cmd.Run(cmd, []string{})
+	elapsed := time.Since(start)
+
+	// Without the fix the wait retries the denied list until the timeout, which
+	// delete sets to a week when --timeout is not given.
+	if elapsed > 30*time.Second {
+		t.Fatalf("expected delete to return promptly, took %v", elapsed)
+	}
 	if buf.String() != "replicationcontroller/redis-master\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
