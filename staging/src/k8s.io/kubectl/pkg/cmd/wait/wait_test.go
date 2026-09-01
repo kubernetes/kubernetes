@@ -17,6 +17,7 @@ limitations under the License.
 package wait
 
 import (
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -612,6 +613,58 @@ func TestWaitForDeletion(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestWaitForDeletionForbidden verifies that a caller allowed to delete an object
+// but not to list or watch it gets the forbidden error back promptly. The reflector
+// backing the wait treats list and watch failures as retryable, so without explicit
+// handling this retries until the timeout, which kubectl delete sets to a week.
+func TestWaitForDeletionForbidden(t *testing.T) {
+	scheme := runtime.NewScheme()
+	listMapping := map[schema.GroupVersionResource]string{
+		{Group: "group", Version: "version", Resource: "theresource"}: "TheKindList",
+	}
+	forbidden := apierrors.NewForbidden(
+		schema.GroupResource{Group: "group", Resource: "theresource"}, "name-foo",
+		fmt.Errorf("not allowed to list theresource"))
+
+	fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+	fakeClient.PrependReactor("get", "theresource", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		return true, newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"), nil
+	})
+	fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		return true, nil, forbidden
+	})
+	fakeClient.PrependWatchReactor("theresource", func(action clienttesting.Action) (bool, watch.Interface, error) {
+		return true, nil, forbidden
+	})
+
+	o := &WaitOptions{
+		ResourceFinder: genericclioptions.NewSimpleFakeResourceFinder(&resource.Info{
+			Mapping: &meta.RESTMapping{
+				Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource"},
+			},
+			Name:      "name-foo",
+			Namespace: "ns-foo",
+		}),
+		DynamicClient: fakeClient,
+		Timeout:       time.Hour,
+
+		Printer:     printers.NewDiscardingPrinter(),
+		ConditionFn: []ConditionFunc{IsDeleted},
+		IOStreams:   genericiooptions.NewTestIOStreamsDiscard(),
+	}
+
+	start := time.Now()
+	err := o.RunWaitContext(t.Context())
+	elapsed := time.Since(start)
+
+	if !apierrors.IsForbidden(err) {
+		t.Fatalf("expected a forbidden error, got %v", err)
+	}
+	if elapsed > 30*time.Second {
+		t.Fatalf("expected to return without waiting for the timeout, took %v", elapsed)
 	}
 }
 
