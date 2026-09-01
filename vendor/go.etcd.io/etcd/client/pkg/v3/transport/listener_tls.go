@@ -23,6 +23,12 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
+)
+
+const (
+	// tlsHandshakeTimeout bounds how long a single TLS handshake may block.
+	tlsHandshakeTimeout = 10 * time.Second
 )
 
 // tlsListener overrides a TLS listener so it will reject client
@@ -143,6 +149,7 @@ func (l *tlsListener) acceptLoop() {
 			}()
 
 			tlsConn := conn.(*tls.Conn)
+			_ = tlsConn.SetDeadline(time.Now().Add(tlsHandshakeTimeout))
 			herr := tlsConn.Handshake()
 			pendingMu.Lock()
 			delete(pending, conn)
@@ -152,6 +159,7 @@ func (l *tlsListener) acceptLoop() {
 				l.handshakeFailure(tlsConn, herr)
 				return
 			}
+			_ = tlsConn.SetDeadline(time.Time{})
 			if err := l.check(ctx, tlsConn); err != nil {
 				l.handshakeFailure(tlsConn, err)
 				return

@@ -216,6 +216,10 @@ type channel struct {
 	// packetPool has a buffer for each extended channel ID to
 	// save allocations during writes.
 	packetPool map[uint32][]byte
+
+	// closeOnce guards close so it is idempotent: closing the internal Go
+	// channels (msg, incomingRequests) more than once would panic.
+	closeOnce sync.Once
 }
 
 // writePacket sends a packet. If the packet is a channel close, it updates
@@ -340,7 +344,18 @@ func (ch *channel) handleData(packet []byte) error {
 	if extended == 1 {
 		ch.extPending.write(data)
 	} else if extended > 0 {
-		// discard other extended data.
+		// RFC 4254, Section 5.2 defines no extended data types other
+		// than stderr (type 1, handled above) and this package provides
+		// no API to read them, so the data is discarded. Credit its
+		// window back immediately: it can never be read, so the
+		// deduction above would otherwise shrink the window permanently.
+		// adjustWindow returns io.EOF if the local side has already
+		// sent a channel close; ignore it like ReadExtended does, since
+		// an error returned here would terminate the mux read loop and
+		// tear down the whole connection.
+		if err := ch.adjustWindow(length); err != nil && err != io.EOF {
+			return err
+		}
 	} else {
 		ch.pending.write(data)
 	}
@@ -393,17 +408,19 @@ func (c *channel) ReadExtended(data []byte, extended uint32) (n int, err error) 
 }
 
 func (c *channel) close() {
-	c.pending.eof()
-	c.extPending.eof()
-	close(c.msg)
-	close(c.incomingRequests)
-	c.writeMu.Lock()
-	// This is not necessary for a normal channel teardown, but if
-	// there was another error, it is.
-	c.sentClose = true
-	c.writeMu.Unlock()
-	// Unblock writers.
-	c.remoteWin.close()
+	c.closeOnce.Do(func() {
+		c.pending.eof()
+		c.extPending.eof()
+		close(c.msg)
+		close(c.incomingRequests)
+		c.writeMu.Lock()
+		// This is not necessary for a normal channel teardown, but if
+		// there was another error, it is.
+		c.sentClose = true
+		c.writeMu.Unlock()
+		// Unblock writers.
+		c.remoteWin.close()
+	})
 }
 
 // responseMessageReceived is called when a success or failure message is
@@ -493,19 +510,20 @@ func (ch *channel) handlePacket(packet []byte) error {
 
 func (m *mux) newChannel(chanType string, direction channelDirection, extraData []byte) *channel {
 	ch := &channel{
-		remoteWin:        window{Cond: newCond()},
-		myWindow:         channelWindowSize,
-		pending:          newBuffer(),
-		extPending:       newBuffer(),
-		direction:        direction,
-		incomingRequests: make(chan *Request, chanSize),
-		msg:              make(chan interface{}, chanSize),
-		chanType:         chanType,
-		extraData:        extraData,
-		mux:              m,
-		packetPool:       make(map[uint32][]byte),
+		remoteWin:          window{Cond: newCond()},
+		myWindow:           channelWindowSize,
+		maxIncomingPayload: channelMaxPacket,
+		pending:            newBuffer(),
+		extPending:         newBuffer(),
+		direction:          direction,
+		incomingRequests:   make(chan *Request, chanSize),
+		msg:                make(chan interface{}, chanSize),
+		chanType:           chanType,
+		extraData:          extraData,
+		mux:                m,
+		packetPool:         make(map[uint32][]byte),
 	}
-	ch.localId = m.chanList.add(ch)
+	m.chanList.add(ch)
 	return ch
 }
 
@@ -529,7 +547,6 @@ func (ch *channel) Accept() (Channel, <-chan *Request, error) {
 	if ch.decided {
 		return nil, nil, errDecidedAlready
 	}
-	ch.maxIncomingPayload = channelMaxPacket
 	confirm := channelOpenConfirmMsg{
 		PeersID:       ch.remoteId,
 		MyID:          ch.localId,
