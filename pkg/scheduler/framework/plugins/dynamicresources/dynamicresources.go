@@ -287,7 +287,7 @@ func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]fwk.ClusterEv
 		// Allocation is tracked in ResourceClaims, so any changes may make the pods schedulable.
 		{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Add | fwk.Update | fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterClaimChange, PreQueueingHintFn: pl.preQueueingHint},
 		// Adding the ResourceClaim name to the pod status makes pods waiting for their ResourceClaim schedulable.
-		{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodGeneratedResourceClaim}, QueueingHintFn: pl.isSchedulableAfterTargetPodUpdate},
+		{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodGeneratedResourceClaim}, QueueingHintFn: pl.isSchedulableAfterTargetPodUpdate, PreQueueingHintFn: pl.preQueueingHintForPodUpdate},
 		// A pod might be waiting for a class to get created or modified.
 		{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.Add | fwk.Update}},
 		// Adding or updating a ResourceSlice might make a pod schedulable because new resources became available.
@@ -316,6 +316,8 @@ func (pl *DynamicResources) PreEnqueue(ctx context.Context, pod *v1.Pod) (status
 func podResourceClaimIndexFunc(obj interface{}) ([]string, error) {
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
+		// An index function that returns an error panics the informer, so we
+		// tolerate an unexpected object type by indexing it under no keys.
 		return nil, nil
 	}
 	keySet := sets.New[string]()
@@ -357,6 +359,8 @@ func (pl *DynamicResources) preQueueingHint(logger klog.Logger, oldObj, newObj i
 	}
 	claim, ok := obj.(*resourceapi.ResourceClaim)
 	if !ok {
+		// Unexpected object type: we can't identify the affected pods, so
+		// conservatively evaluate all of them rather than returning an error.
 		return fwk.PreQueueingHintResult{AllPods: true}, nil
 	}
 	objs, err := pl.podIndexer.ByIndex(pl.podResourceClaimIndex, claim.Namespace+"/"+claim.Name)
@@ -365,11 +369,24 @@ func (pl *DynamicResources) preQueueingHint(logger klog.Logger, oldObj, newObj i
 	}
 	pods := make([]types.NamespacedName, 0, len(objs))
 	for _, obj := range objs {
+		// The indexer only ever stores *v1.Pod, so the cast always succeeds;
+		// the check is defensive.
 		if pod, ok := obj.(*v1.Pod); ok {
 			pods = append(pods, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace})
 		}
 	}
 	return fwk.PreQueueingHintResult{Pods: pods}, nil
+}
+
+func (pl *DynamicResources) preQueueingHintForPodUpdate(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
+	_, modifiedPod, err := schedutil.As[*v1.Pod](oldObj, newObj)
+	if err != nil {
+		// Shouldn't happen; conservatively evaluate all pods.
+		return fwk.PreQueueingHintResult{AllPods: true}, nil
+	}
+
+	return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{
+		{Namespace: modifiedPod.Namespace, Name: modifiedPod.Name}}}, nil
 }
 
 // isSchedulableAfterClaimChange is invoked for add and update claim events reported by
@@ -479,6 +496,11 @@ func (pl *DynamicResources) isSchedulableAfterTargetPodUpdate(logger klog.Logger
 	if err != nil {
 		// Shouldn't happen.
 		return fwk.Queue, fmt.Errorf("unexpected object in isSchedulableAfterTargetPodUpdate: %w", err)
+	}
+
+	// A pod's status update should only unblock the same pod.
+	if pod.UID != modifiedPod.UID {
+		return fwk.QueueSkip, nil
 	}
 
 	if err := pl.foreachPodResourceClaim(modifiedPod, nil); err != nil {
