@@ -201,8 +201,8 @@ type ClusterEventWithHint struct {
 	// the scheduling of Pods will be always retried with backoff when this Event happens.
 	// (the same as Queue)
 	QueueingHintFn QueueingHintFn
-	// PreQueueingHintFn is called once per event to narrow the set of pods to evaluate with QueueingHint.
-	// If set, only pods identified in the returned PreQueueingHintResult are checked.
+	// PreQueueingHintFn, if set, can narrow the unschedulable pods this plugin's
+	// QueueingHintFn is evaluated for when Event happens.
 	PreQueueingHintFn PreQueueingHintFn
 }
 
@@ -220,18 +220,22 @@ type ClusterEventWithHint struct {
 type QueueingHintFn func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (QueueingHint, error)
 
 // PreQueueingHintResult is the return value of PreQueueingHintFn.
-// When AllPods is true, all unschedulable pods are evaluated (existing behavior).
-// When AllPods is false, only pods listed in Pods are evaluated.
+// If AllPods is true, the plugin is not narrowed for the event. Otherwise, of the
+// unschedulable pods the plugin rejected, its QueueingHintFn is evaluated only for
+// those listed in Pods.
 type PreQueueingHintResult struct {
 	AllPods bool
 	Pods    []types.NamespacedName
 }
 
-// PreQueueingHintFn is called once per event before iterating unschedulable pods.
-// PreQueueingHintFn will not be called when the deleted object is unknown (both oldObj and newObj are nil).
-// It returns a PreQueueingHintResult indicating which pods should be evaluated
-// by QueueingHintFn for this event. If it returns an error, the error is logged
-// and the result is treated as AllPods (all unschedulable pods are evaluated).
+// PreQueueingHintFn returns the pods for which the plugin's QueueingHintFn should
+// be evaluated when an event occurs. It is called before QueueingHintFn for each
+// matching registration, unless both oldObj and newObj are nil.
+//
+// Results are merged by plugin name across registrations and profiles. If any
+// matching registration of a plugin returns AllPods, returns an error, or omits
+// PreQueueingHintFn, that plugin evaluates all pods it rejected while other
+// plugins keep their narrowing.
 //
 // - oldObj is the old object in update events, or the deleted object in delete events.
 // - newObj is the new/added object. It is nil for delete events.
