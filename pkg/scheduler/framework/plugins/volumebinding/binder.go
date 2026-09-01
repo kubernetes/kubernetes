@@ -430,7 +430,7 @@ func (b *volumeBinder) AssumePodVolumes(logger klog.Logger, assumedPod *v1.Pod, 
 			b.revertAssumedPVs(newBindings)
 			return false, err
 		}
-		// TODO: can we assume every time?
+		// TODO: can we assume every time? See https://github.com/kubernetes/kubernetes/issues/115473 for tracking.
 		if dirty {
 			err = b.pvCache.Assume(newPV)
 			if err != nil {
