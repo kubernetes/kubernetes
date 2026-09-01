@@ -141,7 +141,7 @@ func (tc *Controller) deletePodHandler() func(ctx context.Context, fireAt time.T
 			if err == nil {
 				if deleted {
 					metrics.PodDeletionsTotal.Inc()
-					metrics.PodDeletionsLatency.Observe(float64(time.Since(fireAt) * time.Second))
+					metrics.PodDeletionsLatency.Observe(time.Since(fireAt).Seconds())
 				}
 				return nil
 			}
@@ -538,7 +538,7 @@ func (tc *Controller) processPodEvictionRetry(ctx context.Context, item podEvict
 		}
 		if deleted {
 			metrics.PodDeletionsTotal.Inc()
-			metrics.PodDeletionsLatency.Observe(float64(time.Since(item.fireAt) * time.Second))
+			metrics.PodDeletionsLatency.Observe(time.Since(item.fireAt).Seconds())
 		}
 		tc.forgetPodEvictionRetry(item)
 		return nil
