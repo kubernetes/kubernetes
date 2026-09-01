@@ -27,6 +27,7 @@ import (
 	"bytes"
 
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	"k8s.io/kube-openapi/pkg/cached"
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
@@ -626,7 +627,7 @@ func buildAndRegisterSpecAggregator(delegationHandlers []http.Handler, mux commo
 			},
 		},
 	}
-	s := buildAndRegisterSpecAggregatorForLocalServices(&downloader, aggregatorSpec, delegationHandlers, mux)
+	s := buildAndRegisterSpecAggregatorForLocalServices(&downloader, cached.Static(aggregatorSpec, "never-changes"), delegationHandlers, mux)
 	return s
 }
 
