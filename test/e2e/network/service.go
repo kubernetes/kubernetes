@@ -3949,8 +3949,9 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 
 		checkOneHealthCheck := func(nodeIP string, expectResponse bool, expectStatus string, deadline time.Time) {
-			// "-i" means to return the HTTP headers in the response
-			cmd := fmt.Sprintf("curl -g -i -s --connect-timeout 3 http://%s/", net.JoinHostPort(nodeIP, hcNodePortStr))
+			// "-i" means to return the HTTP headers in the response. We request /healthz because that is the path
+			// the ESIPP design specifies for healthCheckNodePort, and the one the rest of the suite already uses.
+			cmd := fmt.Sprintf("curl -g -i -s --connect-timeout 3 http://%s/healthz", net.JoinHostPort(nodeIP, hcNodePortStr))
 			err := wait.PollUntilContextTimeout(ctx, framework.Poll, time.Until(deadline), true, func(ctx context.Context) (bool, error) {
 				out, err := e2eoutput.RunHostCmd(namespace, execPod.Name, cmd)
 				if !expectResponse {
