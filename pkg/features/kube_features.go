@@ -639,11 +639,6 @@ const (
 	// kep: https://kep.k8s.io/4205
 	KubeletPSI featuregate.Feature = "KubeletPSI"
 
-	// owner: @moshe010
-	//
-	// Enable POD resources API with Get method
-	KubeletPodResourcesGet featuregate.Feature = "KubeletPodResourcesGet"
-
 	// owner: @ffromani
 	// Deprecated: v1.34
 	//
@@ -1755,12 +1750,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
-	KubeletPodResourcesGet: {
-		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37
-	},
-
 	KubeletPodResourcesListUseActivePods: {
 		{Version: version.MustParse("1.0"), Default: false, PreRelease: featuregate.GA},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Deprecated}, // lock to default in 1.38, remove in 1.39
@@ -2674,8 +2663,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	KubeletInUserNamespace: {},
 
 	KubeletPSI: {},
-
-	KubeletPodResourcesGet: {},
 
 	KubeletPodResourcesListUseActivePods: {},
 
