@@ -117,10 +117,15 @@ func (n *numaFirst) takeFullSecondLevel() {
 // Sort the UncoreCaches within the NUMA nodes.
 func (a *cpuAccumulator) sortAvailableUncoreCaches() []int {
 	var result []int
+	added := cpuset.New()
+
 	for _, numa := range a.sortAvailableNUMANodes() {
-		uncore := a.details.UncoreInNUMANodes(numa).UnsortedList()
-		a.sort(uncore, a.details.CPUsInUncoreCaches)
-		result = append(result, uncore...)
+		uncore := a.details.UncoreInNUMANodes(numa)
+		// UncoreCache can span NUMA nodes, so skip already added
+		uncoreIDs := uncore.Difference(added).UnsortedList()
+		added = added.Union(uncore)
+		a.sort(uncoreIDs, a.details.CPUsInUncoreCaches)
+		result = append(result, uncoreIDs...)
 	}
 	return result
 }
