@@ -431,3 +431,14 @@ func ValidateCustom_Condition_LastTransitionTime(ctx context.Context, op operati
 	}
 	return nil
 }
+
+// ValidateCustom_ObjectMeta enforces ResourceVersion on updates without optional-field short-circuiting.
+func ValidateCustom_ObjectMeta(_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *metav1.ObjectMeta) field.ErrorList {
+	if op.Type != operation.Update || value == nil || value.ResourceVersion != "" {
+		return nil
+	}
+
+	return field.ErrorList{
+		field.Invalid(fldPath.Child("resourceVersion"), value.ResourceVersion, "must be specified for an update").WithOrigin("update"),
+	}
+}
