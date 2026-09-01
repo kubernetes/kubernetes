@@ -1709,12 +1709,14 @@ func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(logger klog.Logger, event 
 //
 // NOTE: this function assumes lock has been acquired in caller
 func (p *PriorityQueue) collectEntitiesToEvaluate(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck) ([]framework.QueuedEntityInfo, *preQueueingHintPodKeys) {
-	// Run PreQueueingHintFns to narrow the pod set.
-	hintKeys := p.runPreQueueingHintPlugins(logger, event, oldObj, newObj)
 
-	// TODO: Add PreQueueingHint support for CompositePodGroup entities.
-	// Until then, skip narrowing when CPG is enabled to avoid missing CPG entities.
-	if !p.isCompositePodGroupEnabled && hintKeys != nil {
+	var hintKeys *preQueueingHintPodKeys
+	// TODO: implement preQueueingHint for CPG
+	if !p.isCompositePodGroupEnabled {
+		hintKeys = p.runPreQueueingHintPlugins(logger, event, oldObj, newObj)
+	}
+
+	if hintKeys != nil && !hintKeys.evaluateAllPods {
 		logger.V(5).Info("PreQueueingHint narrowed pod set", "candidates", hintKeys.candidatePods.Len(), "total", len(p.unschedulableEntities.entityInfoMap))
 		// Directly look up entities for pods identified by PreQueueingHint.
 		entities := make([]framework.QueuedEntityInfo, 0, hintKeys.candidatePods.Len())
@@ -1733,11 +1735,12 @@ func (p *PriorityQueue) collectEntitiesToEvaluate(logger klog.Logger, event fwk.
 			if p.isGenericWorkloadEnabled {
 				pod, err := p.podLister.Pods(nn.Namespace).Get(nn.Name)
 				if err != nil {
-					logger.V(5).Info("Failed to get pod for PodGroup lookup", "pod", nn, "err", err)
+					utilruntime.HandleErrorWithLogger(logger, err, "Failed to get pod for PodGroup lookup", "pod", nn)
 				} else if pod.Spec.SchedulingGroup != nil && pod.Spec.SchedulingGroup.PodGroupName != nil {
 					entityKey = fwk.PodGroupKey(nn.Namespace, *pod.Spec.SchedulingGroup.PodGroupName).String()
 					if entity, exists := p.unschedulableEntities.entityInfoMap[entityKey]; exists && !seen[entityKey] {
 						seen[entityKey] = true
+
 						if preCheck == nil || preCheck(entity) {
 							entities = append(entities, entity)
 						}
@@ -1755,7 +1758,7 @@ func (p *PriorityQueue) collectEntitiesToEvaluate(logger klog.Logger, event fwk.
 			entities = append(entities, entity)
 		}
 	}
-	return entities, nil
+	return entities, hintKeys
 }
 
 // MoveAllToActiveOrBackoffQueue moves all pods from unschedulableEntities to activeQ or backoffQ.
@@ -2133,10 +2136,12 @@ func podGroupKeyForPod(pod *v1.Pod) fwk.EntityKey {
 type preQueueingHintPodKeys struct {
 	candidatePods sets.Set[types.NamespacedName]
 	perPlugin     map[string]sets.Set[types.NamespacedName]
+	// evaluateAllPods indicates at least one plugin wants to evaluate all pods
+	evaluateAllPods bool
 }
 
 // runPreQueueingHintPlugins runs all registered PreQueueingHintFns for the given event
-// and returns a narrowed set of pod keys to evaluate, or nil if all pods should be evaluated.
+// and returns a narrowed set of pod keys to evaluate.
 //
 // NOTE: this function assumes lock has been acquired in caller
 func (p *PriorityQueue) runPreQueueingHintPlugins(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}) *preQueueingHintPodKeys {
@@ -2159,19 +2164,28 @@ func (p *PriorityQueue) runPreQueueingHintPlugins(logger klog.Logger, event fwk.
 			}
 			for _, hintfn := range hintfns {
 				if hintfn.PreQueueingHintFn == nil {
+					// if current plugin doesn't register PreQueueingHints, we will treat it as AllPods
+					p.metricsRecorder.ObserveCounterAsync(metrics.PreQueueingHintEvaluations, 1, hintfn.PluginName, metrics.PreQueueingHintResultNoPreQFn)
+					result.evaluateAllPods = true
 					continue
 				}
 				hintResult, err := hintfn.PreQueueingHintFn(logger, oldObj, newObj)
 				if err != nil {
-					logger.Error(err, "PreQueueingHintFn failed, falling back to evaluate all pods", "plugin", hintfn.PluginName)
-					return nil
+					// we will set evaluateAllPods to true but still continue to evaluate other fns
+					// because we can still skip pods for other plugins
+					utilruntime.HandleErrorWithLogger(logger, err, "PreQueueingHintFn failed, falling back to evaluate all pods", "plugin", hintfn.PluginName)
+					p.metricsRecorder.ObserveCounterAsync(metrics.PreQueueingHintEvaluations, 1, hintfn.PluginName, metrics.PreQueueingHintResultPreQFnError)
+					result.evaluateAllPods = true
+					continue
 				}
 				if hintResult.AllPods {
 					// This plugin wants all pods evaluated; we cannot narrow.
-					p.metricsRecorder.ObserveCounterAsync(metrics.PreQueueingHintEvaluations, 1, hintfn.PluginName, "all_pods")
-					return nil
+					// Same here, we still continue to evaluate other plugins's PreQHints.
+					p.metricsRecorder.ObserveCounterAsync(metrics.PreQueueingHintEvaluations, 1, hintfn.PluginName, metrics.PreQueueingHintResultAllPods)
+					result.evaluateAllPods = true
+					continue
 				}
-				p.metricsRecorder.ObserveCounterAsync(metrics.PreQueueingHintEvaluations, 1, hintfn.PluginName, "narrowed")
+				p.metricsRecorder.ObserveCounterAsync(metrics.PreQueueingHintEvaluations, 1, hintfn.PluginName, metrics.PreQueueingHintResultNarrowed)
 				keys := sets.New(hintResult.Pods...)
 				if existing, ok := result.perPlugin[hintfn.PluginName]; ok {
 					result.perPlugin[hintfn.PluginName] = existing.Union(keys)
@@ -2186,7 +2200,7 @@ func (p *PriorityQueue) runPreQueueingHintPlugins(logger klog.Logger, event fwk.
 			}
 		}
 	}
-	if result.candidatePods == nil {
+	if result.candidatePods == nil && !result.evaluateAllPods {
 		return nil
 	}
 	return result
