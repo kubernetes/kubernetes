@@ -611,6 +611,7 @@ aliases:
   # - logicalhan # Instrumentation
   # conformance aliases https://git.k8s.io/enhancements/keps/sig-architecture/20190412-conformance-behaviors.md
   conformance-behavior-approvers:
+    - BenTheElder
     - smarterclayton
     - johnbelamaric
     - dims
