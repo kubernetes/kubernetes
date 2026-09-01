@@ -57,7 +57,7 @@ export function validateTemplates(root: IConstruct, outdir: string, assembly: pr
 
   // When the default validation plugin is not explicitly opted-in, downgrade
   // its errors to warnings so synthesis does not fail.
-  const validateFlagExplicitlyEnabled = root.node.tryGetContext(cxapi.VALIDATE_AGAINST_DEFAULT_RULES) === true;
+  const validateFlagExplicitlyEnabled = getBooleanContext(root, cxapi.VALIDATE_AGAINST_DEFAULT_RULES, false);
   let warningifiedAnyErrors = false;
   if (!validateFlagExplicitlyEnabled) {
     warningifiedAnyErrors = downgradeCfnValidateErrorsToWarnings(reports);

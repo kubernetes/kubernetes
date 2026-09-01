@@ -54,6 +54,46 @@ describe('CloudFormationValidatePlugin', () => {
     expect(() => app.synth()).toThrow(/BogusProperty/);
   });
 
+  test('fails synthesis when flag is set to the string \'true\', as passed by cdk synth -c', () => {
+    const app = new core.App({
+      context: {
+        [cxapi.VALIDATE_AGAINST_DEFAULT_RULES]: 'true',
+        [cxapi.FAIL_SYNTH_ON_VALIDATION_ERRORS_CONTEXT]: true,
+      },
+    });
+    const stack = new core.Stack(app, 'TestStack');
+    new core.CfnResource(stack, 'MyBucket', {
+      type: 'AWS::S3::Bucket',
+      properties: {
+        BogusProperty: 'invalid-value',
+      },
+    });
+
+    expect(() => app.synth()).toThrow(/BogusProperty/);
+  });
+
+  test('downgrades errors to warnings when flag is set to the string \'false\'', () => {
+    const app = new core.App({
+      context: {
+        [cxapi.VALIDATE_AGAINST_DEFAULT_RULES]: 'false',
+        [cxapi.FAIL_SYNTH_ON_VALIDATION_ERRORS_CONTEXT]: true,
+      },
+    });
+    const stack = new core.Stack(app, 'TestStack');
+    new core.CfnResource(stack, 'MyBucket', {
+      type: 'AWS::S3::Bucket',
+      properties: {
+        BogusProperty: 'invalid-value',
+      },
+    });
+
+    app.synth();
+
+    expect(process.exitCode).toBeUndefined();
+    const output = consoleErrorMock.mock.calls.map((c: any[]) => c[0]).join('\n');
+    expect(output).toContain('Template validation found issues in your templates');
+  });
+
   test('downgrades errors to warnings when flag is not explicitly enabled', () => {
     const app = new core.App({
       context: {
