@@ -397,15 +397,23 @@ func podGatedInQueue(testCtx *testutils.TestContext, t *testing.T, podName strin
 	if pod == nil {
 		t.Fatalf("Expected the pod %s to be in the queue", podName)
 	}
-
 	// Make sure this Pod is gated by the preemption at PreEnqueue extension point
 	// by activating the Pod and see if it's still in the unsched pod pool.
 	testCtx.Scheduler.SchedulingQueue.Activate(logger, map[string]*v1.Pod{podName: pod})
 	if !PodInUnschedulablePodPool(t, testCtx.Scheduler.SchedulingQueue, podName) {
 		t.Fatalf("Expected the pod %s to be in the queue even after the activation", podName)
 	}
-	if pInfo, _ := testCtx.Scheduler.SchedulingQueue.GetPod(podName, testCtx.NS.Name, pod.Spec.SchedulingGroup); pInfo == nil || !pInfo.Gated() {
-		t.Fatalf("Expected the pod %s to be gated", podName)
+	if pod.Spec.SchedulingGroup != nil && pod.Spec.SchedulingGroup.PodGroupName != nil {
+		// If the pod is member of pod group, we should check if the whole pod group is gated,
+		// because due to optimization, the pod might not have the Gated() flag set.
+		podGroupName := *pod.Spec.SchedulingGroup.PodGroupName
+		if pgInfo, _ := testCtx.Scheduler.SchedulingQueue.GetPodGroup(podGroupName, testCtx.NS.Name); pgInfo == nil || !pgInfo.Gated() {
+			t.Fatalf("Expected the pod %s (pod group %s) to be gated", podName, podGroupName)
+		}
+	} else {
+		if pInfo, _ := testCtx.Scheduler.SchedulingQueue.GetPod(podName, testCtx.NS.Name, pod.Spec.SchedulingGroup); pInfo == nil || !pInfo.Gated() {
+			t.Fatalf("Expected the pod %s to be gated", podName)
+		}
 	}
 }
 
