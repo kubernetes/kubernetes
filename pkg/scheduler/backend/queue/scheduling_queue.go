@@ -1710,11 +1710,7 @@ func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(logger klog.Logger, event 
 // NOTE: this function assumes lock has been acquired in caller
 func (p *PriorityQueue) collectEntitiesToEvaluate(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck) ([]framework.QueuedEntityInfo, *preQueueingHintPodKeys) {
 
-	var hintKeys *preQueueingHintPodKeys
-	// TODO: implement preQueueingHint for CPG
-	if !p.isCompositePodGroupEnabled {
-		hintKeys = p.runPreQueueingHintPlugins(logger, event, oldObj, newObj)
-	}
+	hintKeys := p.runPreQueueingHintPlugins(logger, event, oldObj, newObj)
 
 	if hintKeys != nil && !hintKeys.evaluateAllPods {
 		logger.V(5).Info("PreQueueingHint narrowed pod set", "candidates", hintKeys.candidatePods.Len(), "total", len(p.unschedulableEntities.entityInfoMap))
@@ -1737,12 +1733,14 @@ func (p *PriorityQueue) collectEntitiesToEvaluate(logger klog.Logger, event fwk.
 				if err != nil {
 					utilruntime.HandleErrorWithLogger(logger, err, "Failed to get pod for PodGroup lookup", "pod", nn)
 				} else if pod.Spec.SchedulingGroup != nil && pod.Spec.SchedulingGroup.PodGroupName != nil {
-					entityKey = fwk.PodGroupKey(nn.Namespace, *pod.Spec.SchedulingGroup.PodGroupName).String()
-					if entity, exists := p.unschedulableEntities.entityInfoMap[entityKey]; exists && !seen[entityKey] {
-						seen[entityKey] = true
-
-						if preCheck == nil || preCheck(entity) {
-							entities = append(entities, entity)
+					if rootLookup, hasRoot := p.workloadForest.getRootLookupInfoForPod(pod); hasRoot {
+						if entity := p.unschedulableEntities.get(rootLookup); entity != nil {
+							if rootKey := queuedEntityKeyFunc(entity); !seen[rootKey] {
+								seen[rootKey] = true
+								if preCheck == nil || preCheck(entity) {
+									entities = append(entities, entity)
+								}
+							}
 						}
 					}
 				}

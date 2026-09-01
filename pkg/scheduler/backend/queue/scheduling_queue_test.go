@@ -10043,13 +10043,12 @@ func TestPreQueueingHint_PodGroupPreCheck(t *testing.T) {
 	// preCheck rejects an entity whose member pods carry the "block" label.
 	preCheck := func(entity framework.QueuedEntityInfo) bool {
 		allowed := true
-		entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+		for pInfo := range entity.ForEachPodInfo() {
 			if _, hasBlock := pInfo.Pod.Labels["block"]; hasBlock {
 				allowed = false
-				return false // stop
+				break
 			}
-			return true
-		})
+		}
 		return allowed
 	}
 
@@ -10062,9 +10061,10 @@ func TestPreQueueingHint_PodGroupPreCheck(t *testing.T) {
 	}
 }
 
-func TestPreQueueingHint_CPGDisablesNarrowing(t *testing.T) {
-	// When CompositePodGroup feature gate is enabled, PreQueueingHint
-	// narrowing is disabled to avoid missing CPG entities.
+// TestPreQueueingHint_CompositePodGroupLookup verifies that a hinted pod belonging
+// to a CompositePodGroup hierarchy is resolved to its root CPG entity and collected,
+// i.e. PreQueueingHint narrowing works when CompositePodGroup is enabled.
+func TestPreQueueingHint_CompositePodGroupLookup(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.SchedulerPreQueueingHints:       true,
 		features.GenericWorkload:                 true,
@@ -10073,54 +10073,151 @@ func TestPreQueueingHint_CPGDisablesNarrowing(t *testing.T) {
 	})
 	logger, ctx := ktesting.NewTestContext(t)
 
-	preQueueingHintCalled := false
+	cpgName := "root-cpg"
+	pgName := "pg1"
+	cpg := st.MakeCompositePodGroup().Name(cpgName).Namespace("ns1").Obj()
+	pg := st.MakePodGroup().Name(pgName).Namespace("ns1").ParentCompositePodGroup(cpgName).Obj()
+	pod1 := st.MakePod().Name("cpgpod1").Namespace("ns1").UID("cpgpod1").PodGroupName(pgName).Obj()
+	pod2 := st.MakePod().Name("cpgpod2").Namespace("ns1").UID("cpgpod2").PodGroupName(pgName).Obj()
+
+	// Hint narrows to a single CPG member.
 	preQueueingHintFn := func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
-		// When CPG is enabled, PreQueueingHint is skipped entirely: we don't
-		// even run the hint functions, avoiding an index lookup per event whose
-		// result we could not use.
-		preQueueingHintCalled = true
-		return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{{Name: "pod1", Namespace: "ns1"}}}, nil
+		return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{{Name: "cpgpod1", Namespace: "ns1"}}}, nil
 	}
+	m := makeEmptyQueueingHintMapPerProfile()
+	m[""][nodeAdd] = []*QueueingHintFunction{
+		{PluginName: "testPlugin", QueueingHintFn: queueHintReturnQueue, PreQueueingHintFn: preQueueingHintFn},
+	}
+
+	// A standalone pod that the hint does NOT include; it must stay put, proving
+	// narrowing is active under CPG (without narrowing, all pods would be moved).
+	other := st.MakePod().Name("other").Namespace("ns1").UID("other").Obj()
+
+	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{pod1, pod2},
+		WithQueueingHintMapPerProfile(m))
+
+	// Register the hierarchy (root CPG + leaf PodGroup) and its member pods.
+	q.AddGenericPodGroup(logger, framework.NewGenericCompositePodGroup(cpg))
+	q.AddGenericPodGroup(logger, framework.NewGenericPodGroup(pg))
+	for _, pod := range []*v1.Pod{pod1, pod2} {
+		q.Add(ctx, pod)
+	}
+
+	// Move the root CPG entity into the unschedulable pool.
+	cpgLookup := newQueuedPodGroupInfoForLookup("ns1", cpgName, fwk.CompositePodGroupKeyType)
+	entity := q.activeQ.delete(cpgLookup)
+	if entity == nil {
+		t.Fatal("root CPG entity not found in activeQ")
+	}
+	entity.(*framework.QueuedPodGroupInfo).UnschedulablePlugins = sets.New[string]("testPlugin")
+	q.unschedulableEntities.addOrUpdate(entity, false, framework.EventUnscheduledPodAdd.Label(), nil)
+
+	// Add an unrelated standalone pod to the unschedulable pool.
+	q.Add(ctx, other)
+	otherEntity, err := q.Pop(logger)
+	if err != nil {
+		t.Fatalf("Pop failed: %v", err)
+	}
+	otherPInfo := otherEntity.(*framework.QueuedPodInfo)
+	otherPInfo.UnschedulablePlugins = sets.New[string]("testPlugin")
+	if err := q.AddUnschedulablePodIfNotPresent(logger, otherPInfo, q.SchedulingCycle()); err != nil {
+		t.Fatalf("AddUnschedulablePodIfNotPresent failed: %v", err)
+	}
+
+	// Fire an event; the hint points at cpgpod1, which must resolve to the root CPG.
+	q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, st.MakeNode().Name("node1").Obj(), nil)
+
+	if q.unschedulableEntities.get(cpgLookup) != nil {
+		t.Errorf("root CPG should have been moved out of unschedulable via its member's hint")
+	}
+	if q.unschedulableEntities.get(newQueuedPodInfoForLookup(other)) == nil {
+		t.Errorf("unrelated standalone pod should remain unschedulable (narrowing must exclude it)")
+	}
+}
+
+// newCPGQueueInUnschedulable builds a queue with a root CompositePodGroup (root-cpg)
+// whose leaf PodGroup (pg1) has members cpgpod1/cpgpod2, moves the root CPG entity
+// into the unschedulable pool (rejected by "testPlugin"), and returns the queue and
+// the root CPG lookup.
+func newCPGQueueInUnschedulable(t *testing.T, ctx context.Context, hint fwk.PreQueueingHintFn) (*PriorityQueue, *framework.QueuedPodGroupInfo) {
+	t.Helper()
+	logger := klog.FromContext(ctx)
+	cpgName, pgName := "root-cpg", "pg1"
+	cpg := st.MakeCompositePodGroup().Name(cpgName).Namespace("ns1").Obj()
+	pg := st.MakePodGroup().Name(pgName).Namespace("ns1").ParentCompositePodGroup(cpgName).Obj()
+	pod1 := st.MakePod().Name("cpgpod1").Namespace("ns1").UID("cpgpod1").PodGroupName(pgName).Obj()
+	pod2 := st.MakePod().Name("cpgpod2").Namespace("ns1").UID("cpgpod2").PodGroupName(pgName).Obj()
 
 	m := makeEmptyQueueingHintMapPerProfile()
 	m[""][nodeAdd] = []*QueueingHintFunction{
-		{
-			PluginName:        "testPlugin",
-			QueueingHintFn:    queueHintReturnQueue,
-			PreQueueingHintFn: preQueueingHintFn,
-		},
+		{PluginName: "testPlugin", QueueingHintFn: queueHintReturnQueue, PreQueueingHintFn: hint},
 	}
-
-	q := NewTestQueue(ctx, newDefaultQueueSort(), WithQueueingHintMapPerProfile(m))
-
-	pod1 := st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj()
-	pod2 := st.MakePod().Name("pod2").Namespace("ns1").UID("2").Obj()
-
+	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{pod1, pod2},
+		WithQueueingHintMapPerProfile(m))
+	q.AddGenericPodGroup(logger, framework.NewGenericCompositePodGroup(cpg))
+	q.AddGenericPodGroup(logger, framework.NewGenericPodGroup(pg))
 	for _, pod := range []*v1.Pod{pod1, pod2} {
 		q.Add(ctx, pod)
-		entity, err := q.Pop(logger)
-		if err != nil {
-			t.Fatalf("Pop failed: %v", err)
-		}
-		pInfo := entity.(*framework.QueuedPodInfo)
-		pInfo.UnschedulablePlugins = sets.New[string]("testPlugin")
-		if err := q.AddUnschedulablePodIfNotPresent(logger, pInfo, q.SchedulingCycle()); err != nil {
-			t.Fatalf("AddUnschedulablePodIfNotPresent failed: %v", err)
-		}
 	}
 
-	// Trigger event — with CPG enabled, all pods should be evaluated (no narrowing).
-	q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, st.MakeNode().Name("node1").Obj(), nil)
-
-	// Both pods should be moved (narrowing disabled).
-	unschedPods := q.UnschedulablePods()
-	if len(unschedPods) != 0 {
-		t.Errorf("expected 0 pods in unschedulable (all should be moved), got %d", len(unschedPods))
+	lookup := newQueuedPodGroupInfoForLookup("ns1", cpgName, fwk.CompositePodGroupKeyType)
+	entity := q.activeQ.delete(lookup)
+	if entity == nil {
+		t.Fatal("root CPG entity not found in activeQ")
 	}
+	entity.(*framework.QueuedPodGroupInfo).UnschedulablePlugins = sets.New[string]("testPlugin")
+	q.unschedulableEntities.addOrUpdate(entity, false, framework.EventUnscheduledPodAdd.Label(), nil)
+	return q, lookup
+}
 
-	// Under CPG, PreQueueingHint must be skipped entirely, not run-and-discarded.
-	if preQueueingHintCalled {
-		t.Error("PreQueueingHintFn should not be called when CompositePodGroup is enabled")
+// TestPreQueueingHint_CompositePodGroupDedup verifies that when several hinted pods
+// belong to the same CompositePodGroup, its root entity is collected only once.
+func TestPreQueueingHint_CompositePodGroupDedup(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.SchedulerPreQueueingHints:       true,
+		features.GenericWorkload:                 true,
+		features.CompositePodGroup:               true,
+		features.TopologyAwareWorkloadScheduling: true,
+	})
+	logger, ctx := ktesting.NewTestContext(t)
+
+	hint := func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
+		return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{
+			{Name: "cpgpod1", Namespace: "ns1"}, {Name: "cpgpod2", Namespace: "ns1"},
+		}}, nil
+	}
+	q, _ := newCPGQueueInUnschedulable(t, ctx, hint)
+
+	q.lock.Lock()
+	entities, _ := q.collectEntitiesToEvaluate(logger, nodeAdd, nil, st.MakeNode().Name("node1").Obj(), nil)
+	q.lock.Unlock()
+	if len(entities) != 1 {
+		t.Errorf("expected the CPG root collected exactly once, got %d entities", len(entities))
+	}
+}
+
+// TestPreQueueingHint_CompositePodGroupPreCheck verifies preCheck is applied to the
+// resolved CPG root entity in the narrowed path.
+func TestPreQueueingHint_CompositePodGroupPreCheck(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.SchedulerPreQueueingHints:       true,
+		features.GenericWorkload:                 true,
+		features.CompositePodGroup:               true,
+		features.TopologyAwareWorkloadScheduling: true,
+	})
+	logger, ctx := ktesting.NewTestContext(t)
+
+	hint := func(logger klog.Logger, oldObj, newObj interface{}) (fwk.PreQueueingHintResult, error) {
+		return fwk.PreQueueingHintResult{Pods: []types.NamespacedName{{Name: "cpgpod1", Namespace: "ns1"}}}, nil
+	}
+	q, cpgLookup := newCPGQueueInUnschedulable(t, ctx, hint)
+
+	// preCheck rejects the CPG root, so it must not be collected/moved.
+	preCheck := func(entity framework.QueuedEntityInfo) bool { return false }
+	q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, st.MakeNode().Name("node1").Obj(), preCheck)
+
+	if q.unschedulableEntities.get(cpgLookup) == nil {
+		t.Errorf("CPG root should remain unschedulable when preCheck rejects it")
 	}
 }
 
