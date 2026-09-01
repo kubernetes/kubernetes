@@ -187,6 +187,18 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 	defer m.workerLock.Unlock()
 
 	logger := klog.FromContext(ctx)
+	// Detach the workers' context from the caller's: the pod worker cancels the
+	// sync context when the pod begins terminating, but probe workers must keep
+	// probing until the container stops so a failing readiness probe can mark
+	// the pod NotReady during graceful termination. Workers are stopped
+	// explicitly via their stop channel (RemovePod/CleanupPods).
+	//
+	// TODO(#140977): This also means nothing cancels an in-flight probe. worker.stop()
+	// only signals stopCh, which is checked between probes, so an exec probe that is
+	// already running keeps executing in a container that is being killed until its
+	// own TimeoutSeconds elapses. The fix is a per-worker cancellable context
+	// cancelled by stop(), not the pod sync context, which cancels too early.
+	ctx = context.WithoutCancel(ctx)
 	key := probeKey{podUID: pod.UID}
 	for _, c := range append(pod.Spec.Containers, getRestartableInitContainers(pod)...) {
 		key.containerName = c.Name
