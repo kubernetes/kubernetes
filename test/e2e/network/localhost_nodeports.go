@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
@@ -41,7 +42,7 @@ var _ = common.SIGDescribe("LocalhostNodePorts", func() {
 	fr := framework.NewDefaultFramework("localhost-nodeports")
 	fr.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	framework.It("should proxy localhost NodePort traffic to backends across nodes", feature.LocalhostNodePorts, func(ctx context.Context) {
+	framework.It("should proxy localhost NodePort traffic to backends across nodes", feature.LocalhostNodePorts, framework.WithFeatureGate(features.KubeProxyNFTablesLocalhostNodePorts), func(ctx context.Context) {
 		cs := fr.ClientSet
 		ns := fr.Namespace.Name
 
@@ -104,7 +105,7 @@ var _ = common.SIGDescribe("LocalhostNodePorts", func() {
 		}
 	})
 
-	framework.It("should honor sessionAffinity=ClientIP for localhost NodePort", feature.LocalhostNodePorts, func(ctx context.Context) {
+	framework.It("should honor sessionAffinity=ClientIP for localhost NodePort", feature.LocalhostNodePorts, framework.WithFeatureGate(features.KubeProxyNFTablesLocalhostNodePorts), func(ctx context.Context) {
 		cs := fr.ClientSet
 		ns := fr.Namespace.Name
 
@@ -166,7 +167,7 @@ var _ = common.SIGDescribe("LocalhostNodePorts", func() {
 		}
 	})
 
-	framework.It("should let a node pull an image from a registry exposed via localhost NodePort", feature.LocalhostNodePorts, func(ctx context.Context) {
+	framework.It("should let a node pull an image from a registry exposed via localhost NodePort", feature.LocalhostNodePorts, framework.WithFeatureGate(features.KubeProxyNFTablesLocalhostNodePorts), func(ctx context.Context) {
 		cs := fr.ClientSet
 		ns := fr.Namespace.Name
 
