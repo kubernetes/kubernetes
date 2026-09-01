@@ -251,3 +251,63 @@ func TestActiveQueue_AddEventIfAnyInFlight(t *testing.T) {
 		})
 	}
 }
+
+func TestClearPoppedEntity(t *testing.T) {
+	pInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: st.MakePod().Namespace("ns").Name("p1").UID("p1").Obj()}}
+	pInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: st.MakePod().Namespace("ns").Name("p2").UID("p2").Obj()}}
+	pgInfo1 := newSingleLevelPodGroupInfo(&framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: st.MakePod().Namespace("ns").Name("pg1-p").UID("pg1-p").PodGroupName("pg1").Obj()}}, nil)
+	pgInfo2 := newSingleLevelPodGroupInfo(&framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: st.MakePod().Namespace("ns").Name("pg2-p").UID("pg2-p").PodGroupName("pg2").Obj()}}, nil)
+
+	tests := []struct {
+		name                    string
+		entityToPop             framework.QueuedEntityInfo
+		entityToClear           framework.QueuedEntityInfo
+		wantLastPoppedEntityKey string
+	}{
+		{
+			name:                    "clearing an unrelated pod does not clear last popped pod",
+			entityToPop:             pInfo1,
+			entityToClear:           pInfo2,
+			wantLastPoppedEntityKey: queuedEntityKeyFunc(pInfo1),
+		},
+		{
+			name:          "clearing the matching pod clears last popped pod",
+			entityToPop:   pInfo1,
+			entityToClear: pInfo1,
+		},
+		{
+			name:                    "clearing an unrelated pod group does not clear last popped pod group",
+			entityToPop:             pgInfo1,
+			entityToClear:           pgInfo2,
+			wantLastPoppedEntityKey: queuedEntityKeyFunc(pgInfo1),
+		},
+		{
+			name:          "clearing the matching pod group clears last popped pod group",
+			entityToPop:   pgInfo1,
+			entityToClear: pgInfo1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			rr := metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())
+			aq := newActiveQueue(heap.NewWithRecorder(queuedEntityKeyFunc, heap.LessFunc[framework.QueuedEntityInfo](convertLessFn(newDefaultQueueSort())), metrics.NewActiveEntitiesRecorder()), rr, nil)
+
+			aq.add(logger, tt.entityToPop, framework.EventUnscheduledPodAdd.Label(), nil)
+			popped, err := aq.pop(logger)
+			if err != nil {
+				t.Fatalf("pop failed: %v", err)
+			}
+			if !aq.isLastPoppedEntity(popped) {
+				t.Fatalf("expected popped entity to be last popped entity")
+			}
+
+			aq.clearPoppedEntity(tt.entityToClear)
+
+			if aq.lastPoppedEntityKey != tt.wantLastPoppedEntityKey {
+				t.Fatalf("expected last popped entity: %q, got: %q", tt.wantLastPoppedEntityKey, aq.lastPoppedEntityKey)
+			}
+		})
+	}
+}

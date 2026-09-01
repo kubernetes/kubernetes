@@ -8583,7 +8583,8 @@ func TestAddUnschedulablePodIfNotPresentPodGroupMember(t *testing.T) {
 			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState, podGroup)
 
 			if tt.clearLastPopped {
-				q.activeQ.clearPoppedEntity()
+				pgLookup := newQueuedPodGroupInfoForLookup(podGroup.Namespace, podGroup.Name, fwk.PodGroupKeyType)
+				q.activeQ.clearPoppedEntity(pgLookup)
 			}
 
 			if tt.deletePodGroup {
@@ -8593,6 +8594,7 @@ func TestAddUnschedulablePodIfNotPresentPodGroupMember(t *testing.T) {
 			// Add unschedulable pods
 			for _, pInfo := range tt.podsToAdd {
 				pInfoCloned := pInfo.DeepCopy()
+				MarkInFlightForTest(q, pInfoCloned)
 				if err := q.AddUnschedulablePodIfNotPresent(logger, pInfoCloned, q.SchedulingCycle()); err != nil {
 					t.Errorf("Failed to add unschedulable pods %s: %v", pInfoCloned.Pod.Name, err)
 				}
@@ -11046,7 +11048,7 @@ func TestPriorityQueue_InFlightPods(t *testing.T) {
 				}
 			}
 
-			gotPInfo, ok := q.GetPod(tt.initialPod.Name, tt.initialPod.Namespace, nil)
+			gotPInfo, ok := q.GetPod(ctx, tt.initialPod.Name, tt.initialPod.Namespace, nil)
 			if ok != tt.wantInQueue {
 				t.Fatalf("expected inQueue=%v, got %v", tt.wantInQueue, ok)
 			}
@@ -11058,6 +11060,44 @@ func TestPriorityQueue_InFlightPods(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// Requeueing a pod that was deleted while in flight must be a no-op; otherwise the deleted pod
+// is put back into the queue.
+func TestPriorityQueue_AddUnschedulablePodIfNotPresent_DeletedWhileInFlight(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	q := NewTestQueue(ctx, newDefaultQueueSort())
+	pod := st.MakePod().Namespace("ns").Name("p1").UID("p1").Obj()
+	q.Add(ctx, pod)
+
+	popped, err := q.Pop(logger)
+	if err != nil {
+		t.Fatalf("Pop failed: %v", err)
+	}
+	pInfo := popped.(*framework.QueuedPodInfo)
+	pInfo.UnschedulablePlugins = sets.New("fakePlugin")
+
+	q.Delete(logger, pod)
+
+	if err := q.AddUnschedulablePodIfNotPresent(logger, pInfo, q.SchedulingCycle()); err != nil {
+		t.Fatalf("AddUnschedulablePodIfNotPresent: %v", err)
+	}
+
+	if q.activeQ.inFlightPod(pod.UID) != nil {
+		t.Errorf("Expected pod %s not to be in flight", pod.UID)
+	}
+	if q.activeQ.has(pInfo) {
+		t.Errorf("Expected pod %s not to be in activeQ", pod.UID)
+	}
+	if q.backoffQ.has(pInfo) {
+		t.Errorf("Expected pod %s not to be in backoffQ", pod.UID)
+	}
+	if q.unschedulableEntities.get(pInfo) != nil {
+		t.Errorf("Expected pod %s not to be in unschedulableEntities", pod.UID)
 	}
 }
 

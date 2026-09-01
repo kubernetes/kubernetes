@@ -1099,16 +1099,19 @@ func (p *PriorityQueue) AddUnschedulablePodIfNotPresent(logger klog.Logger, pInf
 		}
 	}()
 
-	// Refresh the pod from inFlightPods if present, which contains the latest version delivered by Update events
-	// while the pod was in-flight (preventing stale informer reads from overwriting concurrent updates).
-	//
-	// TODO: Consider strictly requiring inFlightPod != nil here (and aborting if the pod is no longer in-flight,
-	// e.g. deleted or assigned). That would make queue state management fully strict, but requires auditing all callers
-	// and refactoring synthetic unit tests that invoke AddUnschedulablePodIfNotPresent directly without calling Pop().
-	if inFlightPod := p.activeQ.inFlightPod(pInfo.Pod.UID); inFlightPod != nil {
-		pInfo.PodInfo, _ = framework.NewPodInfo(inFlightPod)
-		pInfo.PodSignature = p.signPod(klog.NewContext(context.Background(), logger), inFlightPod)
+	// If the pod is no longer in-flight, it was deleted or assigned while its failure was being handled
+	// (e.g. while waiting for an async status patch), and Delete has already cleaned it up.
+	// Both paths hold p.lock, so requeueing it here would resurrect a pod that no longer needs scheduling.
+	inFlightPod := p.activeQ.inFlightPod(pInfo.Pod.UID)
+	if inFlightPod == nil {
+		logger.V(4).Info("Pod is no longer in-flight, skipping requeue", "pod", klog.KObj(pInfo.Pod))
+		return nil
 	}
+
+	// Refresh the pod from inFlightPods, which contains the latest version delivered by Update events
+	// while the pod was in-flight (preventing stale informer reads from overwriting concurrent updates).
+	pInfo.PodInfo, _ = framework.NewPodInfo(inFlightPod)
+	pInfo.PodSignature = p.signPod(klog.NewContext(context.Background(), logger), inFlightPod)
 
 	pod := pInfo.Pod
 	if p.unschedulableEntities.get(pInfo) != nil {
@@ -1151,7 +1154,7 @@ func (p *PriorityQueue) AddUnschedulablePodIfNotPresent(logger klog.Logger, pInf
 		return nil
 	}
 
-	p.activeQ.clearPoppedEntity()
+	p.activeQ.clearPoppedEntity(pInfo)
 	rejectorPlugins := pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins)
 	for plugin := range rejectorPlugins {
 		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Inc()
@@ -1214,7 +1217,7 @@ func (p *PriorityQueue) AddAttemptedPodGroupIfNeeded(logger klog.Logger, pgInfo 
 		return fmt.Errorf("pod group %v is already present in the backoff queue", klog.KObj(pgInfo))
 	}
 
-	p.activeQ.clearPoppedEntity()
+	p.activeQ.clearPoppedEntity(pgInfo)
 	// Get the pending pods and put them into the pod group.
 	var pendingPods []*framework.QueuedPodInfo
 	for _, leafPodGroup := range p.workloadForest.getLeafPodGroups(logger, pgInfo) {
