@@ -254,8 +254,6 @@ type PriorityQueue struct {
 	isGenericWorkloadEnabled bool
 	// isOpportunisticBatchingEnabled indicates whether the OpportunisticBatching feature gate is enabled.
 	isOpportunisticBatchingEnabled bool
-	// isCompositePodGroupEnabled indicates whether the feature gate for CompositePodGroup is enabled.
-	isCompositePodGroupEnabled bool
 	// isInPlacePodVerticalScalingSchedulerPreemptionEnabled indicates whether the feature gate InPlacePodVerticalScalingSchedulerPreemption is enabled.
 	isInPlacePodVerticalScalingSchedulerPreemptionEnabled bool
 	// isPreQueueingHintsEnabled indicates whether the SchedulerPreQueueingHints feature gate is enabled.
@@ -460,7 +458,6 @@ func NewPriorityQueue(
 		isPopFromBackoffQEnabled:          isPopFromBackoffQEnabled,
 		isGenericWorkloadEnabled:          isGenericWorkloadEnabled,
 		isOpportunisticBatchingEnabled:    isOpportunisticBatchingEnabled,
-		isCompositePodGroupEnabled:        isCompositePodGroupEnabled,
 		isInPlacePodVerticalScalingSchedulerPreemptionEnabled: isInPlacePodVerticalScalingSchedulerPreemptionEnabled,
 		isPreQueueingHintsEnabled:                             isPreQueueingHintsEnabled,
 	}
@@ -1721,12 +1718,7 @@ func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(logger klog.Logger, event 
 //
 // NOTE: this function assumes lock has been acquired in caller
 func (p *PriorityQueue) collectEntitiesToEvaluate(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck) ([]framework.QueuedEntityInfo, *preQueueingHintPodKeys) {
-
-	var hintKeys *preQueueingHintPodKeys
-	// TODO: implement preQueueingHint for CPG
-	if !p.isCompositePodGroupEnabled {
-		hintKeys = p.runPreQueueingHintPlugins(logger, event, oldObj, newObj)
-	}
+	hintKeys := p.runPreQueueingHintPlugins(logger, event, oldObj, newObj)
 
 	if hintKeys != nil && !hintKeys.evaluateAllPods {
 		logger.V(5).Info("PreQueueingHint narrowed pod set", "candidates", hintKeys.candidatePods.Len(), "total", len(p.unschedulableEntities.entityInfoMap))
@@ -1741,25 +1733,38 @@ func (p *PriorityQueue) collectEntitiesToEvaluate(logger klog.Logger, event fwk.
 				}
 				continue
 			}
-			// If not found as standalone pod, check if it belongs to a pod group
-			// via the pod's schedulingGroup field.
-			// TODO: Add support for CompositePodGroup (CPG) lookup.
-			if p.isGenericWorkloadEnabled {
-				pod, err := p.podLister.Pods(nn.Namespace).Get(nn.Name)
+			// If not found as standalone pod, check if it belongs to a group hierarchy.
+			if !p.isGenericWorkloadEnabled {
+				continue
+			}
+			pod, err := p.podLister.Pods(nn.Namespace).Get(nn.Name)
+			if err != nil {
 				if apierrors.IsNotFound(err) {
-					logger.V(5).Info("Pod from PreQueueingHint not found in podLister during PodGroup lookup", "pod", nn)
-				} else if err != nil {
-					utilruntime.HandleErrorWithLogger(logger, err, "Failed to get pod for PodGroup lookup", "pod", nn)
-				} else if pod.Spec.SchedulingGroup != nil && pod.Spec.SchedulingGroup.PodGroupName != nil {
-					entityKey = fwk.PodGroupKey(nn.Namespace, *pod.Spec.SchedulingGroup.PodGroupName).String()
-					if entity, exists := p.unschedulableEntities.entityInfoMap[entityKey]; exists && !seen[entityKey] {
-						seen[entityKey] = true
-
-						if preCheck == nil || preCheck(entity) {
-							entities = append(entities, entity)
-						}
-					}
+					logger.V(5).Info("Pod from PreQueueingHint not found in podLister during group lookup", "pod", nn)
+				} else {
+					utilruntime.HandleErrorWithLogger(logger, err, "Failed to get pod for group lookup", "pod", nn)
 				}
+				continue
+			}
+			if !p.isPodGroupMember(pod) {
+				continue
+			}
+			rootLookup, hasRoot := p.workloadForest.getRootLookupInfoForPod(logger, pod)
+			if !hasRoot {
+				continue
+			}
+			// rootLookup has the same key as the stored entity, so dedup before the lookup.
+			rootKey := queuedEntityKeyFunc(rootLookup)
+			if seen[rootKey] {
+				continue
+			}
+			seen[rootKey] = true
+			entity := p.unschedulableEntities.get(rootLookup)
+			if entity == nil {
+				continue
+			}
+			if preCheck == nil || preCheck(entity) {
+				entities = append(entities, entity)
 			}
 		}
 		return entities, hintKeys
