@@ -124,15 +124,13 @@ func (jm *Controller) ensureWorkloadAndPodGroup(ctx context.Context, job *batch.
 		return nil, nil, nil
 	}
 
-	// Objects are only created for a Job that has never started, so a
-	// Job that predates the feature gate being enabled is left untouched.
-	// An already-started Job discovers and reuses existing objects
-	// but never creates new ones.
-	newJob := isNewJob(job, pods)
-
-	// Case 1 - manage the PodGroup only.
+	// Case 1 - manage the PodGroup only (delegated, non-root Job).
+	// The PodGroup materializes from a parent-owned Workload that may not be
+	// discoverable until a sync after the Job's first one, so creation is gated
+	// on canCreateDelegatedPodGroup rather than isNewJob (whose StartTime and
+	// Suspended-condition checks the first sync would immediately trip).
 	if mode == managePodGroupOnly {
-		pg, err := jm.getOrCreateDelegatedPodGroup(ctx, job, newJob)
+		pg, err := jm.getOrCreateDelegatedPodGroup(ctx, job, canCreateDelegatedPodGroup(job, pods))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -140,6 +138,12 @@ func (jm *Controller) ensureWorkloadAndPodGroup(ctx context.Context, job *batch.
 	}
 
 	// Case 2 - manage both Workload and PodGroup (root Job).
+	//
+	// Objects are only created for a Job that has never started, so a
+	// Job that predates the feature gate being enabled is left untouched.
+	// An already-started Job discovers and reuses existing objects
+	// but never creates new ones.
+	newJob := isNewJob(job, pods)
 	wl, err := jm.getOrCreateWorkload(ctx, job, newJob)
 	if err != nil || wl == nil {
 		return nil, nil, err
@@ -288,7 +292,7 @@ func (jm *Controller) findParentWorkload(job *batch.Job) (*schedulingv1beta1.Wor
 // the parent-owned Workload via the named PodGroupTemplate from the delegation
 // annotation and carries only a controller ownerRef to the Job.
 func (jm *Controller) getOrCreateDelegatedPodGroup(ctx context.Context,
-	job *batch.Job, newJob bool) (*schedulingv1beta1.PodGroup, error) {
+	job *batch.Job, canCreate bool) (*schedulingv1beta1.PodGroup, error) {
 	logger := klog.FromContext(ctx)
 
 	parentWorkload, err := jm.findParentWorkload(job)
@@ -324,10 +328,10 @@ func (jm *Controller) getOrCreateDelegatedPodGroup(ctx context.Context,
 			break
 		}
 	}
-	// Create only when the Job has no pods yet and none exists; otherwise
+	// Create only when the Job has never run and none exists yet; otherwise
 	// discover-only. A create that races with another actor returns
 	// AlreadyExists, which requeues the Job so the next sync discovers it.
-	if updatedPG == nil && newJob {
+	if updatedPG == nil && canCreate {
 		// A delegated Job maps to a parent-owned Workload, so the PodGroup does
 		// not link the Workload as an owner (linkWorkloadOwner=false).
 		updatedPG, err = jm.createPodGroup(ctx, job, parentWorkload, templateName, false, builder)
@@ -379,6 +383,16 @@ func isNewJob(job *batch.Job, pods []*v1.Pod) bool {
 		return false
 	}
 	return findConditionByType(job.Status.Conditions, batch.JobSuspended) == nil
+}
+
+// canCreateDelegatedPodGroup reports whether the delegated path may still
+// create this Job's PodGroup: true only while the Job has never run (no pods,
+// no terminal counters). Unlike isNewJob it ignores StartTime and the Suspended
+// condition, which the Job's first sync writes before the parent-owned Workload
+// this path depends on is necessarily discoverable; gating on them would close
+// the creation window after a single sync.
+func canCreateDelegatedPodGroup(job *batch.Job, pods []*v1.Pod) bool {
+	return len(pods) == 0 && job.Status.Succeeded == 0 && job.Status.Failed == 0
 }
 
 // getOrCreateWorkload returns the Workload for this Job, creating one if needed.
