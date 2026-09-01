@@ -413,54 +413,6 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
-- name: webhook_duration_seconds
-  subsystem: authorization
-  namespace: apiserver
-  help: Request latency in seconds.
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - name
-  - result
-  buckets:
-  - 0.005
-  - 0.01
-  - 0.025
-  - 0.05
-  - 0.1
-  - 0.25
-  - 0.5
-  - 1
-  - 2.5
-  - 5
-  - 10
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: webhook_evaluations_fail_open_total
-  subsystem: authorization
-  namespace: apiserver
-  help: NoOpinion results due to webhook timeout or error.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - name
-  - result
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: webhook_evaluations_total
-  subsystem: authorization
-  namespace: apiserver
-  help: Round-trips to authorization webhooks.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - name
-  - result
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
 - name: cache_list_fetched_objects_total
   namespace: apiserver
   help: Number of objects read from watch cache in the course of serving a LIST request
@@ -7136,6 +7088,54 @@
   labels:
   - apiserver_id_hash
   - status
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: webhook_duration_seconds
+  subsystem: authorization
+  namespace: apiserver
+  help: Request latency in seconds.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - name
+  - result
+  buckets:
+  - 0.005
+  - 0.01
+  - 0.025
+  - 0.05
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 5
+  - 10
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: webhook_evaluations_fail_open_total
+  subsystem: authorization
+  namespace: apiserver
+  help: NoOpinion results due to webhook timeout or error.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - name
+  - result
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: webhook_evaluations_total
+  subsystem: authorization
+  namespace: apiserver
+  help: Round-trips to authorization webhooks.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - name
+  - result
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
