@@ -24,10 +24,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-// TestFeatureGateAPIDependencies exercises the startup check that refuses to boot
-// kube-apiserver when an enabled feature gate requires an API resource that the
-// effective runtime-config does not serve.
-func TestFeatureGateAPIDependencies(t *testing.T) {
+func TestFeatureGateAPIRequirements(t *testing.T) {
 	tests := []struct {
 		name            string
 		flags           []string
@@ -35,31 +32,52 @@ func TestFeatureGateAPIDependencies(t *testing.T) {
 		wantErrContains []string
 	}{
 		{
-			// Guards the invariant that stock defaults never trip the validation:
-			// every mapped gate is off by default, so nothing is required.
-			name:    "default flags start cleanly",
-			flags:   nil,
-			wantErr: false,
+			name:  "default flags start cleanly",
+			flags: nil,
 		},
 		{
-			// The exact failure mode from the issue: gate on, required API silently
-			// not served. Startup must fail fast instead of surfacing runtime 404s.
 			name:    "enabled gate without served API is rejected",
 			flags:   []string{"--feature-gates=EvictionRequestAPI=true"},
 			wantErr: true,
 			wantErrContains: []string{
 				"EvictionRequestAPI is enabled",
-				"lifecycle.k8s.io/evictions",
+				"evictions.lifecycle.k8s.io",
 			},
 		},
 		{
-			// Enabling the required API via runtime-config satisfies the dependency.
 			name: "enabled gate with served API starts",
 			flags: []string{
 				"--feature-gates=EvictionRequestAPI=true",
 				"--runtime-config=lifecycle.k8s.io/v1alpha1=true",
 			},
-			wantErr: false,
+		},
+		{
+			name:  "default flags at an emulated version start cleanly",
+			flags: []string{"--emulated-version=1.36"},
+		},
+		{
+			// clustertrustbundles is only introduced in certificates/v1 at 1.37, so at emulation
+			// 1.36 the resource config says certificates/v1 is enabled while the lifecycle filter
+			// drops the resource. Validating the resource config alone would miss this.
+			name: "enabled gate whose API predates the emulated version is rejected",
+			flags: []string{
+				"--emulated-version=1.36",
+				"--feature-gates=ClusterTrustBundle=true",
+			},
+			wantErr: true,
+			wantErrContains: []string{
+				"ClusterTrustBundle is enabled",
+				"clustertrustbundles.certificates.k8s.io",
+			},
+		},
+		{
+			// The same configuration is satisfiable through the version that does exist at 1.36.
+			name: "enabled gate served by an older version at the emulated version starts",
+			flags: []string{
+				"--emulated-version=1.36",
+				"--feature-gates=ClusterTrustBundle=true",
+				"--runtime-config=certificates.k8s.io/v1beta1/clustertrustbundles=true",
+			},
 		},
 	}
 
