@@ -467,25 +467,31 @@ func TestDeleteEncounters404(t *testing.T) {
 }
 
 func TestDeleteRemainingItems(t *testing.T) {
+	now := metav1.Now()
 	tests := []struct {
-		name         string
-		finalizers   []string
-		wantEstimate int64
+		name               string
+		finalizers         []string
+		deletionTimestamp  *metav1.Time
+		wantEstimate       int64
+		wantContentFailure bool
 	}{
 		{
-			name:         "no finalizers, still listed after delete",
-			finalizers:   nil,
-			wantEstimate: storageDrainEstimateSeconds,
+			name:              "terminating, no finalizers: storage drain",
+			deletionTimestamp: &now,
+			wantEstimate:      storageDrainEstimateSeconds,
 		},
 		{
 			name:         "finalizers remaining",
 			finalizers:   []string{"example.com/cleanup"},
 			wantEstimate: finalizerEstimateSeconds,
 		},
+		{
+			name:               "no deletionTimestamp and no finalizers: delete did not take effect",
+			wantContentFailure: true,
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			now := metav1.Now()
 			nsName := "test"
 			ns := &v1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{Name: nsName, ResourceVersion: "1", DeletionTimestamp: &now},
@@ -499,9 +505,10 @@ func TestDeleteRemainingItems(t *testing.T) {
 					Items: []runtime.RawExtension{{
 						Object: &metav1.PartialObjectMetadata{
 							ObjectMeta: metav1.ObjectMeta{
-								Name:       "lingering",
-								Namespace:  nsName,
-								Finalizers: tc.finalizers,
+								Name:              "lingering",
+								Namespace:         nsName,
+								Finalizers:        tc.finalizers,
+								DeletionTimestamp: tc.deletionTimestamp,
 							},
 						},
 					}},
@@ -522,20 +529,34 @@ func TestDeleteRemainingItems(t *testing.T) {
 			d := NewNamespacedResourcesDeleter(ctx, mockClient.CoreV1().Namespaces(), mockMetadataClient, mockClient.CoreV1(), resourcesFn, v1.FinalizerKubernetes)
 
 			err := d.Delete(ctx, nsName)
-			remaining, ok := err.(*ResourcesRemainingError)
-			if !ok {
-				t.Fatalf("Delete() error = %v (%T), want ResourcesRemainingError", err, err)
-			}
-			if remaining.Estimate != tc.wantEstimate {
-				t.Errorf("Estimate = %d, want %d", remaining.Estimate, tc.wantEstimate)
-			}
-
 			got, getErr := mockClient.CoreV1().Namespaces().Get(ctx, nsName, metav1.GetOptions{})
 			if getErr != nil {
 				t.Fatalf("Get namespace: %v", getErr)
 			}
 			if len(got.Spec.Finalizers) == 0 {
 				t.Fatal("namespace was finalized while content remained")
+			}
+
+			if tc.wantContentFailure {
+				if _, ok := err.(*ResourcesRemainingError); ok {
+					t.Fatalf("Delete() = %v, want a content-deletion failure not ResourcesRemainingError", err)
+				}
+				if err == nil || !strings.Contains(err.Error(), "unexpected items still remain") {
+					t.Fatalf("Delete() error = %v, want unexpected items still remain", err)
+				}
+				cond := getCondition(got.Status.Conditions, v1.NamespaceDeletionContentFailure)
+				if cond == nil || cond.Status != v1.ConditionTrue {
+					t.Fatalf("NamespaceDeletionContentFailure = %v, want True", cond)
+				}
+				return
+			}
+
+			remaining, ok := err.(*ResourcesRemainingError)
+			if !ok {
+				t.Fatalf("Delete() error = %v (%T), want ResourcesRemainingError", err, err)
+			}
+			if remaining.Estimate != tc.wantEstimate {
+				t.Errorf("Estimate = %d, want %d", remaining.Estimate, tc.wantEstimate)
 			}
 			if cond := getCondition(got.Status.Conditions, v1.NamespaceDeletionContentFailure); cond != nil && cond.Status == v1.ConditionTrue {
 				t.Errorf("NamespaceDeletionContentFailure = True (%q), want not a content-deletion failure", cond.Message)
