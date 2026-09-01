@@ -4137,16 +4137,23 @@ func TestConditionSelectorValidation(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, 1, int(afterReconciliationsTotal-beforeReconciliationsTotal), "reconciliation metric should be recorded for action=%s error=%s", tt.expectedActionLabel, tt.expectedErrorLabel)
 
-			if tt.expectedConditions != nil {
-				for _, action := range setup.testClient.Actions() {
-					if action.GetVerb() == "update" && action.GetResource().Resource == "horizontalpodautoscalers" {
-						updatedHPA := action.(core.UpdateAction).GetObject().(*autoscalingv2.HorizontalPodAutoscaler)
-						actualConditions := updatedHPA.Status.Conditions
+			for _, action := range setup.testClient.Actions() {
+				if action.GetVerb() == "update" && action.GetResource().Resource == "horizontalpodautoscalers" {
+					updatedHPA := action.(core.UpdateAction).GetObject().(*autoscalingv2.HorizontalPodAutoscaler)
+					actualConditions := updatedHPA.Status.Conditions
+					if tt.expectedConditions != nil {
 						for i := range actualConditions {
 							actualConditions[i].Message = ""
 							actualConditions[i].LastTransitionTime = metav1.Time{}
 						}
 						assert.Equal(t, tt.expectedConditions, actualConditions, "status conditions should match")
+					} else {
+						for _, condition := range actualConditions {
+							if condition.Type == autoscalingv2.AbleToScale || condition.Type == autoscalingv2.ScalingActive {
+								assert.NotEqual(t, v1.ConditionFalse, condition.Status,
+									"unexpected negative condition: type=%s reason=%s", condition.Type, condition.Reason)
+							}
+						}
 					}
 				}
 			}
