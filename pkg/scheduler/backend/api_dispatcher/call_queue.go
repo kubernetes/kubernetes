@@ -317,7 +317,10 @@ func (cq *callQueue) syncObject(obj metav1.Object) (metav1.Object, error) {
 func (cq *callQueue) close() {
 	cq.lock.Lock()
 	defer cq.lock.Unlock()
-
+	// Cancel all api calls in queue
+	for _, call := range cq.apiCalls {
+		call.sendOnFinish(errors.New("dispatcher closed"))
+	}
 	cq.closed = true
 	cq.cond.Broadcast()
 }

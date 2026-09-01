@@ -559,6 +559,7 @@ func TestCallQueueSyncObject(t *testing.T) {
 }
 
 func TestCallQueueClose(t *testing.T) {
+	registerAndResetMetrics(t)
 	t.Run("Pop returns nil when controller is closed", func(t *testing.T) {
 		cq := newCallQueue(mockRelevances)
 		cq.close()
@@ -594,6 +595,65 @@ func TestCallQueueClose(t *testing.T) {
 			}
 		case <-time.After(100 * time.Millisecond):
 			t.Fatal("Pop() should have been unblocked by close(), but it remained blocked")
+		}
+	})
+
+	t.Run("close cancels both pending and in-flight calls", func(t *testing.T) {
+		cq := newCallQueue(mockRelevances)
+		onFinish1 := make(chan error, 1)
+		onFinish2 := make(chan error, 1)
+
+		call1 := &queuedAPICall{
+			APICall: &mockAPICall{
+				uid:      types.UID("uid-1"),
+				callType: mockCallTypeLow,
+			},
+			onFinish: onFinish1,
+		}
+		call2 := &queuedAPICall{
+			APICall: &mockAPICall{
+				uid:      types.UID("uid-2"),
+				callType: mockCallTypeLow,
+			},
+			onFinish: onFinish2,
+		}
+
+		if err := cq.add(call1); err != nil {
+			t.Fatalf("Unexpected error adding call1: %v", err)
+		}
+		if err := cq.add(call2); err != nil {
+			t.Fatalf("Unexpected error adding call2: %v", err)
+		}
+
+		popped, err := cq.pop()
+		if err != nil {
+			t.Fatalf("Unexpected error popping call1: %v", err)
+		}
+		if popped.UID() != call1.UID() {
+			t.Fatalf("Expected call1 to be popped, got %v", popped.UID())
+		}
+		if !cq.inFlightEntities.Has(call1.UID()) {
+			t.Fatalf("Expected call1 to be in inFlightEntities")
+		}
+
+		cq.close()
+
+		select {
+		case err := <-onFinish1:
+			if err == nil || err.Error() != "dispatcher closed" {
+				t.Errorf("Expected 'dispatcher closed' error for in-flight call, got: %v", err)
+			}
+		default:
+			t.Errorf("In-flight call was not notified on close")
+		}
+
+		select {
+		case err := <-onFinish2:
+			if err == nil || err.Error() != "dispatcher closed" {
+				t.Errorf("Expected 'dispatcher closed' error for pending call, got: %v", err)
+			}
+		default:
+			t.Errorf("Pending call was not notified on close")
 		}
 	})
 }

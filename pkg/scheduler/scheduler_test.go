@@ -37,11 +37,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -296,6 +298,7 @@ func TestFailureHandler(t *testing.T) {
 		name                       string
 		podUpdatedDuringScheduling bool // pod is updated during a scheduling cycle
 		podDeletedDuringScheduling bool // pod is deleted during a scheduling cycle
+		statusPatchError           error
 		expect                     *v1.Pod
 	}{
 		{
@@ -306,6 +309,11 @@ func TestFailureHandler(t *testing.T) {
 		{
 			name:   "pod is not updated during a scheduling cycle",
 			expect: testPod,
+		},
+		{
+			name:             "pod status patch fails, pod is still requeued",
+			statusPatchError: errors.New("simulated patch failure"),
+			expect:           testPod,
 		},
 		{
 			name:                       "pod is deleted during a scheduling cycle",
@@ -322,6 +330,17 @@ func TestFailureHandler(t *testing.T) {
 				defer cancel()
 
 				client := fake.NewClientset(&v1.PodList{Items: []v1.Pod{*testPod}})
+
+				patchStarted := make(chan struct{})
+				unblockPatch := make(chan struct{})
+				defer func() {
+					select {
+					case <-unblockPatch:
+					default:
+						close(unblockPatch)
+					}
+				}()
+
 				informerFactory := informers.NewSharedInformerFactory(client, 0)
 				podInformer := informerFactory.Core().V1().Pods()
 				// Need to add/update/delete testPod to the store.
@@ -339,6 +358,32 @@ func TestFailureHandler(t *testing.T) {
 				recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
 				queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())), internalqueue.WithMetricsRecorder(recorder), internalqueue.WithAPIDispatcher(apiDispatcher))
 				schedulerCache := internalcache.New(ctx, apiDispatcher, false, false)
+
+				if tt.expect != nil {
+					client.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+						patchAction, ok := action.(clienttesting.PatchAction)
+						if ok && patchAction.GetSubresource() == "status" {
+							if !asyncAPICallsEnabled {
+								// In synchronous mode, requeue must have happened before status patch.
+								if getPodFromPriorityQueue(queue, testPod) == nil {
+									t.Errorf("In synchronous mode, pod %s should already be in queue when status patch is executed", testPod.Name)
+								}
+							}
+							select {
+							case <-patchStarted:
+							default:
+								close(patchStarted)
+							}
+							if asyncAPICallsEnabled {
+								<-unblockPatch
+							}
+							if tt.statusPatchError != nil {
+								return true, nil, tt.statusPatchError
+							}
+						}
+						return false, nil, nil
+					})
+				}
 
 				queue.Add(ctx, testPod)
 
@@ -368,14 +413,76 @@ func TestFailureHandler(t *testing.T) {
 				s.FailureHandler(ctx, schedFramework, testPodInfo, fwk.NewStatus(fwk.Unschedulable), nil, time.Now())
 
 				var got *v1.Pod
-				if tt.podUpdatedDuringScheduling {
-					pInfo, ok := queue.GetPod(testPod.Name, testPod.Namespace, testPod.Spec.SchedulingGroup)
-					if !ok {
-						t.Fatalf("Failed to get pod %s/%s from queue", testPod.Namespace, testPod.Name)
+				if asyncAPICallsEnabled {
+					if tt.expect != nil {
+						// 1. Wait until status patch is actively in flight
+						select {
+						case <-patchStarted:
+						case <-time.After(wait.ForeverTestTimeout):
+							t.Fatal("Timed out waiting for status patch to start")
+						}
+
+						// 2. Assert: while status patch is in flight, pod is NOT in queue and IS in-flight
+						if getPodFromPriorityQueue(queue, testPod) != nil {
+							t.Errorf("Pod %s was requeued while status patch was still in flight", testPod.Name)
+						}
+						if !podListContainsPod(queue.InFlightPods(), testPod) {
+							t.Errorf("Pod %s should remain in-flight while status patch is in flight", testPod.Name)
+						}
+
+						// 3. Release the blocked status patch
+						close(unblockPatch)
+
+						// 4. Wait for pod to appear in queue after status patch finishes
+						err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(_ context.Context) (bool, error) {
+							if tt.podUpdatedDuringScheduling {
+								pInfo, ok := queue.GetPod(testPod.Name, testPod.Namespace, testPod.Spec.SchedulingGroup)
+								if ok {
+									got = pInfo.Pod
+									return true, nil
+								}
+							} else {
+								got = getPodFromPriorityQueue(queue, testPod)
+								if got != nil {
+									return true, nil
+								}
+							}
+							return false, nil
+						})
+						if err != nil {
+							t.Fatalf("Failed waiting for pod %s/%s to appear in queue: %v", testPod.Namespace, testPod.Name, err)
+						}
+
+						// 5. Assert: after requeue, pod is no longer in-flight
+						if podListContainsPod(queue.InFlightPods(), testPod) {
+							t.Errorf("Pod %s should no longer be in-flight after being requeued", testPod.Name)
+						}
+					} else {
+						// Wait until in-flight pods are cleared for deleted pod
+						err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(_ context.Context) (bool, error) {
+							return len(queue.InFlightPods()) == 0, nil
+						})
+						if err != nil {
+							t.Fatalf("in-flight pod never cleared for deleted pod: %v", err)
+						}
+						if tt.podUpdatedDuringScheduling {
+							if pInfo, ok := queue.GetPod(testPod.Name, testPod.Namespace, testPod.Spec.SchedulingGroup); ok {
+								got = pInfo.Pod
+							}
+						} else {
+							got = getPodFromPriorityQueue(queue, testPod)
+						}
 					}
-					got = pInfo.Pod
 				} else {
-					got = getPodFromPriorityQueue(queue, testPod)
+					if tt.podUpdatedDuringScheduling {
+						pInfo, ok := queue.GetPod(testPod.Name, testPod.Namespace, testPod.Spec.SchedulingGroup)
+						if !ok {
+							t.Fatalf("Failed to get pod %s/%s from queue", testPod.Namespace, testPod.Name)
+						}
+						got = pInfo.Pod
+					} else {
+						got = getPodFromPriorityQueue(queue, testPod)
+					}
 				}
 
 				if diff := cmp.Diff(tt.expect, got); diff != "" {
@@ -430,6 +537,267 @@ func TestFailureHandler_PodAlreadyBound(t *testing.T) {
 				t.Fatalf("Unexpected pod: %v should not be in PriorityQueue when the NodeName of pod is not empty", pod.Name)
 			}
 		})
+	}
+}
+
+func TestFailureHandler_InFlightRelease(t *testing.T) {
+	metrics.Register()
+	nodeFoo := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+
+	tests := []struct {
+		name           string
+		isBound        bool
+		isDeleted      bool
+		isRecreated    bool
+		deferredResize bool
+		expectRequeued bool
+	}{
+		{
+			name:           "bound pod releases in-flight tracking and is not requeued",
+			isBound:        true,
+			expectRequeued: false,
+		},
+		{
+			name:           "deleted pod releases in-flight tracking and is not requeued",
+			isDeleted:      true,
+			expectRequeued: false,
+		},
+		{
+			name:           "recreated pod releases in-flight tracking and is not requeued",
+			isRecreated:    true,
+			expectRequeued: false,
+		},
+		{
+			name:           "deferred resize pod releases in-flight tracking and is requeued",
+			deferredResize: true,
+			expectRequeued: true,
+		},
+	}
+
+	for _, asyncAPICallsEnabled := range []bool{true, false} {
+		for _, tt := range tests {
+			t.Run(fmt.Sprintf("%s (Async API calls enabled: %v)", tt.name, asyncAPICallsEnabled), func(t *testing.T) {
+				if tt.deferredResize {
+					featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, true)
+				}
+				logger, ctx := ktesting.NewTestContext(t)
+				ctx, cancel := context.WithCancel(ctx)
+				defer cancel()
+
+				podBuilder := st.MakePod().Name("test-pod").Namespace(v1.NamespaceDefault).UID("uid-1")
+				if tt.isBound {
+					podBuilder = podBuilder.Node("foo")
+				}
+				if tt.deferredResize {
+					podBuilder = podBuilder.Node("foo").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred)
+				}
+				testPod := podBuilder.Obj()
+
+				client := fake.NewClientset(&v1.PodList{Items: []v1.Pod{*testPod}}, &v1.NodeList{Items: []v1.Node{nodeFoo}})
+
+				patchStarted := make(chan struct{})
+				unblockPatch := make(chan struct{})
+				defer func() {
+					select {
+					case <-unblockPatch:
+					default:
+						close(unblockPatch)
+					}
+				}()
+
+				client.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+					patchAction, ok := action.(clienttesting.PatchAction)
+					if ok && patchAction.GetSubresource() == "status" {
+						select {
+						case <-patchStarted:
+						default:
+							close(patchStarted)
+						}
+						if asyncAPICallsEnabled {
+							<-unblockPatch
+						}
+					}
+					return false, nil, nil
+				})
+
+				informerFactory := informers.NewSharedInformerFactory(client, 0)
+				podInformer := informerFactory.Core().V1().Pods()
+
+				if err := podInformer.Informer().GetStore().Add(testPod); err != nil {
+					t.Fatal(err)
+				}
+
+				var apiDispatcher *apidispatcher.APIDispatcher
+				if asyncAPICallsEnabled {
+					apiDispatcher = apidispatcher.New(client, 16, apicalls.Relevances)
+					apiDispatcher.Run(logger)
+					defer apiDispatcher.Close()
+				}
+
+				recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
+				queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())), internalqueue.WithMetricsRecorder(recorder), internalqueue.WithAPIDispatcher(apiDispatcher))
+				schedulerCache := internalcache.New(ctx, apiDispatcher, false, false)
+				schedulerCache.AddNode(logger, &nodeFoo)
+
+				s, schedFramework, err := initScheduler(ctx, schedulerCache, queue, apiDispatcher, client, informerFactory)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if tt.deferredResize {
+					s.inPlacePodVerticalScalingSchedulerPreemptionEnabled = true
+				}
+
+				queue.Add(ctx, testPod)
+				if _, err := queue.Pop(logger); err != nil {
+					t.Fatalf("Pop failed: %v", err)
+				}
+				if !podListContainsPod(queue.InFlightPods(), testPod) {
+					t.Fatalf("Pod %s should be in-flight after Pop", testPod.Name)
+				}
+
+				if tt.isDeleted {
+					if err := podInformer.Informer().GetStore().Delete(testPod); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if tt.isRecreated {
+					recreatedPod := testPod.DeepCopy()
+					recreatedPod.UID = "uid-2"
+					if err := podInformer.Informer().GetStore().Update(recreatedPod); err != nil {
+						t.Fatal(err)
+					}
+				}
+
+				testPodInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, testPod)}
+				s.FailureHandler(ctx, schedFramework, testPodInfo, fwk.NewStatus(fwk.Unschedulable).WithError(fmt.Errorf("simulated failure")), nil, time.Now())
+
+				if asyncAPICallsEnabled && (tt.isBound || tt.isDeleted) {
+					// 1. Wait until status patch is actively in flight
+					select {
+					case <-patchStarted:
+					case <-time.After(wait.ForeverTestTimeout):
+						t.Fatal("Timed out waiting for status patch to start")
+					}
+
+					// 2. Assert: while status patch is in flight, in-flight tracking was ALREADY released
+					if podListContainsPod(queue.InFlightPods(), testPod) {
+						t.Errorf("Pod %s should not remain in-flight while status patch is in flight", testPod.Name)
+					}
+					if getPodFromPriorityQueue(queue, testPod) != nil {
+						t.Errorf("Pod %s should not be in queue", testPod.Name)
+					}
+
+					// 3. Unblock patch
+					close(unblockPatch)
+				}
+
+				// Final assertion: verify queue and in-flight state
+				if podListContainsPod(queue.InFlightPods(), testPod) {
+					t.Errorf("Pod %s should not be in-flight", testPod.Name)
+				}
+				got := getPodFromPriorityQueue(queue, testPod)
+				if tt.expectRequeued && got == nil {
+					t.Errorf("expected pod %s to be requeued, but was not in queue", testPod.Name)
+				}
+				if !tt.expectRequeued && got != nil {
+					t.Errorf("expected pod %s to NOT be requeued, but was found in queue", testPod.Name)
+				}
+			})
+		}
+	}
+}
+
+func TestFailureHandler_DispatcherClose(t *testing.T) {
+	metrics.Register()
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	testPod := st.MakePod().Name("test-pod-inflight").Namespace(v1.NamespaceDefault).Obj()
+	client := fake.NewClientset(&v1.PodList{Items: []v1.Pod{*testPod}})
+
+	patchStarted := make(chan struct{})
+	unblockPatch := make(chan struct{})
+	defer func() {
+		select {
+		case <-unblockPatch:
+		default:
+			close(unblockPatch)
+		}
+	}()
+
+	client.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		patchAction, ok := action.(clienttesting.PatchAction)
+		if ok && patchAction.GetSubresource() == "status" {
+			select {
+			case <-patchStarted:
+			default:
+				close(patchStarted)
+			}
+			<-unblockPatch
+		}
+		return false, nil, nil
+	})
+
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	podInformer := informerFactory.Core().V1().Pods()
+	if err := podInformer.Informer().GetStore().Add(testPod); err != nil {
+		t.Fatal(err)
+	}
+
+	apiDispatcher := apidispatcher.New(client, 16, apicalls.Relevances)
+	apiDispatcher.Run(logger)
+
+	recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
+	queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())), internalqueue.WithMetricsRecorder(recorder), internalqueue.WithAPIDispatcher(apiDispatcher))
+	schedulerCache := internalcache.New(ctx, apiDispatcher, false, false)
+
+	s, schedFramework, err := initScheduler(ctx, schedulerCache, queue, apiDispatcher, client, informerFactory)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	queue.Add(ctx, testPod)
+	if _, err := queue.Pop(logger); err != nil {
+		t.Fatalf("Pop failed: %v", err)
+	}
+	if !podListContainsPod(queue.InFlightPods(), testPod) {
+		t.Fatalf("Pod %s should be in-flight after Pop", testPod.Name)
+	}
+
+	testPodInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, testPod)}
+	s.FailureHandler(ctx, schedFramework, testPodInfo, fwk.NewStatus(fwk.Unschedulable).WithError(fmt.Errorf("simulated failure")), nil, time.Now())
+
+	// 1. Wait until status patch is actively in flight in dispatcher (fake blocker)
+	select {
+	case <-patchStarted:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("Timed out waiting for status patch to start")
+	}
+
+	// 2. Assert: while status patch is in flight, pod is NOT in queue and IS in-flight
+	if getPodFromPriorityQueue(queue, testPod) != nil {
+		t.Errorf("Pod %s was requeued while status patch was still in flight", testPod.Name)
+	}
+	if !podListContainsPod(queue.InFlightPods(), testPod) {
+		t.Errorf("Pod %s should remain in-flight while status patch is in flight", testPod.Name)
+	}
+
+	// 3. Close dispatcher while patch is in flight
+	apiDispatcher.Close()
+	close(unblockPatch)
+
+	// 4. Wait for pod to appear in queue after dispatcher close
+	err = wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(_ context.Context) (bool, error) {
+		return getPodFromPriorityQueue(queue, testPod) != nil, nil
+	})
+	if err != nil {
+		t.Fatalf("pod was not requeued after dispatcher close: %v", err)
+	}
+
+	// 5. Assert: pod is no longer in-flight
+	if podListContainsPod(queue.InFlightPods(), testPod) {
+		t.Errorf("Pod %s should no longer be in-flight after being requeued", testPod.Name)
 	}
 }
 
