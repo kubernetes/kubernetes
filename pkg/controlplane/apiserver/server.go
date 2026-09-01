@@ -26,7 +26,9 @@ import (
 	coordinationapiv1 "k8s.io/api/coordination/v1"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	apiserverfeatures "k8s.io/apiserver/pkg/features"
 	peerreconcilers "k8s.io/apiserver/pkg/reconcilers"
@@ -84,6 +86,10 @@ type Server struct {
 	RESTOptionsGetter         genericregistry.RESTOptionsGetter
 	ClusterAuthenticationInfo clusterauthenticationtrust.ClusterAuthenticationInfo
 	VersionedInformers        clientgoinformers.SharedInformerFactory
+
+	// servedResources is populated by InstallAPIs with the resources that survived
+	// runtime-config, emulation version and API lifecycle filtering.
+	servedResources sets.Set[schema.GroupResource]
 }
 
 // New returns a new instance of Master from the given config.

@@ -18,7 +18,10 @@ package apiserver
 
 import (
 	"fmt"
+	"strings"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
@@ -87,6 +90,7 @@ func (c *CompletedConfig) GenericStorageProviders(discovery discovery.DiscoveryI
 // InstallAPIs will install the APIs for the restStorageProviders if they are enabled.
 func (s *Server) InstallAPIs(restStorageProviders ...RESTStorageProvider) error {
 	nonLegacy := []*genericapiserver.APIGroupInfo{}
+	servedResources := sets.New[schema.GroupResource]()
 
 	// used later in the loop to filter the served resource by those that have expired.
 	resourceExpirationEvaluatorOpts := genericapiserver.ResourceExpirationEvaluatorOptions{
@@ -125,6 +129,16 @@ func (s *Server) InstallAPIs(restStorageProviders ...RESTStorageProvider) error 
 			continue
 		}
 
+		// Record what survived, so ValidateFeatureGateAPIRequirements can check enabled feature
+		// gates against the resources that are served rather than against the requested resource
+		// config.
+		for _, resources := range apiGroupInfo.VersionedResourcesStorageMap {
+			for resource := range resources {
+				parent, _, _ := strings.Cut(resource, "/")
+				servedResources.Insert(schema.GroupResource{Group: groupName, Resource: parent})
+			}
+		}
+
 		klog.V(1).Infof("Enabling API group %q.", groupName)
 
 		if postHookProvider, ok := restStorageBuilder.(genericapiserver.PostStartHookProvider); ok {
@@ -149,5 +163,16 @@ func (s *Server) InstallAPIs(restStorageProviders ...RESTStorageProvider) error 
 	if err := s.GenericAPIServer.InstallAPIGroups(nonLegacy...); err != nil {
 		return fmt.Errorf("error in registering group versions: %w", err)
 	}
+
+	s.servedResources = servedResources
 	return nil
+}
+
+// ValidateFeatureGateAPIRequirements checks if an enabled feature gate requires an API resource
+// that this server does serve or not.
+func (s *Server) ValidateFeatureGateAPIRequirements(requirements serverstorage.FeatureGateAPIRequirements) error {
+	if s.servedResources == nil {
+		return fmt.Errorf("cannot validate feature gate API requirements before InstallAPIs has run")
+	}
+	return requirements.Validate(s.GenericAPIServer.FeatureGate, s.servedResources)
 }
