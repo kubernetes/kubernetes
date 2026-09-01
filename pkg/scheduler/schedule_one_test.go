@@ -2310,6 +2310,7 @@ func TestScheduleOne_PodUpdateDuringBindingCycle(t *testing.T) {
 				Profiles:         profile.Map{testSchedulerName: schedFramework},
 				nodeInfoSnapshot: internalcache.NewEmptySnapshot(),
 			}
+			sched.initAlgorithm()
 			sched.FailureHandler = sched.handleSchedulingFailure
 			sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) (ScheduleResult, error) {
 				return scheduleResultOk, nil
@@ -3022,8 +3023,16 @@ func TestUpdatePodStatus(t *testing.T) {
 					apiCacher = apicache.New(queue, nil)
 				}
 
-				if err := updatePod(ctx, cs, apiCacher, pod, test.newPodCondition, test.newNominatingInfo); err != nil {
-					t.Fatalf("Error calling update: %v", err)
+				if asyncAPICallsEnabled {
+					onFinish, err := dispatchPodStatusPatch(apiCacher, pod, test.newPodCondition, test.newNominatingInfo)
+					if err != nil {
+						t.Fatalf("Error dispatching patch: %v", err)
+					}
+					waitPodStatusPatch(ctx, apiCacher, pod, onFinish)
+				} else {
+					if err := patchPodStatusSync(ctx, cs, pod, test.newPodCondition, test.newNominatingInfo); err != nil {
+						t.Fatalf("Error calling patchPodStatusSync: %v", err)
+					}
 				}
 
 				if test.expectPatchRequest {

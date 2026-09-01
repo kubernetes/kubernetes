@@ -251,3 +251,52 @@ func TestActiveQueue_AddEventIfAnyInFlight(t *testing.T) {
 		})
 	}
 }
+
+func TestClearPoppedEntity(t *testing.T) {
+	pInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: st.MakePod().Namespace("ns").Name("p1").UID("p1").Obj()}}
+	pInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: st.MakePod().Namespace("ns").Name("p2").UID("p2").Obj()}}
+
+	tests := []struct {
+		name                    string
+		entityToClear           framework.QueuedEntityInfo
+		wantLastPoppedEntityKey string
+	}{
+		{
+			name:                    "clearing an unrelated entity does not clear last popped entity",
+			entityToClear:           pInfo2,
+			wantLastPoppedEntityKey: queuedEntityKeyFunc(pInfo1),
+		},
+		{
+			name:                    "clearing nil entity does not clear last popped entity",
+			entityToClear:           nil,
+			wantLastPoppedEntityKey: queuedEntityKeyFunc(pInfo1),
+		},
+		{
+			name:          "clearing the matching entity clears last popped entity",
+			entityToClear: pInfo1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			rr := metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())
+			aq := newActiveQueue(heap.NewWithRecorder(queuedEntityKeyFunc, heap.LessFunc[framework.QueuedEntityInfo](convertLessFn(newDefaultQueueSort())), metrics.NewActiveEntitiesRecorder()), rr, nil)
+
+			aq.add(logger, pInfo1, framework.EventUnscheduledPodAdd.Label(), nil)
+			popped, err := aq.pop(logger)
+			if err != nil {
+				t.Fatalf("pop failed: %v", err)
+			}
+			if !aq.isLastPoppedEntity(popped) {
+				t.Fatalf("expected popped entity to be last popped entity")
+			}
+
+			aq.clearPoppedEntity(tt.entityToClear)
+
+			if aq.lastPoppedEntityKey != tt.wantLastPoppedEntityKey {
+				t.Fatalf("expected last popped entity: %q, got: %q", tt.wantLastPoppedEntityKey, aq.lastPoppedEntityKey)
+			}
+		})
+	}
+}

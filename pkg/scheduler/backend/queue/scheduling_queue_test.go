@@ -7904,7 +7904,8 @@ func TestAddUnschedulablePodIfNotPresentPodGroupMember(t *testing.T) {
 			setupInitialPodGroupState(t, ctx, q, tt.initialPods, tt.initialState, podGroup)
 
 			if tt.clearLastPopped {
-				q.activeQ.clearPoppedEntity()
+				pgLookup := newQueuedPodGroupInfoForLookup(podGroup.Namespace, podGroup.Name, fwk.PodGroupKeyType)
+				q.activeQ.clearPoppedEntity(pgLookup)
 			}
 
 			if tt.deletePodGroup {

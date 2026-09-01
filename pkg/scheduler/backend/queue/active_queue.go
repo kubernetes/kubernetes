@@ -63,7 +63,7 @@ type activeQueuer interface {
 	addEventIfAnyInFlight(oldObj, newObj interface{}, event fwk.ClusterEvent) bool
 
 	isLastPoppedEntity(entityLookup framework.QueuedEntityInfo) bool
-	clearPoppedEntity()
+	clearPoppedEntity(entity framework.QueuedEntityInfo)
 
 	schedulingCycle() int64
 	doneSchedulingCycle(pod types.UID)
@@ -417,11 +417,16 @@ func (aq *activeQueue) isLastPoppedEntity(entityLookup framework.QueuedEntityInf
 	return aq.lastPoppedEntityKey == queuedEntityKeyFunc(entityLookup)
 }
 
-// clearPoppedEntity clears the last popped entity.
-func (aq *activeQueue) clearPoppedEntity() {
+// clearPoppedEntity clears the last popped entity if it matches the given entity.
+func (aq *activeQueue) clearPoppedEntity(entity framework.QueuedEntityInfo) {
+	if entity == nil {
+		return
+	}
 	aq.lock.Lock()
 	defer aq.lock.Unlock()
-	aq.lastPoppedEntityKey = ""
+	if aq.lastPoppedEntityKey == queuedEntityKeyFunc(entity) {
+		aq.lastPoppedEntityKey = ""
+	}
 }
 
 // list returns all pods that are in the queue.

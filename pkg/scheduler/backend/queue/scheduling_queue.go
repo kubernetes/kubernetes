@@ -1146,7 +1146,7 @@ func (p *PriorityQueue) AddUnschedulablePodIfNotPresent(logger klog.Logger, pInf
 		return nil
 	}
 
-	p.activeQ.clearPoppedEntity()
+	p.activeQ.clearPoppedEntity(pInfo)
 	rejectorPlugins := pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins)
 	for plugin := range rejectorPlugins {
 		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Inc()
@@ -1201,7 +1201,7 @@ func (p *PriorityQueue) AddAttemptedPodGroupIfNeeded(logger klog.Logger, pgInfo 
 		return fmt.Errorf("pod group %v is already present in the backoff queue", klog.KObj(pgInfo))
 	}
 
-	p.activeQ.clearPoppedEntity()
+	p.activeQ.clearPoppedEntity(pgInfo)
 	// Get the pending pods and put them into the pod group.
 	var pendingPods []*framework.QueuedPodInfo
 	for _, leafPodGroup := range p.workloadForest.getLeafPodGroups(logger, pgInfo) {
