@@ -55,7 +55,7 @@ var (
 	provisioner = "test-provisioner"
 
 	// PVCs for manual binding
-	// TODO: clean up all of these
+	// TODO: clean up all of these. See https://github.com/kubernetes/kubernetes/issues/115475 for tracking.
 	unboundPVC          = makeTestPVC("unbound-pvc", "1G", "", pvcUnbound, "", "1", &waitClass)
 	unboundPVC2         = makeTestPVC("unbound-pvc2", "5G", "", pvcUnbound, "", "1", &waitClass)
 	preboundPVC         = makeTestPVC("prebound-pvc", "1G", "", pvcPrebound, "pv-node1a", "1", &waitClass)
