@@ -281,6 +281,86 @@ func TestAddRemovePodsWithRestartableInitContainer(t *testing.T) {
 	}
 }
 
+func TestStopLivenessAndStartup(t *testing.T) {
+	ktesting.Init(t).SyncTest("", testStopLivenessAndStartup)
+}
+
+func testStopLivenessAndStartup(tCtx ktesting.TContext) {
+	t := tCtx.TB()
+	m := newTestManager()
+	defer cleanup(t, m)
+
+	restartPolicyAlways := v1.ContainerRestartPolicyAlways
+	pod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "stop_probe_pod",
+		},
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{
+				{
+					Name: "regular-init",
+				},
+				{
+					Name:           "sidecar",
+					RestartPolicy:  &restartPolicyAlways,
+					StartupProbe:   defaultProbe,
+					LivenessProbe:  defaultProbe,
+					ReadinessProbe: defaultProbe,
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name:           "main",
+					StartupProbe:   defaultProbe,
+					LivenessProbe:  defaultProbe,
+					ReadinessProbe: defaultProbe,
+				},
+			},
+		},
+	}
+
+	m.AddPod(tCtx, &pod)
+	allProbes := []probeKey{
+		{"stop_probe_pod", "sidecar", startup},
+		{"stop_probe_pod", "sidecar", liveness},
+		{"stop_probe_pod", "sidecar", readiness},
+		{"stop_probe_pod", "main", startup},
+		{"stop_probe_pod", "main", liveness},
+		{"stop_probe_pod", "main", readiness},
+	}
+	if err := expectProbes(m, allProbes); err != nil {
+		t.Fatal(err)
+	}
+
+	m.StopLivenessAndStartup(&pod)
+
+	stoppedProbes := []probeKey{
+		{"stop_probe_pod", "sidecar", startup},
+		{"stop_probe_pod", "sidecar", liveness},
+		{"stop_probe_pod", "main", startup},
+		{"stop_probe_pod", "main", liveness},
+	}
+	if err := waitForWorkerExit(t, m, stoppedProbes); err != nil {
+		t.Fatal(err)
+	}
+
+	remainingProbes := []probeKey{
+		{"stop_probe_pod", "sidecar", readiness},
+		{"stop_probe_pod", "main", readiness},
+	}
+	if err := expectProbes(m, remainingProbes); err != nil {
+		t.Error(err)
+	}
+
+	m.RemovePod(&pod)
+	if err := waitForWorkerExit(t, m, remainingProbes); err != nil {
+		t.Fatal(err)
+	}
+	if err := expectProbes(m, nil); err != nil {
+		t.Error(err)
+	}
+}
+
 func TestCleanupPods(t *testing.T) {
 	ktesting.Init(t).SyncTest("", testCleanupPods)
 }
