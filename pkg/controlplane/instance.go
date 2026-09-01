@@ -77,6 +77,7 @@ import (
 	flowcontrolv1beta1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1"
 	flowcontrolv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
 	flowcontrolv1beta3 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3"
+	"k8s.io/kubernetes/pkg/controlplane/apirequirements"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 	"k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	"k8s.io/kubernetes/pkg/controlplane/controller/defaultservicecidr"
@@ -343,6 +344,10 @@ func (c CompletedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 
 	if err := s.ControlPlane.InstallAPIs(restStorageProviders...); err != nil {
+		return nil, err
+	}
+
+	if err := s.ControlPlane.ValidateFeatureGateAPIRequirements(apirequirements.DefaultForKubeAPIServer()); err != nil {
 		return nil, err
 	}
 
