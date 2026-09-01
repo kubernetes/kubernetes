@@ -185,10 +185,10 @@ var reservationCgroups = []cm.CgroupName{
 	cm.NewCgroupName(cm.RootCgroupName, systemReservedCgroup),
 }
 
-func createTemporaryCgroupsForReservation(cgroupManager cm.CgroupManager) error {
+func createTemporaryCgroupsForReservation(logger klog.Logger, cgroupManager cm.CgroupManager) error {
 	for _, name := range reservationCgroups {
 		if !cgroupManager.Exists(name) {
-			if err := cgroupManager.Create(klog.Background(), &cm.CgroupConfig{Name: name}); err != nil {
+			if err := cgroupManager.Create(logger, &cm.CgroupConfig{Name: name}); err != nil {
 				return err
 			}
 		}
@@ -196,9 +196,9 @@ func createTemporaryCgroupsForReservation(cgroupManager cm.CgroupManager) error 
 	return nil
 }
 
-func destroyTemporaryCgroupsForReservation(cgroupManager cm.CgroupManager) error {
+func destroyTemporaryCgroupsForReservation(logger klog.Logger, cgroupManager cm.CgroupManager) error {
 	for _, name := range reservationCgroups {
-		if err := cgroupManager.Destroy(klog.Background(), &cm.CgroupConfig{Name: name}); err != nil {
+		if err := cgroupManager.Destroy(logger, &cm.CgroupConfig{Name: name}); err != nil {
 			return err
 		}
 	}
@@ -211,6 +211,7 @@ func convertSharesToWeight(shares int64) int64 {
 }
 
 func validateNodeAllocatableEnforcement(ctx context.Context, f *framework.Framework) error {
+	logger := klog.FromContext(ctx)
 	var oldCfg *kubeletconfig.KubeletConfiguration
 	subsystems, err := cm.GetCgroupSubsystems()
 	if err != nil {
@@ -222,15 +223,15 @@ func validateNodeAllocatableEnforcement(ctx context.Context, f *framework.Framew
 		return err
 	}
 
-	cgroupManager := cm.NewCgroupManager(klog.Background(), subsystems, oldCfg.CgroupDriver)
+	cgroupManager := cm.NewCgroupManager(logger, subsystems, oldCfg.CgroupDriver)
 
-	ginkgo.DeferCleanup(destroyTemporaryCgroupsForReservation, cgroupManager)
+	ginkgo.DeferCleanup(destroyTemporaryCgroupsForReservation, logger, cgroupManager)
 	ginkgo.DeferCleanup(func(ctx context.Context) {
 		if oldCfg != nil {
 			updateKubeletConfig(ctx, f, oldCfg, true)
 		}
 	})
-	if err := createTemporaryCgroupsForReservation(cgroupManager); err != nil {
+	if err := createTemporaryCgroupsForReservation(logger, cgroupManager); err != nil {
 		return err
 	}
 
@@ -244,7 +245,7 @@ func validateNodeAllocatableEnforcement(ctx context.Context, f *framework.Framew
 	expectedNAPodCgroup := cm.NewCgroupName(cm.RootCgroupName, nodeAllocatableCgroup)
 
 	// Cleanup from the previous kubelet, to verify the new one creates it correctly
-	if err := cgroupManager.Destroy(klog.Background(), &cm.CgroupConfig{
+	if err := cgroupManager.Destroy(logger, &cm.CgroupConfig{
 		Name: cm.NewCgroupName(expectedNAPodCgroup),
 	}); err != nil {
 		return err
@@ -253,6 +254,9 @@ func validateNodeAllocatableEnforcement(ctx context.Context, f *framework.Framew
 		return fmt.Errorf("Expected Node Allocatable Cgroup %q not to exist", expectedNAPodCgroup)
 	}
 
+	// Stale state files from the previous kubelet run can cause startup failures
+	// when reconfiguring resource reservations. This mirrors updateKubeletConfig
+	// behavior when deleteStateFiles is true.
 	deleteStateFile(cpuManagerStateFile)
 	deleteStateFile(memoryManagerStateFile)
 	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
