@@ -1542,10 +1542,9 @@ func TestHandleSchedulingFailure_PodGroupFitErrorCloned(t *testing.T) {
 	pgInfo := entity.(*framework.QueuedPodGroupInfo)
 
 	var poppedPods []*framework.QueuedPodInfo
-	pgInfo.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+	for pInfo := range pgInfo.ForEachPodInfo() {
 		poppedPods = append(poppedPods, pInfo)
-		return true
-	})
+	}
 	if len(poppedPods) != 2 {
 		t.Fatalf("Expected 2 popped pods, got %d", len(poppedPods))
 	}

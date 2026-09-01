@@ -541,15 +541,12 @@ func (sched *Scheduler) handleBindingCycleError(
 // that don't contain a pod with a specific UID.
 func getDifferentUIDPreCheck(uid types.UID) queue.PreEnqueueCheck {
 	return func(entity framework.QueuedEntityInfo) bool {
-		matchesUID := false
-		entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+		for pInfo := range entity.ForEachPodInfo() {
 			if pInfo.Pod.UID == uid {
-				matchesUID = true
 				return false
 			}
-			return true
-		})
-		return !matchesUID
+		}
+		return true
 	}
 }
 

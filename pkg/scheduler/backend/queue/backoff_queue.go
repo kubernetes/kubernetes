@@ -400,16 +400,14 @@ func (bq *backoffQueue) list() []*v1.Pod {
 
 	var result []*v1.Pod
 	for _, entity := range bq.entityBackoffQ.List() {
-		entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+		for pInfo := range entity.ForEachPodInfo() {
 			result = append(result, pInfo.Pod)
-			return true
-		})
+		}
 	}
 	for _, entity := range bq.entityErrorBackoffQ.List() {
-		entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+		for pInfo := range entity.ForEachPodInfo() {
 			result = append(result, pInfo.Pod)
-			return true
-		})
+		}
 	}
 	return result
 }

@@ -268,18 +268,17 @@ func (aq *activeQueue) delete(entityLookup framework.QueuedEntityInfo) framework
 func (aq *activeQueue) unlockedMoveEntityToInFlight(logger klog.Logger, entity framework.QueuedEntityInfo) error {
 	entity.IncAttempts()
 	var podsToDiscard []*framework.QueuedPodInfo
-	entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+	for pInfo := range entity.ForEachPodInfo() {
 		// If the pod is already in the map, we shouldn't overwrite the inFlightPods otherwise it'd lead to a memory leak.
 		// https://github.com/kubernetes/kubernetes/pull/127016
 		if _, ok := aq.inFlightPods[pInfo.Pod.UID]; ok {
 			podsToDiscard = append(podsToDiscard, pInfo)
-			return true
+			continue
 		}
 
 		aq.metricsRecorder.ObserveInFlightEventsAsync(metrics.PodPoppedInFlightEvent, 1, false)
 		aq.inFlightPods[pInfo.Pod.UID] = aq.inFlightEvents.PushBack(pInfo.Pod)
-		return true
-	})
+	}
 	if len(podsToDiscard) > 0 {
 		switch specificEntity := entity.(type) {
 		case *framework.QueuedPodInfo:
@@ -300,12 +299,11 @@ func (aq *activeQueue) unlockedMoveEntityToInFlight(logger klog.Logger, entity f
 	aq.schedCycle++
 
 	// Update metrics for unschedulable plugins.
-	entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+	for pInfo := range entity.ForEachPodInfo() {
 		for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
 			metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
 		}
-		return true
-	})
+	}
 	return nil
 }
 
@@ -381,10 +379,9 @@ func (aq *activeQueue) list() []*v1.Pod {
 	defer aq.lock.RUnlock()
 	var result []*v1.Pod
 	for _, entity := range aq.queue.List() {
-		entity.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+		for pInfo := range entity.ForEachPodInfo() {
 			result = append(result, pInfo.Pod)
-			return true
-		})
+		}
 	}
 	return result
 }

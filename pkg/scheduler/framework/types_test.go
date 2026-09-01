@@ -22,8 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/sets"
-
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
@@ -31,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -4272,10 +4271,9 @@ func TestQueuedPodGroupInfo_ForEachPodInfo(t *testing.T) {
 	}
 
 	count := 0
-	qpgi.ForEachPodInfo(func(pInfo *QueuedPodInfo) bool {
+	for range qpgi.ForEachPodInfo() {
 		count++
-		return true
-	})
+	}
 
 	if count != 3 {
 		t.Errorf("Expected 3 pods, got %d", count)
@@ -4283,10 +4281,10 @@ func TestQueuedPodGroupInfo_ForEachPodInfo(t *testing.T) {
 
 	// Test early exit
 	count = 0
-	qpgi.ForEachPodInfo(func(pInfo *QueuedPodInfo) bool {
+	for range qpgi.ForEachPodInfo() {
 		count++
-		return false
-	})
+		break
+	}
 
 	if count != 1 {
 		t.Errorf("Expected 1 pod after early exit, got %d", count)

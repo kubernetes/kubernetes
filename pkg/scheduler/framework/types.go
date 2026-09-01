@@ -543,7 +543,7 @@ type QueuedEntityInfo interface {
 	GetNamespace() string
 	// ForEachPodInfo iterates over all QueuedPodInfos in the entity and applies the function fn.
 	// If fn returns false, the iteration stops.
-	ForEachPodInfo(fn func(pInfo *QueuedPodInfo) bool)
+	ForEachPodInfo() iter.Seq[*QueuedPodInfo]
 	// Update updates the specified pod in the entity and returns the updated QueuedPodInfo.
 	Update(pod *v1.Pod) (*QueuedPodInfo, error)
 	// Gated returns true if the entity is gated by any plugin at PreEnqueue.
@@ -704,8 +704,10 @@ func (pqi *QueuedPodInfo) Type() fwk.EntityKeyType {
 	return fwk.PodKeyType
 }
 
-func (pqi *QueuedPodInfo) ForEachPodInfo(fn func(pInfo *QueuedPodInfo) bool) {
-	_ = fn(pqi)
+func (pqi *QueuedPodInfo) ForEachPodInfo() iter.Seq[*QueuedPodInfo] {
+	return func(yield func(*QueuedPodInfo) bool) {
+		_ = yield(pqi)
+	}
 }
 
 // Update updates the pod in QueuedPodInfo and clears the cached PodSignature,
@@ -896,12 +898,13 @@ func PodGroupMemberPodsOrderingFunc(a, b *QueuedPodInfo) int {
 	return 0
 }
 
-func (pgqi *QueuedPodGroupInfo) ForEachPodInfo(fn func(pInfo *QueuedPodInfo) bool) {
-	for _, list := range pgqi.QueuedPodInfos {
-		for _, pInfo := range list {
-			ok := fn(pInfo)
-			if !ok {
-				return
+func (pgqi *QueuedPodGroupInfo) ForEachPodInfo() iter.Seq[*QueuedPodInfo] {
+	return func(yield func(*QueuedPodInfo) bool) {
+		for _, list := range pgqi.QueuedPodInfos {
+			for _, pInfo := range list {
+				if !yield(pInfo) {
+					return
+				}
 			}
 		}
 	}
