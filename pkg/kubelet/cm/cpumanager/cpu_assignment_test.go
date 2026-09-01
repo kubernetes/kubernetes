@@ -1114,6 +1114,37 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 			mustParseCPUSet(t, "0-7,10-16,20-27,30-37,40-47,50-56,60-67,70-77"),
 		},
 		{
+			"ensure allocation with cpuGroupSize 2 terminates when per-NUMA availability is not a multiple of the group size",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "0-4,10-14,20-24,30-34"),
+			14,
+			2,
+			"",
+			mustParseCPUSet(t, "0-3,10-13,20-23,30-31"),
+		},
+		{
+			// Feasible: whole-group capacity exactly covers the request, so
+			// the group accounting must not reject it.
+			"ensure allocation with cpuGroupSize 2 succeeds when whole-group capacity exactly satisfies the request",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "0-4,10-14,20-24,30-34"),
+			16,
+			2,
+			"",
+			mustParseCPUSet(t, "0-3,10-13,20-23,30-33"),
+		},
+		{
+			// Same fragmentation on 8 NUMA nodes with 31 CPUs free each, so
+			// the remainder search walks deeper subsets.
+			"ensure allocation with cpuGroupSize 2 terminates on 8 NUMA nodes with fragmented availability",
+			topoDualSocketMultiNumaPerSocketHTLarge,
+			mustParseCPUSet(t, "1-15,17-31,33-47,49-63,65-79,81-95,97-111,113-127,128-255"),
+			230,
+			2,
+			"",
+			mustParseCPUSet(t, "1-15,17-31,33-47,49-62,65-78,81-94,97-110,113-126,129-143,145-159,161-175,177-190,193-206,209-222,225-238,241-254"),
+		},
+		{
 			"ensure bestRemainder chosen with NUMA nodes that have enough CPUs to satisfy the request",
 			topoDualSocketMultiNumaPerSocketHT,
 			mustParseCPUSet(t, "0-3,10-13,20-23,30-36,40-43,50-53,60-63,70-76"),
