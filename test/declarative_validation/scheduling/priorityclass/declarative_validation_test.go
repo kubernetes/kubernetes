@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	scheduling "k8s.io/kubernetes/pkg/apis/scheduling"
 	registry "k8s.io/kubernetes/pkg/registry/scheduling/priorityclass"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
@@ -99,6 +100,27 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("value"), nil, "").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
+		"invalid update preemptionPolicy changed": {
+			oldObj:    mkPriorityClass(TweakPreemptionPolicy(core.PreemptLowerPriority)),
+			updateObj: mkPriorityClass(TweakPreemptionPolicy(core.PreemptNever)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("preemptionPolicy"), nil, "").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		"invalid update preemptionPolicy set from unset": {
+			oldObj:    mkPriorityClass(),
+			updateObj: mkPriorityClass(TweakPreemptionPolicy(core.PreemptLowerPriority)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("preemptionPolicy"), nil, "").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		"invalid update preemptionPolicy unset from set": {
+			oldObj:    mkPriorityClass(TweakPreemptionPolicy(core.PreemptLowerPriority)),
+			updateObj: mkPriorityClass(),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("preemptionPolicy"), nil, "").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -127,5 +149,11 @@ func mkPriorityClass(tweaks ...func(pc *scheduling.PriorityClass)) scheduling.Pr
 func TweakValue(value int32) func(pc *scheduling.PriorityClass) {
 	return func(pc *scheduling.PriorityClass) {
 		pc.Value = value
+	}
+}
+
+func TweakPreemptionPolicy(policy core.PreemptionPolicy) func(pc *scheduling.PriorityClass) {
+	return func(pc *scheduling.PriorityClass) {
+		pc.PreemptionPolicy = &policy
 	}
 }

@@ -25,6 +25,7 @@ import (
 	context "context"
 	fmt "fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
@@ -123,6 +124,38 @@ func Validate_PriorityClass(
 
 	// field schedulingv1.PriorityClass.GlobalDefault has no validation
 	// field schedulingv1.PriorityClass.Description has no validation
-	// field schedulingv1.PriorityClass.PreemptionPolicy has no validation
+
+	{ // field schedulingv1.PriorityClass.PreemptionPolicy
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.PreemptionPolicy,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *schedulingv1.PriorityClass) *corev1.PreemptionPolicy {
+				return oldObj.PreemptionPolicy
+			})
+		errs = append(errs, fn(fldPath.Child("preemptionPolicy"), obj.PreemptionPolicy, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
