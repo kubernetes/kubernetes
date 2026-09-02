@@ -256,6 +256,13 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 	cgroupRoot := ParseCgroupfsToCgroupName(nodeConfig.CgroupRoot)
 	cgroupManager := NewCgroupManager(logger, subsystems, nodeConfig.CgroupDriver)
 	nodeConfig.CgroupVersion = cgroupManager.Version()
+	if nodeConfig.CgroupVersion == 2 {
+		if nsdelegate, err := cgroupNsdelegateEnabled(procMountInfoPath); err != nil {
+			logger.Error(err, "Failed to read cgroup mount options")
+		} else {
+			nodeConfig.CgroupNsdelegate = nsdelegate
+		}
+	}
 	// Check if Cgroup-root actually exists on the node
 	if nodeConfig.CgroupsPerQOS {
 		// this does default to / when enabled, but this tests against regressions.
