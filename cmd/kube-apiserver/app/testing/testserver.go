@@ -184,7 +184,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		if errCh != nil {
 			err, ok := <-errCh
 			if ok && err != nil {
-				klog.Errorf("Failed to shutdown test server clearly: %v", err)
+				klog.FromContext(tCtx).Error(err, "Failed to shutdown test server clearly")
 			}
 		}
 		os.RemoveAll(result.TmpDir)
