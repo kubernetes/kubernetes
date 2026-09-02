@@ -90,7 +90,7 @@ type MockIdentityServer_GetPluginCapabilities_Call struct {
 // GetPluginCapabilities is a helper method to define mock.On call
 //   - context1 context.Context
 //   - getPluginCapabilitiesRequest *csi.GetPluginCapabilitiesRequest
-func (_e *MockIdentityServer_Expecter) GetPluginCapabilities(context1 interface{}, getPluginCapabilitiesRequest interface{}) *MockIdentityServer_GetPluginCapabilities_Call {
+func (_e *MockIdentityServer_Expecter) GetPluginCapabilities(context1 any, getPluginCapabilitiesRequest any) *MockIdentityServer_GetPluginCapabilities_Call {
 	return &MockIdentityServer_GetPluginCapabilities_Call{Call: _e.mock.On("GetPluginCapabilities", context1, getPluginCapabilitiesRequest)}
 }
 
@@ -158,7 +158,7 @@ type MockIdentityServer_GetPluginInfo_Call struct {
 // GetPluginInfo is a helper method to define mock.On call
 //   - context1 context.Context
 //   - getPluginInfoRequest *csi.GetPluginInfoRequest
-func (_e *MockIdentityServer_Expecter) GetPluginInfo(context1 interface{}, getPluginInfoRequest interface{}) *MockIdentityServer_GetPluginInfo_Call {
+func (_e *MockIdentityServer_Expecter) GetPluginInfo(context1 any, getPluginInfoRequest any) *MockIdentityServer_GetPluginInfo_Call {
 	return &MockIdentityServer_GetPluginInfo_Call{Call: _e.mock.On("GetPluginInfo", context1, getPluginInfoRequest)}
 }
 
@@ -226,7 +226,7 @@ type MockIdentityServer_Probe_Call struct {
 // Probe is a helper method to define mock.On call
 //   - context1 context.Context
 //   - probeRequest *csi.ProbeRequest
-func (_e *MockIdentityServer_Expecter) Probe(context1 interface{}, probeRequest interface{}) *MockIdentityServer_Probe_Call {
+func (_e *MockIdentityServer_Expecter) Probe(context1 any, probeRequest any) *MockIdentityServer_Probe_Call {
 	return &MockIdentityServer_Probe_Call{Call: _e.mock.On("Probe", context1, probeRequest)}
 }
 
@@ -354,7 +354,7 @@ type MockControllerServer_ControllerExpandVolume_Call struct {
 // ControllerExpandVolume is a helper method to define mock.On call
 //   - context1 context.Context
 //   - controllerExpandVolumeRequest *csi.ControllerExpandVolumeRequest
-func (_e *MockControllerServer_Expecter) ControllerExpandVolume(context1 interface{}, controllerExpandVolumeRequest interface{}) *MockControllerServer_ControllerExpandVolume_Call {
+func (_e *MockControllerServer_Expecter) ControllerExpandVolume(context1 any, controllerExpandVolumeRequest any) *MockControllerServer_ControllerExpandVolume_Call {
 	return &MockControllerServer_ControllerExpandVolume_Call{Call: _e.mock.On("ControllerExpandVolume", context1, controllerExpandVolumeRequest)}
 }
 
@@ -422,7 +422,7 @@ type MockControllerServer_ControllerGetCapabilities_Call struct {
 // ControllerGetCapabilities is a helper method to define mock.On call
 //   - context1 context.Context
 //   - controllerGetCapabilitiesRequest *csi.ControllerGetCapabilitiesRequest
-func (_e *MockControllerServer_Expecter) ControllerGetCapabilities(context1 interface{}, controllerGetCapabilitiesRequest interface{}) *MockControllerServer_ControllerGetCapabilities_Call {
+func (_e *MockControllerServer_Expecter) ControllerGetCapabilities(context1 any, controllerGetCapabilitiesRequest any) *MockControllerServer_ControllerGetCapabilities_Call {
 	return &MockControllerServer_ControllerGetCapabilities_Call{Call: _e.mock.On("ControllerGetCapabilities", context1, controllerGetCapabilitiesRequest)}
 }
 
@@ -490,7 +490,7 @@ type MockControllerServer_ControllerGetVolume_Call struct {
 // ControllerGetVolume is a helper method to define mock.On call
 //   - context1 context.Context
 //   - controllerGetVolumeRequest *csi.ControllerGetVolumeRequest
-func (_e *MockControllerServer_Expecter) ControllerGetVolume(context1 interface{}, controllerGetVolumeRequest interface{}) *MockControllerServer_ControllerGetVolume_Call {
+func (_e *MockControllerServer_Expecter) ControllerGetVolume(context1 any, controllerGetVolumeRequest any) *MockControllerServer_ControllerGetVolume_Call {
 	return &MockControllerServer_ControllerGetVolume_Call{Call: _e.mock.On("ControllerGetVolume", context1, controllerGetVolumeRequest)}
 }
 
@@ -558,7 +558,7 @@ type MockControllerServer_ControllerGetVolumeHealth_Call struct {
 // ControllerGetVolumeHealth is a helper method to define mock.On call
 //   - context1 context.Context
 //   - controllerGetVolumeHealthRequest *csi.ControllerGetVolumeHealthRequest
-func (_e *MockControllerServer_Expecter) ControllerGetVolumeHealth(context1 interface{}, controllerGetVolumeHealthRequest interface{}) *MockControllerServer_ControllerGetVolumeHealth_Call {
+func (_e *MockControllerServer_Expecter) ControllerGetVolumeHealth(context1 any, controllerGetVolumeHealthRequest any) *MockControllerServer_ControllerGetVolumeHealth_Call {
 	return &MockControllerServer_ControllerGetVolumeHealth_Call{Call: _e.mock.On("ControllerGetVolumeHealth", context1, controllerGetVolumeHealthRequest)}
 }
 
@@ -626,7 +626,7 @@ type MockControllerServer_ControllerListVolumeHealth_Call struct {
 // ControllerListVolumeHealth is a helper method to define mock.On call
 //   - context1 context.Context
 //   - controllerListVolumeHealthRequest *csi.ControllerListVolumeHealthRequest
-func (_e *MockControllerServer_Expecter) ControllerListVolumeHealth(context1 interface{}, controllerListVolumeHealthRequest interface{}) *MockControllerServer_ControllerListVolumeHealth_Call {
+func (_e *MockControllerServer_Expecter) ControllerListVolumeHealth(context1 any, controllerListVolumeHealthRequest any) *MockControllerServer_ControllerListVolumeHealth_Call {
 	return &MockControllerServer_ControllerListVolumeHealth_Call{Call: _e.mock.On("ControllerListVolumeHealth", context1, controllerListVolumeHealthRequest)}
 }
 
@@ -694,7 +694,7 @@ type MockControllerServer_ControllerModifyVolume_Call struct {
 // ControllerModifyVolume is a helper method to define mock.On call
 //   - context1 context.Context
 //   - controllerModifyVolumeRequest *csi.ControllerModifyVolumeRequest
-func (_e *MockControllerServer_Expecter) ControllerModifyVolume(context1 interface{}, controllerModifyVolumeRequest interface{}) *MockControllerServer_ControllerModifyVolume_Call {
+func (_e *MockControllerServer_Expecter) ControllerModifyVolume(context1 any, controllerModifyVolumeRequest any) *MockControllerServer_ControllerModifyVolume_Call {
 	return &MockControllerServer_ControllerModifyVolume_Call{Call: _e.mock.On("ControllerModifyVolume", context1, controllerModifyVolumeRequest)}
 }
 
@@ -762,7 +762,7 @@ type MockControllerServer_ControllerPublishVolume_Call struct {
 // ControllerPublishVolume is a helper method to define mock.On call
 //   - context1 context.Context
 //   - controllerPublishVolumeRequest *csi.ControllerPublishVolumeRequest
-func (_e *MockControllerServer_Expecter) ControllerPublishVolume(context1 interface{}, controllerPublishVolumeRequest interface{}) *MockControllerServer_ControllerPublishVolume_Call {
+func (_e *MockControllerServer_Expecter) ControllerPublishVolume(context1 any, controllerPublishVolumeRequest any) *MockControllerServer_ControllerPublishVolume_Call {
 	return &MockControllerServer_ControllerPublishVolume_Call{Call: _e.mock.On("ControllerPublishVolume", context1, controllerPublishVolumeRequest)}
 }
 
@@ -830,7 +830,7 @@ type MockControllerServer_ControllerUnpublishVolume_Call struct {
 // ControllerUnpublishVolume is a helper method to define mock.On call
 //   - context1 context.Context
 //   - controllerUnpublishVolumeRequest *csi.ControllerUnpublishVolumeRequest
-func (_e *MockControllerServer_Expecter) ControllerUnpublishVolume(context1 interface{}, controllerUnpublishVolumeRequest interface{}) *MockControllerServer_ControllerUnpublishVolume_Call {
+func (_e *MockControllerServer_Expecter) ControllerUnpublishVolume(context1 any, controllerUnpublishVolumeRequest any) *MockControllerServer_ControllerUnpublishVolume_Call {
 	return &MockControllerServer_ControllerUnpublishVolume_Call{Call: _e.mock.On("ControllerUnpublishVolume", context1, controllerUnpublishVolumeRequest)}
 }
 
@@ -898,7 +898,7 @@ type MockControllerServer_CreateSnapshot_Call struct {
 // CreateSnapshot is a helper method to define mock.On call
 //   - context1 context.Context
 //   - createSnapshotRequest *csi.CreateSnapshotRequest
-func (_e *MockControllerServer_Expecter) CreateSnapshot(context1 interface{}, createSnapshotRequest interface{}) *MockControllerServer_CreateSnapshot_Call {
+func (_e *MockControllerServer_Expecter) CreateSnapshot(context1 any, createSnapshotRequest any) *MockControllerServer_CreateSnapshot_Call {
 	return &MockControllerServer_CreateSnapshot_Call{Call: _e.mock.On("CreateSnapshot", context1, createSnapshotRequest)}
 }
 
@@ -966,7 +966,7 @@ type MockControllerServer_CreateVolume_Call struct {
 // CreateVolume is a helper method to define mock.On call
 //   - context1 context.Context
 //   - createVolumeRequest *csi.CreateVolumeRequest
-func (_e *MockControllerServer_Expecter) CreateVolume(context1 interface{}, createVolumeRequest interface{}) *MockControllerServer_CreateVolume_Call {
+func (_e *MockControllerServer_Expecter) CreateVolume(context1 any, createVolumeRequest any) *MockControllerServer_CreateVolume_Call {
 	return &MockControllerServer_CreateVolume_Call{Call: _e.mock.On("CreateVolume", context1, createVolumeRequest)}
 }
 
@@ -1034,7 +1034,7 @@ type MockControllerServer_DeleteSnapshot_Call struct {
 // DeleteSnapshot is a helper method to define mock.On call
 //   - context1 context.Context
 //   - deleteSnapshotRequest *csi.DeleteSnapshotRequest
-func (_e *MockControllerServer_Expecter) DeleteSnapshot(context1 interface{}, deleteSnapshotRequest interface{}) *MockControllerServer_DeleteSnapshot_Call {
+func (_e *MockControllerServer_Expecter) DeleteSnapshot(context1 any, deleteSnapshotRequest any) *MockControllerServer_DeleteSnapshot_Call {
 	return &MockControllerServer_DeleteSnapshot_Call{Call: _e.mock.On("DeleteSnapshot", context1, deleteSnapshotRequest)}
 }
 
@@ -1102,7 +1102,7 @@ type MockControllerServer_DeleteVolume_Call struct {
 // DeleteVolume is a helper method to define mock.On call
 //   - context1 context.Context
 //   - deleteVolumeRequest *csi.DeleteVolumeRequest
-func (_e *MockControllerServer_Expecter) DeleteVolume(context1 interface{}, deleteVolumeRequest interface{}) *MockControllerServer_DeleteVolume_Call {
+func (_e *MockControllerServer_Expecter) DeleteVolume(context1 any, deleteVolumeRequest any) *MockControllerServer_DeleteVolume_Call {
 	return &MockControllerServer_DeleteVolume_Call{Call: _e.mock.On("DeleteVolume", context1, deleteVolumeRequest)}
 }
 
@@ -1170,7 +1170,7 @@ type MockControllerServer_GetCapacity_Call struct {
 // GetCapacity is a helper method to define mock.On call
 //   - context1 context.Context
 //   - getCapacityRequest *csi.GetCapacityRequest
-func (_e *MockControllerServer_Expecter) GetCapacity(context1 interface{}, getCapacityRequest interface{}) *MockControllerServer_GetCapacity_Call {
+func (_e *MockControllerServer_Expecter) GetCapacity(context1 any, getCapacityRequest any) *MockControllerServer_GetCapacity_Call {
 	return &MockControllerServer_GetCapacity_Call{Call: _e.mock.On("GetCapacity", context1, getCapacityRequest)}
 }
 
@@ -1238,7 +1238,7 @@ type MockControllerServer_GetSnapshot_Call struct {
 // GetSnapshot is a helper method to define mock.On call
 //   - context1 context.Context
 //   - getSnapshotRequest *csi.GetSnapshotRequest
-func (_e *MockControllerServer_Expecter) GetSnapshot(context1 interface{}, getSnapshotRequest interface{}) *MockControllerServer_GetSnapshot_Call {
+func (_e *MockControllerServer_Expecter) GetSnapshot(context1 any, getSnapshotRequest any) *MockControllerServer_GetSnapshot_Call {
 	return &MockControllerServer_GetSnapshot_Call{Call: _e.mock.On("GetSnapshot", context1, getSnapshotRequest)}
 }
 
@@ -1306,7 +1306,7 @@ type MockControllerServer_ListSnapshots_Call struct {
 // ListSnapshots is a helper method to define mock.On call
 //   - context1 context.Context
 //   - listSnapshotsRequest *csi.ListSnapshotsRequest
-func (_e *MockControllerServer_Expecter) ListSnapshots(context1 interface{}, listSnapshotsRequest interface{}) *MockControllerServer_ListSnapshots_Call {
+func (_e *MockControllerServer_Expecter) ListSnapshots(context1 any, listSnapshotsRequest any) *MockControllerServer_ListSnapshots_Call {
 	return &MockControllerServer_ListSnapshots_Call{Call: _e.mock.On("ListSnapshots", context1, listSnapshotsRequest)}
 }
 
@@ -1374,7 +1374,7 @@ type MockControllerServer_ListVolumes_Call struct {
 // ListVolumes is a helper method to define mock.On call
 //   - context1 context.Context
 //   - listVolumesRequest *csi.ListVolumesRequest
-func (_e *MockControllerServer_Expecter) ListVolumes(context1 interface{}, listVolumesRequest interface{}) *MockControllerServer_ListVolumes_Call {
+func (_e *MockControllerServer_Expecter) ListVolumes(context1 any, listVolumesRequest any) *MockControllerServer_ListVolumes_Call {
 	return &MockControllerServer_ListVolumes_Call{Call: _e.mock.On("ListVolumes", context1, listVolumesRequest)}
 }
 
@@ -1442,7 +1442,7 @@ type MockControllerServer_ValidateVolumeCapabilities_Call struct {
 // ValidateVolumeCapabilities is a helper method to define mock.On call
 //   - context1 context.Context
 //   - validateVolumeCapabilitiesRequest *csi.ValidateVolumeCapabilitiesRequest
-func (_e *MockControllerServer_Expecter) ValidateVolumeCapabilities(context1 interface{}, validateVolumeCapabilitiesRequest interface{}) *MockControllerServer_ValidateVolumeCapabilities_Call {
+func (_e *MockControllerServer_Expecter) ValidateVolumeCapabilities(context1 any, validateVolumeCapabilitiesRequest any) *MockControllerServer_ValidateVolumeCapabilities_Call {
 	return &MockControllerServer_ValidateVolumeCapabilities_Call{Call: _e.mock.On("ValidateVolumeCapabilities", context1, validateVolumeCapabilitiesRequest)}
 }
 
@@ -1570,7 +1570,7 @@ type MockNodeServer_NodeExpandVolume_Call struct {
 // NodeExpandVolume is a helper method to define mock.On call
 //   - context1 context.Context
 //   - nodeExpandVolumeRequest *csi.NodeExpandVolumeRequest
-func (_e *MockNodeServer_Expecter) NodeExpandVolume(context1 interface{}, nodeExpandVolumeRequest interface{}) *MockNodeServer_NodeExpandVolume_Call {
+func (_e *MockNodeServer_Expecter) NodeExpandVolume(context1 any, nodeExpandVolumeRequest any) *MockNodeServer_NodeExpandVolume_Call {
 	return &MockNodeServer_NodeExpandVolume_Call{Call: _e.mock.On("NodeExpandVolume", context1, nodeExpandVolumeRequest)}
 }
 
@@ -1638,7 +1638,7 @@ type MockNodeServer_NodeGetCapabilities_Call struct {
 // NodeGetCapabilities is a helper method to define mock.On call
 //   - context1 context.Context
 //   - nodeGetCapabilitiesRequest *csi.NodeGetCapabilitiesRequest
-func (_e *MockNodeServer_Expecter) NodeGetCapabilities(context1 interface{}, nodeGetCapabilitiesRequest interface{}) *MockNodeServer_NodeGetCapabilities_Call {
+func (_e *MockNodeServer_Expecter) NodeGetCapabilities(context1 any, nodeGetCapabilitiesRequest any) *MockNodeServer_NodeGetCapabilities_Call {
 	return &MockNodeServer_NodeGetCapabilities_Call{Call: _e.mock.On("NodeGetCapabilities", context1, nodeGetCapabilitiesRequest)}
 }
 
@@ -1706,7 +1706,7 @@ type MockNodeServer_NodeGetInfo_Call struct {
 // NodeGetInfo is a helper method to define mock.On call
 //   - context1 context.Context
 //   - nodeGetInfoRequest *csi.NodeGetInfoRequest
-func (_e *MockNodeServer_Expecter) NodeGetInfo(context1 interface{}, nodeGetInfoRequest interface{}) *MockNodeServer_NodeGetInfo_Call {
+func (_e *MockNodeServer_Expecter) NodeGetInfo(context1 any, nodeGetInfoRequest any) *MockNodeServer_NodeGetInfo_Call {
 	return &MockNodeServer_NodeGetInfo_Call{Call: _e.mock.On("NodeGetInfo", context1, nodeGetInfoRequest)}
 }
 
@@ -1774,7 +1774,7 @@ type MockNodeServer_NodeGetStorageHealth_Call struct {
 // NodeGetStorageHealth is a helper method to define mock.On call
 //   - context1 context.Context
 //   - nodeGetStorageHealthRequest *csi.NodeGetStorageHealthRequest
-func (_e *MockNodeServer_Expecter) NodeGetStorageHealth(context1 interface{}, nodeGetStorageHealthRequest interface{}) *MockNodeServer_NodeGetStorageHealth_Call {
+func (_e *MockNodeServer_Expecter) NodeGetStorageHealth(context1 any, nodeGetStorageHealthRequest any) *MockNodeServer_NodeGetStorageHealth_Call {
 	return &MockNodeServer_NodeGetStorageHealth_Call{Call: _e.mock.On("NodeGetStorageHealth", context1, nodeGetStorageHealthRequest)}
 }
 
@@ -1842,7 +1842,7 @@ type MockNodeServer_NodeGetVolumeHealth_Call struct {
 // NodeGetVolumeHealth is a helper method to define mock.On call
 //   - context1 context.Context
 //   - nodeGetVolumeHealthRequest *csi.NodeGetVolumeHealthRequest
-func (_e *MockNodeServer_Expecter) NodeGetVolumeHealth(context1 interface{}, nodeGetVolumeHealthRequest interface{}) *MockNodeServer_NodeGetVolumeHealth_Call {
+func (_e *MockNodeServer_Expecter) NodeGetVolumeHealth(context1 any, nodeGetVolumeHealthRequest any) *MockNodeServer_NodeGetVolumeHealth_Call {
 	return &MockNodeServer_NodeGetVolumeHealth_Call{Call: _e.mock.On("NodeGetVolumeHealth", context1, nodeGetVolumeHealthRequest)}
 }
 
@@ -1910,7 +1910,7 @@ type MockNodeServer_NodeGetVolumeStats_Call struct {
 // NodeGetVolumeStats is a helper method to define mock.On call
 //   - context1 context.Context
 //   - nodeGetVolumeStatsRequest *csi.NodeGetVolumeStatsRequest
-func (_e *MockNodeServer_Expecter) NodeGetVolumeStats(context1 interface{}, nodeGetVolumeStatsRequest interface{}) *MockNodeServer_NodeGetVolumeStats_Call {
+func (_e *MockNodeServer_Expecter) NodeGetVolumeStats(context1 any, nodeGetVolumeStatsRequest any) *MockNodeServer_NodeGetVolumeStats_Call {
 	return &MockNodeServer_NodeGetVolumeStats_Call{Call: _e.mock.On("NodeGetVolumeStats", context1, nodeGetVolumeStatsRequest)}
 }
 
@@ -1978,7 +1978,7 @@ type MockNodeServer_NodePublishVolume_Call struct {
 // NodePublishVolume is a helper method to define mock.On call
 //   - context1 context.Context
 //   - nodePublishVolumeRequest *csi.NodePublishVolumeRequest
-func (_e *MockNodeServer_Expecter) NodePublishVolume(context1 interface{}, nodePublishVolumeRequest interface{}) *MockNodeServer_NodePublishVolume_Call {
+func (_e *MockNodeServer_Expecter) NodePublishVolume(context1 any, nodePublishVolumeRequest any) *MockNodeServer_NodePublishVolume_Call {
 	return &MockNodeServer_NodePublishVolume_Call{Call: _e.mock.On("NodePublishVolume", context1, nodePublishVolumeRequest)}
 }
 
@@ -2046,7 +2046,7 @@ type MockNodeServer_NodeStageVolume_Call struct {
 // NodeStageVolume is a helper method to define mock.On call
 //   - context1 context.Context
 //   - nodeStageVolumeRequest *csi.NodeStageVolumeRequest
-func (_e *MockNodeServer_Expecter) NodeStageVolume(context1 interface{}, nodeStageVolumeRequest interface{}) *MockNodeServer_NodeStageVolume_Call {
+func (_e *MockNodeServer_Expecter) NodeStageVolume(context1 any, nodeStageVolumeRequest any) *MockNodeServer_NodeStageVolume_Call {
 	return &MockNodeServer_NodeStageVolume_Call{Call: _e.mock.On("NodeStageVolume", context1, nodeStageVolumeRequest)}
 }
 
@@ -2114,7 +2114,7 @@ type MockNodeServer_NodeUnpublishVolume_Call struct {
 // NodeUnpublishVolume is a helper method to define mock.On call
 //   - context1 context.Context
 //   - nodeUnpublishVolumeRequest *csi.NodeUnpublishVolumeRequest
-func (_e *MockNodeServer_Expecter) NodeUnpublishVolume(context1 interface{}, nodeUnpublishVolumeRequest interface{}) *MockNodeServer_NodeUnpublishVolume_Call {
+func (_e *MockNodeServer_Expecter) NodeUnpublishVolume(context1 any, nodeUnpublishVolumeRequest any) *MockNodeServer_NodeUnpublishVolume_Call {
 	return &MockNodeServer_NodeUnpublishVolume_Call{Call: _e.mock.On("NodeUnpublishVolume", context1, nodeUnpublishVolumeRequest)}
 }
 
@@ -2182,7 +2182,7 @@ type MockNodeServer_NodeUnstageVolume_Call struct {
 // NodeUnstageVolume is a helper method to define mock.On call
 //   - context1 context.Context
 //   - nodeUnstageVolumeRequest *csi.NodeUnstageVolumeRequest
-func (_e *MockNodeServer_Expecter) NodeUnstageVolume(context1 interface{}, nodeUnstageVolumeRequest interface{}) *MockNodeServer_NodeUnstageVolume_Call {
+func (_e *MockNodeServer_Expecter) NodeUnstageVolume(context1 any, nodeUnstageVolumeRequest any) *MockNodeServer_NodeUnstageVolume_Call {
 	return &MockNodeServer_NodeUnstageVolume_Call{Call: _e.mock.On("NodeUnstageVolume", context1, nodeUnstageVolumeRequest)}
 }
 
