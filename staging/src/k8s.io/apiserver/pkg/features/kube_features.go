@@ -63,6 +63,15 @@ const (
 	// traditional k8s resources.
 	AggregatedDiscoveryRemoveBetaType featuregate.Feature = "AggregatedDiscoveryRemoveBetaType"
 
+	// owner: @seans3
+	//
+	// Bounds the capacity of the encode buffers that the apiserver retains in
+	// its protobuf serialization pool (runtime.AllocatorPool). Without the
+	// bound every pooled buffer grows to the largest response it ever
+	// encoded and is kept for the life of the process. The bound is
+	// configured with --max-pooled-encode-buffer-size.
+	AllocatorPoolBufferCap featuregate.Feature = "AllocatorPoolBufferCap"
+
 	// owner: @modulitos
 	//
 	// Allow user.DefaultInfo.UID to be set from x509 cert during cert auth.
@@ -340,6 +349,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.0"), Default: false, PreRelease: featuregate.GA},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Deprecated},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Deprecated, LockToDefault: true},
+	},
+
+	AllocatorPoolBufferCap: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	AllowParsingUserUIDFromCertAuth: {

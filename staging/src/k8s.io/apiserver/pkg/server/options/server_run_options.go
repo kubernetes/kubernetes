@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -48,11 +49,14 @@ const (
 type ServerRunOptions struct {
 	AdvertiseAddress net.IP
 
-	CorsAllowedOriginList        []string
-	HSTSDirectives               []string
-	ExternalHost                 string
-	MaxRequestsInFlight          int
-	MaxMutatingRequestsInFlight  int
+	CorsAllowedOriginList       []string
+	HSTSDirectives              []string
+	ExternalHost                string
+	MaxRequestsInFlight         int
+	MaxMutatingRequestsInFlight int
+	// MaxPooledEncodeBufferSize overrides server.Config.MaxPooledEncodeBufferSize when
+	// positive; zero keeps the config default. Requires the AllocatorPoolBufferCap gate.
+	MaxPooledEncodeBufferSize    int
 	RequestTimeout               time.Duration
 	GoawayChance                 float64
 	LivezGracePeriod             time.Duration
@@ -149,6 +153,9 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.ExternalAddress = s.ExternalHost
 	c.MaxRequestsInFlight = s.MaxRequestsInFlight
 	c.MaxMutatingRequestsInFlight = s.MaxMutatingRequestsInFlight
+	if s.MaxPooledEncodeBufferSize > 0 {
+		c.MaxPooledEncodeBufferSize = s.MaxPooledEncodeBufferSize
+	}
 	c.LivezGracePeriod = s.LivezGracePeriod
 	c.RequestTimeout = s.RequestTimeout
 	c.GoawayChance = s.GoawayChance
@@ -199,6 +206,12 @@ func (s *ServerRunOptions) Validate() []error {
 	}
 	if s.MaxMutatingRequestsInFlight < 0 {
 		errors = append(errors, fmt.Errorf("--max-mutating-requests-inflight can not be negative value"))
+	}
+
+	if s.MaxPooledEncodeBufferSize < 0 {
+		errors = append(errors, fmt.Errorf("--max-pooled-encode-buffer-size can not be negative value"))
+	} else if s.MaxPooledEncodeBufferSize > 0 && !s.ComponentGlobalsRegistry.FeatureGateFor(s.ComponentName).Enabled(features.AllocatorPoolBufferCap) {
+		errors = append(errors, fmt.Errorf("--max-pooled-encode-buffer-size requires the %s feature gate", features.AllocatorPoolBufferCap))
 	}
 
 	if s.RequestTimeout.Nanoseconds() < 0 {
@@ -358,6 +371,12 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"(which must be positive) if --enable-priority-and-fairness is true. "+
 		"Otherwise, this flag limits the maximum number of mutating requests in flight, "+
 		"or a zero value disables the limit completely.")
+
+	fs.IntVar(&s.MaxPooledEncodeBufferSize, "max-pooled-encode-buffer-size", s.MaxPooledEncodeBufferSize, ""+
+		"The largest encode buffer, in bytes, that the server keeps in its protobuf serialization pool; "+
+		"buffers that grew larger are released after use instead of being pooled. "+
+		fmt.Sprintf("A zero value selects the built-in default of %d bytes. ", server.DefaultMaxPooledEncodeBufferSize)+
+		"Requires the AllocatorPoolBufferCap feature gate; with the gate disabled pooled buffers are unbounded.")
 
 	fs.DurationVar(&s.RequestTimeout, "request-timeout", s.RequestTimeout, ""+
 		"An optional field indicating the duration a handler must keep a request open before timing "+
