@@ -65,7 +65,7 @@ func mergePermutation(defaultAffinity bitmask.BitMask, permutation []TopologyHin
 	mergedAffinity := bitmask.And(defaultAffinity, numaAffinities...)
 	// Build a mergedHint from the merged affinity mask, setting preferred as
 	// appropriate based on the logic above.
-	return TopologyHint{mergedAffinity, preferred}
+	return TopologyHint{NUMANodeAffinity: mergedAffinity, Preferred: preferred}
 }
 
 func filterProvidersHints(logger klog.Logger, providersHints []map[string][]TopologyHint) [][]TopologyHint {
@@ -77,7 +77,7 @@ func filterProvidersHints(logger klog.Logger, providersHints []map[string][]Topo
 		// If hints is nil, insert a single, preferred any-numa hint into allProviderHints.
 		if len(hints) == 0 {
 			logger.Info("Hint Provider has no preference for NUMA affinity with any resource")
-			allProviderHints = append(allProviderHints, []TopologyHint{{nil, true}})
+			allProviderHints = append(allProviderHints, []TopologyHint{{NUMANodeAffinity: nil, Preferred: true}})
 			continue
 		}
 
@@ -85,13 +85,13 @@ func filterProvidersHints(logger klog.Logger, providersHints []map[string][]Topo
 		for resource := range hints {
 			if hints[resource] == nil {
 				logger.Info("Hint Provider has no preference for NUMA affinity with resource", "resource", resource)
-				allProviderHints = append(allProviderHints, []TopologyHint{{nil, true}})
+				allProviderHints = append(allProviderHints, []TopologyHint{{NUMANodeAffinity: nil, Preferred: true}})
 				continue
 			}
 
 			if len(hints[resource]) == 0 {
 				logger.Info("Hint Provider has no possible NUMA affinities for resource", "resource", resource)
-				allProviderHints = append(allProviderHints, []TopologyHint{{nil, false}})
+				allProviderHints = append(allProviderHints, []TopologyHint{{NUMANodeAffinity: nil, Preferred: false}})
 				continue
 			}
 
@@ -315,7 +315,7 @@ func (m HintMerger) Merge() TopologyHint {
 	})
 
 	if bestHint == nil {
-		bestHint = &TopologyHint{defaultAffinity, false}
+		bestHint = &TopologyHint{NUMANodeAffinity: defaultAffinity, Preferred: false}
 	}
 
 	return *bestHint
