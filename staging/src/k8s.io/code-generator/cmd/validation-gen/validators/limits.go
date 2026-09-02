@@ -119,14 +119,31 @@ func (maxBytesTagValidator) ValidScopes() sets.Set[Scope] {
 }
 
 var maxBytesValidator = types.Name{Package: libValidationPkg, Name: "MaxBytes"}
-
+var maxBytesSliceValidator = types.Name{Package: libValidationPkg, Name: "MaxBytesSlice"}
+var maxBytesMapValidator = types.Name{Package: libValidationPkg, Name: "MaxBytesMap"}
 func (maxBytesTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	var result Validations
 
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
-	if t := util.NonPointer(util.NativeType(context.Type)); t != types.String {
-		return Validations{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
+	t := util.NonPointer(util.NativeType(context.Type))
+	
+	isValidType := false
+	switch {
+	case t == types.String:
+		isValidType = true
+	case t.Kind == types.Slice || t.Kind == types.Array:
+		if util.NonPointer(util.NativeType(t.Elem)) == types.String {
+			isValidType = true
+		}
+	case t.Kind == types.Map:
+		if util.NonPointer(util.NativeType(t.Key)) == types.String && util.NonPointer(util.NativeType(t.Elem)) == types.String {
+			isValidType = true
+		}
+	}
+	
+	if !isValidType {
+		return Validations{}, fmt.Errorf("can only be used on string, string slice, or string map types (%s)", rootTypeString(context.Type, t))
 	}
 
 	intVal, err := util.ParseInt(tag.Value)
@@ -136,8 +153,19 @@ func (maxBytesTagValidator) GetValidations(context Context, tag codetags.Tag) (V
 	if intVal < 0 {
 		return result, fmt.Errorf("must be greater than or equal to zero")
 	}
-	result.AddFunction(Function(maxBytesTagName, DefaultFlags, maxBytesValidator, intVal).
-		WithEmits(Emission{field.ErrorTypeTooLong, "maxBytes", ""}))
+	
+	switch {
+	case t == types.String:
+		result.AddFunction(Function(maxBytesTagName, DefaultFlags, maxBytesValidator, intVal).
+			WithEmits(Emission{field.ErrorTypeTooLong, "maxBytes", ""}))
+	case t.Kind == types.Slice || t.Kind == types.Array:
+		result.AddFunction(Function(maxBytesTagName, DefaultFlags, maxBytesSliceValidator, intVal).
+			WithEmits(Emission{field.ErrorTypeTooLong, "maxBytes", ""}))
+	case t.Kind == types.Map:
+		result.AddFunction(Function(maxBytesTagName, DefaultFlags, maxBytesMapValidator, intVal).
+			WithEmits(Emission{field.ErrorTypeTooLong, "maxBytes", ""}))
+	}
+
 	return result, nil
 }
 
@@ -146,7 +174,8 @@ func (mbtv maxBytesTagValidator) Docs() TagDoc {
 		Tag:            mbtv.TagName(),
 		StabilityLevel: TagStabilityLevelStable,
 		Scopes:         sets.List(mbtv.ValidScopes()),
-		Description: `Indicates that a string field has a limit on its length in bytes.
+		Description: `Indicates that a string, string slice, or string map field has a limit on its length in bytes.
+		For slices and maps, this validates that the sum of all element byte lengths (including keys for maps) does not exceed the limit.
 		This could only allow as few as N/4 multi-byte characters.
 		If you want to limit length of characters specifically, use maxLength.`,
 		Payloads: []TagPayloadDoc{{

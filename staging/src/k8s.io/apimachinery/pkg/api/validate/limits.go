@@ -70,6 +70,37 @@ func MaxBytes[T ~string](_ context.Context, _ operation.Operation, fldPath *fiel
 	return nil
 }
 
+
+// MaxBytesSlice verifies that the sum of the byte lengths of all strings in the slice is not greater than max.
+func MaxBytesSlice[T ~string](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ []T, max int) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	var total int
+	for _, v := range value {
+		total += len(v)
+	}
+	if total > max {
+		return field.ErrorList{field.TooLong(fldPath, "", max).WithOrigin("maxBytes")}
+	}
+	return nil
+}
+
+// MaxBytesMap verifies that the sum of the byte lengths of all keys and values in the map is not greater than max.
+func MaxBytesMap[K ~string, V ~string](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ map[K]V, max int) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	var total int
+	for k, v := range value {
+		total += len(k) + len(v)
+	}
+	if total > max {
+		return field.ErrorList{field.TooLong(fldPath, "", max).WithOrigin("maxBytes")}
+	}
+	return nil
+}
+
 // MaxItems verifies that the specified slice is not longer than max items.
 func MaxItems[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ []T, max int) field.ErrorList {
 	if len(value) > max {

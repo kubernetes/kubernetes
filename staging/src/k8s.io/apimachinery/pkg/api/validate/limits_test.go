@@ -19,6 +19,7 @@ package validate
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/operation"
@@ -580,6 +581,94 @@ func TestMaxBytes(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			v := tc.value
 			gotErrs := MaxBytes(context.Background(), operation.Operation{}, field.NewPath("fldpath"), &v, nil, tc.max)
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}
+
+func TestMaxBytesSlice(t *testing.T) {
+	cases := []struct {
+		name     string
+		value    []string
+		max      int
+		wantErrs field.ErrorList
+	}{{
+		name:     "nil slice",
+		value:    nil,
+		max:      10,
+		wantErrs: nil,
+	}, {
+		name:     "empty slice",
+		value:    []string{},
+		max:      10,
+		wantErrs: nil,
+	}, {
+		name:     "less bytes than max",
+		value:    []string{strings.Repeat("x", 3), strings.Repeat("x", 3)},
+		max:      10,
+		wantErrs: nil,
+	}, {
+		name:     "exactly max bytes",
+		value:    []string{strings.Repeat("x", 5), strings.Repeat("x", 5)},
+		max:      10,
+		wantErrs: nil,
+	}, {
+		name:  "more bytes than max",
+		value: []string{strings.Repeat("x", 5), strings.Repeat("x", 5), "x"},
+		max:   10,
+		wantErrs: field.ErrorList{
+			field.TooLong(field.NewPath("fldpath"), "", 10).WithOrigin("maxBytes"),
+		},
+	}}
+
+	matcher := field.ErrorMatcher{}.ByOrigin().ByDetailSubstring().ByField().ByType()
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotErrs := MaxBytesSlice(context.Background(), operation.Operation{}, field.NewPath("fldpath"), tc.value, nil, tc.max)
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}
+
+func TestMaxBytesMap(t *testing.T) {
+	cases := []struct {
+		name     string
+		value    map[string]string
+		max      int
+		wantErrs field.ErrorList
+	}{{
+		name:     "nil map",
+		value:    nil,
+		max:      10,
+		wantErrs: nil,
+	}, {
+		name:     "empty map",
+		value:    map[string]string{},
+		max:      10,
+		wantErrs: nil,
+	}, {
+		name:     "less bytes than max",
+		value:    map[string]string{strings.Repeat("a", 2): strings.Repeat("b", 2), "c": "d"},
+		max:      10,
+		wantErrs: nil,
+	}, {
+		name:     "exactly max bytes",
+		value:    map[string]string{strings.Repeat("a", 3): strings.Repeat("b", 2), strings.Repeat("c", 2): strings.Repeat("d", 3)},
+		max:      10,
+		wantErrs: nil,
+	}, {
+		name:  "more bytes than max",
+		value: map[string]string{strings.Repeat("a", 3): strings.Repeat("b", 2), strings.Repeat("c", 2): strings.Repeat("d", 4)},
+		max:   10,
+		wantErrs: field.ErrorList{
+			field.TooLong(field.NewPath("fldpath"), "", 10).WithOrigin("maxBytes"),
+		},
+	}}
+
+	matcher := field.ErrorMatcher{}.ByOrigin().ByDetailSubstring().ByField().ByType()
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotErrs := MaxBytesMap(context.Background(), operation.Operation{}, field.NewPath("fldpath"), tc.value, nil, tc.max)
 			matcher.Test(t, tc.wantErrs, gotErrs)
 		})
 	}
