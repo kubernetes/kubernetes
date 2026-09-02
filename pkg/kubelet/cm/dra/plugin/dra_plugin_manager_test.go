@@ -19,6 +19,7 @@ package plugin
 import (
 	"fmt"
 	"math/rand/v2"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -109,4 +110,51 @@ func TestDelete(t *testing.T) {
 
 	_, err := draPlugins.GetPlugin(driverName)
 	require.Error(t, err, "plugin should not exist after being removed")
+}
+
+func TestValidateDriverName(t *testing.T) {
+	longName := strings.Repeat("a", 64)
+	for _, tt := range []struct {
+		name       string
+		driverName string
+		wantErr    bool
+	}{
+		{"empty", "", true},
+		{"with-slash", "../evil", true},
+		{"with-space", "evil driver", true},
+		{"too-long", longName, true},
+		{"legal", "gpu.example.com", false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateDriverName(tt.driverName)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateEndpoint(t *testing.T) {
+	longEndpoint := "/" + strings.Repeat("a", 108)
+	for _, tt := range []struct {
+		name     string
+		endpoint string
+	}{
+		{"empty", ""},
+		{"relative", "plugin.sock"},
+		{"too-long", longEndpoint},
+		// gRPC parses "unix:"+endpoint via url.Parse, which percent-decodes
+		// and interprets '?', '#', and a leading '//'. Endpoints that
+		// change shape under url.Parse must be rejected.
+		{"percent-encoded-dotdot", "/plugins/%2e%2e/%2e%2e/run/evil.sock"},
+		{"with-authority", "//host/path"},
+		{"with-query", "/plugins/foo/dra.sock?x=1"},
+		{"with-fragment", "/plugins/foo/dra.sock#frag"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Error(t, validateEndpoint(tt.endpoint))
+		})
+	}
 }
