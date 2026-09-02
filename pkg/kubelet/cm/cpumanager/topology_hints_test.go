@@ -374,34 +374,42 @@ func TestGetPodTopologyHintsWithPolicyOptions(t *testing.T) {
 				{
 					NUMANodeAffinity: m0001,
 					Preferred:        true,
+					Score:            90,
 				},
 				{
 					NUMANodeAffinity: m0011,
 					Preferred:        false,
+					Score:            92,
 				},
 				{
 					NUMANodeAffinity: m0101,
 					Preferred:        false,
+					Score:            95,
 				},
 				{
 					NUMANodeAffinity: m1001,
 					Preferred:        false,
+					Score:            95,
 				},
 				{
 					NUMANodeAffinity: m0111,
 					Preferred:        false,
+					Score:            95,
 				},
 				{
 					NUMANodeAffinity: m1011,
 					Preferred:        false,
+					Score:            95,
 				},
 				{
 					NUMANodeAffinity: m1101,
 					Preferred:        false,
+					Score:            96,
 				},
 				{
 					NUMANodeAffinity: m1111,
 					Preferred:        false,
+					Score:            96,
 				},
 			},
 		},
@@ -417,34 +425,42 @@ func TestGetPodTopologyHintsWithPolicyOptions(t *testing.T) {
 				{
 					NUMANodeAffinity: m0001,
 					Preferred:        true,
+					Score:            90,
 				},
 				{
 					NUMANodeAffinity: m0011,
 					Preferred:        true,
+					Score:            92,
 				},
 				{
 					NUMANodeAffinity: m0101,
 					Preferred:        false,
+					Score:            95,
 				},
 				{
 					NUMANodeAffinity: m1001,
 					Preferred:        false,
+					Score:            95,
 				},
 				{
 					NUMANodeAffinity: m0111,
 					Preferred:        false,
+					Score:            95,
 				},
 				{
 					NUMANodeAffinity: m1011,
 					Preferred:        false,
+					Score:            95,
 				},
 				{
 					NUMANodeAffinity: m1101,
 					Preferred:        false,
+					Score:            96,
 				},
 				{
 					NUMANodeAffinity: m1111,
 					Preferred:        false,
+					Score:            96,
 				},
 			},
 		},
@@ -460,10 +476,12 @@ func TestGetPodTopologyHintsWithPolicyOptions(t *testing.T) {
 				{
 					NUMANodeAffinity: m0111,
 					Preferred:        true,
+					Score:            21,
 				},
 				{
 					NUMANodeAffinity: m1111,
 					Preferred:        true,
+					Score:            41,
 				},
 			},
 		},
@@ -549,10 +567,12 @@ func TestTopologyHintsPodLevelResources(t *testing.T) {
 				{
 					NUMANodeAffinity: firstSocketMask,
 					Preferred:        true,
+					Score:            50,
 				},
 				{
 					NUMANodeAffinity: crossSocketMask,
 					Preferred:        false,
+					Score:            66,
 				},
 			},
 			expectedContainerLevelHints: nil,
@@ -566,20 +586,24 @@ func TestTopologyHintsPodLevelResources(t *testing.T) {
 				{
 					NUMANodeAffinity: firstSocketMask,
 					Preferred:        true,
+					Score:            50,
 				},
 				{
 					NUMANodeAffinity: crossSocketMask,
 					Preferred:        false,
+					Score:            66,
 				},
 			},
 			expectedContainerLevelHints: []topologymanager.TopologyHint{
 				{
 					NUMANodeAffinity: firstSocketMask,
 					Preferred:        true,
+					Score:            50,
 				},
 				{
 					NUMANodeAffinity: crossSocketMask,
 					Preferred:        false,
+					Score:            66,
 				},
 			},
 		},
@@ -684,14 +708,17 @@ func returnTestCases() []testCase {
 				{
 					NUMANodeAffinity: firstSocketMask,
 					Preferred:        true,
+					Score:            33,
 				},
 				{
 					NUMANodeAffinity: secondSocketMask,
 					Preferred:        true,
+					Score:            1,
 				},
 				{
 					NUMANodeAffinity: crossSocketMask,
 					Preferred:        false,
+					Score:            16,
 				},
 			},
 		},
@@ -704,10 +731,12 @@ func returnTestCases() []testCase {
 				{
 					NUMANodeAffinity: secondSocketMask,
 					Preferred:        true,
+					Score:            1,
 				},
 				{
 					NUMANodeAffinity: crossSocketMask,
 					Preferred:        false,
+					Score:            16,
 				},
 			},
 		},
@@ -720,6 +749,7 @@ func returnTestCases() []testCase {
 				{
 					NUMANodeAffinity: crossSocketMask,
 					Preferred:        true,
+					Score:            16,
 				},
 			},
 		},
@@ -739,6 +769,7 @@ func returnTestCases() []testCase {
 				{
 					NUMANodeAffinity: crossSocketMask,
 					Preferred:        false,
+					Score:            83,
 				},
 			},
 		},
@@ -763,10 +794,12 @@ func returnTestCases() []testCase {
 				{
 					NUMANodeAffinity: firstSocketMask,
 					Preferred:        true,
+					Score:            66,
 				},
 				{
 					NUMANodeAffinity: crossSocketMask,
 					Preferred:        false,
+					Score:            83,
 				},
 			},
 		},
@@ -784,10 +817,12 @@ func returnTestCases() []testCase {
 				{
 					NUMANodeAffinity: secondSocketMask,
 					Preferred:        true,
+					Score:            66,
 				},
 				{
 					NUMANodeAffinity: crossSocketMask,
 					Preferred:        false,
+					Score:            83,
 				},
 			},
 		},
@@ -805,6 +840,7 @@ func returnTestCases() []testCase {
 				{
 					NUMANodeAffinity: crossSocketMask,
 					Preferred:        true,
+					Score:            8,
 				},
 			},
 		},
@@ -850,10 +886,12 @@ func returnTestCases() []testCase {
 				{
 					NUMANodeAffinity: firstSocketMask,
 					Preferred:        true,
+					Score:            50,
 				},
 				{
 					NUMANodeAffinity: crossSocketMask,
 					Preferred:        false,
+					Score:            66,
 				},
 			},
 			podLevelResourcesEnabled:        true,

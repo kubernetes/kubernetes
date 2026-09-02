@@ -1038,7 +1038,8 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reu
 	hints := []topologymanager.TopologyHint{}
 	bitmask.IterateBitMasks(p.numaNodes, func(mask bitmask.BitMask) {
 		// First, update minAffinitySize for the current request size.
-		cpusInMask := p.topology.CPUDetails.CPUsInNUMANodes(mask.GetBits()...).Size()
+		cpusInMaskSet := p.topology.CPUDetails.CPUsInNUMANodes(mask.GetBits()...)
+		cpusInMask := cpusInMaskSet.Size()
 		if cpusInMask >= request && mask.Count() < minAffinitySize {
 			minAffinitySize = mask.Count()
 		}
@@ -1067,12 +1068,22 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reu
 			return
 		}
 
+		// Compute utilization score for this NUMA combination.
+		var score int64
+		allocatable := cpusInMaskSet.Difference(p.reservedCPUs).Size()
+		if allocatable > 0 {
+			available := availableCPUs.Intersection(cpusInMaskSet).Size()
+			assigned := allocatable - available
+			score = int64(max(1, assigned*100/allocatable))
+		}
+
 		// Otherwise, create a new hint from the numa node bitmask and add it to the
 		// list of hints.  We set all hint preferences to 'false' on the first
 		// pass through.
 		hints = append(hints, topologymanager.TopologyHint{
 			NUMANodeAffinity: mask,
 			Preferred:        false,
+			Score:            score,
 		})
 	})
 
