@@ -202,7 +202,7 @@ func redactSecrets(curr reflect.Value, redact bool) error {
 	}
 
 	actualCurrValue := curr
-	if curr.Kind() == reflect.Ptr {
+	if curr.Kind() == reflect.Pointer {
 		actualCurrValue = curr.Elem()
 	}
 
