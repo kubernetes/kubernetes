@@ -191,6 +191,8 @@ type ObjectMeta struct {
 	// Value must be treated as opaque by clients and .
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
 	// +optional
+	// +k8s:alpha(since: "1.38")=+k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:update=NoUnset
 	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,6,opt,name=resourceVersion"`
 
 	// A sequence number representing a specific generation of the desired state.

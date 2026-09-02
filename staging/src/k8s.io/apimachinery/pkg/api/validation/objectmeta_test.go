@@ -896,6 +896,15 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 				field.Invalid(fldPath.Child("deletionGracePeriodSeconds"), &gracePeriod40, "").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
+		{
+			name:              "missing resourceVersion on update",
+			obj:               mkMeta(tweakResourceVersion("")),
+			oldObj:            mkMeta(tweakResourceVersion("1")),
+			requiresNamespace: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(fldPath.Child("resourceVersion"), "", "must be specified for an update").WithOrigin("update").MarkAlpha(),
+			},
+		},
 	}
 
 	for _, tc := range updateCases {
