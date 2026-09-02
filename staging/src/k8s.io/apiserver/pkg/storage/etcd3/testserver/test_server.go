@@ -17,12 +17,14 @@ limitations under the License.
 package testserver
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
 	"os"
 	"strconv"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -92,12 +94,26 @@ func RunEtcd(t testing.TB, tweakConfig ...func(cfg *embed.Config)) *kubernetes.C
 	// lock until we successfully start the server on the ports we chose
 	autoPortLock.Lock()
 	defer autoPortLock.Unlock()
-	cfg := newTestConfig(t)
-	for _, f := range tweakConfig {
-		f(cfg)
-	}
+	var (
+		cfg *embed.Config
+		e   *embed.Etcd
+		err error
+	)
+	// reattempt up to three times if the port was taken
+	maxAttempts := 3
+	for attempt := range maxAttempts {
+		cfg = newTestConfig(t)
+		for _, f := range tweakConfig {
+			f(cfg)
+		}
 
-	e, err := embed.StartEtcd(cfg)
+		e, err = embed.StartEtcd(cfg)
+		if errors.Is(err, syscall.EADDRINUSE) && attempt < maxAttempts {
+			t.Logf("error starting embedded etcd, retrying: %v", err)
+			continue
+		}
+		break
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
