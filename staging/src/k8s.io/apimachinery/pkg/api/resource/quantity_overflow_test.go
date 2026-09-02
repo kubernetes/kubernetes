@@ -134,8 +134,8 @@ func quantityAccessorCases() []accessorCase {
 			wantSign:  -1,
 			wantValue: -math.MaxInt64,
 			wantMilli: 1000, milliTODO: saturateNeg,
-			wantScaledKilo: -9223372036854774, scaledTODO: "want -9223372036854776 once negatives round away from zero (#138510)",
-			wantAsInt64: 0, wantAsInt64OK: false,
+			wantScaledKilo: -9223372036854776,
+			wantAsInt64:    0, wantAsInt64OK: false,
 			wantFloat:  -9.223372036854776e+18,
 			wantString: "-9223372036854775807",
 		},
@@ -155,8 +155,8 @@ func quantityAccessorCases() []accessorCase {
 			wantSign:  -1,
 			wantValue: -math.MaxInt64,
 			wantMilli: 1000, milliTODO: saturateNeg,
-			wantScaledKilo: -9223372036854774, scaledTODO: "want -9223372036854776 once negatives round away from zero (#138510)",
-			wantAsInt64: 0, wantAsInt64OK: false,
+			wantScaledKilo: -9223372036854776,
+			wantAsInt64:    0, wantAsInt64OK: false,
 			wantFloat:  -9.223372036854776e+18,
 			wantString: "-9223372036854775807",
 		},
@@ -245,25 +245,27 @@ func quantityAccessorCases() []accessorCase {
 			wantString: "92233720368547758070", // lossless: the full unscaled value
 		},
 
-		// --- Negative 19-digit values routed through the Dec backend: only Sign stays honest. ---
+		// --- Negative 19-digit values routed through the Dec backend: MilliValue still overflows. ---
 		{
-			// MinInt64 from a string reads back as zero, unlike NewQuantity(MinInt64).
+			// MinInt64 from a string is Dec-backed, unlike NewQuantity(MinInt64), so the
+			// int64 accessors go through scaledValue.
 			name: "int64-min-parsed", load: func() Quantity { return MustParse("-9223372036854775808") },
 			wantSign:  -1,
-			wantValue: 0, valueTODO: "want math.MinInt64 once scaledValue sends the out-of-range negative coefficient through the big.Int path (#138510)",
+			wantValue: math.MinInt64,
 			wantMilli: 0, milliTODO: saturateNeg,
-			wantScaledKilo: 0, scaledTODO: "want -9223372036854776 once scaledValue rounds the Dec-backed negative away from zero (#138510)",
-			wantAsInt64: math.MinInt64, wantAsInt64OK: false, asInt64TODO: "want (math.MinInt64, true) once #138076 parses -2^63 via the int64 fast path",
-			wantFloat:  -9.223372036854776e+18,
-			wantString: "-9223372036854775808",
+			wantScaledKilo: -9223372036854776,
+			wantAsInt64:    math.MinInt64, wantAsInt64OK: false, asInt64TODO: "want (math.MinInt64, true) once #138076 parses -2^63 via the int64 fast path",
+			wantFloat:       -9.223372036854776e+18,
+			wantString:      "-9223372036854775808",
+			atInt64Boundary: true,
 		},
 		{
 			name: "int64-min-plus-one-parsed", load: func() Quantity { return MustParse("-9223372036854775807") },
 			wantSign:  -1,
-			wantValue: 1, valueTODO: "want math.MinInt64 + 1 once scaledValue fixes the wrong-signed Dec-backed negative projection (#138510)",
+			wantValue: math.MinInt64 + 1,
 			wantMilli: 1000, milliTODO: saturateNeg,
-			wantScaledKilo: 1, scaledTODO: "want -9223372036854776 once scaledValue rounds the Dec-backed negative away from zero (#138510)",
-			wantAsInt64: math.MinInt64 + 1, wantAsInt64OK: false, asInt64TODO: "want (math.MinInt64 + 1, true) once #138076 parses this via the int64 fast path",
+			wantScaledKilo: -9223372036854776,
+			wantAsInt64:    math.MinInt64 + 1, wantAsInt64OK: false, asInt64TODO: "want (math.MinInt64 + 1, true) once #138076 parses this via the int64 fast path",
 			wantFloat:  -9.223372036854776e+18,
 			wantString: "-9223372036854775807",
 		},
@@ -299,24 +301,24 @@ func quantityAccessorCases() []accessorCase {
 			wantString: "-1e21",
 		},
 
-		// --- Negative rounding (#138510): magnitude fits int64 but the sign flips. ---
+		// --- Negative rounding: magnitude fits int64 and rounds away from zero. ---
 		{
 			name: "negative-9_5Gi", load: func() Quantity { return MustParse("-9.5Gi") },
-			wantSign:  -1,
-			wantValue: 8246196746, valueTODO: "want -10200547328 once scaledValue rounds negatives away from zero (#138510)",
-			wantMilli: 8246196745710, milliTODO: "want -10200547328000 once scaledValue rounds negatives away from zero (#138510)",
-			wantScaledKilo: 8246197, scaledTODO: "want -10200548 once scaledValue rounds negatives away from zero (#138510)",
-			wantAsInt64: 0, wantAsInt64OK: false,
+			wantSign:       -1,
+			wantValue:      -10200547328,
+			wantMilli:      -10200547328000,
+			wantScaledKilo: -10200548,
+			wantAsInt64:    0, wantAsInt64OK: false,
 			wantFloat:  -1.0200547328e+10,
 			wantString: "-9728Mi",
 		},
 		{
 			name: "negative-9_5000000001Gi", load: func() Quantity { return MustParse("-9.5000000001Gi") },
-			wantSign:  -1,
-			wantValue: 8246196746, valueTODO: "want -10200547329 once scaledValue rounds negatives away from zero (#138510)",
-			wantMilli: 8246196745603, milliTODO: "want -10200547328108 once scaledValue rounds negatives away from zero (#138510)",
-			wantScaledKilo: 8246197, scaledTODO: "want -10200548 once scaledValue rounds negatives away from zero (#138510)",
-			wantAsInt64: 0, wantAsInt64OK: false,
+			wantSign:       -1,
+			wantValue:      -10200547329,
+			wantMilli:      -10200547328108,
+			wantScaledKilo: -10200548,
+			wantAsInt64:    0, wantAsInt64OK: false,
 			wantFloat:  -1.0200547328107376e+10,
 			wantString: "-10200547328107374183n",
 		},
@@ -344,15 +346,14 @@ func quantityAccessorCases() []accessorCase {
 		},
 		{
 			// Dec-backed sibling of new-milli-min: ToDec routes Value and Kilo
-			// through the big.Int path, where #138510's away-from-zero fix lands.
-			// int64-backed new-milli-min is already correct, so this proves the fix
+			// through the big.Int path, so this proves away-from-zero rounding
 			// reaches the Dec backend too.
 			name: "new-milli-min-via-dec", load: func() Quantity { q := NewMilliQuantity(math.MinInt64, DecimalSI); q.ToDec(); return *q },
-			wantSign:  -1,
-			wantValue: -9223372036854774, valueTODO: "want -9223372036854776 once negatives round away from zero (#138510)",
+			wantSign:       -1,
+			wantValue:      -9223372036854776,
 			wantMilli:      math.MinInt64,
-			wantScaledKilo: -9223372036853, scaledTODO: "want -9223372036855 once negatives round away from zero (#138510)",
-			wantAsInt64: 0, wantAsInt64OK: false,
+			wantScaledKilo: -9223372036855,
+			wantAsInt64:    0, wantAsInt64OK: false,
 			wantFloat:  -9.223372036854776e+15,
 			wantString: "-9223372036854775808m",
 		},
