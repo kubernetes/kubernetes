@@ -41,6 +41,7 @@ func TestFilterVictimsWithPDBViolation(t *testing.T) {
 	viNoPDBMatch := &victim{pods: []fwk.PodInfo{newPodInfo(st.MakePod().Name("p1").Label("app", "foo").Obj())}, keyType: fwk.PodKeyType}
 	viMatchPDB := &victim{pods: []fwk.PodInfo{newPodInfo(st.MakePod().Name("p1").Namespace(metav1.NamespaceDefault).Label("app", "foo").Obj())}, keyType: fwk.PodKeyType}
 	viMatchPDB2 := &victim{pods: []fwk.PodInfo{newPodInfo(st.MakePod().Name("p2").Namespace(metav1.NamespaceDefault).Label("app", "foo").Obj())}, keyType: fwk.PodKeyType}
+	viNoLabels := &victim{pods: []fwk.PodInfo{newPodInfo(st.MakePod().Name("p1").Namespace(metav1.NamespaceDefault).Obj())}, keyType: fwk.PodKeyType}
 	viPodGroup := &victim{
 		pods: []fwk.PodInfo{
 			newPodInfo(st.MakePod().Name("p1").Namespace(metav1.NamespaceDefault).Label("app", "foo").Obj()),
@@ -205,7 +206,29 @@ func TestFilterVictimsWithPDBViolation(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault},
 					Spec: policy.PodDisruptionBudgetSpec{
-						Selector: &metav1.LabelSelector{}, // matches nothing
+						Selector: &metav1.LabelSelector{},
+					},
+					Status: policy.PodDisruptionBudgetStatus{
+						DisruptionsAllowed: 0,
+					},
+				},
+			},
+			expectedViolating: []ViolatingVictim[*victim]{
+				{
+					Victim:       viMatchPDB,
+					ViolateCount: 1,
+				},
+			},
+			expectedNonViolating: nil,
+		},
+		{
+			name:    "PDB with nil selector",
+			victims: []*victim{viMatchPDB},
+			pdbs: []*policy.PodDisruptionBudget{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault},
+					Spec: policy.PodDisruptionBudgetSpec{
+						Selector: nil,
 					},
 					Status: policy.PodDisruptionBudgetStatus{
 						DisruptionsAllowed: 0,
@@ -214,6 +237,35 @@ func TestFilterVictimsWithPDBViolation(t *testing.T) {
 			},
 			expectedViolating:    nil,
 			expectedNonViolating: []*victim{viMatchPDB},
+		},
+		{
+			name:    "unlabeled victim matching PDB",
+			victims: []*victim{viNoLabels},
+			pdbs: []*policy.PodDisruptionBudget{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault},
+					Spec: policy.PodDisruptionBudgetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "app",
+									Operator: metav1.LabelSelectorOpDoesNotExist,
+								},
+							},
+						},
+					},
+					Status: policy.PodDisruptionBudgetStatus{
+						DisruptionsAllowed: 0,
+					},
+				},
+			},
+			expectedViolating: []ViolatingVictim[*victim]{
+				{
+					Victim:       viNoLabels,
+					ViolateCount: 1,
+				},
+			},
+			expectedNonViolating: nil,
 		},
 		{
 			name:    "Multiple PDBs",
