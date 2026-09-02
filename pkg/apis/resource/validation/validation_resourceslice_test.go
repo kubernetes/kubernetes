@@ -2119,6 +2119,19 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 				return slice
 			},
 		},
+		// The handwritten validation only consults the name format to decide
+		// whether looking for the attribute on each device is worthwhile, so a
+		// stored malformed name produces no error here. The declarative side
+		// skips the field because it is unchanged.
+		"valid-update-keeps-stored-partition-type-attribute-with-extra-slash": {
+			oldResourceSlice: func() *resourceapi.ResourceSlice {
+				slice := validResourceSlice.DeepCopy()
+				slice.Spec.Devices[0].ConsumesCounters = createConsumesCounters(1)
+				slice.Spec.PartitionTypeAttribute = ptr.To(resourceapi.FullyQualifiedName("x.example.com/y/z"))
+				return slice
+			}(),
+			update: func(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice { return slice },
+		},
 		"invalid-update-nodename": {
 			wantFailures:     field.ErrorList{field.Invalid(field.NewPath("spec", "nodeName"), ptr.To(name+"-updated"), "field is immutable")},
 			oldResourceSlice: validResourceSlice,
