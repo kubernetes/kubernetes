@@ -86,7 +86,7 @@ type MockPodStatusProvider_GetPodStatus_Call struct {
 
 // GetPodStatus is a helper method to define mock.On call
 //   - uid types.UID
-func (_e *MockPodStatusProvider_Expecter) GetPodStatus(uid interface{}) *MockPodStatusProvider_GetPodStatus_Call {
+func (_e *MockPodStatusProvider_Expecter) GetPodStatus(uid any) *MockPodStatusProvider_GetPodStatus_Call {
 	return &MockPodStatusProvider_GetPodStatus_Call{Call: _e.mock.On("GetPodStatus", uid)}
 }
 
