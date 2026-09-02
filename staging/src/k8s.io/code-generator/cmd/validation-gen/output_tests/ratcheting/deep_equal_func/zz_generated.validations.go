@@ -115,14 +115,14 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, deepEqualImpl_,
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, CustomDeepEqual,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NonComparableStruct) field.ErrorList {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapField[*]")
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			// iterate the map and call the value type's validation function
-			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, deepEqualImpl_, Validate_NonComparableStruct); len(e) != 0 {
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, CustomDeepEqual, Validate_NonComparableStruct); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -134,10 +134,40 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("mapField"), obj.MapField, oldVal, oldObj != nil)...)
 	}
 
-	return errs
-}
+	{ // field Struct.SetField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []NonComparableStruct,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if CustomDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, CustomDeepEqual, nil,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NonComparableStruct) field.ErrorList {
+					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.SetField[*]")
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// lists with set semantics require unique values
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, CustomDeepEqual); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, CustomDeepEqual, nil, Validate_NonComparableStruct); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) []NonComparableStruct {
+				return oldObj.SetField
+			})
+		errs = append(errs, fn(fldPath.Child("setField"), obj.SetField, oldVal, oldObj != nil)...)
+	}
 
-// deepEqualImpl_ is a validate.MatchFunc which allows the implementation of deep-equality to be defined at codegen time.
-func deepEqualImpl_[T any](a, b T) bool {
-	return CustomDeepEqual(a, b)
+	return errs
 }

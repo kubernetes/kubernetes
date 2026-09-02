@@ -26,7 +26,6 @@ import (
 	fmt "fmt"
 
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -74,7 +73,7 @@ func Validate_PodDisruptionBudget(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -98,7 +97,7 @@ func Validate_PodDisruptionBudget(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -136,7 +135,7 @@ func Validate_PodDisruptionBudgetStatus(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -155,7 +154,7 @@ func Validate_PodDisruptionBudgetStatus(
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a *v1.Condition, b *v1.Condition) bool { return a.Type == b.Type }, deepEqualImpl_, validation.Validate_Condition); len(e) != 0 {
+				func(a *v1.Condition, b *v1.Condition) bool { return a.Type == b.Type }, validate.SemanticDeepEqual, validation.Validate_Condition); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -168,9 +167,4 @@ func Validate_PodDisruptionBudgetStatus(
 	}
 
 	return errs
-}
-
-// deepEqualImpl_ is a validate.MatchFunc which allows the implementation of deep-equality to be defined at codegen time.
-func deepEqualImpl_[T any](a, b T) bool {
-	return equality.Semantic.DeepEqual(a, b)
 }

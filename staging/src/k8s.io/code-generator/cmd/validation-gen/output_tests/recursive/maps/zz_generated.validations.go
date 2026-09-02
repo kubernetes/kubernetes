@@ -25,7 +25,6 @@ import (
 	context "context"
 	fmt "fmt"
 
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -144,7 +143,7 @@ func Validate_T1(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -166,7 +165,7 @@ func Validate_T1(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -188,12 +187,12 @@ func Validate_T1(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// iterate the map and call the value type's validation function
-			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, deepEqualImpl_, Validate_T5); len(e) != 0 {
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_T5); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -212,12 +211,12 @@ func Validate_T1(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// iterate the map and call the value type's validation function
-			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, deepEqualImpl_, Validate_T6); len(e) != 0 {
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_T6); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -245,12 +244,12 @@ func Validate_T2(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// iterate the map and call the value type's validation function
-			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, deepEqualImpl_, Validate_T1); len(e) != 0 {
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_T1); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -282,7 +281,7 @@ func Validate_T3(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -313,12 +312,12 @@ func Validate_T4(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// iterate the map and call the value type's validation function
-			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, deepEqualImpl_, Validate_T3); len(e) != 0 {
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_T3); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -346,7 +345,7 @@ func Validate_T5(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -355,7 +354,7 @@ func Validate_T5(
 				errs = append(errs, e...)
 			}
 			// iterate the map and call the value type's validation function
-			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, deepEqualImpl_, Validate_T5); len(e) != 0 {
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_T5); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -407,12 +406,12 @@ func Validate_T6(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// iterate the map and call the value type's validation function
-			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, deepEqualImpl_, Validate_T6); len(e) != 0 {
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_T6); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -425,9 +424,4 @@ func Validate_T6(
 	}
 
 	return errs
-}
-
-// deepEqualImpl_ is a validate.MatchFunc which allows the implementation of deep-equality to be defined at codegen time.
-func deepEqualImpl_[T any](a, b T) bool {
-	return equality.Semantic.DeepEqual(a, b)
 }

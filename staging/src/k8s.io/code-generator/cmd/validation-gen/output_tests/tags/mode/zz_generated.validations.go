@@ -25,7 +25,6 @@ import (
 	context "context"
 	fmt "fmt"
 
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -196,7 +195,7 @@ func Validate_Collections(
 
 	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "listField",
 		func(obj *Collections) []string { return obj.ListField },
-		func(obj *Collections) string { return obj.D1 }, deepEqualImpl_,
+		func(obj *Collections) string { return obj.D1 }, validate.SemanticDeepEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []string) field.ErrorList {
 			errs := field.ErrorList{}
 			errs = append(errs, validate.ForbiddenSlice(ctx, op, fldPath, obj, oldObj)...)
@@ -223,7 +222,7 @@ func Validate_Collections(
 	}
 	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "mapField",
 		func(obj *Collections) map[string]string { return obj.MapField },
-		func(obj *Collections) string { return obj.D1 }, deepEqualImpl_,
+		func(obj *Collections) string { return obj.D1 }, validate.SemanticDeepEqual,
 		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj map[string]string) field.ErrorList {
 			errs := field.ErrorList{}
 			errs = append(errs, validate.ForbiddenMap(ctx, op, fldPath, obj, oldObj)...)
@@ -531,9 +530,4 @@ func Validate_StrictUnion(
 	// field StrictUnion.FieldA has no validation
 	// field StrictUnion.FieldB has no validation
 	return errs
-}
-
-// deepEqualImpl_ is a validate.MatchFunc which allows the implementation of deep-equality to be defined at codegen time.
-func deepEqualImpl_[T any](a, b T) bool {
-	return equality.Semantic.DeepEqual(a, b)
 }

@@ -25,7 +25,6 @@ import (
 	context "context"
 	fmt "fmt"
 
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -72,14 +71,14 @@ func Validate_Struct(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
+				if validate.SemanticDeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
 			// call field-attached validations
 			func() { // cohort = "labels"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "labels",
-					func(o *v1.ObjectMeta) map[string]string { return o.Labels }, deepEqualImpl_,
+					func(o *v1.ObjectMeta) map[string]string { return o.Labels }, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj map[string]string) field.ErrorList {
 						return validate.EachMapKey(ctx, op, fldPath, obj, oldObj,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
@@ -91,7 +90,7 @@ func Validate_Struct(
 			}()
 			func() { // cohort = "ownerReferences"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "ownerReferences",
-					func(o *v1.ObjectMeta) []v1.OwnerReference { return o.OwnerReferences }, deepEqualImpl_,
+					func(o *v1.ObjectMeta) []v1.OwnerReference { return o.OwnerReferences }, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []v1.OwnerReference) field.ErrorList {
 						return validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
 							func(a *v1.OwnerReference, b *v1.OwnerReference) bool { return a.UID == b.UID })
@@ -101,7 +100,7 @@ func Validate_Struct(
 			}()
 			func() { // cohort = "finalizers"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "finalizers",
-					func(o *v1.ObjectMeta) []string { return o.Finalizers }, deepEqualImpl_,
+					func(o *v1.ObjectMeta) []string { return o.Finalizers }, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []string) field.ErrorList {
 						return validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual)
 					}); len(e) != 0 {
@@ -118,9 +117,4 @@ func Validate_Struct(
 	}
 
 	return errs
-}
-
-// deepEqualImpl_ is a validate.MatchFunc which allows the implementation of deep-equality to be defined at codegen time.
-func deepEqualImpl_[T any](a, b T) bool {
-	return equality.Semantic.DeepEqual(a, b)
 }
