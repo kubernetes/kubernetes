@@ -246,7 +246,7 @@ func (m *manager) StopLivenessAndStartup(pod *v1.Pod) {
 	defer m.workerLock.RUnlock()
 
 	key := probeKey{podUID: pod.UID}
-	for _, c := range pod.Spec.Containers {
+	for _, c := range append(pod.Spec.Containers, getRestartableInitContainers(pod)...) {
 		key.containerName = c.Name
 		for _, probeType := range [...]probeType{liveness, startup} {
 			key.probeType = probeType
