@@ -38,6 +38,33 @@ func IsAlignmentGuaranteed(p Policy) bool {
 	return p.Name() == PolicySingleNumaNode
 }
 
+// aggregateHintScores returns the equal-weight average of the Score values in the
+// permutation, and whether any contributor supplied one.
+//
+// Only hints with an affinity and a non-zero Score are counted: Score 0 means "no
+// signal", not "zero utilization", so averaging it in would drag the result towards
+// zero for every provider that simply has nothing to say. The current implementation
+// means that a lone contributor scoring 1 sets the merged score to 1 however many
+// unscored or affinity-less contributors sit beside it.
+//
+// Score is a coarse packing signal and does not drive hint selection. Because of this,
+// we use integer division that truncates towards zero. For example, scores of 40 and 81
+// aggregate to 60.
+func aggregateHintScores(permutation []TopologyHint) (int64, bool) {
+	var sum int64
+	var count int64
+	for _, hint := range permutation {
+		if hint.NUMANodeAffinity != nil && hint.Score > 0 {
+			sum += hint.Score
+			count++
+		}
+	}
+	if count == 0 {
+		return 0, false
+	}
+	return sum / count, true
+}
+
 // Merge a TopologyHints permutation to a single hint by performing a bitwise-AND
 // of their affinity masks. The hint shall be preferred if all hits in the permutation
 // are preferred.
@@ -63,9 +90,16 @@ func mergePermutation(defaultAffinity bitmask.BitMask, permutation []TopologyHin
 
 	// Merge the affinities using a bitwise-and operation.
 	mergedAffinity := bitmask.And(defaultAffinity, numaAffinities...)
+
+	score, hasScores := aggregateHintScores(permutation)
+	if hasScores {
+		// TODO: plumb contextual logger through mergePermutation and replace klog
+		klog.V(4).InfoS("Merged hint includes aggregated score", "score", score)
+	}
+
 	// Build a mergedHint from the merged affinity mask, setting preferred as
 	// appropriate based on the logic above.
-	return TopologyHint{NUMANodeAffinity: mergedAffinity, Preferred: preferred}
+	return TopologyHint{NUMANodeAffinity: mergedAffinity, Preferred: preferred, Score: score}
 }
 
 func filterProvidersHints(logger klog.Logger, providersHints []map[string][]TopologyHint) [][]TopologyHint {

@@ -1612,3 +1612,238 @@ func commonNUMAInfoEightNodes() *NUMAInfo {
 		},
 	}
 }
+
+func TestAggregateHintScores(t *testing.T) {
+	tcases := []struct {
+		name          string
+		permutation   []TopologyHint
+		expectedScore int64
+		expectedOk    bool
+	}{
+		{
+			name: "all scores zero",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 0},
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 0},
+			},
+			expectedScore: 0,
+			expectedOk:    false,
+		},
+		{
+			name: "single scored contributor",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 60},
+			},
+			expectedScore: 60,
+			expectedOk:    true,
+		},
+		{
+			name: "multiple scored contributors averaged",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 40},
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 80},
+			},
+			expectedScore: 60,
+			expectedOk:    true,
+		},
+		{
+			name: "nil affinity contributor ignored",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 80},
+				{NUMANodeAffinity: nil, Preferred: true, Score: 40},
+			},
+			expectedScore: 80,
+			expectedOk:    true,
+		},
+		{
+			name: "mixed scored and unscored contributors",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 90},
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 0},
+			},
+			expectedScore: 90,
+			expectedOk:    true,
+		},
+		{
+			// Unscored and affinity-less contributors are skipped rather than
+			// averaged in, so the weakest possible signal still sets the
+			// merged score instead of being diluted towards zero.
+			name: "lone minimum score survives unscored and affinity-less contributors",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 1},
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 0},
+				{NUMANodeAffinity: nil, Preferred: true, Score: 0},
+				{NUMANodeAffinity: nil, Preferred: true, Score: 100},
+			},
+			expectedScore: 1,
+			expectedOk:    true,
+		},
+		{
+			// 121 / 2 = 60.5, truncated to 60.
+			name: "odd sum truncates towards zero",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 40},
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 81},
+			},
+			expectedScore: 60,
+			expectedOk:    true,
+		},
+		{
+			// 101 / 2 = 50.5, truncated to 50: the extremes of the range
+			// average no differently.
+			name: "minimum and maximum score truncate towards zero",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 1},
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 100},
+			},
+			expectedScore: 50,
+			expectedOk:    true,
+		},
+		{
+			// 5 / 3 = 1.67, truncated to 1. Since every counted score is at
+			// least 1, truncation can never report 0 and so can never be
+			// mistaken for "no contributor had a score".
+			name: "low odd scores truncate towards zero",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 1},
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 1},
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 3},
+			},
+			expectedScore: 1,
+			expectedOk:    true,
+		},
+		{
+			name:          "empty permutation",
+			permutation:   []TopologyHint{},
+			expectedScore: 0,
+			expectedOk:    false,
+		},
+	}
+
+	for _, tc := range tcases {
+		t.Run(tc.name, func(t *testing.T) {
+			score, ok := aggregateHintScores(tc.permutation)
+			if score != tc.expectedScore {
+				t.Errorf("expected score %d, got %d", tc.expectedScore, score)
+			}
+			if ok != tc.expectedOk {
+				t.Errorf("expected ok %v, got %v", tc.expectedOk, ok)
+			}
+		})
+	}
+}
+
+func TestMergePermutationCarriesScore(t *testing.T) {
+	defaultAffinity := NewTestBitMask(0, 1)
+
+	tcases := []struct {
+		name          string
+		permutation   []TopologyHint
+		expectedScore int64
+	}{
+		{
+			name: "merged hint carries aggregated score",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 40},
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 80},
+			},
+			expectedScore: 60,
+		},
+		{
+			name: "merged hint truncates a fractional average",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 40},
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 81},
+			},
+			expectedScore: 60,
+		},
+		{
+			name: "merged hint carries a lone minimum score",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 1},
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 0},
+				{NUMANodeAffinity: nil, Preferred: true, Score: 0},
+			},
+			expectedScore: 1,
+		},
+		{
+			name: "merged hint score is zero when no contributors have scores",
+			permutation: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 0},
+			},
+			expectedScore: 0,
+		},
+	}
+
+	for _, tc := range tcases {
+		t.Run(tc.name, func(t *testing.T) {
+			merged := mergePermutation(defaultAffinity, tc.permutation)
+			if merged.Score != tc.expectedScore {
+				t.Errorf("expected merged Score %d, got %d", tc.expectedScore, merged.Score)
+			}
+		})
+	}
+}
+
+// TestCompareWinnerUnchangedByScore documents that Score is inert during hint
+// selection: the winner is decided by Preferred and by the affinity mask alone,
+// so even the weakest score cannot steer the decision towards itself.
+func TestCompareWinnerUnchangedByScore(t *testing.T) {
+	numaInfo := commonNUMAInfoTwoNodes()
+	hints := [][]TopologyHint{}
+	merger := NewHintMerger(numaInfo, hints, PolicyBestEffort, PolicyOptions{})
+
+	tcases := []struct {
+		name          string
+		current       *TopologyHint
+		candidate     *TopologyHint
+		expectCurrent bool
+	}{
+		{
+			name:          "narrower hint wins over wider hint with a higher score",
+			current:       &TopologyHint{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 10},
+			candidate:     &TopologyHint{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: true, Score: 90},
+			expectCurrent: true,
+		},
+		{
+			name:          "minimum score does not cost the narrower hint the win",
+			current:       &TopologyHint{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 1},
+			candidate:     &TopologyHint{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: true, Score: 100},
+			expectCurrent: true,
+		},
+		{
+			// Same pair with the arguments swapped: the outcome follows the
+			// mask, not the position or the score.
+			name:          "minimum score does not cost the narrower candidate the win",
+			current:       &TopologyHint{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: true, Score: 100},
+			candidate:     &TopologyHint{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 1},
+			expectCurrent: false,
+		},
+		{
+			name:          "unscored narrower hint wins over a fully scored wider hint",
+			current:       &TopologyHint{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 0},
+			candidate:     &TopologyHint{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: true, Score: 100},
+			expectCurrent: true,
+		},
+		{
+			name:          "preferred hint with the minimum score wins over a non-preferred hint with the maximum score",
+			current:       &TopologyHint{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: false, Score: 100},
+			candidate:     &TopologyHint{NUMANodeAffinity: NewTestBitMask(0), Preferred: true, Score: 1},
+			expectCurrent: false,
+		},
+	}
+
+	for _, tc := range tcases {
+		t.Run(tc.name, func(t *testing.T) {
+			expected := tc.candidate
+			if tc.expectCurrent {
+				expected = tc.current
+			}
+			result := merger.compare(tc.current, tc.candidate)
+			if result != expected {
+				t.Errorf("expected hint %v (Score %d) to win, got %v (Score %d)",
+					expected.NUMANodeAffinity, expected.Score, result.NUMANodeAffinity, result.Score)
+			}
+		})
+	}
+}
