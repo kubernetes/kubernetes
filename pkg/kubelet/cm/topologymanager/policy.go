@@ -38,6 +38,21 @@ func IsAlignmentGuaranteed(p Policy) bool {
 	return p.Name() == PolicySingleNumaNode
 }
 
+func aggregateHintScores(permutation []TopologyHint) (int64, bool) {
+	var sum int64
+	var count int64
+	for _, hint := range permutation {
+		if hint.NUMANodeAffinity != nil && hint.Score > 0 {
+			sum += hint.Score
+			count++
+		}
+	}
+	if count == 0 {
+		return 0, false
+	}
+	return sum / count, true
+}
+
 // Merge a TopologyHints permutation to a single hint by performing a bitwise-AND
 // of their affinity masks. The hint shall be preferred if all hits in the permutation
 // are preferred.
@@ -63,9 +78,16 @@ func mergePermutation(defaultAffinity bitmask.BitMask, permutation []TopologyHin
 
 	// Merge the affinities using a bitwise-and operation.
 	mergedAffinity := bitmask.And(defaultAffinity, numaAffinities...)
+
+	score, hasScores := aggregateHintScores(permutation)
+	if hasScores {
+		// TODO: plumb contextual logger through mergePermutation and replace klog
+		klog.V(4).InfoS("Merged hint includes aggregated score", "score", score)
+	}
+
 	// Build a mergedHint from the merged affinity mask, setting preferred as
 	// appropriate based on the logic above.
-	return TopologyHint{NUMANodeAffinity: mergedAffinity, Preferred: preferred}
+	return TopologyHint{NUMANodeAffinity: mergedAffinity, Preferred: preferred, Score: score}
 }
 
 func filterProvidersHints(logger klog.Logger, providersHints []map[string][]TopologyHint) [][]TopologyHint {
