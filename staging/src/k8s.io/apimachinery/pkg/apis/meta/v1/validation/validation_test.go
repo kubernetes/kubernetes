@@ -17,12 +17,14 @@ limitations under the License.
 package validation
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -643,4 +645,73 @@ func errorsAsString(errs field.ErrorList) string {
 		messages = append(messages, curr.Error())
 	}
 	return strings.Join(messages, "\n")
+}
+
+func TestValidateCustomObjectMetaAnnotations(t *testing.T) {
+	fldPath := field.NewPath("annotation")
+	ctx := context.Background()
+	op := operation.Operation{}
+
+	testCases := []struct {
+		name        string
+		annotations map[string]string
+		expectErrs  int
+	} {
+		{
+			name:        "nil annotations",
+			annotations: nil,
+			expectErrs:  0,
+		},
+		{
+			name:        "empty annotations",
+			annotations: map[string]string{},
+			expectErrs:  0,
+		},
+		{
+			name:        "empty annotations",
+			annotations: map[string]string{
+				"example.com/foo": "bar",
+				"simple-key":      "value",
+			},
+			expectErrs:  0,
+		},
+		{
+			name:        "mixed-case prefix is allowed (case-insensitive check)",
+			annotations: map[string]string{
+				"Example.Com/foo": "bar",
+			},
+			expectErrs:  0,
+		},
+		{
+			name:        "total size just under the limit",
+			annotations: map[string]string{
+				"key": strings.Repeat("a", annotationsMaxSize-len("key")-1),
+			},
+			expectErrs:  0,
+		},
+		{
+			name:        "invalid qualified name key",
+			annotations: map[string]string{
+				"not a valid key!": "bar",
+			},
+			expectErrs:  1,
+		},
+		{
+			name:        "total size over the limit",
+			annotations: map[string]string{
+				"key": strings.Repeat("a", annotationsMaxSize),
+			},
+			expectErrs:  1,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidateCustom_ObjectMeta_Annotations(ctx, op, fldPath, tc.annotations, nil)
+			if len(errs) != tc.expectErrs {
+				t.Errorf("expected %d error(s), got %d: %v", tc.expectErrs, len(errs), errs)
+			}
+		})
+	}
+
 }
