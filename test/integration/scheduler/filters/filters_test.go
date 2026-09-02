@@ -3042,6 +3042,80 @@ func TestNodeAffinityFilter(t *testing.T) {
 	}
 }
 
+func TestCgroupOptionsFilter(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CgroupOptions, true)
+
+	tests := []struct {
+		name            string
+		cgroupOptions   *v1.CgroupOptions
+		initContainer   bool
+		requiresFeature bool
+	}{
+		{name: "omitted mount mode"},
+		{name: "empty cgroup options", cgroupOptions: &v1.CgroupOptions{}},
+		{name: "read-only container", cgroupOptions: &v1.CgroupOptions{MountMode: ptr.To(v1.CgroupMountModeReadOnly)}, requiresFeature: true},
+		{name: "writable container", cgroupOptions: &v1.CgroupOptions{MountMode: ptr.To(v1.CgroupMountModeWritable)}, requiresFeature: true},
+		{name: "read-only init container", cgroupOptions: &v1.CgroupOptions{MountMode: ptr.To(v1.CgroupMountModeReadOnly)}, initContainer: true, requiresFeature: true},
+		{name: "writable init container", cgroupOptions: &v1.CgroupOptions{MountMode: ptr.To(v1.CgroupMountModeWritable)}, initContainer: true, requiresFeature: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testCtx := initTest(t, "cgroup-options-filter")
+			cs := testCtx.ClientSet
+			ns := testCtx.NS.Name
+
+			for _, name := range []string{"node-1", "node-2"} {
+				if _, err := createNode(cs, st.MakeNode().Name(name).Obj()); err != nil {
+					t.Fatalf("Failed to create node: %v", err)
+				}
+			}
+			if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, 2); err != nil {
+				t.Fatalf("Failed to wait for nodes in cache: %v", err)
+			}
+
+			pod := st.MakePod().Name("cgroup-options").Namespace(ns).Container(imageutils.GetPauseImageName()).Obj()
+			container := v1.Container{
+				Name:  "cgroup-options",
+				Image: imageutils.GetPauseImageName(),
+				SecurityContext: &v1.SecurityContext{
+					CgroupOptions: tt.cgroupOptions,
+				},
+			}
+			if tt.initContainer {
+				pod.Spec.InitContainers = []v1.Container{container}
+			} else {
+				pod.Spec.Containers = append(pod.Spec.Containers, container)
+			}
+			if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create pod: %v", err)
+			}
+
+			if !tt.requiresFeature {
+				if err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, podScheduled(cs, ns, pod.Name)); err != nil {
+					t.Fatalf("Expected pod using the runtime default to be scheduled without CgroupOptions support: %v", err)
+				}
+				return
+			}
+			if err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, podUnschedulable(cs, ns, pod.Name)); err != nil {
+				t.Fatalf("Expected pod requesting %s to be unschedulable without CgroupOptions support: %v", *tt.cgroupOptions.MountMode, err)
+			}
+
+			// Declaring support must requeue the pending Pod and exclude node-2.
+			node, err := cs.CoreV1().Nodes().Get(testCtx.Ctx, "node-1", metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Failed to get node: %v", err)
+			}
+			node.Status.DeclaredFeatures = []string{"CgroupOptions"}
+			if _, err := cs.CoreV1().Nodes().UpdateStatus(testCtx.Ctx, node, metav1.UpdateOptions{}); err != nil {
+				t.Fatalf("Failed to update declared features: %v", err)
+			}
+			if err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, podScheduledIn(cs, ns, pod.Name, []string{node.Name})); err != nil {
+				t.Fatalf("Expected pod requesting %s to be scheduled on the node declaring CgroupOptions: %v", *tt.cgroupOptions.MountMode, err)
+			}
+		})
+	}
+}
+
 func TestNodeDeclaredFeaturesFilter(t *testing.T) {
 	// Helper to create a pod that requires the feature.
 	podRequiringFeatureA := st.MakePod().Name("pod-req-feature-a").

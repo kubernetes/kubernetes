@@ -42,11 +42,20 @@ func (kl *Kubelet) discoverNodeDeclaredFeatures() []string {
 	if features := kl.runtimeState.runtimeFeatures(); features != nil {
 		runtimeFeatures.UserNamespacesHostNetwork = features.UserNamespacesHostNetwork
 		runtimeFeatures.MountOptions = features.MountOptions
+		runtimeFeatures.CgroupMountMode = features.CgroupMountMode
+	}
+
+	nodeConfig := kl.containerManager.GetNodeConfig()
+	staticConfig := nodedeclaredfeatures.StaticConfiguration{
+		Cgroup2UnifiedMode: nodeConfig.CgroupVersion == 2,
+		CgroupsPerQOS:      nodeConfig.CgroupsPerQOS,
+		CgroupNsdelegate:   nodeConfig.CgroupNsdelegate,
 	}
 
 	cfg := &nodedeclaredfeatures.NodeConfiguration{
 		FeatureGates:    adaptedFG,
 		Version:         kl.version,
+		StaticConfig:    staticConfig,
 		RuntimeFeatures: runtimeFeatures,
 	}
 	return kl.nodeDeclaredFeaturesFramework.DiscoverNodeFeatures(cfg)
