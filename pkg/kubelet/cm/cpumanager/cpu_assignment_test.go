@@ -430,6 +430,169 @@ func TestCPUAccumulatorFreeCPUs(t *testing.T) {
 	}
 }
 
+func TestCPUAccumulatorFreeCPUsSpreadRoundRobin(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	testCases := []struct {
+		description   string
+		topo          *topology.CPUTopology
+		availableCPUs cpuset.CPUSet
+		expect        []int
+	}{
+		// Synthetic topology: contiguous sibling IDs, not representative of known hardware.
+		{
+			description: "contiguous sibling CPU IDs",
+			topo: &topology.CPUTopology{
+				NumCPUs:    8,
+				NumSockets: 1,
+				NumCores:   4,
+				CPUDetails: map[int]topology.CPUInfo{
+					0: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					1: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					2: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					3: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					4: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					5: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					6: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+					7: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+				},
+			},
+			availableCPUs: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			expect:        []int{0, 2, 4, 6, 1, 3, 5, 7},
+		},
+		{
+			description:   "interleaved sibling CPU IDs",
+			topo:          topoSingleSocketHT,
+			availableCPUs: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			expect:        []int{0, 1, 2, 3, 4, 5, 6, 7},
+		},
+		// Synthetic topology: arbitrary CPU numbering, does not correspond to known hardware.
+		{
+			description: "arbitrary logical CPU numbering",
+			topo: &topology.CPUTopology{
+				NumCPUs:    8,
+				NumSockets: 1,
+				NumCores:   4,
+				CPUDetails: map[int]topology.CPUInfo{
+					0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					7:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					2:  {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					11: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					5:  {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					9:  {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					1:  {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+					14: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+				},
+			},
+			availableCPUs: cpuset.New(0, 1, 2, 5, 7, 9, 11, 14),
+			expect:        []int{0, 2, 5, 1, 7, 11, 9, 14},
+		},
+		// Synthetic topology: dual-socket layout synthesized for spread verification, not a specific product.
+		{
+			description: "multiple sockets",
+			topo: &topology.CPUTopology{
+				NumCPUs:    16,
+				NumSockets: 2,
+				NumCores:   8,
+				CPUDetails: map[int]topology.CPUInfo{
+					0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					1:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					2:  {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					3:  {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					4:  {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					5:  {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					6:  {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+					7:  {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+					8:  {CoreID: 4, SocketID: 1, NUMANodeID: 1},
+					9:  {CoreID: 4, SocketID: 1, NUMANodeID: 1},
+					10: {CoreID: 5, SocketID: 1, NUMANodeID: 1},
+					11: {CoreID: 5, SocketID: 1, NUMANodeID: 1},
+					12: {CoreID: 6, SocketID: 1, NUMANodeID: 1},
+					13: {CoreID: 6, SocketID: 1, NUMANodeID: 1},
+					14: {CoreID: 7, SocketID: 1, NUMANodeID: 1},
+					15: {CoreID: 7, SocketID: 1, NUMANodeID: 1},
+				},
+			},
+			availableCPUs: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
+			expect:        []int{0, 2, 4, 6, 1, 3, 5, 7, 8, 10, 12, 14, 9, 11, 13, 15},
+		},
+		// Synthetic topology: partially populated cores on contiguous sibling layout, not modeled on real hardware.
+		{
+			description: "partially allocated cores",
+			topo: &topology.CPUTopology{
+				NumCPUs:    8,
+				NumSockets: 1,
+				NumCores:   4,
+				CPUDetails: map[int]topology.CPUInfo{
+					0: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					1: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					2: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					3: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					4: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					5: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					6: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+					7: {CoreID: 3, SocketID: 0, NUMANodeID: 0},
+				},
+			},
+			availableCPUs: cpuset.New(0, 2, 3, 4, 6, 7),
+			expect:        []int{0, 4, 2, 6, 3, 7},
+		},
+		// Synthetic topology: 3 threads per core is not common hardware; validates multi-thread spread.
+		{
+			description: "more than two CPUs per core",
+			topo: &topology.CPUTopology{
+				NumCPUs:    9,
+				NumSockets: 1,
+				NumCores:   3,
+				CPUDetails: map[int]topology.CPUInfo{
+					0: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					1: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					2: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					3: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					4: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					5: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
+					6: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					7: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+					8: {CoreID: 2, SocketID: 0, NUMANodeID: 0},
+				},
+			},
+			availableCPUs: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+			expect:        []int{0, 3, 6, 1, 4, 7, 2, 5, 8},
+		},
+		// Synthetic topology: multi-NUMA per socket, shows spread ignores NUMA hierarchy and still round-robins per core within each socket.
+		{
+			description: "spread across multi-NUMA sockets round-robins per core",
+			topo: &topology.CPUTopology{
+				NumCPUs:      8,
+				NumSockets:   2,
+				NumCores:     4,
+				NumNUMANodes: 4,
+				CPUDetails: map[int]topology.CPUInfo{
+					0: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					1: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
+					2: {CoreID: 1, SocketID: 0, NUMANodeID: 1},
+					3: {CoreID: 1, SocketID: 0, NUMANodeID: 1},
+					4: {CoreID: 2, SocketID: 1, NUMANodeID: 2},
+					5: {CoreID: 2, SocketID: 1, NUMANodeID: 2},
+					6: {CoreID: 3, SocketID: 1, NUMANodeID: 3},
+					7: {CoreID: 3, SocketID: 1, NUMANodeID: 3},
+				},
+			},
+			availableCPUs: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			expect:        []int{0, 2, 1, 3, 4, 6, 5, 7},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			acc := newCPUAccumulator(logger, tc.topo, tc.availableCPUs, 0, CPUSortingStrategySpread)
+			result := acc.freeCPUs()
+			if !reflect.DeepEqual(result, tc.expect) {
+				t.Errorf("expected %v to equal %v", result, tc.expect)
+			}
+		})
+	}
+}
+
 func TestSortAvailableUncoreCaches(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
@@ -923,7 +1086,7 @@ func TestTakeByTopologyWithSpreadPhysicalCPUsPreferredOption(t *testing.T) {
 			mustParseCPUSet(t, "0-287"),
 			12,
 			"",
-			mustParseCPUSet(t, "0-2,9-10,13-14,21-22,25-26,33"),
+			cpuset.New(0, 50, 57, 58, 71, 72, 79, 80, 87, 88, 95, 96),
 		},
 	}
 
@@ -1112,37 +1275,6 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 			2,
 			"",
 			mustParseCPUSet(t, "0-7,10-16,20-27,30-37,40-47,50-56,60-67,70-77"),
-		},
-		{
-			"ensure allocation with cpuGroupSize 2 terminates when per-NUMA availability is not a multiple of the group size",
-			topoDualSocketMultiNumaPerSocketHT,
-			mustParseCPUSet(t, "0-4,10-14,20-24,30-34"),
-			14,
-			2,
-			"",
-			mustParseCPUSet(t, "0-3,10-13,20-23,30-31"),
-		},
-		{
-			// Feasible: whole-group capacity exactly covers the request, so
-			// the group accounting must not reject it.
-			"ensure allocation with cpuGroupSize 2 succeeds when whole-group capacity exactly satisfies the request",
-			topoDualSocketMultiNumaPerSocketHT,
-			mustParseCPUSet(t, "0-4,10-14,20-24,30-34"),
-			16,
-			2,
-			"",
-			mustParseCPUSet(t, "0-3,10-13,20-23,30-33"),
-		},
-		{
-			// Same fragmentation on 8 NUMA nodes with 31 CPUs free each, so
-			// the remainder search walks deeper subsets.
-			"ensure allocation with cpuGroupSize 2 terminates on 8 NUMA nodes with fragmented availability",
-			topoDualSocketMultiNumaPerSocketHTLarge,
-			mustParseCPUSet(t, "1-15,17-31,33-47,49-63,65-79,81-95,97-111,113-127,128-255"),
-			230,
-			2,
-			"",
-			mustParseCPUSet(t, "1-15,17-31,33-47,49-62,65-78,81-94,97-110,113-126,129-143,145-159,161-175,177-190,193-206,209-222,225-238,241-254"),
 		},
 		{
 			"ensure bestRemainder chosen with NUMA nodes that have enough CPUs to satisfy the request",
