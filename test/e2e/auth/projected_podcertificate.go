@@ -29,6 +29,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/features"
@@ -371,6 +372,10 @@ func generateContainerSecurityContext() *v1.SecurityContext {
 
 // createServerObjects creates the Deployment and Service objects for the mTLS server.
 func createServerObjects(namespace string, spiffeSignerName string, securityContext *v1.SecurityContext) (*appsv1.Deployment, *v1.Service) {
+	// Use an unprivileged port (> 1024) for the container listener because the
+	// container runs with a Restricted security context (non-root with dropped capabilities).
+	const serverPort = 8443
+
 	replicas := int32(1)
 	serverLabels := map[string]string{"app": "server"}
 
@@ -393,7 +398,7 @@ func createServerObjects(namespace string, spiffeSignerName string, securityCont
 							Image: imageutils.GetE2EImage(imageutils.Agnhost), // Use agnhost image >= 2.59
 							Args: []string{
 								"mtlsserver",
-								"--listen=0.0.0.0:443",
+								fmt.Sprintf("--listen=0.0.0.0:%d", serverPort),
 								"--server-creds=/run/tls-config/spiffe-cred-bundle.pem",
 								"--spiffe-trust-bundle=/run/tls-config/spiffe-trust-bundle.pem",
 							},
@@ -434,8 +439,14 @@ func createServerObjects(namespace string, spiffeSignerName string, securityCont
 	serverService := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "server", Namespace: namespace},
 		Spec: v1.ServiceSpec{
-			Type:     v1.ServiceTypeClusterIP,
-			Ports:    []v1.ServicePort{{Name: "https", Port: 443}},
+			Type: v1.ServiceTypeClusterIP,
+			Ports: []v1.ServicePort{
+				{
+					Name:       "https",
+					Port:       443,
+					TargetPort: intstr.FromInt32(serverPort),
+				},
+			},
 			Selector: serverLabels,
 		},
 	}
