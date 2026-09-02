@@ -92,14 +92,6 @@ func TestSnapshotListPrefix(t *testing.T) {
 			snapshot := s.newSnapshot(t)
 			for _, tc := range testCases {
 				t.Run(tc.name, func(t *testing.T) {
-					items, err := snapshot.OrderedListPrefix(tc.prefix, tc.continueKey)
-					require.NoError(t, err)
-					var listed []string
-					for _, item := range items {
-						listed = append(listed, item.(*Element).Key)
-					}
-					assert.Equal(t, tc.expectKeys, listed, "OrderedListPrefix")
-
 					var ranged []string
 					for elem, err := range snapshot.RangePrefix(tc.prefix, tc.continueKey) {
 						require.NoError(t, err)
@@ -140,9 +132,6 @@ func TestSingleElementSnapshot(t *testing.T) {
 			}
 			assert.Equal(t, tc.expectKeys, ranged)
 			assert.Equal(t, len(tc.expectKeys), tc.snapshot.Count(tc.prefix, tc.continueKey))
-			items, err := tc.snapshot.OrderedListPrefix(tc.prefix, tc.continueKey)
-			require.NoError(t, err)
-			assert.Len(t, items, len(tc.expectKeys))
 			_, found, err := tc.snapshot.GetByKey("/pods/ns1/a")
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectFound, found)

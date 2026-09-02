@@ -36,47 +36,6 @@ func TestStoreListOrdered(t *testing.T) {
 	}, store.List())
 }
 
-func TestStoreListPrefix(t *testing.T) {
-	store := newThreadedBtreeStoreIndexer(nil, btreeDegree)
-	require.NoError(t, store.Add(testStorageElement("foo3", "bar3", 1)))
-	require.NoError(t, store.Add(testStorageElement("foo1", "bar2", 2)))
-	require.NoError(t, store.Add(testStorageElement("foo2", "bar1", 3)))
-	require.NoError(t, store.Add(testStorageElement("bar", "baz", 4)))
-
-	items, err := store.OrderedListPrefix("foo", "")
-	require.NoError(t, err)
-	assert.Equal(t, []interface{}{
-		testStorageElement("foo1", "bar2", 2),
-		testStorageElement("foo2", "bar1", 3),
-		testStorageElement("foo3", "bar3", 1),
-	}, items)
-
-	items, err = store.OrderedListPrefix("foo2", "")
-	require.NoError(t, err)
-	assert.Equal(t, []interface{}{
-		testStorageElement("foo2", "bar1", 3),
-	}, items)
-
-	items, err = store.OrderedListPrefix("foo", "foo1\x00")
-	require.NoError(t, err)
-	assert.Equal(t, []interface{}{
-		testStorageElement("foo2", "bar1", 3),
-		testStorageElement("foo3", "bar3", 1),
-	}, items)
-
-	items, err = store.OrderedListPrefix("foo", "foo2\x00")
-	require.NoError(t, err)
-	assert.Equal(t, []interface{}{
-		testStorageElement("foo3", "bar3", 1),
-	}, items)
-
-	items, err = store.OrderedListPrefix("bar", "")
-	require.NoError(t, err)
-	assert.Equal(t, []interface{}{
-		testStorageElement("bar", "baz", 4),
-	}, items)
-}
-
 func TestStoreSnapshotter(t *testing.T) {
 	cache := NewSnapshotter()
 	cache.Add(10, fakeIndexer{rv: 10})
@@ -140,9 +99,6 @@ func (f fakeIndexer) Add(obj interface{}) error    { return nil }
 func (f fakeIndexer) Update(obj interface{}) error { return nil }
 func (f fakeIndexer) Delete(obj interface{}) error { return nil }
 func (f fakeIndexer) Clone() Snapshot              { return f }
-func (f fakeIndexer) OrderedListPrefix(prefixKey, continueKey string) ([]interface{}, error) {
-	return nil, nil
-}
 func (f fakeIndexer) ByIndex(indexName string, indexedValue string) ([]interface{}, error) {
 	return nil, nil
 }

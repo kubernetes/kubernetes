@@ -71,13 +71,11 @@ type Indexer interface {
 	ByIndex(indexName, indexedValue string) ([]interface{}, error)
 	Count(prefix, continueKey string) (count int)
 	Clone() Snapshot
-	OrderedListPrefix(prefix, continueKey string) ([]interface{}, error)
 }
 
 // Snapshot is an immutable point-in-time view of the store.
 type Snapshot interface {
 	GetByKey(key string) (item interface{}, exists bool, err error)
-	OrderedListPrefix(prefix, continueKey string) ([]interface{}, error)
 	// RangePrefix iterates the elements with the given key prefix, in key
 	// order, starting from continueKey.
 	RangePrefix(prefix, continueKey string) iter.Seq2[*Element, error]

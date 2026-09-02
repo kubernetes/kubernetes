@@ -536,10 +536,6 @@ func (s *countingSnapshot) GetByKey(string) (interface{}, bool, error) {
 	return nil, false, nil
 }
 
-func (s *countingSnapshot) OrderedListPrefix(_, _ string) ([]interface{}, error) {
-	return s.items, nil
-}
-
 func (s *countingSnapshot) RangePrefix(_, continueKey string) iter.Seq2[*store.Element, error] {
 	s.rangePrefixCalls++
 	return func(yield func(*store.Element, error) bool) {

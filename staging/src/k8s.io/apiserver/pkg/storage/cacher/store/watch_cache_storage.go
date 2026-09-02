@@ -133,13 +133,6 @@ func (s elementSnapshot) GetByKey(key string) (interface{}, bool, error) {
 	return nil, false, nil
 }
 
-func (s elementSnapshot) OrderedListPrefix(prefix, continueKey string) ([]interface{}, error) {
-	if !s.inRange(prefix, continueKey) {
-		return nil, nil
-	}
-	return []interface{}{s.elem}, nil
-}
-
 func (s elementSnapshot) RangePrefix(prefix, continueKey string) iter.Seq2[*Element, error] {
 	return func(yield func(*Element, error) bool) {
 		if s.inRange(prefix, continueKey) {
@@ -172,73 +165,41 @@ func (l listSnapshot) GetByKey(key string) (interface{}, bool, error) {
 	return nil, false, nil
 }
 
-func (l listSnapshot) OrderedListPrefix(prefix string, continueKey string) ([]interface{}, error) {
-	var result []interface{}
-	for _, item := range l.Items {
-		elem, ok := item.(*Element)
-		if !ok {
-			return nil, fmt.Errorf("non *Element returned from storage: %v", item)
-		}
-		if len(continueKey) > 0 && continueKey > elem.Key {
-			continue
-		}
-		if !key.HasPathPrefix(elem.Key, prefix) {
-			continue
-		}
-		result = append(result, item)
-	}
-	sort.Sort(sortableStoreElements(result))
-	return result, nil
-}
-
 func (l listSnapshot) RangePrefix(prefix, continueKey string) iter.Seq2[*Element, error] {
 	return func(yield func(*Element, error) bool) {
-		items, err := l.OrderedListPrefix(prefix, continueKey)
-		if err != nil {
-			yield(nil, err)
-			return
+		var elems []*Element
+		for _, item := range l.Items {
+			elem, ok := item.(*Element)
+			if !ok {
+				yield(nil, fmt.Errorf("non *Element returned from storage: %v", item))
+				return
+			}
+			if inRange(elem, prefix, continueKey) {
+				elems = append(elems, elem)
+			}
 		}
-		for _, item := range items {
-			// OrderedListPrefix has already checked every item is an *Element.
-			if !yield(item.(*Element), nil) {
+		sort.Slice(elems, func(i, j int) bool { return elems[i].Key < elems[j].Key })
+		for _, elem := range elems {
+			if !yield(elem, nil) {
 				return
 			}
 		}
 	}
 }
 
-// Count returns the number of items RangePrefix(prefix, continueKey) would
-// yield, by applying its filter without allocating or sorting.
+// Count applies RangePrefix's filter without allocating or sorting.
 func (l listSnapshot) Count(prefix, continueKey string) int {
 	count := 0
 	for _, item := range l.Items {
-		elem, ok := item.(*Element)
-		if !ok {
-			continue
+		if elem, ok := item.(*Element); ok && inRange(elem, prefix, continueKey) {
+			count++
 		}
-		if len(continueKey) > 0 && continueKey > elem.Key {
-			continue
-		}
-		if !key.HasPathPrefix(elem.Key, prefix) {
-			continue
-		}
-		count++
 	}
 	return count
 }
 
-type sortableStoreElements []interface{}
-
-func (s sortableStoreElements) Len() int {
-	return len(s)
-}
-
-func (s sortableStoreElements) Less(i, j int) bool {
-	return s[i].(*Element).Key < s[j].(*Element).Key
-}
-
-func (s sortableStoreElements) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
+func inRange(elem *Element, prefix, continueKey string) bool {
+	return continueKey <= elem.Key && key.HasPathPrefix(elem.Key, prefix)
 }
 
 // Get takes runtime.Object as a parameter. However, it returns
