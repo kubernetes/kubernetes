@@ -25,7 +25,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -292,6 +295,111 @@ func TestGetPodContainerName(t *testing.T) {
 			actualCgroupName, actualLiteralCgroupfs := pcm.GetPodContainerName(tt.args.pod)
 			require.Equalf(t, tt.wantCgroupName, actualCgroupName, "Unexpected cgroup name for pod with UID %s, container resources: %v", tt.args.pod.UID, tt.args.pod.Spec.Containers[0].Resources)
 			require.Equalf(t, tt.wantLiteralCgroupfs, actualLiteralCgroupfs, "Unexpected literal cgroupfs for pod with UID %s, container resources: %v", tt.args.pod.UID, tt.args.pod.Spec.Containers[0].Resources)
+		})
+	}
+}
+
+func TestPodRequestsWritableCgroups(t *testing.T) {
+	readWrite := v1.CgroupMountModeReadWrite
+	readOnly := v1.CgroupMountModeReadOnly
+	scWith := func(mode *v1.CgroupMountMode) *v1.SecurityContext {
+		return &v1.SecurityContext{CgroupOptions: &v1.CgroupOptions{MountMode: mode}}
+	}
+
+	tests := []struct {
+		name string
+		pod  *v1.Pod
+		want bool
+	}{
+		{
+			name: "no security context",
+			pod:  &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Name: "c"}}}},
+			want: false,
+		},
+		{
+			name: "read-only mount mode",
+			pod:  &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Name: "c", SecurityContext: scWith(&readOnly)}}}},
+			want: false,
+		},
+		{
+			name: "read-write on a container",
+			pod:  &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Name: "c", SecurityContext: scWith(&readWrite)}}}},
+			want: true,
+		},
+		{
+			name: "read-write on an init container",
+			pod:  &v1.Pod{Spec: v1.PodSpec{InitContainers: []v1.Container{{Name: "i", SecurityContext: scWith(&readWrite)}}}},
+			want: true,
+		},
+		{
+			name: "read-write on an ephemeral container",
+			pod: &v1.Pod{Spec: v1.PodSpec{EphemeralContainers: []v1.EphemeralContainer{{
+				EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debug", SecurityContext: scWith(&readWrite)},
+			}}}},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, podRequestsWritableCgroups(tt.pod))
+		})
+	}
+}
+
+func TestEnsureExistsWritableCgroupLimits(t *testing.T) {
+	tests := []struct {
+		name                 string
+		cgroupOptionsEnabled bool
+		mountMode            v1.CgroupMountMode
+		wantLimits           bool
+	}{
+		{
+			name:                 "limits the pod cgroup when a container requests writable cgroups",
+			cgroupOptionsEnabled: true,
+			mountMode:            v1.CgroupMountModeReadWrite,
+			wantLimits:           true,
+		},
+		{
+			name:                 "no limits with CgroupOptions disabled",
+			cgroupOptionsEnabled: false,
+			mountMode:            v1.CgroupMountModeReadWrite,
+		},
+		{
+			name:                 "no limits for a read-only mount",
+			cgroupOptionsEnabled: true,
+			mountMode:            v1.CgroupMountModeReadOnly,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.CgroupOptions, tt.cgroupOptionsEnabled)
+			logger, _ := ktesting.NewTestContext(t)
+			pod := &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{
+					Name: "c",
+					SecurityContext: &v1.SecurityContext{
+						CgroupOptions: &v1.CgroupOptions{MountMode: &tt.mountMode},
+					},
+				}}},
+			}
+			fake := &fakeCgroupManager{}
+			m := &podContainerManagerImpl{
+				cgroupManager:       fake,
+				podContainerManager: NewStubContainerManager(),
+			}
+
+			require.NoError(t, m.EnsureExists(logger, pod))
+			require.Len(t, fake.created, 1)
+			unified := fake.created[0].ResourceParameters.Unified
+			if tt.wantLimits {
+				require.Equal(t, "250", unified["cgroup.max.descendants"])
+				require.Equal(t, "50", unified["cgroup.max.depth"])
+				return
+			}
+			require.NotContains(t, unified, "cgroup.max.descendants")
+			require.NotContains(t, unified, "cgroup.max.depth")
 		})
 	}
 }
