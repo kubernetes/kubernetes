@@ -136,7 +136,7 @@ func currentPodEvictionRetry(controller *Controller, podNamespacedName types.Nam
 
 func waitForPodEvictionRetry(controller *Controller, podRef NamespacedObject) (podEvictionItem, error) {
 	var item podEvictionItem
-	err := wait.PollImmediate(10*time.Millisecond, time.Second, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
 		var ok bool
 		item, ok = currentPodEvictionRetry(controller, podRef.NamespacedName)
 		return ok && item.podRef == podRef, nil
@@ -146,9 +146,9 @@ func waitForPodEvictionRetry(controller *Controller, podRef NamespacedObject) (p
 
 func waitForTimedWorkerAfterRetry(controller *Controller, fakeClock *testingclock.FakeClock, podNamespacedName types.NamespacedName, delay time.Duration) error {
 	var lastErr error
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		fakeClock.Step(time.Second)
-		if err := wait.PollImmediate(10*time.Millisecond, 200*time.Millisecond, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, 200*time.Millisecond, true, func(context.Context) (bool, error) {
 			worker := controller.taintEvictionQueue.GetWorkerUnsafe(podNamespacedName.String())
 			return worker != nil && worker.FireAt.Sub(worker.CreatedAt) == delay, nil
 		}); err == nil {
@@ -319,7 +319,7 @@ func TestPodEvictionDeletionFailureRetriesDurably(t *testing.T) {
 	}
 	controller.PodUpdated(nil, pod)
 
-	if err := wait.PollImmediate(10*time.Millisecond, time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
 		return deleteAttempts.Load() >= 1, nil
 	}); err != nil {
 		t.Fatalf("Timed out waiting for first delete attempt: %v", err)
@@ -333,7 +333,7 @@ func TestPodEvictionDeletionFailureRetriesDurably(t *testing.T) {
 	for deleteAttempts.Load() <= deniedAttempts {
 		previous := deleteAttempts.Load()
 		fakeClock.Step(time.Second)
-		if err := wait.PollImmediate(10*time.Millisecond, time.Second, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
 			return deleteAttempts.Load() > previous, nil
 		}); err != nil {
 			t.Fatalf("Timed out waiting for durable retry after %d attempts: %v", previous, err)
@@ -394,7 +394,7 @@ func TestPodEvictionDurableRetryKeepsRateLimiterState(t *testing.T) {
 	for i, step := range []time.Duration{time.Second, 2 * time.Second, 4 * time.Second, 8 * time.Second} {
 		fakeClock.Step(step)
 		wantAttempts := int32(retries + i + 1)
-		if err := wait.PollImmediate(10*time.Millisecond, time.Second, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
 			return deleteAttempts.Load() == wantAttempts, nil
 		}); err != nil {
 			t.Fatalf("Timed out waiting for durable retry %d after %s: %v", i+1, step, err)
@@ -532,7 +532,7 @@ func TestPodEvictionDurableRetryWithZeroSecondTolerationDeletesDirectly(t *testi
 	}
 
 	fakeClock.Step(time.Second)
-	if err := wait.PollImmediate(10*time.Millisecond, time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
 		return deleteAttempts.Load() == int32(retries+1), nil
 	}); err != nil {
 		t.Fatalf("Timed out waiting for one durable retry delete attempt: %v", err)
@@ -553,7 +553,7 @@ func TestPodEvictionDurableRetryWithZeroSecondTolerationDeletesDirectly(t *testi
 	}
 
 	fakeClock.Step(2 * time.Second)
-	if err := wait.PollImmediate(10*time.Millisecond, time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
 		return deleteAttempts.Load() == int32(retries+2), nil
 	}); err != nil {
 		t.Fatalf("Timed out waiting for second durable retry delete attempt: %v", err)
@@ -620,7 +620,7 @@ func TestPodEvictionRetryDoesNotDeleteReplacementPod(t *testing.T) {
 	}
 
 	fakeClock.Step(time.Second)
-	if err := wait.PollImmediate(10*time.Millisecond, time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
 		_, ok := currentPodEvictionRetry(controller, podRef.NamespacedName)
 		return !ok, nil
 	}); err != nil {
@@ -668,7 +668,7 @@ func TestPodEvictionRetryCancelledWhenTaintRemoved(t *testing.T) {
 	}
 	controller.PodUpdated(nil, pod)
 
-	if err := wait.PollImmediate(10*time.Millisecond, time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
 		return deleteAttempts.Load() == retries, nil
 	}); err != nil {
 		t.Fatalf("Timed out waiting for initial delete attempts: %v", err)
@@ -681,7 +681,7 @@ func TestPodEvictionRetryCancelledWhenTaintRemoved(t *testing.T) {
 
 	fakeClock.Step(time.Second)
 	podRef := NamespacedObject{NamespacedName: types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, UID: pod.UID}
-	if err := wait.PollImmediate(10*time.Millisecond, time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
 		_, ok := currentPodEvictionRetry(controller, podRef.NamespacedName)
 		return !ok, nil
 	}); err != nil {
@@ -729,7 +729,7 @@ func TestPodEvictionRetrySchedulesNewDeadlineForFiniteToleration(t *testing.T) {
 	}
 	controller.PodUpdated(nil, pod)
 
-	if err := wait.PollImmediate(10*time.Millisecond, time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
 		return deleteAttempts.Load() == retries, nil
 	}); err != nil {
 		t.Fatalf("Timed out waiting for initial delete attempts: %v", err)
@@ -761,14 +761,14 @@ func TestPodEvictionRetrySchedulesNewDeadlineForFiniteToleration(t *testing.T) {
 	}
 
 	fakeClock.Step(time.Second)
-	if err := wait.PollImmediate(10*time.Millisecond, 200*time.Millisecond, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, 200*time.Millisecond, true, func(context.Context) (bool, error) {
 		return deleteAttempts.Load() == retries, nil
 	}); err != nil {
 		t.Fatalf("Pod was deleted before the new toleration deadline: %v", err)
 	}
 
 	fakeClock.Step(time.Duration(tolerationSeconds) * time.Second)
-	if err := wait.PollImmediate(10*time.Millisecond, time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
 		return deleteAttempts.Load() > retries, nil
 	}); err != nil {
 		t.Fatalf("Timed out waiting for delete after new toleration deadline: %v", err)
@@ -843,14 +843,14 @@ func TestPodEvictionRetrySchedulesNewDeadlineForChangedTaint(t *testing.T) {
 	}
 
 	fakeClock.Step(time.Second)
-	if err := wait.PollImmediate(10*time.Millisecond, 200*time.Millisecond, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, 200*time.Millisecond, true, func(context.Context) (bool, error) {
 		return deleteAttempts.Load() == retries, nil
 	}); err != nil {
 		t.Fatalf("Pod was deleted before the new taint deadline: %v", err)
 	}
 
 	fakeClock.Step(time.Duration(tolerationSeconds) * time.Second)
-	if err := wait.PollImmediate(10*time.Millisecond, time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, func(context.Context) (bool, error) {
 		return deleteAttempts.Load() > retries, nil
 	}); err != nil {
 		t.Fatalf("Timed out waiting for delete after new taint deadline: %v", err)
