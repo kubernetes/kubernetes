@@ -98,6 +98,7 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(ctx contex
 		effectiveSc.CgroupOptions != nil && effectiveSc.CgroupOptions.MountMode != nil {
 		switch *effectiveSc.CgroupOptions.MountMode {
 		case v1.CgroupMountModeReadWrite:
+			// In-place static Pod updates skip admission and can add ReadWrite.
 			nodeConfig := m.containerManager.GetNodeConfig()
 			if nodeConfig.CgroupVersion != 2 {
 				return nil, fmt.Errorf("writable cgroups require cgroup v2")
