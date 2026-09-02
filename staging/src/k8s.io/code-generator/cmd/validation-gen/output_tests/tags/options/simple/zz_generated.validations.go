@@ -64,7 +64,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.XEnabledField
+	{ // field Struct.XEnabledField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -91,7 +91,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("xEnabledField"), &obj.XEnabledField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.XDisabledField
+	{ // field Struct.XDisabledField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -118,7 +118,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("xDisabledField"), &obj.XDisabledField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.YEnabledField
+	{ // field Struct.YEnabledField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -145,7 +145,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("yEnabledField"), &obj.YEnabledField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.YDisabledField
+	{ // field Struct.YDisabledField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -172,7 +172,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("yDisabledField"), &obj.YDisabledField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.XYMixedField
+	{ // field Struct.XYMixedField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -205,7 +205,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("xyMixedField"), &obj.XYMixedField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.NilableAliasField
+	{ // field Struct.NilableAliasField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/options/simple.MySlice)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj MySlice,

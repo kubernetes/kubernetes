@@ -62,7 +62,7 @@ func Validate_ComplexSetItem(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *ComplexSetItem) (errs field.ErrorList) {
 
-	{ // field ComplexSetItem.Value
+	{ // field ComplexSetItem.Value (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -96,7 +96,7 @@ func Validate_ComplexSetItemBeta(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *ComplexSetItemBeta) (errs field.ErrorList) {
 
-	{ // field ComplexSetItemBeta.Value
+	{ // field ComplexSetItemBeta.Value (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -132,7 +132,7 @@ func Validate_ListSetStruct(
 
 	// field ListSetStruct.TypeMeta has no validation
 
-	{ // field ListSetStruct.Set
+	{ // field ListSetStruct.Set ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listset.ComplexSetItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []ComplexSetItem,
@@ -161,7 +161,7 @@ func Validate_ListSetStruct(
 		errs = append(errs, fn(fldPath.Child("set"), obj.Set, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ListSetStruct.BetaSet
+	{ // field ListSetStruct.BetaSet ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listset.ComplexSetItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []ComplexSetItem,
@@ -190,7 +190,7 @@ func Validate_ListSetStruct(
 		errs = append(errs, fn(fldPath.Child("betaSet"), obj.BetaSet, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ListSetStruct.ChainedSubfieldSet
+	{ // field ListSetStruct.ChainedSubfieldSet ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listset.SimpleSetItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []SimpleSetItem,
@@ -205,7 +205,12 @@ func Validate_ListSetStruct(
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SimpleSetItem) field.ErrorList {
 					return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-						func(o *SimpleSetItem) *int { return &o.Value }, validate.DirectEqual,
+						func(o *SimpleSetItem) *int {
+							if o == nil {
+								return nil
+							}
+							return &o.Value
+						}, validate.DirectEqual,
 						func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 							return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha()
 						})
@@ -225,7 +230,7 @@ func Validate_ListSetStruct(
 		errs = append(errs, fn(fldPath.Child("chainedSubfieldSet"), obj.ChainedSubfieldSet, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ListSetStruct.SetBetaItem
+	{ // field ListSetStruct.SetBetaItem ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listset.ComplexSetItemBeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []ComplexSetItemBeta,
@@ -254,7 +259,7 @@ func Validate_ListSetStruct(
 		errs = append(errs, fn(fldPath.Child("setBetaItem"), obj.SetBetaItem, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ListSetStruct.BetaSetBetaItem
+	{ // field ListSetStruct.BetaSetBetaItem ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listset.ComplexSetItemBeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []ComplexSetItemBeta,
@@ -283,7 +288,7 @@ func Validate_ListSetStruct(
 		errs = append(errs, fn(fldPath.Child("betaSetBetaItem"), obj.BetaSetBetaItem, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ListSetStruct.ChainedSubfieldSetBeta
+	{ // field ListSetStruct.ChainedSubfieldSetBeta ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/listset.SimpleSetItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []SimpleSetItem,
@@ -298,7 +303,12 @@ func Validate_ListSetStruct(
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SimpleSetItem) field.ErrorList {
 					return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
-						func(o *SimpleSetItem) *int { return &o.Value }, validate.DirectEqual,
+						func(o *SimpleSetItem) *int {
+							if o == nil {
+								return nil
+							}
+							return &o.Value
+						}, validate.DirectEqual,
 						func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 							return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkBeta()
 						})

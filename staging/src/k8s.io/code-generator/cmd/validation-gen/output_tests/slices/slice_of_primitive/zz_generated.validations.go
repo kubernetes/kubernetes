@@ -81,7 +81,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.ListField
+	{ // field Struct.ListField ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -111,7 +111,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("listField"), obj.ListField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ListTypedefField
+	{ // field Struct.ListTypedefField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/slices/slice_of_primitive.StringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []StringType,
@@ -147,7 +147,7 @@ func Validate_Struct(
 
 	// field Struct.UnvalidatedListField has no validation
 
-	{ // field Struct.ListPtrField
+	{ // field Struct.ListPtrField ([]*string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []*string,
@@ -185,7 +185,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("listPtrField"), obj.ListPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ListPtrTypedefField
+	{ // field Struct.ListPtrTypedefField ([]*k8s.io/code-generator/cmd/validation-gen/output_tests/slices/slice_of_primitive.StringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []*StringType,

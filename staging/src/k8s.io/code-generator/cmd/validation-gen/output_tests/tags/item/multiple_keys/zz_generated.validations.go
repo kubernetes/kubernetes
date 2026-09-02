@@ -64,7 +64,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.Items
+	{ // field Struct.Items ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/item/multiple_keys.Item)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []Item,
@@ -108,7 +108,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("items"), obj.Items, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.OutOfOrder
+	{ // field Struct.OutOfOrder ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/item/multiple_keys.Item)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []Item,
@@ -145,7 +145,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("outOfOrder"), obj.OutOfOrder, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.PtrItems
+	{ // field Struct.PtrItems ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/item/multiple_keys.PtrItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []PtrItem,
@@ -184,7 +184,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("ptrItems"), obj.PtrItems, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.MixedPtrItems
+	{ // field Struct.MixedPtrItems ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/item/multiple_keys.MixedPtrItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []MixedPtrItem,

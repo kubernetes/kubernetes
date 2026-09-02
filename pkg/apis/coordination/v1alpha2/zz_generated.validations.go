@@ -64,9 +64,9 @@ func Validate_LeaseCandidate(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *coordinationv1alpha2.LeaseCandidate) (errs field.ErrorList) {
 
-	// field coordinationv1alpha2.LeaseCandidate.TypeMeta has no validation
+	// field LeaseCandidate.TypeMeta has no validation
 
-	{ // field coordinationv1alpha2.LeaseCandidate.ObjectMeta
+	{ // field LeaseCandidate.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -88,6 +88,6 @@ func Validate_LeaseCandidate(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field coordinationv1alpha2.LeaseCandidate.Spec has no validation
+	// field LeaseCandidate.Spec has no validation
 	return errs
 }

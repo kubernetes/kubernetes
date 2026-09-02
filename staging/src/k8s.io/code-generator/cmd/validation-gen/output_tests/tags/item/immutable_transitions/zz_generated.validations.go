@@ -64,7 +64,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.ListField
+	{ // field Struct.ListField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/item/immutable_transitions.Item)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []Item,
@@ -98,7 +98,12 @@ func Validate_Struct(
 					func(item *Item) bool { return item.Key1 == "b" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
 						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
-							func(o *Item) *string { return &o.StringField }, validate.DirectEqual, validate.Immutable)
+							func(o *Item) *string {
+								if o == nil {
+									return nil
+								}
+								return &o.StringField
+							}, validate.DirectEqual, validate.Immutable)
 					}).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true

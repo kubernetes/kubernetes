@@ -65,9 +65,9 @@ func Validate_StorageVersionMigration(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *storagemigrationv1beta1.StorageVersionMigration) (errs field.ErrorList) {
 
-	// field storagemigrationv1beta1.StorageVersionMigration.TypeMeta has no validation
+	// field StorageVersionMigration.TypeMeta has no validation
 
-	{ // field storagemigrationv1beta1.StorageVersionMigration.ObjectMeta
+	{ // field StorageVersionMigration.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -89,9 +89,9 @@ func Validate_StorageVersionMigration(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field storagemigrationv1beta1.StorageVersionMigration.Spec has no validation
+	// field StorageVersionMigration.Spec has no validation
 
-	{ // field storagemigrationv1beta1.StorageVersionMigration.Status
+	{ // field StorageVersionMigration.Status (k8s.io/api/storagemigration/v1beta1.StorageVersionMigrationStatus)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *storagemigrationv1beta1.StorageVersionMigrationStatus,
@@ -122,7 +122,7 @@ func Validate_StorageVersionMigrationStatus(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *storagemigrationv1beta1.StorageVersionMigrationStatus) (errs field.ErrorList) {
 
-	{ // field storagemigrationv1beta1.StorageVersionMigrationStatus.Conditions
+	{ // field StorageVersionMigrationStatus.Conditions ([]k8s.io/apimachinery/pkg/apis/meta/v1.Condition)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []v1.Condition,
@@ -160,6 +160,6 @@ func Validate_StorageVersionMigrationStatus(
 		errs = append(errs, fn(fldPath.Child("conditions"), obj.Conditions, oldVal, oldObj != nil)...)
 	}
 
-	// field storagemigrationv1beta1.StorageVersionMigrationStatus.ResourceVersion has no validation
+	// field StorageVersionMigrationStatus.ResourceVersion has no validation
 	return errs
 }

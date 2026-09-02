@@ -84,9 +84,9 @@ func Validate_CronJob(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *batchv1.CronJob) (errs field.ErrorList) {
 
-	// field batchv1.CronJob.TypeMeta has no validation
+	// field CronJob.TypeMeta has no validation
 
-	{ // field batchv1.CronJob.ObjectMeta
+	{ // field CronJob.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -108,7 +108,7 @@ func Validate_CronJob(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field batchv1.CronJob.Spec
+	{ // field CronJob.Spec (k8s.io/api/batch/v1.CronJobSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *batchv1.CronJobSpec,
@@ -130,7 +130,7 @@ func Validate_CronJob(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	// field batchv1.CronJob.Status has no validation
+	// field CronJob.Status has no validation
 	return errs
 }
 
@@ -140,7 +140,7 @@ func Validate_CronJobSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *batchv1.CronJobSpec) (errs field.ErrorList) {
 
-	{ // field batchv1.CronJobSpec.Schedule
+	{ // field CronJobSpec.Schedule (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -169,12 +169,12 @@ func Validate_CronJobSpec(
 		errs = append(errs, fn(fldPath.Child("schedule"), &obj.Schedule, oldVal, oldObj != nil)...)
 	}
 
-	// field batchv1.CronJobSpec.TimeZone has no validation
-	// field batchv1.CronJobSpec.StartingDeadlineSeconds has no validation
-	// field batchv1.CronJobSpec.ConcurrencyPolicy has no validation
-	// field batchv1.CronJobSpec.Suspend has no validation
+	// field CronJobSpec.TimeZone has no validation
+	// field CronJobSpec.StartingDeadlineSeconds has no validation
+	// field CronJobSpec.ConcurrencyPolicy has no validation
+	// field CronJobSpec.Suspend has no validation
 
-	{ // field batchv1.CronJobSpec.JobTemplate
+	{ // field CronJobSpec.JobTemplate (k8s.io/api/batch/v1.JobTemplateSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *batchv1.JobTemplateSpec,
@@ -196,8 +196,8 @@ func Validate_CronJobSpec(
 		errs = append(errs, fn(fldPath.Child("jobTemplate"), &obj.JobTemplate, oldVal, oldObj != nil)...)
 	}
 
-	// field batchv1.CronJobSpec.SuccessfulJobsHistoryLimit has no validation
-	// field batchv1.CronJobSpec.FailedJobsHistoryLimit has no validation
+	// field CronJobSpec.SuccessfulJobsHistoryLimit has no validation
+	// field CronJobSpec.FailedJobsHistoryLimit has no validation
 	return errs
 }
 
@@ -207,9 +207,9 @@ func Validate_Job(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *batchv1.Job) (errs field.ErrorList) {
 
-	// field batchv1.Job.TypeMeta has no validation
+	// field Job.TypeMeta has no validation
 
-	{ // field batchv1.Job.ObjectMeta
+	{ // field Job.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -231,7 +231,7 @@ func Validate_Job(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field batchv1.Job.Spec
+	{ // field Job.Spec (k8s.io/api/batch/v1.JobSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *batchv1.JobSpec,
@@ -253,7 +253,7 @@ func Validate_Job(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	// field batchv1.Job.Status has no validation
+	// field Job.Status has no validation
 	return errs
 }
 
@@ -263,7 +263,7 @@ func Validate_JobSchedulingConfiguration(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *batchv1.JobSchedulingConfiguration) (errs field.ErrorList) {
 
-	{ // field batchv1.JobSchedulingConfiguration.SchedulingPolicy
+	{ // field JobSchedulingConfiguration.SchedulingPolicy (k8s.io/api/scheduling/v1alpha3.WorkloadPodGroupSchedulingPolicy)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy,
@@ -297,7 +297,7 @@ func Validate_JobSchedulingConfiguration(
 		errs = append(errs, fn(fldPath.Child("schedulingPolicy"), obj.SchedulingPolicy, oldVal, oldObj != nil)...)
 	}
 
-	{ // field batchv1.JobSchedulingConfiguration.SchedulingConstraints
+	{ // field JobSchedulingConfiguration.SchedulingConstraints (k8s.io/api/scheduling/v1alpha3.WorkloadPodGroupSchedulingConstraints)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints,
@@ -331,7 +331,7 @@ func Validate_JobSchedulingConfiguration(
 		errs = append(errs, fn(fldPath.Child("schedulingConstraints"), obj.SchedulingConstraints, oldVal, oldObj != nil)...)
 	}
 
-	{ // field batchv1.JobSchedulingConfiguration.DisruptionMode
+	{ // field JobSchedulingConfiguration.DisruptionMode (k8s.io/api/scheduling/v1alpha3.WorkloadPodGroupDisruptionMode)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *schedulingv1alpha3.WorkloadPodGroupDisruptionMode,
@@ -365,7 +365,7 @@ func Validate_JobSchedulingConfiguration(
 		errs = append(errs, fn(fldPath.Child("disruptionMode"), obj.DisruptionMode, oldVal, oldObj != nil)...)
 	}
 
-	{ // field batchv1.JobSchedulingConfiguration.ResourceClaims
+	{ // field JobSchedulingConfiguration.ResourceClaims ([]k8s.io/api/scheduling/v1alpha3.WorkloadPodGroupResourceClaim)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []schedulingv1alpha3.WorkloadPodGroupResourceClaim,
@@ -440,15 +440,15 @@ func Validate_JobSpec(
 		errs = append(errs, e...)
 	}
 
-	// field batchv1.JobSpec.Parallelism has no validation
-	// field batchv1.JobSpec.Completions has no validation
-	// field batchv1.JobSpec.ActiveDeadlineSeconds has no validation
-	// field batchv1.JobSpec.PodFailurePolicy has no validation
-	// field batchv1.JobSpec.SuccessPolicy has no validation
-	// field batchv1.JobSpec.BackoffLimit has no validation
-	// field batchv1.JobSpec.BackoffLimitPerIndex has no validation
+	// field JobSpec.Parallelism has no validation
+	// field JobSpec.Completions has no validation
+	// field JobSpec.ActiveDeadlineSeconds has no validation
+	// field JobSpec.PodFailurePolicy has no validation
+	// field JobSpec.SuccessPolicy has no validation
+	// field JobSpec.BackoffLimit has no validation
+	// field JobSpec.BackoffLimitPerIndex has no validation
 
-	{ // field batchv1.JobSpec.MaxFailedIndexes
+	{ // field JobSpec.MaxFailedIndexes (int32)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int32,
@@ -476,10 +476,10 @@ func Validate_JobSpec(
 		errs = append(errs, fn(fldPath.Child("maxFailedIndexes"), obj.MaxFailedIndexes, oldVal, oldObj != nil)...)
 	}
 
-	// field batchv1.JobSpec.Selector has no validation
-	// field batchv1.JobSpec.ManualSelector has no validation
+	// field JobSpec.Selector has no validation
+	// field JobSpec.ManualSelector has no validation
 
-	{ // field batchv1.JobSpec.Template
+	{ // field JobSpec.Template (k8s.io/api/core/v1.PodTemplateSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *apicorev1.PodTemplateSpec,
@@ -501,13 +501,13 @@ func Validate_JobSpec(
 		errs = append(errs, fn(fldPath.Child("template"), &obj.Template, oldVal, oldObj != nil)...)
 	}
 
-	// field batchv1.JobSpec.TTLSecondsAfterFinished has no validation
-	// field batchv1.JobSpec.CompletionMode has no validation
-	// field batchv1.JobSpec.Suspend has no validation
-	// field batchv1.JobSpec.PodReplacementPolicy has no validation
-	// field batchv1.JobSpec.ManagedBy has no validation
+	// field JobSpec.TTLSecondsAfterFinished has no validation
+	// field JobSpec.CompletionMode has no validation
+	// field JobSpec.Suspend has no validation
+	// field JobSpec.PodReplacementPolicy has no validation
+	// field JobSpec.ManagedBy has no validation
 
-	{ // field batchv1.JobSpec.Scheduling
+	{ // field JobSpec.Scheduling (k8s.io/api/batch/v1.JobSchedulingConfiguration)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *batchv1.JobSchedulingConfiguration,
@@ -557,9 +557,9 @@ func Validate_JobTemplateSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *batchv1.JobTemplateSpec) (errs field.ErrorList) {
 
-	// field batchv1.JobTemplateSpec.ObjectMeta has no validation
+	// field JobTemplateSpec.ObjectMeta has no validation
 
-	{ // field batchv1.JobTemplateSpec.Spec
+	{ // field JobTemplateSpec.Spec (k8s.io/api/batch/v1.JobSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *batchv1.JobSpec,

@@ -33,7 +33,8 @@ func DependentRequired[T any](_ context.Context, op operation.Operation, fldPath
 	dependentName string, dependentIsSet ExtractorFn[*T, bool],
 ) field.ErrorList {
 	if obj == nil {
-		return nil
+		// If the object is nil here, something should have already caught it.
+		return field.ErrorList{field.Required(fldPath, "").WithOrigin("dependentRequired")}
 	}
 	if op.Type == operation.Update && oldObj != nil {
 		if triggerIsSet(obj) == triggerIsSet(oldObj) && dependentIsSet(obj) == dependentIsSet(oldObj) {

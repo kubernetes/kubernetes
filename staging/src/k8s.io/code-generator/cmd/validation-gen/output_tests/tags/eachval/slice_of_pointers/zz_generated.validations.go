@@ -78,7 +78,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.ListField
+	{ // field Struct.ListField ([]*k8s.io/code-generator/cmd/validation-gen/output_tests/tags/eachval/slice_of_pointers.OtherStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []*OtherStruct,
@@ -117,7 +117,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("listField"), obj.ListField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ListPrimitiveField
+	{ // field Struct.ListPrimitiveField ([]*string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []*string,

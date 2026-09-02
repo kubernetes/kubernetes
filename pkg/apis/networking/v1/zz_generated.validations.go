@@ -125,9 +125,9 @@ func Validate_IPAddress(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *networkingv1.IPAddress) (errs field.ErrorList) {
 
-	// field networkingv1.IPAddress.TypeMeta has no validation
+	// field IPAddress.TypeMeta has no validation
 
-	{ // field networkingv1.IPAddress.ObjectMeta
+	{ // field IPAddress.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -149,7 +149,7 @@ func Validate_IPAddress(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field networkingv1.IPAddress.Spec
+	{ // field IPAddress.Spec (k8s.io/api/networking/v1.IPAddressSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *networkingv1.IPAddressSpec,
@@ -180,7 +180,7 @@ func Validate_IPAddressSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *networkingv1.IPAddressSpec) (errs field.ErrorList) {
 
-	{ // field networkingv1.IPAddressSpec.ParentRef
+	{ // field IPAddressSpec.ParentRef (k8s.io/api/networking/v1.ParentReference)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *networkingv1.ParentReference,
@@ -224,7 +224,7 @@ func Validate_IPBlock(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *networkingv1.IPBlock) (errs field.ErrorList) {
 
-	{ // field networkingv1.IPBlock.CIDR
+	{ // field IPBlock.CIDR (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -253,7 +253,7 @@ func Validate_IPBlock(
 		errs = append(errs, fn(fldPath.Child("cidr"), &obj.CIDR, oldVal, oldObj != nil)...)
 	}
 
-	// field networkingv1.IPBlock.Except has no validation
+	// field IPBlock.Except has no validation
 	return errs
 }
 
@@ -263,9 +263,9 @@ func Validate_Ingress(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *networkingv1.Ingress) (errs field.ErrorList) {
 
-	// field networkingv1.Ingress.TypeMeta has no validation
+	// field Ingress.TypeMeta has no validation
 
-	{ // field networkingv1.Ingress.ObjectMeta
+	{ // field Ingress.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -287,8 +287,8 @@ func Validate_Ingress(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field networkingv1.Ingress.Spec has no validation
-	// field networkingv1.Ingress.Status has no validation
+	// field Ingress.Spec has no validation
+	// field Ingress.Status has no validation
 	return errs
 }
 
@@ -298,9 +298,9 @@ func Validate_IngressClass(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *networkingv1.IngressClass) (errs field.ErrorList) {
 
-	// field networkingv1.IngressClass.TypeMeta has no validation
+	// field IngressClass.TypeMeta has no validation
 
-	{ // field networkingv1.IngressClass.ObjectMeta
+	{ // field IngressClass.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -322,7 +322,7 @@ func Validate_IngressClass(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field networkingv1.IngressClass.Spec
+	{ // field IngressClass.Spec (k8s.io/api/networking/v1.IngressClassSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *networkingv1.IngressClassSpec,
@@ -353,9 +353,9 @@ func Validate_IngressClassParametersReference(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *networkingv1.IngressClassParametersReference) (errs field.ErrorList) {
 
-	// field networkingv1.IngressClassParametersReference.APIGroup has no validation
+	// field IngressClassParametersReference.APIGroup has no validation
 
-	{ // field networkingv1.IngressClassParametersReference.Kind
+	{ // field IngressClassParametersReference.Kind (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -384,7 +384,7 @@ func Validate_IngressClassParametersReference(
 		errs = append(errs, fn(fldPath.Child("kind"), &obj.Kind, oldVal, oldObj != nil)...)
 	}
 
-	{ // field networkingv1.IngressClassParametersReference.Name
+	{ // field IngressClassParametersReference.Name (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -413,8 +413,8 @@ func Validate_IngressClassParametersReference(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
-	// field networkingv1.IngressClassParametersReference.Scope has no validation
-	// field networkingv1.IngressClassParametersReference.Namespace has no validation
+	// field IngressClassParametersReference.Scope has no validation
+	// field IngressClassParametersReference.Namespace has no validation
 	return errs
 }
 
@@ -424,9 +424,9 @@ func Validate_IngressClassSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *networkingv1.IngressClassSpec) (errs field.ErrorList) {
 
-	// field networkingv1.IngressClassSpec.Controller has no validation
+	// field IngressClassSpec.Controller has no validation
 
-	{ // field networkingv1.IngressClassSpec.Parameters
+	{ // field IngressClassSpec.Parameters (k8s.io/api/networking/v1.IngressClassParametersReference)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *networkingv1.IngressClassParametersReference,
@@ -465,9 +465,9 @@ func Validate_NetworkPolicy(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *networkingv1.NetworkPolicy) (errs field.ErrorList) {
 
-	// field networkingv1.NetworkPolicy.TypeMeta has no validation
+	// field NetworkPolicy.TypeMeta has no validation
 
-	{ // field networkingv1.NetworkPolicy.ObjectMeta
+	{ // field NetworkPolicy.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -489,7 +489,7 @@ func Validate_NetworkPolicy(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field networkingv1.NetworkPolicy.Spec
+	{ // field NetworkPolicy.Spec (k8s.io/api/networking/v1.NetworkPolicySpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *networkingv1.NetworkPolicySpec,
@@ -520,9 +520,9 @@ func Validate_NetworkPolicyEgressRule(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *networkingv1.NetworkPolicyEgressRule) (errs field.ErrorList) {
 
-	// field networkingv1.NetworkPolicyEgressRule.Ports has no validation
+	// field NetworkPolicyEgressRule.Ports has no validation
 
-	{ // field networkingv1.NetworkPolicyEgressRule.To
+	{ // field NetworkPolicyEgressRule.To ([]k8s.io/api/networking/v1.NetworkPolicyPeer)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []networkingv1.NetworkPolicyPeer,
@@ -563,9 +563,9 @@ func Validate_NetworkPolicyIngressRule(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *networkingv1.NetworkPolicyIngressRule) (errs field.ErrorList) {
 
-	// field networkingv1.NetworkPolicyIngressRule.Ports has no validation
+	// field NetworkPolicyIngressRule.Ports has no validation
 
-	{ // field networkingv1.NetworkPolicyIngressRule.From
+	{ // field NetworkPolicyIngressRule.From ([]k8s.io/api/networking/v1.NetworkPolicyPeer)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []networkingv1.NetworkPolicyPeer,
@@ -606,10 +606,10 @@ func Validate_NetworkPolicyPeer(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *networkingv1.NetworkPolicyPeer) (errs field.ErrorList) {
 
-	// field networkingv1.NetworkPolicyPeer.PodSelector has no validation
-	// field networkingv1.NetworkPolicyPeer.NamespaceSelector has no validation
+	// field NetworkPolicyPeer.PodSelector has no validation
+	// field NetworkPolicyPeer.NamespaceSelector has no validation
 
-	{ // field networkingv1.NetworkPolicyPeer.IPBlock
+	{ // field NetworkPolicyPeer.IPBlock (k8s.io/api/networking/v1.IPBlock)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *networkingv1.IPBlock,
@@ -648,9 +648,9 @@ func Validate_NetworkPolicySpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *networkingv1.NetworkPolicySpec) (errs field.ErrorList) {
 
-	// field networkingv1.NetworkPolicySpec.PodSelector has no validation
+	// field NetworkPolicySpec.PodSelector has no validation
 
-	{ // field networkingv1.NetworkPolicySpec.Ingress
+	{ // field NetworkPolicySpec.Ingress ([]k8s.io/api/networking/v1.NetworkPolicyIngressRule)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []networkingv1.NetworkPolicyIngressRule,
@@ -682,7 +682,7 @@ func Validate_NetworkPolicySpec(
 		errs = append(errs, fn(fldPath.Child("ingress"), obj.Ingress, oldVal, oldObj != nil)...)
 	}
 
-	{ // field networkingv1.NetworkPolicySpec.Egress
+	{ // field NetworkPolicySpec.Egress ([]k8s.io/api/networking/v1.NetworkPolicyEgressRule)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []networkingv1.NetworkPolicyEgressRule,
@@ -714,7 +714,7 @@ func Validate_NetworkPolicySpec(
 		errs = append(errs, fn(fldPath.Child("egress"), obj.Egress, oldVal, oldObj != nil)...)
 	}
 
-	// field networkingv1.NetworkPolicySpec.PolicyTypes has no validation
+	// field NetworkPolicySpec.PolicyTypes has no validation
 	return errs
 }
 
@@ -724,9 +724,9 @@ func Validate_ParentReference(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *networkingv1.ParentReference) (errs field.ErrorList) {
 
-	// field networkingv1.ParentReference.Group has no validation
+	// field ParentReference.Group has no validation
 
-	{ // field networkingv1.ParentReference.Resource
+	{ // field ParentReference.Resource (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -755,9 +755,9 @@ func Validate_ParentReference(
 		errs = append(errs, fn(fldPath.Child("resource"), &obj.Resource, oldVal, oldObj != nil)...)
 	}
 
-	// field networkingv1.ParentReference.Namespace has no validation
+	// field ParentReference.Namespace has no validation
 
-	{ // field networkingv1.ParentReference.Name
+	{ // field ParentReference.Name (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -795,9 +795,9 @@ func Validate_ServiceCIDR(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *networkingv1.ServiceCIDR) (errs field.ErrorList) {
 
-	// field networkingv1.ServiceCIDR.TypeMeta has no validation
+	// field ServiceCIDR.TypeMeta has no validation
 
-	{ // field networkingv1.ServiceCIDR.ObjectMeta
+	{ // field ServiceCIDR.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -819,7 +819,7 @@ func Validate_ServiceCIDR(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field networkingv1.ServiceCIDR.Spec has no validation
-	// field networkingv1.ServiceCIDR.Status has no validation
+	// field ServiceCIDR.Spec has no validation
+	// field ServiceCIDR.Status has no validation
 	return errs
 }

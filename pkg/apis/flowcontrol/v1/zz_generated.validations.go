@@ -80,9 +80,9 @@ func Validate_FlowSchema(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *flowcontrolv1.FlowSchema) (errs field.ErrorList) {
 
-	// field flowcontrolv1.FlowSchema.TypeMeta has no validation
+	// field FlowSchema.TypeMeta has no validation
 
-	{ // field flowcontrolv1.FlowSchema.ObjectMeta
+	{ // field FlowSchema.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -104,8 +104,8 @@ func Validate_FlowSchema(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field flowcontrolv1.FlowSchema.Spec has no validation
-	// field flowcontrolv1.FlowSchema.Status has no validation
+	// field FlowSchema.Spec has no validation
+	// field FlowSchema.Status has no validation
 	return errs
 }
 
@@ -144,7 +144,7 @@ func Validate_LimitResponse(
 		errs = append(errs, e...)
 	}
 
-	{ // field flowcontrolv1.LimitResponse.Type
+	{ // field LimitResponse.Type (k8s.io/api/flowcontrol/v1.LimitResponseType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *flowcontrolv1.LimitResponseType,
@@ -173,7 +173,7 @@ func Validate_LimitResponse(
 		errs = append(errs, fn(fldPath.Child("type"), &obj.Type, oldVal, oldObj != nil)...)
 	}
 
-	{ // field flowcontrolv1.LimitResponse.Queuing
+	{ // field LimitResponse.Queuing (k8s.io/api/flowcontrol/v1.QueuingConfiguration)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *flowcontrolv1.QueuingConfiguration,
@@ -210,9 +210,9 @@ func Validate_LimitedPriorityLevelConfiguration(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *flowcontrolv1.LimitedPriorityLevelConfiguration) (errs field.ErrorList) {
 
-	// field flowcontrolv1.LimitedPriorityLevelConfiguration.NominalConcurrencyShares has no validation
+	// field LimitedPriorityLevelConfiguration.NominalConcurrencyShares has no validation
 
-	{ // field flowcontrolv1.LimitedPriorityLevelConfiguration.LimitResponse
+	{ // field LimitedPriorityLevelConfiguration.LimitResponse (k8s.io/api/flowcontrol/v1.LimitResponse)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *flowcontrolv1.LimitResponse,
@@ -234,8 +234,8 @@ func Validate_LimitedPriorityLevelConfiguration(
 		errs = append(errs, fn(fldPath.Child("limitResponse"), &obj.LimitResponse, oldVal, oldObj != nil)...)
 	}
 
-	// field flowcontrolv1.LimitedPriorityLevelConfiguration.LendablePercent has no validation
-	// field flowcontrolv1.LimitedPriorityLevelConfiguration.BorrowingLimitPercent has no validation
+	// field LimitedPriorityLevelConfiguration.LendablePercent has no validation
+	// field LimitedPriorityLevelConfiguration.BorrowingLimitPercent has no validation
 	return errs
 }
 
@@ -245,9 +245,9 @@ func Validate_PriorityLevelConfiguration(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *flowcontrolv1.PriorityLevelConfiguration) (errs field.ErrorList) {
 
-	// field flowcontrolv1.PriorityLevelConfiguration.TypeMeta has no validation
+	// field PriorityLevelConfiguration.TypeMeta has no validation
 
-	{ // field flowcontrolv1.PriorityLevelConfiguration.ObjectMeta
+	{ // field PriorityLevelConfiguration.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *metav1.ObjectMeta,
@@ -269,7 +269,7 @@ func Validate_PriorityLevelConfiguration(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field flowcontrolv1.PriorityLevelConfiguration.Spec
+	{ // field PriorityLevelConfiguration.Spec (k8s.io/api/flowcontrol/v1.PriorityLevelConfigurationSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *flowcontrolv1.PriorityLevelConfigurationSpec,
@@ -291,7 +291,7 @@ func Validate_PriorityLevelConfiguration(
 		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
 	}
 
-	// field flowcontrolv1.PriorityLevelConfiguration.Status has no validation
+	// field PriorityLevelConfiguration.Status has no validation
 	return errs
 }
 
@@ -365,7 +365,7 @@ func Validate_PriorityLevelConfigurationSpec(
 		errs = append(errs, e...)
 	}
 
-	{ // field flowcontrolv1.PriorityLevelConfigurationSpec.Type
+	{ // field PriorityLevelConfigurationSpec.Type (k8s.io/api/flowcontrol/v1.PriorityLevelEnablement)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *flowcontrolv1.PriorityLevelEnablement,
@@ -394,7 +394,7 @@ func Validate_PriorityLevelConfigurationSpec(
 		errs = append(errs, fn(fldPath.Child("type"), &obj.Type, oldVal, oldObj != nil)...)
 	}
 
-	{ // field flowcontrolv1.PriorityLevelConfigurationSpec.Limited
+	{ // field PriorityLevelConfigurationSpec.Limited (k8s.io/api/flowcontrol/v1.LimitedPriorityLevelConfiguration)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *flowcontrolv1.LimitedPriorityLevelConfiguration,
@@ -424,7 +424,7 @@ func Validate_PriorityLevelConfigurationSpec(
 		errs = append(errs, fn(fldPath.Child("limited"), obj.Limited, oldVal, oldObj != nil)...)
 	}
 
-	{ // field flowcontrolv1.PriorityLevelConfigurationSpec.Exempt
+	{ // field PriorityLevelConfigurationSpec.Exempt (k8s.io/api/flowcontrol/v1.ExemptPriorityLevelConfiguration)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *flowcontrolv1.ExemptPriorityLevelConfiguration,

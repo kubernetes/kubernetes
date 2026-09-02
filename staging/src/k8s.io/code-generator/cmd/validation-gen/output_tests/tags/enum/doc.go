@@ -28,16 +28,20 @@ var localSchemeBuilder = testscheme.New()
 type Struct struct {
 	TypeMeta int
 
-	Enum0Field    Enum0  `json:"enum0Field"`
+	Enum0Field Enum0 `json:"enum0Field"`
+	// +k8s:optional
 	Enum0PtrField *Enum0 `json:"enum0PtrField"`
 
-	Enum1Field    Enum1  `json:"enum1Field"`
+	Enum1Field Enum1 `json:"enum1Field"`
+	// +k8s:optional
 	Enum1PtrField *Enum1 `json:"enum1PtrField"`
 
-	Enum2Field    Enum2  `json:"enum2Field"`
+	Enum2Field Enum2 `json:"enum2Field"`
+	// +k8s:optional
 	Enum2PtrField *Enum2 `json:"enum2PtrField"`
 
-	NotEnumField    NotEnum  `json:"notEnumField"`
+	NotEnumField NotEnum `json:"notEnumField"`
+	// +k8s:optional
 	NotEnumPtrField *NotEnum `json:"notEnumPtrField"`
 }
 

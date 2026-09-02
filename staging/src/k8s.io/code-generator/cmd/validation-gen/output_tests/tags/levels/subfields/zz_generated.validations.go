@@ -66,7 +66,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.Subfield
+	{ // field Struct.Subfield (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/subfields.SubStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *SubStruct,
@@ -80,7 +80,12 @@ func Validate_Struct(
 			// call field-attached validations
 			func() { // cohort = "inner"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "inner",
-					func(o *SubStruct) *int { return &o.Inner }, validate.DirectEqual,
+					func(o *SubStruct) *int {
+						if o == nil {
+							return nil
+						}
+						return &o.Inner
+					}, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 						return validate.Minimum(ctx, op, fldPath, obj, oldObj, 5)
 					}).MarkAlpha(); len(e) != 0 {
@@ -96,7 +101,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("subfield"), &obj.Subfield, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.SubfieldBeta
+	{ // field Struct.SubfieldBeta (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/subfields.SubStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *SubStruct,
@@ -110,7 +115,12 @@ func Validate_Struct(
 			// call field-attached validations
 			func() { // cohort = "inner"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "inner",
-					func(o *SubStruct) *int { return &o.Inner }, validate.DirectEqual,
+					func(o *SubStruct) *int {
+						if o == nil {
+							return nil
+						}
+						return &o.Inner
+					}, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 						return validate.Minimum(ctx, op, fldPath, obj, oldObj, 5)
 					}).MarkBeta(); len(e) != 0 {
@@ -126,7 +136,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("subfieldBeta"), &obj.SubfieldBeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.UnionField
+	{ // field Struct.UnionField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/subfields.SubUnion)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *SubUnion,

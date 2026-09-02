@@ -81,7 +81,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.ListField
+	{ // field Struct.ListField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/listmap/multiple_keys.OtherStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []OtherStruct,
@@ -120,7 +120,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("listField"), obj.ListField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ListTypedefField
+	{ // field Struct.ListTypedefField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/listmap/multiple_keys.OtherTypedefStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []OtherTypedefStruct,
@@ -159,7 +159,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("listTypedefField"), obj.ListTypedefField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.TypedefField
+	{ // field Struct.TypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/listmap/multiple_keys.ListType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj ListType,
@@ -193,7 +193,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("typedefField"), obj.TypedefField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ListComparableField
+	{ // field Struct.ListComparableField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/listmap/multiple_keys.OtherStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []OtherStruct,
@@ -230,7 +230,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("listComparableField"), obj.ListComparableField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ListNonComparableField
+	{ // field Struct.ListNonComparableField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/listmap/multiple_keys.NonComparableStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []NonComparableStruct,
@@ -267,7 +267,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("listNonComparableField"), obj.ListNonComparableField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ListPtrKeyField
+	{ // field Struct.ListPtrKeyField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/listmap/multiple_keys.PtrKeyStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []PtrKeyStruct,
@@ -306,7 +306,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("listPtrKeyField"), obj.ListPtrKeyField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ListMixedPtrKeyField
+	{ // field Struct.ListMixedPtrKeyField ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/listmap/multiple_keys.MixedPtrKeyStruct)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []MixedPtrKeyStruct,

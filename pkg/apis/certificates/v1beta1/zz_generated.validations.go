@@ -95,9 +95,9 @@ func Validate_CertificateSigningRequest(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *certificatesv1beta1.CertificateSigningRequest) (errs field.ErrorList) {
 
-	// field certificatesv1beta1.CertificateSigningRequest.TypeMeta has no validation
+	// field CertificateSigningRequest.TypeMeta has no validation
 
-	{ // field certificatesv1beta1.CertificateSigningRequest.ObjectMeta
+	{ // field CertificateSigningRequest.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -119,9 +119,9 @@ func Validate_CertificateSigningRequest(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field certificatesv1beta1.CertificateSigningRequest.Spec has no validation
+	// field CertificateSigningRequest.Spec has no validation
 
-	{ // field certificatesv1beta1.CertificateSigningRequest.Status
+	{ // field CertificateSigningRequest.Status (k8s.io/api/certificates/v1beta1.CertificateSigningRequestStatus)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *certificatesv1beta1.CertificateSigningRequestStatus,
@@ -154,7 +154,7 @@ func Validate_CertificateSigningRequestStatus(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *certificatesv1beta1.CertificateSigningRequestStatus) (errs field.ErrorList) {
 
-	{ // field certificatesv1beta1.CertificateSigningRequestStatus.Conditions
+	{ // field CertificateSigningRequestStatus.Conditions ([]k8s.io/api/certificates/v1beta1.CertificateSigningRequestCondition)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []certificatesv1beta1.CertificateSigningRequestCondition,
@@ -202,7 +202,7 @@ func Validate_CertificateSigningRequestStatus(
 		errs = append(errs, fn(fldPath.Child("conditions"), obj.Conditions, oldVal, oldObj != nil)...)
 	}
 
-	// field certificatesv1beta1.CertificateSigningRequestStatus.Certificate has no validation
+	// field CertificateSigningRequestStatus.Certificate has no validation
 	return errs
 }
 
@@ -212,9 +212,9 @@ func Validate_ClusterTrustBundle(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *certificatesv1beta1.ClusterTrustBundle) (errs field.ErrorList) {
 
-	// field certificatesv1beta1.ClusterTrustBundle.TypeMeta has no validation
+	// field ClusterTrustBundle.TypeMeta has no validation
 
-	{ // field certificatesv1beta1.ClusterTrustBundle.ObjectMeta
+	{ // field ClusterTrustBundle.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -236,7 +236,7 @@ func Validate_ClusterTrustBundle(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field certificatesv1beta1.ClusterTrustBundle.Spec
+	{ // field ClusterTrustBundle.Spec (k8s.io/api/certificates/v1beta1.ClusterTrustBundleSpec)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *certificatesv1beta1.ClusterTrustBundleSpec,
@@ -267,7 +267,7 @@ func Validate_ClusterTrustBundleSpec(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *certificatesv1beta1.ClusterTrustBundleSpec) (errs field.ErrorList) {
 
-	{ // field certificatesv1beta1.ClusterTrustBundleSpec.SignerName
+	{ // field ClusterTrustBundleSpec.SignerName (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -299,7 +299,7 @@ func Validate_ClusterTrustBundleSpec(
 		errs = append(errs, fn(fldPath.Child("signerName"), &obj.SignerName, oldVal, oldObj != nil)...)
 	}
 
-	// field certificatesv1beta1.ClusterTrustBundleSpec.TrustBundle has no validation
+	// field ClusterTrustBundleSpec.TrustBundle has no validation
 	return errs
 }
 
@@ -309,9 +309,9 @@ func Validate_PodCertificateRequest(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *certificatesv1beta1.PodCertificateRequest) (errs field.ErrorList) {
 
-	// field certificatesv1beta1.PodCertificateRequest.TypeMeta has no validation
+	// field PodCertificateRequest.TypeMeta has no validation
 
-	{ // field certificatesv1beta1.PodCertificateRequest.ObjectMeta
+	{ // field PodCertificateRequest.ObjectMeta (k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ObjectMeta,
@@ -333,9 +333,9 @@ func Validate_PodCertificateRequest(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field certificatesv1beta1.PodCertificateRequest.Spec has no validation
+	// field PodCertificateRequest.Spec has no validation
 
-	{ // field certificatesv1beta1.PodCertificateRequest.Status
+	{ // field PodCertificateRequest.Status (k8s.io/api/certificates/v1beta1.PodCertificateRequestStatus)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *certificatesv1beta1.PodCertificateRequestStatus,
@@ -366,7 +366,7 @@ func Validate_PodCertificateRequestStatus(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *certificatesv1beta1.PodCertificateRequestStatus) (errs field.ErrorList) {
 
-	{ // field certificatesv1beta1.PodCertificateRequestStatus.Conditions
+	{ // field PodCertificateRequestStatus.Conditions ([]k8s.io/apimachinery/pkg/apis/meta/v1.Condition)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []v1.Condition,
@@ -404,9 +404,9 @@ func Validate_PodCertificateRequestStatus(
 		errs = append(errs, fn(fldPath.Child("conditions"), obj.Conditions, oldVal, oldObj != nil)...)
 	}
 
-	// field certificatesv1beta1.PodCertificateRequestStatus.CertificateChain has no validation
-	// field certificatesv1beta1.PodCertificateRequestStatus.NotBefore has no validation
-	// field certificatesv1beta1.PodCertificateRequestStatus.BeginRefreshAt has no validation
-	// field certificatesv1beta1.PodCertificateRequestStatus.NotAfter has no validation
+	// field PodCertificateRequestStatus.CertificateChain has no validation
+	// field PodCertificateRequestStatus.NotBefore has no validation
+	// field PodCertificateRequestStatus.BeginRefreshAt has no validation
+	// field PodCertificateRequestStatus.NotAfter has no validation
 	return errs
 }

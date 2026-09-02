@@ -77,7 +77,7 @@ func Validate_M1(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *M1) (errs field.ErrorList) {
 
-	{ // field M1.S
+	{ // field M1.S (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -110,7 +110,7 @@ func Validate_T1(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *T1) (errs field.ErrorList) {
 
-	{ // field T1.MSM1
+	{ // field T1.MSM1 (map[string]k8s.io/code-generator/cmd/validation-gen/output_tests/update_validations/maps.M1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj map[string]M1,

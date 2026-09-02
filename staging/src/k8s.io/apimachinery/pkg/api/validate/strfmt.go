@@ -46,7 +46,8 @@ const (
 // like required/optional and max-length.
 func ShortName[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
 	if value == nil {
-		return nil
+		// If the object is nil here, something should have already caught it.
+		return field.ErrorList{field.Required(fldPath, "").WithOrigin("format=k8s-short-name")}
 	}
 	var allErrs field.ErrorList
 	for _, msg := range content.IsDNS1123Label((string)(*value)) {
@@ -67,7 +68,8 @@ func ShortName[T ~string](_ context.Context, op operation.Operation, fldPath *fi
 // like required/optional and max-length.
 func LongName[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
 	if value == nil {
-		return nil
+		// If the object is nil here, something should have already caught it.
+		return field.ErrorList{field.Required(fldPath, "").WithOrigin("format=k8s-long-name")}
 	}
 	var allErrs field.ErrorList
 	for _, msg := range content.IsDNS1123Subdomain((string)(*value)) {
@@ -88,7 +90,8 @@ func LongName[T ~string](_ context.Context, op operation.Operation, fldPath *fie
 //   - be no more than 253 characters
 func LabelKey[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
 	if value == nil {
-		return nil
+		// If the object is nil here, something should have already caught it.
+		return field.ErrorList{field.Required(fldPath, "").WithOrigin("format=k8s-label-key")}
 	}
 	var allErrs field.ErrorList
 	for _, msg := range content.IsLabelKey((string)(*value)) {
@@ -130,7 +133,8 @@ func PrefixedLabelKey[T ~string](_ context.Context, op operation.Operation, fldP
 // (e.g., 'Foo', 'FOO', and 'foo' would be allowed names for foo). Use LongName for strict, lowercase validation.
 func LongNameCaseless[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
 	if value == nil {
-		return nil
+		// If the object is nil here, something should have already caught it.
+		return field.ErrorList{field.Required(fldPath, "").WithOrigin("format=k8s-long-name-caseless")}
 	}
 	var allErrs field.ErrorList
 	for _, msg := range content.IsDNS1123SubdomainCaseless((string)(*value)) {
@@ -146,7 +150,8 @@ func LongNameCaseless[T ~string](_ context.Context, op operation.Operation, fldP
 //   - must contain only alphanumeric characters, dashes, underscores, or dots
 func LabelValue[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
 	if value == nil {
-		return nil
+		// If the object is nil here, something should have already caught it.
+		return field.ErrorList{field.Required(fldPath, "").WithOrigin("format=k8s-label-value")}
 	}
 	var allErrs field.ErrorList
 	for _, msg := range content.IsLabelValue((string)(*value)) {
@@ -163,7 +168,8 @@ func LabelValue[T ~string](_ context.Context, op operation.Operation, fldPath *f
 //   - can contain any other characters including mixed case, numbers, dots, hyphens, underscores, and non-ASCII characters
 func PathSegmentName[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
 	if value == nil {
-		return nil
+		// If the object is nil here, something should have already caught it.
+		return field.ErrorList{field.Required(fldPath, "").WithOrigin("format=k8s-path-segment-name")}
 	}
 	var allErrs field.ErrorList
 	for _, msg := range content.IsPathSegmentName((string)(*value)) {
@@ -178,7 +184,8 @@ func PathSegmentName[T ~string](_ context.Context, op operation.Operation, fldPa
 //   - must use only lowercase hexadecimal characters
 func UUID[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
 	if value == nil {
-		return nil
+		// If the object is nil here, something should have already caught it.
+		return field.ErrorList{field.Required(fldPath, "").WithOrigin("format=k8s-uuid")}
 	}
 	val := (string)(*value)
 	if len(val) != 36 {
@@ -205,7 +212,8 @@ func UUID[T ~string](_ context.Context, op operation.Operation, fldPath *field.P
 // parts separated by a '/' and no longer than 253 characters.
 func ResourcePoolName[T ~string](ctx context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
 	if value == nil {
-		return nil
+		// If the object is nil here, something should have already caught it.
+		return field.ErrorList{field.Required(fldPath, "").WithOrigin("format=k8s-resource-pool-name")}
 	}
 	val := (string)(*value)
 	var allErrs field.ErrorList
@@ -237,7 +245,8 @@ func ResourcePoolName[T ~string](ctx context.Context, op operation.Operation, fl
 //     -- must end with an alphanumeric character
 func ExtendedResourceName[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
 	if value == nil {
-		return nil
+		// If the object is nil here, something should have already caught it.
+		return field.ErrorList{field.Required(fldPath, "").WithOrigin("format=k8s-extended-resource-name")}
 	}
 	val := string(*value)
 	allErrs := field.ErrorList{}
@@ -306,7 +315,8 @@ func resourcesQualifiedName[T ~string](ctx context.Context, op operation.Operati
 //   - the name part must be no more than 32 characters
 func ResourceFullyQualifiedName[T ~string](ctx context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
 	if value == nil {
-		return nil
+		// If the object is nil here, something should have already caught it.
+		return field.ErrorList{field.Required(fldPath, "").WithOrigin("format=k8s-resource-fully-qualified-name")}
 	}
 	var allErrs field.ErrorList
 	s := string(*value)

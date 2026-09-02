@@ -141,7 +141,7 @@ func Validate_MyListStruct(
 
 	// field MyListStruct.TypeMeta has no validation
 
-	{ // field MyListStruct.Tasks
+	{ // field MyListStruct.Tasks ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/unions.Task)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []Task,
@@ -199,7 +199,7 @@ func Validate_MyListStructBeta(
 
 	// field MyListStructBeta.TypeMeta has no validation
 
-	{ // field MyListStructBeta.TasksBeta
+	{ // field MyListStructBeta.TasksBeta ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/unions.Task)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []Task,
@@ -273,7 +273,7 @@ func Validate_MyStruct(
 
 	// field MyStruct.TypeMeta has no validation
 
-	{ // field MyStruct.Z1
+	{ // field MyStruct.Z1 (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/unions.Z1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *Z1,
@@ -301,7 +301,7 @@ func Validate_MyStruct(
 		errs = append(errs, fn(fldPath.Child("z1"), obj.Z1, oldVal, oldObj != nil)...)
 	}
 
-	{ // field MyStruct.Z2
+	{ // field MyStruct.Z2 (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/unions.Z2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *Z2,
@@ -358,7 +358,7 @@ func Validate_MyStructBeta(
 
 	// field MyStructBeta.TypeMeta has no validation
 
-	{ // field MyStructBeta.Z1Beta
+	{ // field MyStructBeta.Z1Beta (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/unions.BetaZ1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *BetaZ1,
@@ -386,7 +386,7 @@ func Validate_MyStructBeta(
 		errs = append(errs, fn(fldPath.Child("z1Beta"), obj.Z1Beta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field MyStructBeta.Z2Beta
+	{ // field MyStructBeta.Z2Beta (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/unions.BetaZ2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *BetaZ2,
@@ -450,7 +450,7 @@ func Validate_Struct(
 	// field Struct.TypeMeta has no validation
 	// field Struct.D has no validation
 
-	{ // field Struct.M1
+	{ // field Struct.M1 (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/unions.M1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *M1,
@@ -478,7 +478,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("m1"), obj.M1, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.M2
+	{ // field Struct.M2 (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/unions.M2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *M2,
@@ -542,7 +542,7 @@ func Validate_UnionStructBeta(
 	// field UnionStructBeta.TypeMeta has no validation
 	// field UnionStructBeta.DBeta has no validation
 
-	{ // field UnionStructBeta.M1Beta
+	{ // field UnionStructBeta.M1Beta (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/unions.BetaM1)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *BetaM1,
@@ -570,7 +570,7 @@ func Validate_UnionStructBeta(
 		errs = append(errs, fn(fldPath.Child("m1Beta"), obj.M1Beta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field UnionStructBeta.M2Beta
+	{ // field UnionStructBeta.M2Beta (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/levels/unions.BetaM2)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *BetaM2,

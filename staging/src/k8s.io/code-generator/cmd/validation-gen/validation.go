@@ -1369,8 +1369,8 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 				}
 			}
 
+			leafType, typePfx, exprPfx := getLeafTypeAndPrefixes(fld.childType)
 			if buf.Len() > 0 {
-				leafType, typePfx, exprPfx := getLeafTypeAndPrefixes(fld.childType)
 				targs := targs.WithArgs(generator.Args{
 					"fieldName":    fld.name,
 					"fieldJSON":    fld.jsonName,
@@ -1382,7 +1382,7 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 				if didSome {
 					sw.Do("\n", nil)
 				}
-				sw.Do("{ // field $.inType|raw$.$.fieldName$\n", targs)
+				sw.Do("{ // field $.inType|name$.$.fieldName$ ($.fieldType$)\n", targs)
 				sw.Do("    fn := func(\n", targs)
 				sw.Do("        fldPath *$.field.Path|raw$,\n", targs)
 				sw.Do("        obj, oldObj $.fieldTypePfx$$.fieldType|raw$,\n", targs)
@@ -1428,8 +1428,9 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 			} else {
 				targs := targs.WithArgs(generator.Args{
 					"fieldName": fld.name,
+					"fieldType": leafType,
 				})
-				sw.Do("// field $.inType|raw$.$.fieldName$ has no validation\n", targs)
+				sw.Do("// field $.inType|name$.$.fieldName$ has no validation\n", targs)
 			}
 			didSome = true
 		}

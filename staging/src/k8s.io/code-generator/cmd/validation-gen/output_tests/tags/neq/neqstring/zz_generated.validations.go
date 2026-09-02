@@ -63,7 +63,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.StringField
+	{ // field Struct.StringField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -87,7 +87,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("stringField"), &obj.StringField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.StringPtrField
+	{ // field Struct.StringPtrField (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -99,6 +99,13 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			if e := validate.NEQ(ctx, op, fldPath, obj, oldObj, "disallowed-pointer"); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -111,7 +118,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("stringPtrField"), obj.StringPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.StringTypedefField
+	{ // field Struct.StringTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/neq/neqstring.StringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *StringType,
@@ -135,7 +142,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("stringTypedefField"), &obj.StringTypedefField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.StringTypedefPtrField
+	{ // field Struct.StringTypedefPtrField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/neq/neqstring.StringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *StringType,
@@ -147,6 +154,13 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			if e := validate.NEQ(ctx, op, fldPath, obj, oldObj, "disallowed-typedef-pointer"); len(e) != 0 {
 				errs = append(errs, e...)
 			}
@@ -159,7 +173,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("stringTypedefPtrField"), obj.StringTypedefPtrField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ValidatedTypedefField
+	{ // field Struct.ValidatedTypedefField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/neq/neqstring.ValidatedStringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *ValidatedStringType,
@@ -181,7 +195,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("validatedTypedefField"), &obj.ValidatedTypedefField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.ValidatedTypedefPtrField
+	{ // field Struct.ValidatedTypedefPtrField (k8s.io/code-generator/cmd/validation-gen/output_tests/tags/neq/neqstring.ValidatedStringType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *ValidatedStringType,
@@ -191,6 +205,14 @@ func Validate_Struct(
 				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
 					return nil
 				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_ValidatedStringType(ctx, op, fldPath, obj, oldObj)...)

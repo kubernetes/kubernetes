@@ -79,7 +79,7 @@ func Validate_ConditionalStruct(
 
 	// field ConditionalStruct.TypeMeta has no validation
 
-	{ // field ConditionalStruct.ConditionalField
+	{ // field ConditionalStruct.ConditionalField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -106,7 +106,7 @@ func Validate_ConditionalStruct(
 		errs = append(errs, fn(fldPath.Child("conditionalField"), &obj.ConditionalField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ConditionalStruct.ConditionalFieldBeta
+	{ // field ConditionalStruct.ConditionalFieldBeta (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -133,7 +133,7 @@ func Validate_ConditionalStruct(
 		errs = append(errs, fn(fldPath.Child("conditionalFieldBeta"), &obj.ConditionalFieldBeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ConditionalStruct.RecursiveAlpha
+	{ // field ConditionalStruct.RecursiveAlpha (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -157,7 +157,7 @@ func Validate_ConditionalStruct(
 		errs = append(errs, fn(fldPath.Child("recursiveAlpha"), &obj.RecursiveAlpha, oldVal, oldObj != nil)...)
 	}
 
-	{ // field ConditionalStruct.RecursiveBeta
+	{ // field ConditionalStruct.RecursiveBeta (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -192,7 +192,7 @@ func Validate_MixedStruct(
 
 	// field MixedStruct.TypeMeta has no validation
 
-	{ // field MixedStruct.IntField
+	{ // field MixedStruct.IntField (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -219,7 +219,7 @@ func Validate_MixedStruct(
 		errs = append(errs, fn(fldPath.Child("intField"), &obj.IntField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field MixedStruct.IntFieldBeta
+	{ // field MixedStruct.IntFieldBeta (int)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int,
@@ -246,7 +246,7 @@ func Validate_MixedStruct(
 		errs = append(errs, fn(fldPath.Child("intFieldBeta"), &obj.IntFieldBeta, oldVal, oldObj != nil)...)
 	}
 
-	{ // field MixedStruct.ListField
+	{ // field MixedStruct.ListField ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,
@@ -279,7 +279,7 @@ func Validate_MixedStruct(
 		errs = append(errs, fn(fldPath.Child("listField"), obj.ListField, oldVal, oldObj != nil)...)
 	}
 
-	{ // field MixedStruct.ListFieldBeta
+	{ // field MixedStruct.ListFieldBeta ([]string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []string,

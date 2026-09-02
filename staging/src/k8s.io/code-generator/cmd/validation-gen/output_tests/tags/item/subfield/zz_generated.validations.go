@@ -64,7 +64,7 @@ func Validate_Struct(
 
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.Items
+	{ // field Struct.Items ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/item/subfield.Item)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []Item,
@@ -86,7 +86,12 @@ func Validate_Struct(
 					func(item *Item) bool { return item.Key == "target" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
 						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
-							func(o *Item) *string { return &o.StringField }, validate.DirectEqual,
+							func(o *Item) *string {
+								if o == nil {
+									return nil
+								}
+								return &o.StringField
+							}, validate.DirectEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 								return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item Items[key=target].stringField")
 							})
@@ -103,7 +108,7 @@ func Validate_Struct(
 		errs = append(errs, fn(fldPath.Child("items"), obj.Items, oldVal, oldObj != nil)...)
 	}
 
-	{ // field Struct.RatchetItems
+	{ // field Struct.RatchetItems ([]k8s.io/code-generator/cmd/validation-gen/output_tests/tags/item/subfield.RatchetItem)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []RatchetItem,
@@ -125,7 +130,12 @@ func Validate_Struct(
 					func(item *RatchetItem) bool { return item.Key == "ratchet" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *RatchetItem) field.ErrorList {
 						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "status",
-							func(o *RatchetItem) *string { return &o.Status }, validate.DirectEqual,
+							func(o *RatchetItem) *string {
+								if o == nil {
+									return nil
+								}
+								return &o.Status
+							}, validate.DirectEqual,
 							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 								return validate.NEQ(ctx, op, fldPath, obj, oldObj, "forbidden")
 							})

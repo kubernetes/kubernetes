@@ -31,16 +31,19 @@ type Struct struct {
 	// +k8s:neq="disallowed-string"
 	StringField string `json:"stringField"`
 
+	// +k8s:optional
 	// +k8s:neq="disallowed-pointer"
 	StringPtrField *string `json:"stringPtrField"`
 
 	// +k8s:neq="disallowed-typedef"
 	StringTypedefField StringType `json:"stringTypedefField"`
 
+	// +k8s:optional
 	// +k8s:neq="disallowed-typedef-pointer"
 	StringTypedefPtrField *StringType `json:"stringTypedefPtrField"`
 
-	ValidatedTypedefField    ValidatedStringType  `json:"validatedTypedefField"`
+	ValidatedTypedefField ValidatedStringType `json:"validatedTypedefField"`
+	// +k8s:optional
 	ValidatedTypedefPtrField *ValidatedStringType `json:"validatedTypedefPtrField"`
 }
 

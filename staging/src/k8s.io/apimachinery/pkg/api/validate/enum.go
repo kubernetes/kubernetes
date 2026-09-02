@@ -31,7 +31,8 @@ import (
 // If ANY exclude rule matches for a value, that value is excluded from the enum when validating.
 func Enum[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T, validValues sets.Set[T], exclusions []EnumExclusion[T]) field.ErrorList {
 	if value == nil {
-		return nil
+		// If the object is nil here, something should have already caught it.
+		return field.ErrorList{field.Required(fldPath, "")}
 	}
 	excluded, err := isExcluded(op, exclusions, *value)
 	if err != nil {

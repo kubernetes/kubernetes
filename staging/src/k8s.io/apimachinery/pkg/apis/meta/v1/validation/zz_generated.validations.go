@@ -40,7 +40,7 @@ func Validate_Condition(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *v1.Condition) (errs field.ErrorList) {
 
-	{ // field v1.Condition.Type
+	{ // field Condition.Type (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -72,7 +72,7 @@ func Validate_Condition(
 		errs = append(errs, fn(fldPath.Child("type"), &obj.Type, oldVal, oldObj != nil)...)
 	}
 
-	{ // field v1.Condition.Status
+	{ // field Condition.Status (k8s.io/apimachinery/pkg/apis/meta/v1.ConditionStatus)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ConditionStatus,
@@ -103,7 +103,7 @@ func Validate_Condition(
 		errs = append(errs, fn(fldPath.Child("status"), &obj.Status, oldVal, oldObj != nil)...)
 	}
 
-	{ // field v1.Condition.ObservedGeneration
+	{ // field Condition.ObservedGeneration (int64)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int64,
@@ -134,7 +134,7 @@ func Validate_Condition(
 		errs = append(errs, fn(fldPath.Child("observedGeneration"), &obj.ObservedGeneration, oldVal, oldObj != nil)...)
 	}
 
-	{ // field v1.Condition.LastTransitionTime
+	{ // field Condition.LastTransitionTime (k8s.io/apimachinery/pkg/apis/meta/v1.Time)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.Time,
@@ -159,7 +159,7 @@ func Validate_Condition(
 		errs = append(errs, fn(fldPath.Child("lastTransitionTime"), &obj.LastTransitionTime, oldVal, oldObj != nil)...)
 	}
 
-	{ // field v1.Condition.Reason
+	{ // field Condition.Reason (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -191,7 +191,7 @@ func Validate_Condition(
 		errs = append(errs, fn(fldPath.Child("reason"), &obj.Reason, oldVal, oldObj != nil)...)
 	}
 
-	// field v1.Condition.Message has no validation
+	// field Condition.Message has no validation
 	return errs
 }
 
@@ -216,9 +216,9 @@ func Validate_ManagedFieldsEntry(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *v1.ManagedFieldsEntry) (errs field.ErrorList) {
 
-	// field v1.ManagedFieldsEntry.Manager has no validation
+	// field ManagedFieldsEntry.Manager has no validation
 
-	{ // field v1.ManagedFieldsEntry.Operation
+	{ // field ManagedFieldsEntry.Operation (k8s.io/apimachinery/pkg/apis/meta/v1.ManagedFieldsOperationType)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.ManagedFieldsOperationType,
@@ -249,11 +249,11 @@ func Validate_ManagedFieldsEntry(
 		errs = append(errs, fn(fldPath.Child("operation"), &obj.Operation, oldVal, oldObj != nil)...)
 	}
 
-	// field v1.ManagedFieldsEntry.APIVersion has no validation
-	// field v1.ManagedFieldsEntry.Time has no validation
-	// field v1.ManagedFieldsEntry.FieldsType has no validation
-	// field v1.ManagedFieldsEntry.FieldsV1 has no validation
-	// field v1.ManagedFieldsEntry.Subresource has no validation
+	// field ManagedFieldsEntry.APIVersion has no validation
+	// field ManagedFieldsEntry.Time has no validation
+	// field ManagedFieldsEntry.FieldsType has no validation
+	// field ManagedFieldsEntry.FieldsV1 has no validation
+	// field ManagedFieldsEntry.Subresource has no validation
 	return errs
 }
 
@@ -278,12 +278,12 @@ func Validate_ObjectMeta(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *v1.ObjectMeta) (errs field.ErrorList) {
 
-	// field v1.ObjectMeta.Name has no validation
-	// field v1.ObjectMeta.GenerateName has no validation
-	// field v1.ObjectMeta.Namespace has no validation
-	// field v1.ObjectMeta.SelfLink has no validation
+	// field ObjectMeta.Name has no validation
+	// field ObjectMeta.GenerateName has no validation
+	// field ObjectMeta.Namespace has no validation
+	// field ObjectMeta.SelfLink has no validation
 
-	{ // field v1.ObjectMeta.UID
+	{ // field ObjectMeta.UID (k8s.io/apimachinery/pkg/types.UID)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *types.UID,
@@ -315,9 +315,9 @@ func Validate_ObjectMeta(
 		errs = append(errs, fn(fldPath.Child("uid"), &obj.UID, oldVal, oldObj != nil)...)
 	}
 
-	// field v1.ObjectMeta.ResourceVersion has no validation
+	// field ObjectMeta.ResourceVersion has no validation
 
-	{ // field v1.ObjectMeta.Generation
+	{ // field ObjectMeta.Generation (int64)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int64,
@@ -348,7 +348,7 @@ func Validate_ObjectMeta(
 		errs = append(errs, fn(fldPath.Child("generation"), &obj.Generation, oldVal, oldObj != nil)...)
 	}
 
-	{ // field v1.ObjectMeta.CreationTimestamp
+	{ // field ObjectMeta.CreationTimestamp (k8s.io/apimachinery/pkg/apis/meta/v1.Time)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.Time,
@@ -377,7 +377,7 @@ func Validate_ObjectMeta(
 		errs = append(errs, fn(fldPath.Child("creationTimestamp"), &obj.CreationTimestamp, oldVal, oldObj != nil)...)
 	}
 
-	{ // field v1.ObjectMeta.DeletionTimestamp
+	{ // field ObjectMeta.DeletionTimestamp (k8s.io/apimachinery/pkg/apis/meta/v1.Time)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *v1.Time,
@@ -409,7 +409,7 @@ func Validate_ObjectMeta(
 		errs = append(errs, fn(fldPath.Child("deletionTimestamp"), obj.DeletionTimestamp, oldVal, oldObj != nil)...)
 	}
 
-	{ // field v1.ObjectMeta.DeletionGracePeriodSeconds
+	{ // field ObjectMeta.DeletionGracePeriodSeconds (int64)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *int64,
@@ -441,10 +441,10 @@ func Validate_ObjectMeta(
 		errs = append(errs, fn(fldPath.Child("deletionGracePeriodSeconds"), obj.DeletionGracePeriodSeconds, oldVal, oldObj != nil)...)
 	}
 
-	// field v1.ObjectMeta.Labels has no validation
-	// field v1.ObjectMeta.Annotations has no validation
+	// field ObjectMeta.Labels has no validation
+	// field ObjectMeta.Annotations has no validation
 
-	{ // field v1.ObjectMeta.OwnerReferences
+	{ // field ObjectMeta.OwnerReferences ([]k8s.io/apimachinery/pkg/apis/meta/v1.OwnerReference)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []v1.OwnerReference,
@@ -476,9 +476,9 @@ func Validate_ObjectMeta(
 		errs = append(errs, fn(fldPath.Child("ownerReferences"), obj.OwnerReferences, oldVal, oldObj != nil)...)
 	}
 
-	// field v1.ObjectMeta.Finalizers has no validation
+	// field ObjectMeta.Finalizers has no validation
 
-	{ // field v1.ObjectMeta.ManagedFields
+	{ // field ObjectMeta.ManagedFields ([]k8s.io/apimachinery/pkg/apis/meta/v1.ManagedFieldsEntry)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj []v1.ManagedFieldsEntry,
@@ -519,7 +519,7 @@ func Validate_OwnerReference(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *v1.OwnerReference) (errs field.ErrorList) {
 
-	{ // field v1.OwnerReference.APIVersion
+	{ // field OwnerReference.APIVersion (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -548,7 +548,7 @@ func Validate_OwnerReference(
 		errs = append(errs, fn(fldPath.Child("apiVersion"), &obj.APIVersion, oldVal, oldObj != nil)...)
 	}
 
-	{ // field v1.OwnerReference.Kind
+	{ // field OwnerReference.Kind (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -577,7 +577,7 @@ func Validate_OwnerReference(
 		errs = append(errs, fn(fldPath.Child("kind"), &obj.Kind, oldVal, oldObj != nil)...)
 	}
 
-	{ // field v1.OwnerReference.Name
+	{ // field OwnerReference.Name (string)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *string,
@@ -606,7 +606,7 @@ func Validate_OwnerReference(
 		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
 	}
 
-	{ // field v1.OwnerReference.UID
+	{ // field OwnerReference.UID (k8s.io/apimachinery/pkg/types.UID)
 		fn := func(
 			fldPath *field.Path,
 			obj, oldObj *types.UID,
@@ -635,7 +635,7 @@ func Validate_OwnerReference(
 		errs = append(errs, fn(fldPath.Child("uid"), &obj.UID, oldVal, oldObj != nil)...)
 	}
 
-	// field v1.OwnerReference.Controller has no validation
-	// field v1.OwnerReference.BlockOwnerDeletion has no validation
+	// field OwnerReference.Controller has no validation
+	// field OwnerReference.BlockOwnerDeletion has no validation
 	return errs
 }
