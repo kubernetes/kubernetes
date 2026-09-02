@@ -18,20 +18,59 @@ package remotecommand
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 
 	"k8s.io/streaming/pkg/runtime"
-	utilexec "k8s.io/utils/exec"
 )
+
+// ExitError is returned by [Executor.ExecInContainer] when the command
+// terminates with a non-zero exit code.
+//
+// ExitCode returns the command's exit code, or -1 if no exit code is
+// available, for example if the process was terminated by a signal.
+//
+// [*os/exec.ExitError] satisfies this interface.
+type ExitError interface {
+	error
+	ExitCode() int
+}
 
 // Executor knows how to execute a command in a container in a pod.
 type Executor interface {
 	// ExecInContainer executes a command in a container in the pod, copying data
 	// between in/out/err and the container's stdin/stdout/stderr.
+	//
+	// If the command terminates with a non-zero exit code,
+	// ExecInContainer should return an [ExitError].
 	ExecInContainer(ctx context.Context, name string, uid string, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan TerminalSize, timeout time.Duration) error
+}
+
+// legacyExitError matches [k8s.io/utils/exec.ExitError] for backward compatibility.
+type legacyExitError interface {
+	error
+	Exited() bool
+	ExitStatus() int
+}
+
+func exitCode(err error) (int, bool) {
+	if exitErr, ok := errors.AsType[ExitError](err); ok {
+		// ExitCode returns -1 if the process has not exited or was terminated
+		// by a signal, so only accept non-negative exit codes.
+		if code := exitErr.ExitCode(); code >= 0 {
+			return code, true
+		}
+	}
+
+	if exitErrLegacy, ok := errors.AsType[legacyExitError](err); ok && exitErrLegacy.Exited() {
+		return exitErrLegacy.ExitStatus(), true
+	}
+
+	return 0, false
 }
 
 // ServeExec handles requests to execute a command in a container. After
@@ -47,28 +86,27 @@ func ServeExec(w http.ResponseWriter, req *http.Request, executor Executor, podN
 
 	err := executor.ExecInContainer(req.Context(), podName, uid, container, cmd, ctx.stdinStream, ctx.stdoutStream, ctx.stderrStream, ctx.tty, ctx.resizeChan, 0)
 	if err != nil {
-		if exitErr, ok := err.(utilexec.ExitError); ok && exitErr.Exited() {
-			rc := exitErr.ExitStatus()
-			ctx.writeStatus(&streamStatusError{ErrStatus: streamStatus{
+		if rc, ok := exitCode(err); ok {
+			_ = ctx.writeStatus(&streamStatusError{ErrStatus: streamStatus{
 				Status: statusFailure,
 				Reason: NonZeroExitCodeReason,
 				Details: &streamStatusDetails{
 					Causes: []streamStatusCause{
 						{
 							Type:    ExitCodeCauseType,
-							Message: fmt.Sprintf("%d", rc),
+							Message: strconv.Itoa(rc),
 						},
 					},
 				},
-				Message: fmt.Sprintf("command terminated with non-zero exit code: %v", exitErr),
+				Message: fmt.Sprintf("command terminated with non-zero exit code: %v", err),
 			}})
 		} else {
 			err = fmt.Errorf("error executing command in container: %v", err)
 			runtime.HandleError(err)
-			ctx.writeStatus(newInternalError(err))
+			_ = ctx.writeStatus(newInternalError(err))
 		}
 	} else {
-		ctx.writeStatus(&streamStatusError{ErrStatus: streamStatus{
+		_ = ctx.writeStatus(&streamStatusError{ErrStatus: streamStatus{
 			Status: statusSuccess,
 		}})
 	}
