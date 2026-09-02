@@ -118,15 +118,23 @@ func (maxBytesTagValidator) ValidScopes() sets.Set[Scope] {
 	return maxBytesTagValidScopes
 }
 
-var maxBytesValidator = types.Name{Package: libValidationPkg, Name: "MaxBytes"}
+var (
+	maxBytesValidator      = types.Name{Package: libValidationPkg, Name: "MaxBytes"}
+	maxBytesSliceValidator = types.Name{Package: libValidationPkg, Name: "MaxBytesSlice"}
+)
 
 func (maxBytesTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	var result Validations
 
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
-	if t := util.NonPointer(util.NativeType(context.Type)); t != types.String {
-		return Validations{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
+	// Byte slices are strings on the wire, so they are limited in bytes, too.
+	t := util.NonPointer(util.NativeType(context.Type))
+	validator := maxBytesValidator
+	if t.Kind == types.Slice && util.NativeType(t.Elem) == types.Byte {
+		validator = maxBytesSliceValidator
+	} else if t != types.String {
+		return Validations{}, fmt.Errorf("can only be used on string and []byte types (%s)", rootTypeString(context.Type, t))
 	}
 
 	intVal, err := util.ParseInt(tag.Value)
@@ -136,7 +144,7 @@ func (maxBytesTagValidator) GetValidations(context Context, tag codetags.Tag) (V
 	if intVal < 0 {
 		return result, fmt.Errorf("must be greater than or equal to zero")
 	}
-	result.AddFunction(Function(maxBytesTagName, DefaultFlags, maxBytesValidator, intVal).
+	result.AddFunction(Function(maxBytesTagName, DefaultFlags, validator, intVal).
 		WithEmits(Emission{field.ErrorTypeTooLong, "maxBytes", ""}))
 	return result, nil
 }
@@ -146,8 +154,8 @@ func (mbtv maxBytesTagValidator) Docs() TagDoc {
 		Tag:            mbtv.TagName(),
 		StabilityLevel: TagStabilityLevelStable,
 		Scopes:         sets.List(mbtv.ValidScopes()),
-		Description: `Indicates that a string field has a limit on its length in bytes.
-		This could only allow as few as N/4 multi-byte characters.
+		Description: `Indicates that a string or []byte field has a limit on its length in bytes.
+		For strings, this could only allow as few as N/4 multi-byte characters.
 		If you want to limit length of characters specifically, use maxLength.`,
 		Payloads: []TagPayloadDoc{{
 			Description: "<non-negative integer>",

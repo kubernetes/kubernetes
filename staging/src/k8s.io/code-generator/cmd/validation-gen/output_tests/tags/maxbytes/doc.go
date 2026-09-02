@@ -63,6 +63,15 @@ type Struct struct {
 
 	// Note: no validation here
 	Max10ValidatedTypedefPtrField *Max10Type `json:"max10ValidatedTypedefPtrField"`
+
+	// Byte slices are strings on the wire, so they are limited in bytes, too.
+	// Note: pointers to slices are not supported.
+
+	// +k8s:maxBytes=10
+	Max10BytesField []byte `json:"max10BytesField"`
+
+	// Note: no validation here
+	Max10ValidatedTypedefBytesField Max10BytesType `json:"max10ValidatedTypedefBytesField"`
 }
 
 // Note: no validation here
@@ -79,3 +88,9 @@ type Max0Type string
 // that use the type definition.
 // +k8s:maxBytes=10
 type Max10Type string
+
+// This tests that markers on type definitions
+// are pulled through the validations of fields
+// that use the type definition.
+// +k8s:maxBytes=10
+type Max10BytesType []byte

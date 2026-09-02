@@ -25,6 +25,7 @@ import (
 	context "context"
 	fmt "fmt"
 
+	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -62,6 +63,19 @@ func Validate_Max0Type(
 	obj, oldObj *Max0Type) (errs field.ErrorList) {
 
 	if e := validate.MaxBytes(ctx, op, fldPath, obj, oldObj, 0); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	return errs
+}
+
+// Validate_Max10BytesType validates an instance of Max10BytesType according
+// to declarative validation rules in the API schema.
+func Validate_Max10BytesType(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj Max10BytesType) (errs field.ErrorList) {
+
+	if e := validate.MaxBytesSlice(ctx, op, fldPath, obj, oldObj, 10); len(e) != 0 {
 		errs = append(errs, e...)
 	}
 
@@ -367,6 +381,52 @@ func Validate_Struct(
 				return oldObj.Max10ValidatedTypedefPtrField
 			})
 		errs = append(errs, fn(fldPath.Child("max10ValidatedTypedefPtrField"), obj.Max10ValidatedTypedefPtrField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field Struct.Max10BytesField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []byte,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			if e := validate.MaxBytesSlice(ctx, op, fldPath, obj, oldObj, 10); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) []byte {
+				return oldObj.Max10BytesField
+			})
+		errs = append(errs, fn(fldPath.Child("max10BytesField"), obj.Max10BytesField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field Struct.Max10ValidatedTypedefBytesField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj Max10BytesType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_Max10BytesType(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) Max10BytesType {
+				return oldObj.Max10ValidatedTypedefBytesField
+			})
+		errs = append(errs, fn(fldPath.Child("max10ValidatedTypedefBytesField"), obj.Max10ValidatedTypedefBytesField, oldVal, oldObj != nil)...)
 	}
 
 	return errs
