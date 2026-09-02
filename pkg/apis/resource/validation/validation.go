@@ -1169,15 +1169,20 @@ func validateNodeAllocatableResources(mappings map[corev1.ResourceName]resource.
 func validateNodeAllocatableMapping(mapping *resource.NodeAllocatableMapping, capacities map[resource.QualifiedName]resource.DeviceCapacity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if mapping.CapacityKey != nil {
+		keyPath := fldPath.Child("capacityKey")
 		if *mapping.CapacityKey == "" {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("capacityKey"), "", "capacityKey must not be an empty string"))
+			allErrs = append(allErrs, field.Invalid(keyPath, "", "capacityKey must not be an empty string"))
+		} else if nameErrs := validateQualifiedName(*mapping.CapacityKey, keyPath); len(nameErrs) > 0 {
+			// A key which is not a valid name cannot be a key of the capacity
+			// map either, so report the format problem instead of "not found".
+			allErrs = append(allErrs, nameErrs...)
 		} else {
 			var exists bool
 			if capacities != nil {
 				_, exists = capacities[*mapping.CapacityKey]
 			}
 			if !exists {
-				allErrs = append(allErrs, field.NotFound(fldPath.Child("capacityKey"), *mapping.CapacityKey))
+				allErrs = append(allErrs, field.NotFound(keyPath, *mapping.CapacityKey))
 			}
 		}
 		if mapping.CapacityMultiplier == nil {
