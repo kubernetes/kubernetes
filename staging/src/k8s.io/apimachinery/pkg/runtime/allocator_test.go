@@ -57,9 +57,19 @@ func TestAllocatorNeverShrinks(t *testing.T) {
 	}
 }
 
+// withMaxPooledBufferCapacity sets the pool bound for the duration of a test.
+func withMaxPooledBufferCapacity(t *testing.T, n int) {
+	t.Helper()
+	previous := MaxPooledBufferCapacity()
+	SetMaxPooledBufferCapacity(n)
+	t.Cleanup(func() { SetMaxPooledBufferCapacity(previous) })
+}
+
 func TestPutAllocatorDropsOversizedBuffer(t *testing.T) {
+	const limit = 64 * 1024
+	withMaxPooledBufferCapacity(t, limit)
 	target := &Allocator{}
-	target.Allocate(uint64(maxPooledBufferCapacity + 1))
+	target.Allocate(limit + 1)
 	PutAllocator(target)
 	if target.buf != nil {
 		t.Fatalf("expected the oversized buffer to be dropped before pooling, got capacity: %v", cap(target.buf))
@@ -67,11 +77,28 @@ func TestPutAllocatorDropsOversizedBuffer(t *testing.T) {
 }
 
 func TestPutAllocatorKeepsSmallBuffer(t *testing.T) {
+	const limit = 64 * 1024
+	withMaxPooledBufferCapacity(t, limit)
 	target := &Allocator{}
-	target.Allocate(uint64(maxPooledBufferCapacity / 2))
+	target.Allocate(limit / 2)
 	PutAllocator(target)
-	if cap(target.buf) < maxPooledBufferCapacity/2 {
+	if cap(target.buf) < limit/2 {
 		t.Fatalf("expected the buffer to be retained, got capacity: %v", cap(target.buf))
+	}
+}
+
+func TestPutAllocatorUnboundedByDefault(t *testing.T) {
+	for _, n := range []int{0, -1} {
+		withMaxPooledBufferCapacity(t, n)
+		if got := MaxPooledBufferCapacity(); got != 0 {
+			t.Fatalf("SetMaxPooledBufferCapacity(%d): got bound %d, want 0", n, got)
+		}
+		target := &Allocator{}
+		target.Allocate(4 * 1024 * 1024)
+		PutAllocator(target)
+		if cap(target.buf) < 4*1024*1024 {
+			t.Fatalf("expected an unbounded pool to retain the buffer, got capacity: %v", cap(target.buf))
+		}
 	}
 }
 

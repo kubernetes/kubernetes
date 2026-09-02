@@ -255,6 +255,11 @@ type Config struct {
 	// MaxRequestsInFlight is the maximum number of parallel non-long-running requests. Every further
 	// request has to wait. Applies only to non-mutating requests.
 	MaxRequestsInFlight int
+	// MaxPooledEncodeBufferSize is the largest encode buffer capacity, in bytes, retained by the
+	// process-wide protobuf serialization pool (runtime.AllocatorPool). Buffers that grew larger
+	// are released to the GC instead of being pooled. Applied process-wide when the
+	// AllocatorPoolBufferCap feature gate is enabled; 0 means unbounded.
+	MaxPooledEncodeBufferSize int
 	// MaxMutatingRequestsInFlight is the maximum number of parallel mutating requests. Every further
 	// request has to wait.
 	MaxMutatingRequestsInFlight int
@@ -402,6 +407,13 @@ func init() {
 }
 
 // NewConfig returns a Config struct with the default values
+// DefaultMaxPooledEncodeBufferSize is the default Config.MaxPooledEncodeBufferSize:
+// large enough to keep pooling typical single-object and streamed-list item
+// responses, small enough that a burst of near-limit objects (the etcd object
+// limit is 1.5MiB) cannot pin many megabytes of encode buffers for the life
+// of the process.
+const DefaultMaxPooledEncodeBufferSize = 256 * 1024
+
 func NewConfig(codecs serializer.CodecFactory) *Config {
 	defaultHealthChecks := []healthz.HealthChecker{healthz.PingHealthz, healthz.LogHealthz}
 	var id string
@@ -449,6 +461,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		DebugSocketPath:                "",
 		EnableMetrics:                  true,
 		MaxRequestsInFlight:            400,
+		MaxPooledEncodeBufferSize:      DefaultMaxPooledEncodeBufferSize,
 		MaxMutatingRequestsInFlight:    200,
 		RequestTimeout:                 time.Duration(60) * time.Second,
 		MinRequestTimeout:              1800,
@@ -787,6 +800,13 @@ var defaultAllowedMediaTypes = []string{
 func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*GenericAPIServer, error) {
 	if c.Serializer == nil {
 		return nil, fmt.Errorf("Genericapiserver.New() called with config.Serializer == nil")
+	}
+	// The encode buffer pool is process-wide; every server in a delegation
+	// chain shares one config value, so applying it per server is idempotent.
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AllocatorPoolBufferCap) {
+		runtime.SetMaxPooledBufferCapacity(c.MaxPooledEncodeBufferSize)
+	} else {
+		runtime.SetMaxPooledBufferCapacity(0)
 	}
 	allowedMediaTypes := defaultAllowedMediaTypes
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.CBORServingAndStorage) {
