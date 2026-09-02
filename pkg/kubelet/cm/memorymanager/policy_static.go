@@ -997,9 +997,16 @@ func (p *staticPolicy) calculateHints(machineState state.NUMANodeMap, pod *v1.Po
 			if _, ok := hints[string(resourceName)]; !ok {
 				hints[string(resourceName)] = []topologymanager.TopologyHint{}
 			}
+			var score int64
+			alloc := totalAllocatableSize[resourceName]
+			if alloc > 0 {
+				assigned := alloc - totalFreeSize[resourceName]
+				score = int64(max(1, assigned*100/alloc))
+			}
 			hints[string(resourceName)] = append(hints[string(resourceName)], topologymanager.TopologyHint{
 				NUMANodeAffinity: mask,
 				Preferred:        false,
+				Score:            score,
 			})
 		}
 	})
