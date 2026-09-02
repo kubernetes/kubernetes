@@ -24,6 +24,7 @@ import (
 	"sync/atomic"
 
 	"github.com/spf13/cobra"
+	flag "github.com/spf13/pflag"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
@@ -179,6 +180,13 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 		// Hook before and after Run initialize and write profiles to disk,
 		// respectively.
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			// Behave like --help: returning pflag.ErrHelp makes cobra invoke
+			// the help function instead of running the command. The "help"
+			// command is excluded so it can resolve its target command itself.
+			if templates.ShowExamplesRequested(cmd) && cmd.Name() != "help" {
+				return flag.ErrHelp
+			}
+
 			rest.SetDefaultWarningHandler(warningHandler)
 
 			if cmd.Name() == cobra.ShellCompRequestCmd {
@@ -220,6 +228,10 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	addProfilingFlags(flags)
 
 	flags.BoolVar(&warningsAsErrors, "warnings-as-errors", warningsAsErrors, "Treat warnings received from the server as errors and exit with a non-zero exit code")
+	var showExamples bool
+	flags.BoolVar(&showExamples, templates.ShowExamplesFlag, false, "If true, print only the examples section of the command's help and exit")
+	flags.BoolVar(&showExamples, templates.ShowExamplesFlagAlias, false, "Alias for --"+templates.ShowExamplesFlag)
+	flags.MarkHidden(templates.ShowExamplesFlagAlias) // nolint:errcheck
 
 	pref := kuberc.NewPreferences()
 	if !cmdutil.KubeRC.IsDisabled() {

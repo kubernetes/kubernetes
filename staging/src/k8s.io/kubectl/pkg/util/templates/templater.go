@@ -29,6 +29,34 @@ import (
 	"k8s.io/kubectl/pkg/util/term"
 )
 
+// ShowExamplesFlag is the name of the global flag that, when set, makes a
+// command print only the examples section of its help text and exit.
+const ShowExamplesFlag = "examples"
+
+// ShowExamplesFlagAlias is a hidden singular alias of ShowExamplesFlag.
+const ShowExamplesFlagAlias = "example"
+
+// ShowExamplesRequested reports whether the --examples flag (or its alias
+// --example) was set on the command tree cmd belongs to. The flag is a
+// persistent flag on the root command, so its value is shared by every
+// command in the tree.
+func ShowExamplesRequested(cmd *cobra.Command) bool {
+	f := cmd.Root().PersistentFlags().Lookup(ShowExamplesFlag)
+	return f != nil && f.Value.String() == "true"
+}
+
+// exampleCommands reformats a command's Example text for direct copying: the
+// indentation added for the --help layout is removed so every line, including
+// the descriptive '# ...' comments, starts at column 0. Blank lines between
+// examples are preserved.
+func exampleCommands(example string) string {
+	lines := strings.Split(strings.TrimRightFunc(example, unicode.IsSpace), "\n")
+	for i, line := range lines {
+		lines[i] = strings.TrimSpace(line)
+	}
+	return strings.Join(lines, "\n")
+}
+
 type FlagExposer interface {
 	ExposeFlags(cmd *cobra.Command, flags ...string) FlagExposer
 }
@@ -38,11 +66,12 @@ func ActsAsRootCommand(cmd *cobra.Command, filters []string, groups ...CommandGr
 		panic("nil root command")
 	}
 	templater := &templater{
-		RootCmd:       cmd,
-		UsageTemplate: MainUsageTemplate(),
-		HelpTemplate:  MainHelpTemplate(),
-		CommandGroups: groups,
-		Filtered:      filters,
+		RootCmd:          cmd,
+		UsageTemplate:    MainUsageTemplate(),
+		HelpTemplate:     MainHelpTemplate(),
+		ExamplesTemplate: ExamplesHelpTemplate(),
+		CommandGroups:    groups,
+		Filtered:         filters,
 	}
 	cmd.SetFlagErrorFunc(templater.FlagErrorFunc())
 	cmd.SilenceUsage = true
@@ -61,9 +90,10 @@ func UseOptionsTemplates(cmd *cobra.Command) {
 }
 
 type templater struct {
-	UsageTemplate string
-	HelpTemplate  string
-	RootCmd       *cobra.Command
+	UsageTemplate    string
+	HelpTemplate     string
+	ExamplesTemplate string
+	RootCmd          *cobra.Command
 	CommandGroups
 	Filtered []string
 }
@@ -87,9 +117,13 @@ func (templater *templater) ExposeFlags(cmd *cobra.Command, flags ...string) Fla
 
 func (templater *templater) HelpFunc() func(*cobra.Command, []string) {
 	return func(c *cobra.Command, s []string) {
+		helpTemplate := templater.HelpTemplate
+		if len(templater.ExamplesTemplate) > 0 && ShowExamplesRequested(c) {
+			helpTemplate = templater.ExamplesTemplate
+		}
 		t := template.New("help")
 		t.Funcs(templater.templateFuncs())
-		template.Must(t.Parse(templater.HelpTemplate))
+		template.Must(t.Parse(helpTemplate))
 		out := term.NewResponsiveWriter(c.OutOrStdout())
 		err := t.Execute(out, c)
 		if err != nil {
@@ -112,6 +146,7 @@ func (templater *templater) templateFuncs(exposedFlags ...string) template.FuncM
 	return template.FuncMap{
 		"trim":                strings.TrimSpace,
 		"trimRight":           func(s string) string { return strings.TrimRightFunc(s, unicode.IsSpace) },
+		"exampleCommands":     exampleCommands,
 		"trimLeft":            func(s string) string { return strings.TrimLeftFunc(s, unicode.IsSpace) },
 		"gt":                  cobra.Gt,
 		"eq":                  cobra.Eq,

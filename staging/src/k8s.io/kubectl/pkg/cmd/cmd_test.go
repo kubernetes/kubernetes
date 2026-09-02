@@ -30,6 +30,7 @@ import (
 
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/kubectl/pkg/cmd/plugin"
+	"k8s.io/kubectl/pkg/util/templates"
 )
 
 func TestNormalizationFuncGlobalExistence(t *testing.T) {
@@ -394,4 +395,81 @@ func (h *testPluginHandler) Execute(executablePath string, cmdArgs, env []string
 	h.withArgs = cmdArgs
 	h.withEnv = env
 	return nil
+}
+
+func TestShowExamplesFlag(t *testing.T) {
+	// The flag is exercised under both of its spellings; every case must
+	// behave identically for --examples and its alias --example.
+	tests := []struct {
+		name    string
+		args    []string // "FLAG" is replaced by the spelling under test
+		want    []string
+		notWant []string
+	}{
+		{
+			name:    "subcommand with required flags prints only examples",
+			args:    []string{"create", "deployment", "FLAG"},
+			want:    []string{"# Create a deployment named my-dep that runs the busybox image\nkubectl create deployment my-dep --image=busybox\n\n# Create a deployment with a command\nkubectl create deployment my-dep --image=busybox -- date\n"},
+			notWant: []string{"Options:", "Usage:", "Create a deployment with the specified name.", "\n  kubectl", "\n  # "},
+		},
+		{
+			name:    "flag before the subcommand",
+			args:    []string{"FLAG", "get"},
+			want:    []string{"kubectl get pods"},
+			notWant: []string{"Options:", "Usage:"},
+		},
+		{
+			name:    "flag with explicit value and other flags",
+			args:    []string{"get", "-n", "kube-system", "FLAG=true"},
+			want:    []string{"kubectl get pods"},
+			notWant: []string{"Options:", "Usage:"},
+		},
+		{
+			name:    "parent command prints only examples",
+			args:    []string{"create", "FLAG"},
+			want:    []string{"kubectl create -f ./pod.json"},
+			notWant: []string{"Available Commands", "Options:"},
+		},
+		{
+			name:    "help command resolves its target and prints only examples",
+			args:    []string{"help", "create", "deployment", "FLAG"},
+			want:    []string{"kubectl create deployment my-dep --image=busybox"},
+			notWant: []string{"Options:", "Usage:", "kubectl help has no examples"},
+		},
+		{
+			name:    "command without examples prints a hint",
+			args:    []string{"FLAG"},
+			want:    []string{"kubectl has no examples"},
+			notWant: []string{"Basic Commands"},
+		},
+	}
+	for _, flagName := range []string{"--" + templates.ShowExamplesFlag, "--" + templates.ShowExamplesFlagAlias} {
+		for _, tt := range tests {
+			t.Run(flagName+"/"+tt.name, func(t *testing.T) {
+				args := make([]string, len(tt.args))
+				for i, a := range tt.args {
+					args[i] = strings.Replace(a, "FLAG", flagName, 1)
+				}
+				ioStreams, _, out, _ := genericiooptions.NewTestIOStreams()
+				root := NewKubectlCommand(KubectlOptions{Arguments: append([]string{"kubectl"}, args...), IOStreams: ioStreams})
+				root.SetOut(out)
+				root.SetErr(out)
+				root.SetArgs(args)
+				if err := root.Execute(); err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				got := out.String()
+				for _, w := range tt.want {
+					if !strings.Contains(got, w) {
+						t.Errorf("expected output to contain %q, got:\n%s", w, got)
+					}
+				}
+				for _, nw := range tt.notWant {
+					if strings.Contains(got, nw) {
+						t.Errorf("expected output NOT to contain %q, got:\n%s", nw, got)
+					}
+				}
+			})
+		}
+	}
 }

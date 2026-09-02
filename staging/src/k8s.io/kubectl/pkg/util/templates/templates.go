@@ -75,6 +75,15 @@ func MainHelpTemplate() string {
 	return `{{with or .Long .Short }}{{. | trim}}{{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}`
 }
 
+// ExamplesHelpTemplate is the template for 'help' used by most commands when
+// only the examples were requested via the --examples flag. It prints the
+// examples without the indentation used in the --help layout, so every
+// command starts at column 0 and can be copied directly.
+func ExamplesHelpTemplate() string {
+	return `{{if .HasExample}}{{exampleCommands .Example}}{{else}}{{.CommandPath}} has no examples. See '{{.CommandPath}} --help' for usage.{{end}}
+`
+}
+
 // MainUsageTemplate if the template for 'usage' used by most commands.
 func MainUsageTemplate() string {
 	sections := []string{
