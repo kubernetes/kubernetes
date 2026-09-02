@@ -204,6 +204,7 @@ type NodeConfig struct {
 	TopologyManagerPolicy        string
 	TopologyManagerPolicyOptions map[string]string
 	CgroupVersion                int
+	CgroupNsdelegate             bool
 }
 
 type NodeAllocatableConfig struct {
