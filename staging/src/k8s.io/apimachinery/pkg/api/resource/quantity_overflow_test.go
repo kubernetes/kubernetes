@@ -40,7 +40,6 @@ const (
 	saturatePos = "want math.MaxInt64 once positive overflow saturates instead of wrapping (#141166)"
 	saturateNeg = "want math.MinInt64 once negative overflow saturates instead of wrapping or reading zero (#141166)"
 	// String drops the DecimalSI suffix above 10^18.
-	suffixDrop = "String drops the suffix for DecimalSI values above 10^18 (#140459)"
 )
 
 type accessorCase struct {
@@ -201,7 +200,7 @@ func quantityAccessorCases() []accessorCase {
 			wantScaledKilo: 1000000000000000000,
 			wantAsInt64:    0, wantAsInt64OK: false,
 			wantFloat:  1e21,
-			wantString: "1", stringTODO: `want "1e21"; ` + suffixDrop,
+			wantString: "1e21",
 		},
 		{
 			name: "five-times-ten-to-21-parsed", load: func() Quantity { return MustParse("5000E") },
@@ -211,7 +210,7 @@ func quantityAccessorCases() []accessorCase {
 			wantScaledKilo: 5000000000000000000,
 			wantAsInt64:    0, wantAsInt64OK: false,
 			wantFloat:  5e21,
-			wantString: "5", stringTODO: `want "5e21"; ` + suffixDrop,
+			wantString: "5e21",
 		},
 		{
 			name: "ten-to-100-parsed", load: func() Quantity { return MustParse("1e100") },
@@ -231,7 +230,7 @@ func quantityAccessorCases() []accessorCase {
 			wantScaledKilo: 1000000000000000000,
 			wantAsInt64:    0, wantAsInt64OK: false,
 			wantFloat:  1e21,
-			wantString: "1", stringTODO: `want "1e21"; ` + suffixDrop,
+			wantString: "1e21",
 		},
 		{
 			// NewScaledQuantity(MaxInt64, 1) is MaxInt64*10; Value wraps to -10,
@@ -297,7 +296,7 @@ func quantityAccessorCases() []accessorCase {
 			wantScaledKilo: -1000000000000000000,
 			wantAsInt64:    0, wantAsInt64OK: false,
 			wantFloat:  -1e21,
-			wantString: "-1", stringTODO: `want "-1e21"; ` + suffixDrop,
+			wantString: "-1e21",
 		},
 
 		// --- Negative rounding (#138510): magnitude fits int64 but the sign flips. ---
