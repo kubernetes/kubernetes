@@ -27,6 +27,7 @@ import (
 	"reflect"
 	"regexp"
 	goruntime "runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -82,6 +83,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
@@ -661,6 +663,72 @@ func TestHandlePodCleanupsPerQOS(t *testing.T) {
 	// Destroy() count in not deterministic on the actual number.
 	// https://github.com/kubernetes/kubernetes/blob/29fdbb065b5e0d195299eb2d260b975cbc554673/pkg/kubelet/kubelet_pods.go#L2006
 	assert.GreaterOrEqual(t, destroyCount, 1, "Expect 1 or more destroys")
+}
+
+// TestSyncPodEnsuresWritableCgroupLimits verifies that SyncPod applies the
+// writable cgroup limits to a pod cgroup that already exists, and does not
+// start containers when it cannot.
+func TestSyncPodEnsuresWritableCgroupLimits(t *testing.T) {
+	tests := []struct {
+		name           string
+		limitErr       error
+		wantErr        bool
+		wantContainers bool
+	}{
+		{
+			name:           "starts containers after applying the limits",
+			wantContainers: true,
+		},
+		{
+			name:     "fails the sync when the limits cannot be applied",
+			limitErr: errors.New("write cgroup.max.descendants: permission denied"),
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
+			kubelet.cgroupsPerQOS = true
+			recorder := record.NewFakeRecorder(10)
+			kubelet.recorder = recorder
+			// The fake reports every pod cgroup as existing.
+			pcm := testKubelet.fakeContainerManager.PodContainerManager
+			pcm.EnsureWritableCgroupLimitsErr = tt.limitErr
+
+			pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
+				Containers: []v1.Container{{Name: "bar"}},
+			})
+			kubelet.podManager.SetPods([]*v1.Pod{pod})
+			_, _, err := kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
+			if tt.wantErr {
+				require.ErrorIs(t, err, tt.limitErr)
+				require.Len(t, recorder.Events, 1)
+				require.Contains(t, <-recorder.Events, events.FailedToCreatePodContainer)
+			} else {
+				require.NoError(t, err)
+			}
+
+			pcm.Lock()
+			pcmCalls := slices.Clone(pcm.CalledFunctions)
+			pcm.Unlock()
+			require.Contains(t, pcmCalls, "EnsureWritableCgroupLimits")
+			require.NotContains(t, pcmCalls, "EnsureExists")
+
+			fakeRuntime := testKubelet.fakeRuntime
+			fakeRuntime.Lock()
+			runtimeCalls := slices.Clone(fakeRuntime.CalledFunctions)
+			fakeRuntime.Unlock()
+			if tt.wantContainers {
+				require.Contains(t, runtimeCalls, "SyncPod")
+			} else {
+				require.NotContains(t, runtimeCalls, "SyncPod")
+			}
+		})
+	}
 }
 
 func TestDispatchWorkOfCompletedPod(t *testing.T) {

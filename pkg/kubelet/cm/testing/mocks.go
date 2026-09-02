@@ -2197,6 +2197,57 @@ func (_c *MockPodContainerManager_EnsureExists_Call) RunAndReturn(run func(logge
 	return _c
 }
 
+// EnsureWritableCgroupLimits provides a mock function for the type MockPodContainerManager
+func (_mock *MockPodContainerManager) EnsureWritableCgroupLimits(pod *v1.Pod) error {
+	ret := _mock.Called(pod)
+
+	if len(ret) == 0 {
+		panic("no return value specified for EnsureWritableCgroupLimits")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*v1.Pod) error); ok {
+		r0 = returnFunc(pod)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockPodContainerManager_EnsureWritableCgroupLimits_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EnsureWritableCgroupLimits'
+type MockPodContainerManager_EnsureWritableCgroupLimits_Call struct {
+	*mock.Call
+}
+
+// EnsureWritableCgroupLimits is a helper method to define mock.On call
+//   - pod *v1.Pod
+func (_e *MockPodContainerManager_Expecter) EnsureWritableCgroupLimits(pod any) *MockPodContainerManager_EnsureWritableCgroupLimits_Call {
+	return &MockPodContainerManager_EnsureWritableCgroupLimits_Call{Call: _e.mock.On("EnsureWritableCgroupLimits", pod)}
+}
+
+func (_c *MockPodContainerManager_EnsureWritableCgroupLimits_Call) Run(run func(pod *v1.Pod)) *MockPodContainerManager_EnsureWritableCgroupLimits_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *v1.Pod
+		if args[0] != nil {
+			arg0 = args[0].(*v1.Pod)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockPodContainerManager_EnsureWritableCgroupLimits_Call) Return(err error) *MockPodContainerManager_EnsureWritableCgroupLimits_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockPodContainerManager_EnsureWritableCgroupLimits_Call) RunAndReturn(run func(pod *v1.Pod) error) *MockPodContainerManager_EnsureWritableCgroupLimits_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Exists provides a mock function for the type MockPodContainerManager
 func (_mock *MockPodContainerManager) Exists(pod *v1.Pod) bool {
 	ret := _mock.Called(pod)
