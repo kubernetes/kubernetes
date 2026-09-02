@@ -852,10 +852,10 @@ type setupOptions struct {
 
 type setupOption func(*setupOptions)
 
-func withClientConfig(config *embed.Config) setupOption {
+func withClientConfig(f func(config *embed.Config)) setupOption {
 	return func(options *setupOptions) {
 		options.client = func(t testing.TB) *kubernetes.Client {
-			return testserver.RunEtcd(t, config)
+			return testserver.RunEtcd(t, f)
 		}
 	}
 }
@@ -892,7 +892,7 @@ func withCodec(codec runtime.Codec) setupOption {
 
 func withDefaults(options *setupOptions) {
 	options.client = func(t testing.TB) *kubernetes.Client {
-		return testserver.RunEtcd(t, nil)
+		return testserver.RunEtcd(t)
 	}
 	options.codec = apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	options.newFunc = newPod

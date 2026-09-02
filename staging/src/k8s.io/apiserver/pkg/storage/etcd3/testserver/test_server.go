@@ -31,6 +31,7 @@ import (
 	"go.etcd.io/etcd/server/v3/embed"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest"
+
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 )
 
@@ -49,14 +50,14 @@ func getAvailablePorts(count int) ([]int, error) {
 	return ports, nil
 }
 
-// NewTestConfig returns a configuration for an embedded etcd server.
+// newTestConfig returns a configuration for an embedded etcd server.
 // The configuration is based on embed.NewConfig(), with the following adjustments:
 //   - sets UnsafeNoFsync = true to improve test performance (only reasonable in a test-only
 //     single-member server we never intend to restart or keep data from)
 //   - uses free ports for client and peer listeners
 //   - cleans up the data directory on test termination
 //   - silences server logs other than errors
-func NewTestConfig(t testing.TB) *embed.Config {
+func newTestConfig(t testing.TB) *embed.Config {
 	cfg := embed.NewConfig()
 
 	cfg.UnsafeNoFsync = true
@@ -82,17 +83,18 @@ func NewTestConfig(t testing.TB) *embed.Config {
 
 var autoPortLock sync.Mutex
 
-// RunEtcd starts an embedded etcd server with the provided config
-// (or NewTestConfig(t) if nil), and returns a client connected to the server.
+// RunEtcd starts an embedded etcd server with a test configuration run through
+// any provided configuration tweak functions, and returns a client connected to the server.
 // The server is terminated when the test ends.
-func RunEtcd(t testing.TB, cfg *embed.Config) *kubernetes.Client {
+func RunEtcd(t testing.TB, tweakConfig ...func(cfg *embed.Config)) *kubernetes.Client {
 	t.Helper()
 
-	if cfg == nil {
-		// if we have to autopick free ports, lock until we successfully start the server on the ports we chose
-		autoPortLock.Lock()
-		defer autoPortLock.Unlock()
-		cfg = NewTestConfig(t)
+	// lock until we successfully start the server on the ports we chose
+	autoPortLock.Lock()
+	defer autoPortLock.Unlock()
+	cfg := newTestConfig(t)
+	for _, f := range tweakConfig {
+		f(cfg)
 	}
 
 	e, err := embed.StartEtcd(cfg)
