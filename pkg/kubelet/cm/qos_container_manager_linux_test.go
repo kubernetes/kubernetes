@@ -451,13 +451,21 @@ func TestQoSContainerCgroupWithMemoryReservationPolicyNone(t *testing.T) {
 	assert.Equal(t, "0", qosConfigs[v1.PodQOSBurstable].ResourceParameters.Unified[Cgroup2MemoryLow])
 }
 
-// fakeCgroupManager is used because Start() requires a functional
-// CgroupManager. All methods are stubbed so that Start() can
-// complete successfully without using real cgroups.
+// fakeCgroupManager stands in for the CgroupManager in the QoS and pod
+// container manager tests. It records the configs and unified files it is
+// asked to apply and never touches real cgroups.
 type fakeCgroupManager struct {
-	mutex   sync.Mutex
-	created []*CgroupConfig
-	updates []*CgroupConfig
+	mutex            sync.Mutex
+	created          []*CgroupConfig
+	updates          []*CgroupConfig
+	unified          []unifiedWrite
+	ensureUnifiedErr error
+}
+
+// unifiedWrite records the cgroup v2 files EnsureUnified was asked to set.
+type unifiedWrite struct {
+	name   CgroupName
+	values map[string]string
 }
 
 // Update() is the observation point for this test.
@@ -499,6 +507,13 @@ func (f *fakeCgroupManager) GetCgroupConfig(_ CgroupName, _ v1.ResourceName) (*R
 }
 func (f *fakeCgroupManager) SetCgroupConfig(_ klog.Logger, _ CgroupName, _ *ResourceConfig) error {
 	return nil
+}
+func (f *fakeCgroupManager) EnsureUnified(name CgroupName, values map[string]string) error {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
+	f.unified = append(f.unified, unifiedWrite{name: name, values: values})
+	return f.ensureUnifiedErr
 }
 func (f *fakeCgroupManager) Version() int { return 1 }
 
