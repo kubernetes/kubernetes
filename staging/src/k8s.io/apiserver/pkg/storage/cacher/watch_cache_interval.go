@@ -68,51 +68,11 @@ func newCacheInterval(startIndex, endIndex int, indexer indexerFunc, indexValida
 	}
 }
 
-// newCacheIntervalFromStore is meant to handle the case of rv=0, such that the events
-// returned by Next() need to be events from a List() done on the underlying store of
-// the watch cache.
-// The items returned in the interval will be sorted by Key.
-func newCacheIntervalFromStore(resourceVersion uint64, indexer store.Indexer, key string, matchesSingle bool) (*watchCacheInterval, error) {
-	buffer := &watchCacheIntervalBuffer{}
-	var allItems []interface{}
-	var err error
-	if matchesSingle {
-		item, exists, err := indexer.GetByKey(key)
-		if err != nil {
-			return nil, err
-		}
-		if exists {
-			allItems = append(allItems, item)
-		}
-	} else {
-		allItems, err = indexer.OrderedListPrefix("", "")
-		if err != nil {
-			return nil, err
-		}
-	}
-	buffer.buffer = make([]*watchCacheEvent, len(allItems))
-	for i, item := range allItems {
-		elem, ok := item.(*store.Element)
-		if !ok {
-			return nil, fmt.Errorf("not a storeElement: %v", elem)
-		}
-		buffer.buffer[i] = storeElementToWatchCacheEvent(elem, resourceVersion)
-		buffer.endIndex++
-	}
-	ci := &watchCacheInterval{
-		source:          &snapshotCacheIntervalSource{buffer: buffer},
-		resourceVersion: resourceVersion,
-	}
-
-	return ci, nil
-}
-
-// newCacheIntervalFromLazySnapshot builds an interval backed by an immutable store snapshot
-// Unlike newCacheIntervalFromStore, it captures snapshot reference which takes O(1) under watch-cache RLock
-// and defers O(N) traversal to first Next() call post lock release
-func newCacheIntervalFromLazySnapshot(resourceVersion uint64, snap store.Snapshot) *watchCacheInterval {
+// newCacheIntervalFromSnapshot serves the state of the store as initial
+// events, in key order, for a watch that starts outside the event history.
+func newCacheIntervalFromSnapshot(resourceVersion uint64, snap store.Snapshot) *watchCacheInterval {
 	return &watchCacheInterval{
-		source: &lazySnapshotCacheIntervalSource{
+		source: &snapshotCacheIntervalSource{
 			snapshot:        snap,
 			resourceVersion: resourceVersion,
 		},
@@ -245,24 +205,7 @@ func (s *historyCacheIntervalSource) fillBuffer() {
 	}
 }
 
-// snapshotCacheIntervalSource serves events from a pre-populated buffer.
 type snapshotCacheIntervalSource struct {
-	buffer *watchCacheIntervalBuffer
-}
-
-func (s *snapshotCacheIntervalSource) Next() (*watchCacheEvent, error) {
-	event, exists := s.buffer.next()
-	if !exists {
-		return nil, nil
-	}
-	return event, nil
-}
-
-// lazySnapshotCacheIntervalSource serves events from an immutable snapshot.
-// The snapshot reference is captured under the watchCache lock, but the O(N)
-// traversal that materializes the events is deferred until the first Next()
-// call so that it runs off the watchCache lock.
-type lazySnapshotCacheIntervalSource struct {
 	snapshot        store.Snapshot
 	resourceVersion uint64
 	// The snapshot is re-ranged from nextKey for each buffer fill rather
@@ -273,7 +216,7 @@ type lazySnapshotCacheIntervalSource struct {
 	exhausted bool
 }
 
-func (s *lazySnapshotCacheIntervalSource) Next() (*watchCacheEvent, error) {
+func (s *snapshotCacheIntervalSource) Next() (*watchCacheEvent, error) {
 	if event, ok := s.buffer.next(); ok {
 		return event, nil
 	}
@@ -287,7 +230,7 @@ func (s *lazySnapshotCacheIntervalSource) Next() (*watchCacheEvent, error) {
 	return event, nil
 }
 
-func (s *lazySnapshotCacheIntervalSource) fillBuffer() error {
+func (s *snapshotCacheIntervalSource) fillBuffer() error {
 	if s.buffer.buffer == nil {
 		s.buffer.buffer = make([]*watchCacheEvent, bufferSize)
 	}

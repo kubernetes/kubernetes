@@ -62,13 +62,6 @@ type WatchCacheStorage struct {
 	snapshottingEnabled atomic.Bool
 }
 
-// StoreLocked returns the live store.
-// Unlike GetExactSnapshotLocked this is not an immutable point-in-time copy.
-// The caller must hold the lock for the duration of use.
-func (w *WatchCacheStorage) StoreLocked() Indexer {
-	return w.store
-}
-
 func (w *WatchCacheStorage) SnapshottingEnabled() bool {
 	return w.snapshots != nil && w.snapshottingEnabled.Load()
 }
@@ -108,61 +101,13 @@ func (w *WatchCacheStorage) LatestSnapshotLocked() (Snapshot, bool) {
 	return nil, false
 }
 
-func (w *WatchCacheStorage) GetLatestSnapshotOrBuildLocked(key, continueKey string) (Snapshot, error) {
+func (w *WatchCacheStorage) LatestSnapshotOrCloneLocked() Snapshot {
 	if snap, ok := w.LatestSnapshotLocked(); ok {
 		// Snapshots are added in order as we update store, so the
 		// latest snapshot match latest store state and latest revision.
-		return snap, nil
+		return snap
 	}
-	// TODO: Consider using Indexer Clone() after benchmarking.
-	return orderedSnapshotResponseFromIndexer(w.store, key, continueKey)
-}
-
-func orderedSnapshotResponseFromIndexer(indexer Indexer, key, continueKey string) (Snapshot, error) {
-	items, err := indexer.OrderedListPrefix(key, continueKey)
-	if err != nil {
-		return nil, err
-	}
-	return orderedListSnapshot{Items: items}, nil
-}
-
-type orderedListSnapshot struct {
-	Items []interface{}
-}
-
-var _ Snapshot = (*orderedListSnapshot)(nil)
-
-func (o orderedListSnapshot) GetByKey(key string) (interface{}, bool, error) {
-	for _, item := range o.Items {
-		elem, ok := item.(*Element)
-		if ok && elem.Key == key {
-			return item, true, nil
-		}
-	}
-	return nil, false, nil
-}
-
-func (o orderedListSnapshot) OrderedListPrefix(prefix, continueKey string) ([]interface{}, error) {
-	return o.Items, nil
-}
-
-func (o orderedListSnapshot) RangePrefix(prefix, continueKey string) iter.Seq2[*Element, error] {
-	return func(yield func(*Element, error) bool) {
-		for _, item := range o.Items {
-			elem, ok := item.(*Element)
-			if !ok {
-				yield(nil, fmt.Errorf("non *Element returned from storage: %v", item))
-				return
-			}
-			if !yield(elem, nil) {
-				return
-			}
-		}
-	}
-}
-
-func (o orderedListSnapshot) Count(prefix, continueKey string) int {
-	return len(o.Items)
+	return w.store.Clone()
 }
 
 func SingleElementSnapshot(elem *Element) Snapshot {
