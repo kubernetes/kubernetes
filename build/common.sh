@@ -50,6 +50,15 @@ readonly KUBE_CROSS_VERSION
 KUBE_CROSS_CONTAINER_ROOT="/go/src/k8s.io/kubernetes"
 readonly KUBE_CROSS_CONTAINER_ROOT
 
+# Controls how image pulls are retried. Registries can return transient errors
+# (e.g. HTTP 5xx) that last only a few seconds, which would otherwise fail an
+# entire build. With the defaults below a pull is attempted 6 times, sleeping
+# 1, 2, 4, 8 and 16 seconds in between, for roughly 31 seconds of total backoff.
+KUBE_IMAGE_PULL_RETRIES="${KUBE_IMAGE_PULL_RETRIES:-6}"
+readonly KUBE_IMAGE_PULL_RETRIES
+KUBE_IMAGE_PULL_RETRY_INITIAL_DELAY="${KUBE_IMAGE_PULL_RETRY_INITIAL_DELAY:-1}"
+readonly KUBE_IMAGE_PULL_RETRY_INITIAL_DELAY
+
 # Here we map the output directories across both the local and remote _output
 # directories:
 #
@@ -353,6 +362,51 @@ function kube::build::clean() {
   fi
 }
 
+# Pull an image, retrying with exponential backoff if the pull fails.
+#
+# `docker run` pulls missing images implicitly, but a single transient registry
+# failure then aborts the entire build. Pulling explicitly lets us retry just
+# the pull instead.
+#
+# Arguments:
+#  $1 - image reference, e.g. registry.k8s.io/build-image/kube-cross:v1.2.3
+function kube::build::pull_image_with_retry() {
+  local -r image="$1"
+
+  local -a pull_cmd=("${DOCKER[@]}" pull "${image}")
+
+  local delay="${KUBE_IMAGE_PULL_RETRY_INITIAL_DELAY}"
+  local attempt
+  for (( attempt=1; attempt<=KUBE_IMAGE_PULL_RETRIES; attempt++ )); do
+    if "${pull_cmd[@]}"; then
+      return 0
+    fi
+    if (( attempt == KUBE_IMAGE_PULL_RETRIES )); then
+      break
+    fi
+    kube::log::status "Failed to pull ${image} (attempt ${attempt}/${KUBE_IMAGE_PULL_RETRIES}), retrying in ${delay}s ..."
+    sleep "${delay}"
+    delay=$(( delay * 2 ))
+  done
+
+  kube::log::error "Failed to pull ${image} after ${KUBE_IMAGE_PULL_RETRIES} attempts"
+  return 1
+}
+
+# Ensure an image is present locally, pulling it with retries if it is not.
+#
+# Arguments:
+#  $1 - image reference, e.g. registry.k8s.io/build-image/kube-cross:v1.2.3
+function kube::build::ensure_image() {
+  local -r image="$1"
+
+  if "${DOCKER[@]}" image inspect "${image}" &>/dev/null; then
+    return 0
+  fi
+
+  kube::build::pull_image_with_retry "${image}"
+}
+
 # Run a command in the kube-build image.  This assumes that the image has
 # already been built.
 function kube::build::run_build_command() {
@@ -460,6 +514,10 @@ function kube::build::run_build_command_ex() {
   elif [[ "${detach}" == false ]]; then
     docker_run_opts+=("--attach=stdout" "--attach=stderr")
   fi
+
+  # `docker run` would pull this implicitly, but that pull is not retried and a
+  # transient registry error would fail the build.
+  kube::build::ensure_image "${KUBE_CROSS_IMAGE}:${KUBE_CROSS_VERSION}" || return 1
 
   local -ra docker_cmd=(
     "${DOCKER[@]}" run "${docker_run_opts[@]}" "${KUBE_CROSS_IMAGE}:${KUBE_CROSS_VERSION}")
