@@ -445,11 +445,15 @@ var (
 	VolumeAttributesClass = framework.WithFeature(framework.ValidFeatures.Add("VolumeAttributesClass"))
 
 	// Owner: sig-storage
-	// Volume group snapshot tests
-	VolumeGroupSnapshotDataSource = framework.WithFeature(framework.ValidFeatures.Add("volumegroupsnapshot"))
+	// Volume group snapshot tests. Tests with this feature require a cluster
+	// with volume group snapshot support, i.e. with the external
+	// snapshot-controller deployed and the VolumeGroupSnapshot CRDs installed.
+	VolumeGroupSnapshotDataSource = framework.WithFeature(framework.ValidFeatures.Add("VolumeGroupSnapshotDataSource"))
 
 	// Owner: sig-storage
-	// TODO: document the feature (when to use this feature for a test)
+	// Volume snapshot tests. Tests with this feature require a cluster
+	// with volume snapshot support, i.e. with the external snapshot-controller
+	// deployed and the VolumeSnapshot CRDs installed.
 	VolumeSnapshotDataSource = framework.WithFeature(framework.ValidFeatures.Add("VolumeSnapshotDataSource"))
 
 	// Owner: sig-storage
