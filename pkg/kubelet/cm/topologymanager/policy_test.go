@@ -1712,7 +1712,8 @@ func TestMergePermutationCarriesScore(t *testing.T) {
 
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
-			merged := mergePermutation(defaultAffinity, tc.permutation)
+			logger, _ := ktesting.NewTestContext(t)
+			merged := mergePermutation(logger, defaultAffinity, tc.permutation)
 			if merged.Score != tc.expectedScore {
 				t.Errorf("expected merged Score %d, got %d", tc.expectedScore, merged.Score)
 			}

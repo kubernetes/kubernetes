@@ -56,7 +56,7 @@ func aggregateHintScores(permutation []TopologyHint) (int64, bool) {
 // Merge a TopologyHints permutation to a single hint by performing a bitwise-AND
 // of their affinity masks. The hint shall be preferred if all hits in the permutation
 // are preferred.
-func mergePermutation(defaultAffinity bitmask.BitMask, permutation []TopologyHint) TopologyHint {
+func mergePermutation(logger klog.Logger, defaultAffinity bitmask.BitMask, permutation []TopologyHint) TopologyHint {
 	// Get the NUMANodeAffinity from each hint in the permutation and see if any
 	// of them encode unpreferred allocations.
 	preferred := true
@@ -81,8 +81,7 @@ func mergePermutation(defaultAffinity bitmask.BitMask, permutation []TopologyHin
 
 	score, hasScores := aggregateHintScores(permutation)
 	if hasScores {
-		// TODO: plumb contextual logger through mergePermutation and replace klog
-		klog.V(4).InfoS("Merged hint includes aggregated score", "score", score)
+		logger.V(4).Info("Merged hint includes aggregated score", "score", score)
 	}
 
 	// Build a mergedHint from the merged affinity mask, setting preferred as
@@ -322,14 +321,14 @@ func (m HintMerger) compare(current *TopologyHint, candidate *TopologyHint) *Top
 
 }
 
-func (m HintMerger) Merge() TopologyHint {
+func (m HintMerger) Merge(logger klog.Logger) TopologyHint {
 	defaultAffinity := m.NUMAInfo.DefaultAffinityMask()
 
 	var bestHint *TopologyHint
 	iterateAllProviderTopologyHints(m.Hints, func(permutation []TopologyHint) {
 		// Get the NUMANodeAffinity from each hint in the permutation and see if any
 		// of them encode unpreferred allocations.
-		mergedHint := mergePermutation(defaultAffinity, permutation)
+		mergedHint := mergePermutation(logger, defaultAffinity, permutation)
 
 		// Compare the current bestHint with the candidate mergedHint and
 		// update bestHint if appropriate.
