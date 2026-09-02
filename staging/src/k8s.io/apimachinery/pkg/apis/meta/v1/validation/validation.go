@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 	"unicode"
 
 	"k8s.io/apimachinery/pkg/api/operation"
@@ -430,4 +431,31 @@ func ValidateCustom_Condition_LastTransitionTime(ctx context.Context, op operati
 		return field.ErrorList{field.Required(fldPath, "")}
 	}
 	return nil
+}
+
+// annotationsMaxSize mirrors api/validation.TotalAnnotationsSizeLimitB (256Kb)
+const annotationsMaxSize = 256 * 1024
+
+// ValidateCustom_ObjectMeta_Annotations validates declaratively for Annotations
+// max size (256Kb) and their case-insensitive qualified-name keys
+func ValidateCustom_ObjectMeta_Annotations(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj map[string]string) field.ErrorList {
+	allErrs := field.ErrorList{}
+	
+	// qualified-name check here since Annotations is case-insensitive unlike Labels
+	// And no format exists for this use case
+	for k := range obj {
+		for _, msg := range validation.IsQualifiedName(strings.ToLower(k)) {
+			allErrs = append(allErrs, field.Invalid(fldPath, k, msg).WithOrigin("format=k8s-label-key"))
+		}
+	}
+
+	var totalSize int64
+	for k, v := range obj {
+		totalSize += int64(len(k)) + int64(len(v))
+	}
+	if totalSize > int64(annotationsMaxSize) {
+		allErrs = append(allErrs, field.TooLong(fldPath, "", annotationsMaxSize))
+	}
+
+	return allErrs
 }

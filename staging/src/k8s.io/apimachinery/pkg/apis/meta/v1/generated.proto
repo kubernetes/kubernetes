@@ -891,8 +891,9 @@ message ObjectMeta {
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels
   // +optional
   // +mapType=granular
-  // +validationRule="self.all(k, !format.qualifiedName().validate(k).hasValue())"
-  // +validationRule="self.all(k, !format.labelValue().validate(self[k]).hasValue())"
+  // +k8s:alpha(since: "1.38")=+k8s:optional
+  // +k8s:alpha(since: "1.38")=+k8s:eachKey=+k8s:format=k8s-label-key
+  // +k8s:alpha(since: "1.38")=+k8s:eachVal=+k8s:format=k8s-label-value
   map<string, string> labels = 11;
 
   // Annotations is an unstructured key value map stored with a resource that may be
@@ -900,9 +901,8 @@ message ObjectMeta {
   // queryable and should be preserved when modifying objects.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations
   // +optional
-  // +mapType=granular
-  // +validationRule="self.all(k, !format.qualifiedName().validate(k.lowerAscii()).hasValue())"
-  // +validationRule="self.map(k, size(k) + size(self[k])).sum() <= 262144"
+  // +k8s:alpha(since: "1.38")=+k8s:optional
+  // +k8s:alpha(since: "1.38")=+k8s:customValidation
   map<string, string> annotations = 12;
 
   // List of objects depended by this object. If ALL objects in the list have

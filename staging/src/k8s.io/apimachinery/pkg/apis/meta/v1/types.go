@@ -250,8 +250,9 @@ type ObjectMeta struct {
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels
 	// +optional
 	// +mapType=granular
-	// +validationRule="self.all(k, !format.qualifiedName().validate(k).hasValue())"
-	// +validationRule="self.all(k, !format.labelValue().validate(self[k]).hasValue())"
+	// +k8s:alpha(since: "1.38")=+k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:eachKey=+k8s:format=k8s-label-key
+	// +k8s:alpha(since: "1.38")=+k8s:eachVal=+k8s:format=k8s-label-value
 	Labels map[string]string `json:"labels,omitempty" protobuf:"bytes,11,rep,name=labels"`
 
 	// Annotations is an unstructured key value map stored with a resource that may be
@@ -259,9 +260,8 @@ type ObjectMeta struct {
 	// queryable and should be preserved when modifying objects.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations
 	// +optional
-	// +mapType=granular
-	// +validationRule="self.all(k, !format.qualifiedName().validate(k.lowerAscii()).hasValue())"
-	// +validationRule="self.map(k, size(k) + size(self[k])).sum() <= 262144"
+	// +k8s:alpha(since: "1.38")=+k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:customValidation
 	Annotations map[string]string `json:"annotations,omitempty" protobuf:"bytes,12,rep,name=annotations"`
 
 	// List of objects depended by this object. If ALL objects in the list have
