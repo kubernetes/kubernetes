@@ -80,7 +80,7 @@ type MockDevicesProvider_GetAllocatableDevices_Call struct {
 
 // GetAllocatableDevices is a helper method to define mock.On call
 //   - logger klog.Logger
-func (_e *MockDevicesProvider_Expecter) GetAllocatableDevices(logger interface{}) *MockDevicesProvider_GetAllocatableDevices_Call {
+func (_e *MockDevicesProvider_Expecter) GetAllocatableDevices(logger any) *MockDevicesProvider_GetAllocatableDevices_Call {
 	return &MockDevicesProvider_GetAllocatableDevices_Call{Call: _e.mock.On("GetAllocatableDevices", logger)}
 }
 
@@ -134,7 +134,7 @@ type MockDevicesProvider_GetDevices_Call struct {
 // GetDevices is a helper method to define mock.On call
 //   - podUID string
 //   - containerName string
-func (_e *MockDevicesProvider_Expecter) GetDevices(podUID interface{}, containerName interface{}) *MockDevicesProvider_GetDevices_Call {
+func (_e *MockDevicesProvider_Expecter) GetDevices(podUID any, containerName any) *MockDevicesProvider_GetDevices_Call {
 	return &MockDevicesProvider_GetDevices_Call{Call: _e.mock.On("GetDevices", podUID, containerName)}
 }
 
@@ -179,7 +179,7 @@ type MockDevicesProvider_UpdateAllocatedDevices_Call struct {
 
 // UpdateAllocatedDevices is a helper method to define mock.On call
 //   - logger klog.Logger
-func (_e *MockDevicesProvider_Expecter) UpdateAllocatedDevices(logger interface{}) *MockDevicesProvider_UpdateAllocatedDevices_Call {
+func (_e *MockDevicesProvider_Expecter) UpdateAllocatedDevices(logger any) *MockDevicesProvider_UpdateAllocatedDevices_Call {
 	return &MockDevicesProvider_UpdateAllocatedDevices_Call{Call: _e.mock.On("UpdateAllocatedDevices", logger)}
 }
 
@@ -315,7 +315,7 @@ type MockPodsProvider_GetPodByName_Call struct {
 // GetPodByName is a helper method to define mock.On call
 //   - namespace string
 //   - name string
-func (_e *MockPodsProvider_Expecter) GetPodByName(namespace interface{}, name interface{}) *MockPodsProvider_GetPodByName_Call {
+func (_e *MockPodsProvider_Expecter) GetPodByName(namespace any, name any) *MockPodsProvider_GetPodByName_Call {
 	return &MockPodsProvider_GetPodByName_Call{Call: _e.mock.On("GetPodByName", namespace, name)}
 }
 
@@ -493,7 +493,7 @@ type MockCPUsProvider_GetCPUs_Call struct {
 // GetCPUs is a helper method to define mock.On call
 //   - pod *v10.Pod
 //   - container *v10.Container
-func (_e *MockCPUsProvider_Expecter) GetCPUs(pod interface{}, container interface{}) *MockCPUsProvider_GetCPUs_Call {
+func (_e *MockCPUsProvider_Expecter) GetCPUs(pod any, container any) *MockCPUsProvider_GetCPUs_Call {
 	return &MockCPUsProvider_GetCPUs_Call{Call: _e.mock.On("GetCPUs", pod, container)}
 }
 
@@ -551,7 +551,7 @@ type MockCPUsProvider_GetPodCPUs_Call struct {
 
 // GetPodCPUs is a helper method to define mock.On call
 //   - podUID string
-func (_e *MockCPUsProvider_Expecter) GetPodCPUs(podUID interface{}) *MockCPUsProvider_GetPodCPUs_Call {
+func (_e *MockCPUsProvider_Expecter) GetPodCPUs(podUID any) *MockCPUsProvider_GetPodCPUs_Call {
 	return &MockCPUsProvider_GetPodCPUs_Call{Call: _e.mock.On("GetPodCPUs", podUID)}
 }
 
@@ -631,7 +631,7 @@ type MockMemoryProvider_GetAllocatableMemory_Call struct {
 
 // GetAllocatableMemory is a helper method to define mock.On call
 //   - logger klog.Logger
-func (_e *MockMemoryProvider_Expecter) GetAllocatableMemory(logger interface{}) *MockMemoryProvider_GetAllocatableMemory_Call {
+func (_e *MockMemoryProvider_Expecter) GetAllocatableMemory(logger any) *MockMemoryProvider_GetAllocatableMemory_Call {
 	return &MockMemoryProvider_GetAllocatableMemory_Call{Call: _e.mock.On("GetAllocatableMemory", logger)}
 }
 
@@ -686,7 +686,7 @@ type MockMemoryProvider_GetMemory_Call struct {
 //   - logger klog.Logger
 //   - pod *v10.Pod
 //   - container *v10.Container
-func (_e *MockMemoryProvider_Expecter) GetMemory(logger interface{}, pod interface{}, container interface{}) *MockMemoryProvider_GetMemory_Call {
+func (_e *MockMemoryProvider_Expecter) GetMemory(logger any, pod any, container any) *MockMemoryProvider_GetMemory_Call {
 	return &MockMemoryProvider_GetMemory_Call{Call: _e.mock.On("GetMemory", logger, pod, container)}
 }
 
@@ -750,7 +750,7 @@ type MockMemoryProvider_GetPodMemory_Call struct {
 // GetPodMemory is a helper method to define mock.On call
 //   - logger klog.Logger
 //   - podUID string
-func (_e *MockMemoryProvider_Expecter) GetPodMemory(logger interface{}, podUID interface{}) *MockMemoryProvider_GetPodMemory_Call {
+func (_e *MockMemoryProvider_Expecter) GetPodMemory(logger any, podUID any) *MockMemoryProvider_GetPodMemory_Call {
 	return &MockMemoryProvider_GetPodMemory_Call{Call: _e.mock.On("GetPodMemory", logger, podUID)}
 }
 
@@ -837,7 +837,7 @@ type MockDynamicResourcesProvider_GetDynamicResources_Call struct {
 //   - logger klog.Logger
 //   - pod *v10.Pod
 //   - container *v10.Container
-func (_e *MockDynamicResourcesProvider_Expecter) GetDynamicResources(logger interface{}, pod interface{}, container interface{}) *MockDynamicResourcesProvider_GetDynamicResources_Call {
+func (_e *MockDynamicResourcesProvider_Expecter) GetDynamicResources(logger any, pod any, container any) *MockDynamicResourcesProvider_GetDynamicResources_Call {
 	return &MockDynamicResourcesProvider_GetDynamicResources_Call{Call: _e.mock.On("GetDynamicResources", logger, pod, container)}
 }
 
