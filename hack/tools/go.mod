@@ -6,7 +6,7 @@ godebug default=go1.27
 
 require (
 	golang.org/x/exp v0.0.0-20260212183809-81e46e3db34a
-	golang.org/x/mod v0.39.0
+	golang.org/x/mod v0.40.0
 	k8s.io/publishing-bot v0.5.0
 )
 
