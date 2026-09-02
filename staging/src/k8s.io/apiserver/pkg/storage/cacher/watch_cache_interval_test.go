@@ -530,8 +530,8 @@ func TestCacheIntervalSourceSelection(t *testing.T) {
 }
 
 type countingSnapshot struct {
-	items                  []interface{}
-	orderedListPrefixCalls int
+	items            []interface{}
+	rangePrefixCalls int
 }
 
 func (s *countingSnapshot) GetByKey(string) (interface{}, bool, error) {
@@ -539,14 +539,14 @@ func (s *countingSnapshot) GetByKey(string) (interface{}, bool, error) {
 }
 
 func (s *countingSnapshot) OrderedListPrefix(_, _ string) ([]interface{}, error) {
-	s.orderedListPrefixCalls++
 	return s.items, nil
 }
 
-func (s *countingSnapshot) RangePrefix(_, _ string) iter.Seq2[*store.Element, error] {
+func (s *countingSnapshot) RangePrefix(_, continueKey string) iter.Seq2[*store.Element, error] {
+	s.rangePrefixCalls++
 	return func(yield func(*store.Element, error) bool) {
 		for _, item := range s.items {
-			if !yield(item.(*store.Element), nil) {
+			if elem := item.(*store.Element); elem.Key >= continueKey && !yield(elem, nil) {
 				return
 			}
 		}
@@ -557,8 +557,6 @@ func (s *countingSnapshot) Count(_, _ string) int {
 	return len(s.items)
 }
 
-// TestLazySnapshotCacheIntervalSourceEmpty checks that on an empty snapshot Next() returns
-// no events, and that repeated calls still read the snapshot only once.
 func TestLazySnapshotCacheIntervalSourceEmpty(t *testing.T) {
 	snap := &countingSnapshot{}
 	wci := newCacheIntervalFromLazySnapshot(100, snap)
@@ -572,7 +570,7 @@ func TestLazySnapshotCacheIntervalSourceEmpty(t *testing.T) {
 			t.Errorf("expected nil event from empty snapshot, got %v", *event)
 		}
 	}
-	if snap.orderedListPrefixCalls != 1 {
-		t.Errorf("expected OrderedListPrefix to be called once, got %d", snap.orderedListPrefixCalls)
+	if snap.rangePrefixCalls != 1 {
+		t.Errorf("expected the snapshot to be ranged once, got %d", snap.rangePrefixCalls)
 	}
 }

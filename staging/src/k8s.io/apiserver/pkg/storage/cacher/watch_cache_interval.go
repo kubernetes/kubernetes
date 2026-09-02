@@ -263,36 +263,48 @@ func (s *snapshotCacheIntervalSource) Next() (*watchCacheEvent, error) {
 // traversal that materializes the events is deferred until the first Next()
 // call so that it runs off the watchCache lock.
 type lazySnapshotCacheIntervalSource struct {
-	// snapshot is an immutable point-in-time copy of the store.
-	snapshot store.Snapshot
-	// resourceVersion is assigned to every watchCacheEvent produced by this source.
+	snapshot        store.Snapshot
 	resourceVersion uint64
-	// loaded indicates whether items has been materialized from the snapshot.
-	loaded bool
-	// items holds the result of OrderedListPrefix, populated on the first Next() call
-	items []interface{}
-	// currentIndex tracks the current position within items.
-	currentIndex int
+	// The snapshot is re-ranged from nextKey for each buffer fill rather
+	// than held open as an iterator, because an interval has no Close with
+	// which to stop one.
+	buffer    watchCacheIntervalBuffer
+	nextKey   string
+	exhausted bool
 }
 
 func (s *lazySnapshotCacheIntervalSource) Next() (*watchCacheEvent, error) {
-	if !s.loaded {
-		items, err := s.snapshot.OrderedListPrefix("", "")
-		if err != nil {
-			return nil, err
-		}
-		s.items = items
-		s.loaded = true
+	if event, ok := s.buffer.next(); ok {
+		return event, nil
 	}
-	if s.currentIndex >= len(s.items) {
+	if s.exhausted {
 		return nil, nil
 	}
-	elem, ok := s.items[s.currentIndex].(*store.Element)
-	if !ok {
-		return nil, fmt.Errorf("not a storeElement: %v", s.items[s.currentIndex])
+	if err := s.fillBuffer(); err != nil {
+		return nil, err
 	}
-	s.currentIndex++
-	return storeElementToWatchCacheEvent(elem, s.resourceVersion), nil
+	event, _ := s.buffer.next()
+	return event, nil
+}
+
+func (s *lazySnapshotCacheIntervalSource) fillBuffer() error {
+	if s.buffer.buffer == nil {
+		s.buffer.buffer = make([]*watchCacheEvent, bufferSize)
+	}
+	s.buffer.startIndex, s.buffer.endIndex = 0, 0
+	for elem, err := range s.snapshot.RangePrefix("", s.nextKey) {
+		if err != nil {
+			return err
+		}
+		s.buffer.buffer[s.buffer.endIndex] = storeElementToWatchCacheEvent(elem, s.resourceVersion)
+		s.buffer.endIndex++
+		s.nextKey = elem.Key + "\x00"
+		if s.buffer.isFull() {
+			return nil
+		}
+	}
+	s.exhausted = true
+	return nil
 }
 
 const bufferSize = 100
