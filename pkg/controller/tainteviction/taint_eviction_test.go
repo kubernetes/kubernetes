@@ -342,7 +342,7 @@ func TestUpdatePod(t *testing.T) {
 
 			_ = podIndexer.Add(item.prevPod)
 			controller.PodUpdated(nil, item.prevPod)
- 
+
 			if item.awaitForScheduledEviction {
 				nsName := types.NamespacedName{Namespace: item.prevPod.Namespace, Name: item.prevPod.Name}
 				err := wait.PollImmediate(time.Millisecond*10, time.Second, func() (bool, error) {
@@ -353,7 +353,7 @@ func TestUpdatePod(t *testing.T) {
 					t.Fatalf("Failed to await for scheduled eviction: %q", err)
 				}
 			}
- 
+
 			_ = podIndexer.Update(item.newPod)
 			controller.PodUpdated(item.prevPod, item.newPod)
 
