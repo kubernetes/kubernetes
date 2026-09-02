@@ -19,7 +19,9 @@ limitations under the License.
 package cm
 
 import (
+	"os"
 	"path"
+	"path/filepath"
 	"reflect"
 	"testing"
 )
@@ -206,4 +208,87 @@ func TestCpuWeightToCPUShares(t *testing.T) {
 				testCase.cpuWeight, testCase.expectedCpuShares, actual)
 		}
 	}
+}
+
+func TestCgroupNsdelegateEnabled(t *testing.T) {
+	tests := []struct {
+		name      string
+		mountinfo string
+		want      bool
+		wantErr   bool
+	}{
+		{
+			name:      "nsdelegate present",
+			mountinfo: "35 25 0:30 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime shared:9 - cgroup2 cgroup2 rw,nsdelegate,memory_recursiveprot\n",
+			want:      true,
+		},
+		{
+			name:      "nsdelegate absent",
+			mountinfo: "35 25 0:30 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime shared:9 - cgroup2 cgroup2 rw,memory_recursiveprot\n",
+			want:      false,
+		},
+		{
+			name:      "nsdelegate only in the per-mount options",
+			mountinfo: "35 25 0:30 / /sys/fs/cgroup rw,nsdelegate shared:9 - cgroup2 cgroup2 rw\n",
+			want:      false,
+		},
+		{
+			name: "nsdelegate on a cgroup v1 mount only",
+			mountinfo: "35 25 0:30 / /sys/fs/cgroup ro,nosuid,nodev,noexec shared:9 - tmpfs tmpfs ro,mode=755\n" +
+				"36 35 0:31 / /sys/fs/cgroup/memory rw,relatime shared:10 - cgroup cgroup rw,nsdelegate,memory\n",
+			want: false,
+		},
+		{
+			name: "nsdelegate on another cgroup2 mount only",
+			mountinfo: "34 25 0:29 / /run rw,nosuid,nodev shared:8 - tmpfs tmpfs rw,size=1024k\n" +
+				"35 25 0:30 / /sys/fs/cgroup rw,relatime shared:9 - cgroup2 cgroup2 rw\n" +
+				"36 25 0:30 / /host/cgroup rw,relatime shared:9 - cgroup2 cgroup2 rw,nsdelegate\n",
+			want: false,
+		},
+		{
+			name: "later mount at the same path has nsdelegate",
+			mountinfo: "35 25 0:30 / /sys/fs/cgroup rw,relatime shared:9 - cgroup2 cgroup2 rw\n" +
+				"36 35 0:31 / /sys/fs/cgroup rw,relatime shared:10 - cgroup2 cgroup2 rw,nsdelegate\n",
+			want: true,
+		},
+		{
+			name: "later mount at the same path lacks nsdelegate",
+			mountinfo: "35 25 0:30 / /sys/fs/cgroup rw,relatime shared:9 - cgroup2 cgroup2 rw,nsdelegate\n" +
+				"36 35 0:31 / /sys/fs/cgroup rw,relatime shared:10 - cgroup2 cgroup2 rw\n",
+			want: false,
+		},
+		{
+			name:      "no mount at /sys/fs/cgroup",
+			mountinfo: "34 25 0:29 / /run rw,nosuid,nodev shared:8 - tmpfs tmpfs rw,size=1024k\n",
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mountInfoPath := filepath.Join(t.TempDir(), "mountinfo")
+			if err := os.WriteFile(mountInfoPath, []byte(tt.mountinfo), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			got, err := cgroupNsdelegateEnabled(mountInfoPath)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("cgroupNsdelegateEnabled should fail for mountinfo %q", tt.mountinfo)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("cgroupNsdelegateEnabled should read the fixture, got error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("nsdelegate should be reported as %v for mountinfo %q, got %v", tt.want, tt.mountinfo, got)
+			}
+		})
+	}
+
+	t.Run("unreadable mountinfo", func(t *testing.T) {
+		if _, err := cgroupNsdelegateEnabled(filepath.Join(t.TempDir(), "missing")); err == nil {
+			t.Error("cgroupNsdelegateEnabled should fail when mountinfo cannot be read")
+		}
+	})
 }
