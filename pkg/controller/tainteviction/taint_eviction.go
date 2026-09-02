@@ -452,7 +452,7 @@ func (tc *Controller) Run(ctx context.Context) {
 			tc.worker(ctx, i)
 		})
 	}
-	for i := 0; i < UpdateWorkerSize; i++ {
+	for range UpdateWorkerSize {
 		wg.Go(func() {
 			tc.podEvictionWorker(ctx)
 		})
