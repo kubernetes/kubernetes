@@ -1351,6 +1351,25 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 
 	var localhostNodePorts []localnodeportproxy.NodePortSpec
 
+	// Index the current shared-endpoints map elements by service, so that
+	// ensureBucketEndpoints can keep endpoints in their existing slots.
+	prevBucketSlots := make(map[string]map[int]string)
+	for key, value := range proxier.endpoints.elements {
+		parts := splitNFTSlice(key)
+		if len(parts) != 4 {
+			continue
+		}
+		slot, err := strconv.Atoi(parts[3])
+		if err != nil {
+			continue
+		}
+		svcKey := joinNFTSlice(parts[:3])
+		if prevBucketSlots[svcKey] == nil {
+			prevBucketSlots[svcKey] = make(map[int]string)
+		}
+		prevBucketSlots[svcKey][slot] = value
+	}
+
 	// Build rules for each service-port.
 	for svcName, svc := range proxier.svcPortMap {
 		svcInfo, ok := svc.(*servicePortInfo)
@@ -1528,7 +1547,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 			if useBucket {
 				// Populate the global endpoints map with this service's
 				// endpoints; the bucket chain selects one by slot at runtime.
-				proxier.ensureBucketEndpoints(tx, svcInfo, protocol, clusterEndpoints)
+				proxier.ensureBucketEndpoints(tx, svcInfo, protocol, clusterEndpoints, prevBucketSlots)
 			}
 		} else {
 			// No endpoints.
@@ -2071,13 +2090,69 @@ func (proxier *Proxier) addBucketChain(tx *knftables.Transaction, numEndpoints i
 // ensureBucketEndpoints adds this service's endpoints to the shared
 // endpoints map, keyed by "clusterIP . protocol . port . slot". The bucket
 // chain for len(endpoints) generates the slot at runtime to select one of them.
-func (proxier *Proxier) ensureBucketEndpoints(tx *knftables.Transaction, svcInfo *servicePortInfo, protocol string, endpoints []proxy.Endpoint) {
+// Surviving endpoints keep the slot recorded in prevBucketSlots; removed
+// endpoints' slots are backfilled from the highest slots down, so adding or
+// removing one endpoint churns at most one map element instead of reshuffling
+// every endpoint after it.
+func (proxier *Proxier) ensureBucketEndpoints(tx *knftables.Transaction, svcInfo *servicePortInfo, protocol string, endpoints []proxy.Endpoint, prevBucketSlots map[string]map[int]string) {
 	clusterIP := svcInfo.ClusterIP().String()
 	port := strconv.Itoa(svcInfo.Port())
-	for i, ep := range endpoints {
+	prevSlots := prevBucketSlots[joinNFTSlice([]string{clusterIP, protocol, port})]
+
+	values := make([]string, 0, len(endpoints))
+	for _, ep := range endpoints {
 		epInfo, ok := ep.(*endpointInfo)
 		if !ok {
 			proxier.logger.Error(nil, "Failed to cast endpointInfo", "endpointInfo", ep)
+			continue
+		}
+		values = append(values, joinNFTSlice([]string{epInfo.IP(), strconv.Itoa(epInfo.Port())}))
+	}
+	n := len(values)
+	unplaced := sets.New(values...)
+
+	// Keep surviving endpoints in their current slots.
+	assigned := make([]string, n)
+	for slot, v := range prevSlots {
+		if slot < n && unplaced.Has(v) {
+			assigned[slot] = v
+			unplaced.Delete(v)
+		}
+	}
+
+	// pending lists the endpoints that still need a slot: first survivors
+	// displaced from now-out-of-range slots (highest slot first), then new
+	// endpoints in the order they were given.
+	var pending []string
+	var outOfRange []int
+	for slot := range prevSlots {
+		if slot >= n {
+			outOfRange = append(outOfRange, slot)
+		}
+	}
+	slices.Sort(outOfRange)
+	for i := len(outOfRange) - 1; i >= 0; i-- {
+		if v := prevSlots[outOfRange[i]]; unplaced.Has(v) {
+			pending = append(pending, v)
+			unplaced.Delete(v)
+		}
+	}
+	for _, v := range values {
+		if unplaced.Has(v) {
+			pending = append(pending, v)
+			unplaced.Delete(v)
+		}
+	}
+
+	// Backfill the holes left by removed endpoints.
+	for slot := 0; slot < n && len(pending) > 0; slot++ {
+		if assigned[slot] == "" {
+			assigned[slot], pending = pending[0], pending[1:]
+		}
+	}
+
+	for slot, v := range assigned {
+		if v == "" {
 			continue
 		}
 		proxier.endpoints.ensureElem(tx, &knftables.Element{
@@ -2086,12 +2161,9 @@ func (proxier *Proxier) ensureBucketEndpoints(tx *knftables.Transaction, svcInfo
 				clusterIP,
 				protocol,
 				port,
-				strconv.Itoa(i),
+				strconv.Itoa(slot),
 			},
-			Value: []string{
-				epInfo.IP(),
-				strconv.Itoa(epInfo.Port()),
-			},
+			Value: splitNFTSlice(v),
 		})
 	}
 }

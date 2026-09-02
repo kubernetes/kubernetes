@@ -4454,6 +4454,121 @@ func TestPrepopulatedBucketChains(t *testing.T) {
 	)
 }
 
+// Test that bucket endpoints keep their slots in the shared endpoints map when
+// other endpoints are added or removed.
+func TestBucketEndpointSlotStability(t *testing.T) {
+	nft, fp := NewFakeProxier(v1.IPv4Protocol)
+	fp.prepopulatedBucketChains = 3
+
+	makeServiceMap(fp,
+		makeTestService("ns1", "svc1", func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeClusterIP
+			svc.Spec.ClusterIP = "172.30.0.41"
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     "p80",
+				Port:     80,
+				Protocol: v1.ProtocolTCP,
+			}}
+		}),
+	)
+	var eps1 *discovery.EndpointSlice
+	populateEndpointSlices(fp,
+		makeTestEndpointSlice("ns1", "svc1", 1, func(eps *discovery.EndpointSlice) {
+			eps1 = eps
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{"10.0.1.1"},
+				NodeName:  ptr.To(testNodeName),
+			}, {
+				Addresses: []string{"10.0.1.3"},
+				NodeName:  ptr.To(testNodeName),
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To("p80"),
+				Port:     ptr.To[int32](80),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+
+	dispatchChains := dedent.Dedent(`
+		add chain ip kube-proxy dispatch-1
+		add rule ip kube-proxy dispatch-1 ct mark set numgen random mod 1 dnat ip addr . port to ip daddr . meta l4proto . th dport . ct mark map @endpoints
+		add chain ip kube-proxy dispatch-2
+		add rule ip kube-proxy dispatch-2 ct mark set numgen random mod 2 dnat ip addr . port to ip daddr . meta l4proto . th dport . ct mark map @endpoints
+		add chain ip kube-proxy dispatch-3
+		add rule ip kube-proxy dispatch-3 ct mark set numgen random mod 3 dnat ip addr . port to ip daddr . meta l4proto . th dport . ct mark map @endpoints
+		`)
+
+	expected := baseRules + dedent.Dedent(`
+		add element ip kube-proxy cluster-ips { 172.30.0.41 }
+		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto dispatch-2 }
+		add element ip kube-proxy endpoints { 172.30.0.41 . tcp . 80 . 0 : 10.0.1.1 . 80 }
+		add element ip kube-proxy endpoints { 172.30.0.41 . tcp . 80 . 1 : 10.0.1.3 . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.1.1 . 10.0.1.1 . tcp . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.1.3 . 10.0.1.3 . tcp . 80 }
+		`) + dispatchChains
+	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
+
+	// Add an endpoint that sorts into the middle of the endpoint list. The
+	// existing endpoints keep their slots; the new one takes the next free slot.
+	eps1update := eps1.DeepCopy()
+	eps1update.Endpoints = []discovery.Endpoint{{
+		Addresses: []string{"10.0.1.1"},
+		NodeName:  ptr.To(testNodeName),
+	}, {
+		Addresses: []string{"10.0.1.2"},
+		NodeName:  ptr.To(testNodeName),
+	}, {
+		Addresses: []string{"10.0.1.3"},
+		NodeName:  ptr.To(testNodeName),
+	}}
+	fp.OnEndpointSliceUpdate(eps1, eps1update)
+	fp.syncProxyRules()
+
+	expected = baseRules + dedent.Dedent(`
+		add element ip kube-proxy cluster-ips { 172.30.0.41 }
+		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto dispatch-3 }
+		add element ip kube-proxy endpoints { 172.30.0.41 . tcp . 80 . 0 : 10.0.1.1 . 80 }
+		add element ip kube-proxy endpoints { 172.30.0.41 . tcp . 80 . 1 : 10.0.1.3 . 80 }
+		add element ip kube-proxy endpoints { 172.30.0.41 . tcp . 80 . 2 : 10.0.1.2 . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.1.1 . 10.0.1.1 . tcp . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.1.2 . 10.0.1.2 . tcp . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.1.3 . 10.0.1.3 . tcp . 80 }
+		`) + dispatchChains
+	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
+	assertNumOperations(t, nft,
+		2, // re-point svc1's service-ips element from dispatch-2 to dispatch-3 (delete+add)
+		1, // add 1 endpoints map element for the new endpoint
+		1, // add 1 hairpin-connections element for the new endpoint
+	)
+
+	// Remove the endpoint in slot 0. The endpoint in the highest slot backfills
+	// the hole; the other endpoint stays put.
+	eps1update2 := eps1update.DeepCopy()
+	eps1update2.Endpoints = eps1update2.Endpoints[1:]
+	fp.OnEndpointSliceUpdate(eps1update, eps1update2)
+	fp.syncProxyRules()
+
+	expected = baseRules + dedent.Dedent(`
+		add element ip kube-proxy cluster-ips { 172.30.0.41 }
+		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto dispatch-2 }
+		add element ip kube-proxy endpoints { 172.30.0.41 . tcp . 80 . 0 : 10.0.1.2 . 80 }
+		add element ip kube-proxy endpoints { 172.30.0.41 . tcp . 80 . 1 : 10.0.1.3 . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.1.2 . 10.0.1.2 . tcp . 80 }
+		add element ip kube-proxy hairpin-connections { 10.0.1.3 . 10.0.1.3 . tcp . 80 }
+		`) + dispatchChains
+	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
+	assertNumOperations(t, nft,
+		2, // re-point svc1's service-ips element from dispatch-3 to dispatch-2 (delete+add)
+		2, // backfill slot 0 with the endpoint from slot 2 (delete+add)
+		1, // remove the now-empty slot 2 endpoints map element
+		1, // remove 1 hairpin-connections element for the deleted endpoint
+	)
+}
+
 // Test calling syncProxyRules() multiple times with various changes
 func TestSyncProxyRulesRepeated(t *testing.T) {
 	nft, fp := NewFakeProxier(v1.IPv4Protocol)
