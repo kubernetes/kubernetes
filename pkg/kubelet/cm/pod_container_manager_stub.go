@@ -35,6 +35,10 @@ func (m *podContainerManagerStub) EnsureExists(_ klog.Logger, _ *v1.Pod) error {
 	return nil
 }
 
+func (m *podContainerManagerStub) EnsureWritableCgroupLimits(_ *v1.Pod) error {
+	return nil
+}
+
 func (m *podContainerManagerStub) GetPodContainerName(_ *v1.Pod) (CgroupName, string) {
 	return nil, ""
 }

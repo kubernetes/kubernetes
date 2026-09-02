@@ -105,6 +105,11 @@ func (c *cgroupV1impl) MemoryUsage(name CgroupName) (int64, error) {
 	return int64(val), err
 }
 
+// EnsureUnified fails because cgroup v1 does not have a unified hierarchy.
+func (c *cgroupV1impl) EnsureUnified(name CgroupName, _ map[string]string) error {
+	return fmt.Errorf("cgroup v2 interface files cannot be set on cgroup v1 cgroup %v", name)
+}
+
 // Get the resource config values applied to the cgroup for specified resource type
 func (c *cgroupV1impl) GetCgroupConfig(name CgroupName, resource v1.ResourceName) (*ResourceConfig, error) {
 	cgroupPaths := c.buildCgroupPaths(name)

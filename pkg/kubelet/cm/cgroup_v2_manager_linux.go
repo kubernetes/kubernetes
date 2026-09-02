@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 
+	libcontainercgroups "github.com/opencontainers/cgroups"
 	"github.com/opencontainers/cgroups/fscommon"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -135,6 +136,31 @@ func (c *cgroupV2impl) getCgroupCPUConfig(cgroupPath string) (*ResourceConfig, e
 
 func (c *cgroupV2impl) getCgroupMemoryConfig(cgroupPath string) (*ResourceConfig, error) {
 	return readCgroupMemoryConfig(cgroupPath, cgroupv2MemLimitFile)
+}
+
+// EnsureUnified sets the cgroup v2 interface files in values on the cgroup.
+func (c *cgroupV2impl) EnsureUnified(name CgroupName, values map[string]string) error {
+	return writeChangedCgroupFiles(c.buildCgroupUnifiedPath(name), values)
+}
+
+// writeChangedCgroupFiles writes each entry of values to its file in dir.
+// Files whose content already matches are skipped in order to avoid the
+// kernel's single global lock, which guards writes but not reads of cgroup
+// core files such as cgroup.max.descendants.
+func writeChangedCgroupFiles(dir string, values map[string]string) error {
+	for file, value := range values {
+		current, err := fscommon.GetCgroupParamString(dir, file)
+		if err != nil {
+			return fmt.Errorf("failed to read %s for cgroup %v: %w", file, dir, err)
+		}
+		if current == value {
+			continue
+		}
+		if err := libcontainercgroups.WriteFile(dir, file, value); err != nil {
+			return fmt.Errorf("failed to write %s for cgroup %v: %w", file, dir, err)
+		}
+	}
+	return nil
 }
 
 // getSupportedUnifiedControllers returns a set of supported controllers when running on cgroup v2
