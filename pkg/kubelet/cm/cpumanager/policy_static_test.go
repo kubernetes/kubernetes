@@ -3163,6 +3163,139 @@ func TestStaticPolicyLifecycleGetTopologyHints(t *testing.T) {
 	}
 }
 
+func TestGenerateCPUTopologyHintsScore(t *testing.T) {
+	// topoDualSocketNoHT: 8 CPUs, 2 NUMA nodes, 4 CPUs each
+	// NUMA 0: CPUs {0,1,2,3}, NUMA 1: CPUs {4,5,6,7}
+
+	mustMask := func(bits ...int) bitmask.BitMask {
+		mask, _ := bitmask.NewBitMask(bits...)
+		return mask
+	}
+
+	findHint := func(hints []topologymanager.TopologyHint, mask bitmask.BitMask) *topologymanager.TopologyHint {
+		for i := range hints {
+			if hints[i].NUMANodeAffinity.IsEqual(mask) {
+				return &hints[i]
+			}
+		}
+		return nil
+	}
+
+	testCases := []struct {
+		description   string
+		topo          *topology.CPUTopology
+		reservedCPUs  cpuset.CPUSet
+		availableCPUs cpuset.CPUSet
+		reusableCPUs  cpuset.CPUSet
+		request       int
+		expectedHints map[string]int64
+	}{
+		{
+			description:   "nothing assigned, symmetric NUMA, all scores are 1",
+			topo:          topoDualSocketNoHT,
+			reservedCPUs:  cpuset.New(),
+			availableCPUs: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			reusableCPUs:  cpuset.New(),
+			request:       1,
+			expectedHints: map[string]int64{
+				"0":   1,
+				"1":   1,
+				"0-1": 1,
+			},
+		},
+		{
+			description:   "2 of 4 assigned on NUMA 0, score reflects utilization",
+			topo:          topoDualSocketNoHT,
+			reservedCPUs:  cpuset.New(),
+			availableCPUs: cpuset.New(2, 3, 4, 5, 6, 7),
+			reusableCPUs:  cpuset.New(),
+			request:       1,
+			// NUMA 0: 4 allocatable, 2 available, 2 assigned → 2*100/4 = 50
+			// NUMA 1: 4 allocatable, 4 available, 0 assigned → max(1, 0) = 1
+			// NUMA {0,1}: 8 allocatable, 6 available, 2 assigned → 2*100/8 = 25
+			expectedHints: map[string]int64{
+				"0":   50,
+				"1":   1,
+				"0-1": 25,
+			},
+		},
+		{
+			description:   "asymmetric reserved CPUs, partial assignment",
+			topo:          topoDualSocketNoHT,
+			reservedCPUs:  cpuset.New(0, 1),
+			availableCPUs: cpuset.New(3, 4, 5, 6, 7),
+			reusableCPUs:  cpuset.New(),
+			request:       1,
+			// NUMA 0: allocatable={2,3}=2, available_on_0={3}=1, assigned=1 → 1*100/2 = 50
+			// NUMA 1: allocatable={4,5,6,7}=4, available_on_1={4,5,6,7}=4, assigned=0 → max(1,0)=1
+			// NUMA {0,1}: allocatable=6, available=5, assigned=1 → 1*100/6 = 16
+			expectedHints: map[string]int64{
+				"0":   50,
+				"1":   1,
+				"0-1": 16,
+			},
+		},
+		{
+			description:   "full utilization via reusable CPUs, score 100",
+			topo:          topoSingleSocketHT,
+			reservedCPUs:  cpuset.New(),
+			availableCPUs: cpuset.New(),
+			reusableCPUs:  cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			request:       1,
+			// NUMA 0: 8 allocatable, 0 available, 8 assigned → 8*100/8 = 100
+			expectedHints: map[string]int64{
+				"0": 100,
+			},
+		},
+		{
+			description:   "3 of 4 assigned on each NUMA, high utilization",
+			topo:          topoDualSocketNoHT,
+			reservedCPUs:  cpuset.New(),
+			availableCPUs: cpuset.New(3, 7),
+			reusableCPUs:  cpuset.New(),
+			request:       1,
+			// NUMA 0: 4 allocatable, 1 available, 3 assigned → 3*100/4 = 75
+			// NUMA 1: 4 allocatable, 1 available, 3 assigned → 3*100/4 = 75
+			// NUMA {0,1}: 8 allocatable, 2 available, 6 assigned → 6*100/8 = 75
+			expectedHints: map[string]int64{
+				"0":   75,
+				"1":   75,
+				"0-1": 75,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			p := staticPolicy{
+				topology:     tc.topo,
+				reservedCPUs: tc.reservedCPUs,
+			}
+			hints := p.generateCPUTopologyHints(tc.availableCPUs, tc.reusableCPUs, tc.request)
+
+			for maskStr, expectedScore := range tc.expectedHints {
+				var mask bitmask.BitMask
+				switch maskStr {
+				case "0":
+					mask = mustMask(0)
+				case "1":
+					mask = mustMask(1)
+				case "0-1":
+					mask = mustMask(0, 1)
+				}
+				hint := findHint(hints, mask)
+				if hint == nil {
+					t.Errorf("expected hint for NUMA %s but not found", maskStr)
+					continue
+				}
+				if hint.Score != expectedScore {
+					t.Errorf("NUMA %s: expected Score %d, got %d", maskStr, expectedScore, hint.Score)
+				}
+			}
+		})
+	}
+}
+
 func TestStaticPolicyLifecycleGetPodTopologyHints(t *testing.T) {
 	testCases := []struct {
 		description string
