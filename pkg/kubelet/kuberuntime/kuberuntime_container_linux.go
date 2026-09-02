@@ -385,7 +385,7 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 		cpuQuota := cm.MilliCPUToQuota(cpuLimit.MilliValue(), cpuPeriod)
 		resources.CpuQuota = cpuQuota
 		// If pod has exclusive cpu the sandbox will not have cfs quota enforced
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DisableCPUQuotaWithExclusiveCPUs) && hasExclusiveCPUs {
+		if hasExclusiveCPUs {
 			resources.CpuQuota = int64(-1)
 		}
 		resources.CpuPeriod = cpuPeriod

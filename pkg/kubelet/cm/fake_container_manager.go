@@ -302,10 +302,10 @@ func (cm *FakeContainerManager) Updates() <-chan resourceupdates.Update {
 	return nil
 }
 
-func (cm *FakeContainerManager) PodHasExclusiveCPUs(logger klog.Logger, _ *v1.Pod) bool {
+func (cm *FakeContainerManager) PodHasExclusiveCPUs(_ klog.Logger, _ *v1.Pod) bool {
 	return cm.ExclusiveCPUs
 }
 
-func (cm *FakeContainerManager) ContainerHasExclusiveCPUs(logger klog.Logger, _ *v1.Pod, _ *v1.Container) bool {
+func (cm *FakeContainerManager) ContainerHasExclusiveCPUs(_ klog.Logger, _ *v1.Pod, _ *v1.Container) bool {
 	return cm.ExclusiveCPUs
 }

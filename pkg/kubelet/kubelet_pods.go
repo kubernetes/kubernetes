@@ -2465,23 +2465,6 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 		// For non-running containers this will be the reported values.
 		// For non-resizable resources, these values will also be used.
 		resources := allocatedContainer.Resources.DeepCopy()
-		if resources.Requests != nil {
-			if cStatus.Resources != nil && cStatus.Resources.CPURequest != nil && !cStatus.Resources.CPURequest.IsZero() {
-				// If both the allocated & actual resources are at or below MinShares, preserve the
-				// allocated value in the API to avoid confusion and simplify comparisons.
-				if cStatus.Resources.CPURequest.MilliValue() > cm.MinShares ||
-					resources.Requests.Cpu().MilliValue() > cm.MinShares {
-					resources.Requests[v1.ResourceCPU] = cStatus.Resources.CPURequest.DeepCopy()
-				}
-			} else {
-				preserveOldResourcesValue(v1.ResourceCPU, oldStatus.Resources.Requests, resources.Requests)
-			}
-			if cStatus.Resources != nil && cStatus.Resources.MemoryRequest != nil {
-				resources.Requests[v1.ResourceMemory] = cStatus.Resources.MemoryRequest.DeepCopy()
-			} else {
-				preserveOldResourcesValue(v1.ResourceMemory, oldStatus.Resources.Requests, resources.Requests)
-			}
-		}
 		if resources.Limits != nil {
 			if cStatus.Resources != nil && cStatus.Resources.CPULimit != nil && !cStatus.Resources.CPULimit.IsZero() {
 				// If both the allocated & actual resources are at or below the minimum effective limit, preserve the
@@ -2503,6 +2486,23 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 				resources.Limits[v1.ResourceMemory] = cStatus.Resources.MemoryLimit.DeepCopy()
 			} else {
 				preserveOldResourcesValue(v1.ResourceMemory, oldStatus.Resources.Limits, resources.Limits)
+			}
+		}
+		if resources.Requests != nil {
+			if cStatus.Resources != nil && cStatus.Resources.CPURequest != nil && !cStatus.Resources.CPURequest.IsZero() {
+				// If both the allocated & actual resources are at or below MinShares, preserve the
+				// allocated value in the API to avoid confusion and simplify comparisons.
+				if cStatus.Resources.CPURequest.MilliValue() > cm.MinShares ||
+					resources.Requests.Cpu().MilliValue() > cm.MinShares {
+					resources.Requests[v1.ResourceCPU] = cStatus.Resources.CPURequest.DeepCopy()
+				}
+			} else {
+				preserveOldResourcesValue(v1.ResourceCPU, oldStatus.Resources.Requests, resources.Requests)
+			}
+			if cStatus.Resources != nil && cStatus.Resources.MemoryRequest != nil {
+				resources.Requests[v1.ResourceMemory] = cStatus.Resources.MemoryRequest.DeepCopy()
+			} else {
+				preserveOldResourcesValue(v1.ResourceMemory, oldStatus.Resources.Requests, resources.Requests)
 			}
 		}
 
