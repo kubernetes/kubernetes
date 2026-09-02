@@ -29,6 +29,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -103,6 +104,13 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 			m.applyPodLevelMemoryHigh(pod, containerConfig.ResourceParameters)
 			logger.V(4).Info("MemoryQoS config for pod", "pod", klog.KObj(pod), "unified", containerConfig.ResourceParameters.Unified)
 		}
+		if podNeedsWritableCgroupLimits(pod) {
+			if containerConfig.ResourceParameters.Unified == nil {
+				containerConfig.ResourceParameters.Unified = map[string]string{}
+			}
+			containerConfig.ResourceParameters.Unified[Cgroup2MaxDescendants] = defaultWritableCgroupMaxDescendants
+			containerConfig.ResourceParameters.Unified[Cgroup2MaxDepth] = defaultWritableCgroupMaxDepth
+		}
 		if err := m.cgroupManager.Create(logger, containerConfig); err != nil {
 			return fmt.Errorf("failed to create container for %v : %v", podContainerName, err)
 		}
@@ -118,6 +126,37 @@ func (m *podContainerManagerImpl) applyPodLevelMemoryHigh(pod *v1.Pod, rc *Resou
 	if m.memoryThrottlingFactor != nil {
 		ApplyPodLevelMemoryHigh(pod, rc, *m.memoryThrottlingFactor)
 	}
+}
+
+const (
+	// These limits apply to the pod subtree, including all containers.
+	defaultWritableCgroupMaxDescendants = "250"
+	defaultWritableCgroupMaxDepth       = "50"
+)
+
+// podNeedsWritableCgroupLimits reports whether the kubelet should limit the
+// cgroups the pod can create.
+func podNeedsWritableCgroupLimits(pod *v1.Pod) bool {
+	return utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CgroupOptions) &&
+		libcontainercgroups.IsCgroup2UnifiedMode() &&
+		podRequestsWritableCgroups(pod)
+}
+
+// containerRequestsWritableCgroups reports whether a container opts into writable
+// cgroups via securityContext.cgroupOptions.mountMode=Writable.
+func containerRequestsWritableCgroups(sc *v1.SecurityContext) bool {
+	if sc == nil || sc.CgroupOptions == nil || sc.CgroupOptions.MountMode == nil {
+		return false
+	}
+	return *sc.CgroupOptions.MountMode == v1.CgroupMountModeWritable
+}
+
+// podRequestsWritableCgroups reports whether a regular or init container opts
+// into writable cgroups via securityContext.cgroupOptions.mountMode=Writable.
+func podRequestsWritableCgroups(pod *v1.Pod) bool {
+	return !podutil.VisitContainers(&pod.Spec, podutil.Containers|podutil.InitContainers, func(c *v1.Container, _ podutil.ContainerType) bool {
+		return !containerRequestsWritableCgroups(c.SecurityContext)
+	})
 }
 
 // GetPodContainerName returns the CgroupName identifier, and its literal cgroupfs form on the host.
