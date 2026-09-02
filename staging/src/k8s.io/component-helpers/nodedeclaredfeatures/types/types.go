@@ -86,6 +86,9 @@ type RuntimeFeatures struct {
 	MountOptions bool
 	// SeccompProfileOCI indicates if the runtime supports seccomp profiles pulled from OCI registries.
 	SeccompProfileOCI bool
+	// CgroupMountMode indicates if the runtime supports the cgroup_mount_mode
+	// field of LinuxContainerSecurityContext.
+	CgroupMountMode bool
 }
 
 // StaticConfiguration provides a view of a node's static configuration required for feature discovery.

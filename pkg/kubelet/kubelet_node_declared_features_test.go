@@ -43,6 +43,7 @@ func TestRegisteredFeatureDiscovery(t *testing.T) {
 			kubelet.runtimeState.setRuntimeFeatures(&kubecontainer.RuntimeFeatures{
 				UserNamespacesHostNetwork: runtimeFeatures.UserNamespacesHostNetwork,
 				MountOptions:              runtimeFeatures.MountOptions,
+				CgroupMountMode:           runtimeFeatures.CgroupMountMode,
 			})
 		}
 		return kubelet.discoverNodeDeclaredFeatures()
@@ -54,7 +55,7 @@ func TestRegisteredFeatureDiscovery(t *testing.T) {
 			if rf := reqs.RequiredRuntimeFeatures; rf != nil {
 				// Only the runtime features that discover sets on the kubelet's runtime state are
 				// reported, so a feature requiring any other runtime feature can't be discovered.
-				reported := ndf.RuntimeFeatures{UserNamespacesHostNetwork: rf.UserNamespacesHostNetwork, MountOptions: rf.MountOptions}
+				reported := ndf.RuntimeFeatures{UserNamespacesHostNetwork: rf.UserNamespacesHostNetwork, MountOptions: rf.MountOptions, CgroupMountMode: rf.CgroupMountMode}
 				if *rf != reported {
 					t.Skipf("the kubelet doesn't report all of the runtime features %s requires: %+v", feature.Name(), *rf)
 				}

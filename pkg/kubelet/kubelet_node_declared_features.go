@@ -43,6 +43,7 @@ func (kl *Kubelet) discoverNodeDeclaredFeatures() []string {
 		runtimeFeatures.UserNamespacesHostNetwork = features.UserNamespacesHostNetwork
 		runtimeFeatures.MountOptions = features.MountOptions
 		runtimeFeatures.SeccompProfileOCI = features.SeccompProfileOCI
+		runtimeFeatures.CgroupMountMode = features.CgroupMountMode
 	}
 
 	cfg := &nodedeclaredfeatures.NodeConfiguration{
