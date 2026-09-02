@@ -542,7 +542,7 @@ func TestGenericStorageProviders(t *testing.T) {
 		}
 
 		// special case: we identify full core and generic core
-		if kt.Kind() == reflect.Ptr && kt.Elem().PkgPath() == reflect.TypeOf(corerest.Config{}).PkgPath() {
+		if kt.Kind() == reflect.Pointer && kt.Elem().PkgPath() == reflect.TypeOf(corerest.Config{}).PkgPath() {
 			kt = reflect.TypeOf(&corerest.GenericConfig{})
 		}
 
