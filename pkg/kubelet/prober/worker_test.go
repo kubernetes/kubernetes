@@ -18,6 +18,7 @@ package prober
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -876,30 +877,27 @@ func TestDoProbe_NewContainerOnKubeletRestart(t *testing.T) {
 		apiContainerID string
 		isSidecar      bool
 		probeType      probeType
-		expectSet      bool
-		expectedResult results.Result // only checked if expectSet is true
+		// expectedUpdates is the sequence of results the worker is expected to publish.
+		expectedUpdates []results.Result
 	}{
 		{
 			name:           "feature disabled, readiness, the same container survived the kubelet restart",
 			featureEnabled: false,
 			apiContainerID: newContainerID,
 			probeType:      readiness,
-			expectSet:      false,
 		},
 		{
-			name:           "feature disabled, readiness, a new container was created while the API server was unreachable",
-			featureEnabled: false,
-			apiContainerID: oldContainerID,
-			probeType:      readiness,
-			expectSet:      true,
-			expectedResult: results.Failure,
+			name:            "feature disabled, readiness, a new container was created while the API server was unreachable",
+			featureEnabled:  false,
+			apiContainerID:  oldContainerID,
+			probeType:       readiness,
+			expectedUpdates: []results.Result{results.Failure},
 		},
 		{
 			name:           "feature disabled, readiness, the kubelet never observed a container ID",
 			featureEnabled: false,
 			apiContainerID: "",
 			probeType:      readiness,
-			expectSet:      false,
 		},
 		{
 			name:           "feature disabled, readiness, the same sidecar survived the kubelet restart",
@@ -907,60 +905,53 @@ func TestDoProbe_NewContainerOnKubeletRestart(t *testing.T) {
 			apiContainerID: newContainerID,
 			isSidecar:      true,
 			probeType:      readiness,
-			expectSet:      false,
 		},
 		{
-			name:           "feature disabled, readiness, a new sidecar was created while the API server was unreachable",
-			featureEnabled: false,
-			apiContainerID: oldContainerID,
-			isSidecar:      true,
-			probeType:      readiness,
-			expectSet:      true,
-			expectedResult: results.Failure,
+			name:            "feature disabled, readiness, a new sidecar was created while the API server was unreachable",
+			featureEnabled:  false,
+			apiContainerID:  oldContainerID,
+			isSidecar:       true,
+			probeType:       readiness,
+			expectedUpdates: []results.Result{results.Failure},
 		},
 		{
-			name:           "feature disabled, startup, a new container was created while the API server was unreachable",
-			featureEnabled: false,
-			apiContainerID: oldContainerID,
-			probeType:      startup,
-			expectSet:      true,
-			expectedResult: results.Unknown,
+			name:            "feature disabled, startup, a new container was created while the API server was unreachable",
+			featureEnabled:  false,
+			apiContainerID:  oldContainerID,
+			probeType:       startup,
+			expectedUpdates: []results.Result{results.Unknown},
 		},
 		{
 			// Regression test for https://github.com/kubernetes/kubernetes/issues/136910:
 			// a sidecar that survived the restart keeps its startup result.
-			name:           "feature disabled, startup, the same sidecar survived the kubelet restart",
-			featureEnabled: false,
-			apiContainerID: newContainerID,
-			isSidecar:      true,
-			probeType:      startup,
-			expectSet:      true,
-			expectedResult: results.Success,
+			name:            "feature disabled, startup, the same sidecar survived the kubelet restart",
+			featureEnabled:  false,
+			apiContainerID:  newContainerID,
+			isSidecar:       true,
+			probeType:       startup,
+			expectedUpdates: []results.Result{results.Success},
 		},
 		{
-			name:           "feature disabled, startup, a new sidecar was created while the API server was unreachable",
-			featureEnabled: false,
-			apiContainerID: oldContainerID,
-			isSidecar:      true,
-			probeType:      startup,
-			expectSet:      true,
-			expectedResult: results.Unknown,
+			name:            "feature disabled, startup, a new sidecar was created while the API server was unreachable",
+			featureEnabled:  false,
+			apiContainerID:  oldContainerID,
+			isSidecar:       true,
+			probeType:       startup,
+			expectedUpdates: []results.Result{results.Unknown},
 		},
 		{
-			name:           "feature is enabled, readiness, the same container survived the kubelet restart",
-			featureEnabled: true,
-			apiContainerID: newContainerID,
-			probeType:      readiness,
-			expectSet:      true,
-			expectedResult: results.Failure,
+			name:            "feature is enabled, readiness, the same container survived the kubelet restart",
+			featureEnabled:  true,
+			apiContainerID:  newContainerID,
+			probeType:       readiness,
+			expectedUpdates: []results.Result{results.Failure},
 		},
 		{
-			name:           "feature is enabled, readiness, a new container was created while the API server was unreachable",
-			featureEnabled: true,
-			apiContainerID: oldContainerID,
-			probeType:      readiness,
-			expectSet:      true,
-			expectedResult: results.Failure,
+			name:            "feature is enabled, readiness, a new container was created while the API server was unreachable",
+			featureEnabled:  true,
+			apiContainerID:  oldContainerID,
+			probeType:       readiness,
+			expectedUpdates: []results.Result{results.Failure},
 		},
 	}
 
@@ -995,12 +986,17 @@ func TestDoProbe_NewContainerOnKubeletRestart(t *testing.T) {
 
 			w.doProbe(ctx)
 
-			result, ok := resultsManager(m, tc.probeType).Get(kubecontainer.ParseContainerID(logger, newContainerID))
-			if ok != tc.expectSet {
-				t.Errorf("Expected result to be set: %v, but got: %v", tc.expectSet, ok)
+			var updates []results.Result
+			for drained := false; !drained; {
+				select {
+				case update := <-resultsManager(m, tc.probeType).Updates():
+					updates = append(updates, update.Result)
+				default:
+					drained = true
+				}
 			}
-			if tc.expectSet && result != tc.expectedResult {
-				t.Errorf("Expected result %v, but got: %v", tc.expectedResult, result)
+			if !slices.Equal(updates, tc.expectedUpdates) {
+				t.Errorf("Expected updates %v, but got: %v", tc.expectedUpdates, updates)
 			}
 		})
 	}
