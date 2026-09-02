@@ -5,7 +5,7 @@ go 1.26.0
 godebug default=go1.26
 
 require (
-	golang.org/x/mod v0.39.0
+	golang.org/x/mod v0.40.0
 	k8s.io/publishing-bot v0.5.0
 )
 
