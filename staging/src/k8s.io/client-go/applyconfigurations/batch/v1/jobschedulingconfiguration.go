@@ -28,22 +28,22 @@ import (
 // JobSchedulingConfiguration composes the reusable workload-aware
 // scheduling building blocks.
 type JobSchedulingConfigurationApplyConfiguration struct {
-	// SchedulingPolicy defines the scheduling policy for this Job.
+	// schedulingPolicy defines the scheduling policy for this Job.
 	// Exactly one of Basic or Gang must be set.
 	// This field is immutable after creation: the policy may not be added or
 	// removed. The policy variant (basic/gang) is frozen by hand-written
 	// validation; only schedulingPolicy.gang.minCount may be changed.
 	SchedulingPolicy *v1alpha3.WorkloadPodGroupSchedulingPolicyApplyConfiguration `json:"schedulingPolicy,omitempty"`
-	// SchedulingConstraints defines scheduling constraints (e.g. topology)
+	// schedulingConstraints defines scheduling constraints (e.g. topology)
 	// for the Job's pods.
 	// This field is immutable after creation.
 	SchedulingConstraints *v1alpha3.WorkloadPodGroupSchedulingConstraintsApplyConfiguration `json:"schedulingConstraints,omitempty"`
-	// DisruptionMode defines the mode in which the Job's pods can be disrupted.
+	// disruptionMode defines the mode in which the Job's pods can be disrupted.
 	// One of Single, All.
 	// This field is immutable after creation: it may not be added or removed,
 	// and the selected mode may not be changed.
 	DisruptionMode *v1alpha3.WorkloadPodGroupDisruptionModeApplyConfiguration `json:"disruptionMode,omitempty"`
-	// ResourceClaims defines which ResourceClaims may be shared among Pods in
+	// resourceClaims defines which ResourceClaims may be shared among Pods in
 	// the Job. Pods consume the devices allocated to a PodGroup's claim by
 	// defining a claim in its own Spec.ResourceClaims that matches the
 	// PodGroup's claim exactly. The claim must have the same name and refer to

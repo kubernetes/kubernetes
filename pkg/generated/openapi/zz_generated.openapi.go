@@ -16476,21 +16476,21 @@ func schema_k8sio_api_batch_v1_CronJob(ref common.ReferenceCallback) common.Open
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specification of the desired behavior of a cron job, including the schedule. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "spec is the specification of the desired behavior of a cron job, including the schedule. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref(batchv1.CronJobSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Current status of a cron job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "status is the current status of a cron job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref(batchv1.CronJobStatus{}.OpenAPIModelName()),
 						},
@@ -16563,7 +16563,7 @@ func schema_k8sio_api_batch_v1_CronJobSpec(ref common.ReferenceCallback) common.
 				Properties: map[string]spec.Schema{
 					"schedule": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",
+							Description: "schedule is the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -16571,21 +16571,21 @@ func schema_k8sio_api_batch_v1_CronJobSpec(ref common.ReferenceCallback) common.
 					},
 					"timeZone": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. If not specified, this will default to the time zone of the kube-controller-manager process. The set of valid time zone names and the time zone offset is loaded from the system-wide time zone database by the API server during CronJob validation and the controller manager during execution. If no system-wide time zone database can be found a bundled version of the database is used instead. If the time zone name becomes invalid during the lifetime of a CronJob or due to a change in host configuration, the controller will stop creating new new Jobs and will create a system event with the reason UnknownTimeZone. More information can be found in https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones",
+							Description: "timeZone is the time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. If not specified, this will default to the time zone of the kube-controller-manager process. The set of valid time zone names and the time zone offset is loaded from the system-wide time zone database by the API server during CronJob validation and the controller manager during execution. If no system-wide time zone database can be found a bundled version of the database is used instead. If the time zone name becomes invalid during the lifetime of a CronJob or due to a change in host configuration, the controller will stop creating new new Jobs and will create a system event with the reason UnknownTimeZone. More information can be found in https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"startingDeadlineSeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Optional deadline in seconds for starting the job if it misses scheduled time for any reason.  Missed jobs executions will be counted as failed ones.",
+							Description: "startingDeadlineSeconds is the optional deadline in seconds for starting the job if it misses scheduled time for any reason.  Missed jobs executions will be counted as failed ones.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
 					},
 					"concurrencyPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specifies how to treat concurrent executions of a Job. Valid values are:\n\n- \"Allow\" (default): allows CronJobs to run concurrently; - \"Forbid\": forbids concurrent runs, skipping next run if previous run hasn't finished yet; - \"Replace\": cancels currently running job and replaces it with a new one\n\nPossible enum values:\n - `\"Allow\"` allows CronJobs to run concurrently.\n - `\"Forbid\"` forbids concurrent runs, skipping next run if previous hasn't finished yet.\n - `\"Replace\"` cancels currently running job and replaces it with a new one.",
+							Description: "concurrencyPolicy specifies how to treat concurrent executions of a Job. Valid values are:\n\n- \"Allow\" (default): allows CronJobs to run concurrently; - \"Forbid\": forbids concurrent runs, skipping next run if previous run hasn't finished yet; - \"Replace\": cancels currently running job and replaces it with a new one\n\nPossible enum values:\n - `\"Allow\"` allows CronJobs to run concurrently.\n - `\"Forbid\"` forbids concurrent runs, skipping next run if previous hasn't finished yet.\n - `\"Replace\"` cancels currently running job and replaces it with a new one.",
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"Allow", "Forbid", "Replace"},
@@ -16593,28 +16593,28 @@ func schema_k8sio_api_batch_v1_CronJobSpec(ref common.ReferenceCallback) common.
 					},
 					"suspend": {
 						SchemaProps: spec.SchemaProps{
-							Description: "This flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
+							Description: "suspend is a flag that tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
 					"jobTemplate": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specifies the job that will be created when executing a CronJob.",
+							Description: "jobTemplate specifies the job that will be created when executing a CronJob.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(batchv1.JobTemplateSpec{}.OpenAPIModelName()),
 						},
 					},
 					"successfulJobsHistoryLimit": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The number of successful finished jobs to retain. Value must be non-negative integer. Defaults to 3.",
+							Description: "successfulJobsHistoryLimit is the number of successful finished jobs to retain. Value must be non-negative integer. Defaults to 3.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"failedJobsHistoryLimit": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The number of failed finished jobs to retain. Value must be non-negative integer. Defaults to 1.",
+							Description: "failedJobsHistoryLimit is the number of failed finished jobs to retain. Value must be non-negative integer. Defaults to 1.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -16696,21 +16696,21 @@ func schema_k8sio_api_batch_v1_Job(ref common.ReferenceCallback) common.OpenAPID
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specification of the desired behavior of a job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "spec is the specification of the desired behavior of a job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref(batchv1.JobSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Current status of a job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "status is the current status of a job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref(batchv1.JobStatus{}.OpenAPIModelName()),
 						},
@@ -16733,7 +16733,7 @@ func schema_k8sio_api_batch_v1_JobCondition(ref common.ReferenceCallback) common
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Type of job condition, Complete or Failed.",
+							Description: "type is the type of job condition, Complete or Failed.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -16741,7 +16741,7 @@ func schema_k8sio_api_batch_v1_JobCondition(ref common.ReferenceCallback) common
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status of the condition, one of True, False, Unknown.",
+							Description: "status is the status of the condition, one of True, False, Unknown.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -16749,26 +16749,26 @@ func schema_k8sio_api_batch_v1_JobCondition(ref common.ReferenceCallback) common
 					},
 					"lastProbeTime": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Last time the condition was checked.",
+							Description: "lastProbeTime is the last time the condition was checked.",
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 					"lastTransitionTime": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Last time the condition transit from one status to another.",
+							Description: "lastTransitionTime is the last time the condition transit from one status to another.",
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Description: "(brief) reason for the condition's last transition.",
+							Description: "reason is the brief reason for the condition's last transition.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"message": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Human readable message indicating details about last transition.",
+							Description: "message is human readable message indicating details about last transition.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -16840,19 +16840,19 @@ func schema_k8sio_api_batch_v1_JobSchedulingConfiguration(ref common.ReferenceCa
 				Properties: map[string]spec.Schema{
 					"schedulingPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "SchedulingPolicy defines the scheduling policy for this Job. Exactly one of Basic or Gang must be set. This field is immutable after creation: the policy may not be added or removed. The policy variant (basic/gang) is frozen by hand-written validation; only schedulingPolicy.gang.minCount may be changed.",
+							Description: "schedulingPolicy defines the scheduling policy for this Job. Exactly one of Basic or Gang must be set. This field is immutable after creation: the policy may not be added or removed. The policy variant (basic/gang) is frozen by hand-written validation; only schedulingPolicy.gang.minCount may be changed.",
 							Ref:         ref(schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{}.OpenAPIModelName()),
 						},
 					},
 					"schedulingConstraints": {
 						SchemaProps: spec.SchemaProps{
-							Description: "SchedulingConstraints defines scheduling constraints (e.g. topology) for the Job's pods. This field is immutable after creation.",
+							Description: "schedulingConstraints defines scheduling constraints (e.g. topology) for the Job's pods. This field is immutable after creation.",
 							Ref:         ref(schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{}.OpenAPIModelName()),
 						},
 					},
 					"disruptionMode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "DisruptionMode defines the mode in which the Job's pods can be disrupted. One of Single, All. This field is immutable after creation: it may not be added or removed, and the selected mode may not be changed.",
+							Description: "disruptionMode defines the mode in which the Job's pods can be disrupted. One of Single, All. This field is immutable after creation: it may not be added or removed, and the selected mode may not be changed.",
 							Ref:         ref(schedulingv1alpha3.WorkloadPodGroupDisruptionMode{}.OpenAPIModelName()),
 						},
 					},
@@ -16868,7 +16868,7 @@ func schema_k8sio_api_batch_v1_JobSchedulingConfiguration(ref common.ReferenceCa
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "ResourceClaims defines which ResourceClaims may be shared among Pods in the Job. Pods consume the devices allocated to a PodGroup's claim by defining a claim in its own Spec.ResourceClaims that matches the PodGroup's claim exactly. The claim must have the same name and refer to the same ResourceClaim or ResourceClaimTemplate. At most 4 claims may be set, matching the limit on the resulting PodGroup. This list is immutable after creation: entries may neither be added, removed, nor modified.",
+							Description: "resourceClaims defines which ResourceClaims may be shared among Pods in the Job. Pods consume the devices allocated to a PodGroup's claim by defining a claim in its own Spec.ResourceClaims that matches the PodGroup's claim exactly. The claim must have the same name and refer to the same ResourceClaim or ResourceClaimTemplate. At most 4 claims may be set, matching the limit on the resulting PodGroup. This list is immutable after creation: entries may neither be added, removed, nor modified.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -16896,28 +16896,28 @@ func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback) common.Open
 				Properties: map[string]spec.Schema{
 					"parallelism": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/",
+							Description: "parallelism specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"completions": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specifies the desired number of successfully finished pods the job should be run with.  Setting to null means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/",
+							Description: "completions specifies the desired number of successfully finished pods the job should be run with.  Setting to null means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"activeDeadlineSeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specifies the duration in seconds relative to the startTime that the job may be continuously active before the system tries to terminate it; value must be positive integer. If a Job is suspended (at creation or through an update), this timer will effectively be stopped and reset when the Job is resumed again.",
+							Description: "activeDeadlineSeconds specifies the duration in seconds relative to the startTime that the job may be continuously active before the system tries to terminate it; value must be positive integer. If a Job is suspended (at creation or through an update), this timer will effectively be stopped and reset when the Job is resumed again.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
 					},
 					"podFailurePolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specifies the policy of handling failed pods. In particular, it allows to specify the set of actions and conditions which need to be satisfied to take the associated action. If empty, the default behaviour applies - the counter of failed pods, represented by the jobs's .status.failed field, is incremented and it is checked against the backoffLimit. This field cannot be used in combination with restartPolicy=OnFailure.",
+							Description: "podFailurePolicy specifies the policy of handling failed pods. In particular, it allows to specify the set of actions and conditions which need to be satisfied to take the associated action. If empty, the default behaviour applies - the counter of failed pods, represented by the jobs's .status.failed field, is incremented and it is checked against the backoffLimit. This field cannot be used in combination with restartPolicy=OnFailure.",
 							Ref:         ref(batchv1.PodFailurePolicy{}.OpenAPIModelName()),
 						},
 					},
@@ -16929,28 +16929,28 @@ func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback) common.Open
 					},
 					"backoffLimit": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specifies the number of retries before marking this job failed. Defaults to 6, unless backoffLimitPerIndex (only Indexed Job) is specified. When backoffLimitPerIndex is specified, backoffLimit defaults to 2147483647.",
+							Description: "backoffLimit specifies the number of retries before marking this job failed. Defaults to 6, unless backoffLimitPerIndex (only Indexed Job) is specified. When backoffLimitPerIndex is specified, backoffLimit defaults to 2147483647.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"backoffLimitPerIndex": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specifies the limit for the number of retries within an index before marking this index as failed. When enabled the number of failures per index is kept in the pod's batch.kubernetes.io/job-index-failure-count annotation. It can only be set when Job's completionMode=Indexed, and the Pod's restart policy is Never. The field is immutable.",
+							Description: "backoffLimitPerIndex specifies the limit for the number of retries within an index before marking this index as failed. When enabled the number of failures per index is kept in the pod's batch.kubernetes.io/job-index-failure-count annotation. It can only be set when Job's completionMode=Indexed, and the Pod's restart policy is Never. The field is immutable.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"maxFailedIndexes": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specifies the maximal number of failed indexes before marking the Job as failed, when backoffLimitPerIndex is set. Once the number of failed indexes exceeds this number the entire Job is marked as Failed and its execution is terminated. When left as null the job continues execution of all of its indexes and is marked with the `Complete` Job condition. It can only be specified when backoffLimitPerIndex is set. It can be null or up to completions. It is required and must be less than or equal to 10^4 when is completions greater than 10^5.",
+							Description: "maxFailedIndexes specifies the maximal number of failed indexes before marking the Job as failed, when backoffLimitPerIndex is set. Once the number of failed indexes exceeds this number the entire Job is marked as Failed and its execution is terminated. When left as null the job continues execution of all of its indexes and is marked with the `Complete` Job condition. It can only be specified when backoffLimitPerIndex is set. It can be null or up to completions. It is required and must be less than or equal to 10^4 when is completions greater than 10^5.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"selector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "A label query over pods that should match the pod count. Normally, the system sets this field for you. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
+							Description: "selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
 							Ref:         ref(metav1.LabelSelector{}.OpenAPIModelName()),
 						},
 					},
@@ -16963,7 +16963,7 @@ func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback) common.Open
 					},
 					"template": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Describes the pod that will be created when executing a job. The only allowed template.spec.restartPolicy values are \"Never\" or \"OnFailure\". More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/",
+							Description: "template describes the pod that will be created when executing a job. The only allowed template.spec.restartPolicy values are \"Never\" or \"OnFailure\". More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/",
 							Default:     map[string]interface{}{},
 							Ref:         ref(corev1.PodTemplateSpec{}.OpenAPIModelName()),
 						},
@@ -17000,7 +17000,7 @@ func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback) common.Open
 					},
 					"managedBy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ManagedBy field indicates the controller that manages a Job. The k8s Job controller reconciles jobs which don't have this field at all or the field value is the reserved string `kubernetes.io/job-controller`, but skips reconciling Jobs with a custom value for this field. The value must be a valid domain-prefixed path (e.g. acme.io/foo) - all characters before the first \"/\" must be a valid subdomain as defined by RFC 1123. All characters trailing the first \"/\" must be valid HTTP Path characters as defined by RFC 3986. The value cannot exceed 63 characters. This field is immutable.",
+							Description: "managedBy field indicates the controller that manages a Job. The k8s Job controller reconciles jobs which don't have this field at all or the field value is the reserved string `kubernetes.io/job-controller`, but skips reconciling Jobs with a custom value for this field. The value must be a valid domain-prefixed path (e.g. acme.io/foo) - all characters before the first \"/\" must be a valid subdomain as defined by RFC 1123. All characters trailing the first \"/\" must be valid HTTP Path characters as defined by RFC 3986. The value cannot exceed 63 characters. This field is immutable.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -17131,14 +17131,14 @@ func schema_k8sio_api_batch_v1_JobTemplateSpec(ref common.ReferenceCallback) com
 				Properties: map[string]spec.Schema{
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata of the jobs created from this template. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object's metadata of the jobs created from this template. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specification of the desired behavior of the job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "spec is the specification of the desired behavior of the job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref(batchv1.JobSpec{}.OpenAPIModelName()),
 						},
@@ -17166,7 +17166,7 @@ func schema_k8sio_api_batch_v1_PodFailurePolicy(ref common.ReferenceCallback) co
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "A list of pod failure policy rules. The rules are evaluated in order. Once a rule matches a Pod failure, the remaining of the rules are ignored. When no rule matches the Pod failure, the default handling applies - the counter of pod failures is incremented and it is checked against the backoffLimit. At most 20 elements are allowed.",
+							Description: "rules is a list of pod failure policy rules. The rules are evaluated in order. Once a rule matches a Pod failure, the remaining of the rules are ignored. When no rule matches the Pod failure, the default handling applies - the counter of pod failures is incremented and it is checked against the backoffLimit. At most 20 elements are allowed.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -17194,14 +17194,14 @@ func schema_k8sio_api_batch_v1_PodFailurePolicyOnExitCodesRequirement(ref common
 				Properties: map[string]spec.Schema{
 					"containerName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Restricts the check for exit codes to the container with the specified name. When null, the rule applies to all containers. When specified, it should match one the container or initContainer names in the pod template.",
+							Description: "containerName restricts the check for exit codes to the container with the specified name. When null, the rule applies to all containers. When specified, it should match one the container or initContainer names in the pod template.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"operator": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Represents the relationship between the container exit code(s) and the specified values. Containers completed with success (exit code 0) are excluded from the requirement check. Possible values are:\n\n- In: the requirement is satisfied if at least one container exit code\n  (might be multiple if there are multiple containers not restricted\n  by the 'containerName' field) is in the set of specified values.\n- NotIn: the requirement is satisfied if at least one container exit code\n  (might be multiple if there are multiple containers not restricted\n  by the 'containerName' field) is not in the set of specified values.\nAdditional values are considered to be added in the future. Clients should react to an unknown operator by assuming the requirement is not satisfied.\n\nPossible enum values:\n - `\"In\"`\n - `\"NotIn\"`",
+							Description: "operator represents the relationship between the container exit code(s) and the specified values. Containers completed with success (exit code 0) are excluded from the requirement check. Possible values are:\n\n- In: the requirement is satisfied if at least one container exit code\n  (might be multiple if there are multiple containers not restricted\n  by the 'containerName' field) is in the set of specified values.\n- NotIn: the requirement is satisfied if at least one container exit code\n  (might be multiple if there are multiple containers not restricted\n  by the 'containerName' field) is not in the set of specified values.\nAdditional values are considered to be added in the future. Clients should react to an unknown operator by assuming the requirement is not satisfied.\n\nPossible enum values:\n - `\"In\"`\n - `\"NotIn\"`",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -17215,7 +17215,7 @@ func schema_k8sio_api_batch_v1_PodFailurePolicyOnExitCodesRequirement(ref common
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Specifies the set of values. Each returned container exit code (might be multiple in case of multiple containers) is checked against this set of values with respect to the operator. The list of values must be ordered and must not contain duplicates. Value '0' cannot be used for the In operator. At least one element is required. At most 255 elements are allowed.",
+							Description: "values specifies the set of values. Each returned container exit code (might be multiple in case of multiple containers) is checked against this set of values with respect to the operator. The list of values must be ordered and must not contain duplicates. Value '0' cannot be used for the In operator. At least one element is required. At most 255 elements are allowed.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -17243,7 +17243,7 @@ func schema_k8sio_api_batch_v1_PodFailurePolicyOnPodConditionsPattern(ref common
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specifies the required Pod condition type. To match a pod condition it is required that specified type equals the pod condition type.",
+							Description: "type specifies the required Pod condition type. To match a pod condition it is required that specified type equals the pod condition type.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -17251,7 +17251,7 @@ func schema_k8sio_api_batch_v1_PodFailurePolicyOnPodConditionsPattern(ref common
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specifies the required Pod condition status. To match a pod condition it is required that the specified status equals the pod condition status. Defaults to True.",
+							Description: "status specifies the required Pod condition status. To match a pod condition it is required that the specified status equals the pod condition status. Defaults to True.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -17273,7 +17273,7 @@ func schema_k8sio_api_batch_v1_PodFailurePolicyRule(ref common.ReferenceCallback
 				Properties: map[string]spec.Schema{
 					"action": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specifies the action taken on a pod failure when the requirements are satisfied. Possible values are:\n\n- FailJob: indicates that the pod's job is marked as Failed and all\n  running pods are terminated.\n- FailIndex: indicates that the pod's index is marked as Failed and will\n  not be restarted.\n- Ignore: indicates that the counter towards the .backoffLimit is not\n  incremented and a replacement pod is created.\n- Count: indicates that the pod is handled in the default way - the\n  counter towards the .backoffLimit is incremented.\nAdditional values are considered to be added in the future. Clients should react to an unknown action by skipping the rule.\n\nPossible enum values:\n - `\"Count\"` This is an action which might be taken on a pod failure - the pod failure is handled in the default way - the counter towards .backoffLimit, represented by the job's .status.failed field, is incremented.\n - `\"FailIndex\"` This is an action which might be taken on a pod failure - mark the Job's index as failed to avoid restarts within this index. This action can only be used when backoffLimitPerIndex is set.\n - `\"FailJob\"` This is an action which might be taken on a pod failure - mark the pod's job as Failed and terminate all running pods.\n - `\"Ignore\"` This is an action which might be taken on a pod failure - the counter towards .backoffLimit, represented by the job's .status.failed field, is not incremented and a replacement pod is created.",
+							Description: "action specifies the action taken on a pod failure when the requirements are satisfied. Possible values are:\n\n- FailJob: indicates that the pod's job is marked as Failed and all\n  running pods are terminated.\n- FailIndex: indicates that the pod's index is marked as Failed and will\n  not be restarted.\n- Ignore: indicates that the counter towards the .backoffLimit is not\n  incremented and a replacement pod is created.\n- Count: indicates that the pod is handled in the default way - the\n  counter towards the .backoffLimit is incremented.\nAdditional values are considered to be added in the future. Clients should react to an unknown action by skipping the rule.\n\nPossible enum values:\n - `\"Count\"` This is an action which might be taken on a pod failure - the pod failure is handled in the default way - the counter towards .backoffLimit, represented by the job's .status.failed field, is incremented.\n - `\"FailIndex\"` This is an action which might be taken on a pod failure - mark the Job's index as failed to avoid restarts within this index. This action can only be used when backoffLimitPerIndex is set.\n - `\"FailJob\"` This is an action which might be taken on a pod failure - mark the pod's job as Failed and terminate all running pods.\n - `\"Ignore\"` This is an action which might be taken on a pod failure - the counter towards .backoffLimit, represented by the job's .status.failed field, is not incremented and a replacement pod is created.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -17282,7 +17282,7 @@ func schema_k8sio_api_batch_v1_PodFailurePolicyRule(ref common.ReferenceCallback
 					},
 					"onExitCodes": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Represents the requirement on the container exit codes.",
+							Description: "onExitCodes represents the requirement on the container exit codes.",
 							Ref:         ref(batchv1.PodFailurePolicyOnExitCodesRequirement{}.OpenAPIModelName()),
 						},
 					},
@@ -17293,7 +17293,7 @@ func schema_k8sio_api_batch_v1_PodFailurePolicyRule(ref common.ReferenceCallback
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Represents the requirement on the pod conditions. The requirement is represented as a list of pod condition patterns. The requirement is satisfied if at least one pattern matches an actual pod condition. At most 20 elements are allowed.",
+							Description: "onPodConditions represents the requirement on the pod conditions. The requirement is represented as a list of pod condition patterns. The requirement is satisfied if at least one pattern matches an actual pod condition. At most 20 elements are allowed.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -17448,21 +17448,21 @@ func schema_k8sio_api_batch_v1beta1_CronJob(ref common.ReferenceCallback) common
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specification of the desired behavior of a cron job, including the schedule. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "spec is the specification of the desired behavior of a cron job, including the schedule. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref(batchv1beta1.CronJobSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Current status of a cron job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "status is the current status of a cron job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref(batchv1beta1.CronJobStatus{}.OpenAPIModelName()),
 						},
@@ -17535,7 +17535,7 @@ func schema_k8sio_api_batch_v1beta1_CronJobSpec(ref common.ReferenceCallback) co
 				Properties: map[string]spec.Schema{
 					"schedule": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",
+							Description: "schedule is the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -17543,49 +17543,49 @@ func schema_k8sio_api_batch_v1beta1_CronJobSpec(ref common.ReferenceCallback) co
 					},
 					"timeZone": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. If not specified, this will default to the time zone of the kube-controller-manager process. The set of valid time zone names and the time zone offset is loaded from the system-wide time zone database by the API server during CronJob validation and the controller manager during execution. If no system-wide time zone database can be found a bundled version of the database is used instead. If the time zone name becomes invalid during the lifetime of a CronJob or due to a change in host configuration, the controller will stop creating new new Jobs and will create a system event with the reason UnknownTimeZone. More information can be found in https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones",
+							Description: "timeZone is the time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. If not specified, this will default to the time zone of the kube-controller-manager process. The set of valid time zone names and the time zone offset is loaded from the system-wide time zone database by the API server during CronJob validation and the controller manager during execution. If no system-wide time zone database can be found a bundled version of the database is used instead. If the time zone name becomes invalid during the lifetime of a CronJob or due to a change in host configuration, the controller will stop creating new new Jobs and will create a system event with the reason UnknownTimeZone. More information can be found in https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"startingDeadlineSeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Optional deadline in seconds for starting the job if it misses scheduled time for any reason.  Missed jobs executions will be counted as failed ones.",
+							Description: "startingDeadlineSeconds is the optional deadline in seconds for starting the job if it misses scheduled time for any reason.  Missed jobs executions will be counted as failed ones.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
 					},
 					"concurrencyPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specifies how to treat concurrent executions of a Job. Valid values are:\n\n- \"Allow\" (default): allows CronJobs to run concurrently; - \"Forbid\": forbids concurrent runs, skipping next run if previous run hasn't finished yet; - \"Replace\": cancels currently running job and replaces it with a new one",
+							Description: "concurrencyPolicy specifies how to treat concurrent executions of a Job. Valid values are:\n\n- \"Allow\" (default): allows CronJobs to run concurrently; - \"Forbid\": forbids concurrent runs, skipping next run if previous run hasn't finished yet; - \"Replace\": cancels currently running job and replaces it with a new one",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"suspend": {
 						SchemaProps: spec.SchemaProps{
-							Description: "This flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
+							Description: "suspend is a flag that tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
 					"jobTemplate": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specifies the job that will be created when executing a CronJob.",
+							Description: "jobTemplate specifies the job that will be created when executing a CronJob.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(batchv1beta1.JobTemplateSpec{}.OpenAPIModelName()),
 						},
 					},
 					"successfulJobsHistoryLimit": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The number of successful finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified. Defaults to 3.",
+							Description: "successfulJobsHistoryLimit is the number of successful finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified. Defaults to 3.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"failedJobsHistoryLimit": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The number of failed finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
+							Description: "failedJobsHistoryLimit is the number of failed finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -17653,14 +17653,14 @@ func schema_k8sio_api_batch_v1beta1_JobTemplateSpec(ref common.ReferenceCallback
 				Properties: map[string]spec.Schema{
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata of the jobs created from this template. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Description: "metadata is the standard object's metadata of the jobs created from this template. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
 							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specification of the desired behavior of the job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Description: "spec is the specification of the desired behavior of the job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
 							Ref:         ref(batchv1.JobSpec{}.OpenAPIModelName()),
 						},
