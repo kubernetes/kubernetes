@@ -99,10 +99,11 @@ const (
 	QueueingHintResultError     = "Error"
 )
 
-// Entity label values used for queued_entities and queue_incoming_entities metrics.
+// Entity label values used for scheduling, queued_entities, and queue_incoming_entities metrics.
 const (
-	Pod      = "pod"
-	PodGroup = "podgroup"
+	Pod               = "pod"
+	PodGroup          = "podgroup"
+	CompositePodGroup = "compositepodgroup"
 )
 
 const (
@@ -188,9 +189,9 @@ var (
 	// This is the same metric that also gets recorded in the kube-controller-manager.
 	ResourceClaimCreatesTotal = resourceclaimmetrics.ResourceClaimCreate
 
-	podGroupScheduleAttempts           *metrics.CounterVec
-	podGroupSchedulingLatency          *metrics.HistogramVec
-	PodGroupSchedulingAlgorithmLatency *metrics.Histogram
+	PodGroupScheduleAttempts           *metrics.CounterVec
+	PodGroupSchedulingLatency          *metrics.HistogramVec
+	PodGroupSchedulingAlgorithmLatency *metrics.HistogramVec
 
 	// The below are only available when the TopologyAwareWorkloadScheduling feature gate is enabled.
 	GeneratedPlacementsTotal    *metrics.CounterVec
@@ -237,8 +238,8 @@ func Register() {
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 			RegisterMetrics(
-				podGroupScheduleAttempts,
-				podGroupSchedulingLatency,
+				PodGroupScheduleAttempts,
+				PodGroupSchedulingLatency,
 				PodGroupSchedulingAlgorithmLatency,
 				WorkloadPreemptionAttempts,
 				WorkloadPreemptionVictims,
@@ -591,30 +592,30 @@ func InitMetrics() {
 		},
 		[]string{"profile"})
 
-	// The below (podGroupScheduleAttempts, podGroupSchedulingLatency and PodGroupSchedulingAlgorithmLatency) are only available when the GenericWorkload feature gate is enabled.
-	podGroupScheduleAttempts = metrics.NewCounterVec(
+	// The below (PodGroupScheduleAttempts, PodGroupSchedulingLatency and PodGroupSchedulingAlgorithmLatency) are only available when the GenericWorkload feature gate is enabled.
+	PodGroupScheduleAttempts = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "podgroup_schedule_attempts_total",
-			Help:           "Number of attempts to schedule pod group, by the result and scheduler profile. 'unschedulable' means a pod group could not be scheduled, while 'error' means an internal scheduler problem.",
+			Help:           "Number of attempts to schedule pod group, by the result, scheduler profile and entity type ('podgroup' or 'compositepodgroup'). 'unschedulable' means a pod group could not be scheduled, while 'error' means an internal scheduler problem.",
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"result", "profile"})
-	podGroupSchedulingLatency = metrics.NewHistogramVec(
+		}, []string{"result", "profile", "type"})
+	PodGroupSchedulingLatency = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "podgroup_scheduling_attempt_duration_seconds",
-			Help:           "Pod group scheduling attempt latency in seconds, by scheduler profile.",
+			Help:           "Pod group scheduling attempt latency in seconds, by result, scheduler profile and entity type ('podgroup' or 'compositepodgroup').",
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"result", "profile"})
-	PodGroupSchedulingAlgorithmLatency = metrics.NewHistogram(
+		}, []string{"result", "profile", "type"})
+	PodGroupSchedulingAlgorithmLatency = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "podgroup_scheduling_algorithm_duration_seconds",
-			Help:           "Pod group scheduling algorithm latency in seconds",
+			Help:           "Pod group scheduling algorithm latency in seconds, by scheduler profile and entity type ('podgroup' or 'compositepodgroup').",
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
-		})
+		}, []string{"profile", "type"})
 
 	// Workload preemption
 	WorkloadPreemptionAttempts = metrics.NewCounterVec(
