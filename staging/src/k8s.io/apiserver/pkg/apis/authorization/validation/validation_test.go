@@ -22,6 +22,7 @@ import (
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	authorizationv1alpha1 "k8s.io/api/authorization/v1alpha1"
+	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -590,7 +591,7 @@ func TestValidateLocalSAR(t *testing.T) {
 // declarative validation (empty ID, invalid label-key format) are intentionally
 // not fired by the handwritten path and are therefore not asserted here.
 func TestValidateAuthorizationConditionsReview(t *testing.T) {
-	emptyDecision := authorizationv1.ConditionsAwareDecision{}
+	allowDecision := authorizationv1.ConditionsAwareDecision{Type: authorizationv1.ConditionsAwareDecisionTypeAllow, Allow: &authorizationv1.UnconditionalDecision{}}
 	validConditionsMap := &authorizationv1.ConditionsMap{
 		DenyConditions:      []authorizationv1.Condition{{ID: "example.com/deny-1", Type: "example.com/type-1"}},
 		NoOpinionConditions: []authorizationv1.Condition{{ID: "example.com/no-op-1"}},
@@ -603,17 +604,17 @@ func TestValidateAuthorizationConditionsReview(t *testing.T) {
 	}{{
 		name: "empty request and response decisions",
 		obj: authorizationv1alpha1.AuthorizationConditionsReview{
-			Request:  &authorizationv1alpha1.AuthorizationConditionsRequest{Decision: emptyDecision},
-			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: emptyDecision},
+			Request:  &authorizationv1alpha1.AuthorizationConditionsRequest{Decision: allowDecision},
+			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: allowDecision},
 		},
 	}, {
 		name: "conditions with valid domain-prefixed keys in all buckets",
 		obj: authorizationv1alpha1.AuthorizationConditionsReview{
 			Request: &authorizationv1alpha1.AuthorizationConditionsRequest{
-				Decision: authorizationv1.ConditionsAwareDecision{ConditionsMap: validConditionsMap},
+				Decision: authorizationv1.ConditionsAwareDecision{Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap, ConditionsMap: validConditionsMap},
 			},
 			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{
-				Decision: authorizationv1.ConditionsAwareDecision{ConditionsMap: validConditionsMap},
+				Decision: authorizationv1.ConditionsAwareDecision{Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap, ConditionsMap: validConditionsMap},
 			},
 		},
 	}, {
@@ -621,12 +622,13 @@ func TestValidateAuthorizationConditionsReview(t *testing.T) {
 		obj: authorizationv1alpha1.AuthorizationConditionsReview{
 			Request: &authorizationv1alpha1.AuthorizationConditionsRequest{
 				Decision: authorizationv1.ConditionsAwareDecision{
+					Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
 					ConditionsMap: &authorizationv1.ConditionsMap{
 						AllowConditions: []authorizationv1.Condition{{ID: "example.com/allow"}},
 					},
 				},
 			},
-			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: emptyDecision},
+			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: allowDecision},
 		},
 	}, {
 		name: "only ManagedFields on ObjectMeta is allowed",
@@ -634,41 +636,15 @@ func TestValidateAuthorizationConditionsReview(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				ManagedFields: []metav1.ManagedFieldsEntry{{Manager: "test"}},
 			},
-			Request:  &authorizationv1alpha1.AuthorizationConditionsRequest{Decision: emptyDecision},
-			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: emptyDecision},
-		},
-	}, {
-		name: "empty id is skipped by handwritten path (declarative covers it)",
-		obj: authorizationv1alpha1.AuthorizationConditionsReview{
-			Request: &authorizationv1alpha1.AuthorizationConditionsRequest{
-				Decision: authorizationv1.ConditionsAwareDecision{
-					ConditionsMap: &authorizationv1.ConditionsMap{
-						DenyConditions: []authorizationv1.Condition{{ID: ""}},
-					},
-				},
-			},
-			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: emptyDecision},
-		},
-	}, {
-		name: "invalid label-key format is skipped by handwritten path (declarative covers it)",
-		obj: authorizationv1alpha1.AuthorizationConditionsReview{
-			Request: &authorizationv1alpha1.AuthorizationConditionsRequest{
-				Decision: authorizationv1.ConditionsAwareDecision{
-					ConditionsMap: &authorizationv1.ConditionsMap{
-						AllowConditions: []authorizationv1.Condition{
-							{ID: "example.com/foo/bar"},
-							{ID: "example.com/_bad", Type: "example.com/e?"},
-						},
-					},
-				},
-			},
-			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: emptyDecision},
+			Request:  &authorizationv1alpha1.AuthorizationConditionsRequest{Decision: allowDecision},
+			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: allowDecision},
 		},
 	}, {
 		name: "condition and description exactly at MaxBytes are allowed",
 		obj: authorizationv1alpha1.AuthorizationConditionsReview{
 			Request: &authorizationv1alpha1.AuthorizationConditionsRequest{
 				Decision: authorizationv1.ConditionsAwareDecision{
+					Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
 					ConditionsMap: &authorizationv1.ConditionsMap{
 						AllowConditions: []authorizationv1.Condition{{
 							ID:          "example.com/foo",
@@ -678,13 +654,13 @@ func TestValidateAuthorizationConditionsReview(t *testing.T) {
 					},
 				},
 			},
-			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: emptyDecision},
+			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: allowDecision},
 		},
 	}}
 
 	for _, c := range successCases {
 		t.Run("success/"+c.name, func(t *testing.T) {
-			if errs := ValidateAuthorizationConditionsReview(&c.obj); len(errs) != 0 {
+			if errs := ValidateAuthorizationConditionsReview(t.Context(), operation.Operation{Type: operation.Create}, &c.obj); len(errs) != 0 {
 				t.Errorf("expected success, got: %v", errs)
 			}
 		})
@@ -698,24 +674,24 @@ func TestValidateAuthorizationConditionsReview(t *testing.T) {
 		name: "non-empty name in ObjectMeta",
 		obj: authorizationv1alpha1.AuthorizationConditionsReview{
 			ObjectMeta: metav1.ObjectMeta{Name: "a-name"},
-			Request:    &authorizationv1alpha1.AuthorizationConditionsRequest{Decision: emptyDecision},
-			Response:   &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: emptyDecision},
+			Request:    &authorizationv1alpha1.AuthorizationConditionsRequest{Decision: allowDecision},
+			Response:   &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: allowDecision},
 		},
 		msgs: []string{`metadata: Invalid value:`, `must be empty`},
 	}, {
 		name: "non-empty namespace in ObjectMeta",
 		obj: authorizationv1alpha1.AuthorizationConditionsReview{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "ns"},
-			Request:    &authorizationv1alpha1.AuthorizationConditionsRequest{Decision: emptyDecision},
-			Response:   &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: emptyDecision},
+			Request:    &authorizationv1alpha1.AuthorizationConditionsRequest{Decision: allowDecision},
+			Response:   &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: allowDecision},
 		},
 		msgs: []string{`metadata: Invalid value:`, `must be empty`},
 	}, {
 		name: "non-empty labels in ObjectMeta",
 		obj: authorizationv1alpha1.AuthorizationConditionsReview{
 			ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"k": "v"}},
-			Request:    &authorizationv1alpha1.AuthorizationConditionsRequest{Decision: emptyDecision},
-			Response:   &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: emptyDecision},
+			Request:    &authorizationv1alpha1.AuthorizationConditionsRequest{Decision: allowDecision},
+			Response:   &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: allowDecision},
 		},
 		msgs: []string{`metadata: Invalid value:`, `must be empty`},
 	}, {
@@ -728,7 +704,7 @@ func TestValidateAuthorizationConditionsReview(t *testing.T) {
 					},
 				},
 			},
-			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: emptyDecision},
+			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: allowDecision},
 		},
 		msgs: []string{`request.decision.conditionsMap.allowConditions[0].id: Invalid value: "no-slash": must be a domain-prefixed key`},
 	}, {
@@ -741,13 +717,13 @@ func TestValidateAuthorizationConditionsReview(t *testing.T) {
 					},
 				},
 			},
-			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: emptyDecision},
+			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: allowDecision},
 		},
 		msgs: []string{`request.decision.conditionsMap.noOpinionConditions[0].type: Invalid value: "no-slash": must be a domain-prefixed key`},
 	}, {
 		name: "response denyConditions: id at index reflects its position",
 		obj: authorizationv1alpha1.AuthorizationConditionsReview{
-			Request: &authorizationv1alpha1.AuthorizationConditionsRequest{Decision: emptyDecision},
+			Request: &authorizationv1alpha1.AuthorizationConditionsRequest{Decision: allowDecision},
 			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{
 				Decision: authorizationv1.ConditionsAwareDecision{
 					ConditionsMap: &authorizationv1.ConditionsMap{
@@ -773,13 +749,13 @@ func TestValidateAuthorizationConditionsReview(t *testing.T) {
 					},
 				},
 			},
-			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: emptyDecision},
+			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: allowDecision},
 		},
 		msgs: []string{`request.decision.conditionsMap.allowConditions[0].condition: Too long`},
 	}, {
 		name: "description over MaxConditionDescriptionBytes",
 		obj: authorizationv1alpha1.AuthorizationConditionsReview{
-			Request: &authorizationv1alpha1.AuthorizationConditionsRequest{Decision: emptyDecision},
+			Request: &authorizationv1alpha1.AuthorizationConditionsRequest{Decision: allowDecision},
 			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{
 				Decision: authorizationv1.ConditionsAwareDecision{
 					ConditionsMap: &authorizationv1.ConditionsMap{
@@ -826,15 +802,44 @@ func TestValidateAuthorizationConditionsReview(t *testing.T) {
 		name: "nil ConditionsMap in decision is skipped by handwritten validation",
 		obj: authorizationv1alpha1.AuthorizationConditionsReview{
 			ObjectMeta: metav1.ObjectMeta{Name: "not-empty"},
-			Request:    &authorizationv1alpha1.AuthorizationConditionsRequest{Decision: emptyDecision},
-			Response:   &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: emptyDecision},
+			Request:    &authorizationv1alpha1.AuthorizationConditionsRequest{Decision: allowDecision},
+			Response:   &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: allowDecision},
 		},
 		msgs: []string{`metadata: Invalid value:`},
+	}, { // TODO: Move these two last tests back to the success cases when we don't call the declarative validation from here.
+		name: "invalid label-key format is skipped by handwritten path (declarative covers it, and that catches it for now)",
+		obj: authorizationv1alpha1.AuthorizationConditionsReview{
+			Request: &authorizationv1alpha1.AuthorizationConditionsRequest{
+				Decision: authorizationv1.ConditionsAwareDecision{
+					Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
+					ConditionsMap: &authorizationv1.ConditionsMap{
+						AllowConditions: []authorizationv1.Condition{
+							{ID: "example.com/foo/bar"},
+							{ID: "example.com/_bad", Type: "example.com/e?"},
+						},
+					},
+				},
+			},
+			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: allowDecision},
+		},
+	}, {
+		name: "empty id is skipped by handwritten path (declarative covers it, and that catches it for now)",
+		obj: authorizationv1alpha1.AuthorizationConditionsReview{
+			Request: &authorizationv1alpha1.AuthorizationConditionsRequest{
+				Decision: authorizationv1.ConditionsAwareDecision{
+					Type: authorizationv1.ConditionsAwareDecisionTypeConditionsMap,
+					ConditionsMap: &authorizationv1.ConditionsMap{
+						DenyConditions: []authorizationv1.Condition{{ID: ""}},
+					},
+				},
+			},
+			Response: &authorizationv1alpha1.AuthorizationConditionsResponse{Decision: allowDecision},
+		},
 	}}
 
 	for _, c := range errorCases {
 		t.Run(c.name, func(t *testing.T) {
-			errs := ValidateAuthorizationConditionsReview(&c.obj)
+			errs := ValidateAuthorizationConditionsReview(t.Context(), operation.Operation{Type: operation.Create}, &c.obj)
 			if len(errs) == 0 {
 				t.Fatalf("expected failure containing %q", c.msgs)
 			}

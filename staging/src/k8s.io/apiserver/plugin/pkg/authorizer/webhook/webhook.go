@@ -567,13 +567,13 @@ func validateSubjectAccessReviewCreate(ctx context.Context, sar *authorizationv1
 }
 
 func validateAuthorizationConditionsReviewCreate(ctx context.Context, acr *authorizationv1alpha1.AuthorizationConditionsReview) field.ErrorList {
+	op := operation.Operation{
+		Type:    operation.Create,
+		Options: authorizationvalidation.GetDeclarativeValidationOptions(),
+	}
 	return compositeValidate(ctx, func() field.ErrorList {
-		return authorizationvalidation.ValidateAuthorizationConditionsReview(acr)
+		return authorizationvalidation.ValidateAuthorizationConditionsReview(ctx, op, acr)
 	}, func() field.ErrorList {
-		op := operation.Operation{
-			Type:    operation.Create,
-			Options: authorizationvalidation.GetDeclarativeValidationOptions(),
-		}
 		return authorizationv1alpha1.Validate_AuthorizationConditionsReview(ctx, op, nil /* fldPath */, acr, nil)
 	})
 }

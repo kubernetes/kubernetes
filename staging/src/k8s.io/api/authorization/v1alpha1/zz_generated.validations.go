@@ -24,15 +24,13 @@ package v1alpha1
 import (
 	context "context"
 
-	admissionv1 "k8s.io/api/admission/v1"
-	authorizationv1 "k8s.io/api/authorization/v1"
+	v1 "k8s.io/api/admission/v1"
 	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
 	types "k8s.io/apimachinery/pkg/types"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
-	v1 "k8s.io/kubernetes/pkg/apis/authorization/v1"
 )
 
 var unionMembershipFor_k8s_io_api_authorization_v1alpha1_AuthorizationConditionsRequest_ = validate.NewUnionMembership(validate.NewUnionMember("admissionRequest"))
@@ -53,32 +51,12 @@ func Validate_AuthorizationConditionsRequest(
 		errs = append(errs, e...)
 	}
 
-	{ // field AuthorizationConditionsRequest.Decision
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *authorizationv1.ConditionsAwareDecision,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call the type's validation function
-			errs = append(errs, v1.Validate_ConditionsAwareDecision(ctx, op, fldPath, obj, oldObj)...)
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *AuthorizationConditionsRequest) *authorizationv1.ConditionsAwareDecision {
-				return &oldObj.Decision
-			})
-		errs = append(errs, fn(fldPath.Child("decision"), &obj.Decision, oldVal, oldObj != nil)...)
-	}
+	// field AuthorizationConditionsRequest.Decision has no validation
 
 	{ // field AuthorizationConditionsRequest.AdmissionRequest
 		fn := func(
 			fldPath *field.Path,
-			obj, oldObj *admissionv1.AdmissionRequest,
+			obj, oldObj *v1.AdmissionRequest,
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
@@ -97,7 +75,7 @@ func Validate_AuthorizationConditionsRequest(
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *AuthorizationConditionsRequest) *admissionv1.AdmissionRequest {
+			func(oldObj *AuthorizationConditionsRequest) *v1.AdmissionRequest {
 				return oldObj.AdmissionRequest
 			})
 		errs = append(errs, fn(fldPath.Child("admissionRequest"), obj.AdmissionRequest, oldVal, oldObj != nil)...)
@@ -141,28 +119,7 @@ func Validate_AuthorizationConditionsResponse(
 		errs = append(errs, fn(fldPath.Child("uid"), &obj.UID, oldVal, oldObj != nil)...)
 	}
 
-	{ // field AuthorizationConditionsResponse.Decision
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *authorizationv1.ConditionsAwareDecision,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call the type's validation function
-			errs = append(errs, v1.Validate_ConditionsAwareDecision(ctx, op, fldPath, obj, oldObj)...)
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *AuthorizationConditionsResponse) *authorizationv1.ConditionsAwareDecision {
-				return &oldObj.Decision
-			})
-		errs = append(errs, fn(fldPath.Child("decision"), &obj.Decision, oldVal, oldObj != nil)...)
-	}
-
+	// field AuthorizationConditionsResponse.Decision has no validation
 	return errs
 }
 

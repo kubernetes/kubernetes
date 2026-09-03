@@ -17,12 +17,14 @@ limitations under the License.
 package validation
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	authorizationv1alpha1 "k8s.io/api/authorization/v1alpha1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/validate/content"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -236,13 +238,19 @@ func validateLabelSelectorAttributes(selector *authorizationv1.LabelSelectorAttr
 
 // ValidateAuthorizationConditionsReview validates a AuthorizationConditionsReview and returns an
 // ErrorList with any errors.
-func ValidateAuthorizationConditionsReview(acr *authorizationv1alpha1.AuthorizationConditionsReview) field.ErrorList {
+func ValidateAuthorizationConditionsReview(ctx context.Context, op operation.Operation, acr *authorizationv1alpha1.AuthorizationConditionsReview) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if acr.Request != nil {
-		allErrs = append(allErrs, ValidateAuthorizationConditionsRequest(acr.Request, field.NewPath("request"))...)
+		fldPath := field.NewPath("request")
+		allErrs = append(allErrs, ValidateAuthorizationConditionsRequest(acr.Request, fldPath)...)
+		// TODO(luxas): Temporarily manually call Validate_ConditionsAwareDecision in the v1 package, until validation-gen generates it correctly
+		allErrs = append(allErrs, authorizationv1.Validate_ConditionsAwareDecision(ctx, op, fldPath.Child("decision"), &acr.Request.Decision, nil)...)
 	}
 	if acr.Response != nil {
-		allErrs = append(allErrs, ValidateAuthorizationConditionsResponse(acr.Response, field.NewPath("response"))...)
+		fldPath := field.NewPath("response")
+		allErrs = append(allErrs, ValidateAuthorizationConditionsResponse(acr.Response, fldPath)...)
+		// TODO(luxas): Temporarily manually call Validate_ConditionsAwareDecision in the v1 package, until validation-gen generates it correctly
+		allErrs = append(allErrs, authorizationv1.Validate_ConditionsAwareDecision(ctx, op, fldPath.Child("decision"), &acr.Response.Decision, nil)...)
 	}
 
 	objectMetaShallowCopy := acr.ObjectMeta

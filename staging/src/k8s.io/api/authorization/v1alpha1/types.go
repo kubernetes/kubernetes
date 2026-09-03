@@ -53,7 +53,9 @@ type AuthorizationConditionsReview struct {
 type AuthorizationConditionsRequest struct {
 	// decision contains the conditional decision the authorizer authored at authorization time.
 	// +required
+	// +k8s:opaqueType
 	Decision authorizationv1.ConditionsAwareDecision `json:"decision" protobuf:"bytes,1,opt,name=decision"`
+	// TODO(luxas): Remove the temporary opaqueType hack when validation-gen supports calling the function of the right package.
 
 	// admissionRequest may contain additional information for evaluating the conditions.
 	// +k8s:unionMember
@@ -74,5 +76,7 @@ type AuthorizationConditionsResponse struct {
 
 	// decision contains the authorizer's decision after seeing the data.
 	// +required
+	// +k8s:opaqueType
 	Decision authorizationv1.ConditionsAwareDecision `json:"decision" protobuf:"bytes,2,opt,name=decision"`
+	// TODO(luxas): Remove the temporary opaqueType hack when validation-gen supports calling the function of the right package.
 }
