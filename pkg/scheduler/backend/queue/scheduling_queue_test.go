@@ -5891,12 +5891,23 @@ func TestPriorityQueue_GetPod(t *testing.T) {
 			Namespace: "default",
 		},
 	}
+	inFlightPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod5",
+			Namespace: "default",
+			UID:       "pod5",
+		},
+	}
 
 	logger, ctx := ktesting.NewTestContext(t)
 	q := NewTestQueue(ctx, newDefaultQueueSort())
 	q.activeQ.add(logger, newQueuedPodInfoForLookup(activeQPod), framework.EventUnscheduledPodAdd.Label(), nil)
 	q.backoffQ.add(logger, newQueuedPodInfoForLookup(backoffQPod), framework.EventUnscheduledPodAdd.Label(), nil)
 	q.unschedulableEntities.addOrUpdate(newQueuedPodInfoForLookup(unschedPod), false, framework.EventUnscheduledPodAdd.Label(), nil)
+	q.activeQ.add(logger, newQueuedPodInfoForLookup(inFlightPod), framework.EventUnscheduledPodAdd.Label(), nil)
+	if _, err := q.activeQ.pop(logger); err != nil {
+		t.Fatalf("pop failed: %v", err)
+	}
 
 	tests := []struct {
 		name        string
@@ -5924,6 +5935,13 @@ func TestPriorityQueue_GetPod(t *testing.T) {
 			podName:     "pod3",
 			namespace:   "default",
 			expectedPod: unschedPod,
+			expectedOK:  true,
+		},
+		{
+			name:        "pod is found in inFlightPods",
+			podName:     "pod5",
+			namespace:   "default",
+			expectedPod: inFlightPod,
 			expectedOK:  true,
 		},
 		{
