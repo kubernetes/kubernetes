@@ -544,7 +544,7 @@ func TestListCorruptObjects(t *testing.T) {
 			}
 
 			// b) list the secrets before we break encryption
-			result, err := test.restClient.CoreV1().Secrets(testNamespace).List(context.Background(), metav1.ListOptions{})
+			result, err := test.restClient.CoreV1().Secrets(testNamespace).List(context.Background(), metav1.ListOptions{Limit: 500})
 			if err != nil {
 				t.Fatalf("listing secrets failed unexpectedly with: %v", err)
 			}
@@ -591,7 +591,7 @@ func TestListCorruptObjects(t *testing.T) {
 			tc.encryptionBrokenFn(t, got)
 
 			// e) list should return expected error
-			_, err = test.restClient.CoreV1().Secrets(testNamespace).List(ctx, metav1.ListOptions{})
+			_, err = test.restClient.CoreV1().Secrets(testNamespace).List(ctx, metav1.ListOptions{Limit: 500})
 			tc.listAfter.verify(t, err)
 		})
 	}

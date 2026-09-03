@@ -449,7 +449,7 @@ func TestCRListCorruptObjects(t *testing.T) {
 			}
 
 			// b) list the CRs before we break encryption
-			result, err := adminDynClient.Resource(fooGVR).Namespace(testNamespace).List(ctx, metav1.ListOptions{})
+			result, err := adminDynClient.Resource(fooGVR).Namespace(testNamespace).List(ctx, metav1.ListOptions{Limit: 500})
 			if err != nil {
 				t.Fatalf("listing foos failed unexpectedly with: %v", err)
 			}
@@ -494,7 +494,7 @@ func TestCRListCorruptObjects(t *testing.T) {
 			tc.encryptionBrokenFn(t, got)
 
 			// e) LIST should return expected error
-			_, err = adminDynClient.Resource(fooGVR).Namespace(testNamespace).List(ctx, metav1.ListOptions{})
+			_, err = adminDynClient.Resource(fooGVR).Namespace(testNamespace).List(ctx, metav1.ListOptions{Limit: 500})
 			tc.listAfter.verify(t, err)
 		})
 	}
