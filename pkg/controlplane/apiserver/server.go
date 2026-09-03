@@ -88,8 +88,11 @@ type Server struct {
 	VersionedInformers        clientgoinformers.SharedInformerFactory
 
 	// servedResources is populated by InstallAPIs with the resources that survived
-	// runtime-config, emulation version and API lifecycle filtering.
+	// runtime-config, feature gate, emulation version and API lifecycle filtering.
 	servedResources sets.Set[schema.GroupResource]
+	// registeredResources is populated by InstallAPIs with every resource the storage
+	// providers know how to serve, before any of that filtering.
+	registeredResources sets.Set[schema.GroupVersionResource]
 }
 
 // New returns a new instance of Master from the given config.

@@ -4,7 +4,9 @@
 <!-- To resolve merge conflicts, run: hack/update-featuregates.sh -->
 
 The Required APIs column lists the API resources that must be served for a feature to function.
-kube-apiserver refuses to start when an enabled feature gate requires an API resource that is not served.
+kube-apiserver refuses to start when a feature gate is named in --feature-gates but a required API resource is not served,
+or when a required API resource is named as group/version/resource in --runtime-config but a feature gate it requires is disabled.
+A feature gate that is enabled by default only logs a warning when its required API resources are not served.
 
 | Feature | Enabled | Locked | Alpha | Beta | GA | Deprecated | Dependencies | Required APIs | Links |
 |---------|---------|--------|-------|------|----|------------|--------------|---------------|-------|
