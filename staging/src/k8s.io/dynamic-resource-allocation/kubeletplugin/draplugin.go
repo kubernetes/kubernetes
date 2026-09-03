@@ -56,7 +56,7 @@ const (
 	// KubeletRegistryDir is the default for [RegistrarDirectoryPath]
 	KubeletRegistryDir = "/var/lib/kubelet/plugins_registry"
 
-	// unixPathMax is the maximum length of an AF_UNIX socket path on Linux.
+	// unixPathMax is the size of the AF_UNIX sun_path field on Linux.
 	unixPathMax = 108
 
 	// rollingUpdateUIDHashBytes is how much of the SHA-256 digest of a pod UID
@@ -74,7 +74,7 @@ const (
 
 // RollingUpdateRegistrarSocketFile returns a kubelet plugin registration socket
 // basename for rolling updates. The full path path.Join(registryDir, basename)
-// must fit within unixPathMax bytes.
+// must be shorter than unixPathMax bytes to leave room for the terminating NUL.
 //
 // The basename is chosen in order of preference:
 //  1. <driver name>-<pod UID>-reg.sock
@@ -90,7 +90,7 @@ func RollingUpdateRegistrarSocketFile(registryDir, driverName string, podUID typ
 		"dra-" + base64.RawURLEncoding.EncodeToString(driverUIDHash[:rollingUpdateRegistrarSocketHashBytes]) + "-reg.sock",
 	}
 	for _, basename := range candidates {
-		if len(path.Join(registryDir, basename)) <= unixPathMax {
+		if len(path.Join(registryDir, basename)) < unixPathMax {
 			return basename
 		}
 	}
