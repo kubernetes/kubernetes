@@ -20,155 +20,31 @@ import (
 	"context"
 	"fmt"
 
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	"k8s.io/apimachinery/pkg/api/operation"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
+
+	apiservervalidation "k8s.io/apiserver/pkg/apis/authorization/validation"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
+	authorizationinternalv1 "k8s.io/kubernetes/pkg/apis/authorization/v1"
 )
-
-// ValidateSubjectAccessReviewSpec validates a SubjectAccessReviewSpec and returns an
-// ErrorList with any errors.
-func ValidateSubjectAccessReviewSpec(spec authorizationapi.SubjectAccessReviewSpec, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if spec.ResourceAttributes != nil && spec.NonResourceAttributes != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, spec.NonResourceAttributes, `exactly one of nonResourceAttributes or resourceAttributes must be specified`).WithOrigin("union").MarkCoveredByDeclarative())
-	}
-	if spec.ResourceAttributes == nil && spec.NonResourceAttributes == nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, spec.NonResourceAttributes, `exactly one of nonResourceAttributes or resourceAttributes must be specified`).WithOrigin("union").MarkCoveredByDeclarative())
-	}
-	if len(spec.User) == 0 && len(spec.Groups) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("user"), spec.User, `at least one of user or group must be specified`))
-	}
-	allErrs = append(allErrs, validateResourceAttributes(spec.ResourceAttributes, field.NewPath("spec.resourceAttributes"))...)
-
-	return allErrs
-}
-
-// ValidateSelfSubjectAccessReviewSpec validates a SelfSubjectAccessReviewSpec and returns an
-// ErrorList with any errors.
-func ValidateSelfSubjectAccessReviewSpec(spec authorizationapi.SelfSubjectAccessReviewSpec, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if spec.ResourceAttributes != nil && spec.NonResourceAttributes != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, spec.NonResourceAttributes, `exactly one of nonResourceAttributes or resourceAttributes must be specified`).WithOrigin("union").MarkCoveredByDeclarative())
-	}
-	if spec.ResourceAttributes == nil && spec.NonResourceAttributes == nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, spec.NonResourceAttributes, `exactly one of nonResourceAttributes or resourceAttributes must be specified`).WithOrigin("union").MarkCoveredByDeclarative())
-	}
-	allErrs = append(allErrs, validateResourceAttributes(spec.ResourceAttributes, field.NewPath("spec.resourceAttributes"))...)
-
-	return allErrs
-}
-
-// ValidateSubjectAccessReview validates a SubjectAccessReview and returns an
-// ErrorList with any errors.
-func ValidateSubjectAccessReview(sar *authorizationapi.SubjectAccessReview) field.ErrorList {
-	allErrs := ValidateSubjectAccessReviewSpec(sar.Spec, field.NewPath("spec"))
-	objectMetaShallowCopy := sar.ObjectMeta
-	objectMetaShallowCopy.ManagedFields = nil
-	if !apiequality.Semantic.DeepEqual(metav1.ObjectMeta{}, objectMetaShallowCopy) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata"), sar.ObjectMeta, `must be empty`))
-	}
-	return allErrs
-}
-
-// ValidateSelfSubjectAccessReview validates a SelfSubjectAccessReview and returns an
-// ErrorList with any errors.
-func ValidateSelfSubjectAccessReview(sar *authorizationapi.SelfSubjectAccessReview) field.ErrorList {
-	allErrs := ValidateSelfSubjectAccessReviewSpec(sar.Spec, field.NewPath("spec"))
-	objectMetaShallowCopy := sar.ObjectMeta
-	objectMetaShallowCopy.ManagedFields = nil
-	if !apiequality.Semantic.DeepEqual(metav1.ObjectMeta{}, objectMetaShallowCopy) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata"), sar.ObjectMeta, `must be empty`))
-	}
-	return allErrs
-}
-
-// ValidateLocalSubjectAccessReview validates a LocalSubjectAccessReview and returns an
-// ErrorList with any errors.
-func ValidateLocalSubjectAccessReview(sar *authorizationapi.LocalSubjectAccessReview) field.ErrorList {
-	allErrs := ValidateSubjectAccessReviewSpec(sar.Spec, field.NewPath("spec"))
-
-	objectMetaShallowCopy := sar.ObjectMeta
-	objectMetaShallowCopy.Namespace = ""
-	objectMetaShallowCopy.ManagedFields = nil
-	if !apiequality.Semantic.DeepEqual(metav1.ObjectMeta{}, objectMetaShallowCopy) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata"), sar.ObjectMeta, `must be empty except for namespace`))
-	}
-
-	if sar.Spec.ResourceAttributes != nil && sar.Spec.ResourceAttributes.Namespace != sar.Namespace {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.resourceAttributes.namespace"), sar.Spec.ResourceAttributes.Namespace, `must match metadata.namespace`))
-	}
-	if sar.Spec.NonResourceAttributes != nil {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.nonResourceAttributes"), sar.Spec.NonResourceAttributes, `disallowed on this kind of request`))
-	}
-
-	return allErrs
-}
-
-func validateResourceAttributes(resourceAttributes *authorizationapi.ResourceAttributes, fldPath *field.Path) field.ErrorList {
-	if resourceAttributes == nil {
-		return nil
-	}
-	allErrs := field.ErrorList{}
-
-	allErrs = append(allErrs, validateFieldSelectorAttributes(resourceAttributes.FieldSelector, fldPath.Child("fieldSelector"))...)
-	allErrs = append(allErrs, validateLabelSelectorAttributes(resourceAttributes.LabelSelector, fldPath.Child("labelSelector"))...)
-
-	return allErrs
-}
-
-func validateFieldSelectorAttributes(selector *authorizationapi.FieldSelectorAttributes, fldPath *field.Path) field.ErrorList {
-	if selector == nil {
-		return nil
-	}
-	allErrs := field.ErrorList{}
-
-	if len(selector.RawSelector) > 0 && len(selector.Requirements) > 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("rawSelector"), selector.RawSelector, "may not specified at the same time as requirements"))
-	}
-	if len(selector.RawSelector) == 0 && len(selector.Requirements) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("requirements"), fmt.Sprintf("when %s is specified, requirements or rawSelector is required", fldPath)))
-	}
-
-	// AllowUnknownOperatorInRequirement enables *SubjectAccessReview requests from newer skewed clients which understand operators kube-apiserver does not know about to be authorized.
-	validationOptions := metav1validation.FieldSelectorValidationOptions{AllowUnknownOperatorInRequirement: true}
-	for i, requirement := range selector.Requirements {
-		allErrs = append(allErrs, metav1validation.ValidateFieldSelectorRequirement(requirement, validationOptions, fldPath.Child("requirements").Index(i))...)
-	}
-
-	return allErrs
-}
-
-func validateLabelSelectorAttributes(selector *authorizationapi.LabelSelectorAttributes, fldPath *field.Path) field.ErrorList {
-	if selector == nil {
-		return nil
-	}
-	allErrs := field.ErrorList{}
-
-	if len(selector.RawSelector) > 0 && len(selector.Requirements) > 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("rawSelector"), selector.RawSelector, "may not specified at the same time as requirements"))
-	}
-	if len(selector.RawSelector) == 0 && len(selector.Requirements) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("requirements"), fmt.Sprintf("when %s is specified, requirements or rawSelector is required", fldPath)))
-	}
-
-	// AllowUnknownOperatorInRequirement enables *SubjectAccessReview requests from newer skewed clients which understand operators kube-apiserver does not know about to be authorized.
-	validationOptions := metav1validation.LabelSelectorValidationOptions{AllowUnknownOperatorInRequirement: true}
-	for i, requirement := range selector.Requirements {
-		allErrs = append(allErrs, metav1validation.ValidateLabelSelectorRequirement(requirement, validationOptions, fldPath.Child("requirements").Index(i))...)
-	}
-
-	return allErrs
-}
 
 // ValidateSubjectAccessReviewCreate is the single composition of handwritten and declarative
 // SubjectAccessReview validation.
 func ValidateSubjectAccessReviewCreate(ctx context.Context, scheme *runtime.Scheme, sar *authorizationapi.SubjectAccessReview) field.ErrorList {
-	errs := ValidateSubjectAccessReview(sar)
+	// The hand-written validations are written only once, for the most recent external API version, so that also k8s.io/apiserver
+	// importers can make use of the validations.
+	sarV1 := &authorizationv1.SubjectAccessReview{}
+
+	// Call the conversion function directly, as we know it exactly. It is known to be fast as the internal package and v1 is byte-identical.
+	// conversion.Scope is known to be unused in this specific case and thus left nil. We know it in practice never errors.
+	if err := authorizationinternalv1.Convert_authorization_SubjectAccessReview_To_v1_SubjectAccessReview(sar, sarV1, nil); err != nil {
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("unexpected, could not convert internal SubjectAccessReview to v1: %w", err))}
+	}
+
+	errs := apiservervalidation.ValidateSubjectAccessReview(sarV1)
 	dv := rest.DeclarativeValidation{Scheme: scheme}
 	return dv.ValidateDeclaratively(ctx, sar, nil, errs, operation.Create, rest.DeclarativeValidationConfig{})
 }
@@ -176,7 +52,17 @@ func ValidateSubjectAccessReviewCreate(ctx context.Context, scheme *runtime.Sche
 // ValidateSelfSubjectAccessReviewCreate is the single composition of handwritten and declarative
 // SelfSubjectAccessReview validation.
 func ValidateSelfSubjectAccessReviewCreate(ctx context.Context, scheme *runtime.Scheme, sar *authorizationapi.SelfSubjectAccessReview) field.ErrorList {
-	errs := ValidateSelfSubjectAccessReview(sar)
+	// The hand-written validations are written only once, for the most recent external API version, so that also k8s.io/apiserver
+	// importers can make use of the validations.
+	sarV1 := &authorizationv1.SelfSubjectAccessReview{}
+
+	// Call the conversion function directly, as we know it exactly. It is known to be fast as the internal package and v1 is byte-identical.
+	// conversion.Scope is known to be unused in this specific case and thus left nil. We know it in practice never errors.
+	if err := authorizationinternalv1.Convert_authorization_SelfSubjectAccessReview_To_v1_SelfSubjectAccessReview(sar, sarV1, nil); err != nil {
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("unexpected, could not convert internal SelfSubjectAccessReview to v1: %w", err))}
+	}
+
+	errs := apiservervalidation.ValidateSelfSubjectAccessReview(sarV1)
 	dv := rest.DeclarativeValidation{Scheme: scheme}
 	return dv.ValidateDeclaratively(ctx, sar, nil, errs, operation.Create, rest.DeclarativeValidationConfig{})
 }
@@ -184,7 +70,17 @@ func ValidateSelfSubjectAccessReviewCreate(ctx context.Context, scheme *runtime.
 // ValidateLocalSubjectAccessReviewCreate is the single composition of handwritten and declarative
 // LocalSubjectAccessReview validation.
 func ValidateLocalSubjectAccessReviewCreate(ctx context.Context, scheme *runtime.Scheme, sar *authorizationapi.LocalSubjectAccessReview) field.ErrorList {
-	errs := ValidateLocalSubjectAccessReview(sar)
+	// The hand-written validations are written only once, for the most recent external API version, so that also k8s.io/apiserver
+	// importers can make use of the validations.
+	sarV1 := &authorizationv1.LocalSubjectAccessReview{}
+
+	// Call the conversion function directly, as we know it exactly. It is known to be fast as the internal package and v1 is byte-identical.
+	// conversion.Scope is known to be unused in this specific case and thus left nil. We know it in practice never errors.
+	if err := authorizationinternalv1.Convert_authorization_LocalSubjectAccessReview_To_v1_LocalSubjectAccessReview(sar, sarV1, nil); err != nil {
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("unexpected, could not convert internal LocalSubjectAccessReview to v1: %w", err))}
+	}
+
+	errs := apiservervalidation.ValidateLocalSubjectAccessReview(sarV1)
 	dv := rest.DeclarativeValidation{Scheme: scheme}
 	return dv.ValidateDeclaratively(ctx, sar, nil, errs, operation.Create, rest.DeclarativeValidationConfig{})
 }
