@@ -66,10 +66,16 @@ func TestGetMachineInfo(t *testing.T) {
 	machineInfo, err := p.getMachineInfo(logger)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(100), machineInfo.MemoryCapacity)
-	hostname, _ := os.Hostname()
-	assert.Equal(t, hostname, machineInfo.MachineID)
 
-	// Check if it's an UUID.
+	// MachineID is the stable per-install OS GUID, which must be a valid UUID
+	// and must not simply be the hostname (hostnames can change/not be unique).
+	assert.NotEmpty(t, machineInfo.MachineID)
+	hostname, _ := os.Hostname()
+	assert.NotEqual(t, hostname, machineInfo.MachineID)
+	_, err = uuid.Parse(machineInfo.MachineID)
+	assert.NoError(t, err)
+
+	// Check SystemUUID is a UUID.
 	_, err = uuid.Parse(machineInfo.SystemUUID)
 	assert.NoError(t, err)
 
@@ -204,4 +210,16 @@ func TestGetSystemUUID(t *testing.T) {
 	assert.NoError(t, err)
 	uuidFromWmiString := strings.Trim(string(uuidFromWmi), "\r\n")
 	assert.Equal(t, uuidFromWmiString, uuidFromRegistry)
+}
+
+func TestGetMachineID(t *testing.T) {
+	machineID := getMachineID()
+
+	// Windows nodes must surface a stable unique identifier for NodeInfo.MachineID
+	// (the per-install MachineGuid), not the hostname which can change on rename.
+	assert.NotEmpty(t, machineID)
+	hostname, _ := os.Hostname()
+	assert.NotEqual(t, hostname, machineID)
+	_, err := uuid.Parse(machineID)
+	assert.NoError(t, err)
 }
