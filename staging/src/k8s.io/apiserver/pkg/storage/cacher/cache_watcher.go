@@ -563,15 +563,10 @@ func (c *cacheWatcher) observeDispatchMetrics(event *watchCacheEvent, builtAt, s
 	if event.Type == watch.Bookmark || sentAt.IsZero() {
 		return
 	}
+	// The pre-fanout points are marked in processEvent; complete the per-watcher
+	// tail here then emit all stages.
 	tl := event.timeline
 	tl.MarkAt(metrics.PointEventBuilt, builtAt)
 	tl.MarkAt(metrics.PointSentToClient, sentAt)
-
-	if !tl[metrics.PointStorageDecoded].IsZero() {
-		if !tl[metrics.PointCacheReceived].IsZero() {
-			c.watcherMetrics.ObserveStage(metrics.StageStorageToCache, tl[metrics.PointCacheReceived].Sub(tl[metrics.PointStorageDecoded]))
-		}
-		c.watcherMetrics.ObserveStage(metrics.StageTotal, sentAt.Sub(tl[metrics.PointStorageDecoded]))
-	}
-	c.watcherMetrics.ObserveStage(metrics.StageWatcherToClientHandler, sentAt.Sub(builtAt))
+	c.watcherMetrics.ObserveTimeline(&tl)
 }
