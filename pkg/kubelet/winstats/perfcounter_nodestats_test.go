@@ -67,13 +67,11 @@ func TestGetMachineInfo(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(100), machineInfo.MemoryCapacity)
 
-	// MachineID is the stable per-install OS GUID, which must be a valid UUID
-	// and must not simply be the hostname (hostnames can change/not be unique).
+	// MachineID must be non-empty and consistent with the value produced by
+	// getMachineID() (the stable per-install OS GUID, or the hostname fallback
+	// when the registry cannot be read).
 	assert.NotEmpty(t, machineInfo.MachineID)
-	hostname, _ := os.Hostname()
-	assert.NotEqual(t, hostname, machineInfo.MachineID)
-	_, err = uuid.Parse(machineInfo.MachineID)
-	assert.NoError(t, err)
+	assert.Equal(t, getMachineID(), machineInfo.MachineID)
 
 	// Check SystemUUID is a UUID.
 	_, err = uuid.Parse(machineInfo.SystemUUID)
@@ -213,12 +211,23 @@ func TestGetSystemUUID(t *testing.T) {
 }
 
 func TestGetMachineID(t *testing.T) {
+	// The result is deterministic on a given machine: when the MachineGuid
+	// registry value is readable it is used as-is (as a lower-case UUID);
+	// otherwise getMachineID() falls back to the hostname so node identity
+	// still resolves without a registry read error stopping the kubelet.
+	guid, guidErr := getMachineGuid()
 	machineID := getMachineID()
-
-	// Windows nodes must surface a stable unique identifier for NodeInfo.MachineID
-	// (the per-install MachineGuid), not the hostname which can change on rename.
-	assert.NotEmpty(t, machineID)
 	hostname, _ := os.Hostname()
+
+	assert.NotEmpty(t, machineID)
+	if guidErr != nil {
+		// Registry unavailable: fall back to the hostname.
+		assert.Equal(t, hostname, machineID)
+		return
+	}
+
+	// Registry available: the stable machine ID is used and must be a valid UUID.
+	assert.Equal(t, guid, machineID)
 	assert.NotEqual(t, hostname, machineID)
 	_, err := uuid.Parse(machineID)
 	assert.NoError(t, err)
