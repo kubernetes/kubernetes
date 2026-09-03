@@ -70,17 +70,17 @@ const (
 // +k8s:supportsSubresource="/status"
 type Job struct {
 	metav1.TypeMeta `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Specification of the desired behavior of a job.
+	// spec is the specification of the desired behavior of a job.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +required
 	Spec JobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
-	// Current status of a job.
+	// status is the current status of a job.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Status JobStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
@@ -171,14 +171,14 @@ const (
 // fields in the Pod status, respectively. Containers completed with success
 // (exit code 0) are excluded from the requirement check.
 type PodFailurePolicyOnExitCodesRequirement struct {
-	// Restricts the check for exit codes to the container with the
+	// containerName restricts the check for exit codes to the container with the
 	// specified name. When null, the rule applies to all containers.
 	// When specified, it should match one the container or initContainer
 	// names in the pod template.
 	// +optional
 	ContainerName *string `json:"containerName,omitempty" protobuf:"bytes,1,opt,name=containerName"`
 
-	// Represents the relationship between the container exit code(s) and the
+	// operator represents the relationship between the container exit code(s) and the
 	// specified values. Containers completed with success (exit code 0) are
 	// excluded from the requirement check. Possible values are:
 	//
@@ -193,7 +193,7 @@ type PodFailurePolicyOnExitCodesRequirement struct {
 	// +required
 	Operator PodFailurePolicyOnExitCodesOperator `json:"operator" protobuf:"bytes,2,req,name=operator"`
 
-	// Specifies the set of values. Each returned container exit code (might be
+	// values specifies the set of values. Each returned container exit code (might be
 	// multiple in case of multiple containers) is checked against this set of
 	// values with respect to the operator. The list of values must be ordered
 	// and must not contain duplicates. Value '0' cannot be used for the In operator.
@@ -206,12 +206,12 @@ type PodFailurePolicyOnExitCodesRequirement struct {
 // PodFailurePolicyOnPodConditionsPattern describes a pattern for matching
 // an actual pod condition type.
 type PodFailurePolicyOnPodConditionsPattern struct {
-	// Specifies the required Pod condition type. To match a pod condition
+	// type specifies the required Pod condition type. To match a pod condition
 	// it is required that specified type equals the pod condition type.
 	// +required
 	Type corev1.PodConditionType `json:"type" protobuf:"bytes,1,req,name=type"`
 
-	// Specifies the required Pod condition status. To match a pod condition
+	// status specifies the required Pod condition status. To match a pod condition
 	// it is required that the specified status equals the pod condition status.
 	// Defaults to True.
 	// +optional
@@ -221,7 +221,7 @@ type PodFailurePolicyOnPodConditionsPattern struct {
 // PodFailurePolicyRule describes how a pod failure is handled when the requirements are met.
 // One of onExitCodes and onPodConditions, but not both, can be used in each rule.
 type PodFailurePolicyRule struct {
-	// Specifies the action taken on a pod failure when the requirements are satisfied.
+	// action specifies the action taken on a pod failure when the requirements are satisfied.
 	// Possible values are:
 	//
 	// - FailJob: indicates that the pod's job is marked as Failed and all
@@ -237,11 +237,11 @@ type PodFailurePolicyRule struct {
 	// +required
 	Action PodFailurePolicyAction `json:"action" protobuf:"bytes,1,req,name=action"`
 
-	// Represents the requirement on the container exit codes.
+	// onExitCodes represents the requirement on the container exit codes.
 	// +optional
 	OnExitCodes *PodFailurePolicyOnExitCodesRequirement `json:"onExitCodes,omitempty" protobuf:"bytes,2,opt,name=onExitCodes"`
 
-	// Represents the requirement on the pod conditions. The requirement is represented
+	// onPodConditions represents the requirement on the pod conditions. The requirement is represented
 	// as a list of pod condition patterns. The requirement is satisfied if at
 	// least one pattern matches an actual pod condition. At most 20 elements are allowed.
 	// +listType=atomic
@@ -251,7 +251,7 @@ type PodFailurePolicyRule struct {
 
 // PodFailurePolicy describes how failed pods influence the backoffLimit.
 type PodFailurePolicy struct {
-	// A list of pod failure policy rules. The rules are evaluated in order.
+	// rules is a list of pod failure policy rules. The rules are evaluated in order.
 	// Once a rule matches a Pod failure, the remaining of the rules are ignored.
 	// When no rule matches the Pod failure, the default handling applies - the
 	// counter of pod failures is incremented and it is checked against
@@ -310,7 +310,7 @@ type SuccessPolicyRule struct {
 // JobSpec describes how the job execution will look like.
 type JobSpec struct {
 
-	// Specifies the maximum desired number of pods the job should
+	// parallelism specifies the maximum desired number of pods the job should
 	// run at any given time. The actual number of pods running in steady state will
 	// be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism),
 	// i.e. when the work left to do is less than max parallelism.
@@ -318,7 +318,7 @@ type JobSpec struct {
 	// +optional
 	Parallelism *int32 `json:"parallelism,omitempty" protobuf:"varint,1,opt,name=parallelism"`
 
-	// Specifies the desired number of successfully finished pods the
+	// completions specifies the desired number of successfully finished pods the
 	// job should be run with.  Setting to null means that the success of any
 	// pod signals the success of all pods, and allows parallelism to have any positive
 	// value.  Setting to 1 means that parallelism is limited to 1 and the success of that
@@ -327,7 +327,7 @@ type JobSpec struct {
 	// +optional
 	Completions *int32 `json:"completions,omitempty" protobuf:"varint,2,opt,name=completions"`
 
-	// Specifies the duration in seconds relative to the startTime that the job
+	// activeDeadlineSeconds specifies the duration in seconds relative to the startTime that the job
 	// may be continuously active before the system tries to terminate it; value
 	// must be positive integer. If a Job is suspended (at creation or through an
 	// update), this timer will effectively be stopped and reset when the Job is
@@ -335,7 +335,7 @@ type JobSpec struct {
 	// +optional
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,3,opt,name=activeDeadlineSeconds"`
 
-	// Specifies the policy of handling failed pods. In particular, it allows to
+	// podFailurePolicy specifies the policy of handling failed pods. In particular, it allows to
 	// specify the set of actions and conditions which need to be
 	// satisfied to take the associated action.
 	// If empty, the default behaviour applies - the counter of failed pods,
@@ -355,13 +355,13 @@ type JobSpec struct {
 	// +optional
 	SuccessPolicy *SuccessPolicy `json:"successPolicy,omitempty" protobuf:"bytes,16,opt,name=successPolicy"`
 
-	// Specifies the number of retries before marking this job failed.
+	// backoffLimit specifies the number of retries before marking this job failed.
 	// Defaults to 6, unless backoffLimitPerIndex (only Indexed Job) is specified.
 	// When backoffLimitPerIndex is specified, backoffLimit defaults to 2147483647.
 	// +optional
 	BackoffLimit *int32 `json:"backoffLimit,omitempty" protobuf:"varint,7,opt,name=backoffLimit"`
 
-	// Specifies the limit for the number of retries within an
+	// backoffLimitPerIndex specifies the limit for the number of retries within an
 	// index before marking this index as failed. When enabled the number of
 	// failures per index is kept in the pod's
 	// batch.kubernetes.io/job-index-failure-count annotation. It can only
@@ -370,7 +370,7 @@ type JobSpec struct {
 	// +optional
 	BackoffLimitPerIndex *int32 `json:"backoffLimitPerIndex,omitempty" protobuf:"varint,12,opt,name=backoffLimitPerIndex"`
 
-	// Specifies the maximal number of failed indexes before marking the Job as
+	// maxFailedIndexes specifies the maximal number of failed indexes before marking the Job as
 	// failed, when backoffLimitPerIndex is set. Once the number of failed
 	// indexes exceeds this number the entire Job is marked as Failed and its
 	// execution is terminated. When left as null the job continues execution of
@@ -388,7 +388,7 @@ type JobSpec struct {
 	// +optional
 	// FailedPodsLimit *int32 `json:"failedPodsLimit,omitempty" protobuf:"varint,9,opt,name=failedPodsLimit"`
 
-	// A label query over pods that should match the pod count.
+	// selector is a label query over pods that should match the pod count.
 	// Normally, the system sets this field for you.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
 	// +optional
@@ -407,7 +407,7 @@ type JobSpec struct {
 	// +optional
 	ManualSelector *bool `json:"manualSelector,omitempty" protobuf:"varint,5,opt,name=manualSelector"`
 
-	// Describes the pod that will be created when executing a job.
+	// template describes the pod that will be created when executing a job.
 	// The only allowed template.spec.restartPolicy values are "Never" or "OnFailure".
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/
 	// +required
@@ -471,7 +471,7 @@ type JobSpec struct {
 	// +optional
 	PodReplacementPolicy *PodReplacementPolicy `json:"podReplacementPolicy,omitempty" protobuf:"bytes,14,opt,name=podReplacementPolicy,casttype=podReplacementPolicy"`
 
-	// ManagedBy field indicates the controller that manages a Job. The k8s Job
+	// managedBy field indicates the controller that manages a Job. The k8s Job
 	// controller reconciles jobs which don't have this field at all or the field
 	// value is the reserved string `kubernetes.io/job-controller`, but skips
 	// reconciling Jobs with a custom value for this field.
@@ -504,7 +504,7 @@ type JobSpec struct {
 // JobSchedulingConfiguration composes the reusable workload-aware
 // scheduling building blocks.
 type JobSchedulingConfiguration struct {
-	// SchedulingPolicy defines the scheduling policy for this Job.
+	// schedulingPolicy defines the scheduling policy for this Job.
 	// Exactly one of Basic or Gang must be set.
 	// This field is immutable after creation: the policy may not be added or
 	// removed. The policy variant (basic/gang) is frozen by hand-written
@@ -516,7 +516,7 @@ type JobSchedulingConfiguration struct {
 	// +k8s:update=NoUnset
 	SchedulingPolicy *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy `json:"schedulingPolicy,omitempty" protobuf:"bytes,1,opt,name=schedulingPolicy"`
 
-	// SchedulingConstraints defines scheduling constraints (e.g. topology)
+	// schedulingConstraints defines scheduling constraints (e.g. topology)
 	// for the Job's pods.
 	// This field is immutable after creation.
 	//
@@ -525,7 +525,7 @@ type JobSchedulingConfiguration struct {
 	// +k8s:immutable
 	SchedulingConstraints *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints `json:"schedulingConstraints,omitempty" protobuf:"bytes,2,opt,name=schedulingConstraints"`
 
-	// DisruptionMode defines the mode in which the Job's pods can be disrupted.
+	// disruptionMode defines the mode in which the Job's pods can be disrupted.
 	// One of Single, All.
 	// This field is immutable after creation: it may not be added or removed,
 	// and the selected mode may not be changed.
@@ -535,7 +535,7 @@ type JobSchedulingConfiguration struct {
 	// +k8s:immutable
 	DisruptionMode *schedulingv1alpha3.WorkloadPodGroupDisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,3,opt,name=disruptionMode"`
 
-	// ResourceClaims defines which ResourceClaims may be shared among Pods in
+	// resourceClaims defines which ResourceClaims may be shared among Pods in
 	// the Job. Pods consume the devices allocated to a PodGroup's claim by
 	// defining a claim in its own Spec.ResourceClaims that matches the
 	// PodGroup's claim exactly. The claim must have the same name and refer to
@@ -720,35 +720,35 @@ const (
 
 // JobCondition describes current state of a job.
 type JobCondition struct {
-	// Type of job condition, Complete or Failed.
+	// type is the type of job condition, Complete or Failed.
 	// +optional
 	Type JobConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=JobConditionType"`
-	// Status of the condition, one of True, False, Unknown.
+	// status is the status of the condition, one of True, False, Unknown.
 	// +optional
 	Status corev1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
-	// Last time the condition was checked.
+	// lastProbeTime is the last time the condition was checked.
 	// +optional
 	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty" protobuf:"bytes,3,opt,name=lastProbeTime"`
-	// Last time the condition transit from one status to another.
+	// lastTransitionTime is the last time the condition transit from one status to another.
 	// +optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastTransitionTime"`
-	// (brief) reason for the condition's last transition.
+	// reason is the brief reason for the condition's last transition.
 	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,5,opt,name=reason"`
-	// Human readable message indicating details about last transition.
+	// message is human readable message indicating details about last transition.
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
 }
 
 // JobTemplateSpec describes the data a Job should have when created from a template
 type JobTemplateSpec struct {
-	// Standard object's metadata of the jobs created from this template.
+	// metadata is the standard object's metadata of the jobs created from this template.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	// +k8s:opaqueType
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Specification of the desired behavior of the job.
+	// spec is the specification of the desired behavior of the job.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +required
 	Spec JobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
@@ -762,17 +762,17 @@ type JobTemplateSpec struct {
 // +k8s:supportsSubresource="/status"
 type CronJob struct {
 	metav1.TypeMeta `json:""`
-	// Standard object's metadata.
+	// metadata is the standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Specification of the desired behavior of a cron job, including the schedule.
+	// spec is the specification of the desired behavior of a cron job, including the schedule.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +required
 	Spec CronJobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
-	// Current status of a cron job.
+	// status is the current status of a cron job.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Status CronJobStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
@@ -797,12 +797,12 @@ type CronJobList struct {
 // CronJobSpec describes how the job execution will look like and when it will actually run.
 type CronJobSpec struct {
 
-	// The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
+	// schedule is the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
 	// +required
 	// +k8s:beta(since: "1.37")=+k8s:required
 	Schedule string `json:"schedule" protobuf:"bytes,1,opt,name=schedule"`
 
-	// The time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones.
+	// timeZone is the time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones.
 	// If not specified, this will default to the time zone of the kube-controller-manager process.
 	// The set of valid time zone names and the time zone offset is loaded from the system-wide time zone
 	// database by the API server during CronJob validation and the controller manager during execution.
@@ -814,12 +814,12 @@ type CronJobSpec struct {
 	// +optional
 	TimeZone *string `json:"timeZone,omitempty" protobuf:"bytes,8,opt,name=timeZone"`
 
-	// Optional deadline in seconds for starting the job if it misses scheduled
+	// startingDeadlineSeconds is the optional deadline in seconds for starting the job if it misses scheduled
 	// time for any reason.  Missed jobs executions will be counted as failed ones.
 	// +optional
 	StartingDeadlineSeconds *int64 `json:"startingDeadlineSeconds,omitempty" protobuf:"varint,2,opt,name=startingDeadlineSeconds"`
 
-	// Specifies how to treat concurrent executions of a Job.
+	// concurrencyPolicy specifies how to treat concurrent executions of a Job.
 	// Valid values are:
 	//
 	// - "Allow" (default): allows CronJobs to run concurrently;
@@ -828,21 +828,21 @@ type CronJobSpec struct {
 	// +optional
 	ConcurrencyPolicy ConcurrencyPolicy `json:"concurrencyPolicy,omitempty" protobuf:"bytes,3,opt,name=concurrencyPolicy,casttype=ConcurrencyPolicy"`
 
-	// This flag tells the controller to suspend subsequent executions, it does
+	// suspend is a flag that tells the controller to suspend subsequent executions, it does
 	// not apply to already started executions.  Defaults to false.
 	// +optional
 	Suspend *bool `json:"suspend,omitempty" protobuf:"varint,4,opt,name=suspend"`
 
-	// Specifies the job that will be created when executing a CronJob.
+	// jobTemplate specifies the job that will be created when executing a CronJob.
 	// +required
 	JobTemplate JobTemplateSpec `json:"jobTemplate" protobuf:"bytes,5,opt,name=jobTemplate"`
 
-	// The number of successful finished jobs to retain. Value must be non-negative integer.
+	// successfulJobsHistoryLimit is the number of successful finished jobs to retain. Value must be non-negative integer.
 	// Defaults to 3.
 	// +optional
 	SuccessfulJobsHistoryLimit *int32 `json:"successfulJobsHistoryLimit,omitempty" protobuf:"varint,6,opt,name=successfulJobsHistoryLimit"`
 
-	// The number of failed finished jobs to retain. Value must be non-negative integer.
+	// failedJobsHistoryLimit is the number of failed finished jobs to retain. Value must be non-negative integer.
 	// Defaults to 1.
 	// +optional
 	FailedJobsHistoryLimit *int32 `json:"failedJobsHistoryLimit,omitempty" protobuf:"varint,7,opt,name=failedJobsHistoryLimit"`
