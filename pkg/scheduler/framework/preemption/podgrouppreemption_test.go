@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -1299,11 +1300,12 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 			if err := pl.Handle.MutableSnapshotSharedLister().StartMutations(); err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			domain, err := newDomainForWorkloadPreemption(logger, snapshot, pgLister, &mockCompositePodGroupLister{}, "test-domain")
+			victims, err := getWorkloadPreemptionVictims(logger, snapshot, pgLister, &mockCompositePodGroupLister{})
 			if err != nil {
-				t.Fatalf("Failed to create domain: %v", err)
+				t.Fatalf("Failed to get victims: %v", err)
 			}
-			res, gotStatus := pl.selectVictimsOnDomain(ctx, tt.preemptor, domain, tt.pdbs, mockSchedulingFunc)
+			potentialVictims := prepareDomainVictims(victims, tt.preemptor.priority, tt.pdbs)
+			res, gotStatus := pl.selectVictimsOnDomain(ctx, tt.preemptor, potentialVictims, mockSchedulingFunc)
 			if !gotStatus.IsSuccess() {
 				t.Logf("SelectVictimsOnDomain failed: %v", gotStatus.Message())
 			}
@@ -1354,15 +1356,8 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain_NominatedNodes(t *testing.T) {
 	)
 
 	node1 := st.MakeNode().Name("node1").Obj()
-	domainNodes := []fwk.NodeInfo{
-		framework.NewNodeInfo(),
-	}
-	domainNodes[0].SetNode(node1)
-
 	// Add a low priority pod as a potential victim to satisfy the check
 	p3 := st.MakePod().Name("p3").UID("p3").Node("node1").Priority(lowPriority).Obj()
-	podInfo, _ := framework.NewPodInfo(p3)
-	domainNodes[0].AddPodInfo(podInfo)
 	objs := []runtime.Object{p1, p2, p3, node1}
 	informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(objs...), 0)
 	registeredPlugins := []tf.RegisterPluginFunc{
@@ -1387,9 +1382,9 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain_NominatedNodes(t *testing.T) {
 	informerFactory.WaitForCacheSync(ctx.Done())
 
 	pgLister := &mockPodGroupLister{podGroups: make(map[string]*schedulingv1beta1.PodGroup)}
-	domain, err := newDomainForWorkloadPreemption(logger, snapshot, pgLister, &mockCompositePodGroupLister{}, "test-domain")
+	victims, err := getWorkloadPreemptionVictims(logger, snapshot, pgLister, &mockCompositePodGroupLister{})
 	if err != nil {
-		t.Fatalf("Failed to create domain: %v", err)
+		t.Fatalf("Failed to get victims: %v", err)
 	}
 
 	mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
@@ -1410,7 +1405,8 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain_NominatedNodes(t *testing.T) {
 	if err := pl.Handle.MutableSnapshotSharedLister().StartMutations(); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	result, gotStatus := pl.selectVictimsOnDomain(ctx, preemptor, domain, nil, mockSchedulingFunc)
+	potentialVictims := prepareDomainVictims(victims, preemptor.priority, nil)
+	result, gotStatus := pl.selectVictimsOnDomain(ctx, preemptor, potentialVictims, mockSchedulingFunc)
 	if err := pl.Handle.MutableSnapshotSharedLister().EndMutations(); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -1577,6 +1573,9 @@ func TestPodGroupEvaluator_Preempt(t *testing.T) {
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithMutableSnapshotLister(snapshot),
 				frameworkruntime.WithLogger(logger),
+				frameworkruntime.WithPreemptionManager(func(fh fwk.Handle) fwk.PreemptionManager {
+					return NewDefaultPreemptionManager(fh, feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate))
+				}),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1724,7 +1723,7 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 				}
 				return nil, tt.evaluationStatus
 			}
-			domain, err := newDomainForWorkloadPreemption(logger, snapshot, pgLister, &mockCompositePodGroupLister{}, "test-domain")
+			victims, err := getWorkloadPreemptionVictims(logger, snapshot, pgLister, &mockCompositePodGroupLister{})
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
@@ -1734,7 +1733,8 @@ func TestPodGroupPreemptionEvaluationDurationMetric(t *testing.T) {
 			if err := pl.Handle.MutableSnapshotSharedLister().StartMutations(); err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			pl.evaluate(ctx, preemptor, domain, mockSchedulingFunc)
+			domainVictims := prepareDomainVictims(victims, preemptor.priority, nil)
+			pl.evaluate(ctx, preemptor, domainVictims, mockSchedulingFunc)
 			if err := pl.Handle.MutableSnapshotSharedLister().EndMutations(); err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
