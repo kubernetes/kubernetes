@@ -70,6 +70,15 @@ func MaxBytes[T ~string](_ context.Context, _ operation.Operation, fldPath *fiel
 	return nil
 }
 
+// MaxBytesSlice verifies that the specified byte slice is not longer than max
+// bytes.
+func MaxBytesSlice[T ~byte](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ []T, max int) field.ErrorList {
+	if len(value) > max {
+		return field.ErrorList{field.TooLong(fldPath, "", max).WithOrigin("maxBytes")}
+	}
+	return nil
+}
+
 // MaxItems verifies that the specified slice is not longer than max items.
 func MaxItems[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ []T, max int) field.ErrorList {
 	if len(value) > max {

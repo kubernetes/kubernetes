@@ -585,6 +585,40 @@ func TestMaxBytes(t *testing.T) {
 	}
 }
 
+func TestMaxBytesSlice(t *testing.T) {
+	cases := []struct {
+		name     string
+		value    []byte
+		max      int
+		wantErrs field.ErrorList
+	}{{
+		name:     "nil slice",
+		value:    nil,
+		max:      0,
+		wantErrs: nil,
+	}, {
+		name:     "exactly max bytes",
+		value:    []byte("abcdefghij"),
+		max:      10,
+		wantErrs: nil,
+	}, {
+		name:  "more bytes than max",
+		value: []byte("abcdefghijk"),
+		max:   10,
+		wantErrs: field.ErrorList{
+			field.TooLong(field.NewPath("fldpath"), "", 10).WithOrigin("maxBytes"),
+		},
+	}}
+
+	matcher := field.ErrorMatcher{}.ByOrigin().ByDetailSubstring().ByField().ByType()
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotErrs := MaxBytesSlice(context.Background(), operation.Operation{}, field.NewPath("fldpath"), tc.value, nil, tc.max)
+			matcher.Test(t, tc.wantErrs, gotErrs)
+		})
+	}
+}
+
 func TestMinLength(t *testing.T) {
 	cases := []struct {
 		name     string
