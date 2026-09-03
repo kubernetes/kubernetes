@@ -6662,6 +6662,66 @@ func TestAllocator(t *testing.T,
 				deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, nil),
 			)},
 		},
+		"consumable-capacity-dedicated-request-blocked-by-persisted-share": {
+			// device1 still carries a live share after allowMultipleAllocations flipped to false,
+			// so a dedicated request must not be handed the device on top of it.
+			features: Features{ConsumableCapacity: true},
+			allocatedSharedDeviceIDs: sets.New(
+				internal.MakeSharedDeviceID(MakeDeviceID(driverA, pool1, device1), &fixedShareID),
+			),
+			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 1))),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 1), driverA,
+					device(device1, nil, nil),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{},
+		},
+		"consumable-capacity-dedicated-request-falls-back-past-persisted-share": {
+			// The guard drops device1 without aborting the search, so the request still lands on device2.
+			features: Features{ConsumableCapacity: true},
+			allocatedSharedDeviceIDs: sets.New(
+				internal.MakeSharedDeviceID(MakeDeviceID(driverA, pool1, device1), &fixedShareID),
+			),
+			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 1))),
+			classes:          objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 1), driverA,
+					device(device1, nil, nil),
+					device(device2, nil, nil),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
+		"consumable-capacity-with-admin-access-request-allowed-over-persisted-share": {
+			// Admin access skips the availability checks, so the live share does not withhold device1.
+			features: Features{ConsumableCapacity: true, AdminAccess: true},
+			allocatedSharedDeviceIDs: sets.New(
+				internal.MakeSharedDeviceID(MakeDeviceID(driverA, pool1, device1), &fixedShareID),
+			),
+			claimsToAllocate: func() []wrapResourceClaim {
+				c := claimWithRequest(claim0, req0, classA)
+				c.Spec.Devices.Requests[0].Exactly.AdminAccess = new(true)
+				return []wrapResourceClaim{c}
+			}(),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 1), driverA,
+					device(device1, nil, nil),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, true),
+			)},
+		},
 		"consumable-capacity-with-partitionable-device-multiple-capacity-pools": {
 			// This test case combines integration of PrioritizedList, PartitionableDevices, and ConsumableCapacity features.
 			features: Features{
