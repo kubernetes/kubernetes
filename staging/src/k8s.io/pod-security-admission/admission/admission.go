@@ -30,6 +30,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -627,8 +628,6 @@ func (a *Admission) PolicyToEvaluate(labels map[string]string) (api.Policy, fiel
 }
 
 // isSignificantPodUpdate determines whether a pod update should trigger a policy evaluation.
-// Relevant mutable pod fields as of 1.21 are image annotations:
-// * https://github.com/kubernetes/kubernetes/blob/release-1.21/pkg/apis/core/validation/validation.go#L3947-L3949
 func isSignificantPodUpdate(pod, oldPod *corev1.Pod) bool {
 	// TODO: invert this logic to only allow specific update types.
 	if len(pod.Spec.Containers) != len(oldPod.Spec.Containers) {
@@ -667,7 +666,10 @@ func isSignificantPodUpdate(pod, oldPod *corev1.Pod) bool {
 
 // isSignificantContainerUpdate determines whether a container update should trigger a policy evaluation.
 func isSignificantContainerUpdate(container, oldContainer *corev1.Container) bool {
-	return container.Image != oldContainer.Image
+	return container.Image != oldContainer.Image ||
+		!apiequality.Semantic.DeepEqual(container.LivenessProbe, oldContainer.LivenessProbe) ||
+		!apiequality.Semantic.DeepEqual(container.ReadinessProbe, oldContainer.ReadinessProbe) ||
+		!apiequality.Semantic.DeepEqual(container.StartupProbe, oldContainer.StartupProbe)
 }
 
 func (a *Admission) exemptNamespace(namespace string) bool {
