@@ -66,8 +66,6 @@ func (b *logBufferTB) TempDir() string                   { return "" }
 
 func TestWarnIgnoredWindowsFields(t *testing.T) {
 	unmasked := v1.UnmaskedProcMount
-	fsGroup := int64(1000)
-	always := v1.FSGroupChangeAlways
 	localhostProfile := "profile.json"
 
 	tests := []struct {
@@ -81,15 +79,6 @@ func TestWarnIgnoredWindowsFields(t *testing.T) {
 			podSc:       nil,
 			containerSc: nil,
 			wantLogs:    []string{},
-		},
-		{
-			name:        "fsGroup and fsGroupChangePolicy requested",
-			podSc:       &v1.PodSecurityContext{FSGroup: &fsGroup, FSGroupChangePolicy: &always},
-			containerSc: &v1.SecurityContext{},
-			wantLogs: []string{
-				"Windows containers do not support securityContext.fsGroup",
-				"Windows containers do not support securityContext.fsGroupChangePolicy",
-			},
 		},
 		{
 			name:        "procMount unmasked requested",
@@ -298,4 +287,27 @@ func TestCalculateWindowsResources(t *testing.T) {
 		windowsContainerResources := fakeRuntimeSvc.calculateWindowsResources(tCtx, &test.cpuLim, &test.memLim)
 		assert.Equal(t, test.expected, windowsContainerResources)
 	}
+}
+
+// TestWarnPodLevelIgnoredWindowsFields verifies that pod-level fields that
+// Windows ignores (fsGroup, fsGroupChangePolicy) produce exactly the expected
+// warnings from the dedicated pod-level helper. These are pod-wide settings, so
+// the helper is invoked once per pod rather than once per container.
+func TestWarnPodLevelIgnoredWindowsFields(t *testing.T) {
+	fsGroup := int64(1000)
+	always := v1.FSGroupChangeAlways
+	buf := &logBufferTB{}
+	tCtx := ktesting.Init(buf, initoption.BufferLogs(true))
+	logger := klog.FromContext(tCtx)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "new", UID: "12345678"},
+		Spec: v1.PodSpec{
+			Containers:      []v1.Container{{Name: "foo"}, {Name: "sidecar"}},
+			SecurityContext: &v1.PodSecurityContext{FSGroup: &fsGroup, FSGroupChangePolicy: &always},
+		},
+	}
+	warnPodLevelIgnoredWindowsFields(logger, pod)
+	got := buf.String()
+	assert.Contains(t, got, "Windows containers do not support securityContext.fsGroup", "expected fsGroup warning:\n%s", got)
+	assert.Contains(t, got, "Windows containers do not support securityContext.fsGroupChangePolicy", "expected fsGroupChangePolicy warning:\n%s", got)
 }
