@@ -634,3 +634,41 @@ func TestMakeWinContainerCPUAndMemoryStats(t *testing.T) {
 		t.Errorf("makeWinContainerCPUAndMemoryStats() = %v, want %v", got, expected)
 	}
 }
+
+func TestMakeWinContainerCPUAndMemoryStatsNilMemory(t *testing.T) {
+	containerStartTime := time.Unix(12345, 0)
+	inputStats := &runtimeapi.WindowsContainerStats{
+		Attributes: &runtimeapi.ContainerAttributes{
+			Metadata: &runtimeapi.ContainerMetadata{Name: "c0"},
+		},
+		Cpu: &runtimeapi.WindowsCpuUsage{
+			Timestamp:            555555,
+			UsageCoreNanoSeconds: &runtimeapi.UInt64Value{Value: 0x123456},
+			UsageNanoCores:       &runtimeapi.UInt64Value{Value: 0x4000},
+		},
+		// Memory is intentionally nil to exercise the else branch.
+	}
+
+	p := &criStatsProvider{}
+	got := p.makeWinContainerCPUAndMemoryStats(inputStats, containerStartTime)
+
+	if got.Memory == nil {
+		t.Fatal("makeWinContainerCPUAndMemoryStats() Memory = nil, want zero-valued MemoryStats")
+	}
+
+	// With no CRI memory stats, the fast-path (resource metrics) should still
+	// report explicit zeros for every field, including UsageBytes, symmetric
+	// with the full makeWinContainerStats path.
+	if got.Memory.UsageBytes == nil || *got.Memory.UsageBytes != 0 {
+		t.Errorf("makeWinContainerCPUAndMemoryStats() UsageBytes = %v, want 0", got.Memory.UsageBytes)
+	}
+	if got.Memory.WorkingSetBytes == nil || *got.Memory.WorkingSetBytes != 0 {
+		t.Errorf("makeWinContainerCPUAndMemoryStats() WorkingSetBytes = %v, want 0", got.Memory.WorkingSetBytes)
+	}
+	if got.Memory.AvailableBytes == nil || *got.Memory.AvailableBytes != 0 {
+		t.Errorf("makeWinContainerCPUAndMemoryStats() AvailableBytes = %v, want 0", got.Memory.AvailableBytes)
+	}
+	if got.Memory.PageFaults == nil || *got.Memory.PageFaults != 0 {
+		t.Errorf("makeWinContainerCPUAndMemoryStats() PageFaults = %v, want 0", got.Memory.PageFaults)
+	}
+}

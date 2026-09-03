@@ -333,6 +333,7 @@ func (p *criStatsProvider) makeWinContainerCPUAndMemoryStats(
 			Time:            metav1.NewTime(time.Unix(0, time.Now().UnixNano())),
 			WorkingSetBytes: ptr.To[uint64](0),
 			AvailableBytes:  ptr.To[uint64](0),
+			UsageBytes:      ptr.To[uint64](0),
 			PageFaults:      ptr.To[uint64](0),
 		}
 	}
