@@ -17,11 +17,11 @@ limitations under the License.
 package patch
 
 import (
+	celgo "cel.dev/cel-go/cel"
+	celtypes "cel.dev/cel-go/common/types"
 	"context"
 	"errors"
 	"fmt"
-	celgo "github.com/google/cel-go/cel"
-	celtypes "github.com/google/cel-go/common/types"
 	"strings"
 
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"

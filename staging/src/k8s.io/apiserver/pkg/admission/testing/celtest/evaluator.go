@@ -39,7 +39,7 @@ import (
 	"fmt"
 	"strings"
 
-	celtypes "github.com/google/cel-go/common/types"
+	celtypes "cel.dev/cel-go/common/types"
 	"google.golang.org/protobuf/types/known/structpb"
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"

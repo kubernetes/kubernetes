@@ -22,7 +22,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/google/cel-go/interpreter"
+	"cel.dev/cel-go/interpreter"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	v1 "k8s.io/api/core/v1"

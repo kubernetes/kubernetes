@@ -43,11 +43,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	celgo "cel.dev/cel-go/cel"
+	"cel.dev/cel-go/common/types"
+	"cel.dev/cel-go/common/types/ref"
+	"cel.dev/cel-go/common/types/traits"
 	"github.com/coreos/go-oidc"
-	celgo "github.com/google/cel-go/cel"
-	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/common/types/traits"
 	jose "gopkg.in/go-jose/go-jose.v2"
 
 	"k8s.io/apimachinery/pkg/util/net"

@@ -5,9 +5,9 @@
         "version": "v1.9.0",
         "reason": "pin to v1.9.0 until we figure out what the future of fsnotify library is, see #138812"
       },
-      "github.com/google/cel-go": {
-        "version": "v0.29.2",
-        "reason": "pin to v0.29.2 until the CEL runtime cost changes in newer releases are handled, see #141056"
+      "cel.dev/cel-go": {
+        "version": "v0.32.0",
+        "reason": "pin to v0.32.0 until the CEL runtime cost changes in newer releases are handled, see #141056"
       }
     },
     "unwantedModules": {
@@ -186,8 +186,8 @@
         "google.golang.org/grpc"
       ],
       "golang.org/x/exp": [
+        "cel.dev/cel-go",
         "github.com/antlr4-go/antlr/v4",
-        "github.com/google/cel-go",
         "github.com/grpc-ecosystem/go-grpc-middleware/v2"
       ],
       "gopkg.in/yaml.v3": [

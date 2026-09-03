@@ -21,10 +21,10 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/checker"
-	"github.com/google/cel-go/ext"
-	"github.com/google/cel-go/interpreter"
+	"cel.dev/cel-go/cel"
+	"cel.dev/cel-go/checker"
+	"cel.dev/cel-go/ext"
+	"cel.dev/cel-go/interpreter"
 	"golang.org/x/sync/singleflight"
 
 	"k8s.io/apimachinery/pkg/util/version"
