@@ -128,8 +128,10 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(ctx context.C
 	// fsGroup/fsGroupChangePolicy are pod-level settings, so warn for them once
 	// per pod (on the first container) rather than repeating the same warning
 	// for every container in a multi-container pod. Container names are unique
-	// within a pod, so the first container is identified by its name.
-	if container.Name == pod.Spec.Containers[0].Name {
+	// within a pod, so the first container is identified by its name. A pod may
+	// legitimately have no regular containers (e.g. only init containers), so
+	// guard the index to avoid panicking on an empty slice.
+	if len(pod.Spec.Containers) > 0 && container.Name == pod.Spec.Containers[0].Name {
 		warnPodLevelIgnoredWindowsFields(logger, pod)
 	}
 	warnIgnoredWindowsFields(logger, pod, container)
