@@ -6107,6 +6107,75 @@ func validatePodSpecUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) 
 	return allErrs
 }
 
+func validateMutableContainerProbes(oldPod *core.Pod, mungedPodSpec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+	_, oldPodIsMirror := oldPod.Annotations[core.MirrorPodAnnotationKey]
+	forbiddenReason := ""
+	switch {
+	case oldPod.DeletionTimestamp != nil:
+		forbiddenReason = "may not be changed once pod deletion has started"
+	case oldPod.Status.Phase == core.PodSucceeded || oldPod.Status.Phase == core.PodFailed:
+		forbiddenReason = "may not be changed for a terminal pod"
+	case oldPodIsMirror:
+		forbiddenReason = "may not be changed for a mirror pod; update the static pod source instead"
+	}
+
+	var allErrs field.ErrorList
+	mungedPod := &core.Pod{Spec: *mungedPodSpec}
+	for _, containerType := range []podutil.ContainerType{podutil.Containers, podutil.InitContainers} {
+		containersPath := fldPath.Child("containers")
+		if containerType == podutil.InitContainers {
+			containersPath = fldPath.Child("initContainers")
+		}
+		i := 0
+		for pair := range podutil.ContainerPairs(mungedPod, oldPod, containerType) {
+			if pair.New == nil {
+				continue
+			}
+			containerPath := containersPath.Index(i)
+			i++
+			if pair.Old == nil {
+				continue
+			}
+			if containerType == podutil.InitContainers &&
+				!podutil.IsRestartableInitContainer(pair.New) {
+				continue
+			}
+			allErrs = append(allErrs, validateMutableProbes(pair.New, pair.Old, containerPath, forbiddenReason)...)
+		}
+	}
+
+	return allErrs
+}
+
+func validateMutableProbes(mungedContainer, oldContainer *core.Container, fldPath *field.Path, forbiddenReason string) field.ErrorList {
+	var allErrs field.ErrorList
+	if !apiequality.Semantic.DeepEqual(mungedContainer.LivenessProbe, oldContainer.LivenessProbe) {
+		if forbiddenReason != "" {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("livenessProbe"), forbiddenReason))
+		}
+
+		mungedContainer.LivenessProbe = oldContainer.LivenessProbe.DeepCopy() // +k8s:verify-mutation:reason=clone
+	}
+
+	if !apiequality.Semantic.DeepEqual(mungedContainer.ReadinessProbe, oldContainer.ReadinessProbe) {
+		if forbiddenReason != "" {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("readinessProbe"), forbiddenReason))
+		}
+
+		mungedContainer.ReadinessProbe = oldContainer.ReadinessProbe.DeepCopy() // +k8s:verify-mutation:reason=clone
+	}
+
+	if !apiequality.Semantic.DeepEqual(mungedContainer.StartupProbe, oldContainer.StartupProbe) {
+		if forbiddenReason != "" {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("startupProbe"), forbiddenReason))
+		}
+
+		mungedContainer.StartupProbe = oldContainer.StartupProbe.DeepCopy() // +k8s:verify-mutation:reason=clone
+	}
+
+	return allErrs
+}
+
 // ValidateContainerStateTransition test to if any illegal container state transitions are being attempted
 func ValidateContainerStateTransition(newStatuses, oldStatuses []core.ContainerStatus, fldPath *field.Path, podSpec core.PodSpec, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -6762,7 +6831,8 @@ func validateResizableSpecChanges(newPod, oldPod *core.Pod, specPath *field.Path
 
 // ValidatePodDynamicUpdate tests that an update through the pods/dynamic
 // subresource is valid. In addition to the changes allowed by ValidatePodUpdate
-// and ValidatePodResize, main containers may be added, removed, and reordered.
+// and ValidatePodResize, main containers may be added, removed, and reordered,
+// and probes may be updated when MutableContainerProbes is enabled.
 func ValidatePodDynamicUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) field.ErrorList {
 	metaPath := field.NewPath("metadata")
 	specPath := field.NewPath("spec")
@@ -6802,6 +6872,10 @@ func ValidatePodDynamicUpdate(newPod, oldPod *core.Pod, opts PodValidationOption
 	}
 	if resized {
 		allErrs = append(allErrs, validateResizeAllowed(newPod, oldPod, specPath, opts)...)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.MutableContainerProbes) {
+		allErrs = append(allErrs, validateMutableContainerProbes(oldPod, &mungedPodSpec, specPath)...)
 	}
 
 	mungedPod := *newPod
