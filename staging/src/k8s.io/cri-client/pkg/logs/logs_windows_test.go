@@ -85,3 +85,31 @@ func TestReadLogsMountPoint(t *testing.T) {
 		t.Fatalf("expected log content, got %q", got)
 	}
 }
+
+// TestEvalSymlinks exercises the error contract of the Windows evalSymlinks
+// helper directly so the fallback behavior is covered even on machines where a
+// volume-mount reparse point (the scenario TestReadLogsMountPoint targets) is
+// not available.
+func TestEvalSymlinks(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "real")
+	if err := os.MkdirAll(p, 0755); err != nil {
+		t.Fatalf("failed to create dir: %v", err)
+	}
+
+	// A resolvable path is returned without error.
+	resolved, err := evalSymlinks(p)
+	if err != nil {
+		t.Errorf("evalSymlinks(%q) unexpected error: %v", p, err)
+	}
+	if resolved == "" {
+		t.Errorf("evalSymlinks(%q) resolved to empty path", p)
+	}
+
+	// A path that EvalSymlinks cannot resolve and os.Stat also cannot reach
+	// must surface an error (the else branch of the fallback), so that the
+	// ReadLogs contract for a genuinely missing log is preserved.
+	missing := filepath.Join(p, "does-not-exist-1234")
+	if _, err := evalSymlinks(missing); err == nil {
+		t.Errorf("evalSymlinks(%q) expected error for missing path, got nil", missing)
+	}
+}
