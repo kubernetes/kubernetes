@@ -102,8 +102,9 @@ func TestWindowsWatcherReportsOOMKilled(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("expected an OOMKilled Kubernetes event")
 	}
-	// The counter metric is backed by recordOOMKill, keyed by container name.
-	assert.Equal(t, uint64(1), OOMEventsForContainer(containerName))
+	// The counter metric is backed by recordOOMKill, keyed by the CRI container ID
+	// so it matches info.Name on the Windows cAdvisor metrics path.
+	assert.Equal(t, uint64(1), OOMEventsForContainer(cid))
 
 	// Reconciling again must not double-emit the event or inflate the counter.
 	w.reconcile(tCtx, logger)
@@ -112,7 +113,7 @@ func TestWindowsWatcherReportsOOMKilled(t *testing.T) {
 		t.Fatal("did not expect a second event for the same OOMKilled container")
 	case <-time.After(100 * time.Millisecond):
 	}
-	assert.Equal(t, uint64(1), OOMEventsForContainer(containerName))
+	assert.Equal(t, uint64(1), OOMEventsForContainer(cid))
 }
 
 // TestWindowsWatcherSkipsRunningContainers verifies that a running container is

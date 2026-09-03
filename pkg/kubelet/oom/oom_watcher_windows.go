@@ -174,14 +174,19 @@ func (ow *windowsWatcher) reconcile(ctx context.Context, logger klog.Logger) {
 			continue
 		}
 
-		// Record the metric under the container name, mirroring the cgroup key
-		// the Linux watcher uses via recordOOMKill. This backs the
-		// container_oom_events_total counter descriptor.
+		// The Windows cAdvisor metrics path keys per-container info by the CRI
+		// container ID (see cadvisor.GetRequestedContainersInfo), and the server
+		// reads the count with OOMEventsForContainer(info.Name). Record under the
+		// container ID so the count is readable back on Windows; on Linux the
+		// in-process counter is unused because the kernel cgroup OOM path also
+		// keys by containerName-equivalent cgroup path.
+		recordOOMKill(c.GetId())
+
+		// The human-facing event still uses the Kubernetes container name.
 		containerName := cs.GetLabels()[kubelettypes.KubernetesContainerNameLabel]
 		if containerName == "" {
 			containerName = cs.GetMetadata().GetName()
 		}
-		recordOOMKill(containerName)
 
 		// Remember the container id so the kill is surfaced exactly once.
 		ow.mu.Lock()
