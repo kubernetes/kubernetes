@@ -630,7 +630,7 @@ func schema_pkg_apis_meta_v1_Condition(ref common.ReferenceCallback) common.Open
 						},
 					},
 				},
-				Required: []string{"type", "status", "lastTransitionTime", "reason", "message"},
+				Required: []string{"type", "status", "lastTransitionTime", "reason"},
 			},
 		},
 		Dependencies: []string{
