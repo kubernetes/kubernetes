@@ -442,8 +442,8 @@ apiserver_watch_cache_consistent_read_total{fallback="skipped", group="", resour
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			forceRequestWatchProgressSupport(t)
-			if tc.skipStorageFallback {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCacheSkipTimeoutFallback, true)
+			if !tc.skipStorageFallback {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCacheSkipTimeoutFallback, false)
 			}
 
 			registry := k8smetrics.NewKubeRegistry()
