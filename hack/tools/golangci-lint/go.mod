@@ -2,15 +2,13 @@ module k8s.io/kubernetes/hack/tools/golangci-lint
 
 go 1.26.0
 
-tool (
-	github.com/golangci/golangci-lint/v2/cmd/golangci-lint
-	sigs.k8s.io/kube-api-linter/pkg/plugin
-	sigs.k8s.io/logtools/logcheck
-)
-
 require (
+	github.com/golangci/golangci-lint/v2 v2.11.2
+	github.com/golangci/plugin-module-register v0.1.2
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 	golang.org/x/tools v0.42.0
+	sigs.k8s.io/kube-api-linter v0.0.0-20260716143926-092fe0c72997
+	sigs.k8s.io/logtools v0.10.1
 )
 
 require (
@@ -93,10 +91,8 @@ require (
 	github.com/golangci/dupl v0.0.0-20250308024227-f665c8d69b32 // indirect
 	github.com/golangci/go-printf-func-name v0.1.1 // indirect
 	github.com/golangci/gofmt v0.0.0-20250106114630-d62b90e6713d // indirect
-	github.com/golangci/golangci-lint/v2 v2.11.2 // indirect
 	github.com/golangci/golines v0.15.0 // indirect
 	github.com/golangci/misspell v0.8.0 // indirect
-	github.com/golangci/plugin-module-register v0.1.2 // indirect
 	github.com/golangci/revgrep v0.8.0 // indirect
 	github.com/golangci/swaggoswag v0.0.0-20250504205917-77f2aca3143e // indirect
 	github.com/golangci/unconvert v0.0.0-20250410112200-a129a6e6413e // indirect
@@ -219,7 +215,5 @@ require (
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 // indirect
 	mvdan.cc/gofumpt v0.9.2 // indirect
 	mvdan.cc/unparam v0.0.0-20251027182757-5beb8c8f8f15 // indirect
-	sigs.k8s.io/kube-api-linter v0.0.0-20260716143926-092fe0c72997 // indirect
-	sigs.k8s.io/logtools v0.10.1 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )

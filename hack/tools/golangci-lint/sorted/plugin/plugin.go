@@ -14,26 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// This must be package main
-package main
+// Package plugin registers the sorted linter as a golangci-lint module plugin.
+package plugin
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+
+	"github.com/golangci/plugin-module-register/register"
 	"golang.org/x/tools/go/analysis"
 
 	"k8s.io/kubernetes/hack/tools/golangci-lint/sorted/pkg"
 )
-
-type analyzerPlugin struct{}
-
-func (*analyzerPlugin) GetAnalyzers() []*analysis.Analyzer {
-	return []*analysis.Analyzer{pkg.NewAnalyzer()}
-}
-
-// AnalyzerPlugin is the entry point for golangci-lint.
-var AnalyzerPlugin analyzerPlugin
 
 // settings defines the configuration options for the sorted linter
 type settings struct {
@@ -54,8 +47,7 @@ var defaultTargetFiles = []string{
 	"test/e2e/environment/environment.go",
 }
 
-// New is the entry point for golangci-lint plugin system
-func New(pluginSettings interface{}) ([]*analysis.Analyzer, error) {
+func New(pluginSettings interface{}) (register.LinterPlugin, error) {
 	// Create default config
 	config := pkg.Config{}
 
@@ -86,11 +78,24 @@ func New(pluginSettings interface{}) ([]*analysis.Analyzer, error) {
 			fmt.Printf("sorted settings: %+v\n", s)
 			fmt.Printf("final config: %+v\n", config)
 		}
+	} else {
+		config.Files = defaultTargetFiles
 	}
 
-	// Get the analyzer with config
-	analyzer := pkg.NewAnalyzerWithConfig(config)
+	return linterPlugin{config: config}, nil
+}
 
-	// Return the analyzer
-	return []*analysis.Analyzer{analyzer}, nil
+type linterPlugin struct {
+	config pkg.Config
+}
+
+func (l linterPlugin) BuildAnalyzers() ([]*analysis.Analyzer, error) {
+	return []*analysis.Analyzer{pkg.NewAnalyzerWithConfig(l.config)}, nil
+}
+func (l linterPlugin) GetLoadMode() string {
+	return register.LoadModeSyntax
+}
+
+func init() {
+	register.Plugin("sorted", New)
 }
