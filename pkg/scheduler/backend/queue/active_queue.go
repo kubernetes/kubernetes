@@ -96,6 +96,8 @@ type unlockedActiveQueueReader interface {
 	get(entityLookup framework.QueuedEntityInfo) (framework.QueuedEntityInfo, bool)
 	// inFlightPod returns the *v1.Pod for the given UID if it is currently in flight.
 	inFlightPod(uid types.UID) *v1.Pod
+	// inFlightPodByName returns the *v1.Pod for the given namespace and name if it is currently in flight.
+	inFlightPodByName(namespace, name string) *v1.Pod
 }
 
 // inFlightPodEntry holds tracking information for a pod that is currently in-flight.
@@ -155,6 +157,18 @@ func (uaq *unlockedActiveQueue) updateInFlightPod(newPod *v1.Pod) bool {
 func (uaq *unlockedActiveQueue) inFlightPod(uid types.UID) *v1.Pod {
 	if entry, ok := uaq.inFlightPods[uid]; ok {
 		return entry.pod
+	}
+	return nil
+}
+
+// inFlightPodByName returns the *v1.Pod for the given namespace and name if it is currently in flight.
+// TODO: inFlightPodByName scans all in-flight pods. Consider maintaining an index
+// (e.g. map[string]*inFlightPodEntry keyed by "namespace/name") for O(1) lookups.
+func (uaq *unlockedActiveQueue) inFlightPodByName(namespace, name string) *v1.Pod {
+	for _, entry := range uaq.inFlightPods {
+		if entry.pod.Namespace == namespace && entry.pod.Name == name {
+			return entry.pod
+		}
 	}
 	return nil
 }

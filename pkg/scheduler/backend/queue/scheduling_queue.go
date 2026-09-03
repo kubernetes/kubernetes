@@ -1922,7 +1922,7 @@ func (p *PriorityQueue) IncompletePodGroupPodsPods() []*v1.Pod {
 	return p.incompletePodGroupPods.list()
 }
 
-// GetPod searches for a pod in the activeQ, backoffQ, and unschedulableEntities.
+// GetPod searches for a pod in the activeQ, backoffQ, unschedulableEntities, and in-flight pods.
 func (p *PriorityQueue) GetPod(name, namespace string, schedulingGroup *v1.PodSchedulingGroup) (*framework.QueuedPodInfo, bool) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
@@ -1976,6 +1976,9 @@ func (p *PriorityQueue) getPod(podLookup *v1.Pod, unlockedActiveQ unlockedActive
 
 	entity := p.getEntityFromAnyQueue(unlockedActiveQ, entityLookup)
 	if entity == nil {
+		if inFlightPod := unlockedActiveQ.inFlightPodByName(podLookup.Namespace, podLookup.Name); inFlightPod != nil {
+			return newQueuedPodInfoForLookup(inFlightPod)
+		}
 		if !p.isPodGroupMember(podLookup) {
 			return nil
 		}
@@ -1985,6 +1988,9 @@ func (p *PriorityQueue) getPod(podLookup *v1.Pod, unlockedActiveQ unlockedActive
 		if pInfo.Pod.Name == podLookup.Name && pInfo.Pod.Namespace == podLookup.Namespace {
 			return pInfo
 		}
+	}
+	if inFlightPod := unlockedActiveQ.inFlightPodByName(podLookup.Namespace, podLookup.Name); inFlightPod != nil {
+		return newQueuedPodInfoForLookup(inFlightPod)
 	}
 	return nil
 }
