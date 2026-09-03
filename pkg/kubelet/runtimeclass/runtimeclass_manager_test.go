@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	rctest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -39,8 +40,9 @@ func TestLookupRuntimeHandler(t *testing.T) {
 		{rcn: ptr.To("phantom"), expectError: true},
 	}
 
+	tCtx := ktesting.Init(t)
 	manager := runtimeclass.NewManager(rctest.NewPopulatedClient())
-	defer rctest.StartManagerSync(manager)()
+	defer rctest.StartManagerSync(tCtx, manager)()
 
 	for _, test := range tests {
 		tname := "nil"

@@ -56,7 +56,7 @@ func Example() {
 	// This will hold incoming changes. Note how we pass downstream in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
-	fifo := NewRealFIFO(MetaNamespaceKeyFunc, downstream, nil)
+	fifo := NewRealFIFO(MetaNamespaceKeyFunc, downstream, nil) //nolint:logcheck // Intentionally testing old API here.
 
 	// Let's do threadsafe output to get predictable test results.
 	deletionCounter := make(chan string, 1000)
@@ -141,7 +141,7 @@ func ExampleNewInformer() {
 
 	// Make a controller that immediately deletes anything added to it, and
 	// logs anything deleted.
-	_, controller := NewInformer(
+	_, controller := NewInformer( //nolint:logcheck // Intentionally testing old API here.
 		source,
 		&v1.Pod{},
 		time.Millisecond*100,
@@ -217,7 +217,7 @@ func TestHammerController(t *testing.T) {
 	}
 
 	// Make a controller which just logs all the changes it gets.
-	_, controller := NewInformer(
+	_, controller := NewInformer( //nolint:logcheck // Intentionally testing old API here.
 		source,
 		&v1.Pod{},
 		time.Millisecond*100,
@@ -369,7 +369,7 @@ func TestUpdate(t *testing.T) {
 	// It calls Done() on the wait group on deletions so we can tell when
 	// everything we've added has been deleted.
 	watchCh := make(chan struct{})
-	_, controller := NewInformer(
+	_, controller := NewInformer( //nolint:logcheck // Intentionally testing old API here.
 		toListWatcherWithUnSupportedWatchListSemantics(&ListWatch{
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				watch, err := source.Watch(options)
@@ -430,7 +430,7 @@ func TestPanicPropagated(t *testing.T) {
 	source := newFakeControllerSource(t)
 
 	// Make a controller that just panic if the AddFunc is called.
-	_, controller := NewInformer(
+	_, controller := NewInformer( //nolint:logcheck // Intentionally testing old API here.
 		source,
 		&v1.Pod{},
 		time.Millisecond*100,
@@ -541,7 +541,7 @@ func TestTransformingInformer(t *testing.T) {
 		return pod, nil
 	}
 
-	store, controller := NewTransformingInformer(
+	store, controller := NewTransformingInformer( //nolint:logcheck // Intentionally testing old API here.
 		source,
 		&v1.Pod{},
 		0,
@@ -653,7 +653,7 @@ func TestTransformingInformerRace(t *testing.T) {
 			<-events
 		}
 	}
-	store, controller := NewTransformingInformer(
+	store, controller := NewTransformingInformer( //nolint:logcheck // Intentionally testing old API here.
 		source,
 		&v1.Pod{},
 		5*time.Millisecond,

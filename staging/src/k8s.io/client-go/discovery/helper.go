@@ -17,6 +17,7 @@ limitations under the License.
 package discovery
 
 import (
+	"context"
 	"fmt"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -28,9 +29,19 @@ import (
 
 // IsResourceEnabled queries the server to determine if the resource specified is present on the server.
 // This is particularly helpful when writing a controller or an e2e test that requires a particular resource to function.
+//
+// IsResourceEnabledWithContext is a better alternative because it supports contextual logging and cancellation.
+//
+//logcheck:context // Use IsResourceEnabledWithContext instead of IsResourceEnabled in code which supports contextual logging.
 func IsResourceEnabled(client DiscoveryInterface, resourceToCheck schema.GroupVersionResource) (bool, error) {
+	return IsResourceEnabledWithContext(context.Background(), ToDiscoveryInterfaceWithContext(client), resourceToCheck)
+}
+
+// IsResourceEnabledWithContext queries the server to determine if the resource specified is present on the server.
+// This is particularly helpful when writing a controller or an e2e test that requires a particular resource to function.
+func IsResourceEnabledWithContext(ctx context.Context, client DiscoveryInterfaceWithContext, resourceToCheck schema.GroupVersionResource) (bool, error) {
 	// this is a single request.  The ServerResourcesForGroupVersion handles the core v1 group as legacy.
-	resourceList, err := client.ServerResourcesForGroupVersion(resourceToCheck.GroupVersion().String())
+	resourceList, err := client.ServerResourcesForGroupVersionWithContext(ctx, resourceToCheck.GroupVersion().String())
 	if apierrors.IsNotFound(err) { // if the discovery endpoint isn't present, then the resource isn't present.
 		return false, nil
 	}
@@ -49,8 +60,19 @@ func IsResourceEnabled(client DiscoveryInterface, resourceToCheck schema.GroupVe
 // MatchesServerVersion queries the server to compares the build version
 // (git hash) of the client with the server's build version. It returns an error
 // if it failed to contact the server or if the versions are not an exact match.
+//
+// MatchesServerVersionWithContext is a better alternative because it supports contextual logging and cancellation.
+//
+//logcheck:context // Use MatchesServerVersionWithContext instead of MatchesServerVersion in code which supports contextual logging.
 func MatchesServerVersion(clientVersion apimachineryversion.Info, client DiscoveryInterface) error {
-	sVer, err := client.ServerVersion()
+	return MatchesServerVersionWithContext(context.Background(), clientVersion, ToDiscoveryInterfaceWithContext(client))
+}
+
+// MatchesServerVersionWithContext queries the server to compares the build version
+// (git hash) of the client with the server's build version. It returns an error
+// if it failed to contact the server or if the versions are not an exact match.
+func MatchesServerVersionWithContext(ctx context.Context, clientVersion apimachineryversion.Info, client DiscoveryInterfaceWithContext) error {
+	sVer, err := client.ServerVersionWithContext(ctx)
 	if err != nil {
 		return fmt.Errorf("couldn't read version from server: %v", err)
 	}
@@ -63,8 +85,17 @@ func MatchesServerVersion(clientVersion apimachineryversion.Info, client Discove
 }
 
 // ServerSupportsVersion returns an error if the server doesn't have the required version
+//
+// ServerSupportsVersionWithContext is a better alternative because it supports contextual logging and cancellation.
+//
+//logcheck:context // Use ServerSupportsVersionWithContext instead of ServerSupportsVersion in code which supports contextual logging.
 func ServerSupportsVersion(client DiscoveryInterface, requiredGV schema.GroupVersion) error {
-	groups, err := client.ServerGroups()
+	return ServerSupportsVersionWithContext(context.Background(), ToDiscoveryInterfaceWithContext(client), requiredGV)
+}
+
+// ServerSupportsVersionWithContext returns an error if the server doesn't have the required version
+func ServerSupportsVersionWithContext(ctx context.Context, client DiscoveryInterfaceWithContext, requiredGV schema.GroupVersion) error {
+	groups, err := client.ServerGroupsWithContext(ctx)
 	if err != nil {
 		// This is almost always a connection error, and higher level code should treat this as a generic error,
 		// not a negotiation specific error.

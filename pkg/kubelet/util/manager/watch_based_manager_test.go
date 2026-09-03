@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/clock"
@@ -86,6 +87,7 @@ func newSecretCache(ctx context.Context, fakeClient clientset.Interface, fakeClo
 
 func TestSecretCache(t *testing.T) {
 	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 	fakeClient := &fake.Clientset{}
 
 	listReactor := func(a core.Action) (bool, runtime.Object, error) {
@@ -97,7 +99,7 @@ func TestSecretCache(t *testing.T) {
 		return true, result, nil
 	}
 	fakeClient.AddReactor("list", "secrets", listReactor)
-	fakeWatch := watch.NewFake()
+	fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 
 	fakeClock := testingclock.NewFakeClock(time.Now())
@@ -160,6 +162,7 @@ func TestSecretCache(t *testing.T) {
 
 func TestSecretCacheMultipleRegistrations(t *testing.T) {
 	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 	fakeClient := &fake.Clientset{}
 
 	listReactor := func(a core.Action) (bool, runtime.Object, error) {
@@ -171,7 +174,7 @@ func TestSecretCacheMultipleRegistrations(t *testing.T) {
 		return true, result, nil
 	}
 	fakeClient.AddReactor("list", "secrets", listReactor)
-	fakeWatch := watch.NewFake()
+	fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 
 	fakeClock := testingclock.NewFakeClock(time.Now())
@@ -265,6 +268,7 @@ func TestImmutableSecretStopsTheReflector(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.desc, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
+			logger := tCtx.Logger()
 			fakeClient := &fake.Clientset{}
 			listReactor := func(a core.Action) (bool, runtime.Object, error) {
 				result := &v1.SecretList{
@@ -278,7 +282,7 @@ func TestImmutableSecretStopsTheReflector(t *testing.T) {
 				return true, result, nil
 			}
 			fakeClient.AddReactor("list", "secrets", listReactor)
-			fakeWatch := watch.NewFake()
+			fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 			fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 
 			fakeClock := testingclock.NewFakeClock(time.Now())
@@ -348,6 +352,7 @@ func TestImmutableSecretStopsTheReflector(t *testing.T) {
 
 func TestMaxIdleTimeStopsTheReflector(t *testing.T) {
 	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "name",
@@ -369,7 +374,7 @@ func TestMaxIdleTimeStopsTheReflector(t *testing.T) {
 	}
 
 	fakeClient.AddReactor("list", "secrets", listReactor)
-	fakeWatch := watch.NewFake()
+	fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	store := newSecretCache(tCtx, fakeClient, fakeClock, time.Minute)
@@ -428,6 +433,7 @@ func TestMaxIdleTimeStopsTheReflector(t *testing.T) {
 
 func TestReflectorNotStoppedOnSlowInitialization(t *testing.T) {
 	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "name",
@@ -453,7 +459,7 @@ func TestReflectorNotStoppedOnSlowInitialization(t *testing.T) {
 	}
 
 	fakeClient.AddReactor("list", "secrets", listReactor)
-	fakeWatch := watch.NewFake()
+	fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 	store := newSecretCache(tCtx, fakeClient, fakeClock, time.Minute)
 
@@ -600,6 +606,7 @@ func TestRefMapHandlesReferencesCorrectly(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.desc, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
+			logger := tCtx.Logger()
 			fakeClient := &fake.Clientset{}
 			listReactor := func(a core.Action) (bool, runtime.Object, error) {
 				result := &v1.SecretList{
@@ -611,7 +618,7 @@ func TestRefMapHandlesReferencesCorrectly(t *testing.T) {
 				return true, result, nil
 			}
 			fakeClient.AddReactor("list", "secrets", listReactor)
-			fakeWatch := watch.NewFake()
+			fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 			fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			store := newSecretCache(tCtx, fakeClient, fakeClock, time.Minute)
@@ -652,7 +659,7 @@ func TestUnSupportWatchListSemantics(t *testing.T) {
 	defer cancel()
 	target := newSecretCache(context.TODO(), fakeClient, fakeClock, time.Minute)
 
-	ret := target.newReflectorLocked("ns", "obj")
+	ret := target.newReflectorLocked(klog.TODO(), "ns", "obj")
 	defer ret.stop()
 
 	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 3*time.Second, true, func(ctx context.Context) (bool, error) {
@@ -663,6 +670,7 @@ func TestUnSupportWatchListSemantics(t *testing.T) {
 }
 
 func TestWatchListSemanticsSimple(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -715,11 +723,11 @@ func TestWatchListSemanticsSimple(t *testing.T) {
 	}
 
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(tCtx, 5*time.Second)
 	defer cancel()
-	target := newSecretCache(context.TODO(), client, fakeClock, time.Second)
+	target := newSecretCache(tCtx, client, fakeClock, time.Second)
 
-	ret := target.newReflectorLocked("ns", "obj")
+	ret := target.newReflectorLocked(tCtx.Logger(), "ns", "obj")
 	defer ret.stop()
 
 	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 3*time.Second, true, func(ctx context.Context) (bool, error) {

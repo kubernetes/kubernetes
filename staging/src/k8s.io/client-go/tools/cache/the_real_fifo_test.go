@@ -82,7 +82,7 @@ func emptyKnownObjects() KeyListerGetter {
 }
 
 func TestRealFIFO_basic(t *testing.T) {
-	f := NewRealFIFO(testFifoObjectKeyFunc, emptyKnownObjects(), nil)
+	f := NewRealFIFO(testFifoObjectKeyFunc, emptyKnownObjects(), nil) //nolint:logcheck // Intentionally testing old API here.
 	const amount = 500
 	go func() {
 		for i := 0; i < amount; i++ {
@@ -126,7 +126,7 @@ func TestRealFIFO_replaceWithDeleteDeltaIn(t *testing.T) {
 	oldObj := mkFifoObj("foo", 1)
 	newObj := mkFifoObj("foo", 2)
 
-	f := NewRealFIFO(
+	f := NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 		testFifoObjectKeyFunc,
 		literalListerGetter(func() []testFifoObject {
 			return []testFifoObject{oldObj}
@@ -248,7 +248,7 @@ func TestRealFIFOW_ReplaceMakesDeletionsForObjectsOnlyInQueue(t *testing.T) {
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test with a RealFIFO with a backing KnownObjects
-			fWithKnownObjects := NewRealFIFO(
+			fWithKnownObjects := NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 				testFifoObjectKeyFunc,
 				literalListerGetter(func() []testFifoObject {
 					return []testFifoObject{}
@@ -284,7 +284,7 @@ func collapseDeltas(ins []interface{}) Deltas {
 // func TestDeltaFIFO_requeueOnPop(t *testing.T) {
 
 func TestRealFIFO_addUpdate(t *testing.T) {
-	f := NewRealFIFO(
+	f := NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 		testFifoObjectKeyFunc,
 		emptyKnownObjects(),
 		nil,
@@ -381,7 +381,7 @@ func TestRealFIFO_transformer(t *testing.T) {
 		return ret
 	}
 
-	f := NewRealFIFO(
+	f := NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 		testFifoObjectKeyFunc,
 		emptyKnownObjects(),
 		xfrm,
@@ -442,7 +442,7 @@ func TestRealFIFO_transformer(t *testing.T) {
 }
 
 func TestRealFIFO_enqueueingNoLister(t *testing.T) {
-	f := NewRealFIFO(
+	f := NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 		testFifoObjectKeyFunc,
 		emptyKnownObjects(),
 		nil,
@@ -468,7 +468,7 @@ func TestRealFIFO_enqueueingNoLister(t *testing.T) {
 }
 
 func TestRealFIFO_enqueueingWithLister(t *testing.T) {
-	f := NewRealFIFO(
+	f := NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 		testFifoObjectKeyFunc,
 		literalListerGetter(func() []testFifoObject {
 			return []testFifoObject{mkFifoObj("foo", 5), mkFifoObj("bar", 6), mkFifoObj("baz", 7)}
@@ -493,7 +493,7 @@ func TestRealFIFO_enqueueingWithLister(t *testing.T) {
 }
 
 func TestRealFIFO_addReplace(t *testing.T) {
-	f := NewRealFIFO(
+	f := NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 		testFifoObjectKeyFunc,
 		emptyKnownObjects(),
 		nil,
@@ -537,7 +537,7 @@ func TestRealFIFO_addReplace(t *testing.T) {
 }
 
 func TestRealFIFO_ResyncNonExisting(t *testing.T) {
-	f := NewRealFIFO(
+	f := NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 		testFifoObjectKeyFunc,
 		literalListerGetter(func() []testFifoObject {
 			return []testFifoObject{mkFifoObj("foo", 5)}
@@ -557,7 +557,7 @@ func TestRealFIFO_ResyncNonExisting(t *testing.T) {
 }
 
 func TestRealFIFO_Resync(t *testing.T) {
-	f := NewRealFIFO(
+	f := NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 		testFifoObjectKeyFunc,
 		literalListerGetter(func() []testFifoObject {
 			return []testFifoObject{mkFifoObj("foo", 5)}
@@ -577,7 +577,7 @@ func TestRealFIFO_Resync(t *testing.T) {
 
 func TestRealFIFO_ResyncPropagatesQueueError(t *testing.T) {
 	sentinel := errors.New("computing key failed")
-	f := NewRealFIFO(
+	f := NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 		func(obj interface{}) (string, error) {
 			if fifoObj, ok := obj.(testFifoObject); ok && fifoObj.name == "broken" {
 				return "", sentinel
@@ -599,7 +599,7 @@ func TestRealFIFO_ResyncPropagatesQueueError(t *testing.T) {
 }
 
 func TestRealFIFO_DeleteExistingNonPropagated(t *testing.T) {
-	f := NewRealFIFO(
+	f := NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 		testFifoObjectKeyFunc,
 		emptyKnownObjects(),
 		nil,
@@ -621,7 +621,7 @@ func TestRealFIFO_ReplaceMakesDeletions(t *testing.T) {
 	// promise about how their deletes are ordered.
 
 	// Try it with a pre-existing Delete
-	f := NewRealFIFO(
+	f := NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 		testFifoObjectKeyFunc,
 		literalListerGetter(func() []testFifoObject {
 			return []testFifoObject{mkFifoObj("foo", 5), mkFifoObj("bar", 6), mkFifoObj("baz", 7)}
@@ -648,7 +648,7 @@ func TestRealFIFO_ReplaceMakesDeletions(t *testing.T) {
 	}
 
 	// Now try starting with an Add instead of a Delete
-	f = NewRealFIFO(
+	f = NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 		testFifoObjectKeyFunc,
 		literalListerGetter(func() []testFifoObject {
 			return []testFifoObject{mkFifoObj("foo", 5), mkFifoObj("bar", 6), mkFifoObj("baz", 7)}
@@ -677,7 +677,7 @@ func TestRealFIFO_ReplaceMakesDeletions(t *testing.T) {
 	}
 
 	// Now try deleting and recreating the object in the queue, then delete it by a Replace call
-	f = NewRealFIFO(
+	f = NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 		testFifoObjectKeyFunc,
 		literalListerGetter(func() []testFifoObject {
 			return []testFifoObject{mkFifoObj("foo", 5), mkFifoObj("bar", 6), mkFifoObj("baz", 7)}
@@ -708,7 +708,7 @@ func TestRealFIFO_ReplaceMakesDeletions(t *testing.T) {
 	}
 
 	// Now try syncing it first to ensure the delete use the latest version
-	f = NewRealFIFO(
+	f = NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 		testFifoObjectKeyFunc,
 		literalListerGetter(func() []testFifoObject {
 			return []testFifoObject{mkFifoObj("foo", 5), mkFifoObj("bar", 6), mkFifoObj("baz", 7)}
@@ -740,7 +740,7 @@ func TestRealFIFO_ReplaceMakesDeletions(t *testing.T) {
 	}
 
 	// Now try starting without an explicit KeyListerGetter
-	f = NewRealFIFO(
+	f = NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 		testFifoObjectKeyFunc,
 		emptyKnownObjects(),
 		nil,
@@ -765,7 +765,7 @@ func TestRealFIFO_ReplaceMakesDeletions(t *testing.T) {
 // TestRealFIFO_ReplaceMakesDeletionsReplaced is the same as the above test, but
 // ensures that a Replaced DeltaType is emitted.
 func TestRealFIFO_ReplaceMakesDeletionsReplaced(t *testing.T) {
-	f := NewRealFIFO(
+	f := NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 		testFifoObjectKeyFunc,
 		literalListerGetter(func() []testFifoObject {
 			return []testFifoObject{mkFifoObj("foo", 5), mkFifoObj("bar", 6), mkFifoObj("baz", 7)}
@@ -797,7 +797,7 @@ func TestRealFIFO_ReplaceMakesDeletionsReplaced(t *testing.T) {
 //func TestRealFIFO_ReplaceDeltaType(t *testing.T) {
 
 func TestRealFIFO_UpdateResyncRace(t *testing.T) {
-	f := NewRealFIFO(
+	f := NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 		testFifoObjectKeyFunc,
 		literalListerGetter(func() []testFifoObject {
 			return []testFifoObject{mkFifoObj("foo", 5)}
@@ -820,7 +820,7 @@ func TestRealFIFO_UpdateResyncRace(t *testing.T) {
 }
 
 func TestRealFIFO_HasSyncedCorrectOnDeletion(t *testing.T) {
-	f := NewRealFIFO(
+	f := NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 		testFifoObjectKeyFunc,
 		literalListerGetter(func() []testFifoObject {
 			return []testFifoObject{mkFifoObj("foo", 5), mkFifoObj("bar", 6), mkFifoObj("baz", 7)}
@@ -856,7 +856,7 @@ func TestRealFIFO_HasSyncedCorrectOnDeletion(t *testing.T) {
 }
 
 func TestRealFIFO_detectLineJumpers(t *testing.T) {
-	f := NewRealFIFO(
+	f := NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 		testFifoObjectKeyFunc,
 		emptyKnownObjects(),
 		nil,
@@ -974,7 +974,7 @@ func TestRealFIFO_HasSynced(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		f := NewRealFIFO(
+		f := NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 			testFifoObjectKeyFunc,
 			emptyKnownObjects(),
 			nil,
@@ -992,7 +992,7 @@ func TestRealFIFO_HasSynced(t *testing.T) {
 // TestRealFIFO_PopShouldUnblockWhenClosed checks that any blocking Pop on an empty queue
 // should unblock and return after Close is called.
 func TestRealFIFO_PopShouldUnblockWhenClosed(t *testing.T) {
-	f := NewRealFIFO(
+	f := NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 		testFifoObjectKeyFunc,
 		literalListerGetter(func() []testFifoObject {
 			return []testFifoObject{mkFifoObj("foo", 5)}
@@ -1153,7 +1153,7 @@ func TestRealFIFO_PopMultipleDeltaInBatch(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			f := NewRealFIFO(
+			f := NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 				testFifoObjectKeyFunc,
 				literalListerGetter(func() []testFifoObject {
 					return tc.initialItems
@@ -1293,7 +1293,7 @@ func TestRealFIFO_PopBrokenItemsInBatch(t *testing.T) {
 				// otherwise success
 				return testFifoObjectKeyFunc(obj)
 			}
-			f := NewRealFIFO(
+			f := NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 				testBrokenItemKeyFunc,
 				literalListerGetter(func() []testFifoObject {
 					return nil
@@ -1417,7 +1417,7 @@ func TestRealFIFO_ReplaceAtomic(t *testing.T) {
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test with a RealFIFO with a backing KnownObjects
-			f := NewRealFIFO(
+			f := NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 				testFifoObjectKeyFunc,
 				literalListerGetter(func() []testFifoObject {
 					return []testFifoObject{}
@@ -1441,7 +1441,7 @@ func TestRealFIFO_ReplaceAtomic(t *testing.T) {
 }
 
 func TestRealFIFO_ReplaceAtomicPop(t *testing.T) {
-	f := NewRealFIFO(
+	f := NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 		testFifoObjectKeyFunc,
 		emptyKnownObjects(),
 		nil,
@@ -1516,7 +1516,7 @@ func TestRealFIFO_ResyncAtomic(t *testing.T) {
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test with a RealFIFO with a backing KnownObjects
-			f := NewRealFIFO(
+			f := NewRealFIFO( //nolint:logcheck // Intentionally testing old API here.
 				testFifoObjectKeyFunc,
 				literalListerGetter(func() []testFifoObject {
 					return []testFifoObject{}

@@ -61,7 +61,7 @@ type StreamWatcher struct {
 
 // NewStreamWatcher creates a StreamWatcher from the given decoder.
 //
-// Contextual logging: NewStreamWatcherWithLogger should be used instead of NewStreamWatcher in code which supports contextual logging.
+//logcheck:context // NewStreamWatcherWithLogger should be used instead of NewStreamWatcher in code which supports contextual logging.
 func NewStreamWatcher(d Decoder, r Reporter) *StreamWatcher {
 	return NewStreamWatcherWithLogger(klog.Background(), d, r)
 }

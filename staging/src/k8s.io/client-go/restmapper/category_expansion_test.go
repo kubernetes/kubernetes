@@ -22,6 +22,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func TestCategoryExpansion(t *testing.T) {
@@ -131,12 +133,13 @@ func TestDiscoveryCategoryExpander(t *testing.T) {
 	}
 
 	dc := &fakeDiscoveryClient{}
+	_, ctx := ktesting.NewTestContext(t)
 	for _, test := range tests {
 		dc.serverResourcesHandler = func() ([]*metav1.APIResourceList, error) {
 			return test.serverResponse, nil
 		}
-		expander := NewDiscoveryCategoryExpander(dc)
-		expanded, _ := expander.Expand(test.category)
+		expander := NewDiscoveryCategoryExpanderWithContext(discovery.ToDiscoveryInterfaceWithContext(dc))
+		expanded, _ := expander.ExpandWithContext(ctx, test.category)
 		if !reflect.DeepEqual(expanded, test.expected) {
 			t.Errorf("expected %v, got %v", test.expected, expanded)
 		}

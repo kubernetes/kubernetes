@@ -130,7 +130,7 @@ func (gc *GarbageCollector) resyncMonitors(logger klog.Logger, deletableResource
 
 // Run starts garbage collector workers.
 func (gc *GarbageCollector) Run(ctx context.Context, workers int, initialSyncTimeout time.Duration) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	gc.eventBroadcaster.StartStructuredLogging(3)

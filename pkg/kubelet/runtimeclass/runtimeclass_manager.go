@@ -17,9 +17,11 @@ limitations under the License.
 package runtimeclass
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	nodev1 "k8s.io/client-go/listers/node/v1"
@@ -45,14 +47,29 @@ func NewManager(client clientset.Interface) *Manager {
 }
 
 // Start starts syncing the RuntimeClass cache with the apiserver.
+//
+//logcheck:context // StartWithContext should be used instead of Start in code which supports contextual logging.
 func (m *Manager) Start(stopCh <-chan struct{}) {
-	m.informerFactory.Start(stopCh)
+	m.StartWithContext(wait.ContextForChannel(stopCh))
+}
+
+// StartWithContext starts syncing the RuntimeClass cache with the apiserver.
+func (m *Manager) StartWithContext(ctx context.Context) {
+	m.informerFactory.StartWithContext(ctx)
 }
 
 // WaitForCacheSync exposes the WaitForCacheSync method on the informer factory for testing
 // purposes.
+//
+//logcheck:context // WaitForCacheSyncWithContext should be used instead of WaitForCacheSync in code which supports contextual logging.
 func (m *Manager) WaitForCacheSync(stopCh <-chan struct{}) {
-	m.informerFactory.WaitForCacheSync(stopCh)
+	m.WaitForCacheSyncWithContext(wait.ContextForChannel(stopCh))
+}
+
+// WaitForCacheSyncWithContext exposes the WaitForCacheSyncWithContext method on the informer
+// factory for testing purposes.
+func (m *Manager) WaitForCacheSyncWithContext(ctx context.Context) {
+	m.informerFactory.WaitForCacheSyncWithContext(ctx)
 }
 
 // LookupRuntimeHandler returns the RuntimeHandler string associated with the given RuntimeClass

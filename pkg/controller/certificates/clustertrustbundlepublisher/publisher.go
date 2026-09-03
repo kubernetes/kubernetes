@@ -197,6 +197,7 @@ func (f caContentListener) Enqueue() {
 // NewBetaClusterTrustBundlePublisher sets up a ClusterTrustBundlePublisher for the
 // v1 API
 func NewGAClusterTrustBundlePublisher(
+	logger klog.Logger,
 	signerName string,
 	caProvider dynamiccertificates.CAContentProvider,
 	kubeClient clientset.Interface,
@@ -210,6 +211,7 @@ func NewGAClusterTrustBundlePublisher(
 		})
 
 	return newClusterTrustBundlePublisher(
+		logger,
 		signerName,
 		caProvider,
 		kubeClient.CertificatesV1().ClusterTrustBundles(),
@@ -222,6 +224,7 @@ func NewGAClusterTrustBundlePublisher(
 // NewBetaClusterTrustBundlePublisher sets up a ClusterTrustBundlePublisher for the
 // v1beta1 API
 func NewBetaClusterTrustBundlePublisher(
+	logger klog.Logger,
 	signerName string,
 	caProvider dynamiccertificates.CAContentProvider,
 	kubeClient clientset.Interface,
@@ -236,6 +239,7 @@ func NewBetaClusterTrustBundlePublisher(
 		})
 
 	return newClusterTrustBundlePublisher(
+		logger,
 		signerName,
 		caProvider,
 		kubeClient.CertificatesV1beta1().ClusterTrustBundles(),
@@ -248,6 +252,7 @@ func NewBetaClusterTrustBundlePublisher(
 // NewAlphaClusterTrustBundlePublisher sets up a ClusterTrustBundlePublisher for the
 // v1alpha1 API
 func NewAlphaClusterTrustBundlePublisher(
+	logger klog.Logger,
 	signerName string,
 	caProvider dynamiccertificates.CAContentProvider,
 	kubeClient clientset.Interface,
@@ -262,6 +267,7 @@ func NewAlphaClusterTrustBundlePublisher(
 		})
 
 	return newClusterTrustBundlePublisher(
+		logger,
 		signerName,
 		caProvider,
 		kubeClient.CertificatesV1alpha1().ClusterTrustBundles(),
@@ -275,6 +281,7 @@ func NewAlphaClusterTrustBundlePublisher(
 // for a signer named `signerName`. The cluster trust bundle object contains the
 // CA from the `caProvider` in its .spec.TrustBundle.
 func newClusterTrustBundlePublisher[T clusterTrustBundle](
+	logger klog.Logger,
 	signerName string,
 	caProvider dynamiccertificates.CAContentProvider,
 	bundleClient clusterTrustBundlesClient[T],
@@ -300,12 +307,13 @@ func newClusterTrustBundlePublisher[T clusterTrustBundle](
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: "ca_cert_publisher_cluster_trust_bundles",
+				Logger: &logger,
+				Name:   "ca_cert_publisher_cluster_trust_bundles",
 			},
 		),
 	}
 
-	_, err := p.ctbInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := p.ctbInformer.AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			p.queue.Add("")
 		},
@@ -315,7 +323,7 @@ func newClusterTrustBundlePublisher[T clusterTrustBundle](
 		DeleteFunc: func(_ interface{}) {
 			p.queue.Add("")
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	if err != nil {
 		return nil, fmt.Errorf("failed to register ClusterTrustBundle event handler: %w", err)
 	}
@@ -331,7 +339,7 @@ func (p *ClusterTrustBundlePublisher[T]) caContentChangedListener() dynamiccerti
 }
 
 func (p *ClusterTrustBundlePublisher[T]) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting ClusterTrustBundle CA cert publisher controller")

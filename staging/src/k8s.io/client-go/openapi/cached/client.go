@@ -39,7 +39,7 @@ var (
 
 // NewClientWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use NewClientWithContext instead.
+//logcheck:context // Use NewClientWithContext instead of NewClient in code which supports contextual logging.
 func NewClient(other openapi.Client) openapi.Client {
 	return newClient(openapi.ToClientWithContext(other))
 }
@@ -56,7 +56,7 @@ func newClient(other openapi.ClientWithContext) *Client {
 
 // PathsWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use PathsWithContext instead.
+//logcheck:context // Use PathsWithContext instead of Paths in code which supports contextual logging.
 func (c *Client) Paths() (map[string]openapi.GroupVersion, error) {
 	// For efficiency reasons in the *WithContext case this is a map to
 	// openapi.GroupVersionWithContext. But we know that all entries

@@ -238,13 +238,19 @@ func NewNamespaceKeyedIndexerAndReflector(lw ListerWatcher, expectedType interfa
 
 // NewReflector creates a new Reflector with its name defaulted to the closest source_file.go:line in the call stack
 // that is outside this package. See NewReflectorWithOptions for further information.
+//
+//logcheck:context // NewReflectorWithOptions and logger should be used instead of NewReflector in code which supports contextual logging.
 func NewReflector(lw ListerWatcher, expectedType interface{}, store ReflectorStore, resyncPeriod time.Duration) *Reflector {
+	//nolint:logcheck // Cannot provide Logger here.
 	return NewReflectorWithOptions(lw, expectedType, store, ReflectorOptions{ResyncPeriod: resyncPeriod})
 }
 
 // NewNamedReflector creates a new Reflector with the specified name. See NewReflectorWithOptions for further
 // information.
+//
+//logcheck:context // NewNamedReflector and logger should be used instead of NewNamedReflector in code which supports contextual logging.
 func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, store ReflectorStore, resyncPeriod time.Duration) *Reflector {
+	//nolint:logcheck // Cannot provide Logger here.
 	return NewReflectorWithOptions(lw, expectedType, store, ReflectorOptions{Name: name, ResyncPeriod: resyncPeriod})
 }
 
@@ -412,7 +418,7 @@ var internalPackages = []string{"client-go/tools/cache/"}
 // objects and subsequent deltas.
 // Run will exit when stopCh is closed.
 //
-// Contextual logging: RunWithContext should be used instead of Run in code which supports contextual logging.
+//logcheck:context // RunWithContext should be used instead of Run in code which supports contextual logging.
 func (r *Reflector) Run(stopCh <-chan struct{}) {
 	r.RunWithContext(wait.ContextForChannel(stopCh))
 }
@@ -459,7 +465,7 @@ func (r *Reflector) resyncChan() (<-chan time.Time, func() bool) {
 // and then use the resource version to watch.
 // It returns error if ListAndWatch didn't even try to initialize watch.
 //
-// Contextual logging: ListAndWatchWithContext should be used instead of ListAndWatch in code which supports contextual logging.
+//logcheck:context // ListAndWatchWithContext should be used instead of ListAndWatch in code which supports contextual logging.
 func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	return r.ListAndWatchWithContext(wait.ContextForChannel(stopCh))
 }

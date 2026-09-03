@@ -27,7 +27,7 @@ import (
 
 // ClientWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ClientWithContext instead.
+//logcheck:context // Use ClientWithContext instead of Client in code which supports contextual logging.
 type Client interface {
 	Paths() (map[string]GroupVersion, error)
 }
@@ -68,7 +68,7 @@ type client struct {
 
 // NewClientWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use NewClientWithContext instead.
+//logcheck:context // Use NewClientWithContext instead of NewClient in code which supports contextual logging.
 func NewClient(restClient rest.Interface) Client {
 	return newClient(restClient)
 }
@@ -85,7 +85,7 @@ func newClient(restClient rest.Interface) *client {
 
 // PathsWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use PathsWithContext instead.
+//logcheck:context // Use PathsWithContext instead of Paths in code which supports contextual logging.
 func (c *client) Paths() (map[string]GroupVersion, error) {
 	resultWithContext, err := c.PathsWithContext(context.Background())
 	result := make(map[string]GroupVersion, len(resultWithContext))

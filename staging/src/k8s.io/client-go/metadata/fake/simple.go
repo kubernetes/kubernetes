@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/testing"
+	"k8s.io/klog/v2"
 )
 
 // MetadataClient assists in creating fake objects for use when testing, since metadata.Getter
@@ -58,7 +59,7 @@ func NewSimpleMetadataClient(scheme *runtime.Scheme, objects ...runtime.Object) 
 	}
 
 	codecs := serializer.NewCodecFactory(scheme)
-	o := testing.NewObjectTracker(scheme, codecs.UniversalDeserializer())
+	o := testing.NewObjectTrackerWithLogger(klog.TODO() /* We need some way for the caller to pass a logger - see also NewSimpleDynamicClientWithCustomListKinds. */, scheme, codecs.UniversalDeserializer())
 	for _, obj := range objects {
 		if err := o.Add(obj); err != nil {
 			panic(err)

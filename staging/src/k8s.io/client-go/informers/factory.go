@@ -308,7 +308,7 @@ type SharedInformerFactory interface {
 	// which run until the stop channel gets closed.
 	// Warning: Start does not block. When run in a go-routine, it will race with a later WaitForCacheSync.
 	//
-	// Contextual logging: StartWithContext should be used instead of Start in code which supports contextual logging.
+	//logcheck:context // StartWithContext should be used instead of Start in code which supports contextual logging.
 	Start(stopCh <-chan struct{})
 
 	// StartWithContext initializes all requested informers. They are handled in goroutines
@@ -331,7 +331,7 @@ type SharedInformerFactory interface {
 	// WaitForCacheSync blocks until all started informers' caches were synced
 	// or the stop channel gets closed.
 	//
-	// Contextual logging: WaitForCacheSyncWithContext should be used instead of WaitForCacheSync in code which supports contextual logging. It also returns a more useful result.
+	//logcheck:context // WaitForCacheSyncWithContext should be used instead of WaitForCacheSync in code which supports contextual logging. It also returns a more useful result.
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
 	// WaitForCacheSyncWithContext blocks until all started informers' caches were synced

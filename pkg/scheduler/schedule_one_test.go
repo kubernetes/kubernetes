@@ -541,8 +541,8 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 	defer stopFn()
 
 	// Run scheduler.
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
+	informerFactory.StartWithContext(ctx)
+	informerFactory.WaitForCacheSyncWithContext(ctx)
 	if err = sched.WaitForHandlersSync(ctx); err != nil {
 		t.Fatalf("Handlers failed to sync: %v: ", err)
 	}
@@ -633,8 +633,8 @@ func TestSchedulerGuaranteeNonNilNodeInSchedulingCycle(t *testing.T) {
 	}
 
 	// Run scheduler.
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
+	informerFactory.StartWithContext(ctx)
+	informerFactory.WaitForCacheSyncWithContext(ctx)
 	go sched.Run(ctx)
 
 	var deleteNodeIndex int
@@ -1163,8 +1163,8 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			APIDispatcher:                          apiDispatcher,
 			nominatedNodeNameForExpectationEnabled: features.nominatedNodeNameForExpectationEnabled,
 		}
-		informerFactory.Start(ctx.Done())
-		informerFactory.WaitForCacheSync(ctx.Done())
+		informerFactory.StartWithContext(ctx)
+		informerFactory.WaitForCacheSyncWithContext(ctx)
 
 		if scheduleAsPodGroup {
 			queue.AddGenericPodGroup(logger, framework.NewGenericPodGroup(podGroup))
@@ -1360,8 +1360,8 @@ func TestHandleSchedulingFailureSkipsRecreatedPod(t *testing.T) {
 		SchedulingQueue: queue,
 	}
 
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
+	informerFactory.StartWithContext(ctx)
+	informerFactory.WaitForCacheSyncWithContext(ctx)
 
 	queue.Add(ctx, oldPod)
 	popped, err := queue.Pop(logger)
@@ -1451,8 +1451,8 @@ func TestHandleSchedulingFailureForDeferredResizePod(t *testing.T) {
 		inPlacePodVerticalScalingSchedulerPreemptionEnabled: true,
 	}
 
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
+	informerFactory.StartWithContext(ctx)
+	informerFactory.WaitForCacheSyncWithContext(ctx)
 
 	queue.Add(ctx, pod)
 	popped, err := queue.Pop(logger)
@@ -1528,8 +1528,8 @@ func TestHandleSchedulingFailure_PodGroupFitErrorCloned(t *testing.T) {
 		SchedulingQueue: queue,
 	}
 
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
+	informerFactory.StartWithContext(ctx)
+	informerFactory.WaitForCacheSyncWithContext(ctx)
 
 	queue.AddGenericPodGroup(logger, framework.NewGenericPodGroup(pg))
 	queue.Add(ctx, pod1)
@@ -3970,8 +3970,8 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			}
 			sched.applyDefaultHandlers()
 
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
 
 			podInfo := queuedPodInfoForPod(test.pod)
 			result, err := sched.SchedulePod(ctx, schedFramework, framework.NewCycleState(), podInfo)
@@ -5287,8 +5287,8 @@ func TestScheduler_DeferredResizePluginSkipping(t *testing.T) {
 		nodeInfoSnapshot: snapshot,
 	}
 
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
+	informerFactory.StartWithContext(ctx)
+	informerFactory.WaitForCacheSyncWithContext(ctx)
 
 	state := framework.NewCycleState()
 	podInfo := queuedPodInfoForPod(pod)
@@ -5412,8 +5412,8 @@ func TestScheduler_DeferredResizePostFilterPluginSkipping(t *testing.T) {
 				t.Fatalf("NewFramework failed: %v", err)
 			}
 
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
 
 			state := framework.NewCycleState()
 
@@ -5499,8 +5499,8 @@ func TestSchedulePodWithOpportunisticBatching(t *testing.T) {
 			}
 			sched.applyDefaultHandlers()
 
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
 
 			// Schedule first pod.
 			pod1 := st.MakePod().Name("pod1").UID("pod1").Namespace(v1.NamespaceDefault).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()

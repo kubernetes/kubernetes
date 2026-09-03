@@ -237,7 +237,10 @@ func newControllerWithFeatures(
 		templatesSynced: templateInformer.Informer().HasSynced,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "resource_claim"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
+				Name:   "resource_claim",
+			},
 		),
 		deletedObjects: newUIDCache(maxUIDCacheEntries),
 	}

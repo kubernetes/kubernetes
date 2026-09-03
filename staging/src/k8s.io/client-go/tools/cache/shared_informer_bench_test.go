@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/klog/v2/ktesting"
 )
 
 var benchmarkNamespace = "default"
@@ -40,7 +41,8 @@ func BenchmarkSharedIndexInformer(b *testing.B) {
 			pods := createPods(podCount, benchmarkNamespace)
 			for _, readers := range []int{0, 1, 10, 20, 40, 80} {
 				b.Run(fmt.Sprintf("readers=%d", readers), func(b *testing.B) {
-					watcher := watch.NewFakeWithChanSize(1, false)
+					logger, _ := ktesting.NewTestContext(b)
+					watcher := watch.NewFakeWithOptions(watch.FakeOptions{ChannelSize: 1, Logger: &logger})
 					informer, stop := setupSharedIndexInformer(watcher, pods)
 					defer stop()
 					queuedEvents := 10
@@ -89,7 +91,7 @@ func setupSharedIndexInformer(watcher watch.Interface, pods []corev1.Pod) (Share
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		podInformer.Run(stop)
+		podInformer.Run(stop) //nolint:logcheck // Intentionally testing old API here.
 	}()
 	for !podInformer.HasSynced() {
 		time.Sleep(time.Millisecond)
@@ -101,10 +103,11 @@ func setupSharedIndexInformer(watcher watch.Interface, pods []corev1.Pod) (Share
 }
 
 func benchmarkSharedIndexInformer(b *testing.B, readers int, watcher *watch.FakeWatcher, podInformer SharedIndexInformer, pods []corev1.Pod, queuedEvents int) {
+	logger, _ := ktesting.NewTestContext(b)
 	var writes atomic.Int64
 	got := make(chan struct{}, queuedEvents)
 
-	_, err := podInformer.AddEventHandler(ResourceEventHandlerDetailedFuncs{
+	_, err := podInformer.AddEventHandlerWithOptions(ResourceEventHandlerDetailedFuncs{
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			writes.Add(1)
 			select {
@@ -112,7 +115,7 @@ func benchmarkSharedIndexInformer(b *testing.B, readers int, watcher *watch.Fake
 			default:
 			}
 		},
-	})
+	}, HandlerOptions{Logger: &logger})
 	if err != nil {
 		b.Fatal(err)
 	}

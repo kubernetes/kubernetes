@@ -263,7 +263,10 @@ type Deltas []Delta
 // instead to receive a `Replaced` event depending on the type.
 //
 // Deprecated: Equivalent to NewDeltaFIFOWithOptions(DeltaFIFOOptions{KeyFunction: keyFunc, KnownObjects: knownObjects})
+//
+//logcheck:context // NewDeltaFIFOWithOptions and logger should be used instead of NewDeltaFIFO in code which supports contextual logging.
 func NewDeltaFIFO(keyFunc KeyFunc, knownObjects KeyListerGetter) *DeltaFIFO {
+	//nolint:logcheck // Cannot provide Logger here.
 	return NewDeltaFIFOWithOptions(DeltaFIFOOptions{
 		KeyFunction:  keyFunc,
 		KnownObjects: knownObjects,

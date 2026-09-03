@@ -521,7 +521,10 @@ func newController(ctx context.Context, options Options) (*Controller, error) {
 	if c.queue == nil {
 		c.queue = workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "node_resource_slices"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: new(klog.FromContext(ctx)),
+				Name:   "node_resource_slices",
+			},
 		)
 	}
 	if c.errorHandler == nil {

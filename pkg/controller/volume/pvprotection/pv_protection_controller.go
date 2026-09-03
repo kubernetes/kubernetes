@@ -55,7 +55,10 @@ func NewPVProtectionController(logger klog.Logger, pvInformer coreinformers.Pers
 		client: cl,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "pvprotection"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
+				Name:   "pvprotection",
+			},
 		),
 	}
 
@@ -78,7 +81,7 @@ func NewPVProtectionController(logger klog.Logger, pvInformer coreinformers.Pers
 
 // Run runs the controller goroutines.
 func (c *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting PV protection controller")

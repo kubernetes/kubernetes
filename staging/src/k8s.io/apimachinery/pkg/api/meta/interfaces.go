@@ -113,7 +113,7 @@ type RESTMapping struct {
 //
 // RESTMapperWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use RESTMapperWithContext instead.
+//logcheck:context // Use RESTMapperWithContext instead of RESTMapper in code which supports contextual logging.
 type RESTMapper interface {
 	// KindFor takes a partial resource and returns the single match.  Returns an error if there are multiple matches
 	KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error)
@@ -212,7 +212,7 @@ func (m *restMapperWrapper) ResourceSingularizerWithContext(ctx context.Context,
 //
 // ResettableRESTMapperWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use ResettableRESTMapperWithContext instead.
+//logcheck:context // Use ResettableRESTMapperWithContext instead of ResettableRESTMapper in code which supports contextual logging.
 type ResettableRESTMapper interface {
 	RESTMapper
 	Reset()

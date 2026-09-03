@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	utiltesting "k8s.io/client-go/util/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/utils/ktesting"
 
 	"github.com/google/go-cmp/cmp"
@@ -350,7 +351,7 @@ users:
 
 func TestRequestNodeCertificateNoKeyData(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	certData, err := requestNodeCertificate(tCtx, newClientset(fakeClient{}), []byte{}, "fake-node-name")
+	certData, err := requestNodeCertificate(tCtx, newClientset(tCtx.Logger(), fakeClient{}), []byte{}, "fake-node-name")
 	if err == nil {
 		t.Errorf("Got no error, wanted error an error because there was an empty private key passed in.")
 	}
@@ -361,7 +362,7 @@ func TestRequestNodeCertificateNoKeyData(t *testing.T) {
 
 func TestRequestNodeCertificateErrorCreatingCSR(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	client := newClientset(fakeClient{
+	client := newClientset(tCtx.Logger(), fakeClient{
 		failureType: createError,
 	})
 	privateKeyData, err := keyutil.MakeEllipticPrivateKeyPEM()
@@ -385,7 +386,7 @@ func TestRequestNodeCertificate(t *testing.T) {
 		t.Fatalf("Unable to generate a new private key: %v", err)
 	}
 
-	certData, err := requestNodeCertificate(tCtx, newClientset(fakeClient{}), privateKeyData, "fake-node-name")
+	certData, err := requestNodeCertificate(tCtx, newClientset(tCtx.Logger(), fakeClient{}), privateKeyData, "fake-node-name")
 	if err != nil {
 		t.Errorf("Got %v, wanted no error.", err)
 	}
@@ -407,7 +408,7 @@ type fakeClient struct {
 	failureType failureType
 }
 
-func newClientset(opts fakeClient) *fake.Clientset {
+func newClientset(logger klog.Logger, opts fakeClient) *fake.Clientset {
 	f := fake.NewSimpleClientset()
 	switch opts.failureType {
 	case createError:
@@ -439,7 +440,7 @@ func newClientset(opts fakeClient) *fake.Clientset {
 		f.PrependWatchReactor("certificatesigningrequests", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
 			switch action.GetResource().Version {
 			case "v1":
-				w := watch.NewFakeWithChanSize(1, false)
+				w := watch.NewFakeWithOptions(watch.FakeOptions{ChannelSize: 1, Logger: &logger})
 				w.Add(opts.generateCSR())
 				w.Stop()
 				return true, w, nil

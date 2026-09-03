@@ -93,7 +93,7 @@ type Signer struct {
 }
 
 // NewSigner returns a new *Signer.
-func NewSigner(cl clientset.Interface, secrets informers.SecretInformer, configMaps informers.ConfigMapInformer, options SignerOptions) (*Signer, error) {
+func NewSigner(logger klog.Logger, cl clientset.Interface, secrets informers.SecretInformer, configMaps informers.ConfigMapInformer, options SignerOptions) (*Signer, error) {
 	e := &Signer{
 		client:             cl,
 		configMapKey:       options.ConfigMapNamespace + "/" + options.ConfigMapName,
@@ -107,12 +107,13 @@ func NewSigner(cl clientset.Interface, secrets informers.SecretInformer, configM
 		syncQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: "bootstrap_signer_queue",
+				Logger: &logger,
+				Name:   "bootstrap_signer_queue",
 			},
 		),
 	}
 
-	configMaps.Informer().AddEventHandlerWithResyncPeriod(
+	_, _ = configMaps.Informer().AddEventHandlerWithOptions(
 		cache.FilteringResourceEventHandler{
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
@@ -128,10 +129,13 @@ func NewSigner(cl clientset.Interface, secrets informers.SecretInformer, configM
 				UpdateFunc: func(_, _ interface{}) { e.pokeConfigMapSync() },
 			},
 		},
-		options.ConfigMapResync,
+		cache.HandlerOptions{
+			Logger:       &logger,
+			ResyncPeriod: &options.ConfigMapResync,
+		},
 	)
 
-	secrets.Informer().AddEventHandlerWithResyncPeriod(
+	_, _ = secrets.Informer().AddEventHandlerWithOptions(
 		cache.FilteringResourceEventHandler{
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
@@ -148,7 +152,10 @@ func NewSigner(cl clientset.Interface, secrets informers.SecretInformer, configM
 				DeleteFunc: func(_ interface{}) { e.pokeConfigMapSync() },
 			},
 		},
-		options.SecretResync,
+		cache.HandlerOptions{
+			Logger:       &logger,
+			ResyncPeriod: &options.SecretResync,
+		},
 	)
 
 	return e, nil
@@ -156,7 +163,7 @@ func NewSigner(cl clientset.Interface, secrets informers.SecretInformer, configM
 
 // Run runs controller loops and returns when they are done
 func (e *Signer) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Starting")

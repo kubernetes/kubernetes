@@ -845,8 +845,8 @@ func TestPodGroupCycle_UpdateSnapshotError(t *testing.T) {
 
 	client := clientsetfake.NewClientset(testPodGroup)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
+	informerFactory.StartWithContext(ctx)
+	informerFactory.WaitForCacheSyncWithContext(ctx)
 
 	var failureHandlerCalled bool
 	sched := &Scheduler{
@@ -918,8 +918,8 @@ func TestPodGroupCycle_FillsPodResultsOnFewerResults(t *testing.T) {
 	client := clientsetfake.NewSimpleClientset(testPodGroup, testNode)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
+	informerFactory.StartWithContext(ctx)
+	informerFactory.WaitForCacheSyncWithContext(ctx)
 	queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
 	snapshot := internalcache.NewEmptySnapshot()
 
@@ -1104,8 +1104,8 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset(testPodGroup, testNode)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
 			queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
 			snapshot := internalcache.NewEmptySnapshot()
 
@@ -1895,8 +1895,8 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 			cache.AddGenericPodGroup(apg)
 
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
 
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			schedulingQueue := internalqueue.NewTestQueue(ctx, schedFwk.QueueSortFunc(), internalqueue.WithClock(fakeClock))
@@ -2339,8 +2339,8 @@ func TestUpdatePodGroupCondition(t *testing.T) {
 			cache.AddGenericPodGroup(apg)
 
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
 			sched := &Scheduler{client: client, Cache: cache}
 
 			var existingLTT metav1.Time
@@ -4390,8 +4390,8 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 
 	client := clientsetfake.NewSimpleClientset(testPodGroup)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
+	informerFactory.StartWithContext(ctx)
+	informerFactory.WaitForCacheSyncWithContext(ctx)
 
 	schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
 		frameworkruntime.WithInformerFactory(informerFactory),
@@ -4505,8 +4505,8 @@ func TestScheduleOnePodGroup_PodGroupNotFound(t *testing.T) {
 	cache := internalcache.New(ctx, nil, true, false /* CompositePodGroup */)
 	queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
 
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
+	informerFactory.StartWithContext(ctx)
+	informerFactory.WaitForCacheSyncWithContext(ctx)
 
 	sched := &Scheduler{
 		Profiles:               profile.Map{"test-scheduler": schedFwk},
@@ -4584,8 +4584,8 @@ func TestScheduleOnePodGroup_SchedulerNameMismatchUpdatesStatus(t *testing.T) {
 	cache.AddGenericPodGroup(apg)
 
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
+	informerFactory.StartWithContext(ctx)
+	informerFactory.WaitForCacheSyncWithContext(ctx)
 	sched := &Scheduler{
 		Profiles:        profile.Map{"sched1": schedFwk1, "sched2": schedFwk2},
 		SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
@@ -4784,8 +4784,8 @@ func TestScheduleOnePodGroup_PodGroupStateAvailability(t *testing.T) {
 			snapshot := internalcache.NewEmptySnapshot()
 			client := clientsetfake.NewClientset(testPodGroup)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
 
 			cache := internalcache.New(ctx, nil, true, false /* CompositePodGroup */)
 			cache.AddGenericPodGroup(framework.NewGenericPodGroup(testPodGroup))
@@ -4969,8 +4969,8 @@ func TestCPGHierarchicalScheduling_ScheduleOnePodGroup(t *testing.T) {
 
 	client := clientsetfake.NewSimpleClientset(cpgRoot, pg1, pg2, pg3)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
+	informerFactory.StartWithContext(ctx)
+	informerFactory.WaitForCacheSyncWithContext(ctx)
 
 	schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
 		frameworkruntime.WithInformerFactory(informerFactory),
@@ -5237,8 +5237,8 @@ func TestCPGHierarchicalScheduling_Internal(t *testing.T) {
 	client := clientsetfake.NewSimpleClientset(clientObjs...)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
+	informerFactory.StartWithContext(ctx)
+	informerFactory.WaitForCacheSyncWithContext(ctx)
 	queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
 	snapshot := internalcache.NewEmptySnapshot()
 
@@ -5253,8 +5253,8 @@ func TestCPGHierarchicalScheduling_Internal(t *testing.T) {
 		frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
 		frameworkruntime.WithPodGroupManager(cache),
 	)
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
+	informerFactory.StartWithContext(ctx)
+	informerFactory.WaitForCacheSyncWithContext(ctx)
 	if err != nil {
 		t.Fatalf("Failed to create new framework: %v", err)
 	}
@@ -5478,8 +5478,8 @@ func TestCPGMinGroupCount_Internal(t *testing.T) {
 		frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
 		frameworkruntime.WithPodGroupManager(cache),
 	)
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
+	informerFactory.StartWithContext(ctx)
+	informerFactory.WaitForCacheSyncWithContext(ctx)
 	if err != nil {
 		t.Fatalf("Failed to create new framework: %v", err)
 	}
@@ -5698,8 +5698,8 @@ func TestCPGBasicWithGangChildren_Internal(t *testing.T) {
 		frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
 		frameworkruntime.WithPodGroupManager(cache),
 	)
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
+	informerFactory.StartWithContext(ctx)
+	informerFactory.WaitForCacheSyncWithContext(ctx)
 	if err != nil {
 		t.Fatalf("Failed to create new framework: %v", err)
 	}
@@ -7351,8 +7351,8 @@ func TestPodGroupCycle_PodStatusConditions(t *testing.T) {
 						return true, binding, nil
 					})
 
-					informerFactory.Start(ctx.Done())
-					informerFactory.WaitForCacheSync(ctx.Done())
+					informerFactory.StartWithContext(ctx)
+					informerFactory.WaitForCacheSyncWithContext(ctx)
 
 					if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
 						t.Fatalf("Failed to update snapshot: %v", err)

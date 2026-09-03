@@ -248,8 +248,8 @@ func TestDryRunPreemption(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
 			nodeInfos, err := snapshot.NodeInfos().List()
 			if err != nil {
 				t.Fatal(err)
@@ -619,8 +619,8 @@ func TestCallExtenders(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
 			cache := internalcache.New(ctx, apiDispatcher, false, false)
 			fwk.SetAPICacher(apicache.New(nil, cache))
 
@@ -1023,8 +1023,8 @@ func TestGetVictimsOnNode(t *testing.T) {
 			_ = informerFactory.Scheduling().V1beta1().PodGroups().Informer()
 			_ = informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer()
 
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
 
 			nodeInfo, err := snapshot.NodeInfos().Get(tt.targetNode)
 			if err != nil {
@@ -1137,8 +1137,8 @@ func TestPreemptionEvaluationDurationMetric(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
 
 			fakePostPlugin := &FakePostFilterPlugin{numViolatingVictim: 0}
 			customInterface := &customEvaluationInterface{

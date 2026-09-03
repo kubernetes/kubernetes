@@ -973,7 +973,7 @@ func (p *podWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 		go func() {
 			// TODO: this should be a wait.Until with backoff to handle panics, and
 			// accept a context for shutdown
-			defer runtime.HandleCrash()
+			defer runtime.HandleCrashWithContext(ctx)
 			defer logger.V(3).Info("Pod worker has stopped", "podUID", uid)
 			p.podWorkerLoop(ctx, uid, outCh)
 		}()

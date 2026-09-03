@@ -209,19 +209,21 @@ func NewDaemonSetsController(
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: "daemonset",
+				Logger: &logger,
+				Name:   "daemonset",
 			},
 		),
 		nodeUpdateQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: "daemonset-node-updates",
+				Logger: &logger,
+				Name:   "daemonset-node-updates",
 			},
 		),
 		consistencyStore: consistencyStore,
 	}
 
-	daemonSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = daemonSetInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			dsc.addDaemonset(logger, obj)
 		},
@@ -231,11 +233,11 @@ func NewDaemonSetsController(
 		DeleteFunc: func(obj interface{}) {
 			dsc.deleteDaemonset(logger, obj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	dsc.dsLister = daemonSetInformer.Lister()
 	dsc.dsStoreSynced = daemonSetInformer.Informer().HasSynced
 
-	historyInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = historyInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			dsc.addHistory(logger, obj)
 		},
@@ -245,14 +247,14 @@ func NewDaemonSetsController(
 		DeleteFunc: func(obj interface{}) {
 			dsc.deleteHistory(logger, obj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	dsc.historyLister = historyInformer.Lister()
 	dsc.historyStoreSynced = historyInformer.Informer().HasSynced
 
 	// Watch for creation/deletion of pods. The reason we watch is that we don't want a daemon set to create/delete
 	// more pods until all the effects (expectations) of a daemon set's create/delete have been observed.
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			dsc.addPod(logger, obj)
 		},
@@ -262,14 +264,14 @@ func NewDaemonSetsController(
 		DeleteFunc: func(obj interface{}) {
 			dsc.deletePod(logger, obj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	dsc.podLister = podInformer.Lister()
 	dsc.podStoreSynced = podInformer.Informer().HasSynced
 	controller.AddPodNodeNameIndexer(podInformer.Informer())
 	controller.AddPodControllerIndexer(podInformer.Informer())
 	dsc.podIndexer = podInformer.Informer().GetIndexer()
 
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = nodeInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			dsc.addNode(logger, obj)
 		},
@@ -277,6 +279,7 @@ func NewDaemonSetsController(
 			dsc.updateNode(logger, oldObj, newObj)
 		},
 	},
+		cache.HandlerOptions{Logger: &logger},
 	)
 	dsc.nodeStoreSynced = nodeInformer.Informer().HasSynced
 	dsc.nodeLister = nodeInformer.Lister()
@@ -354,7 +357,7 @@ func (dsc *DaemonSetsController) deleteDaemonset(logger klog.Logger, obj interfa
 
 // Run begins watching and syncing daemon sets.
 func (dsc *DaemonSetsController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	dsc.eventBroadcaster.StartStructuredLogging(3)
 	dsc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: dsc.kubeClient.CoreV1().Events("")})

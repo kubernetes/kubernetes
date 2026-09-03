@@ -65,11 +65,17 @@ func NewStorageVersionGC(ctx context.Context, clientset kubernetes.Interface, le
 		storageVersionSynced: storageVersionInformer.Informer().HasSynced,
 		leaseQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "storage_version_garbage_collector_leases"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: new(klog.FromContext(ctx)),
+				Name:   "storage_version_garbage_collector_leases",
+			},
 		),
 		storageVersionQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "storage_version_garbage_collector_storageversions"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: new(klog.FromContext(ctx)),
+				Name:   "storage_version_garbage_collector_storageversions",
+			},
 		),
 	}
 	logger := klog.FromContext(ctx)
@@ -95,7 +101,7 @@ func NewStorageVersionGC(ctx context.Context, clientset kubernetes.Interface, le
 
 // Run starts one worker.
 func (c *Controller) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting storage version garbage collector")

@@ -644,43 +644,44 @@ func addAllEventHandlers(
 
 	logger := sched.logger
 
-	if handlerRegistration, err = informerFactory.Core().V1().Pods().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if handlerRegistration, err = informerFactory.Core().V1().Pods().Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    sched.addPod,
 		UpdateFunc: sched.updatePod,
 		DeleteFunc: sched.deletePod,
-	}); err != nil {
+	}, cache.HandlerOptions{Logger: &logger}); err != nil {
 		return err
 	}
 	handlers = append(handlers, handlerRegistration)
 
-	if handlerRegistration, err = informerFactory.Core().V1().Nodes().Informer().AddEventHandler(
+	if handlerRegistration, err = informerFactory.Core().V1().Nodes().Informer().AddEventHandlerWithOptions(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    sched.addNodeToCache,
 			UpdateFunc: sched.updateNodeInCache,
 			DeleteFunc: sched.deleteNodeFromCache,
 		},
+		cache.HandlerOptions{Logger: &logger},
 	); err != nil {
 		return err
 	}
 	handlers = append(handlers, handlerRegistration)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-		if handlerRegistration, err = informerFactory.Scheduling().V1beta1().PodGroups().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		if handlerRegistration, err = informerFactory.Scheduling().V1beta1().PodGroups().Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 			AddFunc:    sched.addPodGroup,
 			UpdateFunc: sched.updatePodGroup,
 			DeleteFunc: sched.deletePodGroup,
-		}); err != nil {
+		}, cache.HandlerOptions{Logger: &logger}); err != nil {
 			return err
 		}
 		handlers = append(handlers, handlerRegistration)
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
-		if handlerRegistration, err = informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		if handlerRegistration, err = informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 			AddFunc:    sched.addCompositePodGroup,
 			UpdateFunc: sched.updateCompositePodGroup,
 			DeleteFunc: sched.deleteCompositePodGroup,
-		}); err != nil {
+		}, cache.HandlerOptions{Logger: &logger}); err != nil {
 			return err
 		}
 		handlers = append(handlers, handlerRegistration)
@@ -723,22 +724,25 @@ func addAllEventHandlers(
 			// UnscheduledPod, and TargetPod are logical Pod event resources
 			// emitted from the Pod add/update/delete handlers.
 		case fwk.CSINode:
-			if handlerRegistration, err = informerFactory.Storage().V1().CSINodes().Informer().AddEventHandler(
+			if handlerRegistration, err = informerFactory.Storage().V1().CSINodes().Informer().AddEventHandlerWithOptions(
 				buildEvtResHandler(at, fwk.CSINode),
+				cache.HandlerOptions{Logger: &logger},
 			); err != nil {
 				return err
 			}
 			handlers = append(handlers, handlerRegistration)
 		case fwk.CSIDriver:
-			if handlerRegistration, err = informerFactory.Storage().V1().CSIDrivers().Informer().AddEventHandler(
+			if handlerRegistration, err = informerFactory.Storage().V1().CSIDrivers().Informer().AddEventHandlerWithOptions(
 				buildEvtResHandler(at, fwk.CSIDriver),
+				cache.HandlerOptions{Logger: &logger},
 			); err != nil {
 				return err
 			}
 			handlers = append(handlers, handlerRegistration)
 		case fwk.CSIStorageCapacity:
-			if handlerRegistration, err = informerFactory.Storage().V1().CSIStorageCapacities().Informer().AddEventHandler(
+			if handlerRegistration, err = informerFactory.Storage().V1().CSIStorageCapacities().Informer().AddEventHandlerWithOptions(
 				buildEvtResHandler(at, fwk.CSIStorageCapacity),
+				cache.HandlerOptions{Logger: &logger},
 			); err != nil {
 				return err
 			}
@@ -757,16 +761,18 @@ func addAllEventHandlers(
 			// bindings due to conflicts if PVs are updated by PV controller or other
 			// parties, then scheduler will add pod back to unschedulable queue. We
 			// need to move pods to active queue on PV update for this scenario.
-			if handlerRegistration, err = informerFactory.Core().V1().PersistentVolumes().Informer().AddEventHandler(
+			if handlerRegistration, err = informerFactory.Core().V1().PersistentVolumes().Informer().AddEventHandlerWithOptions(
 				buildEvtResHandler(at, fwk.PersistentVolume),
+				cache.HandlerOptions{Logger: &logger},
 			); err != nil {
 				return err
 			}
 			handlers = append(handlers, handlerRegistration)
 		case fwk.PersistentVolumeClaim:
 			// MaxPDVolumeCountPredicate: add/update PVC will affect counts of PV when it is bound.
-			if handlerRegistration, err = informerFactory.Core().V1().PersistentVolumeClaims().Informer().AddEventHandler(
+			if handlerRegistration, err = informerFactory.Core().V1().PersistentVolumeClaims().Informer().AddEventHandlerWithOptions(
 				buildEvtResHandler(at, fwk.PersistentVolumeClaim),
+				cache.HandlerOptions{Logger: &logger},
 			); err != nil {
 				return err
 			}
@@ -801,23 +807,26 @@ func addAllEventHandlers(
 					erCache.AddEventHandler(handler)
 					handler = erCache
 				}
-				if handlerRegistration, err = informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(
+				if handlerRegistration, err = informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandlerWithOptions(
 					handler,
+					cache.HandlerOptions{Logger: &logger},
 				); err != nil {
 					return err
 				}
 				handlers = append(handlers, handlerRegistration)
 			}
 		case fwk.StorageClass:
-			if handlerRegistration, err = informerFactory.Storage().V1().StorageClasses().Informer().AddEventHandler(
+			if handlerRegistration, err = informerFactory.Storage().V1().StorageClasses().Informer().AddEventHandlerWithOptions(
 				buildEvtResHandler(at, fwk.StorageClass),
+				cache.HandlerOptions{Logger: &logger},
 			); err != nil {
 				return err
 			}
 			handlers = append(handlers, handlerRegistration)
 		case fwk.VolumeAttachment:
-			if handlerRegistration, err = informerFactory.Storage().V1().VolumeAttachments().Informer().AddEventHandler(
+			if handlerRegistration, err = informerFactory.Storage().V1().VolumeAttachments().Informer().AddEventHandlerWithOptions(
 				buildEvtResHandler(at, fwk.VolumeAttachment),
+				cache.HandlerOptions{Logger: &logger},
 			); err != nil {
 				return err
 			}
@@ -844,8 +853,9 @@ func addAllEventHandlers(
 			// Fall back to try dynamic informers.
 			gvr, _ := schema.ParseResourceArg(string(gvk))
 			dynInformer := dynInformerFactory.ForResource(*gvr).Informer()
-			if handlerRegistration, err = dynInformer.AddEventHandler(
+			if handlerRegistration, err = dynInformer.AddEventHandlerWithOptions(
 				buildEvtResHandler(at, gvk),
+				cache.HandlerOptions{Logger: &logger},
 			); err != nil {
 				return err
 			}

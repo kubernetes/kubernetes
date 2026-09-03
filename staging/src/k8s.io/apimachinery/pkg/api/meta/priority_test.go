@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func TestPriorityRESTMapperResourceForErrorHandling(t *testing.T) {
@@ -120,10 +121,11 @@ func TestPriorityRESTMapperResourceForErrorHandling(t *testing.T) {
 		},
 	}
 
+	_, ctx := ktesting.NewTestContext(t)
 	for _, tc := range tcs {
-		mapper := PriorityRESTMapper{Delegate: tc.delegate, ResourcePriority: tc.resourcePatterns}
+		mapper := ToPriorityRESTMapperWithContext(PriorityRESTMapper{Delegate: tc.delegate, ResourcePriority: tc.resourcePatterns})
 
-		actualResult, actualErr := mapper.ResourceFor(schema.GroupVersionResource{})
+		actualResult, actualErr := mapper.ResourceForWithContext(ctx, schema.GroupVersionResource{})
 		if e, a := tc.result, actualResult; e != a {
 			t.Errorf("%s: expected %v, got %v", tc.name, e, a)
 		}
@@ -239,10 +241,11 @@ func TestPriorityRESTMapperKindForErrorHandling(t *testing.T) {
 		},
 	}
 
+	_, ctx := ktesting.NewTestContext(t)
 	for _, tc := range tcs {
-		mapper := PriorityRESTMapper{Delegate: tc.delegate, KindPriority: tc.kindPatterns}
+		mapper := ToPriorityRESTMapperWithContext(PriorityRESTMapper{Delegate: tc.delegate, KindPriority: tc.kindPatterns})
 
-		actualResult, actualErr := mapper.KindFor(schema.GroupVersionResource{})
+		actualResult, actualErr := mapper.KindForWithContext(ctx, schema.GroupVersionResource{})
 		if e, a := tc.result, actualResult; e != a {
 			t.Errorf("%s: expected %v, got %v", tc.name, e, a)
 		}
@@ -354,8 +357,9 @@ func TestPriorityRESTMapperRESTMapping(t *testing.T) {
 		},
 	}
 
+	_, ctx := ktesting.NewTestContext(t)
 	for _, tc := range tcs {
-		actualResult, actualErr := tc.mapper.RESTMapping(tc.input)
+		actualResult, actualErr := ToPriorityRESTMapperWithContext(tc.mapper).RESTMappingWithContext(ctx, tc.input)
 		if e, a := tc.result, actualResult; !reflect.DeepEqual(e, a) {
 			t.Errorf("%s: expected %v, got %v", tc.name, e, a)
 		}
@@ -384,12 +388,13 @@ func TestPriorityRESTMapperRESTMappingHonorsUserVersion(t *testing.T) {
 		fixedRESTMapper{mappings: []*RESTMapping{mappingV1}},
 	}
 
-	mapper := PriorityRESTMapper{
+	mapper := ToPriorityRESTMapperWithContext(PriorityRESTMapper{
 		Delegate:     allMappers,
 		KindPriority: []schema.GroupVersionKind{{Group: "Bar", Version: "v2alpha1", Kind: AnyKind}, {Group: "Bar", Version: AnyVersion, Kind: AnyKind}},
-	}
+	})
+	_, ctx := ktesting.NewTestContext(t)
 
-	outMapping1, err := mapper.RESTMapping(schema.GroupKind{Group: "Bar", Kind: "Foo"}, "v1")
+	outMapping1, err := mapper.RESTMappingWithContext(ctx, schema.GroupKind{Group: "Bar", Kind: "Foo"}, "v1")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -398,7 +403,7 @@ func TestPriorityRESTMapperRESTMappingHonorsUserVersion(t *testing.T) {
 		t.Errorf("asked for version %v, expected mapping for %v, got mapping for %v", "v1", mappingV1.GroupVersionKind, outMapping1.GroupVersionKind)
 	}
 
-	outMapping2, err := mapper.RESTMapping(schema.GroupKind{Group: "Bar", Kind: "Foo"}, "v2alpha1")
+	outMapping2, err := mapper.RESTMappingWithContext(ctx, schema.GroupKind{Group: "Bar", Kind: "Foo"}, "v2alpha1")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

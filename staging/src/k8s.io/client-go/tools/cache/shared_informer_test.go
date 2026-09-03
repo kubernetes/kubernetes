@@ -614,19 +614,20 @@ func TestSharedInformerTransformer(t *testing.T) {
 }
 
 func TestSharedInformerRemoveHandler(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	source := newFakeControllerSource(t)
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
 
 	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second)
 
 	handler1 := &ResourceEventHandlerFuncs{}
-	handle1, err := informer.AddEventHandler(handler1)
+	handle1, err := informer.AddEventHandlerWithOptions(handler1, HandlerOptions{Logger: &logger})
 	if err != nil {
 		t.Errorf("informer did not add handler1: %s", err)
 		return
 	}
 	handler2 := &ResourceEventHandlerFuncs{}
-	handle2, err := informer.AddEventHandler(handler2)
+	handle2, err := informer.AddEventHandlerWithOptions(handler2, HandlerOptions{Logger: &logger})
 	if err != nil {
 		t.Errorf("informer did not add handler2: %s", err)
 		return
@@ -1181,12 +1182,13 @@ func TestAddWhileActive(t *testing.T) {
 // all goroutines really have stopped in the different scenarios.
 func TestShutdown(t *testing.T) {
 	t.Run("no-context", func(t *testing.T) {
+		logger, _ := ktesting.NewTestContext(t)
 		source := newFakeControllerSource(t)
 
 		informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second)
-		handler, err := informer.AddEventHandler(ResourceEventHandlerFuncs{
+		handler, err := informer.AddEventHandlerWithOptions(ResourceEventHandlerFuncs{
 			AddFunc: func(_ any) {},
-		})
+		}, HandlerOptions{Logger: &logger})
 		require.NoError(t, err)
 		defer func() {
 			assert.NoError(t, informer.RemoveEventHandler(handler))
@@ -1204,6 +1206,7 @@ func TestShutdown(t *testing.T) {
 	})
 
 	t.Run("no-context-later", func(t *testing.T) {
+		logger, _ := ktesting.NewTestContext(t)
 		source := newFakeControllerSource(t)
 		informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second)
 
@@ -1217,19 +1220,20 @@ func TestShutdown(t *testing.T) {
 
 		require.Eventually(t, informer.HasSynced, time.Minute, time.Millisecond, "informer has synced")
 
-		handler, err := informer.AddEventHandler(ResourceEventHandlerFuncs{
+		handler, err := informer.AddEventHandlerWithOptions(ResourceEventHandlerFuncs{
 			AddFunc: func(_ any) {},
-		})
+		}, HandlerOptions{Logger: &logger})
 		require.NoError(t, err)
 		assert.NoError(t, informer.RemoveEventHandler(handler))
 	})
 
 	t.Run("no-run", func(t *testing.T) {
+		logger, _ := ktesting.NewTestContext(t)
 		source := newFakeControllerSource(t)
 		informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second)
-		_, err := informer.AddEventHandler(ResourceEventHandlerFuncs{
+		_, err := informer.AddEventHandlerWithOptions(ResourceEventHandlerFuncs{
 			AddFunc: func(_ any) {},
-		})
+		}, HandlerOptions{Logger: &logger})
 		require.NoError(t, err)
 
 		// At this point, neither informer nor handler have any goroutines running
@@ -1290,7 +1294,7 @@ func TestEventPanics(t *testing.T) {
 		klog.SetLogger(logger)
 		stop := make(chan struct{})
 		informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second)
-		handle, err := informer.AddEventHandler(handler)
+		handle, err := informer.AddEventHandlerWithOptions(handler, HandlerOptions{Logger: &logger})
 		require.NoError(t, err)
 		defer func() {
 			assert.NoError(t, informer.RemoveEventHandler(handle))

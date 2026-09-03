@@ -621,9 +621,9 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	}
 	// This has to start after the calls to NewServiceConfig because that
 	// function must configure its shared informer event handlers first.
-	informerFactory.Start(wait.NeverStop)
-	endpointSliceInformerFactory.Start(wait.NeverStop)
-	serviceInformerFactory.Start(wait.NeverStop)
+	informerFactory.StartWithContext(ctx)
+	endpointSliceInformerFactory.StartWithContext(ctx)
+	serviceInformerFactory.StartWithContext(ctx)
 
 	// hollow-proxy doesn't need node config, and we don't create nodeManager for hollow-proxy.
 	if s.NodeManager != nil {

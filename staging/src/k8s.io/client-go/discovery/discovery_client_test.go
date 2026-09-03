@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/openapi"
 	restclient "k8s.io/client-go/rest"
 	testutil "k8s.io/client-go/util/testing"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kube-openapi/pkg/spec3"
 )
 
@@ -76,6 +77,7 @@ func TestGetServerVersion(t *testing.T) {
 }
 
 func TestGetServerGroupsWithV1Server(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		var obj interface{}
 		switch req.URL.Path {
@@ -114,7 +116,7 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 	}))
 	defer server.Close()
 	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-	apiGroupList, err := client.ServerGroups()
+	apiGroupList, err := client.ServerGroupsWithContext(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -125,6 +127,7 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 }
 
 func TestDiscoveryToleratesMissingCoreGroup(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	// Discovery tolerates 404 from /api. Aggregated api servers can do this.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		var obj interface{}
@@ -158,7 +161,7 @@ func TestDiscoveryToleratesMissingCoreGroup(t *testing.T) {
 	defer server.Close()
 	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 	// ServerGroups should not return an error even if server returns 404 at /api.
-	apiGroupList, err := client.ServerGroups()
+	apiGroupList, err := client.ServerGroupsWithContext(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -169,6 +172,7 @@ func TestDiscoveryToleratesMissingCoreGroup(t *testing.T) {
 }
 
 func TestDiscoveryFailsWhenNonCoreGroupsMissing(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	// Discovery fails when /apis returns 404.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		var obj interface{}
@@ -196,13 +200,14 @@ func TestDiscoveryFailsWhenNonCoreGroupsMissing(t *testing.T) {
 	}))
 	defer server.Close()
 	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-	_, err := client.ServerGroups()
+	_, err := client.ServerGroupsWithContext(ctx)
 	if err == nil {
 		t.Fatal("expected error, received none")
 	}
 }
 
 func TestGetServerGroupsWithBrokenServer(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	// 404 Not Found errors because discovery at /apis returns an error.
 	// 403 Forbidden errors because discovery at both /api and /apis returns error.
 	for _, statusCode := range []int{http.StatusNotFound, http.StatusForbidden} {
@@ -211,7 +216,7 @@ func TestGetServerGroupsWithBrokenServer(t *testing.T) {
 		}))
 		defer server.Close()
 		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-		_, err := client.ServerGroups()
+		_, err := client.ServerGroupsWithContext(ctx)
 		if err == nil {
 			t.Fatal("expected error, received none")
 		}
@@ -225,6 +230,7 @@ func TestTimeoutIsSet(t *testing.T) {
 }
 
 func TestGetServerResourcesForGroupVersion(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	stable := metav1.APIResourceList{
 		GroupVersion: "v1",
 		APIResources: []metav1.APIResource{
@@ -400,7 +406,7 @@ func TestGetServerResourcesForGroupVersion(t *testing.T) {
 	defer server.Close()
 	for _, test := range tests {
 		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-		got, err := client.ServerResourcesForGroupVersion(test.request)
+		got, err := client.ServerResourcesForGroupVersionWithContext(ctx, test.request)
 		if test.expectErr {
 			if err == nil {
 				t.Error("unexpected non-error")
@@ -573,6 +579,7 @@ func TestGetOpenAPISchema(t *testing.T) {
 }
 
 func TestGetOpenAPISchemaV3(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	server, testV3Specs, err := openapiV3SchemaFakeServer(t)
 	if err != nil {
 		t.Errorf("unexpected error starting fake server: %v", err)
@@ -580,8 +587,8 @@ func TestGetOpenAPISchemaV3(t *testing.T) {
 	defer server.Close()
 
 	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-	openapiClient := client.OpenAPIV3()
-	paths, err := openapiClient.Paths()
+	openapiClient := client.OpenAPIV3WithContext(ctx)
+	paths, err := openapiClient.PathsWithContext(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error getting openapi: %v", err)
 	}
@@ -593,7 +600,7 @@ func TestGetOpenAPISchemaV3(t *testing.T) {
 	for _, contentType := range contentTypes {
 		t.Run(contentType, func(t *testing.T) {
 			for k, v := range paths {
-				actual, err := v.Schema(contentType)
+				actual, err := v.SchemaWithContext(ctx, contentType)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -637,7 +644,7 @@ func TestGetOpenAPISchemaV3(t *testing.T) {
 				}
 
 				// Ensure that fetching schema once again does not return same instance
-				actualAgain, err := v.Schema(contentType)
+				actualAgain, err := v.SchemaWithContext(ctx, contentType)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -652,6 +659,7 @@ func TestGetOpenAPISchemaV3(t *testing.T) {
 }
 
 func TestServerPreferredResources(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	stable := metav1.APIResourceList{
 		GroupVersion: "v1",
 		APIResources: []metav1.APIResource{
@@ -755,7 +763,7 @@ func TestServerPreferredResources(t *testing.T) {
 		defer server.Close()
 
 		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-		resources, err := client.ServerPreferredResources()
+		resources, err := client.ServerPreferredResourcesWithContext(ctx)
 		if test.expectErr != nil {
 			if err == nil {
 				t.Error("unexpected non-error")
@@ -781,6 +789,7 @@ func TestServerPreferredResources(t *testing.T) {
 }
 
 func TestServerPreferredResourcesRetries(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	stable := metav1.APIResourceList{
 		GroupVersion: "v1",
 		APIResources: []metav1.APIResource{
@@ -868,7 +877,7 @@ func TestServerPreferredResourcesRetries(t *testing.T) {
 		defer server.Close()
 
 		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-		resources, err := client.ServerPreferredResources()
+		resources, err := client.ServerPreferredResourcesWithContext(ctx)
 		if !tc.expectedError(err) {
 			t.Errorf("case %d: unexpected error: %v", i, err)
 		}
@@ -884,6 +893,7 @@ func TestServerPreferredResourcesRetries(t *testing.T) {
 }
 
 func TestServerPreferredNamespacedResources(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	stable := metav1.APIResourceList{
 		GroupVersion: "v1",
 		APIResources: []metav1.APIResource{
@@ -1058,7 +1068,7 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 		defer server.Close()
 
 		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-		resources, err := client.ServerPreferredNamespacedResources()
+		resources, err := client.ServerPreferredNamespacedResourcesWithContext(ctx)
 		if err != nil {
 			t.Errorf("[%d] unexpected error: %v", i, err)
 			continue
@@ -1078,6 +1088,7 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 
 // Tests of the aggregated discovery format.
 func TestAggregatedServerGroups(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	tests := []struct {
 		name                      string
 		corev1                    *apidiscovery.APIGroupDiscoveryList
@@ -1338,7 +1349,7 @@ func TestAggregatedServerGroups(t *testing.T) {
 		}))
 		defer server.Close()
 		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-		apiGroupList, err := client.ServerGroups()
+		apiGroupList, err := client.ServerGroupsWithContext(ctx)
 		require.NoError(t, err)
 		// Test the expected groups are returned for the aggregated format.
 		expectedGroupNames := sets.NewString(test.expectedGroupNames...)
@@ -2108,6 +2119,7 @@ func TestAggregatedServerGroupsAndResourcesWithErrors(t *testing.T) {
 }
 
 func TestAggregatedServerPreferredResources(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	tests := []struct {
 		name              string
 		corev1            *apidiscovery.APIGroupDiscoveryList
@@ -2703,7 +2715,7 @@ func TestAggregatedServerPreferredResources(t *testing.T) {
 		}))
 		defer server.Close()
 		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-		resources, err := client.ServerPreferredResources()
+		resources, err := client.ServerPreferredResourcesWithContext(ctx)
 		if len(test.expectedFailedGVs) > 0 {
 			require.Error(t, err)
 			expectedFailedGVs := sets.NewString(test.expectedFailedGVs...)
@@ -2796,6 +2808,7 @@ func TestDiscoveryContentTypeVersion(t *testing.T) {
 }
 
 func TestUseLegacyDiscovery(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	// Default client sends aggregated discovery accept format (first) as well as legacy format.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		acceptHeader := req.Header.Get("Accept")
@@ -2803,7 +2816,7 @@ func TestUseLegacyDiscovery(t *testing.T) {
 	}))
 	defer server.Close()
 	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
-	client.ServerGroups()
+	_, _ = client.ServerGroupsWithContext(ctx)
 	// When "UseLegacyDiscovery" field is set, only the legacy discovery format is requested.
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		acceptHeader := req.Header.Get("Accept")
@@ -2812,7 +2825,7 @@ func TestUseLegacyDiscovery(t *testing.T) {
 	defer server.Close()
 	client = NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 	client.UseLegacyDiscovery = true
-	client.ServerGroups()
+	_, _ = client.ServerGroupsWithContext(ctx)
 }
 
 func groupNames(groups []*metav1.APIGroup) []string {

@@ -55,7 +55,7 @@ func TestRemoveContainer(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
 	// Swap in real ContainerLogManager for the stub.
-	logManager, err := logs.NewContainerLogManager(m.runtimeService, m.osInterface, "1", 2, 10, metav1.Duration{Duration: 10 * time.Second})
+	logManager, err := logs.NewContainerLogManager(tCtx.Logger(), m.runtimeService, m.osInterface, "1", 2, 10, metav1.Duration{Duration: 10 * time.Second})
 	require.NoError(t, err)
 	m.logManager = logManager
 
@@ -115,7 +115,7 @@ func TestRemoveContainer_keepLogs(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
 	// Swap in real ContainerLogManager for the stub.
-	logManager, err := logs.NewContainerLogManager(m.runtimeService, m.osInterface, "1", 2, 10, metav1.Duration{Duration: 10 * time.Second})
+	logManager, err := logs.NewContainerLogManager(tCtx.Logger(), m.runtimeService, m.osInterface, "1", 2, 10, metav1.Duration{Duration: 10 * time.Second})
 	require.NoError(t, err)
 	m.logManager = logManager
 

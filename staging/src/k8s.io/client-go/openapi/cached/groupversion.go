@@ -49,7 +49,7 @@ func newGroupVersion(delegate openapi.GroupVersionWithContext) *groupversion {
 
 // SchemaWithContext is a better alternative because it supports contextual logging and cancellation.
 //
-// Contextual logging: Use SchemaWithContext instead.
+//logcheck:context // Use SchemaWithContext instead of Schema in code which supports contextual logging.
 func (g *groupversion) Schema(contentType string) ([]byte, error) {
 	return g.SchemaWithContext(context.Background(), contentType)
 }

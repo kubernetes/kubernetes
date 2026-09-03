@@ -143,7 +143,7 @@ func TestGeneratePodSandboxLinuxConfigSeccomp(t *testing.T) {
 func TestCreatePodSandbox_RuntimeClass(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	rcm := runtimeclass.NewManager(rctest.NewPopulatedClient())
-	defer rctest.StartManagerSync(rcm)()
+	defer rctest.StartManagerSync(tCtx, rcm)()
 
 	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)

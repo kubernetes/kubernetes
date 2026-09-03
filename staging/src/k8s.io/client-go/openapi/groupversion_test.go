@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func TestGroupVersion(t *testing.T) {
@@ -88,12 +89,13 @@ func TestGroupVersion(t *testing.T) {
 				t.Fatalf("unexpected error occurred: %v", err)
 			}
 
-			openapiClient := NewClient(c)
-			paths, err := openapiClient.Paths()
+			_, ctx := ktesting.NewTestContext(t)
+			openapiClient := NewClientWithContext(c)
+			paths, err := openapiClient.PathsWithContext(ctx)
 			if err != nil {
 				t.Fatalf("unexpected error occurred: %v", err)
 			}
-			schema, err := paths["apis/apps/v1"].Schema(runtime.ContentTypeJSON)
+			schema, err := paths["apis/apps/v1"].SchemaWithContext(ctx, runtime.ContentTypeJSON)
 			if err != nil {
 				t.Fatalf("unexpected error occurred: %v", err)
 			}
