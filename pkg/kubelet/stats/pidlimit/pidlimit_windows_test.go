@@ -36,10 +36,13 @@ func TestStats(t *testing.T) {
 	stats, err := Stats()
 	require.NoError(t, err)
 	require.NotNil(t, stats)
-	require.NotNil(t, stats.MaxPID)
 	require.NotNil(t, stats.NumOfRunningProcesses)
-	// Windows has no kernel pid cap, so MaxPID mirrors the observed process
-	// count, which keeps the pid.available eviction signal computable.
-	assert.Equal(t, *stats.MaxPID, *stats.NumOfRunningProcesses)
-	assert.Greater(t, *stats.MaxPID, int64(0))
+	assert.Greater(t, *stats.NumOfRunningProcesses, int64(0))
+
+	// Windows has no kernel pid_max knob, so there is no ceiling to report.
+	// MaxPID must stay nil: fabricating it (e.g. mirroring the process count)
+	// would make pid.available (MaxPID - NumOfRunningProcesses) always resolve
+	// to 0 and permanently pressure the node, so pid eviction stays unsupported
+	// on Windows.
+	assert.Nil(t, stats.MaxPID)
 }

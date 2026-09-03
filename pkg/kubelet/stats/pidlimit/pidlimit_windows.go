@@ -28,21 +28,24 @@ import (
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 )
 
-// Stats provides basic information about max and current process count.
+// Stats reports the current system-wide process count on Windows.
+//
+// Unlike Linux, Windows has no kernel pid knob equivalent to kernel.pid_max,
+// so there is no real ceiling to report. MaxPID is deliberately left unset:
+// fabricating one (for example mirroring the current process count) would make
+// the pid.available eviction signal (MaxPID - NumOfRunningProcesses) always
+// evaluate to 0 and permanently drive the node into NodePIDPressure, evicting
+// pods. Leaving MaxPID nil keeps pid.available eviction unsupported on
+// Windows, matching the behavior for other non-Linux platforms, while still
+// surfacing the live process count for observability.
 func Stats() (*statsapi.RlimitStats, error) {
 	rlimit := &statsapi.RlimitStats{}
 
-	// Windows has no kernel pid knob equivalent to Linux' kernel.pid_max, so
-	// report the observed system-wide process count as both the current count
-	// and the node limit. This makes the pid.available eviction signal
-	// computable on Windows without a config-provided ceiling (pod-max-pids is
-	// applied per cgroup on Linux only).
 	count, err := currentProcessCount()
 	if err != nil {
 		return nil, err
 	}
 	rlimit.NumOfRunningProcesses = &count
-	rlimit.MaxPID = &count
 
 	rlimit.Time = v1.NewTime(time.Now())
 
