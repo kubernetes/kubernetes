@@ -26,6 +26,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/component-base/metrics/testutil"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -359,8 +360,10 @@ func TestCallQueuePop(t *testing.T) {
 	t.Run("Pop blocks when queue is empty and unblocks after add", func(t *testing.T) {
 		cq := newCallQueue(mockRelevances)
 		poppedCallCh := make(chan *queuedAPICall)
+		popStarted := make(chan struct{})
 
 		go func() {
+			close(popStarted)
 			poppedCall, popErr := cq.pop()
 			if popErr != nil {
 				t.Errorf("Unexpected error while popping call: %v", popErr)
@@ -368,7 +371,17 @@ func TestCallQueuePop(t *testing.T) {
 			poppedCallCh <- poppedCall
 		}()
 
-		time.Sleep(100 * time.Millisecond)
+		// Wait for the goroutine to be scheduled before adding a call, so this
+		// test is actually exercising cq.pop()'s blocking path rather than
+		// racing it. This is a best-effort ordering hint, not a guarantee that
+		// pop() has reached cq.cond.Wait() yet -- but that's fine: whichever
+		// order add() and pop() actually run in, the call is still correctly
+		// delivered through poppedCallCh below.
+		select {
+		case <-popStarted:
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Fatal("Timed out waiting for the pop() goroutine to start")
+		}
 
 		call := &queuedAPICall{
 			APICall: &mockAPICall{
@@ -385,7 +398,7 @@ func TestCallQueuePop(t *testing.T) {
 			if diff := cmp.Diff(call, poppedCall, queuedAPICallCmpOpts...); diff != "" {
 				t.Errorf("Popped call does not match added call (-want +got):\n%s", diff)
 			}
-		case <-time.After(100 * time.Millisecond):
+		case <-time.After(wait.ForeverTestTimeout):
 			t.Fatal("Pop() should have returned an added call, but it timed out")
 		}
 	})
@@ -574,8 +587,10 @@ func TestCallQueueClose(t *testing.T) {
 	t.Run("Pop unblocks and returns nil when controller is closed", func(t *testing.T) {
 		cq := newCallQueue(mockRelevances)
 		poppedCallCh := make(chan *queuedAPICall)
+		popStarted := make(chan struct{})
 
 		go func() {
+			close(popStarted)
 			poppedCall, popErr := cq.pop()
 			if popErr != nil {
 				t.Errorf("Unexpected error while popping call: %v", popErr)
@@ -583,7 +598,11 @@ func TestCallQueueClose(t *testing.T) {
 			poppedCallCh <- poppedCall
 		}()
 
-		time.Sleep(100 * time.Millisecond)
+		select {
+		case <-popStarted:
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Fatal("Timed out waiting for the pop() goroutine to start")
+		}
 
 		cq.close()
 
@@ -592,7 +611,7 @@ func TestCallQueueClose(t *testing.T) {
 			if poppedCall != nil {
 				t.Errorf("Expected popped call to be nil, but got %v", poppedCall)
 			}
-		case <-time.After(100 * time.Millisecond):
+		case <-time.After(wait.ForeverTestTimeout):
 			t.Fatal("Pop() should have been unblocked by close(), but it remained blocked")
 		}
 	})
