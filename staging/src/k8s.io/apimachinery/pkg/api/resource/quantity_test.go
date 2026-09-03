@@ -838,6 +838,24 @@ func TestBinarySIPastEiArithmeticRoundTrip(t *testing.T) {
 		t.Errorf("String round trip changed the value: %s vs %s", q.String(), reparsed.String())
 	}
 }
+
+func TestBinarySIZeroExponentString(t *testing.T) {
+	table := []struct {
+		in   Quantity
+		want string
+	}{
+		{intQuantity(2000, 0, BinarySI), "2000"},
+		{intQuantity(-2000, 0, BinarySI), "-2000"},
+		{decQuantity(2000, 0, BinarySI), "2000"},
+		{decQuantity(-2000, 0, BinarySI), "-2000"},
+	}
+	for _, item := range table {
+		if e, a := item.want, item.in.String(); e != a {
+			t.Errorf("String() = %q, want %q", a, e)
+		}
+	}
+}
+
 func TestQuantityStringBelowNano(t *testing.T) {
 	// DecimalSI has no suffix below "n" (10^-9), so these values take the same
 	// exponent-notation fallback as the >"E" cases above. They are not reachable
