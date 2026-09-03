@@ -2002,6 +2002,51 @@ func TestPodStrategyValidateUpdate(t *testing.T) {
 	}
 }
 
+func TestPodStrategyValidateMutableContainerProbesUpdate(t *testing.T) {
+	tests := []struct {
+		name      string
+		enabled   bool
+		wantError bool
+	}{
+		{
+			name:      "disabled",
+			wantError: true,
+		},
+		{
+			name:    "enabled",
+			enabled: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableContainerProbes, tc.enabled)
+
+			oldPod := podtest.MakePod("pod", podtest.SetResourceVersion("1"))
+			oldPod.Spec.Containers[0].ReadinessProbe = &api.Probe{
+				ProbeHandler: api.ProbeHandler{
+					Exec: &api.ExecAction{Command: []string{"check"}},
+				},
+				TimeoutSeconds:   1,
+				PeriodSeconds:    10,
+				SuccessThreshold: 1,
+				FailureThreshold: 3,
+			}
+
+			newPod := oldPod.DeepCopy()
+			newPod.Spec.Containers[0].ReadinessProbe.PeriodSeconds = 5
+
+			errs := Strategy.ValidateUpdate(genericapirequest.NewContext(), newPod, oldPod)
+			if tc.wantError && len(errs) == 0 {
+				t.Fatal("expected probe update to be rejected")
+			}
+			if !tc.wantError && len(errs) != 0 {
+				t.Fatalf("unexpected errors: %v", errs)
+			}
+		})
+	}
+}
+
 func TestDropNonEphemeralContainerUpdates(t *testing.T) {
 	tests := []struct {
 		name                    string
@@ -4771,6 +4816,28 @@ func TestPodGenerationPrepareForUpdate(t *testing.T) {
 					}},
 				},
 			},
+			expectedGeneration: 2,
+		},
+		{
+			description: "container probe updated",
+			oldPod: podtest.MakePod("probe-updated",
+				podtest.SetGeneration(1),
+				podtest.SetContainers(api.Container{
+					Name: "container",
+					LivenessProbe: &api.Probe{
+						PeriodSeconds: 10,
+					},
+				}),
+			),
+			newPod: podtest.MakePod("probe-updated",
+				podtest.SetGeneration(1),
+				podtest.SetContainers(api.Container{
+					Name: "container",
+					LivenessProbe: &api.Probe{
+						PeriodSeconds: 5,
+					},
+				}),
+			),
 			expectedGeneration: 2,
 		},
 		{
