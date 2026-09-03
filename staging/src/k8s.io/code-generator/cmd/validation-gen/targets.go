@@ -58,6 +58,9 @@ const (
 	// value equality.  The value names a function which must be generic
 	// over a single type parameter, e.g:
 	//     func Equal[T any](a, b T) bool
+	// T is instantiated with whatever a call site compares, commonly a
+	// pointer to a struct, slice, or map, so the function must handle any T.
+	// Directly comparable types are compared with == and never reach it.
 	// An unqualified name refers to the package being generated into.
 	// Defaults to "k8s.io/apimachinery/pkg/api/validate.SemanticDeepEqual".
 	deepEqualFuncTagName = "k8s:validation-gen-deep-equal-func"

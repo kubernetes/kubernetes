@@ -43,6 +43,9 @@ const (
 )
 
 // UpdateValue verifies update constraints for value types.
+// A value is "unset" when equiv reports it equal to the zero value of T,
+// so equiv defines the set/unset boundary that NoSet, NoUnset, and
+// NoModify check.
 func UpdateValue[T any](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *T, equiv MatchFunc[T], constraints ...UpdateConstraint) field.ErrorList {
 	// nil oldValue means no prior value to compare against (eg: a new item at +k8s:eachVal scope) -> no transition to check.
 	if op.Type != operation.Update || oldValue == nil {

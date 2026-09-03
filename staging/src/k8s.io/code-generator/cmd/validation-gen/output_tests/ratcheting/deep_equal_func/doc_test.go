@@ -26,7 +26,7 @@ func TestDeepEqualFunc(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
 	// Create
-	val1 := 10
+	val1, val2 := 10, 20
 	obj := &Struct{
 		NonComparableField: NonComparableStruct{Ptr: &val1},
 		MapField: map[string]NonComparableStruct{
@@ -40,7 +40,9 @@ func TestDeepEqualFunc(t *testing.T) {
 		"setField[0]":        {"field Struct.SetField[*]", "type NonComparableStruct"},
 	})
 
-	// Update with same values should ratchet (skip validation) using CustomDeepEqual
+	// CustomDeepEqual treats two non-nil Ptrs as equal, so changing only the
+	// value they point to skips revalidation.  Semantic deep-equal would not.
+	// Each field changes on its own to isolate one call site.
 	CustomDeepEqualCalls = 0
 	oldObj := &Struct{
 		NonComparableField: NonComparableStruct{Ptr: &val1},
@@ -49,21 +51,24 @@ func TestDeepEqualFunc(t *testing.T) {
 		},
 		SetField: []NonComparableStruct{{Ptr: &val1}},
 	}
-	newObj := &Struct{
-		NonComparableField: NonComparableStruct{Ptr: &val1},
-		MapField: map[string]NonComparableStruct{
-			"a": {Ptr: &val1},
-		},
-		SetField: []NonComparableStruct{{Ptr: &val1}},
-	}
-	st.Value(newObj).OldValue(oldObj).ExpectValid()
+	// field ratcheting check
+	changed := *oldObj
+	changed.NonComparableField = NonComparableStruct{Ptr: &val2}
+	st.Value(&changed).OldValue(oldObj).ExpectValid()
+	// EachMapVal equiv
+	changed = *oldObj
+	changed.MapField = map[string]NonComparableStruct{"a": {Ptr: &val2}}
+	st.Value(&changed).OldValue(oldObj).ExpectValid()
+	// EachValSliceVal match
+	changed = *oldObj
+	changed.SetField = []NonComparableStruct{{Ptr: &val2}}
+	st.Value(&changed).OldValue(oldObj).ExpectValid()
 	if CustomDeepEqualCalls == 0 {
 		t.Errorf("expected CustomDeepEqual to be called during update ratcheting, got %d calls", CustomDeepEqualCalls)
 	}
 
 	// Update with a new map key added: old key "a" ratchets via CustomDeepEqual,
 	// only new key "b" fails.
-	val2 := 20
 	updateObj := &Struct{
 		NonComparableField: NonComparableStruct{Ptr: &val1},
 		MapField: map[string]NonComparableStruct{
@@ -76,12 +81,10 @@ func TestDeepEqualFunc(t *testing.T) {
 		"mapField[b]": {"field Struct.MapField[*]", "type NonComparableStruct"},
 	})
 
-	// Set uniqueness runs through CustomDeepEqual: the two elements hold
-	// different pointers to equal values, so only a deep comparison finds them
-	// to be duplicates.
-	val1Copy := val1
+	// Uniqueness also runs through CustomDeepEqual: the first two elements are
+	// duplicates despite different values, while the unset Ptr is distinct.
 	st.Value(&Struct{
-		SetField: []NonComparableStruct{{Ptr: &val1}, {Ptr: &val1Copy}},
+		SetField: []NonComparableStruct{{Ptr: &val1}, {Ptr: &val2}, {Ptr: nil}},
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring(), field.ErrorList{
 		field.Duplicate(field.NewPath("setField").Index(1), nil),
 		field.Invalid(field.NewPath("nonComparableField"), nil, "field Struct.NonComparableField"),
@@ -90,5 +93,7 @@ func TestDeepEqualFunc(t *testing.T) {
 		field.Invalid(field.NewPath("setField").Index(0), nil, "type NonComparableStruct"),
 		field.Invalid(field.NewPath("setField").Index(1), nil, "field Struct.SetField[*]"),
 		field.Invalid(field.NewPath("setField").Index(1), nil, "type NonComparableStruct"),
+		field.Invalid(field.NewPath("setField").Index(2), nil, "field Struct.SetField[*]"),
+		field.Invalid(field.NewPath("setField").Index(2), nil, "type NonComparableStruct"),
 	})
 }

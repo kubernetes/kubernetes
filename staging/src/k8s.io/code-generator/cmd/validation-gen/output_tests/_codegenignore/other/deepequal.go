@@ -18,13 +18,11 @@ package other
 
 import "reflect"
 
-// DeepEqualCalls counts calls to DeepEqual, so tests can assert that generated
-// code actually used it.
+// DeepEqualCalls counts calls to DeepEqual, so tests can assert it was used.
 var DeepEqualCalls int
 
-// DeepEqual exists so that other packages can point
-// +k8s:validation-gen-deep-equal-func at a function outside of the package
-// being generated into.
+// DeepEqual lets a test package point +k8s:validation-gen-deep-equal-func at a
+// function outside the package being generated into.
 func DeepEqual[T any](a, b T) bool {
 	DeepEqualCalls++
 	return reflect.DeepEqual(a, b)

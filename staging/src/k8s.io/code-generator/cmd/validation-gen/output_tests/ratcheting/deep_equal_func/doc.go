@@ -32,8 +32,18 @@ var localSchemeBuilder = testscheme.New()
 
 var CustomDeepEqualCalls int
 
+// CustomDeepEqual deliberately disagrees with semantic deep-equal: for
+// NonComparableStruct it compares only whether Ptr is set.  Tests use that
+// difference to prove generated code honors this function's verdict.
 func CustomDeepEqual[T any](a, b T) bool {
 	CustomDeepEqualCalls++
+	if x, ok := any(a).(*NonComparableStruct); ok {
+		y := any(b).(*NonComparableStruct)
+		if x == nil || y == nil {
+			return x == y
+		}
+		return (x.Ptr == nil) == (y.Ptr == nil)
+	}
 	return reflect.DeepEqual(a, b)
 }
 

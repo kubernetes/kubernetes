@@ -18,9 +18,9 @@ limitations under the License.
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 // +k8s:validation-gen-deep-equal-func=k8s.io/code-generator/cmd/validation-gen/output_tests/_codegenignore/other.DeepEqual
 
-// This is a test package.  Unlike the deep_equal_func package, which names a
-// function in this package, this one names a function in another package, so
-// the generated code has to emit an import for it.
+// This is a test package.  Unlike deep_equal_func, which names a function in
+// its own package, this one names a function in another package, so the
+// generated code must emit an import for it.
 // +k8s:validation-gen-nolint
 package deepequalfunccrosspkg
 

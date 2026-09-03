@@ -223,8 +223,9 @@ func TestUpdateValue_CustomMatchFunc(t *testing.T) {
 		Tags []string
 	}
 
+	// customEquiv ignores Tags, so a value with only Tags set counts as unset.
 	customEquiv := func(a, b NonComparableStruct) bool {
-		return a.Name == b.Name && (len(a.Tags) == 0 && len(b.Tags) == 0 || (len(a.Tags) == len(b.Tags) && a.Tags[0] == b.Tags[0]))
+		return a.Name == b.Name
 	}
 
 	tests := []struct {
@@ -244,6 +245,14 @@ func TestUpdateValue_CustomMatchFunc(t *testing.T) {
 			constraints: []UpdateConstraint{NoSet},
 			wantErrs:    1,
 			wantMsgs:    []string{"field cannot be set once created"},
+		},
+		{
+			name:        "NoSet - Tags-only value is unset per equiv (allowed)",
+			op:          operation.Update,
+			value:       NonComparableStruct{Tags: []string{"a"}},
+			oldValue:    NonComparableStruct{},
+			constraints: []UpdateConstraint{NoSet},
+			wantErrs:    0,
 		},
 		{
 			name:        "NoUnset - set to unset (forbidden)",
@@ -278,6 +287,14 @@ func TestUpdateValue_CustomMatchFunc(t *testing.T) {
 			constraints: []UpdateConstraint{NoModify},
 			wantErrs:    1,
 			wantMsgs:    []string{"field cannot be modified once set"},
+		},
+		{
+			name:        "NoModify - both values unset per equiv (allowed)",
+			op:          operation.Update,
+			value:       NonComparableStruct{Tags: []string{"b"}},
+			oldValue:    NonComparableStruct{Tags: []string{"a"}},
+			constraints: []UpdateConstraint{NoModify},
+			wantErrs:    0,
 		},
 	}
 
