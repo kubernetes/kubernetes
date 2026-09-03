@@ -705,3 +705,51 @@ func Test_criStatsProvider_addCRIPodCPUStats_capsUsageNanoCores(t *testing.T) {
 		t.Errorf("addCRIPodCPUStats() CPU.UsageNanoCores = %d, want %d", *ps.CPU.UsageNanoCores, capacity)
 	}
 }
+
+// Test_criStatsProvider_getContainerUsageNanoCores_capsUsageNanoCores verifies that
+// the default (non-PodAndContainerStatsFromCRI) path clamps an implausible
+// usageNanoCores. makeContainerStats routes the value through
+// getContainerUsageNanoCores, so this closes the gap where the clamp previously
+// only applied on the strict-CRI path.
+func Test_criStatsProvider_getContainerUsageNanoCores_capsUsageNanoCores(t *testing.T) {
+	p := &criStatsProvider{}
+	capacity := maxWindowsUsageNanoCores()
+	over := capacity + 1_000_000_000
+
+	usage := p.getContainerUsageNanoCores(&runtimeapi.ContainerStats{
+		Attributes: &runtimeapi.ContainerAttributes{
+			Id:       "c0",
+			Metadata: &runtimeapi.ContainerMetadata{Name: "c0"},
+		},
+		Cpu: &runtimeapi.CpuUsage{UsageNanoCores: &runtimeapi.UInt64Value{Value: over}},
+	})
+	if usage == nil {
+		t.Fatal("getContainerUsageNanoCores() = nil, want capped value")
+	}
+	if *usage != capacity {
+		t.Errorf("getContainerUsageNanoCores() = %d, want capped to %d", *usage, capacity)
+	}
+}
+
+// Test_criStatsProvider_getAndUpdateContainerUsageNanoCores_capsUsageNanoCores verifies the
+// fresh-update default path clamps too.
+func Test_criStatsProvider_getAndUpdateContainerUsageNanoCores_capsUsageNanoCores(t *testing.T) {
+	p := &criStatsProvider{}
+	capacity := maxWindowsUsageNanoCores()
+	over := capacity + 1_000_000_000
+
+	logger, _ := ktesting.NewTestContext(t)
+	usage := p.getAndUpdateContainerUsageNanoCores(logger, &runtimeapi.ContainerStats{
+		Attributes: &runtimeapi.ContainerAttributes{
+			Id:       "c0",
+			Metadata: &runtimeapi.ContainerMetadata{Name: "c0"},
+		},
+		Cpu: &runtimeapi.CpuUsage{UsageNanoCores: &runtimeapi.UInt64Value{Value: over}},
+	})
+	if usage == nil {
+		t.Fatal("getAndUpdateContainerUsageNanoCores() = nil, want capped value")
+	}
+	if *usage != capacity {
+		t.Errorf("getAndUpdateContainerUsageNanoCores() = %d, want capped to %d", *usage, capacity)
+	}
+}

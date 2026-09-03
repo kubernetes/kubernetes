@@ -89,6 +89,15 @@ func capWindowsUsageNanoCores(usageNanoCores *uint64) *uint64 {
 	return usageNanoCores
 }
 
+// capUsageNanoCores overrides the cross-platform no-op so that usageNanoCores
+// values reported by the Windows CRI runtime (which can exceed the node's CPU
+// capacity due to a measurement artifact, see #134253) are clamped on every
+// path that reaches the summary and resource-metrics endpoints, not only the
+// PodAndContainerStatsFromCRI path.
+func (p *criStatsProvider) capUsageNanoCores(usageNanoCores *uint64) *uint64 {
+	return capWindowsUsageNanoCores(usageNanoCores)
+}
+
 // listContainerNetworkStats returns the network stats of all the running containers.
 func (p *criStatsProvider) listContainerNetworkStats(logger klog.Logger) (map[string]*statsapi.NetworkStats, error) {
 	networkStatsProvider := newNetworkStatsProvider(p)
