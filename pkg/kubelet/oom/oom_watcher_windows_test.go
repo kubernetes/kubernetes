@@ -232,3 +232,47 @@ func (c *countingRuntimeGetter) ContainerStatus(ctx context.Context, id string, 
 	}
 	return c.fakeRuntimeGetter.ContainerStatus(ctx, id, verbose)
 }
+
+// TestWindowsWatcherPollLoopEndToEnd exercises the real poll loop wiring that
+// Start uses (seed, immediate reconcile, then periodic ticks) rather than calling
+// reconcile directly. This is the closest to the production runtime entry point
+// that can run on a developer machine without a full CRI runtime.
+func TestWindowsWatcherPollLoopEndToEnd(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	logger := klog.FromContext(tCtx)
+	containerName := fmt.Sprintf("app-%s", t.Name())
+	cid := "container-e2e-poll"
+
+	// The container begins RUNNING so the seed + first reconcile see a
+	// non-reportable state; it crosses into EXITED/OOMKilled afterwards so a
+	// later poll tick - not the initial pass - is the one that surfaces it.
+	container := &runtimeapi.Container{Id: cid, State: runtimeapi.ContainerState_CONTAINER_RUNNING}
+	runtime := &fakeRuntimeGetter{
+		containers: []*runtimeapi.Container{container},
+		statuses:   map[string]*runtimeapi.ContainerStatus{cid: oomKilledStatus(cid, containerName)},
+	}
+	fakeRecorder := record.NewFakeRecorder(10)
+	w := &windowsWatcher{recorder: fakeRecorder, containers: runtime, pollInterval: 30 * time.Millisecond, seen: map[string]struct{}{}, inspected: map[string]struct{}{}}
+	ctx, cancel := context.WithCancel(tCtx)
+	defer cancel()
+	go w.pollLoop(ctx, logger)
+
+	// Give the seed + first reconcile time to observe the RUNNING state, then
+	// flip the container to EXITED so a subsequent tick performs the detection.
+	time.Sleep(50 * time.Millisecond)
+	container.State = runtimeapi.ContainerState_CONTAINER_EXITED
+
+	select {
+	case ev := <-fakeRecorder.Events:
+		assert.Contains(t, ev, windowsOOMEventReason)
+		assert.Contains(t, ev, containerName)
+	case <-time.After(2 * time.Second):
+		t.Fatal("pollLoop tick did not emit an OOMKilled event in time")
+	}
+	select {
+	case ev := <-fakeRecorder.Events:
+		t.Fatalf("did not expect a second event, got %q", ev)
+	case <-time.After(150 * time.Millisecond):
+	}
+	cancel()
+}
