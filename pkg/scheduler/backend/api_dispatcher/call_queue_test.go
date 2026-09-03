@@ -27,6 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/component-base/metrics/testutil"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -358,27 +359,18 @@ func TestCallQueuePop(t *testing.T) {
 	})
 
 	t.Run("Pop blocks when queue is empty and unblocks after add", func(t *testing.T) {
-		synctest.Test(t, func(t *testing.T) {
-			cq := newCallQueue(mockRelevances)
-			poppedCallCh := make(chan *queuedAPICall)
+		cq := newCallQueue(mockRelevances)
+		poppedCallCh := make(chan *queuedAPICall)
 
-			go func() {
-				poppedCall, popErr := cq.pop()
-				if popErr != nil {
-					t.Errorf("Unexpected error while popping call: %v", popErr)
-				}
-				poppedCallCh <- poppedCall
-			}()
+		go func() {
+			poppedCall, popErr := cq.pop()
+			if popErr != nil {
+				t.Errorf("Unexpected error while popping call: %v", popErr)
+			}
+			poppedCallCh <- poppedCall
+		}()
 
-			// synctest.Wait blocks until every goroutine in the bubble is
-			// durably blocked -- which for the goroutine above means it has
-			// actually reached cq.cond.Wait(), not merely been scheduled.
-			// This is exact (tracked by the runtime), not a timing guess, so
-			// there is no window for add() below to run first. If pop()
-			// never actually blocks (e.g. a bug makes it return early), or
-			// never unblocks after add(), the bubble deadlocks and this test
-			// fails immediately instead of hanging or racing a timeout.
-			synctest.Wait()
+		time.Sleep(100 * time.Millisecond)
 
 			call := &queuedAPICall{
 				APICall: &mockAPICall{
@@ -394,7 +386,9 @@ func TestCallQueuePop(t *testing.T) {
 			if diff := cmp.Diff(call, poppedCall, queuedAPICallCmpOpts...); diff != "" {
 				t.Errorf("Popped call does not match added call (-want +got):\n%s", diff)
 			}
-		})
+		case <-time.After(100 * time.Millisecond):
+			t.Fatal("Pop() should have returned an added call, but it timed out")
+		}
 	})
 }
 
@@ -579,19 +573,18 @@ func TestCallQueueClose(t *testing.T) {
 	})
 
 	t.Run("Pop unblocks and returns nil when controller is closed", func(t *testing.T) {
-		synctest.Test(t, func(t *testing.T) {
-			cq := newCallQueue(mockRelevances)
-			poppedCallCh := make(chan *queuedAPICall)
+		cq := newCallQueue(mockRelevances)
+		poppedCallCh := make(chan *queuedAPICall)
 
-			go func() {
-				poppedCall, popErr := cq.pop()
-				if popErr != nil {
-					t.Errorf("Unexpected error while popping call: %v", popErr)
-				}
-				poppedCallCh <- poppedCall
-			}()
+		go func() {
+			poppedCall, popErr := cq.pop()
+			if popErr != nil {
+				t.Errorf("Unexpected error while popping call: %v", popErr)
+			}
+			poppedCallCh <- poppedCall
+		}()
 
-			synctest.Wait()
+		time.Sleep(100 * time.Millisecond)
 
 			cq.close()
 
@@ -599,6 +592,8 @@ func TestCallQueueClose(t *testing.T) {
 			if poppedCall != nil {
 				t.Errorf("Expected popped call to be nil, but got %v", poppedCall)
 			}
-		})
+		case <-time.After(100 * time.Millisecond):
+			t.Fatal("Pop() should have been unblocked by close(), but it remained blocked")
+		}
 	})
 }
