@@ -1351,6 +1351,12 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		alloc.logger.V(7).Info("Device in use", "device", device.id)
 		return false, nil, nil
 	}
+	// A non-allow-multiple device can still carry a live share after an
+	// allowMultipleAllocations true->false update, which deviceInUse above does not see.
+	if !request.adminAccess() && !allowMultipleAllocations && alloc.deviceCapacityInUse(device.id) {
+		alloc.logger.V(7).Info("Device has an active shared allocation, cannot be allocated exclusively", "device", device.id)
+		return false, nil, nil
+	}
 
 	// Devices that consume counters can not be allocated if the PartitionableDevices feature
 	// is not enabled.
