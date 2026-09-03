@@ -692,6 +692,51 @@ func TestBookmarkAfterResourceVersionWatchers(t *testing.T) {
 	}
 }
 
+// TestForceCloseIncrementsTerminatedWatchers verifies that force-closing an
+// unresponsive watcher increments the terminated watchers counter with
+// reason "unresponsive".
+func TestForceCloseIncrementsTerminatedWatchers(t *testing.T) {
+	registry := compbasemetrics.NewKubeRegistry()
+	if err := registry.Register(metrics.TerminatedWatchersCounter); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	filter := func(string, labels.Set, fields.Set, runtime.Object) bool { return true }
+	var w *cacheWatcher
+	forget := func(drainWatcher bool) {
+		w.setDrainInputBufferLocked(drainWatcher)
+		w.stopLocked()
+	}
+	// A watcher with a full input buffer (chanSize 1, one event already queued)
+	// and no processing goroutine, so any further add cannot succeed.
+	w = newCacheWatcher(1, filter, forget, storage.APIObjectVersioner{}, time.Now(), false, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "")
+	if !w.nonblockingAdd(makeWatchCacheEvent(1)) {
+		t.Fatal("failed to fill the watcher's input buffer")
+	}
+
+	counter := metrics.TerminatedWatchersCounter.WithLabelValues("", "pods", metrics.TerminationReasonUnresponsive)
+	before, err := testutil.GetCounterMetricValue(counter)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// add() with a nil timer terminates the watcher immediately when the
+	// non-blocking send fails.
+	if w.add(makeWatchCacheEvent(2), nil) {
+		t.Fatal("expected add to fail and terminate the watcher")
+	}
+
+	after, err := testutil.GetCounterMetricValue(counter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after-before != 1 {
+		t.Errorf("expected terminated watchers counter (reason=%s) to increase by 1, got %v -> %v", metrics.TerminationReasonUnresponsive, before, after)
+	}
+	if !w.stopped {
+		t.Errorf("expected the watcher to be stopped")
+	}
+}
+
 func gatherWithoutBuckets(gatherer compbasemetrics.Gatherer) testutil.GathererFunc {
 	return func() ([]*testutil.MetricFamily, error) {
 		got, err := gatherer.Gather()
