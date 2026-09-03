@@ -124,7 +124,15 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(ctx context.C
 	// setup security context
 	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
 
-	warnIgnoredWindowsFields(klog.FromContext(ctx), pod, container)
+	logger := klog.FromContext(ctx)
+	// fsGroup/fsGroupChangePolicy are pod-level settings, so warn for them once
+	// per pod (on the first container) rather than repeating the same warning
+	// for every container in a multi-container pod. Container names are unique
+	// within a pod, so the first container is identified by its name.
+	if container.Name == pod.Spec.Containers[0].Name {
+		warnPodLevelIgnoredWindowsFields(logger, pod)
+	}
+	warnIgnoredWindowsFields(logger, pod, container)
 
 	if username != "" {
 		wc.SecurityContext.RunAsUsername = username
@@ -211,6 +219,24 @@ func (m *kubeGenericRuntimeManager) applyPodLevelMemoryHigh(_ *v1.Pod, _ *cm.Res
 // layer no-ops fsGroup handling via ChangePermissions, and procMount and
 // seccomp Localhost profiles are not supported for Windows containers.
 func warnIgnoredWindowsFields(logger klog.Logger, pod *v1.Pod, container *v1.Container) {
+	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
+	if effectiveSc.ProcMount != nil && *effectiveSc.ProcMount != v1.DefaultProcMount {
+		logger.Info("Windows containers do not support securityContext.procMount; it will be ignored",
+			"pod", klog.KObj(pod), "containerName", container.Name, "procMount", *effectiveSc.ProcMount)
+	}
+
+	if effectiveSeccompProfileType(pod, container) == v1.SeccompProfileTypeLocalhost {
+		logger.Info("Windows containers do not support a seccomp profile of type Localhost; it will be ignored",
+			"pod", klog.KObj(pod), "containerName", container.Name)
+	}
+}
+
+// warnPodLevelIgnoredWindowsFields logs kubelet warnings for pod-level security
+// fields that Windows does not apply: the volume layer no-ops fsGroup handling
+// via ChangePermissions and fsGroupChangePolicy is not implemented for Windows.
+// These fields are set once per pod, so the warning must be emitted once per
+// pod rather than repeated once per container.
+func warnPodLevelIgnoredWindowsFields(logger klog.Logger, pod *v1.Pod) {
 	podSc := pod.Spec.SecurityContext
 	if podSc != nil {
 		if podSc.FSGroup != nil {
@@ -221,17 +247,6 @@ func warnIgnoredWindowsFields(logger klog.Logger, pod *v1.Pod, container *v1.Con
 			logger.Info("Windows containers do not support securityContext.fsGroupChangePolicy; it will be ignored",
 				"pod", klog.KObj(pod), "fsGroupChangePolicy", *podSc.FSGroupChangePolicy)
 		}
-	}
-
-	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
-	if effectiveSc.ProcMount != nil && *effectiveSc.ProcMount != v1.DefaultProcMount {
-		logger.Info("Windows containers do not support securityContext.procMount; it will be ignored",
-			"pod", klog.KObj(pod), "containerName", container.Name, "procMount", *effectiveSc.ProcMount)
-	}
-
-	if effectiveSeccompProfileType(pod, container) == v1.SeccompProfileTypeLocalhost {
-		logger.Info("Windows containers do not support a seccomp profile of type Localhost; it will be ignored",
-			"pod", klog.KObj(pod), "containerName", container.Name)
 	}
 }
 
