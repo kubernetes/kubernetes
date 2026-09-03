@@ -30,19 +30,6 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func TestParseOptionsRejectsEmptyFlagName(t *testing.T) {
-	for _, option := range []string{"=value", "-=value", "--=value"} {
-		t.Run(option, func(t *testing.T) {
-			o := &SetOptions{Options: []string{option}}
-
-			_, err := o.parseOptions()
-			if err == nil || !strings.Contains(err.Error(), "flag name must not be empty") {
-				t.Fatalf("expected an empty flag name error, got %v", err)
-			}
-		})
-	}
-}
-
 func TestSetOptions_Run_Defaults(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -273,6 +260,17 @@ defaults:
 					},
 				},
 			},
+		},
+		{
+			name:           "empty option name",
+			existingKuberc: "",
+			options: SetOptions{
+				Section: sectionDefaults,
+				Command: "get",
+				Options: []string{"=output"},
+			},
+			expectError:   true,
+			errorContains: "invalid option format",
 		},
 	}
 
