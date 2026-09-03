@@ -308,10 +308,15 @@ func (a *HorizontalController) enqueueHPA(obj interface{}) {
 func (a *HorizontalController) deleteHPA(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %w", obj, err))
+		// KeyFunc only fails when obj is neither a valid object nor a
+		// DeletedFinalStateUnknown tombstone — the same two cases the
+		// type assertions below rely on. So no HPA identity is
+		// recoverable here either, and there's nothing to clean up in
+		// the queue or selectorTracker. Log it clearly since it would
+		// otherwise be a silent leak.
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %w (skipping queue/selectorTracker cleanup)", obj, err))
 		return
 	}
-
 	hpa, ok := obj.(*autoscalingv2.HorizontalPodAutoscaler)
 	if !ok {
 		if tombstone, isTombstone := obj.(cache.DeletedFinalStateUnknown); isTombstone {
@@ -324,10 +329,7 @@ func (a *HorizontalController) deleteHPA(obj interface{}) {
 			hpa.UID,
 		)
 	}
-
-	// TODO: could we leak if we fail to get the key?
 	a.queue.Forget(key)
-
 	// Remove HPA and attached selector.
 	hpaKey := selectors.Parse(key)
 	a.selectorTracker.Delete(hpaKey.Namespace, hpaKey)
