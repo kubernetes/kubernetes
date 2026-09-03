@@ -61,6 +61,12 @@ type windowsWatcher struct {
 	// seen records container IDs already reported as OOMKilled so a single
 	// terminated container is surfaced exactly once across polling intervals.
 	seen map[string]struct{}
+	// inspected records container IDs whose terminal status we have already
+	// looked up. Exited containers never change their exit reason, so once we
+	// have inspected one we must not query its status again on later polls;
+	// otherwise exited non-OOM containers accumulate and are re-polled every
+	// interval without bound.
+	inspected map[string]struct{}
 }
 
 var _ Watcher = &windowsWatcher{}
@@ -75,6 +81,7 @@ func NewWatcher(recorder record.EventRecorder, containers containerStatusGetter)
 		containers:   containers,
 		pollInterval: windowsOOMPollInterval,
 		seen:         make(map[string]struct{}),
+		inspected:    make(map[string]struct{}),
 	}, nil
 }
 
@@ -136,9 +143,10 @@ func (ow *windowsWatcher) reconcile(ctx context.Context, logger klog.Logger) {
 		}
 
 		ow.mu.Lock()
+		_, inspected := ow.inspected[c.GetId()]
 		_, saw := ow.seen[c.GetId()]
 		ow.mu.Unlock()
-		if saw {
+		if inspected || saw {
 			continue
 		}
 
@@ -154,6 +162,14 @@ func (ow *windowsWatcher) reconcile(ctx context.Context, logger klog.Logger) {
 		}
 
 		cs := status.GetStatus()
+
+		// The exit reason is terminal, so record the container as inspected
+		// regardless of outcome. This stops exited non-OOM containers from being
+		// re-queried on every subsequent poll.
+		ow.mu.Lock()
+		ow.inspected[c.GetId()] = struct{}{}
+		ow.mu.Unlock()
+
 		if cs.GetReason() != oomKilledExitReason {
 			continue
 		}

@@ -72,6 +72,7 @@ func newTestWindowsWatcher(runtime containerStatusGetter) (*windowsWatcher, *rec
 		recorder:   fakeRecorder,
 		containers: runtime,
 		seen:       make(map[string]struct{}),
+		inspected:  make(map[string]struct{}),
 	}, fakeRecorder
 }
 
@@ -180,4 +181,54 @@ func TestWindowsWatcherNoRuntimeIsSafe(t *testing.T) {
 	w.reconcile(tCtx, logger)
 
 	assert.Equal(t, uint64(0), OOMEventsForContainer(t.Name()))
+}
+
+// TestWindowsWatcherInspectsExitedContainerOnce verifies that an exited
+// non-OOM container is queried exactly once: once its terminal status is known
+// the watcher must not re-query it on every subsequent poll, which would grow
+// unboundedly as exited containers accumulate on a busy node.
+func TestWindowsWatcherInspectsExitedContainerOnce(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	logger := klog.FromContext(tCtx)
+	cid := "container-exited-once"
+
+	queried := 0
+	runtime := &countingRuntimeGetter{
+		fakeRuntimeGetter: fakeRuntimeGetter{
+			containers: []*runtimeapi.Container{
+				{Id: cid, State: runtimeapi.ContainerState_CONTAINER_EXITED},
+			},
+			statuses: map[string]*runtimeapi.ContainerStatus{cid: normalExitedStatus(cid)},
+		},
+		countStatus: func() { queried++ },
+	}
+	w, _ := newTestWindowsWatcher(runtime)
+
+	w.reconcile(tCtx, logger)
+	w.reconcile(tCtx, logger)
+	w.reconcile(tCtx, logger)
+
+	// Only the first reconcile may have looked up the status; the later ones
+	// must reuse the inspection bookkeeping rather than hitting the CRI again.
+	assert.Equal(t, 1, queried, "expected the exited non-OOM container to be inspected exactly once")
+}
+
+func normalExitedStatus(id string) *runtimeapi.ContainerStatus {
+	return &runtimeapi.ContainerStatus{
+		Id:       id,
+		Reason:   "Completed",
+		Metadata: &runtimeapi.ContainerMetadata{Name: "c0"},
+	}
+}
+
+type countingRuntimeGetter struct {
+	fakeRuntimeGetter
+	countStatus func()
+}
+
+func (c *countingRuntimeGetter) ContainerStatus(ctx context.Context, id string, verbose bool) (*runtimeapi.ContainerStatusResponse, error) {
+	if c.countStatus != nil {
+		c.countStatus()
+	}
+	return c.fakeRuntimeGetter.ContainerStatus(ctx, id, verbose)
 }
