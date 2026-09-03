@@ -29,8 +29,26 @@ func TestRollingUpdateRegistrarSocketFile_lengthBound(t *testing.T) {
 	podUID := types.UID("ad4af911-5bcd-47c5-a554-f35cea869472")
 	name := RollingUpdateRegistrarSocketFile(KubeletRegistryDir, driver, podUID)
 	full := path.Join(KubeletRegistryDir, name)
-	if len(full) > unixPathMax {
-		t.Fatalf("registration socket path len %d exceeds %d: %q", len(full), unixPathMax, full)
+	if len(full) >= unixPathMax {
+		t.Fatalf("registration socket path len %d must be less than %d: %q", len(full), unixPathMax, full)
+	}
+}
+
+func TestRollingUpdateRegistrarSocketFile_rejectsExactLengthLimit(t *testing.T) {
+	driver := "acme-accelerator.example.com"
+	podUID := types.UID("11111111-2222-3333-4444-555555555555")
+	fullUID := driver + "-" + string(podUID) + "-reg.sock"
+	full := path.Join(KubeletRegistryDir, fullUID)
+	if len(full) != unixPathMax {
+		t.Fatalf("test setup: registration socket path len is %d, expected %d: %q", len(full), unixPathMax, full)
+	}
+
+	got := RollingUpdateRegistrarSocketFile(KubeletRegistryDir, driver, podUID)
+	if got == fullUID {
+		t.Fatalf("expected fallback from %d-byte full UID path, got %q", unixPathMax, got)
+	}
+	if len(path.Join(KubeletRegistryDir, got)) >= unixPathMax {
+		t.Fatalf("registration socket path len must be less than %d: %q", unixPathMax, got)
 	}
 }
 
@@ -80,13 +98,13 @@ func TestRollingUpdateRegistrarSocketFile_respectsCustomRegistryDir(t *testing.T
 	podUID := types.UID("11111111-2222-3333-4444-555555555555")
 
 	fullUID := driver + "-" + string(podUID) + "-reg.sock"
-	if len(path.Join(registryDir, fullUID)) <= unixPathMax {
+	if len(path.Join(registryDir, fullUID)) < unixPathMax {
 		t.Fatalf("test setup: expected full UID form to exceed limit with custom registry dir")
 	}
 
 	got := RollingUpdateRegistrarSocketFile(registryDir, driver, podUID)
-	if len(path.Join(registryDir, got)) > unixPathMax {
-		t.Fatalf("expected path within limit, got len %d: %q", len(path.Join(registryDir, got)), got)
+	if len(path.Join(registryDir, got)) >= unixPathMax {
+		t.Fatalf("expected path below limit, got len %d: %q", len(path.Join(registryDir, got)), got)
 	}
 	if got == fullUID {
 		t.Fatalf("expected fallback from full UID form, got %q", got)
