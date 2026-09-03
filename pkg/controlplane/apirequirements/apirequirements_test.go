@@ -31,11 +31,21 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+
+	// Register the groups the declared requirements refer to into legacyscheme.Scheme.
+	// pkg/controlplane registers all of them, but importing it here would be a cycle.
+	_ "k8s.io/kubernetes/pkg/apis/certificates/install"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	_ "k8s.io/kubernetes/pkg/apis/lifecycle/install"
+	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
+	_ "k8s.io/kubernetes/pkg/apis/storagemigration/install"
 )
 
 func TestFeatureGateAPIRequirementsWellFormed(t *testing.T) {
@@ -86,6 +96,51 @@ func TestFeatureGateAPIRequirementsWellFormed(t *testing.T) {
 			t.Errorf("feature gate %q requires %v generically but %v in kube-apiserver; the kube requirements must include the generic ones", feature, resources, kube[feature])
 		}
 	}
+}
+
+func TestFeatureGateAPIRequirementsMatchScheme(t *testing.T) {
+	tests := []struct {
+		name         string
+		requirements serverstorage.FeatureGateAPIRequirements
+	}{
+		{
+			name:         "generic control plane requirements",
+			requirements: DefaultForGenericControlPlane(),
+		},
+		{
+			name:         "kube-apiserver requirements",
+			requirements: DefaultForKubeAPIServer(),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			for feature, resources := range tc.requirements {
+				for _, gr := range resources {
+					if !legacyscheme.Scheme.IsGroupRegistered(gr.Group) {
+						t.Errorf("feature gate %q requires %s, but group %q is not registered in legacyscheme.Scheme", feature, gr, gr.Group)
+						continue
+					}
+					if len(schemeVersionsCarrying(gr)) == 0 {
+						t.Errorf("feature gate %q requires %s, but no version of group %q has a kind whose plural is %q", feature, gr, gr.Group, gr.Resource)
+					}
+				}
+			}
+		})
+	}
+}
+
+func schemeVersionsCarrying(gr schema.GroupResource) []schema.GroupVersion {
+	var versions []schema.GroupVersion
+	for _, gv := range legacyscheme.Scheme.PrioritizedVersionsForGroup(gr.Group) {
+		for kind := range legacyscheme.Scheme.KnownTypes(gv) {
+			if plural, _ := meta.UnsafeGuessKindToResource(gv.WithKind(kind)); plural.Resource == gr.Resource {
+				versions = append(versions, gv)
+				break
+			}
+		}
+	}
+	return versions
 }
 
 func registrySourceDir(t *testing.T) string {
@@ -151,7 +206,7 @@ func TestFeatureGateAPIRequirementsMatchProviders(t *testing.T) {
 	for _, feature := range slices.Sorted(maps.Keys(allFeatures)) {
 		t.Run(string(feature), func(t *testing.T) {
 			if undeclared := gatedInProviders[feature].Difference(declared[feature]); undeclared.Len() > 0 {
-				t.Errorf("a provider installs %v only when %q is enabled, but %q does not require them; add them to DefaultForKubeAPIServer so enabling the gate without the API fails at startup", sets.List(undeclared), feature, feature)
+				t.Errorf("a provider installs %v only when %q is enabled, but %q does not require them; add them to DefaultForKubeAPIServer so explicitly enabling one without the other fails at startup", sets.List(undeclared), feature, feature)
 			}
 			if featuresRequiringAPIsTheyDoNotGate.Has(feature) {
 				return

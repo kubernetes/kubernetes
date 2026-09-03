@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -91,6 +93,7 @@ func (c *CompletedConfig) GenericStorageProviders(discovery discovery.DiscoveryI
 func (s *Server) InstallAPIs(restStorageProviders ...RESTStorageProvider) error {
 	nonLegacy := []*genericapiserver.APIGroupInfo{}
 	servedResources := sets.New[schema.GroupResource]()
+	registeredResources := sets.New[schema.GroupVersionResource]()
 
 	// used later in the loop to filter the served resource by those that have expired.
 	resourceExpirationEvaluatorOpts := genericapiserver.ResourceExpirationEvaluatorOptions{
@@ -110,6 +113,10 @@ func (s *Server) InstallAPIs(restStorageProviders ...RESTStorageProvider) error 
 		if err != nil {
 			return fmt.Errorf("problem initializing API group %q: %w", groupName, err)
 		}
+
+		// Record every resource the provider could serve, before gate and lifecycle filtering.
+		registeredResources = registeredResources.Union(registeredResourcesFor(&apiGroupInfo))
+
 		if len(apiGroupInfo.VersionedResourcesStorageMap) == 0 {
 			// If we have no storage for any resource configured, this API group is effectively disabled.
 			// This can happen when an entire API group, version, or development-stage (alpha, beta, GA) is disabled.
@@ -165,14 +172,39 @@ func (s *Server) InstallAPIs(restStorageProviders ...RESTStorageProvider) error 
 	}
 
 	s.servedResources = servedResources
+	s.registeredResources = registeredResources
 	return nil
 }
 
-// ValidateFeatureGateAPIRequirements checks if an enabled feature gate requires an API resource
-// that this server does serve or not.
+// registeredResourcesFor returns every resource whose kind is registered in one of the group's
+// versions, regardless of gates or lifecycle. A resource whose gate is off never reaches the
+// storage map.
+func registeredResourcesFor(apiGroupInfo *genericapiserver.APIGroupInfo) sets.Set[schema.GroupVersionResource] {
+	ret := sets.New[schema.GroupVersionResource]()
+	for _, gv := range apiGroupInfo.PrioritizedVersions {
+		for kind := range apiGroupInfo.Scheme.KnownTypes(gv) {
+			plural, _ := meta.UnsafeGuessKindToResource(gv.WithKind(kind))
+			ret.Insert(plural)
+		}
+	}
+	return ret
+}
+
+// ValidateFeatureGateAPIRequirements rejects a gate named in --feature-gates whose required
+// resources are not served, and a resource named in --runtime-config whose required gates are
+// off. A default-enabled gate with unserved resources only logs a warning.
 func (s *Server) ValidateFeatureGateAPIRequirements(requirements serverstorage.FeatureGateAPIRequirements) error {
-	if s.servedResources == nil {
+	if s.servedResources == nil || s.registeredResources == nil {
 		return fmt.Errorf("cannot validate feature gate API requirements before InstallAPIs has run")
 	}
-	return requirements.Validate(s.GenericAPIServer.FeatureGate, s.servedResources)
+
+	warnings, err := requirements.Validate(s.GenericAPIServer.FeatureGate, s.servedResources)
+	for _, warning := range warnings {
+		klog.Warning(warning)
+	}
+
+	return utilerrors.NewAggregate([]error{
+		err,
+		requirements.ValidateExplicitlyEnabledAPIs(s.GenericAPIServer.FeatureGate, s.APIResourceConfigSource, s.registeredResources),
+	})
 }

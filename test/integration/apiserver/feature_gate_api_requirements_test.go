@@ -52,13 +52,108 @@ func TestFeatureGateAPIRequirements(t *testing.T) {
 			},
 		},
 		{
+			name:  "gate enabled by default with its API explicitly disabled starts",
+			flags: []string{"--runtime-config=certificates.k8s.io/v1/clustertrustbundles=false"},
+		},
+		{
+			name: "explicitly enabled gate with its API explicitly disabled is rejected",
+			flags: []string{
+				"--feature-gates=ClusterTrustBundle=true",
+				"--runtime-config=certificates.k8s.io/v1/clustertrustbundles=false",
+			},
+			wantErr: true,
+			wantErrContains: []string{
+				"ClusterTrustBundle is enabled",
+				"clustertrustbundles.certificates.k8s.io",
+			},
+		},
+		{
+			name:    "enabled beta gate without its beta API is rejected",
+			flags:   []string{"--feature-gates=GenericWorkload=true"},
+			wantErr: true,
+			wantErrContains: []string{
+				"GenericWorkload is enabled",
+				"workloads.scheduling.k8s.io",
+				"podgroups.scheduling.k8s.io",
+			},
+		},
+		{
+			name: "enabled beta gate with its beta API starts",
+			flags: []string{
+				"--feature-gates=GenericWorkload=true",
+				"--runtime-config=scheduling.k8s.io/v1beta1=true",
+			},
+		},
+		{
+			// group/version=true asks for the version, not for the gated resources in it.
+			name:  "explicitly enabled API version without its gate starts",
+			flags: []string{"--runtime-config=scheduling.k8s.io/v1beta1=true"},
+		},
+		{
+			name: "explicitly enabled API version with its gate explicitly disabled starts",
+			flags: []string{
+				"--feature-gates=EvictionRequestAPI=false",
+				"--runtime-config=lifecycle.k8s.io/v1alpha1=true",
+			},
+		},
+		{
+			name:    "explicitly enabled API resource without its gate is rejected",
+			flags:   []string{"--runtime-config=lifecycle.k8s.io/v1alpha1/evictionrequests=true"},
+			wantErr: true,
+			wantErrContains: []string{
+				"evictionrequests.lifecycle.k8s.io was explicitly enabled with --runtime-config (lifecycle.k8s.io/v1alpha1/evictionrequests)",
+				"EvictionRequestAPI",
+			},
+		},
+		{
+			name: "explicitly enabled API resource with its gate explicitly disabled is rejected",
+			flags: []string{
+				"--feature-gates=EvictionRequestAPI=false",
+				"--runtime-config=lifecycle.k8s.io/v1alpha1/evictionrequests=true",
+			},
+			wantErr: true,
+			wantErrContains: []string{
+				"evictionrequests.lifecycle.k8s.io was explicitly enabled with --runtime-config",
+				"EvictionRequestAPI",
+			},
+		},
+		{
 			name:  "default flags at an emulated version start cleanly",
 			flags: []string{"--emulated-version=1.36"},
 		},
 		{
-			// clustertrustbundles is only introduced in certificates/v1 at 1.37, so at emulation
-			// 1.36 the resource config says certificates/v1 is enabled while the lifecycle filter
-			// drops the resource. Validating the resource config alone would miss this.
+			name: "explicitly enabled API version at an emulated version starts",
+			flags: []string{
+				"--emulated-version=1.36",
+				"--runtime-config=certificates.k8s.io/v1=true",
+			},
+		},
+		{
+			name: "explicitly enabled API resource not yet introduced at the emulated version is rejected for its gate",
+			flags: []string{
+				"--emulated-version=1.36",
+				"--runtime-config=certificates.k8s.io/v1/clustertrustbundles=true",
+			},
+			wantErr: true,
+			wantErrContains: []string{
+				"clustertrustbundles.certificates.k8s.io was explicitly enabled with --runtime-config",
+				"ClusterTrustBundle",
+			},
+		},
+		{
+			name: "explicitly enabled API resource not yet introduced at the emulated version is rejected by the lifecycle filter",
+			flags: []string{
+				"--emulated-version=1.36",
+				"--feature-gates=ClusterTrustBundle=true",
+				"--runtime-config=certificates.k8s.io/v1/clustertrustbundles=true",
+			},
+			wantErr: true,
+			wantErrContains: []string{
+				"cannot enable resource certificates.k8s.io/v1, Resource=clustertrustbundles in runtime-config",
+				"introduced at 1.37",
+			},
+		},
+		{
 			name: "enabled gate whose API predates the emulated version is rejected",
 			flags: []string{
 				"--emulated-version=1.36",
