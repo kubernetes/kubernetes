@@ -560,12 +560,18 @@ func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
 }
 
 func (c *cacheWatcher) observeDispatchMetrics(event *watchCacheEvent, builtAt, sentAt time.Time) {
-	if event.Type == watch.Bookmark || sentAt.IsZero() || event.RecordTime.IsZero() {
+	if event.Type == watch.Bookmark || sentAt.IsZero() {
 		return
 	}
-	if !event.CacheReceived.IsZero() {
-		c.watcherMetrics.ObserveStage(metrics.StageStorageToCache, event.CacheReceived.Sub(event.RecordTime))
+	tl := event.timeline
+	tl.MarkAt(metrics.PointEventBuilt, builtAt)
+	tl.MarkAt(metrics.PointSentToClient, sentAt)
+
+	if !tl[metrics.PointStorageDecoded].IsZero() {
+		if !tl[metrics.PointCacheReceived].IsZero() {
+			c.watcherMetrics.ObserveStage(metrics.StageStorageToCache, tl[metrics.PointCacheReceived].Sub(tl[metrics.PointStorageDecoded]))
+		}
+		c.watcherMetrics.ObserveStage(metrics.StageTotal, sentAt.Sub(tl[metrics.PointStorageDecoded]))
 	}
 	c.watcherMetrics.ObserveStage(metrics.StageWatcherToClientHandler, sentAt.Sub(builtAt))
-	c.watcherMetrics.ObserveStage(metrics.StageTotal, sentAt.Sub(event.RecordTime))
 }

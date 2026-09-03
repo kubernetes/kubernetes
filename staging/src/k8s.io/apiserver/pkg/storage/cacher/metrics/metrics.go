@@ -64,6 +64,37 @@ var dispatchStageName = [numDispatchStages]string{
 	StageWatcherToClientHandler: "watcher_to_client_handler",
 }
 
+// DispatchPoint identifies a point in a watch event's dispatch lifecycle.
+type DispatchPoint int
+
+const (
+	// PointStorageDecoded: the event was decoded from the storage backend (etcd).
+	PointStorageDecoded DispatchPoint = iota
+	// PointCacheReceived: the event was first processed by the cacher's reflector loop.
+	PointCacheReceived
+	// PointEventBuilt: the outgoing watch.Event was built (filter + convert).
+	PointEventBuilt
+	// PointSentToClient: the watch.Event was written to the watcher's result channel.
+	PointSentToClient
+
+	numDispatchPoints
+)
+
+// DispatchTimeline records the timestamp at which each DispatchPoint was reached
+// for a single event delivery. Points that occur before fan-out are shared and
+// carried on the event; per-watcher points are filled in on delivery.
+//
+// Because DispatchTimeline is an array value, callers sharing a timeline across
+// goroutines (such as during watch event fan-out) should copy it by value
+// (e.g. tl := event.timeline) before calling MarkAt to avoid data races on
+// shared event state.
+type DispatchTimeline [numDispatchPoints]time.Time
+
+// MarkAt records a (previously captured) timestamp for the given point. Callers
+// pass their own time source so that the injectable clock and cross-goroutine
+// timestamps are respected.
+func (tl *DispatchTimeline) MarkAt(p DispatchPoint, t time.Time) { tl[p] = t }
+
 /*
  * By default, all the following metrics are defined as falling under
  * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/1209-metrics-stability/kubernetes-control-plane-metrics-stability.md#stability-classes)
