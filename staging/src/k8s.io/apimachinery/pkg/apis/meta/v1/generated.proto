@@ -890,7 +890,6 @@ message ObjectMeta {
   // and services.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels
   // +optional
-  // +mapType=granular
   // +k8s:alpha(since: "1.38")=+k8s:optional
   // +k8s:alpha(since: "1.38")=+k8s:eachKey=+k8s:format=k8s-label-key
   // +k8s:alpha(since: "1.38")=+k8s:eachVal=+k8s:format=k8s-label-value
