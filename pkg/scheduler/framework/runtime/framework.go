@@ -108,6 +108,8 @@ type frameworkImpl struct {
 
 	parallelizer fwk.Parallelizer
 
+	preemptionManager fwk.PreemptionManager
+
 	batch *OpportunisticBatch
 
 	enableSignatures bool
@@ -171,6 +173,8 @@ type frameworkOptions struct {
 	podGroupManager        fwk.PodGroupManager
 	maxBatchAge            time.Duration
 	logger                 *klog.Logger
+
+	preemptionManagerFactory PreemptionManagerFactory
 }
 
 // Option for the frameworkImpl.
@@ -283,6 +287,15 @@ func WithPodGroupManager(podGroupManager fwk.PodGroupManager) Option {
 	}
 }
 
+// PreemptionManagerFactory defines a factory function to create a PreemptionManager given a Handle.
+type PreemptionManagerFactory func(fh fwk.Handle) fwk.PreemptionManager
+
+func WithPreemptionManager(f PreemptionManagerFactory) Option {
+	return func(o *frameworkOptions) {
+		o.preemptionManagerFactory = f
+	}
+}
+
 // CaptureProfile is a callback to capture a finalized profile.
 type CaptureProfile func(config.KubeSchedulerProfile)
 
@@ -374,6 +387,10 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		podGroupManager:       options.podGroupManager,
 		parallelizer:          options.parallelizer,
 		logger:                logger,
+	}
+
+	if options.preemptionManagerFactory != nil {
+		f.preemptionManager = options.preemptionManagerFactory(f)
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
@@ -2475,6 +2492,11 @@ func (f *frameworkImpl) APICacher() fwk.APICacher {
 		return nil
 	}
 	return f.apiCacher
+}
+
+// PreemptionManager returns PreemptionManager that can be used to customize preemption logic.
+func (f *frameworkImpl) PreemptionManager() fwk.PreemptionManager {
+	return f.preemptionManager
 }
 
 // TotalBatchedPods returns the total number of batched pods. Used only for tests

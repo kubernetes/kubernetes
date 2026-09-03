@@ -17,6 +17,8 @@ limitations under the License.
 package preemption
 
 import (
+	"sort"
+
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
@@ -24,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
+	policylisters "k8s.io/client-go/listers/policy/v1"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kube-scheduler/util"
@@ -271,3 +274,58 @@ func FilterVictimsWithPDBViolation[T Victim](victims []T, pdbs []*policy.PodDisr
 
 	return violatingVictims, nonViolatingVictims
 }
+
+// GetPodDisruptionBudgets returns all pod disruption budgets from the provided lister.
+func GetPodDisruptionBudgets(pdbLister policylisters.PodDisruptionBudgetLister) ([]*policy.PodDisruptionBudget, error) {
+	if pdbLister != nil {
+		return pdbLister.List(labels.Everything())
+	}
+	return nil, nil
+}
+
+var getPodDisruptionBudgets = GetPodDisruptionBudgets
+
+type domainVictimWithPDBViolations struct {
+	*DomainVictim
+	numPDBViolations int
+}
+
+var _ fwk.Victim = &domainVictimWithPDBViolations{}
+
+func (v *domainVictimWithPDBViolations) NumPDBViolations() int {
+	return v.numPDBViolations
+}
+
+// PrepareDomainVictims filters domain victims that are eligible for preemption by preemptorPriority,
+// computes PDB violations using the provided pdbs, and orders victims first by priority, and second such that violating victims
+// are evaluated first, followed by non-violating victims.
+func PrepareDomainVictims(victims []*DomainVictim, preemptorPriority int32, pdbs []*policy.PodDisruptionBudget) []fwk.Victim {
+	var potentialVictims []*DomainVictim
+	for _, victim := range victims {
+		if victim.Priority() < preemptorPriority {
+			potentialVictims = append(potentialVictims, victim)
+		}
+	}
+
+	sort.Slice(potentialVictims, func(i, j int) bool {
+		return MoreImportantVictim(potentialVictims[i], potentialVictims[j])
+	})
+
+	violatingVictims, nonViolatingVictims := FilterVictimsWithPDBViolation(potentialVictims, pdbs)
+	orderedVictims := make([]fwk.Victim, 0, len(potentialVictims))
+	for _, vv := range violatingVictims {
+		orderedVictims = append(orderedVictims, &domainVictimWithPDBViolations{
+			DomainVictim:     vv.Victim,
+			numPDBViolations: vv.ViolateCount,
+		})
+	}
+	for _, nv := range nonViolatingVictims {
+		orderedVictims = append(orderedVictims, &domainVictimWithPDBViolations{
+			DomainVictim:     nv,
+			numPDBViolations: 0,
+		})
+	}
+	return orderedVictims
+}
+
+var prepareDomainVictims = PrepareDomainVictims
