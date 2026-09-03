@@ -256,6 +256,9 @@ func (o *SetOptions) parseOptions() ([]v1beta1.CommandOptionDefault, error) {
 
 		// Remove leading dashes from flag name if present
 		flagName := strings.TrimLeft(parts[0], "-")
+		if flagName == "" {
+			return nil, fmt.Errorf("invalid option format %q, expected flag=value", opt)
+		}
 
 		options = append(options, v1beta1.CommandOptionDefault{
 			Name:    flagName,

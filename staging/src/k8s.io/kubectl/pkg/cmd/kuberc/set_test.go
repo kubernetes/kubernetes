@@ -261,6 +261,17 @@ defaults:
 				},
 			},
 		},
+		{
+			name:           "empty option name",
+			existingKuberc: "",
+			options: SetOptions{
+				Section: sectionDefaults,
+				Command: "get",
+				Options: []string{"=output"},
+			},
+			expectError:   true,
+			errorContains: "invalid option format",
+		},
 	}
 
 	for _, tt := range tests {
