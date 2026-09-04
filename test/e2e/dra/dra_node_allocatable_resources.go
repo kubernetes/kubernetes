@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package dra
 
 import (
 	"context"
@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
@@ -1037,15 +1036,9 @@ func mapToResizableContainerInfo(containers []draContainerInfo) []podresize.Resi
 	return res
 }
 
-var _ = SIGDescribe("DRA Node Allocatable Resources", framework.WithSerial(), feature.DynamicResourceAllocation, framework.WithFeatureGate(features.DRANodeAllocatableResources), framework.WithFeatureGate(features.InPlacePodLevelResourcesVerticalScaling), func() {
+var _ = framework.SIGDescribe("node")("DRA Node Allocatable Resources", framework.WithLabel("DRA"), framework.WithSerial(), feature.DynamicResourceAllocation, framework.WithFeatureGate(features.DRANodeAllocatableResources), framework.WithFeatureGate(features.InPlacePodLevelResourcesVerticalScaling), func() {
 	f := framework.NewDefaultFramework("dra-node-allocatable-resources")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-
-	ginkgo.BeforeEach(func(ctx context.Context) {
-		if framework.NodeOSDistroIs("windows") {
-			e2eskipper.Skipf("not supported on windows -- skipping")
-		}
-	})
 
 	doNodeAllocatableCgroupsTests(f)
 	doNodeAllocatableResizeTests(f)
