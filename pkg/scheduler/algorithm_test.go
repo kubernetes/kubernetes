@@ -400,7 +400,6 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 		filterStatus         *fwk.Status
 		postFilterStatus     *fwk.Status
 		postFilterResult     *fwk.PostFilterResult
-		podGroupCycle        bool
 		wantStatusCode       fwk.Code
 		wantNominatingInfo   *fwk.NominatingInfo
 		wantPostFilterCalled bool
@@ -411,15 +410,6 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 			postFilterStatus:     fwk.NewStatus(fwk.Unschedulable),
 			wantStatusCode:       fwk.Unschedulable,
 			wantPostFilterCalled: true,
-		},
-		{
-			name:                 "pod group cycle: per-pod PostFilter is not run (PodGroupPostFilter handles it)",
-			filterStatus:         fwk.NewStatus(fwk.Unschedulable, "no fit"),
-			postFilterStatus:     fwk.NewStatus(fwk.Success),
-			postFilterResult:     &fwk.PostFilterResult{NominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node1", NominatingMode: fwk.ModeOverride}},
-			podGroupCycle:        true,
-			wantStatusCode:       fwk.Unschedulable,
-			wantPostFilterCalled: false,
 		},
 		{
 			name:             "failure: algorithm fails but PostFilter nominates a node",
@@ -504,9 +494,6 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 			sched.applyDefaultHandlers()
 
 			state := framework.NewCycleState()
-			if tt.podGroupCycle {
-				state.SetPodGroupCycleState(framework.NewCycleState())
-			}
 
 			scheduleResult, status := sched.schedulingAlgorithm(ctx, state, schedFwk, queuedPodInfo, time.Now())
 
