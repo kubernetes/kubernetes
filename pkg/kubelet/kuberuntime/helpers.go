@@ -36,23 +36,36 @@ import (
 	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
-type containerByCreatedThenID []*runtimeapi.Container
+type containerSort []*runtimeapi.Container
 
-func (b containerByCreatedThenID) Len() int      { return len(b) }
-func (b containerByCreatedThenID) Swap(i, j int) { b[i], b[j] = b[j], b[i] }
-func (b containerByCreatedThenID) Less(i, j int) bool {
-	if b[i].CreatedAt != b[j].CreatedAt {
-		return b[i].CreatedAt > (b[j].CreatedAt)
+func (b containerSort) Len() int      { return len(b) }
+func (b containerSort) Swap(i, j int) { b[i], b[j] = b[j], b[i] }
+
+// Less defines the sorting order for containerSort:
+// 1. Primary sort: Descending order of Metadata.Attempt (higher attempts first)
+// 2. Secondary sort: Descending order of CreatedAt (newer containers first)
+// 3. Tertiary sort: Ascending order of ID (smaller IDs first)
+func (b containerSort) Less(i, j int) bool {
+	if b[i].Metadata == nil || b[j].Metadata == nil || (b[i].Metadata.Attempt == b[j].Metadata.Attempt) {
+		if b[i].CreatedAt != b[j].CreatedAt {
+			return b[i].CreatedAt > (b[j].CreatedAt)
+		}
+		return b[i].Id < b[j].Id
 	}
-	return b[i].Id < b[j].Id
+	return b[i].Metadata.Attempt > b[j].Metadata.Attempt
 }
 
 // Newest first.
-type podSandboxByCreatedThenID []*runtimeapi.PodSandbox
+type podSandboxSort []*runtimeapi.PodSandbox
 
-func (p podSandboxByCreatedThenID) Len() int      { return len(p) }
-func (p podSandboxByCreatedThenID) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
-func (p podSandboxByCreatedThenID) Less(i, j int) bool {
+func (p podSandboxSort) Len() int      { return len(p) }
+func (p podSandboxSort) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
+
+// Less defines the sorting order for podSandboxSort:
+// 1. Primary sort: Descending order of Metadata.Attempt (higher attempts first)
+// 2. Secondary sort: Descending order of CreatedAt (newer containers first)
+// 3. Tertiary sort: Ascending order of ID (smaller IDs first)
+func (p podSandboxSort) Less(i, j int) bool {
 	if p[i].Metadata == nil || p[j].Metadata == nil || (p[i].Metadata.Attempt == p[j].Metadata.Attempt) {
 		if p[i].CreatedAt != p[j].CreatedAt {
 			return p[i].CreatedAt > p[j].CreatedAt
@@ -62,11 +75,24 @@ func (p podSandboxByCreatedThenID) Less(i, j int) bool {
 	return p[i].Metadata.Attempt > p[j].Metadata.Attempt
 }
 
-type containerStatusByCreated []*kubecontainer.Status
+type containerStatusSort []*kubecontainer.Status
 
-func (c containerStatusByCreated) Len() int           { return len(c) }
-func (c containerStatusByCreated) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
-func (c containerStatusByCreated) Less(i, j int) bool { return c[i].CreatedAt.After(c[j].CreatedAt) }
+func (c containerStatusSort) Len() int      { return len(c) }
+func (c containerStatusSort) Swap(i, j int) { c[i], c[j] = c[j], c[i] }
+
+// Less defines the sorting order for containerStatusSort:
+// 1. Primary sort: Descending order of RestartCount (higher attempts first)
+// 2. Secondary sort: Descending order of CreatedAt (newer containers first)
+// 3. Tertiary sort: Ascending order of ID (smaller IDs first)
+func (c containerStatusSort) Less(i, j int) bool {
+	if c[i].RestartCount != c[j].RestartCount {
+		return c[i].RestartCount > c[j].RestartCount
+	}
+	if !c[i].CreatedAt.Equal(c[j].CreatedAt) {
+		return c[i].CreatedAt.After(c[j].CreatedAt)
+	}
+	return c[i].ID.ID < c[j].ID.ID
+}
 
 // toKubeContainerState converts runtimeapi.ContainerState to kubecontainer.State.
 func toKubeContainerState(state runtimeapi.ContainerState) kubecontainer.State {
