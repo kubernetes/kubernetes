@@ -1748,6 +1748,7 @@ message EphemeralVolumeSource {
   // to the PVC after it has been created.
   //
   // Required, must not be nil.
+  // +k8s:alpha(since: "1.37")=+k8s:required
   optional PersistentVolumeClaimTemplate volumeClaimTemplate = 1;
 }
 
@@ -3446,6 +3447,9 @@ message PersistentVolumeClaimSpec {
 
   // volumeName is the binding reference to the PersistentVolume backing this claim.
   // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:update=NoModify
+  // +k8s:alpha(since: "1.37")=+k8s:update=NoUnset
   optional string volumeName = 3;
 
   // storageClassName is the name of the StorageClass required by the claim.
@@ -4640,6 +4644,7 @@ message PodSpec {
   // List of volumes that can be mounted by containers belonging to the pod.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes
   // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:optional
   // +patchMergeKey=name
   // +patchStrategy=merge,retainKeys
   // +listType=map
@@ -7626,6 +7631,7 @@ message VolumeSource {
   // persistent volumes at the same time.
   //
   // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:optional
   optional EphemeralVolumeSource ephemeral = 29;
 
   // image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.
