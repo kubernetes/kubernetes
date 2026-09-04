@@ -21,11 +21,15 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"bytes"
 
+	"k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -571,6 +575,45 @@ func TestFailingAPIServiceDoesNotBlockAdd(t *testing.T) {
 	}
 	expectPath(t, swagger, "/apis/foo/v1/")
 	expectNoPath(t, swagger, "/apis/failed/v1/")
+}
+
+func TestOpenAPIRequestMetrics(t *testing.T) {
+	metrics.Register()
+	metrics.Reset()
+
+	mux := http.NewServeMux()
+	delegationHandlers := []http.Handler{
+		&openAPIHandler{
+			openapi: &spec.Swagger{
+				SwaggerProps: spec.SwaggerProps{
+					Paths: &spec.Paths{
+						Paths: map[string]spec.PathItem{
+							"/apis/foo/v1/": {},
+						},
+					},
+				},
+			},
+		},
+	}
+	buildAndRegisterSpecAggregator(delegationHandlers, mux)
+
+	req, err := http.NewRequest(http.MethodGet, "/openapi/v2", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(`
+# HELP apiserver_request_total [STABLE] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.
+# TYPE apiserver_request_total counter
+apiserver_request_total{code="200",component="",dry_run="",group="",resource="",scope="",subresource="openapi/v2",verb="GET",version=""} 1
+`), "apiserver_request_total"); err != nil {
+		t.Fatal(err)
+	}
 }
 
 type openAPIHandler struct {
