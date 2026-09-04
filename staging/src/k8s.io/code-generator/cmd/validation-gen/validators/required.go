@@ -195,7 +195,13 @@ func (rtv requirednessTagValidator) doOptional(context Context) (Validations, er
 // hasZeroDefault returns whether the field has a default value and whether
 // that default value is the zero value for the field's type.
 func (rtv requirednessTagValidator) hasZeroDefault(context Context) (bool, bool, error) {
-	// This validator only applies to fields, so Member must be valid.
+	// This validator only applies to fields, and a field context carries the
+	// struct member it describes. Report a caller which does not honor that
+	// instead of dereferencing a nil member.
+	if context.Member == nil {
+		return false, false, fmt.Errorf("internal error: %s used on a field context with no member", rtv.mode)
+	}
+
 	tagsByName, err := gengo.ExtractFunctionStyleCommentTags("+", []string{defaultTagName}, context.Member.CommentLines)
 	if err != nil {
 		return false, false, fmt.Errorf("failed to read tags: %w", err)
