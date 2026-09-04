@@ -6462,11 +6462,12 @@
 - name: generated_placements_total
   subsystem: scheduler
   help: Number of candidate placements generated when scheduling pod groups, by scheduler
-    profile.
+    profile and entity type.
   type: Counter
   stabilityLevel: ALPHA
   labels:
   - profile
+  - type
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
@@ -6517,13 +6518,14 @@
 - name: placement_evaluation_duration_seconds
   subsystem: scheduler
   help: Latency in seconds of evaluating a single candidate placement when scheduling
-    pod groups, by result and scheduler profile. 'feasible' means the pod group fit
-    into the placement, while 'infeasible' means it did not.
+    pod groups, by result, scheduler profile, and entity type. 'feasible' means the
+    pod group fit into the placement, while 'infeasible' means it did not.
   type: Histogram
   stabilityLevel: ALPHA
   labels:
   - profile
   - result
+  - type
   buckets:
   - 0.001
   - 0.002
@@ -6545,14 +6547,15 @@
     endpoint: /metrics
 - name: placement_evaluations_total
   subsystem: scheduler
-  help: Number of candidate placements evaluated when scheduling pod groups, by result
-    and scheduler profile. 'feasible' means the pod group fit into the placement,
-    while 'infeasible' means it did not.
+  help: Number of candidate placements evaluated when scheduling pod groups, by result,
+    scheduler profile, and entity type. 'feasible' means the pod group fit into the
+    placement, while 'infeasible' means it did not.
   type: Counter
   stabilityLevel: ALPHA
   labels:
   - profile
   - result
+  - type
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
