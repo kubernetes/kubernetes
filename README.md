@@ -38,6 +38,8 @@ The [community repository] hosts all information about
 building Kubernetes from source, how to contribute code
 and documentation, who to contact about what, etc.
 
+For information about contributing to Kubernetes, see the [contributor documentation].
+
 If you want to build Kubernetes right away there are two options:
 
 ##### You have a working [Go environment].
@@ -78,6 +80,7 @@ That said, if you have questions, reach out to us
 [kubernetes.io]: https://kubernetes.io
 [Scalable Microservices with Kubernetes]: https://www.udacity.com/course/scalable-microservices-with-kubernetes--ud615
 [troubleshooting guide]: https://kubernetes.io/docs/tasks/debug/
+[contributor documentation]: https://kubernetes.io/docs/contribute/
 
 ## Community Meetings 
 
