@@ -823,3 +823,29 @@ func TestRuntimeSortLess(t *testing.T) {
 		})
 	}
 }
+
+func TestSortersTreatTwoMissingFieldValuesAsEqual(t *testing.T) {
+	objects := []runtime.Object{
+		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "first"}},
+		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "second"}},
+		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "labeled", Labels: map[string]string{"example": "value"}}},
+	}
+	field := "{.metadata.labels.example}"
+
+	runtimeSorter := NewRuntimeSort(field, objects)
+	if runtimeSorter.Less(0, 1) || runtimeSorter.Less(1, 0) {
+		t.Fatalf("RuntimeSort must treat two missing field values as equal")
+	}
+
+	table := &metav1.Table{}
+	for _, object := range objects {
+		table.Rows = append(table.Rows, metav1.TableRow{Object: runtime.RawExtension{Object: object}})
+	}
+	tableSorter, err := NewTableSorter(table, field)
+	if err != nil {
+		t.Fatalf("NewTableSorter() unexpected error: %v", err)
+	}
+	if tableSorter.Less(0, 1) || tableSorter.Less(1, 0) {
+		t.Fatalf("TableSorter must treat two missing field values as equal")
+	}
+}
