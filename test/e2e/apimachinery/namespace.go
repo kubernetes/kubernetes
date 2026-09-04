@@ -563,13 +563,29 @@ func ensurePodsAreRemovedFirstInOrderedNamespaceDeletion(ctx context.Context, f 
 				return false, nil
 			}
 			hasContextFailure := false
+			hasContentRemaining := false
+			hasFinalizersRemaining := false
 			for _, cond := range ns.Status.Conditions {
 				if cond.Type == v1.NamespaceDeletionContentFailure {
 					hasContextFailure = true
 				}
+				if cond.Type == v1.NamespaceContentRemaining && cond.Status == v1.ConditionTrue {
+					hasContentRemaining = true
+				}
+				if cond.Type == v1.NamespaceFinalizersRemaining && cond.Status == v1.ConditionTrue {
+					hasFinalizersRemaining = true
+				}
 			}
 			if !hasContextFailure {
 				framework.Logf("Namespace %q does not yet have a NamespaceDeletionContentFailure condition, retrying...", nsName)
+				return false, nil
+			}
+			if !hasContentRemaining {
+				framework.Logf("Namespace %q does not yet have a NamespaceContentRemaining condition with status True, retrying...", nsName)
+				return false, nil
+			}
+			if !hasFinalizersRemaining {
+				framework.Logf("Namespace %q does not yet have a NamespaceFinalizersRemaining condition with status True, retrying...", nsName)
 				return false, nil
 			}
 			return true, nil
