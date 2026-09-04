@@ -988,7 +988,8 @@ func TestPodGroupPreemption(t *testing.T) {
 			// both preemptor pods will become schedulable at once, but there will be only place for 1 pod without preemption
 			// the scheduling cycle should prefer binding this pod over preempting to make room for both pods
 			// preemption will be called in the subsequent cycle to make room for the second pod.
-			expectedEventOrder: []string{"Bind:high-1", "PodGroupPostFilter:pg1", "Bind:high-2"},
+			// Either equivalent preemptor pod may be selected first, so only the event types are ordered.
+			expectedEventOrder: []string{"Bind", "PodGroupPostFilter:pg1", "Bind"},
 		},
 		{
 			name: "Binding first before preemption for basic policy",
@@ -1014,7 +1015,8 @@ func TestPodGroupPreemption(t *testing.T) {
 			// both preemptor pods will become schedulable at once, but there will be only place for 1 pod without preemption
 			// the scheduling cycle should prefer binding this pod over preempting to make room for both pods
 			// preemption will be called in the subsequent cycle to make room for the second pod.
-			expectedEventOrder: []string{"Bind:high-1", "PodGroupPostFilter:pg1", "Bind:high-2"},
+			// Either equivalent preemptor pod may be selected first, so only the event types are ordered.
+			expectedEventOrder: []string{"Bind", "PodGroupPostFilter:pg1", "Bind"},
 		},
 		{
 			name: "Topology-Aware Preemption: single topology domain",
@@ -1395,6 +1397,11 @@ func TestPodGroupPreemption(t *testing.T) {
 				// 10. Verify event order
 				if len(tt.expectedEventOrder) > 0 {
 					actualEvents := recorder.GetEvents()
+					for i, event := range actualEvents {
+						if strings.HasPrefix(event, "Bind:") {
+							actualEvents[i] = "Bind"
+						}
+					}
 					if diff := cmp.Diff(tt.expectedEventOrder, actualEvents); diff != "" {
 						t.Errorf("Unexpected event order (-want,+got):\n%s", diff)
 					}
