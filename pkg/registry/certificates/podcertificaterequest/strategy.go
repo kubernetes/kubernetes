@@ -16,7 +16,7 @@ limitations under the License.
 
 // Package podcertificaterequest provides Registry interface and its RESTStorage
 // implementation for storing PodCertificateRequest objects.
-package podcertificaterequest // import "k8s.io/kubernetes/pkg/registry/certificates/podcertificaterequest"
+package podcertificaterequest
 
 import (
 	"context"
