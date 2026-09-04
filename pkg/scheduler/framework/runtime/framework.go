@@ -86,13 +86,14 @@ type frameworkImpl struct {
 	// pluginsMap contains all plugins, by name.
 	pluginsMap map[string]fwk.Plugin
 
-	clientSet        clientset.Interface
-	kubeConfig       *restclient.Config
-	eventRecorder    events.EventRecorderLogger
-	informerFactory  informers.SharedInformerFactory
-	sharedDRAManager fwk.SharedDRAManager
-	podGroupManager  fwk.PodGroupManager
-	logger           klog.Logger
+	clientSet              clientset.Interface
+	kubeConfig             *restclient.Config
+	eventRecorder          events.EventRecorderLogger
+	informerFactory        informers.SharedInformerFactory
+	sharedDRAManager       fwk.SharedDRAManager
+	sharedHierarchyTracker fwk.HierarchyTracker
+	podGroupManager        fwk.PodGroupManager
+	logger                 klog.Logger
 
 	sharedCSIManager fwk.CSIManager
 
@@ -156,6 +157,7 @@ type frameworkOptions struct {
 	eventRecorder          events.EventRecorderLogger
 	informerFactory        informers.SharedInformerFactory
 	sharedDRAManager       fwk.SharedDRAManager
+	sharedHierarchyTracker fwk.HierarchyTracker
 	sharedCSIManager       fwk.CSIManager
 	snapshotSharedLister   fwk.SharedLister
 	mutableSnapshotLister  fwk.MutableSnapshotSharedLister
@@ -218,6 +220,13 @@ func WithInformerFactory(informerFactory informers.SharedInformerFactory) Option
 func WithSharedDRAManager(sharedDRAManager fwk.SharedDRAManager) Option {
 	return func(o *frameworkOptions) {
 		o.sharedDRAManager = sharedDRAManager
+	}
+}
+
+// WithSharedHierarchyTracker sets SharedHierarchyTracker for the framework.
+func WithSharedHierarchyTracker(sharedHierarchyTracker fwk.HierarchyTracker) Option {
+	return func(o *frameworkOptions) {
+		o.sharedHierarchyTracker = sharedHierarchyTracker
 	}
 }
 
@@ -355,25 +364,26 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		logger = *options.logger
 	}
 	f := &frameworkImpl{
-		registry:              r,
-		snapshotSharedLister:  options.snapshotSharedLister,
-		mutableSnapshotLister: options.mutableSnapshotLister,
-		sharedCSIManager:      options.sharedCSIManager,
-		waitingPods:           options.waitingPods,
-		podsInPreBind:         options.podsInPreBind,
-		clientSet:             options.clientSet,
-		kubeConfig:            options.kubeConfig,
-		eventRecorder:         options.eventRecorder,
-		informerFactory:       options.informerFactory,
-		sharedDRAManager:      options.sharedDRAManager,
-		metricsRecorder:       options.metricsRecorder,
-		extenders:             options.extenders,
-		PodNominator:          options.podNominator,
-		PodActivator:          options.podActivator,
-		apiDispatcher:         options.apiDispatcher,
-		podGroupManager:       options.podGroupManager,
-		parallelizer:          options.parallelizer,
-		logger:                logger,
+		registry:               r,
+		snapshotSharedLister:   options.snapshotSharedLister,
+		mutableSnapshotLister:  options.mutableSnapshotLister,
+		sharedCSIManager:       options.sharedCSIManager,
+		waitingPods:            options.waitingPods,
+		podsInPreBind:          options.podsInPreBind,
+		clientSet:              options.clientSet,
+		kubeConfig:             options.kubeConfig,
+		eventRecorder:          options.eventRecorder,
+		informerFactory:        options.informerFactory,
+		sharedDRAManager:       options.sharedDRAManager,
+		sharedHierarchyTracker: options.sharedHierarchyTracker,
+		metricsRecorder:        options.metricsRecorder,
+		extenders:              options.extenders,
+		PodNominator:           options.podNominator,
+		PodActivator:           options.podActivator,
+		apiDispatcher:          options.apiDispatcher,
+		podGroupManager:        options.podGroupManager,
+		parallelizer:           options.parallelizer,
+		logger:                 logger,
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching) {
@@ -2409,6 +2419,11 @@ func (f *frameworkImpl) SharedInformerFactory() informers.SharedInformerFactory 
 // SharedDRAManager returns the SharedDRAManager of the framework.
 func (f *frameworkImpl) SharedDRAManager() fwk.SharedDRAManager {
 	return f.sharedDRAManager
+}
+
+// SharedHierarchyTracker returns the SharedHierarchyTracker of the framework.
+func (f *frameworkImpl) SharedHierarchyTracker() fwk.HierarchyTracker {
+	return f.sharedHierarchyTracker
 }
 
 // SharedCSIManager returns the SharedCSIManager of the framework.

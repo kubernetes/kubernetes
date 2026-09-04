@@ -134,6 +134,11 @@ func (sched *Scheduler) addPod(obj interface{}) {
 		return
 	}
 
+	// Update hierarchy tracker before queue operations so that PreEnqueue evaluations
+	// and queue movement hints (MoveAllToActiveOrBackoffQueue) observe updated quorum counts.
+	if sched.hierarchyTracker != nil {
+		sched.hierarchyTracker.OnPodAdd(pod)
+	}
 	isPodDeferred := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && resource.IsPodResizeDeferred(pod)
 	if responsibleForPod(pod, sched.Profiles) && (!assignedPod(pod) || isPodDeferred) {
 		sched.addPodToSchedulingQueue(pod)
@@ -156,6 +161,10 @@ func (sched *Scheduler) updatePod(oldObj, newObj interface{}) {
 		return
 	}
 
+	// Update hierarchy tracker before scheduling queue operations to keep quorum counts consistent during PreEnqueue checks.
+	if sched.hierarchyTracker != nil {
+		sched.hierarchyTracker.OnPodUpdate(oldPod, newPod)
+	}
 	if assignedPod(oldPod) {
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && responsibleForPod(newPod, sched.Profiles) {
 			oldDeferred := resource.IsPodResizeDeferred(oldPod)
@@ -200,6 +209,10 @@ func (sched *Scheduler) deletePod(obj interface{}) {
 	switch t := obj.(type) {
 	case *v1.Pod:
 		pod = t
+		// Update hierarchy tracker before queue deletion so that queue movement hints reflect the removed pod.
+		if sched.hierarchyTracker != nil {
+			sched.hierarchyTracker.OnPodDelete(pod)
+		}
 		if assignedPod(pod) {
 			sched.deleteAssignedPodFromCache(pod)
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && resource.IsPodResizeDeferred(pod) && responsibleForPod(pod, sched.Profiles) {
@@ -219,6 +232,10 @@ func (sched *Scheduler) deletePod(obj interface{}) {
 		if !ok {
 			utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1.Pod", "obj", t.Obj)
 			return
+		}
+		// Update hierarchy tracker before queue deletion so that queue movement hints reflect the removed pod.
+		if sched.hierarchyTracker != nil {
+			sched.hierarchyTracker.OnPodDelete(pod)
 		}
 		// The carried object may be stale, so we don't use it to check if
 		// it's assigned or not. Attempting to cleanup anyways.
@@ -478,6 +495,9 @@ func (sched *Scheduler) addPodGroup(obj any) {
 	logger.V(3).Info("Add event for pod group", "podGroup", klog.KObj(pg))
 	apg := framework.NewGenericPodGroup(pg)
 	sched.Cache.AddGenericPodGroup(apg)
+	if sched.hierarchyTracker != nil {
+		sched.hierarchyTracker.OnPodGroupAdd(pg)
+	}
 	sched.SchedulingQueue.AddGenericPodGroup(logger, apg)
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, nil, pg, nil)
 }
@@ -504,6 +524,9 @@ func (sched *Scheduler) updatePodGroup(oldObj, newObj any) {
 	logger.V(4).Info("Update event for pod group", "podGroup", klog.KObj(newPG))
 	apg := framework.NewGenericPodGroup(newPG)
 	sched.Cache.UpdateGenericPodGroup(logger, apg)
+	if sched.hierarchyTracker != nil {
+		sched.hierarchyTracker.OnPodGroupUpdate(oldPG, newPG)
+	}
 	sched.SchedulingQueue.UpdateGenericPodGroup(logger, apg)
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, oldPG, newPG, nil)
 }
@@ -532,6 +555,9 @@ func (sched *Scheduler) deletePodGroup(obj any) {
 	logger.V(3).Info("Delete event for pod group", "podGroup", klog.KObj(pg))
 	apg := framework.NewGenericPodGroup(pg)
 	sched.Cache.RemoveGenericPodGroup(logger, apg)
+	if sched.hierarchyTracker != nil {
+		sched.hierarchyTracker.OnPodGroupDelete(pg)
+	}
 	sched.SchedulingQueue.DeleteGenericPodGroup(logger, apg)
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, pg, nil, nil)
 }
@@ -549,6 +575,9 @@ func (sched *Scheduler) addCompositePodGroup(obj any) {
 	logger.V(3).Info("Add event for composite pod group", "compositePodGroup", klog.KObj(cpg))
 	apg := framework.NewGenericCompositePodGroup(cpg)
 	sched.Cache.AddGenericPodGroup(apg)
+	if sched.hierarchyTracker != nil {
+		sched.hierarchyTracker.OnCompositePodGroupAdd(cpg)
+	}
 	sched.SchedulingQueue.AddGenericPodGroup(logger, apg)
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, nil, cpg, nil)
 }
@@ -575,6 +604,9 @@ func (sched *Scheduler) updateCompositePodGroup(oldObj, newObj any) {
 	logger.V(4).Info("Update event for composite pod group", "compositePodGroup", klog.KObj(newCPG))
 	apg := framework.NewGenericCompositePodGroup(newCPG)
 	sched.Cache.UpdateGenericPodGroup(logger, apg)
+	if sched.hierarchyTracker != nil {
+		sched.hierarchyTracker.OnCompositePodGroupUpdate(oldCPG, newCPG)
+	}
 	sched.SchedulingQueue.UpdateGenericPodGroup(logger, apg)
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, oldCPG, newCPG, nil)
 }
@@ -603,6 +635,9 @@ func (sched *Scheduler) deleteCompositePodGroup(obj any) {
 	logger.V(3).Info("Delete event for composite pod group", "compositePodGroup", klog.KObj(cpg))
 	apg := framework.NewGenericCompositePodGroup(cpg)
 	sched.Cache.RemoveGenericPodGroup(logger, apg)
+	if sched.hierarchyTracker != nil {
+		sched.hierarchyTracker.OnCompositePodGroupDelete(cpg)
+	}
 	sched.SchedulingQueue.DeleteGenericPodGroup(logger, apg)
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, cpg, nil, nil)
 }

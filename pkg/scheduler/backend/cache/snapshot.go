@@ -977,3 +977,41 @@ func (s *Snapshot) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bool, e
 func (s *Snapshot) BuildHierarchySnapshotFromPod(pod *v1.Pod) (fwk.PodGroupManager, error) {
 	return s, nil
 }
+
+// GetRootGroup returns the RootGroup containing the root key, PodGroup/PodGroupState (if root is a PodGroup),
+// or CompositePodGroup/CompositePodGroupState (if root is a CompositePodGroup) for the given EntityKey,
+// and a bool indicating whether the root group was found.
+func (s *Snapshot) GetRootGroup(key fwk.EntityKey) (fwk.RootGroup, bool, error) {
+	rootKey, exists, err := s.GetRootKeyForGroup(key)
+	if err != nil {
+		return fwk.RootGroup{}, false, err
+	}
+	if !exists {
+		return fwk.RootGroup{}, false, nil
+	}
+
+	switch rootKey.Type {
+	case fwk.PodGroupKeyType:
+		pgs, ok := s.podGroupStates[rootKey]
+		if !ok || pgs.podGroup == nil {
+			return fwk.RootGroup{}, false, nil
+		}
+		return fwk.RootGroup{
+			Key:           rootKey,
+			PodGroup:      pgs.podGroup,
+			PodGroupState: pgs,
+		}, true, nil
+	case fwk.CompositePodGroupKeyType:
+		cpgs, ok := s.compositePodGroupStates[rootKey]
+		if !ok || cpgs.compositePodGroup == nil {
+			return fwk.RootGroup{}, false, nil
+		}
+		return fwk.RootGroup{
+			Key:                    rootKey,
+			CompositePodGroup:      cpgs.compositePodGroup,
+			CompositePodGroupState: cpgs,
+		}, true, nil
+	default:
+		return fwk.RootGroup{}, false, fmt.Errorf("unsupported root key type %s for %s", rootKey.Type, key.String())
+	}
+}

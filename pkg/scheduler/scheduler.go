@@ -115,6 +115,7 @@ type Scheduler struct {
 	nominatedNodeNameForExpectationEnabled              bool
 	genericWorkloadEnabled                              bool
 	inPlacePodVerticalScalingSchedulerPreemptionEnabled bool
+	hierarchyTracker                                    fwk.HierarchyTracker
 }
 
 func (sched *Scheduler) applyDefaultHandlers() {
@@ -386,6 +387,7 @@ func New(ctx context.Context,
 		nominatedNodeNameForExpectationEnabled: feature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation),
 		genericWorkloadEnabled:                 feature.DefaultFeatureGate.Enabled(features.GenericWorkload),
 		inPlacePodVerticalScalingSchedulerPreemptionEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption),
+		hierarchyTracker: comps.hierarchyTracker,
 	}
 	sched.NextEntity = podQueue.Pop
 	sched.applyDefaultHandlers()
