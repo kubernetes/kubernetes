@@ -353,7 +353,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		}
 
 		// Start lease candidate controller for coordinated leader election
-		leaseCandidate, waitForSync, err := leaderelection.NewCandidate(
+		leaseCandidate, err := leaderelection.NewCandidate(
 			c.Client,
 			"kube-system",
 			id,
@@ -365,7 +365,6 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		if err != nil {
 			return err
 		}
-		healthzHandler.AddHealthChecker(healthz.NewInformerSyncHealthz(waitForSync))
 
 		go leaseCandidate.Run(ctx)
 	}

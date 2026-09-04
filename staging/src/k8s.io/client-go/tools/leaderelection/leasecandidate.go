@@ -18,7 +18,6 @@ package leaderelection
 
 import (
 	"context"
-	"reflect"
 	"sync"
 	"time"
 
@@ -40,10 +39,6 @@ import (
 )
 
 const requeueInterval = 5 * time.Minute
-
-type CacheSyncWaiter interface {
-	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
-}
 
 type LeaseCandidate struct {
 	leaseClient            coordinationv1beta1client.LeaseCandidateInterface
@@ -78,7 +73,7 @@ func NewCandidate(clientset kubernetes.Interface,
 	targetLease string,
 	binaryVersion, emulationVersion string,
 	strategy v1.CoordinatedLeaseStrategy,
-) (*LeaseCandidate, CacheSyncWaiter, error) {
+) (*LeaseCandidate, error) {
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", candidateName).String()
 	// A separate informer factory is required because this must start before informerFactories
 	// are started for leader elected components
@@ -117,11 +112,11 @@ func NewCandidate(clientset kubernetes.Interface,
 		},
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	lc.hasSynced = h.HasSynced
 
-	return lc, informerFactory, nil
+	return lc, nil
 }
 
 func (c *LeaseCandidate) Run(ctx context.Context) {
