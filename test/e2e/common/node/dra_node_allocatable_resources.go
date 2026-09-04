@@ -889,7 +889,7 @@ func doNodeAllocatableResizeTests(f *framework.Framework) {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("waiting for resize actuation to complete")
-			resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, pod, desiredContainers)
+			resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, pod)
 
 			ginkgo.By("verifying updated pod cgroup limits after resize")
 			err = cgroups.VerifyPodCgroups(ctx, f, resizedPod, &tc.expectedPodCgroupAfterResize)
