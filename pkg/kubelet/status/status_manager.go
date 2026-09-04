@@ -1271,7 +1271,8 @@ func (m *manager) syncPod(ctx context.Context, uid types.UID, status versionedPo
 		return
 	}
 
-	mergedStatus := mergePodStatus(pod, pod.Status, status.status, m.podDeletionSafety.PodCouldHaveRunningContainers(pod))
+	statusToPatch := *status.status.DeepCopy()
+	mergedStatus := mergePodStatus(pod, pod.Status, statusToPatch, m.podDeletionSafety.PodCouldHaveRunningContainers(pod))
 
 	newPod, patchBytes, unchanged, err := statusutil.PatchPodStatus(ctx, m.kubeClient, pod.Namespace, pod.Name, pod.UID, pod.Status, mergedStatus)
 	logger.V(3).Info("Patch status for pod", "pod", klog.KObj(pod), "podUID", uid, "patch", string(patchBytes))
