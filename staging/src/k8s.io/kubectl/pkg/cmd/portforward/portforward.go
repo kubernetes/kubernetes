@@ -19,6 +19,7 @@ package portforward
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -45,6 +46,7 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 	streamhttp "k8s.io/streaming/pkg/httpstream"
+	exec "k8s.io/utils/exec"
 )
 
 // PortForwardOptions contains all the options for running the port-forward cli command.
@@ -56,9 +58,13 @@ type PortForwardOptions struct {
 	PodClient     corev1client.PodsGetter
 	Address       []string
 	Ports         []string
+	Command       []string
+	Quiet         bool
 	PortForwarder portForwarder
 	StopChannel   chan struct{}
 	ReadyChannel  chan struct{}
+	Exec          exec.Interface
+	genericiooptions.IOStreams
 }
 
 var (
@@ -91,7 +97,10 @@ var (
 		kubectl port-forward --address localhost,10.19.21.23 pod/mypod 8888:5000
 
 		# Listen on a random port locally, forwarding to 5000 in the pod
-		kubectl port-forward pod/mypod :5000`))
+		kubectl port-forward pod/mypod :5000
+		
+		# Listen on port 8888 locally, forwarding to 5000 in the pod, and run a command
+		kubectl port-forward pod/mypod 8888:5000 -- psql -d postgresql://postgres:postgres@localhost:8888/database`))
 )
 
 const (
@@ -109,13 +118,15 @@ func NewCmdPortForward(f cmdutil.Factory, streams genericiooptions.IOStreams) *c
 		Example:               portforwardExample,
 		ValidArgsFunction:     completion.ResourceAndPortCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(opts.Complete(f, cmd, args))
+			argsLenAtDash := cmd.ArgsLenAtDash()
+			cmdutil.CheckErr(opts.Complete(f, cmd, args, argsLenAtDash))
 			cmdutil.CheckErr(opts.Validate())
 			cmdutil.CheckErr(opts.RunPortForward())
 		},
 	}
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodPortForwardWaitTimeout)
 	cmd.Flags().StringSliceVar(&opts.Address, "address", []string{"localhost"}, "Addresses to listen on (comma separated). Only accepts IP addresses or localhost as a value. When localhost is supplied, kubectl will try to bind on both 127.0.0.1 and ::1 and will fail if neither of these addresses are available to bind.")
+	cmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Only print output from the executed command")
 	// TODO support UID
 	return cmd
 }
@@ -125,6 +136,8 @@ func NewDefaultPortForwardOptions(streams genericiooptions.IOStreams) *PortForwa
 		PortForwarder: &defaultPortForwarder{
 			IOStreams: streams,
 		},
+		IOStreams: streams,
+		Exec:      exec.New(),
 	}
 }
 
@@ -160,7 +173,11 @@ func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts Po
 	if err != nil {
 		return err
 	}
-	fw, err := portforward.NewOnAddressesForStreaming(dialer, opts.Address, opts.Ports, opts.StopChannel, opts.ReadyChannel, f.Out, f.ErrOut)
+	var out io.Writer = f.Out
+	if opts.Quiet {
+		out = io.Discard
+	}
+	fw, err := portforward.NewOnAddressesForStreaming(dialer, opts.Address, opts.Ports, opts.StopChannel, opts.ReadyChannel, out, f.ErrOut)
 	if err != nil {
 		return err
 	}
@@ -315,10 +332,20 @@ func checkUDPPortInPod(ports []string, pod *corev1.Pod) error {
 }
 
 // Complete completes all the required options for port-forward cmd.
-func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string, argsLenAtDash int) error {
 	var err error
+
+	if argsLenAtDash != -1 {
+		o.Command = args[argsLenAtDash:]
+		args = args[:argsLenAtDash]
+	}
+
 	if len(args) < 2 {
 		return cmdutil.UsageErrorf(cmd, "TYPE/NAME and list of ports are required for port-forward")
+	}
+
+	if argsLenAtDash != -1 && len(o.Command) == 0 {
+		return cmdutil.UsageErrorf(cmd, "you must specify at least one command for executing")
 	}
 
 	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
@@ -451,5 +478,31 @@ func (o PortForwardOptions) RunPortForwardContext(ctx context.Context) error {
 		Name(pod.Name).
 		SubResource("portforward")
 
-	return o.PortForwarder.ForwardPorts("POST", req.URL(), o)
+	var cmdErrChan chan error
+	if len(o.Command) > 0 {
+		cmdErrChan = make(chan error, 1)
+		go func() {
+			select {
+			case <-o.ReadyChannel:
+				c := o.Exec.CommandContext(returnCtx, o.Command[0], o.Command[1:]...)
+				c.SetStdout(o.Out)
+				c.SetStderr(o.ErrOut)
+				c.SetStdin(o.In)
+				cmdErrChan <- c.Run()
+				returnCtxCancel()
+			case <-returnCtx.Done():
+				close(cmdErrChan)
+			}
+		}()
+	}
+
+	err = o.PortForwarder.ForwardPorts("POST", req.URL(), o)
+
+	if cmdErrChan != nil {
+		if cmdErr, ok := <-cmdErrChan; ok {
+			return cmdErr
+		}
+	}
+
+	return err
 }
