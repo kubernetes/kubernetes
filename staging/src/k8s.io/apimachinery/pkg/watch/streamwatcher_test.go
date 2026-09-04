@@ -109,6 +109,42 @@ func TestStreamWatcherError(t *testing.T) {
 	}
 }
 
+// timeoutError implements net.Error with Timeout() == true.
+type timeoutError struct{}
+
+func (timeoutError) Error() string   { return "i/o timeout" }
+func (timeoutError) Timeout() bool   { return true }
+func (timeoutError) Temporary() bool { return false }
+
+func TestStreamWatcherClosesQuietly(t *testing.T) {
+	table := []struct {
+		name string
+		err  error
+	}{
+		{"unexpected EOF", io.ErrUnexpectedEOF},
+		{"probable EOF", fmt.Errorf("read: connection reset by peer")},
+		{"timeout", timeoutError{}},
+	}
+
+	for _, item := range table {
+		t.Run(item.name, func(t *testing.T) {
+			fd := fakeDecoder{err: item.err}
+			fr := &fakeReporter{}
+			//nolint:logcheck // Intentionally uses the old API.
+			sw := NewStreamWatcher(fd, fr)
+			// The result channel closes without an Error event being sent.
+			evt, ok := <-sw.ResultChan()
+			if ok {
+				t.Fatalf("unexpected event: %#v", evt)
+			}
+			if fr.err != nil {
+				t.Fatalf("unexpected error reported: %v", fr.err)
+			}
+			sw.Stop()
+		})
+	}
+}
+
 func TestStreamWatcherRace(t *testing.T) {
 	fd := fakeDecoder{err: fmt.Errorf("test error")}
 	fr := &fakeReporter{}
