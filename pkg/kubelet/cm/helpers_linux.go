@@ -125,9 +125,25 @@ func MilliCPUToQuota(milliCPU int64, period int64) (quota int64) {
 	if milliCPU == 0 {
 		return
 	}
+	if milliCPU < 0 {
+		// A negative floors here rather than wrap positive in the multiply.
+		return MinQuotaPeriod
+	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUCFSQuotaPeriod) {
 		period = QuotaPeriod
+	}
+	if period <= 0 {
+		// A non-positive period floors here so the boundary check cannot divide
+		// by zero and the multiply cannot wrap a positive milliCPU.
+		return MinQuotaPeriod
+	}
+
+	// milliCPU*period overflows int64 for a very large limit, which is effectively
+	// unlimited. Return -1, the CFS "no quota" sentinel the backends and
+	// QuotaToMilliCPU understand; MaxInt64 is not one and the kernel rejects it.
+	if milliCPU > math.MaxInt64/period {
+		return -1
 	}
 
 	// we then convert your milliCPU to a value normalized over a period
@@ -142,11 +158,16 @@ func MilliCPUToQuota(milliCPU int64, period int64) (quota int64) {
 
 // MilliCPUToShares converts the milliCPU to CFS shares.
 func MilliCPUToShares(milliCPU int64) uint64 {
-	if milliCPU == 0 {
+	if milliCPU <= 0 {
 		// Docker converts zero milliCPU to unset, which maps to kernel default
-		// for unset: 1024. Return 2 here to really match kernel default for
-		// zero milliCPU.
+		// for unset: 1024. Return 2 here to really match kernel default for zero.
+		// A negative floors here too rather than wrap positive in the multiply.
 		return MinShares
+	}
+	// milliCPU*SharesPerCPU can overflow int64 and wrap into MinShares; an
+	// oversized limit belongs at the ceiling, so clamp to MaxShares.
+	if milliCPU > math.MaxInt64/SharesPerCPU {
+		return MaxShares
 	}
 	// Conceptually (milliCPU / milliCPUToCPU) * sharesPerCPU, but factored to improve rounding.
 	shares := (milliCPU * SharesPerCPU) / MilliCPUToCPU
