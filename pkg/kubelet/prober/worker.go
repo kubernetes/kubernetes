@@ -253,6 +253,8 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		}
 
 		w.containerID = kubecontainer.ParseContainerID(logger, c.ContainerID)
+		w.lastResult = results.Unknown
+		w.resultRun = 0
 
 		if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) {
 			// On kubelet restart, we don't want to immediately set the probe result to Failure,
@@ -346,7 +348,13 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	}
 
 	// Note, exec probe does NOT have access to pod environment variables or downward API
-	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
+	probeCtx := &probeContext{
+		ResultRun:        w.resultRun,
+		LastResult:       w.lastResult,
+		FailureThreshold: w.spec.FailureThreshold,
+		SuccessThreshold: w.spec.SuccessThreshold,
+	}
+	result, err := w.probeManager.prober.probeWithContext(ctx, w.probeType, w.pod, status, w.container, w.containerID, probeCtx)
 	if err != nil {
 		// Prober error, throw away the result.
 		return true
