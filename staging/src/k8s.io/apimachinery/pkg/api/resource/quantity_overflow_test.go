@@ -435,12 +435,11 @@ type parseErrorCase struct {
 func quantityParseErrorCases() []parseErrorCase {
 	return []parseErrorCase{
 		{
-			// exponent reduced mod 2^32 (4294967297 -> 1), so this parses to 1e1.
-			name:              "exponent-over-int32",
-			input:             "1e4294967297",
-			wantParseError:    false,
-			wantValueIfParsed: 10,
-			parseTODO:         "ParseQuantity should reject this; the int32 exponent overflow silently yields 1e1 (#141166)",
+			// #141203 rejects an exponent past the int32 scale instead of
+			// reducing it mod 2^32 (4294967297 -> 1, which parsed as 1e1).
+			name:           "exponent-over-int32",
+			input:          "1e4294967297",
+			wantParseError: true,
 		},
 	}
 }
