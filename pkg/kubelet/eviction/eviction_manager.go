@@ -431,7 +431,18 @@ func (m *managerImpl) synchronize(ctx context.Context, diskInfoProvider DiskInfo
 		gracePeriodOverride := int64(immediateEvictionGracePeriodSeconds)
 		if !isHardEvictionThreshold(thresholdToReclaim) {
 			gracePeriodOverride = m.config.MaxPodGracePeriodSeconds
-			if pod.Spec.TerminationGracePeriodSeconds != nil {
+			if m.config.MaxPodGracePeriodSeconds < 0 {
+				// A negative MaxPodGracePeriodSeconds means "defer to pod
+				// specified value" (see --eviction-max-pod-grace-period). Use the
+				// pod's terminationGracePeriodSeconds so we don't send a negative
+				// grace period to the runtime, which would kill the pod
+				// immediately.
+				if pod.Spec.TerminationGracePeriodSeconds != nil {
+					gracePeriodOverride = *pod.Spec.TerminationGracePeriodSeconds
+				} else {
+					gracePeriodOverride = v1.DefaultTerminationGracePeriodSeconds
+				}
+			} else if pod.Spec.TerminationGracePeriodSeconds != nil {
 				gracePeriodOverride = min(m.config.MaxPodGracePeriodSeconds, *pod.Spec.TerminationGracePeriodSeconds)
 			}
 		}
