@@ -252,6 +252,11 @@ In [DeferCleanup (Each)] at: cleanup_test.go:103 <time>
 `,
 					},
 					SystemErr: ginkgoOutput,
+					Properties: &reporters.JUnitProperties{
+						Properties: []reporters.JUnitProperty{
+							{Name: "client-http-requests", Value: "1"},
+						},
+					},
 				},
 			},
 		},
