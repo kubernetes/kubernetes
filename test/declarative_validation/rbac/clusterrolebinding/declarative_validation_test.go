@@ -57,7 +57,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"missing subjects[0].name": {
 			input: mkValidClusterRoleBinding(tweakSubjectName(0, "")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("subjects").Index(0).Child("name"), "").MarkBeta(),
+				field.Required(field.NewPath("subjects").Index(0).Child("name"), ""),
 			},
 		},
 		// TODO: Add more test cases
@@ -122,7 +122,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			old:    mkValidClusterRoleBinding(),
 			update: mkValidClusterRoleBinding(tweakSubjectName(0, "")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("subjects").Index(0).Child("name"), "").MarkBeta(),
+				field.Required(field.NewPath("subjects").Index(0).Child("name"), ""),
 			},
 		},
 		// TODO: Add more test cases

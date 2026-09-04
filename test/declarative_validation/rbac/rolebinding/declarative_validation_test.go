@@ -99,7 +99,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"missing subject.name": {
 			input: mkValidRoleBinding(tweakSubjectName(0, "")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("subjects").Index(0).Child("name"), "name is required").MarkBeta(),
+				field.Required(field.NewPath("subjects").Index(0).Child("name"), "name is required"),
 			},
 		},
 		// TODO: Add more test cases

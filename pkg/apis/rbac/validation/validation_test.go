@@ -112,15 +112,6 @@ func TestValidateClusterRoleBinding(t *testing.T) {
 			T: field.ErrorTypeRequired,
 			F: "subjects[0].namespace",
 		},
-		"missing subject name": {
-			A: rbac.ClusterRoleBinding{
-				ObjectMeta: metav1.ObjectMeta{Name: "master"},
-				RoleRef:    rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "ClusterRole", Name: "valid"},
-				Subjects:   []rbac.Subject{{Namespace: "foo", Kind: rbac.ServiceAccountKind}},
-			},
-			T: field.ErrorTypeRequired,
-			F: "subjects[0].name",
-		},
 	}
 	for k, v := range errorCases {
 		errs := ValidateClusterRoleBinding(&v.A)
@@ -216,15 +207,6 @@ func TestValidateRoleBinding(t *testing.T) {
 				Subjects:   []rbac.Subject{{Name: "subject:bad", Kind: rbac.ServiceAccountKind}},
 			},
 			T: field.ErrorTypeInvalid,
-			F: "subjects[0].name",
-		},
-		"missing subject name": {
-			A: rbac.RoleBinding{
-				ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "master"},
-				RoleRef:    rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "Role", Name: "valid"},
-				Subjects:   []rbac.Subject{{Kind: rbac.ServiceAccountKind}},
-			},
-			T: field.ErrorTypeRequired,
 			F: "subjects[0].name",
 		},
 	}
@@ -427,23 +409,6 @@ func TestValidateRoleNamespacedNonResourceURL(t *testing.T) {
 		wantErr: true,
 		errType: field.ErrorTypeInvalid,
 		field:   "rules[0].nonResourceURLs",
-	}.test(t)
-}
-
-func TestValidateRoleNonResourceURLNoVerbs(t *testing.T) {
-	ValidateClusterRoleTest{
-		role: rbac.ClusterRole{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "default",
-			},
-			Rules: []rbac.PolicyRule{{
-				Verbs:           []string{},
-				NonResourceURLs: []string{"/*"},
-			}},
-		},
-		wantErr: true,
-		errType: field.ErrorTypeRequired,
-		field:   "rules[0].verbs",
 	}.test(t)
 }
 
