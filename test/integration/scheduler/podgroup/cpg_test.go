@@ -22,6 +22,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -199,6 +200,94 @@ func TestCPGScheduling(t *testing.T) {
 						makeTestPods("pg7", "1", "1", "1"),
 					)),
 				},
+				{
+					Name: "Verify root CPG condition is Scheduled",
+					WaitForCompositePodGroupCondition: &stepsframework.CompositePodGroupConditionCheck{
+						CompositePodGroupName: "cpg-root",
+						ConditionStatus:       metav1.ConditionTrue,
+						Reason:                schedulingv1alpha3.CompositePodGroupReasonScheduled,
+					},
+				},
+				{
+					Name: "Verify sub1 CPG condition is Scheduled",
+					WaitForCompositePodGroupCondition: &stepsframework.CompositePodGroupConditionCheck{
+						CompositePodGroupName: "cpg-sub1",
+						ConditionStatus:       metav1.ConditionTrue,
+						Reason:                schedulingv1alpha3.CompositePodGroupReasonScheduled,
+					},
+				},
+				{
+					Name: "Verify sub2 CPG condition is Scheduled",
+					WaitForCompositePodGroupCondition: &stepsframework.CompositePodGroupConditionCheck{
+						CompositePodGroupName: "cpg-sub2",
+						ConditionStatus:       metav1.ConditionTrue,
+						Reason:                schedulingv1alpha3.CompositePodGroupReasonScheduled,
+					},
+				},
+				{
+					Name: "Verify sub3 CPG condition is Unschedulable",
+					WaitForCompositePodGroupCondition: &stepsframework.CompositePodGroupConditionCheck{
+						CompositePodGroupName: "cpg-sub3",
+						ConditionStatus:       metav1.ConditionFalse,
+						Reason:                schedulingv1alpha3.CompositePodGroupReasonUnschedulable,
+					},
+				},
+				{
+					Name: "Verify pg1 condition is Scheduled",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg1",
+						ConditionStatus: metav1.ConditionTrue,
+						Reason:          schedulingapi.PodGroupReasonScheduled,
+					},
+				},
+				{
+					Name: "Verify pg2 condition is Scheduled",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg2",
+						ConditionStatus: metav1.ConditionTrue,
+						Reason:          schedulingapi.PodGroupReasonScheduled,
+					},
+				},
+				{
+					Name: "Verify pg3 condition is Unschedulable",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg3",
+						ConditionStatus: metav1.ConditionFalse,
+						Reason:          schedulingapi.PodGroupReasonUnschedulable,
+					},
+				},
+				{
+					Name: "Verify pg4 condition is Scheduled",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg4",
+						ConditionStatus: metav1.ConditionTrue,
+						Reason:          schedulingapi.PodGroupReasonScheduled,
+					},
+				},
+				{
+					Name: "Verify pg5 condition is Scheduled",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg5",
+						ConditionStatus: metav1.ConditionTrue,
+						Reason:          schedulingapi.PodGroupReasonScheduled,
+					},
+				},
+				{
+					Name: "Verify pg6 condition is Unschedulable",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg6",
+						ConditionStatus: metav1.ConditionFalse,
+						Reason:          schedulingapi.PodGroupReasonUnschedulable,
+					},
+				},
+				{
+					Name: "Verify pg7 condition is Unschedulable",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg7",
+						ConditionStatus: metav1.ConditionFalse,
+						Reason:          schedulingapi.PodGroupReasonUnschedulable,
+					},
+				},
 			},
 		},
 		{
@@ -268,6 +357,38 @@ func TestCPGScheduling(t *testing.T) {
 						makeTestPods("pg3", "1", "1", "1"),
 					)),
 				},
+				{
+					Name: "Verify root CPG condition is Scheduled",
+					WaitForCompositePodGroupCondition: &stepsframework.CompositePodGroupConditionCheck{
+						CompositePodGroupName: "cpg-root",
+						ConditionStatus:       metav1.ConditionTrue,
+						Reason:                schedulingv1alpha3.CompositePodGroupReasonScheduled,
+					},
+				},
+				{
+					Name: "Verify pg1 condition is Scheduled",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg1",
+						ConditionStatus: metav1.ConditionTrue,
+						Reason:          schedulingapi.PodGroupReasonScheduled,
+					},
+				},
+				{
+					Name: "Verify pg2 condition is Scheduled",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg2",
+						ConditionStatus: metav1.ConditionTrue,
+						Reason:          schedulingapi.PodGroupReasonScheduled,
+					},
+				},
+				{
+					Name: "Verify pg3 condition is Unschedulable",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg3",
+						ConditionStatus: metav1.ConditionFalse,
+						Reason:          schedulingapi.PodGroupReasonUnschedulable,
+					},
+				},
 			},
 		},
 		{
@@ -331,6 +452,30 @@ func TestCPGScheduling(t *testing.T) {
 						makeTestPods("pg2", "1", "1", "1"),
 					)),
 				},
+				{
+					Name: "Verify root CPG condition is Scheduled",
+					WaitForCompositePodGroupCondition: &stepsframework.CompositePodGroupConditionCheck{
+						CompositePodGroupName: "cpg-root",
+						ConditionStatus:       metav1.ConditionTrue,
+						Reason:                schedulingv1alpha3.CompositePodGroupReasonScheduled,
+					},
+				},
+				{
+					Name: "Verify pg1 condition is Scheduled",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg1",
+						ConditionStatus: metav1.ConditionTrue,
+						Reason:          schedulingapi.PodGroupReasonScheduled,
+					},
+				},
+				{
+					Name: "Verify pg2 condition is Unschedulable",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg2",
+						ConditionStatus: metav1.ConditionFalse,
+						Reason:          schedulingapi.PodGroupReasonUnschedulable,
+					},
+				},
 			},
 		},
 		{
@@ -387,6 +532,30 @@ func TestCPGScheduling(t *testing.T) {
 						makeTestPods("pg1", "1", "1"),
 						makeTestPods("pg2", "1", "1"),
 					)),
+				},
+				{
+					Name: "Verify root CPG condition is Scheduled",
+					WaitForCompositePodGroupCondition: &stepsframework.CompositePodGroupConditionCheck{
+						CompositePodGroupName: "cpg-root",
+						ConditionStatus:       metav1.ConditionTrue,
+						Reason:                schedulingv1alpha3.CompositePodGroupReasonScheduled,
+					},
+				},
+				{
+					Name: "Verify pg1 condition is Scheduled",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg1",
+						ConditionStatus: metav1.ConditionTrue,
+						Reason:          schedulingapi.PodGroupReasonScheduled,
+					},
+				},
+				{
+					Name: "Verify pg2 condition is Scheduled",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg2",
+						ConditionStatus: metav1.ConditionTrue,
+						Reason:          schedulingapi.PodGroupReasonScheduled,
+					},
 				},
 			},
 		},
@@ -457,6 +626,38 @@ func TestCPGScheduling(t *testing.T) {
 						makeTestPods("pg3", "1", "1", "1"),
 					)),
 				},
+				{
+					Name: "Verify root CPG condition is Scheduled",
+					WaitForCompositePodGroupCondition: &stepsframework.CompositePodGroupConditionCheck{
+						CompositePodGroupName: "cpg-root",
+						ConditionStatus:       metav1.ConditionTrue,
+						Reason:                schedulingv1alpha3.CompositePodGroupReasonScheduled,
+					},
+				},
+				{
+					Name: "Verify pg1 condition is Scheduled",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg1",
+						ConditionStatus: metav1.ConditionTrue,
+						Reason:          schedulingapi.PodGroupReasonScheduled,
+					},
+				},
+				{
+					Name: "Verify pg2 condition is Scheduled",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg2",
+						ConditionStatus: metav1.ConditionTrue,
+						Reason:          schedulingapi.PodGroupReasonScheduled,
+					},
+				},
+				{
+					Name: "Verify pg3 condition is Unschedulable",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg3",
+						ConditionStatus: metav1.ConditionFalse,
+						Reason:          schedulingapi.PodGroupReasonUnschedulable,
+					},
+				},
 			},
 		},
 		{
@@ -513,6 +714,30 @@ func TestCPGScheduling(t *testing.T) {
 						makeTestPods("pg1", "1", "1"),
 						makeTestPods("pg2", "1", "1"),
 					)),
+				},
+				{
+					Name: "Verify root CPG condition is Unschedulable",
+					WaitForCompositePodGroupCondition: &stepsframework.CompositePodGroupConditionCheck{
+						CompositePodGroupName: "cpg-root",
+						ConditionStatus:       metav1.ConditionFalse,
+						Reason:                schedulingv1alpha3.CompositePodGroupReasonUnschedulable,
+					},
+				},
+				{
+					Name: "Verify pg1 condition is Unschedulable",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg1",
+						ConditionStatus: metav1.ConditionFalse,
+						Reason:          schedulingapi.PodGroupReasonUnschedulable,
+					},
+				},
+				{
+					Name: "Verify pg2 condition is Unschedulable",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg2",
+						ConditionStatus: metav1.ConditionFalse,
+						Reason:          schedulingapi.PodGroupReasonUnschedulable,
+					},
 				},
 			},
 		},
@@ -593,6 +818,22 @@ func TestCPGScheduling(t *testing.T) {
 					WaitForPodsScheduled: podNames(makeTestPods("pg1", "1", "1")),
 				},
 				{
+					Name: "Verify root CPG condition is Scheduled",
+					WaitForCompositePodGroupCondition: &stepsframework.CompositePodGroupConditionCheck{
+						CompositePodGroupName: "cpg-root",
+						ConditionStatus:       metav1.ConditionTrue,
+						Reason:                schedulingv1alpha3.CompositePodGroupReasonScheduled,
+					},
+				},
+				{
+					Name: "Verify pg1 condition is Scheduled",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg1",
+						ConditionStatus: metav1.ConditionTrue,
+						Reason:          schedulingapi.PodGroupReasonScheduled,
+					},
+				},
+				{
 					Name:           "Create pg2",
 					CreatePodGroup: st.MakePodGroup().Name("pg2").WorkloadRef("workload-cpg-dynamic", "basic-t").ParentCompositePodGroup("cpg-root").Priority(100).BasicPolicy().Obj(),
 				},
@@ -603,6 +844,14 @@ func TestCPGScheduling(t *testing.T) {
 				{
 					Name:                 "Wait for pg2 pods to be scheduled",
 					WaitForPodsScheduled: podNames(makeTestPods("pg2", "1", "1")),
+				},
+				{
+					Name: "Verify pg2 condition is Scheduled",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg2",
+						ConditionStatus: metav1.ConditionTrue,
+						Reason:          schedulingapi.PodGroupReasonScheduled,
+					},
 				},
 				{
 					Name:                    "Create cpg-sub",
@@ -621,6 +870,22 @@ func TestCPGScheduling(t *testing.T) {
 					WaitForPodsUnschedulable: podNames(makeTestPods("sub-pg1", "1", "1")),
 				},
 				{
+					Name: "Verify sub-cpg condition is Unschedulable",
+					WaitForCompositePodGroupCondition: &stepsframework.CompositePodGroupConditionCheck{
+						CompositePodGroupName: "cpg-sub",
+						ConditionStatus:       metav1.ConditionFalse,
+						Reason:                schedulingv1alpha3.CompositePodGroupReasonUnschedulable,
+					},
+				},
+				{
+					Name: "Verify sub-pg1 condition is Unschedulable",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "sub-pg1",
+						ConditionStatus: metav1.ConditionFalse,
+						Reason:          schedulingapi.PodGroupReasonUnschedulable,
+					},
+				},
+				{
 					Name:           "Create sub-pg2",
 					CreatePodGroup: st.MakePodGroup().Name("sub-pg2").WorkloadRef("workload-cpg-dynamic", "sub-pg-t").ParentCompositePodGroup("cpg-sub").Priority(100).BasicPolicy().Obj(),
 				},
@@ -634,6 +899,162 @@ func TestCPGScheduling(t *testing.T) {
 						makeTestPods("sub-pg1", "1", "1"),
 						makeTestPods("sub-pg2", "1", "1"),
 					)),
+				},
+				{
+					Name: "Verify sub-cpg condition is Scheduled",
+					WaitForCompositePodGroupCondition: &stepsframework.CompositePodGroupConditionCheck{
+						CompositePodGroupName: "cpg-sub",
+						ConditionStatus:       metav1.ConditionTrue,
+						Reason:                schedulingv1alpha3.CompositePodGroupReasonScheduled,
+					},
+				},
+				{
+					Name: "Verify sub-pg1 condition is Scheduled",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "sub-pg1",
+						ConditionStatus: metav1.ConditionTrue,
+						Reason:          schedulingapi.PodGroupReasonScheduled,
+					},
+				},
+				{
+					Name: "Verify sub-pg2 condition is Scheduled",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "sub-pg2",
+						ConditionStatus: metav1.ConditionTrue,
+						Reason:          schedulingapi.PodGroupReasonScheduled,
+					},
+				},
+			},
+		},
+		{
+			name: "TestCPGStatusConditions_ResourceBlockedThenScheduled",
+			// TestCPGStatusConditions_ResourceBlockedThenScheduled verifies that a CompositePodGroup
+			// hierarchy and its child PodGroups have condition Unschedulable when resources are blocked,
+			// and then transition to Scheduled once resources become available.
+			//
+			// Tree structure:
+			//
+			//	   cpg-root (Gang, MinGroup: 2)
+			//	  /                            \
+			//	pg1 (Gang, Min: 2)          pg2 (Gang, Min: 2)
+			//
+			// Phase 1 (Resource blocked):
+			//	cpg-root: Unschedulable
+			//	pg1:      Unschedulable
+			//	pg2:      Unschedulable
+			//
+			// Phase 2 (Resource freed):
+			//	cpg-root: Scheduled
+			//	pg1:      Scheduled
+			//	pg2:      Scheduled
+			steps: []stepsframework.Step{
+				{
+					Name:        "Create Node",
+					CreateNodes: []*v1.Node{st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()},
+				},
+				{
+					Name:       "Create resource-blocking pod",
+					CreatePods: []*v1.Pod{st.MakePod().Name("blocker").Req(map[v1.ResourceName]string{v1.ResourceCPU: "3"}).Container("image").ZeroTerminationGracePeriod().Priority(100).Obj()},
+				},
+				{
+					Name:                 "Wait for resource-blocking pod to be scheduled",
+					WaitForPodsScheduled: []string{"blocker"},
+				},
+				{
+					Name: "Create Workload",
+					CreateWorkloads: []*schedulingapi.Workload{
+						st.MakeWorkload().Name("workload-cpg-status").
+							Children(
+								st.MakeCompositePodGroupTemplate().Name("root-t").MinGroupCount(2).Priority(100).Children(
+									st.MakePodGroupTemplate().Name("gang-t").MinCount(2).Priority(100),
+								),
+							).Obj(),
+					},
+				},
+				{
+					Name:                    "Create root CPG",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("workload-cpg-status", "root-t").MinGroupCount(2).Priority(100).Obj(),
+				},
+				{
+					Name:           "Create pg1",
+					CreatePodGroup: st.MakePodGroup().Name("pg1").WorkloadRef("workload-cpg-status", "gang-t").ParentCompositePodGroup("cpg-root").Priority(100).MinCount(2).Obj(),
+				},
+				{
+					Name:           "Create pg2",
+					CreatePodGroup: st.MakePodGroup().Name("pg2").WorkloadRef("workload-cpg-status", "gang-t").ParentCompositePodGroup("cpg-root").Priority(100).MinCount(2).Obj(),
+				},
+				{
+					Name: "Create Pods",
+					CreatePods: concatPods(
+						makeTestPods("pg1", "1", "1"),
+						makeTestPods("pg2", "1", "1"),
+					),
+				},
+				{
+					Name: "Verify pods are unschedulable due to resource blocker",
+					WaitForPodsUnschedulable: podNames(concatPods(
+						makeTestPods("pg1", "1", "1"),
+						makeTestPods("pg2", "1", "1"),
+					)),
+				},
+				{
+					Name: "Verify root CPG condition is Unschedulable",
+					WaitForCompositePodGroupCondition: &stepsframework.CompositePodGroupConditionCheck{
+						CompositePodGroupName: "cpg-root",
+						ConditionStatus:       metav1.ConditionFalse,
+						Reason:                schedulingv1alpha3.CompositePodGroupReasonUnschedulable,
+					},
+				},
+				{
+					Name: "Verify child pg1 condition is Unschedulable",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg1",
+						ConditionStatus: metav1.ConditionFalse,
+						Reason:          schedulingapi.PodGroupReasonUnschedulable,
+					},
+				},
+				{
+					Name: "Verify child pg2 condition is Unschedulable",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg2",
+						ConditionStatus: metav1.ConditionFalse,
+						Reason:          schedulingapi.PodGroupReasonUnschedulable,
+					},
+				},
+				{
+					Name:       "Delete resource-blocking pod",
+					DeletePods: []string{"blocker"},
+				},
+				{
+					Name: "Wait for all pods to be scheduled",
+					WaitForPodsScheduled: podNames(concatPods(
+						makeTestPods("pg1", "1", "1"),
+						makeTestPods("pg2", "1", "1"),
+					)),
+				},
+				{
+					Name: "Verify root CPG condition transitions to Scheduled",
+					WaitForCompositePodGroupCondition: &stepsframework.CompositePodGroupConditionCheck{
+						CompositePodGroupName: "cpg-root",
+						ConditionStatus:       metav1.ConditionTrue,
+						Reason:                schedulingv1alpha3.CompositePodGroupReasonScheduled,
+					},
+				},
+				{
+					Name: "Verify child pg1 condition transitions to Scheduled",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg1",
+						ConditionStatus: metav1.ConditionTrue,
+						Reason:          schedulingapi.PodGroupReasonScheduled,
+					},
+				},
+				{
+					Name: "Verify child pg2 condition transitions to Scheduled",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg2",
+						ConditionStatus: metav1.ConditionTrue,
+						Reason:          schedulingapi.PodGroupReasonScheduled,
+					},
 				},
 			},
 		},

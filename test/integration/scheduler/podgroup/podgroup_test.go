@@ -142,7 +142,7 @@ func TestPodGroupScheduling(t *testing.T) {
 					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
 						PodGroupName:    "pg1",
 						ConditionStatus: metav1.ConditionTrue,
-						Reason:          "Scheduled",
+						Reason:          schedulingapi.PodGroupReasonScheduled,
 					},
 				},
 			},
@@ -245,7 +245,7 @@ func TestPodGroupScheduling(t *testing.T) {
 					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
 						PodGroupName:    "pg1",
 						ConditionStatus: metav1.ConditionTrue,
-						Reason:          "Scheduled",
+						Reason:          schedulingapi.PodGroupReasonScheduled,
 					},
 				},
 			},
@@ -482,7 +482,7 @@ func TestPodGroupScheduling(t *testing.T) {
 					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
 						PodGroupName:    "pg1",
 						ConditionStatus: metav1.ConditionTrue,
-						Reason:          "Scheduled",
+						Reason:          schedulingapi.PodGroupReasonScheduled,
 					},
 				},
 				{
