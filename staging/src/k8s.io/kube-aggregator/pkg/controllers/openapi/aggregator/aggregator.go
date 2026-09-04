@@ -26,7 +26,10 @@ import (
 
 	restful "github.com/emicklei/go-restful/v3"
 
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/routes"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-openapi/pkg/aggregator"
@@ -85,12 +88,11 @@ type specAggregator struct {
 	downloader *Downloader
 }
 
-func buildAndRegisterSpecAggregatorForLocalServices(downloader *Downloader, aggregatorSpec *spec.Swagger, delegationHandlers []http.Handler, pathHandler common.PathHandler) *specAggregator {
+func buildAndRegisterSpecAggregatorForLocalServices(downloader *Downloader, cachedAggregatorSpec cached.Value[*spec.Swagger], delegationHandlers []http.Handler, pathHandler common.PathHandler) *specAggregator {
 	s := &specAggregator{
 		downloader:            downloader,
 		specsByAPIServiceName: map[string]*openAPISpecInfo{},
 	}
-	cachedAggregatorSpec := cached.Static(aggregatorSpec, "never-changes")
 	s.addLocalSpec(fmt.Sprintf(localDelegateChainNamePattern, 0), cachedAggregatorSpec)
 	for i, handler := range delegationHandlers {
 		name := fmt.Sprintf(localDelegateChainNamePattern, i+1)
@@ -108,11 +110,28 @@ func buildAndRegisterSpecAggregatorForLocalServices(downloader *Downloader, aggr
 func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.DelegationTarget, webServices []*restful.WebService,
 	config *common.Config, pathHandler common.PathHandler) (SpecAggregator, error) {
 
-	aggregatorOpenAPISpec, err := builder.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices(webServices), config)
-	if err != nil {
-		return nil, err
+	buildAggregatorSpec := func() (*spec.Swagger, error) {
+		aggregatorOpenAPISpec, err := builder.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices(webServices), config)
+		if err != nil {
+			return nil, err
+		}
+		aggregatorOpenAPISpec.Definitions = handler.PruneDefaults(aggregatorOpenAPISpec.Definitions)
+		return aggregatorOpenAPISpec, nil
 	}
-	aggregatorOpenAPISpec.Definitions = handler.PruneDefaults(aggregatorOpenAPISpec.Definitions)
+
+	var cachedAggregatorSpec cached.Value[*spec.Swagger]
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.OpenAPIV2LazyBuild) {
+		// Defer building the aggregator's own spec until the merged spec is
+		// first evaluated. A build error is logged and the source skipped by
+		// the merge (retried on the next evaluation).
+		cachedAggregatorSpec = routes.NewLazyOpenAPIV2SpecSource(buildAggregatorSpec)
+	} else {
+		aggregatorOpenAPISpec, err := buildAggregatorSpec()
+		if err != nil {
+			return nil, err
+		}
+		cachedAggregatorSpec = cached.Static(aggregatorOpenAPISpec, "never-changes")
+	}
 
 	var delegationHandlers []http.Handler
 
@@ -129,7 +148,7 @@ func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.
 		}
 		delegationHandlers = append(delegationHandlers, handler)
 	}
-	s := buildAndRegisterSpecAggregatorForLocalServices(downloader, aggregatorOpenAPISpec, delegationHandlers, pathHandler)
+	s := buildAndRegisterSpecAggregatorForLocalServices(downloader, cachedAggregatorSpec, delegationHandlers, pathHandler)
 	return s, nil
 }
 
