@@ -31,6 +31,16 @@ func TestFileStore(t *testing.T) {
 	testStore(t, store)
 }
 
+func TestFileStoreRealFS(t *testing.T) {
+	dir := t.TempDir()
+	store, err := NewFileStore(dir, &filesystem.DefaultFs{})
+	require.NoError(t, err)
+	require.NoError(t, store.Write("testkey", []byte("testdata")))
+	data, err := store.Read("testkey")
+	require.NoError(t, err)
+	assert.Equal(t, "testdata", string(data))
+}
+
 func testStore(t *testing.T, store Store) {
 	testCases := []struct {
 		key       string
