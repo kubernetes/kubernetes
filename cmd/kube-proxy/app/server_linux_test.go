@@ -495,19 +495,110 @@ detectLocalMode: "BridgeInterface"`)
 	testCases := []struct {
 		name        string
 		proxyServer proxyRun
-		append      bool
+		setup       func(t *testing.T, file *os.File, tempDir string)
+		trigger     func(t *testing.T, file *os.File, tempDir string, errCh chan error)
 		expectedErr string
 	}{
 		{
 			name:        "update config file",
 			proxyServer: new(fakeProxyServerLongRun),
-			append:      true,
+			trigger: func(t *testing.T, file *os.File, tempDir string, errCh chan error) {
+				if _, err := file.WriteString("append fake content"); err != nil {
+					t.Fatalf("failed to write config file: %v", err)
+				}
+			},
 			expectedErr: "content of the proxy server's configuration file was updated",
 		},
 		{
 			name:        "fake error",
 			proxyServer: new(fakeProxyServerError),
+			trigger:     nil,
 			expectedErr: "mocking error from ProxyServer.Run()",
+		},
+		{
+			name:        "kubelet ConfigMap atomic swap (..data)",
+			proxyServer: new(fakeProxyServerLongRun),
+			trigger: func(t *testing.T, file *os.File, tempDir string, errCh chan error) {
+				dataDir := filepath.Join(tempDir, "..data")
+				tempSymlink := filepath.Join(tempDir, "..data_tmp")
+				targetDir := filepath.Join(tempDir, "..2026_07_05_12_26_07.123456789")
+				if err := os.Mkdir(targetDir, 0755); err != nil {
+					t.Fatalf("failed to create target dir: %v", err)
+				}
+				if err := os.Symlink(targetDir, tempSymlink); err != nil {
+					t.Fatalf("failed to create temporary symlink: %v", err)
+				}
+				if err := os.Rename(tempSymlink, dataDir); err != nil {
+					t.Fatalf("failed to atomically rename symlink to ..data: %v", err)
+				}
+			},
+			expectedErr: "content of the proxy server's configuration file was updated",
+		},
+		{
+			name:        "ignore chmod event and then trigger update",
+			proxyServer: new(fakeProxyServerLongRun),
+			trigger: func(t *testing.T, file *os.File, tempDir string, errCh chan error) {
+				if err := os.Chmod(file.Name(), 0644); err != nil {
+					t.Fatalf("failed to chmod config file: %v", err)
+				}
+				select {
+				case err := <-errCh:
+					t.Fatalf("received unexpected error after chmod: %v", err)
+				case <-time.After(200 * time.Millisecond):
+				}
+				if _, err := file.WriteString("append fake content"); err != nil {
+					t.Fatalf("failed to write config file: %v", err)
+				}
+			},
+			expectedErr: "content of the proxy server's configuration file was updated",
+		},
+		{
+			name:        "ignore unrelated file changes in the watched directory",
+			proxyServer: new(fakeProxyServerLongRun),
+			trigger: func(t *testing.T, file *os.File, tempDir string, errCh chan error) {
+				unrelatedFile := filepath.Join(tempDir, "unrelated.conf")
+				if err := os.WriteFile(unrelatedFile, []byte("some content"), 0644); err != nil {
+					t.Fatalf("failed to write unrelated file: %v", err)
+				}
+				select {
+				case err := <-errCh:
+					t.Fatalf("received unexpected error after unrelated file write: %v", err)
+				case <-time.After(200 * time.Millisecond):
+				}
+				if _, err := file.WriteString("append fake content"); err != nil {
+					t.Fatalf("failed to write config file: %v", err)
+				}
+			},
+			expectedErr: "content of the proxy server's configuration file was updated",
+		},
+		{
+			name:        "ignore remove on ..data symlink and then trigger update",
+			proxyServer: new(fakeProxyServerLongRun),
+			setup: func(t *testing.T, file *os.File, tempDir string) {
+				dataDir := filepath.Join(tempDir, "..data")
+				targetDir := filepath.Join(tempDir, "..2026_07_05_12_26_07.123456789")
+				if err := os.Mkdir(targetDir, 0755); err != nil {
+					t.Fatalf("failed to create target dir: %v", err)
+				}
+				if err := os.Symlink(targetDir, dataDir); err != nil {
+					t.Fatalf("failed to create symlink: %v", err)
+				}
+			},
+			trigger: func(t *testing.T, file *os.File, tempDir string, errCh chan error) {
+				dataDir := filepath.Join(tempDir, "..data")
+				if err := os.Remove(dataDir); err != nil {
+					t.Fatalf("failed to remove symlink: %v", err)
+				}
+				select {
+				case err := <-errCh:
+					t.Fatalf("received unexpected error after removing ..data: %v", err)
+				case <-time.After(200 * time.Millisecond):
+				}
+				if _, err := file.WriteString("append fake content"); err != nil {
+					t.Fatalf("failed to write config file: %v", err)
+				}
+			},
+			expectedErr: "content of the proxy server's configuration file was updated",
 		},
 	}
 
@@ -516,6 +607,10 @@ detectLocalMode: "BridgeInterface"`)
 		file, tempDir, err := setUp()
 		if err != nil {
 			t.Fatalf("unexpected error when setting up environment: %v", err)
+		}
+
+		if tc.setup != nil {
+			tc.setup(t, file, tempDir)
 		}
 
 		opt := NewOptions()
@@ -531,8 +626,14 @@ detectLocalMode: "BridgeInterface"`)
 			errCh <- opt.runLoop(ctx)
 		}()
 
-		if tc.append {
-			file.WriteString("append fake content")
+		// <-Ready() blocks until the watcher goroutine is running; avoids a
+		// race between test trigger writes and watcher registration.
+		if opt.watcher != nil {
+			<-opt.watcher.Ready()
+		}
+
+		if tc.trigger != nil {
+			tc.trigger(t, file, tempDir, errCh)
 		}
 
 		select {

@@ -23,9 +23,8 @@ import (
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
 
-// Mock filesystem watcher
 type fakeWatcher struct {
-	watches      []string // List of watches added by the prober, ordered from least recent to most recent.
+	watches      []string
 	eventHandler utilfs.FSEventHandler
 }
 
@@ -42,11 +41,17 @@ func (w *fakeWatcher) Init(eventHandler utilfs.FSEventHandler, _ utilfs.FSErrorH
 	return nil
 }
 
-func (w *fakeWatcher) Run(_ context.Context) { /* no-op */ }
+func (w *fakeWatcher) Run(_ context.Context) {}
 
 func (w *fakeWatcher) AddWatch(path string) error {
 	w.watches = append(w.watches, path)
 	return nil
+}
+
+func (w *fakeWatcher) Ready() <-chan struct{} {
+	ch := make(chan struct{})
+	close(ch)
+	return ch
 }
 
 // Triggers a mock filesystem event.

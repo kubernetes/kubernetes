@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -291,28 +292,63 @@ func copyLogsFromFlags(from *pflag.FlagSet, to *logsapi.LoggingConfiguration) er
 	return err
 }
 
-// Creates a new filesystem watcher and adds watches for the config file.
+// Creates a new filesystem watcher and adds watches for the config file's parent directory.
 func (o *Options) initWatcher() error {
+	// Normalize to absolute so that event path comparisons don't fail on relative paths.
+	configFile, err := filepath.Abs(o.ConfigFile)
+	if err == nil {
+		o.ConfigFile = configFile
+	} else {
+		o.ConfigFile = filepath.Clean(o.ConfigFile)
+	}
+
 	fswatcher := filesystem.NewFsnotifyWatcher()
-	err := fswatcher.Init(o.eventHandler, o.errorHandler)
+	err = fswatcher.Init(o.eventHandler, o.errorHandler)
 	if err != nil {
 		return err
 	}
-	err = fswatcher.AddWatch(o.ConfigFile)
+
+	// Watch the parent directory, not the file itself, to capture:
+	//   - atomic editor writes (unlink+create or rename-over)
+	//   - Kubelet ConfigMap symlink swaps via "..data" rename
+	configDir := filepath.Dir(o.ConfigFile)
+	err = fswatcher.AddWatch(configDir)
 	if err != nil {
 		return err
 	}
+
 	o.watcher = fswatcher
 	return nil
 }
 
 func (o *Options) eventHandler(ent fsnotify.Event) {
-	if ent.Has(fsnotify.Write) || ent.Has(fsnotify.Rename) {
-		// error out when ConfigFile is updated
-		o.errCh <- fmt.Errorf("content of the proxy server's configuration file was updated")
-		return
+	resolvedEventPath, err := filepath.Abs(ent.Name)
+	if err != nil {
+		resolvedEventPath = filepath.Clean(ent.Name)
 	}
-	o.errCh <- nil
+
+	resolvedConfigFile, err := filepath.Abs(o.ConfigFile)
+	if err != nil {
+		resolvedConfigFile = filepath.Clean(o.ConfigFile)
+	}
+
+	configDir := filepath.Dir(resolvedConfigFile)
+	eventDir := filepath.Dir(resolvedEventPath)
+
+	if resolvedEventPath == resolvedConfigFile {
+		if ent.Has(fsnotify.Write) || ent.Has(fsnotify.Create) || ent.Has(fsnotify.Rename) {
+			o.errCh <- fmt.Errorf("content of the proxy server's configuration file was updated")
+			return
+		}
+	}
+
+	// Kubelet swaps ConfigMap data via atomic "..data" rename; the config file's inode never changes.
+	if eventDir == configDir && filepath.Base(resolvedEventPath) == "..data" {
+		if ent.Has(fsnotify.Create) || ent.Has(fsnotify.Rename) {
+			o.errCh <- fmt.Errorf("content of the proxy server's configuration file was updated")
+			return
+		}
+	}
 }
 
 func (o *Options) errorHandler(err error) {
