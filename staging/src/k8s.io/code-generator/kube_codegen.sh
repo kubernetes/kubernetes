@@ -32,11 +32,15 @@ KUBE_CODEGEN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # resource.Quantity) live in the read-only Go module cache, so generators
 # must not attempt to write output files for them. These packages are passed
 # as --readonly-pkg to generators that support it (validation-gen, openapi-gen).
+# meta/v1/validation is listed alongside meta/v1 because it holds the
+# hand-written and generated validations for the meta/v1 types; validation-gen
+# needs it to resolve references such as Condition.lastTransitionTime.
 # NOTE: These must be passed as separate arguments using an array loop, not
 # via "$(printf ...)". Double-quoting a printf command substitution collapses
 # the output into a single argument, which silently breaks flag parsing.
 KUBE_CODEGEN_READONLY_PKGS=(
     k8s.io/apimachinery/pkg/apis/meta/v1
+    k8s.io/apimachinery/pkg/apis/meta/v1/validation
     k8s.io/apimachinery/pkg/api/resource
     k8s.io/apimachinery/pkg/runtime
     k8s.io/apimachinery/pkg/types
