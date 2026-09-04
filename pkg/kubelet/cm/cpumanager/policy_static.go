@@ -633,6 +633,7 @@ func (p *staticPolicy) allocateForAdd(logger klog.Logger, s state.State, pod *v1
 			return
 		}
 		// TODO: move in updateMetricsOnAllocate
+		// See https://github.com/kubernetes/kubernetes/issues/115485 for tracking.
 		if p.options.FullPhysicalCPUsOnly {
 			// increment only if we know we allocate aligned resources
 			metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
