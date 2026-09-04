@@ -222,21 +222,23 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		return fmt.Errorf("unable to set configz: %w", err)
 	}
 
-	// Setup any healthz checks we will want to use.
-	var checks []healthz.HealthChecker
+	// Setup any health checks we will want to use.
+	var readyzChecks []healthz.HealthChecker
 	var electionChecker *leaderelection.HealthzAdaptor
 	if c.ComponentConfig.Generic.LeaderElection.LeaderElect {
 		electionChecker = leaderelection.NewLeaderHealthzAdaptor(time.Second * 20)
-		checks = append(checks, electionChecker)
+		readyzChecks = append(readyzChecks, electionChecker)
 	}
-	healthzHandler := controllerhealthz.NewMutableHealthzHandler(checks...)
+
+	readyzHandler := controllerhealthz.NewMutableHealthzHandler(readyzChecks...)
 
 	// Start the controller manager HTTP server
 	// unsecuredMux is the handler for these controller *after* authn/authz filters have been applied
 	var unsecuredMux *mux.PathRecorderMux
 	if c.SecureServing != nil {
-		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, healthzHandler)
+		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, readyzChecks)
 		slis.SLIMetricsWithReset{}.Install(unsecuredMux)
+
 		if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
 			if c.Flagz != nil {
 				flagz.Install(unsecuredMux, kubeControllerManager, c.Flagz)
@@ -273,7 +275,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		}
 
 		// Prepare all controllers in advance.
-		controllers, err := BuildControllers(ctx, controllerContext, controllerDescriptors, unsecuredMux, healthzHandler)
+		controllers, err := BuildControllers(ctx, controllerContext, controllerDescriptors, unsecuredMux, readyzHandler)
 		if err != nil {
 			logger.Error(err, "Error building controllers")
 			return err
@@ -365,7 +367,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		if err != nil {
 			return err
 		}
-		healthzHandler.AddHealthChecker(healthz.NewInformerSyncHealthz(waitForSync))
+		readyzHandler.AddHealthChecker(healthz.NewInformerSyncHealthz(waitForSync))
 
 		go leaseCandidate.Run(ctx)
 	}
@@ -624,7 +626,7 @@ type HealthCheckAdder interface {
 // If the controller implements controller.HealthCheckable, though, the given check is used.
 // The controller can also implement controller.Debuggable, in which case the debug handler is registered with the given mux.
 func BuildControllers(ctx context.Context, controllerCtx ControllerContext, controllerDescriptors map[string]*ControllerDescriptor,
-	unsecuredMux *mux.PathRecorderMux, healthzHandler HealthCheckAdder) ([]Controller, error) {
+	unsecuredMux *mux.PathRecorderMux, readyzHandler HealthCheckAdder) ([]Controller, error) {
 	logger := klog.FromContext(ctx)
 	var (
 		controllers []Controller
@@ -697,7 +699,7 @@ func BuildControllers(ctx context.Context, controllerCtx ControllerContext, cont
 
 	// Register the checks.
 	if len(checks) > 0 {
-		healthzHandler.AddHealthChecker(checks...)
+		readyzHandler.AddHealthChecker(checks...)
 	}
 	return controllers, nil
 }
