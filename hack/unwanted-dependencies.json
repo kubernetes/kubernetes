@@ -111,7 +111,6 @@
         "github.com/google/cadvisor/lib",
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
         "github.com/grpc-ecosystem/go-grpc-middleware/v2",
-        "github.com/json-iterator/go",
         "github.com/prometheus/common",
         "go.etcd.io/bbolt",
         "go.etcd.io/etcd/api/v3",
@@ -157,12 +156,8 @@
         "google.golang.org/grpc",
         "google.golang.org/protobuf"
       ],
-      "github.com/google/gofuzz": [
-        "github.com/json-iterator/go"
-      ],
       "github.com/json-iterator/go": [
-        "github.com/prometheus/client_golang",
-        "sigs.k8s.io/structured-merge-diff/v6"
+        "github.com/prometheus/client_golang"
       ],
       "github.com/klauspost/compress": [
         "github.com/prometheus/client_golang"
@@ -173,14 +168,10 @@
         "sigs.k8s.io/kustomize/kyaml"
       ],
       "github.com/modern-go/concurrent": [
-        "github.com/json-iterator/go",
-        "github.com/prometheus/client_golang",
-        "sigs.k8s.io/structured-merge-diff/v6"
+        "github.com/prometheus/client_golang"
       ],
       "github.com/modern-go/reflect2": [
-        "github.com/json-iterator/go",
-        "github.com/prometheus/client_golang",
-        "sigs.k8s.io/structured-merge-diff/v6"
+        "github.com/prometheus/client_golang"
       ],
       "github.com/planetscale/vtprotobuf": [
         "google.golang.org/grpc"
@@ -230,9 +221,6 @@
       "github.com/gogo/protobuf",
       "github.com/golang/protobuf",
       "github.com/google/btree",
-      "github.com/json-iterator/go",
-      "github.com/modern-go/concurrent",
-      "github.com/modern-go/reflect2",
       "golang.org/x/exp"
     ]
   }
