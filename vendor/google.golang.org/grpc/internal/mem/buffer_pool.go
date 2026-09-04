@@ -26,11 +26,25 @@ import (
 	"slices"
 	"sort"
 	"sync"
+
+	"google.golang.org/grpc/internal"
 )
 
 const (
 	goPageSize = 4 * 1024 // 4KiB. N.B. this must be a power of 2.
 )
+
+var (
+	// BufferPoolingThreshold is the minimum size of a buffer that can be pooled.
+	// This is used to determine whether to pool buffers or allocate them directly.
+	BufferPoolingThreshold = 1 << 10
+)
+
+func init() {
+	internal.SetBufferPoolingThresholdForTesting = func(threshold int) {
+		BufferPoolingThreshold = threshold
+	}
+}
 
 var uintSize = bits.UintSize // use a variable for mocking during tests.
 
