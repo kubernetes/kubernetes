@@ -1083,7 +1083,7 @@ func TestGenerateDeviceTopologyHintsFiltersNUMANodes(t *testing.T) {
 
 		maskNode0, _ := bitmask.NewBitMask(0)
 		expected := []topologymanager.TopologyHint{
-			{NUMANodeAffinity: maskNode0, Preferred: true},
+			{NUMANodeAffinity: maskNode0, Preferred: true, Score: 1},
 		}
 
 		if !reflect.DeepEqual(hints, expected) {
@@ -1119,9 +1119,9 @@ func TestGenerateDeviceTopologyHintsFiltersNUMANodes(t *testing.T) {
 		maskNode1, _ := bitmask.NewBitMask(1)
 		maskBoth, _ := bitmask.NewBitMask(0, 1)
 		expected := []topologymanager.TopologyHint{
-			{NUMANodeAffinity: maskNode0, Preferred: true},
-			{NUMANodeAffinity: maskNode1, Preferred: true},
-			{NUMANodeAffinity: maskBoth, Preferred: false},
+			{NUMANodeAffinity: maskNode0, Preferred: true, Score: 1},
+			{NUMANodeAffinity: maskNode1, Preferred: true, Score: 1},
+			{NUMANodeAffinity: maskBoth, Preferred: false, Score: 1},
 		}
 		sort.SliceStable(expected, func(i, j int) bool { return expected[i].LessThan(expected[j]) })
 
@@ -1175,7 +1175,7 @@ func TestGenerateDeviceTopologyHintsFiltersNUMANodes(t *testing.T) {
 		hints := m.generateDeviceTopologyHints(logger, resource, nil, sets.New[string]("a"), 1)
 
 		expected := []topologymanager.TopologyHint{
-			{NUMANodeAffinity: makeSocketMask(0), Preferred: true},
+			{NUMANodeAffinity: makeSocketMask(0), Preferred: true, Score: 1},
 		}
 		if !reflect.DeepEqual(hints, expected) {
 			t.Fatalf("expected hints %v, got %v", expected, hints)
@@ -1201,7 +1201,7 @@ func TestGenerateDeviceTopologyHintsFiltersNUMANodes(t *testing.T) {
 		hints := m.generateDeviceTopologyHints(logger, resource, sets.New[string]("b"), sets.New[string]("a"), 2)
 
 		expected := []topologymanager.TopologyHint{
-			{NUMANodeAffinity: makeSocketMask(0, 1), Preferred: true},
+			{NUMANodeAffinity: makeSocketMask(0, 1), Preferred: true, Score: 1},
 		}
 		if !reflect.DeepEqual(hints, expected) {
 			t.Fatalf("expected hints %v, got %v", expected, hints)
@@ -1421,6 +1421,7 @@ func getCommonTestCases() []topologyHintTestCase {
 					{
 						NUMANodeAffinity: makeSocketMask(1),
 						Preferred:        true,
+						Score:            1,
 					},
 				},
 			},
@@ -1455,14 +1456,17 @@ func getCommonTestCases() []topologyHintTestCase {
 					{
 						NUMANodeAffinity: makeSocketMask(0),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(1),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(0, 1),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 			},
@@ -1497,6 +1501,7 @@ func getCommonTestCases() []topologyHintTestCase {
 					{
 						NUMANodeAffinity: makeSocketMask(0, 1),
 						Preferred:        true,
+						Score:            1,
 					},
 				},
 			},
@@ -1533,14 +1538,17 @@ func getCommonTestCases() []topologyHintTestCase {
 					{
 						NUMANodeAffinity: makeSocketMask(0),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(1),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(0, 1),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 			},
@@ -1584,6 +1592,7 @@ func getCommonTestCases() []topologyHintTestCase {
 					{
 						NUMANodeAffinity: makeSocketMask(0, 1),
 						Preferred:        false,
+						Score:            50, // 2 out of 4 devices allocated = 50%
 					},
 				},
 			},
@@ -1624,20 +1633,24 @@ func getCommonTestCases() []topologyHintTestCase {
 					{
 						NUMANodeAffinity: makeSocketMask(0),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(1),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(0, 1),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 				"testdevice2": {
 					{
 						NUMANodeAffinity: makeSocketMask(0),
 						Preferred:        true,
+						Score:            1,
 					},
 				},
 			},
@@ -1710,6 +1723,7 @@ func getCommonTestCases() []topologyHintTestCase {
 					{
 						NUMANodeAffinity: makeSocketMask(0),
 						Preferred:        true,
+						Score:            100, // 2 out of 2 devices allocated = 100%
 					},
 				},
 			},
@@ -1849,28 +1863,34 @@ func getPodScopeTestCases() []topologyHintTestCase {
 					{
 						NUMANodeAffinity: makeSocketMask(0),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(1),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(0, 1),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 				"testdevice2": {
 					{
 						NUMANodeAffinity: makeSocketMask(0),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(1),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(0, 1),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 			},
@@ -1949,28 +1969,34 @@ func getPodScopeTestCases() []topologyHintTestCase {
 					{
 						NUMANodeAffinity: makeSocketMask(0),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(1),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(0, 1),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 				"testdevice2": {
 					{
 						NUMANodeAffinity: makeSocketMask(0),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(1),
 						Preferred:        true,
+						Score:            1,
 					},
 					{
 						NUMANodeAffinity: makeSocketMask(0, 1),
 						Preferred:        false,
+						Score:            1,
 					},
 				},
 			},
@@ -2039,12 +2065,14 @@ func getPodScopeTestCases() []topologyHintTestCase {
 					{
 						NUMANodeAffinity: makeSocketMask(0, 1),
 						Preferred:        false,
+						Score:            50, // 2 out of 4 devices allocated = 50%
 					},
 				},
 				"testdevice2": {
 					{
 						NUMANodeAffinity: makeSocketMask(0, 1),
 						Preferred:        false,
+						Score:            50, // 2 out of 4 devices allocated = 50%
 					},
 				},
 			},
