@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -886,5 +887,31 @@ func TestRetroactiveStorageClassAssignment(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	for _, test := range tests {
 		runSyncTests(t, ctx, test.tests, test.storageClasses, nil)
+	}
+}
+
+// A failed type assertion on the claim cache entry leaves the local claim
+// variable nil, so syncVolume must not build its error message out of it.
+func TestSyncVolumeWithNonClaimObjectInClaimCache(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctrl, err := newTestController(ctx, &fake.Clientset{}, nil, false)
+	if err != nil {
+		t.Fatalf("construct persistent volume controller failed: %v", err)
+	}
+
+	// Store an object of the wrong type under the key syncVolume looks up.
+	if err := ctrl.claims.Add(&v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, Name: "claim1-1"},
+	}); err != nil {
+		t.Fatalf("seed claim cache: %v", err)
+	}
+
+	pv := newVolume("volume1-1", "1Gi", "uid1-1", "claim1-1", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty)
+	err = ctrl.syncVolume(ctx, pv)
+	if err == nil {
+		t.Fatal("syncVolume with a non-claim object in the claim cache = nil error, want an error")
+	}
+	if !strings.Contains(err.Error(), "cannot convert object from claim cache") {
+		t.Errorf("syncVolume error = %q, want it to report the failed claim cache conversion", err)
 	}
 }
