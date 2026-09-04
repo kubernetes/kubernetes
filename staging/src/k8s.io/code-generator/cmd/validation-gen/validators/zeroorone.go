@@ -65,7 +65,7 @@ const (
 	// is frozen at this moment in time, and can never be expanded. Why?
 	// Back-rev clients can't tell the difference between "zero were specified"
 	// and "a field I don't know about was specified".
-	zeroOrOneOfMemberTagName = "k8s:zeroOrOneOfMember"
+	zeroOrOneOfMemberTagName = "zeroOrOneOfMember"
 )
 
 type zeroOrOneOfMemberTagValidator struct {

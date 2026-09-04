@@ -18,11 +18,20 @@ package args
 
 import (
 	"fmt"
+	"regexp"
 
 	"github.com/spf13/pflag"
 
 	"k8s.io/code-generator/pkg/apidefinitions"
 )
+
+// DefaultTagPrefix is the tag prefix used by Kubernetes: "+k8s:required",
+// "+k8s:validation-gen", and so on.
+const DefaultTagPrefix = "k8s:"
+
+// tagPrefixRE matches an empty prefix or one or more ':'-terminated tag name
+// segments, as allowed by the gengo codetags grammar.
+var tagPrefixRE = regexp.MustCompile(`^([a-zA-Z_][a-zA-Z0-9_.-]*:)*$`)
 
 type Args struct {
 	OutputFile   string
@@ -48,12 +57,21 @@ type Args struct {
 	// kind/path/errorType/origin) plus a required reason.
 	TestAllowlist string
 
+	// TagPrefix qualifies every tag this generator recognizes, both the
+	// package-level tags that configure generation (e.g. "+k8s:validation-gen")
+	// and the validation tags themselves (e.g. "+k8s:required"). It is empty
+	// or one or more ':'-terminated segments. Generators built on
+	// validation-gen set this to claim their own tag namespace.
+	TagPrefix string
+
 	apidefinitions.LintArgs
 }
 
 // New returns default arguments for the generator.
 func New() *Args {
-	return &Args{}
+	return &Args{
+		TagPrefix: DefaultTagPrefix,
+	}
 }
 
 // AddFlags add the generator flags to the flag set.
@@ -72,6 +90,8 @@ func (args *Args) AddFlags(fs *pflag.FlagSet) {
 		"prefix prepended to every emitted test fixture filename; useful for marking files via a linguist-generated gitattributes pattern (e.g. \"zz_generated.\")")
 	fs.StringVar(&args.TestAllowlist, "test-allowlist", "",
 		"path to a YAML config file of rule-level filters to exclude from coverage fixture generation; only meaningful with --test-output-root")
+	fs.StringVar(&args.TagPrefix, "tag-prefix", args.TagPrefix,
+		"the prefix of every tag this generator recognizes, e.g. \"k8s:\" for +k8s:validation-gen and +k8s:required; empty or one or more ':'-terminated segments")
 	apidefinitions.AddFlags(&args.LintArgs, fs)
 }
 
@@ -85,6 +105,9 @@ func (args *Args) Validate() error {
 	}
 	if args.TestOutputFilePrefix != "" && args.TestOutputRoot == "" {
 		return fmt.Errorf("--test-output-file-prefix is only meaningful with --test-output-root")
+	}
+	if !tagPrefixRE.MatchString(args.TagPrefix) {
+		return fmt.Errorf("--tag-prefix %q must be empty or one or more ':'-terminated tag name segments (e.g. \"k8s:\")", args.TagPrefix)
 	}
 
 	if err := apidefinitions.ValidateFlags(args.LintRules); err != nil {

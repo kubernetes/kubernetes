@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	customValidationTagName = "k8s:customValidation"
+	customValidationTagName = "customValidation"
 
 	customValidationFuncPrefix = "ValidateCustom_"
 )
@@ -54,6 +54,7 @@ func init() {
 type customValidationTagValidator struct {
 	gengoContext        *generator.Context
 	inputToCanonicalPkg map[string]string
+	prefix              string
 	// claimed records every function a tag wired (directly or via a composing
 	// tag such as ifEnabled), so verifyCustomFunctions can spot ValidateCustom_*
 	// functions defined without a tag.
@@ -63,6 +64,7 @@ type customValidationTagValidator struct {
 func (v *customValidationTagValidator) Init(cfg Config) {
 	v.gengoContext = cfg.GengoContext
 	v.inputToCanonicalPkg = cfg.InputToCanonicalPkg
+	v.prefix = cfg.TagPrefix
 	v.claimed = map[types.Name]bool{}
 }
 
@@ -151,14 +153,14 @@ func (v *customValidationTagValidator) verifyCustomFunctions() error {
 		if pkg := v.gengoContext.Universe[outPkg]; pkg != nil {
 			for name := range pkg.Functions {
 				if strings.HasPrefix(name, customValidationFuncPrefix) && !v.claimed[types.Name{Package: outPkg, Name: name}] {
-					issues = append(issues, fmt.Sprintf("%s.%s: no matching tag (add +%s, or rename if not a custom validation)", outPkg, name, customValidationTagName))
+					issues = append(issues, fmt.Sprintf("%s.%s: no matching tag (add +%s, or rename if not a custom validation)", outPkg, name, v.prefix+customValidationTagName))
 				}
 			}
 		}
 	}
 	if len(issues) > 0 {
 		sort.Strings(issues)
-		return fmt.Errorf("+%s: %s", customValidationTagName, strings.Join(issues, "; "))
+		return fmt.Errorf("+%s: %s", v.prefix+customValidationTagName, strings.Join(issues, "; "))
 	}
 	return nil
 }
@@ -171,16 +173,16 @@ func (v customValidationTagValidator) checkFunction(fn types.Name, valueType *ty
 	}
 	pkg := v.gengoContext.Universe[fn.Package]
 	if pkg == nil {
-		return fmt.Errorf("+%s: cannot find package %q to verify function %q", customValidationTagName, fn.Package, fn.Name)
+		return fmt.Errorf("+%s: cannot find package %q to verify function %q", v.prefix+customValidationTagName, fn.Package, fn.Name)
 	}
 	f := pkg.Functions[fn.Name]
 	if f == nil {
-		return fmt.Errorf("+%s: expected hand-written function %s.%s was not found", customValidationTagName, fn.Package, fn.Name)
+		return fmt.Errorf("+%s: expected hand-written function %s.%s was not found", v.prefix+customValidationTagName, fn.Package, fn.Name)
 	}
 	if sig := f.Underlying.Signature; sig == nil || !signatureMatches(sig, valueType) {
 		return fmt.Errorf("+%s: %s.%s must have signature "+
 			"func(ctx context.Context, op operation.Operation, fldPath *field.Path, value, oldValue %s) field.ErrorList",
-			customValidationTagName, fn.Package, fn.Name, renderType(valueType))
+			v.prefix+customValidationTagName, fn.Package, fn.Name, renderType(valueType))
 	}
 	return nil
 }

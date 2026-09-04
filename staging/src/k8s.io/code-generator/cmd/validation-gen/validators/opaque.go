@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	opaqueTypeTagName = "k8s:opaqueType"
+	opaqueTypeTagName = "opaqueType"
 )
 
 // globalOpaqueTypes and globalOpaqueMembers record the set of types and struct

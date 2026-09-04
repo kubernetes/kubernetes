@@ -29,9 +29,10 @@ import (
 )
 
 // PrintDocs writes the documentation of every registered validation tag, as
-// JSON, to w. It initializes the global tag registry, so it must not be
-// combined with GetTargets in the same process.
-func PrintDocs(w io.Writer) error {
+// JSON, to w. Tag names are qualified with tagPrefix. It initializes the
+// global tag registry, so it must not be combined with GetTargets in the same
+// process.
+func PrintDocs(w io.Writer, tagPrefix string) error {
 	// We need a fake context to init the validator plugins.
 	c := &generator.Context{
 		Namers:    namer.NameSystems{},
@@ -40,7 +41,7 @@ func PrintDocs(w io.Writer) error {
 	}
 
 	// Initialize all registered validators.
-	validator := validators.InitGlobalValidator(c, nil)
+	validator := validators.InitGlobalValidator(c, nil, tagPrefix)
 
 	docs := validator.Docs()
 	for i := range docs {

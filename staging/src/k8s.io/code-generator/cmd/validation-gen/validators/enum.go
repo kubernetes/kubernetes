@@ -31,8 +31,8 @@ import (
 )
 
 const (
-	enumTagName        = "k8s:enum"
-	enumExcludeTagName = "k8s:enumExclude"
+	enumTagName        = "enum"
+	enumExcludeTagName = "enumExclude"
 )
 
 func init() {
@@ -41,9 +41,11 @@ func init() {
 }
 
 type enumExcludeTagValidator struct {
+	prefix string
 }
 
-func (*enumExcludeTagValidator) Init(_ Config) {
+func (eetv *enumExcludeTagValidator) Init(cfg Config) {
+	eetv.prefix = cfg.TagPrefix
 }
 
 func (*enumExcludeTagValidator) TagName() string {
@@ -65,18 +67,21 @@ func (eetv *enumExcludeTagValidator) Docs() TagDoc {
 		Tag:            eetv.TagName(),
 		StabilityLevel: TagStabilityLevelAlpha,
 		Scopes:         sets.List(eetv.ValidScopes()),
-		Description: `Indicates that an constant value is not part of an enum, even if the constant's type is tagged with k8s:enum.
-May be conditionally excluded via +k8s:ifEnabled(Option)=+k8s:enumExclude or +k8s:ifDisabled(Option)=+k8s:enumExclude.
-If multiple +k8s:ifEnabled/+k8s:ifDisabled tags are used, the value is excluded if any of the exclude conditions are met.`,
+		Description: fmt.Sprintf(`Indicates that an constant value is not part of an enum, even if the constant's type is tagged with %[1]s%[2]s.
+May be conditionally excluded via +%[1]s%[3]s(Option)=+%[1]s%[5]s or +%[1]s%[4]s(Option)=+%[1]s%[5]s.
+If multiple +%[1]s%[3]s/+%[1]s%[4]s tags are used, the value is excluded if any of the exclude conditions are met.`,
+			eetv.prefix, enumTagName, ifEnabledTag, ifDisabledTag, enumExcludeTagName),
 	}
 }
 
 type enumTagValidator struct {
 	validator TagValidationExtractor
+	prefix    string
 }
 
 func (etv *enumTagValidator) Init(cfg Config) {
 	etv.validator = cfg.TagValidator
+	etv.prefix = cfg.TagPrefix
 }
 
 func (enumTagValidator) TagName() string {
@@ -107,13 +112,13 @@ func (etv *enumTagValidator) GetValidations(context Context, _ codetags.Tag) (Va
 		isExcluded := false
 		for _, tag := range c.Tags {
 			switch tag.Name {
-			case enumExcludeTagName:
+			case etv.prefix + enumExcludeTagName:
 				isExcluded = true
-			case ifEnabledTag, ifDisabledTag:
-				if tag.ValueTag != nil && tag.ValueTag.Name == enumExcludeTagName {
+			case etv.prefix + ifEnabledTag, etv.prefix + ifDisabledTag:
+				if tag.ValueTag != nil && tag.ValueTag.Name == etv.prefix+enumExcludeTagName {
 					if option, ok := tag.PositionalArg(); ok {
 						exclusions = append(exclusions, enumExclude{
-							excludeWhen: tag.Name == ifEnabledTag,
+							excludeWhen: tag.Name == etv.prefix+ifEnabledTag,
 							option:      option.Value,
 						})
 					}
@@ -198,7 +203,7 @@ func (etv *enumTagValidator) Docs() TagDoc {
 		Tag:            etv.TagName(),
 		StabilityLevel: TagStabilityLevelStable,
 		Scopes:         sets.List(etv.ValidScopes()),
-		Description:    "Indicates that a string type is an enum. All constant values of this type are considered values in the enum unless excluded using +k8s:enumExclude.",
+		Description:    "Indicates that a string type is an enum. All constant values of this type are considered values in the enum unless excluded using +" + etv.prefix + enumExcludeTagName + ".",
 	}
 }
 

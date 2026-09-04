@@ -28,10 +28,10 @@ import (
 )
 
 const (
-	listTypeTagName     = "k8s:listType"
-	ListMapKeyTagName   = "k8s:listMapKey"
-	uniqueTagName       = "k8s:unique"
-	customUniqueTagName = "k8s:customUnique"
+	listTypeTagName     = "listType"
+	ListMapKeyTagName   = "listMapKey"
+	uniqueTagName       = "unique"
+	customUniqueTagName = "customUnique"
 )
 
 // globalListMeta is shared between list-related validators.

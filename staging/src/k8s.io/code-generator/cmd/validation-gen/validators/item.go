@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	itemTagName = "k8s:item"
+	itemTagName = "item"
 )
 
 func init() {
@@ -43,11 +43,13 @@ type keyValuePair struct {
 
 type itemTagValidator struct {
 	validator  TagValidationExtractor
+	prefix     string
 	listByPath map[string]*listMetadata
 }
 
 func (itv *itemTagValidator) Init(cfg Config) {
 	itv.validator = cfg.TagValidator
+	itv.prefix = cfg.TagPrefix
 }
 
 func (itemTagValidator) TagName() string {
@@ -288,12 +290,12 @@ func (itv itemTagValidator) Docs() TagDoc {
 		Tag:            itv.TagName(),
 		StabilityLevel: TagStabilityLevelStable,
 		Scopes:         sets.List(itv.ValidScopes()),
-		Description: "Declares a validation for an item of a slice declared as a +k8s:listType=map. " +
+		Description: "Declares a validation for an item of a slice declared as a +" + itv.prefix + listTypeTagName + "=map. " +
 			"The item to match is declared by providing field-value pair arguments. All key fields must be specified.",
-		Usage: "+k8s:item(stringKey: \"value\", intKey: 42, boolKey: true)=<validation-tag>",
+		Usage: "+" + itv.prefix + itemTagName + "(stringKey: \"value\", intKey: 42, boolKey: true)=<validation-tag>",
 		Docs: "Arguments must be named with the JSON names of the list-map key fields. " +
 			"Values can be strings, integers, or booleans. " +
-			"For example: +k8s:item(name: \"myname\", priority: 10, enabled: true)=<chained-validation-tag>",
+			"For example: +" + itv.prefix + itemTagName + "(name: \"myname\", priority: 10, enabled: true)=<chained-validation-tag>",
 		AcceptsUnknownArgs: true,
 		Payloads: []TagPayloadDoc{{
 			Description: "<validation-tag>",

@@ -27,8 +27,8 @@ import (
 )
 
 const (
-	eachValTagName = "k8s:eachVal"
-	eachKeyTagName = "k8s:eachKey"
+	eachValTagName = "eachVal"
+	eachKeyTagName = "eachKey"
 )
 
 // We keep the eachVal and eachKey validators around because the main

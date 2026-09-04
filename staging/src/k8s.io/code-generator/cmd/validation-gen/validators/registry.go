@@ -31,17 +31,20 @@ import (
 
 // This is the global registry of tag validators. For simplicity this is in
 // the same package as the implementations, but it should not be used directly.
-var globalRegistry = &registry{
-	tagValidators: map[string]TagValidator{},
-}
+var globalRegistry = &registry{}
 
 // registry holds a list of registered tags.
 type registry struct {
 	lock        sync.Mutex
 	initialized atomic.Bool // init() was called
 
-	tagValidators map[string]TagValidator // keyed by tagname
-	tagIndex      []string                // all tag names
+	// prefix is the tag prefix, including any trailing ':', that qualifies
+	// every registered tag name (e.g. "k8s:" for "+k8s:required").
+	prefix string
+
+	pending       []TagValidator          // registered, in order, until init()
+	tagValidators map[string]TagValidator // keyed by qualified tag name
+	tagIndex      []string                // all qualified tag names
 }
 
 func (reg *registry) addTagValidator(tv TagValidator) {
@@ -52,22 +55,10 @@ func (reg *registry) addTagValidator(tv TagValidator) {
 	reg.lock.Lock()
 	defer reg.lock.Unlock()
 
-	name := tv.TagName()
-	if _, exists := globalRegistry.tagValidators[name]; exists {
-		panic(fmt.Sprintf("tag %q was registered twice", name))
-	}
-	switch level := tv.Docs().StabilityLevel; level {
-	case TagStabilityLevelAlpha, TagStabilityLevelBeta, TagStabilityLevelStable:
-		// valid
-	case "":
-		panic(fmt.Sprintf("tag %q is missing stability level", name))
-	default:
-		panic(fmt.Sprintf("tag %q has invalid stability level %q", name, level))
-	}
-	globalRegistry.tagValidators[name] = tv
+	reg.pending = append(reg.pending, tv)
 }
 
-func (reg *registry) init(c *generator.Context, inputToCanonicalPkg map[string]string) {
+func (reg *registry) init(c *generator.Context, inputToCanonicalPkg map[string]string, tagPrefix string) {
 	if reg.initialized.Load() {
 		panic("registry.init() was called twice")
 	}
@@ -75,16 +66,33 @@ func (reg *registry) init(c *generator.Context, inputToCanonicalPkg map[string]s
 	reg.lock.Lock()
 	defer reg.lock.Unlock()
 
+	reg.prefix = tagPrefix
 	cfg := Config{
 		GengoContext:        c,
 		TagValidator:        reg,
 		InputToCanonicalPkg: inputToCanonicalPkg,
+		TagPrefix:           tagPrefix,
 	}
 
-	for _, tv := range globalRegistry.tagValidators {
-		reg.tagIndex = append(reg.tagIndex, tv.TagName())
+	reg.tagValidators = map[string]TagValidator{}
+	for _, tv := range reg.pending {
 		tv.Init(cfg)
+		name := reg.prefix + tv.TagName()
+		if _, exists := reg.tagValidators[name]; exists {
+			panic(fmt.Sprintf("tag %q was registered twice", name))
+		}
+		switch level := tv.Docs().StabilityLevel; level {
+		case TagStabilityLevelAlpha, TagStabilityLevelBeta, TagStabilityLevelStable:
+			// valid
+		case "":
+			panic(fmt.Sprintf("tag %q is missing stability level", name))
+		default:
+			panic(fmt.Sprintf("tag %q has invalid stability level %q", name, level))
+		}
+		reg.tagValidators[name] = tv
+		reg.tagIndex = append(reg.tagIndex, name)
 	}
+	reg.pending = nil
 	sort.Strings(reg.tagIndex)
 
 	reg.initialized.Store(true)
@@ -132,16 +140,20 @@ func (reg *registry) ExtractTagValidations(context Context, tags ...codetags.Tag
 	accumulatedValidations := Validations{}
 	tags = reg.sortTags(tags)
 	for _, tag := range tags {
-		tv := reg.tagValidators[tag.Name]
-		// At this point we know tv exists and is not nil due to the upfront check
+		tv, ok := reg.tagValidators[tag.Name]
+		if !ok {
+			// Top-level tags were filtered by ExtractTags, but tags nested in
+			// another tag's value are only checked here.
+			return Validations{}, fmt.Errorf("unknown validation tag %q", tag.Name)
+		}
 		if scopes := tv.ValidScopes(); !scopes.Has(context.Scope) {
-			return Validations{}, fmt.Errorf("tag %q cannot be specified on %s", tv.TagName(), context.Scope)
+			return Validations{}, fmt.Errorf("tag %q cannot be specified on %s", tag.Name, context.Scope)
 		}
 		if err := typeCheck(tag, tv.Docs()); err != nil {
-			return Validations{}, fmt.Errorf("tag %q: %w", tv.TagName(), err)
+			return Validations{}, fmt.Errorf("tag %q: %w", tag.Name, err)
 		}
 		if theseValidations, err := tv.GetValidations(context, tag); err != nil {
-			return Validations{}, fmt.Errorf("tag %q: %w", tv.TagName(), err)
+			return Validations{}, fmt.Errorf("tag %q: %w", tag.Name, err)
 		} else {
 			accumulatedValidations.Add(theseValidations)
 		}
@@ -179,18 +191,25 @@ func (reg *registry) sortTags(tags []codetags.Tag) []codetags.Tag {
 	return sortedTags
 }
 
-// Docs returns documentation for each tag in this registry.
+// Docs returns documentation for each tag in this registry, with each Tag
+// qualified by the registry's tag prefix.
 func (reg *registry) Docs() []TagDoc {
+	if !reg.initialized.Load() {
+		panic("registry.init() was not called")
+	}
 	var result []TagDoc
 	for _, k := range reg.tagIndex {
-		v := reg.tagValidators[k]
-		result = append(result, v.Docs())
+		doc := reg.tagValidators[k].Docs()
+		doc.Tag = k
+		result = append(result, doc)
 	}
 	return result
 }
 
 // RegisterTagValidator must be called for TagValidator to be used by
-// validation-gen. See TagValidator for more information.
+// validation-gen. See TagValidator for more information. Registration must
+// happen before InitGlobalValidator is called, typically from an init()
+// function.
 func RegisterTagValidator(tv TagValidator) {
 	globalRegistry.addTagValidator(tv)
 }
@@ -232,6 +251,9 @@ type ValidationExtractor interface {
 
 // Stability returns the stability level for a given tag.
 func (reg *registry) Stability(tag string) (TagStabilityLevel, error) {
+	if !reg.initialized.Load() {
+		panic("registry.init() was not called")
+	}
 	tagName := strings.TrimPrefix(tag, "+")
 	tv, ok := reg.tagValidators[tagName]
 	if !ok {
@@ -263,7 +285,10 @@ func IsKnownTag(tag string) bool {
 // InitGlobalValidator must be called exactly once by the main application to
 // initialize and safely access the global tag registry.  Once this is called,
 // no more validators may be registered.
-func InitGlobalValidator(c *generator.Context, inputToCanonicalPkg map[string]string) ValidationExtractor {
-	globalRegistry.init(c, inputToCanonicalPkg)
+//
+// tagPrefix qualifies the name of every registered tag, e.g. "k8s:" makes the
+// tag validator named "required" recognize "+k8s:required".
+func InitGlobalValidator(c *generator.Context, inputToCanonicalPkg map[string]string, tagPrefix string) ValidationExtractor {
+	globalRegistry.init(c, inputToCanonicalPkg, tagPrefix)
 	return globalRegistry
 }

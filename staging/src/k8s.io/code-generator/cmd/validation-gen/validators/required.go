@@ -30,21 +30,22 @@ import (
 )
 
 const (
-	requiredTagName  = "k8s:required"
-	optionalTagName  = "k8s:optional"
-	forbiddenTagName = "k8s:forbidden"
+	requiredTagName  = "required"
+	optionalTagName  = "optional"
+	forbiddenTagName = "forbidden"
 	defaultTagName   = "default" // TODO: this should eventually be +k8s:default
 )
 
 func init() {
-	RegisterTagValidator(requirednessTagValidator{requirednessRequired})
-	RegisterTagValidator(requirednessTagValidator{requirednessOptional})
-	RegisterTagValidator(requirednessTagValidator{requirednessForbidden})
+	RegisterTagValidator(&requirednessTagValidator{mode: requirednessRequired})
+	RegisterTagValidator(&requirednessTagValidator{mode: requirednessOptional})
+	RegisterTagValidator(&requirednessTagValidator{mode: requirednessForbidden})
 }
 
 // requirednessTagValidator implements multiple modes of requiredness.
 type requirednessTagValidator struct {
-	mode requirednessMode
+	mode   requirednessMode
+	prefix string
 }
 
 type requirednessMode string
@@ -55,19 +56,21 @@ const (
 	requirednessForbidden requirednessMode = forbiddenTagName
 )
 
-func (requirednessTagValidator) Init(_ Config) {}
+func (rtv *requirednessTagValidator) Init(cfg Config) {
+	rtv.prefix = cfg.TagPrefix
+}
 
-func (rtv requirednessTagValidator) TagName() string {
+func (rtv *requirednessTagValidator) TagName() string {
 	return string(rtv.mode)
 }
 
 var requirednessTagValidScopes = sets.New(ScopeField)
 
-func (requirednessTagValidator) ValidScopes() sets.Set[Scope] {
+func (*requirednessTagValidator) ValidScopes() sets.Set[Scope] {
 	return requirednessTagValidScopes
 }
 
-func (rtv requirednessTagValidator) GetValidations(context Context, _ codetags.Tag) (Validations, error) {
+func (rtv *requirednessTagValidator) GetValidations(context Context, _ codetags.Tag) (Validations, error) {
 	switch rtv.mode {
 	case requirednessRequired:
 		return rtv.doRequired(context)
@@ -88,7 +91,7 @@ var (
 
 // TODO: It might be valuable to have a string payload for when requiredness is
 // conditional (e.g. required when <otherfield> is specified).
-func (rtv requirednessTagValidator) doRequired(context Context) (Validations, error) {
+func (rtv *requirednessTagValidator) doRequired(context Context) (Validations, error) {
 	// Most validators don't care whether the value they are validating was
 	// originally defined as a value-type or a pointer-type in the API.  This
 	// one does.  Since Go doesn't do partial specialization of templates, we
@@ -113,7 +116,7 @@ func (rtv requirednessTagValidator) doRequired(context Context) (Validations, er
 		// Still, OpenAPI +required / +optional are allowed on non-pointer structs,
 		// and we want to allow colocated declarative validation tags so linters can
 		// enforce tag pairing. Treat this tag as documentation-only.
-		return Validations{Comments: []string{"+k8s:required on non-pointer struct fields is purely documentation"}}, nil
+		return Validations{Comments: []string{"+" + rtv.prefix + requiredTagName + " on non-pointer struct fields is purely documentation"}}, nil
 	}
 	return Validations{Functions: []FunctionGen{Function(requiredTagName, ShortCircuit, requiredValueValidator).WithEmits(emits)}}, nil
 }
@@ -125,7 +128,7 @@ var (
 	optionalMapValidator     = types.Name{Package: libValidationPkg, Name: "OptionalMap"}
 )
 
-func (rtv requirednessTagValidator) doOptional(context Context) (Validations, error) {
+func (rtv *requirednessTagValidator) doOptional(context Context) (Validations, error) {
 	// All of our tags are expressed from the perspective of a client of the
 	// API, but the code we generate is for the server. Optional is tricky.
 	//
@@ -187,14 +190,14 @@ func (rtv requirednessTagValidator) doOptional(context Context) (Validations, er
 		//
 		// Accept the tag to enable OpenAPI/declarative tag pairing (linting), but do
 		// not emit runtime validations.
-		return Validations{Comments: []string{"+k8s:optional on non-pointer struct fields is purely documentation"}}, nil
+		return Validations{Comments: []string{"+" + rtv.prefix + optionalTagName + " on non-pointer struct fields is purely documentation"}}, nil
 	}
 	return Validations{Functions: []FunctionGen{Function(optionalTagName, ShortCircuit|NonError, optionalValueValidator)}}, nil
 }
 
 // hasZeroDefault returns whether the field has a default value and whether
 // that default value is the zero value for the field's type.
-func (rtv requirednessTagValidator) hasZeroDefault(context Context) (bool, bool, error) {
+func (rtv *requirednessTagValidator) hasZeroDefault(context Context) (bool, bool, error) {
 	// This validator only applies to fields, so Member must be valid.
 	tagsByName, err := gengo.ExtractFunctionStyleCommentTags("+", []string{defaultTagName}, context.Member.CommentLines)
 	if err != nil {
@@ -273,7 +276,7 @@ var (
 
 // TODO: It might be valuable to have a string payload for when forbidden is
 // conditional (e.g. forbidden when <option> is disabled).
-func (requirednessTagValidator) doForbidden(context Context) (Validations, error) {
+func (rtv *requirednessTagValidator) doForbidden(context Context) (Validations, error) {
 	// Forbidden is weird.  Each of these emits two checks, which are polar
 	// opposites.  If the field fails the forbidden check, it will
 	// short-circuit and not run the optional check.  If it passes the
@@ -312,7 +315,7 @@ func (requirednessTagValidator) doForbidden(context Context) (Validations, error
 		// for forbiddening a non-pointer struct, please let us know! We need
 		// to understand your scenario to determine if we need to adjust
 		// this behavior or provide alternative validation mechanisms.
-		return Validations{}, fmt.Errorf("non-pointer structs cannot use the %q tag", forbiddenTagName)
+		return Validations{}, fmt.Errorf("non-pointer structs cannot use the %q tag", rtv.prefix+forbiddenTagName)
 	}
 	return Validations{
 		Functions: []FunctionGen{
@@ -322,7 +325,7 @@ func (requirednessTagValidator) doForbidden(context Context) (Validations, error
 	}, nil
 }
 
-func (rtv requirednessTagValidator) Docs() TagDoc {
+func (rtv *requirednessTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:    rtv.TagName(),
 		Scopes: sets.List(rtv.ValidScopes()),

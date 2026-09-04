@@ -30,8 +30,8 @@ import (
 )
 
 const (
-	modeDiscriminatorTagName = "k8s:modeDiscriminator"
-	ifModeTagName            = "k8s:ifMode"
+	modeDiscriminatorTagName = "modeDiscriminator"
+	ifModeTagName            = "ifMode"
 )
 
 // validGroupNameRegex restricts discriminator group names to identifiers that

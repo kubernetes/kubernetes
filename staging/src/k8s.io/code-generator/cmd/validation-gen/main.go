@@ -15,6 +15,9 @@ limitations under the License.
 */
 
 // validation-gen is a tool for auto-generating Validation functions.
+//
+// Projects that want validation-gen with their own tag prefix, or with
+// additional tags, build their own binary on the same packages.
 package main
 
 import (
@@ -46,7 +49,7 @@ func main() {
 	}
 
 	if args.PrintDocs {
-		if err := generators.PrintDocs(os.Stdout); err != nil {
+		if err := generators.PrintDocs(os.Stdout, args.TagPrefix); err != nil {
 			klog.Fatalf("Error: %v", err)
 		}
 		os.Exit(0)

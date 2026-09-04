@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	subfieldTagName = "k8s:subfield"
+	subfieldTagName = "subfield"
 )
 
 func init() {
@@ -62,8 +62,8 @@ func (stv *subfieldTagValidator) GetValidations(context Context, tag codetags.Ta
 	// prevent nil pointer dereferences by checking optionality or requiredness
 	// for intermediate fields.
 	for t := tag.ValueTag; t != nil; t = t.ValueTag {
-		if t.Name == subfieldTagName {
-			return Validations{}, fmt.Errorf("nested +%s tags are unsupported; apply validations directly to the nested type instead", subfieldTagName)
+		if t.Name == tag.Name {
+			return Validations{}, fmt.Errorf("nested +%s tags are unsupported; apply validations directly to the nested type instead", tag.Name)
 		}
 	}
 

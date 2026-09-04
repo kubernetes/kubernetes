@@ -29,12 +29,12 @@ import (
 )
 
 const (
-	updateTagName = "k8s:update"
+	updateTagName = "update"
 )
 
 func init() {
 	shared := map[string]*updateMetadata{}
-	RegisterTagValidator(updateTagCollector{byFieldPath: shared, listByPath: globalListMeta})
+	RegisterTagValidator(&updateTagCollector{byFieldPath: shared, listByPath: globalListMeta})
 }
 
 // updateMetadata collects constraints for a field, supporting both normal and shadow validation.
@@ -47,21 +47,24 @@ type updateMetadata struct {
 type updateTagCollector struct {
 	byFieldPath map[string]*updateMetadata
 	listByPath  map[string]*listMetadata
+	prefix      string
 }
 
-func (updateTagCollector) Init(_ Config) {}
+func (utc *updateTagCollector) Init(cfg Config) {
+	utc.prefix = cfg.TagPrefix
+}
 
-func (updateTagCollector) TagName() string {
+func (*updateTagCollector) TagName() string {
 	return updateTagName
 }
 
 var updateTagValidScopes = sets.New(ScopeField, ScopeListVal, ScopeMapVal)
 
-func (updateTagCollector) ValidScopes() sets.Set[Scope] {
+func (*updateTagCollector) ValidScopes() sets.Set[Scope] {
 	return updateTagValidScopes
 }
 
-func (utc updateTagCollector) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+func (utc *updateTagCollector) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	// Parse constraint from this tag
 	var constraint validate.UpdateConstraint
 	switch tag.Value {
@@ -76,7 +79,7 @@ func (utc updateTagCollector) GetValidations(context Context, tag codetags.Tag) 
 	case "NoRemoveItem":
 		constraint = validate.NoRemoveItem
 	default:
-		return Validations{}, fmt.Errorf("unknown +k8s:update constraint: %s", tag.Value)
+		return Validations{}, fmt.Errorf("unknown +%s constraint: %s", tag.Name, tag.Value)
 	}
 
 	// Element scope (reached via +k8s:eachVal): only NoModify is valid,
@@ -87,11 +90,11 @@ func (utc updateTagCollector) GetValidations(context Context, tag codetags.Tag) 
 	// updateFieldValidator.
 	if context.Scope == ScopeListVal || context.Scope == ScopeMapVal {
 		if constraint != validate.NoModify {
-			return Validations{}, fmt.Errorf("+k8s:update=%s does not apply to %s, attach it to the enclosing field", constraintName(constraint), context.Scope)
+			return Validations{}, fmt.Errorf("+%s=%s does not apply to %s, attach it to the enclosing field", tag.Name, constraintName(constraint), context.Scope)
 		}
 		nt := util.NonPointer(util.NativeType(context.Type))
 		if nt.Kind == types.Slice || nt.Kind == types.Map {
-			return Validations{}, fmt.Errorf("+k8s:update=NoModify cannot be applied to list/map elements that are themselves lists or maps")
+			return Validations{}, fmt.Errorf("+%s=NoModify cannot be applied to list/map elements that are themselves lists or maps", tag.Name)
 		}
 		// For ScopeListVal, NoModify is only meaningful when the enclosing
 		// list matches items by key (listType=map or unique=map). For
@@ -99,7 +102,7 @@ func (utc updateTagCollector) GetValidations(context Context, tag codetags.Tag) 
 		// unmatched item that ratchets through as a no-op. Reject upfront.
 		if context.Scope == ScopeListVal && context.ParentPath != nil {
 			if lm := utc.listByPath[context.ParentPath.String()]; lm != nil && lm.semantic != semanticMap {
-				return Validations{}, fmt.Errorf("+k8s:eachVal=+k8s:update=NoModify requires the enclosing list to use listType=map or unique=map (got %s)", lm.semantic)
+				return Validations{}, fmt.Errorf("+%s=+%s=NoModify requires the enclosing list to use listType=map or unique=map (got %s)", utc.prefix+eachValTagName, tag.Name, lm.semantic)
 			}
 		}
 		v := emitScalarUpdate(context, []validate.UpdateConstraint{constraint})
@@ -119,20 +122,20 @@ func (utc updateTagCollector) GetValidations(context Context, tag codetags.Tag) 
 	// Add this constraint to the set for this field
 	um.constraints.Insert(constraint)
 
-	if err := utc.validateConstraintsForType(context, um.constraints.UnsortedList()); err != nil {
+	if err := utc.validateConstraintsForType(context, tag, um.constraints.UnsortedList()); err != nil {
 		return Validations{}, err
 	}
 
 	return Validations{
 		Deferred: []DeferredGen{
 			Deferred(ThisContext, func() (Validations, error) {
-				return getUpdateValidations(utc.byFieldPath, utc.listByPath, context)
+				return getUpdateValidations(utc.byFieldPath, utc.listByPath, utc.prefix, context)
 			}),
 		},
 	}, nil
 }
 
-func (utc updateTagCollector) validateConstraintsForType(context Context, constraints []validate.UpdateConstraint) error {
+func (utc *updateTagCollector) validateConstraintsForType(context Context, tag codetags.Tag, constraints []validate.UpdateConstraint) error {
 	t := util.NonPointer(util.NativeType(context.Type))
 	isCompound := t.Kind == types.Slice || t.Kind == types.Map
 	isPointer := context.Type.Kind == types.Pointer
@@ -142,16 +145,16 @@ func (utc updateTagCollector) validateConstraintsForType(context Context, constr
 		switch constraint {
 		case validate.NoAddItem, validate.NoRemoveItem:
 			if !isCompound {
-				return fmt.Errorf("+k8s:update=%s can only be used on list or map fields", constraintName(constraint))
+				return fmt.Errorf("+%s=%s can only be used on list or map fields", tag.Name, constraintName(constraint))
 			}
 		case validate.NoModify:
 			if isCompound {
-				return fmt.Errorf("+k8s:update=NoModify is not supported on list or map fields, use +k8s:eachVal=+k8s:update=NoModify for per-item immutability")
+				return fmt.Errorf("+%[1]s=NoModify is not supported on list or map fields, use +%[2]s=+%[1]s=NoModify for per-item immutability", tag.Name, utc.prefix+eachValTagName)
 			}
 		case validate.NoSet, validate.NoUnset:
 			// For non-pointer struct fields, only NoModify is applicable
 			if isStruct && !isPointer {
-				return fmt.Errorf("+k8s:update=%s cannot be used on non-pointer struct fields (they cannot be unset)", constraintName(constraint))
+				return fmt.Errorf("+%s=%s cannot be used on non-pointer struct fields (they cannot be unset)", tag.Name, constraintName(constraint))
 			}
 		}
 	}
@@ -176,7 +179,7 @@ func constraintName(c validate.UpdateConstraint) string {
 	}
 }
 
-func (utc updateTagCollector) Docs() TagDoc {
+func (utc *updateTagCollector) Docs() TagDoc {
 	return TagDoc{
 		Tag:            utc.TagName(),
 		StabilityLevel: TagStabilityLevelStable,
@@ -189,12 +192,12 @@ func (utc updateTagCollector) Docs() TagDoc {
 			"Multiple constraints can be specified using multiple tags. " +
 			"For non-pointer structs, NoSet and NoUnset have no effect as these fields cannot be unset. " +
 			"For slice and map fields, 'unset' means len == 0. Slice item identity for NoAddItem/NoRemoveItem comes from " +
-			"+k8s:listType/+k8s:listMapKey/+k8s:unique, for maps the key is the item identity. " +
-			"NoModify is not supported on slices or maps, use +k8s:eachVal=+k8s:update=NoModify for per-item immutability. " +
-			"On lists, +k8s:eachVal=+k8s:update=NoModify requires listType=map or unique=map, otherwise content changes are not detectable. " +
-			"Examples: +k8s:update=NoModify +k8s:update=NoUnset for set-once fields, " +
-			"+k8s:update=NoSet for fields that must be set at creation or never, " +
-			"+k8s:update=NoAddItem +k8s:update=NoRemoveItem on a listType=map field to freeze the structural shape of the list.",
+			fmt.Sprintf("+%[1]s%[2]s/+%[1]s%[3]s/+%[1]s%[4]s, for maps the key is the item identity. ", utc.prefix, listTypeTagName, ListMapKeyTagName, uniqueTagName) +
+			fmt.Sprintf("NoModify is not supported on slices or maps, use +%[1]s%[2]s=+%[1]s%[3]s=NoModify for per-item immutability. ", utc.prefix, eachValTagName, updateTagName) +
+			fmt.Sprintf("On lists, +%[1]s%[2]s=+%[1]s%[3]s=NoModify requires listType=map or unique=map, otherwise content changes are not detectable. ", utc.prefix, eachValTagName, updateTagName) +
+			fmt.Sprintf("Examples: +%[1]s%[2]s=NoModify +%[1]s%[2]s=NoUnset for set-once fields, ", utc.prefix, updateTagName) +
+			fmt.Sprintf("+%[1]s%[2]s=NoSet for fields that must be set at creation or never, ", utc.prefix, updateTagName) +
+			fmt.Sprintf("+%[1]s%[2]s=NoAddItem +%[1]s%[2]s=NoRemoveItem on a listType=map field to freeze the structural shape of the list.", utc.prefix, updateTagName),
 	}
 }
 
@@ -214,7 +217,7 @@ var (
 	noRemoveItemConstraint = types.Name{Package: libValidationPkg, Name: "NoRemoveItem"}
 )
 
-func getUpdateValidations(byFieldPath map[string]*updateMetadata, listByPath map[string]*listMetadata, context Context) (Validations, error) {
+func getUpdateValidations(byFieldPath map[string]*updateMetadata, listByPath map[string]*listMetadata, prefix string, context Context) (Validations, error) {
 	um := byFieldPath[context.Path.String()]
 
 	if um == nil || um.constraints.Len() == 0 {
@@ -225,7 +228,7 @@ func getUpdateValidations(byFieldPath map[string]*updateMetadata, listByPath map
 
 	constraints := um.constraints.UnsortedList()
 
-	v, err := generateUpdateValidation(listByPath, context, constraints)
+	v, err := generateUpdateValidation(listByPath, prefix, context, constraints)
 	if err != nil {
 		return Validations{}, err
 	}
@@ -239,14 +242,14 @@ func getUpdateValidations(byFieldPath map[string]*updateMetadata, listByPath map
 	return v, nil
 }
 
-func generateUpdateValidation(listByPath map[string]*listMetadata, context Context, constraints []validate.UpdateConstraint) (Validations, error) {
+func generateUpdateValidation(listByPath map[string]*listMetadata, prefix string, context Context, constraints []validate.UpdateConstraint) (Validations, error) {
 	// Sort constraints to ensure deterministic order
 	slices.Sort(constraints)
 
 	t := util.NonPointer(util.NativeType(context.Type))
 	switch t.Kind {
 	case types.Slice:
-		return generateSliceValidation(listByPath, context, constraints)
+		return generateSliceValidation(listByPath, prefix, context, constraints)
 	case types.Map:
 		return generateMapValidation(constraints), nil
 	}
@@ -261,7 +264,7 @@ func generateUpdateValidation(listByPath map[string]*listMetadata, context Conte
 // Metadata lookup falls back from the field path to the type path so that
 // typedef-level list annotations apply, mirroring the pattern used by
 // listValidator.
-func generateSliceValidation(listByPath map[string]*listMetadata, context Context, constraints []validate.UpdateConstraint) (Validations, error) {
+func generateSliceValidation(listByPath map[string]*listMetadata, prefix string, context Context, constraints []validate.UpdateConstraint) (Validations, error) {
 	var matchArg any = Literal("nil")
 	// NoAddItem/NoRemoveItem need a match function to pair items between old and new, NoSet/NoUnset only check len == 0.
 	if slices.Contains(constraints, validate.NoAddItem) || slices.Contains(constraints, validate.NoRemoveItem) {
@@ -270,13 +273,13 @@ func generateSliceValidation(listByPath map[string]*listMetadata, context Contex
 			lm = listByPath[context.Type.String()]
 		}
 		if lm == nil {
-			return Validations{}, fmt.Errorf("+k8s:update=NoAddItem/+k8s:update=NoRemoveItem require list metadata (+k8s:listType with listMapKey, or +k8s:unique) to determine item identity")
+			return Validations{}, fmt.Errorf("+%[1]s=NoAddItem/+%[1]s=NoRemoveItem require list metadata (+%[2]s with listMapKey, or +%[3]s) to determine item identity", prefix+updateTagName, prefix+listTypeTagName, prefix+uniqueTagName)
 		}
 		elem := util.NativeType(context.Type).Elem
 		switch lm.semantic {
 		case semanticMap:
 			if len(lm.keyMembers) == 0 {
-				return Validations{}, fmt.Errorf("+k8s:update=NoAddItem/+k8s:update=NoRemoveItem require listMapKey to be set for listType=map")
+				return Validations{}, fmt.Errorf("+%[1]s=NoAddItem/+%[1]s=NoRemoveItem require listMapKey to be set for listType=map", prefix+updateTagName)
 			}
 			matchArg = lm.makeListMapMatchFunc(elem)
 		case semanticSet:
@@ -286,7 +289,7 @@ func generateSliceValidation(listByPath map[string]*listMetadata, context Contex
 				matchArg = DeepEqualFunc{}
 			}
 		default:
-			return Validations{}, fmt.Errorf("+k8s:update=NoAddItem/+k8s:update=NoRemoveItem require listType=set, listType=map, unique=set, or unique=map to define item identity")
+			return Validations{}, fmt.Errorf("+%[1]s=NoAddItem/+%[1]s=NoRemoveItem require listType=set, listType=map, unique=set, or unique=map to define item identity", prefix+updateTagName)
 		}
 	}
 

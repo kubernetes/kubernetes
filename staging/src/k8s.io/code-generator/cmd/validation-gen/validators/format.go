@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	formatTagName = "k8s:format"
+	formatTagName = "format"
 )
 
 func init() {

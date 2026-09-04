@@ -17,8 +17,16 @@ limitations under the License.
 package validators
 
 import (
+	"os"
 	"testing"
+
+	"k8s.io/gengo/v2/generator"
 )
+
+func TestMain(m *testing.M) {
+	InitGlobalValidator(&generator.Context{}, nil, "k8s:")
+	os.Exit(m.Run())
+}
 
 func TestGetStability(t *testing.T) {
 	tests := []struct {

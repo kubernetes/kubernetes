@@ -27,15 +27,15 @@ import (
 )
 
 const (
-	minItemsTagName      = "k8s:minItems"
-	maxItemsTagName      = "k8s:maxItems"
-	minimumTagName       = "k8s:minimum"
-	maximumTagName       = "k8s:maximum"
-	minLengthTagName     = "k8s:minLength"
-	maxLengthTagName     = "k8s:maxLength"
-	maxBytesTagName      = "k8s:maxBytes"
-	maxPropertiesTagName = "k8s:maxProperties"
-	minPropertiesTagName = "k8s:minProperties"
+	minItemsTagName      = "minItems"
+	maxItemsTagName      = "maxItems"
+	minimumTagName       = "minimum"
+	maximumTagName       = "maximum"
+	minLengthTagName     = "minLength"
+	maxLengthTagName     = "maxLength"
+	maxBytesTagName      = "maxBytes"
+	maxPropertiesTagName = "maxProperties"
+	minPropertiesTagName = "minProperties"
 )
 
 func init() {
