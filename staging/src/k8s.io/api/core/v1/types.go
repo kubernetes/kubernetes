@@ -7635,7 +7635,7 @@ type PodLogOptions struct {
 	// Note that when "TailLines" is specified, "Stream" can only be set to nil or "All".
 	// +featureGate=PodLogsQuerySplitStreams
 	// +optional
-	Stream *string `json:"stream,omitempty" protobuf:"varint,10,opt,name=stream"`
+	Stream *string `json:"stream,omitempty" protobuf:"bytes,10,opt,name=stream"`
 }
 
 // +k8s:conversion-gen:explicit-from=net/url.Values
