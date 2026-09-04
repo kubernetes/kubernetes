@@ -112,6 +112,9 @@ type ConfigFlags struct {
 	clientConfig     clientcmd.ClientConfig
 	clientConfigLock sync.Mutex
 
+	restConfig     *rest.Config
+	restConfigLock sync.Mutex
+
 	restMapper     meta.RESTMapper
 	restMapperLock sync.Mutex
 
@@ -139,7 +142,7 @@ type ConfigFlags struct {
 // Expects the AddFlags method to have been called. If WrapConfigFn
 // is non-nil this function can transform config before return.
 func (f *ConfigFlags) ToRESTConfig() (*rest.Config, error) {
-	c, err := f.ToRawKubeConfigLoader().ClientConfig()
+	c, err := f.toRESTConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -147,6 +150,36 @@ func (f *ConfigFlags) ToRESTConfig() (*rest.Config, error) {
 		return f.WrapConfigFn(c), nil
 	}
 	return c, nil
+}
+
+// toRESTConfig resolves the raw kubeconfig into a *rest.Config. When persistent config
+// is in use the resolved config is memoized, matching what this struct already does for
+// the client config, the rest mapper and the discovery client.
+//
+// Resolving is not free: clientcmd validates the config every time, which stats and
+// opens the certificate-authority, client-certificate and client-key files when those
+// are given as paths. A command that builds a REST client for each of N group-versions
+// calls ToRESTConfig N times and pays that cost N times over.
+//
+// Callers mutate the returned config -- ContentConfig, GroupVersion, APIPath -- so each
+// one gets its own copy.
+func (f *ConfigFlags) toRESTConfig() (*rest.Config, error) {
+	if !f.usePersistentConfig {
+		return f.ToRawKubeConfigLoader().ClientConfig()
+	}
+
+	f.restConfigLock.Lock()
+	defer f.restConfigLock.Unlock()
+
+	if f.restConfig == nil {
+		c, err := f.ToRawKubeConfigLoader().ClientConfig()
+		if err != nil {
+			return nil, err
+		}
+		f.restConfig = c
+	}
+
+	return rest.CopyConfig(f.restConfig), nil
 }
 
 // ToRawKubeConfigLoader binds config flag values to config overrides
