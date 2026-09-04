@@ -21,6 +21,7 @@ package userns
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"testing"
 
@@ -528,4 +529,41 @@ func TestRecordBounds(t *testing.T) {
 	err = m.record(logger, types.UID(fmt.Sprintf("%d", 2)), uint32(2*65536), 65536)
 	assert.Error(t, err)
 	assert.ErrorContains(t, err, "out of range")
+}
+
+func TestUserNsManagerAllocateTerminalBlock(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
+
+	// Mappings that cover the end of the 32-bit ID space. The kernel rejects
+	// uid_map/gid_map extents that include ID 2^32-1 (the extent first+count
+	// wraps), so the last block [4294901760, 4294967295] can never be used to
+	// create a sandbox and must not be allocated to a pod.
+	testUserNsPodsManager := &testUserNsPodsManager{
+		mappingFirstID: 65534 * 65536,
+		mappingLen:     2 * 65536,
+		maxPods:        2,
+	}
+	m, err := MakeUserNsManager(logger, testUserNsPodsManager, nil)
+	require.NoError(t, err)
+
+	var allocs []uint32
+	for i := 0; i < 2; i++ {
+		firstID, length, err := m.allocateOne(logger, types.UID(fmt.Sprintf("pod-%d", i)))
+		if err != nil {
+			break
+		}
+		lastID := uint64(firstID) + uint64(length) - 1
+		assert.Lessf(t, lastID, uint64(math.MaxUint32),
+			"allocated range [%v, %v] includes an ID the kernel rejects in ID mappings", firstID, lastID)
+		allocs = append(allocs, firstID)
+	}
+	assert.NotEmpty(t, allocs, "at least one user namespace should be allocatable")
+
+	// A terminal range persisted by an older kubelet must still be accepted on
+	// restart, so the kubelet can start and the pod can be deleted normally.
+	m2, err := MakeUserNsManager(logger, testUserNsPodsManager, nil)
+	require.NoError(t, err)
+	err = m2.record(logger, "pod-from-disk", 65535*65536, 65536)
+	assert.NoError(t, err)
 }

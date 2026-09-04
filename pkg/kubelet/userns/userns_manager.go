@@ -22,6 +22,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -222,19 +223,30 @@ func (m *UsernsManager) isSet(v uint32) bool {
 // The first return value is the first ID in the user namespace, the second returns
 // the length for the user namespace range.
 func (m *UsernsManager) allocateOne(logger klog.Logger, pod types.UID) (firstID uint32, length uint32, err error) {
-	firstZero, found, err := m.used.AllocateNext()
-	if err != nil {
-		return 0, 0, err
-	}
-	if !found {
-		return 0, 0, fmt.Errorf("could not find an empty slot to allocate a user namespace")
-	}
+	for {
+		firstZero, found, err := m.used.AllocateNext()
+		if err != nil {
+			return 0, 0, err
+		}
+		if !found {
+			return 0, 0, fmt.Errorf("could not find an empty slot to allocate a user namespace")
+		}
 
-	logger.V(5).Info("new pod user namespace allocation", "podUID", pod)
+		first := uint64(firstZero+m.off) * uint64(m.userNsLength)
+		// The kernel rejects uid_map/gid_map extents that include ID 2^32-1, as
+		// the extent first+count wraps. A pod with such a range fails sandbox
+		// creation forever, so leave the range marked as used and try the next one.
+		if first+uint64(m.userNsLength) > math.MaxUint32 {
+			logger.V(2).Info("skipping user namespace range not usable for ID mappings", "firstID", first, "length", m.userNsLength)
+			continue
+		}
 
-	firstID = uint32((firstZero + m.off)) * m.userNsLength
-	m.usedBy[pod] = firstID
-	return firstID, m.userNsLength, nil
+		logger.V(5).Info("new pod user namespace allocation", "podUID", pod)
+
+		firstID = uint32(first)
+		m.usedBy[pod] = firstID
+		return firstID, m.userNsLength, nil
+	}
 }
 
 // record stores the user namespace [from; from+length] to the specified pod.
