@@ -2526,20 +2526,50 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 		oldStatuses[status.Name] = status
 	}
 
+	isInitContainerCompleted := func(container *v1.Container, oldStatus *v1.ContainerStatus, cStatus *kubecontainer.Status) bool {
+		if cStatus != nil {
+			if cStatus.State == kubecontainer.ContainerStateExited && cStatus.ExitCode == 0 {
+				return true
+			}
+			if podutil.IsRestartableInitContainer(container) && cStatus.State == kubecontainer.ContainerStateRunning {
+				return true
+			}
+		}
+		if oldStatus != nil {
+			if oldStatus.State.Terminated != nil && oldStatus.State.Terminated.ExitCode == 0 {
+				return true
+			}
+			if podutil.IsRestartableInitContainer(container) && oldStatus.State.Running != nil {
+				return true
+			}
+		}
+		return false
+	}
+
 	// Set all container statuses to default waiting state
 	statuses := make(map[string]*v1.ContainerStatus, len(containers))
 	defaultWaitingState := v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: ContainerCreating}}
-	if hasInitContainers {
+	if hasInitContainers && !isInitContainer {
 		defaultWaitingState = v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: PodInitializing}}
 	}
 
 	supportsRRO := kl.runtimeClassSupportsRecursiveReadOnlyMounts(logger, pod)
 
+	foundActiveInitContainer := false
 	for _, container := range containers {
+		state := defaultWaitingState
+		if isInitContainer {
+			if !foundActiveInitContainer {
+				state = v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: ContainerCreating}}
+			} else {
+				state = v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: PodInitializing}}
+			}
+		}
+
 		status := &v1.ContainerStatus{
 			Name:  container.Name,
 			Image: container.Image,
-			State: defaultWaitingState,
+			State: state,
 		}
 		// status.VolumeMounts cannot be propagated from kubecontainer.Status
 		// because the CRI API is unaware of the volume names.
@@ -2578,6 +2608,23 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 			}
 		}
 		statuses[container.Name] = status
+
+		if isInitContainer {
+			var cStatus *kubecontainer.Status
+			for _, cs := range podStatus.ContainerStatuses {
+				if cs.Name == container.Name {
+					cStatus = cs
+					break
+				}
+			}
+			var oldStatusPtr *v1.ContainerStatus
+			if found {
+				oldStatusPtr = &oldStatus
+			}
+			if !isInitContainerCompleted(&container, oldStatusPtr, cStatus) {
+				foundActiveInitContainer = true
+			}
+		}
 	}
 
 	for _, container := range containers {
@@ -2637,10 +2684,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 		status := statuses[container.Name]
 		// If the status we're about to write indicates the default, the Waiting status will force this pod back into Pending.
 		// That isn't true, we know the pod was previously running.
-		isDefaultWaitingStatus := status.State.Waiting != nil && status.State.Waiting.Reason == ContainerCreating
-		if hasInitContainers {
-			isDefaultWaitingStatus = status.State.Waiting != nil && status.State.Waiting.Reason == PodInitializing
-		}
+		isDefaultWaitingStatus := status.State.Waiting != nil && (status.State.Waiting.Reason == ContainerCreating || status.State.Waiting.Reason == PodInitializing)
 		if !isDefaultWaitingStatus {
 			// the status was written, don't override
 			continue
