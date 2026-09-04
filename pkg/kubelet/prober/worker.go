@@ -19,6 +19,7 @@ package prober
 import (
 	"context"
 	"math/rand"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -71,6 +72,13 @@ type worker struct {
 
 	// If set, skip probing.
 	onHold bool
+
+	// mu guards cancel and stopped.
+	mu sync.Mutex
+	// cancel aborts an in-flight probe when stop() is called.
+	cancel context.CancelFunc
+	// stopped tracks whether stop() was called before run() initialized cancel.
+	stopped bool
 
 	// proberResultsMetricLabels holds the labels attached to this worker
 	// for the ProberResults metric by result.
@@ -159,6 +167,18 @@ func (w *worker) run(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	probeTickerPeriod := time.Duration(w.spec.PeriodSeconds) * time.Second
 
+	// Derive a worker context so stop() can abort in-flight probes.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	w.mu.Lock()
+	w.cancel = cancel
+	stopped := w.stopped
+	w.mu.Unlock()
+	if stopped {
+		// Honor stop() called before run() started.
+		cancel()
+	}
+
 	// If kubelet restarted the probes could be started in rapid succession.
 	// Let the worker wait for a random portion of tickerPeriod before probing.
 	// Do it only if the kubelet has started recently.
@@ -201,9 +221,18 @@ probeLoop:
 	}
 }
 
-// stop stops the probe worker. The worker handles cleanup and removes itself from its manager.
+// stop stops the probe worker, aborting any probe that is currently executing.
+// The worker handles cleanup and removes itself from its manager.
 // It is safe to call stop multiple times.
 func (w *worker) stop() {
+	w.mu.Lock()
+	w.stopped = true
+	cancel := w.cancel
+	w.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+
 	select {
 	case w.stopCh <- struct{}{}:
 	default: // Non-blocking.
@@ -346,7 +375,7 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	}
 
 	// Note, exec probe does NOT have access to pod environment variables or downward API
-	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
+	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status.PodIP, w.container, w.containerID)
 	if err != nil {
 		// Prober error, throw away the result.
 		return true
