@@ -19,6 +19,7 @@ package cronjob
 import (
 	"context"
 	"testing"
+	"time"
 
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -298,6 +299,49 @@ func TestCronJobStatusStrategy(t *testing.T) {
 	}
 	if newCronJob.ResourceVersion != "9" {
 		t.Errorf("Incoming resource version on update should not be mutated")
+	}
+}
+
+func TestCronJobStatusStrategyNextScheduleTime(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	now := metav1.Now()
+	later := metav1.NewTime(now.Add(time.Hour))
+
+	mkCronJob := func(next *metav1.Time) *batch.CronJob {
+		return &batch.CronJob{
+			ObjectMeta: metav1.ObjectMeta{Name: "cj", Namespace: metav1.NamespaceDefault},
+			Spec:       validCronjobSpec,
+			Status:     batch.CronJobStatus{NextScheduleTime: next},
+		}
+	}
+
+	cases := map[string]struct {
+		gateEnabled bool
+		oldNext     *metav1.Time
+		newNext     *metav1.Time
+		wantNext    *metav1.Time
+	}{
+		"gate enabled keeps the new value": {
+			gateEnabled: true, oldNext: nil, newNext: &later, wantNext: &later,
+		},
+		"gate disabled drops the value when old was unset": {
+			gateEnabled: false, oldNext: nil, newNext: &later, wantNext: nil,
+		},
+		"gate disabled keeps the value when old already had it set": {
+			gateEnabled: false, oldNext: &now, newNext: &later, wantNext: &later,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CronJobsNextScheduleTime, tc.gateEnabled)
+			oldCronJob := mkCronJob(tc.oldNext)
+			newCronJob := mkCronJob(tc.newNext)
+			StatusStrategy.PrepareForUpdate(ctx, newCronJob, oldCronJob)
+			if !newCronJob.Status.NextScheduleTime.Equal(tc.wantNext) {
+				t.Errorf("NextScheduleTime = %v, want %v", newCronJob.Status.NextScheduleTime, tc.wantNext)
+			}
+		})
 	}
 }
 
