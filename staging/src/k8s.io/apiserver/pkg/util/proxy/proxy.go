@@ -56,6 +56,9 @@ func findServicePort(svc *v1.Service, port int32) (*v1.ServicePort, error) {
 // ResolveEndpoint returns a URL to which one can send traffic for the specified service.
 // If the service is dual-stack, the URL will preferentially point to an endpoint of the
 // service's primary IP family.
+//
+// ExternalName services have no selectables EndpointSlice backends; they resolve to the
+// configured external hostname (same as ResolveCluster).
 func ResolveEndpoint(services listersv1.ServiceLister, endpointSlices EndpointSliceGetter, namespace, id string, port int32) (*url.URL, error) {
 	svc, err := services.Services(namespace).Get(id)
 	if err != nil {
@@ -64,7 +67,13 @@ func ResolveEndpoint(services listersv1.ServiceLister, endpointSlices EndpointSl
 
 	switch {
 	case svc.Spec.Type == v1.ServiceTypeClusterIP, svc.Spec.Type == v1.ServiceTypeLoadBalancer, svc.Spec.Type == v1.ServiceTypeNodePort:
-		// these are fine
+		// these are fine — pick a Ready endpoint below
+	case svc.Spec.Type == v1.ServiceTypeExternalName:
+		// No pod endpoints; dial the external hostname directly.
+		return &url.URL{
+			Scheme: "https",
+			Host:   net.JoinHostPort(svc.Spec.ExternalName, fmt.Sprintf("%d", port)),
+		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported service type %q", svc.Spec.Type)
 	}
