@@ -90,7 +90,8 @@ func TestGetEarliestPodStartTime(t *testing.T) {
 				newPriorityPodWithStartTime("pod1", 1, currentTime.Add(-time.Second)),
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "pod2",
+						Name:              "pod2",
+						CreationTimestamp: metav1.NewTime(currentTime),
 					},
 					Spec: v1.PodSpec{
 						Priority: &priority,
@@ -163,6 +164,85 @@ func TestMoreImportantPod(t *testing.T) {
 				t.Errorf("expected %t but got %t", v.expected, got)
 			}
 		})
+	}
+}
+
+func TestMoreImportantPodWithoutStartTime(t *testing.T) {
+	var priority int32 = 1
+	baseTime := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	newPod := func(name string, creationTimestamp time.Time, startTime *metav1.Time) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              name,
+				CreationTimestamp: metav1.NewTime(creationTimestamp),
+			},
+			Spec: v1.PodSpec{
+				Priority: &priority,
+			},
+			Status: v1.PodStatus{StartTime: startTime},
+		}
+	}
+
+	startedAt := metav1.NewTime(baseTime.Add(time.Hour))
+	startedPod := newPod("started-pod", baseTime.Add(time.Hour), &startedAt)
+	unstartedOlderPod := newPod("unstarted-older-pod", baseTime, nil)
+	unstartedNewerPod := newPod("unstarted-newer-pod", baseTime.Add(2*time.Hour), nil)
+
+	tests := []struct {
+		name     string
+		pod1     *v1.Pod
+		pod2     *v1.Pod
+		expected bool
+	}{
+		{
+			name:     "started pod is more important than unstarted pod",
+			pod1:     startedPod,
+			pod2:     unstartedOlderPod,
+			expected: true,
+		},
+		{
+			name:     "unstarted pod is less important than started pod",
+			pod1:     unstartedOlderPod,
+			pod2:     startedPod,
+			expected: false,
+		},
+		{
+			name:     "creation timestamp does not order unstarted pods",
+			pod1:     unstartedOlderPod,
+			pod2:     unstartedNewerPod,
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := MoreImportantPod(test.pod1, test.pod2)
+			if got != test.expected {
+				t.Errorf("expected %t but got %t", test.expected, got)
+			}
+		})
+	}
+}
+
+func BenchmarkMoreImportantPodWithoutStartTime(b *testing.B) {
+	var priority int32 = 1
+	pod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod1"},
+		Spec: v1.PodSpec{
+			Priority: &priority,
+		},
+	}
+	pod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod2"},
+		Spec: v1.PodSpec{
+			Priority: &priority,
+		},
+	}
+
+	b.ReportAllocs()
+	for b.Loop() {
+		MoreImportantPod(pod1, pod2)
 	}
 }
 
