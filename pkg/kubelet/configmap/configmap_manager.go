@@ -136,7 +136,7 @@ func NewCachingConfigMapManager(kubeClient clientset.Interface, getTTL manager.G
 //   - whenever a pod is created or updated, we start individual watches for all
 //     referenced objects that aren't referenced from other registered pods
 //   - every GetObject() returns a value from local cache propagated via watches
-func NewWatchingConfigMapManager(kubeClient clientset.Interface, resyncInterval time.Duration) Manager {
+func NewWatchingConfigMapManager(ctx context.Context, kubeClient clientset.Interface, resyncInterval time.Duration) Manager {
 	listConfigMap := func(namespace string, opts metav1.ListOptions) (runtime.Object, error) {
 		return kubeClient.CoreV1().ConfigMaps(namespace).List(context.TODO(), opts)
 	}
@@ -157,6 +157,6 @@ func NewWatchingConfigMapManager(kubeClient clientset.Interface, resyncInterval 
 	}
 	gr := corev1.Resource("configmap")
 	return &configMapManager{
-		manager: manager.NewWatchBasedManager(listConfigMap, watchConfigMap, newConfigMap, isImmutable, listWatcherWithWatchListSemanticsWrapper, gr, resyncInterval, getConfigMapNames),
+		manager: manager.NewWatchBasedManager(ctx, listConfigMap, watchConfigMap, newConfigMap, isImmutable, listWatcherWithWatchListSemanticsWrapper, gr, resyncInterval, getConfigMapNames),
 	}
 }
