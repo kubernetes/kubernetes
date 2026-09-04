@@ -69,6 +69,9 @@ func isCycleStateEqual(a, b *CycleState) (bool, string) {
 	if a.recordPluginMetrics != b.recordPluginMetrics {
 		return false, fmt.Sprintf("CycleState A and B have a different recordPluginMetrics. A: %v, B: %v", a.recordPluginMetrics, b.recordPluginMetrics)
 	}
+	if a.recordFrameworkExtensionPointMetrics != b.recordFrameworkExtensionPointMetrics {
+		return false, fmt.Sprintf("CycleState A and B have a different recordFrameworkExtensionPointMetrics. A: %v, B: %v", a.recordFrameworkExtensionPointMetrics, b.recordFrameworkExtensionPointMetrics)
+	}
 	if diff := cmp.Diff(a.skipFilterPlugins, b.skipFilterPlugins); diff != "" {
 		return false, fmt.Sprintf("CycleState A and B have different SkipFilterPlugin sets. -wanted,+got:\n%s", diff)
 	}
@@ -281,6 +284,50 @@ func TestPlacementCycleState(t *testing.T) {
 		cloned := state.Clone().(*CycleState)
 		if cloned.GetPlacementCycleState() != nil {
 			t.Errorf("cloned state should have nil PlacementCycleState when original has nil")
+		}
+	})
+}
+
+func TestRecordFrameworkExtensionPointMetrics(t *testing.T) {
+	t.Run("nil cycle state", func(t *testing.T) {
+		var state *CycleState
+		if state.ShouldRecordFrameworkExtensionPointMetrics() {
+			t.Errorf("expected false for nil CycleState")
+		}
+		// Should not panic
+		state.SetRecordFrameworkExtensionPointMetrics(true)
+	})
+
+	t.Run("default false", func(t *testing.T) {
+		state := NewCycleState()
+		if state.ShouldRecordFrameworkExtensionPointMetrics() {
+			t.Errorf("expected default false for ShouldRecordFrameworkExtensionPointMetrics")
+		}
+	})
+
+	t.Run("set and get true", func(t *testing.T) {
+		state := NewCycleState()
+		state.SetRecordFrameworkExtensionPointMetrics(true)
+		if !state.ShouldRecordFrameworkExtensionPointMetrics() {
+			t.Errorf("expected true after setting to true")
+		}
+	})
+
+	t.Run("set false", func(t *testing.T) {
+		state := NewCycleState()
+		state.SetRecordFrameworkExtensionPointMetrics(true)
+		state.SetRecordFrameworkExtensionPointMetrics(false)
+		if state.ShouldRecordFrameworkExtensionPointMetrics() {
+			t.Errorf("expected false after setting to false")
+		}
+	})
+
+	t.Run("clone preserves flag", func(t *testing.T) {
+		state := NewCycleState()
+		state.SetRecordFrameworkExtensionPointMetrics(true)
+		cloned := state.Clone().(*CycleState)
+		if !cloned.ShouldRecordFrameworkExtensionPointMetrics() {
+			t.Errorf("expected cloned CycleState to retain recordFrameworkExtensionPointMetrics true")
 		}
 	})
 }
