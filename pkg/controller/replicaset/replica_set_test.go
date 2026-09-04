@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onsi/gomega"
 	"math/rand"
 	"net/http/httptest"
 	"net/url"
@@ -30,6 +29,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/onsi/gomega"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -1126,7 +1127,7 @@ func TestRSSyncExpectations(t *testing.T) {
 	postExpectationsPod := pods.Items[1]
 
 	manager.expectations = controller.NewUIDTrackingControllerExpectations(FakeRSExpectations{
-		controller.NewControllerExpectations(), true, func() {
+		controller.NewControllerExpectations(nil), true, func() {
 			// If we check active pods before checking expectataions, the
 			// ReplicaSet will create a new replica because it doesn't see
 			// this pod, but has fulfilled its expectations.
