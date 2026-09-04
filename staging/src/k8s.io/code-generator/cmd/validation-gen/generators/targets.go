@@ -311,7 +311,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 	// it is MUCH faster.
 	inputPkgs := make([]string, 0, len(context.Inputs))
 	pkgToInput := map[string]string{}
-	inputToCanonicalPkg := map[string]string{} // types package -> the output package cross-package references resolve to
+	inputToOutputPkgs := map[string][]string{} // types package -> the output packages generated for it, canonical first
 	for _, input := range context.Inputs {
 		klog.V(4).Infof("considering pkg %q", input)
 		pkg := context.Universe[input]
@@ -332,17 +332,20 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 			klog.V(4).Infof("  input pkg %v", inputPath)
 			inputPkgs = append(inputPkgs, inputPath)
 		}
-		// An input's validation may be generated into more than one package. One
-		// is canonical -- the package cross-package references resolve to. The
-		// registering package is canonical; if none registers, the first one seen
-		// wins. At most one package may register.
-		if prev, ok := inputToCanonicalPkg[inputPath]; !ok {
-			inputToCanonicalPkg[inputPath] = input
-		} else if registerScheme(prefix, pkg) {
-			if registerScheme(prefix, context.Universe[prev]) {
-				klog.Fatalf("input %q is generated into two registering packages (%q, %q); mark one +%s=nil", inputPath, prev, input, prefix+schemeRegistryTagName)
+		// An input's validation may be generated into more than one package. The
+		// registering package is canonical (at most one may register); if none
+		// registers, the first one seen is. Canonical is kept first in the list:
+		// it is the package cross-package references resolve to.
+		pkgs := inputToOutputPkgs[inputPath]
+		if registerScheme(prefix, pkg) {
+			for _, prev := range pkgs {
+				if registerScheme(prefix, context.Universe[prev]) {
+					klog.Fatalf("input %q is generated into two registering packages (%q, %q); mark one +%s=nil", inputPath, prev, input, prefix+schemeRegistryTagName)
+				}
 			}
-			inputToCanonicalPkg[inputPath] = input // a registering package displaces a non-registering one
+			inputToOutputPkgs[inputPath] = append([]string{input}, pkgs...)
+		} else {
+			inputToOutputPkgs[inputPath] = append(pkgs, input)
 		}
 	}
 
@@ -365,8 +368,8 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		inputPkgs = append(inputPkgs, extra)
 		pkgToInput[extra] = extra
 		// Don't let a read-only package override a generation mapping.
-		if _, ok := inputToCanonicalPkg[extra]; !ok {
-			inputToCanonicalPkg[extra] = extra
+		if _, ok := inputToOutputPkgs[extra]; !ok {
+			inputToOutputPkgs[extra] = []string{extra}
 		}
 	}
 
@@ -380,10 +383,10 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 	context.Order = orderer.OrderUniverse(context.Universe)
 
 	// Initialize all validator plugins exactly once.
-	validator := validators.InitGlobalValidator(context, inputToCanonicalPkg, prefix)
+	validator := validators.InitGlobalValidator(context, inputToOutputPkgs, prefix)
 
 	// Create a type discoverer for all types of all inputs.
-	td := NewTypeDiscoverer(validator, inputToCanonicalPkg, prefix)
+	td := NewTypeDiscoverer(validator, inputToOutputPkgs, prefix)
 	if err := td.Init(context); err != nil {
 		klog.Fatalf("Error discovering constants: %v", err)
 	}
@@ -530,7 +533,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 
 				GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 					generators = []generator.Generator{
-						NewGenValidations(args.OutputFile, pkg.Path, typesPkg.Path, rootTypes, td, inputToCanonicalPkg, schemeRegistry, registerThisPkg, deepEqualFunc, prefix),
+						NewGenValidations(args.OutputFile, pkg.Path, typesPkg.Path, rootTypes, td, inputToOutputPkgs, schemeRegistry, registerThisPkg, deepEqualFunc, prefix),
 					}
 					testFixtureTags := testFixtureTag(prefix, pkg)
 					if testFixtureTags.Len() > 0 {
