@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -77,15 +78,43 @@ func IsDeleted(ctx context.Context, info *resource.Info, o *WaitOptions) (runtim
 		return info.Object, false, errWaitTimeoutWithName
 	}
 
+	intrCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// The reflector backing UntilWithSync treats list and watch failures as
+	// retryable, so a caller that may delete an object but may not list or watch
+	// it would otherwise retry until the timeout instead of returning. Record the
+	// first forbidden error and stop waiting, so the caller can decide what it
+	// means. Deletion itself has already succeeded at this point.
+	var (
+		forbiddenLock sync.Mutex
+		forbiddenErr  error
+	)
+	recordForbidden := func(err error) {
+		if !apierrors.IsForbidden(err) {
+			return
+		}
+		forbiddenLock.Lock()
+		defer forbiddenLock.Unlock()
+		if forbiddenErr == nil {
+			forbiddenErr = err
+			cancel()
+		}
+	}
+
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
 	lw := cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fieldSelector
-			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(ctx, options)
+			list, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(ctx, options)
+			recordForbidden(err)
+			return list, err
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			options.FieldSelector = fieldSelector
-			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(ctx, options)
+			w, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(ctx, options)
+			recordForbidden(err)
+			return w, err
 		},
 	}, o.DynamicClient)
 
@@ -111,8 +140,6 @@ func IsDeleted(ctx context.Context, info *resource.Info, o *WaitOptions) (runtim
 		return false, nil
 	}
 
-	intrCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
 	intr := interrupt.New(nil, cancel)
 	err := intr.Run(func() error {
 		_, err := watchtools.UntilWithSync(intrCtx, lw, &unstructured.Unstructured{}, preconditionFunc, Wait{errOut: o.ErrOut}.IsDeleted)
@@ -122,6 +149,21 @@ func IsDeleted(ctx context.Context, info *resource.Info, o *WaitOptions) (runtim
 		return err
 	})
 	if err != nil {
+		// A recorded denial is the reason the wait stopped, so report it rather
+		// than the context cancellation it triggered. Only consult it once the
+		// wait has failed: if deletion was confirmed first, the confirmation stands.
+		forbiddenLock.Lock()
+		stoppedByForbidden := forbiddenErr
+		forbiddenLock.Unlock()
+		if stoppedByForbidden != nil {
+			// Cancelling the wait may have pre-empted a precondition that was
+			// about to be satisfied, so confirm through the get that already
+			// succeeded above before reporting the denial.
+			if _, getErr := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Get(ctx, info.Name, metav1.GetOptions{}); apierrors.IsNotFound(getErr) {
+				return info.Object, true, nil
+			}
+			return gottenObj, false, stoppedByForbidden
+		}
 		if wait.Interrupted(err) { // nolint:staticcheck // SA1019
 			return gottenObj, false, errWaitTimeoutWithName
 		}
