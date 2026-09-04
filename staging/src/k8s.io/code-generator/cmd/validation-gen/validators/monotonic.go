@@ -30,7 +30,7 @@ func init() {
 }
 
 const (
-	monotonicTagName = "k8s:monotonic"
+	monotonicTagName = "monotonic"
 )
 
 var (

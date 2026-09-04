@@ -27,8 +27,8 @@ import (
 var kubeVersionRegex = regexp.MustCompile(`^\d+\.\d+$`)
 
 const (
-	alphaTagName = "k8s:alpha"
-	betaTagName  = "k8s:beta"
+	alphaTagName = "alpha"
+	betaTagName  = "beta"
 )
 
 func init() {

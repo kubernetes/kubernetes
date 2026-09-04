@@ -91,18 +91,7 @@ var (
 		InputTag:      "k8s:defaulter-gen-input",
 		ValueMode:     TypeFilterList,
 	}
-	Validation = Spec{
-		ActivationTag: "k8s:validation-gen",
-		InputTag:      "k8s:validation-gen-input",
-		ValueMode:     TypeFilterList,
-		AuxTags: []string{
-			"k8s:validation-gen-deep-equal-func",
-			"k8s:validation-gen-nolint",
-			"k8s:validation-gen-scheme-registry",
-			"k8s:validation-gen-test-fixture",
-			"k8s:validation-gen-test-targets",
-		},
-	}
+	Validation          = ValidationSpec("k8s:")
 	PrereleaseLifecycle = Spec{
 		ActivationTag: "k8s:prerelease-lifecycle-gen",
 		ValueMode:     Boolean,
@@ -158,6 +147,24 @@ var (
 		DefaultEnabled: true,
 	}
 )
+
+// ValidationSpec returns validation-gen's Spec with its tags qualified by
+// tagPrefix, e.g. ValidationSpec("k8s:") recognizes +k8s:validation-gen.
+// Generators built on validation-gen use it to claim their own tag prefix.
+func ValidationSpec(tagPrefix string) Spec {
+	return Spec{
+		ActivationTag: tagPrefix + "validation-gen",
+		InputTag:      tagPrefix + "validation-gen-input",
+		ValueMode:     TypeFilterList,
+		AuxTags: []string{
+			tagPrefix + "validation-gen-deep-equal-func",
+			tagPrefix + "validation-gen-nolint",
+			tagPrefix + "validation-gen-scheme-registry",
+			tagPrefix + "validation-gen-test-fixture",
+			tagPrefix + "validation-gen-test-targets",
+		},
+	}
+}
 
 var allKnownTags = func() sets.Set[string] {
 	out := sets.New[string]()

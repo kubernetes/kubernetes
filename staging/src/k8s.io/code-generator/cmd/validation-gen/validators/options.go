@@ -25,8 +25,8 @@ import (
 )
 
 const (
-	ifEnabledTag  = "k8s:ifEnabled"
-	ifDisabledTag = "k8s:ifDisabled"
+	ifEnabledTag  = "ifEnabled"
+	ifDisabledTag = "ifDisabled"
 )
 
 func init() {

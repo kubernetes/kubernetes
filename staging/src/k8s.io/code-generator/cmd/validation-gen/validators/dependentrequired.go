@@ -28,8 +28,8 @@ import (
 )
 
 const (
-	dependentRequiredTagName  = "k8s:dependentRequired"
-	dependentForbiddenTagName = "k8s:dependentForbidden"
+	dependentRequiredTagName  = "dependentRequired"
+	dependentForbiddenTagName = "dependentForbidden"
 )
 
 var (

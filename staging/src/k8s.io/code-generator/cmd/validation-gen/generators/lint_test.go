@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package generators
 
 import (
 	"errors"
@@ -47,7 +47,9 @@ func mkCountRule(counter *int, realRule lintRule) lintRule {
 	}
 }
 
-var validator = validators.InitGlobalValidator(&generator.Context{}, nil)
+const testTagPrefix = "k8s:"
+
+var validator = validators.InitGlobalValidator(&generator.Context{}, nil, testTagPrefix)
 
 func TestLintCommentsRuleInvocation(t *testing.T) {
 	tests := []struct {
@@ -108,7 +110,7 @@ func TestLintCommentsRuleInvocation(t *testing.T) {
 			for i, rule := range tt.rules {
 				rules[i] = mkCountRule(&counter, rule)
 			}
-			l := newLinter(rules...)
+			l := newLinter(testTagPrefix, rules...)
 			for _, commentLines := range tt.commentLineGroups {
 				_, err := l.lintComments(nil, nil, commentLines)
 				gotErr := err != nil
@@ -179,7 +181,7 @@ func TestRuleAlphaBetaPrefix(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tags, _ := validator.ExtractTags(validators.Context{}, tt.comments)
-			msg, err := alphaBetaPrefix()(nil, nil, tags)
+			msg, err := alphaBetaPrefix(testTagPrefix)(nil, nil, tags)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			} else if msg != tt.wantMsg {
@@ -265,7 +267,7 @@ func TestRuleStability(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dummyType := &types.Type{Name: types.Name{Package: tt.pkg, Name: "Dummy"}}
-			rule := validationStability()
+			rule := validationStability(testTagPrefix)
 			tags, _ := validator.ExtractTags(validators.Context{}, tt.comments)
 			msg, err := rule(nil, dummyType, tags)
 			if err != nil {
@@ -415,7 +417,7 @@ func TestLintType(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			counter := 0
 			rules := []lintRule{mkCountRule(&counter, ruleAlwaysPass)}
-			l := newLinter(rules...)
+			l := newLinter(testTagPrefix, rules...)
 			if err := l.lintType(tt.typeToLint); err != nil {
 				t.Fatal(err)
 			}
@@ -493,7 +495,7 @@ func TestHasAnyValidationTag(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tags, _ := validator.ExtractTags(validators.Context{}, tt.comments)
-			if got := hasNonOpaqueValidationTag(validator, chainTags, tags); got != tt.want {
+			if got := hasNonOpaqueValidationTag(validator, testTagPrefix, chainTags, tags); got != tt.want {
 				t.Errorf("hasNonOpaqueValidationTag() = %v, want %v", got, tt.want)
 			}
 		})
@@ -546,7 +548,7 @@ func TestHasRequirednessTag(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tags, _ := validator.ExtractTags(validators.Context{}, tt.comments)
-			if got := hasRequirednessTag(tags); got != tt.want {
+			if got := hasRequirednessTag(testTagPrefix, tags); got != tt.want {
 				t.Errorf("hasRequirednessTag() = %v, want %v", got, tt.want)
 			}
 		})
@@ -932,7 +934,7 @@ func TestLintRequiredness(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			l := newLinter(requiredAndOptional(validator))
+			l := newLinter(testTagPrefix, requiredAndOptional(validator, testTagPrefix))
 			if err := l.lintType(tt.typeToLint); err != nil {
 				t.Fatalf("lintType() unexpected error: %v", err)
 			}
@@ -1088,7 +1090,7 @@ func TestLintNonPointerStructRequiredness(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			l := newLinter(nonPointerStructRequiredness(validator))
+			l := newLinter(testTagPrefix, nonPointerStructRequiredness(validator, testTagPrefix))
 			if err := l.lintType(tt.typeToLint); err != nil {
 				t.Fatalf("lintType() unexpected error: %v", err)
 			}

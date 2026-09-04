@@ -478,6 +478,19 @@ function codegen::validation() {
         "${tag_pkgs[@]}" \
         "$@"
 
+    # validation-gen's example of a generator with a custom tag prefix
+    # ("+xyz:") is not found by the tag search above, and its output shares
+    # the file prefix removed above, so regenerate it here to keep it in step
+    # with the generator.
+    local custom_prefix_example="staging/src/k8s.io/code-generator/cmd/validation-gen/examples/custom-prefix"
+    kube::log::status "Generating validation code for the custom-prefix example"
+    GOPROXY=off go run "./${custom_prefix_example}" \
+        -v "${KUBE_VERBOSE}" \
+        --go-header-file "${BOILERPLATE_FILENAME}" \
+        --output-file "${output_file}" \
+        "./${custom_prefix_example}/output_tests/..." \
+        "$@"
+
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "Generated validation code"
     fi

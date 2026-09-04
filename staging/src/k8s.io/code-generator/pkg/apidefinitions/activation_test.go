@@ -85,6 +85,18 @@ func TestIdentify(t *testing.T) {
 			wantValues:         []string{"TypesWithField=TypeMeta"},
 		},
 		{
+			name:               "validation-gen with a custom tag prefix activates on its own prefix",
+			spec:               ValidationSpec("xyz:"),
+			comments:           []string{"+xyz:validation-gen=*", "+xyz:validation-gen-input=k8s.io/api/foo/v1"},
+			wantShouldGenerate: true,
+			wantValues:         []string{"*"},
+		},
+		{
+			name:     "validation-gen with a custom tag prefix ignores the default prefix",
+			spec:     ValidationSpec("xyz:"),
+			comments: []string{"+k8s:validation-gen=*"},
+		},
+		{
 			name:               "prerelease-lifecycle-gen=true activates",
 			spec:               PrereleaseLifecycle,
 			comments:           []string{"+k8s:prerelease-lifecycle-gen=true"},
@@ -258,6 +270,12 @@ func TestExternalTypes(t *testing.T) {
 			name:     "validation: input tag",
 			spec:     Validation,
 			comments: []string{"+k8s:validation-gen-input=k8s.io/api/apps/v1"},
+			want:     "k8s.io/api/apps/v1",
+		},
+		{
+			name:     "validation with a custom tag prefix: input tag",
+			spec:     ValidationSpec("xyz:"),
+			comments: []string{"+xyz:validation-gen-input=k8s.io/api/apps/v1"},
 			want:     "k8s.io/api/apps/v1",
 		},
 		{

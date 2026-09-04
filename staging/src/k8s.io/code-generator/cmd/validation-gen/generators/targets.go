@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package generators
 
 import (
 	"cmp"
@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/code-generator/cmd/validation-gen/args"
 	"k8s.io/code-generator/cmd/validation-gen/validators"
 	"k8s.io/code-generator/pkg/apidefinitions"
 	"k8s.io/gengo/v2"
@@ -36,6 +37,8 @@ import (
 )
 
 // These are the comment tags that carry parameters for validation generation.
+// Each is qualified by the configured tag prefix, e.g. "+k8s:validation-gen"
+// for prefix "k8s:".
 const (
 	// Defines which types to generate validation for.  There are two places
 	// this can be used:
@@ -48,12 +51,12 @@ const (
 	//   Per-type:
 	//	   * "true": generate validation for this type
 	//	   * "false": do not generate validation for this type
-	mainTagName = "k8s:validation-gen"
+	mainTagName = "validation-gen"
 	// Defines the type of the scheme used to register validations. Defaults to
 	// "k8s.io/apimachinery/pkg.runtime.Scheme", but can be set to another type
 	// (e.g. in tests), or set to "nil" to disable scheme registration for this
 	// package.
-	schemeRegistryTagName = "k8s:validation-gen-scheme-registry"
+	schemeRegistryTagName = "validation-gen-scheme-registry"
 	// Defines the deep-equal function used wherever generated code needs
 	// value equality.  The value names a function which must be generic
 	// over a single type parameter, e.g:
@@ -63,19 +66,21 @@ const (
 	// Directly comparable types are compared with == and never reach it.
 	// An unqualified name refers to the package being generated into.
 	// Defaults to "k8s.io/apimachinery/pkg/api/validate.SemanticDeepEqual".
-	deepEqualFuncTagName = "k8s:validation-gen-deep-equal-func"
+	deepEqualFuncTagName = "validation-gen-deep-equal-func"
 	// If set, generate go test files for test fixtures.  Supported values: "validateFalse".
-	testFixtureTagName = "k8s:validation-gen-test-fixture"
+	testFixtureTagName = "validation-gen-test-fixture"
 
 	// name of the subresource that this type represents and can validate declaratively.
-	isSubresourceTagName = "k8s:isSubresource"
+	isSubresourceTagName = "isSubresource"
 
 	// name of a subresource that this type can validate declaratively, tag may be
 	// repeated to support multiple subresources.
-	supportsSubresourceTagName = "k8s:supportsSubresource"
+	supportsSubresourceTagName = "supportsSubresource"
 
 	// if set on a package, generates declarative coverage test targets even if it's not a versioned API package.
-	generateTestTargetsTagName = "k8s:validation-gen-test-targets"
+	generateTestTargetsTagName = "validation-gen-test-targets"
+	// if set on a package or type, disables validation-gen's lint rules for it.
+	noLintTagName = "validation-gen-nolint"
 )
 
 var (
@@ -104,10 +109,10 @@ func extractAndParseTag(tagName string, comments []string) ([]codetags.Tag, erro
 	return tags, nil
 }
 
-// validationTypeMatch returns the +k8s:validation-gen tag values for pkg,
+// validationTypeMatch returns the +<prefix>validation-gen tag values for pkg,
 // or false if validation-gen should not run.
-func validationTypeMatch(pkg *types.Package, idOpts []apidefinitions.Option) ([]string, bool) {
-	info, err := apidefinitions.Identify(pkg, apidefinitions.Validation, idOpts...)
+func validationTypeMatch(pkg *types.Package, spec apidefinitions.Spec, idOpts []apidefinitions.Option) ([]string, bool) {
+	info, err := apidefinitions.Identify(pkg, spec, idOpts...)
 	if err != nil {
 		klog.Fatal(err)
 	}
@@ -118,13 +123,14 @@ func validationTypeMatch(pkg *types.Package, idOpts []apidefinitions.Option) ([]
 }
 
 // TODO: this can just accept a single bool
-func checkMainTag(comments []string, require ...string) bool {
+func checkMainTag(prefix string, comments []string, require ...string) bool {
+	mainTag := prefix + mainTagName
 	// TODO: convert to extractAndParseTag() and update all callers to use quoted values
-	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{mainTagName}, comments)
+	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{mainTag}, comments)
 	if err != nil {
 		klog.Fatalf("Failed to extract tags: %v", err)
 	}
-	values, found := tags[mainTagName]
+	values, found := tags[mainTag]
 	if !found {
 		return false
 	}
@@ -141,18 +147,19 @@ func checkMainTag(comments []string, require ...string) bool {
 	return reflect.DeepEqual(valueStrings, require)
 }
 
-func schemeRegistryTag(pkg *types.Package) (types.Name, bool) {
+func schemeRegistryTag(prefix string, pkg *types.Package) (types.Name, bool) {
+	schemeRegistryTag := prefix + schemeRegistryTagName
 	// TODO: convert to extractAndParseTag() and update all callers to use quoted values
-	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{schemeRegistryTagName}, pkg.Comments)
+	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{schemeRegistryTag}, pkg.Comments)
 	if err != nil {
 		klog.Fatalf("Failed to extract scheme registry tags: %v", err)
 	}
-	values, found := tags[schemeRegistryTagName]
+	values, found := tags[schemeRegistryTag]
 	if !found || len(values) == 0 {
 		return schemeType, true // default
 	}
 	if len(values) > 1 {
-		panic(fmt.Sprintf("Package %q contains more than one usage of %q", pkg.Path, schemeRegistryTagName))
+		panic(fmt.Sprintf("Package %q contains more than one usage of %q", pkg.Path, schemeRegistryTag))
 	}
 	val := values[0].Value
 	if val == "nil" {
@@ -163,23 +170,24 @@ func schemeRegistryTag(pkg *types.Package) (types.Name, bool) {
 }
 
 // registerScheme reports whether pkg registers its validations with a scheme.
-func registerScheme(pkg *types.Package) bool {
-	_, ok := schemeRegistryTag(pkg)
+func registerScheme(prefix string, pkg *types.Package) bool {
+	_, ok := schemeRegistryTag(prefix, pkg)
 	return ok
 }
 
-func deepEqualFuncTag(pkg *types.Package) types.Name {
+func deepEqualFuncTag(prefix string, pkg *types.Package) types.Name {
+	deepEqualFuncTag := prefix + deepEqualFuncTagName
 	// TODO: convert to extractAndParseTag() and update all callers to use quoted values
-	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{deepEqualFuncTagName}, pkg.Comments)
+	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{deepEqualFuncTag}, pkg.Comments)
 	if err != nil {
 		klog.Fatalf("Failed to extract deep equal func tags: %v", err)
 	}
-	values, found := tags[deepEqualFuncTagName]
+	values, found := tags[deepEqualFuncTag]
 	if !found || len(values) == 0 {
 		return defaultDeepEqualFunc
 	}
 	if len(values) > 1 {
-		panic(fmt.Sprintf("Package %q contains more than one usage of %q", pkg.Path, deepEqualFuncTagName))
+		panic(fmt.Sprintf("Package %q contains more than one usage of %q", pkg.Path, deepEqualFuncTag))
 	}
 	val := values[0].Value
 	if val == "" {
@@ -188,11 +196,11 @@ func deepEqualFuncTag(pkg *types.Package) types.Name {
 	return types.ParseFullyQualifiedName(val)
 }
 
-func isSubresourceTag(t *types.Type) (string, bool) {
+func isSubresourceTag(prefix string, t *types.Type) (string, bool) {
 	var comments []string
 	comments = append(comments, t.SecondClosestCommentLines...)
 	comments = append(comments, t.CommentLines...)
-	tags, err := extractAndParseTag(isSubresourceTagName, comments)
+	tags, err := extractAndParseTag(prefix+isSubresourceTagName, comments)
 	if err != nil {
 		klog.Fatalf("Failed to extract isSubresource tags: %v", err)
 	}
@@ -200,16 +208,16 @@ func isSubresourceTag(t *types.Type) (string, bool) {
 		return "", false
 	}
 	if len(tags) > 1 {
-		panic(fmt.Sprintf("Type %q contains more than one usage of %q", t.Name.String(), isSubresourceTagName))
+		panic(fmt.Sprintf("Type %q contains more than one usage of %q", t.Name.String(), prefix+isSubresourceTagName))
 	}
 	return tags[0].Value, true
 }
 
-func supportedSubresourceTags(t *types.Type) sets.Set[string] {
+func supportedSubresourceTags(prefix string, t *types.Type) sets.Set[string] {
 	var comments []string
 	comments = append(comments, t.SecondClosestCommentLines...)
 	comments = append(comments, t.CommentLines...)
-	tags, err := extractAndParseTag(supportsSubresourceTagName, comments)
+	tags, err := extractAndParseTag(prefix+supportsSubresourceTagName, comments)
 	if err != nil {
 		klog.Fatalf("Failed to extract supportedSubresource tags: %v", err)
 	}
@@ -225,33 +233,35 @@ func supportedSubresourceTags(t *types.Type) sets.Set[string] {
 
 var testFixtureTagValues = sets.New("validateFalse")
 
-func testFixtureTag(pkg *types.Package) sets.Set[string] {
+func testFixtureTag(prefix string, pkg *types.Package) sets.Set[string] {
 	result := sets.New[string]()
+	testFixtureTag := prefix + testFixtureTagName
 	// TODO: convert to extractAndParseTag() and update all callers to use quoted values
-	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{testFixtureTagName}, pkg.Comments)
+	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{testFixtureTag}, pkg.Comments)
 	if err != nil {
 		klog.Fatalf("Failed to extract test fixture tags: %v", err)
 	}
-	values, found := tags[testFixtureTagName]
+	values, found := tags[testFixtureTag]
 	if !found {
 		return result
 	}
 
 	for _, tag := range values {
 		if !testFixtureTagValues.Has(tag.Value) {
-			panic(fmt.Sprintf("Package %q: %s must be one of '%s', but got: %s", pkg.Path, testFixtureTagName, testFixtureTagValues.UnsortedList(), tag.Value))
+			panic(fmt.Sprintf("Package %q: %s must be one of '%s', but got: %s", pkg.Path, testFixtureTag, testFixtureTagValues.UnsortedList(), tag.Value))
 		}
 		result.Insert(tag.Value)
 	}
 	return result
 }
 
-func generateTestTargetsTag(pkg *types.Package) bool {
-	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{generateTestTargetsTagName}, pkg.Comments)
+func generateTestTargetsTag(prefix string, pkg *types.Package) bool {
+	generateTestTargetsTag := prefix + generateTestTargetsTagName
+	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{generateTestTargetsTag}, pkg.Comments)
 	if err != nil {
-		klog.Fatalf("Failed to extract %s tags: %v", generateTestTargetsTagName, err)
+		klog.Fatalf("Failed to extract %s tags: %v", generateTestTargetsTag, err)
 	}
-	_, found := tags[generateTestTargetsTagName]
+	_, found := tags[generateTestTargetsTag]
 	return found
 }
 
@@ -281,11 +291,14 @@ func DefaultNameSystem() string {
 	return "public"
 }
 
-func GetTargets(context *generator.Context, args *Args) []generator.Target {
+func GetTargets(context *generator.Context, args *args.Args) []generator.Target {
 	boilerplate, err := gengo.GoBoilerplate(args.GoHeaderFile, gengo.StdBuildTag, gengo.StdGeneratedBy)
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
+
+	prefix := args.TagPrefix
+	spec := apidefinitions.ValidationSpec(prefix)
 
 	var idOpts []apidefinitions.Option
 	if len(args.LintRules) > 0 {
@@ -303,7 +316,7 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 		klog.V(4).Infof("considering pkg %q", input)
 		pkg := context.Universe[input]
 
-		info, err := apidefinitions.Identify(pkg, apidefinitions.Validation, idOpts...)
+		info, err := apidefinitions.Identify(pkg, spec, idOpts...)
 		if err != nil {
 			klog.Fatal(err)
 		}
@@ -311,7 +324,7 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 			continue
 		}
 
-		// +k8s:validation-gen-input may direct the generator at types in
+		// +<prefix>validation-gen-input may direct the generator at types in
 		// a different package than the one where validators will be emitted.
 		inputPath := info.ExternalTypes()
 		pkgToInput[input] = inputPath
@@ -325,9 +338,9 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 		// wins. At most one package may register.
 		if prev, ok := inputToCanonicalPkg[inputPath]; !ok {
 			inputToCanonicalPkg[inputPath] = input
-		} else if registerScheme(pkg) {
-			if registerScheme(context.Universe[prev]) {
-				klog.Fatalf("input %q is generated into two registering packages (%q, %q); mark one +k8s:validation-gen-scheme-registry=nil", inputPath, prev, input)
+		} else if registerScheme(prefix, pkg) {
+			if registerScheme(prefix, context.Universe[prev]) {
+				klog.Fatalf("input %q is generated into two registering packages (%q, %q); mark one +%s=nil", inputPath, prev, input, prefix+schemeRegistryTagName)
 			}
 			inputToCanonicalPkg[inputPath] = input // a registering package displaces a non-registering one
 		}
@@ -367,16 +380,16 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 	context.Order = orderer.OrderUniverse(context.Universe)
 
 	// Initialize all validator plugins exactly once.
-	validator := validators.InitGlobalValidator(context, inputToCanonicalPkg)
+	validator := validators.InitGlobalValidator(context, inputToCanonicalPkg, prefix)
 
 	// Create a type discoverer for all types of all inputs.
-	td := NewTypeDiscoverer(validator, inputToCanonicalPkg)
+	td := NewTypeDiscoverer(validator, inputToCanonicalPkg, prefix)
 	if err := td.Init(context); err != nil {
 		klog.Fatalf("Error discovering constants: %v", err)
 	}
 
 	// Create a linter to collect errors as we go.
-	linter := newLinter(lintRules(validator)...)
+	linter := newLinter(prefix, lintRules(validator, prefix)...)
 
 	// groupKindReports accumulates Reports across every input, keyed by
 	// GroupKind so testTargets emits exactly one SimpleTarget per Kind.
@@ -388,16 +401,16 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 
 		pkg := context.Universe[input]
 
-		schemeRegistry, registerThisPkg := schemeRegistryTag(pkg)
-		deepEqualFunc := deepEqualFuncTag(pkg)
+		schemeRegistry, registerThisPkg := schemeRegistryTag(prefix, pkg)
+		deepEqualFunc := deepEqualFuncTag(prefix, pkg)
 
-		criteria, found := validationTypeMatch(pkg, idOpts)
+		criteria, found := validationTypeMatch(pkg, spec, idOpts)
 		if !found {
-			klog.V(2).InfoS("  did not find required tag", "tag", mainTagName)
+			klog.V(2).InfoS("  did not find required tag", "tag", spec.ActivationTag)
 			continue
 		}
 		if len(criteria) == 1 && criteria[0] == "" {
-			klog.Fatalf("%s: found package tag %q with no value", input, mainTagName)
+			klog.Fatalf("%s: found package tag %q with no value", input, spec.ActivationTag)
 		}
 		for _, crit := range criteria {
 			if crit == "*" {
@@ -405,17 +418,17 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 			}
 			if val, found := strings.CutPrefix(crit, "TypesWithField="); found {
 				if val == "" {
-					klog.Fatalf("%s: found package tag \"%s=%s\" with empty value", input, mainTagName, crit)
+					klog.Fatalf("%s: found package tag \"%s=%s\" with empty value", input, spec.ActivationTag, crit)
 				}
 				continue
 			}
 			if val, found := strings.CutPrefix(crit, "TypesWithSuffix="); found {
 				if val == "" {
-					klog.Fatalf("%s: found package tag \"%s=%s\" with empty value", input, mainTagName, crit)
+					klog.Fatalf("%s: found package tag \"%s=%s\" with empty value", input, spec.ActivationTag, crit)
 				}
 				continue
 			}
-			klog.Fatalf("%s: unknown value for package tag %q: %q", input, mainTagName, crit)
+			klog.Fatalf("%s: unknown value for package tag %q: %q", input, spec.ActivationTag, crit)
 		}
 		shouldCreateObjectValidationFn := func(t *types.Type) bool {
 			// Never generate validation for unexported types.
@@ -423,17 +436,17 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 				return false
 			}
 			// opt-out
-			if checkMainTag(t.CommentLines, "false") {
+			if checkMainTag(prefix, t.CommentLines, "false") {
 				return false
 			}
-			if checkMainTag(t.SecondClosestCommentLines, "false") {
+			if checkMainTag(prefix, t.SecondClosestCommentLines, "false") {
 				return false
 			}
 			// opt-in
-			if checkMainTag(t.CommentLines, "true") {
+			if checkMainTag(prefix, t.CommentLines, "true") {
 				return true
 			}
-			if checkMainTag(t.SecondClosestCommentLines, "true") {
+			if checkMainTag(prefix, t.SecondClosestCommentLines, "true") {
 				return true
 			}
 
@@ -495,7 +508,7 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 		}
 
 		extracted := codetags.Extract("+", pkg.Comments)
-		if _, ok := extracted["k8s:validation-gen-nolint"]; !ok {
+		if _, ok := extracted[prefix+noLintTagName]; !ok {
 			for _, t := range rootTypes {
 				klog.V(3).InfoS("linting root-type", "type", t)
 				if err := linter.lintType(t); err != nil {
@@ -517,17 +530,17 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 
 				GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 					generators = []generator.Generator{
-						NewGenValidations(args.OutputFile, pkg.Path, typesPkg.Path, rootTypes, td, inputToCanonicalPkg, schemeRegistry, registerThisPkg, deepEqualFunc),
+						NewGenValidations(args.OutputFile, pkg.Path, typesPkg.Path, rootTypes, td, inputToCanonicalPkg, schemeRegistry, registerThisPkg, deepEqualFunc, prefix),
 					}
-					testFixtureTags := testFixtureTag(pkg)
+					testFixtureTags := testFixtureTag(prefix, pkg)
 					if testFixtureTags.Len() > 0 {
 						if !strings.HasSuffix(args.OutputFile, ".go") {
-							panic(fmt.Sprintf("%s requires that output file have .go suffix", testFixtureTagName))
+							panic(fmt.Sprintf("%s requires that output file have .go suffix", prefix+testFixtureTagName))
 						}
 						filename := args.OutputFile[0:len(args.OutputFile)-3] + "_test.go"
 						generators = append(generators, FixtureTests(filename, testFixtureTags))
 					}
-					if generateTestTargetsTag(pkg) {
+					if generateTestTargetsTag(prefix, pkg) {
 						var reports []*report
 						for _, t := range rootTypes {
 							rules := collectRules(td.typeNodes[t])

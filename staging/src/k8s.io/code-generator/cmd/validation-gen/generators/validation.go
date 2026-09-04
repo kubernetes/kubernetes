@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package generators
 
 import (
 	"bytes"
@@ -70,10 +70,11 @@ type genValidations struct {
 	schemeRegistry      types.Name
 	emitRegisterFunc    bool
 	deepEqualFunc       types.Name
+	tagPrefix           string
 }
 
 // NewGenValidations creates a new generator for the specified package.
-func NewGenValidations(outputFilename, outputPackage, inputPackage string, rootTypes []*types.Type, discovered *typeDiscoverer, inputToCanonicalPkg map[string]string, schemeRegistry types.Name, emitRegisterFunc bool, deepEqualFunc types.Name) generator.Generator {
+func NewGenValidations(outputFilename, outputPackage, inputPackage string, rootTypes []*types.Type, discovered *typeDiscoverer, inputToCanonicalPkg map[string]string, schemeRegistry types.Name, emitRegisterFunc bool, deepEqualFunc types.Name, tagPrefix string) generator.Generator {
 	return &genValidations{
 		GoGenerator: generator.GoGenerator{
 			OutputFilename: outputFilename,
@@ -87,6 +88,7 @@ func NewGenValidations(outputFilename, outputPackage, inputPackage string, rootT
 		schemeRegistry:      schemeRegistry,
 		emitRegisterFunc:    emitRegisterFunc,
 		deepEqualFunc:       deepEqualFunc,
+		tagPrefix:           tagPrefix,
 	}
 }
 
@@ -185,6 +187,7 @@ type typeDiscoverer struct {
 	initialized         bool
 	validator           validators.ValidationExtractor
 	inputToCanonicalPkg map[string]string
+	tagPrefix           string
 
 	// constantsByType holds a map of type to constants of that type.
 	constantsByType map[*types.Type][]*validators.Constant
@@ -196,10 +199,11 @@ type typeDiscoverer struct {
 
 // NewTypeDiscoverer creates a NewTypeDiscoverer.
 // Init must be called before calling DiscoverType.
-func NewTypeDiscoverer(validator validators.ValidationExtractor, inputToCanonicalPkg map[string]string) *typeDiscoverer {
+func NewTypeDiscoverer(validator validators.ValidationExtractor, inputToCanonicalPkg map[string]string, tagPrefix string) *typeDiscoverer {
 	return &typeDiscoverer{
 		validator:           validator,
 		inputToCanonicalPkg: inputToCanonicalPkg,
+		tagPrefix:           tagPrefix,
 		constantsByType:     map[*types.Type][]*validators.Constant{},
 		typeNodes:           map[*types.Type]*typeNode{},
 	}
@@ -497,8 +501,8 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 					if !thisNode.typeValidations.OpaqueValType {
 						return nil, fmt.Errorf("%v: value type %v is in a non-included package; "+
 							"either add this package to validation-gen's --readonly-pkg flag, "+
-							"or add +k8s:eachVal=+k8s:opaqueType to the field to skip validation",
-							fldPath, util.NativeType(t).Elem)
+							"or add +%[3]seachVal=+%[3]sopaqueType to the field to skip validation",
+							fldPath, util.NativeType(t).Elem, td.tagPrefix)
 					}
 				} else if thisNode.typeValidations.OpaqueValType {
 					// If the type is marked as opaque, we can treat it as it is
@@ -530,8 +534,8 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 					if !thisNode.typeValidations.OpaqueKeyType {
 						return nil, fmt.Errorf("%v: key type %v is in a non-included package; "+
 							"either add this package to validation-gen's --readonly-pkg flag, "+
-							"or add +k8s:eachKey=+k8s:opaqueType to the field to skip validation",
-							fldPath, util.NativeType(t).Key)
+							"or add +%[3]seachKey=+%[3]sopaqueType to the field to skip validation",
+							fldPath, util.NativeType(t).Key, td.tagPrefix)
 					}
 				} else if thisNode.typeValidations.OpaqueKeyType {
 					// If the type is marked as opaque, we can treat it as it is
@@ -562,8 +566,8 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 					if !thisNode.typeValidations.OpaqueValType {
 						return nil, fmt.Errorf("%v: value type %v is in a non-included package; "+
 							"either add this package to validation-gen's --readonly-pkg flag, "+
-							"or add +k8s:eachVal=+k8s:opaqueType to the field to skip validation",
-							fldPath, util.NativeType(t).Elem)
+							"or add +%[3]seachVal=+%[3]sopaqueType to the field to skip validation",
+							fldPath, util.NativeType(t).Elem, td.tagPrefix)
 					}
 				} else if thisNode.typeValidations.OpaqueValType {
 					// If the type is marked as opaque, we can treat it as it is
@@ -791,8 +795,8 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 				if !child.fieldValidations.OpaqueType {
 					return fmt.Errorf("%v: type %v is in a non-included package; "+
 						"either add this package to validation-gen's --readonly-pkg flag, "+
-						"or add +k8s:opaqueType to the field to skip validation",
-						childPath, childType.String())
+						"or add +%[3]sopaqueType to the field to skip validation",
+						childPath, childType.String(), td.tagPrefix)
 				}
 			} else if child.fieldValidations.OpaqueType {
 				// If the field is marked as opaque, we can treat it as it is
@@ -815,8 +819,8 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 				if !child.fieldValidations.OpaqueValType {
 					return fmt.Errorf("%v: value type %v is in a non-included package; "+
 						"either add this package to validation-gen's --readonly-pkg flag, "+
-						"or add +k8s:eachVal=+k8s:opaqueType to the field to skip validation",
-						childPath, childType.Elem.String())
+						"or add +%[3]seachVal=+%[3]sopaqueType to the field to skip validation",
+						childPath, childType.Elem.String(), td.tagPrefix)
 				}
 			} else if child.fieldValidations.OpaqueValType {
 				// If the field is marked as opaque, we can treat it as it is
@@ -847,8 +851,8 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 				if !child.fieldValidations.OpaqueKeyType {
 					return fmt.Errorf("%v: key type %v is in a non-included package; "+
 						"either add this package to validation-gen's --readonly-pkg flag, "+
-						"or add +k8s:eachKey=+k8s:opaqueType to the field to skip validation",
-						childPath, childType.Key.String())
+						"or add +%[3]seachKey=+%[3]sopaqueType to the field to skip validation",
+						childPath, childType.Key.String(), td.tagPrefix)
 				}
 			} else if child.fieldValidations.OpaqueKeyType {
 				// If the field is marked as opaque, we can treat it as it is
@@ -878,8 +882,8 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 				if !child.fieldValidations.OpaqueValType {
 					return fmt.Errorf("%v: value type %v is in a non-included package; "+
 						"either add this package to validation-gen's --readonly-pkg flag, "+
-						"or add +k8s:eachVal=+k8s:opaqueType to the field to skip validation",
-						childPath, childType.Elem.String())
+						"or add +%[3]seachVal=+%[3]sopaqueType to the field to skip validation",
+						childPath, childType.Elem.String(), td.tagPrefix)
 				}
 			} else if child.fieldValidations.OpaqueValType {
 				// If the field is marked as opaque, we can treat it as it is
@@ -1123,9 +1127,9 @@ func (g *genValidations) emitRegisterFunction(c *generator.Context, schemeRegist
 
 // toResourceList returns a list of resources that are supported by a kind.
 func (g *genValidations) toResourceList(rootType *types.Type) []string {
-	supportedSubresources := supportedSubresourceTags(rootType)
+	supportedSubresources := supportedSubresourceTags(g.tagPrefix, rootType)
 
-	if subresource, isSubresource := isSubresourceTag(rootType); isSubresource {
+	if subresource, isSubresource := isSubresourceTag(g.tagPrefix, rootType); isSubresource {
 		supportedSubresources.Insert(subresource)
 	} else {
 		supportedSubresources.Insert("/")

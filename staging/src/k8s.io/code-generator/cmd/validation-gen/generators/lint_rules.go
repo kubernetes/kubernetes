@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package generators
 
 import (
 	"fmt"
@@ -28,8 +28,8 @@ import (
 	"k8s.io/gengo/v2/types"
 )
 
-func checkAlphaBetaUsage(tag codetags.Tag, isRoot bool) (string, error) {
-	if tag.Name == "k8s:alpha" || tag.Name == "k8s:beta" {
+func checkAlphaBetaUsage(tagPrefix string, tag codetags.Tag, isRoot bool) (string, error) {
+	if tag.Name == tagPrefix+"alpha" || tag.Name == tagPrefix+"beta" {
 		if !isRoot {
 			return fmt.Sprintf("tag %q can't be used in between", tag.Name), nil
 		}
@@ -39,17 +39,17 @@ func checkAlphaBetaUsage(tag codetags.Tag, isRoot bool) (string, error) {
 	}
 
 	if tag.ValueTag != nil {
-		return checkAlphaBetaUsage(*tag.ValueTag, false)
+		return checkAlphaBetaUsage(tagPrefix, *tag.ValueTag, false)
 	}
 	return "", nil
 }
 
 // alphaBetaPrefix enforces that +k8s:alpha and +k8s:beta tags are always used as prefix to
-func alphaBetaPrefix() lintRule {
+func alphaBetaPrefix(tagPrefix string) lintRule {
 	return func(container *types.Type, t *types.Type, tags []codetags.Tag) (string, error) {
 		for _, tag := range tags {
 			// Only check alpha/beta tags or validation tags.
-			if msg, err := checkAlphaBetaUsage(tag, true); err != nil || msg != "" {
+			if msg, err := checkAlphaBetaUsage(tagPrefix, tag, true); err != nil || msg != "" {
 				return msg, err
 			}
 		}
@@ -79,7 +79,9 @@ func checkTagStability(tag codetags.Tag, contextLevel validators.TagStabilityLev
 }
 
 // validationStability enforces stability level constraints on tags.
-func validationStability() lintRule {
+func validationStability(tagPrefix string) lintRule {
+	alphaTag, betaTag := tagPrefix+"alpha", tagPrefix+"beta"
+	ifEnabledTag, ifDisabledTag := tagPrefix+"ifEnabled", tagPrefix+"ifDisabled"
 	return func(container *types.Type, t *types.Type, tags []codetags.Tag) (string, error) {
 		pkgPath := t.Name.Package
 		if container != nil {
@@ -105,8 +107,8 @@ func validationStability() lintRule {
 
 			// For stability level tags, set the stability context for the inner validation,
 			// overriding the package-level default.
-			if tag.Name == "k8s:alpha" || tag.Name == "k8s:beta" {
-				if tag.Name == "k8s:alpha" {
+			if tag.Name == alphaTag || tag.Name == betaTag {
+				if tag.Name == alphaTag {
 					contextLevel = validators.TagStabilityLevelAlpha
 				} else {
 					contextLevel = validators.TagStabilityLevelBeta
@@ -121,7 +123,7 @@ func validationStability() lintRule {
 			// without forcing validation authors to write redundant handwritten code (bypassing the
 			// declarative validation equivalence check), we automatically relax the stability
 			// context to Beta if the current context is Stable.
-			if tagToCheck.Name == "k8s:ifEnabled" || tagToCheck.Name == "k8s:ifDisabled" {
+			if tagToCheck.Name == ifEnabledTag || tagToCheck.Name == ifDisabledTag {
 				if contextLevel == validators.TagStabilityLevelStable {
 					contextLevel = validators.TagStabilityLevelBeta
 				}
@@ -154,18 +156,18 @@ func hasTag(tags []codetags.Tag, name string) bool {
 }
 
 // hasRequirednessTag returns true if tags contain +k8s:optional, +k8s:required, or +k8s:forbidden.
-func hasRequirednessTag(tags []codetags.Tag) bool {
-	return hasTag(tags, "k8s:optional") || hasTag(tags, "k8s:required") || hasTag(tags, "k8s:forbidden")
+func hasRequirednessTag(tagPrefix string, tags []codetags.Tag) bool {
+	return hasTag(tags, tagPrefix+"optional") || hasTag(tags, tagPrefix+"required") || hasTag(tags, tagPrefix+"forbidden")
 }
 
 // hasNonOpaqueValidationTag returns true if tags contain any registered validation tag that is not opaqueType.
-func hasNonOpaqueValidationTag(extractor validators.ValidationExtractor, chainTags sets.Set[string], tags []codetags.Tag) bool {
+func hasNonOpaqueValidationTag(extractor validators.ValidationExtractor, tagPrefix string, chainTags sets.Set[string], tags []codetags.Tag) bool {
 	for _, tag := range tags {
-		if tag.Name == "k8s:optional" || tag.Name == "k8s:opaqueType" {
+		if tag.Name == tagPrefix+"optional" || tag.Name == tagPrefix+"opaqueType" {
 			continue
 		}
 		if chainTags.Has(tag.Name) {
-			if tag.ValueTag != nil && hasNonOpaqueValidationTag(extractor, chainTags, []codetags.Tag{*tag.ValueTag}) {
+			if tag.ValueTag != nil && hasNonOpaqueValidationTag(extractor, tagPrefix, chainTags, []codetags.Tag{*tag.ValueTag}) {
 				return true
 			}
 			continue
@@ -180,7 +182,8 @@ func hasNonOpaqueValidationTag(extractor validators.ValidationExtractor, chainTa
 
 // requiredAndOptional checks that fields (pointers, slices, maps, arrays) with validation
 // (either direct or transitive) explicitly declare +k8s:optional or +k8s:required.
-func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
+func requiredAndOptional(extractor validators.ValidationExtractor, tagPrefix string) lintRule {
+	requirednessHint := fmt.Sprintf("field with validation must have +%[1]soptional, +%[1]srequired or +%[1]sforbidden", tagPrefix)
 	chainTags := sets.New[string]()
 	for _, doc := range extractor.Docs() {
 		if doc.PayloadsType == codetags.ValueTypeTag {
@@ -279,7 +282,7 @@ func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
 				if err != nil {
 					return false, false, err
 				}
-				if hasNonOpaqueValidationTag(extractor, chainTags, mTags) {
+				if hasNonOpaqueValidationTag(extractor, tagPrefix, chainTags, mTags) {
 					hasVal = true
 					break
 				}
@@ -336,13 +339,13 @@ func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
 		}
 
 		// Check if already has requiredness tag
-		if hasRequirednessTag(tags) {
+		if hasRequirednessTag(tagPrefix, tags) {
 			return "", nil
 		}
 
 		// Check if it has validation (direct or active transitive)
-		if hasNonOpaqueValidationTag(extractor, chainTags, tags) {
-			return "field with validation must have +k8s:optional, +k8s:required or +k8s:forbidden", nil
+		if hasNonOpaqueValidationTag(extractor, tagPrefix, chainTags, tags) {
+			return requirednessHint, nil
 		}
 
 		fieldVals, err := extractor.ExtractValidations(
@@ -365,7 +368,7 @@ func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
 		}
 
 		if hasTransitiveVal {
-			return "field with validation must have +k8s:optional, +k8s:required or +k8s:forbidden", nil
+			return requirednessHint, nil
 		}
 
 		return "", nil
@@ -376,7 +379,7 @@ func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
 // +k8s:required or +k8s:unionMember, directly or in a struct it contains by
 // value. Such a struct rejects its own zero value, which makes a non-pointer
 // field of that type required in effect.
-func isImplicitlyRequired(extractor validators.ValidationExtractor, t *types.Type) (bool, error) {
+func isImplicitlyRequired(extractor validators.ValidationExtractor, tagPrefix string, t *types.Type) (bool, error) {
 	st := util.NativeType(t)
 	if st.Kind != types.Struct {
 		return false, nil
@@ -386,17 +389,17 @@ func isImplicitlyRequired(extractor validators.ValidationExtractor, t *types.Typ
 		if err != nil {
 			return false, err
 		}
-		if hasTag(mTags, "k8s:required") || hasTag(mTags, "k8s:unionMember") {
+		if hasTag(mTags, tagPrefix+"required") || hasTag(mTags, tagPrefix+"unionMember") {
 			return true, nil
 		}
 		// An opaque member's own validations are ignored.
-		if hasTag(mTags, "k8s:opaqueType") {
+		if hasTag(mTags, tagPrefix+"opaqueType") {
 			continue
 		}
 		// Only descend by value: an unset pointer, slice or map member is nil,
 		// so nothing inside it is validated. Go forbids value cycles, so this
 		// terminates without cycle detection.
-		if nested, err := isImplicitlyRequired(extractor, m.Type); err != nil || nested {
+		if nested, err := isImplicitlyRequired(extractor, tagPrefix, m.Type); err != nil || nested {
 			return nested, err
 		}
 	}
@@ -407,7 +410,8 @@ func isImplicitlyRequired(extractor validators.ValidationExtractor, t *types.Typ
 // a non-pointer struct field match the struct's implicit requiredness. Neither
 // tag emits a presence check there (an unset struct is indistinguishable from a
 // zero-valued one), so the field is required exactly when the struct is.
-func nonPointerStructRequiredness(extractor validators.ValidationExtractor) lintRule {
+func nonPointerStructRequiredness(extractor validators.ValidationExtractor, tagPrefix string) lintRule {
+	requiredTag, optionalTag := tagPrefix+"required", tagPrefix+"optional"
 	return func(container *types.Type, t *types.Type, tags []codetags.Tag) (string, error) {
 		// We only care about fields in a struct. Skip if linting the struct itself.
 		if container == nil || container.Kind != types.Struct || container == t {
@@ -417,39 +421,39 @@ func nonPointerStructRequiredness(extractor validators.ValidationExtractor) lint
 			return "", nil
 		}
 
-		isRequired, isOptional := hasTag(tags, "k8s:required"), hasTag(tags, "k8s:optional")
+		isRequired, isOptional := hasTag(tags, requiredTag), hasTag(tags, optionalTag)
 		if !isRequired && !isOptional {
 			return "", nil
 		}
 
 		// An opaque type's validations are ignored, so nothing inside it can
 		// make the field required.
-		if hasTag(tags, "k8s:opaqueType") {
+		if hasTag(tags, tagPrefix+"opaqueType") {
 			if isRequired {
-				return fmt.Sprintf("+k8s:required on non-pointer opaque struct %s: its validations are ignored, so the field is effectively optional", t.Name), nil
+				return fmt.Sprintf("+%s on non-pointer opaque struct %s: its validations are ignored, so the field is effectively optional", requiredTag, t.Name), nil
 			}
 			return "", nil
 		}
 
-		implied, err := isImplicitlyRequired(extractor, t)
+		implied, err := isImplicitlyRequired(extractor, tagPrefix, t)
 		if err != nil {
 			return "", err
 		}
 		switch {
 		case isRequired && !implied:
-			return fmt.Sprintf("+k8s:required on non-pointer struct %s: it has no required or union member, so the field is effectively optional", t.Name), nil
+			return fmt.Sprintf("+%s on non-pointer struct %s: it has no required or union member, so the field is effectively optional", requiredTag, t.Name), nil
 		case isOptional && implied:
-			return fmt.Sprintf("+k8s:optional on non-pointer struct %s: it has a required or union member, so the field is effectively required", t.Name), nil
+			return fmt.Sprintf("+%s on non-pointer struct %s: it has a required or union member, so the field is effectively required", optionalTag, t.Name), nil
 		}
 		return "", nil
 	}
 }
 
-func lintRules(extractor validators.ValidationExtractor) []lintRule {
+func lintRules(extractor validators.ValidationExtractor, tagPrefix string) []lintRule {
 	return []lintRule{
-		alphaBetaPrefix(),
-		validationStability(),
-		requiredAndOptional(extractor),
-		nonPointerStructRequiredness(extractor),
+		alphaBetaPrefix(tagPrefix),
+		validationStability(tagPrefix),
+		requiredAndOptional(extractor, tagPrefix),
+		nonPointerStructRequiredness(extractor, tagPrefix),
 	}
 }

@@ -45,8 +45,9 @@ type TagValidator interface {
 	// Init initializes the implementation.  This will be called exactly once.
 	Init(cfg Config)
 
-	// TagName returns the full tag name (without the "marker" prefix) for this
-	// tag.
+	// TagName returns the name of this tag without the tag prefix, e.g.
+	// "required" for "+k8s:required". The registry qualifies it with the
+	// prefix it was initialized with (see InitGlobalValidator).
 	TagName() string
 
 	// ValidScopes returns the set of scopes where this tag may be used.
@@ -82,6 +83,11 @@ type Config struct {
 	// Validate_<Type> functions, and lets validators reference hand-written
 	// functions that live alongside the generated code (e.g. +k8s:customValidation).
 	InputToCanonicalPkg map[string]string
+
+	// TagPrefix qualifies every registered tag name, e.g. "k8s:" for
+	// "+k8s:required". Validators that refer to other tags by name, in
+	// messages or when inspecting a tag's nested value, must prepend it.
+	TagPrefix string
 }
 
 // Scope describes where a validation (or potential validation) is located.
@@ -240,7 +246,8 @@ func (s TagStabilityLevel) Compare(other TagStabilityLevel) (int, error) {
 
 // TagDoc describes a comment-tag and its usage.
 type TagDoc struct {
-	// Tag is the tag name, without the leading '+'.
+	// Tag is the tag name, without the leading '+'. A TagValidator sets its
+	// unqualified TagName(); the registry qualifies it with the tag prefix.
 	Tag string
 	// StabilityLevel is the stability level of the tag.
 	StabilityLevel TagStabilityLevel
@@ -544,7 +551,8 @@ type Emission struct {
 
 // FunctionGen describes a function call that should be generated.
 type FunctionGen struct {
-	// TagName is the tag which triggered this function.
+	// TagName is the tag which triggered this function, without the tag
+	// prefix (as returned by TagValidator.TagName).
 	TagName string
 
 	// Cohort indicates a set of related functions which are processed

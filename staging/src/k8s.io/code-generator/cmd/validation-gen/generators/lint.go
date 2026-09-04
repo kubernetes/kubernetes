@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package generators
 
 import (
 	"fmt"
@@ -31,6 +31,8 @@ import (
 type linter struct {
 	linted map[*types.Type]bool
 	rules  []lintRule
+	// noLintTag is the qualified name of the tag that disables linting.
+	noLintTag string
 	// lintErrors is all the errors, grouped by type, that occurred during the
 	// linting process.
 	lintErrors map[*types.Type][]error
@@ -54,13 +56,14 @@ func (l *linter) AddError(t *types.Type, field, msg string) {
 	l.lintErrors[t] = append(l.lintErrors[t], err)
 }
 
-func newLinter(rules ...lintRule) *linter {
+func newLinter(tagPrefix string, rules ...lintRule) *linter {
 	if len(rules) == 0 {
 		klog.Errorf("rules are not passed to the linter")
 	}
 	return &linter{
 		linted:     make(map[*types.Type]bool),
 		rules:      rules,
+		noLintTag:  tagPrefix + noLintTagName,
 		lintErrors: map[*types.Type][]error{},
 	}
 }
@@ -73,7 +76,7 @@ func (l *linter) lintType(t *types.Type) error {
 
 	if t.CommentLines != nil {
 		extracted := codetags.Extract("+", t.CommentLines)
-		if _, ok := extracted["k8s:validation-gen-nolint"]; ok {
+		if _, ok := extracted[l.noLintTag]; ok {
 			return nil
 		}
 		klog.V(5).Infof("linting type %s", t.Name.String())

@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	neqTagName = "k8s:neq"
+	neqTagName = "neq"
 )
 
 func init() {
