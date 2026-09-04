@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -257,6 +258,13 @@ func (c *containerLogManager) processContainer(ctx context.Context, worker int) 
 			return
 		}
 	}
+
+	// Remove redundant logs before rotation.
+	if err := c.rmRedundantLogs(ctx, id, path); err != nil {
+		// Print the error and continue log rotation, not block the original log rotation
+		klog.ErrorS(err, "Failed to remove redundant logs for container", "path", path, "containerID", id)
+	}
+
 	if info.Size() < c.policy.MaxSize {
 		logger.V(7).Info("log file doesn't need to be rotated", "worker", worker, "containerID", id, "path", path, "currentSize", info.Size(), "maxSize", c.policy.MaxSize)
 		return
@@ -267,6 +275,76 @@ func (c *containerLogManager) processContainer(ctx context.Context, worker int) 
 		return
 	}
 	return
+}
+
+func (c *containerLogManager) rmRedundantLogs(_ context.Context, id, log string) error {
+	klog.V(4).InfoS("Removing redundant logs for container", "containerID", id, "log", log)
+	// get the log dir and name of log file
+	logDir := filepath.Dir(log)
+	logPattern := filepath.Join(logDir, "*.log*")
+	currentLogsByDir, err := filepath.Glob(logPattern)
+	if err != nil {
+		return fmt.Errorf("failed to get current logs by dir %q: %w", logDir, err)
+	}
+
+	// Only run redundant log cleanup when there are more than MaxFiles logs in the log dir.
+	if len(currentLogsByDir) <= c.policy.MaxFiles {
+		klog.V(4).InfoS("No more than redundant logs found in log dir, skipping redundant log truncation", "MaxFiles", c.policy.MaxFiles, "logDir", logDir)
+		return nil
+	}
+
+	logFile := filepath.Base(log)
+	parts := strings.Split(logFile, ".")
+	if len(parts) < 2 {
+		klog.V(4).InfoS("Log file name does not match expected format, skipping redundant log cleanup", "log", log)
+		return nil
+	}
+
+	logFileNum, err := strconv.Atoi(parts[0])
+	if err != nil {
+		klog.V(4).InfoS("Log file name does not have a numeric prefix, skipping redundant log cleanup", "log", log)
+		return nil
+	}
+
+	// Keep the latest MaxFiles revisions, remove everything older.
+	removeBelow := logFileNum - c.policy.MaxFiles + 1
+	if removeBelow <= 0 {
+		klog.V(4).InfoS("Current log revision is too low to trigger cleanup, skipping redundant log truncation", "logFileNum", logFileNum, "maxFiles", c.policy.MaxFiles, "logDir", logDir)
+		return nil
+	}
+	logs, err := getLogsLessThanN(logDir, removeBelow)
+	if err != nil {
+		klog.ErrorS(err, "Failed to get logs less than N", "logDir", logDir, "N", removeBelow)
+		return err
+	}
+
+	var removeErrors bool
+	for _, l := range logs {
+		if err := c.osInterface.Remove(l); err != nil {
+			removeErrors = true
+			klog.ErrorS(err, "Failed to remove old log", "log", l)
+		}
+	}
+
+	if removeErrors {
+		return fmt.Errorf("failed to remove one or more old logs in dir %q", logDir)
+	}
+
+	return nil
+}
+
+func getLogsLessThanN(dir string, n int) ([]string, error) {
+	var logs []string
+	for i := 0; i < n; i++ {
+		basePattern := fmt.Sprintf("%d.log", i)
+		pattern := filepath.Join(dir, fmt.Sprintf("%s*", basePattern))
+		matches, err := filepath.Glob(pattern)
+		if err != nil {
+			return nil, fmt.Errorf("pattern match failed %q: %w", pattern, err)
+		}
+		logs = append(logs, matches...)
+	}
+	return logs, nil
 }
 
 func (c *containerLogManager) rotateLog(ctx context.Context, id, log string) error {
