@@ -799,7 +799,7 @@ func (pgqi *QueuedPodGroupInfo) Type() fwk.EntityKeyType {
 // AddPod adds a pod to the queued pod group info, if the pod belongs to the pod group.
 // In case of hierarchy, we need to go to all leaf PodGroups.
 func (pgqi *QueuedPodGroupInfo) AddPod(pInfo *QueuedPodInfo) {
-	leafPG, _ := findNodeAndParent(pgqi.PodGroupInfo, nil, *pInfo.Pod.Spec.SchedulingGroup.PodGroupName)
+	leafPG, _ := findTreeNodeAndParent(pgqi.PodGroupInfo, nil, fwk.PodGroupKeyType, *pInfo.Pod.Spec.SchedulingGroup.PodGroupName)
 	if leafPG == nil {
 		return
 	}
@@ -837,7 +837,7 @@ func (pgqi *QueuedPodGroupInfo) RemovePod(pod *v1.Pod) *QueuedPodInfo {
 	}
 
 	// Remove from leaf UnscheduledPods
-	leafPG, _ := findNodeAndParent(pgqi.PodGroupInfo, nil, *pod.Spec.SchedulingGroup.PodGroupName)
+	leafPG, _ := findTreeNodeAndParent(pgqi.PodGroupInfo, nil, fwk.PodGroupKeyType, *pod.Spec.SchedulingGroup.PodGroupName)
 	if leafPG == nil {
 		return removed
 	}
@@ -923,7 +923,7 @@ func (pgqi *QueuedPodGroupInfo) Update(pod *v1.Pod) (*QueuedPodInfo, error) {
 		}
 		err := pInfo.PodInfo.Update(pod)
 
-		leafPG, _ := findNodeAndParent(pgqi.PodGroupInfo, nil, *pod.Spec.SchedulingGroup.PodGroupName)
+		leafPG, _ := findTreeNodeAndParent(pgqi.PodGroupInfo, nil, fwk.PodGroupKeyType, *pod.Spec.SchedulingGroup.PodGroupName)
 		if leafPG != nil {
 			for i, p := range leafPG.UnscheduledPods {
 				if p.Name == pod.Name && p.Namespace == pod.Namespace {
@@ -1009,10 +1009,10 @@ func (pgqi *QueuedPodGroupInfo) AddSubtree(subtree *PodGroupInfo) {
 		return
 	}
 
-	parent, _ := findNodeAndParent(pgqi.PodGroupInfo, nil, *parentName)
+	parent, _ := findTreeNodeAndParent(pgqi.PodGroupInfo, nil, fwk.CompositePodGroupKeyType, *parentName)
 	if parent != nil {
 		for _, child := range parent.Children {
-			if child.GetName() == subtree.GetName() {
+			if child.GetType() == subtree.GetType() && child.GetName() == subtree.GetName() {
 				return
 			}
 		}
@@ -1022,7 +1022,7 @@ func (pgqi *QueuedPodGroupInfo) AddSubtree(subtree *PodGroupInfo) {
 
 // UpdateGenericPodGroup updates a generic pod group in the queued pod group info hierarchy.
 func (pgqi *QueuedPodGroupInfo) UpdateGenericPodGroup(gpg *GenericPodGroup) {
-	node, _ := findNodeAndParent(pgqi.PodGroupInfo, nil, gpg.GetName())
+	node, _ := findTreeNodeAndParent(pgqi.PodGroupInfo, nil, gpg.GetType(), gpg.GetName())
 	if node != nil {
 		node.GenericPodGroup = gpg
 	}
@@ -1031,14 +1031,14 @@ func (pgqi *QueuedPodGroupInfo) UpdateGenericPodGroup(gpg *GenericPodGroup) {
 // RemoveGenericPodGroup removes a generic pod group from the queued pod group info hierarchy.
 // It returns a slice of all pods within the hierarchy of the removed pod group / composite pod group.
 func (pgqi *QueuedPodGroupInfo) RemoveGenericPodGroup(gpg *GenericPodGroup) []*QueuedPodInfo {
-	node, parent := findNodeAndParent(pgqi.PodGroupInfo, nil, gpg.GetName())
+	node, parent := findTreeNodeAndParent(pgqi.PodGroupInfo, nil, gpg.GetType(), gpg.GetName())
 	if node == nil {
 		return nil
 	}
 
 	if parent != nil {
 		for i, child := range parent.Children {
-			if child.GetName() == gpg.GetName() {
+			if child.GetType() == gpg.GetType() && child.GetName() == gpg.GetName() {
 				parent.Children = append(parent.Children[:i], parent.Children[i+1:]...)
 				break
 			}
@@ -1048,14 +1048,15 @@ func (pgqi *QueuedPodGroupInfo) RemoveGenericPodGroup(gpg *GenericPodGroup) []*Q
 	return pgqi.deleteSubtreePods(node)
 }
 
-// findNodeAndParent uses DFS to find a node by name in the hierarchy.
+// findTreeNodeAndParent uses DFS to find a tree node by type and name in the hierarchy.
 // It returns the target node and its parent. If the target is the root, parent is nil.
-func findNodeAndParent(curr, parent *PodGroupInfo, name string) (*PodGroupInfo, *PodGroupInfo) {
-	if curr.GetName() == name {
+// The target may be a leaf podgroup or a composite podgroup.
+func findTreeNodeAndParent(curr, parent *PodGroupInfo, keyType fwk.EntityKeyType, name string) (*PodGroupInfo, *PodGroupInfo) {
+	if curr.GetType() == keyType && curr.GetName() == name {
 		return curr, parent
 	}
 	for _, child := range curr.Children {
-		if n, p := findNodeAndParent(child, curr, name); n != nil {
+		if n, p := findTreeNodeAndParent(child, curr, keyType, name); n != nil {
 			return n, p
 		}
 	}
@@ -1225,7 +1226,7 @@ func (pgi *PodGroupInfo) GetChildGroups() []*PodGroupInfo {
 	result := make([]*PodGroupInfo, len(pgi.Children))
 	copy(result, pgi.Children)
 	// Sort the children by creation timestamp. If timestamps are equal, compare the child groups
-	// by their names to have a tie-breaker that enforces deterministic order.
+	// by their names, and then entity type to have a tie-breaker that enforces deterministic order.
 	slices.SortFunc(result, func(a, b *PodGroupInfo) int {
 		aTime := a.GetCreationTimestamp()
 		bTime := b.GetCreationTimestamp()
@@ -1238,6 +1239,11 @@ func (pgi *PodGroupInfo) GetChildGroups() []*PodGroupInfo {
 		if a.GetName() < b.GetName() {
 			return -1
 		} else if a.GetName() > b.GetName() {
+			return 1
+		}
+		if a.GetType() < b.GetType() {
+			return -1
+		} else if a.GetType() > b.GetType() {
 			return 1
 		}
 		return 0
