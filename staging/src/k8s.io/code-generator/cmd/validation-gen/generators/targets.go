@@ -335,7 +335,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		// An input's validation may be generated into more than one package. The
 		// registering package is canonical (at most one may register); if none
 		// registers, the first one seen is. Canonical is kept first in the list:
-		// it is the package cross-package references resolve to.
+		// it is what cross-package references fall back to when no copy is nearer.
 		pkgs := inputToOutputPkgs[inputPath]
 		if registerScheme(prefix, pkg) {
 			for _, prev := range pkgs {

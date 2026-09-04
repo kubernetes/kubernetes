@@ -104,18 +104,43 @@ func (g *genValidations) emitDeepEqualFunc(sw *generator.SnippetWriter, c *gener
 }
 
 // resolveFunc maps a validator reference to the package it should be called
-// from, applying the first rule that matches (local wins over canonical):
+// from, applying the first rule that matches (nearest wins):
 //  1. if this generator validates the reference's input package, the
 //     generator's own output package (the local copy);
-//  2. else the input's canonical package, if one exists;
+//  2. else the copy of the reference's input nearest this output package;
 //  3. otherwise the reference is returned unchanged.
 func (g *genValidations) resolveFunc(name types.Name) types.Name {
 	if name.Package == g.inputPackage {
 		name.Package = g.outputPackage
-	} else if pkgs, ok := g.inputToOutputPkgs[name.Package]; ok {
-		name.Package = pkgs[0]
+	} else if candidates, ok := g.inputToOutputPkgs[name.Package]; ok {
+		name.Package = nearestPkg(g.outputPackage, candidates)
 	}
 	return name
+}
+
+// nearestPkg returns the candidate whose import path shares the longest prefix
+// with the package being generated. That prefers a candidate in the caller's
+// own module (a module path is a prefix of its packages), then the closest one
+// within it. This is a best-effort heuristic, not a true importability check.
+// candidates is non-empty and canonical-first, so canonical wins ties.
+func nearestPkg(pkg string, candidates []string) string {
+	best, bestDepth := candidates[0], commonPathDepth(pkg, candidates[0])
+	for _, candidate := range candidates[1:] {
+		if d := commonPathDepth(pkg, candidate); d > bestDepth {
+			best, bestDepth = candidate, d
+		}
+	}
+	return best
+}
+
+// commonPathDepth counts the leading "/"-separated segments a and b share.
+func commonPathDepth(a, b string) int {
+	as, bs := strings.Split(a, "/"), strings.Split(b, "/")
+	n := 0
+	for n < len(as) && n < len(bs) && as[n] == bs[n] {
+		n++
+	}
+	return n
 }
 
 func (g *genValidations) Namers(_ *generator.Context) namer.NameSystems {
