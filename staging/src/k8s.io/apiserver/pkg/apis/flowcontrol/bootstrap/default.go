@@ -70,6 +70,7 @@ var (
 	}
 	SuggestedFlowSchemas = []*flowcontrol.FlowSchema{
 		SuggestedFlowSchemaSystemNodes,               // references "system" priority-level
+		SuggestedFlowSchemaKubeProxy,                 // references "system" priority-level
 		SuggestedFlowSchemaSystemNodeHigh,            // references "node-high" priority-level
 		SuggestedFlowSchemaProbes,                    // references "exempt" priority-level
 		SuggestedFlowSchemaSystemLeaderElection,      // references "leader-election" priority-level
@@ -334,6 +335,24 @@ var (
 		flowcontrol.FlowDistinguisherMethodByUserType,
 		flowcontrol.PolicyRulesWithSubjects{
 			Subjects: groups(user.NodesGroup), // the nodes group
+			ResourceRules: []flowcontrol.ResourcePolicyRule{resourceRule(
+				[]string{flowcontrol.VerbAll},
+				[]string{flowcontrol.APIGroupAll},
+				[]string{flowcontrol.ResourceAll},
+				[]string{flowcontrol.NamespaceEvery},
+				true)},
+			NonResourceRules: []flowcontrol.NonResourcePolicyRule{
+				nonResourceRule(
+					[]string{flowcontrol.VerbAll},
+					[]string{flowcontrol.NonResourceAll}),
+			},
+		},
+	)
+	SuggestedFlowSchemaKubeProxy = newFlowSchema(
+		"kube-proxy", "system", 600,
+		flowcontrol.FlowDistinguisherMethodByUserType,
+		flowcontrol.PolicyRulesWithSubjects{
+			Subjects: users(user.KubeProxy),
 			ResourceRules: []flowcontrol.ResourcePolicyRule{resourceRule(
 				[]string{flowcontrol.VerbAll},
 				[]string{flowcontrol.APIGroupAll},
