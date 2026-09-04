@@ -1888,8 +1888,73 @@ func Validate_ResourceQuota(
 		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
 	}
 
-	// field corev1.ResourceQuota.Spec has no validation
+	{ // field corev1.ResourceQuota.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.ResourceQuotaSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_ResourceQuotaSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.ResourceQuota) *corev1.ResourceQuotaSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
+
 	// field corev1.ResourceQuota.Status has no validation
+	return errs
+}
+
+// Validate_ResourceQuotaSpec validates an instance of ResourceQuotaSpec according
+// to declarative validation rules in the API schema.
+func Validate_ResourceQuotaSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.ResourceQuotaSpec) (errs field.ErrorList) {
+
+	// field corev1.ResourceQuotaSpec.Hard has no validation
+
+	{ // field corev1.ResourceQuotaSpec.Scopes
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []corev1.ResourceQuotaScope,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.ResourceQuotaSpec) []corev1.ResourceQuotaScope {
+				return oldObj.Scopes
+			})
+		errs = append(errs, fn(fldPath.Child("scopes"), obj.Scopes, oldVal, oldObj != nil)...)
+	}
+
+	// field corev1.ResourceQuotaSpec.ScopeSelector has no validation
 	return errs
 }
 
