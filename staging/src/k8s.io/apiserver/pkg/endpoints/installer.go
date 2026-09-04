@@ -26,7 +26,7 @@ import (
 	"unicode"
 
 	restful "github.com/emicklei/go-restful/v3"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"

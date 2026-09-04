@@ -20,14 +20,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	celgo "github.com/google/cel-go/cel"
-	celtypes "github.com/google/cel-go/common/types"
 	"strings"
 
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
-	"sigs.k8s.io/structured-merge-diff/v6/schema"
-	"sigs.k8s.io/structured-merge-diff/v6/typed"
-	"sigs.k8s.io/structured-merge-diff/v6/value"
+	celgo "github.com/google/cel-go/cel"
+	celtypes "github.com/google/cel-go/common/types"
+
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v7/schema"
+	"sigs.k8s.io/structured-merge-diff/v7/typed"
+	"sigs.k8s.io/structured-merge-diff/v7/value"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
