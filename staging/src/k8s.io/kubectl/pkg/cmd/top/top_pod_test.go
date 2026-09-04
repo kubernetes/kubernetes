@@ -104,7 +104,7 @@ const (
 func TestTopPod(t *testing.T) {
 	testCases := []struct {
 		name               string
-		options            *TopPodOptions
+		options            *TopPodFlags
 		args               []string
 		expectedPods       []string
 		expectedContainers []string
@@ -125,7 +125,7 @@ func TestTopPod(t *testing.T) {
 	}{
 		{
 			name:            "all namespaces",
-			options:         &TopPodOptions{AllNamespaces: true},
+			options:         &TopPodFlags{AllNamespaces: true},
 			namespaces:      []string{testNS, "secondtestns", "thirdtestns"},
 			listsNamespaces: true,
 		},
@@ -140,17 +140,17 @@ func TestTopPod(t *testing.T) {
 		},
 		{
 			name:       "pod with label selector",
-			options:    &TopPodOptions{LabelSelector: "key=value"},
+			options:    &TopPodFlags{LabelSelector: "key=value"},
 			namespaces: []string{testNS, testNS},
 		},
 		{
 			name:       "pod with field selector",
-			options:    &TopPodOptions{FieldSelector: "key=value"},
+			options:    &TopPodFlags{FieldSelector: "key=value"},
 			namespaces: []string{testNS, testNS},
 		},
 		{
 			name:    "pod with container metrics",
-			options: &TopPodOptions{PrintContainers: true},
+			options: &TopPodFlags{PrintContainers: true},
 			args:    []string{"pod1"},
 			expectedContainers: []string{
 				"container1-1",
@@ -161,19 +161,19 @@ func TestTopPod(t *testing.T) {
 		},
 		{
 			name:         "pod sort by cpu",
-			options:      &TopPodOptions{SortBy: "cpu"},
+			options:      &TopPodFlags{SortBy: "cpu"},
 			expectedPods: []string{"pod2", "pod3", "pod1"},
 			namespaces:   []string{testNS, testNS, testNS},
 		},
 		{
 			name:         "pod sort by memory",
-			options:      &TopPodOptions{SortBy: "memory"},
+			options:      &TopPodFlags{SortBy: "memory"},
 			expectedPods: []string{"pod2", "pod3", "pod1"},
 			namespaces:   []string{testNS, testNS, testNS},
 		},
 		{
 			name:    "container sort by cpu",
-			options: &TopPodOptions{PrintContainers: true, SortBy: "cpu"},
+			options: &TopPodFlags{PrintContainers: true, SortBy: "cpu"},
 			expectedContainers: []string{
 				"container2-3",
 				"container2-2",
@@ -187,7 +187,7 @@ func TestTopPod(t *testing.T) {
 		},
 		{
 			name:    "container sort by memory",
-			options: &TopPodOptions{PrintContainers: true, SortBy: "memory"},
+			options: &TopPodFlags{PrintContainers: true, SortBy: "memory"},
 			expectedContainers: []string{
 				"container2-3",
 				"container2-2",
@@ -201,13 +201,13 @@ func TestTopPod(t *testing.T) {
 		},
 		{
 			name:            "with swap",
-			options:         &TopPodOptions{AllNamespaces: true, ShowSwap: true},
+			options:         &TopPodFlags{AllNamespaces: true, ShowSwap: true},
 			namespaces:      []string{testNS, "secondtestns", "thirdtestns"},
 			listsNamespaces: true,
 		},
 		{
 			name:              "swap values",
-			options:           &TopPodOptions{ShowSwap: true},
+			options:           &TopPodFlags{ShowSwap: true},
 			namespaces:        []string{testNS, testNS, testNS},
 			expectedSwapBytes: map[string]string{"pod1": "4Mi", "pod2": "0Mi", "pod3": "3Mi"},
 		},
@@ -215,7 +215,7 @@ func TestTopPod(t *testing.T) {
 			// The metrics API returns all three pods, while the pod list
 			// endpoint only returns pod1, so the client must drop pod2 and pod3.
 			name:                "pod with field selector filtering metrics",
-			options:             &TopPodOptions{FieldSelector: "spec.nodeName=node-a"},
+			options:             &TopPodFlags{FieldSelector: "spec.nodeName=node-a"},
 			namespaces:          []string{testNS, testNS, testNS},
 			extraPaths:          onlyPod1ListResponse,
 			expectedInOutput:    []string{"pod1"},
@@ -223,7 +223,7 @@ func TestTopPod(t *testing.T) {
 		},
 		{
 			name:           "no resources found in all namespaces",
-			options:        &TopPodOptions{AllNamespaces: true},
+			options:        &TopPodFlags{AllNamespaces: true},
 			extraPaths:     emptyPodListResponse,
 			expectedOutput: new(""),
 			expectedErr:    new("No resources found\n"),
@@ -411,7 +411,7 @@ func emptyPodListResponse(req *http.Request) (*http.Response, error) {
 type runTopPodOpts struct {
 	apisBody    string
 	fakeMetrics *metricsfake.Clientset
-	options     *TopPodOptions
+	options     *TopPodFlags
 	cmdArgs     []string
 	extraPaths  func(req *http.Request) (*http.Response, error)
 }
@@ -448,16 +448,16 @@ func runTopPodTest(t *testing.T, opts runTopPodOpts) (stdout string, stderr stri
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 	streams, _, buf, errbuf := genericiooptions.NewTestIOStreams()
 
-	cmd := NewCmdTopPod(tf, nil, streams)
-	var cmdOptions *TopPodOptions
+	var cmdFlags *TopPodFlags
 	if opts.options != nil {
-		cmdOptions = opts.options
+		cmdFlags = opts.options
 	} else {
-		cmdOptions = &TopPodOptions{}
+		cmdFlags = &TopPodFlags{}
 	}
-	cmdOptions.IOStreams = streams
+	cmdFlags.IOStreams = streams
 
-	if err := cmdOptions.Complete(tf, cmd, opts.cmdArgs); err != nil {
+	cmdOptions, err := cmdFlags.ToOptions(tf, opts.cmdArgs)
+	if err != nil {
 		t.Fatal(err)
 	}
 	cmdOptions.MetricsClient = opts.fakeMetrics

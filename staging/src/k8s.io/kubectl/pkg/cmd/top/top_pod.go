@@ -43,9 +43,8 @@ import (
 	"k8s.io/klog/v2"
 )
 
-type TopPodOptions struct {
-	ResourceName       string
-	Namespace          string
+// TopPodFlags directly reflect the information that CLI is gathering via flags.
+type TopPodFlags struct {
 	LabelSelector      string
 	FieldSelector      string
 	SortBy             string
@@ -55,6 +54,21 @@ type TopPodOptions struct {
 	UseProtocolBuffers bool
 	Sum                bool
 	ShowSwap           bool
+
+	genericiooptions.IOStreams
+}
+
+type TopPodOptions struct {
+	ResourceName    string
+	Namespace       string
+	LabelSelector   string
+	FieldSelector   string
+	SortBy          string
+	AllNamespaces   bool
+	PrintContainers bool
+	NoHeaders       bool
+	Sum             bool
+	ShowSwap        bool
 
 	PodClient       corev1client.PodsGetter
 	Printer         *metricsutil.TopCmdPrinter
@@ -92,12 +106,17 @@ var (
 		kubectl top pod -A --field-selector spec.nodeName=NODE_NAME`))
 )
 
-func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericiooptions.IOStreams) *cobra.Command {
-	if o == nil {
-		o = &TopPodOptions{
-			IOStreams:          streams,
-			UseProtocolBuffers: true,
-		}
+// NewTopPodFlags returns a default TopPodFlags
+func NewTopPodFlags(streams genericiooptions.IOStreams) *TopPodFlags {
+	return &TopPodFlags{
+		IOStreams:          streams,
+		UseProtocolBuffers: true,
+	}
+}
+
+func NewCmdTopPod(f cmdutil.Factory, flags *TopPodFlags, streams genericiooptions.IOStreams) *cobra.Command {
+	if flags == nil {
+		flags = NewTopPodFlags(streams)
 	}
 
 	cmd := &cobra.Command{
@@ -108,58 +127,77 @@ func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericiooptions.
 		Example:               topPodExample,
 		ValidArgsFunction:     completion.ResourceNameCompletionFunc(f, "pod"),
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			o, err := flags.ToOptions(f, args)
+			cmdutil.CheckErr(err)
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunTopPod())
 		},
 		Aliases: []string{"pods", "po"},
 	}
-	cmdutil.AddLabelSelectorFlagVar(cmd, &o.LabelSelector)
-	cmd.Flags().StringVar(&o.FieldSelector, "field-selector", o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
-	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.SortBy, "If non-empty, sort pods list using specified field. The field can be either 'cpu' or 'memory'.")
-	cmd.Flags().BoolVar(&o.PrintContainers, "containers", o.PrintContainers, "If present, print usage of containers within a pod.")
-	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
-	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "If present, print output without headers.")
-	cmd.Flags().BoolVar(&o.UseProtocolBuffers, "use-protocol-buffers", o.UseProtocolBuffers, "Enables using protocol-buffers to access Metrics API.")
-	cmd.Flags().BoolVar(&o.Sum, "sum", o.Sum, "Print the sum of the resource usage")
-	cmd.Flags().BoolVar(&o.ShowSwap, "show-swap", o.ShowSwap, "Print pod resources related to swap memory.")
+	flags.AddFlags(cmd)
 	return cmd
 }
 
-func (o *TopPodOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	var err error
+// AddFlags registers flags for a cli
+func (flags *TopPodFlags) AddFlags(cmd *cobra.Command) {
+	cmdutil.AddLabelSelectorFlagVar(cmd, &flags.LabelSelector)
+	cmd.Flags().StringVar(&flags.FieldSelector, "field-selector", flags.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
+	cmd.Flags().StringVar(&flags.SortBy, "sort-by", flags.SortBy, "If non-empty, sort pods list using specified field. The field can be either 'cpu' or 'memory'.")
+	cmd.Flags().BoolVar(&flags.PrintContainers, "containers", flags.PrintContainers, "If present, print usage of containers within a pod.")
+	cmd.Flags().BoolVarP(&flags.AllNamespaces, "all-namespaces", "A", flags.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	cmd.Flags().BoolVar(&flags.NoHeaders, "no-headers", flags.NoHeaders, "If present, print output without headers.")
+	cmd.Flags().BoolVar(&flags.UseProtocolBuffers, "use-protocol-buffers", flags.UseProtocolBuffers, "Enables using protocol-buffers to access Metrics API.")
+	cmd.Flags().BoolVar(&flags.Sum, "sum", flags.Sum, "Print the sum of the resource usage")
+	cmd.Flags().BoolVar(&flags.ShowSwap, "show-swap", flags.ShowSwap, "Print pod resources related to swap memory.")
+}
+
+// ToOptions converts from CLI inputs to runtime inputs
+func (flags *TopPodFlags) ToOptions(f cmdutil.Factory, args []string) (*TopPodOptions, error) {
+	o := &TopPodOptions{
+		LabelSelector:   flags.LabelSelector,
+		FieldSelector:   flags.FieldSelector,
+		SortBy:          flags.SortBy,
+		AllNamespaces:   flags.AllNamespaces,
+		PrintContainers: flags.PrintContainers,
+		NoHeaders:       flags.NoHeaders,
+		Sum:             flags.Sum,
+		ShowSwap:        flags.ShowSwap,
+		IOStreams:       flags.IOStreams,
+	}
+
 	if len(args) == 1 {
 		o.ResourceName = args[0]
 	} else if len(args) > 1 {
-		return cmdutil.UsageErrorf(cmd, "%s", cmd.Use)
+		return nil, fmt.Errorf("unexpected arguments: %v", args[1:])
 	}
 
+	var err error
 	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	clientset, err := f.KubernetesClientSet()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	o.DiscoveryClient = clientset.DiscoveryClient
 	config, err := f.ToRESTConfig()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if o.UseProtocolBuffers {
+	if flags.UseProtocolBuffers {
 		config.ContentType = "application/vnd.kubernetes.protobuf"
 	}
 	o.MetricsClient, err = metricsclientset.NewForConfig(config)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	o.PodClient = clientset.CoreV1()
 
 	o.Printer = metricsutil.NewTopCmdPrinter(o.Out, o.ShowSwap)
-	return nil
+	return o, nil
 }
 
 func (o *TopPodOptions) Validate() error {
