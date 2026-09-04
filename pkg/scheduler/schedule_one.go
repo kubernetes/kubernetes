@@ -968,6 +968,7 @@ func prioritizeNodes(
 			result = append(result, fwk.NodePluginScores{
 				Name:       nodes[i].Node().Name,
 				TotalScore: 1,
+				Randomizer: rand.Int(),
 			})
 		}
 		return result, nil
@@ -1051,9 +1052,12 @@ func prioritizeNodes(
 			if score, ok := allNodeExtendersScores[nodes[i].Node().Name]; ok {
 				nodesScores[i].Scores = append(nodesScores[i].Scores, score.Scores...)
 				nodesScores[i].TotalScore += score.TotalScore
-				nodesScores[i].Randomizer = rand.Int()
 			}
 		}
+	}
+
+	for i := range nodesScores {
+		nodesScores[i].Randomizer = rand.Int()
 	}
 
 	if loggerVTen.Enabled() {
