@@ -318,7 +318,6 @@ type ValidationRule struct {
 	//
 	// May not be set unless `oldSelf` is used in `rule`.
 	//
-	// +featureGate=CRDValidationRatcheting
 	// +optional
 	OptionalOldSelf *bool `json:"optionalOldSelf,omitempty" protobuf:"bytes,6,opt,name=optionalOldSelf"`
 }
