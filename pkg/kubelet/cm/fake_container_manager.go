@@ -208,7 +208,7 @@ func (cm *FakeContainerManager) GetAllocatableDevices(_ klog.Logger) []*podresou
 	return nil
 }
 
-func (cm *FakeContainerManager) ShouldResetExtendedResourceCapacity() bool {
+func (cm *FakeContainerManager) ShouldResetExtendedResourceCapacity(_ v1.ResourceName) bool {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "ShouldResetExtendedResourceCapacity")
