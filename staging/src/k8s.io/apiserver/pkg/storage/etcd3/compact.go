@@ -231,8 +231,17 @@ func Compact(ctx context.Context, client *clientv3.Client, expectVersion, rev in
 	currentRev = resp.Header.Revision
 
 	if !resp.Succeeded {
-		currentVersion = resp.Responses[0].GetResponseRange().Kvs[0].Version
-		compactRev, err = strconv.ParseInt(string(resp.Responses[0].GetResponseRange().Kvs[0].Value), 10, 64)
+		if len(resp.Responses) == 0 {
+			klog.V(4).Infof("etcd: compact revision key %q is missing, resetting compact time", compactRevKey)
+			return 0, currentRev, 0, nil
+		}
+		rangeResp := resp.Responses[0].GetResponseRange()
+		if rangeResp == nil || len(rangeResp.Kvs) == 0 {
+			klog.V(4).Infof("etcd: compact revision key %q is missing, resetting compact time", compactRevKey)
+			return 0, currentRev, 0, nil
+		}
+		currentVersion = rangeResp.Kvs[0].Version
+		compactRev, err = strconv.ParseInt(string(rangeResp.Kvs[0].Value), 10, 64)
 		if err != nil {
 			return currentVersion, currentRev, 0, nil
 		}
