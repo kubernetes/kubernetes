@@ -19,6 +19,7 @@ package pod
 import (
 	"context"
 	"fmt"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -130,8 +131,14 @@ func (mc *basicMirrorClient) DeleteMirrorPod(ctx context.Context, podFullName st
 	}
 	logger.V(2).Info("Deleting a mirror pod", "pod", klog.KRef(namespace, name), "podUID", uidValue)
 
+	// use a short timeout for the delete call to avoid blocking SyncPod
+	// when a API server is temporarily unavailable (e.g. during etcd restart on a single-master cluster).
+	// Mirror pod deletion will be retried.
+	deleteCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	var GracePeriodSeconds int64
-	if err := mc.apiserverClient.CoreV1().Pods(namespace).Delete(ctx, name, metav1.DeleteOptions{GracePeriodSeconds: &GracePeriodSeconds, Preconditions: &metav1.Preconditions{UID: uid}}); err != nil {
+	if err := mc.apiserverClient.CoreV1().Pods(namespace).Delete(deleteCtx, name, metav1.DeleteOptions{GracePeriodSeconds: &GracePeriodSeconds, Preconditions: &metav1.Preconditions{UID: uid}}); err != nil {
 		// Unfortunately, there's no generic error for failing a precondition
 		if !(apierrors.IsNotFound(err) || apierrors.IsConflict(err)) {
 			// We should return the error here, but historically this routine does
