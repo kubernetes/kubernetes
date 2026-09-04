@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package generators
 
 import (
 	"cmp"
@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/code-generator/cmd/validation-gen/args"
 	"k8s.io/code-generator/cmd/validation-gen/validators"
 	"k8s.io/code-generator/pkg/apidefinitions"
 	"k8s.io/gengo/v2"
@@ -281,7 +282,7 @@ func DefaultNameSystem() string {
 	return "public"
 }
 
-func GetTargets(context *generator.Context, args *Args) []generator.Target {
+func GetTargets(context *generator.Context, args *args.Args) []generator.Target {
 	boilerplate, err := gengo.GoBoilerplate(args.GoHeaderFile, gengo.StdBuildTag, gengo.StdGeneratedBy)
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
