@@ -32,13 +32,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/certificate"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	netutils "k8s.io/utils/net"
@@ -49,11 +47,6 @@ func newGetTemplateFn(nodeName types.NodeName, getAddresses func() []v1.NodeAddr
 		hostnames, ips := addressesToHostnamesAndIPs(getAddresses())
 		// by default, require at least one IP before requesting a serving certificate
 		hasRequiredAddresses := len(ips) > 0
-
-		// optionally allow requesting a serving certificate with just a DNS name
-		if utilfeature.DefaultFeatureGate.Enabled(features.AllowDNSOnlyNodeCSR) {
-			hasRequiredAddresses = hasRequiredAddresses || len(hostnames) > 0
-		}
 
 		// don't return a template if we have no addresses to request for
 		if !hasRequiredAddresses {
