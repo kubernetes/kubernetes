@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc/codes"
@@ -110,6 +111,10 @@ type Manager struct {
 
 	// update channel for resource updates
 	update chan resourceupdates.Update
+
+	// healthStreamMutex serializes stream ownership changes with cache updates.
+	healthStreamMutex   sync.Mutex
+	activeHealthStreams map[string]uint64
 }
 
 // NewManager creates a new DRA manager.
@@ -137,13 +142,14 @@ func NewManager(logger klog.Logger, kubeClient clientset.Interface, stateFileDir
 	reconcilePeriod := defaultReconcilePeriod
 
 	manager := &Manager{
-		cache:           claimInfoCache,
-		kubeClient:      kubeClient,
-		reconcilePeriod: reconcilePeriod,
-		activePods:      nil,
-		sourcesReady:    nil,
-		healthInfoCache: healthInfoCache,
-		update:          make(chan resourceupdates.Update, 100),
+		cache:               claimInfoCache,
+		kubeClient:          kubeClient,
+		reconcilePeriod:     reconcilePeriod,
+		activePods:          nil,
+		sourcesReady:        nil,
+		healthInfoCache:     healthInfoCache,
+		update:              make(chan resourceupdates.Update, 100),
+		activeHealthStreams: make(map[string]uint64),
 	}
 
 	return manager, nil
@@ -1075,17 +1081,17 @@ func buildDeviceHealth(logger klog.Logger, device *drahealthv1.DeviceHealth) sta
 }
 
 // HandleWatchResourcesStream processes health updates from the DRA plugin.
-func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream drahealthv1.DRAResourceHealth_NodeWatchResourcesClient, pluginName string) error {
+func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream drahealthv1.DRAResourceHealth_NodeWatchResourcesClient, pluginName string, generation uint64) error {
 	logger := klog.FromContext(ctx).WithName("dra-manager")
-	logger = klog.LoggerWithValues(logger, "pluginName", pluginName)
+	logger = klog.LoggerWithValues(logger, "pluginName", pluginName, "generation", generation)
 
-	defer func() {
-		logger.V(4).Info("Clearing health cache for driver upon stream exit")
-		// Use a separate context for clearDriver if needed, though background should be fine.
-		if err := m.healthInfoCache.clearDriver(logger, pluginName); err != nil {
-			logger.Error(err, "Failed to clear health info cache for driver")
-		}
-	}()
+	m.healthStreamMutex.Lock()
+	activeGeneration, active := m.activeHealthStreams[pluginName]
+	if !active || activeGeneration != generation {
+		m.healthStreamMutex.Unlock()
+		return fmt.Errorf("health stream generation %d for DRA driver %s is not active", generation, pluginName)
+	}
+	m.healthStreamMutex.Unlock()
 
 	for {
 		resp, err := stream.Recv()
@@ -1110,6 +1116,9 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 			logger.Error(err, "Error receiving from WatchResources stream")
 			return err
 		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 
 		// Convert drahealthv1.DeviceHealth to state.DeviceHealth
 		devices := make([]state.DeviceHealth, len(resp.GetDevices()))
@@ -1117,52 +1126,93 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 			devices[i] = buildDeviceHealth(logger, d)
 		}
 
+		m.healthStreamMutex.Lock()
+		if m.activeHealthStreams[pluginName] != generation {
+			m.healthStreamMutex.Unlock()
+			return fmt.Errorf("health stream generation %d for DRA driver %s was superseded", generation, pluginName)
+		}
+
 		changedDevices, updateErr := m.healthInfoCache.updateHealthInfo(logger, pluginName, devices)
 		if updateErr != nil {
 			logger.Error(updateErr, "Failed to update health info cache")
 		}
-		if len(changedDevices) > 0 {
-			logger.V(4).Info("Health info changed, checking affected pods", "changedDevicesCount", len(changedDevices))
+		m.notifyPodsForHealthChanges(logger, pluginName, changedDevices)
+		m.healthStreamMutex.Unlock()
+	}
+}
 
-			// Snapshot which pods use which of this plugin's devices. The
-			// claim info cache lock is then held once per report and only
-			// while building the index, independent of how many devices
-			// changed, so that a plugin sending large reports at a high
-			// rate cannot block DRA operations on the lock.
-			type deviceKey struct {
-				poolName   string
-				deviceName string
-			}
-			podsByDevice := make(map[deviceKey][]string)
-			m.cache.RLock()
-			for _, cInfo := range m.cache.claimInfo {
-				if driverState, ok := cInfo.DriverState[pluginName]; ok {
-					for _, allocatedDevice := range driverState.Devices {
-						key := deviceKey{poolName: allocatedDevice.PoolName, deviceName: allocatedDevice.DeviceName}
-						podsByDevice[key] = append(podsByDevice[key], cInfo.PodUIDs.UnsortedList()...)
-					}
-				}
-			}
-			m.cache.RUnlock()
+// ActivateHealthStream transfers ownership before the old stream gets
+// canceled, so its remaining updates can no longer modify the cache.
+func (m *Manager) ActivateHealthStream(_ context.Context, pluginName string, generation uint64) {
+	m.healthStreamMutex.Lock()
+	defer m.healthStreamMutex.Unlock()
+	if activeGeneration, ok := m.activeHealthStreams[pluginName]; ok && activeGeneration >= generation {
+		return
+	}
+	m.activeHealthStreams[pluginName] = generation
+}
 
-			podsToUpdate := sets.New[string]()
-			for _, dev := range changedDevices {
-				podsToUpdate.Insert(podsByDevice[deviceKey{poolName: dev.PoolName, deviceName: dev.DeviceName}]...)
-			}
+// DeactivateHealthStream clears health only when the authoritative endpoint
+// is permanently lost. A retryable stream exit does not call this method.
+func (m *Manager) DeactivateHealthStream(ctx context.Context, pluginName string, generation uint64) {
+	logger := klog.FromContext(ctx).WithName("dra-manager")
+	logger = klog.LoggerWithValues(logger, "pluginName", pluginName, "generation", generation)
 
-			if podsToUpdate.Len() > 0 {
-				podUIDs := podsToUpdate.UnsortedList()
-				logger.Info("Sending health update notification for pods", "pods", podUIDs)
-				select {
-				case m.update <- resourceupdates.Update{PodUIDs: podUIDs}:
-				default:
-					logger.Error(nil, "DRA health update channel is full, discarding pod update notification", "pods", podUIDs)
-				}
-			} else {
-				logger.V(4).Info("Health info changed, but no active pods found using the affected devices")
+	m.healthStreamMutex.Lock()
+	defer m.healthStreamMutex.Unlock()
+
+	if m.activeHealthStreams[pluginName] != generation {
+		return
+	}
+	delete(m.activeHealthStreams, pluginName)
+
+	logger.V(4).Info("Clearing health cache for driver after health reporting stopped")
+	changedDevices, err := m.healthInfoCache.clearDriver(logger, pluginName)
+	if err != nil {
+		logger.Error(err, "Failed to clear health info cache for driver")
+	}
+	m.notifyPodsForHealthChanges(logger, pluginName, changedDevices)
+}
+
+func (m *Manager) notifyPodsForHealthChanges(logger klog.Logger, pluginName string, changedDevices []state.DeviceHealth) {
+	if len(changedDevices) == 0 {
+		return
+	}
+
+	logger.V(4).Info("Health info changed, checking affected pods", "changedDevicesCount", len(changedDevices))
+
+	type deviceKey struct {
+		poolName   string
+		deviceName string
+	}
+	podsByDevice := make(map[deviceKey][]string)
+	m.cache.RLock()
+	for _, claimInfo := range m.cache.claimInfo {
+		if driverState, ok := claimInfo.DriverState[pluginName]; ok {
+			for _, allocatedDevice := range driverState.Devices {
+				key := deviceKey{poolName: allocatedDevice.PoolName, deviceName: allocatedDevice.DeviceName}
+				podsByDevice[key] = append(podsByDevice[key], claimInfo.PodUIDs.UnsortedList()...)
 			}
 		}
+	}
+	m.cache.RUnlock()
 
+	podsToUpdate := sets.New[string]()
+	for _, device := range changedDevices {
+		podsToUpdate.Insert(podsByDevice[deviceKey{poolName: device.PoolName, deviceName: device.DeviceName}]...)
+	}
+
+	if podsToUpdate.Len() == 0 {
+		logger.V(4).Info("Health info changed, but no active pods found using the affected devices")
+		return
+	}
+
+	podUIDs := podsToUpdate.UnsortedList()
+	logger.Info("Sending health update notification for pods", "pods", podUIDs)
+	select {
+	case m.update <- resourceupdates.Update{PodUIDs: podUIDs}:
+	default:
+		logger.Error(nil, "DRA health update channel is full, discarding pod update notification", "pods", podUIDs)
 	}
 }
 
