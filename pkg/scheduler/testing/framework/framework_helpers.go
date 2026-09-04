@@ -118,6 +118,11 @@ func RegisterPlacementScorePlugin(pluginName string, pluginNewFunc runtime.Plugi
 	return RegisterPluginAsExtensionsWithWeight(pluginName, weight, pluginNewFunc, "PlacementScore")
 }
 
+// RegisterPlacementFeasiblePlugin returns a function to register a PlacementFeasible Plugin to a given registry.
+func RegisterPlacementFeasiblePlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
+	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "PlacementFeasible")
+}
+
 // RegisterPluginAsExtensions returns a function to register a Plugin as given extensionPoints to a given registry.
 func RegisterPluginAsExtensions(pluginName string, pluginNewFunc runtime.PluginFactory, extensions ...string) RegisterPluginFunc {
 	return RegisterPluginAsExtensionsWithWeight(pluginName, 1, pluginNewFunc, extensions...)
@@ -176,6 +181,10 @@ func getPluginSetByExtension(plugins *schedulerapi.Plugins, extension string) *s
 		return &plugins.PlacementGenerate
 	case "PlacementScore":
 		return &plugins.PlacementScore
+	case "PlacementFeasible":
+		return &plugins.PlacementFeasible
+	case "PodGroupPostFilter":
+		return &plugins.PodGroupPostFilter
 	default:
 		return nil
 	}

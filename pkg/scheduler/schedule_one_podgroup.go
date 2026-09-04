@@ -471,7 +471,7 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 
 	// Run PlacementFeasible plugins to check if the pod group can meet its constraints
 	// before even attempting to schedule any pods.
-	placementProgress := framework.PlacementProgress{
+	placementProgress := fwk.PlacementProgress{
 		Remaining: len(podGroupInfo.GetUnscheduledPods()),
 		Scheduled: podGroupState.ScheduledPodsCount(),
 	}
@@ -520,7 +520,7 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 // the (composite) pod group can meet its constraints based on the placement progress.
 // It returns true when the scheduling should proceed, false otherwise.
 // Returned status is modified to be fine to be copied directly to the podGroupAlgorithmResult.
-func podGroupPotentiallyFeasible(ctx context.Context, schedFwk framework.Framework, placementCycleState *framework.CycleState, podGroupInfo *framework.PodGroupInfo, placementProgress framework.PlacementProgress) (bool, *fwk.Status) {
+func podGroupPotentiallyFeasible(ctx context.Context, schedFwk framework.Framework, placementCycleState *framework.CycleState, podGroupInfo *framework.PodGroupInfo, placementProgress fwk.PlacementProgress) (bool, *fwk.Status) {
 	status := schedFwk.RunPlacementFeasiblePlugins(ctx, placementCycleState, podGroupInfo, placementProgress)
 	switch status.Code() {
 	case fwk.Error:
@@ -1247,7 +1247,7 @@ func (sched *Scheduler) compositePodGroupSchedulingDefaultAlgorithm(ctx context.
 
 	// Run PlacementFeasible plugins to check if the composite pod group can meet its constraints
 	// before even attempting to schedule any children.
-	placementProgress := framework.PlacementProgress{
+	placementProgress := fwk.PlacementProgress{
 		Remaining: len(podGroupInfo.Children),
 	}
 	proceed, placementFeasibleStatus := podGroupPotentiallyFeasible(ctx, schedFwk, placementCycleState, podGroupInfo, placementProgress)
