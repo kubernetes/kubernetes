@@ -1510,6 +1510,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.37"
+- name: PodLevelCheckpointRestore
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.35"
 - name: PodLevelResourceManagers
   versionedSpecs:
   - default: false

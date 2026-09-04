@@ -195,6 +195,16 @@ func (CephFSVolumeSource) SwaggerDoc() map[string]string {
 	return map_CephFSVolumeSource
 }
 
+var map_CheckpointReference = map[string]string{
+	"":        "CheckpointReference identifies a PodCheckpoint and specifies options for restoring a Pod from it.",
+	"name":    "Name is the name of a PodCheckpoint in the Pod's namespace.",
+	"options": "Options contains opaque runtime-specific options for this restore attempt. The kubelet passes these entries unchanged to RestorePodRequest.options. Keys and values must be documented by the runtime selected for this Pod. Unsupported entries cause the restore to fail. Options must not contain secrets.\n\nRestore options are independent of the options used to create the checkpoint and are not stored in the PodCheckpoint. Requirements intrinsic to the checkpoint are recorded in runtime-owned checkpoint data instead.",
+}
+
+func (CheckpointReference) SwaggerDoc() map[string]string {
+	return map_CheckpointReference
+}
+
 var map_CinderPersistentVolumeSource = map[string]string{
 	"":          "Represents a cinder volume resource in Openstack. A Cinder volume must exist before mounting to a container. The volume must also be in the same region as the kubelet. Cinder volumes support ownership management and SELinux relabeling.",
 	"volumeID":  "volumeID used to identify the volume in cinder. More info: https://examples.k8s.io/mysql-cinder-pd/README.md",
@@ -2008,6 +2018,7 @@ var map_PodSpec = map[string]string{
 	"hostnameOverride":              "HostnameOverride specifies an explicit override for the pod's hostname as perceived by the pod. This field only specifies the pod's hostname and does not affect its DNS records. When this field is set to a non-empty string: - It takes precedence over the values set in `hostname` and `subdomain`. - The Pod's hostname will be set to this value. - `setHostnameAsFQDN` must be nil or set to false. - `hostNetwork` must be set to false.\n\nThis field must be a valid DNS subdomain as defined in RFC 1123 and contain at most 64 characters.",
 	"schedulingGroup":               "SchedulingGroup provides a reference to the immediate scheduling runtime grouping object that this Pod belongs to. This field is used by the scheduler to identify the group and apply the correct group scheduling policies. The association with a group also impacts other lifecycle aspects of a Pod that are relevant in a wider context of scheduling like preemption, resource attachment, etc. If not specified, the Pod is treated as a single unit in all of these aspects. The group object referenced by this field may not exist at the time the Pod is created. This field is immutable, but a group object with the same name may be recreated with different policies. Doing this during pod scheduling may result in the placement not conforming to the expected policies.",
 	"evictionResponders":            "evictionResponders reference responders that react to Evictions based on EvictionRequests. Responders should observe and communicate through the Eviction Resource API to help with the graceful termination of a pod. The responders are selected sequentially, according to their specified priority.\n\nResponders should periodically report on an eviction progress by updating the .status.responders[].heartbeatTime field of the Eviction object. If this field is not updated within the heartbeat deadline defined by the Eviction API (currently 20 minutes), the eviction is passed over to the next responder with a lower priority. If there is no other responder, the last default imperative-eviction.k8s.io/evictor responder with a priority of 100 will evict the pod using the imperative Eviction API (pods/<name>/eviction subresource).\n\nThe maximum length of the responders list is 10. Responders are not supported when the pod is part of a PodGroup (.spec.schedulingGroup is set). This field can only be set on creation and is immutable afterwards.",
+	"restoreFrom":                   "RestoreFrom specifies a PodCheckpoint in this Pod's namespace to restore this Pod from. When set, the Pod is restored from that checkpoint's archive instead of being created from scratch; the kubelet resolves the reference to the on-node archive via the PodCheckpoint's status. This field is immutable. Restoring from another checkpoint requires creating a new Pod; in-place restore of an existing Pod is not supported.",
 }
 
 func (PodSpec) SwaggerDoc() map[string]string {

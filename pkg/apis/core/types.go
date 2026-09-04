@@ -4209,6 +4209,35 @@ type PodSpec struct {
 	// +featureGate=EvictionRequestAPI
 	// +optional
 	EvictionResponders []EvictionResponder
+	// RestoreFrom specifies a PodCheckpoint in this Pod's namespace to restore
+	// this Pod from. When set, the Pod is restored from that checkpoint's archive
+	// instead of being created from scratch; the kubelet resolves the reference to
+	// the on-node archive via the PodCheckpoint's status.
+	// This field is immutable. Restoring from another checkpoint requires creating
+	// a new Pod; in-place restore of an existing Pod is not supported.
+	// +featureGate=PodLevelCheckpointRestore
+	// +optional
+	RestoreFrom *CheckpointReference
+}
+
+// CheckpointReference identifies a PodCheckpoint and specifies options for
+// restoring a Pod from it.
+type CheckpointReference struct {
+	// Name is the name of a PodCheckpoint in the Pod's namespace.
+	// +required
+	Name string
+
+	// Options contains opaque runtime-specific options for this restore attempt.
+	// The kubelet passes these entries unchanged to RestorePodRequest.options. Keys
+	// and values must be documented by the runtime selected for this Pod.
+	// Unsupported entries cause the restore to fail. Options must not contain secrets.
+	//
+	// Restore options are independent of the options used to create the checkpoint
+	// and are not stored in the PodCheckpoint. Requirements intrinsic to the
+	// checkpoint are recorded in runtime-owned checkpoint data instead.
+	// +optional
+	// +mapType=atomic
+	Options map[string]string
 }
 
 // PodResourceClaim references exactly one ResourceClaim through a ClaimSource.

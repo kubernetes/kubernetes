@@ -25,6 +25,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	runtimeutil "k8s.io/kubernetes/pkg/kubelet/kuberuntime/util"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -44,7 +45,47 @@ const (
 	ReadinessGatesNotReady = "ReadinessGatesNotReady"
 	// RestartAllContainersStarted says that a container exited and triggered RestartAllContainer action.
 	RestartAllContainersStarted = "RestartAllContainersStarted"
+	// RestoringSandbox says that the pod's sandbox is being restored from a checkpoint.
+	RestoringSandbox = "RestoringSandbox"
 )
+
+// GenerateRestoringCondition returns the "Restoring" condition for a pod that is
+// being restored from the PodCheckpoint named by spec.restoreFrom.name, and a
+// bool reporting whether the condition should be set at all. KEP-5823:
+//   - while the pod's own sandbox restore is in flight (a new sandbox still needs
+//     to be created), the condition is True with reason RestoringSandbox;
+//   - if the restore is blocked waiting for another restore of the same
+//     (namespace, name) to finish, the condition is False with reason
+//     RestoreInProgress;
+//   - once the sandbox is up (the pod is Running), the condition is cleared
+//     (ok=false), so callers omit it.
+//
+// blocked reflects node-local kubelet state recorded by the runtime manager when
+// it cannot acquire the per-(namespace, name) restore lock; the condition is not
+// an API-level lock.
+func GenerateRestoringCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, podStatus *kubecontainer.PodStatus, blocked bool) (v1.PodCondition, bool) {
+	newSandboxNeeded, _, _, _ := runtimeutil.PodSandboxChanged(pod, podStatus)
+	// The sandbox has been restored and is running; the restore is complete, so
+	// the condition is cleared.
+	if !newSandboxNeeded {
+		return v1.PodCondition{}, false
+	}
+
+	cond := v1.PodCondition{
+		Type:               kubetypes.PodRestoring,
+		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(oldPodStatus, pod.Generation, kubetypes.PodRestoring),
+	}
+	if blocked {
+		cond.Status = v1.ConditionFalse
+		cond.Reason = events.RestoreInProgress
+		cond.Message = "waiting for another restore of the same pod (namespace/name) to finish"
+		return cond, true
+	}
+	cond.Status = v1.ConditionTrue
+	cond.Reason = RestoringSandbox
+	cond.Message = "restoring pod sandbox from checkpoint"
+	return cond, true
+}
 
 // GenerateContainersReadyCondition returns the status of "ContainersReady" condition.
 // The status of "ContainersReady" condition is true when all containers are ready.
