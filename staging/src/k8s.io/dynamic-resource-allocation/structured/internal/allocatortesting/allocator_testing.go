@@ -1649,6 +1649,227 @@ func TestAllocator(t *testing.T,
 
 			expectError: gomega.MatchError(gomega.ContainSubstring("invalid resource pools were encountered")),
 		},
+		"inconsistent-resource-slice-count-ordering-a": {
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			// Two slices in the same driver/pool/generation disagree on
+			// ResourceSliceCount. The pool is invalid regardless of the order the
+			// slices are supplied in.
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 1), driverA, device(device1, nil, nil)),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 2), driverA, device(device2, nil, nil)),
+			),
+			node: node(node1, region1),
+
+			expectError: gomega.MatchError(gomega.ContainSubstring("invalid resource pools were encountered")),
+		},
+		"inconsistent-resource-slice-count-ordering-b": {
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			// The previous case in the opposite order. Before the fix this order
+			// made the pool look complete and allocated a device; now both orders
+			// reject it as invalid.
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 2), driverA, device(device2, nil, nil)),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 1), driverA, device(device1, nil, nil)),
+			),
+			node: node(node1, region1),
+
+			expectError: gomega.MatchError(gomega.ContainSubstring("invalid resource pools were encountered")),
+		},
+		"inconsistent-resource-slice-count-across-nodes": {
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			// The node-local slice declares resourceSliceCount 1 while another
+			// slice in the same pool generation, targeting a different node,
+			// declares 2. The node-local view on its own looks complete (1 == 1),
+			// so the disagreement is only visible when every slice in the
+			// generation is considered.
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 1), driverA, device(device1, nil, nil)),
+				sliceWithDevices(slice2, node2, resourcePool(pool1, 2), driverA, device(device2, nil, nil)),
+			),
+			node: node(node1, region1),
+
+			expectError: gomega.MatchError(gomega.ContainSubstring("invalid resource pools were encountered")),
+		},
+		"inconsistent-resource-slice-count-across-nodes-local-higher": {
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			// The reverse of the previous case: the node-local slice declares the
+			// higher count, so the node-local view is incomplete and reaches the slow
+			// path. The generation still disagrees, so the pool is invalid.
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device1, nil, nil)),
+				sliceWithDevices(slice2, node2, resourcePool(pool1, 1), driverA, device(device2, nil, nil)),
+			),
+			node: node(node1, region1),
+
+			expectError: gomega.MatchError(gomega.ContainSubstring("invalid resource pools were encountered")),
+		},
+		"consistent-resource-slice-count-across-generations": {
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			// Two generations of the same pool declare different counts, but each
+			// generation is internally consistent. That is a normal update, not a
+			// contradiction, so the newer generation is allocated from as usual.
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device1, nil, nil)),
+				func() wrapResourceSliceWithDevices {
+					s := sliceWithDevices(slice2, node1, pool1, driverA, device(device2, nil, nil))
+					s.Spec.Pool.Generation = 2
+					s.Spec.Pool.ResourceSliceCount = 1
+					return s
+				}(),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
+		"inconsistent-resource-slice-count-in-obsolete-generation": {
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			// The node-local generation is internally inconsistent (resourceSliceCount
+			// 1 and 2), but a newer generation of the same pool is rolling out on
+			// another node. The local generation is obsolete, so it is ignored like any
+			// other superseded generation rather than reported as invalid. The
+			// higher-count slice is listed first so that before the fix this ordering
+			// would have taken the fast path and allocated.
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 2), driverA, device(device2, nil, nil)),
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 1), driverA, device(device1, nil, nil)),
+				func() wrapResourceSliceWithDevices {
+					s := sliceWithDevices(slice3, node2, pool1, driverA, device(device1, nil, nil))
+					s.Spec.Pool.Generation = 2
+					s.Spec.Pool.ResourceSliceCount = 1
+					return s
+				}(),
+			),
+			node: node(node1, region1),
+
+			expectResults: nil,
+		},
+		"inconsistent-resource-slice-count-in-superseded-generation": {
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			// An older generation on the node is internally inconsistent, but a newer
+			// consistent generation supersedes it on the same node. The pool resolves
+			// to the newer generation, so the stale disagreement must not make it
+			// invalid.
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 1), driverA, device(device1, nil, nil)),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 2), driverA, device(device2, nil, nil)),
+				func() wrapResourceSliceWithDevices {
+					s := sliceWithDevices(slice3, node1, pool1, driverA, device(device1, nil, nil))
+					s.Spec.Pool.Generation = 2
+					s.Spec.Pool.ResourceSliceCount = 1
+					return s
+				}(),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
+		"consistent-selected-generation-not-invalidated-by-inconsistent-newer-generation": {
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			// node1 resolves to generation 1, which is consistent and complete. Generation 2
+			// is rolling out on node2 with slices that disagree, but only the generation a
+			// node resolves to is judged, so node1 still allocates from generation 1.
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 1), driverA, device(device1, nil, nil)),
+				func() wrapResourceSliceWithDevices {
+					s := sliceWithDevices(slice2, node2, pool1, driverA, device(device2, nil, nil))
+					s.Spec.Pool.Generation = 2
+					s.Spec.Pool.ResourceSliceCount = 1
+					return s
+				}(),
+				func() wrapResourceSliceWithDevices {
+					s := sliceWithDevices(slice3, node2, pool1, driverA, device(device3, nil, nil))
+					s.Spec.Pool.Generation = 2
+					s.Spec.Pool.ResourceSliceCount = 2
+					return s
+				}(),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
+		"inconsistent-resource-slice-count-with-filtered-counter-slice": {
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			// With PartitionableDevices disabled the counter-set slice is filtered out
+			// of the pool, but it still belongs to the generation and its
+			// ResourceSliceCount must agree. The disagreement is found from the full
+			// slice set, not just the slices that survived filtering.
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device1, nil, nil)),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 1), driverA,
+					counterSet(counterSet1, nil),
+				),
+			),
+			node: node(node1, region1),
+
+			expectError: gomega.MatchError(gomega.ContainSubstring("invalid resource pools were encountered")),
+		},
+		"incomplete-pool-consistent-resource-slice-count": {
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			// Both slices agree on resourceSliceCount 3 and only two have arrived, so the
+			// pool is incomplete rather than contradictory and is not marked invalid.
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 3), driverA, device(device1, nil, nil)),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA, device(device2, nil, nil)),
+			),
+			node: node(node1, region1),
+
+			expectResults: nil,
+		},
+		"inconsistent-resource-slice-count-does-not-block-valid-pool": {
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			// pool1's slices disagree on resourceSliceCount, so it is invalid. pool2
+			// satisfies the claim, so pool1 is skipped instead of failing allocation.
+			// The higher count comes first so pool1 looked complete before the fix.
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device1, nil, nil)),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 1), driverA, device(device2, nil, nil)),
+				sliceWithDevices(slice3, node1, resourcePool(pool2, 1), driverA, device(device3, nil, nil)),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool2, device3, false),
+			)},
+		},
+		"inconsistent-resource-slice-count-isolated-per-driver": {
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classB)),
+			classes:          objects(class(classA, driverA), class(classB, driverB)),
+			// driverA and driverB both name a pool1 at generation 1. driverA's slices
+			// disagree on resourceSliceCount, but the generation key is per driver, so
+			// driverB's pool stays valid and satisfies the request. Drop the driver from
+			// the key and driverA's contradiction would spread to driverB.
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA, device(device1, nil, nil)),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 1), driverA, device(device2, nil, nil)),
+				sliceWithDevices(slice3, node1, resourcePool(pool1, 1), driverB, device(device1, nil, nil)),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverB, pool1, device1, false),
+			)},
+		},
 		"no-slices": {
 			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
 			classes:          objects(class(classA, driverA)),
