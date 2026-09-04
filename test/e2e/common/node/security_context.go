@@ -523,10 +523,16 @@ var _ = SIGDescribe("Security Context", func() {
 		ginkgo.It("should run with an image specified user ID", func(ctx context.Context) {
 			name := "implicit-nonroot-uid"
 			pod := makeNonRootPod(name, nonRootImage, nil)
+			expectedUser := "1234"
+			if framework.NodeOSDistroIs("windows") {
+				// The Windows nonroot image runs as ContainerUser.
+				pod.Spec.Containers[0].Command = []string{"cmd", "/S", "/C", "echo %username%"}
+				expectedUser = "ContainerUser"
+			}
 			podClient.Create(ctx, pod)
 
 			podClient.WaitForSuccess(ctx, name, framework.PodStartTimeout)
-			framework.ExpectNoError(podClient.MatchContainerOutput(ctx, name, name, "1234"))
+			framework.ExpectNoError(podClient.MatchContainerOutput(ctx, name, name, expectedUser))
 		})
 		ginkgo.It("should not run without a specified user ID", func(ctx context.Context) {
 			name := "implicit-root-uid"
