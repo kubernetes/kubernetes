@@ -45,6 +45,8 @@ type ListerWithContext interface {
 	ListWithContext(ctx context.Context, options metav1.ListOptions) (runtime.Object, error)
 }
 
+// ToListerWithContext wraps a Lister to implement ListerWithContext.
+// If l already implements ListerWithContext, it is returned as-is.
 func ToListerWithContext(l Lister) ListerWithContext {
 	if l, ok := l.(ListerWithContext); ok {
 		return l
@@ -86,6 +88,8 @@ type WatcherWithContext interface {
 	WatchWithContext(ctx context.Context, options metav1.ListOptions) (watch.Interface, error)
 }
 
+// ToWatcherWithContext wraps a Watcher to implement WatcherWithContext.
+// If w already implements WatcherWithContext, it is returned as-is.
 func ToWatcherWithContext(w Watcher) WatcherWithContext {
 	if w, ok := w.(WatcherWithContext); ok {
 		return w
@@ -117,6 +121,8 @@ type ListerWatcherWithContext interface {
 	WatcherWithContext
 }
 
+// ToListerWatcherWithContext wraps a ListerWatcher to implement ListerWatcherWithContext.
+// If lw already implements ListerWatcherWithContext, it is returned as-is.
 func ToListerWatcherWithContext(lw ListerWatcher) ListerWatcherWithContext {
 	if lw, ok := lw.(ListerWatcherWithContext); ok {
 		return lw
