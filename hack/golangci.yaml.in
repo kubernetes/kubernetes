@@ -367,15 +367,13 @@ linters:
         # context cancellation and also
         # addresses other pain points.
         - testingcontext
+        {{- if .Base }}
         # Replace wg.Add(1)/go/wg.Done() with wg.Go.
         #
         # A useful hint leading to shorter code.
         # Makes wait.Group obsolete.
-        {{- if .Hints }}
-        # Please enable when all supported Kubernetes versions
-        # are on GoLang 1.25+
-        {{- end }}
         - waitgroupgo
+        {{- end }}
 
     revive:
       # Only these rules are enabled.
