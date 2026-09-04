@@ -61,6 +61,62 @@ func TestGetContainerDevices(t *testing.T) {
 	}
 }
 
+func TestPodDevicesReservationLifecycle(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	const (
+		podUID                = "pod"
+		containerName         = "container"
+		committedContainer    = "committed-container"
+		resourceName          = "example.com/resource"
+		committedResourceName = "example.com/committed-resource"
+		deviceID              = "dev0"
+		committedDeviceID     = "dev1"
+	)
+
+	podDevices := newPodDevices()
+	require.True(t, podDevices.reserve(podUID, containerName, resourceName))
+	require.False(t, podDevices.reserve(podUID, containerName, resourceName), "a second allocation must not replace an in-flight reservation")
+	require.True(t, podDevices.addDevicesToReservation(podUID, containerName, resourceName, sets.New[string](deviceID)))
+
+	assert.False(t, podDevices.hasPod(podUID), "reservations must not be exposed as committed pod allocations")
+	assert.Empty(t, podDevices.pods())
+	assert.Nil(t, podDevices.containerDevices(podUID, containerName, resourceName))
+	assert.Nil(t, podDevices.getContainerDevices(podUID, containerName))
+	assert.Nil(t, podDevices.deviceRunContainerOptions(logger, podUID, containerName))
+	assert.Empty(t, podDevices.toCheckpointData(logger))
+	assert.Equal(t, sets.New[string](deviceID), podDevices.devices()[resourceName], "reservations must still make devices unavailable")
+
+	// Garbage collection must remove the pod's committed allocations without
+	// removing an in-flight reservation owned by that same pod.
+	podDevices.insert(podUID, committedContainer, committedResourceName, constructDevices([]string{committedDeviceID}), newContainerAllocateResponse())
+	assert.True(t, podDevices.hasPod(podUID))
+	podDevices.delete([]string{podUID})
+	assert.False(t, podDevices.hasPod(podUID))
+	assert.Nil(t, podDevices.containerDevices(podUID, committedContainer, committedResourceName))
+	assert.Equal(t, sets.New[string](deviceID), podDevices.devices()[resourceName])
+
+	response := newContainerAllocateResponse()
+	require.True(t, podDevices.commitReservation(podUID, containerName, resourceName, constructDevices([]string{deviceID}), response))
+	assert.True(t, podDevices.hasPod(podUID))
+	assert.Equal(t, sets.New[string](deviceID), podDevices.containerDevices(podUID, containerName, resourceName))
+	assert.False(t, podDevices.rollbackReservation(podUID, containerName, resourceName), "a committed allocation must not be rolled back as a reservation")
+}
+
+func TestPodDevicesRollbackReservation(t *testing.T) {
+	const (
+		podUID        = "pod"
+		containerName = "container"
+		resourceName  = "example.com/resource"
+	)
+
+	podDevices := newPodDevices()
+	require.True(t, podDevices.reserve(podUID, containerName, resourceName))
+	require.True(t, podDevices.addDevicesToReservation(podUID, containerName, resourceName, sets.New[string]("dev0")))
+	require.True(t, podDevices.rollbackReservation(podUID, containerName, resourceName))
+	assert.Empty(t, podDevices.devs)
+	assert.Empty(t, podDevices.devices())
+}
+
 func TestResourceDeviceInstanceFilter(t *testing.T) {
 	var expected string
 	var cond map[string]sets.Set[string]

@@ -30,11 +30,23 @@ import (
 )
 
 type deviceAllocateInfo struct {
-	// deviceIds contains device Ids allocated to this container for the given resourceName.
+	// deviceIds contains device Ids allocated or reserved for this container for the given resourceName.
 	deviceIds checkpoint.DevicesPerNUMA
-	// allocResp contains cached rpc AllocateResponse.
+	// allocResp contains the cached AllocateResponse for a committed allocation.
 	allocResp *pluginapi.ContainerAllocateResponse
+	// state distinguishes devices reserved for an in-flight Allocate call from
+	// devices whose Allocate response has been committed.
+	state allocationState
 }
+
+type allocationState uint8
+
+const (
+	// allocationCommitted is intentionally the zero value so checkpoint-restored
+	// and test-created deviceAllocateInfo values retain their existing semantics.
+	allocationCommitted allocationState = iota
+	allocationReserved
+)
 
 type resourceAllocateInfo map[string]deviceAllocateInfo // Keyed by resourceName.
 type containerDevices map[string]resourceAllocateInfo   // Keyed by containerName.
@@ -50,12 +62,25 @@ func newPodDevices() *podDevices {
 	return &podDevices{devs: make(map[string]containerDevices)}
 }
 
+// pods returns pods with at least one committed device allocation. Pods that
+// contain only reservations are excluded from garbage collection while their
+// RPC is in flight.
 func (pdev *podDevices) pods() sets.Set[string] {
 	pdev.RLock()
 	defer pdev.RUnlock()
 	ret := sets.New[string]()
-	for k := range pdev.devs {
-		ret.Insert(k)
+	for podUID, containers := range pdev.devs {
+		for _, resources := range containers {
+			for _, devices := range resources {
+				if devices.state == allocationCommitted {
+					ret.Insert(podUID)
+					break
+				}
+			}
+			if ret.Has(podUID) {
+				break
+			}
+		}
 	}
 	return ret
 }
@@ -69,8 +94,14 @@ func (pdev *podDevices) size() int {
 func (pdev *podDevices) hasPod(podUID string) bool {
 	pdev.RLock()
 	defer pdev.RUnlock()
-	_, podExists := pdev.devs[podUID]
-	return podExists
+	for _, resources := range pdev.devs[podUID] {
+		for _, devices := range resources {
+			if devices.state == allocationCommitted {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (pdev *podDevices) insert(podUID, contName, resource string, devices checkpoint.DevicesPerNUMA, resp *pluginapi.ContainerAllocateResponse) {
@@ -85,14 +116,107 @@ func (pdev *podDevices) insert(podUID, contName, resource string, devices checkp
 	pdev.devs[podUID][contName][resource] = deviceAllocateInfo{
 		deviceIds: devices,
 		allocResp: resp,
+		state:     allocationCommitted,
 	}
 }
 
+// reserve creates an empty reservation for a pod, container and resource. The
+// empty entry prevents another allocation for the same owner from starting
+// while this one is in flight.
+func (pdev *podDevices) reserve(podUID, contName, resource string) bool {
+	pdev.Lock()
+	defer pdev.Unlock()
+	if resources, podExists := pdev.devs[podUID]; podExists {
+		if allocations, contExists := resources[contName]; contExists {
+			if _, resourceExists := allocations[resource]; resourceExists {
+				return false
+			}
+		}
+	}
+	if _, podExists := pdev.devs[podUID]; !podExists {
+		pdev.devs[podUID] = make(containerDevices)
+	}
+	if _, contExists := pdev.devs[podUID][contName]; !contExists {
+		pdev.devs[podUID][contName] = make(resourceAllocateInfo)
+	}
+	pdev.devs[podUID][contName][resource] = deviceAllocateInfo{
+		deviceIds: checkpoint.NewDevicesPerNUMA(),
+		state:     allocationReserved,
+	}
+	return true
+}
+
+// addDevicesToReservation records devices selected for an in-flight Allocate
+// call. It may be called more than once as device selection progresses around
+// GetPreferredAllocation RPCs.
+func (pdev *podDevices) addDevicesToReservation(podUID, contName, resource string, devices sets.Set[string]) bool {
+	pdev.Lock()
+	defer pdev.Unlock()
+	allocation, exists := pdev.devs[podUID][contName][resource]
+	if !exists || allocation.state != allocationReserved {
+		return false
+	}
+	reserved := allocation.deviceIds.Devices().Union(devices)
+	allocation.deviceIds = checkpoint.DevicesPerNUMA{nodeWithoutTopology: reserved.UnsortedList()}
+	pdev.devs[podUID][contName][resource] = allocation
+	return true
+}
+
+// commitReservation replaces a reservation with the successful Allocate
+// result. The caller is responsible for serializing this transition with
+// allocatedDevices rebuilds.
+func (pdev *podDevices) commitReservation(podUID, contName, resource string, devices checkpoint.DevicesPerNUMA, resp *pluginapi.ContainerAllocateResponse) bool {
+	pdev.Lock()
+	defer pdev.Unlock()
+	allocation, exists := pdev.devs[podUID][contName][resource]
+	if !exists || allocation.state != allocationReserved {
+		return false
+	}
+	pdev.devs[podUID][contName][resource] = deviceAllocateInfo{
+		deviceIds: devices,
+		allocResp: resp,
+		state:     allocationCommitted,
+	}
+	return true
+}
+
+// rollbackReservation removes an in-flight reservation without disturbing
+// committed allocations for the same device, such as reusable init-container
+// devices.
+func (pdev *podDevices) rollbackReservation(podUID, contName, resource string) bool {
+	pdev.Lock()
+	defer pdev.Unlock()
+	allocation, exists := pdev.devs[podUID][contName][resource]
+	if !exists || allocation.state != allocationReserved {
+		return false
+	}
+	pdev.deleteResourceLocked(podUID, contName, resource)
+	return true
+}
+
+func (pdev *podDevices) deleteResourceLocked(podUID, contName, resource string) {
+	delete(pdev.devs[podUID][contName], resource)
+	if len(pdev.devs[podUID][contName]) == 0 {
+		delete(pdev.devs[podUID], contName)
+	}
+	if len(pdev.devs[podUID]) == 0 {
+		delete(pdev.devs, podUID)
+	}
+}
+
+// delete removes committed allocations for the specified pods while preserving
+// any reservations whose Allocate RPCs are still in flight.
 func (pdev *podDevices) delete(pods []string) {
 	pdev.Lock()
 	defer pdev.Unlock()
-	for _, uid := range pods {
-		delete(pdev.devs, uid)
+	for _, podUID := range pods {
+		for contName, resources := range pdev.devs[podUID] {
+			for resource, devices := range resources {
+				if devices.state == allocationCommitted {
+					pdev.deleteResourceLocked(podUID, contName, resource)
+				}
+			}
+		}
 	}
 }
 
@@ -103,8 +227,11 @@ func (pdev *podDevices) podDevices(podUID, resource string) sets.Set[string] {
 	defer pdev.RUnlock()
 
 	ret := sets.New[string]()
-	for contName := range pdev.devs[podUID] {
-		ret = ret.Union(pdev.containerDevices(podUID, contName, resource))
+	for _, resources := range pdev.devs[podUID] {
+		devices, exists := resources[resource]
+		if exists && devices.state == allocationCommitted {
+			ret = ret.Union(devices.deviceIds.Devices())
+		}
 	}
 	return ret
 }
@@ -121,7 +248,7 @@ func (pdev *podDevices) containerDevices(podUID, contName, resource string) sets
 		return nil
 	}
 	devs, resourceExists := pdev.devs[podUID][contName][resource]
-	if !resourceExists {
+	if !resourceExists || devs.state != allocationCommitted {
 		return nil
 	}
 	return devs.deviceIds.Devices()
@@ -140,6 +267,9 @@ func (pdev *podDevices) addContainerAllocatedResources(podUID, contName string, 
 		return
 	}
 	for resource, devices := range resources {
+		if devices.state != allocationCommitted {
+			continue
+		}
 		allocatedResources[resource] = allocatedResources[resource].Union(devices.deviceIds.Devices())
 	}
 }
@@ -157,11 +287,14 @@ func (pdev *podDevices) removeContainerAllocatedResources(podUID, contName strin
 		return
 	}
 	for resource, devices := range resources {
+		if devices.state != allocationCommitted {
+			continue
+		}
 		allocatedResources[resource] = allocatedResources[resource].Difference(devices.deviceIds.Devices())
 	}
 }
 
-// Returns all devices allocated to the pods being tracked, keyed by resourceName.
+// Returns all committed and reserved devices being tracked, keyed by resourceName.
 func (pdev *podDevices) devices() map[string]sets.Set[string] {
 	ret := make(map[string]sets.Set[string])
 	pdev.RLock()
@@ -169,12 +302,13 @@ func (pdev *podDevices) devices() map[string]sets.Set[string] {
 	for _, containerDevices := range pdev.devs {
 		for _, resources := range containerDevices {
 			for resource, devices := range resources {
+				if devices.state == allocationReserved && devices.deviceIds.Devices().Len() == 0 {
+					continue
+				}
 				if _, exists := ret[resource]; !exists {
 					ret[resource] = sets.New[string]()
 				}
-				if devices.allocResp != nil {
-					ret[resource] = ret[resource].Union(devices.deviceIds.Devices())
-				}
+				ret[resource] = ret[resource].Union(devices.deviceIds.Devices())
 			}
 		}
 	}
@@ -189,7 +323,7 @@ func (pdev *podDevices) getPodAndContainerForDevice(resourceName, deviceID strin
 	defer pdev.RUnlock()
 	for podUID, containerDevices := range pdev.devs {
 		for containerName, resources := range containerDevices {
-			if devices, ok := resources[resourceName]; ok {
+			if devices, ok := resources[resourceName]; ok && devices.state == allocationCommitted {
 				if devices.deviceIds.Devices().Has(deviceID) {
 					return podUID, containerName
 				}
@@ -207,6 +341,9 @@ func (pdev *podDevices) toCheckpointData(logger klog.Logger) []checkpoint.PodDev
 	for podUID, containerDevices := range pdev.devs {
 		for conName, resources := range containerDevices {
 			for resource, devices := range resources {
+				if devices.state != allocationCommitted {
+					continue
+				}
 				if devices.allocResp == nil {
 					logger.Error(nil, "Can't marshal allocResp, allocation response is missing", "podUID", podUID, "containerName", conName, "resourceName", resource)
 					continue
@@ -259,6 +396,7 @@ func (pdev *podDevices) deviceRunContainerOptions(logger klog.Logger, podUID, co
 		return nil
 	}
 	opts := &DeviceRunContainerOptions{}
+	hasCommittedDevices := false
 	// Maps to detect duplicate settings.
 	devsMap := make(map[string]string)
 	mountsMap := make(map[string]string)
@@ -268,6 +406,10 @@ func (pdev *podDevices) deviceRunContainerOptions(logger klog.Logger, podUID, co
 	allCDIDevices := sets.New[string]()
 	// Loops through AllocationResponses of all cached device resources.
 	for _, devices := range resources {
+		if devices.state != allocationCommitted {
+			continue
+		}
+		hasCommittedDevices = true
 		resp := devices.allocResp
 		// Each Allocate response has the following artifacts.
 		// Environment variables
@@ -349,6 +491,9 @@ func (pdev *podDevices) deviceRunContainerOptions(logger klog.Logger, podUID, co
 		cdiDevices := getCDIDeviceInfo(logger, resp, allCDIDevices)
 		opts.CDIDevices = append(opts.CDIDevices, cdiDevices...)
 	}
+	if !hasCommittedDevices {
+		return nil
+	}
 
 	return opts
 }
@@ -385,7 +530,12 @@ func (pdev *podDevices) getContainerDevices(podUID, contName string) ResourceDev
 		return nil
 	}
 	resDev := NewResourceDeviceInstances()
+	hasCommittedAllocation := false
 	for resource, allocateInfo := range pdev.devs[podUID][contName] {
+		if allocateInfo.state != allocationCommitted {
+			continue
+		}
+		hasCommittedAllocation = true
 		if len(allocateInfo.deviceIds) == 0 {
 			continue
 		}
@@ -410,6 +560,9 @@ func (pdev *podDevices) getContainerDevices(podUID, contName string) ResourceDev
 			}
 		}
 		resDev[resource] = devicePluginMap
+	}
+	if !hasCommittedAllocation {
+		return nil
 	}
 	return resDev
 }
