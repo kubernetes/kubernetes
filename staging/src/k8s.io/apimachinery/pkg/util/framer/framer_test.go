@@ -234,3 +234,90 @@ func TestJSONFrameReaderShortBufferNoUnderlyingArrayReuse(t *testing.T) {
 		t.Fatalf("unexpected: %v %d %q", err, n, buf)
 	}
 }
+
+func TestLineDelimitedFrameReader(t *testing.T) {
+	b := bytes.NewBufferString("{\"test\":true}\n1\n[\"a\"]\n")
+	r := NewLineDelimitedFrameReader(io.NopCloser(b))
+	buf := make([]byte, 20)
+	if n, err := r.Read(buf); err != nil || n != 13 || string(buf[:n]) != `{"test":true}` {
+		t.Fatalf("unexpected: %v %d %q", err, n, buf)
+	}
+	if n, err := r.Read(buf); err != nil || n != 1 || string(buf[:n]) != `1` {
+		t.Fatalf("unexpected: %v %d %q", err, n, buf)
+	}
+	if n, err := r.Read(buf); err != nil || n != 5 || string(buf[:n]) != `["a"]` {
+		t.Fatalf("unexpected: %v %d %q", err, n, buf)
+	}
+	if n, err := r.Read(buf); err != io.EOF || n != 0 {
+		t.Fatalf("unexpected: %v %d %q", err, n, buf)
+	}
+}
+
+func TestLineDelimitedFrameReaderShortBuffer(t *testing.T) {
+	b := bytes.NewBufferString("{\"test\":true}\n1\n[\"a\"]\n")
+	r := NewLineDelimitedFrameReader(io.NopCloser(b))
+	buf := make([]byte, 3)
+
+	if n, err := r.Read(buf); err != io.ErrShortBuffer || n != 3 || string(buf[:n]) != `{"t` {
+		t.Fatalf("unexpected: %v %d %q", err, n, buf)
+	}
+	if n, err := r.Read(buf); err != io.ErrShortBuffer || n != 3 || string(buf[:n]) != `est` {
+		t.Fatalf("unexpected: %v %d %q", err, n, buf)
+	}
+	if n, err := r.Read(buf); err != io.ErrShortBuffer || n != 3 || string(buf[:n]) != `":t` {
+		t.Fatalf("unexpected: %v %d %q", err, n, buf)
+	}
+	if n, err := r.Read(buf); err != io.ErrShortBuffer || n != 3 || string(buf[:n]) != `rue` {
+		t.Fatalf("unexpected: %v %d %q", err, n, buf)
+	}
+	if n, err := r.Read(buf); err != nil || n != 1 || string(buf[:n]) != `}` {
+		t.Fatalf("unexpected: %v %d %q", err, n, buf)
+	}
+	if n, err := r.Read(buf); err != nil || n != 1 || string(buf[:n]) != `1` {
+		t.Fatalf("unexpected: %v %d %q", err, n, buf)
+	}
+	if n, err := r.Read(buf); err != io.ErrShortBuffer || n != 3 || string(buf[:n]) != `["a` {
+		t.Fatalf("unexpected: %v %d %q", err, n, buf)
+	}
+	if n, err := r.Read(buf); err != nil || n != 2 || string(buf[:n]) != `"]` {
+		t.Fatalf("unexpected: %v %d %q", err, n, buf)
+	}
+	if n, err := r.Read(buf); err != io.EOF || n != 0 {
+		t.Fatalf("unexpected: %v %d %q", err, n, buf)
+	}
+}
+
+func TestLineDelimitedFrameReaderEmptyLines(t *testing.T) {
+	// Stray empty lines between frames must not surface as empty frames.
+	b := bytes.NewBufferString("\n\n{\"a\":1}\n\n{\"b\":2}\n\n")
+	r := NewLineDelimitedFrameReader(io.NopCloser(b))
+	buf := make([]byte, 16)
+	if n, err := r.Read(buf); err != nil || string(buf[:n]) != `{"a":1}` {
+		t.Fatalf("unexpected: %v %d %q", err, n, buf[:n])
+	}
+	if n, err := r.Read(buf); err != nil || string(buf[:n]) != `{"b":2}` {
+		t.Fatalf("unexpected: %v %d %q", err, n, buf[:n])
+	}
+	if n, err := r.Read(buf); err != io.EOF || n != 0 {
+		t.Fatalf("unexpected: %v %d", err, n)
+	}
+}
+
+func TestLineDelimitedFrameReaderTrailingNoNewline(t *testing.T) {
+	// A trailing frame without a terminating `\n` is returned as a
+	// complete frame at EOF (matches bufio.ScanLines and is needed because
+	// the apiserver's JSON encoder omits the trailing newline on
+	// single-frame responses). The next call returns io.EOF.
+	b := bytes.NewBufferString(`{"a":1}` + "\n" + `{"b":2}`)
+	r := NewLineDelimitedFrameReader(io.NopCloser(b))
+	buf := make([]byte, 16)
+	if n, err := r.Read(buf); err != nil || string(buf[:n]) != `{"a":1}` {
+		t.Fatalf("first frame: unexpected: %v %d %q", err, n, buf[:n])
+	}
+	if n, err := r.Read(buf); err != nil || string(buf[:n]) != `{"b":2}` {
+		t.Fatalf("trailing frame: unexpected: %v %d %q", err, n, buf[:n])
+	}
+	if n, err := r.Read(buf); err != io.EOF || n != 0 {
+		t.Fatalf("eof: unexpected: %v %d", err, n)
+	}
+}

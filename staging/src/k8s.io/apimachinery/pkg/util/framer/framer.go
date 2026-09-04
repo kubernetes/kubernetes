@@ -18,6 +18,8 @@ limitations under the License.
 package framer
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/binary"
 	"encoding/json"
 	"io"
@@ -173,4 +175,126 @@ func (r *jsonFrameReader) Read(data []byte) (int, error) {
 
 func (r *jsonFrameReader) Close() error {
 	return r.r.Close()
+}
+
+// lineDelimitedFrameReader is a fast-path frame reader for streams that are
+// already known to be compact JSON values separated by `\n`. It does not
+// understand JSON; it just splits on `\n`. This is correct only for producers
+// that never emit raw newlines outside of frame boundaries — e.g. anything
+// that goes through json.Marshal / json.Encoder, including the apiserver
+// watch path (StreamSerializer.Serializer is always Pretty=false).
+//
+// For anything that may produce pretty-printed JSON, or any whitespace
+// separator other than `\n`, use NewJSONFramedReader instead.
+type lineDelimitedFrameReader struct {
+	r       io.ReadCloser
+	reader  *bufio.Reader
+	inFrame bool // bytes have been emitted for the current frame; the terminating `\n` has not been seen yet
+}
+
+// NewLineDelimitedFrameReader returns an io.Reader that splits a stream into
+// frames separated by `\n`. The returned reader implements the same Read
+// contract as NewJSONFramedReader (one frame per successful call,
+// io.ErrShortBuffer for partial frames, io.EOF at clean end of stream), so it
+// is a drop-in for callers like streaming.Decoder.
+//
+// Contract on the input: each frame must be a single line (no embedded raw
+// `\n` bytes). A trailing `\n` at end of stream is optional — like
+// bufio.ScanLines, a final frame with no terminating newline is returned
+// as a complete frame at EOF rather than as an error. Stray empty lines
+// between frames are tolerated and skipped. Compact JSON satisfies this;
+// pretty-printed JSON does not.
+func NewLineDelimitedFrameReader(r io.ReadCloser) io.ReadCloser {
+	return &lineDelimitedFrameReader{
+		r:      r,
+		reader: bufio.NewReader(r),
+	}
+}
+
+// Read decodes the next line-delimited frame in the stream into data.
+// See NewLineDelimitedFrameReader for the contract.
+func (r *lineDelimitedFrameReader) Read(data []byte) (int, error) {
+	if len(data) == 0 {
+		return 0, io.ErrShortBuffer
+	}
+	n := 0
+	for {
+		if r.reader.Buffered() == 0 {
+			if _, err := r.reader.Peek(1); err != nil {
+				if err == io.EOF {
+					if r.inFrame {
+						// Trailing frame without `\n` — treat as
+						// complete (matches bufio.ScanLines).
+						r.inFrame = false
+						return n, nil
+					}
+					return 0, io.EOF
+				}
+				return n, err
+			}
+		}
+		buf, err := r.reader.Peek(r.reader.Buffered())
+		if err != nil {
+			return n, err
+		}
+
+		// Defensively skip stray `\n` between frames — a producer that
+		// emits an empty line (or two trailing `\n`s) shouldn't surface
+		// as an empty frame to the caller.
+		if !r.inFrame {
+			skip := 0
+			for skip < len(buf) && buf[skip] == '\n' {
+				skip++
+			}
+			if skip > 0 {
+				if err := r.discard(skip); err != nil {
+					return n, err
+				}
+				if skip == len(buf) {
+					continue
+				}
+				buf = buf[skip:]
+			}
+		}
+
+		if j := bytes.IndexByte(buf, '\n'); j >= 0 {
+			cp := copy(data[n:], buf[:j])
+			n += cp
+			if cp < j {
+				// data filled before the newline; the frame
+				// continues on the next call.
+				if err := r.discard(cp); err != nil {
+					return n, err
+				}
+				r.inFrame = true
+				return n, io.ErrShortBuffer
+			}
+			// frame complete; consume buf[:j+1] (drops the `\n`)
+			if err := r.discard(j + 1); err != nil {
+				return n, err
+			}
+			r.inFrame = false
+			return n, nil
+		}
+
+		// no newline in buf; copy what we can and refill
+		cp := copy(data[n:], buf)
+		n += cp
+		if err := r.discard(cp); err != nil {
+			return n, err
+		}
+		r.inFrame = true
+		if cp < len(buf) {
+			return n, io.ErrShortBuffer
+		}
+	}
+}
+
+func (r *lineDelimitedFrameReader) Close() error {
+	return r.r.Close()
+}
+
+func (r *lineDelimitedFrameReader) discard(n int) error {
+	_, err := r.reader.Discard(n)
+	return err
 }
