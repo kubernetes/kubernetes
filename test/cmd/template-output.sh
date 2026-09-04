@@ -59,7 +59,7 @@ run_template_output_tests() {
   kube::test::if_has_string "${output_message}" 'scale-1:'
 
   # check that expose command supports --template output
-  output_message=$(kubectl "${kube_flags[@]:?}" expose -f hack/testdata/redis-slave-replicaset.yaml --save-config --port=80 --target-port=8000 --dry-run=client --template="{{ .metadata.name }}:")
+  output_message=$(kubectl "${kube_flags[@]:?}" expose -f hack/testdata/test-slave-replicaset.yaml --save-config --port=80 --target-port=8000 --dry-run=client --template="{{ .metadata.name }}:")
   kube::test::if_has_string "${output_message}" 'redis-slave:'
 
   # check that run command supports --template output
