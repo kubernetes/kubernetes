@@ -52,7 +52,6 @@ func InitCustomMultiVolumeTestSuite(patterns []storageframework.TestPattern) sto
 	return &multiVolumeTestSuite{
 		tsInfo: storageframework.TestSuiteInfo{
 			Name:         "multiVolume",
-			TestTags:     []interface{}{framework.WithSlow()},
 			TestPatterns: patterns,
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
