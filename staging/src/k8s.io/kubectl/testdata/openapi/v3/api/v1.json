@@ -24124,7 +24124,7 @@
             ]
           },
           "selector": {
-            "description": "selector is a label query over volumes to consider for binding.",
+            "description": "selector is a label query over volumes to consider for binding. A null or empty selector matches all volumes. This selector is ignored when volumeName is set.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
