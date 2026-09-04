@@ -4709,3 +4709,125 @@ func TestResizeConditionsAndSupportedResources(t *testing.T) {
 		t.Errorf("expected SupportedPodLevelResources to contain CPU")
 	}
 }
+
+// TestPodResourcesDoNotMutatePod verifies that the pod resource accessors leave the
+// Pod they are given untouched. Pod-level quantities that do not fit the int64 fast
+// path (1.5Gi, for example) are backed by a *inf.Dec, so storing one in the result
+// without a DeepCopy makes the returned list share that pointer with
+// pod.Spec.Resources. Any later arithmetic on the result - such as accumulating pod
+// overhead - then writes through into the caller's Pod, which is commonly an object
+// owned by a shared informer cache.
+func TestPodResourcesDoNotMutatePod(t *testing.T) {
+	podWithPodLevelResources := func(requests, limits v1.ResourceList, overhead v1.ResourceList) *v1.Pod {
+		return &v1.Pod{
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{Requests: requests, Limits: limits},
+				Overhead:  overhead,
+				Containers: []v1.Container{{
+					Name: "container-1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+						Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+					},
+				}},
+			},
+		}
+	}
+
+	testCases := []struct {
+		name string
+		pod  *v1.Pod
+	}{
+		{
+			name: "pod-level requests with overhead",
+			pod: podWithPodLevelResources(
+				v1.ResourceList{v1.ResourceMemory: resource.MustParse("1.5Gi")},
+				nil,
+				v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+			),
+		},
+		{
+			name: "pod-level limits with overhead",
+			pod: podWithPodLevelResources(
+				v1.ResourceList{v1.ResourceMemory: resource.MustParse("1.5Gi")},
+				v1.ResourceList{v1.ResourceMemory: resource.MustParse("1.5Gi")},
+				v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+			),
+		},
+		{
+			name: "pod-level requests without overhead",
+			pod: podWithPodLevelResources(
+				v1.ResourceList{v1.ResourceMemory: resource.MustParse("0.5Gi")},
+				nil,
+				nil,
+			),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			expected := tc.pod.DeepCopy()
+
+			PodRequests(tc.pod, PodResourcesOptions{})
+			if !equality.Semantic.DeepEqual(expected, tc.pod) {
+				t.Errorf("PodRequests mutated the pod: %s", diff.Diff(expected, tc.pod))
+			}
+
+			PodLimits(tc.pod, PodResourcesOptions{})
+			if !equality.Semantic.DeepEqual(expected, tc.pod) {
+				t.Errorf("PodLimits mutated the pod: %s", diff.Diff(expected, tc.pod))
+			}
+		})
+	}
+}
+
+// TestPodResourcesAreStableAcrossCalls verifies that the accessors are idempotent.
+// If the returned list aliased pod.Spec.Resources, each call would accumulate pod
+// overhead into the Pod and the reported totals would drift upwards over time.
+func TestPodResourcesAreStableAcrossCalls(t *testing.T) {
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1.5Gi")},
+				Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("1.5Gi")},
+			},
+			Overhead:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+			Containers: []v1.Container{{Name: "container-1"}},
+		},
+	}
+
+	expectedRequests := PodRequests(pod, PodResourcesOptions{})
+	expectedLimits := PodLimits(pod, PodResourcesOptions{})
+
+	for i := range 3 {
+		if got := PodRequests(pod, PodResourcesOptions{}); !equality.Semantic.DeepEqual(expectedRequests, got) {
+			t.Errorf("PodRequests drifted on call %d: %s", i+2, diff.Diff(expectedRequests, got))
+		}
+		if got := PodLimits(pod, PodResourcesOptions{}); !equality.Semantic.DeepEqual(expectedLimits, got) {
+			t.Errorf("PodLimits drifted on call %d: %s", i+2, diff.Diff(expectedLimits, got))
+		}
+	}
+}
+
+// TestPodRequestsResultIsNotAliased verifies that mutating the returned ResourceList
+// cannot reach back into the Pod.
+func TestPodRequestsResultIsNotAliased(t *testing.T) {
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1.5Gi")},
+			},
+			Containers: []v1.Container{{Name: "container-1"}},
+		},
+	}
+	expected := pod.DeepCopy()
+
+	reqs := PodRequests(pod, PodResourcesOptions{})
+	memory := reqs[v1.ResourceMemory]
+	memory.Add(resource.MustParse("1Gi"))
+	reqs[v1.ResourceMemory] = memory
+
+	if !equality.Semantic.DeepEqual(expected, pod) {
+		t.Errorf("mutating the PodRequests result mutated the pod: %s", diff.Diff(expected, pod))
+	}
+}
