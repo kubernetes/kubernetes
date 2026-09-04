@@ -1946,3 +1946,65 @@ func TestControllerV2ProcessNextItemClearFailureRate(t *testing.T) {
 		}
 	})
 }
+
+func TestControllerV2DeleteJob(t *testing.T) {
+	tests := []struct {
+		name              string
+		deleteErr         error
+		expectedSucceeded bool
+		expectedActive    int
+		expectedEvents    []string
+	}{
+		{
+			name:              "job deleted successfully",
+			deleteErr:         nil,
+			expectedSucceeded: true,
+			expectedActive:    0,
+			expectedEvents:    []string{"Normal SuccessfulDelete Deleted job my-job"},
+		},
+		{
+			name:              "job already deleted",
+			deleteErr:         errors.NewNotFound(schema.GroupResource{Group: "batch", Resource: "jobs"}, "my-job"),
+			expectedSucceeded: false,
+			expectedActive:    1,
+			expectedEvents:    []string{},
+		},
+		{
+			name:              "job deletion failed",
+			deleteErr:         fmt.Errorf("api server down"),
+			expectedSucceeded: false,
+			expectedActive:    1,
+			expectedEvents:    []string{"Warning FailedDelete Deleted job: api server down"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			cj := cronJob()
+			job := &batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "my-job",
+					Namespace: cj.Namespace,
+					UID:       types.UID("j1234"),
+				},
+			}
+			cj.Status.Active = []v1.ObjectReference{{UID: job.UID, Name: job.Name, Namespace: job.Namespace}}
+			jc := &fakeJobControl{Err: tc.deleteErr}
+			recorder := record.NewFakeRecorder(10)
+			succeeded := deleteJob(logger, &cj, job, jc, recorder)
+			if succeeded != tc.expectedSucceeded {
+				t.Errorf("deleteJob() = %t, want %t", succeeded, tc.expectedSucceeded)
+			}
+			if len(cj.Status.Active) != tc.expectedActive {
+				t.Errorf("got %d active jobs, want %d", len(cj.Status.Active), tc.expectedActive)
+			}
+			events := []string{}
+			for len(recorder.Events) > 0 {
+				events = append(events, <-recorder.Events)
+			}
+			if !reflect.DeepEqual(events, tc.expectedEvents) {
+				t.Errorf("got events %v, want %v", events, tc.expectedEvents)
+			}
+		})
+	}
+}
