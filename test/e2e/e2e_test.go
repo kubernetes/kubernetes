@@ -53,7 +53,7 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/common"
 	_ "k8s.io/kubernetes/test/e2e/dra"
 	_ "k8s.io/kubernetes/test/e2e/instrumentation"
-	_ "k8s.io/kubernetes/test/e2e/invariants"
+	invariants "k8s.io/kubernetes/test/e2e/invariants"
 	"k8s.io/kubernetes/test/e2e/invariants/logcheck"
 	_ "k8s.io/kubernetes/test/e2e/kubectl"
 	_ "k8s.io/kubernetes/test/e2e/network"
@@ -77,6 +77,7 @@ func handleFlags() {
 	framework.RegisterCommonFlags(flag.CommandLine)
 	framework.RegisterClusterFlags(flag.CommandLine)
 	logcheck.RegisterFlags(flag.CommandLine)
+	invariants.RegisterGoroutineLeakFlags(flag.CommandLine)
 	flag.Parse()
 }
 
