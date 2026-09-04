@@ -681,6 +681,10 @@ type createPodGroups struct {
 	Count int
 	// CountParam is the name of the parameter that determines the count.
 	CountParam string
+	// Template parameter for multiplying CountParam. It is used when total number of podgroups
+	// is defined by number of podgroups per set of composite podgroups for multiple sets of composite podgroups.
+	// Optional.
+	CountMultiplierParam string
 }
 
 func (cpg *createPodGroups) isValid(allowParameterization bool) error {
@@ -710,6 +714,13 @@ func (cpg createPodGroups) patchParams(w *Workload) (realOp, error) {
 			return nil, err
 		}
 		cpg.Count = count
+		if cpg.CountMultiplierParam != "" {
+			multiplier, err := w.Params.get(cpg.CountMultiplierParam[1:])
+			if err != nil {
+				return nil, err
+			}
+			cpg.Count *= multiplier
+		}
 	}
 	if len(cpg.TemplateParams) > 0 {
 		var err error
@@ -719,6 +730,70 @@ func (cpg createPodGroups) patchParams(w *Workload) (realOp, error) {
 		}
 	}
 	return &cpg, cpg.isValid(false)
+}
+
+// createCompositePodGroups defines an op where CompositePodGroups get created from a YAML template
+// then waits for them to be visible in the scheduler's informer cache.
+type createCompositePodGroups struct {
+	// Must match createCompositePodGroupsOpcode.
+	Opcode operationCode
+	// Namespace the objects should be created in.
+	Namespace string
+	// Path to spec file describing the CompositePodGroup to create.
+	TemplatePath string
+	// Params to be passed to the template.
+	TemplateParams map[string]any
+	// Count determines how many CompositePodGroups get created.
+	Count int
+	// CountParam is the name of the parameter that determines the count.
+	CountParam string
+	// CountMultiplierParam is optional template parameter for multiplying CountParam.
+	CountMultiplierParam string
+}
+
+func (ccpg *createCompositePodGroups) isValid(allowParameterization bool) error {
+	if ccpg.TemplatePath == "" {
+		return fmt.Errorf("templatePath must be set")
+	}
+	if ccpg.Namespace == "" {
+		return fmt.Errorf("namespace must be set")
+	}
+	if !isValidCount(allowParameterization, ccpg.Count, ccpg.CountParam) {
+		return fmt.Errorf("invalid Count=%d / CountParam=%q", ccpg.Count, ccpg.CountParam)
+	}
+	if !allowParameterization && ccpg.Count < 1 {
+		return fmt.Errorf("count must be greater than 0, got %d", ccpg.Count)
+	}
+	return nil
+}
+
+func (ccpg *createCompositePodGroups) collectsMetrics() bool {
+	return false
+}
+
+func (ccpg createCompositePodGroups) patchParams(w *Workload) (realOp, error) {
+	if ccpg.CountParam != "" {
+		count, err := w.Params.get(ccpg.CountParam[1:])
+		if err != nil {
+			return nil, err
+		}
+		ccpg.Count = count
+		if ccpg.CountMultiplierParam != "" {
+			multiplier, err := w.Params.get(ccpg.CountMultiplierParam[1:])
+			if err != nil {
+				return nil, err
+			}
+			ccpg.Count *= multiplier
+		}
+	}
+	if len(ccpg.TemplateParams) > 0 {
+		var err error
+		ccpg.TemplateParams, err = resolveTemplateParams(ccpg.TemplateParams, w)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &ccpg, ccpg.isValid(false)
 }
 
 // startCollectingMetricsOp defines an op that starts metrics collectors.

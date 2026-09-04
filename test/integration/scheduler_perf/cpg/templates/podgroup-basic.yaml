@@ -1,0 +1,11 @@
+apiVersion: scheduling.k8s.io/v1beta1
+kind: PodGroup
+metadata:
+  name: basic-group-{{.Index}}
+spec:
+  parentCompositePodGroupName: cpg-{{DivideInt .Index .groupsPerCPG}}
+  workloadRef:
+    workloadName: test-wl-{{DivideInt .Index .groupsPerCPG}}
+    templateName: pg-template
+  schedulingPolicy:
+    basic: {}

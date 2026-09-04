@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-cpg-tas-pod-{{.Index}}
+spec:
+  schedulingGroup:
+    podGroupName: gang-group-{{DivideInt .Index .podsPerGroup}}
+  terminationGracePeriodSeconds: 0
+  containers:
+  - image: registry.k8s.io/pause:3.10.1
+    name: pause
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
