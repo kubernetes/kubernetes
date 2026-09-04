@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package types holds the shared input types generated into ../registered and
-// ../external and referenced by ../consumer.
+// ../othertree/external, and referenced by ../consumer and ../othertree/consumer.
 package types
 
 type T1 struct {

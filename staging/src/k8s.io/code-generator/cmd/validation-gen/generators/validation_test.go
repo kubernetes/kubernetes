@@ -476,3 +476,73 @@ func TestSortIntoCohorts(t *testing.T) {
 		}
 	}
 }
+
+func TestNearestPkg(t *testing.T) {
+	const (
+		modAScheduling = "mod.a/scheduling/validation"
+		modBScheduling = "mod.b/apis/scheduling"
+		modCMeta       = "mod.c/meta/validation"
+	)
+	cases := []struct {
+		name       string
+		pkg        string // the package being generated
+		candidates []string
+		want       string
+	}{{
+		name:       "single candidate is always chosen, even in another module",
+		pkg:        "mod.b/apis/batch",
+		candidates: []string{modCMeta},
+		want:       modCMeta,
+	}, {
+		// The motivating case: a caller must not resolve to a copy in another
+		// module, which it may be unable to import.
+		name:       "caller prefers the candidate in its own module",
+		pkg:        "mod.b/apis/batch",
+		candidates: []string{modBScheduling, modAScheduling},
+		want:       modBScheduling,
+	}, {
+		name:       "a caller in another module prefers that module's candidate",
+		pkg:        "mod.a/batch/validation",
+		candidates: []string{modBScheduling, modAScheduling},
+		want:       modAScheduling,
+	}, {
+		name:       "deeper shared prefix wins over a shallower one",
+		pkg:        "root/nearby/client",
+		candidates: []string{"root/registered", "root/external", "root/nearby/lib"},
+		want:       "root/nearby/lib",
+	}, {
+		// Heuristic limit: with no prefix to tell the candidates apart,
+		// canonical wins. Doing better would need the module graph.
+		name:       "ambiguous shallow tie falls back to canonical",
+		pkg:        "mod.d/x/validation",
+		candidates: []string{modBScheduling, modAScheduling},
+		want:       modBScheduling,
+	}}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := nearestPkg(tc.pkg, tc.candidates); got != tc.want {
+				t.Errorf("nearestPkg(%q, %v) = %q, want %q", tc.pkg, tc.candidates, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestCommonPathDepth(t *testing.T) {
+	cases := []struct {
+		a, b string
+		want int
+	}{
+		{"a/b/c", "a/b/d", 2},
+		{"a/b/c", "a/b/c", 3},
+		{"a/b/c", "a/b", 2}, // stops at the shorter path
+		{"x/y", "a/b", 0},
+		{"k8s.io/api", "k8s.io/apimachinery", 1}, // whole segments only
+	}
+	for _, tc := range cases {
+		t.Run(tc.a+"|"+tc.b, func(t *testing.T) {
+			if got := commonPathDepth(tc.a, tc.b); got != tc.want {
+				t.Errorf("commonPathDepth(%q, %q) = %d, want %d", tc.a, tc.b, got, tc.want)
+			}
+		})
+	}
+}
