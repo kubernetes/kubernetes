@@ -22,6 +22,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+
 	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -57,6 +59,7 @@ var (
 	}
 
 	fieldImmutableError             = "field is immutable"
+	notAllowedToUnsetError          = "field cannot be cleared once set"
 	minCountError                   = "must be greater than or equal to 1"
 	subdomainNameError              = "lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
 	maximumError                    = "must be less than or equal to"
@@ -109,6 +112,42 @@ func TestStrategy(t *testing.T) {
 	}
 	if strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("CompositePodGroup should not allow create on update")
+	}
+}
+
+func TestStrategy_ResetFields(t *testing.T) {
+	strategy := NewStrategy()
+	resetFields := strategy.GetResetFields()
+	if len(resetFields) != 1 {
+		t.Errorf("expected 1 APIVersion in reset fields, got %d", len(resetFields))
+	}
+	for gv, fields := range resetFields {
+		if gv != "scheduling.k8s.io/v1alpha3" {
+			t.Errorf("unexpected APIVersion in reset fields: %s", gv)
+		}
+		if !fields.Has(fieldpath.MakePathOrDie("status")) {
+			t.Errorf("status should be reset on creation and update")
+		}
+	}
+}
+
+func TestStatusStrategy_ResetFields(t *testing.T) {
+	strategy := NewStrategy()
+	statusStrategy := NewStatusStrategy(strategy)
+	resetFields := statusStrategy.GetResetFields()
+	if len(resetFields) != 1 {
+		t.Errorf("expected 1 APIVersion in reset fields, got %d", len(resetFields))
+	}
+	for gv, fields := range resetFields {
+		if gv != "scheduling.k8s.io/v1alpha3" {
+			t.Errorf("unexpected APIVersion in reset fields: %s", gv)
+		}
+		if !fields.Has(fieldpath.MakePathOrDie("spec")) {
+			t.Errorf("spec should be reset on status update")
+		}
+		if !fields.Has(fieldpath.MakePathOrDie("metadata")) {
+			t.Errorf("metadata should be reset on status update")
+		}
 	}
 }
 
@@ -355,14 +394,13 @@ func TestStrategyUpdate(t *testing.T) {
 			}(),
 			expectValidationErrors: []string{fieldImmutableError},
 		},
-		"changing min group count in gang scheduling policy not allowed": {
+		"changing min group count in gang scheduling policy is allowed": {
 			oldObj: cpg,
 			newObj: func() *scheduling.CompositePodGroup {
 				newCpg := cpg.DeepCopy()
 				newCpg.Spec.SchedulingPolicy.Gang.MinGroupCount = 4
 				return newCpg
 			}(),
-			expectValidationErrors: []string{fieldImmutableError},
 		},
 		"changing scheduling policy not allowed": {
 			oldObj: cpg,
@@ -373,7 +411,7 @@ func TestStrategyUpdate(t *testing.T) {
 				}
 				return newCpg
 			}(),
-			expectValidationErrors: []string{fieldImmutableError},
+			expectValidationErrors: []string{fieldImmutableError, notAllowedToUnsetError},
 		},
 		"changing disruption mode not allowed": {
 			oldObj:                 cpg,
