@@ -33,6 +33,13 @@ const (
 	subsystem = "watch_cache"
 )
 
+// Values of the "reason" label on TerminatedWatchersCounter.
+const (
+	// TerminationReasonUnresponsive: the watcher's input buffer was full
+	// and it did not drain within the dispatch time budget.
+	TerminationReasonUnresponsive = "unresponsive"
+)
+
 // DispatchStage identifies a single stage of an event's lifecycle as it moves
 // through the watch cache dispatch pipeline. It is used as the "stage" label
 // value on the dispatchStageDuration metric.
@@ -139,10 +146,10 @@ var (
 		&compbasemetrics.CounterOpts{
 			Namespace:      namespace,
 			Name:           "terminated_watchers_total",
-			Help:           "Counter of watchers closed due to unresponsiveness broken by resource type.",
+			Help:           "Counter of watchers closed by the watch cache broken by resource type and reason.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"group", "resource"},
+		[]string{"group", "resource", "reason"},
 	)
 
 	watchCacheResourceVersion = compbasemetrics.NewGaugeVec(
