@@ -114,6 +114,11 @@ function kube::release::package_client_tarballs() {
 
       local package_name="${RELEASE_TARS}/kubernetes-client-${platform_tag}.tar.gz"
       kube::release::create_tarball "${package_name}" "${release_stage}/.."
+
+      # Orgs commonly block .exe downloads, so also offer Windows clients as a .zip.
+      if [[ "${platform%/*}" = 'windows' ]]; then
+        kube::release::create_zip "${package_name%.tar.gz}.zip" "${release_stage}/.."
+      fi
     ) &
   done
 
@@ -168,6 +173,10 @@ function kube::release::package_node_tarballs() {
 
     local package_name="${RELEASE_TARS}/kubernetes-node-${platform_tag}.tar.gz"
     kube::release::create_tarball "${package_name}" "${release_stage}/.."
+
+    if [[ "${platform%/*}" = 'windows' ]]; then
+      kube::release::create_zip "${package_name%.tar.gz}.zip" "${release_stage}/.."
+    fi
   done
 }
 
@@ -248,6 +257,10 @@ function kube::release::package_server_tarballs() {
     local package_name
     package_name="${RELEASE_TARS}/kubernetes-server-${platform_tag}.tar.gz"
     kube::release::create_tarball "${package_name}" "${release_stage}/.."
+
+    if [[ "${platform%/*}" = 'windows' ]]; then
+      kube::release::create_zip "${package_name%.tar.gz}.zip" "${release_stage}/.."
+    fi
   done
 }
 
@@ -560,4 +573,22 @@ function kube::release::create_tarball() {
   local stagingdir=$2
 
   "${TAR}" czf "${tarfile}" -C "${stagingdir}" kubernetes --owner=0 --group=0
+}
+
+# Build a release zip.  $1 is the output zip name.  $2 is the base directory
+# of the files to be packaged.  This assumes that ${2}/kubernetes is what is
+# being packaged.  Used for Windows artifacts, since some organizations block
+# downloads of .exe files that aren't wrapped in a .zip.
+function kube::release::create_zip() {
+  if ! command -v zip &>/dev/null; then
+    kube::log::error "zip not found; unable to create ${1}"
+    return 1
+  fi
+
+  local zipfile=$1
+  local stagingdir=$2
+
+  # -X drops extra file attributes (uid/gid, timestamps beyond mtime) to keep
+  # the zip reproducible, mirroring --owner=0 --group=0 above for the tarball.
+  (cd "${stagingdir}" && zip -Xrq "${zipfile}" kubernetes)
 }
