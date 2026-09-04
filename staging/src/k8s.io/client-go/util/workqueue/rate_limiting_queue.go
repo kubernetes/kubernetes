@@ -50,7 +50,7 @@ type TypedRateLimitingQueueConfig[T comparable] struct {
 	Name string
 
 	// MetricsProvider optionally allows specifying a metrics provider to use for the queue
-	// instead of the global provider.
+	// instead of the global providers.
 	MetricsProvider MetricsProvider
 
 	// Clock optionally allows injecting a real or fake clock for testing purposes.

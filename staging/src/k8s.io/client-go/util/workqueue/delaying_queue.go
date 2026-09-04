@@ -55,7 +55,7 @@ type TypedDelayingQueueConfig[T comparable] struct {
 	Name string
 
 	// MetricsProvider optionally allows specifying a metrics provider to use for the queue
-	// instead of the global provider.
+	// instead of the global providers.
 	MetricsProvider MetricsProvider
 
 	// Clock optionally allows injecting a real or fake clock for testing purposes.
@@ -105,6 +105,11 @@ func NewTypedDelayingQueueWithConfig[T comparable](config TypedDelayingQueueConf
 	}
 	if config.Clock == nil {
 		config.Clock = clock.RealClock{}
+	}
+	// Use one snapshot for both queue and retry metrics, even if another
+	// provider registers while the underlying queue is being constructed.
+	if config.MetricsProvider == nil {
+		config.MetricsProvider = globalMetricsFactory.getProvider()
 	}
 
 	if config.Queue == nil {
