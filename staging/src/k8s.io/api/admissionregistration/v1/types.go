@@ -598,6 +598,7 @@ type ParamRef struct {
 	// Allowed values are `Allow` or `Deny`
 	//
 	// Required
+	// +required
 	ParameterNotFoundAction *ParameterNotFoundActionType `json:"parameterNotFoundAction,omitempty" protobuf:"bytes,4,rep,name=parameterNotFoundAction"`
 }
 

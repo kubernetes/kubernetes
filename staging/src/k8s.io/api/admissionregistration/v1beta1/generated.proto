@@ -781,6 +781,7 @@ message ParamRef {
   // Allowed values are `Allow` or `Deny`
   //
   // Required
+  // +required
   optional string parameterNotFoundAction = 4;
 }
 
