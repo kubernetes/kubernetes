@@ -3249,14 +3249,13 @@ func (kl *Kubelet) HandlePodReconcile(ctx context.Context, pods []*v1.Pod) {
 		}
 
 		// After an evicted pod is synced, all dead containers in the pod can be removed.
-		// TODO: this is questionable - status read is async and during eviction we already
-		// expect to not have some container info. The pod worker knows whether a pod has
-		// been evicted, so if this is about minimizing the time to react to an eviction we
-		// can do better. If it's about preserving pod status info we can also do better.
+		// Defer to the pod worker (via cleanUpContainersInPod/ShouldPodContentBeRemoved) to
+		// decide whether it is actually safe to remove all containers: the pod's API status
+		// can observably transition to evicted before the pod worker has finished capturing
+		// final container status, and force-removing containers ahead of that would race
+		// with the runtime and surface as ContainerStatusUnknown.
 		if eviction.PodIsEvicted(pod.Status) {
-			if podStatus, err := kl.podCache.Get(pod.UID); err == nil {
-				kl.containerDeletor.deleteContainersInPod(logger, "", podStatus, true)
-			}
+			kl.cleanUpContainersInPod(ctx, pod.UID, "")
 		}
 	}
 
