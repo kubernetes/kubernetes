@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,11 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// validation-gen is a tool for auto-generating Validation functions.
-//
-// Projects that want validation-gen with their own tag prefix, or with
-// additional tags, build their own binary on the same packages; see
-// examples/custom-prefix.
+// This is validation-gen built for a hypothetical project whose tags use the
+// "xyz:" prefix. It recognizes every standard validation tag under that
+// prefix (+xyz:required, +xyz:minimum, ...) plus the project's own tags,
+// which are registered by importing the tags package.
 package main
 
 import (
@@ -32,11 +31,16 @@ import (
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/klog/v2"
+
+	// Registers this project's tags with the validation-gen tag registry.
+	_ "k8s.io/code-generator/cmd/validation-gen/examples/custom-prefix/tags"
 )
 
 func main() {
 	klog.InitFlags(nil)
 	args := args.New()
+	// Claim the project's tag prefix. This is the default for --tag-prefix.
+	args.TagPrefix = "xyz:"
 
 	args.AddFlags(pflag.CommandLine)
 	if err := flag.Set("logtostderr", "true"); err != nil {
@@ -60,7 +64,6 @@ func main() {
 		return generators.GetTargets(context, args)
 	}
 
-	// Run it.
 	if err := gengo.Execute(
 		generators.NameSystems(),
 		generators.DefaultNameSystem(),
@@ -70,5 +73,4 @@ func main() {
 	); err != nil {
 		klog.Fatalf("Error: %v", err)
 	}
-	klog.V(2).Info("Completed successfully.")
 }
