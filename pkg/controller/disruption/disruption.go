@@ -212,7 +212,7 @@ func NewDisruptionControllerInternal(ctx context.Context,
 
 	dc.getUpdater = func() updater { return dc.writePdbStatus }
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			dc.addPod(logger, obj)
 		},
@@ -222,11 +222,12 @@ func NewDisruptionControllerInternal(ctx context.Context,
 		DeleteFunc: func(obj interface{}) {
 			dc.deletePod(logger, obj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 	dc.podLister = podInformer.Lister()
 	dc.podListerSynced = podInformer.Informer().HasSynced
 
-	pdbInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = pdbInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			dc.addDB(logger, obj)
 		},
@@ -236,7 +237,8 @@ func NewDisruptionControllerInternal(ctx context.Context,
 		DeleteFunc: func(obj interface{}) {
 			dc.removeDB(logger, obj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 	dc.pdbLister = pdbInformer.Lister()
 	dc.pdbListerSynced = pdbInformer.Informer().HasSynced
 

@@ -220,7 +220,7 @@ func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetIn
 		consistencyStore:   consistencyStore,
 	}
 
-	rsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := rsInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			rsc.addRS(logger, obj)
 		},
@@ -230,7 +230,8 @@ func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetIn
 		DeleteFunc: func(obj interface{}) {
 			rsc.deleteRS(logger, obj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 	rsInformer.Informer().AddIndexers(cache.Indexers{
 		controllerUIDIndex: func(obj interface{}) ([]string, error) {
 			rs, ok := obj.(*apps.ReplicaSet)
@@ -248,7 +249,7 @@ func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetIn
 	rsc.rsLister = rsInformer.Lister()
 	rsc.rsListerSynced = rsInformer.Informer().HasSynced
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			rsc.addPod(logger, obj)
 		},
@@ -261,7 +262,8 @@ func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetIn
 		DeleteFunc: func(obj interface{}) {
 			rsc.deletePod(logger, obj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 	rsc.podLister = podInformer.Lister()
 	rsc.podListerSynced = podInformer.Informer().HasSynced
 	controller.AddPodControllerIndexer(podInformer.Informer()) //nolint:errcheck
