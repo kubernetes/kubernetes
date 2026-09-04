@@ -2454,14 +2454,14 @@ var statusCmpOpt = cmp.Comparer(func(s1 *fwk.Status, s2 *fwk.Status) bool {
 	return s1.Code() == s2.Code() && s1.Plugin() == s2.Plugin() && s1.Message() == s2.Message()
 })
 
-func assertCounterValueFromGatherer(t *testing.T, g componentmetrics.Gatherer, name, labelName, labelValue string, want int) {
+func assertCounterValueFromGatherer(t *testing.T, g componentmetrics.Gatherer, name string, fixedLabels map[string]string, labelName, labelValue string, want int) {
 	t.Helper()
 	got := 0
-	if vals, err := testutil.GetCounterValuesFromGatherer(g, name, nil, labelName); err == nil {
+	if vals, err := testutil.GetCounterValuesFromGatherer(g, name, fixedLabels, labelName); err == nil {
 		got = int(vals[labelValue])
 	}
 	if got != want {
-		t.Errorf("unexpected %s{%s=%q}: got %d, want %d", name, labelName, labelValue, got, want)
+		t.Errorf("unexpected %s with labels %v and %s=%q: got %d, want %d", name, fixedLabels, labelName, labelValue, got, want)
 	}
 }
 
@@ -2472,7 +2472,7 @@ func assertHistogramSampleCountFromGatherer(t *testing.T, g componentmetrics.Gat
 		got = int(vec.GetAggregatedSampleCount())
 	}
 	if got != want {
-		t.Errorf("unexpected %s%v sample count: got %d, want %d", name, labels, got, want)
+		t.Errorf("unexpected %s sample count with labels %v: got %d, want %d", name, labels, got, want)
 	}
 }
 
@@ -2914,13 +2914,21 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 					t.Fatalf("Unexpected algorithm result (-want,+got):\n%s", diff)
 				}
 
-				feasibleLabels := map[string]string{"profile": "test-scheduler", "result": metrics.FeasibleResult}
-				infeasibleLabels := map[string]string{"profile": "test-scheduler", "result": metrics.InfeasibleResult}
-				assertCounterValueFromGatherer(t, testRegistry, "scheduler_generated_placements_total", "profile", "test-scheduler", tt.expectedGeneratedPlacements)
-				assertCounterValueFromGatherer(t, testRegistry, "scheduler_placement_evaluations_total", "result", metrics.FeasibleResult, tt.expectedFeasibleEvaluations)
-				assertCounterValueFromGatherer(t, testRegistry, "scheduler_placement_evaluations_total", "result", metrics.InfeasibleResult, tt.expectedInfeasibleEvaluations)
+				baseLabels := map[string]string{"profile": "test-scheduler"}
+				fixedLabels := map[string]string{"profile": "test-scheduler", "type": metrics.PodGroup}
+				feasibleLabels := map[string]string{"profile": "test-scheduler", "result": metrics.FeasibleResult, "type": metrics.PodGroup}
+				infeasibleLabels := map[string]string{"profile": "test-scheduler", "result": metrics.InfeasibleResult, "type": metrics.PodGroup}
+				assertCounterValueFromGatherer(t, testRegistry, "scheduler_generated_placements_total", baseLabels, "type", metrics.PodGroup, tt.expectedGeneratedPlacements)
+				assertCounterValueFromGatherer(t, testRegistry, "scheduler_placement_evaluations_total", fixedLabels, "result", metrics.FeasibleResult, tt.expectedFeasibleEvaluations)
+				assertCounterValueFromGatherer(t, testRegistry, "scheduler_placement_evaluations_total", fixedLabels, "result", metrics.InfeasibleResult, tt.expectedInfeasibleEvaluations)
 				assertHistogramSampleCountFromGatherer(t, testRegistry, "scheduler_placement_evaluation_duration_seconds", feasibleLabels, tt.expectedFeasibleEvaluations)
 				assertHistogramSampleCountFromGatherer(t, testRegistry, "scheduler_placement_evaluation_duration_seconds", infeasibleLabels, tt.expectedInfeasibleEvaluations)
+
+				// Verify compositepodgroup metrics are 0
+				cpgFixedLabels := map[string]string{"profile": "test-scheduler", "type": metrics.CompositePodGroup}
+				assertCounterValueFromGatherer(t, testRegistry, "scheduler_generated_placements_total", baseLabels, "type", metrics.CompositePodGroup, 0)
+				assertCounterValueFromGatherer(t, testRegistry, "scheduler_placement_evaluations_total", cpgFixedLabels, "result", metrics.FeasibleResult, 0)
+				assertCounterValueFromGatherer(t, testRegistry, "scheduler_placement_evaluations_total", cpgFixedLabels, "result", metrics.InfeasibleResult, 0)
 			})
 		}
 	}
@@ -3563,6 +3571,8 @@ func TestCPGSchedulingPlacementAlgorithm(t *testing.T) {
 		features.GenericWorkload:                 true,
 		features.CompositePodGroup:               true,
 	})
+	testRegistry := componentmetrics.NewKubeRegistry()
+	testRegistry.MustRegister(metrics.GeneratedPlacementsTotal, metrics.PlacementEvaluations, metrics.PlacementEvaluationDuration)
 
 	nodes := []*v1.Node{
 		st.MakeNode().Name("node1").Obj(),
@@ -3617,9 +3627,12 @@ func TestCPGSchedulingPlacementAlgorithm(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		placementPlugin           fakePlacementPlugin
-		placementFeasibleStatuses [][]fwk.Code
-		expectedResults           map[fwk.EntityKey]podGroupAlgorithmResult
+		placementPlugin               fakePlacementPlugin
+		placementFeasibleStatuses     [][]fwk.Code
+		expectedResults               map[fwk.EntityKey]podGroupAlgorithmResult
+		expectedGeneratedPlacements   map[string]int
+		expectedFeasibleEvaluations   map[string]int
+		expectedInfeasibleEvaluations map[string]int
 	}{
 		"respects higher score of parent placement": {
 			placementPlugin: fakePlacementPlugin{
@@ -3669,6 +3682,18 @@ func TestCPGSchedulingPlacementAlgorithm(t *testing.T) {
 						},
 					},
 				},
+			},
+			expectedGeneratedPlacements: map[string]int{
+				metrics.CompositePodGroup: 2,
+				metrics.PodGroup:          8,
+			},
+			expectedFeasibleEvaluations: map[string]int{
+				metrics.CompositePodGroup: 2,
+				metrics.PodGroup:          8,
+			},
+			expectedInfeasibleEvaluations: map[string]int{
+				metrics.CompositePodGroup: 0,
+				metrics.PodGroup:          0,
 			},
 		},
 		"discards infeasible placements": {
@@ -3725,6 +3750,18 @@ func TestCPGSchedulingPlacementAlgorithm(t *testing.T) {
 					},
 				},
 			},
+			expectedGeneratedPlacements: map[string]int{
+				metrics.CompositePodGroup: 2,
+				metrics.PodGroup:          4,
+			},
+			expectedFeasibleEvaluations: map[string]int{
+				metrics.CompositePodGroup: 1,
+				metrics.PodGroup:          4,
+			},
+			expectedInfeasibleEvaluations: map[string]int{
+				metrics.CompositePodGroup: 1,
+				metrics.PodGroup:          0,
+			},
 		},
 		"returns unschedulable if no pods got scheduled": {
 			placementPlugin: fakePlacementPlugin{
@@ -3774,6 +3811,18 @@ func TestCPGSchedulingPlacementAlgorithm(t *testing.T) {
 						},
 					},
 				},
+			},
+			expectedGeneratedPlacements: map[string]int{
+				metrics.CompositePodGroup: 2,
+				metrics.PodGroup:          8,
+			},
+			expectedFeasibleEvaluations: map[string]int{
+				metrics.CompositePodGroup: 2,
+				metrics.PodGroup:          8,
+			},
+			expectedInfeasibleEvaluations: map[string]int{
+				metrics.CompositePodGroup: 0,
+				metrics.PodGroup:          0,
 			},
 		},
 		"returns unschedulable if no pods got scheduled and placement feasible rejected pods": {
@@ -3849,6 +3898,18 @@ func TestCPGSchedulingPlacementAlgorithm(t *testing.T) {
 					status: fwk.NewStatus(fwk.Unschedulable, "0/2 placements are available, first placement status: injected placementFeasible status"),
 				},
 			},
+			expectedGeneratedPlacements: map[string]int{
+				metrics.CompositePodGroup: 2,
+				metrics.PodGroup:          8,
+			},
+			expectedFeasibleEvaluations: map[string]int{
+				metrics.CompositePodGroup: 0,
+				metrics.PodGroup:          0,
+			},
+			expectedInfeasibleEvaluations: map[string]int{
+				metrics.CompositePodGroup: 2,
+				metrics.PodGroup:          8,
+			},
 		},
 		"respects pods already scheduled in sibling pod groups": {
 			placementPlugin: fakePlacementPlugin{
@@ -3894,6 +3955,18 @@ func TestCPGSchedulingPlacementAlgorithm(t *testing.T) {
 					},
 				},
 			},
+			expectedGeneratedPlacements: map[string]int{
+				metrics.CompositePodGroup: 2,
+				metrics.PodGroup:          8,
+			},
+			expectedFeasibleEvaluations: map[string]int{
+				metrics.CompositePodGroup: 2,
+				metrics.PodGroup:          8,
+			},
+			expectedInfeasibleEvaluations: map[string]int{
+				metrics.CompositePodGroup: 0,
+				metrics.PodGroup:          0,
+			},
 		},
 		"when generate plugin fails at CPG, returns error": {
 			placementPlugin: fakePlacementPlugin{
@@ -3906,6 +3979,18 @@ func TestCPGSchedulingPlacementAlgorithm(t *testing.T) {
 				rootPGInfo.GetKey(): {
 					status: fwk.NewStatus(fwk.Error, "injected error"),
 				},
+			},
+			expectedGeneratedPlacements: map[string]int{
+				metrics.CompositePodGroup: 0,
+				metrics.PodGroup:          0,
+			},
+			expectedFeasibleEvaluations: map[string]int{
+				metrics.CompositePodGroup: 0,
+				metrics.PodGroup:          0,
+			},
+			expectedInfeasibleEvaluations: map[string]int{
+				metrics.CompositePodGroup: 0,
+				metrics.PodGroup:          0,
 			},
 		},
 		"when generate plugin fails at PG, returns error": {
@@ -3947,6 +4032,18 @@ func TestCPGSchedulingPlacementAlgorithm(t *testing.T) {
 				childPGInfo2.GetKey(): {
 					status: fwk.AsStatus(fmt.Errorf("injected error")),
 				},
+			},
+			expectedGeneratedPlacements: map[string]int{
+				metrics.CompositePodGroup: 2,
+				metrics.PodGroup:          2,
+			},
+			expectedFeasibleEvaluations: map[string]int{
+				metrics.CompositePodGroup: 0,
+				metrics.PodGroup:          2,
+			},
+			expectedInfeasibleEvaluations: map[string]int{
+				metrics.CompositePodGroup: 0,
+				metrics.PodGroup:          0,
 			},
 		},
 	}
@@ -4021,6 +4118,10 @@ func TestCPGSchedulingPlacementAlgorithm(t *testing.T) {
 				t.Fatalf("Failed to update snapshot: %v", err)
 			}
 
+			metrics.GeneratedPlacementsTotal.Reset()
+			metrics.PlacementEvaluations.Reset()
+			metrics.PlacementEvaluationDuration.Reset()
+
 			cpgInfo := &framework.QueuedPodGroupInfo{
 				QueuedPodInfos: map[fwk.EntityKey][]*framework.QueuedPodInfo{
 					childPGInfo1.GetKey(): {queuedPodInfo1},
@@ -4051,6 +4152,24 @@ func TestCPGSchedulingPlacementAlgorithm(t *testing.T) {
 
 			if diff := cmp.Diff(tt.expectedResults, gotResults, opts...); diff != "" {
 				t.Fatalf("Unexpected algorithm results (-want,+got):\n%s", diff)
+			}
+
+			baseLabels := map[string]string{"profile": "test-scheduler"}
+			for _, entityType := range []string{metrics.CompositePodGroup, metrics.PodGroup} {
+				wantGen := tt.expectedGeneratedPlacements[entityType]
+				wantFeas := tt.expectedFeasibleEvaluations[entityType]
+				wantInfeas := tt.expectedInfeasibleEvaluations[entityType]
+
+				fixedLabels := map[string]string{"profile": "test-scheduler", "type": entityType}
+				feasibleLabels := map[string]string{"profile": "test-scheduler", "result": metrics.FeasibleResult, "type": entityType}
+				infeasibleLabels := map[string]string{"profile": "test-scheduler", "result": metrics.InfeasibleResult, "type": entityType}
+
+				assertCounterValueFromGatherer(t, testRegistry, "scheduler_generated_placements_total", baseLabels, "type", entityType, wantGen)
+				assertCounterValueFromGatherer(t, testRegistry, "scheduler_placement_evaluations_total", fixedLabels, "result", metrics.FeasibleResult, wantFeas)
+				assertCounterValueFromGatherer(t, testRegistry, "scheduler_placement_evaluations_total", fixedLabels, "result", metrics.InfeasibleResult, wantInfeas)
+
+				assertHistogramSampleCountFromGatherer(t, testRegistry, "scheduler_placement_evaluation_duration_seconds", feasibleLabels, wantFeas)
+				assertHistogramSampleCountFromGatherer(t, testRegistry, "scheduler_placement_evaluation_duration_seconds", infeasibleLabels, wantInfeas)
 			}
 		})
 	}
