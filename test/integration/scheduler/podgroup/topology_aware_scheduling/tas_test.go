@@ -1605,3 +1605,125 @@ func runTestScenario(t *testing.T, tt scenario, cpgEnabled bool) {
 		t.Fatal(err)
 	}
 }
+
+func TestTopologyAwareSchedulingWithPlacementLimit(t *testing.T) {
+	tests := []struct {
+		name  string
+		steps []stepsframework.Step
+	}{
+		{
+			name: "basic podgroup co-locates on a single rack despite a restrictive placement limit",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create nodes in multiple racks, each rack able to fit the whole group",
+					CreateNodes: []*v1.Node{
+						makeNode("node1-rack1", "rack-1", "zone-1"),
+						makeNode("node2-rack1", "rack-1", "zone-1"),
+						makeNode("node3-rack2", "rack-2", "zone-1"),
+						makeNode("node4-rack2", "rack-2", "zone-1"),
+						makeNode("node5-rack3", "rack-3", "zone-2"),
+						makeNode("node6-rack3", "rack-3", "zone-2"),
+					},
+				},
+				{
+					Name:           "Create the PodGroup constrained to a single rack",
+					CreatePodGroup: makeBasicPodGroup("pg1", "rack"),
+				},
+				{
+					Name: "Create all pods belonging to the podgroup",
+					CreatePods: []*v1.Pod{
+						makePod("p1", "pg1"),
+						makePod("p2", "pg1"),
+						makePod("p3", "pg1"),
+					},
+				},
+				{
+					Name:                 "Verify the entire podgroup is scheduled",
+					WaitForPodsScheduled: []string{"p1", "p2", "p3"},
+				},
+				{
+					Name: "Verify all pods landed on a single rack despite the limit",
+					VerifyAssignedInOneDomain: &stepsframework.VerifyAssignedInOneDomain{
+						Pods:        []string{"p1", "p2", "p3"},
+						TopologyKey: "rack",
+					},
+				},
+			},
+		},
+		{
+			name: "restrictive placement limit still finds the only feasible rack for a gang",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create nodes in multiple racks; only rack-1 can fit the whole gang",
+					CreateNodes: []*v1.Node{
+						makeNode("node1-rack1", "rack-1", "zone-1"),
+						makeNode("node2-rack1", "rack-1", "zone-1"),
+						makeNode("node3-rack1", "rack-1", "zone-1"),
+						makeNode("node4-rack2", "rack-2", "zone-1"),
+						makeNode("node5-rack2", "rack-2", "zone-1"),
+						makeNode("node6-zone2", "rack-3", "zone-2"),
+					},
+				},
+				{
+					Name: "Block rack-2 so it can no longer fit the whole gang",
+					CreatePods: []*v1.Pod{
+						makeAssignedPod("existing1", "node4-rack2", "2"),
+					},
+				},
+				{
+					Name:           "Create the PodGroup object (Gang with minCount=3) constrained to a single rack",
+					CreatePodGroup: makeGangPodGroup("pg1", "rack", 3),
+				},
+				{
+					Name: "Create all pods belonging to the gang",
+					CreatePods: []*v1.Pod{
+						makePod("p1", "pg1"),
+						makePod("p2", "pg1"),
+						makePod("p3", "pg1"),
+					},
+				},
+				{
+					Name:                 "Verify the entire gang is scheduled",
+					WaitForPodsScheduled: []string{"p1", "p2", "p3"},
+				},
+				{
+					Name: "Verify all pods landed on the only feasible rack",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p1", "p2", "p3"},
+						Nodes: sets.New("node1-rack1", "node2-rack1", "node3-rack1"),
+					},
+				},
+			},
+		},
+	}
+
+	// A low percentage forces the scheduler to score only a subset of the generated placements.
+	percentageLimit := int32(1)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+			})
+
+			testCtx := testutils.InitTestSchedulerWithNS(t, "tas-placement-limit",
+				scheduler.WithPodMaxBackoffSeconds(0),
+				scheduler.WithPodInitialBackoffSeconds(0),
+				scheduler.WithPercentageOfPlacementsToScore(new(percentageLimit)))
+			ns := testCtx.NS.Name
+
+			workload := st.MakeWorkload().Name("workload").Namespace(ns).
+				PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(1).Obj()).
+				Obj()
+			workloadStep := []stepsframework.Step{
+				{
+					Name:            "Creating workload",
+					CreateWorkloads: []*schedulingapi.Workload{workload},
+				},
+			}
+			if err := stepsframework.RunSteps(testCtx, t, ns, append(workloadStep, tt.steps...)); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}

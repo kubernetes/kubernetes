@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	componentbasevalidation "k8s.io/component-base/config/validation"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 )
@@ -69,6 +70,7 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) u
 	}
 
 	errs = append(errs, validatePercentageOfNodesToScore(field.NewPath("percentageOfNodesToScore"), cc.PercentageOfNodesToScore))
+	errs = append(errs, validatePercentageOfPlacementsToScore(field.NewPath("percentageOfPlacementsToScore"), cc.PercentageOfPlacementsToScore))
 
 	if cc.PodInitialBackoffSeconds <= 0 {
 		errs = append(errs, field.Invalid(field.NewPath("podInitialBackoffSeconds"),
@@ -87,6 +89,18 @@ func validatePercentageOfNodesToScore(path *field.Path, percentageOfNodesToScore
 	if percentageOfNodesToScore != nil {
 		if *percentageOfNodesToScore < 0 || *percentageOfNodesToScore > 100 {
 			return field.Invalid(path, *percentageOfNodesToScore, "not in valid range [0-100]")
+		}
+	}
+	return nil
+}
+
+func validatePercentageOfPlacementsToScore(path *field.Path, percentageOfPlacementsToScore *int32) error {
+	if percentageOfPlacementsToScore != nil {
+		if !feature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
+			return field.Forbidden(path, "TopologyAwareWorkloadScheduling feature gate is disabled")
+		}
+		if *percentageOfPlacementsToScore < 0 || *percentageOfPlacementsToScore > 100 {
+			return field.Invalid(path, *percentageOfPlacementsToScore, "not in valid range [0-100]")
 		}
 	}
 	return nil
@@ -144,6 +158,7 @@ func validateKubeSchedulerProfile(path *field.Path, apiVersion string, profile *
 		errs = append(errs, field.Required(path.Child("schedulerName"), ""))
 	}
 	errs = append(errs, validatePercentageOfNodesToScore(path.Child("percentageOfNodesToScore"), profile.PercentageOfNodesToScore))
+	errs = append(errs, validatePercentageOfPlacementsToScore(path.Child("percentageOfPlacementsToScore"), profile.PercentageOfPlacementsToScore))
 	errs = append(errs, validatePluginConfig(path, apiVersion, profile)...)
 	return errs
 }
