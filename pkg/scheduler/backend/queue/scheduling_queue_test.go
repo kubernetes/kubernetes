@@ -61,12 +61,12 @@ const queueMetricMetadata = `
 	`
 
 const queueIncomingEntitiesMetricMetadata = `
-	# HELP scheduler_queue_incoming_entities_total [ALPHA] Number of scheduling entities added to scheduling queues by event, queue type, and entity type. Entity types are either 'pod' (for individual pods that are not members of any podgroup) or 'podgroup'.
+	# HELP scheduler_queue_incoming_entities_total [ALPHA] Number of scheduling entities added to scheduling queues by event, queue type, and entity type. Entity types are 'pod' (for individual pods that are not members of any podgroup), 'podgroup', or 'compositepodgroup'.
 	# TYPE scheduler_queue_incoming_entities_total counter
 `
 
 const queuedEntitiesMetricMetadata = `
-	# HELP scheduler_queued_entities [ALPHA] Number of queued scheduling entities ('pod' or 'podgroup'; 'pod' stands for individual pods that are not members of any podgroup) by the queue type. 'active' means number of entities in activeQ; 'backoff' means number of entities in backoffQ; 'unschedulable' means number of entities in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable entities that the scheduler never attempted to schedule because they are gated.
+	# HELP scheduler_queued_entities [ALPHA] Number of queued scheduling entities ('pod', 'podgroup', or 'compositepodgroup'; 'pod' stands for individual pods that are not members of any podgroup) by the queue type. 'active' means number of entities in activeQ; 'backoff' means number of entities in backoffQ; 'unschedulable' means number of entities in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable entities that the scheduler never attempted to schedule because they are gated.
 	# TYPE scheduler_queued_entities gauge
 `
 
@@ -5042,14 +5042,36 @@ func TestIncomingPodsMetrics(t *testing.T) {
 			if err := testutil.CollectAndCompare(metrics.SchedulerQueueIncomingPods, strings.NewReader(queueMetricMetadata+test.want), metricName); err != nil {
 				t.Errorf("unexpected collecting result:\n%s", err)
 			}
-
 		})
 	}
 }
 
+var podGroupGateSetups = []struct {
+	name       string
+	cpgEnabled bool
+	features   featuregatetesting.FeatureOverrides
+}{
+	{
+		name:       "Generic",
+		cpgEnabled: false,
+		features: featuregatetesting.FeatureOverrides{
+			features.GenericWorkload: true,
+		},
+	},
+	{
+		name:       "CPG",
+		cpgEnabled: true,
+		// CompositePodGroup depends on GenericWorkload and TopologyAwareWorkloadScheduling.
+		features: featuregatetesting.FeatureOverrides{
+			features.GenericWorkload:                 true,
+			features.TopologyAwareWorkloadScheduling: true,
+			features.CompositePodGroup:               true,
+		},
+	},
+}
+
 func TestIncomingEntitiesMetrics(t *testing.T) {
 	logger := klog.Background()
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
 	timestamp := time.Now()
 
 	unschedulablePlugin := "unschedulable_plugin"
@@ -5063,17 +5085,34 @@ func TestIncomingEntitiesMetrics(t *testing.T) {
 		makeQueuedPodInfo(t, "pod2", "ns-pg", queuingParams, withPodGroup("pg-1")),
 		makeQueuedPodInfo(t, "pod3", "ns-pg", queuingParams, withPodGroup("pg-1")),
 		makeQueuedPodInfo(t, "pod4", "ns-pg", queuingParams, withPodGroup("pg-1")),
+		makeQueuedPodInfo(t, "pod5", "ns-pg", queuingParams, withPodGroup("pg-cpg-1")),
+		makeQueuedPodInfo(t, "pod6", "ns-pg", queuingParams, withPodGroup("pg-cpg-1")),
+		makeQueuedPodInfo(t, "pod7", "ns-pg", queuingParams, withPodGroup("pg-cpg-2")),
 	}
 
 	metricName := metrics.SchedulerSubsystem + "_" + metrics.SchedulerQueueIncomingEntities.Name
 
 	tests := []struct {
-		name string
-		run  func(tCtx ktesting.TContext, queue *PriorityQueue)
-		want string
+		name  string
+		isCPG bool
+		run   func(tCtx ktesting.TContext, queue *PriorityQueue)
+		want  string
 	}{
 		{
 			name: "add all pods to active queue",
+			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
+				for _, pInfo := range pInfos[:4] {
+					queue.Add(tCtx, pInfo.Pod)
+				}
+			},
+			want: `
+				scheduler_queue_incoming_entities_total{event="UnscheduledPodAdd",queue="active",type="pod"} 1
+				scheduler_queue_incoming_entities_total{event="UnscheduledPodAdd",queue="active",type="podgroup"} 1
+			`,
+		},
+		{
+			name:  "add all pods including compositepodgroup to active queue",
+			isCPG: true,
 			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
 				for _, pInfo := range pInfos {
 					queue.Add(tCtx, pInfo.Pod)
@@ -5082,6 +5121,7 @@ func TestIncomingEntitiesMetrics(t *testing.T) {
 			want: `
 				scheduler_queue_incoming_entities_total{event="UnscheduledPodAdd",queue="active",type="pod"} 1
 				scheduler_queue_incoming_entities_total{event="UnscheduledPodAdd",queue="active",type="podgroup"} 1
+				scheduler_queue_incoming_entities_total{event="UnscheduledPodAdd",queue="active",type="compositepodgroup"} 1
 			`,
 		},
 		{
@@ -5107,6 +5147,28 @@ func TestIncomingEntitiesMetrics(t *testing.T) {
 			`,
 		},
 		{
+			name: "add pods of a podgroup, mark as unschedulable and add to unschedulable queue",
+			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
+				queue.Add(tCtx, pInfos[1].Pod)
+				queue.Add(tCtx, pInfos[2].Pod)
+				queue.Add(tCtx, pInfos[3].Pod)
+				entityGroup, err := queue.Pop(logger)
+				if err != nil {
+					tCtx.Fatalf("Unexpected error popping from queue: %v", err)
+				}
+				pgInfo := entityGroup.(*framework.QueuedPodGroupInfo)
+				queue.pendingPodGroupPods.add(pInfos[2])
+				queue.pendingPodGroupPods.add(pInfos[3])
+				pgInfo.UnschedulablePlugins = sets.New(unschedulablePlugin)
+				pgInfo.UnschedulableCount = 1
+				queue.unschedulableEntities.addOrUpdate(pgInfo, false, framework.ScheduleAttemptFailure, nil)
+			},
+			want: `
+				scheduler_queue_incoming_entities_total{event="UnscheduledPodAdd",queue="active",type="podgroup"} 1
+				scheduler_queue_incoming_entities_total{event="ScheduleAttemptFailure",queue="unschedulable",type="podgroup"} 1
+			`,
+		},
+		{
 			name: "add individual pod to active queue",
 			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
 				queue.Add(tCtx, pInfos[0].Pod)
@@ -5124,26 +5186,115 @@ func TestIncomingEntitiesMetrics(t *testing.T) {
 				scheduler_queue_incoming_entities_total{event="UnscheduledPodAdd",queue="active",type="pod"} 1
 			`,
 		},
+		{
+			name: "add individual pod, mark as unschedulable and add to unschedulable queue",
+			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
+				queue.Add(tCtx, pInfos[0].Pod)
+				entity, err := queue.Pop(logger)
+				if err != nil {
+					tCtx.Fatalf("Unexpected error popping from queue: %v", err)
+				}
+				pod := entity.(*framework.QueuedPodInfo)
+				pod.UnschedulablePlugins = sets.New(unschedulablePlugin)
+				pod.UnschedulableCount = 1
+				queue.unschedulableEntities.addOrUpdate(pod, false, framework.ScheduleAttemptFailure, nil)
+			},
+			want: `
+				scheduler_queue_incoming_entities_total{event="UnscheduledPodAdd",queue="active",type="pod"} 1
+				scheduler_queue_incoming_entities_total{event="ScheduleAttemptFailure",queue="unschedulable",type="pod"} 1
+			`,
+		},
+		{
+			name:  "add pods of a compositepodgroup to active queue",
+			isCPG: true,
+			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
+				queue.Add(tCtx, pInfos[4].Pod)
+				queue.Add(tCtx, pInfos[5].Pod)
+				queue.Add(tCtx, pInfos[6].Pod)
+			},
+			want: `
+				scheduler_queue_incoming_entities_total{event="UnscheduledPodAdd",queue="active",type="compositepodgroup"} 1
+			`,
+		},
+		{
+			name:  "add pods of a compositepodgroup to active queue, simulate scheduling failure attempt, and requeue compositepodgroup to backoff queue",
+			isCPG: true,
+			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
+				queue.Add(tCtx, pInfos[4].Pod)
+				queue.Add(tCtx, pInfos[5].Pod)
+				queue.Add(tCtx, pInfos[6].Pod)
+				entityGroup, err := queue.Pop(logger)
+				if err != nil {
+					tCtx.Fatalf("Unexpected error popping from queue: %v", err)
+				}
+				cpgInfo := entityGroup.(*framework.QueuedPodGroupInfo)
+				queue.pendingPodGroupPods.add(pInfos[5])
+				queue.pendingPodGroupPods.add(pInfos[6])
+				if err := queue.AddAttemptedPodGroupIfNeeded(logger, cpgInfo, 1, fwk.NewStatus(fwk.Unschedulable)); err != nil {
+					tCtx.Fatalf("Unexpected error adding attempted pod group: %v", err)
+				}
+			},
+			want: `
+				scheduler_queue_incoming_entities_total{event="UnscheduledPodAdd",queue="active",type="compositepodgroup"} 1
+				scheduler_queue_incoming_entities_total{event="ScheduleAttemptFailure",queue="backoff",type="compositepodgroup"} 1
+			`,
+		},
+		{
+			name:  "add pods of a compositepodgroup, mark as unschedulable and add to unschedulable queue",
+			isCPG: true,
+			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
+				queue.Add(tCtx, pInfos[4].Pod)
+				queue.Add(tCtx, pInfos[5].Pod)
+				queue.Add(tCtx, pInfos[6].Pod)
+				entityGroup, err := queue.Pop(logger)
+				if err != nil {
+					tCtx.Fatalf("Unexpected error popping from queue: %v", err)
+				}
+				cpgInfo := entityGroup.(*framework.QueuedPodGroupInfo)
+				queue.pendingPodGroupPods.add(pInfos[5])
+				queue.pendingPodGroupPods.add(pInfos[6])
+				cpgInfo.UnschedulablePlugins = sets.New(unschedulablePlugin)
+				cpgInfo.UnschedulableCount = 1
+				queue.unschedulableEntities.addOrUpdate(cpgInfo, false, framework.ScheduleAttemptFailure, nil)
+			},
+			want: `
+				scheduler_queue_incoming_entities_total{event="UnscheduledPodAdd",queue="active",type="compositepodgroup"} 1
+				scheduler_queue_incoming_entities_total{event="ScheduleAttemptFailure",queue="unschedulable",type="compositepodgroup"} 1
+			`,
+		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			tCtx := ktesting.Init(t)
-			metrics.SchedulerQueueIncomingEntities.Reset()
-			queue := NewTestQueue(tCtx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)))
-			queue.AddGenericPodGroup(logger, framework.NewGenericPodGroup(st.MakePodGroup().Name("pg-1").Namespace("ns-pg").Obj()))
-			test.run(tCtx, queue)
-			if err := testutil.CollectAndCompare(metrics.SchedulerQueueIncomingEntities, strings.NewReader(queueIncomingEntitiesMetricMetadata+test.want), metricName); err != nil {
-				t.Errorf("unexpected collecting result:\n%s", err)
+	for _, setup := range podGroupGateSetups {
+		t.Run(setup.name, func(t *testing.T) {
+			for _, test := range tests {
+				if test.isCPG && !setup.cpgEnabled {
+					continue
+				}
+				t.Run(test.name, func(t *testing.T) {
+					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, setup.features)
+					tCtx := ktesting.Init(t)
+					metrics.SchedulerQueueIncomingEntities.Reset()
+					queue := NewTestQueue(tCtx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)))
+					queue.AddGenericPodGroup(logger, framework.NewGenericPodGroup(st.MakePodGroup().Name("pg-1").Namespace("ns-pg").Obj()))
+					if setup.cpgEnabled {
+						queue.AddGenericPodGroup(logger, framework.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-root").Namespace("ns-pg").Obj()))
+						queue.AddGenericPodGroup(logger, framework.NewGenericPodGroup(st.MakePodGroup().Name("pg-cpg-1").Namespace("ns-pg").ParentCompositePodGroup("cpg-root").Obj()))
+						queue.AddGenericPodGroup(logger, framework.NewGenericPodGroup(st.MakePodGroup().Name("pg-cpg-2").Namespace("ns-pg").ParentCompositePodGroup("cpg-root").Obj()))
+					}
+					test.run(tCtx, queue)
+					if err := testutil.CollectAndCompare(metrics.SchedulerQueueIncomingEntities, strings.NewReader(queueIncomingEntitiesMetricMetadata+test.want), metricName); err != nil {
+						t.Errorf("unexpected collecting result:\n%s", err)
+					}
+				})
 			}
 		})
 	}
 }
 
 func TestQueuedEntitiesMetrics(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
 	timestamp := time.Now()
 	unschedulablePlugin := "unschedulable_plugin"
+	gatingPlugin := "gating_plugin"
 	logger := klog.Background()
 	queuingParams := framework.QueueingParams{
 		Timestamp:            timestamp,
@@ -5155,17 +5306,34 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 		makeQueuedPodInfo(t, "pod2", "ns-pg", queuingParams, withPodGroup("pg-1")),
 		makeQueuedPodInfo(t, "pod3", "ns-pg", queuingParams, withPodGroup("pg-1")),
 		makeQueuedPodInfo(t, "pod4", "ns-pg", queuingParams, withPodGroup("pg-1")),
+		makeQueuedPodInfo(t, "pod5", "ns-pg", queuingParams, withPodGroup("pg-cpg-1")),
+		makeQueuedPodInfo(t, "pod6", "ns-pg", queuingParams, withPodGroup("pg-cpg-1")),
+		makeQueuedPodInfo(t, "pod7", "ns-pg", queuingParams, withPodGroup("pg-cpg-2")),
 	}
 
 	metricName := metrics.SchedulerSubsystem + "_" + metrics.QueuedEntities.Name
 
 	tests := []struct {
-		name string
-		run  func(tCtx ktesting.TContext, queue *PriorityQueue)
-		want string
+		name  string
+		isCPG bool
+		run   func(tCtx ktesting.TContext, queue *PriorityQueue)
+		want  string
 	}{
 		{
 			name: "add all pods to active queue",
+			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
+				for _, pInfo := range pInfos[:4] {
+					queue.Add(tCtx, pInfo.Pod)
+				}
+			},
+			want: `
+				scheduler_queued_entities{queue="active",type="pod"} 1
+				scheduler_queued_entities{queue="active",type="podgroup"} 1
+			`,
+		},
+		{
+			name:  "add all pods including compositepodgroup to active queue",
+			isCPG: true,
 			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
 				for _, pInfo := range pInfos {
 					queue.Add(tCtx, pInfo.Pod)
@@ -5174,6 +5342,7 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 			want: `
 				scheduler_queued_entities{queue="active",type="pod"} 1
 				scheduler_queued_entities{queue="active",type="podgroup"} 1
+				scheduler_queued_entities{queue="active",type="compositepodgroup"} 1
 			`,
 		},
 		{
@@ -5199,6 +5368,49 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 			`,
 		},
 		{
+			name: "add pods of a podgroup, mark as unschedulable and add to unschedulable queue",
+			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
+				queue.Add(tCtx, pInfos[1].Pod)
+				queue.Add(tCtx, pInfos[2].Pod)
+				queue.Add(tCtx, pInfos[3].Pod)
+				entityGroup, err := queue.Pop(logger)
+				if err != nil {
+					tCtx.Fatalf("Unexpected error popping from queue: %v", err)
+				}
+				pgInfo := entityGroup.(*framework.QueuedPodGroupInfo)
+				queue.pendingPodGroupPods.add(pInfos[2])
+				queue.pendingPodGroupPods.add(pInfos[3])
+				pgInfo.UnschedulablePlugins = sets.New(unschedulablePlugin)
+				pgInfo.UnschedulableCount = 1
+				queue.unschedulableEntities.addOrUpdate(pgInfo, false, framework.ScheduleAttemptFailure, nil)
+			},
+			want: `
+				scheduler_queued_entities{queue="active",type="podgroup"} 0
+				scheduler_queued_entities{queue="unschedulable",type="podgroup"} 1
+			`,
+		},
+		{
+			name: "add pods of a podgroup, mark as gated and add to unschedulable queue",
+			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
+				queue.Add(tCtx, pInfos[1].Pod)
+				queue.Add(tCtx, pInfos[2].Pod)
+				queue.Add(tCtx, pInfos[3].Pod)
+				entityGroup, err := queue.Pop(logger)
+				if err != nil {
+					tCtx.Fatalf("Unexpected error popping from queue: %v", err)
+				}
+				pgInfo := entityGroup.(*framework.QueuedPodGroupInfo)
+				queue.pendingPodGroupPods.add(pInfos[2])
+				queue.pendingPodGroupPods.add(pInfos[3])
+				pgInfo.SetGatingPlugin(gatingPlugin, nil)
+				queue.unschedulableEntities.addOrUpdate(pgInfo, false, framework.ScheduleAttemptFailure, nil)
+			},
+			want: `
+				scheduler_queued_entities{queue="active",type="podgroup"} 0
+				scheduler_queued_entities{queue="gated",type="podgroup"} 1
+			`,
+		},
+		{
 			name: "Add individual pod to active queue, then mark it as unschedulable and add it unschedulable queue",
 			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
 				queue.Add(tCtx, pInfos[0].Pod)
@@ -5215,6 +5427,23 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 			want: `
 				scheduler_queued_entities{queue="active",type="pod"} 0
 				scheduler_queued_entities{queue="unschedulable",type="pod"} 1
+			`,
+		},
+		{
+			name: "Add individual pod to active queue, then mark it as gated and add it unschedulable queue",
+			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
+				queue.Add(tCtx, pInfos[0].Pod)
+				entity, err := queue.Pop(logger)
+				if err != nil {
+					tCtx.Fatalf("Unexpected error popping from queue: %v", err)
+				}
+				pod := entity.(*framework.QueuedPodInfo)
+				pod.SetGatingPlugin(gatingPlugin, nil)
+				queue.unschedulableEntities.addOrUpdate(pod, false, framework.ScheduleAttemptFailure, nil)
+			},
+			want: `
+				scheduler_queued_entities{queue="active",type="pod"} 0
+				scheduler_queued_entities{queue="gated",type="pod"} 1
 			`,
 		},
 		{
@@ -5236,6 +5465,28 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 			want: `
 				scheduler_queued_entities{queue="active",type="pod"} 0
 				scheduler_queued_entities{queue="backoff",type="pod"} 1
+				scheduler_queued_entities{queue="unschedulable",type="pod"} 0
+			`,
+		},
+		{
+			name: "Move an individual pod from backoff queue to active queue",
+			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
+				queue.Add(tCtx, pInfos[0].Pod)
+				entity, err := queue.Pop(logger)
+				if err != nil {
+					tCtx.Fatalf("Unexpected error popping from queue: %v", err)
+				}
+				pod := entity.(*framework.QueuedPodInfo)
+				pod.UnschedulablePlugins = sets.New(unschedulablePlugin)
+				if err := queue.AddUnschedulablePodIfNotPresent(logger, pod, 1); err != nil {
+					tCtx.Fatalf("Unexpected error adding unschedulable pod: %v", err)
+				}
+
+				queue.clock.(*testingclock.FakeClock).Step(3 * time.Second)
+				queue.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
+			},
+			want: `
+				scheduler_queued_entities{queue="active",type="pod"} 1
 				scheduler_queued_entities{queue="unschedulable",type="pod"} 0
 			`,
 		},
@@ -5289,18 +5540,155 @@ func TestQueuedEntitiesMetrics(t *testing.T) {
 				scheduler_queued_entities{queue="unschedulable",type="podgroup"} 0
 			`,
 		},
+		{
+			name:  "add pods of a compositepodgroup to active queue",
+			isCPG: true,
+			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
+				queue.Add(tCtx, pInfos[4].Pod)
+				queue.Add(tCtx, pInfos[5].Pod)
+				queue.Add(tCtx, pInfos[6].Pod)
+			},
+			want: `
+				scheduler_queued_entities{queue="active",type="compositepodgroup"} 1
+			`,
+		},
+		{
+			name:  "add pods of a compositepodgroup to active queue, simulate scheduling failure attempt, and requeue compositepodgroup to backoff queue",
+			isCPG: true,
+			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
+				queue.Add(tCtx, pInfos[4].Pod)
+				queue.Add(tCtx, pInfos[5].Pod)
+				queue.Add(tCtx, pInfos[6].Pod)
+				entityGroup, err := queue.Pop(logger)
+				if err != nil {
+					tCtx.Fatalf("Unexpected error popping from queue: %v", err)
+				}
+				cpgInfo := entityGroup.(*framework.QueuedPodGroupInfo)
+				queue.pendingPodGroupPods.add(pInfos[5])
+				queue.pendingPodGroupPods.add(pInfos[6])
+				if err := queue.AddAttemptedPodGroupIfNeeded(logger, cpgInfo, 1, fwk.NewStatus(fwk.Unschedulable)); err != nil {
+					tCtx.Fatalf("Unexpected error adding attempted pod group: %v", err)
+				}
+			},
+			want: `
+				scheduler_queued_entities{queue="active",type="compositepodgroup"} 0
+				scheduler_queued_entities{queue="backoff",type="compositepodgroup"} 1
+			`,
+		},
+		{
+			name:  "add pods of a compositepodgroup, mark as unschedulable and add to unschedulable queue",
+			isCPG: true,
+			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
+				queue.Add(tCtx, pInfos[4].Pod)
+				queue.Add(tCtx, pInfos[5].Pod)
+				queue.Add(tCtx, pInfos[6].Pod)
+				entityGroup, err := queue.Pop(logger)
+				if err != nil {
+					tCtx.Fatalf("Unexpected error popping from queue: %v", err)
+				}
+				cpgInfo := entityGroup.(*framework.QueuedPodGroupInfo)
+				cpgInfo.UnschedulablePlugins = sets.New(unschedulablePlugin)
+				cpgInfo.UnschedulableCount = 1
+				queue.unschedulableEntities.addOrUpdate(cpgInfo, false, framework.ScheduleAttemptFailure, nil)
+			},
+			want: `
+				scheduler_queued_entities{queue="active",type="compositepodgroup"} 0
+				scheduler_queued_entities{queue="unschedulable",type="compositepodgroup"} 1
+			`,
+		},
+		{
+			name:  "add pods of a compositepodgroup, mark as gated and add to unschedulable queue",
+			isCPG: true,
+			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
+				queue.Add(tCtx, pInfos[4].Pod)
+				queue.Add(tCtx, pInfos[5].Pod)
+				queue.Add(tCtx, pInfos[6].Pod)
+				entityGroup, err := queue.Pop(logger)
+				if err != nil {
+					tCtx.Fatalf("Unexpected error popping from queue: %v", err)
+				}
+				cpgInfo := entityGroup.(*framework.QueuedPodGroupInfo)
+				cpgInfo.SetGatingPlugin(gatingPlugin, nil)
+				queue.unschedulableEntities.addOrUpdate(cpgInfo, false, framework.ScheduleAttemptFailure, nil)
+			},
+			want: `
+				scheduler_queued_entities{queue="active",type="compositepodgroup"} 0
+				scheduler_queued_entities{queue="gated",type="compositepodgroup"} 1
+			`,
+		},
+		{
+			name:  "add pods of a compositepodgroup, mark as unschedulable and move to unschedulable queue, then to backoff queue",
+			isCPG: true,
+			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
+				queue.Add(tCtx, pInfos[4].Pod)
+				queue.Add(tCtx, pInfos[5].Pod)
+				queue.Add(tCtx, pInfos[6].Pod)
+				entityGroup, err := queue.Pop(logger)
+				if err != nil {
+					tCtx.Fatalf("Unexpected error popping from queue: %v", err)
+				}
+				cpgInfo := entityGroup.(*framework.QueuedPodGroupInfo)
+				cpgInfo.UnschedulablePlugins = sets.New(unschedulablePlugin)
+				cpgInfo.UnschedulableCount = 1
+				queue.unschedulableEntities.addOrUpdate(cpgInfo, false, framework.ScheduleAttemptFailure, nil)
+
+				queue.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
+			},
+			want: `
+				scheduler_queued_entities{queue="active",type="compositepodgroup"} 0
+				scheduler_queued_entities{queue="backoff",type="compositepodgroup"} 1
+				scheduler_queued_entities{queue="unschedulable",type="compositepodgroup"} 0
+			`,
+		},
+		{
+			name:  "Move a compositepodgroup from backoff queue to active queue",
+			isCPG: true,
+			run: func(tCtx ktesting.TContext, queue *PriorityQueue) {
+				queue.Add(tCtx, pInfos[4].Pod)
+				queue.Add(tCtx, pInfos[5].Pod)
+				queue.Add(tCtx, pInfos[6].Pod)
+				entityGroup, err := queue.Pop(logger)
+				if err != nil {
+					tCtx.Fatalf("Unexpected error popping from queue: %v", err)
+				}
+				cpgInfo := entityGroup.(*framework.QueuedPodGroupInfo)
+				cpgInfo.UnschedulablePlugins = sets.New(unschedulablePlugin)
+				cpgInfo.UnschedulableCount = 1
+				queue.unschedulableEntities.addOrUpdate(cpgInfo, false, framework.ScheduleAttemptFailure, nil)
+
+				queue.clock.(*testingclock.FakeClock).Step(3 * time.Second)
+				queue.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnschedulableTimeout, nil, nil, nil)
+			},
+			want: `
+				scheduler_queued_entities{queue="active",type="compositepodgroup"} 1
+				scheduler_queued_entities{queue="unschedulable",type="compositepodgroup"} 0
+			`,
+		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			tCtx := ktesting.Init(t)
-			metrics.QueuedEntities.Reset()
-			queue := NewTestQueue(tCtx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)))
-			queue.AddGenericPodGroup(logger, framework.NewGenericPodGroup(st.MakePodGroup().Name("pg-1").Namespace("ns-pg").Obj()))
-			test.run(tCtx, queue)
+	for _, setup := range podGroupGateSetups {
+		t.Run(setup.name, func(t *testing.T) {
+			for _, test := range tests {
+				if test.isCPG && !setup.cpgEnabled {
+					continue
+				}
+				t.Run(test.name, func(t *testing.T) {
+					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, setup.features)
+					tCtx := ktesting.Init(t)
+					metrics.QueuedEntities.Reset()
+					queue := NewTestQueue(tCtx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)))
+					queue.AddGenericPodGroup(logger, framework.NewGenericPodGroup(st.MakePodGroup().Name("pg-1").Namespace("ns-pg").Obj()))
+					if setup.cpgEnabled {
+						queue.AddGenericPodGroup(logger, framework.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("cpg-root").Namespace("ns-pg").Obj()))
+						queue.AddGenericPodGroup(logger, framework.NewGenericPodGroup(st.MakePodGroup().Name("pg-cpg-1").Namespace("ns-pg").ParentCompositePodGroup("cpg-root").Obj()))
+						queue.AddGenericPodGroup(logger, framework.NewGenericPodGroup(st.MakePodGroup().Name("pg-cpg-2").Namespace("ns-pg").ParentCompositePodGroup("cpg-root").Obj()))
+					}
+					test.run(tCtx, queue)
 
-			if err := testutil.CollectAndCompare(metrics.QueuedEntities, strings.NewReader(queuedEntitiesMetricMetadata+test.want), metricName); err != nil {
-				t.Errorf("unexpected collecting result:\n%s", err)
+					if err := testutil.CollectAndCompare(metrics.QueuedEntities, strings.NewReader(queuedEntitiesMetricMetadata+test.want), metricName); err != nil {
+						t.Errorf("unexpected collecting result:\n%s", err)
+					}
+				})
 			}
 		})
 	}

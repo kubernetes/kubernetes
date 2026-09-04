@@ -23,11 +23,11 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 )
 
-// Entity is either a pod or a podgroup that gets recorded in the metrics.
+// Entity is either a pod, a pod group, or a composite pod group that gets recorded in the metrics.
 type Entity interface {
 	// Size returns the number of pods within the entity (1 for a single pod, or the pod count for a pod group).
 	Size() int
-	// Type returns the entity type (e.g. "pod" or "podgroup").
+	// Type returns the entity type (e.g. "pod", "podgroup", or "compositepodgroup").
 	Type() fwk.EntityKeyType
 }
 
@@ -94,6 +94,8 @@ func EntityToLabel(entity Entity) (string, bool) {
 		return Pod, true
 	case fwk.PodGroupKeyType:
 		return PodGroup, true
+	case fwk.CompositePodGroupKeyType:
+		return CompositePodGroup, true
 	}
 
 	return "", false
@@ -130,6 +132,7 @@ func (r *QueuedEntitiesRecorder) Clear() {
 	r.pods.Set(float64(0))
 	r.entities(Pod).Set(float64(0))
 	r.entities(PodGroup).Set(float64(0))
+	r.entities(CompositePodGroup).Set(float64(0))
 }
 
 // histogramVecMetric is the data structure passed in the buffer channel between the main framework thread
