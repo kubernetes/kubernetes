@@ -10,7 +10,7 @@ require (
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
-	k8s.io/kube-openapi v0.0.0-20260904170622-9ab3195f2a72
+	k8s.io/kube-openapi v0.0.0-20260904182125-37b90da719f6
 	sigs.k8s.io/structured-merge-diff/v7 v7.0.0
 )
 
@@ -63,3 +63,5 @@ replace (
 )
 
 replace github.com/container-storage-interface/spec => github.com/gnufied/spec v1.7.1-0.20260718120346-8e06851c4133
+
+replace k8s.io/kube-openapi => github.com/liggitt/kube-openapi v0.0.0-20260904182125-37b90da719f6

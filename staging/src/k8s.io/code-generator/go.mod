@@ -16,7 +16,7 @@ require (
 	k8s.io/apimachinery v0.0.0
 	k8s.io/gengo/v2 v2.0.0-20260408192533-25e2208e0dc3
 	k8s.io/klog/v2 v2.140.0
-	k8s.io/kube-openapi v0.0.0-20260904170622-9ab3195f2a72
+	k8s.io/kube-openapi v0.0.0-20260904182125-37b90da719f6
 	k8s.io/utils v0.0.0-20260626114624-be93311217bd
 	sigs.k8s.io/randfill v1.0.0
 	sigs.k8s.io/yaml v1.6.0
@@ -56,5 +56,6 @@ require (
 
 replace (
 	k8s.io/apimachinery => ../apimachinery
+	k8s.io/kube-openapi => github.com/liggitt/kube-openapi v0.0.0-20260904182125-37b90da719f6
 	k8s.io/streaming => ../streaming
 )

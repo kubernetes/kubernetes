@@ -84,7 +84,7 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/api v0.0.0 // indirect
-	k8s.io/kube-openapi v0.0.0-20260904170622-9ab3195f2a72 // indirect
+	k8s.io/kube-openapi v0.0.0-20260904182125-37b90da719f6 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v7 v7.0.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
@@ -94,5 +94,6 @@ replace (
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
+	k8s.io/kube-openapi => github.com/liggitt/kube-openapi v0.0.0-20260904182125-37b90da719f6
 	k8s.io/streaming => ../streaming
 )

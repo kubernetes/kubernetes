@@ -17,8 +17,9 @@ limitations under the License.
 package internal
 
 import (
+	jsonv2 "encoding/json/v2"
+
 	"github.com/go-openapi/jsonreference"
-	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 )
 
 // DeterministicMarshal calls the jsonv2 library with the deterministic
