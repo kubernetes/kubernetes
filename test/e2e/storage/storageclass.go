@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econformance "k8s.io/kubernetes/test/e2e/framework/conformance"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -171,5 +172,26 @@ var _ = utils.SIGDescribe("StorageClasses", func() {
 			}))
 			framework.ExpectNoError(err, "timeout while waiting to confirm StorageClass %q deletion", updatedStorageClass.Name)
 		})
+	})
+
+	// TODO: Promote this test to framework.ConformanceIt after it has been stable for at least two weeks,
+	// then remove the legacy StorageClass lifecycle test above.
+	framework.It("should support StorageClass API operations", func(ctx context.Context) {
+		e2econformance.TestResource(ctx, f,
+			&e2econformance.ResourceTestcase[*storagev1.StorageClass]{
+				GVR:                        storagev1.SchemeGroupVersion.WithResource("storageclasses"),
+				Namespaced:                 new(bool),
+				ContentVerificationEnabled: true,
+				InitialSpec: &storagev1.StorageClass{
+					Provisioner: "e2e-fake-provisioner",
+					Parameters:  map[string]string{"foo": "bar"},
+				},
+				UpdateSpec: func(obj *storagev1.StorageClass) *storagev1.StorageClass {
+					obj.MountOptions = []string{"ro", "soft"}
+					return obj
+				},
+				StrategicMergePatchSpec: `{"mountOptions": ["ro", "soft"]}`,
+			},
+		)
 	})
 })
