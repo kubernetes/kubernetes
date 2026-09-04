@@ -22,6 +22,8 @@ import (
 	"context"
 	"fmt"
 
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,7 +38,6 @@ import (
 	certvalidation "k8s.io/kubernetes/pkg/apis/certificates/validation"
 	"k8s.io/kubernetes/pkg/certauthorization"
 	"k8s.io/utils/clock"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // strategy implements behavior for PodCertificateRequests.
