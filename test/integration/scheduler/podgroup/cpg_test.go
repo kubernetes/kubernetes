@@ -1393,6 +1393,112 @@ func TestCPGScheduling(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "TestCPGStatusConditions_HierarchicalDiagnostics",
+			// TestCPGStatusConditions_HierarchicalDiagnostics verifies that failures at any level of the
+			// CPG hierarchy are propagated to descendants with context-aware messages (distinguishing direct parent
+			// vs indirect ancestor failure), while groups that failed on their own keep their own failure message.
+			//
+			// Tree structure:
+			//
+			//	        cpg-root (Gang, MinGroup: 2) [Fails: only 1 child group schedulable]
+			//	       /                                                               \
+			//	   cpg-sub1 (Gang, MinGroup: 2) [Fails: only pg1 schedulable]       cpg-sub2 (Gang, MinGroup: 2) [Skipped]
+			//	  /                            \                                    /                   \
+			//	pg1 (Gang, Min: 2)           pg2 (Gang, Min: 3)                  pg3 (Gang, Min: 2)   pg4 (Gang, Min: 2)
+			//	[Feasible, blocked by sub1]  [Fails: cpu]                        [Skipped]            [Skipped]
+			//
+			// Diagnostics (condition message fragments):
+			//   - cpg-root: scheduling policy's minimum threshold (2) cannot be satisfied: 0 scheduled, 1 remaining
+			//   - cpg-sub1: scheduling policy's minimum threshold (2) cannot be satisfied: 1 scheduled, 0 remaining
+			//   - pg1: ancestor composite pod group "cpg-sub1" is unschedulable
+			//   - pg2: scheduling policy's minimum threshold (3) cannot be satisfied: 0 scheduled, 2 remaining
+			//   - cpg-sub2: ancestor composite pod group "cpg-root" is unschedulable
+			//   - pg3: ancestor composite pod group "cpg-root" is unschedulable
+			//   - pg4: ancestor composite pod group "cpg-root" is unschedulable
+			steps: []stepsframework.Step{
+				{
+					Name:        "Create Node",
+					CreateNodes: []*v1.Node{st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()},
+				},
+				{
+					Name: "Create Workload",
+					CreateWorkloads: []*schedulingapi.Workload{
+						st.MakeWorkload().Name("workload-diag").
+							Children(
+								st.MakeCompositePodGroupTemplate().Name("root-t").MinGroupCount(2).Priority(100).Children(
+									st.MakeCompositePodGroupTemplate().Name("sub-t").MinGroupCount(2).Priority(100).Children(
+										st.MakePodGroupTemplate().Name("gang-t").MinCount(2).Priority(100),
+										st.MakePodGroupTemplate().Name("gang3-t").MinCount(3).Priority(100),
+									),
+								),
+							).Obj(),
+					},
+				},
+				{
+					Name:                    "Create root CPG",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("workload-diag", "root-t").MinGroupCount(2).Priority(100).Obj(),
+				},
+				{
+					Name:                    "Create cpg-sub1",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-sub1").WorkloadRef("workload-diag", "sub-t").MinGroupCount(2).ParentCompositePodGroup("cpg-root").Priority(100).Obj(),
+				},
+				{
+					Name:                    "Create cpg-sub2",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-sub2").WorkloadRef("workload-diag", "sub-t").MinGroupCount(2).ParentCompositePodGroup("cpg-root").Priority(100).Obj(),
+				},
+				{
+					Name:           "Create pg1",
+					CreatePodGroup: st.MakePodGroup().Name("pg1").WorkloadRef("workload-diag", "gang-t").ParentCompositePodGroup("cpg-sub1").Priority(100).MinCount(2).Obj(),
+				},
+				{
+					Name:           "Create pg2",
+					CreatePodGroup: st.MakePodGroup().Name("pg2").WorkloadRef("workload-diag", "gang3-t").ParentCompositePodGroup("cpg-sub1").Priority(100).MinCount(3).Obj(),
+				},
+				{
+					Name:           "Create pg3",
+					CreatePodGroup: st.MakePodGroup().Name("pg3").WorkloadRef("workload-diag", "gang-t").ParentCompositePodGroup("cpg-sub2").Priority(100).MinCount(2).Obj(),
+				},
+				{
+					Name:           "Create pg4",
+					CreatePodGroup: st.MakePodGroup().Name("pg4").WorkloadRef("workload-diag", "gang-t").ParentCompositePodGroup("cpg-sub2").Priority(100).MinCount(2).Obj(),
+				},
+				{
+					Name: "Create Pods",
+					CreatePods: concatPods(
+						makeTestPods("pg1", "1", "1"),
+						makeTestPods("pg2", "100", "100", "100"), // Unschedulable
+						makeTestPods("pg3", "1", "1"),
+						makeTestPods("pg4", "1", "1"),
+					),
+				},
+				{
+					Name: "Verify all pods remain unschedulable",
+					WaitForPodsUnschedulable: podNames(concatPods(
+						makeTestPods("pg1", "1", "1"),
+						makeTestPods("pg2", "1", "1", "1"),
+						makeTestPods("pg3", "1", "1"),
+						makeTestPods("pg4", "1", "1"),
+					)),
+				},
+				{
+					Name: "Verify all CPGs and PodGroups unschedulable conditions with diagnostics",
+					WaitForGroupsUnschedulable: &stepsframework.Groups{
+						CompositePodGroups: []string{"cpg-root", "cpg-sub1", "cpg-sub2"},
+						PodGroups:          []string{"pg1", "pg2", "pg3", "pg4"},
+						Messages: map[string]string{
+							"cpg-root": "scheduling policy's minimum threshold (2) cannot be satisfied: 0 scheduled, 1 remaining",
+							"cpg-sub1": "scheduling policy's minimum threshold (2) cannot be satisfied: 1 scheduled, 0 remaining",
+							"cpg-sub2": "ancestor composite pod group \"cpg-root\" is unschedulable",
+							"pg1":      "ancestor composite pod group \"cpg-sub1\" is unschedulable",
+							"pg2":      "scheduling policy's minimum threshold (3) cannot be satisfied: 0 scheduled, 2 remaining",
+							"pg3":      "ancestor composite pod group \"cpg-root\" is unschedulable",
+							"pg4":      "ancestor composite pod group \"cpg-root\" is unschedulable",
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
