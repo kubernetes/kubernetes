@@ -39,6 +39,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
+	kubepodtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	"k8s.io/kubernetes/pkg/volume"
@@ -138,6 +139,8 @@ func TestCadvisorListPodStats(t *testing.T) {
 		seedPod3Infra         = 7000
 		seedPod3Container0    = 8000
 		seedPod3Container1    = 8001
+		seedPod4Infra         = 8500
+		seedPod4Container0    = 8501
 		seedEphemeralVolume1  = 10000
 		seedEphemeralVolume2  = 10001
 		seedPersistentVolume1 = 20000
@@ -148,6 +151,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 		pName1 = "pod1"
 		pName2 = "pod0" // ensure pName2 conflicts with pName0, but is in a different namespace
 		pName3 = "pod3"
+		pName4 = "pod4" // unknown to the PodManager and so should be filtered out
 	)
 	const (
 		cName00 = "c0"
@@ -172,6 +176,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 	prf1 := statsapi.PodReference{Name: pName1, Namespace: namespace0, UID: "UID" + pName1}
 	prf2 := statsapi.PodReference{Name: pName2, Namespace: namespace2, UID: "UID" + pName2}
 	prf3 := statsapi.PodReference{Name: pName3, Namespace: namespace0, UID: "UID" + pName3}
+	prf4 := statsapi.PodReference{Name: pName4, Namespace: namespace0, UID: "UID" + pName4}
 	infos := map[string]cadvisorapi.ContainerInfo{
 		"/":              getTestContainerInfo(seedRoot, "", "", ""),
 		"/docker-daemon": getTestContainerInfo(seedRuntime, "", "", ""),
@@ -193,6 +198,9 @@ func TestCadvisorListPodStats(t *testing.T) {
 		"/pod3-i":       getTestContainerInfo(seedPod3Infra, pName3, namespace0, kubelettypes.PodInfraContainerName),
 		"/pod3-c0-init": getTestContainerInfo(seedPod3Container0, pName3, namespace0, cName30),
 		"/pod3-c1":      getTestContainerInfo(seedPod3Container1, pName3, namespace0, cName31),
+		// Pod4 is unknown to the PodManager (e.g. already deleted)
+		"/pod4-i":  getTestContainerInfo(seedPod4Infra, pName4, namespace0, kubelettypes.PodInfraContainerName),
+		"/pod4-c0": getTestContainerInfo(seedPod4Container0, pName4, namespace0, cName00),
 	}
 
 	freeRootfsInodes := rootfsInodesFree
@@ -276,7 +284,13 @@ func TestCadvisorListPodStats(t *testing.T) {
 
 	resourceAnalyzer := &fakeResourceAnalyzer{podVolumeStats: volumeStats}
 
-	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, nil, mockRuntime, mockStatus, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil)
+	// All pods except pod4 are known to the PodManager
+	unknownPodUID := types.UID("UID" + pName4)
+	mockPodManager := new(kubepodtest.MockManager)
+	mockPodManager.EXPECT().GetPodByUID(unknownPodUID).Return(nil, false)
+	mockPodManager.EXPECT().GetPodByUID(mock.MatchedBy(func(uid types.UID) bool { return uid != unknownPodUID })).Return(&v1.Pod{}, true)
+
+	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, mockPodManager, mockRuntime, mockStatus, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil)
 	pods, err := p.ListPodStats(ctx)
 	assert.NoError(t, err)
 
@@ -368,6 +382,10 @@ func TestCadvisorListPodStats(t *testing.T) {
 	checkSwapStats(t, "Pod3Container1", seedPod3Container1, infos["/pod3-c1"], con.Swap)
 	checkIOStats(t, "Pod3Container1", seedPod3Container1, infos["/pod3-c1"], con.IO)
 	checkContainersSwapStats(t, ps, infos["/pod3-c1"])
+
+	// Pod4 is unknown to the PodManager and so should be filtered out
+	_, found = indexPods[prf4]
+	assert.False(t, found)
 }
 
 func TestCadvisorPodCPUAndMemoryStats(t *testing.T) {
@@ -482,6 +500,8 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 		seedPod1Container     = 4000
 		seedPod2Infra         = 5000
 		seedPod2Container     = 6000
+		seedPod3Infra         = 7000
+		seedPod3Container     = 7001
 		seedEphemeralVolume1  = 10000
 		seedEphemeralVolume2  = 10001
 		seedPersistentVolume1 = 20000
@@ -491,6 +511,7 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 		pName0 = "pod0"
 		pName1 = "pod1"
 		pName2 = "pod0" // ensure pName2 conflicts with pName0, but is in a different namespace
+		pName3 = "pod3" // unknown to the PodManager and so should be filtered out
 	)
 	const (
 		cName00 = "c0"
@@ -502,6 +523,7 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 	prf0 := statsapi.PodReference{Name: pName0, Namespace: namespace0, UID: "UID" + pName0}
 	prf1 := statsapi.PodReference{Name: pName1, Namespace: namespace0, UID: "UID" + pName1}
 	prf2 := statsapi.PodReference{Name: pName2, Namespace: namespace2, UID: "UID" + pName2}
+	prf3 := statsapi.PodReference{Name: pName3, Namespace: namespace0, UID: "UID" + pName3}
 	infos := map[string]cadvisorapi.ContainerInfo{
 		"/":              getTestContainerInfo(seedRoot, "", "", ""),
 		"/docker-daemon": getTestContainerInfo(seedRuntime, "", "", ""),
@@ -519,6 +541,9 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 		"/pod2-c0":                       getTestContainerInfo(seedPod2Container, pName2, namespace2, cName20),
 		"/kubepods/burstable/podUIDpod0": getTestContainerInfo(seedPod0Infra, pName0, namespace0, kubelettypes.PodInfraContainerName),
 		"/kubepods/podUIDpod1":           getTestContainerInfo(seedPod1Infra, pName1, namespace0, kubelettypes.PodInfraContainerName),
+		// Pod3 is unknown to the PodManager (e.g. already deleted)
+		"/pod3-i":  getTestContainerInfo(seedPod3Infra, pName3, namespace0, kubelettypes.PodInfraContainerName),
+		"/pod3-c0": getTestContainerInfo(seedPod3Container, pName3, namespace0, cName00),
 	}
 
 	// memory limit overrides for each container (used to test available bytes if a memory limit is known)
@@ -555,7 +580,13 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 
 	resourceAnalyzer := &fakeResourceAnalyzer{podVolumeStats: volumeStats}
 
-	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, nil, nil, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil)
+	// All pods except pod3 are known to the PodManager
+	unknownPodUID := types.UID("UID" + pName3)
+	mockPodManager := new(kubepodtest.MockManager)
+	mockPodManager.EXPECT().GetPodByUID(unknownPodUID).Return(nil, false)
+	mockPodManager.EXPECT().GetPodByUID(mock.MatchedBy(func(uid types.UID) bool { return uid != unknownPodUID })).Return(&v1.Pod{}, true)
+
+	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, mockPodManager, nil, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil)
 	pods, err := p.ListPodCPUAndMemoryStats(ctx)
 	assert.NoError(t, err)
 
@@ -640,6 +671,10 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 	assert.Nil(t, ps.VolumeStats)
 	assert.Nil(t, ps.Network)
 	assert.Nil(t, con.IO)
+
+	// Pod3 is unknown to the PodManager and so should be filtered out
+	_, found = indexPods[prf3]
+	assert.False(t, found)
 }
 
 func TestCadvisorImagesFsStatsKubeletSeparateDiskOff(t *testing.T) {
@@ -659,7 +694,7 @@ func TestCadvisorImagesFsStatsKubeletSeparateDiskOff(t *testing.T) {
 	mockCadvisor.EXPECT().ImagesFsInfo(ctx).Return(imageFsInfo, nil)
 	mockRuntime.EXPECT().ImageStats(ctx).Return(imageStats, nil)
 
-	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil)
+	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil, nil)
 	stats, _, err := provider.ImageFsStats(ctx)
 	assert.NoError(err)
 
@@ -740,7 +775,7 @@ func TestImageFsStatsCustomResponse(t *testing.T) {
 			mockCadvisor.EXPECT().ContainerFsInfo(ctx).Return(res, nil)
 		}
 
-		provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil)
+		provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil, nil)
 		stats, containerfs, err := provider.ImageFsStats(ctx)
 		if tc.shouldErr {
 			require.Error(t, err, desc)
@@ -777,7 +812,7 @@ func TestCadvisorImagesFsStats(t *testing.T) {
 	mockCadvisor.EXPECT().ImagesFsInfo(ctx).Return(imageFsInfo, nil)
 	mockRuntime.EXPECT().ImageFsInfo(ctx).Return(imageFsInfoResponse, nil)
 
-	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil)
+	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil, nil)
 	stats, containerfs, err := provider.ImageFsStats(ctx)
 	assert.NoError(err)
 
@@ -831,7 +866,7 @@ func TestCadvisorSplitImagesFsStats(t *testing.T) {
 	mockRuntime.EXPECT().ImageFsInfo(ctx).Return(imageFsInfoResponse, nil)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, true)
 
-	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil)
+	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil, nil)
 	stats, containerfs, err := provider.ImageFsStats(ctx)
 	assert.NoError(err)
 
@@ -884,7 +919,7 @@ func TestCadvisorSameDiskDifferentLocations(t *testing.T) {
 	mockRuntime.EXPECT().ImageFsInfo(ctx).Return(imageFsInfoResponse, nil)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, true)
 
-	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil)
+	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}), nil, nil)
 	stats, containerfs, err := provider.ImageFsStats(ctx)
 	require.NoError(t, err, "imageFsStats should have no error")
 
@@ -995,7 +1030,10 @@ func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
 
 	resourceAnalyzer := &fakeResourceAnalyzer{podVolumeStats: volumeStats}
 
-	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, nil, mockRuntime, mockStatus, NewFakeHostStatsProviderWithData(fakeStats, fakeOS), nil)
+	mockPodManager := new(kubepodtest.MockManager)
+	mockPodManager.EXPECT().GetPodByUID(mock.Anything).Return(&v1.Pod{}, true).Maybe()
+
+	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, mockPodManager, mockRuntime, mockStatus, NewFakeHostStatsProviderWithData(fakeStats, fakeOS), nil)
 	pods, err := p.ListPodStats(ctx)
 	assert.NoError(t, err)
 
