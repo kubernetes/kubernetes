@@ -204,9 +204,6 @@ func newTaintEvictionControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:        names.TaintEvictionController,
 		constructor: newTaintEvictionController,
-		requiredFeatureGates: []featuregate.Feature{
-			features.SeparateTaintEvictionController,
-		},
 	}
 }
 
