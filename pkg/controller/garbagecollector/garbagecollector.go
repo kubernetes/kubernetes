@@ -460,10 +460,36 @@ func (gc *GarbageCollector) isDangling(ctx context.Context, reference metav1.Own
 // dangling: the owner does not exist
 // waitingForDependentsDeletion: the owner exists, its deletionTimestamp is non-nil, and it has
 // FinalizerDeletingDependents
-// This function communicates with the server.
+// This function communicates with the server only when necessary.
 func (gc *GarbageCollector) classifyReferences(ctx context.Context, item *node, latestReferences []metav1.OwnerReference) (
 	solid, dangling, waitingForDependentsDeletion []metav1.OwnerReference, err error) {
 	for _, reference := range latestReferences {
+		if ownerNode, found := gc.dependencyGraphBuilder.uidToNode.Read(reference.UID); found && ownerNode.isObserved() {
+			if ownerNode.isBeingDeleted() {
+				if ownerNode.isDeletingDependents() {
+					waitingForDependentsDeletion = append(waitingForDependentsDeletion, reference)
+				} else {
+					dangling = append(dangling, reference)
+				}
+				continue
+			}
+			if len(ownerNode.identity.Namespace) > 0 && ownerNode.identity.Namespace != item.identity.Namespace {
+				// owner exists but in a different namespace than the child's reference,
+				// fall through to isDangling to properly record the absent entry
+			} else if !ownerReferenceMatchesCoordinates(reference, ownerNode.identity.OwnerReference) {
+				// owner reference coordinates (name, kind, apiVersion) don't match
+				// what's in the graph, fall through to isDangling
+			} else {
+				solid = append(solid, reference)
+				continue
+			}
+		}
+		absentOwnerCacheKey := objectReference{OwnerReference: ownerReferenceCoordinates(reference)}
+		absentOwnerCacheKey.Namespace = item.identity.Namespace
+		if gc.absentOwnerCache.Has(absentOwnerCacheKey) {
+			dangling = append(dangling, reference)
+			continue
+		}
 		isDangling, owner, err := gc.isDangling(ctx, reference, item)
 		if err != nil {
 			return nil, nil, nil, err
@@ -515,30 +541,31 @@ func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node)
 		)
 		return nil
 	}
-	// TODO: It's only necessary to talk to the API server if this is a
-	// "virtual" node. The local graph could lag behind the real status, but in
-	// practice, the difference is small.
-	latest, err := gc.getObject(item.identity)
-	switch {
-	case errors.IsNotFound(err):
-		// the GraphBuilder can add "virtual" node for an owner that doesn't
-		// exist yet, so we need to enqueue a virtual Delete event to remove
-		// the virtual node from GraphBuilder.uidToNode.
-		logger.V(5).Info("item not found, generating a virtual delete event",
-			"item", item.identity,
-		)
-		gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
-		return enqueuedVirtualDeleteEventErr
-	case err != nil:
-		return err
-	}
+	// For virtual nodes, we need to verify existence via the API server.
+	// For non-virtual (observed) nodes, we can skip the GET call and use the
+	// graph data directly, since the informer already has the latest state.
+	var latest *metav1.PartialObjectMetadata
+	var err error
+	if !item.isObserved() {
+		latest, err = gc.getObject(item.identity)
+		switch {
+		case errors.IsNotFound(err):
+			logger.V(5).Info("item not found, generating a virtual delete event",
+				"item", item.identity,
+			)
+			gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
+			return enqueuedVirtualDeleteEventErr
+		case err != nil:
+			return err
+		}
 
-	if latest.GetUID() != item.identity.UID {
-		logger.V(5).Info("UID doesn't match, item not found, generating a virtual delete event",
-			"item", item.identity,
-		)
-		gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
-		return enqueuedVirtualDeleteEventErr
+		if latest.GetUID() != item.identity.UID {
+			logger.V(5).Info("UID doesn't match, item not found, generating a virtual delete event",
+				"item", item.identity,
+			)
+			gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
+			return enqueuedVirtualDeleteEventErr
+		}
 	}
 
 	// TODO: attemptToOrphanWorker() routine is similar. Consider merging
@@ -547,8 +574,13 @@ func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node)
 		return gc.processDeletingDependentsItem(logger, item)
 	}
 
-	// compute if we should delete the item
-	ownerReferences := latest.GetOwnerReferences()
+	// For observed nodes (latest==nil), use item.getOwners() from the informer graph
+	// which should be up-to-date. For virtual nodes (latest!=nil), use the
+	// ownerReferences from the API response which is authoritative.
+	ownerReferences := item.getOwners()
+	if latest != nil {
+		ownerReferences = latest.GetOwnerReferences()
+	}
 	if len(ownerReferences) == 0 {
 		logger.V(2).Info("item doesn't have an owner, continue on next item",
 			"item", item.identity,
@@ -625,7 +657,13 @@ func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node)
 		// FinalizerDeletingDependents from the item, resulting in the final
 		// deletion of the item.
 		policy := metav1.DeletePropagationForeground
-		err := gc.deleteObject(item.identity, latest.ResourceVersion, latest.OwnerReferences, &policy)
+		var resourceVersion string
+		var ownerRefs []metav1.OwnerReference
+		if latest != nil {
+			resourceVersion = latest.ResourceVersion
+			ownerRefs = latest.OwnerReferences
+		}
+		err := gc.deleteObject(item.identity, resourceVersion, ownerRefs, &policy)
 		if errors.IsNotFound(err) {
 			gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
 			return enqueuedVirtualDeleteEventErr
@@ -635,6 +673,19 @@ func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node)
 		// item doesn't have any solid owner, so it needs to be garbage
 		// collected. Also, none of item's owners is waiting for the deletion of
 		// the dependents, so set propagationPolicy based on existing finalizers.
+		if latest == nil {
+			latest, err = gc.getObject(item.identity)
+			if err != nil {
+				if errors.IsNotFound(err) {
+					logger.V(5).Info("item not found in default case",
+						"item", item.identity,
+					)
+					gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
+					return enqueuedVirtualDeleteEventErr
+				}
+				return err
+			}
+		}
 		var policy metav1.DeletionPropagation
 		switch {
 		case hasOrphanFinalizer(latest):
