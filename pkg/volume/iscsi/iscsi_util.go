@@ -481,6 +481,17 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 	return devicePath, nil
 }
 
+func validateISCSIPluginPath(path, pluginDir string) error {
+	if !mount.PathWithinBase(path, pluginDir) {
+		return fmt.Errorf(
+			"iscsi: resolved path %q escapes plugin directory %q",
+			path,
+			pluginDir,
+		)
+	}
+	return nil
+}
+
 // persistISCSI saves iSCSI volume configuration for DetachDisk into global
 // mount / map directory.
 func (util *ISCSIUtil) persistISCSI(b iscsiDiskMounter) error {
@@ -490,6 +501,17 @@ func (util *ISCSIUtil) persistISCSI(b iscsiDiskMounter) error {
 		globalPDPath = b.manager.MakeGlobalVDPDName(*b.iscsiDisk)
 	} else {
 		globalPDPath = b.manager.MakeGlobalPDName(*b.iscsiDisk)
+	}
+
+	var pluginDir string
+	if b.volumeMode == v1.PersistentVolumeBlock {
+		pluginDir = b.iscsiDisk.plugin.host.GetVolumeDevicePluginDir(iscsiPluginName)
+	} else {
+		pluginDir = b.iscsiDisk.plugin.host.GetPluginDir(iscsiPluginName)
+	}
+
+	if err := validateISCSIPluginPath(globalPDPath, pluginDir); err != nil {
+		return err
 	}
 
 	if err := os.MkdirAll(globalPDPath, 0750); err != nil {
