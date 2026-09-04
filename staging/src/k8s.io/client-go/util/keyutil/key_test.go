@@ -111,6 +111,14 @@ Vdc3psr1OaNzyTyuhTECyRdFKXm63cMnGg==
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEZZzi1u5f2/AEGFI/HYUhU+u6cTK1
 q2bbtE7r1JMK+/sQA5sNAp+7Vdc3psr1OaNzyTyuhTECyRdFKXm63cMnGg==
 -----END PUBLIC KEY-----`
+
+	// ecdsaPrivateKeyPKCS8 is an ECDSA Private Key in unencrypted PKCS#8 format
+	// openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256
+	ecdsaPrivateKeyPKCS8 = `-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgwT13QkeA46l7QPdI
+Iuvo5ZTj+0h3XAu2bfKFMdnXhd+hRANCAATDE2ubMIhLuXhUaXJSa+6fKDnkIOvx
+RN7UYjUYaNfwAggNPxwE1SFtdfK1rSWKx6nNpOaoXR0E9OWg64BCZQG5
+-----END PRIVATE KEY-----`
 )
 
 func TestReadPrivateKey(t *testing.T) {
@@ -171,6 +179,15 @@ func TestReadPublicKeys(t *testing.T) {
 	}
 	if keys, err := PublicKeysFromFile(f.Name()); err != nil {
 		t.Fatalf("error reading ECDSA public key: %v", err)
+	} else if len(keys) != 1 {
+		t.Fatalf("expected 1 key, got %d", len(keys))
+	}
+
+	if err := os.WriteFile(f.Name(), []byte(ecdsaPrivateKeyPKCS8), os.FileMode(0600)); err != nil {
+		t.Fatalf("error writing PKCS#8 ECDSA private key to tmpfile: %v", err)
+	}
+	if keys, err := PublicKeysFromFile(f.Name()); err != nil {
+		t.Fatalf("error reading public key from PKCS#8 ECDSA private key: %v", err)
 	} else if len(keys) != 1 {
 		t.Fatalf("expected 1 key, got %d", len(keys))
 	}
