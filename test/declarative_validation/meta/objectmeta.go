@@ -80,7 +80,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("annotations"), "", "").WithOrigin("format=k8s-label-key").MarkFromImperative(),
+				field.Invalid(fldPath.Child("annotations"), "", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 			},
 		},
 		{
@@ -91,7 +91,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.TooLong(fldPath.Child("annotations"), "", apivalidation.TotalAnnotationSizeLimitB).MarkFromImperative(),
+				field.TooLong(fldPath.Child("annotations"), "", apivalidation.TotalAnnotationSizeLimitB).MarkAlpha(),
 			},
 		},
 		{
@@ -331,7 +331,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-key").MarkFromImperative(),
+				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 			},
 		},
 		{
@@ -342,7 +342,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-key").MarkFromImperative(),
+				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 			},
 		},
 		{
@@ -353,7 +353,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-value").MarkFromImperative(),
+				field.Invalid(fldPath.Child("labels").Key("key"), "", "").WithOrigin("format=k8s-label-value").MarkAlpha(),
 			},
 		},
 		{
@@ -364,7 +364,7 @@ func RunObjectMetaTestCases[T runtime.Object](t *testing.T, ctx context.Context,
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-value").MarkFromImperative(),
+				field.Invalid(fldPath.Child("labels").Key("key"), "", "").WithOrigin("format=k8s-label-value").MarkAlpha(),
 			},
 		},
 		{
@@ -470,7 +470,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("annotations"), "", "").WithOrigin("format=k8s-label-key").MarkFromImperative(),
+				field.Invalid(fldPath.Child("annotations"), "", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 			},
 		},
 		{
@@ -481,7 +481,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.TooLong(fldPath.Child("annotations"), "", 0).MarkFromImperative(),
+				field.TooLong(fldPath.Child("annotations"), "", 0).MarkAlpha(),
 			},
 		},
 		{
@@ -622,7 +622,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-key").MarkFromImperative(),
+				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 			},
 		},
 		{
@@ -633,7 +633,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-key").MarkFromImperative(),
+				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 			},
 		},
 		{
@@ -644,7 +644,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-value").MarkFromImperative(),
+				field.Invalid(fldPath.Child("labels").Key("key"), "", "").WithOrigin("format=k8s-label-value").MarkAlpha(),
 			},
 		},
 		{
@@ -655,7 +655,7 @@ func RunObjectMetaUpdateTestCases[T runtime.Object](t *testing.T, ctx context.Co
 				})
 			},
 			ExpectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("labels"), "", "").WithOrigin("format=k8s-label-value").MarkFromImperative(),
+				field.Invalid(fldPath.Child("labels").Key("key"), "", "").WithOrigin("format=k8s-label-value").MarkAlpha(),
 			},
 		},
 	}

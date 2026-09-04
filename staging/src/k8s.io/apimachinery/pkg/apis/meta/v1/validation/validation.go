@@ -116,9 +116,9 @@ func ValidateLabelName(labelName string, fldPath *field.Path) field.ErrorList {
 func ValidateLabels(labels map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for k, v := range labels {
-		allErrs = append(allErrs, ValidateLabelName(k, fldPath)...)
+		allErrs = append(allErrs, ValidateLabelName(k, fldPath).MarkCoveredByDeclarative()...)
 		for _, msg := range validation.IsValidLabelValue(v) {
-			allErrs = append(allErrs, field.Invalid(fldPath, v, msg).WithOrigin("format=k8s-label-value"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Key(k), v, msg).WithOrigin("format=k8s-label-value").MarkCoveredByDeclarative())
 		}
 	}
 	return allErrs
@@ -440,7 +440,7 @@ const annotationsMaxSize = 256 * 1024
 // max size (256Kb) and their case-insensitive qualified-name keys
 func ValidateCustom_ObjectMeta_Annotations(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj map[string]string) field.ErrorList {
 	allErrs := field.ErrorList{}
-	
+
 	// qualified-name check here since Annotations is case-insensitive unlike Labels
 	// And no format exists for this use case
 	for k := range obj {

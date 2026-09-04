@@ -723,7 +723,7 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 			obj:               mkMeta(tweakAnnotations(map[string]string{"-invalid": "val"})),
 			requiresNamespace: true,
 			expectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("annotations"), "-invalid", "").WithOrigin("format=k8s-label-key").MarkFromImperative(),
+				field.Invalid(fldPath.Child("annotations"), "-invalid", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 			},
 		},
 		{
@@ -731,7 +731,7 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 			obj:               mkMeta(tweakAnnotations(map[string]string{"a": strings.Repeat("b", TotalAnnotationSizeLimitB)})),
 			requiresNamespace: true,
 			expectedErrs: field.ErrorList{
-				field.TooLong(fldPath.Child("annotations"), "", TotalAnnotationSizeLimitB).MarkFromImperative(),
+				field.TooLong(fldPath.Child("annotations"), "", TotalAnnotationSizeLimitB).MarkAlpha(),
 			},
 		},
 	}
@@ -857,7 +857,7 @@ func TestValidateObjectMetaDeclaratively(t *testing.T) {
 			oldObj:            mkMeta(tweakResourceVersion("1")),
 			requiresNamespace: true,
 			expectedErrs: field.ErrorList{
-				field.Invalid(fldPath.Child("annotations"), "-invalid", "").WithOrigin("format=k8s-label-key").MarkFromImperative(),
+				field.Invalid(fldPath.Child("annotations"), "-invalid", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
 			},
 		},
 		{

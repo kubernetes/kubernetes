@@ -656,7 +656,7 @@ func TestValidateCustomObjectMetaAnnotations(t *testing.T) {
 		name        string
 		annotations map[string]string
 		expectErrs  int
-	} {
+	}{
 		{
 			name:        "nil annotations",
 			annotations: nil,
@@ -668,40 +668,40 @@ func TestValidateCustomObjectMetaAnnotations(t *testing.T) {
 			expectErrs:  0,
 		},
 		{
-			name:        "empty annotations",
+			name: "empty annotations",
 			annotations: map[string]string{
 				"example.com/foo": "bar",
 				"simple-key":      "value",
 			},
-			expectErrs:  0,
+			expectErrs: 0,
 		},
 		{
-			name:        "mixed-case prefix is allowed (case-insensitive check)",
+			name: "mixed-case prefix is allowed (case-insensitive check)",
 			annotations: map[string]string{
 				"Example.Com/foo": "bar",
 			},
-			expectErrs:  0,
+			expectErrs: 0,
 		},
 		{
-			name:        "total size just under the limit",
+			name: "total size just under the limit",
 			annotations: map[string]string{
 				"key": strings.Repeat("a", annotationsMaxSize-len("key")-1),
 			},
-			expectErrs:  0,
+			expectErrs: 0,
 		},
 		{
-			name:        "invalid qualified name key",
+			name: "invalid qualified name key",
 			annotations: map[string]string{
 				"not a valid key!": "bar",
 			},
-			expectErrs:  1,
+			expectErrs: 1,
 		},
 		{
-			name:        "total size over the limit",
+			name: "total size over the limit",
 			annotations: map[string]string{
 				"key": strings.Repeat("a", annotationsMaxSize),
 			},
-			expectErrs:  1,
+			expectErrs: 1,
 		},
 	}
 
