@@ -137,6 +137,13 @@ func TestCreateServices(t *testing.T) {
 			expectErr:   true,
 		},
 		{
+			name:        "invalid-port-mapping-extra-field",
+			tcp:         []string{"8080:80:extra"},
+			clusterip:   "None",
+			serviceType: v1.ServiceTypeClusterIP,
+			expectErr:   true,
+		},
+		{
 			expectErr: true,
 		},
 		{
