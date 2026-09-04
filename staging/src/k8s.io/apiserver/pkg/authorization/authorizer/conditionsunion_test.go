@@ -30,36 +30,66 @@ func TestConditionsAwareDecisionUnionAdd(t *testing.T) {
 	noOp := authorizer.ConditionsAwareDecisionNoOpinion("", nil)
 	allow := authorizer.ConditionsAwareDecisionAllow("a", nil)
 	deny := authorizer.ConditionsAwareDecisionDeny("d", nil)
-	condMapAllow := authorizer.ConditionsAwareDecisionConditionsMap(nil, nil, []authorizer.Condition{authorizer.GenericCondition{ID: "allow-1"}})
-	condMapDeny := authorizer.ConditionsAwareDecisionConditionsMap([]authorizer.Condition{authorizer.GenericCondition{ID: "deny-1"}}, nil, nil)
+	condMapAllow := authorizer.ConditionsAwareDecisionConditionsMap(nil, nil, []authorizer.Condition{authorizer.GenericCondition{ID: "example.com/allow-1"}})
+	condMapDeny := authorizer.ConditionsAwareDecisionConditionsMap([]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/deny-1"}}, nil, nil)
 
 	t.Run("duplicate conditional authorizers fails closed", func(t *testing.T) {
 		var u authorizer.ConditionsAwareDecisionUnion
-		u.Add("nop", noOp)
-		u.Add("dup", condMapAllow)
-		u.Add("dup", condMapAllow)
+		u.Add("nop.example.com", noOp)
+		u.Add("dup.example.com", condMapAllow)
+		u.Add("dup.example.com", condMapAllow)
 
 		d := u.ToDecision()
 		if !d.IsNoOpinion() {
 			t.Errorf("expected NoOpinion (no Deny leaf), got %s", d.String())
 		}
-		if d.Error().Error() != `duplicate conditionalAuthorizerName "dup"` {
+		if d.Error().Error() != `duplicate authorizerName "dup.example.com"` {
 			t.Errorf("expected aggregated duplicate error, got %v", d.Error())
 		}
 	})
 
 	t.Run("duplicate when outcome could be deny fails closed", func(t *testing.T) {
 		var u authorizer.ConditionsAwareDecisionUnion
-		u.Add("dup", condMapAllow)
-		u.Add("dup", condMapDeny)
-		u.Add("a", allow)
+		u.Add("dup.example.com", condMapAllow)
+		u.Add("dup.example.com", condMapDeny)
+		u.Add("a.example.com", allow)
 
 		d := u.ToDecision()
 		if !d.IsDeny() {
 			t.Errorf("expected Deny (deny leaf present), got %s", d.String())
 		}
-		if d.Error().Error() != `duplicate conditionalAuthorizerName "dup"` {
+		if d.Error().Error() != `duplicate authorizerName "dup.example.com"` {
 			t.Errorf("expected aggregated duplicate error, got %v", d.Error())
+		}
+	})
+
+	t.Run("empty authorizerName fails validation but subsequent Adds still happen (no short-circuit)", func(t *testing.T) {
+		var u authorizer.ConditionsAwareDecisionUnion
+		u.Add("", condMapAllow)
+		u.Add("ok.example.com", condMapAllow)
+
+		d := u.ToDecision()
+		if d.Error() == nil {
+			t.Fatalf("expected error, got none")
+		}
+		// Both the non-empty check and the DNS-1123-subdomain check flag the empty name.
+		// IsDNS1123Subdomain reports the empty string as failing the subdomain regex.
+		if got := d.Error().Error(); got != `[authorizerName must be non-empty, invalid authorizerName: [a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')]]` {
+			t.Errorf("expected empty-name error, got %v", d.Error())
+		}
+	})
+
+	t.Run("non-DNS-1123-subdomain authorizerName is rejected", func(t *testing.T) {
+		var u authorizer.ConditionsAwareDecisionUnion
+		// Underscores are not valid in a DNS 1123 subdomain.
+		u.Add("not_a_subdomain", condMapAllow)
+
+		d := u.ToDecision()
+		if d.Error() == nil {
+			t.Fatalf("expected error, got none")
+		}
+		if got := d.Error().Error(); got != `invalid authorizerName: [a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')]` {
+			t.Errorf("expected subdomain error, got %v", d.Error())
 		}
 	})
 
@@ -130,10 +160,10 @@ func TestConditionsAwareDecisionUnion_AddAfterToDecisionDoesNotMutate(t *testing
 	// Build a union with two ConditionsMap sub-decisions. Neither is an unconditional
 	// Allow/Deny leaf, so the builder does NOT short-circuit subsequent Add calls.
 	cmAllow1 := authorizer.ConditionsAwareDecisionConditionsMap(
-		nil, nil, []authorizer.Condition{authorizer.GenericCondition{ID: "allow-1"}},
+		nil, nil, []authorizer.Condition{authorizer.GenericCondition{ID: "example.com/allow-1"}},
 	)
 	cmAllow2 := authorizer.ConditionsAwareDecisionConditionsMap(
-		nil, nil, []authorizer.Condition{authorizer.GenericCondition{ID: "allow-2"}},
+		nil, nil, []authorizer.Condition{authorizer.GenericCondition{ID: "example.com/allow-2"}},
 	)
 
 	var u authorizer.ConditionsAwareDecisionUnion
@@ -159,7 +189,7 @@ func TestConditionsAwareDecisionUnion_AddAfterToDecisionDoesNotMutate(t *testing
 	// (Deny) not previously present. If ToDecision failed to defensively copy the
 	// builder's memoized state, this Add would leak into the already-returned decision.
 	cmDeny := authorizer.ConditionsAwareDecisionConditionsMap(
-		[]authorizer.Condition{authorizer.GenericCondition{ID: "deny-1"}}, nil, nil,
+		[]authorizer.Condition{authorizer.GenericCondition{ID: "example.com/deny-1"}}, nil, nil,
 	)
 	u.Add("third.example.com", cmDeny)
 

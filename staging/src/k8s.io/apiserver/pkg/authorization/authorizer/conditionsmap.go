@@ -21,10 +21,10 @@ import (
 	"fmt"
 	"iter"
 	"slices"
-	"strings"
 
-	"k8s.io/apimachinery/pkg/api/validate/content"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // ConditionsMap is a map of conditions, where each condition has a map-unique
@@ -111,8 +111,16 @@ func (c ConditionsMap) PossibleDecisions() sets.Set[Decision] {
 	return possibleDecisions
 }
 
-// MaxConditionsPerMap is the maximum number of conditions allowed in a single ConditionsMap.
-const MaxConditionsPerMap = 128
+const (
+	// MaxConditionsPerMap is the maximum number of conditions allowed in a single ConditionsMap.
+	MaxConditionsPerMap = 128
+
+	// MaxConditionBytes is the maximum number of bytes a condition can consist of.
+	MaxConditionBytes = 10240
+
+	// MaxConditionDescriptionBytes is the maximum number of bytes a condition's description can consist of.
+	MaxConditionDescriptionBytes = 1024
+)
 
 // ConditionsAwareDecisionConditionsMap creates a ConditionsMap decision.
 // The conditions are grouped by their effects: Deny, NoOpinion and Allow, that function as follows:
@@ -186,15 +194,25 @@ func validateConditions(seenIDs sets.Set[string], conditions []Condition) error 
 		seenIDs.Insert(id)
 
 		// Validate ID as a label key.
-		if errs := content.IsLabelKey(id); len(errs) > 0 {
-			return fmt.Errorf("invalid condition ID %q: %s", id, strings.Join(errs, "; "))
+		if errs := utilvalidation.IsDomainPrefixedKey(field.NewPath("id"), id); len(errs) > 0 {
+			return fmt.Errorf("invalid condition: %w", errs.ToAggregate())
+		}
+
+		// Validate condition maximum byte length
+		if conditionByteLength := len(condition.GetCondition()); conditionByteLength > MaxConditionBytes {
+			return fmt.Errorf("condition %q length %d is larger than the maximum allowed %d bytes", id, conditionByteLength, MaxConditionBytes)
 		}
 
 		// Validate type as a label key, if set.
 		if conditionType := condition.GetType(); len(conditionType) != 0 {
-			if errs := content.IsLabelKey(conditionType); len(errs) > 0 {
-				return fmt.Errorf("invalid condition type %q: %s", conditionType, strings.Join(errs, "; "))
+			if errs := utilvalidation.IsDomainPrefixedKey(field.NewPath("type"), conditionType); len(errs) > 0 {
+				return fmt.Errorf("invalid condition: %w", errs.ToAggregate())
 			}
+		}
+
+		// Validate condition description maximum byte length
+		if conditionDescriptionByteLength := len(condition.GetDescription()); conditionDescriptionByteLength > MaxConditionDescriptionBytes {
+			return fmt.Errorf("condition %q description length %d is larger than the maximum allowed %d bytes", id, conditionDescriptionByteLength, MaxConditionDescriptionBytes)
 		}
 	}
 	return nil

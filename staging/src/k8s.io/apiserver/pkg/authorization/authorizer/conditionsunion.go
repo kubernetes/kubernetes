@@ -24,6 +24,7 @@ import (
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 )
 
 type namedConditionsAwareDecision struct {
@@ -49,29 +50,32 @@ type ConditionsAwareDecisionUnion struct {
 }
 
 // Add adds a named sub-decision to the current Union ConditionsAwareDecision builder.
-// Add is a no-op if ContainsUnconditionalAllowOrDeny() is true, as adding decisions after an Allow or
-// Deny will never change the final evaluated outcome.
-// An error might be returned if the name is empty or a duplicate, the bool signifies whether
-// the Add was a no-op.
+// Add is a no-op if ContainsUnconditionalAllowOrDeny() is true, as adding decisions after
+// an Allow or Deny will never change the final evaluated outcome.
+// Invalid inputs (empty name, duplicate name, invalid DNS-1123 subdomain) are recorded as
+// aggregated errors and surfaced by ToDecision(); Add itself never returns.
 // Add is not thread-safe.
-func (unionMap *ConditionsAwareDecisionUnion) Add(conditionalAuthorizerName string, d ConditionsAwareDecision) {
+func (unionMap *ConditionsAwareDecisionUnion) Add(authorizerName string, d ConditionsAwareDecision) {
 	if unionMap.ContainsUnconditionalAllowOrDeny() {
 		return // all items after the first concrete Allow or Deny aren't anyways used in evaluation, so they are not added to inner
 	}
 
-	if len(conditionalAuthorizerName) == 0 {
-		unionMap.errs = append(unionMap.errs, fmt.Errorf("conditionalAuthorizerName must be non-empty"))
+	if len(authorizerName) == 0 {
+		unionMap.errs = append(unionMap.errs, fmt.Errorf("authorizerName must be non-empty"))
 	}
-	if unionMap.hasConditionalAuthorizerName(conditionalAuthorizerName) {
+	if unionMap.hasConditionalAuthorizerName(authorizerName) {
 		// Note: We don't short-circuit here, as we want to see all decisions "until the end", such that we can fail closed stronger if needed.
-		unionMap.errs = append(unionMap.errs, fmt.Errorf("duplicate conditionalAuthorizerName %q", conditionalAuthorizerName))
+		unionMap.errs = append(unionMap.errs, fmt.Errorf("duplicate authorizerName %q", authorizerName))
+	}
+	if errs := utilvalidation.IsDNS1123Subdomain(authorizerName); len(errs) > 0 {
+		unionMap.errs = append(unionMap.errs, fmt.Errorf("invalid authorizerName: %v", errs))
 	}
 	// Once we've seen an unconditional Allow or Deny somewhere in the chain, we can stop accepting
 	// other decisions, as they won't ever apply.
 	if d.ContainsUnconditionalAllowOrDeny() {
 		unionMap.containsUnconditionalAllowOrDeny = true
 	}
-	unionMap.inner = append(unionMap.inner, namedConditionsAwareDecision{conditionalAuthorizerName: conditionalAuthorizerName, d: d})
+	unionMap.inner = append(unionMap.inner, namedConditionsAwareDecision{conditionalAuthorizerName: authorizerName, d: d})
 	// Memorize the possible decisions. This is sound, as ConditionsAwareDecisions are immutable after construction.
 	if unionMap.subDecisionsPossibleDecisions == nil {
 		unionMap.subDecisionsPossibleDecisions = sets.New[Decision]()

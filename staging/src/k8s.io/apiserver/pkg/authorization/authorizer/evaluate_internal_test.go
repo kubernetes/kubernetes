@@ -29,9 +29,12 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 	falseResult := ConditionEvaluationResultBoolean(false)
 	errResult := ConditionEvaluationResultError(evalErr)
 
+	// prefixID makes a domain-prefixed condition ID from a bare name; the resulting
+	// ID is what surfaces in wantString error messages.
+	prefixID := func(id string) string { return "example.com/" + id }
 	cond := func(id string, result ConditionEvaluationResult) GenericCondition {
 		return GenericCondition{
-			ID: id,
+			ID: prefixID(id),
 			EvaluateFunc: func(context.Context, ConditionsData) ConditionEvaluationResult {
 				return result
 			},
@@ -43,7 +46,7 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 		return c
 	}
 	unevalCond := func(id string) GenericCondition {
-		return GenericCondition{ID: id} // nil EvaluateFunc → unevaluatable
+		return GenericCondition{ID: prefixID(id)} // nil EvaluateFunc → unevaluatable
 	}
 
 	type subCase struct {
@@ -66,7 +69,7 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 		// ============================================================
 		{
 			name:       "deny: at least one deny condition matched",
-			wantString: `Deny(reason="condition \"deny-1\" denied the request")`,
+			wantString: `Deny(reason="condition \"example.com/deny-1\" denied the request")`,
 			subCases: []subCase{
 				{
 					name:           "minimal",
@@ -157,7 +160,7 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 		},
 		{
 			name:       "deny: at least one deny condition matched with description",
-			wantString: `Deny(reason="condition \"deny-1\" denied the request with description \"access denied\"")`,
+			wantString: `Deny(reason="condition \"example.com/deny-1\" denied the request with description \"access denied\"")`,
 			subCases: []subCase{
 				{
 					name:           "minimal",
@@ -177,7 +180,7 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 		// ============================================================
 		{
 			name:       "deny: error fail closed",
-			wantString: `Deny(reason="one or more conditional evaluation errors occurred", err="condition \"deny-1\" with effect=Deny evaluated to an error: eval error")`,
+			wantString: `Deny(reason="one or more conditional evaluation errors occurred", err="condition \"example.com/deny-1\" with effect=Deny evaluated to an error: eval error")`,
 			subCases: []subCase{
 				{
 					name:           "minimal",
@@ -223,7 +226,7 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 		},
 		{
 			name:       "deny: error fail closed",
-			wantString: `Deny(reason="one or more conditional evaluation errors occurred", err="[condition \"deny-1\" with effect=Deny evaluated to an error: eval error, condition \"deny-2\" with effect=Deny evaluated to an error: eval error]")`,
+			wantString: `Deny(reason="one or more conditional evaluation errors occurred", err="[condition \"example.com/deny-1\" with effect=Deny evaluated to an error: eval error, condition \"example.com/deny-2\" with effect=Deny evaluated to an error: eval error]")`,
 			subCases: []subCase{
 				{
 					name:           "minimal",
@@ -237,7 +240,7 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 		// ============================================================
 		{
 			name:       "noopinion: at least one noopinion condition matched",
-			wantString: `NoOpinion(reason="condition \"nop-1\" evaluated to NoOpinion")`,
+			wantString: `NoOpinion(reason="condition \"example.com/nop-1\" evaluated to NoOpinion")`,
 			subCases: []subCase{
 				{
 					name:                "simple",
@@ -312,7 +315,7 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 		},
 		{
 			name:       "noopinion: at least one noopinion condition matched with description",
-			wantString: `NoOpinion(reason="condition \"nop-1\" evaluated to NoOpinion with description \"not relevant\"")`,
+			wantString: `NoOpinion(reason="condition \"example.com/nop-1\" evaluated to NoOpinion with description \"not relevant\"")`,
 			subCases: []subCase{
 				{
 					name:                "simple",
@@ -332,7 +335,7 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 		// ============================================================
 		{
 			name:       "noopinion: nop error fail closed",
-			wantString: `NoOpinion(reason="one or more conditional evaluation errors occurred", err="condition \"nop-1\" with effect=NoOpinion evaluated to an error: eval error")`,
+			wantString: `NoOpinion(reason="one or more conditional evaluation errors occurred", err="condition \"example.com/nop-1\" with effect=NoOpinion evaluated to an error: eval error")`,
 			subCases: []subCase{
 				{
 					name:                "simple",
@@ -373,7 +376,7 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 		// ============================================================
 		{
 			name:       "noopinion: single allow error fail closed",
-			wantString: `NoOpinion(reason="one or more conditional evaluation errors occurred", err="condition \"allow-1\" with effect=Allow evaluated to an error: eval error")`,
+			wantString: `NoOpinion(reason="one or more conditional evaluation errors occurred", err="condition \"example.com/allow-1\" with effect=Allow evaluated to an error: eval error")`,
 			subCases: []subCase{
 				{
 					name:            "minimal",
@@ -408,7 +411,7 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 		},
 		{
 			name:       "noopinion: multiple allow errors fail closed",
-			wantString: `NoOpinion(reason="one or more conditional evaluation errors occurred", err="[condition \"allow-1\" with effect=Allow evaluated to an error: eval error, condition \"allow-2\" with effect=Allow evaluated to an error: eval error]")`,
+			wantString: `NoOpinion(reason="one or more conditional evaluation errors occurred", err="[condition \"example.com/allow-1\" with effect=Allow evaluated to an error: eval error, condition \"example.com/allow-2\" with effect=Allow evaluated to an error: eval error]")`,
 			subCases: []subCase{
 				{
 					name: "minimal",
@@ -476,7 +479,7 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 		// ============================================================
 		{
 			name:       "allow: at least one allow condition matched",
-			wantString: `Allow(reason="condition \"allow-1\" allowed the request")`,
+			wantString: `Allow(reason="condition \"example.com/allow-1\" allowed the request")`,
 			subCases: []subCase{
 				{
 					name:            "minimal",
@@ -513,7 +516,7 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 		},
 		{
 			name:       "allow: at least one allow condition matched with description",
-			wantString: `Allow(reason="condition \"allow-1\" allowed the request with description \"access granted\"")`,
+			wantString: `Allow(reason="condition \"example.com/allow-1\" allowed the request with description \"access granted\"")`,
 			subCases: []subCase{
 				{
 					name:            "minimal",
@@ -536,7 +539,7 @@ func TestConditionsMapPartiallyEvaluate(t *testing.T) {
 			// short-circuits. The short-circuit path returns the reason with nil errors,
 			// so the accumulated allow-err warning is dropped and not surfaced on Allow.
 			name:       "allow: matching allow short-circuits and drops prior error",
-			wantString: `Allow(reason="condition \"allow-1\" allowed the request")`,
+			wantString: `Allow(reason="condition \"example.com/allow-1\" allowed the request")`,
 			subCases: []subCase{
 				{
 					name: "minimal",
