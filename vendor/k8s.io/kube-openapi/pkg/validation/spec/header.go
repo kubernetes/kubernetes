@@ -15,12 +15,10 @@
 package spec
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 
-	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
-	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
-	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/jsontext"
 )
 
 const (
@@ -44,33 +42,14 @@ type Header struct {
 
 // MarshalJSON marshal this to JSON
 func (h Header) MarshalJSON() ([]byte, error) {
-	if internal.UseOptimizedJSONMarshaling {
-		return internal.DeterministicMarshal(h)
-	}
-	b1, err := json.Marshal(h.CommonValidations)
-	if err != nil {
-		return nil, err
-	}
-	b2, err := json.Marshal(h.SimpleSchema)
-	if err != nil {
-		return nil, err
-	}
-	b3, err := json.Marshal(h.HeaderProps)
-	if err != nil {
-		return nil, err
-	}
-	b4, err := json.Marshal(h.VendorExtensible)
-	if err != nil {
-		return nil, err
-	}
-	return swag.ConcatJSON(b1, b2, b3, b4), nil
+	return internal.DeterministicMarshal(h)
 }
 
 func (h Header) MarshalJSONTo(enc *jsontext.Encoder) error {
 	var x struct {
-		CommonValidations commonValidationsOmitZero `json:",inline"`
-		SimpleSchema      simpleSchemaOmitZero      `json:",inline"`
-		Extensions        Extensions                `json:",inline"`
+		CommonValidations commonValidationsOmitZero `json:",embed"`
+		SimpleSchema      simpleSchemaOmitZero      `json:",embed"`
+		Extensions        Extensions                `json:",embed"`
 		HeaderProps
 	}
 	x.CommonValidations = commonValidationsOmitZero(h.CommonValidations)
@@ -82,27 +61,14 @@ func (h Header) MarshalJSONTo(enc *jsontext.Encoder) error {
 
 // UnmarshalJSON unmarshals this header from JSON
 func (h *Header) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshaling {
-		return jsonv2.Unmarshal(data, h)
-	}
-
-	if err := json.Unmarshal(data, &h.CommonValidations); err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, &h.SimpleSchema); err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, &h.VendorExtensible); err != nil {
-		return err
-	}
-	return json.Unmarshal(data, &h.HeaderProps)
+	return jsonv2.Unmarshal(data, h)
 }
 
 func (h *Header) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	var x struct {
 		CommonValidations
 		SimpleSchema
-		Extensions Extensions `json:",inline"`
+		Extensions Extensions `json:",embed"`
 		HeaderProps
 	}
 

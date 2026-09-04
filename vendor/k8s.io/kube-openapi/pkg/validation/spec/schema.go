@@ -16,14 +16,13 @@ package spec
 
 import (
 	"encoding/json"
-	"fmt"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 	"net/url"
-	"strings"
 
 	"github.com/go-openapi/swag"
+
 	"k8s.io/kube-openapi/pkg/internal"
-	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
-	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/jsontext"
 )
 
 // BooleanProperty creates a boolean property
@@ -484,46 +483,15 @@ func (s *Schema) WithExternalDocs(description, url string) *Schema {
 
 // MarshalJSON marshal this to JSON
 func (s Schema) MarshalJSON() ([]byte, error) {
-	if internal.UseOptimizedJSONMarshaling {
-		return internal.DeterministicMarshal(s)
-	}
-	b1, err := json.Marshal(s.SchemaProps)
-	if err != nil {
-		return nil, fmt.Errorf("schema props %v", err)
-	}
-	b2, err := json.Marshal(s.VendorExtensible)
-	if err != nil {
-		return nil, fmt.Errorf("vendor props %v", err)
-	}
-	b3, err := s.Ref.MarshalJSON()
-	if err != nil {
-		return nil, fmt.Errorf("ref prop %v", err)
-	}
-	b4, err := s.Schema.MarshalJSON()
-	if err != nil {
-		return nil, fmt.Errorf("schema prop %v", err)
-	}
-	b5, err := json.Marshal(s.SwaggerSchemaProps)
-	if err != nil {
-		return nil, fmt.Errorf("common validations %v", err)
-	}
-	var b6 []byte
-	if s.ExtraProps != nil {
-		jj, err := json.Marshal(s.ExtraProps)
-		if err != nil {
-			return nil, fmt.Errorf("extra props %v", err)
-		}
-		b6 = jj
-	}
-	return swag.ConcatJSON(b1, b2, b3, b4, b5, b6), nil
+	return internal.DeterministicMarshal(s)
 }
 
 func (s Schema) MarshalJSONTo(enc *jsontext.Encoder) error {
 	type ArbitraryKeys map[string]interface{}
 	var x struct {
-		ArbitraryKeys      ArbitraryKeys              `json:",inline"`
-		SchemaProps        schemaPropsOmitZero        `json:",inline"`
-		SwaggerSchemaProps swaggerSchemaPropsOmitZero `json:",inline"`
+		ArbitraryKeys      ArbitraryKeys              `json:",embed"`
+		SchemaProps        schemaPropsOmitZero        `json:",embed"`
+		SwaggerSchemaProps swaggerSchemaPropsOmitZero `json:",embed"`
 		Schema             string                     `json:"$schema,omitempty"`
 		Ref                string                     `json:"$ref,omitempty"`
 	}
@@ -545,60 +513,12 @@ func (s Schema) MarshalJSONTo(enc *jsontext.Encoder) error {
 
 // UnmarshalJSON marshal this from JSON
 func (s *Schema) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshaling {
-		return jsonv2.Unmarshal(data, s)
-	}
-
-	props := struct {
-		SchemaProps
-		SwaggerSchemaProps
-	}{}
-	if err := json.Unmarshal(data, &props); err != nil {
-		return err
-	}
-
-	sch := Schema{
-		SchemaProps:        props.SchemaProps,
-		SwaggerSchemaProps: props.SwaggerSchemaProps,
-	}
-
-	var d map[string]interface{}
-	if err := json.Unmarshal(data, &d); err != nil {
-		return err
-	}
-
-	_ = sch.Ref.fromMap(d)
-	_ = sch.Schema.fromMap(d)
-
-	delete(d, "$ref")
-	delete(d, "$schema")
-	for _, pn := range swag.DefaultJSONNameProvider.GetJSONNames(s) {
-		delete(d, pn)
-	}
-
-	for k, vv := range d {
-		lk := strings.ToLower(k)
-		if strings.HasPrefix(lk, "x-") {
-			if sch.Extensions == nil {
-				sch.Extensions = map[string]interface{}{}
-			}
-			sch.Extensions[k] = vv
-			continue
-		}
-		if sch.ExtraProps == nil {
-			sch.ExtraProps = map[string]interface{}{}
-		}
-		sch.ExtraProps[k] = vv
-	}
-
-	*s = sch
-
-	return nil
+	return jsonv2.Unmarshal(data, s)
 }
 
 func (s *Schema) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	var x struct {
-		Extensions Extensions `json:",inline"`
+		Extensions Extensions `json:",embed"`
 		SchemaProps
 		SwaggerSchemaProps
 	}

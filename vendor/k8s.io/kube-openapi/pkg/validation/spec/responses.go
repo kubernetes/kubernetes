@@ -16,14 +16,12 @@ package spec
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 	"fmt"
-	"reflect"
 	"strconv"
 
-	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
-	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
-	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/jsontext"
 )
 
 // Responses is a container for the expected responses of an operation.
@@ -46,43 +44,18 @@ type Responses struct {
 
 // UnmarshalJSON hydrates this items instance with the data from JSON
 func (r *Responses) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshaling {
-		return jsonv2.Unmarshal(data, r)
-	}
-
-	if err := json.Unmarshal(data, &r.ResponsesProps); err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, &r.VendorExtensible); err != nil {
-		return err
-	}
-	if reflect.DeepEqual(ResponsesProps{}, r.ResponsesProps) {
-		r.ResponsesProps = ResponsesProps{}
-	}
-	return nil
+	return jsonv2.Unmarshal(data, r)
 }
 
 // MarshalJSON converts this items object to JSON
 func (r Responses) MarshalJSON() ([]byte, error) {
-	if internal.UseOptimizedJSONMarshaling {
-		return internal.DeterministicMarshal(r)
-	}
-	b1, err := json.Marshal(r.ResponsesProps)
-	if err != nil {
-		return nil, err
-	}
-	b2, err := json.Marshal(r.VendorExtensible)
-	if err != nil {
-		return nil, err
-	}
-	concated := swag.ConcatJSON(b1, b2)
-	return concated, nil
+	return internal.DeterministicMarshal(r)
 }
 
 func (r Responses) MarshalJSONTo(enc *jsontext.Encoder) error {
 	type ArbitraryKeys map[string]interface{}
 	var x struct {
-		ArbitraryKeys ArbitraryKeys `json:",inline"`
+		ArbitraryKeys ArbitraryKeys `json:",embed"`
 		Default       *Response     `json:"default,omitempty"`
 	}
 	x.ArbitraryKeys = make(map[string]any, len(r.Extensions)+len(r.StatusCodeResponses))
@@ -120,35 +93,7 @@ func (r ResponsesProps) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON unmarshals responses from JSON
 func (r *ResponsesProps) UnmarshalJSON(data []byte) error {
-	if internal.UseOptimizedJSONUnmarshaling {
-		return jsonv2.Unmarshal(data, r)
-	}
-	var res map[string]json.RawMessage
-	if err := json.Unmarshal(data, &res); err != nil {
-		return err
-	}
-	if v, ok := res["default"]; ok {
-		value := Response{}
-		if err := json.Unmarshal(v, &value); err != nil {
-			return err
-		}
-		r.Default = &value
-		delete(res, "default")
-	}
-	for k, v := range res {
-		// Take all integral keys
-		if nk, err := strconv.Atoi(k); err == nil {
-			if r.StatusCodeResponses == nil {
-				r.StatusCodeResponses = map[int]Response{}
-			}
-			value := Response{}
-			if err := json.Unmarshal(v, &value); err != nil {
-				return err
-			}
-			r.StatusCodeResponses[nk] = value
-		}
-	}
-	return nil
+	return jsonv2.Unmarshal(data, r)
 }
 
 func (r *Responses) UnmarshalJSONFrom(dec *jsontext.Decoder) (err error) {

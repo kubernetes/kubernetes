@@ -42,4 +42,5 @@ replace (
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
 	k8s.io/cri-api => ../cri-api
+	k8s.io/kube-openapi => github.com/liggitt/kube-openapi v0.0.0-20260904182125-37b90da719f6
 )
