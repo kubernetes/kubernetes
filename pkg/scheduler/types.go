@@ -100,9 +100,9 @@ func (ar *algorithmResult) GetCycleState() fwk.CycleState {
 	return ar.podCtx.state
 }
 
-// podGroupAlgorithmResult stores the scheduling pod scheduling results for a pod group
+// PodGroupScheduledResult stores the scheduling pod scheduling results for a pod group
 // and any information needed to act on these results.
-type podGroupAlgorithmResult struct {
+type PodGroupScheduledResult struct {
 	// podGroupInfo is the leaf pod group this result applies to.
 	podGroupInfo *framework.PodGroupInfo
 	// podResults is the list of scheduling results for each pod in the group.
