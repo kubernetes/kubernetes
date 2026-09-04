@@ -1637,6 +1637,9 @@ func validateQualifiedName(name resource.QualifiedName, fldPath *field.Path) fie
 		//
 		// The fix should be introduced carefully, possibly using ratcheting to avoid
 		// breaking existing, non-compliant objects.
+	default:
+		// Reject names with more than one slash.
+		allErrs = append(allErrs, field.Invalid(fldPath, string(name), "must not contain more than one slash"))
 	}
 
 	return allErrs

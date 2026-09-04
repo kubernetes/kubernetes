@@ -294,6 +294,10 @@ func resourcesQualifiedName[T ~string](ctx context.Context, op operation.Operati
 			allErrs = append(allErrs, validateCIdentifier(parts[1], resourceDeviceMaxLength, fldPath)...)
 		}
 	}
+	default:
+		// Reject names with more than one slash.
+		allErrs = append(allErrs, field.Invalid(fldPath, s, "must not contain more than one slash"))
+	}
 	return allErrs
 }
 
