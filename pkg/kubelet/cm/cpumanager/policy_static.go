@@ -636,6 +636,7 @@ func (p *staticPolicy) allocateForAdd(logger klog.Logger, s state.State, pod *v1
 		if p.options.FullPhysicalCPUsOnly {
 			// increment only if we know we allocate aligned resources
 			metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
+			metrics.ContainerAlignedComputeResourcesTotal.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
 		}
 	}()
 
@@ -1130,9 +1131,12 @@ func (p *staticPolicy) getAlignedCPUs(numaAffinity bitmask.BitMask, allocatableC
 }
 
 func (p *staticPolicy) initializeMetrics(logger klog.Logger, s state.State) {
-	metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Add(0) // ensure the value exists
-	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Add(0)        // ensure the value exists
-	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedUncoreCache).Add(0)        // ensure the value exists
+	metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Add(0)      // ensure the value exists
+	metrics.ContainerAlignedComputeResourcesFailureTotal.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Add(0) // ensure the value exists
+	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Add(0)             // ensure the value exists
+	metrics.ContainerAlignedComputeResourcesTotal.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Add(0)        // ensure the value exists
+	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedUncoreCache).Add(0)             // ensure the value exists
+	metrics.ContainerAlignedComputeResourcesTotal.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedUncoreCache).Add(0)
 	p.updateMetricsFromState(logger, s)
 }
 
@@ -1148,12 +1152,14 @@ func (p *staticPolicy) updateMetricsFromState(logger klog.Logger, s state.State)
 	metrics.CPUManagerSharedPoolSizeMilliCores.Set(float64(p.GetAvailableCPUs(s).Size() * 1000))
 	totalExclusiveCPUs := getTotalAssignedExclusiveCPUs(s)
 	metrics.CPUManagerExclusiveCPUsAllocationCount.Set(float64(totalExclusiveCPUs.Size()))
+	metrics.CPUManagerExclusiveCPUsAllocation.Set(float64(totalExclusiveCPUs.Size()))
 	updateAllocationPerNUMAMetric(logger, p.topology, totalExclusiveCPUs, p.numaNodes)
 }
 
 func (p *staticPolicy) updateMetricsOnAllocate(logger klog.Logger, s state.State, cpuAlloc topology.Allocation) {
 	if cpuAlloc.Aligned.UncoreCache {
 		metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedUncoreCache).Inc()
+		metrics.ContainerAlignedComputeResourcesTotal.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedUncoreCache).Inc()
 	}
 	p.updateMetricsFromState(logger, s)
 }
