@@ -18,6 +18,8 @@ package library
 
 import (
 	"fmt"
+	"maps"
+	"math"
 	"net/netip"
 
 	"github.com/google/cel-go/cel"
@@ -42,16 +44,22 @@ import (
 //
 //	cidr('192.168.0.0/16') // returns an IPv4 address with a CIDR mask
 //	cidr('::1/128') // returns an IPv6 address with a CIDR mask
+//	cidr('192.168.0.1/16') // returns an IPv4 address with a CIDR mask that is shorter than the address
 //	cidr('192.168.0.0/33') // error
 //	cidr('::1/129') // error
-//	cidr('192.168.0.1/16') // error, because there are non-0 bits after the prefix
 //
 // isCIDR
 //
-// Returns true if a string is a valid CIDR notation respresentation of a subnet with mask.
-// The CIDR must be an IPv4 or IPv6 subnet address with a mask.
+// Returns true if a string is a valid CIDR notation respresentation.
+// The CIDR must be an IPv4 or IPv6 IP or subnet address with a mask.
 // Leading zeros in IPv4 address octets are not allowed.
 // IPv4-mapped IPv6 addresses (e.g. ::ffff:1.2.3.4/24) are not allowed.
+//
+// Note that (unlike the apimachinery `IsValidCIDR` function), this accepts
+// both "subnet"/"mask"-style CIDR values ('192.168.0.0/16') and "interface
+// address"-style CIDR values ('192.168.0.1/16'). If you want to restrict the
+// value to valid subnets or masks, you should also call cidr().isMask() on
+// it.
 //
 //	isCIDR(<string>) <bool>
 //
@@ -59,10 +67,11 @@ import (
 //
 //	isCIDR('192.168.0.0/16') // returns true
 //	isCIDR('::1/128') // returns true
+//	isCIDR('192.168.0.1/16') // returns true
 //	isCIDR('192.168.0.0/33') // returns false
 //	isCIDR('::1/129') // returns false
 //
-// containsIP / containerCIDR / ip / masked / prefixLength
+// containsIP / containerCIDR / ip / isMask / masked / prefixLength
 //
 // - containsIP: Returns true if a the CIDR contains the given IP address.
 // The IP address must be an IPv4 or IPv6 address.
@@ -73,6 +82,9 @@ import (
 // May take either a string or CIDR as an argument.
 //
 // - ip: Returns the IP address representation of the CIDR.
+//
+// - isMask: Returns true if the CIDR is in mask/subnet form, with all of the bits
+// after the prefix length being 0. (Added in Kubernetes 1.37, CIDR library version 1.)
 //
 // - masked: Returns the CIDR representation of the network address with a masked prefix.
 // This can be used to return the canonical form of the CIDR network.
@@ -94,33 +106,55 @@ import (
 //	cidr('192.168.0.1/24').ip().family() // returns '4'
 //	cidr('::1/128').ip() // returns ipAddr('::1')
 //	cidr('::1/128').ip().family() // returns '6'
+//	cidr('192.168.0.0/24').isMask() // returns true
 //	cidr('192.168.0.0/24').masked() // returns cidr('192.168.0.0/24')
+//	cidr('192.168.0.1/24').isMask() // returns false
 //	cidr('192.168.0.1/24').masked() // returns cidr('192.168.0.0/24')
 //	cidr('192.168.0.0/24') == cidr('192.168.0.0/24').masked() // returns true, CIDR was already in canonical format
 //	cidr('192.168.0.1/24') == cidr('192.168.0.1/24').masked() // returns false, CIDR was not in canonical format
 //	cidr('192.168.0.0/16').prefixLength() // returns 16
 //	cidr('::1/128').prefixLength() // returns 128
-func CIDR() cel.EnvOption {
+func CIDR(options ...CIDROption) cel.EnvOption {
+	cidrsLib := &cidrs{}
+	for _, o := range options {
+		cidrsLib = o(cidrsLib)
+	}
 	return cel.Lib(cidrsLib)
 }
 
-var cidrsLib = &cidrs{}
+type CIDROption func(*cidrs) *cidrs
 
-type cidrs struct{}
+func CIDRVersion(version uint32) CIDROption {
+	return func(lib *cidrs) *cidrs {
+		lib.version = version
+		return lib
+	}
+}
+
+var cidrsLib = &cidrs{version: math.MaxUint32} // include all versions
+
+type cidrs struct {
+	version uint32
+}
 
 func (*cidrs) LibraryName() string {
 	return "kubernetes.net.cidr"
 }
 
-func (*cidrs) declarations() map[string][]cel.FunctionOpt {
-	return cidrLibraryDecls
+func (c *cidrs) declarations() map[string][]cel.FunctionOpt {
+	decls := map[string][]cel.FunctionOpt{}
+	maps.Copy(decls, cidrLibraryDeclsV0)
+	if c.version >= 1 {
+		maps.Copy(decls, cidrLibraryDeclsV1)
+	}
+	return decls
 }
 
 func (*cidrs) Types() []*cel.Type {
 	return []*cel.Type{apiservercel.CIDRType, apiservercel.IPType}
 }
 
-var cidrLibraryDecls = map[string][]cel.FunctionOpt{
+var cidrLibraryDeclsV0 = map[string][]cel.FunctionOpt{
 	"cidr": {
 		cel.Overload("string_to_cidr", []*cel.Type{cel.StringType}, apiservercel.CIDRType,
 			cel.UnaryBinding(stringToCIDR)),
@@ -159,9 +193,16 @@ var cidrLibraryDecls = map[string][]cel.FunctionOpt{
 	},
 }
 
-func (*cidrs) CompileOptions() []cel.EnvOption {
+var cidrLibraryDeclsV1 = map[string][]cel.FunctionOpt{
+	"isMask": {
+		cel.MemberOverload("cidr_is_mask", []*cel.Type{apiservercel.CIDRType}, cel.BoolType,
+			cel.UnaryBinding(isMask)),
+	},
+}
+
+func (c *cidrs) CompileOptions() []cel.EnvOption {
 	options := []cel.EnvOption{cel.Types(apiservercel.CIDRType)}
-	for name, overloads := range cidrLibraryDecls {
+	for name, overloads := range c.declarations() {
 		options = append(options, cel.Function(name, overloads...))
 	}
 	return options
@@ -260,6 +301,15 @@ func cidrToIP(arg ref.Val) ref.Val {
 	return apiservercel.IP{
 		Addr: cidr.Prefix.Addr(),
 	}
+}
+
+func isMask(arg ref.Val) ref.Val {
+	cidr, ok := arg.(apiservercel.CIDR)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(arg)
+	}
+
+	return types.Bool(cidr.Prefix == cidr.Prefix.Masked())
 }
 
 func masked(arg ref.Val) ref.Val {

@@ -30,10 +30,10 @@ import (
 	"k8s.io/apiserver/pkg/cel/library"
 )
 
-func testCIDR(t *testing.T, expr string, expectResult ref.Val, expectRuntimeErr string, expectCompileErrs []string) {
+func testCIDR(t *testing.T, expr string, version uint32, expectResult ref.Val, expectRuntimeErr string, expectCompileErrs []string) {
 	env, err := cel.NewEnv(
 		library.IP(),
-		library.CIDR(),
+		library.CIDR(library.CIDRVersion(version)),
 	)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -101,9 +101,11 @@ func testCIDR(t *testing.T, expr string, expectResult ref.Val, expectRuntimeErr 
 
 func TestCIDR(t *testing.T) {
 	ipv4CIDR, _ := netip.ParsePrefix("192.168.0.0/24")
+	ipv4IfAddr, _ := netip.ParsePrefix("192.168.0.1/24")
 	ipv4Addr, _ := netip.ParseAddr("192.168.0.0")
 
 	ipv6CIDR, _ := netip.ParsePrefix("2001:db8::/32")
+	ipv6IfAddr, _ := netip.ParsePrefix("2001:db8::1/32")
 	ipv6Addr, _ := netip.ParseAddr("2001:db8::")
 
 	trueVal := types.Bool(true)
@@ -112,6 +114,7 @@ func TestCIDR(t *testing.T) {
 	cases := []struct {
 		name              string
 		expr              string
+		version           uint32
 		expectResult      ref.Val
 		expectRuntimeErr  string
 		expectCompileErrs []string
@@ -120,6 +123,11 @@ func TestCIDR(t *testing.T) {
 			name:         "parse ipv4",
 			expr:         `cidr("192.168.0.0/24")`,
 			expectResult: apiservercel.CIDR{Prefix: ipv4CIDR},
+		},
+		{
+			name:         "parse ipv4 ifaddr",
+			expr:         `cidr("192.168.0.1/24")`,
+			expectResult: apiservercel.CIDR{Prefix: ipv4IfAddr},
 		},
 		{
 			name:             "parse invalid ipv4",
@@ -182,14 +190,36 @@ func TestCIDR(t *testing.T) {
 			expectResult: apiservercel.IP{Addr: ipv4Addr},
 		},
 		{
-			name:         "masks masked ipv4",
+			name:         "ipv4 mask isMask",
+			expr:         `cidr("192.168.0.0/24").isMask()`,
+			version:      1,
+			expectResult: trueVal,
+		},
+		{
+			name:         "ipv4 mask can be masked",
 			expr:         `cidr("192.168.0.0/24").masked()`,
 			expectResult: apiservercel.CIDR{Prefix: netip.PrefixFrom(ipv4Addr, 24)},
 		},
 		{
-			name:         "masks unmasked ipv4",
+			name:         "ipv4 mask masks to itself",
+			expr:         `cidr("192.168.0.0/24").masked() == cidr("192.168.0.0/24")`,
+			expectResult: trueVal,
+		},
+		{
+			name:         "ipv4 address !isMask",
+			expr:         `cidr("192.168.0.1/24").isMask()`,
+			version:      1,
+			expectResult: falseVal,
+		},
+		{
+			name:         "ipv4 address can be masked",
 			expr:         `cidr("192.168.0.1/24").masked()`,
 			expectResult: apiservercel.CIDR{Prefix: netip.PrefixFrom(ipv4Addr, 24)},
+		},
+		{
+			name:         "ipv4 address does not mask to itself",
+			expr:         `cidr("192.168.0.1/24").masked() == cidr("192.168.0.1/24")`,
+			expectResult: falseVal,
 		},
 		{
 			name:         "returns prefix length ipv4",
@@ -200,6 +230,11 @@ func TestCIDR(t *testing.T) {
 			name:         "parse ipv6",
 			expr:         `cidr("2001:db8::/32")`,
 			expectResult: apiservercel.CIDR{Prefix: ipv6CIDR},
+		},
+		{
+			name:         "parse ipv6 ifaddr",
+			expr:         `cidr("2001:db8::1/32")`,
+			expectResult: apiservercel.CIDR{Prefix: ipv6IfAddr},
 		},
 		{
 			name:             "parse invalid ipv6",
@@ -252,19 +287,56 @@ func TestCIDR(t *testing.T) {
 			expectResult: apiservercel.IP{Addr: ipv6Addr},
 		},
 		{
-			name:         "masks masked ipv6",
+			name:         "ipv6 mask isMask",
+			expr:         `cidr("2001:db8::/32").isMask()`,
+			version:      1,
+			expectResult: trueVal,
+		},
+		{
+			name:         "ipv6 mask can be masked",
 			expr:         `cidr("2001:db8::/32").masked()`,
 			expectResult: apiservercel.CIDR{Prefix: netip.PrefixFrom(ipv6Addr, 32)},
 		},
 		{
-			name:         "masks unmasked ipv6",
+			name:         "ipv6 mask masks to itself",
+			expr:         `cidr("2001:db8::/32").masked() == cidr("2001:db8::/32")`,
+			expectResult: trueVal,
+		},
+		{
+			name:         "ipv6 address !isMask",
+			expr:         `cidr("2001:db8:1::/32").isMask()`,
+			version:      1,
+			expectResult: falseVal,
+		},
+		{
+			name:         "ipv6 address can be masked",
 			expr:         `cidr("2001:db8:1::/32").masked()`,
 			expectResult: apiservercel.CIDR{Prefix: netip.PrefixFrom(ipv6Addr, 32)},
+		},
+		{
+			name:         "ipv6 address does not mask to itself",
+			expr:         `cidr("2001:db8:1::/32").masked() == cidr("2001:db8:1::/32")`,
+			expectResult: falseVal,
 		},
 		{
 			name:         "returns prefix length ipv6",
 			expr:         `cidr("2001:db8::/32").prefixLength()`,
 			expectResult: types.Int(32),
+		},
+		{
+			name:         "ipv6 CIDR isCIDR",
+			expr:         `isCIDR("2001:db8::/32")`,
+			expectResult: trueVal,
+		},
+		{
+			name:         "ipv6 ifaddr isCIDR",
+			expr:         `isCIDR("2001:db8::1/32")`,
+			expectResult: trueVal,
+		},
+		{
+			name:         "cidr(ipv6IfAddr).masked() == cidr(ipv6CIDR)",
+			expr:         `cidr("2001:db8::1/32").masked() == cidr("2001:db8::/32")`,
+			expectResult: trueVal,
 		},
 		{
 			name:         "converting a CIDR to a string",
@@ -280,7 +352,7 @@ func TestCIDR(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			testCIDR(t, tc.expr, tc.expectResult, tc.expectRuntimeErr, tc.expectCompileErrs)
+			testCIDR(t, tc.expr, tc.version, tc.expectResult, tc.expectRuntimeErr, tc.expectCompileErrs)
 		})
 	}
 }
