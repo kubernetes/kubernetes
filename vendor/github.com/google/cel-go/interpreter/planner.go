@@ -281,6 +281,10 @@ func (p *planBuilder) planCall(expr ast.Expr) (InterpretableV2, error) {
 	if fnDef == nil {
 		fnDef, _ = p.disp.FindOverload(fnName)
 	}
+	// Async overloads are planned into an evalAsyncFunc regardless of arity.
+	if fnDef != nil && fnDef.Async != nil {
+		return p.planCallAsync(expr, fnName, oName, fnDef, args)
+	}
 	switch argCount {
 	case 0:
 		return p.planCallZero(expr, fnName, oName, fnDef)
@@ -301,6 +305,24 @@ func (p *planBuilder) planCall(expr ast.Expr) (InterpretableV2, error) {
 	default:
 		return p.planCallVarArgs(expr, fnName, oName, fnDef, args)
 	}
+}
+
+// planCallAsync generates an asynchronous callable Interpretable.
+func (p *planBuilder) planCallAsync(expr ast.Expr,
+	function string,
+	overload string,
+	impl *functions.Overload,
+	args []InterpretableV2) (InterpretableV2, error) {
+	if impl == nil || impl.Async == nil {
+		return nil, fmt.Errorf("no such overload: %s()", function)
+	}
+	return &evalAsyncFunc{
+		id:       expr.ID(),
+		function: function,
+		overload: overload,
+		args:     args,
+		impl:     impl.Async,
+	}, nil
 }
 
 // planCallZero generates a zero-arity callable Interpretable.

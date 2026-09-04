@@ -16,12 +16,15 @@ package ext
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"math"
 
 	"github.com/google/cel-go/cel"
+	"github.com/google/cel-go/checker"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
+	"github.com/google/cel-go/interpreter"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -106,6 +109,12 @@ func (lib *encoderLib) CompileOptions() []cel.EnvOption {
 				}))),
 	}
 	if lib.version >= 1 {
+		estimators := []checker.CostOption{
+			checker.OverloadCostEstimate("base64_decode_string", estimateDecode),
+			checker.OverloadCostEstimate("base64_encode_bytes", estimateEncode),
+			checker.OverloadCostEstimate("json_encode_dyn", estimateJSONEncode),
+		}
+		opts = append(opts, cel.CostEstimatorOptions(estimators...))
 		opts = append(opts,
 			cel.Function("json.encode",
 				cel.Overload("json_encode_dyn", []*cel.Type{cel.DynType}, cel.StringType,
@@ -117,8 +126,17 @@ func (lib *encoderLib) CompileOptions() []cel.EnvOption {
 	return opts
 }
 
-func (*encoderLib) ProgramOptions() []cel.ProgramOption {
-	return []cel.ProgramOption{}
+func (lib *encoderLib) ProgramOptions() []cel.ProgramOption {
+	var opts []cel.ProgramOption
+	if lib.version >= 1 {
+		trackers := []interpreter.CostTrackerOption{
+			interpreter.OverloadCostTracker("base64_decode_string", trackDecode),
+			interpreter.OverloadCostTracker("base64_encode_bytes", trackEncode),
+			interpreter.OverloadCostTracker("json_encode_dyn", trackJSONEncode),
+		}
+		opts = append(opts, cel.CostTrackerOptions(trackers...))
+	}
+	return opts
 }
 
 func base64DecodeString(str string) ([]byte, error) {
@@ -136,6 +154,71 @@ func base64EncodeBytes(bytes []byte) (string, error) {
 	return base64.StdEncoding.EncodeToString(bytes), nil
 }
 
+func estimateEncode(estimator checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+	if len(args) != 1 {
+		return nil
+	}
+	sz := estimateSize(estimator, args[0])
+	cost := sz.MultiplyByCostFactor(stringCostFactor).Add(callCostEstimate)
+	resSize := estimateEncodeSize(sz)
+	return &checker.CallEstimate{CostEstimate: cost, ResultSize: &resSize}
+}
+
+func estimateJSONEncode(estimator checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+	if len(args) != 1 {
+		return nil
+	}
+	size := estimateJSONEncodeSize()
+	return &checker.CallEstimate{CostEstimate: checker.UnknownCostEstimate(), ResultSize: &size}
+}
+
+func estimateDecode(estimator checker.CostEstimator, target *checker.AstNode, args []checker.AstNode) *checker.CallEstimate {
+	if len(args) != 1 {
+		return nil
+	}
+	sz := estimateSize(estimator, args[0])
+	cost := sz.MultiplyByCostFactor(stringCostFactor).Add(callCostEstimate)
+	resSize := estimateDecodeSize(sz)
+	return &checker.CallEstimate{CostEstimate: cost, ResultSize: &resSize}
+}
+
+func trackEncode(args []ref.Val, _ ref.Val) *uint64 {
+	sz := actualSize(args[0])
+	cost := uint64(math.Ceil(float64(sz)*stringCostFactor)) + callCost
+	return &cost
+}
+
+func trackJSONEncode(args []ref.Val, _ ref.Val) *uint64 {
+	maxCost := uint64(math.MaxUint64)
+	return &maxCost
+}
+
+func trackDecode(args []ref.Val, _ ref.Val) *uint64 {
+	sz := actualSize(args[0])
+	cost := uint64(math.Ceil(float64(sz)*stringCostFactor)) + callCost
+	return &cost
+}
+
+func estimateEncodeSize(sz checker.SizeEstimate) checker.SizeEstimate {
+	minVal := (sz.Min*4 + 2) / 3
+	maxVal := (sz.Max*4 + 2) / 3
+	if sz.Max > math.MaxUint64/4 {
+		maxVal = math.MaxUint64
+	}
+	return checker.SizeEstimate{Min: minVal, Max: maxVal}
+}
+
+func estimateJSONEncodeSize() checker.SizeEstimate {
+	// TODO: provide a more sophisticated size estimate based on the CEL value's type.
+	return checker.UnknownSizeEstimate()
+}
+
+func estimateDecodeSize(sz checker.SizeEstimate) checker.SizeEstimate {
+	minVal := sz.Min * 3 / 4
+	maxVal := sz.Max * 3 / 4
+	return checker.SizeEstimate{Min: minVal, Max: maxVal}
+}
+
 func jsonEncodeValue(val ref.Val) (string, error) {
 	native, err := val.ConvertToNative(types.JSONValueType)
 	if err != nil {
@@ -148,6 +231,15 @@ func jsonEncodeValue(val ref.Val) (string, error) {
 	jsonBytes, err := protojson.Marshal(jsonValue)
 	if err != nil {
 		return "", err
+	}
+	var obj interface{}
+	if err := json.Unmarshal(jsonBytes, &obj); err != nil {
+		return "", fmt.Errorf("unmarshaling protojson: %w", err)
+	}
+	// Re-marshal with standard json.Marshal for deterministic compact output
+	jsonBytes, err = json.Marshal(obj)
+	if err != nil {
+		return "", fmt.Errorf("re-marshaling value: %w", err)
 	}
 	return string(jsonBytes), nil
 }

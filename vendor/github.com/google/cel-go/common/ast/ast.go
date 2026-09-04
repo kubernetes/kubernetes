@@ -172,6 +172,14 @@ func (a *AST) IDs() map[int64]bool {
 	return visitor
 }
 
+// NodeCount returns the total number of expression nodes in the AST, including macro calls.
+func NodeCount(a *AST) int {
+	if a == nil {
+		return 0
+	}
+	return len(a.IDs())
+}
+
 // ClearUnusedIDs removes IDs not used in the AST or macro calls from SourceInfo.
 func (a *AST) ClearUnusedIDs() {
 	ids := a.IDs()

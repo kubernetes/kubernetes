@@ -43,6 +43,7 @@ const (
 	optionalUnwrapFunc         = "optional.unwrap"
 	valueFunc                  = "value"
 	unusedIterVar              = "#unused"
+	targetVar                  = "@target"
 )
 
 // Library provides a collection of EnvOption and ProgramOption values used to configure a CEL
@@ -97,6 +98,7 @@ func Lib(l Library) EnvOption {
 			if e.HasLibrary(singleton.LibraryName()) {
 				return e, nil
 			}
+			e.ensureMutableLibraries()
 			e.libraries[singleton.LibraryName()] = singleton
 		}
 		var err error
@@ -181,6 +183,9 @@ func (lib *stdLibrary) CompileOptions() []EnvOption {
 			var err error
 			if err = lib.subset.Validate(); err != nil {
 				return nil, err
+			}
+			if len(funcs) > 0 {
+				e.ensureMutableFunctions()
 			}
 			for _, fn := range funcs {
 				existing, found := e.functions[fn.Name()]
@@ -609,22 +614,38 @@ func optMap(meh MacroExprFactory, target ast.Expr, args []ast.Expr) (ast.Expr, *
 		return nil, meh.NewError(varIdent.ID(), "optMap() variable name must be a simple identifier")
 	}
 	mapExpr := args[1]
-	return meh.NewCall(
+	targetIdent := target
+	if target.Kind() != ast.IdentKind {
+		targetIdent = meh.NewIdent(targetVar)
+	}
+	res := meh.NewCall(
 		operators.Conditional,
-		meh.NewMemberCall(hasValueFunc, target),
+		meh.NewMemberCall(hasValueFunc, targetIdent),
 		meh.NewCall(optionalOfFunc,
 			meh.NewComprehension(
 				meh.NewList(),
 				unusedIterVar,
 				varName,
-				meh.NewMemberCall(valueFunc, meh.Copy(target)),
+				meh.NewMemberCall(valueFunc, meh.Copy(targetIdent)),
 				meh.NewLiteral(types.False),
 				meh.NewIdent(varName),
 				mapExpr,
 			),
 		),
 		meh.NewCall(optionalNoneFunc),
-	), nil
+	)
+	if target.Kind() != ast.IdentKind {
+		return meh.NewComprehension(
+			meh.NewList(),
+			unusedIterVar,
+			targetVar,
+			target,
+			meh.NewLiteral(types.False),
+			meh.NewIdent(targetVar),
+			res,
+		), nil
+	}
+	return res, nil
 }
 
 func optFlatMap(meh MacroExprFactory, target ast.Expr, args []ast.Expr) (ast.Expr, *Error) {
@@ -637,20 +658,36 @@ func optFlatMap(meh MacroExprFactory, target ast.Expr, args []ast.Expr) (ast.Exp
 		return nil, meh.NewError(varIdent.ID(), "optFlatMap() variable name must be a simple identifier")
 	}
 	mapExpr := args[1]
-	return meh.NewCall(
+	targetIdent := target
+	if target.Kind() != ast.IdentKind {
+		targetIdent = meh.NewIdent(targetVar)
+	}
+	res := meh.NewCall(
 		operators.Conditional,
-		meh.NewMemberCall(hasValueFunc, target),
+		meh.NewMemberCall(hasValueFunc, targetIdent),
 		meh.NewComprehension(
 			meh.NewList(),
 			unusedIterVar,
 			varName,
-			meh.NewMemberCall(valueFunc, meh.Copy(target)),
+			meh.NewMemberCall(valueFunc, meh.Copy(targetIdent)),
 			meh.NewLiteral(types.False),
 			meh.NewIdent(varName),
 			mapExpr,
 		),
 		meh.NewCall(optionalNoneFunc),
-	), nil
+	)
+	if target.Kind() != ast.IdentKind {
+		return meh.NewComprehension(
+			meh.NewList(),
+			unusedIterVar,
+			targetVar,
+			target,
+			meh.NewLiteral(types.False),
+			meh.NewIdent(targetVar),
+			res,
+		), nil
+	}
+	return res, nil
 }
 
 func optUnwrap(value ref.Val) ref.Val {

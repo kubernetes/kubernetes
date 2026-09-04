@@ -33,6 +33,8 @@ Encoding utilities for marshalling data into standardized representations.
 
 ### Base64.Decode
 
+**Introduced in version 0 (cost support in version 1)**
+
 Decodes base64-encoded string to bytes.
 
 This function will return an error if the string input is not
@@ -46,6 +48,8 @@ Examples:
     base64.decode('aGVsbG8')   // error
 
 ### Base64.Encode
+
+**Introduced in version 0 (cost support in version 1)**
 
 Encodes bytes to a base64-encoded string.
 
@@ -80,6 +84,8 @@ intended; however, there is some chance for collision.
 
 ### Math.Greatest
 
+**Introduced in version 0 (cost support in version 3)**
+
 Returns the greatest valued number present in the arguments to the macro.
 
 Greatest is a variable argument count macro which must take at least one
@@ -106,6 +112,8 @@ Examples:
     math.greatest(dyn('string')) // runtime error
 
 ### Math.Least
+
+**Introduced in version 0 (cost support in version 3)**
 
 Returns the least valued number present in the arguments to the macro.
 

@@ -26,6 +26,7 @@ go_library(
     importpath = "github.com/google/cel-go/cel",
     visibility = ["//visibility:public"],
     deps = [
+        "//cel/async:go_default_library",
         "//checker:go_default_library",
         "//checker/decls:go_default_library",
         "//common:go_default_library",
@@ -70,6 +71,7 @@ go_test(
         "inlining_test.go",
         "io_test.go",
         "optimizer_test.go",
+        "program_async_test.go",
         "prompt_test.go",
         "validator_test.go",
     ],
@@ -84,6 +86,7 @@ go_test(
         "//cel/testdata:test_fds_with_source_info",
     ],
     deps = [
+        "//cel/async:go_default_library",
         "//common/operators:go_default_library",
         "//common/overloads:go_default_library",
         "//common/types:go_default_library",

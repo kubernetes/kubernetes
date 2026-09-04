@@ -9,6 +9,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "activation.go",
+        "async.go",
         "attribute_patterns.go",
         "attributes.go",
         "decorators.go",
@@ -46,6 +47,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "activation_test.go",
+        "async_test.go",
         "attribute_patterns_test.go",
         "attributes_test.go",
         "frame_test.go",
@@ -65,6 +67,7 @@ go_test(
         "//common/operators:go_default_library",
         "//common/stdlib:go_default_library",
         "//common/types:go_default_library",
+        "//common/types/ref:go_default_library",
         "//parser:go_default_library",
         "//test:go_default_library",
         "//test/proto2pb:go_default_library",

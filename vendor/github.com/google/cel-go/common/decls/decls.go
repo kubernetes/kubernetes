@@ -16,6 +16,7 @@
 package decls
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -77,6 +78,9 @@ type FunctionDecl struct {
 
 	// overloadOrdinals indicates the order in which the overload was declared.
 	overloadOrdinals []string
+
+	// overloadDecls caches the slice of overloads in declaration order.
+	overloadDecls []*OverloadDecl
 }
 
 type declarationState int
@@ -150,7 +154,8 @@ func (f *FunctionDecl) Merge(other *FunctionDecl) (*FunctionDecl, error) {
 		name:             f.Name(),
 		overloads:        make(map[string]*OverloadDecl, len(f.overloads)),
 		singleton:        f.singleton,
-		overloadOrdinals: make([]string, len(f.overloads)),
+		overloadOrdinals: make([]string, len(f.overloadOrdinals)),
+		overloadDecls:    make([]*OverloadDecl, len(f.overloadDecls)),
 		// if one function is expecting type-guards and the other is not, then they
 		// must not be disabled.
 		disableTypeGuards: f.disableTypeGuards && other.disableTypeGuards,
@@ -169,6 +174,7 @@ func (f *FunctionDecl) Merge(other *FunctionDecl) (*FunctionDecl, error) {
 	}
 	// baseline copy of the overloads and their ordinals
 	copy(merged.overloadOrdinals, f.overloadOrdinals)
+	copy(merged.overloadDecls, f.overloadDecls)
 	for oID, o := range f.overloads {
 		merged.overloads[oID] = o
 	}
@@ -231,11 +237,13 @@ func (f *FunctionDecl) Subset(selector OverloadSelector) *FunctionDecl {
 	}
 	overloads := make(map[string]*OverloadDecl)
 	overloadOrdinals := make([]string, 0, len(f.overloadOrdinals))
+	overloadDecls := make([]*OverloadDecl, 0, len(f.overloadDecls))
 	for _, oID := range f.overloadOrdinals {
 		overload := f.overloads[oID]
 		if selector(overload) {
 			overloads[oID] = overload
 			overloadOrdinals = append(overloadOrdinals, oID)
+			overloadDecls = append(overloadDecls, overload)
 		}
 	}
 	if len(overloads) == 0 {
@@ -249,6 +257,7 @@ func (f *FunctionDecl) Subset(selector OverloadSelector) *FunctionDecl {
 		disableTypeGuards: f.disableTypeGuards,
 		state:             f.state,
 		overloadOrdinals:  overloadOrdinals,
+		overloadDecls:     overloadDecls,
 	}
 	return subset
 }
@@ -272,6 +281,12 @@ func (f *FunctionDecl) AddOverload(overload *OverloadDecl) error {
 				// Allow redefinition of an overload implementation so long as the signatures match.
 				if overload.HasBinding() {
 					f.overloads[oID] = overload
+					for i, decl := range f.overloadDecls {
+						if decl.ID() == oID {
+							f.overloadDecls[i] = overload
+							break
+						}
+					}
 				}
 				// Allow redefinition of the doc string.
 				if len(overload.doc) != 0 && o.doc != overload.doc {
@@ -287,20 +302,16 @@ func (f *FunctionDecl) AddOverload(overload *OverloadDecl) error {
 	}
 	f.overloadOrdinals = append(f.overloadOrdinals, overload.ID())
 	f.overloads[overload.ID()] = overload
+	f.overloadDecls = append(f.overloadDecls, overload)
 	return nil
 }
 
 // OverloadDecls returns the overload declarations in the order in which they were declared.
 func (f *FunctionDecl) OverloadDecls() []*OverloadDecl {
-	var emptySet []*OverloadDecl
 	if f == nil {
-		return emptySet
+		return nil
 	}
-	overloads := make([]*OverloadDecl, 0, len(f.overloads))
-	for _, oID := range f.overloadOrdinals {
-		overloads = append(overloads, f.overloads[oID])
-	}
-	return overloads
+	return f.overloadDecls
 }
 
 // HasSingletonBinding indicates whether the function has a singleton binding definition.
@@ -316,8 +327,12 @@ func (f *FunctionDecl) HasLateBinding() bool {
 	if f == nil {
 		return false
 	}
+	if f.singleton != nil && f.singleton.Async != nil {
+		return true
+	}
 	for _, oID := range f.overloadOrdinals {
-		if f.overloads[oID].HasLateBinding() {
+		o := f.overloads[oID]
+		if o.HasLateBinding() {
 			return true
 		}
 	}
@@ -342,6 +357,7 @@ func (f *FunctionDecl) Bindings() ([]*functions.Overload, error) {
 				Unary:        o.guardedUnaryOp(f.Name(), f.disableTypeGuards),
 				Binary:       o.guardedBinaryOp(f.Name(), f.disableTypeGuards),
 				Function:     o.guardedFunctionOp(f.Name(), f.disableTypeGuards),
+				Async:        o.guardedAsyncOp(f.Name(), f.disableTypeGuards),
 				OperandTrait: o.OperandTrait(),
 				NonStrict:    o.IsNonStrict(),
 			}
@@ -362,6 +378,7 @@ func (f *FunctionDecl) Bindings() ([]*functions.Overload, error) {
 				Unary:        f.singleton.Unary,
 				Binary:       f.singleton.Binary,
 				Function:     f.singleton.Function,
+				Async:        f.singleton.Async,
 				OperandTrait: f.singleton.OperandTrait,
 			},
 		}
@@ -380,6 +397,7 @@ func (f *FunctionDecl) Bindings() ([]*functions.Overload, error) {
 			Unary:        overloads[0].Unary,
 			Binary:       overloads[0].Binary,
 			Function:     overloads[0].Function,
+			Async:        overloads[0].Async,
 			NonStrict:    overloads[0].NonStrict,
 			OperandTrait: overloads[0].OperandTrait,
 		}), nil
@@ -538,6 +556,30 @@ func SingletonFunctionBinding(fn functions.FunctionOp, traits ...int) FunctionOp
 	}
 }
 
+// SingletonAsyncBinding creates a singleton async function definition to be used with all function overloads.
+// The provided function is called in its own goroutine with the provided context. The function should
+// block until the result is available, and the framework manages goroutine and channel lifecycle.
+//
+// Note, this approach works well if operand is expected to have a specific trait which it implements,
+// e.g. traits.ContainerType. Otherwise, prefer per-overload async bindings.
+func SingletonAsyncBinding(fn functions.BlockingAsyncOp, traits ...int) FunctionOpt {
+	trait := 0
+	for _, t := range traits {
+		trait = trait | t
+	}
+	return func(f *FunctionDecl) (*FunctionDecl, error) {
+		if f.singleton != nil {
+			return nil, fmt.Errorf("function already has a singleton binding: %s", f.Name())
+		}
+		f.singleton = &functions.Overload{
+			Operator:     f.Name(),
+			Async:        wrapAsyncOp(fn),
+			OperandTrait: trait,
+		}
+		return f, nil
+	}
+}
+
 // Overload defines a new global overload with an overload id, argument types, and result type. Through the
 // use of OverloadOpt options, the overload may also be configured with a binding, an operand trait, and to
 // be non-strict.
@@ -622,6 +664,8 @@ type OverloadDecl struct {
 	binaryOp functions.BinaryOp
 	// functionOp is a catch-all for zero-arity and three-plus arity functions.
 	functionOp functions.FunctionOp
+	// asyncOp is an asynchronous function binding that returns a channel.
+	asyncOp functions.AsyncOp
 }
 
 // Examples returns a list of string examples for the overload.
@@ -677,7 +721,7 @@ func (o *OverloadDecl) HasLateBinding() bool {
 	if o == nil {
 		return false
 	}
-	return o.hasLateBinding
+	return o.hasLateBinding || o.asyncOp != nil
 }
 
 // OperandTrait returns the trait mask of the first operand to the overload call, e.g.
@@ -750,7 +794,7 @@ func (o *OverloadDecl) SignatureOverlaps(other *OverloadDecl) bool {
 
 // HasBinding indicates whether the overload already has a definition.
 func (o *OverloadDecl) HasBinding() bool {
-	return o != nil && (o.unaryOp != nil || o.binaryOp != nil || o.functionOp != nil)
+	return o != nil && (o.unaryOp != nil || o.binaryOp != nil || o.functionOp != nil || o.asyncOp != nil)
 }
 
 // guardedUnaryOp creates an invocation guard around the provided unary operator, if one is defined.
@@ -792,6 +836,22 @@ func (o *OverloadDecl) guardedFunctionOp(funcName string, disableTypeGuards bool
 	}
 }
 
+// guardedAsyncOp creates an invocation guard around the provided async function binding, if one is provided.
+func (o *OverloadDecl) guardedAsyncOp(funcName string, disableTypeGuards bool) functions.AsyncOp {
+	if o.asyncOp == nil {
+		return nil
+	}
+	return func(ctx context.Context, args ...ref.Val) <-chan ref.Val {
+		if !o.matchesRuntimeSignature(disableTypeGuards, args...) {
+			ch := make(chan ref.Val, 1)
+			ch <- MaybeNoSuchOverload(funcName, args...)
+			close(ch)
+			return ch
+		}
+		return o.asyncOp(ctx, args...)
+	}
+}
+
 // matchesRuntimeUnarySignature indicates whether the argument type is runtime assiganble to the overload's expected argument.
 func (o *OverloadDecl) matchesRuntimeUnarySignature(disableTypeGuards bool, arg ref.Val) bool {
 	return matchRuntimeArgType(o.IsNonStrict(), disableTypeGuards, o.ArgTypes()[0], arg) &&
@@ -825,6 +885,8 @@ func matchRuntimeArgType(nonStrict, disableTypeGuards bool, argType *types.Type,
 	if nonStrict && (disableTypeGuards || types.IsUnknownOrError(arg)) {
 		return true
 	}
+	// Note, early returns and unknown aggregation happen in the interpretable.go file; however, this check is here
+	// for defense in depth or for scenarios where someone manipulates bindings to offer their own dispatch logic.
 	if types.IsUnknownOrError(arg) {
 		return false
 	}
@@ -894,6 +956,40 @@ func FunctionBinding(binding functions.FunctionOp) OverloadOpt {
 		}
 		o.functionOp = binding
 		return o, nil
+	}
+}
+
+// AsyncBinding provides the implementation of an asynchronous overload. The provided function
+// is called in its own goroutine with the provided context. The function should block until
+// the result is available, and the framework manages goroutine and channel lifecycle.
+//
+// This follows the same pattern used by gRPC-Go and other major Go frameworks where user
+// code is synchronous and the framework manages concurrency.
+func AsyncBinding(fn functions.BlockingAsyncOp) OverloadOpt {
+	return func(o *OverloadDecl) (*OverloadDecl, error) {
+		if o.HasBinding() {
+			return nil, fmt.Errorf("overload already has a binding: %s", o.ID())
+		}
+		if o.hasLateBinding {
+			return nil, fmt.Errorf("overload already has a late binding: %s", o.ID())
+		}
+		o.asyncOp = wrapAsyncOp(fn)
+		return o, nil
+	}
+}
+
+// wrapAsyncOp adapts a blocking function into the channel-based AsyncOp used internally.
+//
+// The blocking function is invoked synchronously and its result delivered on a buffered channel.
+// The interpreter always invokes an AsyncOp from a dedicated goroutine, so running the blocking
+// call inline here keeps the framework to a single goroutine per async call rather than spawning
+// an additional one to bridge blocking-to-channel.
+func wrapAsyncOp(fn functions.BlockingAsyncOp) functions.AsyncOp {
+	return func(ctx context.Context, args ...ref.Val) <-chan ref.Val {
+		ch := make(chan ref.Val, 1)
+		ch <- fn(ctx, args...)
+		close(ch)
+		return ch
 	}
 }
 

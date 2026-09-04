@@ -24,6 +24,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/dynamicpb"
 
+	"github.com/google/cel-go/cel/async"
 	"github.com/google/cel-go/checker"
 	"github.com/google/cel-go/common/containers"
 	"github.com/google/cel-go/common/decls"
@@ -109,12 +110,26 @@ const (
 	limitCodePointSize
 	// The number of attempts to recover from a parse error.
 	limitParseErrorRecovery
+	// The maximum nesting depth permitted for ASTs loaded outside the parser.
+	limitMaxASTDepth
+	// The maximum number of expression nodes permitted in parsing (including macro expansion).
+	limitExpressionNodeCount
+	// The maximum regex program plan size permitted.
+	limitRegexProgramSize
 )
+
+// defaultMaxASTDepth mirrors the parser's default maxRecursionDepth (250) and
+// is applied to ASTs that enter through non-parser ingestion paths (e.g. via
+// ParsedExprToAst / CheckedExprToAst) when no explicit limit is configured.
+const defaultMaxASTDepth = 250
 
 var limitIDsToNames = map[limitID]string{
 	limitCodePointSize:       "cel.limit.expression_code_points",
 	limitParseErrorRecovery:  "cel.limit.parse_error_recovery",
 	limitParseRecursionDepth: "cel.limit.parse_recursion_depth",
+	limitMaxASTDepth:         "cel.limit.max_ast_depth",
+	limitExpressionNodeCount: "cel.limit.expression_node_count",
+	limitRegexProgramSize:    "cel.limit.regex_program_size",
 }
 
 func limitNameByID(id limitID) (string, bool) {
@@ -735,6 +750,47 @@ func InterruptCheckFrequency(checkFrequency uint) ProgramOption {
 	}
 }
 
+// AsyncCallObserver sets the observer for monitoring asynchronous function calls during ConcurrentEval.
+func AsyncCallObserver(observer async.Observer) ProgramOption {
+	return func(p *prog) (*prog, error) {
+		p.asyncObserver = observer
+		return p, nil
+	}
+}
+
+// AsyncCompletionBufferSize sets the size of the buffer for the async completion channel.
+// By default, the channel is unbuffered.
+func AsyncCompletionBufferSize(size int) ProgramOption {
+	return func(p *prog) (*prog, error) {
+		p.asyncCompletionBufferSize = size
+		return p, nil
+	}
+}
+
+// AsyncMaxConcurrency sets the maximum number of concurrently launched async calls during
+// ConcurrentEval. This bounds the number of in-flight async goroutines, so a wide fan-out (such
+// as an async call inside a comprehension over a large list) cannot exhaust memory.
+//
+// A value of 0 (unset) applies a built-in default bound. A positive value sets an explicit bound.
+// A negative value disables the limiter (unbounded launches) and should only be used when
+// concurrency is bounded by other means.
+func AsyncMaxConcurrency(maxConcurrency int) ProgramOption {
+	return func(p *prog) (*prog, error) {
+		p.asyncMaxConcurrency = maxConcurrency
+		return p, nil
+	}
+}
+
+// ConcurrentDrainStrategy configures the strategy for when to re-evaluate the program
+// during a ConcurrentEval call after receiving asynchronous completion signals.
+// By default, the program re-evaluates immediately after every completion.
+func ConcurrentDrainStrategy(strategy async.DrainStrategy) ProgramOption {
+	return func(p *prog) (*prog, error) {
+		p.drainStrategy = strategy
+		return p, nil
+	}
+}
+
 // CostEstimatorOptions configure type-check time options for estimating expression cost.
 func CostEstimatorOptions(costOpts ...checker.CostOption) EnvOption {
 	return func(e *Env) (*Env, error) {
@@ -864,7 +920,11 @@ func ContextProtoVars(ctx proto.Message, opts ...types.RegistryOption) (Activati
 	}
 	regOpts := []types.RegistryOption{types.ProtoTypeDefs(ctx)}
 	regOpts = append(regOpts, opts...)
-	reg, err := types.NewProtoRegistry(regOpts...)
+	var ro []any
+	for _, opt := range regOpts {
+		ro = append(ro, opt)
+	}
+	reg, err := types.NewRegistry(ro...)
 	if err != nil {
 		return nil, err
 	}
@@ -917,6 +977,7 @@ func DefaultUTCTimeZone(enabled bool) EnvOption {
 // features sets the given feature flags.  See list of Feature constants above.
 func features(flag int, enabled bool) EnvOption {
 	return func(e *Env) (*Env, error) {
+		e.ensureMutableFeatures()
 		e.features[flag] = enabled
 		return e, nil
 	}
@@ -927,6 +988,7 @@ func setLimit(id limitID, limit int) EnvOption {
 		limit = -1
 	}
 	return func(e *Env) (*Env, error) {
+		e.ensureMutableLimits()
 		e.limits[id] = limit
 		return e, nil
 	}
@@ -948,6 +1010,44 @@ func ParserErrorRecoveryLimit(limit int) EnvOption {
 // Defaults are defined in the parser package. A negative value means unbounded.
 func ParserExpressionSizeLimit(limit int) EnvOption {
 	return setLimit(limitCodePointSize, limit)
+}
+
+// ExpressionNodeLimit adjusts the maximum number of expression nodes permitted during parsing
+// and checking, including nodes created by macro expansion. Defaults are defined in the parser
+// package (100,000). A negative value means unbounded.
+func ExpressionNodeLimit(limit int) EnvOption {
+	return setLimit(limitExpressionNodeCount, limit)
+}
+
+// ExpressionNestingDepthLimit records the maximum nesting depth permitted for ASTs in the
+// environment configuration so that the value round-trips through env.Config export/import.
+//
+// ASTs loaded outside the parser (e.g. via ParsedExprToAst / CheckedExprToAst) bypass the
+// parser's recursion limit, so those conversion paths validate nesting depth against the
+// parser-matching default (250) to avoid a Go stack overflow during later checking or planning.
+// Embedders that fully control their AST inputs and want to skip the check can construct the AST
+// through the common/ast package directly rather than the cel conversion helpers.
+func ExpressionNestingDepthLimit(limit int) EnvOption {
+	return setLimit(limitMaxASTDepth, limit)
+}
+
+// RegexProgramSizeLimit caps the maximum regex program plan size permitted for regular expressions.
+// A negative or zero value means unbounded.
+func RegexProgramSizeLimit(limit int) EnvOption {
+	return func(e *Env) (*Env, error) {
+		var err error
+		e, err = setLimit(limitRegexProgramSize, limit)(e)
+		if err != nil {
+			return nil, err
+		}
+		if limit > 0 {
+			e, err = ASTValidators(ValidateRegexProgramSizeLimit(limit))(e)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return e, nil
+	}
 }
 
 // EnableHiddenAccumulatorName sets the parser to use the identifier '@result' for accumulators

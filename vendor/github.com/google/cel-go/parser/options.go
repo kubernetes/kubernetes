@@ -22,6 +22,7 @@ type options struct {
 	errorRecoveryTokenLookaheadLimit int
 	errorRecoveryLimit               int
 	expressionSizeCodePointLimit     int
+	maxExpressionNodeCount           int
 	macros                           map[string]Macro
 	populateMacroCalls               bool
 	enableOptionalSyntax             bool
@@ -93,6 +94,18 @@ func ExpressionSizeCodePointLimit(expressionSizeCodePointLimit int) Option {
 			return fmt.Errorf("expression size code point limit must be greater than or equal to -1: %d", expressionSizeCodePointLimit)
 		}
 		opts.expressionSizeCodePointLimit = expressionSizeCodePointLimit
+		return nil
+	}
+}
+
+// MaxExpressionNodeCount limits the maximum number of expression nodes that may be emitted by the parser,
+// including nodes created by macro expansion.
+func MaxExpressionNodeCount(limit int) Option {
+	return func(opts *options) error {
+		if limit < -1 {
+			return fmt.Errorf("max expression node count must be greater than or equal to -1: %d", limit)
+		}
+		opts.maxExpressionNodeCount = limit
 		return nil
 	}
 }

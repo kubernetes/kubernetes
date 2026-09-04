@@ -113,6 +113,12 @@ type activationWrapper interface {
 	Unwrap() Activation
 }
 
+// localVariableHolder identifies an Activation scope that holds local variables and supports testing
+// whether a variable name is local to this scope.
+type localVariableHolder interface {
+	IsLocalVariable(name string) bool
+}
+
 // evalStateFactory holds a reference to a factory function that produces an EvalState instance.
 type evalStateFactory struct {
 	factory func() EvalState
@@ -121,6 +127,9 @@ type evalStateFactory struct {
 // InitState produces an EvalState instance and bundles it into the ExecutionFrame in a way which is
 // not visible to expression evaluation.
 func (et *evalStateFactory) InitState(frame *ExecutionFrame) (any, error) {
+	if frame.ctx != nil && frame.ctx.state != nil {
+		return frame.ctx.state, nil
+	}
 	state := et.factory()
 	if frame.ctx == nil {
 		frame.ctx = evalContextPool.Get().(*evalContext)
@@ -216,6 +225,11 @@ type RegexOptimization struct {
 // compile errors.
 func CompileRegexConstants(regexOptimizations ...*RegexOptimization) PlannerOption {
 	return CustomDecoratorV2(decRegexOptimizer(regexOptimizations...))
+}
+
+// RegexProgramSizeLimit caps the maximum regex program plan size permitted during evaluation.
+func RegexProgramSizeLimit(limit int) PlannerOption {
+	return CustomDecoratorV2(decRegexProgramSizeLimit(limit))
 }
 
 type exprInterpreter struct {

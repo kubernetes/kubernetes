@@ -72,6 +72,12 @@ func NewParser(opts ...Option) (*Parser, error) {
 	if p.expressionSizeCodePointLimit == -1 {
 		p.expressionSizeCodePointLimit = int((^uint(0)) >> 1)
 	}
+	if p.maxExpressionNodeCount == 0 {
+		p.maxExpressionNodeCount = 100_000
+	}
+	if p.maxExpressionNodeCount == -1 {
+		p.maxExpressionNodeCount = int((^uint(0)) >> 1)
+	}
 	// Bool is false by default, so populateMacroCalls will be false by default
 	return p, nil
 }
@@ -102,6 +108,7 @@ func (p *Parser) Parse(source common.Source) (*ast.AST, *common.Errors) {
 		helper:                           newParserHelper(source, fac),
 		macros:                           p.macros,
 		maxRecursionDepth:                p.maxRecursionDepth,
+		maxExpressionNodeCount:           p.maxExpressionNodeCount,
 		errorReportingLimit:              p.errorReportingLimit,
 		errorRecoveryLimit:               p.errorRecoveryLimit,
 		errorRecoveryLookaheadTokenLimit: p.errorRecoveryTokenLookaheadLimit,
@@ -319,6 +326,7 @@ type parser struct {
 	recursionDepth                   int
 	errorReports                     int
 	maxRecursionDepth                int
+	maxExpressionNodeCount           int
 	errorReportingLimit              int
 	errorRecoveryLimit               int
 	errorRecoveryLookaheadTokenLimit int
@@ -964,11 +972,21 @@ func (p *parser) expandMacro(exprID int64, function string, target ast.Expr, arg
 			return nil, false
 		}
 	}
+	if int(p.helper.expressionCount()) > p.maxExpressionNodeCount {
+		loc := p.helper.getLocation(exprID)
+		p.helper.deleteID(exprID)
+		return p.reportError(loc, "expression count exceeds limit of %d while expanding macro '%s'", p.maxExpressionNodeCount, function), true
+	}
 	eh := exprHelperPool.Get().(*exprHelper)
 	defer exprHelperPool.Put(eh)
 	eh.parserHelper = p.helper
 	eh.id = exprID
 	expr, err := macro.Expander()(eh, target, args)
+	if int(p.helper.expressionCount()) > p.maxExpressionNodeCount {
+		loc := p.helper.getLocation(exprID)
+		p.helper.deleteID(exprID)
+		return p.reportError(loc, "expression count exceeds limit of %d while expanding macro '%s'", p.maxExpressionNodeCount, function), true
+	}
 	// An error indicates that the macro was matched, but the arguments were not well-formed.
 	if err != nil {
 		loc := err.Location
