@@ -229,7 +229,7 @@ func (itv *itemTagValidator) prepareArgs(context Context, criteria []keyValuePai
 	if directComparable {
 		equivArg = Identifier(validateDirectEqual)
 	} else {
-		equivArg = Identifier(validateSemanticDeepEqual)
+		equivArg = DeepEqualFunc{}
 	}
 	return matchArg, equivArg, nil
 }

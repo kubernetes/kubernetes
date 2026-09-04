@@ -113,7 +113,7 @@ func (stv *subfieldTagValidator) GetValidations(context Context, tag codetags.Ta
 
 	// equivArg compares the correlated elements in the old and new lists, for
 	// ratcheting. directComparable selects "==" vs semantic DeepEqual.
-	var equivArg any = Identifier(validateSemanticDeepEqual)
+	var equivArg any = DeepEqualFunc{}
 	if util.IsDirectComparable(util.NonPointer(util.NativeType(submemb.Type))) {
 		// It must be a pointer, since other nilable types are not directly
 		// comparable.

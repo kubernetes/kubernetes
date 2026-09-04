@@ -406,10 +406,9 @@ func (cutv customUniqueTagValidator) Docs() TagDoc {
 }
 
 var (
-	validateValSliceUnique    = types.Name{Package: libValidationPkg, Name: "ValSliceUnique"}
-	validatePtrSliceUnique    = types.Name{Package: libValidationPkg, Name: "PtrSliceUnique"}
-	validateSemanticDeepEqual = types.Name{Package: libValidationPkg, Name: "SemanticDeepEqual"}
-	validateDirectEqual       = types.Name{Package: libValidationPkg, Name: "DirectEqual"}
+	validateValSliceUnique = types.Name{Package: libValidationPkg, Name: "ValSliceUnique"}
+	validatePtrSliceUnique = types.Name{Package: libValidationPkg, Name: "PtrSliceUnique"}
+	validateDirectEqual    = types.Name{Package: libValidationPkg, Name: "DirectEqual"}
 )
 
 // getListMeta is a helper to find list metadata for a given context.
@@ -487,16 +486,16 @@ func getListValidations(byPath map[string]*listMetadata, context Context) (Valid
 		// comparable, and structs might hold pointer fields, which are directly
 		// comparable but not what we need.
 		//
-		matchArg := validateSemanticDeepEqual
+		var matchArg any = DeepEqualFunc{}
 		if util.IsDirectComparable(util.NonPointer(util.NativeType(nt.Elem))) {
-			matchArg = validateDirectEqual
+			matchArg = Identifier(validateDirectEqual)
 		}
 		validateFunc := validateValSliceUnique
 		if nt.Elem.Kind == types.Pointer {
 			validateFunc = validatePtrSliceUnique
 		}
 		comment := "lists with set semantics require unique values"
-		f := Function("listValidator", DefaultFlags, validateFunc, Identifier(matchArg)).
+		f := Function("listValidator", DefaultFlags, validateFunc, matchArg).
 			WithComment(comment).
 			WithEmits(Emission{field.ErrorTypeDuplicate, "", "[*]"})
 		if lm.stabilityLevel != "" {

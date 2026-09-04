@@ -200,14 +200,14 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 			if directComparable {
 				equivArg = Identifier(validateDirectEqual)
 			} else {
-				equivArg = Identifier(validateSemanticDeepEqual)
+				equivArg = DeepEqualFunc{}
 			}
 		case semanticSet:
 			// For listType=set, matchArg is the equivalence check, so equivArg is nil.
 			if directComparable {
 				matchArg = Identifier(validateDirectEqual)
 			} else {
-				matchArg = Identifier(validateSemanticDeepEqual)
+				matchArg = DeepEqualFunc{}
 			}
 		default:
 			// For non-map and non-set list, we don't lookup the correlated element in the old list.
@@ -237,7 +237,7 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 // typedef to a map, this is the alias type, not the underlying type.
 func (evtv eachValTagValidator) getMapValidations(t *types.Type, validations Validations) (Validations, error) {
 	nt := util.NativeType(t)
-	equivArg := Identifier(validateSemanticDeepEqual)
+	var equivArg any = DeepEqualFunc{}
 	if util.IsDirectComparable(util.NonPointer(util.NativeType(nt.Elem))) {
 		equivArg = Identifier(validateDirectEqual)
 	}

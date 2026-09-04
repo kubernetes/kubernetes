@@ -26,6 +26,11 @@ import (
 	"k8s.io/gengo/v2/types"
 )
 
+// DeepEqualFunc stands in for the deep-equal function configured for the
+// package being generated (see +k8s:validation-gen-deep-equal-func).  The
+// generator substitutes the real name when it renders this argument.
+type DeepEqualFunc struct{}
+
 // TagValidator describes a single validation tag and how to use it. To be
 // findable by validation-gen, a TagValidator must be registered - see
 // RegisterTagValidator.
