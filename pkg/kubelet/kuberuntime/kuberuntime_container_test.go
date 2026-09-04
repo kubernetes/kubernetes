@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -203,6 +204,75 @@ func TestKillContainer(t *testing.T) {
 		if test.succeed != (err == nil) {
 			t.Errorf("%s: expected %v, got %v (%v)", test.caseName, test.succeed, (err == nil), err)
 		}
+	}
+}
+
+func TestExecutePreStopSleepHook(t *testing.T) {
+	tests := []struct {
+		name                string
+		initialState        runtimeapi.ContainerState
+		notifyContainerDied bool
+	}{
+		{
+			name:                "cancel running hook when container exits",
+			initialState:        runtimeapi.ContainerState_CONTAINER_RUNNING,
+			notifyContainerDied: true,
+		},
+		{
+			name:         "skip hook when container already exited",
+			initialState: runtimeapi.ContainerState_CONTAINER_EXITED,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			recorder := record.NewFakeRecorder(1)
+			fakeRuntime, _, m, err := createTestRuntimeManager(tCtx, withRecorder(recorder))
+			require.NoError(t, err)
+
+			pod := makeTestPod("pod", "namespace", "pod-uid", []v1.Container{{
+				Name:  "container",
+				Image: "image",
+				Lifecycle: &v1.Lifecycle{
+					PreStop: &v1.LifecycleHandler{
+						Sleep: &v1.SleepAction{Seconds: 30},
+					},
+				},
+			}})
+			_, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
+			require.Len(t, fakeContainers, 1)
+			fakeContainers[0].State = test.initialState
+			containerID := kubecontainer.ContainerID{Type: m.runtimeName, ID: fakeContainers[0].Id}
+
+			done := make(chan int64, 1)
+			go func() {
+				done <- m.executePreStopHook(tCtx, pod, containerID, &pod.Spec.Containers[0], 40)
+			}()
+			t.Cleanup(func() { m.NotifyContainerDied(containerID.ID) })
+
+			if test.notifyContainerDied {
+				require.Eventually(t, func() bool {
+					m.containerExitCancelsLock.Lock()
+					defer m.containerExitCancelsLock.Unlock()
+					_, ok := m.containerExitCancels[containerID.ID]
+					return ok
+				}, 5*time.Second, 10*time.Millisecond)
+				m.NotifyContainerDied(containerID.ID)
+			}
+
+			select {
+			case elapsed := <-done:
+				assert.Zero(t, elapsed)
+			case <-time.After(5 * time.Second):
+				t.Fatal("preStop sleep hook did not return after the container exited")
+			}
+			select {
+			case event := <-recorder.Events:
+				t.Fatalf("unexpected event after clean container exit: %s", event)
+			default:
+			}
+		})
 	}
 }
 
