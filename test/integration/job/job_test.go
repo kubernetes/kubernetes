@@ -4654,6 +4654,30 @@ func waitForWorkload(ctx context.Context, t *testing.T, clientSet clientset.Inte
 	return workload
 }
 
+// ensurePodGroupAbsent fails if a PodGroup owned by the given Job exists at any
+// point during window. Unlike waitForPodGroup with expectAbsent=true, which
+// returns as soon as a single list comes back empty, this verifies sustained
+// absence: it keeps checking for the full window and only passes if no owned
+// PodGroup is ever observed.
+func ensurePodGroupAbsent(ctx context.Context, t *testing.T, clientSet clientset.Interface, job *batchv1.Job, window time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(window)
+	for time.Now().Before(deadline) {
+		podGroups, err := clientSet.SchedulingV1beta1().PodGroups(job.Namespace).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			t.Fatalf("Failed to list PodGroups: %v", err)
+		}
+		for i := range podGroups.Items {
+			for _, ref := range podGroups.Items[i].OwnerReferences {
+				if ref.UID == job.UID && ref.Kind == "Job" {
+					t.Fatalf("Unexpected PodGroup %q owned by Job %q", podGroups.Items[i].Name, job.Name)
+				}
+			}
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
 // waitForPodGroup waits for a PodGroup owned by the given Job to appear
 // (expectAbsent=false) or to not exist (expectAbsent=true).
 func waitForPodGroup(ctx context.Context, t *testing.T, clientSet clientset.Interface, job *batchv1.Job, expectAbsent bool, timeout time.Duration) *schedulingv1beta1.PodGroup {
@@ -5514,5 +5538,111 @@ func TestJobDelegatedPodGroup(t *testing.T) {
 		if ref.UID == jobObj.UID {
 			t.Errorf("parent Workload unexpectedly owned by delegated Job %q", jobObj.Name)
 		}
+	}
+}
+
+// TestJobDelegatedPodGroupRetriesAfterFirstSync verifies that a delegated
+// Job whose parent-owned Workload isn't discoverable yet on its first sync
+// still gets its PodGroup created on a later sync once the Workload exists.
+// The Job is created suspended so its first sync writes the JobSuspended
+// condition without creating any pods; under the old isNewJob-based gating
+// that write closed the delegation window for good, so no subsequent sync
+// (here, the resume) could ever create the PodGroup.
+func TestJobDelegatedPodGroupRetriesAfterFirstSync(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload: true,
+		features.WorkloadWithJob: true,
+	})
+
+	closeFn, restConfig, clientSet, ns := setup(t, "delegated-podgroup-retry")
+	t.Cleanup(closeFn)
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+	t.Cleanup(cancel)
+
+	const (
+		parentKind   = "SuperJob"
+		parentGroup  = "example.com"
+		parentName   = "parent-superjob"
+		templateName = "workers"
+	)
+
+	// Created suspended and before the parent Workload exists, so the first
+	// sync has no Workload to delegate to.
+	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "delegated-job",
+			Annotations: map[string]string{apischeduling.GroupTemplateNameAnnotation: templateName},
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: parentGroup + "/v1",
+				Kind:       parentKind,
+				Name:       parentName,
+				UID:        types.UID("parent-superjob-uid"),
+				Controller: new(true),
+			}},
+		},
+		Spec: batchv1.JobSpec{
+			Parallelism:    new(int32(3)),
+			Completions:    new(int32(3)),
+			CompletionMode: new(batchv1.IndexedCompletion),
+			Suspend:        new(true),
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to create delegated Job: %v", err)
+	}
+
+	// Wait for the first sync to complete and write the JobSuspended
+	// condition. Under the old isNewJob-based gating this write alone would
+	// have permanently closed the delegation window.
+	validateJobCondition(ctx, t, clientSet, jobObj, batchv1.JobSuspended)
+
+	// No PodGroup yet: the parent Workload is not discoverable, so there is
+	// nothing to materialize it from.
+	ensurePodGroupAbsent(ctx, t, clientSet, jobObj, 2*time.Second)
+
+	// The parent Workload only becomes discoverable now, on a later sync.
+	parentWorkload, err := clientSet.SchedulingV1beta1().Workloads(ns.Name).Create(ctx, &schedulingv1beta1.Workload{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "parent-workload",
+			Namespace: ns.Name,
+		},
+		Spec: schedulingv1beta1.WorkloadSpec{
+			ControllerRef: &schedulingv1beta1.TypedLocalObjectReference{
+				APIGroup: parentGroup,
+				Kind:     parentKind,
+				Name:     parentName,
+			},
+			PodGroupTemplates: []schedulingv1beta1.PodGroupTemplate{{
+				Name: templateName,
+				SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{
+					Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 3},
+				},
+			}},
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create parent Workload: %v", err)
+	}
+
+	// Resume the Job, mirroring a queueing controller admitting the Workload.
+	// The old isNewJob-based gating returned false on this sync too (the
+	// Suspended condition persists), so the PodGroup would never be created;
+	// with the delegated gating the sync creates it now that the parent
+	// Workload is discoverable and the Job still has no pods.
+	if _, err := updateJob(ctx, clientSet.BatchV1().Jobs(ns.Name), jobObj.Name, func(j *batchv1.Job) {
+		j.Spec.Suspend = new(false)
+	}); err != nil {
+		t.Fatalf("Failed to resume Job: %v", err)
+	}
+
+	// The delegation window stayed open across syncs: a sync well after the
+	// Job's first one creates the PodGroup now that the parent Workload
+	// resolves and the Job still has no pods.
+	podGroup := waitForPodGroup(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout)
+	if podGroup.Spec.WorkloadRef == nil ||
+		podGroup.Spec.WorkloadRef.WorkloadName != parentWorkload.Name ||
+		podGroup.Spec.WorkloadRef.TemplateName != templateName {
+		t.Errorf("PodGroup workloadRef = %+v, want workload %q template %q",
+			podGroup.Spec.WorkloadRef, parentWorkload.Name, templateName)
 	}
 }
