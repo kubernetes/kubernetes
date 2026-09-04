@@ -2218,6 +2218,182 @@ func TestAllocationManagerAddPod(t *testing.T) {
 	}
 }
 
+// failNTimesState wraps a state.State and reports a failure from the first n
+// calls to SetPodResourceInfo, used to simulate a transient checkpoint
+// persistence failure (e.g. a disk write error). The real stateCheckpoint
+// always updates its in-memory cache before attempting to persist to disk, so
+// only the persistence step can fail; this always applies the write to the
+// wrapped state and only fakes the returned error, to match that behavior.
+type failNTimesState struct {
+	state.State
+	n int
+}
+
+func (f *failNTimesState) SetPodResourceInfo(logger klog.Logger, uid types.UID, info state.PodResourceInfo) error {
+	err := f.State.SetPodResourceInfo(logger, uid, info)
+	if err != nil {
+		return err
+	}
+	if f.n > 0 {
+		f.n--
+		return fmt.Errorf("simulated checkpoint write failure")
+	}
+	return nil
+}
+
+// TestAllocationManagerAddPodCheckpointFailureIsRetried is a regression test for
+// https://github.com/kubernetes/kubernetes/issues/133538: AddPod used to only log
+// and drop the error when persisting the allocation checkpoint failed, so a
+// transient write failure (the in-memory allocation is already updated by that
+// point) left the on-disk checkpoint permanently stale with no retry. It now
+// queues the pod for periodic retry instead.
+func TestAllocationManagerAddPodCheckpointFailureIsRetried(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	tCtx := ktesting.Init(t)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: types.UID("pod1"), Name: "pod1", Namespace: "ns1"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name: "c1",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")},
+				},
+			}},
+		},
+	}
+
+	allocatedPods := []*v1.Pod{pod}
+	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, allocatedPods, nil)
+	m := allocationManager.(*manager)
+
+	// Fail exactly the write triggered by AddPod; the retry (below) should succeed.
+	m.allocated = &failNTimesState{State: m.allocated, n: 1}
+
+	ok, _, _ := allocationManager.AddPod(tCtx, []*v1.Pod{}, pod)
+	require.True(t, ok, "pod should still be admitted even though the checkpoint write failed")
+
+	// The in-memory allocation must already reflect the pod's resources: the
+	// pod is correctly admitted for the rest of this kubelet's lifetime even
+	// though the checkpoint write failed.
+	allocated, found := allocationManager.GetContainerResourceAllocation(pod.UID, "c1")
+	require.True(t, found)
+	assert.Equal(t, pod.Spec.Containers[0].Resources, allocated)
+
+	m.allocationMutex.Lock()
+	pending := append([]types.UID(nil), m.podsWithPendingCheckpoint...)
+	m.allocationMutex.Unlock()
+	assert.Equal(t, []types.UID{pod.UID}, pending, "pod should be queued for a checkpoint retry")
+
+	successful := m.retryPendingCheckpoints(tCtx)
+	require.Len(t, successful, 1)
+	assert.Equal(t, pod.UID, successful[0].UID)
+
+	m.allocationMutex.Lock()
+	pending = append([]types.UID(nil), m.podsWithPendingCheckpoint...)
+	m.allocationMutex.Unlock()
+	assert.Empty(t, pending, "pod should no longer be pending after a successful retry")
+}
+
+// TestAllocationManagerRetryPendingCheckpointsKeepsFailingPods verifies that a
+// pod whose checkpoint retry fails again stays queued for a later retry,
+// instead of being dropped.
+func TestAllocationManagerRetryPendingCheckpointsKeepsFailingPods(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	tCtx := ktesting.Init(t)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: types.UID("pod1"), Name: "pod1", Namespace: "ns1"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name: "c1",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")},
+				},
+			}},
+		},
+	}
+
+	allocatedPods := []*v1.Pod{pod}
+	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, allocatedPods, nil)
+	m := allocationManager.(*manager)
+
+	// Fail the initial write plus the first retry; the second retry succeeds.
+	m.allocated = &failNTimesState{State: m.allocated, n: 2}
+
+	ok, _, _ := allocationManager.AddPod(tCtx, []*v1.Pod{}, pod)
+	require.True(t, ok)
+
+	successful := m.retryPendingCheckpoints(tCtx)
+	assert.Empty(t, successful, "retry should fail again and report no successes")
+
+	m.allocationMutex.Lock()
+	pending := append([]types.UID(nil), m.podsWithPendingCheckpoint...)
+	m.allocationMutex.Unlock()
+	assert.Equal(t, []types.UID{pod.UID}, pending, "pod should still be pending after a second failure")
+
+	successful = m.retryPendingCheckpoints(tCtx)
+	require.Len(t, successful, 1, "third attempt should finally succeed")
+
+	m.allocationMutex.Lock()
+	pending = append([]types.UID(nil), m.podsWithPendingCheckpoint...)
+	m.allocationMutex.Unlock()
+	assert.Empty(t, pending)
+}
+
+// TestAllocationManagerRemovePodClearsPendingCheckpoint verifies that removing a
+// pod also drops it from the pending-checkpoint-retry queue, so a deleted pod
+// isn't retried forever.
+func TestAllocationManagerRemovePodClearsPendingCheckpoint(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: types.UID("pod1"), Name: "pod1", Namespace: "ns1"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name: "c1",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")},
+				},
+			}},
+		},
+	}
+
+	allocatedPods := []*v1.Pod{pod}
+	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, allocatedPods, nil)
+	m := allocationManager.(*manager)
+	m.allocated = &failNTimesState{State: m.allocated, n: 1}
+
+	ok, _, _ := allocationManager.AddPod(tCtx, []*v1.Pod{}, pod)
+	require.True(t, ok)
+
+	m.allocationMutex.Lock()
+	pending := len(m.podsWithPendingCheckpoint)
+	m.allocationMutex.Unlock()
+	require.Equal(t, 1, pending, "pod should be queued after the failed write")
+
+	allocationManager.RemovePod(logger, pod.UID)
+
+	m.allocationMutex.Lock()
+	pending = len(m.podsWithPendingCheckpoint)
+	m.allocationMutex.Unlock()
+	assert.Equal(t, 0, pending, "removed pod should no longer be queued for checkpoint retry")
+}
+
 func TestIsResizeIncreasingRequests(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 
