@@ -559,7 +559,7 @@ type JobSchedulingConfiguration struct {
 
 // JobStatus represents the current state of a Job.
 type JobStatus struct {
-	// The latest available observations of an object's current state. When a Job
+	// conditions are the latest available observations of an object's current state. When a Job
 	// fails, one of the conditions will have type "Failed" and status true. When
 	// a Job is suspended, one of the conditions will have type "Suspended" and
 	// status true; when the Job is resumed, the status of this condition will
@@ -578,7 +578,7 @@ type JobStatus struct {
 	// +listType=atomic
 	Conditions []JobCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 
-	// Represents time when the job controller started processing a job. When a
+	// startTime represents time when the job controller started processing a job. When a
 	// Job is created in the suspended state, this field is not set until the
 	// first time it is resumed. This field is reset every time a Job is resumed
 	// from suspension. It is represented in RFC3339 form and is in UTC.
@@ -589,7 +589,7 @@ type JobStatus struct {
 	// +optional
 	StartTime *metav1.Time `json:"startTime,omitempty" protobuf:"bytes,2,opt,name=startTime"`
 
-	// Represents time when the job was completed. It is not guaranteed to
+	// completionTime represents time when the job was completed. It is not guaranteed to
 	// be set in happens-before order across separate operations.
 	// It is represented in RFC3339 form and is in UTC.
 	// The completion time is set when the job finishes successfully, and only then.
@@ -598,24 +598,24 @@ type JobStatus struct {
 	// +optional
 	CompletionTime *metav1.Time `json:"completionTime,omitempty" protobuf:"bytes,3,opt,name=completionTime"`
 
-	// The number of pending and running pods which are not terminating (without
+	// active is the number of pending and running pods which are not terminating (without
 	// a deletionTimestamp).
 	// The value is zero for finished jobs.
 	// +optional
 	Active int32 `json:"active,omitempty" protobuf:"varint,4,opt,name=active"`
 
-	// The number of pods which reached phase Succeeded.
+	// succeeded is the number of pods which reached phase Succeeded.
 	// The value increases monotonically for a given spec. However, it may
 	// decrease in reaction to scale down of elastic indexed jobs.
 	// +optional
 	Succeeded int32 `json:"succeeded,omitempty" protobuf:"varint,5,opt,name=succeeded"`
 
-	// The number of pods which reached phase Failed.
+	// failed is the number of pods which reached phase Failed.
 	// The value increases monotonically.
 	// +optional
 	Failed int32 `json:"failed,omitempty" protobuf:"varint,6,opt,name=failed"`
 
-	// The number of pods which are terminating (in phase Pending or Running
+	// terminating is the number of pods which are terminating (in phase Pending or Running
 	// and have a deletionTimestamp).
 	// +optional
 	Terminating *int32 `json:"terminating,omitempty" protobuf:"varint,11,opt,name=terminating"`
@@ -630,7 +630,7 @@ type JobStatus struct {
 	// +optional
 	CompletedIndexes string `json:"completedIndexes,omitempty" protobuf:"bytes,7,opt,name=completedIndexes"`
 
-	// FailedIndexes holds the failed indexes when spec.backoffLimitPerIndex is set.
+	// failedIndexes holds the failed indexes when spec.backoffLimitPerIndex is set.
 	// The indexes are represented in the text format analogous as for the
 	// `completedIndexes` field, ie. they are kept as decimal integers
 	// separated by commas. The numbers are listed in increasing order. Three or
@@ -661,7 +661,7 @@ type JobStatus struct {
 	// +optional
 	UncountedTerminatedPods *UncountedTerminatedPods `json:"uncountedTerminatedPods,omitempty" protobuf:"bytes,8,opt,name=uncountedTerminatedPods"`
 
-	// The number of active pods which have a Ready condition and are not
+	// ready is the number of active pods which have a Ready condition and are not
 	// terminating (without a deletionTimestamp).
 	Ready *int32 `json:"ready,omitempty" protobuf:"varint,9,opt,name=ready"`
 }
@@ -869,16 +869,16 @@ const (
 
 // CronJobStatus represents the current state of a cron job.
 type CronJobStatus struct {
-	// A list of pointers to currently running jobs.
+	// active is a list of pointers to currently running jobs.
 	// +optional
 	// +listType=atomic
 	Active []corev1.ObjectReference `json:"active,omitempty" protobuf:"bytes,1,rep,name=active"`
 
-	// Information when was the last time the job was successfully scheduled.
+	// lastScheduleTime is the time when the job was last successfully scheduled.
 	// +optional
 	LastScheduleTime *metav1.Time `json:"lastScheduleTime,omitempty" protobuf:"bytes,4,opt,name=lastScheduleTime"`
 
-	// Information when was the last time the job successfully completed.
+	// lastSuccessfulTime is the time when the job last successfully completed.
 	// +optional
 	LastSuccessfulTime *metav1.Time `json:"lastSuccessfulTime,omitempty" protobuf:"bytes,5,opt,name=lastSuccessfulTime"`
 }
