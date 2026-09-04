@@ -5020,6 +5020,21 @@ func testIsSchedulableAfterTargetPodUpdate(tCtx ktesting.TContext) {
 			obj:      podWithClaimTemplateInStatus,
 			wantHint: fwk.QueueSkip,
 		},
+		"different-pod": {
+			// The update is for a different pod (different UID) than the one
+			// being evaluated. A pod's own generated-claim status update must
+			// not requeue other pods, otherwise a single pod update triggers a
+			// thundering herd across all DRA-rejected pods.
+			objs: []apiruntime.Object{pendingClaim},
+			pod: func() *v1.Pod {
+				pod := podWithClaimTemplate.DeepCopy()
+				pod.Name = "other-pod"
+				pod.UID = types.UID(podUID + "-other")
+				return pod
+			}(),
+			obj:      podWithClaimTemplateInStatus,
+			wantHint: fwk.QueueSkip,
+		},
 		"incomplete": {
 			objs: []apiruntime.Object{pendingClaim},
 			pod:  podWithTwoClaimTemplates,
@@ -6205,24 +6220,6 @@ func TestPreQueueingHint(t *testing.T) {
 			},
 			wantKeys: sets.New[string](), // no pod in indexer
 		},
-		"shared claim returns nil": {
-			newObj: &resourceapi.ResourceClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "shared-claim",
-					Namespace: "ns1",
-				},
-			},
-			wantKeys: sets.New[string](), // no pod in indexer
-		},
-		"claim with no matching pods returns empty set": {
-			newObj: &resourceapi.ResourceClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "claim-2",
-					Namespace: "ns1",
-				},
-			},
-			wantKeys: sets.New[string](), // no pod in indexer
-		},
 		"delete event uses oldObj": {
 			oldObj: &resourceapi.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
@@ -6374,4 +6371,33 @@ func TestPreQueueingHint_SharedClaimMultiplePods(t *testing.T) {
 	if len(got.Pods) != 3 {
 		t.Errorf("expected 3 pods, got %d: %v", len(got.Pods), got.Pods)
 	}
+}
+
+func TestPreQueueingHintForPodUpdate(t *testing.T) {
+	logger := klog.Background()
+	pl := &DynamicResources{}
+
+	t.Run("narrows to the updated pod", func(t *testing.T) {
+		pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "my-pod", Namespace: "ns1"}}
+		got, err := pl.preQueueingHintForPodUpdate(logger, nil, pod)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got.AllPods {
+			t.Fatal("expected AllPods=false, got true")
+		}
+		if len(got.Pods) != 1 || got.Pods[0].Name != "my-pod" || got.Pods[0].Namespace != "ns1" {
+			t.Errorf("expected [{my-pod ns1}], got %v", got.Pods)
+		}
+	})
+
+	t.Run("falls back to AllPods on unexpected object", func(t *testing.T) {
+		got, err := pl.preQueueingHintForPodUpdate(logger, nil, "not-a-pod")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !got.AllPods {
+			t.Errorf("expected AllPods=true for unexpected object, got %+v", got)
+		}
+	})
 }

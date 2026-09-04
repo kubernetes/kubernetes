@@ -132,6 +132,14 @@ const (
 	BatchFlushNormalizeError  = "normalize_error"
 )
 
+// Values of the "result" label on the PreQueueingHintEvaluations metric.
+const (
+	PreQueueingHintResultAllPods     = "all_pods"
+	PreQueueingHintResultNarrowed    = "narrowed"
+	PreQueueingHintResultNoPreQFn    = "no_prequeueing_hint_fn"
+	PreQueueingHintResultPreQFnError = "prequeueing_hint_fn_error"
+)
+
 // DRADeviceBindingConditions status labels
 const (
 	BindingConditionsStatusSuccess = "success"
