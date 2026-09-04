@@ -260,7 +260,6 @@ func (ctrl *PersistentVolumeController) syncClaim(ctx context.Context, claim *v1
 // checkVolumeSatisfyClaim checks if the volume requested by the claim satisfies the requirements of the claim
 func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVolumeClaim) error {
 	requestedQty := claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	requestedSize := requestedQty.Value()
 
 	// check if PV's DeletionTimeStamp is set, if so, return error.
 	if volume.ObjectMeta.DeletionTimestamp != nil {
@@ -268,8 +267,9 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 	}
 
 	volumeQty := volume.Spec.Capacity[v1.ResourceStorage]
-	volumeSize := volumeQty.Value()
-	if volumeSize < requestedSize {
+	// Cmp rather than Value(): a capacity or request past int64 overflows Value()
+	// and would misorder the comparison. FindMatchingVolume compares with Cmp too.
+	if volumeQty.Cmp(requestedQty) < 0 {
 		return fmt.Errorf("requested PV is too small")
 	}
 
