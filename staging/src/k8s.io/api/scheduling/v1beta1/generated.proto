@@ -543,6 +543,7 @@ message PodGroupStatus {
   //   due to disruption such as preemption.
   //
   // Known reasons for the PodGroupInitiallyScheduled condition:
+  // - "Scheduled": All required pods in the PodGroup have been successfully scheduled.
   // - "Unschedulable": The PodGroup cannot be scheduled due to resource constraints,
   //   affinity/anti-affinity rules, or insufficient capacity for the gang.
   // - "SchedulerError": The PodGroup cannot be scheduled due to some internal error
