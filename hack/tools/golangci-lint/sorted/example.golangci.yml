@@ -2,7 +2,7 @@ linters:
   settings:
     custom:
       sorted:
-        path: /path/to/sorted.so
+        type: module
         description: Checks if feature gates are sorted alphabetically
         original-url: k8s.io/kubernetes/hack/tools/golangci-lint/sorted
         settings:
