@@ -97,8 +97,6 @@ func init() {
 }
 
 const (
-	// ControllerStartJitter is the Jitter used when starting controller managers
-	ControllerStartJitter = 1.0
 	// ConfigzName is the name used for register kube-controller manager /configz, same with GroupName.
 	ConfigzName = "kubecontrollermanager.config.k8s.io"
 	// kubeControllerManager defines variable used internally when referring to cloud-controller-manager component
@@ -288,7 +286,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 
 		// Actually start the controllers.
 		if len(controllers) > 0 {
-			if !RunControllers(ctx, controllerContext, controllers, ControllerStartJitter, c.ControllerShutdownTimeout) {
+			if !RunControllers(ctx, controllers, c.ControllerShutdownTimeout) {
 				return errors.New("controller shutdown timeout reached")
 			}
 		} else {
@@ -707,8 +705,7 @@ func BuildControllers(ctx context.Context, controllerCtx ControllerContext, cont
 // Once the context is cancelled, RunControllers waits for shutdownTimeout for all controllers to terminate.
 // When the timeout is reached, the function unblocks and returns false.
 // Zero shutdown timeout means that there is no timeout.
-func RunControllers(ctx context.Context, controllerCtx ControllerContext, controllers []Controller,
-	controllerStartJitterMaxFactor float64, shutdownTimeout time.Duration) bool {
+func RunControllers(ctx context.Context, controllers []Controller, shutdownTimeout time.Duration) bool {
 	logger := klog.FromContext(ctx)
 
 	// We gather running controllers names for logging purposes.
@@ -756,11 +753,6 @@ func RunControllers(ctx context.Context, controllerCtx ControllerContext, contro
 		for _, controller := range controllers {
 			go func() {
 				defer wg.Done()
-
-				// It would be better to unblock and return on context cancelled here,
-				// but that makes tests more flaky regarding timing.
-				time.Sleep(wait.Jitter(controllerCtx.ComponentConfig.Generic.ControllerStartInterval.Duration, controllerStartJitterMaxFactor))
-
 				logger.V(1).Info("Controller starting...", "controller", controller.Name())
 
 				runningControllersLock.Lock()
