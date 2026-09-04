@@ -252,7 +252,7 @@ func (a *Plugin) admitPod(ctx context.Context, pod *api.Pod, attributes admissio
 //	    client-key: /path/to/key.pem          # key matching the cert
 //
 // For additional HTTP configuration, refer to the kubeconfig documentation
-// http://kubernetes.io/v1.1/docs/user-guide/kubeconfig-file.html.
+// https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/.
 func NewImagePolicyWebhook(configFile io.Reader) (*Plugin, error) {
 	if configFile == nil {
 		return nil, fmt.Errorf("no config specified")
