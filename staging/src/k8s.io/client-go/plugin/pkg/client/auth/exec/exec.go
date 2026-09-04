@@ -50,7 +50,6 @@ import (
 	"k8s.io/client-go/util/connrotation"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
-	"k8s.io/utils/dump"
 )
 
 const execInfoEnv = "KUBERNETES_EXEC_INFO"
@@ -78,46 +77,6 @@ var (
 		clientauthenticationv1.SchemeGroupVersion.String():      clientauthenticationv1.SchemeGroupVersion,
 	}
 )
-
-func newCache() *cache {
-	return &cache{m: make(map[string]*Authenticator)}
-}
-
-func cacheKey(conf *api.ExecConfig, cluster *clientauthentication.Cluster) string {
-	key := struct {
-		conf    *api.ExecConfig
-		cluster *clientauthentication.Cluster
-	}{
-		conf:    conf,
-		cluster: cluster,
-	}
-	return dump.Pretty(key)
-}
-
-type cache struct {
-	mu sync.Mutex
-	m  map[string]*Authenticator
-}
-
-func (c *cache) get(s string) (*Authenticator, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	a, ok := c.m[s]
-	return a, ok
-}
-
-// put inserts an authenticator into the cache. If an authenticator is already
-// associated with the key, the first one is returned instead.
-func (c *cache) put(s string, a *Authenticator) *Authenticator {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	existing, ok := c.m[s]
-	if ok {
-		return existing
-	}
-	c.m[s] = a
-	return a
-}
 
 // sometimes rate limits how often a function f() is called. Specifically, Do()
 // will run the provided function f() up to threshold times every interval
@@ -164,7 +123,10 @@ func GetAuthenticator(config *api.ExecConfig, cluster *clientauthentication.Clus
 }
 
 func newAuthenticator(c *cache, isTerminalFunc func(int) bool, config *api.ExecConfig, cluster *clientauthentication.Cluster) (*Authenticator, error) {
-	key := cacheKey(config, cluster)
+	key, err := newCacheKey(config, cluster)
+	if err != nil {
+		return nil, fmt.Errorf("creating exec plugin cache key: %w", err)
+	}
 	if a, ok := c.get(key); ok {
 		return a, nil
 	}
