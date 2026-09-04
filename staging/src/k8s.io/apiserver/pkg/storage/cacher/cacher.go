@@ -821,17 +821,13 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 			if !ok {
 				return fmt.Errorf("non *store.Element returned from storage: %v", obj)
 			}
-			shardMatch := true
-			if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
-				var err error
-				shardMatch, err = opts.Predicate.MatchesSharding(elem.Object)
-				if err != nil {
-					return fmt.Errorf("shard matching failed: %w", err)
-				}
+			shardMatch, err := opts.Predicate.MatchesSharding(elem.Object)
+			if err != nil {
+    			return fmt.Errorf("shard matching failed: %w", err)
 			}
 			if shardMatch && opts.Predicate.MatchesObjectAttributes(elem.Labels, elem.Fields) {
-				selectedObjects = append(selectedObjects, elem.Object)
-				lastSelectedObjectKey = elem.Key
+    			selectedObjects = append(selectedObjects, elem.Object)
+    			lastSelectedObjectKey = elem.Key
 			}
 			if limit > 0 && int64(len(selectedObjects)) >= limit {
 				hasMoreListItems = i < len(resp.Items)-1
