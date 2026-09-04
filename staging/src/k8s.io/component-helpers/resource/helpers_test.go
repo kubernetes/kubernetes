@@ -970,6 +970,7 @@ func TestPodResourceLimits(t *testing.T) {
 		description           string
 		options               PodResourcesOptions
 		overhead              v1.ResourceList
+		podLevelResources     *v1.ResourceRequirements
 		initContainers        []v1.Container
 		initContainerStatuses []v1.ContainerStatus
 		containers            []v1.Container
@@ -1115,11 +1116,8 @@ func TestPodResourceLimits(t *testing.T) {
 			},
 		},
 		{
-			description: "one limited and one unlimited container should result in the limited container's limits for the pod",
-			expectedLimits: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("2"),
-				v1.ResourceMemory: resource.MustParse("2Gi"),
-			},
+			description:    "one limited and one unlimited container should result in no pod limits",
+			expectedLimits: v1.ResourceList{},
 			initContainers: []v1.Container{},
 			containers: []v1.Container{
 				{
@@ -1136,11 +1134,8 @@ func TestPodResourceLimits(t *testing.T) {
 			},
 		},
 		{
-			description: "one limited and one unlimited init container should result in the limited init container's limits for the pod",
-			expectedLimits: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("2"),
-				v1.ResourceMemory: resource.MustParse("2Gi"),
-			},
+			description:    "one limited and one unlimited init container should result in no pod limits",
+			expectedLimits: v1.ResourceList{},
 			initContainers: []v1.Container{
 				{
 					Resources: v1.ResourceRequirements{
@@ -1546,6 +1541,100 @@ func TestPodResourceLimits(t *testing.T) {
 				},
 			},
 		},
+		{
+			description: "cpu limit missing on one container is omitted by default",
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{}}},
+			},
+			expectedLimits: v1.ResourceList{},
+		},
+		{
+			description: "only the resource that is missing on a container is omitted",
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+				}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+				}}},
+			},
+			expectedLimits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+		},
+		{
+			description: "init container missing the limit omits the limit",
+			initContainers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{}}},
+			},
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}}},
+			},
+			expectedLimits: v1.ResourceList{},
+		},
+		{
+			description: "ephemeral-storage partial sums are kept, only cpu and memory limits are omitted",
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{}}},
+			},
+			expectedLimits: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+		},
+		{
+			description: "hugepages are kept, an unset hugepages limit means zero",
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{"hugepages-2Mi": resource.MustParse("2Mi")}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{}}},
+			},
+			expectedLimits: v1.ResourceList{"hugepages-2Mi": resource.MustParse("2Mi")},
+		},
+		{
+			description: "extended resources are kept, an unset extended resource limit means zero",
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{"example.com/gpu": resource.MustParse("1")}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{}}},
+			},
+			expectedLimits: v1.ResourceList{"example.com/gpu": resource.MustParse("1")},
+		},
+		{
+			description:       "pod-level limit covers the container that omits one",
+			podLevelResources: &v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4")}},
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{}}},
+			},
+			expectedLimits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4")},
+		},
+		{
+			description: "overhead is not added to an omitted limit",
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("64Mi"),
+			},
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+				}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+				}}},
+			},
+			expectedLimits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2112Mi")},
+		},
+		{
+			description: "restartable init container missing the limit omits the limit",
+			initContainers: []v1.Container{
+				{
+					RestartPolicy: &restartAlways,
+					Resources:     v1.ResourceRequirements{Limits: v1.ResourceList{}},
+				},
+			},
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}}},
+			},
+			expectedLimits: v1.ResourceList{},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
@@ -1554,6 +1643,7 @@ func TestPodResourceLimits(t *testing.T) {
 					Containers:     tc.containers,
 					InitContainers: tc.initContainers,
 					Overhead:       tc.overhead,
+					Resources:      tc.podLevelResources,
 				},
 				Status: v1.PodStatus{
 					ContainerStatuses:     tc.containerStatuses,
