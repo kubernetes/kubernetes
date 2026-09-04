@@ -17,6 +17,7 @@ limitations under the License.
 package container
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -52,10 +53,10 @@ type Cache interface {
 // methods to retrieve the PodStatus: the non-blocking Get() and the blocking
 // GetNewerThan() method.
 type ROCache interface {
-	Get(types.UID) (*PodStatus, error)
+	Get(context.Context, types.UID) (*PodStatus, error)
 	// GetNewerThan is a blocking call that only returns the status
 	// when it is newer than the given time.
-	GetNewerThan(types.UID, time.Time) (*PodStatus, error)
+	GetNewerThan(context.Context, types.UID, time.Time) (*PodStatus, error)
 }
 
 type data struct {
@@ -98,14 +99,14 @@ func NewCache() Cache {
 
 // Get returns the PodStatus for the pod; callers are expected not to
 // modify the objects returned.
-func (c *cache) Get(id types.UID) (*PodStatus, error) {
+func (c *cache) Get(_ context.Context, id types.UID) (*PodStatus, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	d := c.get(id)
 	return d.status, d.err
 }
 
-func (c *cache) GetNewerThan(id types.UID, minTime time.Time) (*PodStatus, error) {
+func (c *cache) GetNewerThan(ctx context.Context, id types.UID, minTime time.Time) (*PodStatus, error) {
 	ch := c.subscribe(id, minTime)
 	d := <-ch
 	return d.status, d.err
