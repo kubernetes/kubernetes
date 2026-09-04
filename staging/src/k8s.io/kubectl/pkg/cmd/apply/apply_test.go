@@ -1002,20 +1002,18 @@ func TestApplyPruneObjectsWithAllowlist(t *testing.T) {
 				"namespace/test-apply pruned",
 			},
 		},
-		// Deprecated: kubectl apply will no longer prune non-namespaced resources by default when used with the --namespace flag in a future release
-		// namespace is a non-namespaced resource and will not be pruned in the future
+		// namespace is a non-namespaced resource and is not pruned by default when a namespace is specified
 		"prune with namespace and without allowlist should delete resources that are not in the specified file": {
 			currentResources:        []runtime.Object{rc, rc2, cm, ns},
 			namespace:               "test",
-			expectedPrunedResources: []string{"test/test-cm", "test/test-rc2", "/test-apply"},
+			expectedPrunedResources: []string{"test/test-cm", "test/test-rc2"},
 			expectedOutputs: []string{
 				"replicationcontroller/test-rc unchanged",
 				"configmap/test-cm pruned",
 				"replicationcontroller/test-rc2 pruned",
-				"namespace/test-apply pruned",
 			},
 		},
-		// Even namespace is a non-namespaced resource, it will be pruned if specified in pruneAllowList in the future
+		// Even though namespace is a non-namespaced resource, it is pruned if specified in pruneAllowlist
 		"prune with namespace and allowlist should delete all matching resources": {
 			currentResources:        []runtime.Object{rc, cm, ns},
 			pruneAllowlist:          []string{"core/v1/ConfigMap", "core/v1/Namespace"},
@@ -1089,7 +1087,9 @@ func TestApplyPruneObjectsWithAllowlist(t *testing.T) {
 	for testCaseName, tc := range testCases {
 		for _, testingOpenAPISchema := range testingOpenAPISchemas {
 			t.Run(testCaseName, func(t *testing.T) {
-				tf := cmdtesting.NewTestFactory().WithNamespace("test")
+				// the namespace flag is owned by the root command, not the apply
+				// command, so the namespace is set on the factory instead
+				tf := cmdtesting.NewTestFactory().WithNamespace(tc.namespace)
 				defer tf.Cleanup()
 
 				tf.UnstructuredClient = &fake.RESTClient{
@@ -1124,7 +1124,6 @@ func TestApplyPruneObjectsWithAllowlist(t *testing.T) {
 				cmd := NewCmdApply("kubectl", tf, ioStreams)
 				cmd.Flags().Set("filename", filenameRC)
 				cmd.Flags().Set("prune", "true")
-				cmd.Flags().Set("namespace", tc.namespace)
 				cmd.Flags().Set("all", "true")
 				for _, allow := range tc.pruneAllowlist {
 					cmd.Flags().Set("prune-allowlist", allow)
