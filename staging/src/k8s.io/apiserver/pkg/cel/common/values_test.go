@@ -1385,6 +1385,11 @@ func TestListAdd(t *testing.T) {
 			expression: "(x.mapList + [{'key1': 'k1v9', 'key2': 'k2v9', 'value': 9}])[2].value == 9",
 		}, skipSchemaless: true},
 		{testCase: testCase{
+			name:       "map list + literal list merges duplicate new keys",
+			expression: "size(x.mapList + [{'key1': 'k1v9', 'key2': 'k2v9', 'value': 9}, {'key1': 'k1v9', 'key2': 'k2v9', 'value': 10}]) == 3 && (x.mapList + [{'key1': 'k1v9', 'key2': 'k2v9', 'value': 9}, {'key1': 'k1v9', 'key2': 'k2v9', 'value': 10}])[2].value == 10",
+		}, // skipUnstructured: unstructuredMapList.Add cannot compute merge keys for CEL literal elements.
+			skipSchemaless: true, skipUnstructured: true},
+		{testCase: testCase{
 			name:       "chained map list merge",
 			expression: "(x.mapList + y.mapList + [{'key1': 'k1v3', 'key2': 'k2v3', 'value': 33}])[2].value == 33",
 		}, skipSchemaless: true},
