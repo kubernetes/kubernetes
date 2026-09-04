@@ -31,11 +31,9 @@ func TestSnapshotListPrefix(t *testing.T) {
 		testStorageElement("/pods/ns1/a", "a", 1),
 		testStorageElement("/pods/ns1/c", "c", 3),
 	}
-	// orderedListSnapshot is excluded: it serves a pre-computed range and
-	// ignores prefix and continueKey by contract. Prefixes are "/"-terminated
-	// as the cacher produces them; the implementations differ on other
-	// prefixes (strings.HasPrefix in the btree, path segments in
-	// listSnapshot).
+	// Prefixes are "/"-terminated as the cacher produces them; the
+	// implementations differ on other prefixes (strings.HasPrefix in the
+	// btree, path segments in listSnapshot).
 	snapshots := []struct {
 		name        string
 		newSnapshot func(t *testing.T) Snapshot
@@ -94,14 +92,6 @@ func TestSnapshotListPrefix(t *testing.T) {
 			snapshot := s.newSnapshot(t)
 			for _, tc := range testCases {
 				t.Run(tc.name, func(t *testing.T) {
-					items, err := snapshot.OrderedListPrefix(tc.prefix, tc.continueKey)
-					require.NoError(t, err)
-					var listed []string
-					for _, item := range items {
-						listed = append(listed, item.(*Element).Key)
-					}
-					assert.Equal(t, tc.expectKeys, listed, "OrderedListPrefix")
-
 					var ranged []string
 					for elem, err := range snapshot.RangePrefix(tc.prefix, tc.continueKey) {
 						require.NoError(t, err)
@@ -112,6 +102,39 @@ func TestSnapshotListPrefix(t *testing.T) {
 					assert.Equal(t, len(tc.expectKeys), snapshot.Count(tc.prefix, tc.continueKey), "Count")
 				})
 			}
+		})
+	}
+}
+
+func TestSingleElementSnapshot(t *testing.T) {
+	elem := testStorageElement("/pods/ns1/a", "a", 1)
+	tcs := []struct {
+		name        string
+		snapshot    Snapshot
+		prefix      string
+		continueKey string
+		expectKeys  []string
+		expectFound bool
+	}{
+		{name: "matching prefix", snapshot: SingleElementSnapshot(elem), prefix: "/pods/ns1/", expectKeys: []string{"/pods/ns1/a"}, expectFound: true},
+		{name: "exact key as prefix", snapshot: SingleElementSnapshot(elem), prefix: "/pods/ns1/a", expectKeys: []string{"/pods/ns1/a"}, expectFound: true},
+		{name: "other prefix", snapshot: SingleElementSnapshot(elem), prefix: "/pods/ns2/", expectKeys: nil, expectFound: true},
+		{name: "continue from the key", snapshot: SingleElementSnapshot(elem), prefix: "/pods/ns1/", continueKey: "/pods/ns1/a", expectKeys: []string{"/pods/ns1/a"}, expectFound: true},
+		{name: "continue past the key", snapshot: SingleElementSnapshot(elem), prefix: "/pods/ns1/", continueKey: "/pods/ns1/a\x00", expectKeys: nil, expectFound: true},
+		{name: "empty", snapshot: EmptySnapshot(), prefix: "/pods/", expectKeys: nil},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			var ranged []string
+			for e, err := range tc.snapshot.RangePrefix(tc.prefix, tc.continueKey) {
+				require.NoError(t, err)
+				ranged = append(ranged, e.Key)
+			}
+			assert.Equal(t, tc.expectKeys, ranged)
+			assert.Equal(t, len(tc.expectKeys), tc.snapshot.Count(tc.prefix, tc.continueKey))
+			_, found, err := tc.snapshot.GetByKey("/pods/ns1/a")
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectFound, found)
 		})
 	}
 }

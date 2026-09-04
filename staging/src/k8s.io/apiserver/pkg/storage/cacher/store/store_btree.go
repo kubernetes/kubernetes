@@ -99,12 +99,6 @@ func (si *threadedStoreIndexer) List() []interface{} {
 	return si.store.List()
 }
 
-func (si *threadedStoreIndexer) OrderedListPrefix(prefix, continueKey string) ([]interface{}, error) {
-	si.lock.RLock()
-	defer si.lock.RUnlock()
-	return si.store.OrderedListPrefix(prefix, continueKey)
-}
-
 func (si *threadedStoreIndexer) ListKeys() []string {
 	si.lock.RLock()
 	defer si.lock.RUnlock()
@@ -253,21 +247,6 @@ func (s *btreeStore) getByKey(key string) (item interface{}, exists bool, err er
 	keyElement := &Element{Key: key}
 	item, exists = s.tree.Get(keyElement)
 	return item, exists, nil
-}
-
-func (s *btreeStore) OrderedListPrefix(prefix, continueKey string) ([]interface{}, error) {
-	if continueKey == "" {
-		continueKey = prefix
-	}
-	var result []interface{}
-	s.tree.AscendGreaterOrEqual(&Element{Key: continueKey}, func(item *Element) bool {
-		if !strings.HasPrefix(item.Key, prefix) {
-			return false
-		}
-		result = append(result, item)
-		return true
-	})
-	return result, nil
 }
 
 func (s *btreeStore) RangePrefix(prefix, continueKey string) iter.Seq2[*Element, error] {

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"iter"
 	"sort"
+	"strings"
 	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -61,13 +62,6 @@ type WatchCacheStorage struct {
 	snapshottingEnabled atomic.Bool
 }
 
-// StoreLocked returns the live store.
-// Unlike GetExactSnapshotLocked this is not an immutable point-in-time copy.
-// The caller must hold the lock for the duration of use.
-func (w *WatchCacheStorage) StoreLocked() Indexer {
-	return w.store
-}
-
 func (w *WatchCacheStorage) SnapshottingEnabled() bool {
 	return w.snapshots != nil && w.snapshottingEnabled.Load()
 }
@@ -107,61 +101,51 @@ func (w *WatchCacheStorage) LatestSnapshotLocked() (Snapshot, bool) {
 	return nil, false
 }
 
-func (w *WatchCacheStorage) GetLatestSnapshotOrBuildLocked(key, continueKey string) (Snapshot, error) {
+func (w *WatchCacheStorage) LatestSnapshotOrCloneLocked() Snapshot {
 	if snap, ok := w.LatestSnapshotLocked(); ok {
 		// Snapshots are added in order as we update store, so the
 		// latest snapshot match latest store state and latest revision.
-		return snap, nil
+		return snap
 	}
-	// TODO: Consider using Indexer Clone() after benchmarking.
-	return orderedSnapshotResponseFromIndexer(w.store, key, continueKey)
+	return w.store.Clone()
 }
 
-func orderedSnapshotResponseFromIndexer(indexer Indexer, key, continueKey string) (Snapshot, error) {
-	items, err := indexer.OrderedListPrefix(key, continueKey)
-	if err != nil {
-		return nil, err
-	}
-	return orderedListSnapshot{Items: items}, nil
+func SingleElementSnapshot(elem *Element) Snapshot {
+	return elementSnapshot{elem: elem}
 }
 
-type orderedListSnapshot struct {
-	Items []interface{}
+func EmptySnapshot() Snapshot {
+	return elementSnapshot{}
 }
 
-var _ Snapshot = (*orderedListSnapshot)(nil)
+type elementSnapshot struct {
+	elem *Element
+}
 
-func (o orderedListSnapshot) GetByKey(key string) (interface{}, bool, error) {
-	for _, item := range o.Items {
-		elem, ok := item.(*Element)
-		if ok && elem.Key == key {
-			return item, true, nil
-		}
+func (s elementSnapshot) inRange(prefix, continueKey string) bool {
+	return s.elem != nil && strings.HasPrefix(s.elem.Key, prefix) && s.elem.Key >= continueKey
+}
+
+func (s elementSnapshot) GetByKey(key string) (interface{}, bool, error) {
+	if s.elem != nil && s.elem.Key == key {
+		return s.elem, true, nil
 	}
 	return nil, false, nil
 }
 
-func (o orderedListSnapshot) OrderedListPrefix(prefix, continueKey string) ([]interface{}, error) {
-	return o.Items, nil
-}
-
-func (o orderedListSnapshot) RangePrefix(prefix, continueKey string) iter.Seq2[*Element, error] {
+func (s elementSnapshot) RangePrefix(prefix, continueKey string) iter.Seq2[*Element, error] {
 	return func(yield func(*Element, error) bool) {
-		for _, item := range o.Items {
-			elem, ok := item.(*Element)
-			if !ok {
-				yield(nil, fmt.Errorf("non *Element returned from storage: %v", item))
-				return
-			}
-			if !yield(elem, nil) {
-				return
-			}
+		if s.inRange(prefix, continueKey) {
+			yield(s.elem, nil)
 		}
 	}
 }
 
-func (o orderedListSnapshot) Count(prefix, continueKey string) int {
-	return len(o.Items)
+func (s elementSnapshot) Count(prefix, continueKey string) int {
+	if s.inRange(prefix, continueKey) {
+		return 1
+	}
+	return 0
 }
 
 // listSnapshot serves an unordered index bucket.
@@ -181,73 +165,41 @@ func (l listSnapshot) GetByKey(key string) (interface{}, bool, error) {
 	return nil, false, nil
 }
 
-func (l listSnapshot) OrderedListPrefix(prefix string, continueKey string) ([]interface{}, error) {
-	var result []interface{}
-	for _, item := range l.Items {
-		elem, ok := item.(*Element)
-		if !ok {
-			return nil, fmt.Errorf("non *Element returned from storage: %v", item)
-		}
-		if len(continueKey) > 0 && continueKey > elem.Key {
-			continue
-		}
-		if !key.HasPathPrefix(elem.Key, prefix) {
-			continue
-		}
-		result = append(result, item)
-	}
-	sort.Sort(sortableStoreElements(result))
-	return result, nil
-}
-
 func (l listSnapshot) RangePrefix(prefix, continueKey string) iter.Seq2[*Element, error] {
 	return func(yield func(*Element, error) bool) {
-		items, err := l.OrderedListPrefix(prefix, continueKey)
-		if err != nil {
-			yield(nil, err)
-			return
+		var elems []*Element
+		for _, item := range l.Items {
+			elem, ok := item.(*Element)
+			if !ok {
+				yield(nil, fmt.Errorf("non *Element returned from storage: %v", item))
+				return
+			}
+			if inRange(elem, prefix, continueKey) {
+				elems = append(elems, elem)
+			}
 		}
-		for _, item := range items {
-			// OrderedListPrefix has already checked every item is an *Element.
-			if !yield(item.(*Element), nil) {
+		sort.Slice(elems, func(i, j int) bool { return elems[i].Key < elems[j].Key })
+		for _, elem := range elems {
+			if !yield(elem, nil) {
 				return
 			}
 		}
 	}
 }
 
-// Count returns the number of items RangePrefix(prefix, continueKey) would
-// yield, by applying its filter without allocating or sorting.
+// Count applies RangePrefix's filter without allocating or sorting.
 func (l listSnapshot) Count(prefix, continueKey string) int {
 	count := 0
 	for _, item := range l.Items {
-		elem, ok := item.(*Element)
-		if !ok {
-			continue
+		if elem, ok := item.(*Element); ok && inRange(elem, prefix, continueKey) {
+			count++
 		}
-		if len(continueKey) > 0 && continueKey > elem.Key {
-			continue
-		}
-		if !key.HasPathPrefix(elem.Key, prefix) {
-			continue
-		}
-		count++
 	}
 	return count
 }
 
-type sortableStoreElements []interface{}
-
-func (s sortableStoreElements) Len() int {
-	return len(s)
-}
-
-func (s sortableStoreElements) Less(i, j int) bool {
-	return s[i].(*Element).Key < s[j].(*Element).Key
-}
-
-func (s sortableStoreElements) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
+func inRange(elem *Element, prefix, continueKey string) bool {
+	return continueKey <= elem.Key && key.HasPathPrefix(elem.Key, prefix)
 }
 
 // Get takes runtime.Object as a parameter. However, it returns

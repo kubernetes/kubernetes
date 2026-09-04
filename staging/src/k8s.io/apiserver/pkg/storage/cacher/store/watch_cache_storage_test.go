@@ -86,10 +86,9 @@ func TestLatestSnapshotLocked(t *testing.T) {
 
 	snap, ok := s.LatestSnapshotLocked()
 	require.True(t, ok, "expected snapshot after write")
-	items, err := snap.OrderedListPrefix("", "")
-	require.NoError(t, err)
+	items := allElements(t, snap)
 	assert.Len(t, items, 1)
-	assert.Equal(t, &mockObject{key: "foo", val: "100"}, items[0].(*Element).Object)
+	assert.Equal(t, &mockObject{key: "foo", val: "100"}, items[0].Object)
 }
 
 func TestWatchCacheStorageMatchExactResourceVersionFallback(t *testing.T) {
@@ -197,10 +196,9 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 
 	snap100, err := s.GetExactSnapshotLocked(100)
 	require.NoError(t, err)
-	elements, err := snap100.OrderedListPrefix("", "")
-	require.NoError(t, err)
+	elements := allElements(t, snap100)
 	assert.Len(t, elements, 1)
-	assert.Equal(t, &mockObject{key: "foo", val: "100"}, elements[0].(*Element).Object)
+	assert.Equal(t, &mockObject{key: "foo", val: "100"}, elements[0].Object)
 
 	t.Log("Compact snapshots to remove rev 100")
 	s.CompactSnapshotsLocked(200)
@@ -210,16 +208,14 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 	t.Log("Test cache on rev 200")
 	snap200, err := s.GetExactSnapshotLocked(200)
 	require.NoError(t, err)
-	elements, err = snap200.OrderedListPrefix("", "")
-	require.NoError(t, err)
+	elements = allElements(t, snap200)
 	assert.Len(t, elements, 1)
-	assert.Equal(t, &mockObject{key: "foo", val: "200"}, elements[0].(*Element).Object)
+	assert.Equal(t, &mockObject{key: "foo", val: "200"}, elements[0].Object)
 
 	t.Log("Test cache on rev 300")
 	snap300, err := s.GetExactSnapshotLocked(300)
 	require.NoError(t, err)
-	elements, err = snap300.OrderedListPrefix("", "")
-	require.NoError(t, err)
+	elements = allElements(t, snap300)
 	assert.Empty(t, elements)
 
 	t.Log("Test cache on rev 400")
@@ -228,10 +224,9 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 
 	snap400, err := s.GetExactSnapshotLocked(400)
 	require.NoError(t, err)
-	elements, err = snap400.OrderedListPrefix("", "")
-	require.NoError(t, err)
+	elements = allElements(t, snap400)
 	assert.Len(t, elements, 1)
-	assert.Equal(t, &mockObject{key: "foo", val: "400"}, elements[0].(*Element).Object)
+	assert.Equal(t, &mockObject{key: "foo", val: "400"}, elements[0].Object)
 
 	t.Log("Compact snapshots to simulate cache capacity downsize")
 	s.CompactSnapshotsLocked(500)
@@ -244,10 +239,9 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 
 	snap500, err := s.GetExactSnapshotLocked(500)
 	require.NoError(t, err)
-	elements, err = snap500.OrderedListPrefix("", "")
-	require.NoError(t, err)
+	elements = allElements(t, snap500)
 	assert.Len(t, elements, 1)
-	assert.Equal(t, &mockObject{key: "foo", val: "500"}, elements[0].(*Element).Object)
+	assert.Equal(t, &mockObject{key: "foo", val: "500"}, elements[0].Object)
 
 	t.Log("Test cache on rev 600")
 	elem6 := &Element{Key: "foo", Object: &mockObject{key: "foo", val: "600"}}
@@ -255,10 +249,9 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 
 	snap600, err := s.GetExactSnapshotLocked(600)
 	require.NoError(t, err)
-	elements, err = snap600.OrderedListPrefix("", "")
-	require.NoError(t, err)
+	elements = allElements(t, snap600)
 	assert.Len(t, elements, 1)
-	assert.Equal(t, &mockObject{key: "foo", val: "600"}, elements[0].(*Element).Object)
+	assert.Equal(t, &mockObject{key: "foo", val: "600"}, elements[0].Object)
 
 	t.Log("Replace cache to remove history")
 	_, err = s.GetExactSnapshotLocked(500)
@@ -277,8 +270,17 @@ func TestWatchCacheStorageSnapshots(t *testing.T) {
 	t.Log("Test cache on rev 700")
 	snap700, err := s.GetExactSnapshotLocked(700)
 	require.NoError(t, err)
-	elements, err = snap700.OrderedListPrefix("", "")
-	require.NoError(t, err)
+	elements = allElements(t, snap700)
 	assert.Len(t, elements, 1)
-	assert.Equal(t, &mockObject{key: "foo", val: "600"}, elements[0].(*Element).Object)
+	assert.Equal(t, &mockObject{key: "foo", val: "600"}, elements[0].Object)
+}
+
+func allElements(t *testing.T, snapshot Snapshot) []*Element {
+	t.Helper()
+	var elems []*Element
+	for elem, err := range snapshot.RangePrefix("", "") {
+		require.NoError(t, err)
+		elems = append(elems, elem)
+	}
+	return elems
 }
