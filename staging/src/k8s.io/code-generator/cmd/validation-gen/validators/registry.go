@@ -58,7 +58,7 @@ func (reg *registry) addTagValidator(tv TagValidator) {
 	reg.pending = append(reg.pending, tv)
 }
 
-func (reg *registry) init(c *generator.Context, inputToCanonicalPkg map[string]string, tagPrefix string) {
+func (reg *registry) init(c *generator.Context, inputToOutputPkgs map[string][]string, tagPrefix string) {
 	if reg.initialized.Load() {
 		panic("registry.init() was called twice")
 	}
@@ -68,10 +68,10 @@ func (reg *registry) init(c *generator.Context, inputToCanonicalPkg map[string]s
 
 	reg.prefix = tagPrefix
 	cfg := Config{
-		GengoContext:        c,
-		TagValidator:        reg,
-		InputToCanonicalPkg: inputToCanonicalPkg,
-		TagPrefix:           tagPrefix,
+		GengoContext:      c,
+		TagValidator:      reg,
+		InputToOutputPkgs: inputToOutputPkgs,
+		TagPrefix:         tagPrefix,
 	}
 
 	reg.tagValidators = map[string]TagValidator{}
@@ -288,7 +288,7 @@ func IsKnownTag(tag string) bool {
 //
 // tagPrefix qualifies the name of every registered tag, e.g. "k8s:" makes the
 // tag validator named "required" recognize "+k8s:required".
-func InitGlobalValidator(c *generator.Context, inputToCanonicalPkg map[string]string, tagPrefix string) ValidationExtractor {
-	globalRegistry.init(c, inputToCanonicalPkg, tagPrefix)
+func InitGlobalValidator(c *generator.Context, inputToOutputPkgs map[string][]string, tagPrefix string) ValidationExtractor {
+	globalRegistry.init(c, inputToOutputPkgs, tagPrefix)
 	return globalRegistry
 }

@@ -18,6 +18,7 @@ package validators
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -52,9 +53,9 @@ func init() {
 // (in the generated package, found by naming convention) into the generated
 // traversal, so it inherits traversal, ratcheting and short-circuiting.
 type customValidationTagValidator struct {
-	gengoContext        *generator.Context
-	inputToCanonicalPkg map[string]string
-	prefix              string
+	gengoContext      *generator.Context
+	inputToOutputPkgs map[string][]string
+	prefix            string
 	// claimed records every function a tag wired (directly or via a composing
 	// tag such as ifEnabled), so verifyCustomFunctions can spot ValidateCustom_*
 	// functions defined without a tag.
@@ -63,7 +64,7 @@ type customValidationTagValidator struct {
 
 func (v *customValidationTagValidator) Init(cfg Config) {
 	v.gengoContext = cfg.GengoContext
-	v.inputToCanonicalPkg = cfg.InputToCanonicalPkg
+	v.inputToOutputPkgs = cfg.InputToOutputPkgs
 	v.prefix = cfg.TagPrefix
 	v.claimed = map[types.Name]bool{}
 }
@@ -85,10 +86,13 @@ func (v *customValidationTagValidator) GetValidations(context Context, _ codetag
 	if context.Scope == ScopeField {
 		definingType = context.ParentType
 	}
-	outPkg, ok := v.inputToCanonicalPkg[definingType.Name.Package]
+	outPkgs, ok := v.inputToOutputPkgs[definingType.Name.Package]
 	if !ok {
 		return Validations{}, fmt.Errorf("cannot resolve generated package for %s (is it being processed by validation-gen?)", definingType.Name.Package)
 	}
+	// The call site is the same for every copy of the input's validation, so the
+	// hand-written function must live in the canonical package.
+	outPkg := outPkgs[0]
 
 	// Resolve the function name from the naming convention.
 	funcName := customValidationFuncPrefix + definingType.Name.Name
@@ -132,28 +136,31 @@ func (v *customValidationTagValidator) verifyCustomFunctions() error {
 	}
 	var issues []string
 	scanned := map[string]bool{}
-	for inPkg, outPkg := range v.inputToCanonicalPkg {
+	for inPkg, outPkgs := range v.inputToOutputPkgs {
 		// A ValidateCustom_* function in the input package is misplaced; it must
-		// live in the generated package. (inPkg == outPkg for self-contained
-		// packages, e.g. test fixtures.)
-		if inPkg != outPkg {
+		// live in a generated package. (Self-contained packages, e.g. test
+		// fixtures, generate into themselves.)
+		if !slices.Contains(outPkgs, inPkg) {
 			if pkg := v.gengoContext.Universe[inPkg]; pkg != nil {
 				for name := range pkg.Functions {
 					if strings.HasPrefix(name, customValidationFuncPrefix) {
-						issues = append(issues, fmt.Sprintf("%s.%s: move to the generated package %s", inPkg, name, outPkg))
+						issues = append(issues, fmt.Sprintf("%s.%s: move to the generated package %s", inPkg, name, outPkgs[0]))
 					}
 				}
 			}
 		}
-		// A ValidateCustom_* function in the generated package with no tag.
-		if scanned[outPkg] {
-			continue
-		}
-		scanned[outPkg] = true
-		if pkg := v.gengoContext.Universe[outPkg]; pkg != nil {
-			for name := range pkg.Functions {
-				if strings.HasPrefix(name, customValidationFuncPrefix) && !v.claimed[types.Name{Package: outPkg, Name: name}] {
-					issues = append(issues, fmt.Sprintf("%s.%s: no matching tag (add +%s, or rename if not a custom validation)", outPkg, name, v.prefix+customValidationTagName))
+		// A ValidateCustom_* function in a generated package with no tag. Calls
+		// only resolve to the canonical package, so a copy elsewhere is dead code.
+		for _, outPkg := range outPkgs {
+			if scanned[outPkg] {
+				continue
+			}
+			scanned[outPkg] = true
+			if pkg := v.gengoContext.Universe[outPkg]; pkg != nil {
+				for name := range pkg.Functions {
+					if strings.HasPrefix(name, customValidationFuncPrefix) && !v.claimed[types.Name{Package: outPkg, Name: name}] {
+						issues = append(issues, fmt.Sprintf("%s.%s: no matching tag (add +%s, or rename if not a custom validation)", outPkg, name, v.prefix+customValidationTagName))
+					}
 				}
 			}
 		}

@@ -77,12 +77,12 @@ type Config struct {
 	// be initialized yet.
 	TagValidator TagValidationExtractor
 
-	// InputToCanonicalPkg maps each input (API types) package to its canonical
-	// generated validation package (the one cross-package references resolve to).
-	// This is the same mapping the generator uses to locate generated
-	// Validate_<Type> functions, and lets validators reference hand-written
-	// functions that live alongside the generated code (e.g. +k8s:customValidation).
-	InputToCanonicalPkg map[string]string
+	// InputToOutputPkgs maps each input (API types) package to the packages its
+	// validation is generated into, canonical one first.  This is the same
+	// mapping the generator uses to locate generated Validate_<Type> functions,
+	// and lets validators reference hand-written functions that live alongside
+	// the generated code (e.g. +k8s:customValidation).
+	InputToOutputPkgs map[string][]string
 
 	// TagPrefix qualifies every registered tag name, e.g. "k8s:" for
 	// "+k8s:required". Validators that refer to other tags by name, in

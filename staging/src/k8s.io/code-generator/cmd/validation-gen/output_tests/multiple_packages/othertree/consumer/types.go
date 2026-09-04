@@ -14,15 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Its types reference ../types; neither copy is nearer, so validators must call
-// the canonical (registered) one.  Compare ../othertree/consumer.
-// +k8s:validation-gen=TypesWithField=TypeMeta
-// +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
-
-// This is a test package.
-// +k8s:validation-gen-nolint
 package consumer
 
-import "k8s.io/code-generator/cmd/validation-gen/testscheme"
+import "k8s.io/code-generator/cmd/validation-gen/output_tests/multiple_packages/types"
 
-var localSchemeBuilder = testscheme.New()
+type Consumer struct {
+	TypeMeta int
+
+	Shared types.T2 `json:"shared"`
+}
