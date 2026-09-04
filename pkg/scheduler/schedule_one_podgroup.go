@@ -19,9 +19,6 @@ package scheduler
 import (
 	"context"
 	"fmt"
-	"iter"
-	"maps"
-	"math/rand"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -29,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
@@ -319,51 +315,19 @@ func (sched *Scheduler) skipPodGroupPodSchedule(ctx context.Context, schedFwk fr
 	}
 }
 
-// initPodSchedulingContext initializes the scheduling context of a single pod for pod group scheduling cycle.
-func initPodSchedulingContext(ctx context.Context, pod *v1.Pod, placementCycleState *framework.CycleState) *podSchedulingContext {
-	logger := klog.FromContext(ctx)
-	// TODO(knelasevero): Remove duplicated keys from log entry calls
-	// When contextualized logging hits GA
-	// https://github.com/kubernetes/kubernetes/issues/111672
-	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
-
-	// Synchronously attempt to find a fit for the pod.
-	state := framework.NewCycleState()
-	// For the sake of performance, scheduler does not measure and export the scheduler_plugin_execution_duration metric
-	// for every plugin execution in each scheduling cycle. Instead it samples a portion of scheduling cycles - percentage
-	// determined by pluginMetricsSamplePercent. The line below helps to randomly pick appropriate scheduling cycles.
-	state.SetRecordPluginMetrics(rand.Intn(100) < pluginMetricsSamplePercent)
-
-	// Initialize an empty podsToActivate struct, which will be filled up by plugins or stay empty.
-	podsToActivate := framework.NewPodsToActivate()
-	state.Write(framework.PodsToActivateKey, podsToActivate)
-
-	podGroupCycleState := placementCycleState.GetPodGroupCycleState()
-	// Marks this cycle as a pod group scheduling cycle.
-	state.SetPodGroupCycleState(podGroupCycleState)
-	// Set the placement cycle state so per-pod plugins can access placement-scoped data.
-	state.SetPlacementCycleState(placementCycleState)
-
-	return &podSchedulingContext{
-		logger:         logger,
-		state:          state,
-		podsToActivate: podsToActivate,
-	}
-}
-
 // podGroupCycle runs a pod group scheduling cycle for the given pod group.
 // Cluster state should be snapshotted before calling this method.
 func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, rootPodGroupInfo *framework.QueuedPodGroupInfo, start time.Time) {
-	pgResults := sched.runRootSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, rootPodGroupInfo)
+	pgResults := sched.podGroupAlgorithm.RunRootSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, rootPodGroupInfo)
 	rootStatus := pgResults[rootPodGroupInfo.PodGroupInfo.GetKey()].status
-	var completePGResults map[fwk.EntityKey]*podGroupAlgorithmResult
+	var completePGResults map[fwk.EntityKey]*PodGroupScheduledResult
 	if rootPodGroupInfo.GetType() == fwk.CompositePodGroupKeyType {
 		completePGResults = completeCompositePodGroupAlgorithmResult(ctx, rootPodGroupInfo, podGroupCycleState, pgResults)
 	} else {
 		// pgResults has exactly 1 element.
 		queuedPodInfos := rootPodGroupInfo.PodInfosForGroup(rootPodGroupInfo.PodGroupInfo.GetKey())
 		result := completePodGroupAlgorithmResult(ctx, queuedPodInfos, podGroupCycleState, pgResults[rootPodGroupInfo.PodGroupInfo.GetKey()])
-		completePGResults = map[fwk.EntityKey]*podGroupAlgorithmResult{rootPodGroupInfo.PodGroupInfo.GetKey(): result}
+		completePGResults = map[fwk.EntityKey]*PodGroupScheduledResult{rootPodGroupInfo.PodGroupInfo.GetKey(): result}
 	}
 
 	metrics.PodGroupSchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
@@ -372,7 +336,7 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 	// we need to put the pods from pod group back into the scheduling queue.
 	if rootStatus.Code() == fwk.Unschedulable {
 		var pgSchedulingFunc fwk.PodGroupSchedulingFunc = func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
-			results := sched.runRootSchedulingAlgorithm(ctx, schedFwk, framework.NewCycleState(), rootPodGroupInfo)
+			results := sched.podGroupAlgorithm.RunRootSchedulingAlgorithm(ctx, schedFwk, framework.NewCycleState(), rootPodGroupInfo)
 			proposedAssignments := make([]fwk.ProposedAssignment, 0)
 			for _, res := range results {
 				proposedAssignments = append(proposedAssignments, makeProposedAssignments(res)...)
@@ -388,191 +352,8 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 	sched.submitPodGroupAlgorithmResult(ctx, schedFwk, podGroupCycleState, rootPodGroupInfo, completePGResults, start, rootStatus)
 }
 
-// runRootSchedulingAlgorithm orchestrates the scheduling attempt for a root pod group.
-// It decides whether to evaluate a single group or recursively evaluate a composite group hierarchy
-// and eventually cleans up the tentative reservations that the algorithm makes during its execution.
-// The returned map aggregates scheduling results across the entire pod group hierarchy.
-func (sched *Scheduler) runRootSchedulingAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, rootPodGroupInfo *framework.QueuedPodGroupInfo) map[fwk.EntityKey]*podGroupAlgorithmResult {
-	var revertFns revertFns
-	defer revertFns.revert()
-	if rootPodGroupInfo.GetType() == fwk.CompositePodGroupKeyType {
-		result := map[fwk.EntityKey]*podGroupAlgorithmResult{}
-		rootResult, childRevertFns := sched.podGroupSchedulingRecursiveAlgorithm(ctx, schedFwk, podGroupCycleState, rootPodGroupInfo, rootPodGroupInfo.PodGroupInfo, result)
-		revertFns = childRevertFns
-		if rootResult.status.IsSuccess() && !rootResult.anyScheduled {
-			// The framework requires at least 1 pod to be scheduled in order to return a success status.
-			fitError := newPodGroupFitError(fwk.NewStatus(fwk.Unschedulable, "no pods were schedulable"))
-			rootResult.status = fwk.NewStatus(fwk.Unschedulable).WithError(fitError)
-		}
-		return result
-	}
-	result, childRevertFns := sched.podGroupSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, rootPodGroupInfo.PodGroupInfo, rootPodGroupInfo)
-	revertFns = childRevertFns
-
-	if result.status.IsSuccess() && !result.anyScheduled {
-		// The framework requires at least 1 pod to be scheduled in order to return a success status.
-		fitError := newPodGroupFitError(fwk.NewStatus(fwk.Unschedulable, "no pods were schedulable"))
-		result.status = fwk.NewStatus(fwk.Unschedulable).WithError(fitError)
-	}
-	return map[fwk.EntityKey]*podGroupAlgorithmResult{result.podGroupInfo.GetKey(): result}
-}
-
-// podGroupSchedulingDefaultAlgorithm runs the default algorithm for scheduling a pod group.
-// It tries to schedule each pod using standard filtering and scoring logic in a fixed order.
-// If a pod requires preemption to be schedulable, subsequent pods in the algorithm
-// treat that pod as already scheduled on that node with victims being already removed in memory.
-// The returned revertFns accumulates revert functions for all scheduled pods, allowing the caller
-// to rollback tentative reservations if the pod group scheduling cycle fails.
-func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, schedFwk framework.Framework, placementCycleState *framework.CycleState, podGroupInfo *framework.PodGroupInfo, queuedPodGroupInfo *framework.QueuedPodGroupInfo) (result *podGroupAlgorithmResult, revertFns revertFns) {
-	defer func() {
-		if !result.status.IsSuccess() {
-			revertFns.revert()
-			result.anyScheduled = false
-		}
-	}()
-
-	// Retrieve the queued podinfos for the given pod group from the root queuedPodGroupInfo.
-	queuedPodInfos := queuedPodGroupInfo.PodInfosForGroup(podGroupInfo.GetKey())
-	result = &podGroupAlgorithmResult{
-		podGroupInfo:        podGroupInfo,
-		podResults:          make([]algorithmResult, 0, len(queuedPodInfos)),
-		status:              fwk.NewStatus(fwk.Unschedulable),
-		waitingOnPreemption: false,
-		placementCycleState: placementCycleState,
-	}
-
-	logger := klog.FromContext(ctx)
-	logger.V(5).Info("Running a pod group scheduling algorithm", "podGroup", klog.KObj(podGroupInfo), "unscheduledPodsCount", len(queuedPodInfos))
-
-	podGroupState, err := sched.nodeInfoSnapshot.PodGroupStates().Get(podGroupInfo.GetNamespace(), podGroupInfo.GetName())
-	if err != nil {
-		result.status = fwk.AsStatus(fmt.Errorf("failed to get podGroup state for podGroup %s to compute gang feasibility: %w", klog.KObj(podGroupInfo), err))
-		return result, nil
-	}
-
-	// Run PlacementFeasible plugins to check if the pod group can meet its constraints
-	// before even attempting to schedule any pods.
-	placementProgress := fwk.PlacementProgress{
-		Remaining: len(podGroupInfo.GetAllUnscheduledPods()),
-		Scheduled: podGroupState.ScheduledPodsCount(),
-	}
-	proceed, placementFeasibleStatus := podGroupPotentiallyFeasible(ctx, schedFwk, placementCycleState, podGroupInfo, placementProgress)
-	result.status = placementFeasibleStatus
-	if !proceed {
-		// PlacementFeasible plugins said not to proceed to the subsequent pods.
-		// Exit early from the pod group algorithm.
-		return result, nil
-	}
-
-	anyScheduled := false
-	for _, podInfo := range queuedPodInfos {
-		podResult, revertFn := sched.podGroupPodSchedulingAlgorithm(ctx, schedFwk, placementCycleState, podGroupInfo, podInfo)
-		result.podResults = append(result.podResults, podResult)
-		if revertFn != nil {
-			revertFns.append([]func(){revertFn})
-		}
-
-		if !podResult.status.IsSuccess() && !podResult.status.IsRejected() {
-			// When the algorithm returns error or unexpected status, stop evaluating the rest of the pods.
-			result.status = fwk.AsStatus(fmt.Errorf("failed to schedule other pod from a pod group: %w", podResult.status.AsError()))
-			break
-		}
-
-		// Check if the pod group can still meet its constraints after scheduling the current pod.
-		placementProgress.Remaining--
-		if podResult.status.IsSuccess() {
-			placementProgress.Scheduled++
-		}
-		proceed, placementFeasibleStatus := podGroupPotentiallyFeasible(ctx, schedFwk, placementCycleState, podGroupInfo, placementProgress)
-		result.status = placementFeasibleStatus
-		if !proceed {
-			// PlacementFeasible plugins said not to proceed to the subsequent pods.
-			// We can stop the scheduling loop early.
-			break
-		}
-		anyScheduled = anyScheduled || podResult.status.IsSuccess()
-	}
-
-	result.anyScheduled = anyScheduled
-	return result, revertFns
-}
-
-// podGroupPotentiallyFeasible runs placement feasible plugins and returns a status indicating whether
-// the (composite) pod group can meet its constraints based on the placement progress.
-// It returns true when the scheduling should proceed, false otherwise.
-// Returned status is modified to be fine to be copied directly to the podGroupAlgorithmResult.
-func podGroupPotentiallyFeasible(ctx context.Context, schedFwk framework.Framework, placementCycleState *framework.CycleState, podGroupInfo *framework.PodGroupInfo, placementProgress fwk.PlacementProgress) (bool, *fwk.Status) {
-	status := schedFwk.RunPlacementFeasiblePlugins(ctx, placementCycleState, podGroupInfo, placementProgress)
-	switch status.Code() {
-	case fwk.Error:
-		// Do not evaluate more children if PlacementFeasible plugins return error or unexpected status.
-		return false, fwk.AsStatus(fmt.Errorf("failed to evaluate placement feasibility: %w", status.AsError()))
-	case fwk.Unschedulable:
-		// Unschedulable from PlacementFeasible plugins indicates that the (composite) pod group
-		// cannot meet its constraints, even if we succeed in scheduling all the children.
-		fitError := newPodGroupFitError(status)
-		return false, fwk.NewStatus(fwk.Unschedulable).WithError(fitError)
-	case fwk.Wait:
-		// Wait status indicates the scheduling should proceed,
-		// while at the same time, if it's a terminal status, the outcome should be Unschedulable.
-		fitError := newPodGroupFitError(status)
-		return true, fwk.NewStatus(fwk.Unschedulable).WithError(fitError)
-	default:
-		return true, status
-	}
-}
-
-// podGroupPodSchedulingAlgorithm runs a scheduling algorithm for individual pod from a pod group.
-// It returns the algorithm result together with the revert function.
-// The returned revert function rolls back tentative node reservations for the pod if the overall
-// pod group fails to schedule.
-//
-// Pods of a pod group are assumed into the snapshot rather than the cache: the group's placement
-// stays tentative until the whole group is submitted, and a snapshot assume is dropped by the
-// next UpdateSnapshot instead of outliving the cycle.
-func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, schedFwk framework.Framework,
-	placementCycleState *framework.CycleState, podGroupInfo *framework.PodGroupInfo,
-	podInfo *framework.QueuedPodInfo) (algorithmResult, func()) {
-
-	pod := podInfo.Pod
-	podCtx := initPodSchedulingContext(ctx, pod, placementCycleState)
-	logger := podCtx.logger
-	ctx = klog.NewContext(ctx, logger)
-	start := time.Now()
-
-	logger.V(4).Info("Attempting to schedule a pod belonging to a pod group",
-		"podGroup", klog.KObj(podGroupInfo), "pod", klog.KObj(pod))
-
-	scheduleResult, status := sched.schedulingAlgorithm(ctx, podCtx.state, schedFwk, podInfo, start)
-
-	algorithmResult := algorithmResult{
-		podInfo:            podInfo,
-		scheduleResult:     scheduleResult,
-		schedulingDuration: time.Since(start),
-		podCtx:             podCtx,
-		status:             status,
-	}
-
-	if !status.IsSuccess() {
-		return algorithmResult, nil
-	}
-
-	assumeStatus, revertFn := sched.algorithm.AssumeAndReserveInSnapshot(
-		ctx, podCtx.state, schedFwk, podInfo, scheduleResult)
-	algorithmResult.schedulingDuration = time.Since(start)
-	if !assumeStatus.IsSuccess() {
-		// The evaluation succeeded but the placement could not be held: drop the
-		// result and clear the nomination, as the single-pod cycle does.
-		algorithmResult.scheduleResult = ScheduleResult{nominatingInfo: clearNominatedNode}
-		algorithmResult.status = assumeStatus
-		return algorithmResult, nil
-	}
-
-	return algorithmResult, revertFn
-}
-
 // completePodGroupAlgorithmResult ensures that the podGroupAlgorithmResult contains the same number of podResults as there are queued pods in the pod group.
-func completePodGroupAlgorithmResult(ctx context.Context, queuedPodInfos []*framework.QueuedPodInfo, podGroupState *framework.CycleState, podGroupResult *podGroupAlgorithmResult) *podGroupAlgorithmResult {
+func completePodGroupAlgorithmResult(ctx context.Context, queuedPodInfos []*framework.QueuedPodInfo, podGroupState *framework.CycleState, podGroupResult *PodGroupScheduledResult) *PodGroupScheduledResult {
 	numInResult := len(podGroupResult.podResults)
 	numInQueue := len(queuedPodInfos)
 	if numInResult == numInQueue {
@@ -597,8 +378,8 @@ func completePodGroupAlgorithmResult(ctx context.Context, queuedPodInfos []*fram
 // completeCompositePodGroupAlgorithmResult post-processes scheduling results for a composite pod group.
 // It ensures that every pod in every subgroup has a fully populated status and that failure statuses
 // are propagated down the tree before finalizing the cycle.
-func completeCompositePodGroupAlgorithmResult(ctx context.Context, rootPodGroupInfo *framework.QueuedPodGroupInfo, rootCycleState *framework.CycleState, pgResults map[fwk.EntityKey]*podGroupAlgorithmResult) map[fwk.EntityKey]*podGroupAlgorithmResult {
-	completeCompositePodGroupAlgorithmResultMap(ctx, rootPodGroupInfo.PodGroupInfo, pgResults, &podGroupAlgorithmResult{})
+func completeCompositePodGroupAlgorithmResult(ctx context.Context, rootPodGroupInfo *framework.QueuedPodGroupInfo, rootCycleState *framework.CycleState, pgResults map[fwk.EntityKey]*PodGroupScheduledResult) map[fwk.EntityKey]*PodGroupScheduledResult {
+	completeCompositePodGroupAlgorithmResultMap(ctx, rootPodGroupInfo.PodGroupInfo, pgResults, &PodGroupScheduledResult{})
 	for pgKey, queuedPodInfos := range rootPodGroupInfo.ForEachGroupAndPodInfos() {
 		pgResult := pgResults[pgKey]
 		// Ensure podResults has an entry for each pod in the pod group with a status.
@@ -610,12 +391,12 @@ func completeCompositePodGroupAlgorithmResult(ctx context.Context, rootPodGroupI
 // completeCompositePodGroupAlgorithmResultMap propagates scheduling failures from parents to children.
 // This is necessary because child pod groups cannot be committed or bound if their parent composite
 // pod group fails to meet its scheduling requirements.
-func completeCompositePodGroupAlgorithmResultMap(ctx context.Context, podGroupInfo *framework.PodGroupInfo, pgResults map[fwk.EntityKey]*podGroupAlgorithmResult, parentResult *podGroupAlgorithmResult) {
+func completeCompositePodGroupAlgorithmResultMap(ctx context.Context, podGroupInfo *framework.PodGroupInfo, pgResults map[fwk.EntityKey]*PodGroupScheduledResult, parentResult *PodGroupScheduledResult) {
 	key := podGroupInfo.GetKey()
 	result, ok := pgResults[key]
 	if !ok {
 		// In case the pod group wasn't processed, create the result and set its status to parent.
-		result = &podGroupAlgorithmResult{
+		result = &PodGroupScheduledResult{
 			podGroupInfo: podGroupInfo,
 			status:       parentResult.status.Clone(),
 		}
@@ -641,7 +422,7 @@ func completeCompositePodGroupAlgorithmResultMap(ctx context.Context, podGroupIn
 // nominations are properly registered so they can reclaim resources, and that scheduling failures,
 // errors, and preemption states are propagated down the hierarchy (including composite groups)
 // to prevent invalid bindings and ensure accurate root-level metrics.
-func applyPodGroupPostFilterResult(completePGResults map[fwk.EntityKey]*podGroupAlgorithmResult, pgPostFilterResult *fwk.PodGroupPostFilterResult, status *fwk.Status) {
+func applyPodGroupPostFilterResult(completePGResults map[fwk.EntityKey]*PodGroupScheduledResult, pgPostFilterResult *fwk.PodGroupPostFilterResult, status *fwk.Status) {
 	if status.IsError() {
 		for _, pgResult := range completePGResults {
 			pgResult.status = status.Clone()
@@ -687,7 +468,7 @@ func applyPodGroupPostFilterResult(completePGResults map[fwk.EntityKey]*podGroup
 // TODO(#142269): Group statuses are updated sequentially and synchronously on the main
 // scheduling goroutine. Offload or parallelize these updates for larger hierarchies to avoid
 // head-of-line blocking in the scheduling queue.
-func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, schedFwk framework.Framework, podGroupState *framework.CycleState, rootPodGroupInfo *framework.QueuedPodGroupInfo, podGroupResults map[fwk.EntityKey]*podGroupAlgorithmResult, start time.Time, rootStatus *fwk.Status) {
+func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, schedFwk framework.Framework, podGroupState *framework.CycleState, rootPodGroupInfo *framework.QueuedPodGroupInfo, podGroupResults map[fwk.EntityKey]*PodGroupScheduledResult, start time.Time, rootStatus *fwk.Status) {
 	logger := klog.FromContext(ctx)
 
 	for _, podGroupResult := range podGroupResults {
@@ -720,7 +501,7 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 }
 
 // submitCompositePodGroupResult updates the CompositePodGroup status condition based on the scheduling outcome.
-func (sched *Scheduler) submitCompositePodGroupResult(ctx context.Context, podGroupResult *podGroupAlgorithmResult) {
+func (sched *Scheduler) submitCompositePodGroupResult(ctx context.Context, podGroupResult *PodGroupScheduledResult) {
 	logger := klog.FromContext(ctx)
 	pgi := podGroupResult.podGroupInfo
 	var condition *metav1.Condition
@@ -762,7 +543,7 @@ func (sched *Scheduler) submitCompositePodGroupResult(ctx context.Context, podGr
 // submitPodGroupResult processes scheduling results for a leaf PodGroup and its member pods.
 // Schedulable pods proceed to their binding cycles if the PodGroup succeeded, while unschedulable,
 // preempting, or errored pods are passed to the FailureHandler for requeueing.
-func (sched *Scheduler) submitPodGroupResult(ctx context.Context, schedFwk framework.Framework, podGroupState *framework.CycleState, queuedPodInfos []*framework.QueuedPodInfo, podGroupResult *podGroupAlgorithmResult) {
+func (sched *Scheduler) submitPodGroupResult(ctx context.Context, schedFwk framework.Framework, podGroupState *framework.CycleState, queuedPodInfos []*framework.QueuedPodInfo, podGroupResult *PodGroupScheduledResult) {
 	logger := klog.FromContext(ctx)
 	pgi := podGroupResult.podGroupInfo
 
@@ -920,592 +701,5 @@ func (sched *Scheduler) updateCompositePodGroupCondition(ctx context.Context,
 
 	if err := util.PatchCompositePodGroupStatus(ctx, sched.client, podGroupInfo.GetName(), podGroupInfo.GetNamespace(), &cpg.Status, newStatus); err != nil {
 		utilruntime.HandleErrorWithLogger(logger, err, "Failed to update CompositePodGroup status", "compositePodGroup", klog.KObj(podGroupInfo))
-	}
-}
-
-// podGroupSchedulingPlacementAlgorithm tries several different combinations for scheduling the pod group and selects the best one.
-// First it runs placement generator plugins to create a list of placements.
-// Placement is a set of nodes that will be considered when scheduling a pod group.
-// For a standalone PodGroup it evaluates the placement matching the pods' NominatedNodeName first
-// and uses it if the gang is feasible there, short-circuiting the rest. Otherwise (or for a
-// PodGroup that is part of a CompositePodGroup) it tries every placement through
-// podGroupSchedulingDefaultAlgorithm and runs placement scorer plugins to select the best one.
-func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, podGroupInfo *framework.PodGroupInfo, queuedPodGroupInfo *framework.QueuedPodGroupInfo) (finalResult *podGroupAlgorithmResult, revertFns revertFns) {
-	allNodes, err := sched.nodeInfoSnapshot.ListNodesInPlacement()
-	if err != nil {
-		return &podGroupAlgorithmResult{
-			podGroupInfo: podGroupInfo,
-			status:       fwk.AsStatus(fmt.Errorf("failed to list node infos: %w", err)),
-		}, nil
-	}
-
-	// For now, always record plugin metrics until we understand its impact on performance.
-	podGroupCycleState.SetRecordPluginMetrics(true)
-	placements, status := schedFwk.RunPlacementGeneratePlugins(ctx, podGroupCycleState, podGroupInfo, allNodes)
-	if !status.IsSuccess() {
-		return &podGroupAlgorithmResult{
-			podGroupInfo: podGroupInfo,
-			status:       status,
-		}, nil
-	}
-	metrics.RecordGeneratedPlacements(schedFwk.ProfileName(), len(placements))
-
-	var anyResult *podGroupAlgorithmResult
-	successfulResults := make(map[*fwk.Placement]*podGroupAlgorithmResult)
-
-	parentPlacement := sched.nodeInfoSnapshot.GetPlacement()
-	defer func() {
-		sched.nodeInfoSnapshot.ForgetPlacement()
-		err := sched.nodeInfoSnapshot.AssumePlacement(parentPlacement)
-		if err != nil {
-			finalResult.status = fwk.AsStatus(fmt.Errorf("failed to restore parent pod group placement: %w", err))
-			revertFns.revert()
-		}
-	}()
-
-	// Try the placement matching the pods' NominatedNodeName first, mirroring pod-by-pod
-	// scheduling, which evaluates the nominated node before all others. A nominated node is
-	// usually set by a previous preemption cycle and is the placement the pod group is
-	// expected to land on, so if the gang is feasible there we use it and skip the rest.
-	//
-	// This fast path is limited to standalone PodGroups. A PodGroup that is part of a
-	// CompositePodGroup defers its feasibility verdict to the CPG root, where a Success status
-	// with nothing scheduled is still meaningful. Short-circuiting on it (or dropping it) here
-	// could wrongly report the whole CPG Unschedulable and stop sibling groups from being
-	// evaluated, so CPG children evaluate every placement as before.
-	// TODO(kubernetes/kubernetes#140863): extend NNN support to CompositePodGroups.
-	nominatedFeasible := false
-	var nominated *fwk.Placement
-	if queuedPodGroupInfo.GetType() == fwk.PodGroupKeyType {
-		nominated = nominatedPlacement(placements, podGroupInfo, queuedPodGroupInfo)
-	}
-	if nominated != nil {
-		result := sched.evaluatePlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, queuedPodGroupInfo, nominated)
-		if result.status.IsError() {
-			return result, nil
-		}
-		anyResult = result
-		// Honoring the nominated placement matters more than fitting more pods elsewhere: the NNN
-		// was typically set by a prior preemption cycle. This mirrors pod-by-pod NNN, which can
-		// pick a non-optimal node because it skips scoring. The tradeoff: when minCount < len(pods)
-		// we may prefer the nominated placement over one that fits the whole gang. For a standalone
-		// PodGroup a Success status implies at least minCount pods were placed. The anyScheduled
-		// check prevents short-circuiting when the placement is feasible only because minCount pods
-		// were already scheduled in previous cycles (for example minCount=3 with 3 pods already
-		// running), but we failed to place any newly arriving pods on the nominated placement.
-		if result.status.IsSuccess() && result.anyScheduled {
-			successfulResults[nominated] = result
-			nominatedFeasible = true
-		}
-	}
-
-	// Only evaluate the remaining placements when the nominated one wasn't feasible.
-	if !nominatedFeasible {
-		for _, placement := range placements {
-			if placement == nominated {
-				continue
-			}
-			result := sched.evaluatePlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, queuedPodGroupInfo, placement)
-			if result.status.IsError() {
-				return result, nil
-			}
-
-			if anyResult == nil {
-				anyResult = result
-			}
-
-			if result.status.IsSuccess() {
-				successfulResults[placement] = result
-			}
-		}
-	}
-
-	if len(successfulResults) == 0 {
-		// We need to send events and set the status for pods in case all simulations were infeasible.
-		// anyResult is the nominated placement's result when one was evaluated, otherwise the first
-		// placement tried. Which one we report is otherwise arbitrary and may change in the future.
-		// A feasible nominated placement that scheduled no new pod leaves anyResult with a Success
-		// status and no message; report an actionable reason rather than an empty one.
-		reportStatus := anyResult.status
-		if reportStatus.IsSuccess() {
-			reportStatus = fwk.NewStatus(fwk.Unschedulable, "nominated placement is feasible but no pending pod was scheduled")
-		}
-		fitError := newPodGroupPlacementFitError(reportStatus, len(placements))
-		anyResult.status = fwk.NewStatus(fwk.Unschedulable).WithError(fitError)
-		return anyResult, nil
-	}
-
-	bestPlacement, status := sched.findBestPodGroupPlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, successfulResults)
-	if !status.IsSuccess() {
-		return &podGroupAlgorithmResult{
-			podGroupInfo: podGroupInfo,
-			status:       status,
-		}, nil
-	}
-	bestResult := successfulResults[bestPlacement]
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
-		revertFns, err = sched.assumeSubtreeWithRevert(ctx, schedFwk, podGroupInfo, map[fwk.EntityKey]*podGroupAlgorithmResult{podGroupInfo.GetKey(): bestResult})
-		if err != nil {
-			return &podGroupAlgorithmResult{
-				podGroupInfo: podGroupInfo,
-				status:       fwk.AsStatus(fmt.Errorf("failed to assume the subtree: %w", err)),
-			}, nil
-		}
-
-		return bestResult, revertFns
-	}
-	return bestResult, nil
-}
-
-// compositePodGroupSchedulingPlacementAlgorithm tries several different combinations for scheduling the child pod groups and selects the best one.
-// First it runs placement generator plugins to create a list of placements.
-// Placement is a set of nodes that will be considered when scheduling a pod group.
-// Then for each placement it tries to schedule the pod group through podGroupSchedulingDefaultAlgorithm.
-// Finally, it runs placement scorer plugins to select the best placement.
-func (sched *Scheduler) compositePodGroupSchedulingPlacementAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, root *framework.QueuedPodGroupInfo, podGroupInfo *framework.PodGroupInfo, results map[fwk.EntityKey]*podGroupAlgorithmResult) (finalResult *podGroupAlgorithmResult, revertFns revertFns) {
-	defer func() {
-		results[podGroupInfo.GetKey()] = finalResult
-	}()
-	logger := klog.FromContext(ctx)
-	allNodes, err := sched.nodeInfoSnapshot.ListNodesInPlacement()
-	if err != nil {
-		return &podGroupAlgorithmResult{
-			podGroupInfo: podGroupInfo,
-			status:       fwk.AsStatus(fmt.Errorf("failed to list node infos: %w", err)),
-		}, nil
-	}
-
-	// For now, always record plugin metrics until we understand its impact on performance.
-	podGroupCycleState.SetRecordPluginMetrics(true)
-	placements, status := schedFwk.RunPlacementGeneratePlugins(ctx, podGroupCycleState, podGroupInfo, allNodes)
-	if !status.IsSuccess() {
-		return &podGroupAlgorithmResult{
-			podGroupInfo: podGroupInfo,
-			status:       status,
-		}, nil
-	}
-
-	var anyResultSubtree map[fwk.EntityKey]*podGroupAlgorithmResult
-	successfulResults := make(map[*fwk.Placement]map[fwk.EntityKey]*podGroupAlgorithmResult)
-
-	parentPlacement := sched.nodeInfoSnapshot.GetPlacement()
-	defer func() {
-		sched.nodeInfoSnapshot.ForgetPlacement()
-		err := sched.nodeInfoSnapshot.AssumePlacement(parentPlacement)
-		if err != nil {
-			finalResult.status = fwk.AsStatus(fmt.Errorf("failed to restore parent pod group placement: %w", err))
-			revertFns.revert()
-		}
-	}()
-
-	for _, placement := range placements {
-		logger.V(4).Info("Assuming placement in snapshot", "placement", placement.Name)
-		err := sched.nodeInfoSnapshot.AssumePlacement(placement)
-		if err != nil {
-			return &podGroupAlgorithmResult{
-				podGroupInfo: podGroupInfo,
-				status:       fwk.AsStatus(fmt.Errorf("failed to assume pod group placement: %w", err)),
-			}, nil
-		}
-		placementCycleState := framework.NewCycleState()
-		placementCycleState.SetPodGroupCycleState(podGroupCycleState)
-		subtreeResult := map[fwk.EntityKey]*podGroupAlgorithmResult{}
-		result, placementRevertFns := sched.compositePodGroupSchedulingDefaultAlgorithm(ctx, schedFwk, placementCycleState, root, podGroupInfo, subtreeResult)
-		placementRevertFns.revert()
-
-		if result.status.IsError() {
-			// It is critical to copy the entire subtreeResult into results.
-			// If omitted, the pod results are reconstructed later using the generic parent error
-			// (*podGroupFitError) rather than their original *framework.FitError.
-			maps.Copy(results, subtreeResult)
-			return result, nil
-		}
-
-		if anyResultSubtree == nil {
-			anyResultSubtree = subtreeResult
-		}
-
-		if result.status.IsSuccess() {
-			successfulResults[placement] = subtreeResult
-		}
-	}
-
-	if len(successfulResults) == 0 {
-		// We need to send events and set the status for pods in case all simulations were infeasible.
-		// The selection of which simulation we report is arbitrary for now, but may change in the future.
-		anyResultRoot := anyResultSubtree[podGroupInfo.GetKey()]
-		fitError := newPodGroupPlacementFitError(anyResultRoot.status, len(placements))
-		anyResultRoot.status = fwk.NewStatus(fwk.Unschedulable).WithError(fitError)
-		// It is critical to copy the entire anyResultSubtree into results.
-		// If omitted, the pod results are reconstructed later using the generic parent error
-		// (*podGroupFitError) rather than their original *framework.FitError.
-		// Losing the FitError means we lose the UnschedulablePlugins for each pod,
-		// which breaks the QueueingHints.
-		maps.Copy(results, anyResultSubtree)
-		return anyResultRoot, nil
-	}
-
-	bestPlacement, status := sched.findBestCompositePodGroupPlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, successfulResults)
-	if !status.IsSuccess() {
-		return &podGroupAlgorithmResult{
-			podGroupInfo: podGroupInfo,
-			status:       status,
-		}, nil
-	}
-
-	bestResult := successfulResults[bestPlacement]
-
-	revertFns, err = sched.assumeSubtreeWithRevert(ctx, schedFwk, podGroupInfo, bestResult)
-	if err != nil {
-		return &podGroupAlgorithmResult{
-			podGroupInfo: podGroupInfo,
-			status:       fwk.AsStatus(fmt.Errorf("failed to assume the subtree: %w", err)),
-		}, nil
-	}
-	maps.Copy(results, bestResult)
-
-	return bestResult[podGroupInfo.GetKey()], revertFns
-}
-
-func (sched *Scheduler) findBestPodGroupPlacement(ctx context.Context, schedFwk framework.Framework, podGroupCycleState fwk.PodGroupCycleState, podGroupInfo *framework.PodGroupInfo, successfulResults map[*fwk.Placement]*podGroupAlgorithmResult) (*fwk.Placement, *fwk.Status) {
-	if len(successfulResults) == 1 {
-		for placement := range successfulResults {
-			return placement, nil
-		}
-	}
-
-	placementPodGroupAssignments, placementStates := makePodGroupAssignments(successfulResults)
-	return sched.findBestPlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, placementPodGroupAssignments, placementStates)
-}
-
-func (sched *Scheduler) findBestCompositePodGroupPlacement(ctx context.Context, schedFwk framework.Framework, podGroupCycleState fwk.PodGroupCycleState, podGroupInfo *framework.PodGroupInfo, successfulResults map[*fwk.Placement]map[fwk.EntityKey]*podGroupAlgorithmResult) (*fwk.Placement, *fwk.Status) {
-	if len(successfulResults) == 1 {
-		for placement := range successfulResults {
-			return placement, nil
-		}
-	}
-
-	placementPodGroupAssignments, placementStates := makeCompositePodGroupAssignments(podGroupInfo, successfulResults)
-	return sched.findBestPlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, placementPodGroupAssignments, placementStates)
-}
-
-// evaluatePlacement runs the pod group scheduling algorithm within a single placement,
-// assuming the placement in the snapshot for the duration of the simulation.
-func (sched *Scheduler) evaluatePlacement(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, podGroupInfo *framework.PodGroupInfo, queuedPodGroupInfo *framework.QueuedPodGroupInfo, placement *fwk.Placement) *podGroupAlgorithmResult {
-	klog.FromContext(ctx).V(4).Info("Assuming placement in snapshot", "placement", placement.Name)
-	evaluationStart := time.Now()
-	if err := sched.nodeInfoSnapshot.AssumePlacement(placement); err != nil {
-		return &podGroupAlgorithmResult{
-			podGroupInfo: podGroupInfo,
-			status:       fwk.AsStatus(fmt.Errorf("failed to assume pod group placement: %w", err)),
-		}
-	}
-	placementCycleState := framework.NewCycleState()
-	placementCycleState.SetPodGroupCycleState(podGroupCycleState)
-	result, placementRevertFns := sched.podGroupSchedulingDefaultAlgorithm(ctx, schedFwk, placementCycleState, podGroupInfo, queuedPodGroupInfo)
-	placementRevertFns.revert()
-
-	if result.status.IsError() {
-		// Error results are internal faults, not feasibility verdicts, and callers early-return
-		// on them, so skip the feasible/infeasible evaluation metric.
-		return result
-	}
-
-	evaluationResult := metrics.InfeasibleResult
-	if result.status.IsSuccess() {
-		evaluationResult = metrics.FeasibleResult
-	}
-	metrics.ObservePlacementEvaluation(evaluationResult, schedFwk.ProfileName(), metrics.SinceInSeconds(evaluationStart))
-	return result
-}
-
-// nominatedPlacement returns the placement to evaluate first because it holds the pods'
-// NominatedNodeName, or nil when zero or more than one placement matches. A nominated node is
-// typically set by a previous preemption cycle, so preferring its placement mirrors pod-by-pod
-// scheduling, which tries the nominated node before all others.
-//
-// The framework contract permits overlapping placements, so a nominated node can appear in more
-// than one. NNN alone can't tell which placement WAP picked last cycle, so we only take the fast
-// path when exactly one placement matches; otherwise the caller scores every placement, which is
-// deterministic regardless of the order the generator returned them.
-func nominatedPlacement(placements []*fwk.Placement, podGroupInfo *framework.PodGroupInfo, queuedPodGroupInfo *framework.QueuedPodGroupInfo) *fwk.Placement {
-	// Collect nominated nodes across the pods of the currently evaluated pod group node
-	// (podGroupInfo), which for CPG TAS is the CPG or PG carrying the TAS constraints, not the
-	// whole hierarchy rooted at queuedPodGroupInfo.
-	nominatedNodes := sets.New[string]()
-	for _, podInfo := range queuedPodGroupInfo.PodInfosForGroup(podGroupInfo.GetKey()) {
-		if nnn := podInfo.Pod.Status.NominatedNodeName; nnn != "" {
-			nominatedNodes.Insert(nnn)
-		}
-	}
-	if nominatedNodes.Len() == 0 {
-		return nil
-	}
-
-	var matched *fwk.Placement
-	for _, placement := range placements {
-		for _, node := range placement.Nodes {
-			if nominatedNodes.Has(node.Node().Name) {
-				if matched != nil {
-					// Overlap: fall back to scoring all placements.
-					return nil
-				}
-				matched = placement
-				break
-			}
-		}
-	}
-	return matched
-}
-
-// findBestPlacement uses PlacementScore plugins to determine the best placement based on the scheduling results.
-func (sched *Scheduler) findBestPlacement(ctx context.Context, schedFwk framework.Framework, podGroupCycleState fwk.PodGroupCycleState, podGroupInfo *framework.PodGroupInfo, placementPodGroupAssignments []*fwk.PodGroupAssignments, placementStates []fwk.PlacementCycleState) (*fwk.Placement, *fwk.Status) {
-	scores, status := schedFwk.RunPlacementScorePlugins(ctx, podGroupCycleState, podGroupInfo, placementPodGroupAssignments, placementStates)
-	if !status.IsSuccess() {
-		return nil, status
-	}
-
-	for i := range scores {
-		scores[i].Randomizer = rand.Int()
-	}
-
-	loggerVTen := klog.FromContext(ctx).V(10)
-	if loggerVTen.Enabled() {
-		for _, score := range scores {
-			for _, pluginScore := range score.Scores {
-				loggerVTen.Info("Plugin scored placement for podGroup", "podGroup", klog.KObj(podGroupInfo), "plugin", pluginScore.Name, "placement", score.Placement.Name, "score", pluginScore.Score)
-			}
-			loggerVTen.Info("Calculated placement's final score for podGroup", "podGroup", klog.KObj(podGroupInfo), "placement", score.Placement.Name, "score", score.TotalScore)
-		}
-	}
-
-	bestScore := &scores[0]
-	for _, score := range scores[1:] {
-		if score.TotalScore > bestScore.TotalScore ||
-			score.TotalScore == bestScore.TotalScore &&
-				score.Randomizer > bestScore.Randomizer {
-			bestScore = &score
-		}
-	}
-	return bestScore.Placement, nil
-}
-
-// makePodGroupAssignments converts scheduling results for PodGroup from candidate placements into the format
-// required by PlacementScore plugins to score and select the best placement for the pod group.
-func makePodGroupAssignments(successfulResults map[*fwk.Placement]*podGroupAlgorithmResult) ([]*fwk.PodGroupAssignments, []fwk.PlacementCycleState) {
-	placementPodGroupAssignments := make([]*fwk.PodGroupAssignments, 0, len(successfulResults))
-	placementStates := make([]fwk.PlacementCycleState, 0, len(successfulResults))
-	for placement, result := range successfulResults {
-		proposedAssignments := makeProposedAssignments(result)
-		placementPodGroupAssignments = append(placementPodGroupAssignments, &fwk.PodGroupAssignments{
-			Placement:           placement,
-			ProposedAssignments: proposedAssignments,
-		})
-		placementStates = append(placementStates, result.placementCycleState)
-	}
-	return placementPodGroupAssignments, placementStates
-}
-
-// makePodGroupAssignments converts scheduling results for CompositePodGroup from candidate placements into the format
-// required by PlacementScore plugins to score and select the best placement for the composite pod group.
-func makeCompositePodGroupAssignments(pgi *framework.PodGroupInfo, successfulResults map[*fwk.Placement]map[fwk.EntityKey]*podGroupAlgorithmResult) ([]*fwk.PodGroupAssignments, []fwk.PlacementCycleState) {
-	placementPodGroupAssignments := make([]*fwk.PodGroupAssignments, 0)
-	placementStates := make([]fwk.PlacementCycleState, 0)
-	for placement, subtreeResults := range successfulResults {
-		var combinedProposedAssignments []fwk.ProposedAssignment
-		for result := range successfulLeafResults(pgi, subtreeResults) {
-			combinedProposedAssignments = append(combinedProposedAssignments, makeProposedAssignments(result)...)
-		}
-		placementPodGroupAssignments = append(placementPodGroupAssignments, &fwk.PodGroupAssignments{
-			Placement:           placement,
-			ProposedAssignments: combinedProposedAssignments,
-		})
-		placementStates = append(placementStates, subtreeResults[pgi.GetKey()].placementCycleState)
-	}
-	return placementPodGroupAssignments, placementStates
-}
-
-// makeProposedAssignments builds a list of proposedAssignments from the result of a pod group scheduling attempt.
-func makeProposedAssignments(res *podGroupAlgorithmResult) []fwk.ProposedAssignment {
-	proposedAssignments := make([]fwk.ProposedAssignment, 0)
-	for _, podRes := range res.podResults {
-		if podRes.status.IsSuccess() && podRes.GetNodeName() != "" {
-			proposedAssignments = append(proposedAssignments, &podRes)
-		}
-	}
-	return proposedAssignments
-}
-
-// podGroupSchedulingAlgorithm attempts to schedule pods in the pod group according to the policy and constraints and returns the scheduling result for all evaluated pods in the pod group, not necessarily all pods in the pod group.
-// The returned revertFns accumulates revert functions for all scheduled pods, allowing the caller to rollback tentative reservations if the pod group scheduling cycle fails.
-func (sched *Scheduler) podGroupSchedulingAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, podGroupInfo *framework.PodGroupInfo, queuedPodGroupInfo *framework.QueuedPodGroupInfo) (*podGroupAlgorithmResult, revertFns) {
-	podGroupCycleCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
-		return sched.podGroupSchedulingPlacementAlgorithm(podGroupCycleCtx, schedFwk, podGroupCycleState, podGroupInfo, queuedPodGroupInfo)
-	}
-	// The non-TAS default algorithm does not evaluate placement candidates, but it
-	// still runs in a single implicit placement context so placement-scoped
-	// extension points can use the same state plumbing as TAS.
-	placementCycleState := framework.NewCycleState()
-	placementCycleState.SetPodGroupCycleState(podGroupCycleState)
-	return sched.podGroupSchedulingDefaultAlgorithm(podGroupCycleCtx, schedFwk, placementCycleState, podGroupInfo, queuedPodGroupInfo)
-}
-
-// podGroupSchedulingRecursiveAlgorithm runs a recursive pod group scheduling algorithm.
-// If the pod group info wraps a composite pod group, it will recursively invoke the algorithm on its children.
-// Otherwise, the pod group info wraps a leaf pod group for which we invoke the standard pod group scheduling algorithm.
-// The returned revertFns propagates revert functions from all child pod group evaluations up to the root level.
-func (sched *Scheduler) podGroupSchedulingRecursiveAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, root *framework.QueuedPodGroupInfo, podGroupInfo *framework.PodGroupInfo, results map[fwk.EntityKey]*podGroupAlgorithmResult) (*podGroupAlgorithmResult, revertFns) {
-	logger := klog.FromContext(ctx)
-	logger.V(5).Info("Running recursive podgroup scheduling algorithm", "rootType", podGroupInfo.GetType(), "root", klog.KObj(podGroupInfo))
-
-	var algorithmResult *podGroupAlgorithmResult
-	var childRevertFns revertFns
-	if podGroupInfo.GetType() == fwk.PodGroupKeyType {
-		algorithmResult, childRevertFns = sched.podGroupSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, podGroupInfo, root)
-		results[podGroupInfo.GetKey()] = algorithmResult
-	} else {
-		algorithmResult, childRevertFns = sched.compositePodGroupSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, root, podGroupInfo, results)
-	}
-	return algorithmResult, childRevertFns
-}
-
-func (sched *Scheduler) compositePodGroupSchedulingAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, root *framework.QueuedPodGroupInfo, podGroupInfo *framework.PodGroupInfo, results map[fwk.EntityKey]*podGroupAlgorithmResult) (result *podGroupAlgorithmResult, revertFns revertFns) {
-	podGroupCycleCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	// CPG requires TopologyAwareWorkloadScheduling feature to be enabled
-	return sched.compositePodGroupSchedulingPlacementAlgorithm(podGroupCycleCtx, schedFwk, podGroupCycleState, root, podGroupInfo, results)
-}
-
-// compositePodGroupSchedulingDefaultAlgorithm schedules a composite pod group by recursively scheduling
-// its children. It uses PlacementFeasible plugins to verify if the composite group constraints
-// remain satisfiable at each step of the recursion, aborting and reverting early if they cannot be met.
-// The returned revertFns propagates revert functions from all child pod group evaluations up to the root level.
-func (sched *Scheduler) compositePodGroupSchedulingDefaultAlgorithm(ctx context.Context, schedFwk framework.Framework, placementCycleState *framework.CycleState, root *framework.QueuedPodGroupInfo, podGroupInfo *framework.PodGroupInfo, results map[fwk.EntityKey]*podGroupAlgorithmResult) (result *podGroupAlgorithmResult, revertFns revertFns) {
-	logger := klog.FromContext(ctx)
-	defer func() {
-		results[podGroupInfo.GetKey()] = result
-		if result.status.IsSuccess() {
-			logger.V(5).Info("Composite podgroup scheduling algorithm succeeded", "compositePodGroup", klog.KObj(podGroupInfo))
-		} else {
-			logger.V(5).Info("Composite podgroup scheduling algorithm failed", "compositePodGroup", klog.KObj(podGroupInfo), "status", result.status)
-			revertFns.revert()
-			result.anyScheduled = false
-		}
-	}()
-
-	// Run PlacementFeasible plugins to check if the composite pod group can meet its constraints
-	// before even attempting to schedule any children.
-	placementProgress := fwk.PlacementProgress{
-		Remaining: len(podGroupInfo.Children),
-	}
-	proceed, placementFeasibleStatus := podGroupPotentiallyFeasible(ctx, schedFwk, placementCycleState, podGroupInfo, placementProgress)
-	if !proceed {
-		// PlacementFeasible plugins said not to proceed to the subsequent children.
-		// Exit early from the pod group algorithm.
-		return &podGroupAlgorithmResult{
-			podGroupInfo:        podGroupInfo,
-			status:              placementFeasibleStatus,
-			placementCycleState: placementCycleState,
-		}, revertFns
-	}
-
-	anyScheduled := false
-	for _, childPGInfo := range podGroupInfo.GetChildGroups() {
-		childPodGroupState := framework.NewCycleState()
-		childPodGroupState.SetPlacementCycleState(placementCycleState)
-		childResult, childRevertFns := sched.podGroupSchedulingRecursiveAlgorithm(ctx, schedFwk, childPodGroupState, root, childPGInfo, results)
-		if childResult.status.IsError() {
-			return &podGroupAlgorithmResult{
-				podGroupInfo:        podGroupInfo,
-				status:              fwk.AsStatus(fmt.Errorf("composite pod group evaluation failed due to child error: %w", childResult.status.AsError())),
-				placementCycleState: placementCycleState,
-			}, revertFns
-		}
-		anyScheduled = anyScheduled || childResult.anyScheduled
-		revertFns.append(childRevertFns)
-		placementProgress.Remaining--
-		if childResult.status.IsSuccess() {
-			placementProgress.Scheduled++
-		}
-		proceed, placementFeasibleStatus = podGroupPotentiallyFeasible(ctx, schedFwk, placementCycleState, podGroupInfo, placementProgress)
-		if !proceed {
-			// PlacementFeasible plugins said not to proceed to the subsequent children.
-			// We can stop the scheduling loop early.
-			break
-		}
-	}
-
-	return &podGroupAlgorithmResult{
-		podGroupInfo:        podGroupInfo,
-		status:              placementFeasibleStatus,
-		placementCycleState: placementCycleState,
-		anyScheduled:        anyScheduled,
-	}, revertFns
-}
-
-// assumeSubtreeWithRevert runs AssumeAndReserveInSnapshot on all pods within the subtree.
-// This is needed for placement-based algorithm, because after evaluating the results for all placements,
-// the chosen result needs to be assumed for the other pods in the hierarchy to see the result.
-func (sched *Scheduler) assumeSubtreeWithRevert(ctx context.Context, schedFwk framework.Framework, pgi *framework.PodGroupInfo, results map[fwk.EntityKey]*podGroupAlgorithmResult) (_ revertFns, err error) {
-	if results == nil {
-		return nil, fmt.Errorf("results for the subtree are missing")
-	}
-
-	var revertFns revertFns
-	defer func() {
-		if err != nil {
-			revertFns.revert()
-		}
-	}()
-	for leafResult := range successfulLeafResults(pgi, results) {
-		for _, podResult := range leafResult.podResults {
-			if !podResult.status.IsSuccess() || podResult.GetNodeName() == "" {
-				continue
-			}
-			status, revert := sched.algorithm.AssumeAndReserveInSnapshot(ctx, podResult.podCtx.state, schedFwk, podResult.podInfo, podResult.scheduleResult)
-			if revert != nil {
-				revertFns = append(revertFns, revert)
-			}
-			if !status.IsSuccess() {
-				return nil, status.AsError()
-			}
-		}
-	}
-
-	return revertFns, nil
-}
-
-// successfulLeafResults walks the tree down to the successful leafs.
-// A leaf is only deemed successful if its ancestors are also successful.
-// If the results are missing for a given subtree, that subtree is skipped.
-func successfulLeafResults(root *framework.PodGroupInfo, results map[fwk.EntityKey]*podGroupAlgorithmResult) iter.Seq[*podGroupAlgorithmResult] {
-	return func(yield func(*podGroupAlgorithmResult) bool) {
-		var walk func(pgi *framework.PodGroupInfo) bool
-		walk = func(pgi *framework.PodGroupInfo) bool {
-			result, ok := results[pgi.GetKey()]
-			// Result may be missing because it may have been skipped due to PlacementFeasible status.
-			// If the result for a given subtree is non-success (e.g. actualCount < minGroupCount), we treat all of its descendants as non-success with 0 pods scheduled.
-			if !ok || !result.status.IsSuccess() {
-				return true
-			}
-
-			for _, child := range pgi.Children {
-				if !walk(child) {
-					return false
-				}
-			}
-
-			if len(result.podResults) > 0 {
-				return yield(result)
-			}
-
-			return true
-		}
-		walk(root)
 	}
 }
