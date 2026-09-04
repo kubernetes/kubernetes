@@ -69,6 +69,8 @@ const (
 	FlagPersistent = 0x1
 	// FlagHashed specify IPVS service hash flag
 	FlagHashed = 0x2
+	// FlagFallBack specify IPVS service fallback flag
+	FlagFallBack = 0x08
 	// FlagSourceHash enables IPVS service hashing on source port and source IP
 	FlagSourceHash = 0x10
 )
