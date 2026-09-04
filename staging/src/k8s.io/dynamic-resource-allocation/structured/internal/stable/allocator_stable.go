@@ -1464,6 +1464,7 @@ func (alloc *allocator) createNodeSelector(result []internalDeviceResult) (*v1.N
 	ns := &v1.NodeSelector{
 		NodeSelectorTerms: []v1.NodeSelectorTerm{{}},
 	}
+	var nodeNameForAllocation *string
 
 	for i := range result {
 		slice := result[i].slice
@@ -1476,19 +1477,6 @@ func (alloc *allocator) createNodeSelector(result []internalDeviceResult) (*v1.N
 			nodeName = slice.Spec.NodeName
 			nodeSelector = slice.Spec.NodeSelector
 		}
-		if nodeName != nil {
-			// At least one device is local to one node. This
-			// restricts the allocation to that node.
-			return &v1.NodeSelector{
-				NodeSelectorTerms: []v1.NodeSelectorTerm{{
-					MatchFields: []v1.NodeSelectorRequirement{{
-						Key:      "metadata.name",
-						Operator: v1.NodeSelectorOpIn,
-						Values:   []string{*nodeName},
-					}},
-				}},
-			}, nil
-		}
 		if nodeSelector != nil {
 			switch len(nodeSelector.NodeSelectorTerms) {
 			case 0:
@@ -1499,9 +1487,26 @@ func (alloc *allocator) createNodeSelector(result []internalDeviceResult) (*v1.N
 				addNewNodeSelectorRequirements(nodeSelector.NodeSelectorTerms[0].MatchExpressions, &ns.NodeSelectorTerms[0].MatchExpressions)
 			default:
 				// This shouldn't occur, validation must prevent creation of such slices.
-				return nil, fmt.Errorf("unsupported ResourceSlice.NodeSelector with %d terms", len(nodeSelector.NodeSelectorTerms))
+				return nil, fmt.Errorf("unsupported ResourceSlice.NodeSelector with %d terms%w", len(nodeSelector.NodeSelectorTerms), internal.ErrFailedAllocationOnNode)
 			}
 		}
+		if nodeNameForAllocation == nil && nodeName != nil {
+			nodeNameForAllocation = nodeName
+		}
+	}
+
+	if nodeNameForAllocation != nil {
+		// At least one device is local to one node. This restricts the allocation
+		// to that node after validating all selected devices.
+		return &v1.NodeSelector{
+			NodeSelectorTerms: []v1.NodeSelectorTerm{{
+				MatchFields: []v1.NodeSelectorRequirement{{
+					Key:      "metadata.name",
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{*nodeNameForAllocation},
+				}},
+			}},
+		}, nil
 	}
 
 	if len(ns.NodeSelectorTerms[0].MatchFields) > 0 || len(ns.NodeSelectorTerms[0].MatchExpressions) > 0 {
