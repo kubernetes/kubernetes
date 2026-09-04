@@ -185,6 +185,8 @@ In [DeferCleanup (Each)] at: cleanup_test.go:103 <time>
 > Enter [DeferCleanup (Each)] e2e - dump namespaces | framework.go:xxx <time>
 < Exit [DeferCleanup (Each)] e2e - dump namespaces | framework.go:xxx <time>
 > Enter [DeferCleanup (Each)] e2e - tear down framework | framework.go:xxx <time>
+client-http-requests - E2E framework <time>
+  1
 STEP: Destroying namespace "test-namespace-zzz" for this suite. - framework.go:xxx <time>
 < Exit [DeferCleanup (Each)] e2e - tear down framework | framework.go:xxx <time>
 `
