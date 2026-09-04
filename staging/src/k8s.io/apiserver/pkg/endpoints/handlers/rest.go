@@ -66,6 +66,37 @@ const (
 	longPrefix = "error converting YAML to JSON: yaml: unmarshal errors:\n"
 )
 
+// ResourceGVK implements runtime.GroupVersioner for a resource's singular and (optionally) list
+// GVKs. It prefers exact matches over group+version matches, which disambiguates when a single Go
+// type is registered under multiple Kind names in the same GroupVersion.
+type ResourceGVK struct {
+	Kind     schema.GroupVersionKind
+	ListKind schema.GroupVersionKind
+}
+
+func (r ResourceGVK) KindForGroupVersionKinds(kinds []schema.GroupVersionKind) (schema.GroupVersionKind, bool) {
+	for _, k := range kinds {
+		if k == r.Kind || (!r.ListKind.Empty() && k == r.ListKind) {
+			return k, true
+		}
+	}
+	for _, k := range kinds {
+		if k.Group == r.Kind.Group && k.Version == r.Kind.Version {
+			return k, true
+		}
+	}
+	for _, k := range kinds {
+		if k.Group == r.Kind.Group {
+			return r.Kind.GroupVersion().WithKind(k.Kind), true
+		}
+	}
+	return schema.GroupVersionKind{}, false
+}
+
+func (r ResourceGVK) Identifier() string {
+	return r.Kind.String()
+}
+
 // RequestScope encapsulates common fields across all RESTful handler methods.
 type RequestScope struct {
 	Namer ScopeNamer
@@ -90,8 +121,9 @@ type RequestScope struct {
 	TableConvertor rest.TableConvertor
 	FieldManager   *managedfields.FieldManager
 
-	Resource schema.GroupVersionResource
-	Kind     schema.GroupVersionKind
+	Resource          schema.GroupVersionResource
+	Kind              schema.GroupVersionKind
+	ResourceVersioner ResourceGVK
 
 	// AcceptsGroupVersionDelegate is an optional delegate that can be queried about whether a given GVK
 	// can be accepted in create or update requests. If nil, only scope.Kind is accepted.
@@ -234,7 +266,7 @@ type responder struct {
 }
 
 func (r *responder) Object(statusCode int, obj runtime.Object) {
-	responsewriters.WriteObjectNegotiated(r.scope.Serializer, r.scope, r.scope.Kind.GroupVersion(), r.w, r.req, statusCode, obj, false)
+	responsewriters.WriteObjectNegotiated(r.scope.Serializer, r.scope, r.scope.ResourceVersioner, r.w, r.req, statusCode, obj, false)
 }
 
 func (r *responder) Error(err error) {
