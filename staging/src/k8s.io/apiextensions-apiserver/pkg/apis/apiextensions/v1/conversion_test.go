@@ -462,6 +462,80 @@ func TestConversion(t *testing.T) {
 			},
 		},
 		{
+			Name: "v1 to internal, identical selectable fields with distinct schemas remain per-version",
+			In: &CustomResourceDefinition{
+				Spec: CustomResourceDefinitionSpec{
+					Versions: []CustomResourceDefinitionVersion{
+						{
+							Name:    "v1",
+							Served:  true,
+							Storage: true,
+							SelectableFields: []SelectableField{
+								{JSONPath: ".spec.name"},
+							},
+							Schema: &CustomResourceValidation{
+								OpenAPIV3Schema: &JSONSchemaProps{
+									Type:        "object",
+									Description: "v1",
+								},
+							},
+						},
+						{
+							Name:    "v2",
+							Served:  true,
+							Storage: false,
+							SelectableFields: []SelectableField{
+								{JSONPath: ".spec.name"},
+							},
+							Schema: &CustomResourceValidation{
+								OpenAPIV3Schema: &JSONSchemaProps{
+									Type:        "object",
+									Description: "v2",
+								},
+							},
+						},
+					},
+				},
+			},
+			Out: &apiextensions.CustomResourceDefinition{},
+			ExpectOut: &apiextensions.CustomResourceDefinition{
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Version: "v1",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "v1",
+							Served:  true,
+							Storage: true,
+							SelectableFields: []apiextensions.SelectableField{
+								{JSONPath: ".spec.name"},
+							},
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type:        "object",
+									Description: "v1",
+								},
+							},
+						},
+						{
+							Name:    "v2",
+							Served:  true,
+							Storage: false,
+							SelectableFields: []apiextensions.SelectableField{
+								{JSONPath: ".spec.name"},
+							},
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type:        "object",
+									Description: "v2",
+								},
+							},
+						},
+					},
+					PreserveUnknownFields: new(bool),
+				},
+			},
+		},
+		{
 			Name: "v1 to internal, distinct selectable fields remains per-version",
 			In: &CustomResourceDefinition{
 				Spec: CustomResourceDefinitionSpec{
