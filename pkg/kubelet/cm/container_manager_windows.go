@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -128,6 +129,18 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 		return nil, err
 	}
 	capacity := cadvisor.CapacityFromMachineInfo(machineInfo)
+
+	// On Linux the "pids" node capacity is derived from kernel.pid_max via
+	// pidlimit.Stats() (see container_manager_linux.go). Windows has no equivalent
+	// global ceiling, but populating "pids" here keeps the resource advertised so
+	// kubelet can still observe and surface NodePIDPressure from the PID eviction
+	// signal. On Windows pidlimit.Stats() reports the live process count and a
+	// sentinel MaxPID (see pkg/kubelet/stats/pidlimit/pidlimit_windows.go).
+	if pidlimits, err := pidlimit.Stats(); err == nil && pidlimits != nil && pidlimits.MaxPID != nil {
+		capacity[pidlimit.PIDs] = *resource.NewQuantity(
+			int64(*pidlimits.MaxPID),
+			resource.DecimalSI)
+	}
 
 	cm := &containerManagerImpl{
 		capacity:          capacity,
