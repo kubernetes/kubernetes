@@ -50,8 +50,11 @@ import (
 )
 
 const (
-	// The maximum length of requester-controlled attributes to allow caching.
-	maxControlledAttrCacheSize = 10000
+	// maxCacheKeySize is the maximum length of the JSON-serialized
+	// SubjectAccessReviewSpec that may be used as a webhook response cache key.
+	// Oversized keys would let a requester bloat the shared LRU cache and evict
+	// legitimate entries (cache-poisoning DoS), so such requests bypass the cache.
+	maxCacheKeySize = 10000
 )
 
 // DefaultRetryBackoff returns the default backoff parameters for webhook retry.
@@ -272,7 +275,7 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 		}
 
 		r.Status = result.Status
-		if shouldCache(attr) {
+		if shouldCache(key) {
 			if r.Status.Allowed {
 				w.responseCache.Add(string(key), r.Status, w.authorizedTTL)
 			} else {
@@ -535,18 +538,13 @@ func (t *subjectAccessReviewV1beta1ClientGW) Create(ctx context.Context, subject
 	return subjectAccessReview, statusCode, err
 }
 
-// shouldCache determines whether it is safe to cache the given request attributes. If the
-// requester-controlled attributes are too large, this may be a DoS attempt, so we skip the cache.
-func shouldCache(attr authorizer.Attributes) bool {
-	controlledAttrSize := int64(len(attr.GetNamespace())) +
-		int64(len(attr.GetVerb())) +
-		int64(len(attr.GetAPIGroup())) +
-		int64(len(attr.GetAPIVersion())) +
-		int64(len(attr.GetResource())) +
-		int64(len(attr.GetSubresource())) +
-		int64(len(attr.GetName())) +
-		int64(len(attr.GetPath()))
-	return controlledAttrSize < maxControlledAttrCacheSize
+// shouldCache guards the webhook response cache against DoS via oversized keys.
+// The cache key is the JSON-serialized SubjectAccessReviewSpec, so the size limit
+// must apply to the actual key. Measuring only a subset of fields leaves any
+// requester-controlled input outside the check (e.g. fieldSelector/labelSelector
+// requirements) free to bloat the cache and evict legitimate entries.
+func shouldCache(key []byte) bool {
+	return int64(len(key)) < maxCacheKeySize
 }
 
 func v1beta1StatusToV1Status(in *authorizationv1beta1.SubjectAccessReviewStatus) authorizationv1.SubjectAccessReviewStatus {
