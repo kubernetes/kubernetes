@@ -4,6 +4,19 @@ Go API changes are typically not included in the Kubernetes release notes, so
 noteworthy Go API changes *may* be documented here. This is currently not
 *required*, so consult the git history to see all changes.
 
+### Dynamic shared informer factory: add StartWithContext
+
+The same change was made earlier for the type informer factory:
+the new API supports contextual logging because a logger can
+be attached to the context.
+
+Mock implementations of the DynamicSharedInformerFactory have to add a
+StartWithContext implementation.
+
+```
+- ./dynamic/dynamicinformer.DynamicSharedInformerFactory.StartWithContext: added
+```
+
 ### Type-safe informers
 
 All code using the result of the generated client-go Informer() methods (a
