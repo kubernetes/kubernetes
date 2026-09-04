@@ -4209,6 +4209,16 @@ type PodSpec struct {
 	// +featureGate=EvictionRequestAPI
 	// +optional
 	EvictionResponders []EvictionResponder
+
+	// Hermetic indicates that the Pod's sandbox should be completely sealed off.
+	// If true, the container runtime creates the namespace but bypasses attaching
+	// any default external interfaces (e.g., CNI is not invoked), leaving only a
+	// loopback interface. This provides a pristine, sealed environment for
+	// Dynamic Resource Allocation (DRA) or external controllers to manage connectivity.
+	// Must be false if HostNetwork is true.
+	// Defaults to false.
+	// +optional
+	Hermetic *bool
 }
 
 // PodResourceClaim references exactly one ResourceClaim through a ClaimSource.

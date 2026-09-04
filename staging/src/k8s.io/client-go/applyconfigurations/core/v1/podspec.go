@@ -302,6 +302,14 @@ type PodSpecApplyConfiguration struct {
 	// Responders are not supported when the pod is part of a PodGroup (.spec.schedulingGroup is set).
 	// This field can only be set on creation and is immutable afterwards.
 	EvictionResponders []EvictionResponderApplyConfiguration `json:"evictionResponders,omitempty"`
+	// Hermetic indicates that the Pod's sandbox should be completely sealed off.
+	// If true, the container runtime creates the namespace but bypasses attaching
+	// any default external interfaces (e.g., CNI is not invoked), leaving only a
+	// loopback interface. This provides a pristine, sealed environment for
+	// Dynamic Resource Allocation (DRA) or external controllers to manage connectivity.
+	// Must be false if HostNetwork is true.
+	// Defaults to false.
+	Hermetic *bool `json:"hermetic,omitempty"`
 }
 
 // PodSpecApplyConfiguration constructs a declarative configuration of the PodSpec type for use with
@@ -717,5 +725,13 @@ func (b *PodSpecApplyConfiguration) WithEvictionResponders(values ...*EvictionRe
 		}
 		b.EvictionResponders = append(b.EvictionResponders, *values[i])
 	}
+	return b
+}
+
+// WithHermetic sets the Hermetic field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Hermetic field is set to the value of the last call.
+func (b *PodSpecApplyConfiguration) WithHermetic(value bool) *PodSpecApplyConfiguration {
+	b.Hermetic = &value
 	return b
 }

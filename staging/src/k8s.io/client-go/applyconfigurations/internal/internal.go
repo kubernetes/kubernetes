@@ -7224,6 +7224,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - name
+    - name: hermetic
+      type:
+        scalar: boolean
     - name: hostAliases
       type:
         list:

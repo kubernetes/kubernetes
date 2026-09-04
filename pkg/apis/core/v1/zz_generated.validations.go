@@ -1402,6 +1402,7 @@ func Validate_PodSpec(
 		errs = append(errs, fn(fldPath.Child("evictionResponders"), obj.EvictionResponders, oldVal, oldObj != nil)...)
 	}
 
+	// field corev1.PodSpec.Hermetic has no validation
 	return errs
 }
 

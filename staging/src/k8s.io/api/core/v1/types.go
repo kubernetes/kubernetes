@@ -4742,6 +4742,16 @@ type PodSpec struct {
 	// +k8s:maxItems=10
 	// +k8s:alpha(since: "1.37")=+k8s:dependentForbidden("schedulingGroup")
 	EvictionResponders []EvictionResponder `json:"evictionResponders,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,44,rep,name=evictionResponders"`
+
+	// Hermetic indicates that the Pod's sandbox should be completely sealed off.
+	// If true, the container runtime creates the namespace but bypasses attaching
+	// any default external interfaces (e.g., CNI is not invoked), leaving only a
+	// loopback interface. This provides a pristine, sealed environment for
+	// Dynamic Resource Allocation (DRA) or external controllers to manage connectivity.
+	// Must be false if HostNetwork is true.
+	// Defaults to false.
+	// +optional
+	Hermetic *bool `json:"hermetic,omitempty" protobuf:"varint,45,opt,name=hermetic"`
 }
 
 // PodResourceClaim references exactly one ResourceClaim, either directly

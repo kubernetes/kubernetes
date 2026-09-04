@@ -1844,7 +1844,8 @@
         "name": "nameValue",
         "priority": 2
       }
-    ]
+    ],
+    "hermetic": true
   },
   "status": {
     "observedGeneration": 17,

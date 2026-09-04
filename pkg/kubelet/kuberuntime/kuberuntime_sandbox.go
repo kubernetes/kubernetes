@@ -95,6 +95,14 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(ctx context.Context
 		Annotations: newPodAnnotations(pod),
 	}
 
+	if kubecontainer.IsHermeticPod(pod) {
+		podSandboxConfig.Hermetic = true
+		if podSandboxConfig.Annotations == nil {
+			podSandboxConfig.Annotations = make(map[string]string)
+		}
+		podSandboxConfig.Annotations[runtimeapi.SandboxHermeticAnnotation] = "true"
+	}
+
 	dnsConfig, err := m.runtimeHelper.GetPodDNS(ctx, pod)
 	if err != nil {
 		return nil, err
@@ -289,6 +297,9 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxWindowsConfig(pod *v1.Pod)
 func (m *kubeGenericRuntimeManager) determinePodSandboxIPs(ctx context.Context, podNamespace, podName string, podSandbox *runtimeapi.PodSandboxStatus) []string {
 	logger := klog.FromContext(ctx)
 	podIPs := make([]string, 0)
+	if podSandbox.GetAnnotations()[runtimeapi.SandboxHermeticAnnotation] == "true" {
+		return podIPs
+	}
 	if podSandbox.Network == nil {
 		logger.Info("Pod Sandbox status doesn't have network information, cannot report IPs", "pod", klog.KRef(podNamespace, podName))
 		return podIPs

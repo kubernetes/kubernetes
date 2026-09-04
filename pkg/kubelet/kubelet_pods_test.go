@@ -302,6 +302,38 @@ fe00::2	ip6-allrouters
 fd00::6	podFoo.domainFoo	podFoo
 `,
 		},
+		{
+			hostIPs:        []string{},
+			hostName:       "podHermetic",
+			hostDomainName: "",
+			hostAliases:    []v1.HostAlias{},
+			expectedContent: `# Kubernetes-managed hosts file.
+127.0.0.1	localhost
+::1	localhost ip6-localhost ip6-loopback
+fe00::0	ip6-localnet
+fe00::0	ip6-mcastprefix
+fe00::1	ip6-allnodes
+fe00::2	ip6-allrouters
+127.0.0.1	podHermetic
+::1	podHermetic
+`,
+		},
+		{
+			hostIPs:        []string{},
+			hostName:       "podHermetic",
+			hostDomainName: "domainFoo",
+			hostAliases:    []v1.HostAlias{},
+			expectedContent: `# Kubernetes-managed hosts file.
+127.0.0.1	localhost
+::1	localhost ip6-localhost ip6-loopback
+fe00::0	ip6-localnet
+fe00::0	ip6-mcastprefix
+fe00::1	ip6-allnodes
+fe00::2	ip6-allrouters
+127.0.0.1	podHermetic.domainFoo	podHermetic
+::1	podHermetic.domainFoo	podHermetic
+`,
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -423,6 +455,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		nilLister          bool                   // whether the lister should be nil
 		staticPod          bool                   // whether the pod should be a static pod (versus an API pod)
 		unsyncedServices   bool                   // whether the services should NOT be synced
+		hermeticPod        bool                   // whether the pod is hermetic
 		configMap          *v1.ConfigMap          // an optional ConfigMap to pull from
 		secret             *v1.Secret             // an optional Secret to pull from
 		podIPs             []string               // the pod IPs
@@ -1977,6 +2010,21 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			},
 			expectedError: true,
 		},
+		{
+			name:               "hermetic pod should omit service env vars even if unsynced or with master services",
+			ns:                 metav1.NamespaceDefault,
+			enableServiceLinks: &falseValue,
+			hermeticPod:        true,
+			unsyncedServices:   true,
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{Name: "CUSTOM_ENV", Value: "VAL"},
+				},
+			},
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "CUSTOM_ENV", Value: "VAL"},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -2029,6 +2077,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					ServiceAccountName: "special",
 					NodeName:           "node-name",
 					EnableServiceLinks: tc.enableServiceLinks,
+					Hermetic:           ptr.To(tc.hermeticPod),
 				},
 			}
 			podIP := ""

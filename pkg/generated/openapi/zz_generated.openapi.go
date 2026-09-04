@@ -29433,6 +29433,13 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 							},
 						},
 					},
+					"hermetic": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Hermetic indicates that the Pod's sandbox should be completely sealed off. If true, the container runtime creates the namespace but bypasses attaching any default external interfaces (e.g., CNI is not invoked), leaving only a loopback interface. This provides a pristine, sealed environment for Dynamic Resource Allocation (DRA) or external controllers to manage connectivity. Must be false if HostNetwork is true. Defaults to false.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"containers"},
 			},
