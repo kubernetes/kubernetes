@@ -524,8 +524,8 @@ func TestWithPercentageOfPlacementsToScore(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create scheduler: %v", err)
 			}
-			if sched.percentageOfPlacementsToScore != tt.wantedPercentageOfPlacementsToScore {
-				t.Errorf("scheduler.percentageOfPlacementsToScore = %v, want %v", sched.percentageOfPlacementsToScore, tt.wantedPercentageOfPlacementsToScore)
+			if sched.podGroupAlgorithm.percentageOfPlacementsToScore != tt.wantedPercentageOfPlacementsToScore {
+				t.Errorf("scheduler.percentageOfPlacementsToScore = %v, want %v", sched.podGroupAlgorithm.percentageOfPlacementsToScore, tt.wantedPercentageOfPlacementsToScore)
 			}
 		})
 	}
