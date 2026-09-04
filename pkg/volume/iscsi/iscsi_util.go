@@ -701,8 +701,14 @@ func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string)
 
 	devicePath := getDevByPath(portals[0], iqn, lun)
 	klog.V(5).Infof("iscsi: devicePath: %s", devicePath)
-	if _, err = os.Stat(devicePath); err != nil {
-		return fmt.Errorf("failed to validate devicePath: %s", devicePath)
+	if _, err := os.Stat(devicePath); err != nil {
+		// The by-path link may already be gone if the iSCSI session was lost
+		// before teardown ran. The remaining steps handle a missing session
+		// (detachISCSIDisk ignores ISCSI_ERR_NO_OBJS_FOUND and
+		// ISCSI_ERR_SESS_NOT_FOUND, and isSessionBusy counts plugin
+		// directories rather than devices), so continue instead of failing
+		// detach permanently and stranding the volume in volumesInUse.
+		klog.V(4).Infof("iscsi: devicePath %s already gone, continuing to detach", devicePath)
 	}
 
 	// Lock the target while we determine if we can safely log out or not
