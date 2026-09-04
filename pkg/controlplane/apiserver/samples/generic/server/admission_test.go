@@ -24,7 +24,8 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/limitranger"
 	"k8s.io/kubernetes/plugin/pkg/admission/network/defaultingressclass"
 	"k8s.io/kubernetes/plugin/pkg/admission/nodedeclaredfeatures"
-	"k8s.io/kubernetes/plugin/pkg/admission/nodetaint"
+	"k8s.io/kubernetes/plugin/pkg/admission/nodetaintcondition"
+	"k8s.io/kubernetes/plugin/pkg/admission/nodetainttimeadded"
 	"k8s.io/kubernetes/plugin/pkg/admission/podresize"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtopologylabels"
 	podpriority "k8s.io/kubernetes/plugin/pkg/admission/priority"
@@ -43,7 +44,8 @@ var intentionallyOffPlugins = sets.New[string](
 	storageobjectinuseprotection.PluginName, // StorageObjectInUseProtection
 	podgroupprotection.PluginName,           // PodGroupProtection
 	podpriority.PluginName,                  // Priority
-	nodetaint.PluginName,                    // TaintNodesByCondition
+	nodetaintcondition.PluginName,           // TaintNodesByCondition
+	nodetainttimeadded.PluginName,           // NodeTaintTimeAddedDefaulting
 	runtimeclass.PluginName,                 // RuntimeClass
 	defaultingressclass.PluginName,          // DefaultIngressClass
 	podsecurity.PluginName,                  // PodSecurity
