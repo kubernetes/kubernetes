@@ -1058,6 +1058,158 @@ func TestCPGScheduling(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "TestCPGStatusConditions_HierarchicalDiagnostics",
+			// TestCPGStatusConditions_HierarchicalDiagnostics verifies that failures at any level of the
+			// CPG hierarchy are propagated to descendants with context-aware messages (distinguishing direct parent
+			// vs indirect ancestor failure) while preserving local unschedulable root-cause messages.
+			//
+			// Tree structure:
+			//
+			//	        cpg-root (Gang, MinGroup: 2) [Fails: only 1 child group schedulable]
+			//	       /                            \
+			//	   cpg-sub1 (Gang, MinGroup: 2)     cpg-sub2 (Gang, MinGroup: 2) [Schedulable on its own, blocked by root]
+			//	  /                            \          /                            \
+			//	pg1 (Gang, Min: 2)         pg2 (Gang)   pg3 (Gang, Min: 2)         pg4 (Gang, Min: 2)
+			//	[Feasible, blocked by sub1] [Fails: cpu] [Feasible, blocked by root] [Feasible, blocked by root]
+			//
+			// Diagnostics:
+			//   - cpg-root: minGroupCount (2) cannot be satisfied: 1 scheduled, 0 remaining
+			//   - cpg-sub1: minGroupCount (2) cannot be satisfied: 1 scheduled, 0 remaining
+			//   - pg1: parent composite pod group "cpg-sub1" is unschedulable: minGroupCount (2) cannot be satisfied: 1 scheduled, 0 remaining
+			//   - pg2: 0/1 nodes are available: 1 Insufficient cpu
+			//   - cpg-sub2: parent composite pod group "cpg-root" is unschedulable: minGroupCount (2) cannot be satisfied: 1 scheduled, 0 remaining
+			//   - pg3: ancestor composite pod group "cpg-root" is unschedulable: minGroupCount (2) cannot be satisfied: 1 scheduled, 0 remaining
+			//   - pg4: ancestor composite pod group "cpg-root" is unschedulable: minGroupCount (2) cannot be satisfied: 1 scheduled, 0 remaining
+			steps: []stepsframework.Step{
+				{
+					Name:        "Create Node",
+					CreateNodes: []*v1.Node{st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()},
+				},
+				{
+					Name: "Create Workload",
+					CreateWorkloads: []*schedulingapi.Workload{
+						st.MakeWorkload().Name("workload-diag").
+							Children(
+								st.MakeCompositePodGroupTemplate().Name("root-t").MinGroupCount(2).Priority(100).Children(
+									st.MakeCompositePodGroupTemplate().Name("sub-t").MinGroupCount(2).Priority(100).Children(
+										st.MakePodGroupTemplate().Name("gang-t").MinCount(2).Priority(100),
+									),
+								),
+							).Obj(),
+					},
+				},
+				{
+					Name:                    "Create root CPG",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-root").WorkloadRef("workload-diag", "root-t").MinGroupCount(2).Priority(100).Obj(),
+				},
+				{
+					Name:                    "Create cpg-sub1",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-sub1").WorkloadRef("workload-diag", "sub-t").MinGroupCount(2).ParentCompositePodGroup("cpg-root").Priority(100).Obj(),
+				},
+				{
+					Name:                    "Create cpg-sub2",
+					CreateCompositePodGroup: st.MakeCompositePodGroup().Name("cpg-sub2").WorkloadRef("workload-diag", "sub-t").MinGroupCount(2).ParentCompositePodGroup("cpg-root").Priority(100).Obj(),
+				},
+				{
+					Name:           "Create pg1",
+					CreatePodGroup: st.MakePodGroup().Name("pg1").WorkloadRef("workload-diag", "gang-t").ParentCompositePodGroup("cpg-sub1").Priority(100).MinCount(2).Obj(),
+				},
+				{
+					Name:           "Create pg2",
+					CreatePodGroup: st.MakePodGroup().Name("pg2").WorkloadRef("workload-diag", "gang-t").ParentCompositePodGroup("cpg-sub1").Priority(100).MinCount(2).Obj(),
+				},
+				{
+					Name:           "Create pg3",
+					CreatePodGroup: st.MakePodGroup().Name("pg3").WorkloadRef("workload-diag", "gang-t").ParentCompositePodGroup("cpg-sub2").Priority(100).MinCount(2).Obj(),
+				},
+				{
+					Name:           "Create pg4",
+					CreatePodGroup: st.MakePodGroup().Name("pg4").WorkloadRef("workload-diag", "gang-t").ParentCompositePodGroup("cpg-sub2").Priority(100).MinCount(2).Obj(),
+				},
+				{
+					Name: "Create Pods",
+					CreatePods: concatPods(
+						makeTestPods("pg1", "1", "1"),
+						makeTestPods("pg2", "100", "100"), // Unschedulable
+						makeTestPods("pg3", "1", "1"),
+						makeTestPods("pg4", "1", "1"),
+					),
+				},
+				{
+					Name: "Verify all pods remain unschedulable",
+					WaitForPodsUnschedulable: podNames(concatPods(
+						makeTestPods("pg1", "1", "1"),
+						makeTestPods("pg2", "1", "1"),
+						makeTestPods("pg3", "1", "1"),
+						makeTestPods("pg4", "1", "1"),
+					)),
+				},
+				{
+					Name: "Verify root CPG condition is Unschedulable with minGroupCount reason",
+					WaitForCompositePodGroupCondition: &stepsframework.CompositePodGroupConditionCheck{
+						CompositePodGroupName: "cpg-root",
+						ConditionStatus:       metav1.ConditionFalse,
+						Reason:                schedulingv1alpha3.CompositePodGroupReasonUnschedulable,
+						MessageContains:       "minGroupCount (2) cannot be satisfied: 0 scheduled, 1 remaining",
+					},
+				},
+				{
+					Name: "Verify cpg-sub1 condition is Unschedulable with minGroupCount reason",
+					WaitForCompositePodGroupCondition: &stepsframework.CompositePodGroupConditionCheck{
+						CompositePodGroupName: "cpg-sub1",
+						ConditionStatus:       metav1.ConditionFalse,
+						Reason:                schedulingv1alpha3.CompositePodGroupReasonUnschedulable,
+						MessageContains:       "minGroupCount (2) cannot be satisfied: 1 scheduled, 0 remaining",
+					},
+				},
+				{
+					Name: "Verify pg1 condition is Unschedulable with parent composite pod group error",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg1",
+						ConditionStatus: metav1.ConditionFalse,
+						Reason:          schedulingapi.PodGroupReasonUnschedulable,
+						MessageContains: "parent composite pod group \"cpg-sub1\" is unschedulable: 0/1 placements are available, first placement status: minGroupCount (2) cannot be satisfied: 1 scheduled, 0 remaining",
+					},
+				},
+				{
+					Name: "Verify pg2 condition is Unschedulable with direct minCount error",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg2",
+						ConditionStatus: metav1.ConditionFalse,
+						Reason:          schedulingapi.PodGroupReasonUnschedulable,
+						MessageContains: "minCount (2) cannot be satisfied: 0 scheduled, 1 remaining",
+					},
+				},
+				{
+					Name: "Verify cpg-sub2 condition is Unschedulable with parent composite pod group error",
+					WaitForCompositePodGroupCondition: &stepsframework.CompositePodGroupConditionCheck{
+						CompositePodGroupName: "cpg-sub2",
+						ConditionStatus:       metav1.ConditionFalse,
+						Reason:                schedulingv1alpha3.CompositePodGroupReasonUnschedulable,
+						MessageContains:       "parent composite pod group \"cpg-root\" is unschedulable: 0/1 placements are available, first placement status: minGroupCount (2) cannot be satisfied: 0 scheduled, 1 remaining",
+					},
+				},
+				{
+					Name: "Verify pg3 condition is Unschedulable with ancestor composite pod group error",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg3",
+						ConditionStatus: metav1.ConditionFalse,
+						Reason:          schedulingapi.PodGroupReasonUnschedulable,
+						MessageContains: "ancestor composite pod group \"cpg-root\" is unschedulable: 0/1 placements are available, first placement status: minGroupCount (2) cannot be satisfied: 0 scheduled, 1 remaining",
+					},
+				},
+				{
+					Name: "Verify pg4 condition is Unschedulable with ancestor composite pod group error",
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+						PodGroupName:    "pg4",
+						ConditionStatus: metav1.ConditionFalse,
+						Reason:          schedulingapi.PodGroupReasonUnschedulable,
+						MessageContains: "ancestor composite pod group \"cpg-root\" is unschedulable: 0/1 placements are available, first placement status: minGroupCount (2) cannot be satisfied: 0 scheduled, 1 remaining",
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {

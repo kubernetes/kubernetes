@@ -1088,6 +1088,33 @@ func TestPlacementFeasible(t *testing.T) {
 						if gotCode := gotStatus.Code(); gotCode != tc.expectedStatuses[i] {
 							t.Errorf("Step %d: expected status %v, got %v", i, tc.expectedStatuses[i], gotCode)
 						}
+
+						countName := "minCount"
+						if isCPG {
+							countName = "minGroupCount"
+						}
+						effectiveMin := tc.minCount
+						if effectiveMin == 0 {
+							effectiveMin = 1
+						}
+
+						var expectedMsg string
+						switch tc.expectedStatuses[i] {
+						case fwk.Unschedulable:
+							expectedMsg = fmt.Sprintf("%s (%d) cannot be satisfied: %d scheduled, %d remaining", countName, effectiveMin, args.Scheduled, args.Remaining)
+						case fwk.Wait:
+							expectedMsg = fmt.Sprintf("%s (%d) is not yet satisfied: %d scheduled, %d remaining", countName, effectiveMin, args.Scheduled, args.Remaining)
+						case fwk.Success:
+							expectedMsg = ""
+						}
+
+						var gotMsg string
+						if gotStatus != nil {
+							gotMsg = gotStatus.Message()
+						}
+						if gotMsg != expectedMsg {
+							t.Errorf("Step %d: expected status message %q, got %q", i, expectedMsg, gotMsg)
+						}
 					}
 				})
 			}

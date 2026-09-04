@@ -354,17 +354,22 @@ func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleS
 	remaining := args.Remaining
 	scheduled := args.Scheduled
 
+	countName := "minCount"
+	if podGroupInfo.GetType() == fwk.CompositePodGroupKeyType {
+		countName = "minGroupCount"
+	}
+
 	if remaining+scheduled < minCount {
-		// minCount can't be satisfied because there are not enough remaining pods.
-		return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("minCount (%d) cannot be satisfied: %d scheduled, %d remaining", minCount, scheduled, remaining))
+		// minCount/minGroupCount can't be satisfied because there are not enough remaining pods/child groups.
+		return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("%s (%d) cannot be satisfied: %d scheduled, %d remaining", countName, minCount, scheduled, remaining))
 	}
 
 	if scheduled < minCount {
-		// minCount might be satisfied once more remaining pods are evaluated.
-		return fwk.NewStatus(fwk.Wait, fmt.Sprintf("minCount (%d) is not yet satisfied: %d scheduled, %d remaining", minCount, scheduled, remaining))
+		// minCount/minGroupCount might be satisfied once more remaining pods/child groups are evaluated.
+		return fwk.NewStatus(fwk.Wait, fmt.Sprintf("%s (%d) is not yet satisfied: %d scheduled, %d remaining", countName, minCount, scheduled, remaining))
 	}
 
-	// minCount is satisfied.
+	// minCount/minGroupCount is satisfied.
 	return nil
 }
 
