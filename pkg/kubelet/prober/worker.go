@@ -29,6 +29,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 )
 
@@ -346,7 +347,7 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	}
 
 	// Note, exec probe does NOT have access to pod environment variables or downward API
-	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
+	result, probeOutput, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
 	if err != nil {
 		// Prober error, throw away the result.
 		return true
@@ -373,7 +374,25 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	if (result == results.Failure && w.resultRun < int(w.spec.FailureThreshold)) ||
 		(result == results.Success && w.resultRun < int(w.spec.SuccessThreshold)) {
 		// Success or failure is below threshold - leave the probe state unchanged.
+		if result == results.Failure {
+			// Emit a dedicated event indicating this failure was ignored because
+			// FailureThreshold has not yet been reached, including the probe output
+			// so operators can see why the probe failed.
+			w.probeManager.prober.recordContainerEvent(ctx, w.pod, &w.container,
+				v1.EventTypeWarning, events.ContainerProbeFailureIgnored,
+				"%s probe failed: %s (failure %d/%d, FailureThreshold not yet reached)",
+				w.probeType, probeOutput, w.resultRun, int(w.spec.FailureThreshold))
+		}
 		return true
+	}
+
+	// Emit the Unhealthy event when FailureThreshold is reached, including the
+	// probe output so operators know what caused the threshold to be crossed.
+	if result == results.Failure {
+		w.probeManager.prober.recordContainerEvent(ctx, w.pod, &w.container,
+			v1.EventTypeWarning, events.ContainerUnhealthy,
+			"%s probe failed: %s (failure threshold %d reached)",
+			w.probeType, probeOutput, w.spec.FailureThreshold)
 	}
 
 	w.resultsManager.Set(w.containerID, result, w.pod)
