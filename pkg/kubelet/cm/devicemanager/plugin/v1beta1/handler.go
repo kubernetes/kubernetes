@@ -76,6 +76,12 @@ func (s *server) ValidatePlugin(ctx context.Context, pluginName string, endpoint
 
 func (s *server) connectClient(ctx context.Context, name string, socketPath string) error {
 	logger := klog.FromContext(ctx)
+
+	if c := s.getClient(name, socketPath); c != nil {
+		logger.V(2).Info("Client already connected with the same socket path", "name", name, "socketPath", socketPath)
+		return nil
+	}
+
 	c := NewPluginClient(name, socketPath, s.chandler)
 
 	s.registerClient(logger, name, c)
