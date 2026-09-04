@@ -34,6 +34,9 @@ func (s PodsByCreationTime) Swap(i, j int) {
 }
 
 func (s PodsByCreationTime) Less(i, j int) bool {
+	if s[i].CreationTimestamp.Equal(&s[j].CreationTimestamp) {
+		return s[i].UID < s[j].UID
+	}
 	return s[i].CreationTimestamp.Before(&s[j].CreationTimestamp)
 }
 
