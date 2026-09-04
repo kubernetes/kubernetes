@@ -78,7 +78,7 @@ func NewCertificateController(
 	}
 
 	// Manage the addition/update of certificate requests
-	csrInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := csrInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			csr := obj.(*certificates.CertificateSigningRequest)
 			logger.V(4).Info("Adding certificate request", "csr", csr.Name)
@@ -106,7 +106,8 @@ func NewCertificateController(
 			logger.V(4).Info("Deleting certificate request", "csr", csr.Name)
 			cc.enqueueCertificateRequest(obj)
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
+	utilruntime.Must(err)
 	cc.csrLister = csrInformer.Lister()
 	cc.csrsSynced = csrInformer.Informer().HasSynced
 	return cc
