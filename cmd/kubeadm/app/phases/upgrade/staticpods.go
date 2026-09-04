@@ -293,12 +293,20 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 		return true, errors.Wrap(err, "etcd cluster is not healthy")
 	}
 
-	// Backing up etcd data store
+	// Back up the etcd data store via the etcd Maintenance snapshot API.
+	// This produces a consistent, point-in-time snapshot that is not affected
+	// by WAL pre-allocation file churn (see kubernetes/kubeadm#3324).
 	backupEtcdDir := pathMgr.BackupEtcdDir()
-	runningEtcdDir := cfg.Etcd.Local.DataDir
-	output, err := filesutil.CopyDir(runningEtcdDir, backupEtcdDir)
-	if err != nil {
-		return true, errors.Wrapf(err, "failed to back up etcd data, output: %q", output)
+	if err := etcdutil.BackupDataForRollback(
+		etcdutil.GetClientURL(&cfg.LocalAPIEndpoint),
+		filepath.Join(cfg.CertificatesDir, constants.EtcdCACertName),
+		filepath.Join(cfg.CertificatesDir, constants.EtcdHealthcheckClientCertName),
+		filepath.Join(cfg.CertificatesDir, constants.EtcdHealthcheckClientKeyName),
+		cfg.Etcd.Local.DataDir,
+		pathMgr.RealManifestDir(),
+		backupEtcdDir,
+	); err != nil {
+		return true, errors.Wrap(err, "failed to back up etcd data")
 	}
 
 	// Get the desired etcd version. That's either the one specified by the user in cfg.Etcd.Local.ImageTag
@@ -561,12 +569,15 @@ func rollbackEtcdData(cfg *kubeadmapi.InitConfiguration, pathMgr StaticPodPathMa
 	backupEtcdDir := pathMgr.BackupEtcdDir()
 	runningEtcdDir := cfg.Etcd.Local.DataDir
 
-	output, err := filesutil.CopyDir(backupEtcdDir, runningEtcdDir)
-	if err != nil {
-		// Let the user know there we're problems, but we tried to reçover
-		return errors.Wrapf(err, "couldn't recover etcd database with error, the location of etcd backup: %s, output: %q", backupEtcdDir, output)
+	if err := etcdutil.RestoreDataForRollback(
+		backupEtcdDir,
+		runningEtcdDir,
+		cfg.NodeRegistration.Name,
+		etcdutil.GetPeerURL(&cfg.LocalAPIEndpoint),
+		"",
+	); err != nil {
+		return errors.Wrapf(err, "couldn't recover etcd database from snapshot, the location of etcd backup: %s", backupEtcdDir)
 	}
-
 	return nil
 }
 
