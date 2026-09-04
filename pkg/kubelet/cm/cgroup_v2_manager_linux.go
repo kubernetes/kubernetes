@@ -63,11 +63,15 @@ func (c *cgroupV2impl) Validate(name CgroupName) error {
 	neededControllers := getSupportedUnifiedControllers()
 	enabledControllers, err := readUnifiedControllers(cgroupPath)
 	if err != nil {
-		return fmt.Errorf("could not read controllers for cgroup %q: %w", name, err)
+		klog.ErrorS(err, "could not read controllers for cgroup", "cgroup", name)
+		return err
 	}
 	difference := neededControllers.Difference(enabledControllers)
 	if difference.Len() > 0 {
-		return fmt.Errorf("cgroup %q has some missing controllers: %v", name, strings.Join(sets.List(difference), ", "))
+		missing := strings.Join(sets.List(difference), ", ")
+		err := fmt.Errorf("cgroup %q has some missing controllers: %v", name, missing)
+		klog.ErrorS(err, "cgroup has some missing controllers", "cgroup", name, "missingControllers", missing)
+		return err
 	}
 	return nil
 }
