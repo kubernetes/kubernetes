@@ -4421,6 +4421,9 @@ type PodSpec struct {
 	// StartTime before the system will actively try to mark it failed and kill associated containers.
 	// Value must be a positive integer.
 	// +optional
+	// +k8s:alpha(since: "1.38")=+k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:minimum=1
+	// +k8s:alpha(since: "1.38")=+k8s:maximum=2147483647
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,5,opt,name=activeDeadlineSeconds"`
 	// Set DNS policy for the pod.
 	// Defaults to "ClusterFirst".
