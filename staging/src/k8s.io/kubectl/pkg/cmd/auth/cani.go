@@ -314,8 +314,16 @@ func (o *CanIOptions) resourceFor(mapper meta.RESTMapper, resourceArg string) sc
 	if resourceArg == "*" {
 		return schema.GroupVersionResource{Resource: resourceArg}
 	}
+	resourceArg = strings.ToLower(resourceArg)
 
-	fullySpecifiedGVR, groupResource := schema.ParseResourceArg(strings.ToLower(resourceArg))
+	if nonStandardResourceNames.Has(resourceArg) {
+		return schema.GroupVersionResource{
+			Resource: resourceArg,
+		}
+	}
+
+	fullySpecifiedGVR, groupResource := schema.ParseResourceArg(resourceArg)
+
 	gvr := schema.GroupVersionResource{}
 	if fullySpecifiedGVR != nil {
 		gvr, _ = mapper.ResourceFor(*fullySpecifiedGVR)
