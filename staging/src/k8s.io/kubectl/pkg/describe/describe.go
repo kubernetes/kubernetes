@@ -2101,6 +2101,9 @@ func describeStatus(stateName string, state corev1.ContainerState, w PrefixWrite
 		if state.Waiting.Reason != "" {
 			w.Write(LEVEL_3, "Reason:\t%s\n", state.Waiting.Reason)
 		}
+		if state.Waiting.Message != "" {
+			w.Write(LEVEL_3, "Message:\t%s\n", state.Waiting.Message)
+		}
 	case state.Terminated != nil:
 		w.Write(LEVEL_2, "%s:\tTerminated\n", stateName)
 		if state.Terminated.Reason != "" {
