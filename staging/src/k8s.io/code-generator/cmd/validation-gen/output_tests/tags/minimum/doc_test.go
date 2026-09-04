@@ -338,3 +338,35 @@ func TestNegativeMinimumStruct(t *testing.T) {
 		field.Invalid(field.NewPath("requiredNegativeMinimumPtrField"), nil, "").WithOrigin("minimum"),
 	})
 }
+
+func TestSymbolicStruct(t *testing.T) {
+	st := localSchemeBuilder.Test(t)
+
+	// Int32MinField has minimum=MIN (-2147483648). All values in int32 range are valid.
+	st.Value(&SymbolicStruct{
+		Int32MinField:  -2147483648,
+		Int32MaxField:  2147483647,
+		Uint32MinField: 0,
+		Uint32MaxField: 4294967295,
+	}).ExpectValid()
+
+	// Int32MaxField has minimum=MAX (2147483647). Value 2147483646 is below minimum.
+	st.Value(&SymbolicStruct{
+		Int32MinField:  -2147483648,
+		Int32MaxField:  2147483646,
+		Uint32MinField: 0,
+		Uint32MaxField: 4294967295,
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
+		field.Invalid(field.NewPath("int32MaxField"), nil, "").WithOrigin("minimum"),
+	})
+
+	// Uint32MaxField has minimum=MAX (4294967295). Value 4294967294 is below minimum.
+	st.Value(&SymbolicStruct{
+		Int32MinField:  -2147483648,
+		Int32MaxField:  2147483647,
+		Uint32MinField: 0,
+		Uint32MaxField: 4294967294,
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
+		field.Invalid(field.NewPath("uint32MaxField"), nil, "").WithOrigin("minimum"),
+	})
+}

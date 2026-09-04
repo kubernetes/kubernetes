@@ -97,6 +97,21 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
 			}
 		})
+	// type SymbolicStruct
+	scheme.AddValidationFunc(
+		(*SymbolicStruct)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_SymbolicStruct(
+					ctx, op, nil, /* fldPath */
+					obj.(*SymbolicStruct),
+					safe.Cast[*SymbolicStruct](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
@@ -858,6 +873,113 @@ func Validate_RequiredStruct(
 				return oldObj.RequiredTypedefPtrField
 			})
 		errs = append(errs, fn(fldPath.Child("requiredTypedefPtrField"), obj.RequiredTypedefPtrField, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_SymbolicStruct validates an instance of SymbolicStruct according
+// to declarative validation rules in the API schema.
+func Validate_SymbolicStruct(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *SymbolicStruct) (errs field.ErrorList) {
+
+	// field SymbolicStruct.TypeMeta has no validation
+
+	{ // field SymbolicStruct.Int32MinField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int32,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, -2147483648); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *SymbolicStruct) *int32 {
+				return &oldObj.Int32MinField
+			})
+		errs = append(errs, fn(fldPath.Child("int32MinField"), &obj.Int32MinField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field SymbolicStruct.Int32MaxField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int32,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 2147483647); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *SymbolicStruct) *int32 {
+				return &oldObj.Int32MaxField
+			})
+		errs = append(errs, fn(fldPath.Child("int32MaxField"), &obj.Int32MaxField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field SymbolicStruct.Uint32MinField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *uint32,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *SymbolicStruct) *uint32 {
+				return &oldObj.Uint32MinField
+			})
+		errs = append(errs, fn(fldPath.Child("uint32MinField"), &obj.Uint32MinField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field SymbolicStruct.Uint32MaxField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *uint32,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 4294967295); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *SymbolicStruct) *uint32 {
+				return &oldObj.Uint32MaxField
+			})
+		errs = append(errs, fn(fldPath.Child("uint32MaxField"), &obj.Uint32MaxField, oldVal, oldObj != nil)...)
 	}
 
 	return errs
