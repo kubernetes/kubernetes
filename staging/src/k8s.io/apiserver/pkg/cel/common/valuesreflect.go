@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"sync"
 
-	"sigs.k8s.io/structured-merge-diff/v6/value"
+	"sigs.k8s.io/structured-merge-diff/v7/value"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"

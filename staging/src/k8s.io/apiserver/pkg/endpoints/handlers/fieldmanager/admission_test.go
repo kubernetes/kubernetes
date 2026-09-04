@@ -21,13 +21,14 @@ import (
 	"reflect"
 	"testing"
 
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 func TestAdmission(t *testing.T) {

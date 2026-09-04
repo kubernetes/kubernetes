@@ -21,8 +21,9 @@ import (
 	"path"
 	"strings"
 
+	"sigs.k8s.io/structured-merge-diff/v7/schema"
+
 	"k8s.io/kube-openapi/pkg/validation/spec"
-	"sigs.k8s.io/structured-merge-diff/v6/schema"
 )
 
 // ToSchemaFromOpenAPI converts a directory of OpenAPI schemas to an smd Schema.

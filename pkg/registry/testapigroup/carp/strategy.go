@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 
+	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/testapigroup"
 	"k8s.io/apimachinery/pkg/fields"
@@ -32,7 +34,6 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // carpStrategy implements behavior for Carp objects
