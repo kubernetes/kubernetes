@@ -2091,6 +2091,111 @@ func Test_reconcileNodeLabels(t *testing.T) {
 
 }
 
+func TestUpdateNodeStatusReconcilesAdditionalLabels(t *testing.T) {
+	tests := []struct {
+		name             string
+		existingLabels   map[string]string
+		additionalLabels map[string]string
+		expectedLabels   map[string]string
+	}{
+		{
+			name: "adds a missing label",
+			existingLabels: map[string]string{
+				"example.com/existing": "preserved",
+			},
+			additionalLabels: map[string]string{
+				"topology.example.com/host-id": "host-a",
+			},
+			expectedLabels: map[string]string{
+				"example.com/existing":         "preserved",
+				"topology.example.com/host-id": "host-a",
+			},
+		},
+		{
+			name: "updates a changed label",
+			existingLabels: map[string]string{
+				"topology.example.com/host-id": "host-a",
+			},
+			additionalLabels: map[string]string{
+				"topology.example.com/host-id": "host-b",
+			},
+			expectedLabels: map[string]string{
+				"topology.example.com/host-id": "host-b",
+			},
+		},
+		{
+			name: "discards labels in reserved namespaces",
+			additionalLabels: map[string]string{
+				"topology.kubernetes.io/zone": "zone-a",
+				"example.k8s.io/value":        "reserved",
+				"topology.example.com/zone":   "zone-a",
+			},
+			expectedLabels: map[string]string{
+				"topology.example.com/zone": "zone-a",
+			},
+		},
+		{
+			name: "adds a missing label with an empty value",
+			additionalLabels: map[string]string{
+				"example.com/empty": "",
+			},
+			expectedLabels: map[string]string{
+				"example.com/empty": "",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
+			node := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "node0",
+					Labels: test.existingLabels,
+				},
+				Spec: v1.NodeSpec{
+					ProviderID: "fake://node0",
+				},
+			}
+
+			clientset := fake.NewSimpleClientset(node)
+			factory := informers.NewSharedInformerFactory(clientset, 0)
+			nodeInformer := factory.Core().V1().Nodes()
+
+			if err := nodeInformer.Informer().GetIndexer().Add(node); err != nil {
+				t.Fatalf("failed to add node to informer indexer: %v", err)
+			}
+
+			cnc := &CloudNodeController{
+				kubeClient:              clientset,
+				nodeInformer:            nodeInformer,
+				nodesLister:             nodeInformer.Lister(),
+				statusUpdateWorkerCount: 1,
+				cloud: &fakecloud.Cloud{
+					EnableInstancesV2: true,
+					AdditionalLabels:  test.additionalLabels,
+				},
+			}
+
+			if err := cnc.UpdateNodeStatus(ctx); err != nil {
+				t.Fatalf("UpdateNodeStatus() returned an error: %v", err)
+			}
+
+			updatedNode, err := clientset.CoreV1().Nodes().Get(
+				ctx,
+				node.Name,
+				metav1.GetOptions{},
+			)
+			if err != nil {
+				t.Fatalf("failed to get updated node: %v", err)
+			}
+
+			assert.Equal(t, test.expectedLabels, updatedNode.Labels)
+		})
+	}
+}
+
 // Tests that node address changes are detected correctly
 func TestNodeAddressesChangeDetected(t *testing.T) {
 	addressSet1 := []v1.NodeAddress{
