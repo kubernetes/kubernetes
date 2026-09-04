@@ -41,6 +41,9 @@ type containerByCreatedThenID []*runtimeapi.Container
 func (b containerByCreatedThenID) Len() int      { return len(b) }
 func (b containerByCreatedThenID) Swap(i, j int) { b[i], b[j] = b[j], b[i] }
 func (b containerByCreatedThenID) Less(i, j int) bool {
+	if b[i].Metadata != nil && b[j].Metadata != nil && b[i].Metadata.Attempt != b[j].Metadata.Attempt {
+		return b[i].Metadata.Attempt > b[j].Metadata.Attempt
+	}
 	if b[i].CreatedAt != b[j].CreatedAt {
 		return b[i].CreatedAt > (b[j].CreatedAt)
 	}
@@ -62,11 +65,19 @@ func (p podSandboxByCreatedThenID) Less(i, j int) bool {
 	return p[i].Metadata.Attempt > p[j].Metadata.Attempt
 }
 
+// Sorts container statuses newest-first. RestartCount (attempt number) is the
+// primary key so that a clock-skew scenario cannot cause a terminated container
+// with a future CreatedAt to sort above the actually-newest running container.
 type containerStatusByCreated []*kubecontainer.Status
 
-func (c containerStatusByCreated) Len() int           { return len(c) }
-func (c containerStatusByCreated) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
-func (c containerStatusByCreated) Less(i, j int) bool { return c[i].CreatedAt.After(c[j].CreatedAt) }
+func (c containerStatusByCreated) Len() int      { return len(c) }
+func (c containerStatusByCreated) Swap(i, j int) { c[i], c[j] = c[j], c[i] }
+func (c containerStatusByCreated) Less(i, j int) bool {
+	if c[i].RestartCount != c[j].RestartCount {
+		return c[i].RestartCount > c[j].RestartCount
+	}
+	return c[i].CreatedAt.After(c[j].CreatedAt)
+}
 
 // toKubeContainerState converts runtimeapi.ContainerState to kubecontainer.State.
 func toKubeContainerState(state runtimeapi.ContainerState) kubecontainer.State {
