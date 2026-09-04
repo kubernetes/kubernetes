@@ -24,13 +24,15 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	coreinformers "k8s.io/client-go/informers/core/v1"
 	eventsv1client "k8s.io/client-go/kubernetes/typed/events/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -41,11 +43,12 @@ import (
 
 // See ipallocator/controller/repair.go; this is a copy for ports.
 type Repair struct {
-	interval      time.Duration
-	serviceClient corev1client.ServicesGetter
-	portRange     net.PortRange
-	alloc         rangeallocation.RangeRegistry
-	leaks         map[int]int // counter per leaked port
+	interval       time.Duration
+	serviceLister  corelisters.ServiceLister
+	servicesSynced cache.InformerSynced
+	portRange      net.PortRange
+	alloc          rangeallocation.RangeRegistry
+	leaks          map[int]int // counter per leaked port
 
 	broadcaster events.EventBroadcaster
 	recorder    events.EventRecorder
@@ -57,20 +60,21 @@ const numRepairsBeforeLeakCleanup = 3
 
 // NewRepair creates a controller that periodically ensures that all ports are uniquely allocated across the cluster
 // and generates informational warnings for a cluster that is not in sync.
-func NewRepair(interval time.Duration, serviceClient corev1client.ServicesGetter, eventClient eventsv1client.EventsV1Interface, portRange net.PortRange, alloc rangeallocation.RangeRegistry) *Repair {
+func NewRepair(interval time.Duration, serviceInformer coreinformers.ServiceInformer, eventClient eventsv1client.EventsV1Interface, portRange net.PortRange, alloc rangeallocation.RangeRegistry) *Repair {
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: eventClient})
 	recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, "portallocator-repair-controller")
 
 	registerMetrics()
 
 	return &Repair{
-		interval:      interval,
-		serviceClient: serviceClient,
-		portRange:     portRange,
-		alloc:         alloc,
-		leaks:         map[int]int{},
-		broadcaster:   eventBroadcaster,
-		recorder:      recorder,
+		interval:       interval,
+		serviceLister:  serviceInformer.Lister(),
+		servicesSynced: serviceInformer.Informer().HasSynced,
+		portRange:      portRange,
+		alloc:          alloc,
+		leaks:          map[int]int{},
+		broadcaster:    eventBroadcaster,
+		recorder:       recorder,
 	}
 }
 
@@ -78,6 +82,10 @@ func NewRepair(interval time.Duration, serviceClient corev1client.ServicesGetter
 func (c *Repair) RunUntil(onFirstSuccess func(), stopCh chan struct{}) {
 	c.broadcaster.StartRecordingToSink(stopCh)
 	defer c.broadcaster.Shutdown()
+
+	if !cache.WaitForNamedCacheSync("portallocator-repair-controller", stopCh, c.servicesSynced) {
+		return
+	}
 
 	var once sync.Once
 	wait.Until(func() {
@@ -139,7 +147,7 @@ func (c *Repair) doRunOnce() error {
 	// the service collection. The caching layer keeps per-collection RVs,
 	// and this is proper, since in theory the collections could be hosted
 	// in separate etcd (or even non-etcd) instances.
-	list, err := c.serviceClient.Services(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+	list, err := c.serviceLister.List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("unable to refresh the port block: %v", err)
 	}
@@ -149,8 +157,7 @@ func (c *Repair) doRunOnce() error {
 		return fmt.Errorf("unable to create port allocator: %v", err)
 	}
 	// Check every Service's ports, and rebuild the state as we think it should be.
-	for i := range list.Items {
-		svc := &list.Items[i]
+	for _, svc := range list {
 		ports := collectServiceNodePorts(svc)
 		if len(ports) == 0 {
 			continue
