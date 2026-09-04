@@ -145,12 +145,26 @@ func isPodTerminating(pod *v1.Pod) bool {
 	return pod.ObjectMeta.DeletionTimestamp != nil
 }
 
+// isPodBlockedOnFinalizers returns true if there is nothing left for PodGCController to do
+// for the pod, which is the case when both of the following hold:
+//  1. the pod is already in a terminal phase and has been accepted for immediate deletion.
+//  2. the pod still has finalizers that have not been removed yet.
+//
+// Only the removal of those finalizers can make the pod go away, so deleting it again is a
+// no-op. Pods without finalizers are not skipped: for those, resending the deletion recovers
+// a deletion that failed after the object was already marked for deletion, see rest.BeforeDelete.
+func isPodBlockedOnFinalizers(pod *v1.Pod) bool {
+	return isPodTerminated(pod) && isPodTerminating(pod) &&
+		pod.ObjectMeta.DeletionGracePeriodSeconds != nil && *pod.ObjectMeta.DeletionGracePeriodSeconds == 0 &&
+		len(pod.ObjectMeta.Finalizers) > 0
+}
+
 func (gcc *PodGCController) gcTerminating(ctx context.Context, pods []*v1.Pod) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("GC'ing terminating pods that are on out-of-service nodes")
 	terminatingPods := []*v1.Pod{}
 	for _, pod := range pods {
-		if isPodTerminating(pod) {
+		if isPodTerminating(pod) && !isPodBlockedOnFinalizers(pod) {
 			node, err := gcc.nodeLister.Get(pod.Spec.NodeName)
 			if err != nil {
 				logger.Error(err, "Failed to get node", "node", klog.KRef("", pod.Spec.NodeName))
@@ -191,16 +205,20 @@ func (gcc *PodGCController) gcTerminating(ctx context.Context, pods []*v1.Pod) {
 }
 
 func (gcc *PodGCController) gcTerminated(ctx context.Context, pods []*v1.Pod) {
-	terminatedPods := []*v1.Pod{}
+	terminatedPodCount := 0
+	deletionCandidates := []*v1.Pod{}
 	for _, pod := range pods {
-		if isPodTerminated(pod) {
-			terminatedPods = append(terminatedPods, pod)
+		if !isPodTerminated(pod) {
+			continue
+		}
+		// Pods that are only waiting for their finalizers still count towards the threshold
+		terminatedPodCount++
+		if !isPodBlockedOnFinalizers(pod) {
+			deletionCandidates = append(deletionCandidates, pod)
 		}
 	}
 
-	terminatedPodCount := len(terminatedPods)
-	deleteCount := terminatedPodCount - gcc.terminatedPodThreshold
-
+	deleteCount := min(terminatedPodCount-gcc.terminatedPodThreshold, len(deletionCandidates))
 	if deleteCount <= 0 {
 		return
 	}
@@ -208,7 +226,7 @@ func (gcc *PodGCController) gcTerminated(ctx context.Context, pods []*v1.Pod) {
 	logger := klog.FromContext(ctx)
 	logger.Info("Garbage collecting pods", "numPods", deleteCount)
 	// sort only when necessary
-	sort.Sort(byEvictionAndCreationTimestamp(terminatedPods))
+	sort.Sort(byEvictionAndCreationTimestamp(deletionCandidates))
 	var wait sync.WaitGroup
 	for i := 0; i < deleteCount; i++ {
 		wait.Add(1)
@@ -220,7 +238,7 @@ func (gcc *PodGCController) gcTerminated(ctx context.Context, pods []*v1.Pod) {
 				metrics.DeletingPodsErrorTotal.WithLabelValues(pod.Namespace, metrics.PodGCReasonTerminated).Inc()
 			}
 			metrics.DeletingPodsTotal.WithLabelValues(pod.Namespace, metrics.PodGCReasonTerminated).Inc()
-		}(terminatedPods[i])
+		}(deletionCandidates[i])
 	}
 	wait.Wait()
 }
@@ -246,7 +264,7 @@ func (gcc *PodGCController) gcOrphaned(ctx context.Context, pods []*v1.Pod, node
 	}
 	// Delete orphaned pods
 	for _, pod := range pods {
-		if !deletedNodesNames.Has(pod.Spec.NodeName) {
+		if !deletedNodesNames.Has(pod.Spec.NodeName) || isPodBlockedOnFinalizers(pod) {
 			continue
 		}
 		logger.V(2).Info("Found orphaned Pod assigned to the Node, deleting", "pod", klog.KObj(pod), "node", klog.KRef("", pod.Spec.NodeName))
@@ -304,7 +322,7 @@ func (gcc *PodGCController) gcUnscheduledTerminating(ctx context.Context, pods [
 	logger.V(4).Info("GC'ing unscheduled pods which are terminating")
 
 	for _, pod := range pods {
-		if pod.DeletionTimestamp == nil || len(pod.Spec.NodeName) > 0 {
+		if pod.DeletionTimestamp == nil || len(pod.Spec.NodeName) > 0 || isPodBlockedOnFinalizers(pod) {
 			continue
 		}
 
