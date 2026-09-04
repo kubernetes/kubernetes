@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"iter"
 	"sort"
+	"strings"
 	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -162,6 +163,51 @@ func (o orderedListSnapshot) RangePrefix(prefix, continueKey string) iter.Seq2[*
 
 func (o orderedListSnapshot) Count(prefix, continueKey string) int {
 	return len(o.Items)
+}
+
+func SingleElementSnapshot(elem *Element) Snapshot {
+	return elementSnapshot{elem: elem}
+}
+
+func EmptySnapshot() Snapshot {
+	return elementSnapshot{}
+}
+
+type elementSnapshot struct {
+	elem *Element
+}
+
+func (s elementSnapshot) inRange(prefix, continueKey string) bool {
+	return s.elem != nil && strings.HasPrefix(s.elem.Key, prefix) && s.elem.Key >= continueKey
+}
+
+func (s elementSnapshot) GetByKey(key string) (interface{}, bool, error) {
+	if s.elem != nil && s.elem.Key == key {
+		return s.elem, true, nil
+	}
+	return nil, false, nil
+}
+
+func (s elementSnapshot) OrderedListPrefix(prefix, continueKey string) ([]interface{}, error) {
+	if !s.inRange(prefix, continueKey) {
+		return nil, nil
+	}
+	return []interface{}{s.elem}, nil
+}
+
+func (s elementSnapshot) RangePrefix(prefix, continueKey string) iter.Seq2[*Element, error] {
+	return func(yield func(*Element, error) bool) {
+		if s.inRange(prefix, continueKey) {
+			yield(s.elem, nil)
+		}
+	}
+}
+
+func (s elementSnapshot) Count(prefix, continueKey string) int {
+	if s.inRange(prefix, continueKey) {
+		return 1
+	}
+	return 0
 }
 
 // listSnapshot serves an unordered index bucket.
