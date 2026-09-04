@@ -22,9 +22,13 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	basecompatibility "k8s.io/component-base/compatibility"
 	netutils "k8s.io/utils/net"
@@ -420,4 +424,79 @@ func TestServerRunOptionsWithShutdownWatchTerminationGracePeriod(t *testing.T) {
 			t.Errorf("expected default of ShutdownWatchTerminationGracePeriod to be zero, but got: %s", options.ShutdownWatchTerminationGracePeriod)
 		}
 	})
+}
+
+func TestServerRunOptionsValidateMaxPooledEncodeBufferSize(t *testing.T) {
+	testComponent := "test"
+	newOptions := func(size int, gateEnabled bool) *ServerRunOptions {
+		// newTestRegistry emulates an older version at which the gate does
+		// not exist; register at the build version instead.
+		registry := basecompatibility.NewComponentGlobalsRegistry()
+		featureGate := utilfeature.DefaultFeatureGate.DeepCopy()
+		utilruntime.Must(registry.Register(testComponent, compatibility.DefaultBuildEffectiveVersion(), featureGate))
+		utilruntime.Must(featureGate.SetFromMap(map[string]bool{string(features.AllocatorPoolBufferCap): gateEnabled}))
+		return &ServerRunOptions{
+			AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
+			MaxRequestsInFlight:         400,
+			MaxMutatingRequestsInFlight: 200,
+			RequestTimeout:              time.Duration(2) * time.Minute,
+			MinRequestTimeout:           1800,
+			JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
+			MaxRequestBodyBytes:         10 * 1024 * 1024,
+			MaxPooledEncodeBufferSize:   size,
+			ComponentGlobalsRegistry:    registry,
+			ComponentName:               testComponent,
+		}
+	}
+	testCases := []struct {
+		name        string
+		size        int
+		gateEnabled bool
+		expectErr   string
+	}{
+		{name: "default with gate enabled", size: 0, gateEnabled: true},
+		{name: "default with gate disabled", size: 0, gateEnabled: false},
+		{name: "explicit size with gate enabled", size: 128 * 1024, gateEnabled: true},
+		{name: "explicit size with gate disabled", size: 128 * 1024, gateEnabled: false,
+			expectErr: "--max-pooled-encode-buffer-size requires the AllocatorPoolBufferCap feature gate"},
+		{name: "negative size", size: -1, gateEnabled: true,
+			expectErr: "--max-pooled-encode-buffer-size can not be negative value"},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := newOptions(tc.size, tc.gateEnabled).Validate()
+			if tc.expectErr == "" {
+				if len(errs) != 0 {
+					t.Fatalf("expected no error, got %v", errs)
+				}
+				return
+			}
+			if !strings.Contains(utilerrors.NewAggregate(errs).Error(), tc.expectErr) {
+				t.Fatalf("expected error containing %q, got %v", tc.expectErr, errs)
+			}
+		})
+	}
+}
+
+func TestServerRunOptionsApplyToMaxPooledEncodeBufferSize(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		size int
+		want int
+	}{
+		{name: "zero keeps the config default", size: 0, want: server.DefaultMaxPooledEncodeBufferSize},
+		{name: "positive overrides the config default", size: 64 * 1024, want: 64 * 1024},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := NewServerRunOptions()
+			opts.MaxPooledEncodeBufferSize = tc.size
+			config := server.NewConfig(serializer.CodecFactory{})
+			if err := opts.ApplyTo(config); err != nil {
+				t.Fatal(err)
+			}
+			if config.MaxPooledEncodeBufferSize != tc.want {
+				t.Fatalf("got MaxPooledEncodeBufferSize %d, want %d", config.MaxPooledEncodeBufferSize, tc.want)
+			}
+		})
+	}
 }
