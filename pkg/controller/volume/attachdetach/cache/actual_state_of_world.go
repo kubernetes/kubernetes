@@ -396,7 +396,11 @@ func (asw *actualStateOfWorld) SetVolumesMountedByNode(
 	asw.Lock()
 	defer asw.Unlock()
 
-	asw.inUseVolumes[nodeName] = sets.New(volumeNames...)
+	if volumeNames == nil {
+		delete(asw.inUseVolumes, nodeName)
+	} else {
+		asw.inUseVolumes[nodeName] = sets.New(volumeNames...)
+	}
 	logger.V(5).Info("SetVolumesMountedByNode volume to the node",
 		"node", klog.KRef("", string(nodeName)),
 		"volumeNames", volumeNames)
