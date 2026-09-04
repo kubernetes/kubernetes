@@ -20,7 +20,15 @@ package logs
 
 import (
 	"os"
+	"path/filepath"
 )
+
+// evalSymlinks resolves symbolic links in the log path. On non-Windows
+// platforms fsnotify follows symlinks itself, so this is a direct
+// passthrough to filepath.EvalSymlinks.
+func evalSymlinks(path string) (string, error) {
+	return filepath.EvalSymlinks(path)
+}
 
 func openFileShareDelete(path string) (*os.File, error) {
 	// Noop. Only relevant for Windows.
