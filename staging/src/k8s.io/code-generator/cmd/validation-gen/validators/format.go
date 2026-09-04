@@ -53,6 +53,9 @@ var (
 	// TODO: uncomment the following when we've done the homework
 	// to be sure it works the current state of IP manual-ratcheting
 	// ipSloppyValidator         = types.Name{Package: libValidationPkg, Name: "IPSloppy"}
+	cidrSloppyValidator                 = types.Name{Package: libValidationPkg, Name: "CIDRSloppy"}
+	cidrv4SloppyValidator               = types.Name{Package: libValidationPkg, Name: "CIDRv4Sloppy"}
+	cidrv6SloppyValidator               = types.Name{Package: libValidationPkg, Name: "CIDRv6Sloppy"}
 	extendedResourceNameValidator       = types.Name{Package: libValidationPkg, Name: "ExtendedResourceName"}
 	labelKeyValidator                   = types.Name{Package: libValidationPkg, Name: "LabelKey"}
 	labelValueValidator                 = types.Name{Package: libValidationPkg, Name: "LabelValue"}
@@ -90,6 +93,12 @@ func getFormatValidationFunction(format string) (FunctionGen, error) {
 
 	switch format {
 	// Keep this sequence alphabetized.
+	case "k8s-cidr":
+		return Function(formatTagName, DefaultFlags, cidrSloppyValidator), nil
+	case "k8s-cidrv4":
+		return Function(formatTagName, DefaultFlags, cidrv4SloppyValidator), nil
+	case "k8s-cidrv6":
+		return Function(formatTagName, DefaultFlags, cidrv6SloppyValidator), nil
 	case "k8s-extended-resource-name":
 		return Function(formatTagName, DefaultFlags, extendedResourceNameValidator).
 			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-extended-resource-name", ""}), nil
@@ -142,6 +151,15 @@ func (ftv formatTagValidator) Docs() TagDoc {
 		Scopes:         sets.List(ftv.ValidScopes()),
 		Description:    "Indicates that a string field has a particular format.",
 		Payloads: []TagPayloadDoc{{ // Keep this list alphabetized.
+			Description: "k8s-cidr",
+			Docs:        "This field holds an IPv4 or IPv6 CIDR value. Both subnet-mask form (e.g., 192.168.1.0/24) and interface-address form (e.g., 192.168.1.5/24) are accepted. IPv4 octets may have leading zeros (sloppy parsing for backwards compatibility).",
+		}, {
+			Description: "k8s-cidrv4",
+			Docs:        "This field holds an IPv4 CIDR value. Both subnet-mask form (e.g., 192.168.1.0/24) and interface-address form (e.g., 192.168.1.5/24) are accepted. IPv4 octets may have leading zeros (sloppy parsing for backwards compatibility).",
+		}, {
+			Description: "k8s-cidrv6",
+			Docs:        "This field holds an IPv6 CIDR value (e.g., 2001:db8::/64). Both subnet-mask form and interface-address form are accepted.",
+		}, {
 			Description: "k8s-extended-resource-name",
 			Docs:        "This field holds a Kubernetes extended resource name. This is a domain-prefixed name that must not have a `kubernetes.io` or `requests.` prefix. When `requests.` is prepended, the result must be a valid label key, as used by quota.",
 		}, {
