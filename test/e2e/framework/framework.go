@@ -130,6 +130,10 @@ type Framework struct {
 	// plain Counter cannot be passed), so this uses one with zero labels.
 	requestCounter *prometheus.CounterVec
 
+	// requestCounterResetTime records when requestCounter was last reset,
+	// used to turn the accumulated count into a rate for reporting.
+	requestCounterResetTime time.Time
+
 	DynamicClient dynamic.Interface
 
 	ScalesGetter scaleclient.ScalesGetter
@@ -415,6 +419,7 @@ func (f *Framework) BeforeEach(ctx context.Context) {
 	// needed to set up the framework (client creation, namespace
 	// creation, etc.).
 	f.requestCounter.Reset()
+	f.requestCounterResetTime = time.Now()
 }
 
 func (f *Framework) dumpNamespaceInfo(ctx context.Context) {
@@ -488,7 +493,12 @@ func (f *Framework) AfterEach(ctx context.Context) {
 	// vs.
 	// https://github.com/onsi/ginkgo/blob/f2d0f65b6d1e99c58d1f9a31b41c53a2754a6c2c/reporters/default_reporter.go#L645-L650
 	requestCount := testutil.ToFloat64(f.requestCounter.With(prometheus.Labels{}))
-	ginkgo.AddReportEntry("client-http-requests", requestCount, ginkgo.ReportEntryVisibilityNever, ginkgotypes.NewCustomCodeLocation("E2E framework"))
+	elapsed := time.Since(f.requestCounterResetTime).Seconds()
+	var requestsPerSecond float64
+	if elapsed > 0 {
+		requestsPerSecond = requestCount / elapsed
+	}
+	ginkgo.AddReportEntry("client-http-requests-per-second", requestsPerSecond, ginkgo.ReportEntryVisibilityNever, ginkgotypes.NewCustomCodeLocation("E2E framework"))
 
 	// DeleteNamespace at the very end in defer, to avoid any
 	// expectation failures preventing deleting the namespace.
