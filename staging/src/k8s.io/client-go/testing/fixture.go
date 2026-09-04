@@ -452,6 +452,32 @@ func (t *tracker) Watch(gvr schema.GroupVersionResource, ns string, opts ...meta
 		}
 	}
 
+	// When SendInitialEvents is requested (WatchList protocol), emit the
+	// required initial-events-end bookmark so the reflector knows the
+	// initial list is complete and can mark the informer as synced.
+	if len(opts) > 0 && opts[0].SendInitialEvents != nil && *opts[0].SendInitialEvents {
+		resourceVersion, ok := t.resourceVersions[gvr]
+		if !ok {
+			resourceVersion = 1
+		}
+		var bookmarkObj runtime.Object
+		if objs := t.objects[gvr]; len(objs) > 0 {
+			for _, obj := range objs {
+				bookmarkObj = reflect.New(reflect.TypeOf(obj.Object).Elem()).Interface().(runtime.Object)
+				break
+			}
+		} else {
+			bookmarkObj = &metav1.PartialObjectMetadata{}
+		}
+		if accessor, err := meta.Accessor(bookmarkObj); err == nil {
+			accessor.SetAnnotations(map[string]string{
+				metav1.InitialEventsAnnotationKey: "true",
+			})
+			accessor.SetResourceVersion(fmt.Sprintf("%d", resourceVersion))
+			fakewatcher.Action(watch.Bookmark, bookmarkObj)
+		}
+	}
+
 	return fakewatcher, nil
 }
 
