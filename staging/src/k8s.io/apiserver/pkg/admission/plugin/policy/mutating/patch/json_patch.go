@@ -17,16 +17,16 @@ limitations under the License.
 package patch
 
 import (
+	celgo "cel.dev/cel-go/cel"
 	"context"
 	gojson "encoding/json"
 	"errors"
 	"fmt"
-	celgo "github.com/google/cel-go/cel"
 	"reflect"
 	"strconv"
 
-	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/common/types/traits"
+	"cel.dev/cel-go/common/types"
+	"cel.dev/cel-go/common/types/traits"
 	"google.golang.org/protobuf/types/known/structpb"
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 

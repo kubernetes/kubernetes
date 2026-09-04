@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	celgo "github.com/google/cel-go/cel"
+	celgo "cel.dev/cel-go/cel"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"

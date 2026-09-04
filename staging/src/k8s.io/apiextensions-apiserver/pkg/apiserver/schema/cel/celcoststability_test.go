@@ -438,8 +438,8 @@ func TestCelCostStability(t *testing.T) {
 				// - without has checks:
 
 				// all() and exists() macros ignore errors from predicates so long as the condition holds for at least one element
-				"self.listMap.exists(m, m.v2 == 'z')": 24,
-				"!self.listMap.all(m, m.v2 != 'z')":   22,
+				"self.listMap.exists(m, m.v2 == 'z')": 22,
+				"!self.listMap.all(m, m.v2 != 'z')":   20,
 
 				// two variable comprehensions
 				"!self.listMap.all(i, m, has(m.v2) && m.v2 != 'z')":                            10,
@@ -1166,7 +1166,7 @@ func TestCelCostStability(t *testing.T) {
 				"optional.of('a').hasValue()":                         2,
 				"optional.of('a').or(optional.of('a')).hasValue()":    2, // or() is short-circuited
 				"optional.none().or(optional.of('a')).hasValue()":     3,
-				"optional.of('a').optMap(v, v == 'value').hasValue()": 8,
+				"optional.of('a').optMap(v, v == 'value').hasValue()": 9,
 				"self.obj.?field == optional.of('a')":                 5,
 				"self.obj.?absentField == optional.none()":            4,
 				"self.obj.?field.orValue('v') == 'a'":                 4,
@@ -2056,16 +2056,16 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				"optional.of('a').hasValue()":                                  2,
 				"optional.of('a').or(optional.of('a')).hasValue()":             4, // or() is short-circuited
 				"optional.none().or(optional.of('a')).hasValue()":              4,
-				"optional.of('a').optMap(v, v == 'value').hasValue()":          18,
+				"optional.of('a').optMap(v, v == 'value').hasValue()":          29,
 				"self.obj.?field == optional.of('a')":                          uint64(1844674407370955268),
 				"self.obj.?absentField == optional.none()":                     uint64(1844674407370955268),
 				"self.obj.?field.orValue('v') == 'a'":                          5,
 				"self.m[?'k'] == optional.of('v')":                             uint64(1844674407370955268),
 				"self.l[?0] == optional.of('a')":                               uint64(1844674407370955268),
 				"optional.ofNonZeroValue(1).hasValue()":                        2,
-				"optional.of([1, 2, 3, 4, 5]).optMap(v, v.size()).hasValue()":  38,
-				"optional.of('abcdefgabcdefg').optMap(v, v.size()).hasValue()": 18,
-				"self.l[?0].optMap(v, v == 'a').hasValue()":                    22,
+				"optional.of([1, 2, 3, 4, 5]).optMap(v, v.size()).hasValue()":  39,
+				"optional.of('abcdefgabcdefg').optMap(v, v.size()).hasValue()": 29,
+				"self.l[?0].optMap(v, v == 'a').hasValue()":                    31,
 			},
 		},
 		{name: "quantity",

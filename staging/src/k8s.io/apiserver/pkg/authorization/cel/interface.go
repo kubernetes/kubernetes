@@ -17,7 +17,7 @@ limitations under the License.
 package cel
 
 import (
-	celgo "github.com/google/cel-go/cel"
+	celgo "cel.dev/cel-go/cel"
 )
 
 type ExpressionAccessor interface {

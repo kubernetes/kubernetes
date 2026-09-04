@@ -20,8 +20,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/cel-go/common/types/traits"
-	"github.com/google/cel-go/interpreter"
+	"cel.dev/cel-go/common/types/traits"
+	"cel.dev/cel-go/interpreter"
 )
 
 var _ ClaimsMapper = &mapper{}

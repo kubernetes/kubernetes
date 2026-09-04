@@ -20,7 +20,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/google/cel-go/cel"
+	"cel.dev/cel-go/cel"
 )
 
 func TestOutOfBudgetError(t *testing.T) {

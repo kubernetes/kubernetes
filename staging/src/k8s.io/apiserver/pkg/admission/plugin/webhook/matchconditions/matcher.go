@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/cel-go/cel"
-	celtypes "github.com/google/cel-go/common/types"
+	"cel.dev/cel-go/cel"
+	celtypes "cel.dev/cel-go/common/types"
 
 	v1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
