@@ -1810,6 +1810,39 @@ func (_c *MockContainerManager_UnprepareDynamicResources_Call) RunAndReturn(run 
 	return _c
 }
 
+// InvalidatePreparedDynamicResources provides a mock function for the type MockContainerManager
+func (_mock *MockContainerManager) InvalidatePreparedDynamicResources(pod *v1.Pod) {
+	_mock.Called(pod)
+}
+
+// MockContainerManager_InvalidatePreparedDynamicResources_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'InvalidatePreparedDynamicResources'
+type MockContainerManager_InvalidatePreparedDynamicResources_Call struct {
+	*mock.Call
+}
+
+// InvalidatePreparedDynamicResources is a helper method to define mock.On call
+//   - pod *v1.Pod
+func (_e *MockContainerManager_Expecter) InvalidatePreparedDynamicResources(pod interface{}) *MockContainerManager_InvalidatePreparedDynamicResources_Call {
+	return &MockContainerManager_InvalidatePreparedDynamicResources_Call{Call: _e.mock.On("InvalidatePreparedDynamicResources", pod)}
+}
+
+func (_c *MockContainerManager_InvalidatePreparedDynamicResources_Call) Run(run func(pod *v1.Pod)) *MockContainerManager_InvalidatePreparedDynamicResources_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*v1.Pod))
+	})
+	return _c
+}
+
+func (_c *MockContainerManager_InvalidatePreparedDynamicResources_Call) Return() *MockContainerManager_InvalidatePreparedDynamicResources_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockContainerManager_InvalidatePreparedDynamicResources_Call) RunAndReturn(run func(pod *v1.Pod)) *MockContainerManager_InvalidatePreparedDynamicResources_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdateAllocatedDevices provides a mock function for the type MockContainerManager
 func (_mock *MockContainerManager) UpdateAllocatedDevices(logger klog.Logger) {
 	_mock.Called(logger)

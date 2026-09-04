@@ -145,6 +145,12 @@ type ContainerManager interface {
 	// UnprepareDynamicResources unprepares dynamic pod resources
 	UnprepareDynamicResources(context.Context, *v1.Pod) error
 
+	// InvalidatePreparedDynamicResources clears the prepared state for a pod's
+	// DRA claims so that the next PrepareDynamicResources call re-invokes the
+	// driver. Use when container creation fails due to CDI device resolution
+	// errors after a node or runtime restart.
+	InvalidatePreparedDynamicResources(*v1.Pod)
+
 	// PodMightNeedToUnprepareResources returns true if the pod with the given UID
 	// might need to unprepare resources.
 	PodMightNeedToUnprepareResources(UID types.UID) bool

@@ -1842,6 +1842,18 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 				metrics.StartedHostProcessContainersErrorsTotal.WithLabelValues(metricLabel, err.Error()).Inc()
 			}
 			startContainerResult.Fail(err, msg)
+
+			// If container creation failed due to CDI device resolution errors,
+			// invalidate the DRA prepared state so the next syncPod re-prepares
+			// the claims and offer the CDI driver a chance to re-establish CDI spec files.
+			if errors.Is(err, ErrCreateContainer) && isCDIResolutionError(msg) {
+				if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+					m.containerManager.InvalidatePreparedDynamicResources(pod)
+					logger.V(2).Info("Invalidated DRA prepared state due to CDI resolution failure",
+						"pod", klog.KObj(pod), "container", spec.container.Name, "message", msg)
+				}
+			}
+
 			// known errors that are logged in other places are logged at higher levels here to avoid
 			// repetitive log spam
 			switch {
@@ -2463,4 +2475,19 @@ func isResizableContainer(container *v1.Container, containerType podutil.Contain
 	default:
 		return false
 	}
+}
+
+// isCDIResolutionError returns true if the error message from container
+// creation indicates a CDI device resolution failure. This typically happens
+// when CDI spec files are missing or stale after a node/runtime restart,
+// even though the DRA driver reported successful preparation.
+//
+// These strings originate from the CNCF CDI library (cache.go:InjectDevices).
+// If the library changes these messages, this detection gracefully degrades
+// to the pre-fix behavior (no automatic re-preparation). These error strings
+// have remained stable since the CDI library was created in 2021.
+func isCDIResolutionError(msg string) bool {
+	// containerd and CRI-O both report CDI failures with these patterns.
+	return strings.Contains(msg, "unresolvable CDI devices") ||
+		strings.Contains(msg, "CDI device injection failed")
 }

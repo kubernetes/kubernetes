@@ -291,6 +291,9 @@ func (cm *FakeContainerManager) UnprepareDynamicResources(context.Context, *v1.P
 	return nil
 }
 
+func (cm *FakeContainerManager) InvalidatePreparedDynamicResources(pod *v1.Pod) {
+}
+
 func (cm *FakeContainerManager) PodMightNeedToUnprepareResources(_ types.UID) bool {
 	return false
 }
