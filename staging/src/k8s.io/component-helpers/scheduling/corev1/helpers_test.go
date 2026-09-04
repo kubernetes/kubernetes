@@ -652,7 +652,8 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 		taints                      []v1.Taint
 		applyFilter                 taintsFilterFunc
 		expectTolerated             bool
-		expectError                 bool
+		expectWarning               bool
+		expectUntoleratedTaint      *v1.Taint
 		enableComparisonOperatorsFG bool
 	}{
 		{
@@ -833,13 +834,106 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 			},
 			applyFilter:                 func(t *v1.Taint) bool { return true },
 			expectTolerated:             false,
-			expectError:                 true,
+			expectWarning:               true,
+			enableComparisonOperatorsFG: true,
+		},
+		{
+			description: "prefer cleanly untolerated taint over earlier comparison parse error",
+			tolerations: []v1.Toleration{
+				{
+					Key:      "node.kubernetes.io/sla",
+					Operator: "Gt",
+					Value:    "950",
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+			},
+			taints: []v1.Taint{
+				{
+					Key:    "node.kubernetes.io/sla",
+					Value:  "high",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+				{
+					Key:    "dedicated",
+					Value:  "gpu",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			applyFilter:     func(t *v1.Taint) bool { return true },
+			expectTolerated: false,
+			expectWarning:   false,
+			expectUntoleratedTaint: &v1.Taint{
+				Key:    "dedicated",
+				Value:  "gpu",
+				Effect: v1.TaintEffectNoSchedule,
+			},
+			enableComparisonOperatorsFG: true,
+		},
+		{
+			description: "prefer cleanly untolerated taint even when it appears before comparison parse error",
+			tolerations: []v1.Toleration{
+				{
+					Key:      "node.kubernetes.io/sla",
+					Operator: "Gt",
+					Value:    "950",
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+			},
+			taints: []v1.Taint{
+				{
+					Key:    "dedicated",
+					Value:  "gpu",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+				{
+					Key:    "node.kubernetes.io/sla",
+					Value:  "high",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			applyFilter:     func(t *v1.Taint) bool { return true },
+			expectTolerated: false,
+			expectWarning:   false,
+			expectUntoleratedTaint: &v1.Taint{
+				Key:    "dedicated",
+				Value:  "gpu",
+				Effect: v1.TaintEffectNoSchedule,
+			},
+			enableComparisonOperatorsFG: true,
+		},
+		{
+			description: "numeric Gt parse error is ignored when a later toleration matches the taint",
+			tolerations: []v1.Toleration{
+				{
+					Key:      "node.kubernetes.io/sla",
+					Operator: "Gt",
+					Value:    "950",
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+				{
+					Key:      "node.kubernetes.io/sla",
+					Operator: "Exists",
+					Effect:   v1.TaintEffectNoSchedule,
+				},
+			},
+			taints: []v1.Taint{
+				{
+					Key:    "node.kubernetes.io/sla",
+					Value:  "high",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			applyFilter:                 func(t *v1.Taint) bool { return true },
+			expectTolerated:             true,
 			enableComparisonOperatorsFG: true,
 		},
 	}
 
 	for _, tc := range testCases {
-		_, untolerated := FindMatchingUntoleratedTaint(logger, tc.taints, tc.tolerations, tc.applyFilter, tc.enableComparisonOperatorsFG)
+		untoleratedTaint, untolerated, warning := FindMatchingUntoleratedTaint(logger, tc.taints, tc.tolerations, tc.applyFilter, tc.enableComparisonOperatorsFG)
+		if (warning != nil) != tc.expectWarning {
+			t.Errorf("[%s] expect error %v, got %v", tc.description, tc.expectWarning, warning)
+		}
 		if tc.expectTolerated != !untolerated {
 			filteredTaints := []v1.Taint{}
 			for _, taint := range tc.taints {
@@ -849,6 +943,9 @@ func TestFindMatchingUntoleratedTaint(t *testing.T) {
 				filteredTaints = append(filteredTaints, taint)
 			}
 			t.Errorf("[%s] expect tolerations %+v tolerate filtered taints %+v in taints %+v", tc.description, tc.tolerations, filteredTaints, tc.taints)
+		}
+		if tc.expectUntoleratedTaint != nil && !apiequality.Semantic.DeepEqual(*tc.expectUntoleratedTaint, untoleratedTaint) {
+			t.Errorf("[%s] expect untolerated taint %+v, got %+v", tc.description, *tc.expectUntoleratedTaint, untoleratedTaint)
 		}
 	}
 }

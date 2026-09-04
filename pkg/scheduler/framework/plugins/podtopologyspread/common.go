@@ -49,7 +49,11 @@ func (tsc *topologySpreadConstraint) matchNodeInclusionPolicies(logger klog.Logg
 	}
 
 	if tsc.NodeTaintsPolicy == v1.NodeInclusionPolicyHonor {
-		if _, untolerated := v1helper.FindMatchingUntoleratedTaint(logger, node.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc(), enableComparisonOperators); untolerated {
+		_, untolerated, warning := v1helper.FindMatchingUntoleratedTaint(logger, node.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc(), enableComparisonOperators)
+		if warning != nil {
+			logger.V(4).Info("Failed to match tolerations against node taints", "node", klog.KObj(node), "pod", klog.KObj(pod), "warning", warning)
+		}
+		if untolerated {
 			return false
 		}
 	}
