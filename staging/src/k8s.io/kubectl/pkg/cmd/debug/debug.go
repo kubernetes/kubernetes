@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"time"
 
@@ -114,35 +115,37 @@ type DebugAttachFunc func(ctx context.Context, restClientGetter genericclioption
 
 // DebugOptions holds the options for an invocation of kubectl debug.
 type DebugOptions struct {
-	Args               []string
-	ArgsOnly           bool
-	Attach             bool
-	AttachFunc         DebugAttachFunc
-	Container          string
-	CopyTo             string
-	Replace            bool
-	Env                []corev1.EnvVar
-	Image              string
-	Interactive        bool
-	KeepLabels         bool
-	KeepAnnotations    bool
-	KeepLiveness       bool
-	KeepReadiness      bool
-	KeepStartup        bool
-	KeepInitContainers bool
-	Namespace          string
-	TargetNames        []string
-	PullPolicy         corev1.PullPolicy
-	Quiet              bool
-	SameNode           bool
-	SetImages          map[string]string
-	ShareProcesses     bool
-	TargetContainer    string
-	TTY                bool
-	Profile            string
-	CustomProfileFile  string
-	CustomProfile      *corev1.Container
-	Applier            ProfileApplier
+	Args                       []string
+	ArgsOnly                   bool
+	Attach                     bool
+	AttachFunc                 DebugAttachFunc
+	Container                  string
+	CopyTo                     string
+	Replace                    bool
+	Env                        []corev1.EnvVar
+	Image                      string
+	Interactive                bool
+	KeepLabels                 bool
+	KeepAnnotations            bool
+	KeepLiveness               bool
+	KeepReadiness              bool
+	KeepStartup                bool
+	KeepInitContainers         bool
+	Namespace                  string
+	TargetNames                []string
+	PullPolicy                 corev1.PullPolicy
+	DebugImagePullSecretConfig string
+	DebugImagePullSecret       *corev1.Secret
+	Quiet                      bool
+	SameNode                   bool
+	SetImages                  map[string]string
+	ShareProcesses             bool
+	TargetContainer            string
+	TTY                        bool
+	Profile                    string
+	CustomProfileFile          string
+	CustomProfile              *corev1.Container
+	Applier                    ProfileApplier
 
 	explicitNamespace     bool
 	attachChanged         bool
@@ -207,6 +210,7 @@ func (o *DebugOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&o.KeepInitContainers, "keep-init-containers", o.KeepInitContainers, i18n.T("Run the init containers for the pod. Defaults to true.(This flag only works when used with '--copy-to')"))
 	cmd.Flags().StringToStringVar(&o.SetImages, "set-image", o.SetImages, i18n.T("When used with '--copy-to', a list of name=image pairs for changing container images, similar to how 'kubectl set image' works."))
 	cmd.Flags().String("image-pull-policy", "", i18n.T("The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server."))
+	cmd.Flags().StringVar(&o.DebugImagePullSecretConfig, "image-pull-secret-config", o.DebugImagePullSecretConfig, i18n.T("A docker configuration file path to use for pulling image of the debug container."))
 	cmd.Flags().BoolVarP(&o.Interactive, "stdin", "i", o.Interactive, i18n.T("Keep stdin open on the container(s) in the pod, even if nothing is attached."))
 	cmd.Flags().BoolVarP(&o.Quiet, "quiet", "q", o.Quiet, i18n.T("If true, suppress informational messages."))
 	cmd.Flags().BoolVar(&o.SameNode, "same-node", o.SameNode, i18n.T("When used with '--copy-to', schedule the copy of target Pod on the same node."))
@@ -463,6 +467,19 @@ func (o *DebugOptions) visitNode(ctx context.Context, node *corev1.Node) (*corev
 	if err != nil {
 		return nil, "", err
 	}
+
+	if len(o.DebugImagePullSecretConfig) > 0 {
+		secret, err := o.generateDebugImagePullsecret(debugPod)
+		if err != nil {
+			return nil, "", err
+		}
+
+		o.DebugImagePullSecret, err = o.podClient.Secrets(debugPod.Namespace).Create(ctx, secret, metav1.CreateOptions{})
+		if err != nil {
+			return nil, "", err
+		}
+	}
+
 	newPod, err := pods.Create(ctx, debugPod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, "", err
@@ -616,6 +633,18 @@ func (o *DebugOptions) debugByCopy(ctx context.Context, pod *corev1.Pod) (*corev
 		return nil, "", err
 	}
 
+	if len(o.DebugImagePullSecretConfig) > 0 {
+		secret, err := o.generateDebugImagePullsecret(pod)
+		if err != nil {
+			return nil, "", err
+		}
+
+		o.DebugImagePullSecret, err = o.podClient.Secrets(copied.Namespace).Create(ctx, secret, metav1.CreateOptions{})
+		if err != nil {
+			return nil, "", err
+		}
+	}
+
 	var debugContainer *corev1.Container
 	for i := range copied.Spec.Containers {
 		if copied.Spec.Containers[i].Name == dc {
@@ -752,6 +781,14 @@ func (o *DebugOptions) generateNodeDebugPod(node *corev1.Node) (*corev1.Pod, err
 		},
 	}
 
+	if len(o.DebugImagePullSecretConfig) > 0 {
+		p.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
+			{
+				Name: o.pullSecretName(p),
+			},
+		}
+	}
+
 	if o.ArgsOnly {
 		p.Spec.Containers[0].Args = o.Args
 	} else {
@@ -827,6 +864,13 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 		c = &copied.Spec.Containers[len(copied.Spec.Containers)-1]
 	}
 
+	if len(o.DebugImagePullSecretConfig) > 0 {
+		copied.Spec.ImagePullSecrets = append(copied.Spec.ImagePullSecrets,
+			corev1.LocalObjectReference{
+				Name: o.pullSecretName(copied),
+			})
+	}
+
 	if len(o.Args) > 0 {
 		if o.ArgsOnly {
 			c.Args = o.Args
@@ -844,6 +888,7 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 	if len(o.PullPolicy) > 0 {
 		c.ImagePullPolicy = o.PullPolicy
 	}
+
 	c.Stdin = o.Interactive
 	c.TTY = o.TTY
 
@@ -973,6 +1018,24 @@ func (o *DebugOptions) handleAttachPod(ctx context.Context, restClientGetter gen
 		return err
 	}
 
+	if o.DebugImagePullSecret != nil {
+		o.DebugImagePullSecret.ObjectMeta.OwnerReferences = []metav1.OwnerReference{{
+			APIVersion: "v1",
+			Kind:       "pod",
+			Name:       podName,
+			UID:        pod.UID,
+		}}
+
+		o.DebugImagePullSecret, err = o.podClient.Secrets(pod.Namespace).Update(ctx, o.DebugImagePullSecret, metav1.UpdateOptions{})
+		if err != nil {
+			deleteErr := o.podClient.Secrets(pod.Namespace).Delete(ctx, o.DebugImagePullSecret.ObjectMeta.Name, metav1.DeleteOptions{})
+			if deleteErr != nil {
+				err = fmt.Errorf("%w\n%w", err, deleteErr)
+			}
+			return err
+		}
+	}
+
 	opts.Namespace = ns
 	opts.Pod = pod
 	opts.PodName = podName
@@ -996,6 +1059,37 @@ func (o *DebugOptions) handleAttachPod(ctx context.Context, restClientGetter gen
 		return logOpts(ctx, restClientGetter, pod, opts)
 	}
 	return nil
+}
+
+func (o *DebugOptions) generateDebugImagePullsecret(pod *corev1.Pod) (*corev1.Secret, error) {
+	var config []byte
+	var err error
+
+	if o.DebugImagePullSecretConfig == "-" {
+		config, err = io.ReadAll(os.Stdin)
+	} else {
+		config, err = os.ReadFile(o.DebugImagePullSecretConfig)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	secret := corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      o.pullSecretName(pod),
+			Namespace: pod.Namespace,
+		},
+		Type: corev1.SecretTypeDockercfg,
+		Data: map[string][]byte{
+			corev1.DockerConfigKey: config,
+		},
+	}
+	return &secret, nil
+}
+
+func (o *DebugOptions) pullSecretName(pod *corev1.Pod) string {
+	return fmt.Sprintf("debug-secret-%s", pod.Name)
 }
 
 func getContainerStatusByName(pod *corev1.Pod, containerName string) *corev1.ContainerStatus {
