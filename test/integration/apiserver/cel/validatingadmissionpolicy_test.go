@@ -2571,6 +2571,97 @@ func Test_ValidateSecondaryAuthorization(t *testing.T) {
 	}
 }
 
+func TestCRDParamKindResolvesBeforeDiscoveryRefresh(t *testing.T) {
+	resetPolicyRefreshInterval := generic.SetPolicyRefreshIntervalForTests(policyRefreshInterval)
+	defer resetPolicyRefreshInterval()
+
+	server := apiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+	}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	dynamicClient := dynamic.NewForConfigOrDie(server.ClientConfig)
+	apiextensionsClient := apiextensionsclientset.NewForConfigOrDie(server.ClientConfig)
+	paramKind := schema.GroupVersionKind{Group: "params.example.com", Version: "v1", Kind: "ExampleParam"}
+	crd := &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "exampleparams." + paramKind.Group},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: paramKind.Group,
+			Scope: apiextensionsv1.NamespaceScoped,
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
+				Plural: "exampleparams",
+				Kind:   paramKind.Kind,
+			},
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{{
+				Name:    paramKind.Version,
+				Served:  true,
+				Storage: true,
+				Schema:  fixtures.AllowAllSchema(),
+			}},
+		},
+	}
+
+	policy := withWaitReadyConstraintAndExpression(withValidations([]admissionregistrationv1.Validation{{
+		Expression: "object.metadata.name.startsWith(params.metadata.name)",
+		Message:    "wrong prefix",
+	}}, withParams(withCRDParamKind(paramKind.Kind, paramKind.Group, paramKind.Version), withNamespaceMatch(withFailurePolicy(admissionregistrationv1.Fail, makePolicy("fresh-crd-param"))))))
+	if _, err := client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(context.Background(), policy, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	markerName := policy.Annotations["test-marker-name"]
+	marker := &v1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: markerName, Namespace: "default"}}
+	if _, err := client.CoreV1().Endpoints("default").Create(context.Background(), marker, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	binding := makeBinding("fresh-crd-param-binding", policy.Name, "test")
+	if _, err := client.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Create(context.Background(), binding, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		_, err := client.CoreV1().Endpoints("default").Patch(ctx, markerName, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
+		if err == nil || strings.Contains(err.Error(), "not yet synced to use for admission") {
+			return false, nil
+		}
+		if strings.Contains(err.Error(), "failed to find resource referenced by paramKind") {
+			return true, nil
+		}
+		return false, err
+	}); err != nil {
+		t.Fatalf("failed to prime stale paramKind REST mapping: %v", err)
+	}
+
+	// Wait only for establishment, not discovery. The admission RESTMapper must
+	// remain stale so this exercises the CRD informer fallback.
+	etcd.CreateTestCRDs(t, apiextensionsClient, true, crd)
+	param := &unstructured.Unstructured{Object: map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"name":      "test",
+			"namespace": "default",
+		},
+	}}
+	param.SetGroupVersionKind(paramKind)
+	paramResource := paramKind.GroupVersion().WithResource(crd.Spec.Names.Plural)
+	if _, err := dynamicClient.Resource(paramResource).Namespace("default").Create(context.Background(), param, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+		_, err := client.CoreV1().Namespaces().Patch(ctx, "default", types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
+		if err == nil || strings.Contains(err.Error(), "failed to find resource referenced by paramKind") || strings.Contains(err.Error(), "not yet synced to use for admission") {
+			return false, nil
+		}
+		if strings.Contains(err.Error(), "wrong prefix") {
+			return true, nil
+		}
+		return false, err
+	}); err != nil {
+		t.Fatalf("policy did not resolve the established CRD before discovery refresh: %v", err)
+	}
+}
+
 func TestCRDsOnStartup(t *testing.T) {
 
 	testContext, testCancel := context.WithCancel(context.Background())
@@ -2675,10 +2766,6 @@ func TestCRDsOnStartup(t *testing.T) {
 			}
 
 			if strings.Contains(err.Error(), "not yet synced to use for admission") {
-				return false, nil
-			}
-
-			if strings.Contains(err.Error(), "failed to find resource referenced by paramKind") {
 				return false, nil
 			}
 

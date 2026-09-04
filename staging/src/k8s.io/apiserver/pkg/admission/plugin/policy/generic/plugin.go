@@ -42,6 +42,10 @@ import (
 type apiSourceFactory[H any] func(informers.SharedInformerFactory, kubernetes.Interface, dynamic.Interface, meta.RESTMapper) Source[H]
 type dispatcherFactory[H any] func(authorizer.UnconditionalAuthorizer, *matching.Matcher, kubernetes.Interface) Dispatcher[H]
 
+type wantsParamKindResolver interface {
+	SetParamKindResolver(ParamKindResolver)
+}
+
 // ReloadableSource extends HookSource with a method to run a reload loop
 // that watches for configuration changes and blocks until the context is canceled.
 type ReloadableSource[H any] interface {
@@ -90,10 +94,11 @@ type Plugin[H any] struct {
 	// apiServerID is the identity of this API server instance, used for metrics labeling.
 	apiServerID string
 
-	informerFactory informers.SharedInformerFactory
-	client          kubernetes.Interface
-	restMapper      meta.RESTMapper
-	dynamicClient   dynamic.Interface
+	informerFactory   informers.SharedInformerFactory
+	client            kubernetes.Interface
+	restMapper        meta.RESTMapper
+	dynamicClient     dynamic.Interface
+	paramKindResolver ParamKindResolver
 	// admissionConfigResources are admission configuration resources (VAP/MAP/VAPB/MAPB).
 	// API-based policies skip these to prevent circular dependencies, but static policies
 	// are safe to evaluate on them.
@@ -149,6 +154,12 @@ func (c *Plugin[H]) SetRESTMapper(mapper meta.RESTMapper) {
 
 func (c *Plugin[H]) SetDynamicClient(client dynamic.Interface) {
 	c.dynamicClient = client
+}
+
+// SetParamKindResolver configures a kube-apiserver-specific resolver for
+// parameter kinds not yet visible through the cached RESTMapper.
+func (c *Plugin[H]) SetParamKindResolver(resolver ParamKindResolver) {
+	c.paramKindResolver = resolver
 }
 
 func (c *Plugin[H]) SetDrainedNotification(stopCh <-chan struct{}) {
@@ -253,6 +264,9 @@ func (c *Plugin[H]) ValidateInitialization() error {
 	// Construct source once, avoiding overwriting if already set.
 	if c.source == nil {
 		apiSource := c.apiSourceFactory(c.informerFactory, c.client, c.dynamicClient, c.restMapper)
+		if wants, ok := apiSource.(wantsParamKindResolver); ok {
+			wants.SetParamKindResolver(c.paramKindResolver)
+		}
 
 		if len(c.staticManifestsDir) > 0 {
 			if c.staticSourceFactory == nil {
