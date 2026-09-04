@@ -208,7 +208,8 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 			// Guaranteed pods get memory.min (hard protection).
 			// Burstable pods get memory.low (soft protection).
 			if kubeapiqos.GetPodQOS(pod) == v1.PodQOSGuaranteed {
-				unified[cm.Cgroup2MemoryMin] = strconv.FormatInt(memoryRequest, 10)
+				memoryMin := int64(math.Floor(0.9*float64(memoryRequest)/float64(defaultPageSize))) * defaultPageSize
+				unified[cm.Cgroup2MemoryMin] = strconv.FormatInt(memoryMin, 10)
 			} else {
 				unified[cm.Cgroup2MemoryLow] = strconv.FormatInt(memoryRequest, 10)
 			}
