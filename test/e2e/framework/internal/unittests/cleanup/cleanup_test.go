@@ -185,6 +185,8 @@ In [DeferCleanup (Each)] at: cleanup_test.go:103 <time>
 > Enter [DeferCleanup (Each)] e2e - dump namespaces | framework.go:xxx <time>
 < Exit [DeferCleanup (Each)] e2e - dump namespaces | framework.go:xxx <time>
 > Enter [DeferCleanup (Each)] e2e - tear down framework | framework.go:xxx <time>
+client-http-requests-per-second - E2E framework <time>
+  <rate>
 STEP: Destroying namespace "test-namespace-zzz" for this suite. - framework.go:xxx <time>
 < Exit [DeferCleanup (Each)] e2e - tear down framework | framework.go:xxx <time>
 `
@@ -250,6 +252,11 @@ In [DeferCleanup (Each)] at: cleanup_test.go:103 <time>
 `,
 					},
 					SystemErr: ginkgoOutput,
+					Properties: &reporters.JUnitProperties{
+						Properties: []reporters.JUnitProperty{
+							{Name: "client-http-requests-per-second", Value: "<rate>"},
+						},
+					},
 				},
 			},
 		},
@@ -266,6 +273,12 @@ func normalizeOutput(output string) string {
 		`kubeConfig: .*/kube.config`: `kubeConfig: yyy/kube.config`,
 		// Random suffix for namespace.
 		`test-namespace-\d+`: `test-namespace-zzz`,
+		// Client request rate varies with test machine speed. It is printed
+		// either standalone (as the JUnit property value) or indented by two
+		// spaces (as the body of the ReportEntry in the captured output),
+		// and may or may not have a fractional part depending on timing.
+		`^\d+(\.\d+)?$`:       `<rate>`,
+		`(?m)^  \d+(\.\d+)?$`: `  <rate>`,
 	} {
 		output = regexp.MustCompile(exp).ReplaceAllString(output, replacement)
 	}
