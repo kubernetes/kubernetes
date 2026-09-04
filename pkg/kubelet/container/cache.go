@@ -21,8 +21,6 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // Cache stores the PodStatus for the pods. It represents *all* the visible
@@ -36,10 +34,8 @@ import (
 // Delete() to explicitly free the cache entries.
 type Cache interface {
 	ROCache
-	// Set updates the cache by setting the PodStatus for the pod only
-	// if the data is newer than the cache based on the provided
-	// time stamp. Returns if the cache was updated.
-	Set(types.UID, *PodStatus, error, time.Time) (updated bool)
+	// Set updates the cache by setting the PodStatus for the pod.
+	Set(types.UID, *PodStatus, error, time.Time)
 	// SetObservedTime modifies the observed timestamp of a pod in the cache.
 	// This indicates that the pod's state was recently confirmed to be accurate
 	// by the runtime, even if its status wasn't modified.
@@ -111,22 +107,13 @@ func (c *cache) GetNewerThan(id types.UID, minTime time.Time) (*PodStatus, error
 	return d.status, d.err
 }
 
-// Set sets the PodStatus for the pod only if the data is newer than the cache
-func (c *cache) Set(id types.UID, status *PodStatus, err error, timestamp time.Time) (updated bool) {
+// Set sets the PodStatus for the pod.
+func (c *cache) Set(id types.UID, status *PodStatus, err error, timestamp time.Time) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
-		// Set the value in the cache only if it's not present already
-		// or the timestamp in the cache is older than the current update timestamp
-		if cachedVal, ok := c.pods[id]; ok && cachedVal.modified.After(timestamp) {
-			return false
-		}
-	}
-
 	c.pods[id] = &data{status: status, err: err, modified: timestamp, observedTime: timestamp}
 	c.notify(id, timestamp)
-	return true
 }
 
 // SetObservedTime modifies the observed timestamp of a pod in the cache and
