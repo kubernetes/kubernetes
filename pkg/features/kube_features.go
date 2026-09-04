@@ -697,12 +697,6 @@ const (
 	// Relies on UserNamespacesSupport feature, and thus should follow it when setting defaults.
 	LocalStorageCapacityIsolationFSQuotaMonitoring featuregate.Feature = "LocalStorageCapacityIsolationFSQuotaMonitoring"
 
-	// owner: @sanposhiho
-	// kep: https://kep.k8s.io/3633
-	//
-	// Enables the MatchLabelKeys and MismatchLabelKeys in PodAffinity and PodAntiAffinity.
-	MatchLabelKeysInPodAffinity featuregate.Feature = "MatchLabelKeysInPodAffinity"
-
 	// owner: @denkensk
 	// kep: https://kep.k8s.io/3243
 	//
@@ -1773,12 +1767,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
 	},
 
-	MatchLabelKeysInPodAffinity: {
-		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
-
 	MatchLabelKeysInPodTopologySpread: {
 		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
@@ -2651,8 +2639,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	KubeletServiceAccountTokenForCredentialProviders: {},
 
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {},
-
-	MatchLabelKeysInPodAffinity: {},
 
 	MatchLabelKeysInPodTopologySpread: {},
 
