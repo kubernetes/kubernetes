@@ -104,7 +104,13 @@ func NewCommandStartWardleServer(ctx context.Context, defaults *WardleServerOpti
 			if skipDefaultComponentGlobalsRegistrySet {
 				return nil
 			}
-			return defaults.ComponentGlobalsRegistry.Set()
+			if err := defaults.ComponentGlobalsRegistry.Set(); err != nil {
+				return err
+			}
+			if err := utilfeature.DefaultMutableFeatureGate.Freeze(); err != nil {
+				return err
+			}
+			return nil
 		},
 		RunE: func(c *cobra.Command, args []string) error {
 			if err := o.Complete(); err != nil {
