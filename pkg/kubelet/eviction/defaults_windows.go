@@ -22,8 +22,10 @@ package eviction
 // Note: On Linux, the default eviction hard threshold is 100Mi for memory.available
 // but Windows generally requires more memory reserved for system processes so we'll
 // set the default threshold to 500Mi.
+// Note: imagefs.available is intentionally excluded because the Windows CRI stats
+// provider does not publish image filesystem stats, so the signal never produces an
+// observation and would be a dead, registered signal.
 var DefaultEvictionHard = map[string]string{
-	"memory.available":  "500Mi",
-	"nodefs.available":  "10%",
-	"imagefs.available": "15%",
+	"memory.available": "500Mi",
+	"nodefs.available": "10%",
 }
