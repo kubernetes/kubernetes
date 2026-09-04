@@ -1490,7 +1490,7 @@ func TestPodGroupPreemptionStatus(t *testing.T) {
 			}
 			// Verify the PodGroup condition.
 			// We want PodGroupInitiallyScheduled status to be False, Reason to be Unschedulable, and Message to contain
-			// both "minCount (1) cannot be satisfied" and "pod group preemption found a placement for podgroup"
+			// both "scheduling policy's minimum threshold (1) cannot be satisfied" and "pod group preemption found a placement for podgroup"
 			var cond *metav1.Condition
 			err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
 				currentPG, err := cs.SchedulingV1beta1().PodGroups(ns).Get(ctx, pg.Name, metav1.GetOptions{})
@@ -1501,7 +1501,7 @@ func TestPodGroupPreemptionStatus(t *testing.T) {
 				if cond != nil &&
 					cond.Status == metav1.ConditionFalse &&
 					cond.Reason == schedulingv1beta1.PodGroupReasonUnschedulable &&
-					strings.Contains(cond.Message, "minCount (1) cannot be satisfied") &&
+					strings.Contains(cond.Message, "scheduling policy's minimum threshold (1) cannot be satisfied") &&
 					strings.Contains(cond.Message, "pod group preemption: found a placement for podgroup, preempting 1 victims") {
 					return true, nil
 				}
