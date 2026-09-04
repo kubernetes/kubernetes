@@ -716,7 +716,13 @@ func (p *podWorkers) ShouldPodContentBeRemoved(uid types.UID) bool {
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
 	if status, ok := p.podSyncStatuses[uid]; ok {
-		return status.IsEvicted() || (status.IsDeleted() && status.IsTerminated())
+		// An evicted pod is only safe to fully clean up once the pod worker has
+		// finished syncing it - otherwise the pod worker may not have captured the
+		// final container status yet (SyncTerminatedPod runs as part of finishing),
+		// and aggressively removing containers here would race with that, causing
+		// the runtime to be unable to report a container's true terminated status
+		// (surfacing as ContainerStatusUnknown). See https://issue.k8s.io/122160.
+		return (status.IsEvicted() && status.IsFinished()) || (status.IsDeleted() && status.IsTerminated())
 	}
 	// a pod that hasn't been sent to the pod worker yet should have no content on disk once we have
 	// synced all content.

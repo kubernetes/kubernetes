@@ -341,6 +341,32 @@ var _ = SIGDescribe("Pods Extended", func() {
 				framework.Failf("error waiting for pod to be evicted: %v", err)
 			}
 
+			ginkgo.By("Checking that the container's terminated reason reflects the eviction, not a status race")
+			// Regression test for https://issue.k8s.io/122160: the kubelet used to
+			// remove all of an evicted pod's containers as soon as its status was
+			// observed as evicted, racing with the pod worker's own capture of the
+			// final container status and surfacing as ContainerStatusUnknown instead
+			// of the container's true terminated reason.
+			evictedPod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+			if err != nil {
+				framework.Failf("error getting evicted pod: %v", err)
+			}
+			foundContainer := false
+			for _, cs := range evictedPod.Status.ContainerStatuses {
+				if cs.Name != "bar" {
+					continue
+				}
+				foundContainer = true
+				if cs.State.Terminated == nil {
+					framework.Failf("expected container %q to have a terminated state, got: %#v", cs.Name, cs.State)
+				}
+				if cs.State.Terminated.Reason == "ContainerStatusUnknown" {
+					framework.Failf("container %q terminated reason should not be ContainerStatusUnknown after eviction", cs.Name)
+				}
+			}
+			if !foundContainer {
+				framework.Failf("expected to find status for container %q on evicted pod", "bar")
+			}
 		})
 	})
 

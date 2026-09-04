@@ -1900,6 +1900,33 @@ func TestSyncKnownPods(t *testing.T) {
 	}
 }
 
+// TestShouldPodContentBeRemovedWaitsForEvictedPodToFinish verifies that a pod
+// marked evicted does not become eligible for aggressive content removal until
+// the pod worker has actually finished syncing it. The pod's status can be
+// observed as evicted (e.g. by HandlePodReconcile via the API server) before
+// the pod worker has captured the container's final terminated status as part
+// of finishing; removing containers ahead of that point races with the
+// container runtime and can surface as ContainerStatusUnknown.
+// See https://issue.k8s.io/122160.
+func TestShouldPodContentBeRemovedWaitsForEvictedPodToFinish(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	podWorkers, _, _ := createPodWorkers(logger)
+
+	podUID := types.UID("evicted-pod")
+	podWorkers.podSyncStatuses[podUID] = &podSyncStatus{
+		evicted:  true,
+		finished: false,
+	}
+	if podWorkers.ShouldPodContentBeRemoved(podUID) {
+		t.Errorf("Expected an evicted pod that has not finished syncing to not yet be suitable for content removal")
+	}
+
+	podWorkers.podSyncStatuses[podUID].finished = true
+	if !podWorkers.ShouldPodContentBeRemoved(podUID) {
+		t.Errorf("Expected an evicted pod that has finished syncing to be suitable for content removal")
+	}
+}
+
 func Test_removeTerminatedWorker(t *testing.T) {
 	podUID := types.UID("pod-uid")
 
