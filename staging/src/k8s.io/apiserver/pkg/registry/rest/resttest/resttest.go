@@ -1194,20 +1194,14 @@ func (t *Tester) testGetDifferentNamespace(obj runtime.Object) {
 	objMeta := t.getObjectMetaOrFail(obj)
 	objMeta.SetName(t.namer(5))
 
-	ctx1 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar3")
-	if t.requestInfo != nil {
-		ctx1 = genericapirequest.WithRequestInfo(ctx1, t.requestInfo)
-	}
+	ctx1 := genericapirequest.WithNamespace(t.TestContext(), "bar3")
 	objMeta.SetNamespace(genericapirequest.NamespaceValue(ctx1))
 	_, err := t.storage.(rest.Creater).Create(ctx1, obj, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	ctx2 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar4")
-	if t.requestInfo != nil {
-		ctx2 = genericapirequest.WithRequestInfo(ctx2, t.requestInfo)
-	}
+	ctx2 := genericapirequest.WithNamespace(t.TestContext(), "bar4")
 	objMeta.SetNamespace(genericapirequest.NamespaceValue(ctx2))
 	_, err = t.storage.(rest.Creater).Create(ctx2, obj, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
@@ -1261,14 +1255,8 @@ func (t *Tester) testGetFound(obj runtime.Object) {
 }
 
 func (t *Tester) testGetMimatchedNamespace(obj runtime.Object) {
-	ctx1 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar1")
-	if t.requestInfo != nil {
-		ctx1 = genericapirequest.WithRequestInfo(ctx1, t.requestInfo)
-	}
-	ctx2 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar2")
-	if t.requestInfo != nil {
-		ctx2 = genericapirequest.WithRequestInfo(ctx2, t.requestInfo)
-	}
+	ctx1 := genericapirequest.WithNamespace(t.TestContext(), "bar1")
+	ctx2 := genericapirequest.WithNamespace(t.TestContext(), "bar2")
 	objMeta := t.getObjectMetaOrFail(obj)
 	objMeta.SetName(t.namer(4))
 	objMeta.SetNamespace(genericapirequest.NamespaceValue(ctx1))
