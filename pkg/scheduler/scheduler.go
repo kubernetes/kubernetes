@@ -63,8 +63,6 @@ type Scheduler struct {
 	// by NodeLister and Algorithm.
 	Cache internalcache.Cache
 
-	Extenders []fwk.Extender
-
 	// NextEntity should be a function that blocks until the next entity (pod or pod group)
 	// is available. We don't use a channel for this, because scheduling
 	// a pod may take some amount of time and we don't want pods to get
@@ -100,10 +98,6 @@ type Scheduler struct {
 
 	nodeInfoSnapshot *internalcache.Snapshot
 
-	percentageOfNodesToScore int32
-
-	nextStartNodeIndex int
-
 	// logger *must* be initialized when creating a Scheduler,
 	// otherwise logging functions will access a nil sink and
 	// panic.
@@ -115,12 +109,43 @@ type Scheduler struct {
 	nominatedNodeNameForExpectationEnabled              bool
 	genericWorkloadEnabled                              bool
 	inPlacePodVerticalScalingSchedulerPreemptionEnabled bool
+
+	algorithm *SchedulingAlgorithm
+
+	podGroupAlgorithm *PodGroupSchedulingAlgorithm
 }
 
+// applyDefaultHandlers installs the default handlers. It must run after
+// initAlgorithm, whose result SchedulePod points at.
 func (sched *Scheduler) applyDefaultHandlers() {
-	sched.SchedulePod = sched.schedulePod
+	sched.SchedulePod = sched.algorithm.SchedulePod
 	sched.FailureHandler = sched.handleSchedulingFailure
 }
+
+// schedulerPodStep adapts Scheduler to the podScheduler interface, bridging single-pod
+// evaluation and tentative snapshot reservations into PodGroupSchedulingAlgorithm.
+// This decouples gang scheduling orchestration from Scheduler's queue, binding, and error-handling mechanics.
+type schedulerPodStep struct {
+	sched *Scheduler
+}
+
+// SchedulePod delegates single-pod evaluation to Scheduler.SchedulePod rather than calling
+// the underlying algorithm directly, ensuring custom handlers or test hooks configured on
+// Scheduler are respected during pod group scheduling.
+func (s *schedulerPodStep) SchedulePod(ctx context.Context, schedFramework framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) (result ScheduleResult, err error) {
+	return s.sched.SchedulePod(ctx, schedFramework, state, podInfo)
+}
+
+// AssumeAndReserveInSnapshot delegates tentative snapshot reservation to SchedulingAlgorithm,
+// allowing subsequent group members to observe simulated node allocations and reserve plugins
+// without committing mutations to the live scheduler cache before group completion.
+func (s *schedulerPodStep) AssumeAndReserveInSnapshot(ctx context.Context, state fwk.CycleState,
+	schedFramework framework.Framework, podInfo *framework.QueuedPodInfo,
+	scheduleResult ScheduleResult) (*fwk.Status, func()) {
+	return s.sched.algorithm.AssumeAndReserveInSnapshot(ctx, state, schedFramework, podInfo, scheduleResult)
+}
+
+var _ podScheduler = (*schedulerPodStep)(nil)
 
 type schedulerOptions struct {
 	clock                  clock.WithTicker
@@ -375,8 +400,6 @@ func New(ctx context.Context,
 		Cache:                                  schedulerCache,
 		client:                                 client,
 		nodeInfoSnapshot:                       snapshot,
-		percentageOfNodesToScore:               options.percentageOfNodesToScore,
-		Extenders:                              comps.extenders,
 		StopEverything:                         stopEverything,
 		SchedulingQueue:                        podQueue,
 		Profiles:                               profiles,
@@ -387,6 +410,7 @@ func New(ctx context.Context,
 		genericWorkloadEnabled:                 feature.DefaultFeatureGate.Enabled(features.GenericWorkload),
 		inPlacePodVerticalScalingSchedulerPreemptionEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption),
 	}
+	sched.initAlgorithm(WithAlgorithmPercentageOfNodesToScore(options.percentageOfNodesToScore))
 	sched.NextEntity = podQueue.Pop
 	sched.applyDefaultHandlers()
 
@@ -598,4 +622,16 @@ func (sched *Scheduler) CurrentCycle() int64 {
 		return sched.SchedulingQueue.SchedulingCycle()
 	}
 	return 0
+}
+
+// initAlgorithm builds the scheduling algorithm from the Scheduler's fields. It
+// has to run before any scheduling method, and before applyDefaultHandlers, which
+// hands SchedulePod the algorithm's method value. New calls it, and so must a
+// Scheduler assembled field by field.
+//
+// CurrentCycle is passed as a bound method value, so a SchedulingQueue installed
+// after this call is still picked up.
+func (sched *Scheduler) initAlgorithm(opts ...AlgorithmOption) {
+	sched.algorithm = NewSchedulingAlgorithm(sched.nodeInfoSnapshot, sched.Cache, append(opts, WithCurrentCycleProvider(sched.CurrentCycle))...)
+	sched.podGroupAlgorithm = NewPodGroupAlgorithm(sched.nodeInfoSnapshot, &schedulerPodStep{sched: sched})
 }
