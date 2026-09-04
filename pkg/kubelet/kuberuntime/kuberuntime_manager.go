@@ -887,7 +887,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	resizeResult := kubecontainer.NewSyncResult(kubecontainer.ResizePodInPlace, format.Pod(pod))
 	pcm := m.containerManager.NewPodContainerManager()
 	enforceCPULimits := m.cpuCFSQuota
-	if utilfeature.DefaultFeatureGate.Enabled(features.DisableCPUQuotaWithExclusiveCPUs) && m.containerManager.PodHasExclusiveCPUs(logger, pod) {
+	if m.containerManager.PodHasExclusiveCPUs(logger, pod) {
 		enforceCPULimits = false
 		logger.V(2).Info("Disabled CFS quota", "pod", klog.KObj(pod))
 	}
