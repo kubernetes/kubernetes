@@ -74,6 +74,9 @@ type RoundTripper struct {
 	// If Proxy is nil or returns a nil *URL, no proxy is used.
 	Proxier func(req *http.Request) (*url.URL, error)
 
+	// Dialer specifies the dial function for creating TCP connections
+	Dialer utilnet.DialFunc
+
 	// Conn holds the WebSocket connection after a round trip.
 	Conn *gwebsocket.Conn
 }
@@ -111,6 +114,7 @@ func (rt *RoundTripper) RoundTrip(request *http.Request) (retResp *http.Response
 	delete(request.Header, wsstream.WebSocketProtocolHeader)
 
 	dialer := gwebsocket.Dialer{
+		NetDialContext:  rt.Dialer,
 		Proxy:           rt.Proxier,
 		TLSClientConfig: rt.TLSConfig,
 		Subprotocols:    protocolVersions,
@@ -195,6 +199,7 @@ func RoundTripperFor(config *restclient.Config) (http.RoundTripper, ConnectionHo
 	}
 
 	upgradeRoundTripper := &RoundTripper{
+		Dialer:    config.Dial,
 		TLSConfig: tlsConfig,
 		Proxier:   proxy,
 	}
