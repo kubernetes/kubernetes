@@ -246,10 +246,44 @@ func TestArgsFromType(t *testing.T) {
 			expected: generator.Args{
 				"introducedMajor": 1,
 				"introducedMinor": 5,
-				"deprecatedMajor": 1,
-				"deprecatedMinor": 8,
+			},
+		},
+		{
+			name: "alpha type - explicit removed only",
+			t: &types.Type{
+				Name: types.Name{
+					Name:    "Simple",
+					Package: "k8s.io/apis/core/v1alpha1",
+				},
+				CommentLines: []string{
+					"+k8s:prerelease-lifecycle-gen:introduced=1.5",
+					"+k8s:prerelease-lifecycle-gen:removed=1.9",
+				},
+			},
+			expected: generator.Args{
+				"introducedMajor": 1,
+				"introducedMinor": 5,
 				"removedMajor":    1,
-				"removedMinor":    11,
+				"removedMinor":    9,
+			},
+		},
+		{
+			name: "alpha type - explicit deprecated only",
+			t: &types.Type{
+				Name: types.Name{
+					Name:    "Simple",
+					Package: "k8s.io/apis/core/v1alpha1",
+				},
+				CommentLines: []string{
+					"+k8s:prerelease-lifecycle-gen:introduced=1.5",
+					"+k8s:prerelease-lifecycle-gen:deprecated=1.7",
+				},
+			},
+			expected: generator.Args{
+				"introducedMajor": 1,
+				"introducedMinor": 5,
+				"deprecatedMajor": 1,
+				"deprecatedMinor": 7,
 			},
 		},
 	}
