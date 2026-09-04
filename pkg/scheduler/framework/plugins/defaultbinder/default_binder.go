@@ -51,9 +51,14 @@ func (b DefaultBinder) Name() string {
 // Bind binds pods to nodes using the k8s client.
 func (b DefaultBinder) Bind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
 	logger := klog.FromContext(ctx)
+
 	binding := &v1.Binding{
 		ObjectMeta: metav1.ObjectMeta{Namespace: p.Namespace, Name: p.Name, UID: p.UID},
-		Target:     v1.ObjectReference{Kind: "Node", Name: nodeName},
+		Target: v1.ObjectReference{
+			Kind: "Node",
+			Name: nodeName,
+			UID:  p.Spec.NodeUID,
+		},
 	}
 	if b.handle.APICacher() != nil {
 		// When API cacher is available, use it to bind the pod.

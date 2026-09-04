@@ -45,6 +45,7 @@ func init() {
 
 func TestDefaultBinder(t *testing.T) {
 	testPod := st.MakePod().Name("foo").Namespace("ns").Obj()
+	testPod.Spec.NodeUID = "test-node-uid"
 	testNode := "foohost.kubernetes.mydomain.com"
 	tests := []struct {
 		name        string
@@ -55,7 +56,11 @@ func TestDefaultBinder(t *testing.T) {
 			name: "successful",
 			wantBinding: &v1.Binding{
 				ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "foo"},
-				Target:     v1.ObjectReference{Kind: "Node", Name: testNode},
+				Target: v1.ObjectReference{
+					Kind: "Node",
+					Name: testNode,
+					UID:  "test-node-uid",
+				},
 			},
 		}, {
 			name:      "binding error",
@@ -71,6 +76,7 @@ func TestDefaultBinder(t *testing.T) {
 
 				var gotBinding *v1.Binding
 				client := fake.NewClientset(testPod)
+
 				client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
 					if action.GetSubresource() != "binding" {
 						return false, nil, nil
@@ -89,7 +95,13 @@ func TestDefaultBinder(t *testing.T) {
 					defer apiDispatcher.Close()
 				}
 
-				fh, err := frameworkruntime.NewFramework(ctx, nil, nil, frameworkruntime.WithClientSet(client), frameworkruntime.WithAPIDispatcher(apiDispatcher))
+				fh, err := frameworkruntime.NewFramework(
+					ctx,
+					nil,
+					nil,
+					frameworkruntime.WithClientSet(client),
+					frameworkruntime.WithAPIDispatcher(apiDispatcher),
+				)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -100,6 +112,7 @@ func TestDefaultBinder(t *testing.T) {
 
 				binder := &DefaultBinder{handle: fh}
 				status := binder.Bind(ctx, nil, testPod, testNode)
+
 				if got := status.AsError(); (tt.injectErr != nil) != (got != nil) {
 					t.Errorf("got error %q, want %q", got, tt.injectErr)
 				}

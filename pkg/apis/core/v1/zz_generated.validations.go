@@ -1298,6 +1298,7 @@ func Validate_PodSpec(
 	// field corev1.PodSpec.DeprecatedServiceAccount has no validation
 	// field corev1.PodSpec.AutomountServiceAccountToken has no validation
 	// field corev1.PodSpec.NodeName has no validation
+	// field corev1.PodSpec.NodeUID has no validation
 	// field corev1.PodSpec.HostNetwork has no validation
 	// field corev1.PodSpec.HostPID has no validation
 	// field corev1.PodSpec.HostIPC has no validation
