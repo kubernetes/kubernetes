@@ -31,6 +31,12 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kube-openapi/pkg/handler3"
+	"k8s.io/kube-openapi/pkg/spec3"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -352,6 +358,74 @@ func TestPrepareRun(t *testing.T) {
 	resp, err = http.Get(server.URL + "/healthz/ping")
 	assert.NoError(err)
 	assert.Equal(http.StatusOK, resp.StatusCode)
+}
+
+// TestOpenAPIV3LazyBuild verifies that with the OpenAPIV3LazyBuild feature
+// gate PrepareRun installs the lazy /openapi/v3 service instead of
+// kube-openapi's, that the endpoint serves discovery and group-version
+// documents, and that OpenAPIV3Updater publishes additional group-versions.
+func TestOpenAPIV3LazyBuild(t *testing.T) {
+	for _, lazyBuild := range []bool{false, true} {
+		t.Run(fmt.Sprintf("OpenAPIV3LazyBuild=%v", lazyBuild), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OpenAPIV3LazyBuild, lazyBuild)
+			s, _, assert := newMaster(t)
+			s.PrepareRun()
+
+			if lazyBuild {
+				assert.Nil(s.OpenAPIV3VersionedService)
+				assert.NotNil(s.OpenAPIV3LazyService)
+				assert.Equal(s.OpenAPIV3LazyService, s.OpenAPIV3Updater())
+				assert.Nil(s.openAPIV3Config.Definitions, "the pre-computed definitions map must be released after PrepareRun")
+			} else {
+				assert.NotNil(s.OpenAPIV3VersionedService)
+				assert.Nil(s.OpenAPIV3LazyService)
+				assert.Equal(s.OpenAPIV3VersionedService, s.OpenAPIV3Updater())
+				assert.NotNil(s.openAPIV3Config.Definitions)
+			}
+
+			server := httptest.NewServer(s.Handler.Director)
+			defer server.Close()
+
+			getJSON := func(path string, into interface{}) *http.Response {
+				t.Helper()
+				resp, err := http.Get(server.URL + path)
+				require.NoError(t, err)
+				require.Equal(t, http.StatusOK, resp.StatusCode, path)
+				body, err := io.ReadAll(resp.Body)
+				require.NoError(t, resp.Body.Close())
+				require.NoError(t, err)
+				require.NoError(t, json.Unmarshal(body, into), path)
+				return resp
+			}
+
+			var discovery handler3.OpenAPIV3Discovery
+			getJSON("/openapi/v3", &discovery)
+			require.NotEmpty(t, discovery.Paths)
+			for gv, entry := range discovery.Paths {
+				var doc spec3.OpenAPI
+				resp := getJSON(entry.ServerRelativeURL, &doc)
+				assert.Equal("3.0.0", doc.Version, gv)
+				assert.Equal("public, immutable", resp.Header.Get("Cache-Control"), gv)
+			}
+
+			// Publish an extra group-version through the gate-independent interface.
+			s.OpenAPIV3Updater().UpdateGroupVersion("apis/extra.example.com/v1", &spec3.OpenAPI{
+				Version: "3.0.0",
+				Info:    &spec.Info{InfoProps: spec.InfoProps{Title: "extra", Version: "v1"}},
+				Paths:   &spec3.Paths{Paths: map[string]*spec3.Path{}},
+			})
+			discovery = handler3.OpenAPIV3Discovery{}
+			getJSON("/openapi/v3", &discovery)
+			require.Contains(t, discovery.Paths, "apis/extra.example.com/v1")
+			var extra spec3.OpenAPI
+			getJSON("/openapi/v3/apis/extra.example.com/v1", &extra)
+			assert.Equal("extra", extra.Info.Title)
+			s.OpenAPIV3Updater().DeleteGroupVersion("apis/extra.example.com/v1")
+			discovery = handler3.OpenAPIV3Discovery{}
+			getJSON("/openapi/v3", &discovery)
+			assert.NotContains(discovery.Paths, "apis/extra.example.com/v1")
+		})
+	}
 }
 
 func TestUpdateOpenAPISpec(t *testing.T) {
