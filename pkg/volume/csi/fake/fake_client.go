@@ -85,6 +85,8 @@ type NodeClient struct {
 	SetVolumeStats           bool
 	SetVolumeHealth          bool
 	SetStorageHealth         bool
+	OmitVolumeHealth         bool    // drop the REQUIRED volume_health from the response
+	VolumeHealthVolumeID     *string // report this volume_id instead of the requested one
 	singleNodeMultiWriterSet bool
 	volumeMountGroupSet      bool
 	nodeGetInfoResp          *csipb.NodeGetInfoResponse
@@ -465,16 +467,23 @@ func (f *NodeClient) NodeGetVolumeHealth(ctx context.Context, req *csipb.NodeGet
 	if f.nextErr != nil {
 		return nil, f.nextErr
 	}
-	resp := &csipb.NodeGetVolumeHealthResponse{}
-	if f.SetVolumeHealth {
-		resp.VolumeHealth = &csipb.VolumeHealth{
-			VolumeId: req.GetVolumeId(),
-			HealthStatuses: []*csipb.VolumeHealth_VolumeHealthEntry{
-				{
-					Status:  csipb.VolumeHealthErrorType_DEGRADED,
-					Reason:  "FakeHealthIssue",
-					Message: "fake volume health issue",
-				},
+	// volume_health is REQUIRED; "healthy" is an empty entry list, not a missing field.
+	volumeID := req.GetVolumeId()
+	if f.VolumeHealthVolumeID != nil {
+		volumeID = *f.VolumeHealthVolumeID
+	}
+	resp := &csipb.NodeGetVolumeHealthResponse{
+		VolumeHealth: &csipb.VolumeHealth{VolumeId: volumeID},
+	}
+	if f.OmitVolumeHealth {
+		resp.VolumeHealth = nil
+	}
+	if f.SetVolumeHealth && resp.VolumeHealth != nil {
+		resp.VolumeHealth.HealthStatuses = []*csipb.VolumeHealth_VolumeHealthEntry{
+			{
+				Status:  csipb.VolumeHealthErrorType_DEGRADED,
+				Reason:  "FakeHealthIssue",
+				Message: "fake volume health issue",
 			},
 		}
 	}
