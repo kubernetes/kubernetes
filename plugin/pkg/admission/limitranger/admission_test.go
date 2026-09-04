@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/features"
 
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -1059,5 +1060,88 @@ func TestLimitRanger_GetLimitRangesFixed22422(t *testing.T) {
 	}
 	if test1Count != 1 {
 		t.Errorf("Expected 1 limit range call, got %d", test1Count)
+	}
+}
+
+// TestIsSupportedPodLevelResourceMatchesCanonical guards against this package's
+// notion of a pod-level resource drifting from the canonical one in
+// component-helpers. A drift for hugepages previously caused podRequests and
+// podLimits to ignore the pod-level values.
+func TestIsSupportedPodLevelResourceMatchesCanonical(t *testing.T) {
+	resourceNames := []string{
+		"cpu",
+		"memory",
+		"hugepages-2Mi",
+		"hugepages-1Gi",
+		"ephemeral-storage",
+		"example.com/dongle",
+	}
+
+	for _, name := range resourceNames {
+		t.Run(name, func(t *testing.T) {
+			want := resourcehelper.IsSupportedPodLevelResource(corev1.ResourceName(name))
+			if got := isSupportedPodLevelResource(api.ResourceName(name)); got != want {
+				t.Errorf("isSupportedPodLevelResource(%q) = %v, component-helpers says %v", name, got, want)
+			}
+		})
+	}
+}
+
+// TestPodLimitFuncPodLevelHugepages verifies that a Pod-type LimitRange is enforced
+// against the pod-level hugepages values. Validation permits the pod-level value to
+// exceed the aggregated container value, so evaluating the container aggregate
+// instead would let a pod exceed the configured maximum.
+func TestPodLimitFuncPodLevelHugepages(t *testing.T) {
+	const hugepages = "hugepages-2Mi"
+
+	limitRange := corev1.LimitRange{
+		ObjectMeta: metav1.ObjectMeta{Name: "hugepages-max", Namespace: "test"},
+		Spec: corev1.LimitRangeSpec{
+			Limits: []corev1.LimitRangeItem{{
+				Type: corev1.LimitTypePod,
+				Max:  corev1.ResourceList{corev1.ResourceName(hugepages): resource.MustParse("4Gi")},
+			}},
+		},
+	}
+
+	hugepagesList := func(value string) api.ResourceList {
+		return api.ResourceList{api.ResourceName(hugepages): resource.MustParse(value)}
+	}
+
+	tests := []struct {
+		name        string
+		podLevel    string
+		expectError bool
+	}{
+		{
+			name:        "pod-level hugepages above the maximum is rejected",
+			podLevel:    "8Gi",
+			expectError: true,
+		},
+		{
+			name:        "pod-level hugepages within the maximum is accepted",
+			podLevel:    "4Gi",
+			expectError: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+
+			// Containers declare less than the pod-level value on purpose: the
+			// aggregated container total stays within the maximum in every case.
+			containerResources := getResourceRequirements(hugepagesList("2Gi"), hugepagesList("2Gi"))
+			podResources := getResourceRequirements(hugepagesList(test.podLevel), hugepagesList(test.podLevel))
+			pod := validPodWithPodLevelResources("pod-level-hugepages", 1, containerResources, podResources)
+
+			err := PodValidateLimitFunc(&limitRange, &pod)
+			if test.expectError && err == nil {
+				t.Errorf("expected pod with pod-level %s=%s to be rejected by max 4Gi, got no error", hugepages, test.podLevel)
+			}
+			if !test.expectError && err != nil {
+				t.Errorf("expected pod with pod-level %s=%s to be accepted, got: %v", hugepages, test.podLevel, err)
+			}
+		})
 	}
 }
