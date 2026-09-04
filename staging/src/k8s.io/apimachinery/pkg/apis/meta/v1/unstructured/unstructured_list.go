@@ -153,12 +153,30 @@ func (u *UnstructuredList) SetAPIVersion(version string) {
 	u.setNestedField(version, "apiVersion")
 }
 
+// WithAPIVersion sets the apiVersion and returns u, which allows a list object with
+// type information to be constructed in a single expression:
+//
+//	list := (&unstructured.UnstructuredList{}).WithAPIVersion("v1").WithKind("PodList")
+func (u *UnstructuredList) WithAPIVersion(version string) *UnstructuredList {
+	u.SetAPIVersion(version)
+	return u
+}
+
 func (u *UnstructuredList) GetKind() string {
 	return getNestedString(u.Object, "kind")
 }
 
 func (u *UnstructuredList) SetKind(kind string) {
 	u.setNestedField(kind, "kind")
+}
+
+// WithKind sets the kind and returns u, which allows a list object with type
+// information to be constructed in a single expression:
+//
+//	list := (&unstructured.UnstructuredList{}).WithAPIVersion("v1").WithKind("PodList")
+func (u *UnstructuredList) WithKind(kind string) *UnstructuredList {
+	u.SetKind(kind)
+	return u
 }
 
 func (u *UnstructuredList) GetResourceVersion() string {
@@ -200,6 +218,15 @@ func (u *UnstructuredList) SetRemainingItemCount(c *int64) {
 func (u *UnstructuredList) SetGroupVersionKind(gvk schema.GroupVersionKind) {
 	u.SetAPIVersion(gvk.GroupVersion().String())
 	u.SetKind(gvk.Kind)
+}
+
+// WithGroupVersionKind sets the apiVersion and kind from gvk and returns u, which
+// allows a list object with type information to be constructed in a single expression:
+//
+//	list := (&unstructured.UnstructuredList{}).WithGroupVersionKind(gvk)
+func (u *UnstructuredList) WithGroupVersionKind(gvk schema.GroupVersionKind) *UnstructuredList {
+	u.SetGroupVersionKind(gvk)
+	return u
 }
 
 func (u *UnstructuredList) GroupVersionKind() schema.GroupVersionKind {
