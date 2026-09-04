@@ -120,7 +120,7 @@ func (m *imageManager) imagePullPrecheck(
 	case v1.PullIfNotPresent, v1.PullNever:
 		imageRef, err = m.imageService.GetImageRef(ctx, *spec)
 		if err != nil {
-			msg = fmt.Sprintf("Failed to inspect image %q: %v", imageRef, err)
+			msg = fmt.Sprintf("Failed to inspect image %q: %v", requestedImage, err)
 			m.logIt(klog.FromContext(ctx), objRef, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg)
 			return "", nil, msg, ErrImageInspect
 		}
