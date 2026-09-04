@@ -281,7 +281,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		volDataKey.driverName:          string(c.driverName),
 		volDataKey.nodeName:            nodeName,
 		volDataKey.volumeLifecycleMode: string(c.volumeLifecycleMode),
-		volDataKey.attachmentID:        getAttachmentName(volumeHandle, string(c.driverName), nodeName),
+		volDataKey.attachmentID:        GetVolumeAttachmentName(volumeHandle, string(c.driverName), nodeName),
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) && selinuxLabelMount {

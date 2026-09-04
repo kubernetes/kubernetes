@@ -782,6 +782,10 @@ func (adc *attachDetachController) VolumeAttachmentLister() storagelistersv1.Vol
 	return adc.volumeAttachmentLister
 }
 
+func (adc *attachDetachController) PersistentVolumeLister() corelisters.PersistentVolumeLister {
+	return adc.pvLister
+}
+
 // VolumeHost implementation
 // This is an unfortunate requirement of the current factoring of volume plugin
 // initializing code. It requires kubelet specific methods used by the mounting

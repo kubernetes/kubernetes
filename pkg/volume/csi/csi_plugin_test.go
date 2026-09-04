@@ -34,7 +34,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
-	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
@@ -57,10 +56,7 @@ func newTestPluginWithAttachDetachVolumeHost(t *testing.T, client *fakeclient.Cl
 
 // create a plugin mgr to load plugins and setup a fake client
 func newTestPluginWithVolumeHost(t *testing.T, client *fakeclient.Clientset, hostType int) (*csiPlugin, string) {
-	tmpDir, err := utiltesting.MkTmpdir("csi-test")
-	if err != nil {
-		t.Fatalf("can't create temp dir: %v", err)
-	}
+	tmpDir := t.TempDir()
 
 	if client == nil {
 		client = fakeclient.NewSimpleClientset()
@@ -79,10 +75,11 @@ func newTestPluginWithVolumeHost(t *testing.T, client *fakeclient.Clientset, hos
 	csiDriverLister := csiDriverInformer.Lister()
 	volumeAttachmentInformer := factory.Storage().V1().VolumeAttachments()
 	volumeAttachmentLister := volumeAttachmentInformer.Lister()
+	pvLister := factory.Core().V1().PersistentVolumes().Lister()
 
 	factory.Start(wait.NeverStop)
 	syncedTypes := factory.WaitForCacheSync(wait.NeverStop)
-	if len(syncedTypes) != 2 {
+	if len(syncedTypes) != 3 {
 		t.Fatalf("informers are not synced")
 	}
 	for ty, ok := range syncedTypes {
@@ -119,6 +116,7 @@ func newTestPluginWithVolumeHost(t *testing.T, client *fakeclient.Clientset, hos
 			"fakeNode",
 			csiDriverLister,
 			volumeAttachmentLister,
+			pvLister,
 		)
 	default:
 		t.Fatalf("Unsupported volume host type")
@@ -951,11 +949,7 @@ func TestPluginFindAttachablePlugin(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tmpDir, err := utiltesting.MkTmpdir("csi-test")
-			if err != nil {
-				t.Fatalf("can't create temp dir: %v", err)
-			}
-			defer os.RemoveAll(tmpDir)
+			tmpDir := t.TempDir()
 
 			client := fakeclient.NewSimpleClientset(
 				getTestCSIDriver(test.driverName, nil, &test.canAttach, nil),
@@ -1077,11 +1071,7 @@ func TestPluginFindDeviceMountablePluginBySpec(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tmpDir, err := utiltesting.MkTmpdir("csi-test")
-			if err != nil {
-				t.Fatalf("can't create temp dir: %v", err)
-			}
-			defer os.RemoveAll(tmpDir)
+			tmpDir := t.TempDir()
 
 			client := fakeclient.NewSimpleClientset(
 				&api.Node{
