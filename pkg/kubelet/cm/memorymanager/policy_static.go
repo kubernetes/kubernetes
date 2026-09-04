@@ -235,7 +235,11 @@ func (p *staticPolicy) AllocatePod(logger klog.Logger, s state.State, pod *v1.Po
 
 	// 3. Handle hints and NUMA alignment.
 	machineState := s.GetMachineState()
-	bestHint := p.affinity.GetAffinity(logger, podUID, append(pod.Spec.InitContainers, pod.Spec.Containers...)[0].Name)
+	firstContainerName := pod.Spec.Containers[0].Name
+	if len(pod.Spec.InitContainers) > 0 {
+		firstContainerName = pod.Spec.InitContainers[0].Name
+	}
+	bestHint := p.affinity.GetAffinity(logger, podUID, firstContainerName)
 	if bestHint.NUMANodeAffinity == nil {
 		defaultHint, err := p.getDefaultHint(machineState, pod, podTotalMemory)
 		if err != nil {
@@ -395,7 +399,7 @@ func (p *staticPolicy) AllocatePod(logger klog.Logger, s state.State, pod *v1.Po
 	logger.V(4).Info("Partitioned pod-level memory allocation", "exclusiveMemory", podMemoryAllocationToString(exclusiveMemory), "podSharedPool", memoryBlocksToString(podSharedPoolBlocks))
 
 	// 6. Save all container assignments to the state.
-	for _, c := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+	for c := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 		if blocks, isExclusive := exclusiveMemory[c.Name]; isExclusive {
 			s.SetMemoryBlocks(podUID, c.Name, blocks)
 		} else {
@@ -845,13 +849,13 @@ func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, po
 		return nil
 	}
 
-	for _, ctn := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+	for ctn := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 		containerBlocks := s.GetMemoryBlocks(string(pod.UID), ctn.Name)
 		// Short circuit to regenerate the same hints if there are already
 		// memory allocated for the container. This might happen after a
 		// kubelet restart, for example.
 		if containerBlocks != nil {
-			return regenerateHints(logger, pod, &ctn, containerBlocks, reqRsrcs)
+			return regenerateHints(logger, pod, ctn, containerBlocks, reqRsrcs)
 		}
 	}
 
