@@ -17,6 +17,7 @@ limitations under the License.
 package headerrequest
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -25,6 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	x509request "k8s.io/apiserver/pkg/authentication/request/x509"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 )
 
 // StringSliceProvider is a way to get a string slice value.  It is heavily used for authentication headers among other places.
@@ -112,10 +114,82 @@ func trimHeaders(headerNames ...string) ([]string, error) {
 	return ret, nil
 }
 
-func NewDynamicVerifyOptionsSecure(verifyOptionFn x509request.VerifyOptionFunc, proxyClientNames, nameHeaders, uidHeaders, groupHeaders, extraHeaderPrefixes StringSliceProvider) authenticator.Request {
-	headerAuthenticator := NewDynamic(nameHeaders, uidHeaders, groupHeaders, extraHeaderPrefixes)
+// secureRequestHeaderAuthenticator authenticates front-proxy requests by verifying the client
+// certificate against the CA bundle of the given caContentProvider and, on success, extracting
+// the user info from the request headers as described by the configuration returned by the
+// provider.
+type secureRequestHeaderAuthenticator struct {
+	caContentProvider dynamiccertificates.CAContentProvider
+	provider          RequestHeaderConfigProvider
+}
 
-	return x509request.NewDynamicCAVerifier(verifyOptionFn, headerAuthenticator, proxyClientNames)
+var _ authenticator.Request = &secureRequestHeaderAuthenticator{}
+
+type requestHeaderConfigContextKey struct{}
+
+type requestHeaderConfigContextValue struct {
+	config *RequestHeaderConfig
+}
+
+// WithRequestHeaderConfig returns a context that supplies config to NewSecure. The context
+// value allows request authentication and subsequent request header clearing to use the same
+// point-in-time configuration.
+func WithRequestHeaderConfig(ctx context.Context, config *RequestHeaderConfig) context.Context {
+	return context.WithValue(ctx, requestHeaderConfigContextKey{}, requestHeaderConfigContextValue{config: config})
+}
+
+// RequestHeaderConfigFromContext returns the request header configuration supplied with
+// WithRequestHeaderConfig. The boolean distinguishes an unavailable configuration from one
+// that was not supplied in the context.
+func RequestHeaderConfigFromContext(ctx context.Context) (*RequestHeaderConfig, bool) {
+	value, ok := ctx.Value(requestHeaderConfigContextKey{}).(requestHeaderConfigContextValue)
+	if !ok {
+		return nil, false
+	}
+	return value.config, true
+}
+
+// NewSecure returns a request.Authenticator that verifies the request's client certificate
+// against the CA bundle served by caContentProvider and then extracts user info from the
+// request headers according to a configuration snapshot taken from provider.
+//
+// Exactly one snapshot is taken per request, so certificate verification, allowed common name
+// enforcement and header extraction all observe a mutually consistent view of the configuration
+// even when it changes concurrently.
+func NewSecure(provider RequestHeaderConfigProvider, caContentProvider dynamiccertificates.CAContentProvider) authenticator.Request {
+	return &secureRequestHeaderAuthenticator{
+		caContentProvider: caContentProvider,
+		provider:          provider,
+	}
+}
+
+func (a *secureRequestHeaderAuthenticator) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
+	config, found := RequestHeaderConfigFromContext(req.Context())
+	if !found {
+		config = a.provider.Snapshot()
+	}
+	if config == nil {
+		// no configuration available (the source configmap has never been read or was deleted),
+		// fail closed by expressing "no opinion" with no headers extracted and none cleared
+		return nil, false, nil
+	}
+	return a.authenticateWithConfig(req, config)
+}
+
+// authenticateWithConfig authenticates the request using exactly the given configuration snapshot.
+func (a *secureRequestHeaderAuthenticator) authenticateWithConfig(req *http.Request, config *RequestHeaderConfig) (*authenticator.Response, bool, error) {
+	headerAuthenticator := NewDynamic(
+		StaticStringSlice(config.UsernameHeaders),
+		StaticStringSlice(config.UIDHeaders),
+		StaticStringSlice(config.GroupHeaders),
+		StaticStringSlice(config.ExtraHeaderPrefixes),
+	)
+	verifier := x509request.NewDynamicCAVerifier(
+		a.caContentProvider.VerifyOptions,
+		headerAuthenticator,
+		StaticStringSlice(config.AllowedClientNames),
+	)
+	return verifier.AuthenticateRequest(req)
 }
 
 func (a *requestHeaderAuthRequestHandler) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
@@ -140,17 +214,33 @@ func (a *requestHeaderAuthRequestHandler) AuthenticateRequest(req *http.Request)
 	}, true, nil
 }
 
+// ClearAuthenticationHeaders deletes all headers used for request header authentication
+// from the given header map, according to the given providers.
 func ClearAuthenticationHeaders(h http.Header, nameHeaders, uidHeaders, groupHeaders, extraHeaderPrefixes StringSliceProvider) {
-	for _, headerName := range nameHeaders.Value() {
+	clearAuthenticationHeaders(h, nameHeaders.Value(), uidHeaders.Value(), groupHeaders.Value(), extraHeaderPrefixes.Value())
+}
+
+// ClearAuthenticationHeadersFromConfig deletes all headers used for request header authentication
+// from the given header map, according to the given configuration snapshot. It is a no-op for a
+// nil snapshot.
+func ClearAuthenticationHeadersFromConfig(h http.Header, config *RequestHeaderConfig) {
+	if config == nil {
+		return
+	}
+	clearAuthenticationHeaders(h, config.UsernameHeaders, config.UIDHeaders, config.GroupHeaders, config.ExtraHeaderPrefixes)
+}
+
+func clearAuthenticationHeaders(h http.Header, nameHeaders, uidHeaders, groupHeaders, extraHeaderPrefixes []string) {
+	for _, headerName := range nameHeaders {
 		h.Del(headerName)
 	}
-	for _, headerName := range uidHeaders.Value() {
+	for _, headerName := range uidHeaders {
 		h.Del(headerName)
 	}
-	for _, headerName := range groupHeaders.Value() {
+	for _, headerName := range groupHeaders {
 		h.Del(headerName)
 	}
-	for _, prefix := range extraHeaderPrefixes.Value() {
+	for _, prefix := range extraHeaderPrefixes {
 		for k := range h {
 			if hasPrefixIgnoreCase(k, prefix) {
 				delete(h, k) // we have the raw key so avoid relying on canonicalization

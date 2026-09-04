@@ -42,28 +42,63 @@ const (
 	authenticationRoleName = "extension-apiserver-authentication-reader"
 )
 
-// RequestHeaderAuthRequestProvider a provider that knows how to dynamically fill parts of RequestHeaderConfig struct
-type RequestHeaderAuthRequestProvider interface {
-	UsernameHeaders() []string
-	UIDHeaders() []string
-	GroupHeaders() []string
-	ExtraHeaderPrefixes() []string
-	// AllowedClientNames returns the common names the front proxy client certificate may have.
-	AllowedClientNames() []string
-}
-
-var _ RequestHeaderAuthRequestProvider = &RequestHeaderAuthRequestController{}
-
-type requestHeaderBundle struct {
-	UsernameHeaders     []string
-	UIDHeaders          []string
-	GroupHeaders        []string
+// RequestHeaderConfig is an immutable point-in-time snapshot of the front-proxy request
+// header authentication configuration read from the extension-apiserver-authentication
+// configmap. All fields of a snapshot returned by a RequestHeaderConfigProvider are
+// mutually consistent, i.e. they originate from a single observation of the configmap.
+type RequestHeaderConfig struct {
+	// UsernameHeaders are the headers to check (in order, case-insensitively) for an identity. The first header with a value wins.
+	UsernameHeaders []string
+	// UIDHeaders are the headers to check (in order, case-insensitively) for an identity UID. The first header with a value wins.
+	UIDHeaders []string
+	// GroupHeaders are the headers to check (case-insensitively) for group membership. All values of all headers will be added.
+	GroupHeaders []string
+	// ExtraHeaderPrefixes are the header prefixes to check (case-insensitively) for filling in the user.Info.Extra. All values of all matching headers will be added.
 	ExtraHeaderPrefixes []string
-	AllowedClientNames  []string
+	// AllowedClientNames are the common names the front proxy client certificate may have. Empty means: accept any verified client certificate.
+	AllowedClientNames []string
 }
 
-// RequestHeaderAuthRequestController a controller that exposes a set of methods for dynamically filling parts of RequestHeaderConfig struct.
-// The methods are sourced from the config map which is being monitored by this controller.
+// Snapshot returns the receiver, so a static RequestHeaderConfig doubles as a
+// RequestHeaderConfigProvider serving an immutable snapshot.
+func (c *RequestHeaderConfig) Snapshot() *RequestHeaderConfig {
+	return c
+}
+
+var _ RequestHeaderConfigProvider = &RequestHeaderConfig{}
+
+// RequestHeaderConfigProvider provides atomic point-in-time snapshots of the request header
+// authentication configuration.
+type RequestHeaderConfigProvider interface {
+	// Snapshot returns the current request header configuration, or nil if no configuration
+	// is available. Nil is returned when the source configmap has never been read or has been
+	// deleted, so those two states are indistinguishable. Callers must fail closed, i.e.
+	// reject every request, when Snapshot returns nil.
+	Snapshot() *RequestHeaderConfig
+}
+
+// RequestHeaderConfigProviderFunc is a function that matches the RequestHeaderConfigProvider interface
+type RequestHeaderConfigProviderFunc func() *RequestHeaderConfig
+
+// Snapshot returns the current request header configuration.
+func (f RequestHeaderConfigProviderFunc) Snapshot() *RequestHeaderConfig {
+	return f()
+}
+
+// NewStaticRequestHeaderConfig returns a RequestHeaderConfigProvider serving an immutable
+// snapshot of the given configuration.
+func NewStaticRequestHeaderConfig(usernameHeaders, uidHeaders, groupHeaders, extraHeaderPrefixes, allowedClientNames []string) *RequestHeaderConfig {
+	return &RequestHeaderConfig{
+		UsernameHeaders:     usernameHeaders,
+		UIDHeaders:          uidHeaders,
+		GroupHeaders:        groupHeaders,
+		ExtraHeaderPrefixes: extraHeaderPrefixes,
+		AllowedClientNames:  allowedClientNames,
+	}
+}
+
+// RequestHeaderAuthRequestController a controller that exposes a snapshot of the request header
+// configuration sourced from the config map which is being monitored by this controller.
 // The controller is primed from the server at the construction time for components that don't want to dynamically react to changes
 // in the config map.
 type RequestHeaderAuthRequestController struct {
@@ -79,10 +114,10 @@ type RequestHeaderAuthRequestController struct {
 
 	queue workqueue.TypedRateLimitingInterface[string]
 
-	// exportedRequestHeaderBundle is a requestHeaderBundle that contains the last read content of the
-	// configmap. It is nil when the configmap has never been read and nil again once the configmap
-	// is deleted, see clearRequestHeaderBundle, so those two states are indistinguishable.
-	exportedRequestHeaderBundle atomic.Pointer[requestHeaderBundle]
+	// exportedRequestHeaderConfig contains the last read content of the configmap.
+	// It is nil when the configmap has never been read and nil again once the configmap
+	// is deleted, see clearRequestHeaderConfig, so those two states are indistinguishable.
+	exportedRequestHeaderConfig atomic.Pointer[RequestHeaderConfig]
 
 	usernameHeadersKey     string
 	uidHeadersKey          string
@@ -155,24 +190,11 @@ func NewRequestHeaderAuthRequestController(
 	return c
 }
 
-func (c *RequestHeaderAuthRequestController) UsernameHeaders() []string {
-	return c.loadRequestHeaderFor(c.usernameHeadersKey)
-}
-
-func (c *RequestHeaderAuthRequestController) UIDHeaders() []string {
-	return c.loadRequestHeaderFor(c.uidHeadersKey)
-}
-
-func (c *RequestHeaderAuthRequestController) GroupHeaders() []string {
-	return c.loadRequestHeaderFor(c.groupHeadersKey)
-}
-
-func (c *RequestHeaderAuthRequestController) ExtraHeaderPrefixes() []string {
-	return c.loadRequestHeaderFor(c.extraHeaderPrefixesKey)
-}
-
-func (c *RequestHeaderAuthRequestController) AllowedClientNames() []string {
-	return c.loadRequestHeaderFor(c.allowedClientNamesKey)
+// Snapshot returns a point-in-time snapshot of the request header configuration, or nil
+// when the configmap has never been read or has been deleted. All fields of the returned
+// snapshot are mutually consistent.
+func (c *RequestHeaderAuthRequestController) Snapshot() *RequestHeaderConfig {
+	return c.exportedRequestHeaderConfig.Load()
 }
 
 // Run starts RequestHeaderAuthRequestController controller and blocks until stopCh is closed.
@@ -201,7 +223,7 @@ func (c *RequestHeaderAuthRequestController) RunOnce(ctx context.Context) error 
 	configMap, err := c.client.CoreV1().ConfigMaps(c.configmapNamespace).Get(ctx, c.configmapName, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
-		c.clearRequestHeaderBundle()
+		c.clearRequestHeaderConfig()
 		return nil
 	case errors.IsForbidden(err):
 		klog.Warningf("Unable to get configmap/%s in %s.  Usually fixed by "+
@@ -238,14 +260,14 @@ func (c *RequestHeaderAuthRequestController) processNextWorkItem() bool {
 	return true
 }
 
-// sync reads the config and propagates the changes to exportedRequestHeaderBundle
-// which is exposed by the set of methods that are used to fill RequestHeaderConfig struct
+// sync reads the config and propagates the changes to exportedRequestHeaderConfig
+// which is exposed via Snapshot
 func (c *RequestHeaderAuthRequestController) sync() error {
 	configMap, err := c.configmapLister.Get(c.configmapName)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// returning nil keeps the workqueue from retrying a deletion forever
-			c.clearRequestHeaderBundle()
+			c.clearRequestHeaderConfig()
 			return nil
 		}
 		return err
@@ -253,34 +275,33 @@ func (c *RequestHeaderAuthRequestController) sync() error {
 	return c.syncConfigMap(configMap)
 }
 
-// clearRequestHeaderBundle resets the bundle to the same state as when the controller has
-// never read the configmap, so a deleted configmap is indistinguishable from one that never
-// existed. With no username headers configured, request header authentication rejects every
-// request regardless of what AllowedClientNames reports.
-func (c *RequestHeaderAuthRequestController) clearRequestHeaderBundle() {
-	c.exportedRequestHeaderBundle.Store(nil)
+// clearRequestHeaderConfig resets the configuration to the same unavailable state as when the
+// controller has never read the configmap, so a deleted configmap is indistinguishable from one
+// that never existed.
+func (c *RequestHeaderAuthRequestController) clearRequestHeaderConfig() {
+	c.exportedRequestHeaderConfig.Store(nil)
 	klog.InfoS("Cleared request header values, configmap was deleted", "name", c.name)
 }
 
 func (c *RequestHeaderAuthRequestController) syncConfigMap(configMap *corev1.ConfigMap) error {
-	hasChanged, newRequestHeaderBundle, err := c.hasRequestHeaderBundleChanged(configMap)
+	hasChanged, newRequestHeaderConfig, err := c.hasRequestHeaderBundleChanged(configMap)
 	if err != nil {
 		return err
 	}
 	if hasChanged {
-		c.exportedRequestHeaderBundle.Store(newRequestHeaderBundle)
+		c.exportedRequestHeaderConfig.Store(newRequestHeaderConfig)
 		klog.V(2).Infof("Loaded a new request header values for %v", c.name)
 	}
 	return nil
 }
 
-func (c *RequestHeaderAuthRequestController) hasRequestHeaderBundleChanged(cm *corev1.ConfigMap) (bool, *requestHeaderBundle, error) {
+func (c *RequestHeaderAuthRequestController) hasRequestHeaderBundleChanged(cm *corev1.ConfigMap) (bool, *RequestHeaderConfig, error) {
 	currentHeadersBundle, err := c.getRequestHeaderBundleFromConfigMap(cm)
 	if err != nil {
 		return false, nil, err
 	}
 
-	rawHeaderBundle := c.exportedRequestHeaderBundle.Load()
+	rawHeaderBundle := c.exportedRequestHeaderConfig.Load()
 	if rawHeaderBundle == nil {
 		return true, currentHeadersBundle, nil
 	}
@@ -292,7 +313,7 @@ func (c *RequestHeaderAuthRequestController) hasRequestHeaderBundleChanged(cm *c
 	return false, nil, nil
 }
 
-func (c *RequestHeaderAuthRequestController) getRequestHeaderBundleFromConfigMap(cm *corev1.ConfigMap) (*requestHeaderBundle, error) {
+func (c *RequestHeaderAuthRequestController) getRequestHeaderBundleFromConfigMap(cm *corev1.ConfigMap) (*RequestHeaderConfig, error) {
 	usernameHeaderCurrentValue, err := deserializeStrings(cm.Data[c.usernameHeadersKey])
 	if err != nil {
 		return nil, err
@@ -319,35 +340,13 @@ func (c *RequestHeaderAuthRequestController) getRequestHeaderBundleFromConfigMap
 		return nil, err
 	}
 
-	return &requestHeaderBundle{
+	return &RequestHeaderConfig{
 		UsernameHeaders:     usernameHeaderCurrentValue,
 		UIDHeaders:          uidHeaderCurrentValue,
 		GroupHeaders:        groupHeadersCurrentValue,
 		ExtraHeaderPrefixes: extraHeaderPrefixesCurrentValue,
 		AllowedClientNames:  allowedClientNamesCurrentValue,
 	}, nil
-}
-
-func (c *RequestHeaderAuthRequestController) loadRequestHeaderFor(key string) []string {
-	headerBundle := c.exportedRequestHeaderBundle.Load()
-	if headerBundle == nil {
-		return nil // this can happen if we've been unable load data from the apiserver for some reason
-	}
-
-	switch key {
-	case c.usernameHeadersKey:
-		return headerBundle.UsernameHeaders
-	case c.uidHeadersKey:
-		return headerBundle.UIDHeaders
-	case c.groupHeadersKey:
-		return headerBundle.GroupHeaders
-	case c.extraHeaderPrefixesKey:
-		return headerBundle.ExtraHeaderPrefixes
-	case c.allowedClientNamesKey:
-		return headerBundle.AllowedClientNames
-	default:
-		return nil
-	}
 }
 
 func (c *RequestHeaderAuthRequestController) keyFn() string {

@@ -18,23 +18,19 @@ package headerrequest
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/json"
 	"errors"
-	"math/big"
 	"net/http"
 	"testing"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	x509request "k8s.io/apiserver/pkg/authentication/request/x509"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/client-go/kubernetes/fake"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	clienttesting "k8s.io/client-go/testing"
@@ -58,6 +54,9 @@ type expectedHeadersHolder struct {
 	groupHeaders        []string
 	extraHeaderPrefixes []string
 	allowedClientNames  []string
+	// nilSnapshot asserts that Snapshot returns nil instead of an empty snapshot,
+	// i.e. the state matches a configmap that never existed
+	nilSnapshot bool
 }
 
 func TestRequestHeaderAuthRequestController(t *testing.T) {
@@ -96,6 +95,11 @@ func TestRequestHeaderAuthRequestController(t *testing.T) {
 				return c
 			}(),
 			expectErr: true,
+			expectedHeader: expectedHeadersHolder{
+				// nothing was loaded before the invalid configmap, so the state
+				// stays identical to never-loaded
+				nilSnapshot: true,
+			},
 		},
 	}
 
@@ -259,9 +263,9 @@ func TestRequestHeaderAuthRequestControllerSyncOnce(t *testing.T) {
 }
 
 // expectedHeadersAfterDeletion is the state both sync and RunOnce must reach once the
-// configmap is gone: it is deliberately identical to the never-loaded state, where all
-// accessors return nil, including AllowedClientNames.
-var expectedHeadersAfterDeletion = expectedHeadersHolder{}
+// configmap is gone: it is deliberately identical to the never-loaded state, where
+// Snapshot returns nil, including for AllowedClientNames.
+var expectedHeadersAfterDeletion = expectedHeadersHolder{nilSnapshot: true}
 
 func TestRequestHeaderAuthRequestControllerSyncClearsHeadersOnConfigMapDeletion(t *testing.T) {
 	target := newDefaultTarget()
@@ -311,7 +315,7 @@ func TestRequestHeaderAuthRequestControllerDeletedStateMatchesNeverFoundState(t 
 		{name: "configmap was deleted", target: loaded},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
-			validateExpectedHeaders(t, scenario.target, expectedHeadersHolder{})
+			validateExpectedHeaders(t, scenario.target, expectedHeadersAfterDeletion)
 		})
 	}
 }
@@ -391,6 +395,23 @@ func TestRequestHeaderAuthRequestControllerRunOnceKeepsHeadersOnOtherAPIErrors(t
 	validateExpectedHeaders(t, target, expected)
 }
 
+// staticVerifyOptionsCA is a dynamiccertificates.CAContentProvider whose VerifyOptions
+// are backed by a swappable function, so a test can simulate the CA half of the
+// configuration going away and coming back.
+type staticVerifyOptionsCA struct {
+	verifyOptionsFn func() (x509.VerifyOptions, bool)
+}
+
+func (s *staticVerifyOptionsCA) Name() string                                      { return "test-ca" }
+func (s *staticVerifyOptionsCA) CurrentCABundleContent() []byte                    { return nil }
+func (s *staticVerifyOptionsCA) AddListener(listener dynamiccertificates.Listener) {}
+
+func (s *staticVerifyOptionsCA) VerifyOptions() (x509.VerifyOptions, bool) {
+	return s.verifyOptionsFn()
+}
+
+var _ dynamiccertificates.CAContentProvider = &staticVerifyOptionsCA{}
+
 // TestRequestHeaderAuthRequestControllerFailsClosedDuringDeleteRecreateTransition covers the
 // window where the configmap is deleted and immediately recreated, which is what happens in a
 // real cluster because the kube-apiserver rewrites it. The two controllers consuming the
@@ -410,8 +431,8 @@ func TestRequestHeaderAuthRequestControllerFailsClosedDuringDeleteRecreateTransi
 		t.Fatal(err)
 	}
 
-	roots, allowedClientCert := newTestClientCert(t, "front-proxy-client")
-	_, disallowedClientCert := newTestClientCert(t, "not-allowed-client")
+	roots, clientCerts := newTestClientCertsFromSameCA(t, "front-proxy-client", "not-allowed-client")
+	allowedClientCert, disallowedClientCert := clientCerts[0], clientCerts[1]
 
 	// mirrors ConfigMapCAController.VerifyOptions across the transition: unavailable while
 	// the CA half is cleared, available again once it has synced the recreated configmap
@@ -425,14 +446,7 @@ func TestRequestHeaderAuthRequestControllerFailsClosedDuringDeleteRecreateTransi
 			KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		}, true
 	})
-	auth := NewDynamicVerifyOptionsSecure(
-		verifyOptionsFn,
-		StringSliceProviderFunc(target.AllowedClientNames),
-		StringSliceProviderFunc(target.UsernameHeaders),
-		StringSliceProviderFunc(target.UIDHeaders),
-		StringSliceProviderFunc(target.GroupHeaders),
-		StringSliceProviderFunc(target.ExtraHeaderPrefixes),
-	)
+	auth := NewSecure(target, &staticVerifyOptionsCA{verifyOptionsFn: verifyOptionsFn})
 
 	request := func(cert *x509.Certificate) bool {
 		req, err := http.NewRequest(http.MethodGet, "/", nil)
@@ -497,62 +511,6 @@ func TestRequestHeaderAuthRequestControllerFailsClosedDuringDeleteRecreateTransi
 	}
 }
 
-// newTestClientCert returns a root pool and a client certificate signed by that root,
-// so the certificate chain verifies and the common name check is what decides the request.
-func newTestClientCert(t *testing.T, commonName string) (*x509.CertPool, *x509.Certificate) {
-	t.Helper()
-
-	notBefore := time.Now().Add(-time.Hour)
-	notAfter := time.Now().Add(time.Hour)
-
-	caKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
-	caTemplate := &x509.Certificate{
-		SerialNumber:          big.NewInt(1),
-		Subject:               pkix.Name{CommonName: "test-requestheader-ca"},
-		NotBefore:             notBefore,
-		NotAfter:              notAfter,
-		IsCA:                  true,
-		BasicConstraintsValid: true,
-		KeyUsage:              x509.KeyUsageCertSign,
-	}
-	caDER, err := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	caCert, err := x509.ParseCertificate(caDER)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	clientKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
-	clientTemplate := &x509.Certificate{
-		SerialNumber: big.NewInt(2),
-		Subject:      pkix.Name{CommonName: commonName},
-		NotBefore:    notBefore,
-		NotAfter:     notAfter,
-		KeyUsage:     x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-	}
-	clientDER, err := x509.CreateCertificate(rand.Reader, clientTemplate, caCert, &clientKey.PublicKey, caKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	clientCert, err := x509.ParseCertificate(clientDER)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	roots := x509.NewCertPool()
-	roots.AddCert(caCert)
-	return roots, clientCert
-}
-
 func defaultConfigMap(t *testing.T, usernameHeaderVal, uidHeaderVal, groupHeadersVal, extraHeaderPrefixesVal, allowedClientNamesVal []string) *corev1.ConfigMap {
 	encode := func(val []string) string {
 		encodedVal, err := json.Marshal(val)
@@ -589,19 +547,29 @@ func newDefaultTarget() *RequestHeaderAuthRequestController {
 }
 
 func validateExpectedHeaders(t *testing.T, target *RequestHeaderAuthRequestController, expected expectedHeadersHolder) {
-	if !equality.Semantic.DeepEqual(target.UsernameHeaders(), expected.usernameHeaders) {
-		t.Fatalf("incorrect usernameHeaders, got %v, wanted %v", target.UsernameHeaders(), expected.usernameHeaders)
+	snapshot := target.Snapshot()
+	if expected.nilSnapshot {
+		if snapshot != nil {
+			t.Fatalf("expected a nil snapshot after deletion, got %v", *snapshot)
+		}
+		return
 	}
-	if !equality.Semantic.DeepEqual(target.UIDHeaders(), expected.uidHeaders) {
-		t.Fatalf("incorrect uidHeaders, got %v, wanted %v", target.UIDHeaders(), expected.uidHeaders)
+	if snapshot == nil {
+		t.Fatal("expected a non-nil snapshot, got nil")
 	}
-	if !equality.Semantic.DeepEqual(target.GroupHeaders(), expected.groupHeaders) {
-		t.Fatalf("incorrect groupHeaders, got %v, wanted %v", target.GroupHeaders(), expected.groupHeaders)
+	if !equality.Semantic.DeepEqual(snapshot.UsernameHeaders, expected.usernameHeaders) {
+		t.Fatalf("incorrect usernameHeaders, got %v, wanted %v", snapshot.UsernameHeaders, expected.usernameHeaders)
 	}
-	if !equality.Semantic.DeepEqual(target.ExtraHeaderPrefixes(), expected.extraHeaderPrefixes) {
-		t.Fatalf("incorrect extraheaderPrefixes, got %v, wanted %v", target.ExtraHeaderPrefixes(), expected.extraHeaderPrefixes)
+	if !equality.Semantic.DeepEqual(snapshot.UIDHeaders, expected.uidHeaders) {
+		t.Fatalf("incorrect uidHeaders, got %v, wanted %v", snapshot.UIDHeaders, expected.uidHeaders)
 	}
-	if !equality.Semantic.DeepEqual(target.AllowedClientNames(), expected.allowedClientNames) {
-		t.Fatalf("incorrect expectedAllowedClientNames, got %v, wanted %v", target.AllowedClientNames(), expected.allowedClientNames)
+	if !equality.Semantic.DeepEqual(snapshot.GroupHeaders, expected.groupHeaders) {
+		t.Fatalf("incorrect groupHeaders, got %v, wanted %v", snapshot.GroupHeaders, expected.groupHeaders)
+	}
+	if !equality.Semantic.DeepEqual(snapshot.ExtraHeaderPrefixes, expected.extraHeaderPrefixes) {
+		t.Fatalf("incorrect extraheaderPrefixes, got %v, wanted %v", snapshot.ExtraHeaderPrefixes, expected.extraHeaderPrefixes)
+	}
+	if !equality.Semantic.DeepEqual(snapshot.AllowedClientNames, expected.allowedClientNames) {
+		t.Fatalf("incorrect expectedAllowedClientNames, got %v, wanted %v", snapshot.AllowedClientNames, expected.allowedClientNames)
 	}
 }
