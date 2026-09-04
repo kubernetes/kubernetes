@@ -1820,11 +1820,13 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	MutablePodResourcesForSuspendedJobs: {
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.41
 	},
 
 	MutableSchedulingDirectivesForSuspendedJobs: {
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.41
 	},
 
 	NFTablesNetlink: {
