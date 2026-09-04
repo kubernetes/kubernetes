@@ -31,10 +31,16 @@ type containerAllocation struct {
 	Resources v1.ResourceRequirements `json:"resources,omitempty"`
 }
 
+type volumeAllocation struct {
+	Name     string                  `json:"name"`
+	EmptyDir *v1.EmptyDirVolumeSource `json:"emptyDir,omitempty"`
+}
+
 type podResourceSummary struct {
 	// TODO: resources v1.ResourceRequirements, add pod-level resources here once resizing pod-level resources is supported
 	InitContainers []containerAllocation `json:"initContainers,omitempty"`
 	Containers     []containerAllocation `json:"containers,omitempty"`
+	Volumes        []volumeAllocation    `json:"volumes,omitempty"`
 	Generation     int64                 `json:"generation"`
 	Error          string                `json:"error,omitempty"`
 }
@@ -81,6 +87,14 @@ func makeResourceSummaryFromSpec(logger klog.Logger, pod *v1.Pod, generation int
 			specResources.InitContainers = append(specResources.InitContainers, allocation)
 		case podutil.Containers:
 			specResources.Containers = append(specResources.Containers, allocation)
+		}
+	}
+	for _, vol := range pod.Spec.Volumes {
+		if vol.EmptyDir != nil && vol.EmptyDir.Medium == v1.StorageMediumMemory {
+			specResources.Volumes = append(specResources.Volumes, volumeAllocation{
+				Name:     vol.Name,
+				EmptyDir: vol.EmptyDir,
+			})
 		}
 	}
 

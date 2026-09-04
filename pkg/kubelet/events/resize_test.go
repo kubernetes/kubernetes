@@ -33,6 +33,7 @@ func TestPodResizeCompletedMsg(t *testing.T) {
 	tests := []struct {
 		name               string
 		containers         []testContainer
+		volumes            []v1.Volume
 		observedGeneration int64
 		expected           string
 	}{{
@@ -61,6 +62,33 @@ func TestPodResizeCompletedMsg(t *testing.T) {
 		}},
 		observedGeneration: 3,
 		expected:           `Pod resize completed: {"containers":[{"name":"c0","resources":{}}],"generation":3}`,
+	}, {
+		name: "pod with memory-backed and default volumes",
+		containers: []testContainer{{
+			resources: testResources{100, 100, 100, 100},
+		}},
+		volumes: []v1.Volume{
+			{
+				Name: "mem-vol",
+				VolumeSource: v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{
+						Medium:    v1.StorageMediumMemory,
+						SizeLimit: ptr.To(resource.MustParse("128Mi")),
+					},
+				},
+			},
+			{
+				Name: "disk-vol",
+				VolumeSource: v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{
+						Medium:    v1.StorageMediumDefault,
+						SizeLimit: ptr.To(resource.MustParse("256Mi")),
+					},
+				},
+			},
+		},
+		observedGeneration: 4,
+		expected:           `Pod resize completed: {"containers":[{"name":"c0","resources":{"limits":{"cpu":"100m","memory":"100"},"requests":{"cpu":"100m","memory":"100"}}}],"volumes":[{"name":"mem-vol","emptyDir":{"medium":"Memory","sizeLimit":"128Mi"}}],"generation":4}`,
 	}}
 
 	for _, test := range tests {
@@ -69,6 +97,9 @@ func TestPodResizeCompletedMsg(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-pod",
 					UID:  "12345",
+				},
+				Spec: v1.PodSpec{
+					Volumes: test.volumes,
 				},
 			}
 

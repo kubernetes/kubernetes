@@ -98,7 +98,12 @@ func verifyPodResourceAllocation(t *testing.T, expected, actual *PodResourceInfo
 			for volName, expectedQty := range expectedPodInfo.EmptyDirVolumeLimits {
 				actualQty, exists := actualPodInfo.EmptyDirVolumeLimits[volName]
 				require.True(t, exists, "actual emptyDir volume %s missing", volName)
-				require.True(t, expectedQty.Equal(*actualQty), msgAndArgs)
+				if expectedQty == nil {
+					require.Nil(t, actualQty, msgAndArgs)
+				} else {
+					require.NotNil(t, actualQty, msgAndArgs)
+					require.True(t, expectedQty.Equal(*actualQty), msgAndArgs)
+				}
 			}
 		}
 	}
@@ -197,6 +202,29 @@ func Test_stateCheckpoint_storeState(t *testing.T) {
 									q := resource.MustParse(qStr)
 									return &q
 								}(),
+							},
+						},
+					},
+				},
+			})
+
+			// Test case 3b: Container resources and volume limits populated with nil limit
+			tests = append(tests, testCase{
+				name: fmt.Sprintf("resource - %s - container and nil volume limits", qStr),
+				args: args{
+					resInfoMap: PodResourceInfoMap{
+						"pod1": {
+							ContainerResources: map[string]v1.ResourceRequirements{
+								"container1": {
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    resource.MustParse(qStr),
+										v1.ResourceMemory: resource.MustParse(qStr),
+									},
+								},
+							},
+							PodLevelResources: nil,
+							EmptyDirVolumeLimits: map[string]*resource.Quantity{
+								"volume1": nil,
 							},
 						},
 					},

@@ -87,6 +87,9 @@ func (s *stateMemory) GetEmptyDirVolumeLimit(podUID types.UID, volumeName string
 	if !ok {
 		return nil, ok
 	}
+	if sizeLimit == nil {
+		return nil, ok
+	}
 
 	sizeLimitCopy := sizeLimit.DeepCopy()
 	return &sizeLimitCopy, ok
