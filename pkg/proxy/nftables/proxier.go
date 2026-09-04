@@ -76,6 +76,7 @@ const (
 	servicesChain       = "services"
 	serviceIPsMap       = "service-ips"
 	serviceNodePortsMap = "service-nodeports"
+	sharedEndpointsMap  = "endpoints"
 
 	// set of IPs that accept NodePort traffic
 	nodePortIPsSet = "nodeport-ips"
@@ -180,6 +181,11 @@ type Proxier struct {
 	nodeName       string
 	nodeIP         net.IP
 
+	// prepopulatedBucketChains is the number of shared "dispatch-N" bucket
+	// chains (dispatch-1 through dispatch-N) that are pre-created at setup time
+	// and exempt from garbage collection.
+	prepopulatedBucketChains int
+
 	serviceHealthServer healthcheck.ServiceHealthServer
 	healthzServer       *healthcheck.ProxyHealthServer
 
@@ -206,6 +212,7 @@ type Proxier struct {
 	noEndpointNodePorts *nftElementStorage
 	serviceNodePorts    *nftElementStorage
 	hairpinConnections  *nftElementStorage
+	endpoints           *nftElementStorage
 
 	// localhostNodePortRejects holds the (proto . port) keys of localhost NodePorts
 	// that kube-proxy rejects rather than serving.
@@ -278,6 +285,7 @@ func NewProxier(ctx context.Context,
 		nodePortAddresses:        nodePortAddresses,
 		networkInterfacer:        proxyutil.RealNetwork{},
 		staleChains:              make(map[string]time.Time),
+		prepopulatedBucketChains: defaultPrepopulatedBucketChains,
 		logger:                   logger,
 		logRateLimiter:           rate.NewLimiter(rate.Every(24*time.Hour), 1),
 		clusterIPs:               newNFTElementStorage("set", clusterIPsSet),
@@ -287,6 +295,7 @@ func NewProxier(ctx context.Context,
 		noEndpointNodePorts:      newNFTElementStorage("map", noEndpointNodePortsMap),
 		serviceNodePorts:         newNFTElementStorage("map", serviceNodePortsMap),
 		hairpinConnections:       newNFTElementStorage("set", hairpinConnectionsSet),
+		endpoints:                newNFTElementStorage("map", sharedEndpointsMap),
 		localhostNodePortRejects: newNFTElementStorage("map", localhostNodePortRejectMap),
 	}
 
@@ -732,6 +741,18 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 		Comment: ptr.To("NodePort traffic"),
 	})
 
+	tx.Add(&knftables.Map{
+		Name:    sharedEndpointsMap,
+		Type:    ipvX_addr + " . inet_proto . inet_service . mark : " + ipvX_addr + " . inet_service",
+		Comment: new("endpoints for services using shared buckets"),
+	})
+
+	// Pre-create the bucket chains for the most common endpoint counts so that
+	// partial syncs rarely need to create one.
+	for n := 1; n <= proxier.prepopulatedBucketChains; n++ {
+		proxier.addBucketChain(tx, n)
+	}
+
 	if proxier.masqueradeAll {
 		tx.Add(&knftables.Rule{
 			Chain: servicesChain,
@@ -794,6 +815,7 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 	proxier.noEndpointNodePorts.readOrReset(tx, proxier.nftables, proxier.logger)
 	proxier.serviceNodePorts.readOrReset(tx, proxier.nftables, proxier.logger)
 	proxier.hairpinConnections.readOrReset(tx, proxier.nftables, proxier.logger)
+	proxier.endpoints.readOrReset(tx, proxier.nftables, proxier.logger)
 	if proxier.localhostNodePortsEnabled {
 		proxier.localhostNodePortRejects.readOrReset(tx, proxier.nftables, proxier.logger)
 	}
@@ -947,7 +969,33 @@ const (
 	servicePortEndpointChainNamePrefix      = "endpoint-"
 	servicePortEndpointAffinityNamePrefix   = "affinity-"
 	servicePortFirewallChainNamePrefix      = "firewall-"
+	serviceDispatchChainNamePrefix          = "dispatch-"
 )
+
+// defaultPrepopulatedBucketChains is how many shared "dispatch-N" bucket chains
+// (dispatch-1 through dispatch-N) are pre-created at setup time, covering the
+// most common endpoint counts so partial syncs rarely need to create one.
+const defaultPrepopulatedBucketChains = 10
+
+// numEndpointsChainName returns the name of the shared bucket chain for services
+// with the given number of endpoints, e.g. "dispatch-3".
+func numEndpointsChainName(numEndpoints int) string {
+	return fmt.Sprintf("%s%d", serviceDispatchChainNamePrefix, numEndpoints)
+}
+
+// dispatchChainNumEndpoints returns the endpoint count N encoded in a
+// "dispatch-N" bucket chain name, or false if chainString is not one.
+func dispatchChainNumEndpoints(chainString string) (int, bool) {
+	numStr, ok := strings.CutPrefix(chainString, serviceDispatchChainNamePrefix)
+	if !ok {
+		return 0, false
+	}
+	n, err := strconv.Atoi(numStr)
+	if err != nil {
+		return 0, false
+	}
+	return n, true
+}
 
 // hashAndTruncate prefixes name with a hash of itself and then truncates to
 // chainNameBaseLengthMax. The hash ensures that (a) the name is still unique if we have
@@ -1303,6 +1351,25 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 
 	var localhostNodePorts []localnodeportproxy.NodePortSpec
 
+	// Index the current shared-endpoints map elements by service, so that
+	// ensureBucketEndpoints can keep endpoints in their existing slots.
+	prevBucketSlots := make(map[string]map[int]string)
+	for key, value := range proxier.endpoints.elements {
+		parts := splitNFTSlice(key)
+		if len(parts) != 4 {
+			continue
+		}
+		slot, err := strconv.Atoi(parts[3])
+		if err != nil {
+			continue
+		}
+		svcKey := joinNFTSlice(parts[:3])
+		if prevBucketSlots[svcKey] == nil {
+			prevBucketSlots[svcKey] = make(map[int]string)
+		}
+		prevBucketSlots[svcKey][slot] = value
+	}
+
 	// Build rules for each service-port.
 	for svcName, svc := range proxier.svcPortMap {
 		svcInfo, ok := svc.(*servicePortInfo)
@@ -1361,6 +1428,20 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		// clusterPolicyChain contains the endpoints used with "Cluster" traffic policy
 		clusterPolicyChain := svcInfo.clusterPolicyChainName
 		usesClusterPolicyChain := len(clusterEndpoints) > 0 && svcInfo.UsesClusterEndpoints()
+
+		// Eligible services are routed through a shared
+		// "dispatch-N" bucket chain and the global endpoints map instead of
+		// a bespoke per-service chain. A service is eligible when its internal
+		// (ClusterIP) traffic uses the cluster policy, it has no session
+		// affinity, and it has no external access (NodePort/ExternalIP/LB).
+		// Those restrictions guarantee that the bucket's "ip daddr"-keyed lookup
+		// always resolves to the right service.
+		useBucket := usesClusterPolicyChain && !serviceUsesAffinity &&
+			!svcInfo.InternalPolicyLocal() && !svcInfo.ExternallyAccessible()
+		if useBucket {
+			// The bucket chain replaces the per-service cluster policy chain.
+			usesClusterPolicyChain = false
+		}
 		if usesClusterPolicyChain {
 			ensureChain(clusterPolicyChain, tx, activeChains, skipServiceUpdate)
 		}
@@ -1387,6 +1468,11 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 			}
 		}
 		internalTrafficChain := internalPolicyChain
+		if useBucket {
+			// Route internal traffic to the shared bucket chain for this
+			// service's endpoint count instead of a per-service chain.
+			internalTrafficChain = proxier.ensureBucketChain(tx, len(clusterEndpoints), activeChains, existingChains, doFullSync)
+		}
 
 		// Similarly, externalPolicyChain is the chain containing the endpoints
 		// for "external" (NodePort, LoadBalancer, and ExternalIP) traffic.
@@ -1458,6 +1544,11 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 					fmt.Sprintf("goto %s", internalTrafficChain),
 				},
 			})
+			if useBucket {
+				// Populate the global endpoints map with this service's
+				// endpoints; the bucket chain selects one by slot at runtime.
+				proxier.ensureBucketEndpoints(tx, svcInfo, protocol, clusterEndpoints, prevBucketSlots)
+			}
 		} else {
 			// No endpoints.
 			proxier.noEndpointServices.ensureElem(tx, &knftables.Element{
@@ -1827,15 +1918,20 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	// now, and record the time that they become stale in staleChains so they can be
 	// deleted later.
 	for chain := range existingChains {
-		if isServiceChainName(chain) {
-			if !activeChains.Has(chain) {
-				tx.Flush(&knftables.Chain{
-					Name: chain,
-				})
-				proxier.staleChains[chain] = start
-			} else {
-				delete(proxier.staleChains, chain)
-			}
+		keep := activeChains.Has(chain)
+		if n, isDispatch := dispatchChainNumEndpoints(chain); isDispatch {
+			// Pre-populated bucket chains are part of the base setup; never GC them.
+			keep = keep || n <= proxier.prepopulatedBucketChains
+		} else if !isServiceChainName(chain) {
+			continue
+		}
+		if !keep {
+			tx.Flush(&knftables.Chain{
+				Name: chain,
+			})
+			proxier.staleChains[chain] = start
+		} else {
+			delete(proxier.staleChains, chain)
 		}
 	}
 
@@ -1855,6 +1951,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	proxier.noEndpointNodePorts.cleanupLeftoverKeys(tx)
 	proxier.serviceNodePorts.cleanupLeftoverKeys(tx)
 	proxier.hairpinConnections.cleanupLeftoverKeys(tx)
+	proxier.endpoints.cleanupLeftoverKeys(tx)
 	if proxier.localhostNodePortsEnabled {
 		proxier.localhostNodePortRejects.cleanupLeftoverKeys(tx)
 	}
@@ -1918,6 +2015,157 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		conntrack.CleanStaleEntries(proxier.conntrack, proxier.ipFamily, proxier.svcPortMap, proxier.endpointsMap, serviceUpdateResult.DeletedServices)
 	}
 	return
+}
+
+// ensureBucketChain ensures that the shared "dispatch-N" bucket chain for
+// services with numEndpoints endpoints exists and contains its single
+// endpoints-map lookup rule, and returns its name. Multiple eligible services
+// with the same endpoint count share one bucket chain. Chains up to
+// proxier.prepopulatedBucketChains are written by setupNFTables and never
+// garbage-collected; the rest are tracked in activeChains like other dynamic
+// chains so they can be garbage-collected once no service references them.
+func (proxier *Proxier) ensureBucketChain(tx *knftables.Transaction, numEndpoints int, activeChains, existingChains sets.Set[string], doFullSync bool) string {
+	chain := numEndpointsChainName(numEndpoints)
+	if activeChains.Has(chain) {
+		return chain
+	}
+	activeChains.Insert(chain)
+
+	// On a full sync, setupNFTables already wrote the pre-populated chains to
+	// this transaction.
+	if doFullSync && numEndpoints <= proxier.prepopulatedBucketChains {
+		return chain
+	}
+
+	// A bucket chain's rule is fully determined by numEndpoints (encoded in the
+	// chain name), so it never needs rewriting once created. Skip recreation
+	// unless this is a full resync, the chain doesn't exist yet, or it was
+	// flushed (i.e. is stale) and needs its rule restored. Gating on chain
+	// existence rather than per-service dirtiness keeps the transaction
+	// deterministic regardless of service processing order.
+	_, isStale := proxier.staleChains[chain]
+	if !doFullSync && existingChains.Has(chain) && !isStale {
+		return chain
+	}
+
+	proxier.addBucketChain(tx, numEndpoints)
+	return chain
+}
+
+// addBucketChain writes the "dispatch-numEndpoints" bucket chain and its single
+// endpoints-map lookup rule to tx, flushing any previous contents.
+func (proxier *Proxier) addBucketChain(tx *knftables.Transaction, numEndpoints int) {
+	chain := numEndpointsChainName(numEndpoints)
+
+	ipX := "ip"
+	if proxier.ipFamily == v1.IPv6Protocol {
+		ipX = "ip6"
+	}
+
+	tx.Add(&knftables.Chain{Name: chain})
+	tx.Flush(&knftables.Chain{Name: chain})
+
+	// A single DNAT rule for all protocols; the packet's protocol is part of
+	// the endpoints map key ("meta l4proto"), so only elements for the right
+	// protocol can match, and a lookup miss means no DNAT.
+	//
+	// The slot is generated by storing "numgen random mod N" (even for N==1,
+	// which always yields 0) into the conntrack mark and using "ct mark" in
+	// the lookup key: numgen's bare-integer datatype can't be used directly in
+	// a concatenation against the map's mark-typed slot field, but routing it
+	// through the ct mark gives it the mark datatype without clobbering the
+	// packet mark (and thus the masquerade bit set in the services chain).
+	tx.Add(&knftables.Rule{
+		Chain: chain,
+		Rule: knftables.Concat(
+			"ct mark set numgen random mod", strconv.Itoa(numEndpoints),
+			"dnat", ipX, "addr . port to",
+			ipX, "daddr", ".", "meta l4proto", ".", "th dport", ".",
+			"ct mark",
+			"map", "@", sharedEndpointsMap,
+		),
+	})
+}
+
+// ensureBucketEndpoints adds this service's endpoints to the shared
+// endpoints map, keyed by "clusterIP . protocol . port . slot". The bucket
+// chain for len(endpoints) generates the slot at runtime to select one of them.
+// Surviving endpoints keep the slot recorded in prevBucketSlots; removed
+// endpoints' slots are backfilled from the highest slots down, so adding or
+// removing one endpoint churns at most one map element instead of reshuffling
+// every endpoint after it.
+func (proxier *Proxier) ensureBucketEndpoints(tx *knftables.Transaction, svcInfo *servicePortInfo, protocol string, endpoints []proxy.Endpoint, prevBucketSlots map[string]map[int]string) {
+	clusterIP := svcInfo.ClusterIP().String()
+	port := strconv.Itoa(svcInfo.Port())
+	prevSlots := prevBucketSlots[joinNFTSlice([]string{clusterIP, protocol, port})]
+
+	values := make([]string, 0, len(endpoints))
+	for _, ep := range endpoints {
+		epInfo, ok := ep.(*endpointInfo)
+		if !ok {
+			proxier.logger.Error(nil, "Failed to cast endpointInfo", "endpointInfo", ep)
+			continue
+		}
+		values = append(values, joinNFTSlice([]string{epInfo.IP(), strconv.Itoa(epInfo.Port())}))
+	}
+	n := len(values)
+	unplaced := sets.New(values...)
+
+	// Keep surviving endpoints in their current slots.
+	assigned := make([]string, n)
+	for slot, v := range prevSlots {
+		if slot < n && unplaced.Has(v) {
+			assigned[slot] = v
+			unplaced.Delete(v)
+		}
+	}
+
+	// pending lists the endpoints that still need a slot: first survivors
+	// displaced from now-out-of-range slots (highest slot first), then new
+	// endpoints in the order they were given.
+	var pending []string
+	var outOfRange []int
+	for slot := range prevSlots {
+		if slot >= n {
+			outOfRange = append(outOfRange, slot)
+		}
+	}
+	slices.Sort(outOfRange)
+	for i := len(outOfRange) - 1; i >= 0; i-- {
+		if v := prevSlots[outOfRange[i]]; unplaced.Has(v) {
+			pending = append(pending, v)
+			unplaced.Delete(v)
+		}
+	}
+	for _, v := range values {
+		if unplaced.Has(v) {
+			pending = append(pending, v)
+			unplaced.Delete(v)
+		}
+	}
+
+	// Backfill the holes left by removed endpoints.
+	for slot := 0; slot < n && len(pending) > 0; slot++ {
+		if assigned[slot] == "" {
+			assigned[slot], pending = pending[0], pending[1:]
+		}
+	}
+
+	for slot, v := range assigned {
+		if v == "" {
+			continue
+		}
+		proxier.endpoints.ensureElem(tx, &knftables.Element{
+			Map: sharedEndpointsMap,
+			Key: []string{
+				clusterIP,
+				protocol,
+				port,
+				strconv.Itoa(slot),
+			},
+			Value: splitNFTSlice(v),
+		})
+	}
 }
 
 func (proxier *Proxier) writeServiceToEndpointDNATs(tx *knftables.Transaction, svcInfo *servicePortInfo, svcChain string, endpoints []proxy.Endpoint) {
