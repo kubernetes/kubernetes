@@ -185,7 +185,7 @@ func (s *server) isVersionCompatibleWithPlugin(versions ...string) bool {
 	// TODO(vikasc): Currently this is fine as we only have a single supported version. When we do need to support
 	// multiple versions in the future, we may need to extend this function to return a supported version.
 	// E.g., say kubelet supports v1beta1 and v1beta2, and we get v1alpha1 and v1beta1 from a device plugin,
-	// this function should return v1beta1
+	// this function should return v1beta1. See https://github.com/kubernetes/kubernetes/issues/115479 for tracking.
 	for _, version := range versions {
 		for _, supportedVersion := range api.SupportedVersions {
 			if version == supportedVersion {

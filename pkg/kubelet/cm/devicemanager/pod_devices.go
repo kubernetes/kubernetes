@@ -327,6 +327,7 @@ func (pdev *podDevices) deviceRunContainerOptions(logger klog.Logger, podUID, co
 				HostPath:      mount.HostPath,
 				ReadOnly:      mount.ReadOnly,
 				// TODO: This may need to be part of Device plugin API.
+				// See https://github.com/kubernetes/kubernetes/issues/115482 for tracking.
 				SELinuxRelabel: false,
 			})
 		}
