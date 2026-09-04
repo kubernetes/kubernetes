@@ -78,7 +78,7 @@ func testStoreIndexerSingleKey(t *testing.T, store Indexer) {
 	require.NoError(t, store.Add(testStorageElement("foo", "bar", 1)))
 	items, err = store.ByIndex("by_val", "bar")
 	require.NoError(t, err)
-	assert.Equal(t, []interface{}{
+	assert.Equal(t, []*Element{
 		testStorageElement("foo", "bar", 1),
 	}, items)
 
@@ -88,7 +88,7 @@ func testStoreIndexerSingleKey(t *testing.T, store Indexer) {
 	assert.Empty(t, items)
 	items, err = store.ByIndex("by_val", "baz")
 	require.NoError(t, err)
-	assert.Equal(t, []interface{}{
+	assert.Equal(t, []*Element{
 		testStorageElement("foo", "baz", 2),
 	}, items)
 
@@ -98,7 +98,7 @@ func testStoreIndexerSingleKey(t *testing.T, store Indexer) {
 	assert.Empty(t, items)
 	items, err = store.ByIndex("by_val", "baz")
 	require.NoError(t, err)
-	assert.Equal(t, []interface{}{
+	assert.Equal(t, []*Element{
 		testStorageElement("foo", "baz", 3),
 	}, items)
 
@@ -107,7 +107,7 @@ func testStoreIndexerSingleKey(t *testing.T, store Indexer) {
 	}, ""))
 	items, err = store.ByIndex("by_val", "bar")
 	require.NoError(t, err)
-	assert.Equal(t, []interface{}{
+	assert.Equal(t, []*Element{
 		testStorageElement("foo", "bar", 4),
 	}, items)
 	items, err = store.ByIndex("by_val", "baz")

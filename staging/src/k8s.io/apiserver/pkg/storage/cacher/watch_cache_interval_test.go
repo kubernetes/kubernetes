@@ -543,18 +543,24 @@ func (s *countingSnapshot) OrderedListPrefix(_, _ string) ([]interface{}, error)
 	return s.items, nil
 }
 
-func (s *countingSnapshot) RangePrefix(_, _ string) iter.Seq2[*store.Element, error] {
-	return func(yield func(*store.Element, error) bool) {
-		for _, item := range s.items {
-			if !yield(item.(*store.Element), nil) {
+func (s *countingSnapshot) RangePrefix(_, _ string) store.Range {
+	return countingRange{s}
+}
+
+type countingRange struct{ *countingSnapshot }
+
+func (r countingRange) All() iter.Seq[*store.Element] {
+	return func(yield func(*store.Element) bool) {
+		for _, item := range r.items {
+			if !yield(item.(*store.Element)) {
 				return
 			}
 		}
 	}
 }
 
-func (s *countingSnapshot) Count(_, _ string) int {
-	return len(s.items)
+func (r countingRange) Count() int {
+	return len(r.items)
 }
 
 // TestLazySnapshotCacheIntervalSourceEmpty checks that on an empty snapshot Next() returns

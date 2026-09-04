@@ -17,7 +17,6 @@ limitations under the License.
 package store
 
 import (
-	"iter"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -143,7 +142,7 @@ func (f fakeIndexer) Clone() Snapshot              { return f }
 func (f fakeIndexer) OrderedListPrefix(prefixKey, continueKey string) ([]interface{}, error) {
 	return nil, nil
 }
-func (f fakeIndexer) ByIndex(indexName string, indexedValue string) ([]interface{}, error) {
+func (f fakeIndexer) ByIndex(indexName string, indexedValue string) ([]*Element, error) {
 	return nil, nil
 }
 
@@ -166,10 +165,7 @@ func (f fakeIndexer) ListKeys() []string {
 func (f fakeIndexer) Replace([]interface{}, string) error {
 	return nil
 }
-func (f fakeIndexer) Count(prefixKey, continueKey string) int { return 0 }
-func (f fakeIndexer) RangePrefix(prefixKey, continueKey string) iter.Seq2[*Element, error] {
-	return func(yield func(*Element, error) bool) {}
-}
+func (f fakeIndexer) RangePrefix(prefixKey, continueKey string) Range { return orderedElements(nil) }
 
 type fakeSnapshotter struct {
 	getLessOrEqual func(rv uint64) (Snapshot, bool)

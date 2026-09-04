@@ -19,7 +19,8 @@ package store
 import (
 	"fmt"
 	"iter"
-	"sort"
+	"slices"
+	"strings"
 	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -122,132 +123,87 @@ func orderedSnapshotResponseFromIndexer(indexer Indexer, key, continueKey string
 	if err != nil {
 		return nil, err
 	}
-	return orderedListSnapshot{Items: items}, nil
+	elems := make(orderedListSnapshot, 0, len(items))
+	for _, item := range items {
+		elem, ok := item.(*Element)
+		if !ok {
+			return nil, fmt.Errorf("non *Element returned from storage: %v", item)
+		}
+		elems = append(elems, elem)
+	}
+	return elems, nil
 }
 
-type orderedListSnapshot struct {
-	Items []interface{}
-}
-
-var _ Snapshot = (*orderedListSnapshot)(nil)
+// orderedListSnapshot serves a key-ordered slice copied out of the store.
+type orderedListSnapshot []*Element
 
 func (o orderedListSnapshot) GetByKey(key string) (interface{}, bool, error) {
-	for _, item := range o.Items {
-		elem, ok := item.(*Element)
-		if ok && elem.Key == key {
-			return item, true, nil
-		}
+	if i, found := slices.BinarySearchFunc(o, key, compareKey); found {
+		return o[i], true, nil
 	}
 	return nil, false, nil
 }
 
 func (o orderedListSnapshot) OrderedListPrefix(prefix, continueKey string) ([]interface{}, error) {
-	return o.Items, nil
+	return listOf(o.RangePrefix(prefix, continueKey)), nil
 }
 
-func (o orderedListSnapshot) RangePrefix(prefix, continueKey string) iter.Seq2[*Element, error] {
-	return func(yield func(*Element, error) bool) {
-		for _, item := range o.Items {
-			elem, ok := item.(*Element)
-			if !ok {
-				yield(nil, fmt.Errorf("non *Element returned from storage: %v", item))
-				return
-			}
-			if !yield(elem, nil) {
-				return
-			}
-		}
+func (o orderedListSnapshot) RangePrefix(prefix, continueKey string) Range {
+	start, _ := slices.BinarySearchFunc(o, max(prefix, continueKey), compareKey)
+	end := start
+	for end < len(o) && strings.HasPrefix(o[end].Key, prefix) {
+		end++
 	}
+	return orderedElements(o[start:end])
 }
 
-func (o orderedListSnapshot) Count(prefix, continueKey string) int {
-	return len(o.Items)
+func compareKey(elem *Element, key string) int {
+	return strings.Compare(elem.Key, key)
 }
 
 // listSnapshot serves an unordered index bucket.
-type listSnapshot struct {
-	Items []interface{}
-}
-
-var _ Snapshot = (*listSnapshot)(nil)
+type listSnapshot []*Element
 
 func (l listSnapshot) GetByKey(key string) (interface{}, bool, error) {
-	for _, item := range l.Items {
-		elem, ok := item.(*Element)
-		if ok && elem.Key == key {
-			return item, true, nil
+	for _, elem := range l {
+		if elem.Key == key {
+			return elem, true, nil
 		}
 	}
 	return nil, false, nil
 }
 
 func (l listSnapshot) OrderedListPrefix(prefix string, continueKey string) ([]interface{}, error) {
-	var result []interface{}
-	for _, item := range l.Items {
-		elem, ok := item.(*Element)
-		if !ok {
-			return nil, fmt.Errorf("non *Element returned from storage: %v", item)
-		}
-		if len(continueKey) > 0 && continueKey > elem.Key {
-			continue
-		}
-		if !key.HasPathPrefix(elem.Key, prefix) {
-			continue
-		}
-		result = append(result, item)
-	}
-	sort.Sort(sortableStoreElements(result))
-	return result, nil
+	return listOf(l.RangePrefix(prefix, continueKey)), nil
 }
 
-func (l listSnapshot) RangePrefix(prefix, continueKey string) iter.Seq2[*Element, error] {
-	return func(yield func(*Element, error) bool) {
-		items, err := l.OrderedListPrefix(prefix, continueKey)
-		if err != nil {
-			yield(nil, err)
-			return
-		}
-		for _, item := range items {
-			// OrderedListPrefix has already checked every item is an *Element.
-			if !yield(item.(*Element), nil) {
-				return
-			}
+func (l listSnapshot) RangePrefix(prefix, continueKey string) Range {
+	var elems orderedElements
+	for _, elem := range l {
+		if continueKey <= elem.Key && key.HasPathPrefix(elem.Key, prefix) {
+			elems = append(elems, elem)
 		}
 	}
+	slices.SortFunc(elems, func(a, b *Element) int { return strings.Compare(a.Key, b.Key) })
+	return elems
 }
 
-// Count returns the number of items RangePrefix(prefix, continueKey) would
-// yield, by applying its filter without allocating or sorting.
-func (l listSnapshot) Count(prefix, continueKey string) int {
-	count := 0
-	for _, item := range l.Items {
-		elem, ok := item.(*Element)
-		if !ok {
-			continue
-		}
-		if len(continueKey) > 0 && continueKey > elem.Key {
-			continue
-		}
-		if !key.HasPathPrefix(elem.Key, prefix) {
-			continue
-		}
-		count++
+type orderedElements []*Element
+
+func (o orderedElements) All() iter.Seq[*Element] {
+	return slices.Values(o)
+}
+
+func (o orderedElements) Count() int {
+	return len(o)
+}
+
+func listOf(r Range) []interface{} {
+	items := make([]interface{}, 0, r.Count())
+	for elem := range r.All() {
+		items = append(items, elem)
 	}
-	return count
-}
-
-type sortableStoreElements []interface{}
-
-func (s sortableStoreElements) Len() int {
-	return len(s)
-}
-
-func (s sortableStoreElements) Less(i, j int) bool {
-	return s[i].(*Element).Key < s[j].(*Element).Key
-}
-
-func (s sortableStoreElements) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
+	return items
 }
 
 // Get takes runtime.Object as a parameter. However, it returns
@@ -340,7 +296,7 @@ func (w *WatchCacheStorage) GetByIndexSnapshot(indexName, value string) (Snapsho
 	if err != nil {
 		return nil, err
 	}
-	return listSnapshot{Items: result}, nil
+	return listSnapshot(result), nil
 }
 
 // ListResourceVersion returns the list resource version.
