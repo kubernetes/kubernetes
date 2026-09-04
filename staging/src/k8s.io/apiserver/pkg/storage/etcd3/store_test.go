@@ -54,6 +54,7 @@ import (
 	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
 	storagemetrics "k8s.io/apiserver/pkg/storage/metrics"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
+	"k8s.io/apiserver/pkg/storage/testing/coverage"
 	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -341,13 +342,22 @@ func TestTransformationFailure(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
+	var tracker *coverage.CoverageTracker
+	if coverage.IsEnabled() {
+		tracker = coverage.NewTracker()
+		t.Cleanup(func() {
+			t.Log(tracker.FormatScorecard(coverage.SectionList))
+		})
+	}
+
 	for _, rangeStream := range []bool{false, true} {
 		t.Run(fmt.Sprintf("rangeStream=%v", rangeStream), func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EtcdRangeStream, rangeStream)
 			resetFeatureSupportCheckerDuringTest(t)
 			ctx, store, client := testSetup(t)
+			wrappedStore := coverage.Wrap(store, tracker)
 			kvRecorder := client.KV.(*storagetesting.KVRecorder)
-			storagetesting.RunTestList(ctx, t, store, compactStorage(store, client.Client), false, client.Kubernetes.(*storagetesting.KubernetesRecorder))
+			storagetesting.RunTestList(ctx, t, wrappedStore, compactStorage(store, client.Client), false, client.Kubernetes.(*storagetesting.KubernetesRecorder))
 			streamReads := kvRecorder.GetStreamReadsAndReset()
 			if rangeStream && streamReads == 0 {
 				t.Error("expected lists to be served by RangeStream")

@@ -650,7 +650,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 
 	getAttrs := func(obj runtime.Object) (labels.Set, fields.Set, error) {
 		pod := obj.(*example.Pod)
-		return nil, fields.Set{"metadata.name": pod.Name, "spec.nodeName": pod.Spec.NodeName}, nil
+		return labels.Set(pod.Labels), fields.Set{"metadata.name": pod.Name, "spec.nodeName": pod.Spec.NodeName}, nil
 	}
 	// Compact and increase RV to test consistent List.
 	compact(ctx, t, createdPods[0].ResourceVersion)
@@ -1422,6 +1422,44 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
 			expectedOut: []example.Pod{},
+		},
+		{
+			name:   "filter with label selector matching multiple items",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Field: fields.Everything(),
+				Label: labels.SelectorFromSet(map[string]string{"app": "foo"}),
+			},
+			expectedOut: []example.Pod{*createdPods[2], *createdPods[4]},
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				return nil
+			},
+		},
+		{
+			name:   "filter with label selector and pagination",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Field: fields.Everything(),
+				Label: labels.SelectorFromSet(map[string]string{"app": "foo"}),
+				Limit: 1,
+			},
+			expectedOut:    []example.Pod{*createdPods[2]},
+			expectContinue: true,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				return nil
+			},
+		},
+		{
+			name:   "filter with label selector matching zero items",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Field: fields.Everything(),
+				Label: labels.SelectorFromSet(map[string]string{"app": "nonexistent"}),
+			},
+			expectedOut: []example.Pod{},
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:        "test consistent List",
@@ -2485,12 +2523,12 @@ func seedMultiLevelData(ctx context.Context, store storage.Interface) (initialRV
 	//   - third/
 	//  |         - barfoo
 	//  |         - foo
-	barFirst := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "first", Name: "bar"}}
-	barSecond := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "second", Name: "bar"}}
-	fooSecond := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "second", Name: "foo"}}
-	bazSecond := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "second", Name: "baz"}}
-	barfooThird := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "third", Name: "barfoo"}}
-	fooThird := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "third", Name: "foo"}}
+	barFirst := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "first", Name: "bar", Labels: map[string]string{"app": "bar", "env": "prod"}}}
+	barSecond := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "second", Name: "bar", Labels: map[string]string{"app": "bar", "env": "prod"}}}
+	fooSecond := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "second", Name: "foo", Labels: map[string]string{"app": "foo", "env": "prod"}}}
+	bazSecond := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "second", Name: "baz", Labels: map[string]string{"app": "baz"}}}
+	barfooThird := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "third", Name: "barfoo", Labels: map[string]string{"app": "barfoo", "env": "dev"}}}
+	fooThird := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "third", Name: "foo", Labels: map[string]string{"app": "foo", "env": "dev"}}}
 
 	preset := []struct {
 		key       string
