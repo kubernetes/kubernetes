@@ -452,9 +452,9 @@ func (sched *Scheduler) bindingCycle(
 	// We define the Pod as "unschedulable" only when Pods are rejected at specific extension points, and Permit is the last one in the scheduling/binding cycle.
 	// If a Pod fails on PreBind or Bind, it should be moved to BackoffQ for retry.
 	//
-	// We can call Done() here because
-	// we can free the cluster events stored in the scheduling queue sooner, which is worth for busy clusters memory consumption wise.
-	sched.SchedulingQueue.Done(assumedPod.UID)
+	// We call DoneSchedulingCycle() here to free the cluster events stored in the scheduling queue sooner,
+	// while keeping the pod tracked in in-flight pods until binding finishes.
+	sched.SchedulingQueue.DoneSchedulingCycle(assumedPod.UID)
 
 	// If we are going to run prebind plugins we put the pod in binding map to optimize preemption.
 	if preFlightStatus.IsSuccess() {
@@ -495,6 +495,9 @@ func (sched *Scheduler) bindingCycle(
 	}
 	// Run "postbind" plugins.
 	schedFramework.RunPostBindPlugins(ctx, state, assumedPod, scheduleResult.SuggestedHost)
+
+	// Mark pod as done in scheduling queue after successful binding.
+	sched.SchedulingQueue.Done(assumedPod.UID)
 
 	// At the end of a successful binding cycle, move up Pods if needed.
 	if len(podsToActivate.Map) != 0 {
@@ -1230,6 +1233,12 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 				logger.V(2).Info("Pod was recreated while handling scheduling failure. Skip requeueing and status updates.", "pod", klog.KObj(pod), "oldUID", podInfo.Pod.UID, "newUID", cachedPod.UID)
 				return
 			}
+			// TODO: As the scheduling queue now tracks in-flight pods and automatically refreshes
+			// podInfo from the latest in-flight version during AddUnschedulablePodIfNotPresent,
+			// refreshing from the informer cache here might no longer be necessary.
+			// However, fully removing the informer lookup here requires auditing other consumers
+			// (e.g. nominator, patch) and refactoring associated unit tests.
+			//
 			// As <cachedPod> is from SharedInformer, we need to do a DeepCopy() here.
 			// ignore this err since apiserver doesn't properly validate affinity terms
 			// and we can't fix the validation for backwards compatibility.
