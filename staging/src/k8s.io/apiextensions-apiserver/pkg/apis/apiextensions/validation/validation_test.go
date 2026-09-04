@@ -11105,6 +11105,30 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			},
 		},
 		{
+			// reproducer from https://github.com/kubernetes/kubernetes/issues/134029
+			name: "x-kubernetes-validations rule on a string field bounded only via allOf maxLength should be within estimated cost limit",
+			opts: validationOptions{requireStructuralSchema: true},
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"text": {
+							Type: "string",
+							AllOf: []apiextensions.JSONSchemaProps{
+								{MaxLength: ptr.To[int64](10)},
+								{MaxLength: ptr.To[int64](20)},
+							},
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule: "true && self.contains(self)",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "x-kubernetes-validations rule invalidated by messageExpression exceeding per-CRD estimated cost limit",
 			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
