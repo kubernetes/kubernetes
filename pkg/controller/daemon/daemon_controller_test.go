@@ -281,10 +281,10 @@ func (f *fakePodControl) CreatePods(ctx context.Context, namespace string, templ
 	return nil
 }
 
-func (f *fakePodControl) DeletePod(ctx context.Context, namespace string, podID string, object runtime.Object) error {
+func (f *fakePodControl) DeletePod(ctx context.Context, namespace string, podID string, object runtime.Object, opts metav1.DeleteOptions) error {
 	f.Lock()
 	defer f.Unlock()
-	if err := f.FakePodControl.DeletePod(ctx, namespace, podID, object); err != nil {
+	if err := f.FakePodControl.DeletePod(ctx, namespace, podID, object, opts); err != nil {
 		return fmt.Errorf("failed to delete pod %q", podID)
 	}
 	pod, ok := f.podIDMap[podID]

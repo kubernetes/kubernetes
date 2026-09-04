@@ -345,10 +345,10 @@ func (pc podControlAdapter) CreatePods(ctx context.Context, namespace string, te
 	return pc.PodControlInterface.CreatePods(ctx, namespace, template, rc, controllerRef)
 }
 
-func (pc podControlAdapter) DeletePod(ctx context.Context, namespace string, podID string, object runtime.Object) error {
+func (pc podControlAdapter) DeletePod(ctx context.Context, namespace string, podID string, object runtime.Object, opts metav1.DeleteOptions) error {
 	rc, err := convertRStoRC(object.(*apps.ReplicaSet))
 	if err != nil {
 		return err
 	}
-	return pc.PodControlInterface.DeletePod(ctx, namespace, podID, rc)
+	return pc.PodControlInterface.DeletePod(ctx, namespace, podID, rc, opts)
 }
