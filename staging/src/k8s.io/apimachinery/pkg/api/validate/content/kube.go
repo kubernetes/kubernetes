@@ -115,3 +115,21 @@ func IsPrefixedLabelKey(value string) []string {
 	}
 	return nil
 }
+
+// IsReason tests whether ths value passed is a valid reason
+// starts with an alphabetic character
+// optionally followed by alphanumeric characters or _, ,, :
+// must end with an alphanumeric character or _
+// valid examples: my_name, MY_NAME, MyName, ReasonA,ReasonB, ReasonA:ReasonB
+
+var conditionReasonRegexp = regexp.MustCompile("^" + conditionReasonFmt + "$")
+
+const conditionReasonFmt string = "[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?"
+const conditionReasonErrMsg string = "a condition reason must start with alphabetic character, optionally followed by a string of alphanumeric characters or '_,:', and must end with an alphanumeric character or '_'"
+
+func IsReason(value string) []string {
+	if !conditionReasonRegexp.MatchString(value) {
+		return []string{RegexError(conditionReasonErrMsg, conditionReasonFmt, "my_name", "MY_NAME", "MyName", "ReasonA,ReasonB", "ReasonA:ReasonB")}
+	}
+	return nil
+}

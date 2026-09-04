@@ -327,3 +327,19 @@ func validateCIdentifier(id string, length int, fldPath *field.Path) field.Error
 	}
 	return allErrs
 }
+
+// ReasonMessage  tests whether ths value passed is a valid reason
+// starts with an alphabetic character
+// - optionally followed by alphanumeric characters or _, ,, :
+// - must end with an alphanumeric character or _
+// valid examples: my_name, MY_NAME, MyName, ReasonA,ReasonB, ReasonA:ReasonB
+func ReasonMessage[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	var allErrs field.ErrorList
+	for _, msg := range content.IsReason((string)(*value)) {
+		allErrs = append(allErrs, field.Invalid(fldPath, *value, msg).WithOrigin("format=k8s-reason"))
+	}
+	return allErrs
+}
