@@ -658,6 +658,21 @@ func (cache *cacheImpl) UpdatePod(logger klog.Logger, oldPod, newPod *v1.Pod) er
 		return fmt.Errorf("assumed pod %v(%v) should not be updated", key, klog.KObj(oldPod))
 	}
 
+	// If a bound pod is recreated with the same name, the informer may collapse
+	// the delete and add events into an update event. Treat a UID mismatch as an
+	// atomic removal and addition to purge stale cache state.
+	if oldPod.UID != newPod.UID {
+		if err := cache.removePod(logger, currState.pod, false); err != nil {
+			return err
+		}
+		// Unscheduled pods belong in the scheduling queue, not in the scheduler cache.
+		// Only add the recreated pod if it has already been assigned to a node.
+		if newPod.Spec.NodeName != "" {
+			return cache.addPod(logger, newPod, false)
+		}
+		return nil
+	}
+
 	if currState.pod.Spec.NodeName != newPod.Spec.NodeName {
 		utilruntime.HandleErrorWithLogger(logger, nil, "Pod updated on a different node than previously added to. Scheduler cache is corrupted and can badly affect scheduling decisions", "podKey", key, "pod", klog.KObj(oldPod))
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
