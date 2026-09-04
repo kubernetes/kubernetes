@@ -445,3 +445,14 @@ func PrepareKey(resourcePrefix, key string, recursive bool) (string, error) {
 	}
 	return key, nil
 }
+
+// ReverseKeyFunc recovers object identity from a resource-relative key
+// produced by the corresponding registry KeyFunc. Backend-specific prefixes
+// are removed before the key is passed to this function.
+//
+// For namespaced resources, namespace and name are both non-empty. For
+// cluster-scoped resources, namespace is empty and name is non-empty. An error
+// is returned if the key cannot be parsed into a valid object identity.
+// A nil ReverseKeyFunc indicates that identity cannot be derived from the
+// key and callers must fall back to decoding the stored object.
+type ReverseKeyFunc func(key string) (name string, namespace string, err error)
