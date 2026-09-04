@@ -43,6 +43,7 @@ type PodCertificateRequestInterface interface {
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 	UpdateStatus(ctx context.Context, podCertificateRequest *certificatesv1.PodCertificateRequest, opts metav1.UpdateOptions) (*certificatesv1.PodCertificateRequest, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions) (metav1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*certificatesv1.PodCertificateRequest, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*certificatesv1.PodCertificateRequestList, error)

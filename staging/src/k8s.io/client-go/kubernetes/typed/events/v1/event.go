@@ -41,6 +41,7 @@ type EventInterface interface {
 	Create(ctx context.Context, event *eventsv1.Event, opts metav1.CreateOptions) (*eventsv1.Event, error)
 	Update(ctx context.Context, event *eventsv1.Event, opts metav1.UpdateOptions) (*eventsv1.Event, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions) (metav1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*eventsv1.Event, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*eventsv1.EventList, error)

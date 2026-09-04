@@ -41,6 +41,7 @@ type PodTemplateInterface interface {
 	Create(ctx context.Context, podTemplate *corev1.PodTemplate, opts metav1.CreateOptions) (*corev1.PodTemplate, error)
 	Update(ctx context.Context, podTemplate *corev1.PodTemplate, opts metav1.UpdateOptions) (*corev1.PodTemplate, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions) (metav1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*corev1.PodTemplate, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*corev1.PodTemplateList, error)

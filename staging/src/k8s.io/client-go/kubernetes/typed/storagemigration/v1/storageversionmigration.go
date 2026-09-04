@@ -43,6 +43,7 @@ type StorageVersionMigrationInterface interface {
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 	UpdateStatus(ctx context.Context, storageVersionMigration *storagemigrationv1.StorageVersionMigration, opts metav1.UpdateOptions) (*storagemigrationv1.StorageVersionMigration, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions) (metav1.APIResult, error)
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*storagemigrationv1.StorageVersionMigration, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*storagemigrationv1.StorageVersionMigrationList, error)

@@ -229,6 +229,28 @@ func (c *FakeClient[T]) Delete(ctx context.Context, name string, opts metav1.Del
 	return err
 }
 
+// DeleteWithResult takes name of the resource and deletes it. Returns an error if one occurs, or a metav1.APIResult on success.
+func (c *FakeClient[T]) DeleteWithResult(ctx context.Context, name string, opts metav1.DeleteOptions) (metav1.APIResult, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewDeleteActionWithOptions(c.resource, c.ns, name, opts), &metav1.Status{})
+
+	fakeResult := testing.FakeAPIResult{
+		Obj: obj,
+		Err: err,
+	}
+	if err != nil {
+		if statusErr, ok := err.(interface{ Status() metav1.Status }); ok {
+			fakeResult.Code = int(statusErr.Status().Code)
+		}
+	} else if obj != nil {
+		fakeResult.Code = 200
+		if status, ok := obj.(*metav1.Status); ok {
+			fakeResult.Code = int(status.Code)
+		}
+	}
+	return fakeResult, err
+}
+
 // DeleteCollection deletes a collection of objects.
 func (l *alsoFakeLister[T, L]) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	_, err := l.client.Fake.
