@@ -71,6 +71,16 @@ func rs(name string, replicas int32, selector map[string]string, timestamp metav
 	}
 }
 
+func rsWithDesiredReplica(name string, replicas int32, selector map[string]string, timestamp metav1.Time, annReplicas, maxSurge int32) *apps.ReplicaSet {
+	r := rs(name, replicas, selector, timestamp)
+	if r.Annotations == nil {
+		r.Annotations = map[string]string{}
+	}
+	r.Annotations[util.DesiredReplicasAnnotation] = fmt.Sprintf("%d", annReplicas)
+	r.Annotations[util.MaxReplicasAnnotation] = fmt.Sprintf("%d", annReplicas+maxSurge)
+	return r
+}
+
 func newRSWithStatus(name string, specReplicas, statusReplicas int32, selector map[string]string) *apps.ReplicaSet {
 	rs := rs(name, specReplicas, selector, noTimestamp)
 	rs.Status = apps.ReplicaSetStatus{
