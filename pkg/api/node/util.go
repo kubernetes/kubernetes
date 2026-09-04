@@ -34,7 +34,7 @@ var deprecatedNodeLabels = map[string]string{
 	`beta.kubernetes.io/instance-type`:              `deprecated since v1.17; use "node.kubernetes.io/instance-type" instead`,
 	`app.kubernetes.io/created-by`:                  `deprecated since v1.9`,
 	`scheduler.alpha.kubernetes.io/preferAvoidPods`: `deprecated since v1.22; use Taints and Tolerations instead`,
-	`node-role.kubernetes.io/master`:                `use "node-role.kubernetes.io/control-plane" instead`,
+	`node-role.kubernetes.io/master`:                `deprecated; use "node-role.kubernetes.io/control-plane" instead`,
 }
 
 // GetNodeLabelDeprecatedMessage returns the message for the deprecated node label
