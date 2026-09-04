@@ -152,6 +152,24 @@ func TestGeneratePlacements(t *testing.T) {
 			},
 			wantStatus: fwk.Error,
 		},
+		"with pods already scheduled in conflicting domains where one is the empty string, returns error": {
+			podGroupInfo: makePodGroup("topology"),
+			scheduledPodGroupPods: []scheduledPod{
+				{assignedNode: "node2"},
+				{assignedNode: "node3"},
+			},
+			placementNodes: []*v1.Node{
+				st.MakeNode().Name("node0").Label("topology", "d2").Obj(),
+				st.MakeNode().Name("node1").Label("topology", "d1").Obj(),
+			},
+			otherNodes: []*v1.Node{
+				// The empty string is a valid topology label value; a pod in this
+				// domain must not be treated as "no domain seen yet".
+				st.MakeNode().Name("node2").Label("topology", "").Obj(),
+				st.MakeNode().Name("node3").Label("topology", "d1").Obj(),
+			},
+			wantStatus: fwk.Error,
+		},
 		"with already scheduled pod on node outside of snapshot, returns error": {
 			podGroupInfo: makePodGroup("topology"),
 			scheduledPodGroupPods: []scheduledPod{
@@ -471,6 +489,59 @@ func TestGeneratePlacements(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestGetScheduledPodsTopologyDomainEmptyValue(t *testing.T) {
+	_, tCtx := ktesting.NewTestContext(t)
+
+	nodes := []*v1.Node{
+		st.MakeNode().Name("empty-domain-node").Label("topology", "").Obj(),
+		st.MakeNode().Name("non-empty-domain-node").Label("topology", "d1").Obj(),
+	}
+	snapshot := cache.NewSnapshot(nil, nodes)
+	fh, _ := runtime.NewFramework(tCtx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
+	pl, err := New(tCtx, nil, fh, feature.Features{})
+	if err != nil {
+		t.Fatalf("failed when creating plugin: %v", err)
+	}
+
+	tests := map[string]struct {
+		pods       []*v1.Pod
+		wantDomain string
+		wantErr    bool
+	}{
+		"single empty domain is valid": {
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").UID("pod1").Node("empty-domain-node").Obj(),
+			},
+			wantDomain: "",
+		},
+		"empty domain followed by non-empty domain conflicts": {
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").UID("pod1").Node("empty-domain-node").Obj(),
+				st.MakePod().Name("pod2").UID("pod2").Node("non-empty-domain-node").Obj(),
+			},
+			wantErr: true,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			gotDomain, err := pl.getScheduledPodsTopologyDomain("topology", tt.pods)
+			if err != nil {
+				if !tt.wantErr {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+			if tt.wantErr {
+				t.Fatal("expected error, got nil")
+			}
+			if gotDomain != tt.wantDomain {
+				t.Errorf("domain = %q, want %q", gotDomain, tt.wantDomain)
+			}
+		})
 	}
 }
 
