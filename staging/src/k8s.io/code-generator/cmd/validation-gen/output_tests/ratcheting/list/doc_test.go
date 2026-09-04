@@ -18,8 +18,6 @@ package list
 
 import (
 	"testing"
-
-	"k8s.io/utils/ptr"
 )
 
 func Test_StructSlice(t *testing.T) {
@@ -29,13 +27,13 @@ func Test_StructSlice(t *testing.T) {
 		AtomicSliceStringField:        []StringType{""},
 		AtomicSliceTypeField:          IntSliceType{1},
 		AtomicSliceComparableField:    []ComparableStruct{{IntField: 1}},
-		AtomicSliceNonComparableField: []NonComparableStruct{{IntPtrField: ptr.To(1)}},
+		AtomicSliceNonComparableField: []NonComparableStruct{{IntPtrField: new(1)}},
 		SetSliceComparableField:       []ComparableStruct{{IntField: 1}},
-		SetSliceNonComparableField:    []NonComparableStruct{{IntPtrField: ptr.To(1)}},
+		SetSliceNonComparableField:    []NonComparableStruct{{IntPtrField: new(1)}},
 		MapSliceComparableField:       []ComparableStructWithKey{{Key: "x", IntField: 1}},
-		MapSliceNonComparableField:    []NonComparableStructWithKey{{Key: "x", IntPtrField: ptr.To(1)}},
-		MapSlicePtrKeyField:           []PtrKeyStruct{{Key: ptr.To("x"), Data: "y"}},
-		MapSliceMixedKeyField:         []MixedKeyStruct{{Key1: ptr.To("x"), Key2: "y", Data: "z"}},
+		MapSliceNonComparableField:    []NonComparableStructWithKey{{Key: "x", IntPtrField: new(1)}},
+		MapSlicePtrKeyField:           []PtrKeyStruct{{Key: new("x"), Data: "y"}},
+		MapSliceMixedKeyField:         []MixedKeyStruct{{Key1: new("x"), Key2: "y", Data: "z"}},
 	}
 	st.Value(invalidStructSlice).ExpectValidateFalseByPath(map[string][]string{
 		"atomicSliceStringField[0]":        {"field AtomicSliceStringField[*]"},
@@ -58,24 +56,24 @@ func Test_StructSlice(t *testing.T) {
 		AtomicSliceStringField:        []StringType{""},
 		AtomicSliceTypeField:          IntSliceType{1},
 		AtomicSliceComparableField:    []ComparableStruct{{IntField: 1}},
-		AtomicSliceNonComparableField: []NonComparableStruct{{IntPtrField: ptr.To(1)}},
+		AtomicSliceNonComparableField: []NonComparableStruct{{IntPtrField: new(1)}},
 		SetSliceComparableField:       []ComparableStruct{{IntField: 1}},
-		SetSliceNonComparableField:    []NonComparableStruct{{IntPtrField: ptr.To(1)}},
+		SetSliceNonComparableField:    []NonComparableStruct{{IntPtrField: new(1)}},
 		MapSliceComparableField:       []ComparableStructWithKey{{Key: "x", IntField: 1}},
-		MapSliceNonComparableField:    []NonComparableStructWithKey{{Key: "x", IntPtrField: ptr.To(1)}},
-		MapSlicePtrKeyField:           []PtrKeyStruct{{Key: ptr.To("x"), Data: "y"}},
-		MapSliceMixedKeyField:         []MixedKeyStruct{{Key1: ptr.To("x"), Key2: "y", Data: "z"}},
+		MapSliceNonComparableField:    []NonComparableStructWithKey{{Key: "x", IntPtrField: new(1)}},
+		MapSlicePtrKeyField:           []PtrKeyStruct{{Key: new("x"), Data: "y"}},
+		MapSliceMixedKeyField:         []MixedKeyStruct{{Key1: new("x"), Key2: "y", Data: "z"}},
 	}).OldValue(&StructSlice{
 		AtomicSliceStringField:        []StringType{"", "x"},
 		AtomicSliceTypeField:          IntSliceType{1, 2},
 		AtomicSliceComparableField:    []ComparableStruct{{IntField: 2}, {IntField: 1}},
-		AtomicSliceNonComparableField: []NonComparableStruct{{IntPtrField: ptr.To(2)}, {IntPtrField: ptr.To(1)}},
+		AtomicSliceNonComparableField: []NonComparableStruct{{IntPtrField: new(2)}, {IntPtrField: new(1)}},
 		SetSliceComparableField:       []ComparableStruct{{IntField: 2}, {IntField: 1}},
-		SetSliceNonComparableField:    []NonComparableStruct{{IntPtrField: ptr.To(2)}, {IntPtrField: ptr.To(1)}},
+		SetSliceNonComparableField:    []NonComparableStruct{{IntPtrField: new(2)}, {IntPtrField: new(1)}},
 		MapSliceComparableField:       []ComparableStructWithKey{{Key: "y", IntField: 2}, {Key: "x", IntField: 1}},
-		MapSliceNonComparableField:    []NonComparableStructWithKey{{Key: "y", IntPtrField: ptr.To(2)}, {Key: "x", IntPtrField: ptr.To(1)}},
-		MapSlicePtrKeyField:           []PtrKeyStruct{{Key: ptr.To("a"), Data: "b"}, {Key: ptr.To("x"), Data: "y"}},
-		MapSliceMixedKeyField:         []MixedKeyStruct{{Key1: ptr.To("a"), Key2: "b", Data: "c"}, {Key1: ptr.To("x"), Key2: "y", Data: "z"}},
+		MapSliceNonComparableField:    []NonComparableStructWithKey{{Key: "y", IntPtrField: new(2)}, {Key: "x", IntPtrField: new(1)}},
+		MapSlicePtrKeyField:           []PtrKeyStruct{{Key: new("a"), Data: "b"}, {Key: new("x"), Data: "y"}},
+		MapSliceMixedKeyField:         []MixedKeyStruct{{Key1: new("a"), Key2: "b", Data: "c"}, {Key1: new("x"), Key2: "y", Data: "z"}},
 	}).ExpectValidateFalseByPath(map[string][]string{"atomicSliceStringField[0]": {"field AtomicSliceStringField[*]"},
 		"atomicSliceTypeField[0]":          {"field AtomicSliceTypeField[*]"},
 		"atomicSliceComparableField[0]":    {"field AtomicSliceComparableField[*]"},
@@ -85,18 +83,18 @@ func Test_StructSlice(t *testing.T) {
 	// Same data, different order.
 	st.Value(&StructSlice{
 		SetSliceComparableField:    []ComparableStruct{{IntField: 2}, {IntField: 1}},
-		SetSliceNonComparableField: []NonComparableStruct{{IntPtrField: ptr.To(2)}, {IntPtrField: ptr.To(1)}},
+		SetSliceNonComparableField: []NonComparableStruct{{IntPtrField: new(2)}, {IntPtrField: new(1)}},
 		MapSliceComparableField:    []ComparableStructWithKey{{Key: "y", IntField: 2}, {Key: "x", IntField: 1}},
-		MapSliceNonComparableField: []NonComparableStructWithKey{{Key: "y", IntPtrField: ptr.To(2)}, {Key: "x", IntPtrField: ptr.To(1)}},
-		MapSlicePtrKeyField:        []PtrKeyStruct{{Key: ptr.To("b"), Data: "2"}, {Key: ptr.To("a"), Data: "1"}},
-		MapSliceMixedKeyField:      []MixedKeyStruct{{Key1: ptr.To("b"), Key2: "2", Data: "B"}, {Key1: ptr.To("a"), Key2: "1", Data: "A"}},
+		MapSliceNonComparableField: []NonComparableStructWithKey{{Key: "y", IntPtrField: new(2)}, {Key: "x", IntPtrField: new(1)}},
+		MapSlicePtrKeyField:        []PtrKeyStruct{{Key: new("b"), Data: "2"}, {Key: new("a"), Data: "1"}},
+		MapSliceMixedKeyField:      []MixedKeyStruct{{Key1: new("b"), Key2: "2", Data: "B"}, {Key1: new("a"), Key2: "1", Data: "A"}},
 	}).OldValue(&StructSlice{
 		SetSliceComparableField:    []ComparableStruct{{IntField: 1}, {IntField: 2}},
-		SetSliceNonComparableField: []NonComparableStruct{{IntPtrField: ptr.To(1)}, {IntPtrField: ptr.To(2)}},
+		SetSliceNonComparableField: []NonComparableStruct{{IntPtrField: new(1)}, {IntPtrField: new(2)}},
 		MapSliceComparableField:    []ComparableStructWithKey{{Key: "x", IntField: 1}, {Key: "y", IntField: 2}},
-		MapSliceNonComparableField: []NonComparableStructWithKey{{Key: "x", IntPtrField: ptr.To(1)}, {Key: "y", IntPtrField: ptr.To(2)}},
-		MapSlicePtrKeyField:        []PtrKeyStruct{{Key: ptr.To("a"), Data: "1"}, {Key: ptr.To("b"), Data: "2"}},
-		MapSliceMixedKeyField:      []MixedKeyStruct{{Key1: ptr.To("a"), Key2: "1", Data: "A"}, {Key1: ptr.To("b"), Key2: "2", Data: "B"}},
+		MapSliceNonComparableField: []NonComparableStructWithKey{{Key: "x", IntPtrField: new(1)}, {Key: "y", IntPtrField: new(2)}},
+		MapSlicePtrKeyField:        []PtrKeyStruct{{Key: new("a"), Data: "1"}, {Key: new("b"), Data: "2"}},
+		MapSliceMixedKeyField:      []MixedKeyStruct{{Key1: new("a"), Key2: "1", Data: "A"}, {Key1: new("b"), Key2: "2", Data: "B"}},
 	}).ExpectValid()
 }
 
