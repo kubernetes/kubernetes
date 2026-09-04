@@ -90,7 +90,10 @@ func NewSVMController(
 		dependencyGraphBuilder: dependencyGraphBuilder,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			rateLimiter,
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: controllerName},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: new(klog.FromContext(ctx)),
+				Name:   controllerName,
+			},
 		),
 		rateLimiter: rateLimiter,
 	}
@@ -136,7 +139,7 @@ func (svmc *SVMController) enqueue(svm *svmv1.StorageVersionMigration) {
 }
 
 func (svmc *SVMController) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting", "controller", svmc.controllerName)

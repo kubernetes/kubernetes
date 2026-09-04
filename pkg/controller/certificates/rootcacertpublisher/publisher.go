@@ -52,29 +52,30 @@ func init() {
 // NewPublisher construct a new controller which would manage the configmap
 // which stores certificates in each namespace. It will make sure certificate
 // configmap exists in each namespace.
-func NewPublisher(cmInformer coreinformers.ConfigMapInformer, nsInformer coreinformers.NamespaceInformer, cl clientset.Interface, rootCA []byte) (*Publisher, error) {
+func NewPublisher(logger klog.Logger, cmInformer coreinformers.ConfigMapInformer, nsInformer coreinformers.NamespaceInformer, cl clientset.Interface, rootCA []byte) (*Publisher, error) {
 	e := &Publisher{
 		client: cl,
 		rootCA: rootCA,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: "root_ca_cert_publisher",
+				Logger: &logger,
+				Name:   "root_ca_cert_publisher",
 			},
 		),
 	}
 
-	cmInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = cmInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: e.configMapDeleted,
 		UpdateFunc: e.configMapUpdated,
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	e.cmLister = cmInformer.Lister()
 	e.cmListerSynced = cmInformer.Informer().HasSynced
 
-	nsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = nsInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    e.namespaceAdded,
 		UpdateFunc: e.namespaceUpdated,
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	e.nsListerSynced = nsInformer.Informer().HasSynced
 
 	e.syncHandler = e.syncNamespace
@@ -101,7 +102,7 @@ type Publisher struct {
 
 // Run starts process
 func (c *Publisher) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting root CA cert publisher controller")

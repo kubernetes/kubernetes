@@ -127,7 +127,10 @@ func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.Pe
 		client: cl,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "pvcprotection"},
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Logger: &logger,
+				Name:   "pvcprotection",
+			},
 		),
 		pvcProcessingStore: NewPVCProcessingStore(),
 	}
@@ -172,7 +175,7 @@ func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.Pe
 
 // Run runs the controller goroutines.
 func (c *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting PVC protection controller")

@@ -67,18 +67,57 @@ type LeaseCandidate struct {
 	strategy                        v1.CoordinatedLeaseStrategy
 }
 
+// CandidateConfig specifies optional configuration for NewCandidateWithConfig.
+type CandidateConfig struct {
+	// Logger is used for contextual logging. If unset, klog.Background() is used.
+	Logger *klog.Logger
+}
+
 // NewCandidate creates new LeaseCandidate controller that creates a
 // LeaseCandidate object if it does not exist and watches changes
 // to the corresponding object and renews if PingTime is set.
 // WARNING: This is an ALPHA feature. Ensure that the CoordinatedLeaderElection
 // feature gate is on.
-func NewCandidate(clientset kubernetes.Interface,
+//
+// Contextual logging: NewCandidateWithConfig and logger should be used instead of NewCandidate in code which supports contextual logging.
+func NewCandidate(
+	clientset kubernetes.Interface,
 	candidateNamespace string,
 	candidateName string,
 	targetLease string,
 	binaryVersion, emulationVersion string,
 	strategy v1.CoordinatedLeaseStrategy,
 ) (*LeaseCandidate, CacheSyncWaiter, error) {
+	//nolint:logcheck // Cannot provide Logger here, use NewCandidateWithConfig.
+	return NewCandidateWithConfig(
+		clientset,
+		candidateNamespace,
+		candidateName,
+		targetLease,
+		binaryVersion, emulationVersion,
+		strategy,
+		CandidateConfig{},
+	)
+}
+
+// NewCandidateWithConfig creates new LeaseCandidate controller that creates a
+// LeaseCandidate object if it does not exist and watches changes
+// to the corresponding object and renews if PingTime is set.
+// WARNING: This is an ALPHA feature. Ensure that the CoordinatedLeaderElection
+// feature gate is on.
+func NewCandidateWithConfig(
+	clientset kubernetes.Interface,
+	candidateNamespace string,
+	candidateName string,
+	targetLease string,
+	binaryVersion, emulationVersion string,
+	strategy v1.CoordinatedLeaseStrategy,
+	config CandidateConfig,
+) (*LeaseCandidate, CacheSyncWaiter, error) {
+	logger := klog.Background()
+	if config.Logger != nil {
+		logger = *config.Logger
+	}
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", candidateName).String()
 	// A separate informer factory is required because this must start before informerFactories
 	// are started for leader elected components
@@ -105,9 +144,12 @@ func NewCandidate(clientset kubernetes.Interface,
 		emulationVersion:       emulationVersion,
 		strategy:               strategy,
 	}
-	lc.queue = workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.DefaultTypedControllerRateLimiter[int](), workqueue.TypedRateLimitingQueueConfig[int]{Name: "leasecandidate"})
+	lc.queue = workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.DefaultTypedControllerRateLimiter[int](), workqueue.TypedRateLimitingQueueConfig[int]{
+		Logger: &logger,
+		Name:   "leasecandidate",
+	})
 
-	h, err := leaseCandidateInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	h, err := leaseCandidateInformer.AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			if leasecandidate, ok := newObj.(*v1beta1.LeaseCandidate); ok {
 				if leasecandidate.Spec.PingTime != nil && leasecandidate.Spec.PingTime.After(leasecandidate.Spec.RenewTime.Time) {
@@ -115,7 +157,7 @@ func NewCandidate(clientset kubernetes.Interface,
 				}
 			}
 		},
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	if err != nil {
 		return nil, nil, err
 	}

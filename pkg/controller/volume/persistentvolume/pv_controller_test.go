@@ -361,8 +361,8 @@ func TestControllerSync(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.TODO())
 		defer cancel()
 
-		informers.Start(ctx.Done())
-		informers.WaitForCacheSync(ctx.Done())
+		informers.StartWithContext(ctx)
+		informers.WaitForCacheSyncWithContext(ctx)
 
 		wg.Go(func() {
 			ctrl.Run(ctx)

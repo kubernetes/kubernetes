@@ -79,6 +79,7 @@ const (
 // NewEndpointController returns a new *Controller.
 func NewEndpointController(ctx context.Context, podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer,
 	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface, endpointUpdatesBatchPeriod time.Duration) *Controller {
+	logger := klog.FromContext(ctx)
 	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: ControllerName})
 
@@ -87,34 +88,40 @@ func NewEndpointController(ctx context.Context, podInformer coreinformers.PodInf
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: "endpoint",
+				Logger: &logger,
+				Name:   "endpoint",
 			},
 		),
-		podQueue:         workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[*endpointsliceutil.PodProjectionKey]()),
+		podQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[*endpointsliceutil.PodProjectionKey](),
+			workqueue.TypedRateLimitingQueueConfig[*endpointsliceutil.PodProjectionKey]{
+				Logger: &logger,
+			},
+		),
 		workerLoopPeriod: time.Second,
 	}
 
-	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = serviceInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: e.onServiceUpdate,
 		UpdateFunc: func(old, cur interface{}) {
 			e.onServiceUpdate(cur)
 		},
 		DeleteFunc: e.onServiceDelete,
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	e.serviceLister = serviceInformer.Lister()
 	e.servicesSynced = serviceInformer.Informer().HasSynced
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj interface{}) { e.onPodUpdate(nil, obj) },
 		UpdateFunc: e.onPodUpdate,
 		DeleteFunc: func(obj interface{}) { e.onPodUpdate(obj, nil) },
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	e.podLister = podInformer.Lister()
 	e.podsSynced = podInformer.Informer().HasSynced
 
-	endpointsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = endpointsInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: e.onEndpointsDelete,
-	})
+	}, cache.HandlerOptions{Logger: &logger})
 	e.endpointsLister = endpointsInformer.Lister()
 	e.endpointsSynced = endpointsInformer.Informer().HasSynced
 
@@ -182,7 +189,7 @@ type Controller struct {
 // Run will not return until stopCh is closed. workers determines how many
 // endpoints will be handled in parallel.
 func (e *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	e.eventBroadcaster.StartStructuredLogging(3)
