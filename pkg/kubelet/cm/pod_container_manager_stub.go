@@ -27,6 +27,10 @@ type podContainerManagerStub struct {
 
 var _ PodContainerManager = &podContainerManagerStub{}
 
+func (m *podContainerManagerStub) Validate(_ *v1.Pod) error {
+	return nil
+}
+
 func (m *podContainerManagerStub) Exists(_ *v1.Pod) bool {
 	return true
 }
