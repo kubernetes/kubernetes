@@ -695,7 +695,10 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 			return err
 		default:
 			patchType = types.StrategicMergePatchType
-			patch, err = strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, versionedObject, preconditions...)
+			patch, err = strategicpatch.CreateTwoWayMergePatch(
+				originalJS, editedJS, versionedObject,
+				strategicpatch.WithPreconditions(preconditions...),
+				strategicpatch.WithDuplicateMergeKeySupport(true))
 			if err != nil {
 				klog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
 				if mergepatch.IsPreconditionFailed(err) {
