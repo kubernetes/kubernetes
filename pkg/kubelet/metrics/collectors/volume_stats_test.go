@@ -43,6 +43,18 @@ func TestVolumeStatsCollector(t *testing.T) {
 		# TYPE kubelet_volume_stats_inodes_free gauge
 		# HELP kubelet_volume_stats_inodes_used [ALPHA] Number of used inodes in the volume
 		# TYPE kubelet_volume_stats_inodes_used gauge
+		# HELP kubelet_volume_stats_pod_available_bytes [ALPHA] Number of available bytes in a pod-scoped (non-PVC) volume
+		# TYPE kubelet_volume_stats_pod_available_bytes gauge
+		# HELP kubelet_volume_stats_pod_capacity_bytes [ALPHA] Capacity in bytes of a pod-scoped (non-PVC) volume
+		# TYPE kubelet_volume_stats_pod_capacity_bytes gauge
+		# HELP kubelet_volume_stats_pod_inodes [ALPHA] Maximum number of inodes in a pod-scoped (non-PVC) volume
+		# TYPE kubelet_volume_stats_pod_inodes gauge
+		# HELP kubelet_volume_stats_pod_inodes_free [ALPHA] Number of free inodes in a pod-scoped (non-PVC) volume
+		# TYPE kubelet_volume_stats_pod_inodes_free gauge
+		# HELP kubelet_volume_stats_pod_inodes_used [ALPHA] Number of used inodes in a pod-scoped (non-PVC) volume
+		# TYPE kubelet_volume_stats_pod_inodes_used gauge
+		# HELP kubelet_volume_stats_pod_used_bytes [ALPHA] Number of used bytes in a pod-scoped (non-PVC) volume
+		# TYPE kubelet_volume_stats_pod_used_bytes gauge
 		# HELP kubelet_volume_stats_used_bytes [ALPHA] Number of used bytes in the volume
 		# TYPE kubelet_volume_stats_used_bytes gauge
 	`
@@ -115,6 +127,12 @@ func TestVolumeStatsCollector(t *testing.T) {
 			kubelet_volume_stats_inodes{namespace="testns",persistentvolumeclaim="testpvc"} 655360
 			kubelet_volume_stats_inodes_free{namespace="testns",persistentvolumeclaim="testpvc"} 655344
 			kubelet_volume_stats_inodes_used{namespace="testns",persistentvolumeclaim="testpvc"} 16
+			kubelet_volume_stats_pod_available_bytes{namespace="test-namespace",pod="test-pod",volume_name="test"} 5.663154176e+09
+			kubelet_volume_stats_pod_capacity_bytes{namespace="test-namespace",pod="test-pod",volume_name="test"} 1.0434699264e+10
+			kubelet_volume_stats_pod_inodes{namespace="test-namespace",pod="test-pod",volume_name="test"} 655360
+			kubelet_volume_stats_pod_inodes_free{namespace="test-namespace",pod="test-pod",volume_name="test"} 655344
+			kubelet_volume_stats_pod_inodes_used{namespace="test-namespace",pod="test-pod",volume_name="test"} 16
+			kubelet_volume_stats_pod_used_bytes{namespace="test-namespace",pod="test-pod",volume_name="test"} 4.21789696e+09
 			kubelet_volume_stats_used_bytes{namespace="testns",persistentvolumeclaim="testpvc"} 4.21789696e+09
 			`
 
@@ -124,6 +142,12 @@ func TestVolumeStatsCollector(t *testing.T) {
 			"kubelet_volume_stats_inodes",
 			"kubelet_volume_stats_inodes_free",
 			"kubelet_volume_stats_inodes_used",
+			"kubelet_volume_stats_pod_available_bytes",
+			"kubelet_volume_stats_pod_capacity_bytes",
+			"kubelet_volume_stats_pod_inodes",
+			"kubelet_volume_stats_pod_inodes_free",
+			"kubelet_volume_stats_pod_inodes_used",
+			"kubelet_volume_stats_pod_used_bytes",
 			"kubelet_volume_stats_used_bytes",
 		}
 	)
@@ -152,6 +176,18 @@ func TestVolumeStatsCollectorWithNullVolumeStatus(t *testing.T) {
 		# TYPE kubelet_volume_stats_inodes_free gauge
 		# HELP kubelet_volume_stats_inodes_used [ALPHA] Number of used inodes in the volume
 		# TYPE kubelet_volume_stats_inodes_used gauge
+		# HELP kubelet_volume_stats_pod_available_bytes [ALPHA] Number of available bytes in a pod-scoped (non-PVC) volume
+		# TYPE kubelet_volume_stats_pod_available_bytes gauge
+		# HELP kubelet_volume_stats_pod_capacity_bytes [ALPHA] Capacity in bytes of a pod-scoped (non-PVC) volume
+		# TYPE kubelet_volume_stats_pod_capacity_bytes gauge
+		# HELP kubelet_volume_stats_pod_inodes [ALPHA] Maximum number of inodes in a pod-scoped (non-PVC) volume
+		# TYPE kubelet_volume_stats_pod_inodes gauge
+		# HELP kubelet_volume_stats_pod_inodes_free [ALPHA] Number of free inodes in a pod-scoped (non-PVC) volume
+		# TYPE kubelet_volume_stats_pod_inodes_free gauge
+		# HELP kubelet_volume_stats_pod_inodes_used [ALPHA] Number of used inodes in a pod-scoped (non-PVC) volume
+		# TYPE kubelet_volume_stats_pod_inodes_used gauge
+		# HELP kubelet_volume_stats_pod_used_bytes [ALPHA] Number of used bytes in a pod-scoped (non-PVC) volume
+		# TYPE kubelet_volume_stats_pod_used_bytes gauge
 		# HELP kubelet_volume_stats_used_bytes [ALPHA] Number of used bytes in the volume
 		# TYPE kubelet_volume_stats_used_bytes gauge
 	`
@@ -201,6 +237,12 @@ func TestVolumeStatsCollectorWithNullVolumeStatus(t *testing.T) {
 			kubelet_volume_stats_inodes{namespace="testns",persistentvolumeclaim="testpvc"} 655360
 			kubelet_volume_stats_inodes_free{namespace="testns",persistentvolumeclaim="testpvc"} 655344
 			kubelet_volume_stats_inodes_used{namespace="testns",persistentvolumeclaim="testpvc"} 16
+			kubelet_volume_stats_pod_available_bytes{namespace="test-namespace",pod="test-pod",volume_name="test"} 5.663154176e+09
+			kubelet_volume_stats_pod_capacity_bytes{namespace="test-namespace",pod="test-pod",volume_name="test"} 1.0434699264e+10
+			kubelet_volume_stats_pod_inodes{namespace="test-namespace",pod="test-pod",volume_name="test"} 655360
+			kubelet_volume_stats_pod_inodes_free{namespace="test-namespace",pod="test-pod",volume_name="test"} 655344
+			kubelet_volume_stats_pod_inodes_used{namespace="test-namespace",pod="test-pod",volume_name="test"} 16
+			kubelet_volume_stats_pod_used_bytes{namespace="test-namespace",pod="test-pod",volume_name="test"} 4.21789696e+09
 			kubelet_volume_stats_used_bytes{namespace="testns",persistentvolumeclaim="testpvc"} 4.21789696e+09
 			`
 
@@ -210,6 +252,12 @@ func TestVolumeStatsCollectorWithNullVolumeStatus(t *testing.T) {
 			"kubelet_volume_stats_inodes",
 			"kubelet_volume_stats_inodes_free",
 			"kubelet_volume_stats_inodes_used",
+			"kubelet_volume_stats_pod_available_bytes",
+			"kubelet_volume_stats_pod_capacity_bytes",
+			"kubelet_volume_stats_pod_inodes",
+			"kubelet_volume_stats_pod_inodes_free",
+			"kubelet_volume_stats_pod_inodes_used",
+			"kubelet_volume_stats_pod_used_bytes",
 			"kubelet_volume_stats_used_bytes",
 		}
 	)
