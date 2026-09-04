@@ -56,7 +56,7 @@ var (
 
 	// The validation Regex is the concatenation of hostPathSvc validation regex
 	// and the TLS validation regex
-	ruleRegex = regexHostPathSvc + regexTLS
+	ruleRegex = regexHostPathSvc + regexTLS + "$"
 
 	ingressLong = templates.LongDesc(i18n.T(`
 	Create an ingress with the specified name.`))

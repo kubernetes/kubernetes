@@ -130,6 +130,18 @@ func TestCreateIngressValidation(t *testing.T) {
 			},
 			expected: "",
 		},
+		"invalid trailing data after tls secret": {
+			rules: []string{
+				"foo.com/=svc:http,tls=secret123,garbage",
+			},
+			expected: "rule foo.com/=svc:http,tls=secret123,garbage is invalid and should be in format host/path=svcname:svcport[,tls[=secret]]",
+		},
+		"invalid trailing data after tls": {
+			rules: []string{
+				"foo.com/=svc:http,tls,garbage",
+			},
+			expected: "rule foo.com/=svc:http,tls,garbage is invalid and should be in format host/path=svcname:svcport[,tls[=secret]]",
+		},
 	}
 
 	for name, tc := range tests {
