@@ -38,6 +38,7 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
@@ -184,8 +185,7 @@ func (r *BindingREST) Create(ctx context.Context, name string, obj runtime.Objec
 		return nil, errors.NewBadRequest("name in URL does not match name in Binding object")
 	}
 
-	// TODO: move me to a binding strategy
-	if errs := validation.ValidatePodBinding(binding); len(errs) != 0 {
+	if errs := validation.ValidatePodBindingCreate(ctx, legacyscheme.Scheme, binding); len(errs) != 0 {
 		return nil, errs.ToAggregate()
 	}
 

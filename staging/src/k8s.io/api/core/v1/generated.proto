@@ -181,6 +181,7 @@ message AzureFileVolumeSource {
 }
 
 // Binding ties one object to another; for example, a pod is bound to a node by a scheduler.
+// +k8s:supportsSubresource="/binding"
 message Binding {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -189,6 +190,7 @@ message Binding {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // The target object that you want to bind to the standard object.
+  // +k8s:alpha(since: "1.37")=+k8s:subfield(name)=+k8s:required
   optional ObjectReference target = 2;
 }
 

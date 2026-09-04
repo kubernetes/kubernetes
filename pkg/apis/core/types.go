@@ -6329,6 +6329,7 @@ type Binding struct {
 	metav1.ObjectMeta
 
 	// Target is the object to bind to.
+	// +k8s:alpha(since: "1.37")=+k8s:subfield(name)=+k8s:required
 	Target ObjectReference
 }
 
