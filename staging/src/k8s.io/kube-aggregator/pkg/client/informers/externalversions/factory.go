@@ -92,7 +92,7 @@ func WithTransform(transform cache.TransformFunc) SharedInformerOption {
 	}
 }
 
-// WithInformerName sets the InformerName for informer identity used in metrics.
+// WithInformerName sets the InformerName for informer identity used in metrics and logging.
 // The InformerName must be created via cache.NewInformerName() at startup,
 // which validates global uniqueness. Each informer type will register its
 // GVR under this name.

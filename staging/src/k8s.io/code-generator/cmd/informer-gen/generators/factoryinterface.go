@@ -100,8 +100,9 @@ type InformerOptions struct {
 	// Indexers are the indexers for this informer.
 	Indexers {{.cacheIndexers|raw}}
 
-	// InformerName is used to uniquely identify this informer for metrics.
-	// If not set, metrics will not be published for this informer.
+	// InformerName is used to uniquely identify this informer for metrics and logging.
+	// If not set, metrics will not be published for this informer and its
+	// reflector uses the default name.
 	// Use cache.NewInformerName() to create an InformerName at startup.
 	InformerName *{{.cacheInformerName|raw}}
 

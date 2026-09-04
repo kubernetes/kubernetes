@@ -36,6 +36,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -541,6 +542,65 @@ func TestSharedInformerErrorHandling(t *testing.T) {
 	case err := <-errCh:
 		if !strings.Contains(err.Error(), "Access Denied") {
 			t.Errorf("Expected 'Access Denied' error. Actual: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Errorf("Timeout waiting for error handler call")
+	}
+}
+
+func TestSharedInformerReflectorNameFromIdentifier(t *testing.T) {
+	source := newFakeControllerSource(t)
+	source.ListError = fmt.Errorf("Access Denied")
+
+	informerName, err := NewInformerName("shared-informer-reflector-name")
+	if err != nil {
+		t.Fatalf("NewInformerName() error = %v", err)
+	}
+	t.Cleanup(informerName.Release)
+
+	informer := NewSharedIndexInformerWithOptions(
+		source,
+		&v1.Pod{},
+		SharedIndexInformerOptions{
+			ResyncPeriod: time.Second,
+			Identifier: informerName.WithResource(schema.GroupVersionResource{
+				Group:    "",
+				Version:  "v1",
+				Resource: "pods",
+			}),
+		},
+	)
+
+	type watchError struct {
+		reflectorName string
+		err           error
+	}
+	errCh := make(chan watchError, 1)
+	_ = informer.SetWatchErrorHandler(func(r *Reflector, err error) {
+		select {
+		case errCh <- watchError{
+			reflectorName: r.Name(),
+			err:           err,
+		}:
+		default:
+		}
+	})
+
+	var wg wait.Group
+	stop := make(chan struct{})
+	wg.StartWithChannel(stop, informer.Run)
+	defer func() {
+		close(stop)
+		wg.Wait()
+	}()
+
+	select {
+	case got := <-errCh:
+		if !strings.Contains(got.err.Error(), "Access Denied") {
+			t.Errorf("Expected 'Access Denied' error. Actual: %v", got.err)
+		}
+		if got.reflectorName != "shared-informer-reflector-name" {
+			t.Errorf("Expected reflector name %q. Actual: %q", "shared-informer-reflector-name", got.reflectorName)
 		}
 	case <-time.After(time.Second):
 		t.Errorf("Timeout waiting for error handler call")
