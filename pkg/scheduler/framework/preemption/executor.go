@@ -86,7 +86,7 @@ type Executor struct {
 	lastVictimsPendingPreemption map[types.UID]pendingVictim
 
 	// PreemptPod is a function that actually preempts a specific Pod. It returns true
-	// when the victim was preempted only in scheduler memory, without a delete call.
+	// when a successful delete call will produce a deletion event for the victim.
 	// This is exposed to be replaced during tests.
 	PreemptPod func(ctx context.Context, c Candidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error)
 }
@@ -157,7 +157,7 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 
 		fh.EventRecorder().WithLogger(logger).Eventf(victim, preemptor.Obj(), v1.EventTypeNormal, "Preempted", "Preempting", eventMessage)
 
-		return preemptedInMemory, nil
+		return !preemptedInMemory, nil
 	}
 
 	return e
@@ -219,7 +219,7 @@ func (e *Executor) prepareCandidateAsync(c Candidate, preemptor ExecutorPreempto
 
 	errCh := parallelize.NewResultChannel[error]()
 	// PreEnqueue only watches the last victim for completion, so activate when that victim won't emit a deletion event.
-	preemptedLastVictimInMemory := false
+	lastVictimWillProduceDeletionEvent := true
 	preemptPod := func(index int) {
 		victim := victimPods[index]
 		if _, err := e.PreemptPod(ctx, c, preemptor, victim, pluginName); err != nil {
@@ -245,7 +245,7 @@ func (e *Executor) prepareCandidateAsync(c Candidate, preemptor ExecutorPreempto
 			metrics.PreemptionGoroutinesExecutionTotal.WithLabelValues(result).Inc()
 		}()
 		defer func() {
-			if result == metrics.GoroutineResultError || preemptedLastVictimInMemory {
+			if result == metrics.GoroutineResultError || !lastVictimWillProduceDeletionEvent {
 				// When API call isn't successful or no victim deletion event will be produced, the preemptor's
 				// Pods may get stuck in the unschedulable pod pool in the worst case.
 				e.fh.Activate(logger, preemptor.Pods())
@@ -294,12 +294,12 @@ func (e *Executor) prepareCandidateAsync(c Candidate, preemptor ExecutorPreempto
 			e.lastVictimsPendingPreemption[preemptor.UID()] = pendingVictim{namespace: lastVictim.Namespace, name: lastVictim.Name}
 			e.mu.Unlock()
 
-			preemptedInMemory, err := e.PreemptPod(ctx, c, preemptor, lastVictim, pluginName)
+			willProduceDeletionEvent, err := e.PreemptPod(ctx, c, preemptor, lastVictim, pluginName)
 			if err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption of the last victim")
 				result = metrics.GoroutineResultError
-			} else if preemptedInMemory {
-				preemptedLastVictimInMemory = true
+			} else {
+				lastVictimWillProduceDeletionEvent = willProduceDeletionEvent
 			}
 		}
 		e.mu.Lock()

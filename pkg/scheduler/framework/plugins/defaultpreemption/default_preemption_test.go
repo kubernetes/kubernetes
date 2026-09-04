@@ -3785,11 +3785,11 @@ func TestPreEnqueue(t *testing.T) {
 			finishPreemption := make(chan struct{})
 
 			p.Executor.PreemptPod = func(ctx context.Context, c preemption.Candidate, preemptor preemption.ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {
-				if !tt.features.EnableAsyncPreemption {
-					return false, nil
+				if tt.features.EnableAsyncPreemption {
+					<-finishPreemption
 				}
-				<-finishPreemption
-				return false, nil
+				// Keep activation out of this test so it only exercises the PreEnqueue gate.
+				return true, nil
 			}
 
 			// Fill the cycle state

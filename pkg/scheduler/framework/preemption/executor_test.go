@@ -444,6 +444,7 @@ func TestPrepareCandidate(t *testing.T) {
 			nodeNames:             []string{node1Name},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "one victim with same condition",
@@ -1526,12 +1527,13 @@ func TestPreemptPod(t *testing.T) {
 					preemptor = &compositePodGroupExecutorPreemptor{cpg: preemptorCompositePodGroup, pods: preemptorPods}
 				}
 
-				preemptedInMemory, err := pe.PreemptPod(ctx, &candidate{name: "fake-node"}, preemptor, victimPod, "test-plugin")
+				willProduceDeletionEvent, err := pe.PreemptPod(ctx, &candidate{name: "fake-node"}, preemptor, victimPod, "test-plugin")
 				if err != nil {
 					t.Fatal(err)
 				}
-				if preemptedInMemory != (tt.addVictimToPrebind || tt.addVictimToWaiting) {
-					t.Errorf("PreemptPod() preemptedInMemory = %v, want %v", preemptedInMemory, tt.addVictimToPrebind || tt.addVictimToWaiting)
+				wantDeletionEvent := !tt.addVictimToPrebind && !tt.addVictimToWaiting
+				if willProduceDeletionEvent != wantDeletionEvent {
+					t.Errorf("PreemptPod() willProduceDeletionEvent = %v, want %v", willProduceDeletionEvent, wantDeletionEvent)
 				}
 				if tt.expectCancel {
 					if victimCtx.Err() == nil {
