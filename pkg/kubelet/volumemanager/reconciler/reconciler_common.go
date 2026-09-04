@@ -166,7 +166,8 @@ func (rc *reconciler) unmountVolumes(logger klog.Logger) {
 	}
 }
 
-func (rc *reconciler) mountOrAttachVolumes(logger klog.Logger) {
+func (rc *reconciler) mountOrAttachVolumes(ctx context.Context) {
+	logger := klog.FromContext(ctx)
 	// Ensure volumes that should be attached/mounted are attached/mounted.
 	for _, volumeToMount := range rc.desiredStateOfWorld.GetVolumesToMount() {
 		if rc.operationExecutor.IsOperationPending(volumeToMount.VolumeName, nestedpendingoperations.EmptyUniquePodName, nestedpendingoperations.EmptyNodeName) {
@@ -181,9 +182,9 @@ func (rc *reconciler) mountOrAttachVolumes(logger klog.Logger) {
 			rc.desiredStateOfWorld.AddErrorToPod(volumeToMount.PodName, err.Error())
 			continue
 		} else if cache.IsVolumeNotAttachedError(err) {
-			rc.waitForVolumeAttach(logger, volumeToMount)
+			rc.waitForVolumeAttach(ctx, volumeToMount)
 		} else if !volMounted || cache.IsRemountRequiredError(err) {
-			rc.mountAttachedVolumes(logger, volumeToMount, err)
+			rc.mountAttachedVolumes(ctx, volumeToMount, err)
 		} else if cache.IsFSResizeRequiredError(err) {
 			fsResizeRequiredErr, _ := err.(cache.FsResizeRequiredError)
 			rc.expandVolume(logger, volumeToMount, fsResizeRequiredErr.CurrentSize)
@@ -204,7 +205,8 @@ func (rc *reconciler) expandVolume(logger klog.Logger, volumeToMount cache.Volum
 	}
 }
 
-func (rc *reconciler) mountAttachedVolumes(logger klog.Logger, volumeToMount cache.VolumeToMount, podExistError error) {
+func (rc *reconciler) mountAttachedVolumes(ctx context.Context, volumeToMount cache.VolumeToMount, podExistError error) {
+	logger := klog.FromContext(ctx)
 	// Volume is not mounted, or is already mounted, but requires remounting
 	remountingLogStr := ""
 	isRemount := cache.IsRemountRequiredError(podExistError)
@@ -213,6 +215,7 @@ func (rc *reconciler) mountAttachedVolumes(logger klog.Logger, volumeToMount cac
 	}
 	logger.V(4).Info(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.MountVolume", remountingLogStr), "pod", klog.KObj(volumeToMount.Pod))
 	err := rc.operationExecutor.MountVolume(
+		ctx,
 		rc.waitForAttachTimeout,
 		volumeToMount.VolumeToMount,
 		rc.actualStateOfWorld,
@@ -229,7 +232,8 @@ func (rc *reconciler) mountAttachedVolumes(logger klog.Logger, volumeToMount cac
 	}
 }
 
-func (rc *reconciler) waitForVolumeAttach(logger klog.Logger, volumeToMount cache.VolumeToMount) {
+func (rc *reconciler) waitForVolumeAttach(ctx context.Context, volumeToMount cache.VolumeToMount) {
+	logger := klog.FromContext(ctx)
 	if rc.controllerAttachDetachEnabled || !volumeToMount.PluginIsAttachable {
 		//// lets not spin a goroutine and unnecessarily trigger exponential backoff if this happens
 		if volumeToMount.PluginIsAttachable && !volumeToMount.ReportedInUse {
@@ -240,7 +244,7 @@ func (rc *reconciler) waitForVolumeAttach(logger klog.Logger, volumeToMount cach
 		// for controller to finish attaching volume.
 		logger.V(5).Info(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.VerifyControllerAttachedVolume", ""), "pod", klog.KObj(volumeToMount.Pod))
 		err := rc.operationExecutor.VerifyControllerAttachedVolume(
-			logger,
+			ctx,
 			volumeToMount.VolumeToMount,
 			rc.nodeName,
 			rc.actualStateOfWorld)

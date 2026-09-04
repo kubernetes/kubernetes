@@ -31,11 +31,11 @@ import (
 
 var _ volume.NodeExpandableVolumePlugin = &csiPlugin{}
 
-func (c *csiPlugin) RequiresFSResize() bool {
+func (p *csiPlugin) RequiresFSResize() bool {
 	return true
 }
 
-func (c *csiPlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, error) {
+func (p *csiPlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, error) {
 	klog.V(4).Info(log("Expander.NodeExpand(%s)", resizeOptions.DeviceMountPath))
 	csiSource, err := getCSISourceFromSpec(resizeOptions.VolumeSpec)
 	if err != nil {
@@ -53,10 +53,10 @@ func (c *csiPlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, er
 		return false, errors.New(log("Expander.NodeExpand failed to check VolumeMode of source: %v", err))
 	}
 
-	return c.nodeExpandWithClient(resizeOptions, csiSource, csClient, fsVolume)
+	return p.nodeExpandWithClient(resizeOptions, csiSource, csClient, fsVolume)
 }
 
-func (c *csiPlugin) nodeExpandWithClient(
+func (p *csiPlugin) nodeExpandWithClient(
 	resizeOptions volume.NodeResizeOptions,
 	csiSource *api.CSIPersistentVolumeSource,
 	csClient csiClient,
@@ -77,10 +77,10 @@ func (c *csiPlugin) nodeExpandWithClient(
 
 	pv := resizeOptions.VolumeSpec.PersistentVolume
 	if pv == nil {
-		return false, fmt.Errorf("Expander.NodeExpand failed to find associated PersistentVolume for plugin %s", c.GetPluginName())
+		return false, fmt.Errorf("Expander.NodeExpand failed to find associated PersistentVolume for plugin %s", p.GetPluginName())
 	}
 	nodeExpandSecrets := map[string]string{}
-	expandClient := c.host.GetKubeClient()
+	expandClient := p.host.GetKubeClient()
 
 	if csiSource.NodeExpandSecretRef != nil {
 		nodeExpandSecrets, err = getCredentialsFromSecret(expandClient, csiSource.NodeExpandSecretRef)

@@ -409,7 +409,7 @@ func (expc *expandController) GetKubeClient() clientset.Interface {
 	return expc.kubeClient
 }
 
-func (expc *expandController) NewWrapperMounter(volName string, spec volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
+func (expc *expandController) NewWrapperMounter(logger klog.Logger, volName string, spec volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	return nil, fmt.Errorf("NewWrapperMounter not supported by expand controller's VolumeHost implementation")
 }
 
@@ -421,23 +421,23 @@ func (expc *expandController) GetMounter() mount.Interface {
 	return nil
 }
 
-func (expc *expandController) GetNodeAllocatable() (v1.ResourceList, error) {
+func (expc *expandController) GetNodeAllocatable(ctx context.Context) (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
 }
 
-func (expc *expandController) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
-	return func(_, _ string) (*v1.Secret, error) {
+func (expc *expandController) GetSecretFunc() func(ctx context.Context, namespace, name string) (*v1.Secret, error) {
+	return func(_ context.Context, _, _ string) (*v1.Secret, error) {
 		return nil, fmt.Errorf("GetSecret unsupported in expandController")
 	}
 }
 
-func (expc *expandController) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
-	return func(_, _ string) (*v1.ConfigMap, error) {
+func (expc *expandController) GetConfigMapFunc() func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error) {
+	return func(_ context.Context, _, _ string) (*v1.ConfigMap, error) {
 		return nil, fmt.Errorf("GetConfigMap unsupported in expandController")
 	}
 }
 
-func (expc *expandController) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error) {
+func (expc *expandController) GetAttachedVolumesFromNodeStatus(ctx context.Context) (map[v1.UniqueVolumeName]string, error) {
 	return map[v1.UniqueVolumeName]string{}, nil
 }
 
@@ -454,7 +454,7 @@ func (expc *expandController) DeleteServiceAccountTokenFunc() func(types.UID) {
 	}
 }
 
-func (expc *expandController) GetNodeLabels() (map[string]string, error) {
+func (expc *expandController) GetNodeLabels(ctx context.Context) (map[string]string, error) {
 	return nil, fmt.Errorf("GetNodeLabels unsupported in expandController")
 }
 

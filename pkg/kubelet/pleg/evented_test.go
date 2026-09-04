@@ -247,7 +247,7 @@ func TestProcessCRIEventsRequestsRelistOnlyForStoppedEvents(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			podRelister := newFakePodRelister()
 			eventedPleg := newTestEventedPLEG(podRelister)
-			logger := ktesting.NewLogger(t, ktesting.DefaultConfig)
+			logger, _ := ktesting.NewTestContext(t)
 			eventsCh := make(chan *v1.ContainerEventResponse, 1)
 			eventsCh <- test.event
 			close(eventsCh)

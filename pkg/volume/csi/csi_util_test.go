@@ -19,7 +19,6 @@ package csi
 import (
 	"bytes"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -30,7 +29,6 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -38,7 +36,6 @@ import (
 // Surfaces klog flags by default to enable
 // go test -v ./ --args <klog flags>
 func TestMain(m *testing.M) {
-	klog.InitFlags(flag.CommandLine)
 	os.Exit(m.Run())
 }
 

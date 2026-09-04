@@ -27,6 +27,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -212,7 +213,10 @@ func (dsw *desiredStateOfWorld) AddPod(
 			nodeName)
 	}
 
-	attachableVolumePlugin, err := dsw.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+	// Use klog.TODO() because we currently do not have a proper logger to pass in.
+	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
+	logger := klog.TODO()
+	attachableVolumePlugin, err := dsw.volumePluginMgr.FindAttachablePluginBySpec(logger, volumeSpec)
 	if err != nil || attachableVolumePlugin == nil {
 		if attachableVolumePlugin == nil {
 			err = fmt.Errorf("plugin do not support attachment")

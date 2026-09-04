@@ -211,6 +211,7 @@ func (m *csiBlockMapper) publishVolumeForBlock(
 	csiSource *v1.CSIPersistentVolumeSource,
 	attachment *storage.VolumeAttachment,
 ) (string, error) {
+	logger := klog.FromContext(ctx)
 	klog.V(4).Info(log("blockMapper.publishVolumeForBlock called"))
 
 	publishVolumeInfo := map[string]string{}
@@ -220,7 +221,7 @@ func (m *csiBlockMapper) publishVolumeForBlock(
 
 	// Inject pod information into volume_attributes
 	volAttribs := csiSource.VolumeAttributes
-	podInfoEnabled, err := m.plugin.podInfoEnabled(string(m.driverName))
+	podInfoEnabled, err := m.plugin.podInfoEnabled(logger, string(m.driverName))
 	if err != nil {
 		return "", volumetypes.NewTransientOperationFailure(log("blockMapper.publishVolumeForBlock failed to assemble volume attributes: %v", err))
 	}
@@ -277,7 +278,7 @@ func (m *csiBlockMapper) publishVolumeForBlock(
 }
 
 // SetUpDevice ensures the device is attached returns path where the device is located.
-func (m *csiBlockMapper) SetUpDevice() (string, error) {
+func (m *csiBlockMapper) SetUpDevice(logger klog.Logger) (string, error) {
 	klog.V(4).Info(log("blockMapper.SetUpDevice called"))
 
 	// Get csiSource from spec
@@ -291,7 +292,7 @@ func (m *csiBlockMapper) SetUpDevice() (string, error) {
 	}
 
 	driverName := csiSource.Driver
-	skip, err := m.plugin.skipAttach(driverName)
+	skip, err := m.plugin.skipAttach(logger, driverName)
 	if err != nil {
 		return "", errors.New(log("blockMapper.SetupDevice failed to check CSIDriver for %s: %v", driverName, err))
 	}
@@ -339,7 +340,7 @@ func (m *csiBlockMapper) SetUpDevice() (string, error) {
 	return stagingPath, nil
 }
 
-func (m *csiBlockMapper) MapPodDevice() (string, error) {
+func (m *csiBlockMapper) MapPodDevice(logger klog.Logger) (string, error) {
 	klog.V(4).Info(log("blockMapper.MapPodDevice called"))
 
 	// Get csiSource from spec
@@ -353,7 +354,7 @@ func (m *csiBlockMapper) MapPodDevice() (string, error) {
 	}
 
 	driverName := csiSource.Driver
-	skip, err := m.plugin.skipAttach(driverName)
+	skip, err := m.plugin.skipAttach(logger, driverName)
 	if err != nil {
 		return "", errors.New(log("blockMapper.MapPodDevice failed to check CSIDriver for %s: %v", driverName, err))
 	}

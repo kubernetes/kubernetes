@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/mount-utils"
 )
 
@@ -46,6 +47,8 @@ func (fake *fakeMountDetector) GetMountMedium(path string, requestedMedium v1.St
 
 func TestEmptyDirVolumeModeWindows(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EmptyDirVolumeMode, true)
+
+	tCtx := ktesting.Init(t)
 
 	basePath, err := utiltesting.MkTmpdir("emptydir_mode_windows_test")
 	if err != nil {
@@ -84,7 +87,7 @@ func TestEmptyDirVolumeModeWindows(t *testing.T) {
 		t.Fatalf("Failed to make a new Mounter: %v", err)
 	}
 
-	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+	if err := mounter.SetUp(tCtx, volume.MounterArgs{}); err != nil {
 		t.Fatalf("SetUp should not fail on Windows with mode set, got: %v", err)
 	}
 

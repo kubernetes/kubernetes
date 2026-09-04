@@ -173,10 +173,7 @@ func (kvh *kubeletVolumeHost) CSIDriversSynced() cache.InformerSynced {
 }
 
 // WaitForCacheSync is a helper function that waits for cache sync for CSIDriverLister
-func (kvh *kubeletVolumeHost) WaitForCacheSync() error {
-	// Use context.TODO() because we currently do not have a proper context to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
-	logger := klog.FromContext(context.TODO())
+func (kvh *kubeletVolumeHost) WaitForCacheSync(logger klog.Logger) error {
 	if kvh.csiDriversSynced == nil {
 		logger.Error(nil, "CsiDriversSynced not found on KubeletVolumeHost")
 		return fmt.Errorf("csiDriversSynced not found on KubeletVolumeHost")
@@ -192,12 +189,10 @@ func (kvh *kubeletVolumeHost) WaitForCacheSync() error {
 }
 
 func (kvh *kubeletVolumeHost) NewWrapperMounter(
+	logger klog.Logger,
 	volName string,
 	spec volume.Spec,
 	pod *v1.Pod) (volume.Mounter, error) {
-	// Use context.TODO() because we currently do not have a proper context to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
-	logger := klog.FromContext(context.TODO())
 
 	// The name of wrapper volume is set to "wrapped_{wrapped_volume_name}"
 	wrapperVolumeName := "wrapped_" + volName
@@ -227,29 +222,28 @@ func (kvh *kubeletVolumeHost) GetMounter() mount.Interface {
 	return kvh.kubelet.mounter
 }
 
-func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
-	// TODO: Pass proper context when VolumeHost interface methods support context parameters
-	node, err := kvh.kubelet.getNodeAnyWay(context.TODO())
+func (kvh *kubeletVolumeHost) GetNodeAllocatable(ctx context.Context) (v1.ResourceList, error) {
+	node, err := kvh.kubelet.getNodeAnyWay(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving node: %v", err)
 	}
 	return node.Status.Allocatable, nil
 }
 
-func (kvh *kubeletVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
+func (kvh *kubeletVolumeHost) GetSecretFunc() func(ctx context.Context, namespace, name string) (*v1.Secret, error) {
 	if kvh.secretManager != nil {
 		return kvh.secretManager.GetSecret
 	}
-	return func(namespace, name string) (*v1.Secret, error) {
+	return func(ctx context.Context, namespace, name string) (*v1.Secret, error) {
 		return nil, fmt.Errorf("not supported due to running kubelet in standalone mode")
 	}
 }
 
-func (kvh *kubeletVolumeHost) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
+func (kvh *kubeletVolumeHost) GetConfigMapFunc() func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error) {
 	if kvh.configMapManager != nil {
 		return kvh.configMapManager.GetConfigMap
 	}
-	return func(namespace, name string) (*v1.ConfigMap, error) {
+	return func(ctx context.Context, namespace, name string) (*v1.ConfigMap, error) {
 		return nil, fmt.Errorf("not supported due to running kubelet in standalone mode")
 	}
 }
@@ -274,18 +268,16 @@ func (kvh *kubeletVolumeHost) GetPodCertificateCredentialBundle(ctx context.Cont
 	return kvh.podCertificateManager.GetPodCertificateCredentialBundle(ctx, namespace, podName, podUID, volumeName, sourceIndex)
 }
 
-func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {
-	// TODO: Pass proper context when VolumeHost interface methods support context parameters
-	node, err := kvh.kubelet.GetNode(context.TODO())
+func (kvh *kubeletVolumeHost) GetNodeLabels(ctx context.Context) (map[string]string, error) {
+	node, err := kvh.kubelet.GetNode(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving node: %v", err)
 	}
 	return node.Labels, nil
 }
 
-func (kvh *kubeletVolumeHost) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error) {
-	// TODO: Pass proper context when VolumeHost interface methods support context parameters
-	node, err := kvh.kubelet.GetNode(context.TODO())
+func (kvh *kubeletVolumeHost) GetAttachedVolumesFromNodeStatus(ctx context.Context) (map[v1.UniqueVolumeName]string, error) {
+	node, err := kvh.kubelet.GetNode(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving node: %v", err)
 	}

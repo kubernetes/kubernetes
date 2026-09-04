@@ -17,6 +17,7 @@ limitations under the License.
 package nfs
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -93,7 +94,7 @@ func (plugin *nfsPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.NFS != nil)
 }
 
-func (plugin *nfsPlugin) RequiresRemount(spec *volume.Spec) bool {
+func (plugin *nfsPlugin) RequiresRemount(logger klog.Logger, spec *volume.Spec) bool {
 	return false
 }
 
@@ -101,7 +102,7 @@ func (plugin *nfsPlugin) SupportsMountOption() bool {
 	return true
 }
 
-func (plugin *nfsPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+func (plugin *nfsPlugin) SupportsSELinuxContextMount(logger klog.Logger, spec *volume.Spec) (bool, error) {
 	return false, nil
 }
 
@@ -219,11 +220,11 @@ func (nfsMounter *nfsMounter) GetAttributes() volume.Attributes {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (nfsMounter *nfsMounter) SetUp(mounterArgs volume.MounterArgs) error {
-	return nfsMounter.SetUpAt(nfsMounter.GetPath(), mounterArgs)
+func (nfsMounter *nfsMounter) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
+	return nfsMounter.SetUpAt(ctx, nfsMounter.GetPath(), mounterArgs)
 }
 
-func (nfsMounter *nfsMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (nfsMounter *nfsMounter) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
 	notMnt, err := mount.IsNotMountPoint(nfsMounter.mounter, dir)
 	klog.V(4).Infof("NFS mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
