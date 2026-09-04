@@ -26,7 +26,7 @@ import (
 // Usage:
 //
 //	memoryAllocator := runtime.AllocatorPool.Get().(*runtime.Allocator)
-//	defer runtime.AllocatorPool.Put(memoryAllocator)
+//	defer runtime.PutAllocator(memoryAllocator)
 //
 // A note for future:
 //
@@ -36,6 +36,29 @@ var AllocatorPool = sync.Pool{
 	New: func() interface{} {
 		return &Allocator{}
 	},
+}
+
+// maxPooledBufferCapacity bounds the buffer capacity an Allocator may retain
+// while parked in AllocatorPool. An Allocator's buffer grows to the largest
+// object it has ever encoded and never shrinks, so without a bound a burst of
+// large responses leaves every pooled allocator holding a multi-megabyte
+// buffer for the lifetime of the process. Encodes larger than this bound still
+// work; their buffers are simply released to the GC instead of being pooled.
+const maxPooledBufferCapacity = 256 * 1024
+
+// PutAllocator returns a MemoryAllocator previously obtained from
+// AllocatorPool. Buffers that grew beyond maxPooledBufferCapacity are dropped
+// before pooling so that steady-state memory retained by the pool stays
+// bounded. Allocators of other types are ignored.
+func PutAllocator(m MemoryAllocator) {
+	a, ok := m.(*Allocator)
+	if !ok {
+		return
+	}
+	if cap(a.buf) > maxPooledBufferCapacity {
+		a.buf = nil
+	}
+	AllocatorPool.Put(a)
 }
 
 // Allocator knows how to allocate memory
