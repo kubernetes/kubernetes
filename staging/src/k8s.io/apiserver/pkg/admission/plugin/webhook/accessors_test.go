@@ -111,3 +111,47 @@ func TestValidatingWebhookAccessor(t *testing.T) {
 		})
 	}
 }
+
+func TestHookClientConfigForWebhookIncludesTimeout(t *testing.T) {
+	tests := []struct {
+		name     string
+		accessor WebhookAccessor
+		expected *int32
+	}{
+		{
+			name: "mutating",
+			accessor: NewMutatingWebhookAccessor("uid", "config", &v1.MutatingWebhook{
+				TimeoutSeconds: new(int32(3)),
+			}),
+			expected: new(int32(3)),
+		},
+		{
+			name: "validating",
+			accessor: NewValidatingWebhookAccessor("uid", "config", &v1.ValidatingWebhook{
+				TimeoutSeconds: new(int32(4)),
+			}),
+			expected: new(int32(4)),
+		},
+		{
+			name:     "validating - v2",
+			accessor: NewValidatingWebhookAccessor("uid", "config", &v1.ValidatingWebhook{}),
+			expected: nil,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			config := hookClientConfigForWebhook(tc.accessor)
+			to := config.TimeoutSeconds
+			if tc.expected == nil {
+				if to != nil {
+					t.Fatalf("expected nil but got timeout seconds %d", *to)
+				}
+			} else {
+				if to == nil || *to != *tc.expected {
+					t.Fatalf("expected timeoutSeconds %d, got %v", *tc.expected, to)
+				}
+			}
+		})
+	}
+}
