@@ -26,8 +26,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 cd "${KUBE_ROOT}"
 
 all_e2e_files=()
-# NOTE: This checks e2e test code without the e2e framework which contains Expect().To(HaveOccurred())
-kube::util::read-array all_e2e_files < <(find test/e2e{,_node,_kubeadm} -name '*.go' | grep -v 'test/e2e/framework/')
+# NOTE: This checks test code without the e2e framework which contains Expect().To(HaveOccurred())
+kube::util::read-array all_e2e_files < <(find test/ -name '*.go')
 errors_expect_no_error=()
 for file in "${all_e2e_files[@]}"
 do
@@ -36,6 +36,10 @@ do
         errors_expect_no_error+=( "${file}" )
     fi
     if grep -E "Expect\(err\)\.To\(gomega\.BeNil\(\)\)" "${file}" > /dev/null
+    then
+        errors_expect_no_error+=( "${file}" )
+    fi
+    if grep -E "[[:space:]]ExpectNoError\([a-zA-Z0-9_. \t]+\)" "${file}" > /dev/null
     then
         errors_expect_no_error+=( "${file}" )
     fi
@@ -59,8 +63,8 @@ if [ ${#errors_expect_no_error[@]} -ne 0 ]; then
       echo "$err"
     done
     echo
-    echo 'The above files need to use framework.ExpectNoError(err) instead of '
-    echo 'Expect(err).NotTo(HaveOccurred()) or gomega.Expect(err).NotTo(gomega.HaveOccurred())'
+    echo 'The above files need to use framework.ExpectNoError(err, "explanation...") instead of '
+    echo 'Expect(err).NotTo(HaveOccurred()) or gomega.Expect(err).NotTo(gomega.HaveOccurred()) or framework.ExpectNoError(err) without an explanation'
     echo
     echo 'See https://github.com/kubernetes/community/blob/master/contributors/devel/sig-testing/writing-good-e2e-tests.md for more guidance'
   } >&2
