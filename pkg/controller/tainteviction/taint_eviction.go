@@ -117,7 +117,7 @@ func deletePodHandler(c clientset.Interface, emitEventFunc func(types.Namespaced
 			err = addConditionAndDeletePod(ctx, c, name, ns)
 			if err == nil {
 				metrics.PodDeletionsTotal.Inc()
-				metrics.PodDeletionsLatency.Observe(float64(time.Since(fireAt) * time.Second))
+				metrics.PodDeletionsLatency.Observe(time.Since(fireAt).Seconds())
 				break
 			}
 			time.Sleep(10 * time.Millisecond)
