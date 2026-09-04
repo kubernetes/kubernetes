@@ -19,12 +19,14 @@ package filters
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +38,7 @@ import (
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/component-helpers/storage/volume"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
@@ -3334,6 +3337,138 @@ func TestNodeDeclaredFeaturesFilter(t *testing.T) {
 				err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, testutils.PodUnschedulable(cs, tt.pod.Namespace, tt.pod.Name))
 				if err != nil {
 					t.Errorf("Expected pod to be unschedulable, but it was not: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestDynamicResourcesFilter(t *testing.T) {
+	const (
+		nodeWithDevice    = "node-with-device"
+		nodeWithoutDevice = "node-without-device"
+		driverName        = "dra.example.com"
+		className         = "example-device"
+		claimName         = "example-claim"
+	)
+
+	tests := []struct {
+		name                    string
+		resourceSliceNode       string
+		expectedNode            string
+		wantUnschedulableReason string
+	}{
+		{
+			name:              "device is available on one node",
+			resourceSliceNode: nodeWithDevice,
+			expectedNode:      nodeWithDevice,
+		},
+		{
+			name:                    "device is unavailable on all nodes",
+			wantUnschedulableReason: "cannot allocate all claims",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testCtx := initTest(t, "dynamic-resources-filter")
+			cs := testCtx.ClientSet
+			ns := testCtx.NS.Name
+
+			for _, nodeName := range []string{nodeWithDevice, nodeWithoutDevice} {
+				if _, err := createNode(cs, st.MakeNode().Name(nodeName).Obj()); err != nil {
+					t.Fatalf("Failed to create node %q: %v", nodeName, err)
+				}
+			}
+
+			if _, err := cs.ResourceV1().DeviceClasses().Create(
+				testCtx.Ctx,
+				&resourceapi.DeviceClass{
+					ObjectMeta: metav1.ObjectMeta{Name: className},
+					Spec: resourceapi.DeviceClassSpec{
+						Selectors: []resourceapi.DeviceSelector{
+							{
+								CEL: &resourceapi.CELDeviceSelector{
+									Expression: fmt.Sprintf("device.driver == %q", driverName),
+								},
+							},
+						},
+					},
+				},
+				metav1.CreateOptions{},
+			); err != nil {
+				t.Fatalf("Failed to create device class %q: %v", className, err)
+			}
+
+			if tt.resourceSliceNode != "" {
+				resourceSlice := st.MakeResourceSlice(tt.resourceSliceNode, driverName).Device("device-0").Obj()
+				if _, err := cs.ResourceV1().ResourceSlices().Create(
+					testCtx.Ctx,
+					resourceSlice,
+					metav1.CreateOptions{},
+				); err != nil {
+					t.Fatalf("Failed to create resource slice: %v", err)
+				}
+			}
+
+			claim := st.MakeResourceClaim().Name(claimName).Namespace(ns).Request(className).Obj()
+			if _, err := cs.ResourceV1().ResourceClaims(ns).Create(
+				testCtx.Ctx,
+				claim,
+				metav1.CreateOptions{},
+			); err != nil {
+				t.Fatalf("Failed to create resource claim %q: %v", claimName, err)
+			}
+
+			pod := st.MakePod().Name("pod-with-dra-driver").Namespace(ns).PodResourceClaims(
+				v1.PodResourceClaim{
+					Name:              "device",
+					ResourceClaimName: ptr.To(claimName),
+				}).
+				Container(imageutils.GetPauseImageName()).Obj()
+			createdPod, err := cs.CoreV1().Pods(ns).Create(
+				testCtx.Ctx,
+				pod,
+				metav1.CreateOptions{},
+			)
+			if err != nil {
+				t.Fatalf("Failed to create pod %s/%s: %v", ns, pod.Name, err)
+			}
+			defer testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{createdPod})
+
+			if tt.expectedNode != "" {
+				if err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, podScheduledIn(cs, ns, createdPod.Name, []string{tt.expectedNode})); err != nil {
+					t.Fatalf(
+						"Expected pod %s/%s to be scheduled on %q: %v",
+						ns,
+						createdPod.Name,
+						tt.expectedNode,
+						err,
+					)
+				}
+			} else {
+				if err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, podUnschedulable(cs, ns, createdPod.Name)); err != nil {
+					t.Fatalf(
+						"Expected pod %s/%s to be unschedulable: %v",
+						ns,
+						createdPod.Name,
+						err,
+					)
+				}
+				observedPod, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, createdPod.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("Failed to get pod %s/%s: %v", ns, createdPod.Name, err)
+				}
+				_, condition := podutil.GetPodCondition(&observedPod.Status, v1.PodScheduled)
+				if condition == nil {
+					t.Fatalf("Pod %s/%s has no PodScheduled condition", ns, createdPod.Name)
+				}
+				if !strings.Contains(condition.Message, tt.wantUnschedulableReason) {
+					t.Fatalf(
+						"Expected PodScheduled condition message to contain %q, got %q",
+						tt.wantUnschedulableReason,
+						condition.Message,
+					)
 				}
 			}
 		})
