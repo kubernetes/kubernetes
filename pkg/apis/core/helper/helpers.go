@@ -19,9 +19,11 @@ package helper
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
+	inf "gopkg.in/inf.v0"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -67,6 +69,12 @@ func IsHugePageResourceName(name core.ResourceName) bool {
 	return strings.HasPrefix(string(name), core.ResourceHugePagesPrefix)
 }
 
+// maxHugePageDivisibilityDigits bounds the exact-decimal work the divisibility
+// check will do. An exponent is caller supplied, so "1e100000000" is a short
+// string naming a 10^8-digit number, and dividing it exactly would materialize
+// all of them. Everything downstream stores bytes in an int64 (nineteen digits).
+const maxHugePageDivisibilityDigits = 64
+
 // IsHugePageResourceValueDivisible returns true if the resource value of storage is
 // integer multiple of page size.
 func IsHugePageResourceValueDivisible(name core.ResourceName, quantity resource.Quantity) bool {
@@ -75,11 +83,72 @@ func IsHugePageResourceValueDivisible(name core.ResourceName, quantity resource.
 		return false
 	}
 
-	if pageSize.Sign() <= 0 || pageSize.MilliValue()%int64(1000) != int64(0) {
+	// The page size is parsed out of the resource name, so it is caller supplied
+	// and unbounded. Value() collapses a huge page size to 0 (which made this
+	// divide by zero) and MilliValue() disagrees between spellings of the same
+	// number, so require an exact positive int64 instead.
+	size, ok := wholePositiveBytes(pageSize)
+	if !ok {
 		return false
 	}
 
-	return quantity.Value()%pageSize.Value() == 0
+	// The request may legitimately exceed an int64, since whether it is a
+	// multiple is a property of the number rather than of the accessor. Compare
+	// in exact decimal, but bound the work.
+	q := quantity.AsDec()
+	if !withinDigitBound(q, maxHugePageDivisibilityDigits) {
+		return false
+	}
+	p := inf.NewDec(size, 0)
+	multiples := new(inf.Dec).QuoRound(q, p, 0, inf.RoundDown)
+	return new(inf.Dec).Mul(multiples, p).Cmp(q) == 0
+}
+
+// wholePositiveBytes returns q as a positive whole number of bytes, and false
+// when q is zero, negative, fractional, or outside the int64 range. Unlike
+// Quantity.Value() it neither rounds nor silently overflows.
+func wholePositiveBytes(q resource.Quantity) (int64, bool) {
+	if v, ok := q.AsInt64(); ok {
+		return v, v > 0
+	}
+	d := q.AsDec()
+	unscaled, ok := d.Unscaled()
+	if !ok {
+		return 0, false
+	}
+	scale := d.Scale()
+	// Trailing zeros are not precision: 2097152.000 is a whole number of bytes.
+	for scale > 0 && unscaled%10 == 0 {
+		unscaled /= 10
+		scale--
+	}
+	if scale > 0 {
+		return 0, false
+	}
+	// Scale back up, giving up as soon as it cannot fit; runs at most 19 times.
+	for scale < 0 {
+		if unscaled > math.MaxInt64/10 || unscaled < math.MinInt64/10 {
+			return 0, false
+		}
+		unscaled *= 10
+		scale++
+	}
+	return unscaled, unscaled > 0
+}
+
+// withinDigitBound reports whether d has at most maxDigits decimal digits, from
+// its scale and bit length alone, so it never rescales or allocates.
+func withinDigitBound(d *inf.Dec, maxDigits int) bool {
+	if d.Sign() == 0 {
+		return true
+	}
+	// A big.Int of n bits has at most n/3+1 decimal digits.
+	digits := int64(d.UnscaledBig().BitLen()/3 + 1)
+	scale := int64(d.Scale())
+	if scale < 0 {
+		scale = -scale
+	}
+	return digits+scale <= int64(maxDigits)
 }
 
 // IsQuotaHugePageResourceName returns true if the resource name has the quota

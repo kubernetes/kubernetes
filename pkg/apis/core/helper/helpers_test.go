@@ -183,54 +183,93 @@ func TestIsHugePageResourceName(t *testing.T) {
 
 func TestIsHugePageResourceValueDivisible(t *testing.T) {
 	testCases := []struct {
+		desc     string
 		name     core.ResourceName
 		quantity resource.Quantity
 		result   bool
 	}{
-		{
-			name:     core.ResourceName("hugepages-2Mi"),
-			quantity: resource.MustParse("4Mi"),
-			result:   true,
-		},
-		{
-			name:     core.ResourceName("hugepages-2Mi"),
-			quantity: resource.MustParse("5Mi"),
-			result:   false,
-		},
-		{
-			name:     core.ResourceName("hugepages-1Gi"),
-			quantity: resource.MustParse("2Gi"),
-			result:   true,
-		},
-		{
-			name:     core.ResourceName("hugepages-1Gi"),
-			quantity: resource.MustParse("2.1Gi"),
-			result:   false,
-		},
-		{
-			name:     core.ResourceName("hugepages-1Mi"),
-			quantity: resource.MustParse("2.1Mi"),
-			result:   false,
-		},
-		{
-			name:     core.ResourceName("hugepages-64Ki"),
-			quantity: resource.MustParse("128Ki"),
-			result:   true,
-		},
-		{
-			name:     core.ResourceName("hugepages-"),
-			quantity: resource.MustParse("128Ki"),
-			result:   false,
-		},
-		{
-			name:     core.ResourceName("hugepages"),
-			quantity: resource.MustParse("128Ki"),
-			result:   false,
-		},
+		{"multiple of the page size", "hugepages-2Mi", resource.MustParse("4Mi"), true},
+		{"not a multiple of the page size", "hugepages-2Mi", resource.MustParse("5Mi"), false},
+		{"multiple of a 1Gi page", "hugepages-1Gi", resource.MustParse("2Gi"), true},
+		{"fractional multiple of 1Gi", "hugepages-1Gi", resource.MustParse("2.1Gi"), false},
+		{"fractional multiple of 1Mi", "hugepages-1Mi", resource.MustParse("2.1Mi"), false},
+		{"multiple of a 64Ki page", "hugepages-64Ki", resource.MustParse("128Ki"), true},
+		{"empty page size", "hugepages-", resource.MustParse("128Ki"), false},
+		{"not a hugepage resource name", "hugepages", resource.MustParse("128Ki"), false},
 	}
 	for _, testCase := range testCases {
 		if testCase.result != IsHugePageResourceValueDivisible(testCase.name, testCase.quantity) {
-			t.Errorf("resource: %v storage:%v expected result: %v", testCase.name, testCase.quantity, testCase.result)
+			t.Errorf("%s: resource: %v quantity: %v expected result: %v", testCase.desc, testCase.name, testCase.quantity.String(), testCase.result)
+		}
+	}
+}
+
+func TestIsHugePageResourceValueDivisibleOverflow(t *testing.T) {
+	// These pin values by magnitude: the same number must get the same answer
+	// however it is written, and a value past int64 must not read as divisible
+	// just because Quantity.Value() wrapped it or collapsed it to zero.
+	testCases := []struct {
+		desc     string
+		name     core.ResourceName
+		quantity resource.Quantity
+		result   bool
+	}{
+		{"multiple of a non power of two page size, past 2^63", "hugepages-3Mi", resource.MustParse("9437184000000000000"), true},
+		{"same number written with an exponent", "hugepages-3Mi", resource.MustParse("9437184e12"), true},
+		{"same number written with a decimal point", "hugepages-3Mi", resource.MustParse("9.437184e18"), true},
+		{"one byte past a multiple, past 2^63", "hugepages-3Mi", resource.MustParse("9437184000000000001"), false},
+		{"multiple of a power of two page size, past 2^64", "hugepages-2Mi", resource.MustParse("18446744073709551616"), true},
+		{"one byte past 2^64", "hugepages-2Mi", resource.MustParse("18446744073709551617"), false},
+		{"not a multiple, but Value() collapses it to 0", "hugepages-3Mi", resource.MustParse("1e30"), false},
+		{"not a multiple, smallest value where Value() collapses", "hugepages-3Mi", resource.MustParse("1e19"), false},
+		{"beyond any byte count a node could serve", "hugepages-2Mi", resource.MustParse("1e100000000"), false},
+	}
+	for _, testCase := range testCases {
+		if testCase.result != IsHugePageResourceValueDivisible(testCase.name, testCase.quantity) {
+			t.Errorf("%s: resource: %v quantity: %v expected result: %v", testCase.desc, testCase.name, testCase.quantity.String(), testCase.result)
+		}
+	}
+}
+
+func TestIsHugePageResourceValueDivisiblePageSizeOverflow(t *testing.T) {
+	// A page size comes out of the resource name, so it is caller supplied.
+	// pageSize.Value() collapsed to 0 for these and the check divided by zero,
+	// and the MilliValue guard disagreed with itself on the two spellings.
+	testCases := []struct {
+		desc string
+		name core.ResourceName
+	}{
+		{"page size collapses Value() to 0", "hugepages-1e19"},
+		{"same page size written as a literal", "hugepages-10000000000000000000"},
+		{"page size well past int64", "hugepages-1e30"},
+		{"page size at 2^64", "hugepages-18446744073709551616"},
+	}
+	for _, testCase := range testCases {
+		if IsHugePageResourceValueDivisible(testCase.name, resource.MustParse("1")) {
+			t.Errorf("%s: resource: %v expected result: false", testCase.desc, testCase.name)
+		}
+	}
+}
+
+func TestIsHugePageResourceValueDivisibleFractional(t *testing.T) {
+	// Value() rounds away from zero, so a request half a byte short of a whole
+	// page used to read back as a whole page. Trailing zeros are not precision
+	// and must still count as whole bytes.
+	testCases := []struct {
+		desc     string
+		name     core.ResourceName
+		quantity resource.Quantity
+		result   bool
+	}{
+		{"2Mi written in milli", "hugepages-2Mi", resource.MustParse("2097152000m"), true},
+		{"2Mi written scaled", "hugepages-2Mi", resource.MustParse("20971520e-1"), true},
+		{"half a byte short of 2Mi", "hugepages-2Mi", resource.MustParse("2097151500m"), false},
+		{"half a byte short of 1Ki", "hugepages-1Ki", resource.MustParse("1023500m"), false},
+		{"negative, half a byte short of 2Mi", "hugepages-2Mi", resource.MustParse("-2097151500m"), false},
+	}
+	for _, testCase := range testCases {
+		if testCase.result != IsHugePageResourceValueDivisible(testCase.name, testCase.quantity) {
+			t.Errorf("%s: resource: %v quantity: %v expected result: %v", testCase.desc, testCase.name, testCase.quantity.String(), testCase.result)
 		}
 	}
 }
