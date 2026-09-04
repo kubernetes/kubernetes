@@ -84,6 +84,7 @@ func NewPolicyTestContext[P, B runtime.Object, E Evaluator](
 	dispatcher dispatcherFactory[PolicyHook[P, B, E]],
 	initialObjects []runtime.Object,
 	paramMappings []meta.RESTMapping,
+	paramKindResolver ParamKindResolver,
 ) (*PolicyTestContext[P, B, E], func(), error) {
 	var Pexample P
 	var Bexample B
@@ -203,6 +204,7 @@ func NewPolicyTestContext[P, B runtime.Object, E Evaluator](
 			return source
 		}, dispatcher)
 	plugin.SetEnabled(true)
+	plugin.SetParamKindResolver(paramKindResolver)
 
 	featureGate := featuregate.NewFeatureGate()
 	effectiveVersion := compatibility.DefaultBuildEffectiveVersion()

@@ -18,6 +18,7 @@ package validating_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -29,6 +30,7 @@ import (
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -45,7 +47,9 @@ import (
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/warning"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes"
+	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/utils/ptr"
 )
 
@@ -395,6 +399,7 @@ func setupTestCommon(
 				Scope:            meta.RESTScopeRoot,
 			},
 		},
+		nil,
 	)
 	require.NoError(t, err)
 	t.Cleanup(testContextCancel)
@@ -871,6 +876,60 @@ func TestInvalidParamSourceInstanceName(t *testing.T) {
 	require.ErrorContains(t, err,
 		"no params found for policy binding with `Deny` parameterNotFoundAction")
 	require.Empty(t, passedParams)
+}
+
+func TestDirectParamReadErrorsFailClosed(t *testing.T) {
+	tests := []struct {
+		name      string
+		directErr error
+		wantError string
+	}{
+		{
+			name:      "timeout",
+			directErr: context.DeadlineExceeded,
+			wantError: context.DeadlineExceeded.Error(),
+		},
+		{
+			name:      "server error",
+			directErr: apierrors.NewInternalError(errors.New("backend unavailable")),
+			wantError: "backend unavailable",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			compiler := &fakeCompiler{}
+			matcher := &fakeMatcher{DefaultMatch: true}
+			testContext := setupTestCommon(t, compiler, matcher, false)
+			client, ok := testContext.DynamicClient.(*dynamicfake.FakeDynamicClient)
+			require.True(t, ok)
+			client.PrependReactor("get", "paramsconfigs", func(clienttesting.Action) (bool, runtime.Object, error) {
+				return true, nil, test.directErr
+			})
+			require.NoError(t, testContext.Start())
+
+			var evaluations atomic.Int32
+			compiler.RegisterDefinition(denyPolicy, func(context.Context, schema.GroupVersionResource, *admission.VersionedAttributes, runtime.Object, *v1.Namespace, int64, authorizer.UnconditionalAuthorizer) validating.ValidateResult {
+				evaluations.Add(1)
+				return validating.ValidateResult{Decisions: []validating.PolicyDecision{{Action: validating.ActionAdmit}}}
+			})
+
+			binding := denyBinding.DeepCopy()
+			binding.Spec.ParamRef.ParameterNotFoundAction = ptr.To(admissionregistrationv1.AllowAction)
+			require.NoError(t, testContext.UpdateAndWait(denyPolicy, binding))
+
+			err := testContext.Plugin.Dispatch(
+				testContext,
+				attributeRecord(nil, fakeParams, admission.Create),
+				&admission.RuntimeObjectInterfaces{},
+			)
+
+			require.ErrorContains(t, err, "failed to configure binding")
+			require.ErrorContains(t, err, test.wantError)
+			require.NotContains(t, err.Error(), "no params found")
+			require.Zero(t, evaluations.Load(), "policy evaluation must not run after a parameter read fault")
+		})
+	}
 }
 
 // Show that policy still gets evaluated with `nil` param if paramRef & namespaceParamRef

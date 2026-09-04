@@ -18,14 +18,14 @@ package generic
 
 import (
 	"context"
-	goerrors "errors"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -54,6 +54,7 @@ type policySource[P runtime.Object, B runtime.Object, E Evaluator] struct {
 	policyInformer     generic.Informer[P]
 	bindingInformer    generic.Informer[B]
 	restMapper         meta.RESTMapper
+	paramKindResolver  ParamKindResolver
 	newPolicyAccessor  func(P) PolicyAccessor
 	newBindingAccessor func(B) BindingAccessor
 
@@ -71,14 +72,15 @@ type policySource[P runtime.Object, B runtime.Object, E Evaluator] struct {
 	compiledPolicies map[types.NamespacedName]compiledPolicyEntry[E]
 
 	// Temporary until we use the dynamic informer factory
-	paramsCRDControllers map[schema.GroupVersionKind]*paramInfo
+	paramsCRDControllers  map[schema.GroupVersionKind]*paramInfo
+	paramKindsToReconcile map[schema.GroupVersionKind]struct{}
 }
 
 type paramInfo struct {
 	mapping meta.RESTMapping
 
-	// When the param is changed, or the informer is done being used, the cancel
-	// func should be called to stop/cleanup the original informer
+	// For privately owned dynamic informers, cancelFunc stops the informer. It is
+	// a no-op for informers owned by the shared factory.
 	cancelFunc func()
 
 	// The lister for this param
@@ -90,6 +92,15 @@ type compiledPolicyEntry[E Evaluator] struct {
 	evaluator     E
 }
 
+// ParamKindResolver resolves param kinds that are not yet available through the
+// admission plugin's cached RESTMapper.
+type ParamKindResolver interface {
+	Resolve(context.Context, schema.GroupVersionKind) (*meta.RESTMapping, error)
+	Handles(schema.GroupVersionKind) bool
+	HasSynced() bool
+	RegisterForChanges(func(schema.GroupKind)) func()
+}
+
 type PolicyHook[P runtime.Object, B runtime.Object, E Evaluator] struct {
 	Policy   P
 	Bindings []B
@@ -98,6 +109,9 @@ type PolicyHook[P runtime.Object, B runtime.Object, E Evaluator] struct {
 	// there is no param or if there was a configuration error
 	ParamInformer informers.GenericInformer
 	ParamScope    meta.RESTScope
+	// ParamMapping is the mapping selected for ParamKind by the policy source.
+	// API-backed hooks use it for direct reads while ParamInformer is warming.
+	ParamMapping *meta.RESTMapping
 
 	// DynamicClient is used for direct API calls to handle cache misses
 	DynamicClient dynamic.Interface
@@ -120,19 +134,51 @@ func NewPolicySource[P runtime.Object, B runtime.Object, E Evaluator](
 	dynamicClient dynamic.Interface,
 	restMapper meta.RESTMapper,
 ) Source[PolicyHook[P, B, E]] {
+	return newPolicySource(
+		policyInformer,
+		bindingInformer,
+		newPolicyAccessor,
+		newBindingAccessor,
+		compiler,
+		paramInformerFactory,
+		dynamicClient,
+		restMapper,
+		nil,
+	)
+}
+
+func newPolicySource[P runtime.Object, B runtime.Object, E Evaluator](
+	policyInformer cache.SharedIndexInformer,
+	bindingInformer cache.SharedIndexInformer,
+	newPolicyAccessor func(P) PolicyAccessor,
+	newBindingAccessor func(B) BindingAccessor,
+	compiler func(P) E,
+	paramInformerFactory informers.SharedInformerFactory,
+	dynamicClient dynamic.Interface,
+	restMapper meta.RESTMapper,
+	paramKindResolver ParamKindResolver,
+) Source[PolicyHook[P, B, E]] {
 	res := &policySource[P, B, E]{
-		compiler:             compiler,
-		policyInformer:       generic.NewInformer[P](policyInformer),
-		bindingInformer:      generic.NewInformer[B](bindingInformer),
-		compiledPolicies:     map[types.NamespacedName]compiledPolicyEntry[E]{},
-		newPolicyAccessor:    newPolicyAccessor,
-		newBindingAccessor:   newBindingAccessor,
-		paramsCRDControllers: map[schema.GroupVersionKind]*paramInfo{},
-		informerFactory:      paramInformerFactory,
-		dynamicClient:        dynamicClient,
-		restMapper:           restMapper,
+		compiler:              compiler,
+		policyInformer:        generic.NewInformer[P](policyInformer),
+		bindingInformer:       generic.NewInformer[B](bindingInformer),
+		compiledPolicies:      map[types.NamespacedName]compiledPolicyEntry[E]{},
+		newPolicyAccessor:     newPolicyAccessor,
+		newBindingAccessor:    newBindingAccessor,
+		paramsCRDControllers:  map[schema.GroupVersionKind]*paramInfo{},
+		paramKindsToReconcile: map[schema.GroupVersionKind]struct{}{},
+		informerFactory:       paramInformerFactory,
+		dynamicClient:         dynamicClient,
+		restMapper:            restMapper,
+		paramKindResolver:     paramKindResolver,
 	}
 	return res
+}
+
+// SetParamKindResolver configures a fallback resolver for parameter kinds not
+// yet visible through the cached RESTMapper.
+func (s *policySource[P, B, E]) SetParamKindResolver(resolver ParamKindResolver) {
+	s.paramKindResolver = resolver
 }
 
 // SetPolicyRefreshIntervalForTests allows the refresh interval to be overridden during tests.
@@ -151,6 +197,10 @@ func SetPolicyRefreshIntervalForTests(interval time.Duration) func() {
 func (s *policySource[P, B, E]) Run(ctx context.Context) error {
 	if s.ctx != nil {
 		return fmt.Errorf("policy source already running")
+	}
+	if s.paramKindResolver != nil {
+		unregister := s.paramKindResolver.RegisterForChanges(s.paramKindChanged)
+		defer unregister()
 	}
 
 	// Wait for initial cache sync of policies and informers before reconciling
@@ -215,7 +265,9 @@ func (s *policySource[P, B, E]) Run(ctx context.Context) error {
 }
 
 func (s *policySource[P, B, E]) UpstreamHasSynced() bool {
-	return s.policyInformer.HasSynced() && s.bindingInformer.HasSynced()
+	return s.policyInformer.HasSynced() &&
+		s.bindingInformer.HasSynced() &&
+		(s.paramKindResolver == nil || s.paramKindResolver.HasSynced())
 }
 
 // HasSynced implements Source.
@@ -272,6 +324,17 @@ func (s *policySource[P, B, E]) notify() {
 	s.policiesDirty.Store(true)
 }
 
+func (s *policySource[P, B, E]) paramKindChanged(groupKind schema.GroupKind) {
+	s.lock.Lock()
+	for paramKind := range s.paramsCRDControllers {
+		if paramKind.GroupKind() == groupKind {
+			s.paramKindsToReconcile[paramKind] = struct{}{}
+		}
+	}
+	s.lock.Unlock()
+	s.notify()
+}
+
 // calculatePolicyData calculates the list of policies and bindings for each
 // policy. If there is an error in generation, it will return the error and
 // the partial list of policies that were able to be generated. Policies that
@@ -315,7 +378,7 @@ func (s *policySource[P, B, E]) calculatePolicyData() ([]PolicyHook[P, B, E], er
 			inf = s.policyInformer.Namespaced(policyKey.Namespace)
 		}
 		policySpec, err := inf.Get(policyKey.Name)
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			// Policy for bindings doesn't exist. This can happen if the policy
 			// was deleted before the binding, or the binding was created first.
 			//
@@ -350,21 +413,25 @@ func (s *policySource[P, B, E]) calculatePolicyData() ([]PolicyHook[P, B, E], er
 			usedParams[*parsedParamKind] = struct{}{}
 		}
 
-		paramInformer, paramScope, configurationError := s.ensureParamsForPolicyLocked(parsedParamKind)
+		paramInformer, paramMapping, configurationError := s.ensureParamsForPolicyLocked(parsedParamKind)
+		var paramScope meta.RESTScope
+		if paramMapping != nil {
+			paramScope = paramMapping.Scope
+		}
 		result = append(result, PolicyHook[P, B, E]{
 			Policy:             policySpec,
 			Bindings:           bindingSpecs,
 			Evaluator:          s.compilePolicyLocked(policySpec),
 			ParamInformer:      paramInformer,
 			ParamScope:         paramScope,
+			ParamMapping:       paramMapping,
 			DynamicClient:      s.dynamicClient,
 			RESTMapper:         s.restMapper,
 			ConfigurationError: configurationError,
 		})
 
-		// Should queue a re-sync for policy sync error. If our shared param
-		// informer can notify us when CRD discovery changes we can remove this
-		// and just rely on the informer to notify us when the CRDs change
+		// Keep retrying errors that may involve non-CRD kinds or transient
+		// failures. CRD lifecycle changes also mark affected mappings for refresh.
 		if configurationError != nil {
 			errs = append(errs, configurationError)
 		}
@@ -383,57 +450,65 @@ func (s *policySource[P, B, E]) calculatePolicyData() ([]PolicyHook[P, B, E], er
 		if _, wasSeen := usedParams[paramKind]; !wasSeen {
 			info.cancelFunc()
 			delete(s.paramsCRDControllers, paramKind)
+			delete(s.paramKindsToReconcile, paramKind)
 		}
 	}
 
 	err = nil
 	if len(errs) > 0 {
-		err = goerrors.Join(errs...)
+		err = errors.Join(errs...)
 	}
 	return result, err
 }
 
 // ensureParamsForPolicyLocked ensures that the informer for the paramKind is
-// started and returns the informer and the scope of the paramKind.
+// started and returns the informer and REST mapping of the paramKind.
 //
 // Must be called under write lock
-func (s *policySource[P, B, E]) ensureParamsForPolicyLocked(paramSource *schema.GroupVersionKind) (informers.GenericInformer, meta.RESTScope, error) {
+func (s *policySource[P, B, E]) ensureParamsForPolicyLocked(paramSource *schema.GroupVersionKind) (informers.GenericInformer, *meta.RESTMapping, error) {
 	if paramSource == nil {
 		return nil, nil, nil
-	} else if info, ok := s.paramsCRDControllers[*paramSource]; ok {
-		return info.informer, info.mapping.Scope, nil
 	}
 
-	mapping, err := s.restMapper.RESTMapping(schema.GroupKind{
-		Group: paramSource.Group,
-		Kind:  paramSource.Kind,
-	}, paramSource.Version)
+	existingInfo, exists := s.paramsCRDControllers[*paramSource]
+	_, mustReconcile := s.paramKindsToReconcile[*paramSource]
+	if exists && !mustReconcile {
+		return existingInfo.informer, &existingInfo.mapping, nil
+	}
+	delete(s.paramKindsToReconcile, *paramSource)
 
+	mapping, err := s.resolveParamKindRESTMappingLocked(*paramSource)
 	if err != nil {
-		// Failed to resolve. Return error so we retry again (rate limited)
-		// Save a record of this definition with an evaluator that unconditionally
-		return nil, nil, fmt.Errorf("failed to find resource referenced by paramKind: '%v'", *paramSource)
+		if exists {
+			existingInfo.cancelFunc()
+			delete(s.paramsCRDControllers, *paramSource)
+		}
+		return nil, nil, err
 	}
-
-	// We are not watching this param. Start an informer for it.
-	instanceContext, instanceCancel := context.WithCancel(s.ctx)
+	if exists && sameRESTMapping(&existingInfo.mapping, mapping) {
+		return existingInfo.informer, &existingInfo.mapping, nil
+	}
+	if exists {
+		existingInfo.cancelFunc()
+		delete(s.paramsCRDControllers, *paramSource)
+	}
 
 	var informer informers.GenericInformer
+	var cancelInformer func()
 
 	// Try to see if our provided informer factory has an informer for this type.
-	// We assume the informer is already started, and starts all types associated
-	// with it.
 	if genericInformer, err := s.informerFactory.ForResource(mapping.Resource); err == nil {
 		informer = genericInformer
-
-		// Start the informer
-		s.informerFactory.Start(instanceContext.Done())
+		cancelInformer = func() {}
+		s.informerFactory.Start(s.ctx.Done())
 
 	} else {
 		// Dynamic JSON informer fallback.
 		// Cannot use shared dynamic informer since it would be impossible
 		// to clean CRD informers properly with multiple dependents
 		// (cannot start ahead of time, and cannot track dependencies via stopCh)
+		instanceContext, instanceCancel := context.WithCancel(s.ctx)
+		cancelInformer = instanceCancel
 		informer = dynamicinformer.NewFilteredDynamicInformer(
 			s.dynamicClient,
 			mapping.Resource,
@@ -450,11 +525,54 @@ func (s *policySource[P, B, E]) ensureParamsForPolicyLocked(paramSource *schema.
 	klog.Infof("informer started for %v", *paramSource)
 	ret := &paramInfo{
 		mapping:    *mapping,
-		cancelFunc: instanceCancel,
+		cancelFunc: cancelInformer,
 		informer:   informer,
 	}
 	s.paramsCRDControllers[*paramSource] = ret
-	return ret.informer, mapping.Scope, nil
+	return ret.informer, &ret.mapping, nil
+}
+
+func (s *policySource[P, B, E]) resolveParamKindFromResolverLocked(paramSource schema.GroupVersionKind) (*meta.RESTMapping, error) {
+	mapping, err := s.paramKindResolver.Resolve(s.ctx, paramSource)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve resource referenced by paramKind %q: %w", paramSource, err)
+	}
+	if mapping == nil {
+		return nil, fmt.Errorf("failed to find resource referenced by paramKind: '%v'", paramSource)
+	}
+	return mapping, nil
+}
+
+func sameRESTMapping(left, right *meta.RESTMapping) bool {
+	return left.Resource == right.Resource &&
+		left.GroupVersionKind == right.GroupVersionKind &&
+		left.Scope.Name() == right.Scope.Name()
+}
+
+func (s *policySource[P, B, E]) resolveParamKindRESTMappingLocked(paramSource schema.GroupVersionKind) (*meta.RESTMapping, error) {
+	if s.paramKindResolver != nil && s.paramKindResolver.Handles(paramSource) {
+		return s.resolveParamKindFromResolverLocked(paramSource)
+	}
+	mapping, err := s.restMapper.RESTMapping(schema.GroupKind{
+		Group: paramSource.Group,
+		Kind:  paramSource.Kind,
+	}, paramSource.Version)
+	if err == nil {
+		return mapping, nil
+	}
+	if meta.IsNoMatchError(err) && s.paramKindResolver != nil {
+		mapping, resolveErr := s.paramKindResolver.Resolve(s.ctx, paramSource)
+		if resolveErr != nil {
+			return nil, fmt.Errorf("failed to resolve resource referenced by paramKind %q: %w", paramSource, resolveErr)
+		}
+		if mapping != nil {
+			return mapping, nil
+		}
+	}
+
+	// Failed to resolve. Return error so we retry again (rate limited)
+	// Save a record of this definition with an evaluator that unconditionally
+	return nil, fmt.Errorf("failed to find resource referenced by paramKind: '%v'", paramSource)
 }
 
 // For testing
