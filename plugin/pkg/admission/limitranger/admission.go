@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"golang.org/x/sync/singleflight"
+	inf "gopkg.in/inf.v0"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -291,33 +292,18 @@ func mergePodResourceRequirements(pod *api.Pod, defaultRequirements *api.Resourc
 	}
 }
 
-// requestLimitEnforcedValues returns the specified values at a common precision to support comparability
-func requestLimitEnforcedValues(requestQuantity, limitQuantity, enforcedQuantity resource.Quantity) (request, limit, enforced int64) {
-	request = requestQuantity.Value()
-	limit = limitQuantity.Value()
-	enforced = enforcedQuantity.Value()
-	// do a more precise comparison if possible (if the value won't overflow)
-	if request <= resource.MaxMilliValue && limit <= resource.MaxMilliValue && enforced <= resource.MaxMilliValue {
-		request = requestQuantity.MilliValue()
-		limit = limitQuantity.MilliValue()
-		enforced = enforcedQuantity.MilliValue()
-	}
-	return
-}
-
 // minConstraint enforces the min constraint over the specified resource
 func minConstraint(limitType string, resourceName string, enforced resource.Quantity, request api.ResourceList, limit api.ResourceList) error {
 	req, reqExists := request[api.ResourceName(resourceName)]
 	lim, limExists := limit[api.ResourceName(resourceName)]
-	observedReqValue, observedLimValue, enforcedValue := requestLimitEnforcedValues(req, lim, enforced)
 
 	if !reqExists {
 		return fmt.Errorf("minimum %s usage per %s is %s.  No request is specified", resourceName, limitType, enforced.String())
 	}
-	if observedReqValue < enforcedValue {
+	if req.Cmp(enforced) < 0 {
 		return fmt.Errorf("minimum %s usage per %s is %s, but request is %s", resourceName, limitType, enforced.String(), req.String())
 	}
-	if limExists && (observedLimValue < enforcedValue) {
+	if limExists && lim.Cmp(enforced) < 0 {
 		return fmt.Errorf("minimum %s usage per %s is %s, but limit is %s", resourceName, limitType, enforced.String(), lim.String())
 	}
 	return nil
@@ -327,12 +313,11 @@ func minConstraint(limitType string, resourceName string, enforced resource.Quan
 // use when specify LimitType resource doesn't recognize limit values
 func maxRequestConstraint(limitType string, resourceName string, enforced resource.Quantity, request api.ResourceList) error {
 	req, reqExists := request[api.ResourceName(resourceName)]
-	observedReqValue, _, enforcedValue := requestLimitEnforcedValues(req, resource.Quantity{}, enforced)
 
 	if !reqExists {
 		return fmt.Errorf("maximum %s usage per %s is %s.  No request is specified", resourceName, limitType, enforced.String())
 	}
-	if observedReqValue > enforcedValue {
+	if req.Cmp(enforced) > 0 {
 		return fmt.Errorf("maximum %s usage per %s is %s, but request is %s", resourceName, limitType, enforced.String(), req.String())
 	}
 	return nil
@@ -342,15 +327,14 @@ func maxRequestConstraint(limitType string, resourceName string, enforced resour
 func maxConstraint(limitType string, resourceName string, enforced resource.Quantity, request api.ResourceList, limit api.ResourceList) error {
 	req, reqExists := request[api.ResourceName(resourceName)]
 	lim, limExists := limit[api.ResourceName(resourceName)]
-	observedReqValue, observedLimValue, enforcedValue := requestLimitEnforcedValues(req, lim, enforced)
 
 	if !limExists {
 		return fmt.Errorf("maximum %s usage per %s is %s.  No limit is specified", resourceName, limitType, enforced.String())
 	}
-	if observedLimValue > enforcedValue {
+	if lim.Cmp(enforced) > 0 {
 		return fmt.Errorf("maximum %s usage per %s is %s, but limit is %s", resourceName, limitType, enforced.String(), lim.String())
 	}
-	if reqExists && (observedReqValue > enforcedValue) {
+	if reqExists && req.Cmp(enforced) > 0 {
 		return fmt.Errorf("maximum %s usage per %s is %s, but request is %s", resourceName, limitType, enforced.String(), req.String())
 	}
 	return nil
@@ -360,25 +344,21 @@ func maxConstraint(limitType string, resourceName string, enforced resource.Quan
 func limitRequestRatioConstraint(limitType string, resourceName string, enforced resource.Quantity, request api.ResourceList, limit api.ResourceList) error {
 	req, reqExists := request[api.ResourceName(resourceName)]
 	lim, limExists := limit[api.ResourceName(resourceName)]
-	observedReqValue, observedLimValue, _ := requestLimitEnforcedValues(req, lim, enforced)
 
-	if !reqExists || (observedReqValue == int64(0)) {
+	if !reqExists || req.Sign() == 0 {
 		return fmt.Errorf("%s max limit to request ratio per %s is %s, but no request is specified or request is 0", resourceName, limitType, enforced.String())
 	}
-	if !limExists || (observedLimValue == int64(0)) {
+	if !limExists || lim.Sign() == 0 {
 		return fmt.Errorf("%s max limit to request ratio per %s is %s, but no limit is specified or limit is 0", resourceName, limitType, enforced.String())
 	}
 
-	observedRatio := float64(observedLimValue) / float64(observedReqValue)
-	displayObservedRatio := observedRatio
-	maxLimitRequestRatio := float64(enforced.Value())
-	if enforced.Value() <= resource.MaxMilliValue {
-		observedRatio = observedRatio * 1000
-		maxLimitRequestRatio = float64(enforced.MilliValue())
-	}
-
-	if observedRatio > maxLimitRequestRatio {
-		return fmt.Errorf("%s max limit to request ratio per %s is %s, but provided ratio is %f", resourceName, limitType, enforced.String(), displayObservedRatio)
+	// Reject when limit / request exceeds the ratio. Compare exactly as
+	// limit > request * enforced, in decimal, so a very large limit or request
+	// cannot wrap an int64 projection and collapse distinct values onto one rail.
+	maxAllowed := new(inf.Dec).Mul(req.AsDec(), enforced.AsDec())
+	if lim.AsDec().Cmp(maxAllowed) > 0 {
+		observedRatio := lim.AsApproximateFloat64() / req.AsApproximateFloat64()
+		return fmt.Errorf("%s max limit to request ratio per %s is %s, but provided ratio is %f", resourceName, limitType, enforced.String(), observedRatio)
 	}
 
 	return nil
