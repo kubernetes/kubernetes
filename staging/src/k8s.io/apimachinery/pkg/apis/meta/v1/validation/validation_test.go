@@ -61,6 +61,15 @@ func TestValidateCustomObjectMetaResourceVersion(t *testing.T) {
 				field.Invalid(fldPath.Child("resourceVersion"), "", "must be specified for an update").WithOrigin("update"),
 			},
 		},
+		{
+			name:     "update with empty old resourceVersion",
+			op:       operation.Update,
+			value:    &metav1.ObjectMeta{},
+			oldValue: &metav1.ObjectMeta{ResourceVersion: ""},
+			want: field.ErrorList{
+				field.Invalid(fldPath.Child("resourceVersion"), "", "must be specified for an update").WithOrigin("update"),
+			},
+		},
 	}
 
 	for _, test := range tests {
