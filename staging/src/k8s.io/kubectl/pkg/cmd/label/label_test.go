@@ -372,6 +372,47 @@ func TestLabelErrors(t *testing.T) {
 	}
 }
 
+func TestLabelListWithChanges(t *testing.T) {
+	testCases := map[string]struct {
+		args  []string
+		errFn func(error) bool
+	}{
+		"addition": {
+			args: []string{"pods", "foo", "app=bar"},
+			errFn: func(err error) bool {
+				return err != nil && strings.Contains(err.Error(), "cannot modify labels when --list is specified")
+			},
+		},
+		"removal": {
+			args: []string{"pods", "foo", "app-"},
+			errFn: func(err error) bool {
+				return err != nil && strings.Contains(err.Error(), "cannot modify labels when --list is specified")
+			},
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
+			defer tf.Cleanup()
+
+			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+			ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
+			cmd := NewCmdLabel(tf, ioStreams)
+			opts := NewLabelOptions(ioStreams)
+			opts.list = true
+
+			err := opts.Complete(tf, cmd, testCase.args)
+			if err == nil {
+				err = opts.Validate()
+			}
+			if !testCase.errFn(err) {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
 func TestLabelForResourceFromFile(t *testing.T) {
 	pods, _, _ := cmdtesting.TestData()
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")

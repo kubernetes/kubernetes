@@ -225,7 +225,9 @@ func (flags *AnnotateFlags) ToOptions(cmd *cobra.Command, args []string) (*Annot
 	if err := validateAnnotations(removeAnnotations, newAnnotations); err != nil {
 		return nil, err
 	}
-
+	if flags.List && (len(newAnnotations) > 0 || len(removeAnnotations) > 0) {
+		return nil, fmt.Errorf("cannot modify annotations when --list is specified")
+	}
 	options := &AnnotateOptions{
 		FieldManager:      flags.FieldManager,
 		IOStreams:         flags.IOStreams,

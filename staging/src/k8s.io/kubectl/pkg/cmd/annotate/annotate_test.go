@@ -465,6 +465,44 @@ func TestAnnotateErrors(t *testing.T) {
 	}
 }
 
+func TestAnnotateListWithChanges(t *testing.T) {
+	testCases := map[string]struct {
+		args  []string
+		errFn func(error) bool
+	}{
+		"addition": {
+			args: []string{"pods", "foo", "app=bar"},
+			errFn: func(err error) bool {
+				return err != nil && strings.Contains(err.Error(), "cannot modify annotations when --list is specified")
+			},
+		},
+		"removal": {
+			args: []string{"pods", "foo", "app-"},
+			errFn: func(err error) bool {
+				return err != nil && strings.Contains(err.Error(), "cannot modify annotations when --list is specified")
+			},
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
+			defer tf.Cleanup()
+
+			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+			ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
+			cmd := NewCmdAnnotate("kubectl", tf, ioStreams)
+			flags := NewAnnotateFlags(tf, ioStreams)
+			flags.List = true
+
+			_, err := flags.ToOptions(cmd, testCase.args)
+			if !testCase.errFn(err) {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
 func TestRunAnnotate(t *testing.T) {
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	pods, _, _ := cmdtesting.TestData()
