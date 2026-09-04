@@ -21,6 +21,9 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 )
 
 func Test_atomicLastError(t *testing.T) {
@@ -44,5 +47,36 @@ func Test_atomicLastError(t *testing.T) {
 	err = aError.Load()
 	if err.Error() != "now error" {
 		t.Fatalf("Expected: \"now error\" got: %s", err.Error())
+	}
+}
+
+func Test_isEtcdMaintenancePermissionDenied(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "etcd >= 3.6 maintenance permission denied",
+			err:  grpcstatus.Error(codes.PermissionDenied, "etcdserver: permission denied"),
+			want: true,
+		},
+		{
+			name: "other grpc error",
+			err:  grpcstatus.Error(codes.Unavailable, "etcdserver: unavailable"),
+			want: false,
+		},
+		{
+			name: "plain error",
+			err:  errors.New("some error"),
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isEtcdMaintenancePermissionDenied(tt.err); got != tt.want {
+				t.Fatalf("isEtcdMaintenancePermissionDenied(%v) = %v, want %v", tt.err, got, tt.want)
+			}
+		})
 	}
 }
