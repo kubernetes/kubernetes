@@ -687,7 +687,9 @@ func (a *SchedulingAlgorithm) UnreserveAndForgetFromCache(ctx context.Context, s
 }
 
 // AssumeAndReserveInSnapshot assumes the pod into the transient node snapshot and runs Reserve plugins.
-// Returns a revert function to roll back the assumption and reservation from the snapshot if needed.
+// On success, it returns a nil status and a non-nil revert function to roll back the assumption and
+// reservation from the snapshot if needed. On failure, any partial assumption or reservation is rolled
+// back internally and the returned revert function is nil.
 //
 // This method mutates shared snapshot structures (nodeInfoSnapshot) without internal mutex locks.
 // It is not thread-safe; concurrent calls on the same snapshot are unsupported and callers must ensure
